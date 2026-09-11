@@ -105,6 +105,27 @@ describe("the four-cell contest countdown", () => {
     );
   });
 
+  it("renders the schedule slot in every one of its four states", () => {
+    const panel = readCode(PANEL);
+
+    /*
+      The panel has four returns - upcoming, started, running, ended - and the schedule now lives
+      inside it. A branch that forgets the slot is a card that sheds half its content at the exact
+      moment it changes state, with no error: the clock reaches zero, the layout jumps, and the
+      window's open and close disappear. A player concludes the page is broken.
+
+      Counting rather than matching, because three of the four satisfy a presence check on their
+      own - and the branch most likely to be forgotten is `ended`, which is the one a player is
+      looking at when the jump happens.
+    */
+    const slots = panel.match(/\{details && <PanelDetails>/g) ?? [];
+    expect(slots).toHaveLength(4);
+
+    // And the slot is optional, so the trading lobby - which has its own schedule accordion -
+    // gets exactly the card it had before.
+    expect(panel).toMatch(/details\?: React\.ReactNode/);
+  });
+
   it("keeps both finished messages, one per direction", () => {
     const panel = readCode(PANEL);
 
@@ -180,18 +201,61 @@ describe("the game lobby's contest clock", () => {
 
     const entry = code.indexOf("<CompetitionEntryButton");
     const countdown = code.indexOf("<ContestCountdown");
-    const playWindow = code.indexOf('title="Play window"');
+    const prizes = code.indexOf('title="Prize distribution"');
 
     // Reason each index is checked for -1 separately: a test that slices from a missing marker
     // examines nothing and passes everything asked of it.
     expect(entry).toBeGreaterThan(-1);
     expect(countdown).toBeGreaterThan(-1);
-    expect(playWindow).toBeGreaterThan(-1);
+    expect(prizes).toBeGreaterThan(-1);
 
     // The trading sidebar's order is entry, then the clock, then the details. A player
     // comparing the two screens should not have to look in two different places.
     expect(countdown).toBeGreaterThan(entry);
-    expect(countdown).toBeLessThan(playWindow);
+    expect(countdown).toBeLessThan(prizes);
+  });
+
+  it("carries the schedule inside itself rather than in a second card", () => {
+    const code = readCode(GAME_LOBBY);
+
+    /*
+      FLIPPED RATHER THAN DELETED (owner instruction, 11 September 2026: "no need to have 2,
+      merge them into the big one"). This test used to assert the clock sat ABOVE a separate card
+      headed "Play window" - correct about the order, and the order was the lesser problem.
+
+      That card counted down to the contest's close in a small row, directly under a panel
+      counting down to the same close in four large cells, because `12` s2.3 derives the window
+      from the contest clock and `playWindowEnd` IS `endTime`. **Two statements of one clock**,
+      which is the class of defect this codebase keeps finding, not a layout preference.
+
+      The schedule is now one node with two hosts: inside the countdown while there is a clock to
+      show, and in its own card when there is not. Asserting the node is built ONCE is the
+      load-bearing half - the obvious way to write a fallback is to paste the rows twice, and two
+      copies of a player-facing deadline is how one of them stops being updated.
+    */
+    expect(code).toMatch(/const scheduleDetails =/);
+    expect(code).toMatch(/details=\{scheduleDetails\}/);
+    expect(code.match(/const scheduleDetails =/g) ?? []).toHaveLength(1);
+
+    // The rows themselves may appear in exactly one place, whichever host renders them.
+    expect(code.match(/label="Opens"/g) ?? []).toHaveLength(1);
+    expect(code.match(/label="Closes"/g) ?? []).toHaveLength(1);
+
+    // And the second host exists, gated on the countdown being absent, so a finished contest
+    // does not silently shed its schedule.
+    expect(code).toMatch(/!showCountdown && scheduleDetails/);
+  });
+
+  it("no longer counts down twice to the same moment", () => {
+    const code = readCode(GAME_LOBBY);
+
+    /*
+      The removed row was `label={isActive ? "Closes in" : "Opens in"}` counting down to
+      `countdownTarget` - the very expression the cells above it are given. A screen cannot
+      disagree with itself about a clock it renders twice, but it can look careless, and the next
+      edit to one copy is where it starts disagreeing.
+    */
+    expect(code).not.toMatch(/label=\{isActive \? "Closes in"/);
   });
 
   it("is rendered once, not once per contest state", () => {
@@ -218,13 +282,26 @@ describe("the game lobby's contest clock", () => {
 
   it("is withheld from a contest that has finished or been called off", () => {
     const code = readCode(GAME_LOBBY);
-    const at = code.indexOf("<ContestCountdown");
-    const guard = code.slice(Math.max(0, at - 200), at);
 
-    // A clock on a cancelled contest counts down to a start that will never happen.
-    expect(guard.length).toBeGreaterThan(50);
-    expect(guard).toMatch(/!isCompleted/);
-    expect(guard).toMatch(/!isCancelled/);
+    /*
+      RE-AIMED AT THE NAMED CONSTANT, and the reason generalises: this used to scan the 200
+      characters before `<ContestCountdown` for the two clauses. That worked only while the
+      condition was written inline, and it is the same fixed-character scan that once reported a
+      present Edit guard as missing - a slice that begins mid-identifier is a test whose result
+      depends on the length of the code above it.
+
+      The condition now has a name, because two hosts have to agree about whether there is a
+      clock to show. So the property moved: the DEFINITION carries the two clauses, and the
+      render is gated on the definition.
+
+      A clock on a cancelled contest counts down to a start that will never happen.
+    */
+    const definition = code.match(/const showCountdown = [^;]+;/);
+    expect(definition).not.toBeNull();
+    expect(definition![0]).toMatch(/!isCompleted/);
+    expect(definition![0]).toMatch(/!isCancelled/);
+    expect(definition![0]).toMatch(/countdownTarget/);
+    expect(code).toMatch(/\{showCountdown && \(\s*<ContestCountdown/);
   });
 });
 

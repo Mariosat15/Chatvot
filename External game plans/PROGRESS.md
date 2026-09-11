@@ -759,6 +759,48 @@ Newest at the top.
 
 ---
 
+### 11 Sep 2026 - ONE CLOCK ON THE GAME LOBBY, NOT TWO
+
+**Shipped.** `13` **s4.1l**. The owner, with the sidebar circled: *"the first one keep that but
+the second timer with the start and end and the info merge them with the above timer no need to
+have 2 so merge them into the big one"*.
+
+**The duplication was of a clock, not of a card**, which is why the answer was removal rather
+than restyling. Yesterday's s4.1j put the large four-cell countdown on this screen; directly
+beneath it sat a card headed "Play window" whose `Closes in` row counted down to the same
+expression the cells above were given. `12` s2.3 derives the play window from the contest clock,
+so `playWindowEnd` **is** `endTime` - one instant stated twice, in two sizes, one above the other.
+
+**Files touched:** `components/competitions/CountdownPanel.tsx` (an optional `details` slot in
+all four branches), `components/games/ContestCountdown.tsx` (passes it through),
+`components/games/ProviderContestLobby.tsx` (the card folded in; the duplicate row gone),
+`__tests__/games/contest-countdown.test.ts`, `__tests__/games/provider-play-ui.test.ts`,
+`tools/probe-contest-countdown.ps1`.
+
+**Three things worth carrying.** The one countdown that survived - `Last attempt can start in` -
+survived because it counts to a **different** moment, which is the test the removed row failed;
+the lobby's `InlineCountdown` count moved 3 → 2 and the assertion was updated with that reasoning
+rather than relaxed. The schedule is **one node with two hosts**, because the countdown is
+withheld from a finished contest and the window's times are still facts on one - pasting the rows
+twice is the "one rule, two copies" shape, so the test counts `label="Opens"` rather than finding
+it. And **three probes had to be re-aimed** when the inline guard became the named
+`showCountdown`: left alone they reported `DID NOT APPLY`, which reads like a broken harness
+rather than a moved target.
+
+**Deviated from plan:** nothing planned this; it is an owner instruction against the screen
+shipped the day before.
+
+**Owner tested:** no. **Never verified by eye** - the lobby is behind sign-in.
+
+**Deferred:** the trading lobby is untouched, deliberately - `details` is optional, trading passes
+nothing, and it keeps its own schedule accordion because it really has four operator-set dates.
+
+**Next chat should:** the arena play screen, which is the second half of the same owner message -
+*"the structure is very not professional, redo the design"* against the reference in
+`External game plans/design-reference/`.
+
+---
+
 ### 11 Sep 2026 - THE DASHBOARD CONTEST CARDS ARE LIVE, AND THE RANK IS SORTED IN ONE PLACE
 
 **Shipped.** `13` **s5.1b**. The last stale surface from the owner's "all pages related to live

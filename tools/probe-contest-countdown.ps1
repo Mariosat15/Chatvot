@@ -130,13 +130,19 @@ Invoke-Probe -Name 'reaches the panel by some other path' -File $Game `
 Write-Host ''
 Write-Host '=== The game lobby mounts it, once, in the right place ===' -ForegroundColor Cyan
 
+# RE-AIMED 11 September 2026. The guard was written inline as
+# `{countdownTarget && !isCompleted && !isCancelled && (` and is now the named `showCountdown`,
+# because two hosts have to agree about whether there is a clock to show. Left alone these three
+# probes reported DID NOT APPLY, which reads like a broken harness rather than a moved target -
+# the same trap the play-shape harness fell into for a day.
 Invoke-Probe -Name 'the clock is never mounted' -File $Lobby `
-  -Find "          {countdownTarget && !isCompleted && !isCancelled && (
+  -Find "          {showCountdown && (
             <ContestCountdown
               target={countdownTarget}
               serverNow={state?.serverNow}
               label={isActive ? `"Time remaining`" : `"Competition starts in`"}
               variant={isActive ? `"end`" : `"start`"}
+              details={scheduleDetails}
             />
           )}
 " `
@@ -147,11 +153,11 @@ Invoke-Probe -Name 'the clock is never mounted' -File $Lobby `
 # this screen two chances to count down to different moments. Injected AFTER the real one, so
 # the guard probe below still finds the guarded occurrence first.
 Invoke-Probe -Name 'mounted twice, one per state' -File $Lobby `
-  -Find "              variant={isActive ? `"end`" : `"start`"}
+  -Find "              details={scheduleDetails}
             />
           )}
 " `
-  -Replace "              variant={isActive ? `"end`" : `"start`"}
+  -Replace "              details={scheduleDetails}
             />
           )}
           {isActive && (
@@ -167,11 +173,77 @@ Invoke-Probe -Name 'the server time is never passed in' -File $Lobby `
   -ExpectTest "hands the countdown the server's time rather than letting it guess"
 
 Invoke-Probe -Name 'a cancelled contest still counts down' -File $Lobby `
-  -Find "{countdownTarget && !isCompleted && !isCancelled && (
-            <ContestCountdown" `
-  -Replace "{countdownTarget && !isCompleted && (
-            <ContestCountdown" `
+  -Find '  const showCountdown = Boolean(countdownTarget) && !isCompleted && !isCancelled;' `
+  -Replace '  const showCountdown = Boolean(countdownTarget) && !isCompleted;' `
   -ExpectTest 'is withheld from a contest that has finished or been called off'
+
+# The half of that guard nobody would think to break on purpose: the render reading something
+# other than the constant. A definition carrying both clauses and a render that ignores it is
+# the silent half-fix - every assertion about the constant passes.
+Invoke-Probe -Name 'the render ignores the constant' -File $Lobby `
+  -Find '          {showCountdown && (
+            <ContestCountdown' `
+  -Replace '          {countdownTarget && (
+            <ContestCountdown' `
+  -ExpectTest 'is withheld from a contest that has finished or been called off'
+
+Write-Host ''
+Write-Host '=== One clock, with the schedule inside it ===' -ForegroundColor Cyan
+
+# The owner's instruction, 11 September 2026. The failure to guard against is the schedule
+# drifting back out into a card of its own - at which point the contest's close is counted down
+# twice, in two sizes, one above the other.
+Invoke-Probe -Name 'the schedule is not passed to the clock' -File $Lobby `
+  -Find '              details={scheduleDetails}
+' `
+  -Replace '' `
+  -ExpectTest 'carries the schedule inside itself rather than in a second card'
+
+# Pasting the rows a second time is the obvious way to write the fallback host, and it is how one
+# of the two copies stops being maintained. The node must be built once.
+Invoke-Probe -Name 'the schedule rows are duplicated' -File $Lobby `
+  -Find '          {!showCountdown && scheduleDetails && (
+            <NeonPanel icon={Clock} accent="players" title="Schedule">
+              {scheduleDetails}
+            </NeonPanel>
+          )}' `
+  -Replace '          {!showCountdown && (
+            <NeonPanel icon={Clock} accent="players" title="Schedule">
+              <NeonRow label="Opens" value={playWindowStart} />
+              <NeonRow label="Closes" value={playWindowEnd} />
+            </NeonPanel>
+          )}' `
+  -ExpectTest 'carries the schedule inside itself rather than in a second card'
+
+# A finished contest with no fallback host sheds its schedule entirely.
+Invoke-Probe -Name 'the fallback host goes' -File $Lobby `
+  -Find '          {!showCountdown && scheduleDetails && (' `
+  -Replace '          {false && scheduleDetails && (' `
+  -ExpectTest 'carries the schedule inside itself rather than in a second card'
+
+# The defect this slice removed, restored verbatim. TWO failures are honest here: the row itself
+# and the count of inline countdowns, which is in the other suite and not run by this probe.
+Invoke-Probe -Name 'the duplicate close countdown returns' -File $Lobby `
+  -Find '          {playWindowEnd && <NeonRow label="Closes" value={playWindowEnd} />}' `
+  -Replace '          {playWindowEnd && <NeonRow label="Closes" value={playWindowEnd} />}
+          {countdownTarget && (
+            <NeonRow
+              label={isActive ? "Closes in" : "Opens in"}
+              accent="score"
+              value={<InlineCountdown targetDate={new Date(countdownTarget).toISOString()} type="end" />}
+            />
+          )}' `
+  -ExpectTest 'no longer counts down twice to the same moment'
+
+# And the panel branch most likely to be forgotten, because it is the one a player is looking at
+# when the clock reaches zero.
+Invoke-Probe -Name 'the ended branch drops the schedule' -File $Panel `
+  -Find '          <span className="font-bold">Competition has ended!</span>
+        </div>
+        {details && <PanelDetails>{details}</PanelDetails>}' `
+  -Replace '          <span className="font-bold">Competition has ended!</span>
+        </div>' `
+  -ExpectTest 'renders the schedule slot in every one of its four states'
 
 Write-Host ''
 Write-Host '=== The two clocks stay different ===' -ForegroundColor Cyan

@@ -44,6 +44,14 @@ interface ContestCountdownProps {
   label: string;
   /** `start` counts down to the contest opening, `end` to it closing. */
   variant: "start" | "end";
+  /**
+   * The contest's schedule, rendered inside the same card beneath the cells.
+   *
+   * The lobby used to put this in a card of its own headed "Play window", which counted down to
+   * the same instant as the cells above it - `playWindowEnd` is `endTime` since `12` s2.3. Passed
+   * through rather than built here, because this component has no contest to read.
+   */
+  details?: React.ReactNode;
 }
 
 export default function ContestCountdown({
@@ -51,6 +59,7 @@ export default function ContestCountdown({
   serverNow,
   label,
   variant,
+  details,
 }: ContestCountdownProps) {
   const now = useServerClock(serverNow);
   const targetMs = new Date(target).getTime();
@@ -68,6 +77,7 @@ export default function ContestCountdown({
       remainingMs={targetMs - now}
       label={label}
       variant={variant}
+      details={details}
     />
   );
 }

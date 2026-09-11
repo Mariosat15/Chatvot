@@ -105,18 +105,48 @@ function Cells({
   );
 }
 
+/**
+ * The schedule folded in underneath the cells, hairline-separated.
+ *
+ * WHY THE CLOCK AND THE SCHEDULE ARE ONE CARD (owner instruction, 11 September 2026). The game
+ * lobby carried a second card headed "Play window" holding the window's open and close and a
+ * countdown to the close - and since `12` s2.3 derived the window from the contest clock,
+ * `playWindowEnd` IS `endTime`, so that countdown and this panel's cells were counting down to
+ * the same instant in two sizes, one above the other. **That is a duplicate statement of one
+ * clock, not merely clutter**, and the same class of error as the dashboard card that could
+ * disagree with the page that drew it.
+ *
+ * It is an optional slot rather than fixed content, because the trading lobby renders this panel
+ * too and has its own schedule accordion. A caller that passes nothing gets exactly the card it
+ * got before.
+ */
+function PanelDetails({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="mt-4 border-t border-white/10 pt-3">{children}</div>
+  );
+}
+
 interface CountdownPanelProps {
   /** Milliseconds until the target. At or below zero the finished panel is shown instead. */
   remainingMs: number;
   label: string;
   /** `start` counts down to a contest opening, `end` to it closing. */
   variant: "start" | "end";
+  /**
+   * The contest's schedule, rendered inside this card beneath the cells.
+   *
+   * Reason it appears in the finished branches too: the window's open and close are still facts
+   * once the clock reaches zero, and a card that silently sheds half its content at the moment
+   * it changes state is how a player concludes the page is broken.
+   */
+  details?: React.ReactNode;
 }
 
 export default function CountdownPanel({
   remainingMs,
   label,
   variant,
+  details,
 }: CountdownPanelProps) {
   const parts = splitDuration(remainingMs);
   const isComplete = parts.total <= 0;
@@ -129,6 +159,7 @@ export default function CountdownPanel({
             <CheckCircle className="h-5 w-5" />
             <span className="font-bold">Competition has started!</span>
           </div>
+          {details && <PanelDetails>{details}</PanelDetails>}
         </div>
       );
     }
@@ -143,6 +174,7 @@ export default function CountdownPanel({
           parts={parts}
           secondsClassName="text-yellow-400 animate-pulse"
         />
+        {details && <PanelDetails>{details}</PanelDetails>}
       </div>
     );
   }
@@ -154,6 +186,7 @@ export default function CountdownPanel({
           <AlertCircle className="h-5 w-5" />
           <span className="font-bold">Competition has ended!</span>
         </div>
+        {details && <PanelDetails>{details}</PanelDetails>}
       </div>
     );
   }
@@ -189,6 +222,7 @@ export default function CountdownPanel({
           isWarning ? "text-red-400 animate-pulse" : "text-blue-400"
         }
       />
+      {details && <PanelDetails>{details}</PanelDetails>}
     </div>
   );
 }

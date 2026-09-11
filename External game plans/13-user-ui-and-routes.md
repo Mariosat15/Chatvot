@@ -1295,6 +1295,64 @@ player lobby and no play screen - so `check:mirrors` says nothing about any of i
 
 ---
 
+### 4.1l One clock, not two (owner instruction, 11 September 2026)
+
+**BUILT.** `components/competitions/CountdownPanel.tsx` gained an optional `details` slot,
+`components/games/ContestCountdown.tsx` passes it through, and the game lobby's "Play window"
+card was folded into the four-cell countdown above it. 5 tests changed or added, **23 probes red
+on exactly one failure**.
+
+The owner's words, with the screen circled: *"since you make the timer more priority and big the
+first one keep that but the second timer with the start and end and the info merge them with the
+above timer no need to have 2 so merge them into the big one"*.
+
+**THE DUPLICATION WAS OF A CLOCK, NOT OF A CARD, AND THAT IS WHY IT WAS REMOVED RATHER THAN
+RESTYLED.** s4.1j put the large four-cell panel on the game lobby counting down to
+`countdownTarget`. Directly beneath it sat a card headed "Play window" carrying `Opens`, `Closes`
+and a row reading `Closes in` - and that row counted down to `countdownTarget` as well. Since
+`12` s2.3 derives the window from the contest clock, `playWindowStart` **is** `startTime` and
+`playWindowEnd` **is** `endTime`, so the screen stated one instant twice, in two sizes, one above
+the other. A screen cannot disagree with itself about a value it renders twice from one
+expression; it can look careless, and the next edit to either copy is where it starts disagreeing.
+That is the same class as the dashboard card that could contradict the page which drew it.
+
+**What survived the merge, and why exactly one countdown did.** `Last attempt can start in`
+stayed, because it counts down to a *different* moment - the last instant a new round may open
+under `reserve_full_round` - which is precisely the test the removed row failed. The lobby's
+`InlineCountdown` count therefore moves from three to two, and the test asserting it was
+**updated with the reasoning rather than relaxed**: if it falls, one of the two real clocks has
+gone; if it rises, the merged one has crept back.
+
+**THE SCHEDULE IS ONE NODE WITH TWO HOSTS, and the second host is not optional.** The countdown
+is withheld from a finished or cancelled contest, and the window's open and close are still facts
+on one - so something has to render them when there is no clock. The obvious way to write that is
+to paste the rows into both places, which is the "one rule, two copies" shape behind
+`referenceId`, `failedReason`, `challengeId` and the Game Master `||`. Instead `scheduleDetails`
+is built once as a variable and handed either to the countdown or to a card headed `Schedule`,
+and the test **counts** `label="Opens"` rather than merely finding it.
+
+**The slot appears in all four of the panel's branches, and the test counts them.** A branch that
+forgets it is a card which sheds half its content at the exact moment it changes state: the clock
+reaches zero, the layout jumps, and the schedule disappears with no error. The branch most likely
+to be forgotten is `ended`, which is the one a player is looking at when that happens.
+
+**Three probes had to be re-aimed and the reason generalises.** The render guard was written
+inline as `{countdownTarget && !isCompleted && !isCancelled && (` and is now the named
+`showCountdown`, because two hosts have to agree about whether there is a clock. Left alone those
+probes reported `DID NOT APPLY`, which reads like a broken harness rather than a moved target -
+the trap the play-shape harness sat in for a day. The test that scanned the 200 characters before
+`<ContestCountdown` was re-aimed at the constant's **definition**, with a second assertion that
+the render actually reads it: a definition carrying both clauses beside a render that ignores it
+is the silent half-fix, and every assertion about the constant passes.
+
+**The trading lobby is untouched.** `details` is optional and trading passes nothing, so
+`LiveCountdown` renders exactly the card it rendered before. Trading keeps its own schedule
+accordion, which is a different shape for a screen with four operator-set dates.
+
+**Never verified by eye** - the lobby is behind sign-in.
+
+---
+
 ## 5. Dashboard
 
 `components/dashboard/` is about **15 components** backed by

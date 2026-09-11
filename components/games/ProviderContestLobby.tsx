@@ -30,7 +30,7 @@ import {
   StatCard,
   StatusCard,
 } from "@/components/neon/Cards";
-import { NEON_PANEL } from "@/components/neon/tokens";
+import { NEON_LABEL, NEON_PANEL } from "@/components/neon/tokens";
 import { formatVolts } from "@/lib/utils/format-volts";
 import { getPlayState } from "@/lib/services/games/round-status.service";
 import {
@@ -258,6 +258,97 @@ export default async function ProviderContestLobby({
     ? contestReservesFullRound(state.roundStartPolicy)
     : true;
 
+  /*
+    THE SCHEDULE, BUILT ONCE AND HOSTED IN TWO PLACES (owner instruction, 11 September 2026:
+    "no need to have 2, merge them into the big one").
+
+    It used to be a card of its own headed "Play window", sitting directly under the four-cell
+    countdown, and it carried a "Closes in" countdown of its own. Since `12` s2.3 derives the
+    window from the contest clock, `playWindowEnd` IS `endTime` - so that row and the cells above
+    it were counting down to the same instant in two sizes, one above the other. **The
+    duplication was of a clock, not merely of a card**, which is the reason to remove it rather
+    than to restyle it.
+
+    WHY IT IS A VARIABLE RATHER THAN JSX WRITTEN INSIDE THE COUNTDOWN. The countdown is withheld
+    from a finished or cancelled contest, and the window's open and close are still facts on one
+    - so there has to be a second host. Two copies of these rows is the "one rule, two copies"
+    shape behind `referenceId`, `failedReason`, `challengeId` and the Game Master `||`; one node
+    with two hosts cannot drift.
+
+    The heading survives inside it because a player still has to be told which pair of times
+    these are, and "Play window" is the phrase `13` s4 names as one of the three things this
+    lobby must answer.
+  */
+  const scheduleDetails =
+    playWindowStart || playWindowEnd ? (
+      <>
+        <p className={NEON_LABEL}>Play window</p>
+        <div className="mt-2 space-y-2">
+          {playWindowStart && <NeonRow label="Opens" value={playWindowStart} />}
+          {playWindowEnd && <NeonRow label="Closes" value={playWindowEnd} />}
+          {/*
+            THE SECOND DEADLINE, AND THE ONE PLAYERS MISS. Under `reserve_full_round` the last
+            attempt has to begin a full round before the window shuts, so a player watching
+            "Closes in 4m" on a game whose rounds run five minutes has in fact already missed it.
+            Stating the contest's close and staying silent about this one is how a player arrives
+            at the play screen to find Play disabled with time visibly left on the clock they
+            were shown.
+
+            This is the ONE countdown that survived the merge, and it survived because it counts
+            down to a different moment from the cells above - which is exactly why the other one
+            did not.
+
+            `zeroLabel` is "Passed" rather than "Ended", because the contest has not ended - only
+            the chance to open a new round has, and a player with a round already running may
+            still finish it.
+          */}
+          {isActive &&
+            reservesFullRound &&
+            attemptCutoffMs !== null &&
+            attemptCutoffMs > Date.now() && (
+              <NeonRow
+                label="Last attempt can start in"
+                accent="waiting"
+                value={
+                  <InlineCountdown
+                    targetDate={new Date(attemptCutoffMs).toISOString()}
+                    type="end"
+                    zeroLabel="Passed"
+                  />
+                }
+              />
+            )}
+        </div>
+        {/*
+          THIS NOTE USED TO SAY THE PLAY WINDOW COULD BE NARROWER THAN THE COMPETITION, and it was
+          true when an operator set four separate dates. Since the window is derived from the
+          contest clock (`12` s2.3) it is false, and a player-facing caution that has become false
+          is worse than none - it sends somebody looking for a second pair of times that no longer
+          exists. Replaced rather than deleted, because the fact players actually need is what
+          happens to a round still open when the clock runs out.
+
+          THE SECOND HALF OF THE SENTENCE DEPENDS ON THE POLICY, and getting it wrong is not
+          harmless in either direction. Under `reserve_full_round` a round cannot still be running
+          at the close - that is the entire point of holding time back - so promising that it
+          would be closed and scored describes a situation the contest has made impossible, and a
+          player reading it concludes they may start whenever they like. Under
+          `until_window_closes` the opposite is true and must be said, because it is the fact that
+          makes a shortened attempt worth taking at all.
+
+          It defaults to the reserving wording for a player with no seat, matching the schema
+          default rather than the wizard's.
+        */}
+        <NeonNote>
+          Every player gets the same window.{" "}
+          {reservesFullRound
+            ? "An attempt has to begin early enough to finish inside it, so the last one starts before the window shuts."
+            : "You can start an attempt at any time until it shuts, and anything still running then is closed with the competition and scored on what you managed."}
+        </NeonNote>
+      </>
+    ) : null;
+
+  const showCountdown = Boolean(countdownTarget) && !isCompleted && !isCancelled;
+
   return (
     <div className="flex min-h-screen flex-col gap-4 overflow-x-hidden p-3 sm:gap-6 sm:p-4 md:p-8">
       <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4">
@@ -448,13 +539,18 @@ export default async function ProviderContestLobby({
             expression is already the answer to "which clock matters now", and it is what the
             hero tile and the play-window row count down to. A third date resolved separately
             is a third chance for this screen to contradict itself.
+
+            THE SCHEDULE IS NOW INSIDE IT (owner instruction, 11 September 2026). Two cards, one
+            counting down to the close in large cells and one counting down to the same close in
+            a small row, is a duplicate statement of one clock.
           */}
-          {countdownTarget && !isCompleted && !isCancelled && (
+          {showCountdown && (
             <ContestCountdown
               target={countdownTarget}
               serverNow={state?.serverNow}
               label={isActive ? "Time remaining" : "Competition starts in"}
               variant={isActive ? "end" : "start"}
+              details={scheduleDetails}
             />
           )}
 
@@ -493,95 +589,15 @@ export default async function ProviderContestLobby({
             </NeonPanel>
           )}
 
-          {(playWindowStart || playWindowEnd) && (
-            <NeonPanel icon={Clock} accent="players" title="Play window">
-              <div className="space-y-2">
-                {playWindowStart && (
-                  <NeonRow label="Opens" value={playWindowStart} />
-                )}
-                {playWindowEnd && (
-                  <NeonRow label="Closes" value={playWindowEnd} />
-                )}
-                {/*
-                  A COUNTDOWN FOR A PLAYER WHO HAS ALREADY JOINED, which this lobby did not
-                  have. The hero's fourth tile counts down only for someone who has NOT
-                  entered - once they do, it is replaced by their score, so the player with
-                  the most reason to watch the clock was the one shown no clock at all.
-
-                  It is the same `InlineCountdown` the trading lobby and the hero tile use.
-                  A third implementation of "2d 4h" would be a third place for the wording to
-                  drift, which is the shape behind several defects here.
-                */}
-                {countdownTarget && !isCompleted && !isCancelled && (
-                  <NeonRow
-                    label={isActive ? "Closes in" : "Opens in"}
-                    accent="score"
-                    value={
-                      <InlineCountdown
-                        targetDate={new Date(countdownTarget).toISOString()}
-                        type={isActive ? "end" : "start"}
-                      />
-                    }
-                  />
-                )}
-                {/*
-                  THE SECOND DEADLINE, AND THE ONE PLAYERS MISS. Under `reserve_full_round` the
-                  last attempt has to begin a full round before the window shuts, so a player
-                  watching "Closes in 4m" on a game whose rounds run five minutes has in fact
-                  already missed it. Stating the contest's close and staying silent about this
-                  one is how a player arrives at the play screen to find Play disabled with
-                  time visibly left on the clock they were shown.
-
-                  `zeroLabel` is "Passed" rather than "Ended", because the contest has not
-                  ended - only the chance to open a new round has, and a player with a round
-                  already running may still finish it.
-                */}
-                {isActive &&
-                  reservesFullRound &&
-                  attemptCutoffMs !== null &&
-                  attemptCutoffMs > Date.now() && (
-                    <NeonRow
-                      label="Last attempt can start in"
-                      accent="waiting"
-                      value={
-                        <InlineCountdown
-                          targetDate={new Date(attemptCutoffMs).toISOString()}
-                          type="end"
-                          zeroLabel="Passed"
-                        />
-                      }
-                    />
-                  )}
-              </div>
-              {/*
-                THIS NOTE USED TO SAY THE PLAY WINDOW COULD BE NARROWER THAN THE COMPETITION,
-                and it was true when an operator set four separate dates. Since the window is
-                derived from the contest clock (`12` s2.3) it is false, and a player-facing
-                caution that has become false is worse than none - it sends somebody looking
-                for a second pair of times that no longer exists. Replaced rather than deleted,
-                because the fact players actually need is what happens to a round still open
-                when the clock runs out.
-              */}
-              {/*
-                THE SECOND HALF OF THE SENTENCE DEPENDS ON THE POLICY, and getting it wrong is
-                not harmless in either direction.
-
-                Under `reserve_full_round` a round cannot still be running at the close - that
-                is the entire point of holding time back - so promising that it would be closed
-                and scored describes a situation the contest has made impossible, and a player
-                reading it concludes they may start whenever they like. Under
-                `until_window_closes` the opposite is true and must be said, because it is the
-                fact that makes a shortened attempt worth taking at all.
-
-                It defaults to the reserving wording for a player with no seat, matching the
-                schema default rather than the wizard's.
-              */}
-              <NeonNote>
-                Every player gets the same window.{" "}
-                {reservesFullRound
-                  ? "An attempt has to begin early enough to finish inside it, so the last one starts before the window shuts."
-                  : "You can start an attempt at any time until it shuts, and anything still running then is closed with the competition and scored on what you managed."}
-              </NeonNote>
+          {/*
+            THE SCHEDULE'S FALLBACK HOST. The countdown above owns it while there is a clock to
+            show; a finished or cancelled contest has none, and the window's open and close are
+            still facts on one. Same node, so the two hosts cannot disagree - two copies of these
+            rows would be the "one rule, two copies" shape this codebase keeps paying for.
+          */}
+          {!showCountdown && scheduleDetails && (
+            <NeonPanel icon={Clock} accent="players" title="Schedule">
+              {scheduleDetails}
             </NeonPanel>
           )}
 

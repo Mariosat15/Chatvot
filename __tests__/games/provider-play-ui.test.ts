@@ -1424,14 +1424,19 @@ describe("the game lobby shows a joined player the clock", () => {
       Asserting the COUNT rather than the presence, because the hero's has been there all along
       and a bare `<InlineCountdown` match is green on the bug.
 
-      THREE since 7 September 2026: the hero tile, the window's close, and the last moment a new
-      attempt may start. The third is a different clock from the second and is the one players
-      miss - see "the last moment to start an attempt has one producer" below. If this number
-      falls, one of the three has been removed; if it rises, a fourth clock has appeared on a
-      screen that already shows three, which is its own problem.
+      IT WAS THREE FROM 7 SEPTEMBER 2026 AND IS TWO FROM 11 SEPTEMBER: the hero tile, and the
+      last moment a new attempt may start. The one that went was the window's close, and it went
+      because the owner asked for one clock instead of two - correctly, since `12` s2.3 derives
+      the play window from the contest clock, so `playWindowEnd` IS `endTime` and that row was
+      counting down to the same instant as the four-cell panel directly above it.
+
+      **The remaining two count down to two different moments**, which is the whole test: the
+      contest's end, and the last moment a new attempt may open under `reserve_full_round`. If
+      this number falls, one of those two has been removed; if it rises, either a third clock has
+      appeared or the merged one has crept back.
     */
     const countdowns = code.match(/<InlineCountdown/g) ?? [];
-    expect(countdowns.length).toBe(3);
+    expect(countdowns.length).toBe(2);
 
     // Reused, not re-implemented. A third place that formats "2d 4h" is a third place for the
     // wording to drift, which is the shape behind several defects here.
