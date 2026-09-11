@@ -17,6 +17,7 @@ import CompetitionEntryButton from "@/components/trading/CompetitionEntryButton"
 import UTCClock from "@/components/trading/UTCClock";
 import InlineCountdown from "@/components/trading/InlineCountdown";
 import ProviderLeaderboard from "@/components/games/ProviderLeaderboard";
+import ContestCountdown from "@/components/games/ContestCountdown";
 import PrizeTable from "@/components/competitions/PrizeTable";
 import { NeonHero, NeonStatusBadge } from "@/components/neon/Hero";
 import { providerBanner } from "@/components/neon/banners";
@@ -393,6 +394,34 @@ export default async function ProviderContestLobby({
             participantStatus={participantStatus}
             registrationClosed={registrationClosed}
           />
+
+          {/*
+            THE CONTEST CLOCK, AT THE SIZE THE OWNER ASKED FOR. Until now this screen's only
+            clocks were three lines of small text, where the trading lobby has a four-cell
+            panel you can read across a room - and it sits in the same place in the same
+            column, directly under the entry control and above the details, because a player
+            comparing the two screens should not have to look in two different places.
+
+            `ContestCountdown` rather than trading's `LiveCountdown`, for two reasons that are
+            both about being wrong quietly. It runs on the SERVER's clock, which is the clock
+            every gate on the game side is judged against. And `LiveCountdown` renders nothing
+            at all unless its `type` matches the contest's `status` - a mismatch produces an
+            empty space and no error, which is exactly how a countdown disappears without
+            anybody noticing. Here the decision to show one is made here, in the open.
+
+            Reason it reuses `countdownTarget` instead of picking a date of its own: that
+            expression is already the answer to "which clock matters now", and it is what the
+            hero tile and the play-window row count down to. A third date resolved separately
+            is a third chance for this screen to contradict itself.
+          */}
+          {countdownTarget && !isCompleted && !isCancelled && (
+            <ContestCountdown
+              target={countdownTarget}
+              serverNow={state?.serverNow}
+              label={isActive ? "Time remaining" : "Competition starts in"}
+              variant={isActive ? "end" : "start"}
+            />
+          )}
 
           {/*
             A control that cannot work must refuse with its reason rather than be quietly

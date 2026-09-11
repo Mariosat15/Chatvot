@@ -1119,6 +1119,92 @@ lobby showed a prize pool and an entry fee and **never said what second place wa
   whole unclaimed figure. Changing it during a move would be a payout-facing change smuggled
   into a commit whose whole claim is that nothing moved.
 
+### 4.1j The game lobby got the trading lobby's clock (owner requirement, 10 September 2026)
+
+The owner's words: **"the timer must be the same graphics as the counter in trading competition
+countdown"**. It is the fourth and last item of the 10 September report, after R65, R66 and R67.
+
+**This is presentation work and no defect was found**, which is worth stating plainly because
+every other entry from that report carries a risk number. The game lobby's clocks were correct,
+they were simply small: three lines of `InlineCountdown` text where the trading lobby has a panel
+of four large cells - days, hours, minutes, seconds - that a player can read across a room. So
+there is **no risk register entry, nothing was backfilled and no money was ever involved.**
+
+#### What was built
+
+| Piece | Where | Mirrored |
+|---|---|---|
+| The four-cell panel, one definition | `components/competitions/CountdownPanel.tsx` | No |
+| Trading's countdown, now rendering it | `components/trading/LiveCountdown.tsx` | No |
+| The game lobby's countdown, on the server's clock | `components/games/ContestCountdown.tsx` | No |
+| The mount, under the entry control | `components/games/ProviderContestLobby.tsx` | No |
+
+18 tests in `__tests__/games/contest-countdown.test.ts`, 16 probes in
+`tools/probe-contest-countdown.ps1`, **all red on exactly one failure**. Full suite 2091 passing,
+typecheck error **lists** identical before and after, `check:mirrors` 80 agree / 0 drifted -
+correctly silent, since nothing here exists in `apps/admin`.
+
+#### The five things worth carrying
+
+- **The appearance was extracted and the CLOCK deliberately was not, and that is the whole
+  reason this is two components rather than one reused twice.** The two callers disagree about
+  what time it is, on purpose. Trading reads the browser's clock, as it always has. The game
+  screens read the **server's**, because every rule about when a contest opens, when an attempt
+  may start and when entry shuts is enforced on our servers against our time - and a clock
+  working from a visitor's own computer is wrong in both of the directions that cost something:
+  a button offered when the window has shut, or withheld while it is genuinely open. Neither
+  records an error, because neither *is* one. `CountdownPanel` is therefore handed a number of
+  milliseconds and knows nothing about clocks at all. **A later "consistency" pass that unifies
+  the two clocks is a behaviour change to a screen nobody was asked to touch**, and there is a
+  probe in each direction because both read as tidying up.
+- **`LiveCountdown` renders nothing for a `type`/`status` pair it does not recognise - including
+  `status: "completed"`, which its own props admit and nothing handles.** That is the second
+  reason the game lobby does not simply render it: a mismatch produces an empty space and no
+  error, which is exactly how a countdown goes missing without anybody being told. It is
+  **latent, not live** - both existing callers (the trading sidebar and the challenge page) always
+  pass matched pairs, verified rather than assumed - so it is **pinned by a test and deliberately
+  left alone**, because changing it in the same edit as the move would destroy the only evidence
+  that nothing moved. `ContestCountdown` has no such gate: the caller decides whether a clock
+  belongs on the screen, in the open.
+- **The negative assertion is the load-bearing half.** "Does the screen import the shared panel"
+  is trivially satisfied by a screen that imports it *and* hand-rolls its own cells beside it,
+  which is how "the same graphics" becomes two panels that drift on the first edit. So the guard
+  checks six of the panel's own literals - the grid, the large digits, the `Mins`/`Secs`
+  captions, the ending-soon badge and both gradients - and requires them to appear in
+  `CountdownPanel.tsx` and in **no consumer**. Picking those markers needed a grep first:
+  `grid-cols-4` alone appears in the lobby's own hero, and `uppercase tracking-wider` appears in
+  about forty files, so a guard built on either would have failed on correct code and been
+  deleted by the first person it inconvenienced.
+- **An unparseable target must refuse rather than clamp.** `splitDuration` treats anything
+  non-finite or negative as zero, and **zero is the FINISHED state** - so without the
+  `Number.isNaN` guard in `ContestCountdown` one bad stored date renders "Competition has ended!"
+  over a contest that is running. A missing clock is recoverable by reading the schedule panel; a
+  confident wrong one is not. The same reasoning keeps the target prop as `string | number | Date`
+  rather than a narrowed ISO string: `new Date(x).toISOString()` **throws** on a bad value, and
+  converting at the call site would put that throw inside the lobby's render, where one stored
+  date takes the whole page down instead of one panel.
+- **It is mounted once, not once per contest state, and reuses `countdownTarget`.** The trading
+  sidebar writes two blocks, one for upcoming and one for active; here a single block switches on
+  `isActive`, because `countdownTarget` is already the answer to "which clock matters now" and is
+  what the hero tile and the play-window row count down to. A second block, or a date resolved
+  separately, is a third chance for this one screen to contradict itself. Position is asserted
+  rather than presence - entry control, then the clock, then the details, the same order as the
+  trading sidebar - because a player comparing the two screens should not have to look in two
+  different places.
+
+#### Deliberately not changed
+
+- **`RoundPreflight`'s four time readouts stay inline text.** They are clocks embedded in
+  sentences - "Play closes in 4m 12s", "Less than a full round is left. Start now and you get
+  2m 30s of play" - and they explain a *gate*, not the contest. Four-cell grids would destroy the
+  sentences, and trading has no large-panel equivalent for them either.
+- **The hero tile's `InlineCountdown` stays small**, because the trading lobby's hero tile is
+  small too. The test pinning **exactly three** `InlineCountdown` instances in
+  `ProviderContestLobby.tsx` is therefore still green and unmodified: this slice **added** a
+  clock rather than replacing one.
+- **Never verified by eye.** Both lobbies are behind sign-in and the automated browser has no
+  session, so the owner's review is the first time this is seen.
+
 ---
 
 ## 5. Dashboard
