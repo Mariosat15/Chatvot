@@ -893,6 +893,13 @@ with a View Rules button** - a rules surface for a provider title is real outsta
 the trading lobby's rules accordion is entirely trading content and a game has nothing to put in
 it yet.
 
+> **Amended 11 September 2026.** The last sentence is now false and is kept rather than rewritten,
+> because the reason nobody looked is the useful part: a game *did* have something to put in it.
+> R63 found on 10 September that `rulesSummary` and `howToPlay` had been demanded of providers,
+> validated on arrival and then discarded by a parse bug. Both are stored now, and **`13` s4.1k
+> renders them on the lobby and on the play screen.** The footer strip stays a help link, which
+> is a different thing from the rules of one game.
+
 ### 4.1d Both lobbies rebuilt on one design kit (owner requirement, 6 September 2026)
 
 **The instruction reversed the direction of 4.1c.** That slice made the game lobby match the
@@ -975,6 +982,10 @@ what replaced it.
   the game lobby renders a link to `/help/competitions` instead, because the catalogue stores a
   `description` and no rules summary or how-to-play. A button that opens nothing is worse than an
   honest destination.
+  > **BUILT 11 September 2026, `13` s4.1k.** The stated reason was already false when this was
+  > written: the catalogue *had* been given `rulesSummary` and `howToPlay`, and a parse bug was
+  > discarding them (R63). Both are now rendered on the lobby and on the play screen by
+  > `GameRulesPanel`. The footer strip deliberately stays a help link.
 - **The equity chart on the trading hero** is unchanged from the existing dashboard component;
   the sheet's styling of it was not applied.
 - **The announcements panel and the "Share Event" button** in `trading-lobby-target.png` are not
@@ -1204,6 +1215,83 @@ correctly silent, since nothing here exists in `apps/admin`.
   clock rather than replacing one.
 - **Never verified by eye.** Both lobbies are behind sign-in and the automated browser has no
   session, so the owner's review is the first time this is seen.
+
+### 4.1k The rules an operator wrote were shown to nobody (11 September 2026)
+
+The owner's words: **"in the game providers we have rules that are not shown anywhere in game
+area or competition area fix a place to have the rules the admin set in woding that stants
+out"**.
+
+They were right, and the cause sits one step further back than the report suggests. **R63, on
+10 September, fixed a parse bug that had been discarding `rulesSummary` and `howToPlay` on every
+catalogue sync**, so both are now stored and both are editable by an operator in the Game Content
+dialog. What nobody then checked is whether anything *read* them. Nothing did:
+`getGamePresentation` - the one reader every player-facing game screen goes through - did not
+name either field in its projection. So a paying player could see the pot, the entry fee, the
+clock, the prize split and the standings, and **never be told what a winning score was.**
+
+On a lower-is-better title that is not a gap in the copy, it is the difference between playing
+the game and playing it backwards.
+
+**The live code is `components/games/GameRulesPanel.tsx`, the three additions to
+`lib/services/games/game-presentation.service.ts`, the mount in `ProviderContestLobby.tsx`, and
+the `rules` slot on `components/games/arena/GameArenaLayout.tsx` filled by
+`app/(root)/competitions/[id]/play/page.tsx`.** None of it is mirrored - `apps/admin` has no
+player lobby and no play screen - so `check:mirrors` says nothing about any of it.
+13 probes, all red on exactly one failure.
+
+#### Six facts that drift easily
+
+- **The field was stored and unread, which is a different defect from the one R63 fixed and was
+  invisible for the same reason.** A document describing this slice as fixing the sync, or as
+  making the fields editable, is describing 10 September's work; a document implying R63 put the
+  rules in front of a player is wrong. Say which half.
+- **One panel, two screens, and the NEGATIVE assertion is the load-bearing half.** Importing
+  `GameRulesPanel` is trivially satisfied by a screen that then writes its own rules block beside
+  it, which is how the lobby and the arena end up describing one game's scoring differently. The
+  guard is that the two headings - "How you win" and "How to play" - appear in the panel and in
+  **no** consumer. A document describing the guard as "both screens import the panel" is
+  describing the half that cannot catch a disagreement.
+- **The heading negative had to be narrowed, for the `s4.1g` reason.** The first version forbade
+  the phrase "is scored" anywhere in a consumer and **failed on correct code**: the lobby's
+  `UNRESOLVED_POLICY_COPY.score_zero` legitimately says "it is scored zero and the competition
+  still settles on time". A guard that fires on correct code is the kind the first person it
+  inconveniences deletes, so it names the two block headings and nothing else.
+- **Only the SCORING rule gets the emphasis, and that asymmetry is deliberate.** `rulesSummary`
+  sits in an amber-bordered block; `howToPlay` is plain. A player can discover the controls by
+  trying them and cannot discover the direction - whether a lower time beats a higher one - by
+  any amount of playing. Emphasising both is how a page ends up with no emphasis at all, and a
+  test asserts the amber treatment appears **exactly once** and **before** "How to play".
+- **An absent field renders NOTHING, not a heading over an empty box**, and this is the common
+  case rather than an edge one: every title synced before R63 carries neither value, so until
+  task 17's catalogue re-sync runs, **this panel is invisible on every contest**. The service
+  normalises a stored `""` to `undefined` and the panel trims before deciding, because a cleared
+  field can legitimately hold an empty string. A heading reading "How Circuit Sprint is scored"
+  above nothing tells a player the game has no rules.
+- **The lobby's own `ProviderGame.findOne` was collapsed onto the shared reader, and that is part
+  of the deliverable rather than tidying.** It had its own projection and its own hand-written
+  `.lean<{...}>` generic, so adding a field to `GamePresentation` would have shown the rules on
+  the play screen and silently not on the lobby - task 20.1's defect exactly, where two
+  hand-written projections of one document mean a new field arrives `undefined` at whichever
+  caller nobody remembered, with nothing failing. Two pre-existing tests that pinned the old
+  projection were **flipped rather than deleted.**
+
+#### Deliberately not changed
+
+- **The footer help strip still points at `/help/competitions`.** How competitions work is a
+  different thing from the rules of one game, and the trading lobby's link goes to the same
+  place. The stale comment beside it - which said a provider title had no rules surface because
+  the catalogue stored only a `description` - is **corrected in place with the old wording
+  quoted**, because it was believed for five days and is the reason nobody looked.
+- **`ArenaContestPanel`'s "Round time" tile still states the title's nominal length.** It is
+  recorded rather than built: `RoundPreflight` already discloses the shortened figure on the
+  server clock, and the game's own countdown is authoritative once `games-service` is rebuilt, so
+  a third server-rendered statement of the same clock would be stale the instant it was drawn.
+- **The in-frame board rules in `games-service/src/games/instructions.ts` are a separate thing**
+  and were not touched. Those are the service's own instructions, shown inside the iframe; this
+  panel is the platform's copy of what the operator published in the catalogue.
+- **Never verified by eye**, and there is a second reason here: until the catalogue is re-synced
+  there is nothing for the panel to render, so even a session would show an empty result.
 
 ---
 

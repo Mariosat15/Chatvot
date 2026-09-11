@@ -618,14 +618,27 @@ describe("a provider contest gets its own lobby, not the trading one", () => {
     expect(code).toMatch(/nothing has been charged/i);
   });
 
-  it("reads only fields the catalogue model actually declares", () => {
+  /*
+    FLIPPED ON 11 SEPTEMBER 2026, NOT DELETED, because the property is unchanged and only the
+    mechanism moved. It used to assert `.select("displayName scoreType")` on the lobby's own
+    `ProviderGame.findOne`, and the reason recorded with it is still the reason this test
+    exists: `tagline` was in the first draft and `provider-game.model.ts` did not have it, so
+    it would have rendered nothing for ever while looking correct, and a hand-written
+    `.lean<{...}>()` generic is exactly where an invented field name survives a typecheck.
+
+    The answer to that hazard is now stronger than an assertion about one projection: there is
+    only ONE projection. `getGamePresentation` is the shared read, and a lobby keeping its own
+    was task 20.1's defect waiting to happen - the rules text added the same day would have
+    rendered on the play screen and silently not here.
+  */
+  it("reads the catalogue through the shared projection, never its own", () => {
     const code = readCode(PROVIDER_LOBBY);
 
-    // `tagline` was in the first draft and `provider-game.model.ts` does not have it, so it
-    // would have rendered nothing for ever while looking correct. A hand-written `.lean<{...}>()`
-    // generic is exactly where an invented field name survives a typecheck.
-    expect(code).toMatch(/\.select\("displayName scoreType"\)/);
-    expect(code).not.toMatch(/tagline/);
+    expect(code).toMatch(/getGamePresentation\(/);
+    // The negative half is the load-bearing one: importing the shared reader is trivially
+    // satisfied by a screen that then runs a second query for the one field it wants.
+    expect(code).not.toMatch(/ProviderGame\.find/);
+    expect(code).not.toMatch(/\.lean</);
   });
 
   it("takes the game's name from the catalogue, never from the keys", () => {
@@ -633,7 +646,7 @@ describe("a provider contest gets its own lobby, not the trading one", () => {
 
     // `gameKey` is an internal join key that happens to read like English, and `providerKey` is
     // the supplier's brand - `13` s4 requires provider-neutral labels.
-    expect(code).toMatch(/title\?\.displayName/);
+    expect(code).toMatch(/presentation\.gameName/);
     expect(code).not.toMatch(/gameName = .*gameKey/);
     expect(code).not.toMatch(/gameName = .*providerKey/);
   });

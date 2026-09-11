@@ -25,6 +25,19 @@ export interface GamePresentation {
   tagline?: string;
   description?: string;
   /**
+   * How the game decides who wins, in the provider's own words.
+   *
+   * THE MOST CONSEQUENTIAL SENTENCE IN THIS SHAPE, and the reason it is here at all. `01`
+   * section 3.1 calls it the text support quotes back when a player disputes a prize, which
+   * is also why the content assistant is barred from writing it. It was stored by R63 on
+   * 10 September 2026 and then read by nothing: this projection did not select it, so a
+   * contest could tell a paying player the pot, the entry fee and the clock while never
+   * saying what a winning score was.
+   */
+  rulesSummary?: string;
+  /** How the game is played - the controls and the objective, not the scoring. */
+  howToPlay?: string;
+  /**
    * The genre a PLAYER reads - "Puzzle", not `puzzle` (task document 9).
    *
    * Resolved from the stored slug rather than passed through, because the stored value is a
@@ -43,7 +56,19 @@ export interface GamePresentation {
   maxDurationSeconds?: number;
 }
 
-const UNKNOWN_GAME_NAME = "this game";
+/**
+ * Exported so a caller that needs a different placeholder can detect the fallback rather than
+ * inventing its own read of the catalogue.
+ *
+ * Reason: this phrase reads correctly in a sentence ("you have no score in this game") and
+ * badly in a badge, where the lobby wants the single word "Game". Before this was exported,
+ * the lobby avoided the problem by running its own `ProviderGame.findOne` with its own
+ * projection - which is how task 20.1's defect worked: two hand-written projections of one
+ * document, so a field added to this shape arrives `undefined` at the other caller and its
+ * line is silently omitted. One reader, one placeholder, and the difference handled in the
+ * open.
+ */
+export const UNKNOWN_GAME_NAME = "this game";
 
 /**
  * Read a title's presentation by the provider/code pair on a contest.
@@ -67,12 +92,14 @@ export async function getGamePresentation(
 
   const title = await ProviderGame.findOne({ providerKey, gameCode })
     .select(
-      "displayName tagline description category thumbnailUrl bannerUrl highlights family scoreType scoreDirection maxDurationSeconds",
+      "displayName tagline description rulesSummary howToPlay category thumbnailUrl bannerUrl highlights family scoreType scoreDirection maxDurationSeconds",
     )
     .lean<{
       displayName?: string;
       tagline?: string;
       description?: string;
+      rulesSummary?: string;
+      howToPlay?: string;
       category?: string;
       thumbnailUrl?: string;
       bannerUrl?: string;
@@ -95,6 +122,8 @@ export async function getGamePresentation(
     // means no screen has to know that.
     tagline: title.tagline || undefined,
     description: title.description || undefined,
+    rulesSummary: title.rulesSummary || undefined,
+    howToPlay: title.howToPlay || undefined,
     // Reason: `resolveGameCategory` already answers `undefined` for an absent or empty value,
     // so no `|| undefined` is needed - and an unrecognised slug comes back with its own text
     // humanised rather than as a placeholder, because a badge reading "Uncategorised" on a

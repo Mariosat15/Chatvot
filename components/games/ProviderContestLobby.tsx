@@ -12,12 +12,12 @@ import {
   Users,
 } from "lucide-react";
 import { connectToDatabase } from "@/database/mongoose";
-import ProviderGame from "@/database/models/games/provider-game.model";
 import CompetitionEntryButton from "@/components/trading/CompetitionEntryButton";
 import UTCClock from "@/components/trading/UTCClock";
 import InlineCountdown from "@/components/trading/InlineCountdown";
 import ProviderLeaderboard from "@/components/games/ProviderLeaderboard";
 import ContestCountdown from "@/components/games/ContestCountdown";
+import GameRulesPanel from "@/components/games/GameRulesPanel";
 import PrizeTable from "@/components/competitions/PrizeTable";
 import { NeonHero, NeonStatusBadge } from "@/components/neon/Hero";
 import { providerBanner } from "@/components/neon/banners";
@@ -33,6 +33,10 @@ import {
 import { NEON_PANEL } from "@/components/neon/tokens";
 import { formatVolts } from "@/lib/utils/format-volts";
 import { getPlayState } from "@/lib/services/games/round-status.service";
+import {
+  getGamePresentation,
+  UNKNOWN_GAME_NAME,
+} from "@/lib/services/games/game-presentation.service";
 import { isProviderContest } from "@/lib/services/games/contest-config";
 import {
   contestReservesFullRound,
@@ -141,18 +145,27 @@ export default async function ProviderContestLobby({
     provider's brand: `13` section 4 requires provider-neutral labels, because the player is
     playing a ChartVolt game.
 
-    `displayName` and `scoreType`, both of which `provider-game.model.ts` really declares. The
-    first draft of this read a third field the model does NOT have, which would have rendered
-    nothing for ever while looking entirely correct. **An unverified field name is a claim, not a
-    fact**, and a hand-written `.lean<{...}>()` generic is precisely where one survives a
-    typecheck, because the compiler checks the generic rather than the schema.
+    IT WAS ITS OWN `ProviderGame.findOne` UNTIL 11 SEPTEMBER 2026, and the reasoning recorded
+    here then is worth keeping because it is still true of anything that writes one: it
+    selected `displayName` and `scoreType`, both of which `provider-game.model.ts` really
+    declares, after a first draft had read a third field the model does NOT have - which would
+    have rendered nothing for ever while looking entirely correct. **An unverified field name
+    is a claim, not a fact**, and a hand-written `.lean<{...}>()` generic is precisely where
+    one survives a typecheck, because the compiler checks the generic rather than the schema.
+
+    What the read could not survive was a SECOND field being needed. `getGamePresentation` is
+    the shared projection of this document, and the rules text the owner asked for on 11
+    September lives on it - so a lobby with its own projection would have rendered the rules
+    on the play screen and silently not here, which is task 20.1's defect exactly: two
+    hand-written projections of one document, and a field added to the shape arrives
+    `undefined` at whichever caller nobody remembered. The placeholder differs (a badge wants
+    "Game", a sentence wants "this game"), and that is now handled in the open below rather
+    than by keeping a second reader.
   */
-  const title = await ProviderGame.findOne({
-    providerKey: competition?.gameConfig?.providerKey,
-    gameCode: competition?.gameConfig?.gameCode,
-  })
-    .select("displayName scoreType")
-    .lean<{ displayName?: string; scoreType?: string } | null>();
+  const presentation = await getGamePresentation(
+    competition?.gameConfig?.providerKey,
+    competition?.gameConfig?.gameCode,
+  );
 
   /*
     Attempts and the live round are only meaningful for someone holding a seat, and `getPlayState`
@@ -185,7 +198,14 @@ export default async function ProviderContestLobby({
     ? UNRESOLVED_POLICY_COPY[competition.unresolvedRoundPolicy as string]
     : undefined;
 
-  const gameName = title?.displayName ?? "Game";
+  /*
+    The badge's own placeholder. `UNKNOWN_GAME_NAME` reads correctly inside a sentence and
+    badly on its own next to a controller icon, so the substitution is explicit rather than
+    the service being asked to answer two questions. Only reachable on a contest whose title
+    has left the catalogue, which already renders its own warning card further down.
+  */
+  const gameName =
+    presentation.gameName === UNKNOWN_GAME_NAME ? "Game" : presentation.gameName;
 
   /*
     The column heading comes from the game's own score type, which is the smallest possible step
@@ -196,7 +216,8 @@ export default async function ProviderContestLobby({
     Note what it does not do: it does not reformat the number. `05` section 2 requires the raw
     score to be displayed as stored, because any transformation makes a dispute unanswerable.
   */
-  const scoreLabel = title?.scoreType === "duration_ms" ? "Time" : "Score";
+  const scoreLabel =
+    presentation.scoreType === "duration_ms" ? "Time" : "Score";
 
   const status = String(competition.status ?? "");
   const isActive = status === "active";
@@ -364,6 +385,20 @@ export default async function ProviderContestLobby({
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
+          {/*
+            ABOVE THE LEADERBOARD, DELIBERATELY. This is the screen a player reads before
+            paying an entry fee, and the rules are what make that decision informed - the
+            standings are not, because they are a fact about other people. It renders nothing
+            at all when the catalogue holds neither field, which is every title synced before
+            R63 and every provider not yet re-synced, so the ordering costs nothing on a
+            contest with no rules text.
+
+            `wide`, because this column is two thirds of the grid: the scoring rule and the
+            controls sit side by side rather than stacking into a tall block that pushes the
+            leaderboard off a laptop screen.
+          */}
+          <GameRulesPanel presentation={presentation} layout="wide" />
+
           <NeonPanel
             icon={Trophy}
             accent="prize"
@@ -579,11 +614,16 @@ export default async function ProviderContestLobby({
 
       {/*
         The sheet's footer help strip. It points at `/help/competitions`, which really exists and
-        is where the trading lobby's help link already goes - the mock's "View Rules" button does
-        NOT have a destination yet, because a provider title has no rules surface: the catalogue
-        stores a `description` and no rules summary or how-to-play. Building one is real
-        outstanding work rather than a styling gap, so this offers the honest destination instead
-        of a button that opens nothing.
+        is where the trading lobby's help link already goes.
+
+        THE SENTENCE THAT WAS HERE IS CORRECTED RATHER THAN DELETED, because it was believed for
+        five days and was the reason nobody looked. It said the mock's "View Rules" button had no
+        destination "because a provider title has no rules surface: the catalogue stores a
+        `description` and no rules summary or how-to-play". The second half stopped being true on
+        10 September 2026, when R63 found that `rulesSummary` and `howToPlay` had been demanded of
+        providers, validated on arrival and then discarded by a parse bug - they are stored now,
+        and `GameRulesPanel` above renders them. So the rules have a surface and it is on this
+        page; this strip stays a help link, which is a different thing from the rules of one game.
       */}
       <div
         className={`${NEON_PANEL} flex flex-wrap items-center justify-between gap-3 px-4 py-3`}

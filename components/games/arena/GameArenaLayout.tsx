@@ -41,6 +41,15 @@ interface Props {
   standingsCount: number;
   /** The contest's facts and, beneath them, the prize table. */
   sidebar: ReactNode;
+  /**
+   * The operator's rules for the title, full width beneath the board.
+   *
+   * NOT IN THE SIDEBAR, and the reason is the 320px column: how a game scores is prose, and
+   * prose in a narrow column beside a board is where a player stops reading. It sits below
+   * the stage because the board is why they are here, and above the highlights because a
+   * scoring rule outranks three marketing phrases.
+   */
+  rules: ReactNode;
   highlights: ReactNode;
 }
 
@@ -54,6 +63,7 @@ export function GameArenaLayout({
   standings,
   standingsCount,
   sidebar,
+  rules,
   highlights,
 }: Props) {
   const banner = presentation.bannerUrl
@@ -134,7 +144,10 @@ export function GameArenaLayout({
         <div className="order-3 space-y-5 lg:order-2 xl:order-3">{sidebar}</div>
       </div>
 
-      <div className="mt-5">{highlights}</div>
+      <div className="mt-5 space-y-5">
+        {rules}
+        {highlights}
+      </div>
 
       <p className={`mt-5 text-center ${NEON_LABEL}`}>
         Scores are reported by the game and settled by ChartVolt.

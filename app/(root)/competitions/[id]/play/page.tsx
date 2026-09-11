@@ -20,6 +20,7 @@ import PrizeTable from "@/components/competitions/PrizeTable";
 import { GameArenaLayout } from "@/components/games/arena/GameArenaLayout";
 import { ArenaContestPanel } from "@/components/games/arena/ArenaContestPanel";
 import { ArenaHighlights } from "@/components/games/arena/ArenaHighlights";
+import GameRulesPanel from "@/components/games/GameRulesPanel";
 import { Button } from "@/components/ui/button";
 
 /**
@@ -223,6 +224,7 @@ export default async function PlayPage({ params }: PlayPageProps) {
             )}
         </>
       }
+      rules={<GameRulesPanel presentation={presentation} layout="wide" />}
       highlights={<ArenaHighlights highlights={presentation.highlights} />}
     />
   );
