@@ -1933,6 +1933,47 @@ the rules slot alone while the activity panel renders an empty third of the page
 
 **Never verified by eye** - the arena is behind sign-in.
 
+### 4.1s The leaderboard row, and the lookup that found nobody (owner instruction, 11 September 2026)
+
+The owner sent a crop of the arena's leaderboard: *"our leaderboard first doesnt fit the wording,
+the names are cut of and we dont have the avantars of the player"*. **Two separate defects wearing
+one screenshot**, and merging them is the mistake a summary invites - one is a layout fault in this
+folder, the other is a database query two layers down (**R68**).
+
+**THE AVATARS WERE BUILT, WIRED AND TESTED, AND COULD NEVER HAVE APPEARED.**
+`lib/utils/user-lookup.ts`'s batch lookup filtered on the `id` **field** alone, while Better Auth's
+MongoDB adapter keeps an account's identity in `_id` - so the query matched nothing, the map came
+back empty, every row correctly had no picture, and `NeonAvatar` correctly drew initials. No error,
+no log line, every layer reporting success. `getUserById` ten lines above it has tried `id`, then
+`_id` as an ObjectId, then `_id` as a string since it was written, which is the evidence that the
+shape varies; the batch version had one of the three. See `17` R68 - including why no other screen
+was affected, and why the guard has to be behavioural.
+
+**The names were cut off by the row's own furniture, not by the rail.** The rail had already been
+widened 280 → 300 → 360 (s4.1q), each time by counting characters, and the names were still
+truncated. What was on the line beside the name was:
+
+| Fixture | Why it went |
+|---|---|
+| A gold crown, from `NeonPlayerName`'s `isLeader` | `NeonRankBadge style="plates"` was **already** drawing a crown two columns to the left. The same fact twice, about 20px apart |
+| A `= #1` tie chip | A statement about the **figure a player is ranked on**, so it belongs beside that figure - and it repeated the rank the plate states. Moved to the score cell as a bare `=`, with the long form on a `title` |
+| The level badge | Already removed in s4.1q, for this reason |
+
+**Nothing was hidden to make room**, which is the test for removing furniture rather than shrinking
+it: the crown is in the plate, the tie is beside the score, both still on the row. Beside that, the
+two numeric columns were cut to the width of a five-figure score and a `12:34` clock, the plate
+column to the plate's own size, and the gaps from 8px to 6px - together about **40px handed back**
+to the one column whose content has no upper bound.
+
+**The tie marker is counted and its position asserted**, because a second copy left on the name
+line satisfies any positional check aimed at the first - the shape that has defeated four
+structural tests here. The numeric widths are counted too: the column template is written twice,
+once for the heading and once for the rows, and a widening applied to one of them misaligns every
+row while reading correctly in a diff.
+
+**Never verified by eye** - the arena is behind sign-in, and the avatar half cannot be seen at all
+until the fix runs against a real database.
+
 ---
 
 ## 5. Dashboard

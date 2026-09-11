@@ -41,6 +41,7 @@ chapter covers risks to the programme and to the application.
 | **R65** | **The entry panel promised every game entrant "$0 in trading capital to compete"**, because `startingCapital` is `required` only while the contest is trading and the panel's `\|\| 0` turned the absent field into a number. Beside it, one unconditional sentence claimed no entries are taken "whether or not the competition is still running" - false under `until_window_closes`, where the deadline IS the moment play stops, and silent about the reason under `reserve_full_round`, where the gap exists to stop somebody paying for a contest they cannot finish a round in | Medium | **LIVE and player-visible**, on the screen a player reads before paying; no money moved | **CLOSED 10 Sep 2026** (`13` s1.1i); nothing stored, so nothing to backfill |
 | **R66** | **The game's own countdown ignored the contest.** `stateFor` sent `endsAt = gameplayEndsAt(round)`, the title's length from `startedAt`, while `playability` refuses at `expiresAt` too - so a player starting a ten-minute sprint with five minutes of contest left watched a clock counting from **10:00** and was stopped with **5:00** still showing. The pre-Start sentence read the configured length and was wrong the same way. **`hardDeadline` already returned the right answer and was called by nothing** | Medium | **LIVE and player-visible** whenever a round is started late; scores and payouts were correct throughout | **CLOSED 10 Sep 2026** (`21` s4.1p); nothing stored, so nothing to backfill |
 | **R67** | **A contest lobby was a photograph.** `CompetitionStatusMonitor` was mounted inside the *trading* return of `app/(root)/competitions/[id]/page.tsx`, and the game branch returns the whole page before reaching it - so a player who had already paid watched the countdown reach zero and had to **reload before the Play button appeared**. The monitor also fires only on a status CHANGE, so on **both** lobbies the standings stayed frozen for the whole of a running contest, when the status does not move | Medium | **LIVE and player-visible** on every game contest since the branch was written; no money moved and nothing was stored wrongly | **CLOSED 10 Sep 2026** (`13` s1.1j); nothing stored, so nothing to backfill |
+| **R68** | **The batch user lookup could not find a player at all.** `getUsersByIds` filtered on the `id` FIELD alone while Better Auth's MongoDB adapter keeps the identity in `_id`, so the query matched nothing, the map came back empty, and every game leaderboard drew **initials for everybody** the day after the owner ordered faces shown. `getUserById` beside it has carried three fallbacks since it was written. No error, no log line | Medium | **LIVE and player-visible** on both game boards; the lookup has exactly one caller, so nothing else was affected, and no money or stored value was involved | **CLOSED 11 Sep 2026** (`13` s4.1s); nothing stored, so nothing to backfill |
 | R8 | Bulk find-and-replace on wording | High | Medium | X8 |
 | R9 | Fraud throttle blind to provider entries | High | High | X5 |
 | R11 | Legal wording changed without review | High | Medium | X8 |
@@ -2219,6 +2220,43 @@ one the first person it inconveniences deletes, which is the same reasoning that
 Probed by `tools/probe-client-bundle-guard.ps1`: two probes, one restoring the admin defect
 verbatim and one reverting the main app's `import type` to a plain import, each red on exactly
 the expected test.
+
+---
+
+### R68 - The lookup that could not find anybody - **CLOSED 11 September 2026**
+
+**What it was.** The owner reported it as part of one sentence about the leaderboard: *"we dont
+have the avantars of the player"*. The avatars had been built the day before, wired through one
+producer, tested and probed - and every row on both game boards drew initials.
+
+**`getUsersByIds` filtered on `{ id: { $in: uniqueIds } }` and nothing else.** Better Auth uses
+the MongoDB adapter, so an account's identity is its `_id` and `session.user.id` is an ObjectId
+string; a document that carries no `id` field is therefore invisible to that filter. The query
+succeeded, matched nothing, and returned an empty `Map`. `attachProfileImages` then found no
+picture for anybody and correctly attached none, `NeonAvatar` correctly drew initials, and every
+layer reported success.
+
+**The evidence that the shape varies was in the same file.** `getUserById`, ten lines above, tries
+`id`, then `_id` as an ObjectId, then `_id` as a string - three fallbacks written because one was
+not enough. The batch version had one. The platform's own global leaderboard shows faces because
+it goes through `getAllUsers()`, which applies **no id filter at all** and derives
+`id: user.id || user._id?.toString()` on the way out, so it never met the problem.
+
+**Why no other screen was affected, stated precisely.** `getUsersByIds` has exactly one caller in
+the whole repository - `leaderboard-avatars.ts`, added on 10 September 2026. So this is a defect
+that arrived with the feature that first used the function, not a long-standing hole in the
+messaging screens.
+
+**The guard has to be behavioural, and that is the transferable part.** `{ id: { $in: ids } }`
+reads perfectly; there is no structural assertion that could call it wrong. The test seeds three
+real documents into a real `user` collection - one with an `id` field, one with an ObjectId `_id`
+alone, one with a string `_id` - and asserts all three are found **under the id the caller passed
+in**. The second half matters as much as the first: a document fetched through `_id` whose `id`
+field says something else would otherwise be found and then lost on the way out, which is the same
+silent empty answer one step later. The map is keyed under both.
+
+**A "fix" that only handled `_id` would have been the same defect facing the other way**, so the
+`id`-field case is asserted too, and a probe removes each half separately.
 
 ---
 

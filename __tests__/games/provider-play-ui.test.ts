@@ -2015,6 +2015,47 @@ describe("the standings board fits the column it is given", () => {
     expect(board).not.toMatch(/grid-cols-\[[\w.]+_1fr_/);
     expect(board).not.toMatch(/\bflex-wrap\b/);
   });
+
+  it("keeps the name line to the name and the you marker", () => {
+    /*
+      THE OWNER REPORTED TRUNCATED NAMES TWICE, and the second time the rail had already been
+      widened to 360px. What was actually eating the line was its own furniture: a gold crown
+      drawn beside the name while `NeonRankBadge style="plates"` was already drawing one two
+      columns to the left, and a "= #1" tie chip repeating the rank that same plate states.
+
+      Both facts are still on the row - the crown in the plate, the tie beside the score it is
+      a statement about - so this asserts WHERE they are rather than that they are gone.
+
+      The tie marker is COUNTED. A second copy left on the name line satisfies any positional
+      check aimed at the first, which is the shape that has defeated four structural tests in
+      this repository.
+    */
+    expect(board).not.toMatch(/isLeader/);
+
+    const scoreCellAt = board.indexOf("row.score === undefined");
+    expect(scoreCellAt).toBeGreaterThan(0);
+
+    const nameAt = board.indexOf("<NeonPlayerName");
+    expect(nameAt).toBeGreaterThan(0);
+    const nameBlock = board.slice(nameAt, scoreCellAt);
+    expect(nameBlock.length).toBeGreaterThan(0);
+    expect(nameBlock).not.toMatch(/row\.isTied/);
+
+    expect(board.match(/row\.isTied/g) ?? []).toHaveLength(1);
+    expect(board.indexOf("row.isTied")).toBeGreaterThan(scoreCellAt);
+  });
+
+  it("spends the rail on the name rather than on the numeric columns", () => {
+    /*
+      Every fixed width here is space the name cannot have, and the name is the only column
+      whose content has no upper bound. Counted rather than found, because the template is
+      written twice - once for the heading and once for the rows - and a widening applied to
+      one of them silently misaligns the two.
+    */
+    expect(board.match(/\bw-12\b/g) ?? []).toHaveLength(2);
+    expect(board.match(/\bw-10\b/g) ?? []).toHaveLength(2);
+    expect(board.match(/gap-x-1\.5/g) ?? []).toHaveLength(2);
+  });
 });
 
 describe("the stage is dressed in the same kit as the frame around it", () => {

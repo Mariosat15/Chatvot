@@ -155,13 +155,20 @@ export default function ProviderLeaderboard({
   */
   return (
     <div>
+      {/*
+        THE COLUMNS ARE MEASURED AGAINST THE 360px RAIL, NOT AGAINST THE LOBBY. Every fixed
+        width here is space the name cannot have, and the name is the only column whose content
+        has no upper bound. The plate is exactly the plate's own size, the two numeric columns
+        are as wide as a five-figure score and a `12:34` clock and no wider, and the gaps are
+        6px rather than 8px - which together is about 40px handed back to the name.
+      */}
       <div
-        className={`grid grid-cols-[2rem_minmax(0,1fr)_auto_auto] items-center gap-x-2 px-2 pb-1.5 ${NEON_TABLE_HEAD}`}
+        className={`grid grid-cols-[1.75rem_minmax(0,1fr)_auto_auto] items-center gap-x-1.5 px-1.5 pb-1.5 ${NEON_TABLE_HEAD}`}
       >
         <div>#</div>
         <div className="min-w-0">Player</div>
-        <div className="w-14 text-right">{scoreLabel}</div>
-        <div className="w-11 text-right">Time</div>
+        <div className="w-12 text-right">{scoreLabel}</div>
+        <div className="w-10 text-right">Time</div>
       </div>
 
       <div className={NEON_DIVIDE}>
@@ -179,7 +186,7 @@ export default function ProviderLeaderboard({
           return (
             <div
               key={row.userId}
-              className={`grid grid-cols-[2rem_minmax(0,1fr)_auto_auto] items-center gap-x-2 px-2 py-1.5 ${neonRowClasses(
+              className={`grid grid-cols-[1.75rem_minmax(0,1fr)_auto_auto] items-center gap-x-1.5 px-1.5 py-1.5 ${neonRowClasses(
                 { rank: row.currentRank, isCurrentUser: isYou, variant: "flush" },
               )}`}
             >
@@ -205,18 +212,27 @@ export default function ProviderLeaderboard({
                 />
 
                 <div className="min-w-0 flex-1">
-                  <div className="flex min-w-0 items-center gap-1.5">
-                    <NeonPlayerName
-                      name={row.username || "Anonymous"}
-                      isCurrentUser={isYou}
-                      isLeader={row.currentRank === 1}
-                    />
-                    {row.isTied && (
-                      <span className="shrink-0 rounded bg-amber-500/20 px-1.5 py-0.5 text-[11px] font-semibold text-amber-300">
-                        = #{row.currentRank}
-                      </span>
-                    )}
-                  </div>
+                  {/*
+                    NOTHING SHARES THIS LINE WITH THE NAME EXCEPT THE "YOU" MARKER, and that is
+                    what fixed the truncation the owner reported twice. Two fixtures were
+                    removed rather than the rail widened a third time:
+
+                    - THE CROWN IS NOT DRAWN TWICE. `NeonRankBadge style="plates"` already puts a
+                      gold crown in the rank plate two columns to the left, so `isLeader` here
+                      was a second crown on the one line that has to fit whatever a player is
+                      called. Deliberately not passed - see the file header on the level badge,
+                      which came off for the same reason.
+                    - THE TIE MARKER MOVED TO THE SCORE. "= #1" is a statement about the figure
+                      players are ranked on, so it belongs beside that figure; on the name line
+                      it cost about 50px and repeated the rank the plate had already stated.
+
+                    Neither fact is lost, which is the test for removing furniture rather than
+                    shrinking it.
+                  */}
+                  <NeonPlayerName
+                    name={row.username || "Anonymous"}
+                    isCurrentUser={isYou}
+                  />
 
                   {phrase && (
                     <div className="mt-0.5 flex min-w-0 items-baseline gap-1.5 text-[11px] leading-tight">
@@ -249,7 +265,7 @@ export default function ProviderLeaderboard({
                 the read-side form of the `score ?? 0` that made every provider participant
                 tie in R37.
               */}
-              <div className="w-14 self-center text-right tabular-nums">
+              <div className="w-12 self-center text-right tabular-nums">
                 {row.score === undefined || row.score === null ? (
                   <span className="text-sm text-gray-600">-</span>
                 ) : (
@@ -260,6 +276,17 @@ export default function ProviderLeaderboard({
                     pay five.
                   */
                   <span className={`text-sm font-bold ${NEON_SCORE_GOLD}`}>
+                    {/*
+                      The tie is marked here rather than beside the name, and as a bare `=`
+                      rather than "= #1": the rank plate to the left already says which
+                      position it is, so repeating the number is the same fact twice in one
+                      row. The title attribute carries the long form for anyone who needs it.
+                    */}
+                    {row.isTied && (
+                      <span className="mr-0.5 font-semibold text-amber-300" title={`Tied at #${row.currentRank}`}>
+                        =
+                      </span>
+                    )}
                     {row.score.toLocaleString()}
                   </span>
                 )}
@@ -274,7 +301,7 @@ export default function ProviderLeaderboard({
 
                 A dash for an unknown clock, never `0:00` - see `formatRoundClock`.
               */}
-              <div className="w-11 self-center text-right text-xs tabular-nums text-gray-400">
+              <div className="w-10 self-center text-right text-xs tabular-nums text-gray-400">
                 {clock ?? <span className="text-gray-600">-</span>}
               </div>
             </div>

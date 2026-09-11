@@ -1,5 +1,5 @@
 import { connectToDatabase } from "@/database/mongoose";
-import { ReadPreference } from "mongodb";
+import { ObjectId, ReadPreference } from "mongodb";
 import { userCache } from "./cache";
 
 export interface UserInfo {
@@ -235,15 +235,38 @@ export async function getUsersByIds(
       postalCode: 1,
     };
 
+    /*
+     * THREE WAYS TO BE THE SAME USER, exactly as `getUserById` above has always had.
+     *
+     * Reason: this used to filter on `{ id: { $in: uniqueIds } }` alone, which finds nothing
+     * for an account whose document has no `id` field - and Better Auth's MongoDB adapter
+     * stores the identity in `_id`, so `session.user.id` is an ObjectId string. The single
+     * lookup carries all three fallbacks precisely because the shape varies; this one did not,
+     * and the whole batch came back empty with no error and nothing in a log. That is what put
+     * initials on every row of the game leaderboards after the owner asked for faces.
+     */
+    const objectIds = uniqueIds
+      .filter((id) => ObjectId.isValid(id))
+      .map((id) => new ObjectId(id));
+
+    const idFilters: Record<string, unknown>[] = [{ id: { $in: uniqueIds } }];
+    if (objectIds.length > 0) idFilters.push({ _id: { $in: objectIds } });
+    // A string `_id` is the third shape `getUserById` handles, and `$in` may legitimately mix
+    // types, so both go in rather than one being chosen.
+    idFilters.push({ _id: { $in: uniqueIds } });
+
     const users = await db
       .collection("user")
-      .find({ id: { $in: uniqueIds } }, { projection })
+      .find({ $or: idFilters }, { projection })
       .toArray();
 
     for (const user of users) {
-      const id = user.id || user._id?.toString() || "";
+      const declaredId = user.id ? String(user.id) : "";
+      const documentId = user._id ? String(user._id) : "";
+      const id = declaredId || documentId;
       if (!id) continue;
-      userMap.set(id, {
+
+      const info: UserInfo = {
         id,
         email: user.email || "unknown",
         name: user.name || user.email || "Unknown User",
@@ -254,7 +277,16 @@ export async function getUsersByIds(
         address: user.address,
         city: user.city,
         postalCode: user.postalCode,
-      });
+      };
+
+      /*
+       * KEYED UNDER BOTH IDS, because the caller looks the map up by the string it passed in.
+       * A document found through `_id` whose `id` field says something else would otherwise be
+       * fetched successfully and then missed on the way out - the same silent empty answer one
+       * step later.
+       */
+      if (declaredId) userMap.set(declaredId, info);
+      if (documentId) userMap.set(documentId, info);
     }
 
     return userMap;

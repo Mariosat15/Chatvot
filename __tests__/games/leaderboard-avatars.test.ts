@@ -218,13 +218,22 @@ describe("the rank marker and the score colour", () => {
     // The old rule - amber for the top three, grey below - is gone: a colour that changed at
     // fourth place read as "these three are paid" on a contest that may pay five.
     expect(board).not.toMatch(/currentRank <= 3/);
-    // Scoped to the score cell: the tied badge beside the name is legitimately amber, so a
-    // file-wide ban would fail on correct code.
-    const scoreAt = board.indexOf("row.score.toLocaleString()");
-    expect(scoreAt).toBeGreaterThan(0);
-    const cell = board.slice(board.lastIndexOf("<span", scoreAt), scoreAt);
-    expect(cell.length).toBeGreaterThan(0);
-    expect(cell).not.toMatch(/text-amber-300|text-gray-100/);
+    /*
+      Scoped to the span that actually colours the figure: the tie marker is legitimately amber,
+      so a file-wide ban would fail on correct code.
+
+      RE-POINTED ON 11 SEPTEMBER 2026, AND THE CLAIM IS UNCHANGED. This used to slice backwards
+      from `row.score.toLocaleString()` to the nearest `<span`, which was the score's own span
+      until the tie marker moved into that cell and became the nearest one - so the assertion
+      began reading a construct that is meant to be amber and failed on a correct file. A slice
+      taken backwards finds whatever construct happens to be closest, which is the third time
+      that has cost a false result here; anchoring on the token instead cannot drift.
+    */
+    const goldAt = board.indexOf("${NEON_SCORE_GOLD}");
+    expect(goldAt).toBeGreaterThan(0);
+    const goldSpan = board.slice(board.lastIndexOf("<span", goldAt), goldAt);
+    expect(goldSpan.length).toBeGreaterThan(0);
+    expect(goldSpan).not.toMatch(/text-amber-300|text-gray-100/);
   });
 });
 

@@ -93,6 +93,8 @@ $KitRow = 'components/neon/LeaderboardRow.tsx'
 $Tokens = 'components/neon/tokens.ts'
 $Layout = 'components/games/arena/GameArenaLayout.tsx'
 $Live = 'components/games/arena/ArenaLiveStandings.tsx'
+$Lookup = 'lib/utils/user-lookup.ts'
+$LookupSuite = '__tests__/games/user-lookup-batch.test.ts'
 
 Write-Host ''
 Write-Host '=== The row gains the picture and nothing else ===' -ForegroundColor Cyan
@@ -230,6 +232,77 @@ Invoke-Probe -Name 'the count says traders' -File $Live `
   -Find '  return <NeonCountPill>Players ({rows.length})</NeonCountPill>;' `
   -Replace '  return <NeonCountPill>Traders ({rows.length})</NeonCountPill>;' `
   -ExpectTest 'counts players in the reference.s form, and never traders'
+
+Write-Host ''
+Write-Host '=== The lookup finds the player at all ===' -ForegroundColor Cyan
+
+# THE DEFECT BEHIND "we dont have the avatars of the player". The batch lookup filtered on the
+# `id` FIELD alone, which finds nothing for an account whose identity is in `_id` - and Better
+# Auth's MongoDB adapter puts it there. No error, no log line, initials on every row. The guard
+# has to be behavioural: this filter reads perfectly.
+Invoke-Probe -Name 'the batch lookup filters on the id field alone' -File $Lookup `
+  -Find '      .find({ $or: idFilters }, { projection })' `
+  -Replace '      .find({ id: { $in: uniqueIds } }, { projection })' `
+  -ExpectTest 'finds a player whose identity lives in' -Suite $LookupSuite
+
+# Found and then lost on the way out: keyed under the document's own `id` only, a user fetched
+# through `_id` is never returned under the id the caller asked about.
+Invoke-Probe -Name 'the map is keyed by the declared id only' -File $Lookup `
+  -Find '      if (declaredId) userMap.set(declaredId, info);
+      if (documentId) userMap.set(documentId, info);' `
+  -Replace '      if (declaredId) userMap.set(declaredId, info);' `
+  -ExpectTest 'finds a player whose identity lives in' -Suite $LookupSuite
+
+# The other half of a missing face: Better Auth writes `image`, the platform writes
+# `profileImage`, and the global leaderboard has always resolved both.
+Invoke-Probe -Name 'only profileImage is read, never Better Auth''s image' -File $Lookup `
+  -Find '        profileImage: user.profileImage || user.image,
+        bio: user.bio,
+        role: user.role || "trader",
+        country: user.country,
+        address: user.address,
+        city: user.city,
+        postalCode: user.postalCode,
+      };
+
+      /*' `
+  -Replace '        profileImage: user.profileImage,
+        bio: user.bio,
+        role: user.role || "trader",
+        country: user.country,
+        address: user.address,
+        city: user.city,
+        postalCode: user.postalCode,
+      };
+
+      /*' `
+  -ExpectTest 'finds a player whose identity lives in' -Suite $LookupSuite
+
+Write-Host ''
+Write-Host '=== The name line is the name ===' -ForegroundColor Cyan
+
+# The crown drawn a second time beside the name, while the rank plate already carries one.
+Invoke-Probe -Name 'the crown is drawn twice' -File $Board `
+  -Find '                    isCurrentUser={isYou}
+                  />' `
+  -Replace '                    isCurrentUser={isYou}
+                    isLeader={row.currentRank === 1}
+                  />' `
+  -ExpectTest 'keeps the name line to the name and the you marker' -Suite $PlayUiSuite
+
+# The tie chip back on the name line, which is where it cost about 50px.
+Invoke-Probe -Name 'the tie chip returns to the name line' -File $Board `
+  -Find '                  <NeonPlayerName' `
+  -Replace '                  {row.isTied && <span>= #{row.currentRank}</span>}
+                  <NeonPlayerName' `
+  -ExpectTest 'keeps the name line to the name and the you marker' -Suite $PlayUiSuite
+
+# The numeric columns widened on the heading only: the two templates then disagree, which is
+# invisible in a diff and misaligns every row.
+Invoke-Probe -Name 'the score column is widened on the heading alone' -File $Board `
+  -Find '        <div className="w-12 text-right">{scoreLabel}</div>' `
+  -Replace '        <div className="w-14 text-right">{scoreLabel}</div>' `
+  -ExpectTest 'spends the rail on the name rather than on the numeric columns' -Suite $PlayUiSuite
 
 Write-Host ''
 Write-Host 'Done. Every probe above must read RED with exactly 1 failure.' -ForegroundColor Cyan
