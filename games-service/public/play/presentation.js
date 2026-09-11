@@ -194,6 +194,51 @@ export function boardCellPx(availableWidth, availableHeight, gridWidth, gridHeig
   return Math.max(MIN_CELL_PX, Math.min(MAX_CELL_PX, Math.min(byWidth, byHeight)));
 }
 
+/**
+ * The cell size the AVAILABLE WIDTH permits, which is the size the board will actually draw at.
+ *
+ * WHY THIS EXISTS, and it is the owner's report of 11 September 2026 - *"this is the large board,
+ * when we choose medium and large the system makes the board smaller"*. The board is width-bound
+ * in the platform's arena and always has been: the frame is a middle column of 450 to 650 pixels,
+ * and a cell is square, so `boardCellPx` takes the width's answer. A 4x4 got a comfortable cell
+ * out of that and an 8x8 got the floor - the same board, drawn small, with nothing errored.
+ *
+ * Two things follow, and only the second is arithmetic. The rails beside the board had to go
+ * (see `.arena` in `app.css`), because they were taking a third of the width the grid divides up.
+ * And the height asked for has to be derived from the width rather than from `TARGET_CELL_PX`,
+ * or the frame is granted room for a 72-pixel cell while the width only permits 49 and the
+ * difference shows as the empty band above and below the board that the owner drew arrows across.
+ *
+ * IT IS SAFE TO READ THE CURRENT WIDTH AND IT IS NOT SAFE TO READ THE CURRENT HEIGHT, which reads
+ * like an inconsistency and is the whole reason this is sound. Nothing we report changes our
+ * width: it is the width of the host's column, decided by the host's layout. The height IS what
+ * we report, so a height derived from the height we have is a fixed point at whatever the host
+ * opened with - the postage-stamp defect, and the reason `desiredFrameHeight` takes no such
+ * field. A width that moves because the host gained a scrollbar moves the answer by a pixel or
+ * two of cell, which `HEIGHT_REPORT_THRESHOLD_PX` swallows rather than reporting.
+ */
+export function widthBoundCellPx(availableWidth, gridWidth, gridHeight) {
+  const cols = positive(gridWidth) ? Math.round(gridWidth) : 0;
+  /*
+   * THE `cols` HALF DECIDES SOMETHING AND THE WIDTH HALF IS CLARITY, and saying so is the honest
+   * version. Without the first, `grid / 0` is `Infinity` and the clamp below answers
+   * `MAX_CELL_PX` - a 104-pixel cell for a board with no columns, which is a request for a frame
+   * a third taller than it needs. The width half changes no answer: `spaceForGrid` reports 0 for
+   * anything that is not a positive number, and the `!positive(grid)` line four below then
+   * returns the target. It stays because a reader looking for "what happens before the first
+   * paint" looks at the top of the function, and its probe is recorded as unprobed for exactly
+   * this reason rather than shipped green.
+   */
+  if (!cols || !positive(availableWidth)) return TARGET_CELL_PX;
+
+  const rows = positive(gridHeight) ? Math.round(gridHeight) : cols;
+  const { horizontal } = frameOverhang(boardFrameFor(cols, rows));
+  const grid = spaceForGrid(availableWidth, horizontal);
+  if (!positive(grid)) return TARGET_CELL_PX;
+
+  return Math.max(MIN_CELL_PX, Math.min(MAX_CELL_PX, Math.floor(grid / cols)));
+}
+
 function clampFrame(height) {
   if (!Number.isFinite(height)) return MIN_FRAME_HEIGHT;
   return Math.max(MIN_FRAME_HEIGHT, Math.min(MAX_FRAME_HEIGHT, Math.ceil(height)));
@@ -207,13 +252,15 @@ function clampFrame(height) {
  * whatever its own text comes to and no arithmetic here could know that.
  *
  * Note what is NOT in the parameter list: the height we currently have. See the header - taking
- * it is the defect, not an optimisation of it.
+ * it is the defect, not an optimisation of it. `availableWidth` IS in the list, and
+ * `widthBoundCellPx` explains at length why one is safe and the other is not.
  */
 export function desiredFrameHeight(input) {
-  const { screen, gridWidth, gridHeight, chromeHeight, contentHeight } = input ?? {};
+  const { screen, gridWidth, gridHeight, chromeHeight, contentHeight, availableWidth } = input ?? {};
 
   if (screen === "play") {
     const rows = positive(gridHeight) ? Math.round(gridHeight) : 6;
+    const cols = positive(gridWidth) ? Math.round(gridWidth) : rows;
     const chrome = positive(chromeHeight) ? chromeHeight : DEFAULT_CHROME_PX;
     // The bezel is counted here as well as in `spaceForGrid`, and leaving it out is the version
     // that looks correct: the board still fits, because `boardCellPx` measures what arrived - it
@@ -221,9 +268,16 @@ export function desiredFrameHeight(input) {
     // in a new disguise, so the height asked for is the height the framed board needs - and it
     // is THIS board's frame, because the drawn 4x4 bezel is nearly three times as deep as the
     // generic one.
-    const frame = boardFrameFor(positive(gridWidth) ? Math.round(gridWidth) : rows, rows);
+    const frame = boardFrameFor(cols, rows);
     const { vertical } = frameOverhang(frame);
-    return clampFrame(chrome + framedGridPx(rows * TARGET_CELL_PX, vertical) + BOARD_FRAME_PX);
+    // The cell the width permits when the width is known, and the target otherwise. Asking for
+    // the target's height on a narrow frame is what left the empty band above and below the
+    // board: the grid can only ever be as big as the narrower axis allows, so a request based on
+    // the other one is a request for space the board cannot use.
+    const cell = positive(availableWidth)
+      ? widthBoundCellPx(availableWidth, cols, rows)
+      : TARGET_CELL_PX;
+    return clampFrame(chrome + framedGridPx(rows * cell, vertical) + BOARD_FRAME_PX);
   }
 
   return clampFrame(positive(contentHeight) ? contentHeight : 0);

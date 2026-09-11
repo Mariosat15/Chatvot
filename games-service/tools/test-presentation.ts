@@ -50,6 +50,7 @@ interface Presentation {
   MAX_FRAME_HEIGHT: number;
   HEIGHT_REPORT_THRESHOLD_PX: number;
   boardCellPx(w: number, h: number, gw: number, gh: number): number;
+  widthBoundCellPx(availableWidth: number, gridWidth: number, gridHeight: number): number;
   desiredFrameHeight(input: Record<string, unknown>): number;
   BOARD_ART_OVERHANG: number;
   DRAWN_BOARD_FRAMES: DrawnFrame[];
@@ -168,6 +169,88 @@ async function main(): Promise<void> {
         `the request moved when it was told the frame is currently ${currentHeight}px`,
       );
     }
+  });
+
+  test("the height asked for follows the width the frame has, and still ignores the height", () => {
+    /*
+     * THE OWNER'S SECOND REPORT ABOUT THIS BOARD'S SIZE, 11 September 2026: *"when we choose
+     * medium and large the system makes the board smaller"*.
+     *
+     * The board is width-bound in the platform's arena - a 450-to-650-pixel middle column, and a
+     * cell is square - so a request built on `TARGET_CELL_PX` asks for room a narrow frame's grid
+     * can never use, and the surplus shows as the empty band above and below the board that the
+     * owner drew arrows across. So the request follows the width.
+     *
+     * AND THE ANTI-LOOP PROPERTY SURVIVES IT, which is the half worth asserting hardest. Reading
+     * the current width is safe because nothing we report changes it: it is the host's column.
+     * Reading the current height is the original postage-stamp defect, because the height IS what
+     * we report. The distinction is invisible in the code and obvious here.
+     */
+    const base = { screen: "play", gridWidth: 8, gridHeight: 8, chromeHeight: 160, availableWidth: 480 };
+    const answer = p.desiredFrameHeight(base);
+
+    for (const currentHeight of [320, 1000, 0, -50]) {
+      assert.equal(
+        p.desiredFrameHeight({ ...base, currentHeight, scrollHeight: currentHeight }),
+        answer,
+        `the request moved when it was told the frame is currently ${currentHeight}px`,
+      );
+    }
+
+    // It is the width's own answer, not the target's, and on a narrow frame that is smaller.
+    const cell = p.widthBoundCellPx(480, 8, 8);
+    const vertical = p.frameOverhang(p.boardFrameFor(8, 8)).vertical;
+    assert.ok(Math.abs(answer - (160 + p.framedGridPx(8 * cell, vertical) + 16)) <= 1);
+    assert.ok(cell < p.TARGET_CELL_PX, `a 480px frame gave an 8x8 a ${cell}px cell`);
+    assert.ok(
+      answer < p.desiredFrameHeight({ screen: "play", gridWidth: 8, gridHeight: 8, chromeHeight: 160 }),
+      "a narrow frame asked for as much height as a comfortable one - the band is still there",
+    );
+
+    // A wider frame asks for more, because a wider frame can genuinely draw a bigger board.
+    assert.ok(p.desiredFrameHeight({ ...base, availableWidth: 700 }) > answer);
+  });
+
+  test("a bigger grid does not get a smaller board", () => {
+    /*
+     * THE OWNER'S COMPLAINT AS A PROPERTY, and the one assertion that would have caught it. The
+     * three drawn boards are 4x4, 6x6 and 8x8; whichever is chosen, the FRAMED board should come
+     * out at very nearly the width available, with only the cell size differing. Before the rails
+     * left the board's row all three were handed about 280 pixels of a 500-pixel frame, and the
+     * 8x8 hit its 34-pixel floor and overflowed while the 4x4 sat comfortably - the same board,
+     * drawn small, with nothing errored.
+     *
+     * Asserted against the available width rather than between the sizes, because "all three are
+     * equally small" satisfies a comparison between them.
+     */
+    for (const available of [420, 500, 620]) {
+      for (const cells of [4, 6, 8]) {
+        const cell = p.widthBoundCellPx(available, cells, cells);
+        const { horizontal } = p.frameOverhang(p.boardFrameFor(cells, cells));
+        const framed = p.framedGridPx(cells * cell, horizontal);
+        assert.ok(
+          framed <= available,
+          `a ${cells}x${cells} framed board is ${framed}px in ${available}px of frame - it overflows`,
+        );
+        assert.ok(
+          available - framed <= cell + 2,
+          `a ${cells}x${cells} framed board is ${framed}px in ${available}px of frame - ` +
+            `${available - framed}px of it is unused`,
+        );
+      }
+    }
+  });
+
+  test("a width the board cannot use leaves the cell at the target or the floor", () => {
+    // The two ends. No width known at all means the target, because a request has to be made
+    // before the first paint and the target is the size the board wants. A width too small for a
+    // playable cell means the floor, which OVERFLOWS deliberately: a 20-pixel cell is narrower
+    // than a fingertip, so the game stops being playable before it stops being visible.
+    assert.equal(p.widthBoundCellPx(0, 8, 8), p.TARGET_CELL_PX);
+    assert.equal(p.widthBoundCellPx(Number.NaN, 8, 8), p.TARGET_CELL_PX);
+    assert.equal(p.widthBoundCellPx(500, 0, 0), p.TARGET_CELL_PX);
+    assert.equal(p.widthBoundCellPx(180, 8, 8), p.MIN_CELL_PX);
+    assert.equal(p.widthBoundCellPx(4000, 4, 4), p.MAX_CELL_PX);
   });
 
   test("a board always asks for more than a host's usual minimum, at every grid size", () => {

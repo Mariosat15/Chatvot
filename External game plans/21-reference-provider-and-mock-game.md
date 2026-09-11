@@ -1359,6 +1359,14 @@ Three findings came out of building it:
 | `public/play/board.js` | `drawOrder`, `noteDrawn`, `lastDrawn`, `undo()`, `canUndo()`; `onPointerUp` now reports `{ settled: true }` so a completed drag can be counted |
 | `public/play/index.html` | `#screen-play` rebuilt: three boxed header cells, an `.arena` of action rail + board + stat rail, one wide Submit |
 | `public/play/app.css` | The header strip, the arena grid, the rails, the coverage meter, the stat tiles, `.submit-wide`, and the 680px stacking query |
+
+> **AMENDED LATER THE SAME DAY BY s4.1r, and the two rows above are correct as history only.**
+> Putting a rail on each side of a **width-bound** board is what made the larger grids draw
+> smaller: the two strips took about a third of the frame's width, so the cell size collapsed. The
+> arena is now one column - the board, then the figures beneath it - with the actions in the footer
+> beside Submit, and there is no arena media query at all. `chromeHeightOf` is unchanged and still
+> correct in the new arrangement, which is the point of measuring the arena rather than allowing a
+> fixed amount.
 | `public/play/app.js` | `renderInstruments`, `renderStatTiles`, `noteBoardBoundary`, `renderUndo`, the move and best-board state, the Undo handler, and the widened `chromeHeightOf` |
 
 Three smaller decisions recorded rather than absorbed. **Submit is alone on its row** - a
@@ -1380,6 +1388,116 @@ build and no cache purge. **`npm run build` is still required in the same moveme
 R66's clock fix and the progress callback are TypeScript and have never been built on the server.
 
 **Not verified by eye**, and it cannot be from here - the surface needs a signed launch token.
+
+### 4.1r The larger the board, the smaller it was drawn - 11 September 2026
+
+The owner opened a large board inside the platform arena and reported, with four red arrows
+across the empty space around it: *"this is the large board, when we choose medium and large the
+system makes the board smaller. This is not what I want, I want the board to be big, fill like I
+show in red arrows."* Two green circles marked the `UNDO` / `CLEAR` rail on the left of the board
+and the `THIS BOARD / PATHS / MOVES / BOARDS DONE` column on the right: *"you need to rearrange
+the info and buttons in green circles."*
+
+He is right, and the direction of the fault is the part worth keeping: **a bigger grid really did
+get a smaller board.**
+
+#### The board was WIDTH-bound, and the rails were eating the width
+
+The frame is the arena's middle column, 450 to 650 pixels. A cell is square, so `boardCellPx`
+takes whichever axis answers smaller - and s4.1q had put a rail on each side of the board inside
+the same `.arena` grid, each sized to its own content, plus two gaps. That came to roughly 220
+pixels of a 500-pixel frame. An 8x8 divided what was left into cells at their **34-pixel floor**;
+a 4x4, dividing the same remainder four ways, looked perfectly healthy. Hence the owner's exact
+observation, and hence the absence of any signal: nothing errored, nothing logged, and
+`boardCellPx` was correct throughout. **It was being handed a third of the room.**
+
+Separately, `desiredFrameHeight` asked the platform for `rows * TARGET_CELL_PX` (72) while the
+width would only permit a 49-pixel cell. The surplus is the empty band above and below the board
+that the owner's vertical arrows point at. **Two faults, one report.**
+
+This is the **third** distinct cause of a small board on this screen, and the pattern across all
+three is worth carrying rather than the individual causes: s4.1f's frame-height feedback loop
+(the 34-pixel postage stamp), s4.1m's `align-items: center` (which stopped `.board-wrap`
+stretching, so the fit had no height to converge on), and now the width. **Every one of them was
+a layout fault that presented as an arithmetic one**, and every review of `boardCellPx`,
+`fitBoard` and `desiredFrameHeight` came back clean each time.
+
+#### The safe axis and the unsafe axis, which is the rule to keep
+
+`desiredFrameHeight` now takes `availableWidth` and derives the cell from it. Reading the
+**width** is safe because nothing we report changes it - the width is the host's column. Reading
+the **height** is the original defect, because the height *is* what we report, so a height derived
+from it is a fixed point that settles at whatever the host opened with (320 pixels). The
+distinction is in the function's own comment, because the two reads look identical in a diff.
+
+No loop is possible in the other direction either: the only way our height can change our width
+is a scrollbar appearing, which moves the cell by a pixel or two, and
+`HEIGHT_REPORT_THRESHOLD_PX` (24) swallows that.
+
+#### The rearrangement
+
+**One column.** `.arena` is `grid-template-columns: minmax(0, 1fr)` with the board as a
+stretching `minmax(0, 1fr)` row and the figures as an `auto` strip beneath it. The actions moved
+out of the arena entirely, into the footer beside Submit.
+
+- **The board is first in document order, so nothing needs an `order` rule at any width.** Grid
+  auto-placement follows *order-modified* document order (`13` s1.1h, and s4.1q's own second
+  layout note), and a single column that reads correctly top to bottom in the DOM cannot be got
+  wrong by a media query somebody adds later.
+- **`chromeHeightOf` needed no change and that is by construction, not luck.** It sums the bars
+  and then adds `arena height - board height`, so the figures strip is counted by the
+  subtraction and the action buttons by the sum. Either home is accounted for. What it could
+  never count was a rail left beside the board as a *column*: no taller than the board, so worth
+  nothing in height while costing a third of the width.
+- **Submit takes the leftover width rather than a fixed one** (`flex: 1 1 auto`, capped at 26rem),
+  and s4.1q's recorded hazard is honoured rather than discarded. That section put Clear in the
+  rail because *"a destructive control beside the confirming one, both the same width, is how a
+  player wipes a finished grid instead of sending it."* **The clause that carries the argument is
+  the width.** Clear is a 62-pixel ghost icon button; Submit is everything left over and lights
+  cyan. The comment on `.submit-wide` was rewritten in place to say so, and to say that
+  equalising the two widths or giving Clear the primary style reinstates the hazard - because a
+  future reader seeing them share a row will otherwise assume the rule was abandoned.
+- **Only the footer folds on a phone**, at 420px, and the arena is never re-laid by a media
+  query - pinned by a test, since a query restoring three columns at one width is exactly how the
+  defect comes back for laptop-sized frames only.
+
+#### One measure, two callers
+
+`fitBoard` and the height request were each reading the wrap's box themselves. They now both
+call `boardSpace()`. This is the "one rule, two copies" shape in its smallest form: two
+measurements of one box drift the moment either gains a margin, and the *symptom* of that drift
+is a board sized for one width inside a frame sized for another - which is the defect being
+fixed, arriving by a different road.
+
+A structural test asserts `fitBoard` contains no `getBoundingClientRect` of its own and that the
+height request passes `boardSpace().width`. It slices both functions rather than searching the
+file, because `chromeHeightOf` legitimately calls `getBoundingClientRect` and a file-wide count
+is green either way.
+
+#### What was built
+
+| File | Change |
+|---|---|
+| `public/play/presentation.js` | `widthBoundCellPx` (exported, pure); `desiredFrameHeight` takes `availableWidth` and derives the cell from it |
+| `public/play/app.js` | `boardSpace()`, shared by `fitBoard` and the height request |
+| `public/play/index.html` | `.action-rail` moved into the footer inside `.footer-actions`; the arena is board then figures |
+| `public/play/app.css` | `.arena` one column and two rows; `.stat-rail` and `.stat-tiles` wrapping horizontal strips; `.footer-actions`; `.submit-wide` flexible; the 520px rail query replaced by a 420px footer query |
+
+**6 new tests (297 in the service, from 291), 13 probes red on exactly the named test.** One came
+back green for a cause now recorded rather than papered over: the width half of
+`widthBoundCellPx`'s first guard changes no answer, because `spaceForGrid` reports 0 for a
+non-positive width and the line below returns the target anyway. The two guards cover each other,
+so the mutation reaches no observable. It is **recorded in the probe file as unprobed with the
+reason** and the `cols` half - which genuinely decides something, since `grid / 0` clamps to
+`MAX_CELL_PX` - carries the probe instead. Shipping the green one would have taught the next
+reader that the early return is decoration.
+
+**Verified by eye** through `tools/smoke-play.ts` at an emulated 500-pixel frame: the large board
+draws 460 pixels of 468 available, the medium 463 of 468. Both fill the width within a cell.
+
+**Deploy: `public/play` needs only a pull and `pm2 restart chartvolt-games`** - no build for this
+change, since all of it is the unbundled surface. `npm run build` is still owed in the same
+movement for R66 and the progress callback, which have never been built on the server.
 
 ---
 

@@ -589,43 +589,57 @@ button.icon-btn {
 }
 
 /*
- * THE ARENA. A rail, the board, a rail.
+ * THE ARENA. The board, then the figures under it.
  *
- * The board is the middle column, and it is the only one allowed to take the leftover space -
- * both rails are sized to their own contents. `minmax(0, 1fr)` and not `1fr`: a bare `1fr` track
- * is floored by its content, so a wide stat value would push the grid past its container and the
- * board would be the thing that gave way, with nothing on screen to say why.
+ * IT WAS `auto minmax(0, 1fr) auto` - a rail, the board, a rail - UNTIL 11 SEPTEMBER 2026, and
+ * the owner's second report about this board's size is why it is one column now: *"when we choose
+ * medium and large the system makes the board smaller"*. The board is WIDTH-BOUND here. This page
+ * runs in an iframe that is the middle column of the platform's arena, 450 to 650 pixels, and a
+ * cell is square - so `boardCellPx` takes the width's answer on every laptop. Two rails at their
+ * own content widths plus two gaps came to about 220 of those pixels, which an 8x8 then divided
+ * into cells at their floor while a 4x4, dividing the same remainder four ways, looked perfectly
+ * healthy. Nothing errored and nothing logged: the large board was simply drawn small, which is
+ * exactly how the owner described it.
  *
- * THE BOARD'S CELL MUST STRETCH TO THE ROW, AND `align-items: center` HERE IS A DEFECT. `fitBoard`
+ * So the single column is the fix, and it is a layout change rather than an arithmetic one -
+ * `boardCellPx` was right all along and was being handed a third of the room. The actions are in
+ * the footer beside Submit and the figures are a strip under the board.
+ *
+ * `minmax(0, 1fr)` and not `1fr`, on both axes: a bare `fr` track is floored by its content, so a
+ * wide stat value or a tall meter would push the grid past its container and the board would be
+ * the thing that gave way, with nothing on screen to say why.
+ *
+ * THE BOARD'S CELL MUST STRETCH TO ITS ROW, AND `align-items: center` HERE IS A DEFECT. `fitBoard`
  * sizes the grid from the space `.board-wrap` actually has, so the wrap has to be the size of the
  * row and never the size of the grid inside it. Centred, the wrap shrinks to the `<svg>`, the next
  * fit measures a wrap the size of the previous grid, takes the bezel's share off it and draws a
  * smaller grid - and the fit after that measures THAT. It converges on the 34-pixel floor while
  * `desiredFrameHeight`, which deliberately never reads the current height, keeps asking the host
  * for a frame tall enough for a full-size board. The result was a tall frame with a postage-stamp
- * board in the middle of it, reported by the owner on 11 September 2026, with nothing errored and
- * nothing logged. So the row stretches and the RAILS centre themselves - the centring the owner
- * sees is the same, and only the element that is measured has changed.
+ * board in the middle of it, reported by the owner earlier the same day, also with nothing
+ * errored. The wrap centres the board inside itself; the ROW is what must not be centred.
  */
 .arena {
   flex: 1;
   min-height: 0;
   width: 100%;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
   align-items: stretch;
-  gap: 12px;
+  gap: 10px;
 }
 
-.action-rail,
-.stat-rail {
-  align-self: center;
-}
-
+/*
+ * The actions, now a row in the footer.
+ *
+ * `flex-wrap` rather than a fixed direction: on a very narrow frame the two buttons drop under
+ * Submit instead of squeezing its label to two characters.
+ */
 .action-rail {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
+  flex-direction: row;
+  gap: 8px;
 }
 
 button.rail-btn {
@@ -655,10 +669,20 @@ button.rail-btn:disabled {
   cursor: default;
 }
 
+/*
+ * The figures, now a strip under the board rather than a column beside it.
+ *
+ * `flex-wrap` with a basis on each half, so the meter and the tiles sit side by side while there
+ * is room for both and the tiles drop to their own line when there is not. A grid of fixed tracks
+ * would keep them side by side and shrink the labels instead, and these labels are already at
+ * 0.54rem.
+ */
 .stat-rail {
-  display: grid;
-  gap: 10px;
-  min-width: 8.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 8px;
+  min-width: 0;
 }
 
 /* ------------------------------------------------------------------------------------------
@@ -666,7 +690,10 @@ button.rail-btn:disabled {
  * ---------------------------------------------------------------------------------------- */
 
 .board-meter {
+  flex: 1 1 10rem;
+  min-width: 0;
   display: grid;
+  align-content: center;
   gap: 6px;
   padding: 8px 10px 10px;
   border-radius: var(--radius-sm);
@@ -726,8 +753,17 @@ button.rail-btn:disabled {
   box-shadow: 0 0 16px -4px var(--ready);
 }
 
+/*
+ * `grid-auto-flow: column` with `minmax(0, 1fr)` columns: however many tiles `playStatTiles`
+ * returns, they share the strip equally and none of them widens it. It omits a tile rather than
+ * rendering an empty value, so the count genuinely varies.
+ */
 .stat-tiles {
+  flex: 2 1 18rem;
+  min-width: 0;
   display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   gap: 8px;
 }
 
@@ -757,50 +793,33 @@ button.rail-btn:disabled {
 }
 
 /*
- * NARROW SCREENS: the rails fold above and below the board instead of squeezing it.
+ * NARROW FRAMES.
  *
- * Written as a max-width query rather than by reordering with `order`, because grid
- * auto-placement follows order-modified document order - so an `order` rule that fires only on a
- * wide screen leaves a phone arranged by DOM order, which puts the actions above the board and
- * the figures below the fold. That exact mistake was made on the platform's own arena layout.
+ * THIS QUERY USED TO FOLD THE TWO RAILS ABOVE AND BELOW THE BOARD, and it is much smaller now
+ * because the wide arrangement it existed to escape has gone: since 11 September 2026 the board
+ * has the whole width at every frame size, the figures are already a strip under it and the
+ * actions are already a row in the footer, so there is no side-by-side arrangement left to
+ * undo. What remains is the two things that genuinely need a narrower frame to look right.
  *
- * `chromeHeightOf` measures the arena and subtracts the board, so the height these two rows add
- * is accounted for here without this query being restated in JavaScript.
+ * Still written as a max-width query rather than by reordering with `order`: grid auto-placement
+ * follows order-modified document order, so an `order` rule that fires only on a wide screen
+ * leaves a phone arranged by DOM order. That exact mistake was made on the platform's own arena
+ * layout, and the arena above is now in document order precisely so nothing needs `order` at all.
  *
  * THE WIDTH IS THE FRAME'S, NOT THE DEVICE'S. This page runs inside an iframe in the platform's
  * arena, and a media query reads the iframe's width - which on a laptop is the middle column
- * between a standings rail and a sidebar, about 450 to 650 pixels. At 680 this query fired on
- * every laptop and the rails sat under the board on the one screen the owner was looking at, so
- * the threshold is the width at which a rail beside the board would genuinely squeeze it: two
- * rails at their minimum plus a grid at the smallest cell size worth having.
+ * between a standings rail and a sidebar, about 450 to 650 pixels. A threshold in that band fires
+ * on every laptop, which is how the rails came to be stacked on the one screen the owner was
+ * looking at, so this one stays well below it.
  */
-@media (max-width: 520px) {
-  .arena {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr) auto auto;
-    gap: 10px;
-  }
-
-  .board-wrap {
-    grid-row: 1;
-  }
-
-  .stat-rail {
-    grid-row: 2;
-    min-width: 0;
-    grid-auto-flow: column;
-    grid-auto-columns: minmax(0, 1fr);
-    align-items: stretch;
-  }
-
-  .stat-tiles {
-    grid-auto-flow: column;
-    grid-auto-columns: minmax(0, 1fr);
+@media (max-width: 420px) {
+  /* Submit takes its own line; two icon buttons beside it leave it about five characters. */
+  .footer-actions {
+    flex-wrap: wrap;
   }
 
   .action-rail {
-    grid-row: 3;
-    flex-direction: row;
+    flex: 1 1 100%;
   }
 
   button.rail-btn {
@@ -1001,15 +1020,29 @@ svg#board .terminal-art {
 }
 
 /*
- * The submit control: one wide button rather than a pair.
+ * The footer's row of actions: Undo, Clear, and the wide Submit.
  *
- * Clear moved into the action rail beside the board, which leaves the only thing that ENDS a
- * board down here on its own. A destructive control sharing a row with the confirming one, both
- * the same width, is how a player wipes a finished grid instead of sending it - and it is worth
- * more here than width alone, because this is the control a player reaches for under a clock.
+ * THE SAFETY ARGUMENT THAT PUT CLEAR BESIDE THE BOARD IS PRESERVED, AND IT WAS NEVER ABOUT THE
+ * ROW. Until 11 September 2026 this comment read that Clear had moved to the rail beside the
+ * board, leaving the control that ENDS a board down here on its own - because "a destructive
+ * control sharing a row with the confirming one, BOTH THE SAME WIDTH, is how a player wipes a
+ * finished grid instead of sending it". The rails then had to leave the board's row, since they
+ * were taking a third of the width the grid divides into cells (see `.arena`), so Clear is back
+ * on this row - and the clause that matters is the one about width. It is a 62-pixel ghost icon
+ * button; Submit takes everything left over, stands 52 pixels tall and lights up cyan the moment
+ * the board is submittable. Nothing about them invites the same tap. Equalising their widths, or
+ * giving Clear the primary style, reinstates the hazard this paragraph exists to record.
  */
-.submit-wide {
+.footer-actions {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 8px;
   width: 100%;
+}
+
+.submit-wide {
+  flex: 1 1 auto;
   max-width: 26rem;
   min-height: 52px;
   font-size: 1.02rem;

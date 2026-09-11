@@ -189,30 +189,29 @@
         </header>
 
         <!--
-          THE ARENA: a rail of actions, the board, a rail of figures.
+          THE ARENA: the board, then the figures under it.
 
-          The board is the MIDDLE column and the middle grid row, and the rails are laid out around
-          it, so on a narrow screen they fold above and below it rather than squeezing it. The
-          board's size is computed from the space this row actually leaves it - see `fitBoard` - so
-          a rail that grows takes space from itself and never from the grid.
+          IT WAS A RAIL, THE BOARD AND A RAIL UNTIL 11 SEPTEMBER 2026, and the owner's report is
+          why it is not any more: *"when we choose medium and large the system makes the board
+          smaller"*. The board is width-bound in the platform's arena - the frame is a middle
+          column of 450 to 650 pixels and a cell is square - so the two rails beside it were
+          taking about a third of the width the grid divides up, and an 8x8 divided what was left
+          into cells at their floor while a 4x4 looked fine. Nothing errored; the large board was
+          simply drawn small. So the actions moved into the footer beside Submit and the figures
+          moved under the board, and the grid gets the whole width at every size.
+
+          THE FIGURES STAY INSIDE THE ARENA AND THE BUTTONS DO NOT, which is not tidiness.
+          `chromeHeightOf` sums the `.bar` rows and then adds whatever the arena has over and
+          above the board - so a strip inside the arena is counted by the subtraction and a row of
+          buttons inside the footer is counted by the sum. Either place is accounted for; a third
+          `.bar` between them would be too, but the coverage meter belongs against the board it
+          describes.
+
+          The board is the FIRST row in document order, so nothing here needs `order` - grid
+          auto-placement follows order-modified document order, and an `order` rule that fires at
+          one width leaves every other width arranged by the DOM.
         -->
         <div class="arena">
-          <!--
-            Two actions, and deliberately not the three the reference design shows. Undo removes
-            the path drawn last and is strictly weaker than Clear; a HINT is forbidden outright,
-            because it would improve a score in a paid contest. The reasoning is in `undoState`.
-          -->
-          <div class="action-rail">
-            <button id="undo" class="ghost rail-btn" type="button" disabled>
-              <span class="rail-btn-icon" aria-hidden="true">&#8630;</span>
-              <span class="rail-btn-label">Undo</span>
-            </button>
-            <button id="clear" class="ghost rail-btn" type="button">
-              <span class="rail-btn-icon" aria-hidden="true">&#10005;</span>
-              <span class="rail-btn-label">Clear</span>
-            </button>
-          </div>
-
           <div id="board-wrap" class="board-wrap">
             <!--
               The reactions - the solved sweep and the refusal shake - are classes on this element
@@ -265,9 +264,29 @@
 
         <footer class="bar footer">
           <p id="hint" class="hint" aria-live="polite"></p>
-          <button id="submit" class="primary submit-wide" type="button" disabled>
-            Submit solution
-          </button>
+          <div class="footer-actions">
+            <!--
+              Two actions, and deliberately not the three the reference design shows. Undo removes
+              the path drawn last and is strictly weaker than Clear; a HINT is forbidden outright,
+              because it would improve a score in a paid contest. The reasoning is in `undoState`.
+
+              They sit beside Submit rather than beside the board, so the grid keeps the full
+              width - see the arena's comment above.
+            -->
+            <div class="action-rail">
+              <button id="undo" class="ghost rail-btn" type="button" disabled>
+                <span class="rail-btn-icon" aria-hidden="true">&#8630;</span>
+                <span class="rail-btn-label">Undo</span>
+              </button>
+              <button id="clear" class="ghost rail-btn" type="button">
+                <span class="rail-btn-icon" aria-hidden="true">&#10005;</span>
+                <span class="rail-btn-label">Clear</span>
+              </button>
+            </div>
+            <button id="submit" class="primary submit-wide" type="button" disabled>
+              Submit solution
+            </button>
+          </div>
         </footer>
       </section>
 

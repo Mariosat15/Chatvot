@@ -222,6 +222,19 @@ function contentHeightOf(screen) {
  * Without it the frame is reported too short on a phone, and the board - which is fitted into
  * whatever the arena row actually leaves it - is squeezed by exactly the height of the rails.
  */
+/**
+ * The space the board has to draw in, in one place because two callers must not disagree.
+ *
+ * `fitBoard` fits the grid into it and `requestHeight` asks the host for the height a grid this
+ * wide needs. Measured separately they drift by the 8-pixel breathing room, and the symptom of a
+ * drift is not an error: it is a band of empty frame above and below the board, or a board a few
+ * pixels wider than its own frame with the bezel clipped.
+ */
+function boardSpace() {
+  const box = ui.boardWrap.getBoundingClientRect();
+  return { width: box.width - 8, height: box.height - 8 };
+}
+
 function chromeHeightOf(screen) {
   const bars = [...screen.querySelectorAll(":scope > .bar")];
   const height = bars.reduce((total, bar) => total + bar.getBoundingClientRect().height, 0);
@@ -260,6 +273,11 @@ function requestHeight() {
     gridHeight: state && state.board ? state.board.height : undefined,
     chromeHeight: playing ? chromeHeightOf(active) : undefined,
     contentHeight: playing ? undefined : contentHeightOf(active),
+    // THE SAME MEASURE `fitBoard` USES, and it has to be the same one or the frame is granted
+    // room for a cell the width will not permit and the difference shows as an empty band above
+    // and below the board. Reading the width is safe where reading the height is the defect -
+    // `widthBoundCellPx` explains why at length.
+    availableWidth: playing ? boardSpace().width : undefined,
   });
 
   if (Math.abs(height - lastHeight) < HEIGHT_REPORT_THRESHOLD_PX) return;
@@ -773,8 +791,8 @@ function onBoardChange(change) {
 const board = createBoard(ui.board, onBoardChange);
 
 function fitBoard() {
-  const box = ui.boardWrap.getBoundingClientRect();
-  board.resize(box.width - 8, box.height - 8);
+  const space = boardSpace();
+  board.resize(space.width, space.height);
 }
 
 function renderPlay() {

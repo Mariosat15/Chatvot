@@ -443,8 +443,21 @@ npm run probe:round-clock    # the same, for the clock and the length promised b
 > fastest board of the round; every one of them is something this client can observe for itself,
 > and all of it is computed in `presentation.js` so it can be asserted in Node.
 
-`npm test` runs **285 tests**: 15 config, 42 engine, 28 scoring, 41 API, 78 play and delivery,
-11 progress, 20 board client, 50 presentation. (Counted from the suite's own output. Any figure of
+> **THE BOARD FILLS THE WIDTH, AND ONE ARRANGEMENT DETAIL IS LOAD-BEARING.** The frame is the
+> platform arena's middle column, 450-650 pixels, and a cell is square - so the board is
+> **width-bound**, and anything placed beside it comes directly out of the cell size. Two rails
+> either side of it cost about a third of a 500-pixel frame, which is why until 11 September 2026
+> **the larger the grid the smaller the board was drawn**: an 8x8 hit its 34-pixel floor while a
+> 4x4 divided the same remainder four ways and looked healthy. The arena is now one column, the
+> figures sit under the board and the buttons in the footer. **Do not put anything back beside the
+> board.** `desiredFrameHeight` derives its cell from the width for the same reason - and reading
+> the width is safe only because nothing we report changes it, where a height derived from our own
+> reported height is the postage-stamp defect of `21` s4.1f.
+
+`npm test` runs **297 tests**: 15 config, 42 engine, 28 scoring, 41 API, 82 play and delivery,
+11 progress, 20 board client, 58 presentation. (Counted from the suite's own output. Any figure of
+285 predates the board filling its frame's width - the rails sat beside it and took about a third
+of the room, so the larger the grid the smaller the board was drawn. Any figure of
 270 predates the round header, the coverage meter, the stat tiles and Undo - see the note below.
 Any figure of
 259 predates the mid-round progress callback, which added a whole suite - `tools/test-progress.ts`,

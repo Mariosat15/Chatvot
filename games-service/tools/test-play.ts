@@ -583,50 +583,174 @@ async function main(): Promise<number> {
     assert.match(warm[1], /failedArt\.add\(url\)/, "a failed picture is not recorded");
   });
 
-  await test("the arena stretches the board's cell to the row and centres only the rails", async () => {
+  await test("the arena stretches the board's row and gives the board the whole width", async () => {
     /*
-     * THE POSTAGE-STAMP BOARD, SECOND COMING (11 September 2026). `fitBoard` sizes the grid from
-     * the space `.board-wrap` has, so the wrap must be the size of its grid ROW. `align-items:
-     * center` on the arena shrinks the wrap to the `<svg>` inside it, and the next fit measures a
-     * wrap the size of the previous grid, reserves the bezel's share, and draws a smaller one -
-     * converging on the 34-pixel floor while `desiredFrameHeight`, which never reads the current
-     * height, keeps the frame tall. A big empty frame with a tiny board in it, no error anywhere.
+     * TWO DEFECTS IN ONE RULE, BOTH REPORTED BY THE OWNER ON 11 SEPTEMBER 2026, AND THE COMMENT
+     * ON THE SECOND IS WHY THIS TEST WAS FLIPPED RATHER THAN REPLACED.
+     *
+     * The first: `fitBoard` sizes the grid from the space `.board-wrap` has, so the wrap must be
+     * the size of its grid ROW. `align-items: center` on the arena shrinks the wrap to the `<svg>`
+     * inside it, and the next fit measures a wrap the size of the previous grid, reserves the
+     * bezel's share, and draws a smaller one - converging on the 34-pixel floor while
+     * `desiredFrameHeight`, which never reads the current height, keeps the frame tall. A big
+     * empty frame with a tiny board in it, no error anywhere. That half is unchanged and is the
+     * first two assertions.
+     *
+     * The second, reported after the first was fixed: *"when we choose medium and large the system
+     * makes the board smaller"*. The arena was `auto minmax(0, 1fr) auto` - a rail of actions, the
+     * board, a rail of figures. This page is an iframe in the platform's arena, 450 to 650 pixels
+     * of middle column, and a cell is square, so the board is WIDTH-bound on every laptop. The two
+     * rails took about 220 of those pixels; an 8x8 divided what was left into cells at their floor
+     * while a 4x4, dividing the same remainder four ways, looked healthy. `boardCellPx` was right
+     * throughout and was being handed a third of the room.
+     *
+     * So the assertions about the rails are inverted rather than dropped: they must NOT be a
+     * column beside the board any more. The stacking breakpoint they needed is gone with them -
+     * there is no wide arrangement left to escape from - and a query still folding the arena is
+     * evidence the three-column layout has come back.
      *
      * Asserted on the `.arena` rule's own body, sliced by position, because `align-items: center`
      * legitimately appears elsewhere in this stylesheet and a file-wide search is green either
-     * way. The rails must centre THEMSELVES - `align-self` on the rails, never `align-items` on
-     * the row - so the second assertion is what stops the fix being "moved" back onto the arena.
+     * way.
      */
     const css = withoutComments(playFile("app.css"));
     const arenaRules = [...css.matchAll(/(^|[}\s])\.arena\s*\{([^{}]*)\}/g)].map((m) => m[2]);
-    assert.ok(arenaRules.length >= 1, "app.css has no bare .arena rule");
-    for (const body of arenaRules) {
-      assert.ok(
-        !/align-items\s*:\s*center/.test(body),
-        ".arena centres its items again - fitBoard will measure the board's own height",
-      );
-    }
+    assert.equal(arenaRules.length, 1, "app.css no longer has exactly one bare .arena rule");
+    assert.ok(
+      !/align-items\s*:\s*center/.test(arenaRules[0]),
+      ".arena centres its items again - fitBoard will measure the board's own height",
+    );
     assert.match(
       arenaRules[0],
       /align-items\s*:\s*stretch/,
-      "the arena's first rule no longer stretches the board's cell to the row",
+      "the arena no longer stretches the board's cell to the row",
     );
 
-    const railRule = /\.action-rail\s*,\s*\.stat-rail\s*\{([^{}]*)\}/.exec(css);
-    assert.ok(railRule, "the two rails no longer share an alignment rule");
-    assert.match(railRule[1], /align-self\s*:\s*center/, "the rails no longer centre themselves");
+    /*
+     * ONE COLUMN, and the `auto` is what the assertion is really about: an `auto` track in this
+     * template is a rail sized to its own content, and a rail sized to its own content is the
+     * 220 pixels the grid did not get.
+     */
+    const columns = /grid-template-columns\s*:([^;]*);/.exec(arenaRules[0]);
+    assert.ok(columns, ".arena declares no column template");
+    assert.ok(
+      !/\bauto\b/.test(columns[1]),
+      `.arena has a content-sized column again (${columns[1].trim()}) - that is a rail beside the board`,
+    );
+    assert.equal(
+      (columns[1].match(/minmax\(/g) || []).length,
+      1,
+      `.arena has more than one column (${columns[1].trim()}) - the board no longer has the width`,
+    );
 
     /*
-     * And the breakpoint reads the FRAME's width, not the device's. At 680 the rails stacked
-     * under the board inside every laptop-sized iframe, which is the arrangement the owner
-     * photographed. The bound is a ceiling rather than a pinned number: the argument is only
-     * that a laptop's middle column must not trip it.
+     * And the board is the FIRST row in document order, so nothing needs `order`. Grid
+     * auto-placement follows order-modified document order, so an `order` rule that fires at one
+     * width leaves every other width arranged by the DOM - the mistake already made once on the
+     * platform's own arena layout.
      */
-    const stack = /@media\s*\(max-width:\s*(\d+)px\)\s*\{\s*\.arena\s*\{/.exec(css);
-    assert.ok(stack, "the rails' stacking breakpoint is no longer a max-width query on .arena");
+    const html = withoutComments(playFile("index.html"));
+    const arenaOpen = html.indexOf('class="arena"');
+    assert.ok(arenaOpen > 0, "index.html has no arena");
+    const boardAt = html.indexOf('id="board-wrap"', arenaOpen);
+    const figuresAt = html.indexOf('class="stat-rail"', arenaOpen);
+    assert.ok(boardAt > 0 && figuresAt > 0, "the arena no longer holds the board and the figures");
     assert.ok(
-      Number(stack[1]) <= 560,
-      `the rails stack under the board at ${stack[1]}px - that fires inside a laptop's iframe`,
+      boardAt < figuresAt,
+      "the figures come before the board in the arena - on a phone they take the top of the frame",
+    );
+
+    const stack = /@media\s*\([^)]*\)\s*\{\s*\.arena\s*\{/.exec(css);
+    assert.equal(
+      stack,
+      null,
+      "a media query re-lays the arena - the rails are beside the board again at some width",
+    );
+  });
+
+  await test("the actions and the figures are out of the board's row", async () => {
+    /*
+     * WHERE EACH OF THEM WENT, and it is not interchangeable. `chromeHeightOf` sums the `.bar`
+     * rows and then adds whatever the arena measures over and above the board, so a strip inside
+     * the arena is counted by the subtraction and a row of buttons inside the footer is counted by
+     * the sum. Either is accounted for - but a rail left inside the arena as a COLUMN is counted
+     * as nothing at all, because it is no taller than the board beside it, which is the shape of
+     * the defect this pins.
+     *
+     * The action rail is asserted to be inside the footer by position rather than by presence: it
+     * exists in the file either way, and "the file contains an action rail" is green on exactly
+     * the arrangement that was wrong.
+     */
+    const html = withoutComments(playFile("index.html"));
+
+    const footerAt = html.indexOf("<footer");
+    const footerEnd = html.indexOf("</footer>", footerAt);
+    assert.ok(footerAt > 0 && footerEnd > footerAt, "index.html has no footer");
+    const footer = html.slice(footerAt, footerEnd);
+    assert.ok(footer.length > 100, "the footer slice found nothing - the assertions below are vacuous");
+
+    assert.match(footer, /class="action-rail"/, "the actions are not in the footer");
+    assert.match(footer, /id="undo"/, "Undo is not in the footer");
+    assert.match(footer, /id="clear"/, "Clear is not in the footer");
+    assert.match(footer, /id="submit"/, "Submit is not in the footer");
+
+    assert.equal(
+      (html.match(/class="action-rail"/g) || []).length,
+      1,
+      "there is more than one action rail - one of them is beside the board",
+    );
+
+    /*
+     * Clear shares a row with Submit again, which the stylesheet's own comment records as a
+     * hazard: a destructive control the same width as the confirming one is how a player wipes a
+     * finished grid instead of sending it. The clause that matters is the width, so that is what
+     * is asserted - Submit takes the leftover space, Clear is sized to an icon.
+     */
+    const css = withoutComments(playFile("app.css"));
+    const submit = /\.submit-wide\s*\{([^{}]*)\}/.exec(css);
+    assert.ok(submit, "app.css has no .submit-wide rule");
+    assert.match(
+      submit[1],
+      /flex\s*:\s*1/,
+      "Submit no longer takes the row's leftover width - it may now match Clear's",
+    );
+    const railBtn = /button\.rail-btn\s*\{([^{}]*)\}/.exec(css);
+    assert.ok(railBtn, "app.css has no button.rail-btn rule");
+    assert.match(railBtn[1], /min-width\s*:\s*\d/, "the rail buttons are no longer sized to an icon");
+  });
+
+  await test("the fit and the height request measure the same space", async () => {
+    /*
+     * ONE MEASURE, TWO CALLERS. `fitBoard` fits the grid into the space the wrap has, and
+     * `requestHeight` asks the host for the height a grid that wide needs. Measured separately
+     * they drift by the 8-pixel breathing room, or by more once somebody adjusts one of them, and
+     * a drift produces no error: it produces a band of empty frame above and below the board - the
+     * exact thing the owner photographed - or a board a few pixels wider than its own bezel.
+     *
+     * Asserted by position inside each function rather than file-wide: `getBoundingClientRect`
+     * appears legitimately in `chromeHeightOf`, which wants the board's HEIGHT in order to
+     * subtract it, so a file-wide count is green either way.
+     */
+    const js = withoutComments(playFile("app.js"));
+
+    const fit = /function fitBoard\(\)\s*\{([\s\S]*?)\n\}/.exec(js);
+    assert.ok(fit, "app.js has no fitBoard()");
+    assert.match(fit[1], /boardSpace\(\)/, "fitBoard no longer uses the shared measure");
+    assert.ok(
+      !/getBoundingClientRect/.test(fit[1]),
+      "fitBoard measures the wrap itself again - it can now disagree with the height request",
+    );
+
+    const request = /function requestHeight\(\)\s*\{([\s\S]*?)\n\}/.exec(js);
+    assert.ok(request, "app.js has no requestHeight()");
+    assert.match(
+      request[1],
+      /availableWidth\s*:[^,]*boardSpace\(\)\.width/,
+      "the height request no longer follows the width the board actually has",
+    );
+    assert.ok(
+      !/currentHeight|scrollHeight/.test(request[1]),
+      "the height request reads the height we already have - that is the postage-stamp loop",
     );
   });
 
