@@ -131,12 +131,17 @@ export function GameArenaLayout({
       </div>
 
       {/*
-        THE STANDINGS RAIL IS 300px, NOT 280. At 280 the leaderboard's three columns - rank,
-        name, score - left the name about eleven characters, so the reference's readable board
-        rendered as "M..." beside "Andy...". Twenty pixels is the difference between a name and
-        an ellipsis, and it costs the board column nothing at this page width.
+        THE STANDINGS RAIL IS 360px, AND IT WAS 300 UNTIL THE OWNER SAW IT. 300 was itself a
+        widening from 280, decided by reasoning about how many characters fit; the screen then
+        rendered "M..." and "Andy ..." anyway, because the reasoning counted the rank plate,
+        the name and the score and forgot the avatar, the title icon and the "you" marker.
+
+        The reference settles it by measurement rather than by argument: its board occupies
+        just under a quarter of the page width, and 300 of 1440 is a fifth. 360 is that
+        quarter, and the width comes out of the middle column, which had more than the
+        reference gives it. Count the things in the row, not the columns.
       */}
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[300px_minmax(0,1fr)_320px]">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[360px_minmax(0,1fr)_320px]">
         {/*
           EVERY BREAKPOINT SETS AN ORDER, and the reason is that grid auto-placement follows
           order-modified document order, so a rule that only fires at `xl` leaves the other two
@@ -161,7 +166,14 @@ export function GameArenaLayout({
               <NeonCountPill>{standingsCount} players</NeonCountPill>
             }
           >
-            <div className="max-h-[460px] overflow-y-auto p-2">{standings}</div>
+            {/*
+              Tight padding, because the rows are flush now and their left accent bar is the
+              state marker. Padded in from the panel edge as far as a card would be, the bar
+              floats in the middle of a gutter and stops reading as an edge.
+            */}
+            <div className="max-h-[460px] overflow-y-auto px-1.5 py-1">
+              {standings}
+            </div>
             {/*
               A BUTTON, NOT A TEXT LINK. The reference draws a full-width bordered control at
               the foot of the board, and it is the only way off this panel: a line of small

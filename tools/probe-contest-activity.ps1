@@ -208,5 +208,53 @@ import {
   -ExpectTest 'decides which rounds earned a score once, in the service'
 
 Write-Host ''
+Write-Host '=== The attempt clock says what it knows and nothing else ===' -ForegroundColor Cyan
+
+# A voided attempt was handed back, so its duration is the residue of a support action. Left in,
+# a cancelled round shows a time beside a dash where its score should be.
+Invoke-Probe -Name 'a cancelled attempt still reports a time' -File $Service `
+  -Find '  if (row.status === "voided") return undefined;' `
+  -Replace '' `
+  -ExpectTest 'reports no clock at all for a cancelled attempt'
+
+# Without the live branch the Time column is empty for every player in a contest that is being
+# played, which is exactly when somebody is reading it.
+Invoke-Probe -Name 'a player still at the board has no clock' -File $Service `
+  -Find '  if (!LIVE_STATUSES.has(row.status)) return undefined;' `
+  -Replace '  return undefined;' `
+  -ExpectTest 'reports a running clock for a player who is still at the board'
+
+# The game measured the round; `completedAt - startedAt` includes however long the player read
+# the rules for, and is the figure we can compute rather than the one that is true.
+Invoke-Probe -Name 'our own timestamps are subtracted instead' -File $Service `
+  -Find '  if (typeof row.durationMs === "number" && Number.isFinite(row.durationMs)) {
+    return row.durationMs;
+  }' `
+  -Replace '  if (row.startedAt && row.completedAt) {
+    return row.completedAt.getTime() - row.startedAt.getTime();
+  }' `
+  -ExpectTest 'reports the clock the game measured for a finished attempt'
+
+# Rounding up shows a moment the player had not reached. On a lower-is-better title that is a
+# figure slightly worse than the one they earned, beside a score that is exactly right.
+Invoke-Probe -Name 'the seconds are rounded rather than floored' -File $Phrase `
+  -Find '  const totalSeconds = Math.floor(ms / 1000);' `
+  -Replace '  const totalSeconds = Math.round(ms / 1000);' `
+  -ExpectTest 'floors the seconds rather than rounding them up'
+
+# `0:00` reads as an instantaneous round rather than an unknown one - R50 one field along.
+Invoke-Probe -Name 'an unknown clock renders as zero' -File $Phrase `
+  -Find '  if (typeof ms !== "number" || !Number.isFinite(ms) || ms < 0) return undefined;' `
+  -Replace '  if (typeof ms !== "number" || !Number.isFinite(ms) || ms < 0) return "0:00";' `
+  -ExpectTest 'answers nothing for a figure it cannot show, and never zero'
+
+# Importing the formatter is trivially satisfied by a board that does the arithmetic anyway.
+Invoke-Probe -Name 'a board rolls its own stopwatch' -File $Board `
+  -Find '          const clock = formatRoundClock(entry?.durationMs);' `
+  -Replace '          const secs = Math.floor((entry?.durationMs ?? 0) / 1000);
+          const clock = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`;' `
+  -ExpectTest 'formats an attempt.s clock in one place'
+
+Write-Host ''
 Write-Host 'Done. Every probe above must read RED with exactly 1 failure.' -ForegroundColor Cyan
 Write-Host 'GREEN means the guard is absent, weak, unreachable, or the mutation changed no observable.' -ForegroundColor DarkGray

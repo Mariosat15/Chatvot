@@ -1,6 +1,9 @@
 import { Crown, Medal, Trophy } from "lucide-react";
 import {
   NEON_ROW,
+  NEON_ROW_FLUSH,
+  NEON_ROW_FLUSH_PODIUM,
+  NEON_ROW_FLUSH_YOU,
   NEON_ROW_PODIUM,
   NEON_ROW_YOU,
 } from "@/components/neon/tokens";
@@ -24,10 +27,23 @@ import {
 export function neonRowClasses({
   rank,
   isCurrentUser,
+  variant = "card",
 }: {
   rank: number;
   isCurrentUser: boolean;
+  /**
+   * `card` is the sheet's tile - bordered, rounded, with a gap beneath it. `flush` is the same
+   * three states drawn as a table row, for a board long enough that the tiles are most of the
+   * panel. See the tokens for why both exist rather than one replacing the other.
+   */
+  variant?: "card" | "flush";
 }): string {
+  if (variant === "flush") {
+    if (isCurrentUser) return NEON_ROW_FLUSH_YOU;
+    if (rank >= 1 && rank <= 3) return NEON_ROW_FLUSH_PODIUM;
+    return NEON_ROW_FLUSH;
+  }
+
   if (isCurrentUser) return NEON_ROW_YOU;
   if (rank >= 1 && rank <= 3) return NEON_ROW_PODIUM;
   return NEON_ROW;
@@ -41,33 +57,54 @@ export function neonRowClasses({
  * scores upward or downward - so a component that numbered its own rows would quietly disagree
  * with the payout for every lower-is-better game.
  */
-export function NeonRankBadge({ rank }: { rank: number }) {
+export function NeonRankBadge({
+  rank,
+  size = "md",
+}: {
+  rank: number;
+  /**
+   * `sm` is for a dense board in a narrow rail. The plate shrinks; the marker does not change,
+   * because which players are marked is the information and it must read the same everywhere.
+   */
+  size?: "sm" | "md";
+}) {
+  const plate = size === "sm" ? "h-7 w-7" : "h-8 w-8";
+  const glyph = size === "sm" ? "h-3.5 w-3.5" : "h-4 w-4";
+
   if (rank === 1) {
     return (
-      <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-amber-500/40 bg-amber-500/15">
-        <Trophy className="h-4 w-4 text-amber-300" />
+      <span
+        className={`flex ${plate} items-center justify-center rounded-lg border border-amber-500/40 bg-amber-500/15`}
+      >
+        <Trophy className={`${glyph} text-amber-300`} />
       </span>
     );
   }
 
   if (rank === 2) {
     return (
-      <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-400/40 bg-slate-400/15">
-        <Medal className="h-4 w-4 text-slate-300" />
+      <span
+        className={`flex ${plate} items-center justify-center rounded-lg border border-slate-400/40 bg-slate-400/15`}
+      >
+        <Medal className={`${glyph} text-slate-300`} />
       </span>
     );
   }
 
   if (rank === 3) {
     return (
-      <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-orange-500/40 bg-orange-500/15">
-        <Medal className="h-4 w-4 text-orange-300" />
+      <span
+        className={`flex ${plate} items-center justify-center rounded-lg border border-orange-500/40 bg-orange-500/15`}
+      >
+        <Medal className={`${glyph} text-orange-300`} />
       </span>
     );
   }
 
   return (
-    <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#1B2540] bg-[#080C18] text-xs font-bold text-gray-400">
+    <span
+      className={`flex ${plate} items-center justify-center rounded-lg border border-[#1B2540] bg-[#080C18] text-xs font-bold text-gray-400`}
+    >
       {rank > 0 ? rank : "-"}
     </span>
   );
@@ -81,7 +118,13 @@ export function NeonRankBadge({ rank }: { rank: number }) {
  * a player refreshes most often. The chip is also the only version that cannot leak a face into
  * a public leaderboard for someone who never chose to publish one.
  */
-export function NeonAvatar({ name }: { name: string }) {
+export function NeonAvatar({
+  name,
+  size = "md",
+}: {
+  name: string;
+  size?: "sm" | "md";
+}) {
   const initials =
     name
       .trim()
@@ -92,7 +135,11 @@ export function NeonAvatar({ name }: { name: string }) {
       .toUpperCase() || "?";
 
   return (
-    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-sky-500/30 bg-sky-500/15 text-[11px] font-bold text-sky-200">
+    <span
+      className={`flex ${
+        size === "sm" ? "h-7 w-7 text-[10px]" : "h-8 w-8 text-[11px]"
+      } shrink-0 items-center justify-center rounded-full border border-sky-500/30 bg-sky-500/15 font-bold text-sky-200`}
+    >
       {initials}
     </span>
   );

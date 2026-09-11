@@ -147,6 +147,33 @@ export const NEON_ROW_YOU = "rounded-xl border border-sky-500/40 bg-sky-500/10";
 export const NEON_ROW_PODIUM =
   "rounded-xl border border-amber-500/25 bg-amber-500/[0.06] transition-colors hover:border-amber-500/40";
 
+/**
+ * THE SAME THREE STATES DRAWN FLUSH, for a board long enough that the cards become the problem.
+ *
+ * Added 11 September 2026 on the owner's reference. A bordered, rounded, gapped tile per player
+ * reads well for five rows and badly for twenty: at that length the borders and the gaps are
+ * most of the panel, every row is mostly empty space, and the shape of the contest - who is
+ * close to whom - is below the fold. The reference draws a table: rows flush against each
+ * other, one hairline between them, and a state shown by a left accent bar and a wash rather
+ * than by an outline.
+ *
+ * BOTH SETS EXIST AND NEITHER REPLACES THE OTHER. The card form is right for a short board in a
+ * wide column and it is what the trading lobby renders today; changing it here would be an
+ * unasked-for change to a trading screen, made invisibly, through a shared token.
+ *
+ * The left bar is `border-l-2` on every state INCLUDING the ordinary one, where it is
+ * transparent. Applied only to the highlighted states, the two pixels appear and disappear with
+ * the state and every ordinary row's content sits two pixels to the left of the podium's.
+ */
+export const NEON_ROW_FLUSH =
+  "border-l-2 border-transparent transition-colors hover:bg-[#0D1428]/60";
+export const NEON_ROW_FLUSH_YOU = "border-l-2 border-sky-400 bg-sky-500/10";
+export const NEON_ROW_FLUSH_PODIUM =
+  "border-l-2 border-amber-400/70 bg-amber-500/[0.05] transition-colors hover:bg-amber-500/[0.08]";
+
+/** The hairline between flush rows, as a `divide-*` utility rather than a border. */
+export const NEON_DIVIDE = "divide-y divide-[#16203C]";
+
 /** The column headings above a leaderboard - small, spaced and quiet. */
 export const NEON_TABLE_HEAD =
   "text-[11px] font-medium uppercase tracking-wider text-gray-500";

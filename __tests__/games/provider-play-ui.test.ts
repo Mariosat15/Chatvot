@@ -1955,10 +1955,16 @@ describe("the standings board fits the column it is given", () => {
       COUNTED, not merely found. The column template is written twice, once for the heading row
       and once for the player rows, so `toMatch` is satisfied by either - a probe restoring the
       bare `1fr` on the heading alone came back green until this counted them.
+
+      THE TEMPLATE GAINED A FOURTH COLUMN on 11 September 2026 when the board grew the
+      reference's Time column. The claim is unchanged and only the shape moved, so the
+      assertion was re-pointed rather than relaxed: the name column is still the only flexible
+      one and it is still `minmax(0,1fr)`.
     */
-    const template = board.match(/grid-cols-\[auto_minmax\(0,1fr\)_auto\]/g) ?? [];
+    const template =
+      board.match(/grid-cols-\[[\w.]+_minmax\(0,1fr\)_auto_auto\]/g) ?? [];
     expect(template).toHaveLength(2);
-    expect(board).not.toMatch(/grid-cols-\[auto_1fr_auto\]/);
+    expect(board).not.toMatch(/grid-cols-\[[\w.]+_1fr_/);
     expect(board).not.toMatch(/\bflex-wrap\b/);
   });
 });

@@ -51,6 +51,22 @@ export interface ContestPlayerActivity {
   breakdown?: Record<string, unknown>;
   /** When this happened. Falls back through the round's own timestamps. */
   at?: string;
+  /**
+   * How long this attempt has taken, in milliseconds.
+   *
+   * TWO DIFFERENT FACTS UNDER ONE NAME, AND THAT IS THE POINT. A reported round carries the
+   * duration the GAME measured, which is the only authority on it - the platform never sees
+   * the moment a player pressed Start inside the frame. A round still in flight has no such
+   * figure, so this is the time since the round was created, which is when the player pressed
+   * Play. Those differ by however long the frame took to load, a second or two.
+   *
+   * Reason a live round is measured at all rather than reading a dash: the board's Time column
+   * is otherwise empty for every player in a contest that is actually being played, which is
+   * precisely when somebody is looking at it. The lobby re-reads every fifteen seconds, so the
+   * figure advances there; the arena's copy is rendered once and does not, which is the
+   * already-recorded staleness of that sidebar rather than anything new here.
+   */
+  durationMs?: number;
 }
 
 export interface ContestActivity {
@@ -69,7 +85,11 @@ interface ActivityRow {
   startedAt?: Date;
   completedAt?: Date;
   createdAt?: Date;
+  durationMs?: number;
 }
+
+/** Statuses where the round is still in flight, so its clock is still running. */
+const LIVE_STATUSES = new Set(["pending", "launched"]);
 
 const EMPTY: ContestActivity = { latestByUser: {}, recent: [] };
 
@@ -116,7 +136,9 @@ export async function getContestActivity(
     userId: { $in: userIds },
     mode: "ranked",
   })
-    .select("userId status attemptNumber rawScore scoreBreakdown startedAt completedAt createdAt")
+    .select(
+      "userId status attemptNumber rawScore scoreBreakdown startedAt completedAt createdAt durationMs",
+    )
     // Highest attempt first, so the first row seen for a player is their latest.
     .sort({ attemptNumber: -1 })
     .lean<ActivityRow[]>();
@@ -157,5 +179,31 @@ function toActivity(row: ActivityRow): ContestPlayerActivity {
         ? undefined
         : row.scoreBreakdown,
     at: at?.toISOString(),
+    durationMs: attemptClock(row),
   };
+}
+
+/**
+ * The attempt's clock - reported when the game reported one, running when it has not.
+ *
+ * A voided round is withheld for the same reason its score and its figures are: the attempt
+ * was handed back, so its duration is the residue of a support action rather than play.
+ *
+ * The live branch is floored at zero rather than trusted, because a clock difference between
+ * the database's `createdAt` and this process makes a negative elapsed time possible, and a
+ * negative duration formats as something nobody can read.
+ */
+function attemptClock(row: ActivityRow): number | undefined {
+  if (row.status === "voided") return undefined;
+
+  if (typeof row.durationMs === "number" && Number.isFinite(row.durationMs)) {
+    return row.durationMs;
+  }
+
+  if (!LIVE_STATUSES.has(row.status)) return undefined;
+
+  const began = row.startedAt ?? row.createdAt;
+  if (!began) return undefined;
+
+  return Math.max(0, Date.now() - began.getTime());
 }

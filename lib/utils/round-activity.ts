@@ -46,6 +46,8 @@ export interface RoundActivitySummary {
   /** Already filtered to statuses that produce one. Absent is not zero. */
   score?: number;
   breakdown?: Record<string, unknown>;
+  /** The attempt's clock in milliseconds. Absent when there is nothing to time. */
+  durationMs?: number;
 }
 
 export interface RoundActivityPhrase {
@@ -136,6 +138,36 @@ export function describeRoundActivity(
     tone: copy.tone,
     metrics,
   };
+}
+
+/**
+ * An attempt's clock as a leaderboard reads it.
+ *
+ * `m:ss` below an hour and `h:mm:ss` above it, which is the shape the reference board uses and
+ * the shape every stopwatch a player has ever seen uses. Minutes are NOT zero-padded at the
+ * front: a column of `0:42` and `1:15` is what a stopwatch shows, and `00:42` reads as a
+ * duration on a video player.
+ *
+ * SECONDS ARE FLOORED, NEVER ROUNDED. A round that lasted 41.8 seconds is in its forty-second
+ * second, and rounding up shows a time the player had not yet reached - which on a lower-is-
+ * better title is a figure slightly worse than the one they earned, next to a score that is
+ * exactly right.
+ *
+ * An unusable figure answers `undefined` rather than `0:00`, because a zero here is the phantom
+ * nought (R50) one field along: it reads as an instantaneous round rather than as an unknown.
+ */
+export function formatRoundClock(ms: number | undefined): string | undefined {
+  if (typeof ms !== "number" || !Number.isFinite(ms) || ms < 0) return undefined;
+
+  const totalSeconds = Math.floor(ms / 1000);
+  const seconds = totalSeconds % 60;
+  const minutes = Math.floor(totalSeconds / 60) % 60;
+  const hours = Math.floor(totalSeconds / 3600);
+
+  const mm = String(minutes).padStart(2, "0");
+  const ss = String(seconds).padStart(2, "0");
+
+  return hours > 0 ? `${hours}:${mm}:${ss}` : `${minutes}:${ss}`;
 }
 
 /** The tone as a text colour, so every surface tints an activity line the same way. */

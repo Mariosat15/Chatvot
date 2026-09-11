@@ -31,6 +31,7 @@ import GameRound, {
 import { getContestActivity } from "../../lib/services/games/contest-activity.service";
 import {
   describeRoundActivity,
+  formatRoundClock,
   roundActivityToneClass,
 } from "../../lib/utils/round-activity";
 
@@ -217,6 +218,97 @@ describe("what each player has been doing in a contest", () => {
     expect(activity.recent).toHaveLength(0);
     expect(Object.keys(activity.latestByUser)).toHaveLength(0);
   });
+
+  it("reports the clock the game measured for a finished attempt", async () => {
+    /*
+      The game's own figure, not a subtraction of our timestamps. The platform never sees the
+      moment a player pressed Start inside the frame, so `completedAt - startedAt` would include
+      however long they read the rules for.
+    */
+    await seedRound(contestId, PLAYER, 1, "completed", {
+      rawScore: 100,
+      durationMs: 41_800,
+      startedAt: new Date(Date.now() - 600_000),
+      completedAt: new Date(Date.now() - 300_000),
+    });
+
+    const activity = await getContestActivity(contestId, [PLAYER]);
+
+    expect(activity.latestByUser[PLAYER].durationMs).toBe(41_800);
+  });
+
+  it("reports a running clock for a player who is still at the board", async () => {
+    /*
+      Otherwise the Time column is empty for every player in a contest that is actually being
+      played, which is exactly when somebody is reading it.
+    */
+    await seedRound(contestId, PLAYER, 1, "launched", {
+      createdAt: new Date(Date.now() - 90_000),
+    });
+
+    const running = activityClock(await getContestActivity(contestId, [PLAYER]));
+
+    // A range rather than a value: the clock is read at query time, so an exact figure would
+    // make this test depend on how long the suite took to get here.
+    expect(running).toBeGreaterThanOrEqual(85_000);
+    expect(running).toBeLessThan(120_000);
+  });
+
+  it("reports no clock at all for a cancelled attempt", async () => {
+    /*
+      Withheld for the same reason its score and its figures are: a voided round is the residue
+      of a support action, and the attempt was handed back. A duration on it is bookkeeping.
+    */
+    await seedRound(contestId, PLAYER, 1, "voided", {
+      rawScore: 0,
+      durationMs: 41_800,
+    });
+
+    const activity = await getContestActivity(contestId, [PLAYER]);
+
+    expect(activity.latestByUser[PLAYER].durationMs).toBeUndefined();
+  });
+
+  /** The latest attempt's clock, so the assertions above read as one line. */
+  function activityClock(activity: {
+    latestByUser: Record<string, { durationMs?: number }>;
+  }): number {
+    const value = activity.latestByUser[PLAYER]?.durationMs;
+    expect(typeof value).toBe("number");
+    return value as number;
+  }
+});
+
+describe("an attempt's clock, as a board reads it", () => {
+  it("reads as a stopwatch below an hour and gains hours above it", () => {
+    expect(formatRoundClock(41_800)).toBe("0:41");
+    expect(formatRoundClock(75_000)).toBe("1:15");
+    expect(formatRoundClock(600_000)).toBe("10:00");
+    expect(formatRoundClock(3_725_000)).toBe("1:02:05");
+  });
+
+  it("floors the seconds rather than rounding them up", () => {
+    /*
+      A run of 41.8 seconds is in its forty-second second. Rounded up it reads 0:42, which is a
+      moment the player had not reached - and on a lower-is-better title that is a figure
+      slightly worse than the one they earned, beside a score that is exactly right.
+    */
+    expect(formatRoundClock(41_800)).toBe("0:41");
+    expect(formatRoundClock(59_999)).toBe("0:59");
+  });
+
+  it("answers nothing for a figure it cannot show, and never zero", () => {
+    /*
+      `0:00` reads as an instantaneous round rather than as an unknown one - the phantom nought
+      of R50, one field along.
+    */
+    for (const value of [undefined, Number.NaN, -1, Infinity]) {
+      expect(formatRoundClock(value as number | undefined)).toBeUndefined();
+    }
+
+    // A genuine zero is a different fact and does render.
+    expect(formatRoundClock(0)).toBe("0:00");
+  });
 });
 
 describe("putting a round into words", () => {
@@ -367,6 +459,31 @@ describe("the activity layer names no game", () => {
     ]) {
       expect(readCode(path)).not.toContain("roundContributesScore");
     }
+  });
+
+  /**
+   * THE CLOCK IS FORMATTED ONCE, and the negative half is the load-bearing one.
+   *
+   * Importing `formatRoundClock` is trivially satisfied by a board that imports it and then
+   * divides by 60_000 five lines later - which is what the score column's own history warns
+   * about - so the rule is that no surface may do the arithmetic itself. Two copies of it drift
+   * on the rounding, and the two surfaces sit millimetres apart on the same screen.
+   */
+  it("formats an attempt's clock in one place", () => {
+    for (const path of [
+      "components/games/ProviderLeaderboard.tsx",
+      "components/games/arena/ArenaActivityFeed.tsx",
+    ]) {
+      const code = readCode(path);
+      // 60_000 and 1000 are the two divisors a hand-rolled stopwatch needs; `padStart` is how
+      // it zero-pads the seconds afterwards.
+      expect(code).not.toMatch(/60_?000/);
+      expect(code).not.toMatch(/padStart/);
+    }
+
+    expect(readCode("components/games/ProviderLeaderboard.tsx")).toMatch(
+      /formatRoundClock\(/,
+    );
   });
 
   /**

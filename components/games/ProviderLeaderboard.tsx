@@ -5,11 +5,12 @@ import {
   NeonRankBadge,
   neonRowClasses,
 } from "@/components/neon/LeaderboardRow";
-import { NEON_TABLE_HEAD } from "@/components/neon/tokens";
+import { NEON_DIVIDE, NEON_TABLE_HEAD } from "@/components/neon/tokens";
 import { GameIcon } from "@/components/ui/GameIcon";
 import { GAME_ICONS, type GameIconName } from "@/lib/constants/game-icons";
 import {
   describeRoundActivity,
+  formatRoundClock,
   roundActivityToneClass,
   type RoundActivitySummary,
 } from "@/lib/utils/round-activity";
@@ -108,27 +109,35 @@ export default function ProviderLeaderboard({
 
   /*
     NO MINIMUM WIDTH AND NO SIDEWAYS SCROLL. This board is rendered in two places whose widths
-    are nothing like each other - the lobby's main column, and the arena's 300px standings rail -
-    and it used to force `min-w-[320px]` inside a horizontal scroller. In the rail that produced
+    are nothing like each other - the lobby's main column, and the arena's standings rail - and
+    it used to force `min-w-[320px]` inside a horizontal scroller. In the rail that produced
     exactly what a scrollbar always produces on a leaderboard: the score column pushed out of
     sight, so the one number the board exists to show was the one thing a player could not see
     without dragging.
 
-    It compresses instead. The rank marker and the score are fixed, the name column takes what is
-    left and truncates, and the row never wraps - a wrapping row is what turned the rail into a
-    stack of three-line entries with the avatar on its own line.
+    It compresses instead. The rank marker, the score and the clock are fixed, the name column
+    takes what is left and truncates, and the row never wraps - a wrapping row is what turned
+    the rail into a stack of three-line entries with the avatar on its own line.
+
+    THE ROW IS A TABLE ROW, NOT A CARD, and that was the owner's complaint about this board.
+    Each entry used to be a padded, bordered, rounded tile with a gap beneath it, so twenty
+    players filled a screen and a half and every one of them was mostly empty space and border.
+    The reference draws them flush and close: one hairline between rows, a tint only on the
+    podium and on your own row, and the vertical rhythm tight enough that the shape of the
+    contest is visible without scrolling.
   */
   return (
     <div>
       <div
-        className={`grid grid-cols-[auto_minmax(0,1fr)_auto] gap-2 px-3 pb-2 md:gap-3 md:px-4 ${NEON_TABLE_HEAD}`}
+        className={`grid grid-cols-[1.75rem_minmax(0,1fr)_auto_auto] items-center gap-x-2.5 px-2 pb-1.5 ${NEON_TABLE_HEAD}`}
       >
-        <div className="w-9 shrink-0">#</div>
+        <div>#</div>
         <div className="min-w-0">Player</div>
-        <div className="shrink-0 text-right">{scoreLabel}</div>
+        <div className="w-14 text-right">{scoreLabel}</div>
+        <div className="w-12 text-right">Time</div>
       </div>
 
-      <div className="space-y-2 pt-2">
+      <div className={NEON_DIVIDE}>
         {rows.map((row) => {
           const isYou = row.userId === currentUserId;
           /*
@@ -136,15 +145,15 @@ export default function ProviderLeaderboard({
             did before this feature - see the `activity` prop. When the map IS present, an
             absent entry is a real answer: this player holds a seat and has not played.
           */
-          const phrase = activity
-            ? describeRoundActivity(activity[row.userId])
-            : undefined;
+          const entry = activity ? activity[row.userId] : undefined;
+          const phrase = activity ? describeRoundActivity(entry) : undefined;
+          const clock = formatRoundClock(entry?.durationMs);
 
           return (
             <div
               key={row.userId}
-              className={`grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2.5 p-3 md:gap-3 md:px-4 ${neonRowClasses(
-                { rank: row.currentRank, isCurrentUser: isYou },
+              className={`grid grid-cols-[1.75rem_minmax(0,1fr)_auto_auto] items-center gap-x-2.5 px-2 py-2 ${neonRowClasses(
+                { rank: row.currentRank, isCurrentUser: isYou, variant: "flush" },
               )}`}
             >
               {/*
@@ -153,10 +162,10 @@ export default function ProviderLeaderboard({
                 whether the game scores upward or downward, so a board numbering its own rows
                 would quietly disagree with the payout for every lower-is-better game.
               */}
-              <NeonRankBadge rank={row.currentRank} />
+              <NeonRankBadge rank={row.currentRank} size="sm" />
 
-              <div className="flex min-w-0 flex-nowrap items-center gap-2.5">
-                <NeonAvatar name={row.username || "Anonymous"} />
+              <div className="flex min-w-0 flex-nowrap items-center gap-2">
+                <NeonAvatar name={row.username || "Anonymous"} size="sm" />
 
                 <div className="min-w-0 flex-1">
                   <div className="flex min-w-0 items-center gap-1.5">
@@ -205,8 +214,8 @@ export default function ProviderLeaderboard({
                         <span className="truncate text-gray-500">
                           {/*
                             Joined with a middot rather than rendered as separate chips: the
-                            rail is 300px and a chip per metric wraps the row, which is the one
-                            thing this grid is built not to do.
+                            rail is narrow and a chip per metric wraps the row, which is the
+                            one thing this grid is built not to do.
                           */}
                           {phrase.metrics
                             .map((metric) => `${metric.label} ${metric.value}`)
@@ -225,18 +234,31 @@ export default function ProviderLeaderboard({
                 the read-side form of the `score ?? 0` that made every provider participant
                 tie in R37.
               */}
-              <div className="shrink-0 self-center text-right tabular-nums">
+              <div className="w-14 self-center text-right tabular-nums">
                 {row.score === undefined || row.score === null ? (
                   <span className="text-sm text-gray-600">-</span>
                 ) : (
                   <span
-                    className={`text-base font-bold ${
+                    className={`text-sm font-bold ${
                       row.currentRank <= 3 ? "text-amber-300" : "text-gray-100"
                     }`}
                   >
                     {row.score.toLocaleString()}
                   </span>
                 )}
+              </div>
+
+              {/*
+                THE CLOCK IS NOT A SECOND SCORE, and it is quieter than the score deliberately.
+                Under a multi-attempt policy the score is combined across attempts while this
+                is the clock of the one attempt the line beneath the name describes, which the
+                line's own "attempt 2" wording makes visible. Drawn at the same weight as the
+                score, the two would read as one pair of figures about one run.
+
+                A dash for an unknown clock, never `0:00` - see `formatRoundClock`.
+              */}
+              <div className="w-12 self-center text-right text-xs tabular-nums text-gray-400">
+                {clock ?? <span className="text-gray-600">-</span>}
               </div>
             </div>
           );
