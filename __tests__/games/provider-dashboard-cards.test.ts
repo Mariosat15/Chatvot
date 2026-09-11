@@ -34,6 +34,13 @@ const ACTION = "lib/actions/comprehensive-dashboard.actions.ts";
 const SIDEBAR = "components/dashboard/ContestsSidebar.tsx";
 const CARD = "components/dashboard/ActiveCompetitionCard.tsx";
 const TABLE = "components/dashboard/CompetitionsTable.tsx";
+const RANK_SERVICE = "lib/services/games/dashboard-contest-rank.service.ts";
+/**
+ * The public arena broadcast display. A NAMED EXCEPTION carrying its own copy of the
+ * comparator, with a test below asserting it is still an offender - see that test for why an
+ * exception needs a canary rather than a comment.
+ */
+const ARENA_ROUTE = "app/api/dashboard/competitions/route.ts";
 
 describe("the dashboard action carries the game label and the score", () => {
   /**
@@ -84,9 +91,15 @@ describe("the dashboard ranks a provider contest on its score", () => {
    * has-trades pre-sort is a no-op because nobody has trades - so every comparison returns
    * zero, the sort does nothing, and the card shows the player's position in the query's
    * result order as though it were a rank.
+   *
+   * THESE FOUR CLAIMS ARE UNCHANGED AND ONLY THEIR LOCATION MOVED. The sort was extracted
+   * out of the action into `dashboard-contest-rank.service.ts` on 11 September 2026 so the
+   * endpoint that refreshes these cards can ask the same question. Re-pointed rather than
+   * deleted and rewritten, on the rule that the comment explaining why a guard exists is the
+   * most valuable part of it.
    */
   it("resolves the score direction rather than assuming higher is better", () => {
-    const code = readCode(ACTION);
+    const code = readCode(RANK_SERVICE);
 
     // Reason this asserts the ABSENCE of a literal and not merely the presence of the call:
     // the first version of this test matched `await resolveScoreDirection(` and stayed green
@@ -107,7 +120,7 @@ describe("the dashboard ranks a provider contest on its score", () => {
     // Reason: the direction negation must exist in exactly one place. A `case "score":` in
     // `getDashboardRankingValue` would be a fourth copy of it, and the fourth copy is the one
     // that disagrees with the leaderboard.
-    const code = readCode(ACTION);
+    const code = readCode(RANK_SERVICE);
     expect(code).toMatch(/getGameModuleOrTrading\(\s*competition\.gameType\s*\)/);
     expect(code).toMatch(/providerModule\.getRankingValue\(/);
     expect(code).not.toMatch(/case\s+["']score["']/);
@@ -118,7 +131,7 @@ describe("the dashboard ranks a provider contest on its score", () => {
     // outranks one without, applied to a game that has no trades. Today it is a no-op
     // because the answer is the same for everyone; the moment anything sets `totalTrades`
     // on a provider row it silently becomes the ranking.
-    const code = readCode(ACTION);
+    const code = readCode(RANK_SERVICE);
     const guard = code.match(/if\s*\(\s*!isProviderGame\s*\)\s*\{/);
     expect(guard).not.toBeNull();
 
@@ -132,9 +145,70 @@ describe("the dashboard ranks a provider contest on its score", () => {
     // contest missing those cannot launch a round. Ranking is not launching - a keyless
     // provider contest still has scores and no P&L - so the strict helper would rank its
     // players on `pnl` and tie every one of them at zero.
-    const code = readCode(ACTION);
+    const code = readCode(RANK_SERVICE);
     expect(code).toMatch(/hasProviderGameLabel\(\s*competition\s*\)/);
     expect(code).not.toMatch(/isProviderContest\(/);
+  });
+});
+
+describe("the live rank is sorted in exactly one place", () => {
+  /**
+   * WHY A SECOND COPY IS A VISIBLE DEFECT AND NOT A TIDINESS QUESTION. The stored
+   * `currentRank` is stale on a running contest, so every screen wanting a live rank sorts
+   * the participants itself. The card and the endpoint that refreshes the card are two
+   * callers of one question - so a second copy does not merely risk drifting one day, it
+   * shows the player one rank on load and a different one on the first refresh, with no
+   * error and nothing in a log.
+   */
+  it("the action delegates rather than sorting participants itself", () => {
+    const code = readCode(ACTION);
+
+    // The call, with its arguments - an import is not a use.
+    expect(code).toMatch(/await\s+resolveRank\(\s*\{/);
+    expect(code).toMatch(/createDashboardRankResolver\(\)/);
+
+    // THE LOAD-BEARING HALF. Importing the resolver is trivially satisfied by an action that
+    // calls it and then sorts anyway, keeping its own answer. So the comparator, the registry
+    // dispatch and the direction literal must all be absent from this file.
+    expect(code).not.toMatch(/aHasTrades/);
+    expect(code).not.toMatch(/getRankingValue\(/);
+    expect(code).not.toMatch(/["'](higher|lower)_is_better["']/);
+    expect(code).not.toMatch(/getGameModuleOrTrading\(/);
+  });
+
+  it("the resolver is created once per request, not once per contest", () => {
+    // Reason: the memo is what makes the score direction one database read rather than one
+    // per contest. Created inside the per-contest loop it still returns the right answer,
+    // which is why no assertion on the rank could catch it.
+    const code = readCode(ACTION);
+    const created = code.match(/createDashboardRankResolver\(\)/g) || [];
+    expect(created).toHaveLength(1);
+
+    const createdAt = code.indexOf("createDashboardRankResolver()");
+    const loopAt = code.indexOf("for (const participation of competitionParticipations");
+    expect(loopAt).toBeGreaterThan(createdAt);
+  });
+
+  it("the arena broadcast route is STILL an offender", () => {
+    /**
+     * A DELIBERATELY-LISTED EXCEPTION DOUBLES AS A CANARY FOR THE RULE ITSELF, which is the
+     * R60 lesson: a stale exception reads as a known problem long after it is solved, and
+     * silently re-permits the defect in that file.
+     *
+     * `/api/dashboard/competitions` is the PUBLIC, unauthenticated broadcast display behind
+     * `/arena` and `TraderChampionshipClient`. It carries two more copies of the comparator
+     * and it was left alone on purpose: folding a 545-line public route into the commit that
+     * extracted this would have destroyed the only evidence the extraction offers, which is
+     * that the existing guards stayed green. Recorded rather than swept.
+     *
+     * It is also trading-shaped - it selects neither `score` nor `gameType` - so it would
+     * rank a provider contest on `pnl` and tie every player at zero ON A PUBLIC SCREEN. That
+     * is its own finding and its own commit. When it is fixed, this test goes red and should
+     * be deleted along with the exception.
+     */
+    const code = readCode(ARENA_ROUTE);
+    expect(code).toMatch(/aHasTrades/);
+    expect(code).not.toMatch(/resolveRank\(/);
   });
 });
 
