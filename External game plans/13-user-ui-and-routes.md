@@ -1383,6 +1383,18 @@ player's score in a paid contest), **Moves / Best Time / Combo**, the **LEVEL 3*
 the **GLOBAL / FRIENDS / COUNTRY** leaderboard tabs, and the **RECENT PLAYERS** activity feed.
 `13` s4.1d already records the live ticker as not built for the same reason.
 
+> **AMENDED 11 September 2026, twice, and the amendments run in opposite directions - so a
+> document citing this list as it stands is wrong in both.** The **RECENT PLAYERS feed had a
+> source all along** and is built: `game_round.scoreBreakdown` has been stored since X3 and no
+> board read it (`13` **s4.1n**). And the **in-frame half was authorised by the owner** and is
+> built (`21` **s4.1q**) - the round header, the rail, the stats column and `SUBMIT SOLUTION` -
+> which took **Undo** and **Moves** off this list as well, because Undo is strictly weaker than
+> the Clear button that has always been there and Moves is a count of completed drags. **The
+> remaining refusals are `SCORE`, `Hint`, `Combo`, the `LEVEL` number and the three leaderboard
+> tabs**, and the first two are refusals of *principle* rather than of effort: `PlayState`
+> carries no score by design, and a hint improves a score in a paid contest. Read `21` s4.1q
+> before restating any of this.
+
 #### What the platform half actually lacked
 
 Three things, and only the first is a matter of appearance.

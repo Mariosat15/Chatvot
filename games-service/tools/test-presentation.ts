@@ -82,6 +82,15 @@ interface Presentation {
   newlyJoined(before: number[], after: number[]): number[];
   countUpSteps(target: number): number[];
   withCountUpValue(statValue: string, value: number): string;
+
+  boardProgress(input: Record<string, unknown>): { fraction: number; percent: number };
+  formatBoardTime(ms: number): string;
+  bestBoardTime(previousMs: number | null, elapsedMs: number | null): number | null;
+  roundHeaderCells(
+    input: Record<string, unknown>,
+  ): { key: string; label: string; value: string | null }[];
+  playStatTiles(input: Record<string, unknown>): { key: string; label: string; value: string }[];
+  undoState(input: Record<string, unknown>): { disabled: boolean; title: string };
 }
 
 /** One synthesised note, as `sound.js` consumes it. */
@@ -707,6 +716,139 @@ async function main(): Promise<void> {
     // `localStorage` is shared with it. A key called "sound" is a collision waiting to happen,
     // and the symptom would be a player's mute choice changing when they used something else.
     assert.match(p.SOUND_PREFERENCE_KEY, /circuit/i);
+  });
+
+  console.log("");
+  console.log("The play screen's instruments");
+
+  test("the header never states a score, and neither does anything beside the board", () => {
+    /*
+     * THE LOAD-BEARING TEST OF THIS WHOLE SECTION, and the reason it is an assertion rather than
+     * a comment. The reference design puts a running SCORE in the round header. This client has
+     * no honest source for one: `PlayState` carries no score, no rank and no prize, deliberately,
+     * and `resultCopy` is asserted below to refuse them even when handed them.
+     *
+     * So a score cell could only be filled by computing one HERE - a second scoring authority,
+     * which is the single thing the provider seam exists to prevent - or by changing the protocol,
+     * which is an owner's decision. Every figure these functions return is something the client
+     * can observe for itself: coverage, pairs joined, drags made, a board time.
+     */
+    const cells = p.roundHeaderCells({ boardsSolved: 2, boardTarget: 5, used: 18, cells: 36 });
+    const tiles = p.playStatTiles({ boardsSolved: 2, joined: 3, pairs: 4, moves: 9, bestBoardMs: 4200 });
+    const words = [...cells, ...tiles]
+      .map((entry) => `${entry.label} ${entry.value ?? ""}`)
+      .join(" ")
+      .toLowerCase();
+
+    for (const forbidden of ["score", "points", "rank", "prize"]) {
+      assert.ok(!words.includes(forbidden), `the instruments mention "${forbidden}": ${words}`);
+    }
+  });
+
+  test("a title with a fixed set of boards gets a denominator; one without does not", () => {
+    // Circuit Perfect has a declared number of boards, so "3 / 5" is a true statement. Sprint has
+    // no finishing line at all, and inventing one there would promise a player an end the title
+    // does not have - so the first cell changes its question rather than its number.
+    const perfect = p.roundHeaderCells({ boardsSolved: 2, boardTarget: 5, used: 0, cells: 36 });
+    assert.equal(perfect[0].label, "Board");
+    assert.equal(perfect[0].value, "3 / 5");
+
+    const sprint = p.roundHeaderCells({ boardsSolved: 2, used: 0, cells: 36 });
+    assert.equal(sprint[0].label, "Solved");
+    assert.equal(sprint[0].value, "2");
+  });
+
+  test("the board cell never counts past the set it belongs to", () => {
+    // The last board is solved before the round's own state turns terminal, so there is a moment
+    // where `boardsSolved` equals the target. Unclamped this reads "6 / 5", which is the game
+    // telling a player who has just finished everything that there is another board coming.
+    const done = p.roundHeaderCells({ boardsSolved: 5, boardTarget: 5, used: 36, cells: 36 });
+    assert.equal(done[0].value, "5 / 5");
+  });
+
+  test("the clock cell brings its caption and deliberately not its value", () => {
+    // `renderClock` owns the figure, because it changes four times a second and carries the
+    // urgent styling. If this returned a value too, the two writers would fight and the loser
+    // would be whichever ran last - which is a clock that freezes on a board change.
+    const clock = p.roundHeaderCells({ boardsSolved: 0, used: 0, cells: 36 }).find(
+      (cell) => cell.key === "clock",
+    );
+    assert.ok(clock, "there is no clock cell");
+    assert.equal(clock?.value, null, "the header wrote the clock's value");
+    assert.match(String(clock?.label), /time/i);
+  });
+
+  test("progress is COVERAGE, not pairs joined", () => {
+    /*
+     * The two genuinely differ, and this is the one that matters: the puzzle is complete when
+     * every pair is joined AND every square is used, so a board with all its pairs joined by
+     * short routes can be a long way from finished.
+     *
+     * Driven by pairs, the bar would sit at 100% while the server refused the board with
+     * `incomplete_coverage` - which reads to a player as the game being broken rather than as the
+     * puzzle being unfinished.
+     */
+    assert.equal(p.boardProgress({ used: 18, cells: 36 }).percent, 50);
+    assert.equal(p.boardProgress({ used: 36, cells: 36 }).percent, 100);
+    assert.equal(p.boardProgress({ used: 0, cells: 36 }).fraction, 0);
+
+    // No board yet, and a used count above the grid, both answer without throwing: the fill is a
+    // CSS transform, and a fraction of `NaN` or 1.5 is a bar that vanishes or overflows its track.
+    assert.equal(p.boardProgress({}).percent, 0);
+    assert.equal(p.boardProgress({ used: 40, cells: 36 }).percent, 100);
+  });
+
+  test("the best board time keeps the quicker of the two, and survives a bad reading", () => {
+    // The elapsed figure is the difference of two wall-clock readings, and a device that suspends
+    // its timers can produce a negative or a zero. Taken literally, either becomes the player's
+    // "best" for the rest of the round and can never be beaten.
+    assert.equal(p.bestBoardTime(null, 4200), 4200);
+    assert.equal(p.bestBoardTime(4200, 3100), 3100);
+    assert.equal(p.bestBoardTime(3100, 4200), 3100);
+    assert.equal(p.bestBoardTime(3100, -5), 3100);
+    assert.equal(p.bestBoardTime(3100, 0), 3100);
+    assert.equal(p.bestBoardTime(null, 0), null);
+  });
+
+  test("a board time keeps its minutes, so it cannot be read as a score", () => {
+    assert.equal(p.formatBoardTime(4200), "0:04");
+    assert.equal(p.formatBoardTime(73_000), "1:13");
+    assert.equal(p.formatBoardTime(Number.NaN), "");
+  });
+
+  test("the best-board tile is omitted until there is one, never shown empty", () => {
+    // A tile reading "-" beside three real figures reads as a number that failed to load, and the
+    // first board of every round would show one. The column shrinks instead.
+    const early = p.playStatTiles({ boardsSolved: 0, joined: 1, pairs: 4, moves: 3 });
+    assert.ok(!early.some((tile) => tile.key === "best"), "an empty best-board tile was rendered");
+
+    const later = p.playStatTiles({ boardsSolved: 1, joined: 1, pairs: 4, moves: 3, bestBoardMs: 4200 });
+    assert.ok(later.some((tile) => tile.key === "best"), "the best-board tile never appears");
+  });
+
+  test("undo is offered only when there is something to remove, and never on a locked board", () => {
+    // Locked is checked FIRST, because the round has ended: a board still holding paths would
+    // otherwise offer an enabled control that `board.undo()` then refuses, which is the shape of
+    // dead control this codebase keeps finding.
+    assert.equal(p.undoState({ canUndo: true, locked: false }).disabled, false);
+    assert.equal(p.undoState({ canUndo: false, locked: false }).disabled, true);
+    assert.equal(p.undoState({ canUndo: true, locked: true }).disabled, true);
+    assert.equal(p.undoState({}).disabled, true);
+  });
+
+  test("nothing here offers a hint, and that is the fairness rule rather than a gap", () => {
+    /*
+     * The reference design shows a Hint button with a count of three. It is not a styling omission
+     * and must not be added as one: a hint tells a player something about the solution they had
+     * not worked out, which improves a score in a paid contest, and a consumable count is the
+     * marketplace mechanic the platform's fairness rule names explicitly.
+     *
+     * Asserted over the exported surface rather than left as a comment, so the day somebody adds
+     * `hintState` beside `undoState` this goes red and they read the reason.
+     */
+    const surface = Object.keys(p).join(" ").toLowerCase();
+    assert.ok(!surface.includes("hint" + "state"), "a hint control was added to the play surface");
+    assert.ok(!surface.includes("hintsleft"), "a hint allowance was added to the play surface");
   });
 
   console.log("");

@@ -179,6 +179,16 @@ export function createBoard(svg, onChange) {
   let cellPx = 48;
   let dragging = null;
   let locked = false;
+  /**
+   * @type {number[]} pair ids, oldest first, each appearing once.
+   *
+   * WHY THE ORDER IS THE ORDER PAIRS WERE DRAWN AND NOT THE ORDER THEY WERE JOINED. Undo says it
+   * removes the path drawn last, and a player who starts a route, abandons it half way and moves
+   * on has still drawn it - so keying on "joined" would silently skip their most recent work and
+   * remove something from several moves ago instead. A control that undoes the wrong thing is
+   * worse than no control, because the player then has to repair it.
+   */
+  let drawOrder = [];
   /** @type {{cells:Node,traces:Node,marks:Node,sockets:Node,flashes:Node}|null} Set by `build`. */
   let layers = null;
   /** @type {Map<number, number[][]>} pairId -> the two terminal centres, for the join pulse. */
@@ -193,6 +203,29 @@ export function createBoard(svg, onChange) {
 
   function pathOf(pairId) {
     return paths.get(pairId) || [];
+  }
+
+  /** Record that `pairId` is the pair most recently drawn, keeping one entry per pair. */
+  function noteDrawn(pairId) {
+    drawOrder = drawOrder.filter((entry) => entry !== pairId);
+    drawOrder.push(pairId);
+  }
+
+  /**
+   * The most recently drawn pair, or `null` when nothing has been drawn.
+   *
+   * THE LAST ENTRY AND NOTHING CLEVERER, which is only correct because every writer of `drawOrder`
+   * keeps it honest: `noteDrawn` is the one place a pair is added, and the three places a path
+   * disappears - undo, clear, a new board - each remove the matching entry in the same breath. So
+   * an entry here always names a pair with a real path.
+   *
+   * The first version walked backwards skipping entries whose paths had gone. It read as careful
+   * and it was unreachable - nothing can empty one path without also removing its entry - and it
+   * made the resets in `clear` and `setPuzzle` unprobeable, because each guard silently covered
+   * for the other. Deleting it is what lets a test see whether those resets actually happen.
+   */
+  function lastDrawn() {
+    return drawOrder.length > 0 ? drawOrder.at(-1) : null;
   }
 
   /** A pair is joined when its path runs terminal to terminal, in either direction. */
@@ -347,6 +380,8 @@ export function createBoard(svg, onChange) {
       dragging = pathOwner;
     }
 
+    noteDrawn(dragging);
+
     // Pointer capture, so a drag that leaves the grid - which happens constantly on a phone, where
     // the finger is wider than a cell - keeps being tracked instead of silently ending.
     if (event.pointerId !== undefined && svg.setPointerCapture) {
@@ -387,7 +422,10 @@ export function createBoard(svg, onChange) {
     if (dragging === null) return;
     dragging = null;
     paint();
-    onChange();
+    // `settled` marks one COMPLETED drag, which is what a move count must be. The early return
+    // above means it cannot fire for a tap that grabbed nothing, and `onPointerDown` is the wrong
+    // place for the same reason - a player who touches a cell and lifts has moved nothing.
+    onChange({ settled: true });
   }
 
   svg.addEventListener("pointerdown", onPointerDown);
@@ -745,6 +783,7 @@ export function createBoard(svg, onChange) {
       terminals = new Map();
       dragging = null;
       locked = false;
+      drawOrder = [];
       for (const pair of next.pairs) {
         terminals.set(key(pair.a), pair.id);
         terminals.set(key(pair.b), pair.id);
@@ -756,8 +795,30 @@ export function createBoard(svg, onChange) {
       paths = new Map();
       rebuildOwnership();
       dragging = null;
+      drawOrder = [];
       paint();
       onChange();
+    },
+    /**
+     * Remove the path drawn last. Reports whether anything was removed.
+     *
+     * `paint`, never `render`: nothing here moves a cell or a terminal, and rebuilding them is
+     * what made the board stutter on a phone. Same reason as the drag handlers.
+     */
+    undo() {
+      if (locked || !puzzle) return false;
+      const pairId = lastDrawn();
+      if (pairId === null) return false;
+      paths.delete(pairId);
+      drawOrder = drawOrder.filter((entry) => entry !== pairId);
+      rebuildOwnership();
+      dragging = null;
+      paint();
+      onChange();
+      return true;
+    },
+    canUndo() {
+      return !locked && puzzle !== null && lastDrawn() !== null;
     },
     lock() {
       locked = true;

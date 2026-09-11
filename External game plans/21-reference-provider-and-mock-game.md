@@ -1281,6 +1281,106 @@ repository, so `check:mirrors` and every platform test say nothing about any of 
 **Not verified by eye.** The surface is reachable only with a signed launch token, and the case
 itself needs a contest whose window is closing.
 
+### 4.1q The chrome around the board was rebuilt to the reference, and two of its figures were refused - 11 September 2026
+
+The owner supplied `arena-target-full.png` and rejected the arena screen twice. `13` s4.1m
+answered the platform's half of it and recorded that **the centre column is drawn by this
+service** - the round header, the board and its bezel, the `Hint / Undo / Clear` rail, the
+`LEVEL / Moves / Best Time / Combo` column and `SUBMIT SOLUTION`. The owner then authorised that
+half explicitly ("do as well"), and this is it.
+
+**Nothing was broken.** The surface was readable and correct after s4.1f and s4.1m; what it was
+not was the reference. So this is presentation work with one genuine behaviour addition, and it is
+worth saying plainly because the diff is large.
+
+#### The two figures the reference asks for that this client must not produce
+
+- **A running SCORE in the round header.** `PlayState` carries no score, no rank and no prize,
+  deliberately, and `resultCopy` is pinned by a test that hands it all three and asserts none
+  reaches the screen. A score cell could therefore only be filled by **computing one here** - a
+  second scoring authority, which is the single thing the provider seam exists to prevent - or by
+  **sending one down**, which is a protocol change and an owner's decision rather than a styling
+  one. `roundHeaderCells` returns three cells and a probe injects a plausible local figure
+  (`solved * 250`) to prove the guard is behavioural rather than a comment.
+- **A HINT with a count of three.** Forbidden outright, and not by effort: a hint tells a player
+  something about the solution they had not worked out, which improves a score in a paid contest,
+  and a consumable count is exactly the marketplace mechanic the platform's fairness rule names -
+  *"extra time, retries, hints, skips and easier content are not"*. A probe adds `hintState`
+  beside `undoState` and the test goes red, so the next person to try it reads the reason.
+
+**`LEVEL` and `Combo` have no source either.** The honest reading of the reference's LEVEL bar is
+the board's own **coverage**, which is a real fact the client holds and one a player under a clock
+acts on, so that is what the meter shows. Combo is not built at all.
+
+#### Undo IS built, and the distinction from a hint is the whole argument
+
+It removes the path drawn last. It is **strictly weaker than the Clear button that has always been
+here** - the same position is already reachable by touching that pair's terminal and drawing it
+again - so it changes no rule of the puzzle, reveals nothing, and cannot improve a score. It is an
+input convenience on a touch screen.
+
+Three findings came out of building it:
+
+- **The order is the order pairs were DRAWN, never the order they were joined.** A player who
+  starts a route, abandons it half way and moves on has still drawn it, so keying on "joined"
+  silently skips their most recent work and removes something from several moves ago. A control
+  that undoes the wrong thing is worse than no control, because the player then repairs it under a
+  clock. The test asserts **which** pair survives on a hand-written grid: counting alone passes
+  either way, which is how the first version of it let the defect through, and a generated puzzle
+  cannot say which, because `generated.solution` has no fixed relation to `puzzle.pairs`.
+- **A guard that read as careful was unreachable, and it made two real resets unprobeable.** The
+  first `lastDrawn` walked backwards past entries whose paths had gone. Nothing in `board.js` can
+  empty one pair's path without also removing its entry - touching a terminal leaves a path of
+  length one, not none - so the walk could never fire, and with it in place **removing
+  `drawOrder = []` from `clear` changed no observable at all**, because every stale entry's path
+  was empty and the walk skipped the lot. Two guards each silently covering for the other, R42's
+  shape. It was **deleted rather than probed**, and the two resets are the real mechanism.
+- **`undo()` must RETURN false rather than merely doing nothing.** `app.js` plays the clearing
+  sound on a true, so a false success is the game making the noise of an action it did not take -
+  and a disabled button is still keyboard-reachable in some browsers.
+
+#### Two layout decisions that would have been wrong the obvious way
+
+- **The frame-height report counts the rails as chrome when they stack, and only then.**
+  `chromeHeightOf` measures the arena and subtracts the board, which is right in both
+  arrangements without the function knowing which is in force and without a media query being
+  restated in JavaScript. Adding a fixed allowance instead would shrink the board on a desktop,
+  where the rails sit beside it and cost no height at all.
+- **The phone rearrangement uses explicit `grid-row`s inside a max-width query, never `order`.**
+  Grid auto-placement follows *order-modified* document order, so an `order` rule that fires only
+  on a wide screen leaves a phone arranged by DOM order - which is the mistake already made once
+  on the platform's own arena layout (`13` s1.1h).
+
+#### What was built
+
+| File | Change |
+|---|---|
+| `public/play/presentation.js` | `boardProgress`, `formatBoardTime`, `bestBoardTime`, `roundHeaderCells`, `playStatTiles`, `undoState` - every figure and label the screen shows, pure and covered in Node |
+| `public/play/board.js` | `drawOrder`, `noteDrawn`, `lastDrawn`, `undo()`, `canUndo()`; `onPointerUp` now reports `{ settled: true }` so a completed drag can be counted |
+| `public/play/index.html` | `#screen-play` rebuilt: three boxed header cells, an `.arena` of action rail + board + stat rail, one wide Submit |
+| `public/play/app.css` | The header strip, the arena grid, the rails, the coverage meter, the stat tiles, `.submit-wide`, and the 680px stacking query |
+| `public/play/app.js` | `renderInstruments`, `renderStatTiles`, `noteBoardBoundary`, `renderUndo`, the move and best-board state, the Undo handler, and the widened `chromeHeightOf` |
+
+Three smaller decisions recorded rather than absorbed. **Submit is alone on its row** - a
+destructive control beside the confirming one, both the same width, is how a player wipes a
+finished grid instead of sending it, so Clear moved into the rail. **Leave keeps its word rather
+than becoming an icon**, because an unlabelled exit on a paid attempt is the one control a player
+must not have to guess at. And **a board time keeps its minutes** (`1:13`, not `73`), because a
+bare figure beside a label reading "best board" is read as a score.
+
+**15 new tests (285 in the service, from 270), 48 probes red on exactly the named test.** Four
+came back green on the first run and all four were the same two causes - one weak test (counting
+instead of identifying) and one unreachable guard covering for two real ones - both fixed above.
+Nothing here is in the platform repository, so `check:mirrors` and every platform test say nothing
+about any of it.
+
+**Deploy: `public/play` needs only a pull and `pm2 restart chartvolt-games`.** The served set is
+read from the directory at boot (s4.1i) and the assets carry a content fingerprint (s4.1o), so no
+build and no cache purge. **`npm run build` is still required in the same movement**, because
+R66's clock fix and the progress callback are TypeScript and have never been built on the server.
+
+**Not verified by eye**, and it cannot be from here - the surface needs a signed launch token.
+
 ---
 
 ## 5. What this does NOT prove

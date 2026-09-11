@@ -138,6 +138,8 @@ interface Board {
   pairCount(): number;
   cellsUsed(): number;
   cellCount(): number;
+  undo(): boolean;
+  canUndo(): boolean;
   submission(): { pairId: number; cells: Cell[] }[];
 }
 
@@ -440,6 +442,126 @@ async function main(): Promise<void> {
     assert.equal(board.cellsUsed(), 0);
     assert.equal(board.joinedCount(), 0);
     assert.equal(board.isComplete(), false);
+  });
+
+  /*
+   * UNDO, AND THE ONE THING IT MUST NOT BE.
+   *
+   * It removes the path the player drew last, and that is the whole of it. It is strictly weaker
+   * than the Clear button that has always been here - the same position is already reachable by
+   * touching that pair's terminal and drawing it again - so it changes no rule of the puzzle,
+   * tells the player nothing they had not worked out, and cannot improve a score.
+   *
+   * A HINT WOULD BE ALL THREE, which is why there is not one and why these tests sit next to the
+   * ones for Clear rather than being filed as a feature. See `undoState` in `presentation.js`.
+   */
+  test("undo removes the path drawn last, and only that one", () => {
+    const { generated, svg, board } = boardFor("undo-1");
+    const [first, second] = generated.solution;
+    drag(svg, first);
+    drag(svg, second);
+    const afterBoth = board.cellsUsed();
+
+    assert.equal(board.undo(), true, "undo reported nothing to remove");
+    assert.equal(board.cellsUsed(), afterBoth - second.length, "the wrong path was removed");
+    assert.equal(board.joinedCount(), 1, "undo removed more than one pair");
+  });
+
+  test("undo follows the order pairs were DRAWN, not the order they were joined", () => {
+    /*
+     * Redrawing a pair makes it the most recent one, so the second undo must take the pair that
+     * was drawn second-to-last - which here is the FIRST pair, redrawn - and not the one that has
+     * been joined the longest.
+     *
+     * Keyed on joins instead, the first undo below would still look right and the second would
+     * quietly remove somebody's oldest work. That is the failure this test exists for: a control
+     * that undoes the wrong thing is worse than no control, because the player then has to repair
+     * it under a clock.
+     */
+    /*
+     * ON A HAND-WRITTEN GRID, because the assertion is WHICH pair survives and a generated puzzle
+     * cannot say that: `generated.solution` is in no particular relation to `puzzle.pairs`, so a
+     * join-keyed undo - which walks the puzzle's own order - would remove the right pair on some
+     * seeds and the wrong one on others. Here pair 1 is drawn first and is deliberately NOT last
+     * in the puzzle, so the two rules give different answers on every run.
+     */
+    const { svg, board } = syntheticBoard({
+      width: 4,
+      height: 2,
+      pairs: [
+        { id: 1, a: [0, 0], b: [3, 0] },
+        { id: 2, a: [0, 1], b: [3, 1] },
+      ],
+    });
+    const drawn = () =>
+      board
+        .submission()
+        .filter((entry) => entry.cells.length > 0)
+        .map((entry) => entry.pairId);
+
+    drag(svg, [
+      [0, 0],
+      [1, 0],
+      [2, 0],
+      [3, 0],
+    ]);
+    drag(svg, [
+      [0, 1],
+      [1, 1],
+      [2, 1],
+      [3, 1],
+    ]);
+    drag(svg, [
+      [0, 0],
+      [1, 0],
+      [2, 0],
+      [3, 0],
+    ]); // Redrawn: pair 1 is now the most recent.
+
+    // WHICH pair survives, not how many. Counting alone passes either way, which is how the first
+    // version of this test let the defect through.
+    assert.equal(board.undo(), true);
+    assert.deepEqual(drawn(), [2], "undo removed the pair drawn first, not the one drawn last");
+
+    board.undo();
+    assert.deepEqual(drawn(), [], "the second undo did not remove the other pair");
+    assert.equal(board.canUndo(), false, "undo is still offered with an empty board");
+  });
+
+  test("undo refuses on an empty board and on a locked one", () => {
+    // Both must be refusals rather than no-ops that report success: `app.js` plays the clearing
+    // sound only when `undo()` says it removed something, so a false success is the game making
+    // the noise of an action it did not take.
+    const { generated, svg, board } = boardFor("undo-refuse-1");
+    assert.equal(board.canUndo(), false);
+    assert.equal(board.undo(), false, "undo claimed to remove something from an empty board");
+
+    drag(svg, generated.solution[0]);
+    assert.equal(board.canUndo(), true);
+    board.lock();
+    assert.equal(board.canUndo(), false, "undo is offered on a locked board");
+    assert.equal(board.undo(), false, "undo ran on a locked board");
+  });
+
+  test("clearing also clears what undo would reach for", () => {
+    // The draw order is separate state from the paths, so it has to be reset alongside them.
+    // Left behind, Undo stays enabled on a freshly cleared board and then reports failure when
+    // pressed - an enabled control that does nothing.
+    const { generated, svg, board } = boardFor("undo-clear-1");
+    drag(svg, generated.solution[0]);
+    board.clear();
+    assert.equal(board.canUndo(), false, "undo survived a clear");
+    assert.equal(board.undo(), false, "undo claimed to remove something from a cleared board");
+  });
+
+  test("a new board starts with nothing to undo", () => {
+    // `setPuzzle` is called for every board inside one round, so a draw order that survived would
+    // let Undo reach for a pair id belonging to the previous grid.
+    const { client, generated, svg, board } = boardFor("undo-next-1");
+    drag(svg, generated.solution[0]);
+    board.setPuzzle(client);
+    assert.equal(board.canUndo(), false, "undo carried over to the next board");
+    assert.equal(board.undo(), false, "undo reached for a pair from the previous board");
   });
 
   test("a locked board ignores the player", () => {

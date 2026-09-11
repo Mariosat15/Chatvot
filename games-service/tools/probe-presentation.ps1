@@ -16,6 +16,7 @@ Set-Location (Split-Path -Parent $PSScriptRoot)
 $SuitePresentation = 'tools/test-presentation.ts'
 $SuitePlayRoutes = 'tools/test-play.ts'
 $SuiteCatalogue = 'tools/test-api.ts'
+$SuiteBoard = 'tools/test-board.ts'
 
 $srcPresentation = 'public/play/presentation.js'
 $srcClient = 'public/play/app.js'
@@ -258,11 +259,17 @@ Write-Host "The module graph the page cannot describe" -ForegroundColor Cyan
 # from the directory, so it reported DID NOT APPLY - which reads like a broken harness rather than
 # a moved target. The half that can still go wrong is a module the directory does not hold, so the
 # mutation now renames the import instead.
+#
+# Declared at 3, and the width is the finding rather than harness damage: renaming `board.js`'s
+# import means `board.js` itself cannot be imported, so the test that reads `BOARD_ART` out of it
+# to check the artwork is served fails too. That is the defect's real blast radius - an ES module
+# that 404s takes its importer down with it - and tightening this to 1 would mean deleting the
+# artwork assertion to make a probe tidy.
 $results += Invoke-Probe -Name 'a module reached only by import goes missing' `
   -Suite $SuitePlayRoutes -File 'public/play/board.js' `
   -Find 'from "./presentation.js";' `
   -Replace 'from "./presentation-v2.js";' `
-  -ExpectRed 'every module the play surface imports is served'
+  -ExpectRed 'every module the play surface imports is served' -MaxRed 3
 
 Write-Host ""
 Write-Host "The arcade pass - movement and sound" -ForegroundColor Cyan
@@ -399,8 +406,206 @@ $results += Invoke-Probe -Name 'the count-up starts before the correct figure is
 # sighted can see, and nothing else in this repository compares the two.
 $results += Invoke-Probe -Name 'the markup announces the opposite of the default state' `
   -Suite $SuitePlayRoutes -File $srcMarkup `
-  -Find '            aria-label="Mute sound"' `
-  -Replace '            aria-label="Unmute sound"' `
+  -Find '              aria-label="Mute sound"' `
+  -Replace '              aria-label="Unmute sound"' `
   -ExpectRed 'the mute control ships announcing the state it is actually in'
+
+Write-Host ""
+Write-Host "The play screen's instruments" -ForegroundColor Cyan
+
+# THE ONE THAT MATTERS. The reference design puts a running SCORE in the round header, and this
+# client has no honest source for one: `PlayState` carries no score, no rank and no prize.
+#
+# So a score cell could only be filled by computing one HERE - a second scoring authority, which
+# is the single thing the provider seam exists to prevent. The mutation is the shape somebody
+# would actually write: a plausible local figure, derived from real facts, that nothing
+# authoritative ever agreed to.
+$results += Invoke-Probe -Name 'a locally-computed score appears in the round header' `
+  -Suite $SuitePresentation -File $srcPresentation `
+  -Find '    { key: "clock", label: "Time left", value: null },' `
+  -Replace '    { key: "clock", label: "Time left", value: null },
+    { key: "score", label: "Score", value: String(solved * 250) },' `
+  -ExpectRed 'the header never states a score, and neither does anything beside the board'
+
+# Circuit Sprint has no fixed set of boards, so there is no denominator to show. Written as one
+# branch, the game promises every Sprint player a finishing line the title does not have - and
+# `boardTarget` is undefined there, so the cell reads "3 / undefined".
+$results += Invoke-Probe -Name 'a title with no fixed set is given a denominator anyway' `
+  -Suite $SuitePresentation -File $srcPresentation `
+  -Find '    target === null
+      ? { key: "board", label: "Solved", value: String(solved) }
+      : { key: "board", label: "Board", value: `${Math.min(solved + 1, target)} / ${target}` },' `
+  -Replace '    { key: "board", label: "Board", value: `${solved + 1} / ${target}` },' `
+  -ExpectRed 'a title with a fixed set of boards gets a denominator; one without does not' -MaxRed 2
+
+# The clamp. The last board is solved before the round's own state turns terminal, so there is a
+# moment where `boardsSolved` equals the target - and unclamped the header says "6 / 5", telling a
+# player who has just finished everything that there is another board coming.
+$results += Invoke-Probe -Name 'the board cell counts past the set it belongs to' `
+  -Suite $SuitePresentation -File $srcPresentation `
+  -Find '      : { key: "board", label: "Board", value: `${Math.min(solved + 1, target)} / ${target}` },' `
+  -Replace '      : { key: "board", label: "Board", value: `${solved + 1} / ${target}` },' `
+  -ExpectRed 'the board cell never counts past the set it belongs to'
+
+# The header writing the clock's value as well as its caption. Two writers for one figure, and the
+# winner is whichever ran last - so the clock freezes on every board change, which is the one
+# readout a player under a clock is watching.
+$results += Invoke-Probe -Name 'the header writes the clock value as well as its caption' `
+  -Suite $SuitePresentation -File $srcPresentation `
+  -Find '    { key: "clock", label: "Time left", value: null },' `
+  -Replace '    { key: "clock", label: "Time left", value: "0:00" },' `
+  -ExpectRed 'the clock cell brings its caption and deliberately not its value'
+
+# Driven by pairs joined, the meter sits at 100% while the server refuses the board with
+# `incomplete_coverage` - because this puzzle is only complete when every SQUARE is used too. A
+# full bar over a refused board reads to a player as the game being broken.
+$results += Invoke-Probe -Name 'the meter measures pairs joined instead of coverage' `
+  -Suite $SuitePresentation -File $srcPresentation `
+  -Find '  const { used, cells } = input ?? {};
+  if (!positive(cells)) return { fraction: 0, percent: 0 };
+  const filled = positive(used) ? Math.min(used, cells) : 0;' `
+  -Replace '  const { joined, pairs: cells } = input ?? {};
+  if (!positive(cells)) return { fraction: 0, percent: 0 };
+  const filled = positive(joined) ? Math.min(joined, cells) : 0;' `
+  -ExpectRed 'progress is COVERAGE, not pairs joined' -MaxRed 2
+
+# The fill is a CSS transform, so a fraction above 1 overflows its track and a fraction of `NaN`
+# removes the bar entirely. `getBoundingClientRect` on a hidden element returns zeroes, which is
+# exactly the state this screen is in for the frame before it is shown.
+$results += Invoke-Probe -Name 'the meter is not clamped to the grid it measures' `
+  -Suite $SuitePresentation -File $srcPresentation `
+  -Find '  const filled = positive(used) ? Math.min(used, cells) : 0;' `
+  -Replace '  const filled = used;' `
+  -ExpectRed 'progress is COVERAGE, not pairs joined'
+
+# The elapsed figure is the difference of two wall-clock readings, and a device that suspends its
+# timers produces a negative or a zero. Taken literally, either becomes the player's "best" for
+# the rest of the round and can never be beaten.
+$results += Invoke-Probe -Name 'a nonsensical board time becomes the best one' `
+  -Suite $SuitePresentation -File $srcPresentation `
+  -Find '  if (!Number.isFinite(elapsedMs) || elapsedMs <= 0) return previous;' `
+  -Replace '  if (!Number.isFinite(elapsedMs)) return previous;' `
+  -ExpectRed 'the best board time keeps the quicker of the two, and survives a bad reading'
+
+# Taking the later reading rather than the quicker one. "Best" then means "most recent", which is
+# a figure that moves in both directions under a label promising it only improves.
+$results += Invoke-Probe -Name 'the best board time keeps the most recent instead of the quickest' `
+  -Suite $SuitePresentation -File $srcPresentation `
+  -Find '  return Math.min(previous, elapsedMs);' `
+  -Replace '  return elapsedMs;' `
+  -ExpectRed 'the best board time keeps the quicker of the two, and survives a bad reading'
+
+# A tile reading "-" beside three real figures reads as a number that failed to load, and the
+# first board of every round would show one - so this is the common case rather than an edge.
+$results += Invoke-Probe -Name 'the best-board tile is rendered empty before there is one' `
+  -Suite $SuitePresentation -File $srcPresentation `
+  -Find '  const best = formatBoardTime(bestBoardTime(null, bestBoardMs));
+  if (best) tiles.push({ key: "best", label: "Best board", value: best });' `
+  -Replace '  const best = formatBoardTime(bestBoardTime(null, bestBoardMs));
+  tiles.push({ key: "best", label: "Best board", value: best || "-" });' `
+  -ExpectRed 'the best-board tile is omitted until there is one, never shown empty'
+
+# Locked must be checked FIRST. The other way round, a board still holding paths offers an enabled
+# Undo after the round has ended, and `board.undo()` then refuses it - a control that appears to
+# work and does nothing, which is the shape this codebase keeps finding.
+$results += Invoke-Probe -Name 'undo is offered on a locked board' `
+  -Suite $SuitePresentation -File $srcPresentation `
+  -Find '  if (locked) return { disabled: true, title: "The board is locked." };
+  if (!canUndo) return { disabled: true, title: "Nothing to undo yet." };' `
+  -Replace '  if (!canUndo) return { disabled: true, title: "Nothing to undo yet." };
+  if (false) return { disabled: true, title: "The board is locked." };' `
+  -ExpectRed 'undo is offered only when there is something to remove, and never on a locked board'
+
+# THE FAIRNESS RULE, asserted rather than left as a comment. The reference design shows a Hint
+# button with a count of three; a hint tells a player something about the solution they had not
+# worked out, which improves a score in a paid contest, and a consumable count is the marketplace
+# mechanic the platform's rule names explicitly. This is what somebody adding it would write.
+$results += Invoke-Probe -Name 'a hint allowance is added beside undo' `
+  -Suite $SuitePresentation -File $srcPresentation `
+  -Find 'export function undoState(input) {' `
+  -Replace 'export function hintState(input) {
+  const { hintsLeft } = input ?? {};
+  return { disabled: !hintsLeft, title: `${hintsLeft ?? 0} hints left` };
+}
+
+export function undoState(input) {' `
+  -ExpectRed 'nothing here offers a hint, and that is the fairness rule rather than a gap'
+
+Write-Host ""
+Write-Host "The board's own half of undo, and the move count" -ForegroundColor Cyan
+
+$srcBoard = 'public/play/board.js'
+
+# Keyed on which pairs are JOINED rather than on which was drawn, undo skips a player's most
+# recent work - an abandoned half-drawn route - and removes something from several moves ago
+# instead. A control that undoes the wrong thing is worse than no control, because the player then
+# has to repair it under a clock.
+$results += Invoke-Probe -Name 'undo follows the joined pairs rather than the drawn ones' `
+  -Suite $SuiteBoard -File $srcBoard `
+  -Find '    return drawOrder.length > 0 ? drawOrder.at(-1) : null;' `
+  -Replace '    const joined = joinedIds();
+    return joined.length > 0 ? joined.at(-1) : null;' `
+  -ExpectRed 'undo follows the order pairs were DRAWN, not the order they were joined'
+
+# Reporting success without removing anything. `app.js` plays the clearing sound only when
+# `undo()` says it removed something, so a false success is the game making the noise of an action
+# it did not take - and a disabled button can still be reached by keyboard on some browsers.
+#
+# Declared at 3: "an empty board has nothing to undo" is one rule with three observable faces,
+# because a cleared board and a fresh board are both empty boards. All three assert that `undo()`
+# RETURNS false rather than merely doing nothing, which is the half that matters - `app.js` plays
+# the clearing sound on a true, so a false success is the game making the noise of an action it
+# did not take.
+$results += Invoke-Probe -Name 'undo claims success on a locked or empty board' -MaxRed 3 `
+  -Suite $SuiteBoard -File $srcBoard `
+  -Find '      if (locked || !puzzle) return false;
+      const pairId = lastDrawn();
+      if (pairId === null) return false;' `
+  -Replace '      const pairId = lastDrawn();
+      if (pairId === null) return true;' `
+  -ExpectRed 'undo refuses on an empty board and on a locked one'
+
+# The draw order is separate state from the paths, so it has to be reset alongside them. Left
+# behind by `clear`, Undo stays enabled on a freshly cleared board and then reports failure when
+# pressed - an enabled control that does nothing.
+$results += Invoke-Probe -Name 'clearing the board leaves the draw order behind' `
+  -Suite $SuiteBoard -File $srcBoard `
+  -Find '      rebuildOwnership();
+      dragging = null;
+      drawOrder = [];
+      paint();' `
+  -Replace '      rebuildOwnership();
+      dragging = null;
+      paint();' `
+  -ExpectRed 'clearing also clears what undo would reach for'
+
+# `setPuzzle` runs for every board inside one round, so a draw order that survived would let Undo
+# reach for a pair id belonging to the previous grid.
+$results += Invoke-Probe -Name 'the next board inherits the previous one''s draw order' `
+  -Suite $SuiteBoard -File $srcBoard `
+  -Find '      locked = false;
+      drawOrder = [];' `
+  -Replace '      locked = false;' `
+  -ExpectRed 'a new board starts with nothing to undo'
+
+# Nothing recorded as drawn, so there is never anything to undo. The control is permanently
+# disabled, which looks exactly like a control that is simply not needed yet.
+$results += Invoke-Probe -Name 'nothing is recorded as having been drawn' `
+  -Suite $SuiteBoard -File $srcBoard `
+  -Find '    noteDrawn(dragging);' `
+  -Replace '' `
+  -ExpectRed 'undo removes the path drawn last, and only that one' -MaxRed 4
+
+# A NOTE ON THE PROBE THAT IS NOT HERE.
+#
+# The first cut of `lastDrawn` walked backwards past entries whose paths had gone. It read as
+# careful, and it was UNREACHABLE - nothing in this file can empty one pair's path without also
+# removing its entry, and touching a terminal leaves a path of length one rather than none. Worse,
+# it made the two resets above unprobeable: with the walk in place, removing `drawOrder = []` from
+# `clear` changed no observable at all, because every stale entry's path was empty and the walk
+# skipped the lot. Two guards each silently covering for the other, which is R42's shape.
+#
+# It was deleted rather than probed, and the two resets are the real mechanism. That is why both
+# probes above go red now and reported GREEN on the first run of this file.
 
 Write-ProbeSummary $results

@@ -428,8 +428,25 @@ npm run probe:round-clock    # the same, for the clock and the length promised b
 > that would have sent it was definitely present.** A test pins the markup's side of that bargain:
 > exactly one screen ships visible, and it is the loading screen.
 
-`npm test` runs **270 tests**: 15 config, 42 engine, 28 scoring, 41 API, 78 play and delivery,
-11 progress, 15 board client, 40 presentation. (Counted from the suite's own output. Any figure of
+> **The board's chrome shows six figures and refuses two, and the refusals are the load-bearing
+> part.** The reference design the owner supplied puts a running **score** in the round header and
+> a **hint** button with a count of three beside the board. Neither is built. `PlayState` carries
+> no score, no rank and no prize, so a score cell could only be filled by computing one here - a
+> second scoring authority, which is the one thing the provider seam exists to prevent - or by
+> changing the protocol, which is the owner's decision. A hint would tell a player something about
+> the solution they had not worked out, which improves a score in a paid contest, and a consumable
+> count is precisely the marketplace mechanic the platform's fairness rule names. Both are pinned
+> by probes: one injects a plausible local score, the other adds `hintState` beside `undoState`.
+> **Undo is built** and the distinction is the argument - it is strictly weaker than the Clear
+> button that has always been here, so it changes no rule and reveals nothing. What the screen does
+> show is board (or boards solved), time left, coverage, paths joined, completed drags and the
+> fastest board of the round; every one of them is something this client can observe for itself,
+> and all of it is computed in `presentation.js` so it can be asserted in Node.
+
+`npm test` runs **285 tests**: 15 config, 42 engine, 28 scoring, 41 API, 78 play and delivery,
+11 progress, 20 board client, 50 presentation. (Counted from the suite's own output. Any figure of
+270 predates the round header, the coverage meter, the stat tiles and Undo - see the note below.
+Any figure of
 259 predates the mid-round progress callback, which added a whole suite - `tools/test-progress.ts`,
 which opens **no database** on purpose, every assertion in it being about what leaves this process.
 Any figure of 249 predates

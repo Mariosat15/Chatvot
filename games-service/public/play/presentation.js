@@ -513,3 +513,141 @@ export function withCountUpValue(statValue, value) {
   if (!Number.isFinite(value)) return statValue;
   return statValue.replace(/^\d+/, String(Math.max(0, Math.round(value))));
 }
+
+/* ------------------------------------------------------------------------------------------
+ * The play screen's instruments
+ *
+ * WHAT MAY BE SHOWN HERE, AND THE ONE THING THAT MAY NOT.
+ *
+ * Every figure below is something this client can observe for itself and state truthfully: how
+ * much of the grid is covered, how many pairs are joined, how many drags the player has made,
+ * how long their quickest board took. None of them is a score, none of them is sent anywhere,
+ * and none of them changes what the server pays.
+ *
+ * A SCORE IS DELIBERATELY ABSENT AND MUST STAY ABSENT. `PlayState` carries no score, no rank and
+ * no prize, and a test asserts that `resultCopy` refuses to print them even when handed them.
+ * The client is an input device. A score cell in this header would either have to be invented
+ * here - a second scoring authority, which is the single thing this whole architecture exists to
+ * prevent - or be sent down from the server, which is a protocol change and a decision for the
+ * owner rather than a styling one.
+ * ---------------------------------------------------------------------------------------- */
+
+/**
+ * How far through the current board the player is, as a fraction between 0 and 1.
+ *
+ * COVERAGE, NOT PAIRS JOINED, and the two genuinely differ: this puzzle is only complete when
+ * every square is used as well as every pair joined, so a board with all its pairs joined by
+ * short routes can be a long way from finished. A bar driven by pairs would sit at full while the
+ * board was refused, which is the shape of complaint that becomes a ticket about the game being
+ * broken.
+ */
+export function boardProgress(input) {
+  const { used, cells } = input ?? {};
+  if (!positive(cells)) return { fraction: 0, percent: 0 };
+  const filled = positive(used) ? Math.min(used, cells) : 0;
+  const fraction = filled / cells;
+  return { fraction, percent: Math.round(fraction * 100) };
+}
+
+/**
+ * `4200` -> `"0:04"`. A board time, which is always short.
+ *
+ * Minutes are kept rather than dropped once a board runs past sixty seconds, because a bare
+ * `"73"` beside a label reading "best board" is read as a score.
+ */
+export function formatBoardTime(ms) {
+  if (!Number.isFinite(ms) || ms < 0) return "";
+  const seconds = Math.round(ms / 1000);
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
+/**
+ * The quicker of a running best and a board that has just been solved.
+ *
+ * A REDUCER RATHER THAN A RUNNING VARIABLE IN `app.js`, so the one comparison that decides what a
+ * player is told about their own pace can be asserted. It refuses a non-finite or negative
+ * elapsed time by keeping the previous best: the elapsed figure is derived from two wall-clock
+ * readings, and a device that suspends its timers can produce either.
+ */
+export function bestBoardTime(previousMs, elapsedMs) {
+  const previous = Number.isFinite(previousMs) && previousMs > 0 ? previousMs : null;
+  if (!Number.isFinite(elapsedMs) || elapsedMs <= 0) return previous;
+  if (previous === null) return elapsedMs;
+  return Math.min(previous, elapsedMs);
+}
+
+/**
+ * The three cells of the round header, left to right.
+ *
+ * TWO OF THEM ARE ALWAYS THE SAME QUESTION - how far am I, how long have I got - and the third is
+ * the board's own coverage, which is the only other fact this client holds that a player under a
+ * clock acts on. The labels are returned with the values so a caption can never end up over the
+ * wrong figure, which is how a "boards" count gets read as a time.
+ *
+ * `boardTarget` is absent for Circuit Sprint, which has no fixed set, so the first cell answers
+ * "how many have I finished" rather than "which one am I on". Inventing a denominator there would
+ * be inventing a finishing line the title does not have.
+ */
+export function roundHeaderCells(input) {
+  const { boardsSolved, boardTarget, used, cells } = input ?? {};
+  const solved = positive(boardsSolved) ? Math.round(boardsSolved) : 0;
+  const target = positive(boardTarget) ? Math.round(boardTarget) : null;
+  const coverage = boardProgress({ used, cells });
+
+  return [
+    target === null
+      ? { key: "board", label: "Solved", value: String(solved) }
+      : { key: "board", label: "Board", value: `${Math.min(solved + 1, target)} / ${target}` },
+    { key: "clock", label: "Time left", value: null },
+    { key: "coverage", label: "Filled", value: `${coverage.percent}%` },
+  ];
+}
+
+/**
+ * The stat tiles beside the board.
+ *
+ * A TILE IS OMITTED RATHER THAN SHOWN EMPTY. Best board has no value until a board has been
+ * solved, and a tile reading "-" next to three real figures reads as a number that failed to
+ * load. The caller renders whatever comes back, so the column shrinks honestly.
+ */
+export function playStatTiles(input) {
+  const { boardsSolved, joined, pairs, moves, bestBoardMs } = input ?? {};
+  const tiles = [
+    {
+      key: "paths",
+      label: "Paths",
+      value: `${positive(joined) ? Math.round(joined) : 0} / ${positive(pairs) ? Math.round(pairs) : 0}`,
+    },
+    { key: "moves", label: "Moves", value: String(positive(moves) ? Math.round(moves) : 0) },
+    {
+      key: "solved",
+      label: "Boards done",
+      value: String(positive(boardsSolved) ? Math.round(boardsSolved) : 0),
+    },
+  ];
+
+  const best = formatBoardTime(bestBoardTime(null, bestBoardMs));
+  if (best) tiles.push({ key: "best", label: "Best board", value: best });
+  return tiles;
+}
+
+/**
+ * Whether Undo is offered, and what it says it will do.
+ *
+ * WHY THERE IS AN UNDO AND DELIBERATELY NO HINT. Undo removes the path the player drew last. It
+ * is strictly weaker than the Clear button that has always been here - the same result is already
+ * reachable by touching that pair's terminal and drawing it again - so it changes no rule, gives
+ * no information the player did not have, and cannot improve a score. It is an input convenience.
+ *
+ * A hint is the opposite, and is forbidden outright: it would tell a player something about the
+ * solution they had not worked out, which improves a score in a paid contest. The reference
+ * design shows it as a consumable with a count, which is the marketplace mechanic the platform's
+ * fairness rule names explicitly - "extra time, retries, hints, skips and easier content are
+ * not [permitted]". It is not a styling omission and must not be added as one.
+ */
+export function undoState(input) {
+  const { canUndo, locked } = input ?? {};
+  if (locked) return { disabled: true, title: "The board is locked." };
+  if (!canUndo) return { disabled: true, title: "Nothing to undo yet." };
+  return { disabled: false, title: "Remove the path you drew last" };
+}

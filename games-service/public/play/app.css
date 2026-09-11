@@ -510,6 +510,243 @@ button.small-btn {
 }
 
 /* ------------------------------------------------------------------------------------------
+ * The round header, and the rails either side of the board
+ * ---------------------------------------------------------------------------------------- */
+
+.round-bar {
+  gap: 10px;
+}
+
+/*
+ * The instrument cells.
+ *
+ * `1fr` per cell rather than auto widths, so the three stay put as their contents change: the
+ * clock loses a character crossing 10:00 to 9:59 and the coverage figure gains one at 100%, and
+ * with auto widths each of those drags the whole strip sideways in the player's peripheral vision
+ * while they are concentrating on the grid.
+ */
+.round-cells {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+.round-controls {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+button.icon-btn {
+  min-height: 36px;
+  min-width: 40px;
+  padding: 6px 10px;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+/*
+ * THE ARENA. A rail, the board, a rail.
+ *
+ * The board is the middle column, and it is the only one allowed to take the leftover space -
+ * both rails are sized to their own contents. `minmax(0, 1fr)` and not `1fr`: a bare `1fr` track
+ * is floored by its content, so a wide stat value would push the grid past its container and the
+ * board would be the thing that gave way, with nothing on screen to say why.
+ */
+.arena {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+}
+
+.action-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+button.rail-btn {
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+  min-height: 58px;
+  min-width: 62px;
+  padding: 8px 10px;
+}
+
+.rail-btn-icon {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.rail-btn-label {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+button.rail-btn:disabled {
+  color: var(--muted);
+  box-shadow: inset 0 0 0 1px var(--panel-edge);
+  cursor: default;
+}
+
+.stat-rail {
+  display: grid;
+  gap: 10px;
+  min-width: 8.5rem;
+}
+
+/* ------------------------------------------------------------------------------------------
+ * The board's own meter, and the figures under it
+ * ---------------------------------------------------------------------------------------- */
+
+.board-meter {
+  display: grid;
+  gap: 6px;
+  padding: 8px 10px 10px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(180deg, #101d31 0%, #0a1322 100%);
+  box-shadow:
+    inset 0 0 0 1px var(--panel-edge),
+    inset 0 1px 0 rgba(190, 220, 255, 0.14);
+}
+
+.board-meter-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.board-meter-label {
+  font-size: 0.56rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.board-meter-value {
+  font-size: 0.88rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent-bright);
+}
+
+.board-meter-track {
+  height: 7px;
+  border-radius: 99px;
+  overflow: hidden;
+  background: #0a1322;
+  box-shadow: inset 0 0 0 1px var(--panel-edge);
+}
+
+/*
+ * The fill is scaled with a transform rather than by setting `width`, because a width change
+ * re-runs layout on every drag - and on this screen a drag is the one moment the board must not
+ * stutter. `transform-origin: left` so it grows from the start of the track.
+ */
+.board-meter-fill {
+  height: 100%;
+  width: 100%;
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 160ms ease-out;
+  background: linear-gradient(90deg, var(--accent-deep) 0%, var(--accent) 60%, var(--accent-bright) 100%);
+  box-shadow: 0 0 16px -4px var(--accent);
+}
+
+.board-meter-fill.full {
+  background: linear-gradient(90deg, #15803d 0%, var(--ready) 100%);
+  box-shadow: 0 0 16px -4px var(--ready);
+}
+
+.stat-tiles {
+  display: grid;
+  gap: 8px;
+}
+
+.stat-tile {
+  display: grid;
+  gap: 1px;
+  padding: 6px 10px 7px;
+  border-radius: var(--radius-sm);
+  background: var(--panel-soft);
+  box-shadow: inset 0 0 0 1px var(--panel-edge);
+  text-align: left;
+}
+
+.stat-tile-label {
+  font-size: 0.54rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.stat-tile-value {
+  font-size: 0.94rem;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+/*
+ * NARROW SCREENS: the rails fold above and below the board instead of squeezing it.
+ *
+ * Written as a max-width query rather than by reordering with `order`, because grid
+ * auto-placement follows order-modified document order - so an `order` rule that fires only on a
+ * wide screen leaves a phone arranged by DOM order, which puts the actions above the board and
+ * the figures below the fold. That exact mistake was made on the platform's own arena layout.
+ *
+ * `chromeHeightOf` measures the arena and subtracts the board, so the height these two rows add
+ * is accounted for here without this query being restated in JavaScript.
+ */
+@media (max-width: 680px) {
+  .arena {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto auto;
+    gap: 10px;
+  }
+
+  .board-wrap {
+    grid-row: 1;
+  }
+
+  .stat-rail {
+    grid-row: 2;
+    min-width: 0;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    align-items: stretch;
+  }
+
+  .stat-tiles {
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+  }
+
+  .action-rail {
+    grid-row: 3;
+    flex-direction: row;
+  }
+
+  button.rail-btn {
+    flex: 1;
+    min-height: 48px;
+  }
+}
+
+/* ------------------------------------------------------------------------------------------
  * The board
  * ---------------------------------------------------------------------------------------- */
 
@@ -665,15 +902,30 @@ svg#board .terminal-art {
   color: var(--danger);
 }
 
-.actions {
-  display: flex;
-  gap: 10px;
+/*
+ * The submit control: one wide button rather than a pair.
+ *
+ * Clear moved into the action rail beside the board, which leaves the only thing that ENDS a
+ * board down here on its own. A destructive control sharing a row with the confirming one, both
+ * the same width, is how a player wipes a finished grid instead of sending it - and it is worth
+ * more here than width alone, because this is the control a player reaches for under a clock.
+ */
+.submit-wide {
   width: 100%;
   max-width: 26rem;
+  min-height: 52px;
+  font-size: 1.02rem;
+  letter-spacing: 0.04em;
 }
 
-.actions button {
-  flex: 1;
+/* The lit state is the whole point: the button is disabled until the board is genuinely
+   submittable, so its turning on is the game telling the player they are finished. */
+.submit-wide:not(:disabled) {
+  box-shadow:
+    inset 0 1px 0 rgba(210, 245, 255, 0.4),
+    0 0 0 1px var(--accent-line),
+    0 0 34px -8px var(--accent),
+    0 10px 26px -16px rgba(0, 0, 0, 0.9);
 }
 
 /* ------------------------------------------------------------------------------------------
@@ -1032,5 +1284,11 @@ button.primary:active:not(:disabled) {
   button.primary:active:not(:disabled) {
     transform: none;
     filter: none;
+  }
+
+  /* The bar still fills, it simply arrives rather than sliding. Removing the transition and not
+     the transform would freeze it at zero, which is a meter that never moves. */
+  .board-meter-fill {
+    transition: none;
   }
 }

@@ -37,12 +37,17 @@ import { BOARD_ART, createBoard } from "./board.js";
 import {
   BOARD_COMPLETE_MS,
   COUNT_UP_STEP_MS,
+  bestBoardTime,
+  boardProgress,
   countUpSteps,
   desiredFrameHeight,
   hintCopy,
   introCopy,
+  playStatTiles,
   resultCopy,
+  roundHeaderCells,
   soundControlCopy,
+  undoState,
   withCountUpValue,
   HEIGHT_REPORT_THRESHOLD_PX,
 } from "./presentation.js";
@@ -92,7 +97,20 @@ const ui = {
   introNote: document.getElementById("intro-note"),
   start: document.getElementById("start"),
   clock: document.getElementById("clock"),
-  progress: document.getElementById("progress"),
+  cellLabels: {
+    board: document.getElementById("cell-board-label"),
+    clock: document.getElementById("cell-clock-label"),
+    coverage: document.getElementById("cell-coverage-label"),
+  },
+  cellValues: {
+    board: document.getElementById("cell-board-value"),
+    coverage: document.getElementById("cell-coverage-value"),
+  },
+  boardMeterValue: document.getElementById("board-meter-value"),
+  boardMeterTrack: document.getElementById("board-meter-track"),
+  boardMeterFill: document.getElementById("board-meter-fill"),
+  statTiles: document.getElementById("stat-tiles"),
+  undo: document.getElementById("undo"),
   leave: document.getElementById("leave"),
   board: document.getElementById("board"),
   boardWrap: document.getElementById("board-wrap"),
@@ -190,11 +208,30 @@ function contentHeightOf(screen) {
   return content + frameOf(screen, children.length);
 }
 
-/** The header and footer bars around the board, measured rather than assumed. */
+/**
+ * Everything on the play screen that is not the board, measured rather than assumed.
+ *
+ * THE RAILS COUNT AS CHROME WHEN THEY STACK, AND ONLY THEN. The arena lays the action rail and
+ * the figures either side of the board on a wide screen and above and below it on a narrow one,
+ * so their contribution to the height the frame needs is not a constant - it is zero in one
+ * arrangement and the sum of two rails in the other. Measuring the arena and subtracting the
+ * board gives the right answer in both without this function having to know which arrangement is
+ * in force, or a media query having to be restated here to tell it.
+ *
+ * Without it the frame is reported too short on a phone, and the board - which is fitted into
+ * whatever the arena row actually leaves it - is squeezed by exactly the height of the rails.
+ */
 function chromeHeightOf(screen) {
   const bars = [...screen.querySelectorAll(":scope > .bar")];
   const height = bars.reduce((total, bar) => total + bar.getBoundingClientRect().height, 0);
-  return height > 0 ? height + frameOf(screen, screen.children.length) : 0;
+  if (height <= 0) return 0;
+
+  const arena = screen.querySelector(":scope > .arena");
+  const railHeight = arena
+    ? Math.max(0, arena.getBoundingClientRect().height - ui.boardWrap.getBoundingClientRect().height)
+    : 0;
+
+  return height + railHeight + frameOf(screen, screen.children.length);
 }
 
 /**
@@ -410,12 +447,116 @@ function warmBoardArt() {
   }
 }
 
-function renderProgress() {
-  if (state.boardTarget) {
-    ui.progress.textContent = "Board " + (state.boardsSolved + 1) + " of " + state.boardTarget;
-  } else {
-    ui.progress.textContent = "Solved " + state.boardsSolved;
+/**
+ * The round header and the figures beside the board.
+ *
+ * ONE FUNCTION FOR BOTH, because every one of these readouts answers a question about the same
+ * moment, and rendering them from two places is how a header saying "board 3 of 5" ends up beside
+ * a tile saying two boards done. Called on every board change, which is also every drag, so it
+ * does no layout work of its own: the meter is scaled with a transform and the tiles are only
+ * rebuilt when their shape changes.
+ */
+function renderInstruments() {
+  if (!state) return;
+  const used = board.cellsUsed();
+  const cells = board.cellCount();
+
+  for (const cell of roundHeaderCells({
+    boardsSolved: state.boardsSolved,
+    boardTarget: state.boardTarget,
+    used,
+    cells,
+  })) {
+    const label = ui.cellLabels[cell.key];
+    if (label) label.textContent = cell.label;
+    const value = ui.cellValues[cell.key];
+    if (value && cell.value !== null) value.textContent = cell.value;
   }
+
+  const progress = boardProgress({ used, cells });
+  ui.boardMeterValue.textContent = progress.percent + "%";
+  ui.boardMeterFill.style.transform = "scaleX(" + progress.fraction + ")";
+  ui.boardMeterFill.classList.toggle("full", board.isComplete());
+  ui.boardMeterTrack.setAttribute("aria-valuenow", String(progress.percent));
+
+  renderStatTiles();
+}
+
+/*
+ * Two figures this client measures for itself, and the one rule they both obey: they are shown to
+ * the player and sent nowhere. Neither is a score, neither reaches the server, and neither changes
+ * what the round is worth - see the instruments section of `presentation.js`.
+ */
+
+/** Drags that changed the board, this round. Reset with the round, not with the board. */
+let moves = 0;
+/** The quickest board solved this round, in milliseconds, or `null`. */
+let bestBoardMs = null;
+/** When the board on screen was first drawn, so a solve can be timed. */
+let boardStartedAt = null;
+/** `state.boardsSolved` as at the last render, so a solve can be noticed. */
+let lastBoardsSolved = null;
+
+function renderStatTiles() {
+  const tiles = playStatTiles({
+    boardsSolved: state.boardsSolved,
+    joined: board.joinedCount(),
+    pairs: board.pairCount(),
+    moves,
+    bestBoardMs,
+  });
+
+  // Rebuilt only when the SET of tiles changes - which happens once a round, when the first board
+  // is solved and "best board" appears. Rewriting the nodes on every drag would discard the
+  // browser's own text layout sixty times a second for values that mostly have not moved.
+  if (ui.statTiles.childElementCount !== tiles.length) {
+    ui.statTiles.replaceChildren(
+      ...tiles.map((tile) => {
+        const node = document.createElement("div");
+        node.className = "stat-tile";
+        const label = document.createElement("span");
+        label.className = "stat-tile-label";
+        const value = document.createElement("span");
+        value.className = "stat-tile-value";
+        node.append(label, value);
+        return node;
+      }),
+    );
+  }
+
+  const nodes = [...ui.statTiles.children];
+  tiles.forEach((tile, at) => {
+    const node = nodes.at(at);
+    if (!node) return;
+    node.firstElementChild.textContent = tile.label;
+    node.lastElementChild.textContent = tile.value;
+  });
+}
+
+/**
+ * Notice that the server has accepted a board, and time it.
+ *
+ * TIMED FROM WHEN THE BOARD WAS DRAWN, not from when the round started, and compared against
+ * `state.boardsSolved` rather than against the submit handler - because a board is only solved
+ * when the SERVER says so, and a submission can be refused. Trusting the local submit would
+ * record a time for a board the player has not finished.
+ */
+function noteBoardBoundary() {
+  const solved = state.boardsSolved;
+  if (lastBoardsSolved !== null && solved > lastBoardsSolved && boardStartedAt !== null) {
+    bestBoardMs = bestBoardTime(bestBoardMs, Date.now() - boardStartedAt);
+  }
+  if (lastBoardsSolved !== solved) {
+    boardStartedAt = Date.now();
+    moves = 0;
+  }
+  lastBoardsSolved = solved;
+}
+
+function renderUndo() {
+  const undo = undoState({ canUndo: board.canUndo(), locked: !state || Boolean(state.finished) });
+  ui.undo.disabled = undo.disabled;
+  ui.undo.title = undo.title;
 }
 
 function renderClock() {
@@ -569,7 +710,7 @@ function renderHint(refusal) {
 }
 
 /**
- * @param {{justJoined?:number[], complete?:boolean}} [change] What the board did, when it knows.
+ * @param {{justJoined?:number[], complete?:boolean, settled?:boolean}} [change] What the board did.
  *
  * `justJoined` is only ever populated by the drag - the one interaction that can complete a pair -
  * so the note sounds once, as the wire lands. Derived here instead, from "is this pair joined
@@ -585,6 +726,9 @@ function onBoardChange(change) {
   }
   renderHint(null);
   ui.submit.disabled = !board.isComplete();
+  if (change && change.settled) moves += 1;
+  renderInstruments();
+  renderUndo();
 
   for (const pairId of (change && change.justJoined) || []) sound.playPair(pairId);
 }
@@ -598,7 +742,10 @@ function fitBoard() {
 
 function renderPlay() {
   board.setPuzzle(state.board);
-  renderProgress();
+  // Before `onBoardChange`, which renders the figures this decides: the tiles read `moves` and
+  // `bestBoardMs`, and a board that has just been accepted resets the first and may set the
+  // second. Rendering first would show the previous board's move count under the new grid.
+  noteBoardBoundary();
   show("play");
   fitBoard();
   onBoardChange();
@@ -734,6 +881,12 @@ ui.submit.addEventListener("click", submit);
 ui.clear.addEventListener("click", () => {
   sound.play("clear");
   board.clear();
+});
+// The sound is played only when something was actually removed, which is why `undo()` reports it.
+// A disabled button can still be reached by keyboard on some browsers, and a click that clears
+// nothing while making the noise of clearing something is the game lying about what it did.
+ui.undo.addEventListener("click", () => {
+  if (board.undo()) sound.play("clear");
 });
 ui.leave.addEventListener("click", leave);
 ui.done.addEventListener("click", done);

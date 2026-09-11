@@ -132,68 +132,142 @@
       </section>
 
       <section id="screen-play" class="screen play" hidden>
-        <header class="bar">
-          <!--
-            Two readouts of the same shape, because they answer the two questions a player asks
-            under a clock: how far am I, and how long have I got. The labels are permanent markup
-            and only the values are written by the script - a bare number with no caption is the
-            thing that gets misread as the other one.
-          -->
-          <div class="readout">
-            <span class="readout-label">Progress</span>
-            <span id="progress" class="readout-value"></span>
+        <!--
+          THE ROUND HEADER. Three instrument cells and the two controls.
+
+          Every caption is written by `roundHeaderCells` together with its value, so a label can
+          never end up over the wrong figure - which is exactly how a board count gets read as a
+          time. The captions are script-written rather than fixed markup because the first cell
+          asks a DIFFERENT QUESTION for each title: Circuit Perfect has a fixed set of boards and
+          so has a denominator, Circuit Sprint has no finishing line and so has none. Hard-coded
+          text would have to invent one.
+
+          The shells stay in the document, because a timed game must not wait for JavaScript to
+          show its instruments - and the clock's VALUE is written by `renderClock` rather than by
+          the header, since it is the one figure that changes four times a second.
+
+          THERE IS NO SCORE CELL, and its absence is a decision rather than an omission. See the
+          instruments section of `presentation.js`.
+        -->
+        <header class="bar round-bar">
+          <div class="round-cells">
+            <div class="readout">
+              <span id="cell-board-label" class="readout-label"></span>
+              <span id="cell-board-value" class="readout-value"></span>
+            </div>
+            <div class="readout readout-clock">
+              <span id="cell-clock-label" class="readout-label"></span>
+              <span id="clock" class="readout-value clock" aria-live="off"></span>
+            </div>
+            <div class="readout">
+              <span id="cell-coverage-label" class="readout-label"></span>
+              <span id="cell-coverage-value" class="readout-value"></span>
+            </div>
           </div>
-          <div class="readout readout-clock">
-            <span class="readout-label">Time left</span>
-            <span id="clock" class="readout-value clock" aria-live="off"></span>
+          <div class="round-controls">
+            <!--
+              The label, the title and `aria-pressed` are all written by `renderSoundControl` from
+              one call to `soundControlCopy`, so the button cannot announce one state and show
+              another. It ships with the label of its DEFAULT state rather than empty: the script
+              replaces it within a frame, but a button that is briefly nameless is a button a
+              screen reader may reach and read as "button".
+            -->
+            <button
+              id="mute"
+              class="ghost icon-btn sound-btn"
+              type="button"
+              aria-pressed="false"
+              aria-label="Mute sound"
+              title="Mute sound"
+            >
+              &#128266;
+            </button>
+            <!-- Leave keeps its word. An unlabelled exit icon on a paid attempt is the one control
+                 a player must not have to guess at. -->
+            <button id="leave" class="ghost small-btn" type="button">Leave</button>
           </div>
-          <!--
-            The label, the title and `aria-pressed` are all written by `renderSoundControl` from
-            one call to `soundControlCopy`, so the button cannot announce one state and show
-            another. It ships with the label of its DEFAULT state rather than empty: the script
-            replaces it within a frame, but a button that is briefly nameless is a button a screen
-            reader may reach and read as "button".
-          -->
-          <button
-            id="mute"
-            class="ghost small-btn sound-btn"
-            type="button"
-            aria-pressed="false"
-            aria-label="Mute sound"
-            title="Mute sound"
-          >
-            &#128266;
-          </button>
-          <button id="leave" class="ghost small-btn" type="button">Leave</button>
         </header>
 
-        <div id="board-wrap" class="board-wrap">
+        <!--
+          THE ARENA: a rail of actions, the board, a rail of figures.
+
+          The board is the MIDDLE column and the middle grid row, and the rails are laid out around
+          it, so on a narrow screen they fold above and below it rather than squeezing it. The
+          board's size is computed from the space this row actually leaves it - see `fitBoard` - so
+          a rail that grows takes space from itself and never from the grid.
+        -->
+        <div class="arena">
           <!--
-            The reactions - the solved sweep and the refusal shake - are classes on this element
-            and not on the `<svg>`. Accepting a board replaces the whole grid with the next one in
-            the same tick, so an animation started on the SVG is discarded before a frame is drawn.
+            Two actions, and deliberately not the three the reference design shows. Undo removes
+            the path drawn last and is strictly weaker than Clear; a HINT is forbidden outright,
+            because it would improve a score in a paid contest. The reasoning is in `undoState`.
           -->
-          <div id="board-stage" class="board-stage">
-            <!--
-              The bezel is a SIBLING of the grid rather than part of it, and overhangs it by
-              `--board-art-overhang`. Drawn inside the `<svg>` it would sit in the element that
-              hit-tests drags, and `cellAt` maps a finger to a cell by proportion of that element's
-              box - so every touch would be off by the frame, worst at the edges, with nothing on
-              screen to suggest why. See `BOARD_ART_OVERHANG` in `presentation.js`.
-            -->
-            <div class="board-art" aria-hidden="true"></div>
-            <!-- `touch-action: none` lives in the stylesheet: a drag must not scroll the page. -->
-            <svg id="board" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Puzzle grid">
-            </svg>
+          <div class="action-rail">
+            <button id="undo" class="ghost rail-btn" type="button" disabled>
+              <span class="rail-btn-icon" aria-hidden="true">&#8630;</span>
+              <span class="rail-btn-label">Undo</span>
+            </button>
+            <button id="clear" class="ghost rail-btn" type="button">
+              <span class="rail-btn-icon" aria-hidden="true">&#10005;</span>
+              <span class="rail-btn-label">Clear</span>
+            </button>
           </div>
+
+          <div id="board-wrap" class="board-wrap">
+            <!--
+              The reactions - the solved sweep and the refusal shake - are classes on this element
+              and not on the `<svg>`. Accepting a board replaces the whole grid with the next one
+              in the same tick, so an animation started on the SVG is discarded before a frame is
+              drawn.
+            -->
+            <div id="board-stage" class="board-stage">
+              <!--
+                The bezel is a SIBLING of the grid rather than part of it, and overhangs it by
+                `--board-art-overhang`. Drawn inside the `<svg>` it would sit in the element that
+                hit-tests drags, and `cellAt` maps a finger to a cell by proportion of that
+                element's box - so every touch would be off by the frame, worst at the edges, with
+                nothing on screen to suggest why. See `BOARD_ART_OVERHANG` in `presentation.js`.
+              -->
+              <div class="board-art" aria-hidden="true"></div>
+              <!-- `touch-action: none` lives in the stylesheet: a drag must not scroll the page. -->
+              <svg id="board" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Puzzle grid">
+              </svg>
+            </div>
+          </div>
+
+          <!--
+            The figures. The bar is the current board's COVERAGE, not its pairs joined, because
+            this puzzle is only complete when every square is used too - a bar driven by pairs
+            would sit at full while the server refused the board. The tiles below it are built by
+            `playStatTiles`, which omits one rather than showing an empty value.
+          -->
+          <aside class="stat-rail">
+            <div class="board-meter">
+              <div class="board-meter-head">
+                <span class="board-meter-label">This board</span>
+                <span id="board-meter-value" class="board-meter-value">0%</span>
+              </div>
+              <div
+                id="board-meter-track"
+                class="board-meter-track"
+                role="progressbar"
+                aria-label="Squares filled on this board"
+                aria-valuemin="0"
+                aria-valuemax="100"
+                aria-valuenow="0"
+              >
+                <div id="board-meter-fill" class="board-meter-fill"></div>
+              </div>
+            </div>
+            <div id="stat-tiles" class="stat-tiles"></div>
+          </aside>
         </div>
 
         <footer class="bar footer">
           <p id="hint" class="hint" aria-live="polite"></p>
-          <div class="actions">
-            <button id="clear" class="ghost" type="button">Clear</button>
-            <button id="submit" class="primary" type="button" disabled>Submit</button>
-          </div>
+          <button id="submit" class="primary submit-wide" type="button" disabled>
+            Submit solution
+          </button>
         </footer>
       </section>
 
