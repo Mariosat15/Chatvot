@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { ArrowLeft, ListOrdered } from "lucide-react";
+import { ArrowLeft, ArrowRight, ListOrdered } from "lucide-react";
 import { NEON_PANEL, NEON_LABEL } from "@/components/neon/tokens";
 import { NeonCountPill, NeonHeadedPanel } from "@/components/neon/Cards";
 import { providerBanner } from "@/components/neon/banners";
@@ -95,11 +95,25 @@ export function GameArenaLayout({
         */}
         <div className="pointer-events-none absolute inset-0" aria-hidden>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={banner.src} alt="" className="h-full w-full object-cover opacity-45" />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#070C1A] via-[#070C1A]/90 to-[#070C1A]/30" />
+          <img src={banner.src} alt="" className="h-full w-full object-cover opacity-60" />
+          {/*
+            Two gradients rather than one. The horizontal pass keeps the copy on an opaque
+            background, which is the only thing the scrim MUST guarantee; the vertical pass
+            darkens the foot so the feature row reads against artwork instead of sitting on a
+            bright patch of it. One gradient doing both jobs has to be dark enough for the
+            worst case everywhere, which is how the banner ended up invisible before.
+          */}
+          <div className="absolute inset-0 bg-gradient-to-r from-[#070C1A] via-[#070C1A]/85 to-[#070C1A]/20" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#070C1A] via-transparent to-transparent" />
         </div>
 
-        <div className="relative p-5">
+        {/*
+          A MINIMUM HEIGHT, because the hero's size is the owner's point. Without one it is
+          exactly as tall as its text, so a title with no tagline and no description collapses
+          to a strip and the banner behind it is reduced to a stripe - which is the reference's
+          largest element rendered as its smallest.
+        */}
+        <div className="relative min-h-[220px] p-5 sm:p-7">
           <ArenaIdentity
             presentation={presentation}
             contestName={competitionName}
@@ -131,15 +145,28 @@ export function GameArenaLayout({
           <NeonHeadedPanel
             icon={ListOrdered}
             title="Standings"
-            action={<NeonCountPill>{standingsCount}</NeonCountPill>}
+            action={
+              /*
+                "players", never "traders", and the bare count was the reference's one legible
+                omission - a pill reading `20` beside a heading reading `Standings` says twenty
+                of what.
+              */
+              <NeonCountPill>{standingsCount} players</NeonCountPill>
+            }
           >
-            <div className="max-h-[420px] overflow-y-auto p-2">{standings}</div>
-            <div className="border-t border-[#161E36] px-4 py-2.5">
+            <div className="max-h-[460px] overflow-y-auto p-2">{standings}</div>
+            {/*
+              A BUTTON, NOT A TEXT LINK. The reference draws a full-width bordered control at
+              the foot of the board, and it is the only way off this panel: a line of small
+              blue text under a scrolling list is the thing a player's eye skips.
+            */}
+            <div className="border-t border-[#161E36] p-3">
               <Link
                 href={`/competitions/${competitionId}?view=details`}
-                className="text-xs text-sky-400 transition-colors hover:text-sky-300"
+                className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-[#1B2540] bg-[#0B1120] px-3 py-2 text-xs font-semibold text-sky-300 transition-colors hover:border-sky-500/40 hover:text-sky-200"
               >
-                Full leaderboard and prizes →
+                Full leaderboard and prizes
+                <ArrowRight className="h-3.5 w-3.5" />
               </Link>
             </div>
           </NeonHeadedPanel>

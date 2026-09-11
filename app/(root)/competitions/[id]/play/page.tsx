@@ -13,6 +13,7 @@ import Competition from "@/database/models/trading/competition.model";
 import AppSettingsModel from "@/database/models/app-settings.model";
 import { getPlayState } from "@/lib/services/games/round-status.service";
 import { getGamePresentation } from "@/lib/services/games/game-presentation.service";
+import { getContestActivity } from "@/lib/services/games/contest-activity.service";
 import { getCompetitionLeaderboard } from "@/lib/actions/trading/competition.actions";
 import { ProviderRoundHost } from "@/components/games/ProviderRoundHost";
 import ProviderLeaderboard from "@/components/games/ProviderLeaderboard";
@@ -20,6 +21,7 @@ import PrizeTable from "@/components/competitions/PrizeTable";
 import { GameArenaLayout } from "@/components/games/arena/GameArenaLayout";
 import { ArenaContestPanel } from "@/components/games/arena/ArenaContestPanel";
 import { ArenaHighlights } from "@/components/games/arena/ArenaHighlights";
+import { ArenaActivityFeed } from "@/components/games/arena/ArenaActivityFeed";
 import GameRulesPanel from "@/components/games/GameRulesPanel";
 import { NeonCountPill, NeonHeadedPanel } from "@/components/neon/Cards";
 import { Button } from "@/components/ui/button";
@@ -177,6 +179,38 @@ export default async function PlayPage({ params }: PlayPageProps) {
   // payout disagreed because each had computed it separately. Absent when they hold no rank.
   const yourRank = rows.find((row) => row.userId === session.user.id)?.currentRank;
 
+  /*
+    WHAT EACH PLAYER HAS ACTUALLY DONE, which is the owner's request and is the one thing on
+    this screen that no amount of styling could supply. A board of names and numbers says who
+    is ahead; it says nothing about what anybody did, and the game already reports that - every
+    round is written to `game_round` with the game's own `scoreBreakdown`.
+
+    READ AFTER THE BOARD RATHER THAN BESIDE IT, deliberately. The query is scoped to the user
+    ids the board returned, so it is bounded by the players on screen instead of by every
+    person who has ever entered - which means it cannot be started until the board has answered.
+    One indexed query is the price of that bound, and it is the right way round: an unscoped
+    read grows with the contest for ever.
+
+    The id goes in as the string from the URL because this is a Mongoose query and Mongoose
+    casts it to an ObjectId when the query executes. The raw driver does NOT, which is the
+    boundary that has now produced three separate defects, so the distinction is worth keeping
+    in view rather than relying on.
+  */
+  const activity = await getContestActivity(
+    competitionId,
+    rows.map((row) => row.userId),
+    { recentLimit: 6 },
+  );
+
+  // The feed's names come from the board that has already been read, not from a second user
+  // lookup: every player in the feed is by construction a player in the standings.
+  const nameByUser = new Map(rows.map((row) => [row.userId, row.username]));
+  const activityFeed = activity.recent.map((entry) => ({
+    userId: entry.userId,
+    username: nameByUser.get(entry.userId),
+    activity: entry,
+  }));
+
   const prizePositions = Array.isArray(contest?.prizeDistribution)
     ? contest.prizeDistribution.length
     : 0;
@@ -199,6 +233,7 @@ export default async function PlayPage({ params }: PlayPageProps) {
             rows={rows}
             currentUserId={session.user.id}
             scoreLabel="Score"
+            activity={activity.latestByUser}
           />
         )
       }
@@ -246,6 +281,23 @@ export default async function PlayPage({ params }: PlayPageProps) {
               <PrizeTable competition={contest} creditSymbol={creditSymbol} />
             </NeonHeadedPanel>
           )}
+
+          {/*
+            IN THE SIDEBAR RATHER THAN THE REFERENCE'S BOTTOM BAND, and that is a deviation
+            worth recording rather than absorbing. The reference puts Recent Players in a
+            three-panel row across the foot of the page beside How It Works and Game Tips. Two
+            of those three render nothing at all until the catalogue is re-synced, and a CSS
+            grid cannot see that its child returned `null` - so a two-thirds column holding a
+            null child is still a two-thirds column, and the common case is a band with one
+            panel adrift in it. The same attempt was made and reverted on 11 Sep 2026.
+
+            Here it sits under the prize breakdown in a column that already stacks, so the
+            panel simply is not there when nobody has played.
+          */}
+          <ArenaActivityFeed
+            entries={activityFeed}
+            currentUserId={session.user.id}
+          />
         </>
       }
       rules={<GameRulesPanel presentation={presentation} layout="wide" />}

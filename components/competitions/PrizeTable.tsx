@@ -37,6 +37,21 @@ import { formatVolts } from "@/lib/utils/format-volts";
  * sidebar carries while it is still projecting.
  */
 
+/**
+ * `1st`, `2nd`, `3rd`, `4th`. Presentation only - the rank itself is the number the payout is
+ * keyed on and is never derived from this.
+ *
+ * The teens are the whole reason this is a function rather than a lookup on the last digit:
+ * 11, 12 and 13 take `th` while 21, 22 and 23 take `st`, `nd`, `rd`. A contest can pay more
+ * than ten places, so "11st place" is reachable rather than theoretical.
+ */
+function ordinal(rank: number): string {
+  const lastTwo = rank % 100;
+  if (lastTwo >= 11 && lastTwo <= 13) return `${rank}th`;
+  const suffix = ["th", "st", "nd", "rd"][rank % 10] ?? "th";
+  return `${rank}${suffix}`;
+}
+
 export default function PrizeTable({
   competition,
   creditSymbol,
@@ -82,19 +97,35 @@ export default function PrizeTable({
                 : "border-[#161E36] bg-[#080C18]/40 opacity-50"
             }`}
           >
-            <div className="flex min-w-0 items-center gap-2">
+            <div className="flex min-w-0 items-center gap-2.5">
               <NeonRankBadge rank={row.rank} />
-              <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[11px] font-medium text-amber-300">
-                {row.configuredPercentage}%
-              </span>
-              {row.bonusPercentage > 0 && (
-                <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[11px] font-medium text-emerald-300">
-                  +{row.bonusPercentage.toFixed(1)}%
-                </span>
-              )}
+              <div className="min-w-0">
+                {/*
+                  The place, named. The medal alone says first, second and third and says
+                  nothing at all from fourth down, where the badge is a bare number - so a
+                  contest paying five places had two rows whose only label was a digit.
+                */}
+                <div
+                  className={`text-sm font-semibold leading-tight ${
+                    row.filled ? "text-gray-100" : "text-gray-500"
+                  }`}
+                >
+                  {ordinal(row.rank)} place
+                </div>
+                <div className="mt-1 flex items-center gap-1.5">
+                  <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[11px] font-medium text-amber-300">
+                    {row.configuredPercentage}%
+                  </span>
+                  {row.bonusPercentage > 0 && (
+                    <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[11px] font-medium text-emerald-300">
+                      +{row.bonusPercentage.toFixed(1)}%
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
             <span
-              className={`shrink-0 text-sm font-bold ${
+              className={`shrink-0 text-base font-bold ${
                 row.filled ? "text-amber-300" : "text-gray-500"
               }`}
             >

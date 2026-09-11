@@ -1474,6 +1474,96 @@ it.
 
 ---
 
+### 4.1n What each player solved (11 September 2026)
+
+The owner rejected s4.1m outright: *"you didn't do anything I ask... this is unacceptable, do
+exactly as image 2, if needed recreate the graphics items yourself to match exactly the image,
+see image 3 how the live standings must look and also show what each player solved or progress
+according to game."*
+
+**The rejection was right and the reason is worth stating plainly rather than defended.** s4.1m
+made three structural corrections and left the screen looking like the application's neutral
+shell beside a bright, art-heavy mock. It had also answered a question the owner had not asked -
+where the boundary runs - and the two things they named next are both squarely on **our** side
+of it.
+
+#### A player's progress was already arriving and nothing on a board read it
+
+**This is the finding.** Every game reports a `scoreBreakdown` alongside its score -
+`{ boardsCompleted: 3, boardsAttempted: 5, fastestBoardMs: 8100, ... }` for this catalogue - and
+`game_round` has stored it since X3. It was read by exactly two screens: the player's own
+results page and the admin per-user performance tab. **The contest board, which is where every
+player looks, showed a rank, a name and a number.** So "show what each player solved" is not a
+feature needing a provider change, a spec change or a version bump - it is a read that was never
+written. `lib/services/games/contest-activity.service.ts` is that read and
+`lib/utils/round-activity.ts` turns a row into words.
+
+**THE PLATFORM MUST NOT CHOOSE AMONG A GAME'S METRICS, and that is the design rather than a
+limitation.** `01` section 3.2 declares the breakdown display-only, free-form and **ordered by
+the provider**. A table saying *for a puzzle show `boardsCompleted`* is a `switch` on game code
+wearing a different hat: it makes the no-developer-needed claim false for the next title while
+every existing test still passes. So the entries are handed over **in the order the game
+declared them**, filtered only by whether a screen can render the value at all, and a structural
+test forbids any metric name, game code or provider key in the service, the phrase builder, the
+board or the feed. A probe reorders a breakdown to prove the order is honoured.
+
+**Which rounds carry a number is decided once, in the service.** `roundContributesScore` is the
+ingestion path's rule, and a component re-deciding it is the second copy this codebase keeps
+finding. Two statuses matter and for different reasons: a **`voided`** round stores
+`rawScore: 0` **deliberately**, so passing that zero through puts a number beside a cancelled
+round and, on a lower-is-better title, **the best one on the board**; an **`unresolved`** round
+is `unresolvedRoundPolicy`'s question and answering it here answers it twice. Guarded
+positively on the service and **negatively on all three consumers**, which is the load-bearing
+half - a service that computes it correctly is trivially satisfied by a component that then
+decides for itself.
+
+**`expired` wording describes the clock, never the player.** `createRound` clamps `expiresAt` to
+`playWindowEnd`, so under the universal cut-off `expired` is the **ordinary** ending for anybody
+still playing at the final whistle, and since R48 those runs count. "Gave up" would blame a
+player for attending. A probe rewords it to prove the test can tell.
+
+**An absent activity map renders no second line at all**, which is not the same as rendering
+"not played". A caller that has not read the activity is saying *I do not know*; answering
+*nobody has played* on its behalf is false for every row. The lobby and the arena both read it,
+so the distinction only protects a future third caller - which is exactly when it would be got
+wrong.
+
+#### The feed is in the sidebar, and that is a recorded deviation
+
+The reference puts **RECENT PLAYERS** in a three-panel bottom band. `ArenaActivityFeed` is in
+the sidebar instead, for the reason s4.1m already learned the hard way: **a layout cannot see
+that its child rendered nothing**, and the band's other two members return `null` until the
+catalogue is re-synced. The sidebar already stacks.
+
+**The score in the feed is printed plain, with no `+` sign.** The reference's `+240 ⚡` is right
+for an upward game and exactly backwards for a time trial, where a *lower* number is the better
+result - and the direction is resolved once, server-side, in `calculateRankings`. A `+` is a
+screen forming its own opinion about which way a game scores.
+
+#### What else changed, and what it is not
+
+`NeonStatTiles` joins `NeonStatStrip` in the kit as a **second shape rather than a `variant`
+flag** - a strip is a dense table-like run, tiles are the few figures a player should take in
+without reading - and `ArenaContestPanel` adopts it with a real **state pill** derived from
+`contestStatus` **and** `isPaused`, never from the fact that the page rendered: a paused contest
+is still stored `active`, and a player can be standing here before the contest opens.
+`PrizeTable` gained ordinal place labels and a larger amount - **markup only**, and the four
+payout expressions in `lib/utils/prize-projection.ts` survive character for character, which the
+existing text assertions prove. The hero is taller with the artwork at `opacity-60` behind two
+gradients, and the three chips became the reference's icon-above-label row - **the words are not
+copied**, because the mock's four chips are marketing claims (`BIG REWARDS`) while these three
+are facts declared in `arena-facts.ts`. `GameRulesPanel`'s *How to play* renders as numbered
+steps **from the operator's own paragraph breaks and nothing else**; splitting on sentences would
+invent boundaries, and the common case today is a single paragraph, which renders as prose.
+
+**28 tests, 13 probes all red on exactly 1 failure. Typecheck at the 194 baseline. Never
+verified by eye.** Two probes had to be re-aimed before the run could be believed: one searched
+the service for `SCORE_PRODUCING_ROUND_STATUSES`, which is declared in `round-types.ts`, and one
+matched a single-line literal against a file prettier had wrapped. **`DID NOT APPLY` means the
+target moved, never that the run was quiet.**
+
+---
+
 ## 5. Dashboard
 
 `components/dashboard/` is about **15 components** backed by

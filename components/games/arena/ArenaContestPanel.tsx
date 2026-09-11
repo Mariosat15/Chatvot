@@ -8,12 +8,8 @@ import {
   Gauge,
   Medal,
 } from "lucide-react";
-import {
-  NEON_DIVIDER,
-  NEON_LABEL,
-  NEON_SEAM,
-} from "@/components/neon/tokens";
-import { NeonHeadedPanel, NeonStatStrip } from "@/components/neon/Cards";
+import { NEON_DIVIDER, NEON_LABEL } from "@/components/neon/tokens";
+import { NeonHeadedPanel, NeonStatTiles } from "@/components/neon/Cards";
 import type { PlayState } from "@/components/games/play-state";
 import type { GamePresentation } from "@/lib/services/games/game-presentation.service";
 import { attemptProgress, clock, scoreText, scoringSummary } from "./arena-facts";
@@ -64,6 +60,44 @@ interface Props {
   rank?: number;
 }
 
+/**
+ * The contest's own state, as a pill on the heading - the reference's green `LIVE` dot.
+ *
+ * DERIVED FROM TWO FIELDS, NEVER FROM THE FACT THAT THIS SCREEN RENDERED. A paused contest is
+ * still stored as `active`, which is precisely why `PlayState` carries `isPaused` separately,
+ * and a player can legitimately be on this screen before a contest opens. A pill that said
+ * `LIVE` because the page loaded would be a status indicator that is right most of the time,
+ * which is worse than none: the one moment it matters is the moment it would be wrong.
+ *
+ * A `Map`, because the key is a stored status. Anything unrecognised falls through to the
+ * neutral phrase rather than resolving to something truthy off the prototype chain.
+ */
+const STATUS_PILL: ReadonlyMap<string, { label: string; classes: string }> = new Map([
+  ["active", { label: "Live", classes: "text-emerald-300 bg-emerald-400" }],
+  ["upcoming", { label: "Not started", classes: "text-sky-300 bg-sky-400" }],
+  ["finalizing", { label: "Settling", classes: "text-amber-300 bg-amber-400" }],
+]);
+
+function StatePill({ contestStatus, isPaused }: { contestStatus: string; isPaused: boolean }) {
+  const pill = isPaused
+    ? { label: "Paused", classes: "text-amber-300 bg-amber-400" }
+    : (STATUS_PILL.get(contestStatus) ?? {
+        label: "Closed",
+        classes: "text-gray-400 bg-gray-500",
+      });
+
+  // One string holding both a text colour and a dot colour, split rather than stored twice:
+  // the two must agree, and two fields is two chances for them not to.
+  const [text, dot] = pill.classes.split(" ");
+
+  return (
+    <span className={`flex items-center gap-1.5 text-[11px] font-medium ${text}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${dot}`} aria-hidden />
+      {pill.label}
+    </span>
+  );
+}
+
 export function ArenaContestPanel({ facts, state, presentation, rank }: Props) {
   const attempt = attemptProgress(state.attemptsUsed, state.attemptsPermitted);
   // The round clock is the CONFIGURED playing time for one attempt, which is what a player
@@ -73,15 +107,28 @@ export function ArenaContestPanel({ facts, state, presentation, rank }: Props) {
   const scoring = scoringSummary(presentation.scoreType, presentation.scoreDirection);
 
   return (
-    <NeonHeadedPanel icon={Info} title="Contest info">
+    <NeonHeadedPanel
+      icon={Info}
+      title="Contest info"
+      action={
+        <StatePill
+          contestStatus={state.contestStatus}
+          isPaused={state.isPaused}
+        />
+      }
+    >
       {/*
-        Two strips rather than one six-cell grid, and the wrapper's background is what draws
-        the hairline between them. The reference separates the contest's own facts from the
-        player's own two figures, which is the difference between "what is this contest" and
-        "how am I doing in it" - and merging them makes the score just another tile.
+        Two groups rather than one six-cell grid, separated by a rule. The reference separates
+        the contest's own facts from the player's own two figures, which is the difference
+        between "what is this contest" and "how am I doing in it" - and merging them makes the
+        score just another tile.
+
+        Cards rather than the hairline strip, which is the owner's reference and is also the
+        reason this panel now reads at a glance: the strip packed six figures into six flush
+        cells of identical weight, so nothing on it was more important than anything else.
       */}
-      <div className={`space-y-px ${NEON_SEAM}`}>
-        <NeonStatStrip
+      <div className="space-y-2.5 px-4 py-3">
+        <NeonStatTiles
           items={[
             {
               icon: Trophy,
@@ -119,7 +166,7 @@ export function ArenaContestPanel({ facts, state, presentation, rank }: Props) {
           ]}
         />
 
-        <NeonStatStrip
+        <NeonStatTiles
           items={[
             {
               icon: Gauge,
@@ -138,7 +185,7 @@ export function ArenaContestPanel({ facts, state, presentation, rank }: Props) {
         />
       </div>
 
-      <div className={`space-y-3 border-t ${NEON_DIVIDER} px-4 py-3`}>
+      <div className={`space-y-3 border-t ${NEON_DIVIDER} px-4 pb-3 pt-3`}>
         {attempt && (
           <div>
             <div className="flex items-baseline justify-between">

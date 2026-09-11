@@ -117,22 +117,52 @@ export default function GameRulesPanel({ presentation, layout = "column" }: Prop
           </div>
         )}
 
-        {playing && (
-          <div>
-            <h3 className="mb-2 text-sm font-semibold text-gray-200">
-              How to play
-            </h3>
-            {paragraphs(playing).map((line, index) => (
-              <p
-                key={index}
-                className="text-sm leading-relaxed text-gray-400 [&+p]:mt-2"
-              >
-                {line}
-              </p>
-            ))}
-          </div>
-        )}
+        {playing && <HowToPlay text={playing} />}
       </div>
     </NeonPanel>
+  );
+}
+
+/**
+ * The operator's instructions, numbered when they wrote them as steps.
+ *
+ * THE STEPS ARE THE OPERATOR'S PARAGRAPH BREAKS AND NOTHING ELSE. The reference draws a
+ * numbered list, and the tempting way to produce one is to split on sentences - which would
+ * invent a step boundary in the middle of the operator's meaning and number four clauses of
+ * one instruction as four things to do. If they pressed Return, they meant a step; if they
+ * did not, this renders the prose they wrote.
+ *
+ * SO THE COMMON CASE TODAY IS PROSE, and that is worth saying plainly rather than presenting
+ * the numbered form as the normal one: `circuit-sprint`'s `howToPlay` is a single paragraph,
+ * so it will render as a paragraph until somebody edits it in the content dialog. The list
+ * appears the moment an operator writes one, with no code change - which is the point.
+ */
+function HowToPlay({ text }: { text: string }) {
+  const steps = paragraphs(text);
+
+  return (
+    <div>
+      <h3 className="mb-2.5 text-sm font-semibold text-gray-200">How to play</h3>
+
+      {steps.length < 2 ? (
+        <p className="text-sm leading-relaxed text-gray-400">{steps[0]}</p>
+      ) : (
+        <ol className="space-y-2.5">
+          {steps.map((step, index) => (
+            <li key={index} className="flex gap-2.5">
+              <span
+                className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-cyan-400/40 bg-cyan-400/10 text-[11px] font-bold text-cyan-300"
+                aria-hidden
+              >
+                {index + 1}
+              </span>
+              <span className="text-sm leading-relaxed text-gray-400">
+                {step}
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
   );
 }

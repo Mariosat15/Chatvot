@@ -77,7 +77,7 @@ export function ArenaIdentity({
   chips.push({ chip: SKILL_CHIP, icon: Shield });
 
   return (
-    <div className="flex flex-col gap-5 lg:flex-row lg:items-center">
+    <div className="flex flex-col gap-5">
       <div className="flex min-w-0 flex-1 flex-col gap-4 sm:flex-row sm:items-start">
         <GameLogo url={presentation.logoUrl} name={presentation.gameName} />
 
@@ -124,15 +124,35 @@ export function ArenaIdentity({
         </div>
       </div>
 
-      <div className="flex shrink-0 flex-wrap gap-x-6 gap-y-4 lg:w-56 lg:flex-col lg:gap-4">
+      {/*
+        THE FEATURE ROW, ACROSS THE FOOT OF THE HERO, on the reference. It was a column down
+        the right-hand side, which put three small facts in the space the reference gives to
+        artwork and squeezed the title into two thirds of the width for no gain.
+
+        Each chip is icon ABOVE label rather than beside it. That is the reference's shape, and
+        it is also what lets three of them sit in a row on a phone without the labels
+        truncating - which is how the previous version's "Independent play" read as
+        "Independent p...".
+
+        THE CHIPS THEMSELVES ARE UNCHANGED and still come from `arena-facts.ts`. The reference
+        shows four marketing claims ("FAST ROUNDS", "BIG REWARDS"); these are three DECLARED
+        facts about this title and this contest. Copying the reference's words would be putting
+        a promise on the screen that nothing in the catalogue backs.
+      */}
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
         {chips.map(({ chip, icon: Icon }) => (
-          <div key={chip.label} className="flex items-center gap-2.5">
+          <div
+            key={chip.label}
+            className="flex flex-col items-center gap-1.5 rounded-lg border border-[#1B2540] bg-[#080C18]/60 px-2 py-3 text-center"
+          >
             <IconTile icon={Icon} accent="players" size="sm" />
-            <div className="min-w-0 leading-tight">
-              <div className="text-xs font-semibold text-gray-100">
+            <div className="min-w-0">
+              <div className="truncate text-[11px] font-bold uppercase tracking-wider text-gray-100">
                 {chip.label}
               </div>
-              <div className="text-[11px] text-gray-500">{chip.detail}</div>
+              <div className="truncate text-[11px] text-gray-500">
+                {chip.detail}
+              </div>
             </div>
           </div>
         ))}

@@ -264,6 +264,62 @@ export function NeonStatStrip({
   );
 }
 
+/**
+ * The reference's figure CARDS: the same figures as the strip, each in its own rounded cell
+ * with the kit's icon tile.
+ *
+ * TWO SHAPES RATHER THAN A `variant` ON THE STRIP, for the reason `NeonHeadedPanel` is not an
+ * option on `NeonPanel`. The strip is hairline-separated cells flush inside a panel, so it has
+ * no padding and no radius of its own; these are separated cards that need both. A flag would
+ * mean every caller also deciding the padding, which is two decisions where there should be
+ * one.
+ *
+ * WHEN TO USE WHICH. The strip is for a dense run of facts inside a panel that already has a
+ * heading strip - it reads as a table. This is for the small number of figures a player should
+ * be able to take in without reading, which on the arena is the contest's own four. Using the
+ * cards for everything is how a screen ends up with no hierarchy, which was the owner's
+ * complaint about the version before this one.
+ */
+export function NeonStatTiles({
+  items,
+  columns = 2,
+}: {
+  items: {
+    icon: LucideIcon;
+    accent: NeonAccent;
+    label: string;
+    /** Absent renders a dash at the call site. A zero is a real figure and renders as zero. */
+    value: React.ReactNode;
+  }[];
+  columns?: 2 | 3;
+}) {
+  return (
+    <div
+      className={`grid gap-2.5 ${columns === 3 ? "grid-cols-3" : "grid-cols-2"}`}
+    >
+      {items.map((item) => {
+        const classes = accentClasses(item.accent);
+        return (
+          <div
+            key={item.label}
+            className="rounded-lg border border-[#161E36] bg-[#080C18]/70 p-3"
+          >
+            <div className="flex items-center gap-2">
+              <IconTile icon={item.icon} accent={item.accent} size="sm" />
+              <span className={`truncate ${NEON_LABEL}`}>{item.label}</span>
+            </div>
+            <div
+              className={`mt-2 truncate text-xl font-bold leading-none ${classes.text}`}
+            >
+              {item.value}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 /** A label/value line inside a panel. */
 export function NeonRow({
   label,

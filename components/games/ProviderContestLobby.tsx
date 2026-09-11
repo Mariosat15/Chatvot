@@ -38,6 +38,7 @@ import {
   UNKNOWN_GAME_NAME,
 } from "@/lib/services/games/game-presentation.service";
 import { isProviderContest } from "@/lib/services/games/contest-config";
+import { getContestActivity } from "@/lib/services/games/contest-activity.service";
 import {
   contestReservesFullRound,
   fullRoundCutoffMs,
@@ -178,6 +179,19 @@ export default async function ProviderContestLobby({
       ? await getPlayState(String(competition._id), userId)
       : null;
   const state = playState?.success ? playState.state : null;
+
+  /*
+    WHAT EACH PLAYER HAS DONE, so the lobby board says the same thing the arena board says. The
+    two are the same component and the same read; a board that describes progress on one screen
+    and not the other teaches a player that one of them is out of date.
+
+    Scoped to the user ids already on the board, so the query is bounded by the players being
+    rendered rather than by everyone who has ever entered.
+  */
+  const activity = await getContestActivity(
+    competition._id,
+    leaderboard.map((row) => String(row.userId)),
+  );
 
   /*
     THE LABEL DECIDES THE SCREEN; THE KEYS DECIDE WHETHER PLAY CAN WORK. The page routes here on
@@ -507,6 +521,7 @@ export default async function ProviderContestLobby({
               rows={leaderboard}
               currentUserId={userId}
               scoreLabel={scoreLabel}
+              activity={activity.latestByUser}
             />
           </NeonPanel>
         </div>
