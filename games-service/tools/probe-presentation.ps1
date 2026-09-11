@@ -38,8 +38,8 @@ Write-Host "The size the board asks for" -ForegroundColor Cyan
 # The board then hit its minimum cell size on every screen, for every player, with no error.
 $results += Invoke-Probe -Name 'the height asked for is fed back from the height we have' `
   -Suite $SuitePresentation -File $srcPresentation `
-  -Find '  const { screen, gridHeight, chromeHeight, contentHeight } = input ?? {};' `
-  -Replace '  const { screen, gridHeight, chromeHeight, contentHeight, currentHeight } = input ?? {};
+  -Find '  const { screen, gridWidth, gridHeight, chromeHeight, contentHeight } = input ?? {};' `
+  -Replace '  const { screen, gridWidth, gridHeight, chromeHeight, contentHeight, currentHeight } = input ?? {};
   if (positive(currentHeight)) return clampFrame(currentHeight);' `
   -ExpectRed 'the height asked for does not depend on the height we already have'
 
@@ -55,9 +55,59 @@ $results += Invoke-Probe -Name 'the height asked for is fed back from the height
 # defect produced. Tightening this to 2 would mean deleting three assertions to make a probe tidy.
 $results += Invoke-Probe -Name 'the request no longer scales with the grid' `
   -Suite $SuitePresentation -File $srcPresentation `
-  -Find '    return clampFrame(chrome + framedGridPx(rows * TARGET_CELL_PX) + BOARD_FRAME_PX);' `
-  -Replace '    return clampFrame(chrome + framedGridPx(rows * MIN_CELL_PX) + BOARD_FRAME_PX);' `
+  -Find '    return clampFrame(chrome + framedGridPx(rows * TARGET_CELL_PX, vertical) + BOARD_FRAME_PX);' `
+  -Replace '    return clampFrame(chrome + framedGridPx(rows * MIN_CELL_PX, vertical) + BOARD_FRAME_PX);' `
   -ExpectRed "a board always asks for more than a host's usual minimum, at every grid size" -MaxRed 4
+
+# The reserve for the drawn 4x4 board is three times the generic bezel's. Reserving the generic
+# share clips the artwork top and bottom on every screen, while the grid inside still fits and
+# still works - so there is no error and the board merely looks cut off.
+#
+# RE-AIMED. This was first aimed at 'a taller grid asks for a taller frame' and came back GREEN:
+# the generic reserve also grows with the rows, so that test is true of both figures. The
+# mutation has an observable - the 4x4 request is about 85px shorter - and the test below is the
+# one that reads it.
+$results += Invoke-Probe -Name 'the frame height reserves the generic bezel for every board' `
+  -Suite $SuitePresentation -File $srcPresentation `
+  -Find '    return clampFrame(chrome + framedGridPx(rows * TARGET_CELL_PX, vertical) + BOARD_FRAME_PX);' `
+  -Replace '    return clampFrame(chrome + framedGridPx(rows * TARGET_CELL_PX) + BOARD_FRAME_PX);' `
+  -ExpectRed "the frame height reserves the drawn frame's own depth, not the generic bezel's"
+
+Write-Host ""
+Write-Host "The three drawn boards" -ForegroundColor Cyan
+
+# A drawn frame chosen for the wrong size paints a 6x6 grid under an 8x8 game: the wires land
+# between the painted cells and the board reads as broken rather than as plain.
+$results += Invoke-Probe -Name 'a drawn frame is chosen for the wrong grid size' `
+  -Suite $SuitePresentation -File $srcPresentation `
+  -Find '  return DRAWN_BOARD_FRAMES.find((frame) => frame.cells === gridWidth) ?? null;' `
+  -Replace '  return DRAWN_BOARD_FRAMES.find((frame) => frame.cells >= gridWidth) ?? null;' `
+  -ExpectRed 'each of the three grid sizes has its own drawn frame, and nothing else does'
+
+# A rectangle handed a square picture: the painted cells cannot line up with the grid on both axes.
+$results += Invoke-Probe -Name 'a non-square grid is handed a square drawn frame' `
+  -Suite $SuitePresentation -File $srcPresentation `
+  -Find '  if (!positive(gridWidth) || gridWidth !== gridHeight) return null;' `
+  -Replace '  if (!positive(gridWidth)) return null;' `
+  -ExpectRed 'each of the three grid sizes has its own drawn frame, and nothing else does'
+
+# One inset for all four sides is 2.5% off on the 4x4 art - a band of page inside the bezel, or the
+# outer row of painted cells clipped, and both read as "the art is a bit off".
+$results += Invoke-Probe -Name 'the inset is written as one figure for all four sides' `
+  -Suite $SuitePresentation -File $srcPresentation `
+  -Find '  return [pct(f.top), pct(f.right), pct(f.bottom), pct(f.left)].join(" ");' `
+  -Replace '  return [pct(f.top), pct(f.top), pct(f.top), pct(f.top)].join(" ");' `
+  -ExpectRed "the artwork's inset is written per side, negative, as percentages"
+
+# The old single reserve, with the per-axis figure ignored. A 4x4 board then gets the space a
+# generic-bezel board would and its frame overflows the column.
+$results += Invoke-Probe -Name 'the grid reserve ignores the frame it was told about' `
+  -Suite $SuitePresentation -File $srcPresentation `
+  -Find '  const total = positive(overhang) ? overhang : 2 * BOARD_ART_OVERHANG;
+  return Math.floor(available / (1 + total));' `
+  -Replace '  const total = 2 * BOARD_ART_OVERHANG;
+  return Math.floor(available / (1 + total));' `
+  -ExpectRed "the space reserved for the frame is the frame's own, on each axis"
 
 # A board screen taking the measured content height is the feedback loop by another route: the
 # content is inside the frame, so its height IS the frame's height, and measuring it is the same
@@ -65,12 +115,14 @@ $results += Invoke-Probe -Name 'the request no longer scales with the grid' `
 #
 # Declared at 5 - the four above plus the branch's own test. This probe deletes the board branch
 # entirely, so it is the widest legitimate blast radius in this file and everything it breaks is
-# a property of that branch.
+# a property of that branch. SIX since 11 Sep 2026: the drawn-frame depth test reads the same
+# branch, so it goes red with the rest - an honest sixth face of one mutation, and the limit was
+# raised rather than the test weakened.
 $results += Invoke-Probe -Name 'a board screen measures its content like a panel does' `
   -Suite $SuitePresentation -File $srcPresentation `
   -Find '  if (screen === "play") {' `
   -Replace '  if (false) {' `
-  -ExpectRed 'a panel screen asks for its measured content, and a board screen ignores it' -MaxRed 5
+  -ExpectRed 'a panel screen asks for its measured content, and a board screen ignores it' -MaxRed 6
 
 Write-Host ""
 Write-Host "The size a cell draws at" -ForegroundColor Cyan

@@ -53,8 +53,19 @@ const BY_GAME_CODE = new Map<string, NeonHeroBanner>([
   [
     "circuit-sprint",
     {
-      src: "/assets/neon/banner-circuit-sprint-r2.webp",
-      alt: "Glowing neon circuit terminals joined by curving energy paths, beside a golden trophy and floating coins",
+      /*
+        `-r3`, redrawn 11 September 2026 from the owner's hero crop. Two things changed and
+        both were in the reference: the terminals are drawn as the game's own lit orbs rather
+        than as abstract circuitry, and the right third carries the trophy and the pot, which
+        is what says "there is money on this" before a player has read a word.
+
+        The middle stays near-black on purpose - see the scrim note in `GameArenaLayout`. The
+        artwork carries NO lettering, although the reference's does: the platform writes the
+        contest's own name over this space, and painted text would be a second heading, wrong
+        in every locale and impossible to change.
+      */
+      src: "/assets/neon/banner-circuit-sprint-r3.webp",
+      alt: "Glowing neon circuit terminals joined by energy paths, beside a golden trophy spilling coins",
     },
   ],
   [

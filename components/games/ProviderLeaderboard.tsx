@@ -5,9 +5,11 @@ import {
   NeonRankBadge,
   neonRowClasses,
 } from "@/components/neon/LeaderboardRow";
-import { NEON_DIVIDE, NEON_TABLE_HEAD } from "@/components/neon/tokens";
-import { GameIcon } from "@/components/ui/GameIcon";
-import { GAME_ICONS, type GameIconName } from "@/lib/constants/game-icons";
+import {
+  NEON_DIVIDE,
+  NEON_SCORE_GOLD,
+  NEON_TABLE_HEAD,
+} from "@/components/neon/tokens";
 import {
   describeRoundActivity,
   formatRoundClock,
@@ -34,7 +36,7 @@ import {
  * negative number is unexplainable to a player.
  *
  * THE ROW PIECES COME FROM `components/neon/LeaderboardRow`, WHICH THE TRADING BOARD ALSO USES:
- * the same rank medal, the same initials chip, the same "you" highlight, the same uppercase
+ * the same rank plate, the same avatar chip, the same "you" highlight, the same uppercase
  * column headings. Only the columns differ, which is the whole point - two boards that look
  * like one product and report different things, rather than one board reporting a number it
  * does not have.
@@ -66,6 +68,22 @@ import {
  * the order the game declared them - see its header for why picking one by name would make the
  * "no additional coding" claim false for the next title.
  * ----------------------------------------------------------------------------------------
+ *
+ * REBUILT TO THE OWNER'S LEADERBOARD REFERENCE ON 11 SEPTEMBER 2026, after a third rejection
+ * ("the names in the standings are not shown correctly, are too squeezed ... users' avatars
+ * must show"). Three things changed and one is a recorded deviation.
+ *
+ * - PLAYERS' PICTURES. `profileImage` on the row, attached by `leaderboard-avatars.ts` after
+ *   ranking, drawn by the kit's `NeonAvatar`; a row without one shows initials on the same chip.
+ * - THE LEADER'S ROW IS FRAMED IN GOLD and every score is gold, the leader wears a crown and
+ *   everyone else a numbered blue plate - `neonRowClasses` and `NeonRankBadge style="plates"`.
+ * - THE LEVEL BADGE (`userTitleIcon`) IS NO LONGER DRAWN ON THIS BOARD. It was the third
+ *   fixture on the name line, before the name, the crown and the "you" marker, and in a 300px
+ *   rail it was part of what turned "Michael Brown" into "Mich...n". The reference draws a
+ *   plate, a picture and a name, so that is what is drawn. This is a deviation from the
+ *   trading board, which still shows the badge, and it is recorded here rather than absorbed:
+ *   the level is a platform-wide fact and belongs on the profile the name will one day link
+ *   to, not squeezed into the one column that has to fit whatever a player is called.
  */
 
 export interface ProviderLeaderboardRow {
@@ -76,7 +94,8 @@ export interface ProviderLeaderboardRow {
   score?: number;
   status?: string;
   isTied?: boolean;
-  userTitleIcon?: string;
+  /** The player's picture, if they have one. Absent draws initials - see `NeonAvatar`. */
+  profileImage?: string;
 }
 
 interface ProviderLeaderboardProps {
@@ -137,12 +156,12 @@ export default function ProviderLeaderboard({
   return (
     <div>
       <div
-        className={`grid grid-cols-[1.75rem_minmax(0,1fr)_auto_auto] items-center gap-x-2.5 px-2 pb-1.5 ${NEON_TABLE_HEAD}`}
+        className={`grid grid-cols-[2rem_minmax(0,1fr)_auto_auto] items-center gap-x-2 px-2 pb-1.5 ${NEON_TABLE_HEAD}`}
       >
         <div>#</div>
         <div className="min-w-0">Player</div>
         <div className="w-14 text-right">{scoreLabel}</div>
-        <div className="w-12 text-right">Time</div>
+        <div className="w-11 text-right">Time</div>
       </div>
 
       <div className={NEON_DIVIDE}>
@@ -160,7 +179,7 @@ export default function ProviderLeaderboard({
           return (
             <div
               key={row.userId}
-              className={`grid grid-cols-[1.75rem_minmax(0,1fr)_auto_auto] items-center gap-x-2.5 px-2 py-2 ${neonRowClasses(
+              className={`grid grid-cols-[2rem_minmax(0,1fr)_auto_auto] items-center gap-x-2 px-2 py-1.5 ${neonRowClasses(
                 { rank: row.currentRank, isCurrentUser: isYou, variant: "flush" },
               )}`}
             >
@@ -170,35 +189,23 @@ export default function ProviderLeaderboard({
                 whether the game scores upward or downward, so a board numbering its own rows
                 would quietly disagree with the payout for every lower-is-better game.
               */}
-              <NeonRankBadge rank={row.currentRank} size="sm" />
+              <NeonRankBadge rank={row.currentRank} size="sm" style="plates" />
 
               <div className="flex min-w-0 flex-nowrap items-center gap-2">
-                <NeonAvatar name={row.username || "Anonymous"} size="sm" />
+                {/*
+                  The picture comes on the row, or nothing does. This board never looks a
+                  player up itself - it is rendered on the server once and then re-rendered
+                  from a polled response, and a lookup here would be a second producer that
+                  could disagree with the one in `arena-standings.service.ts`.
+                */}
+                <NeonAvatar
+                  name={row.username || "Anonymous"}
+                  size="sm"
+                  src={row.profileImage}
+                />
 
                 <div className="min-w-0 flex-1">
                   <div className="flex min-w-0 items-center gap-1.5">
-                    {/*
-                      `userTitleIcon` is TWO different things depending on the level, which is
-                      why rendering it raw was wrong rather than merely plain. Most levels store
-                      an artwork KEY - level 2 is literally `"guideBook"` - and a few store an
-                      emoji. Printed as text, a player's rank badge read "guideBook" beside
-                      their name.
-
-                      The resolution rule is not invented here: `LeaderboardContent.tsx` has
-                      always done exactly this, so the provider board was the copy that never
-                      learned it. `Object.hasOwn` rather than `in`, because `in` walks the
-                      prototype chain and would resolve a title of "toString" to a missing
-                      artwork file.
-                    */}
-                    {row.userTitleIcon &&
-                      (Object.hasOwn(GAME_ICONS, row.userTitleIcon) ? (
-                        <GameIcon
-                          name={row.userTitleIcon as GameIconName}
-                          size={16}
-                        />
-                      ) : (
-                        <span className="shrink-0">{row.userTitleIcon}</span>
-                      ))}
                     <NeonPlayerName
                       name={row.username || "Anonymous"}
                       isCurrentUser={isYou}
@@ -246,11 +253,13 @@ export default function ProviderLeaderboard({
                 {row.score === undefined || row.score === null ? (
                   <span className="text-sm text-gray-600">-</span>
                 ) : (
-                  <span
-                    className={`text-sm font-bold ${
-                      row.currentRank <= 3 ? "text-amber-300" : "text-gray-100"
-                    }`}
-                  >
+                  /*
+                    Gold on every row, not only the podium's - the reference colours the
+                    figure a player is ranked on, and a board where the colour changed at
+                    fourth place would read as "these three are paid" on a contest that may
+                    pay five.
+                  */
+                  <span className={`text-sm font-bold ${NEON_SCORE_GOLD}`}>
                     {row.score.toLocaleString()}
                   </span>
                 )}
@@ -265,7 +274,7 @@ export default function ProviderLeaderboard({
 
                 A dash for an unknown clock, never `0:00` - see `formatRoundClock`.
               */}
-              <div className="w-12 self-center text-right text-xs tabular-nums text-gray-400">
+              <div className="w-11 self-center text-right text-xs tabular-nums text-gray-400">
                 {clock ?? <span className="text-gray-600">-</span>}
               </div>
             </div>

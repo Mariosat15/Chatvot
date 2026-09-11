@@ -1,7 +1,9 @@
 import { Crown, Medal, Trophy } from "lucide-react";
+import ProfileImage from "@/components/ui/ProfileImage";
 import {
   NEON_ROW,
   NEON_ROW_FLUSH,
+  NEON_ROW_FLUSH_LEADER,
   NEON_ROW_FLUSH_PODIUM,
   NEON_ROW_FLUSH_YOU,
   NEON_ROW_PODIUM,
@@ -22,6 +24,13 @@ import {
  * "This is you" wins over "this is the podium", because a player scanning a long board is
  * looking for themselves first and the highlight is what they scan for; a podium tint that
  * overrode it would hide the one row they came to read.
+ *
+ * ONE EXCEPTION, ON THE FLUSH BOARD ONLY, SINCE 11 SEPTEMBER 2026: the leader's row is framed
+ * in gold whoever they are, because the owner's leaderboard reference draws it that way with
+ * "You" sitting in it. The rule above loses nothing - the leader is the top row, the one place
+ * on a board nobody has to scan for, and the "you" marker is still written beside the name.
+ * The card form keeps its three states: it is what the trading lobby renders, and the trading
+ * board was not part of that request.
  */
 
 export function neonRowClasses({
@@ -39,6 +48,7 @@ export function neonRowClasses({
   variant?: "card" | "flush";
 }): string {
   if (variant === "flush") {
+    if (rank === 1) return NEON_ROW_FLUSH_LEADER;
     if (isCurrentUser) return NEON_ROW_FLUSH_YOU;
     if (rank >= 1 && rank <= 3) return NEON_ROW_FLUSH_PODIUM;
     return NEON_ROW_FLUSH;
@@ -60,6 +70,7 @@ export function neonRowClasses({
 export function NeonRankBadge({
   rank,
   size = "md",
+  style = "medals",
 }: {
   rank: number;
   /**
@@ -67,9 +78,37 @@ export function NeonRankBadge({
    * because which players are marked is the information and it must read the same everywhere.
    */
   size?: "sm" | "md";
+  /**
+   * `medals` is the sheet's marker - a trophy and two medals for the paying positions, and what
+   * the trading board has always shown. `plates` is the owner's leaderboard reference of
+   * 11 September 2026: a gold crown for the leader and a blue numbered plate for everyone else,
+   * second and third included. It is an option rather than a replacement because the two say
+   * different things - the medals mark the three paying positions, the plates mark only the
+   * top - and swapping the trading board's marker was not asked for.
+   */
+  style?: "medals" | "plates";
 }) {
   const plate = size === "sm" ? "h-7 w-7" : "h-8 w-8";
   const glyph = size === "sm" ? "h-3.5 w-3.5" : "h-4 w-4";
+
+  if (style === "plates") {
+    if (rank === 1) {
+      return (
+        <span
+          className={`flex ${plate} items-center justify-center rounded-lg border border-[#FFC01B]/70 bg-[#FFB300]/20`}
+        >
+          <Crown className={`${glyph} text-[#FFD72D]`} />
+        </span>
+      );
+    }
+    return (
+      <span
+        className={`flex ${plate} items-center justify-center rounded-lg border border-[#1B7DFF]/50 bg-[#1B7DFF]/15 text-xs font-bold text-sky-200`}
+      >
+        {rank > 0 ? rank : "-"}
+      </span>
+    );
+  }
 
   if (rank === 1) {
     return (
@@ -111,19 +150,35 @@ export function NeonRankBadge({
 }
 
 /**
- * The initials chip beside a player's name.
+ * The avatar beside a player's name: their picture when the caller supplies one, their
+ * initials when it does not.
  *
- * Initials rather than a profile photo, deliberately. A board renders up to fifty of these, and
- * fifty remote avatars is fifty requests plus fifty layout shifts as they arrive, on the screen
- * a player refreshes most often. The chip is also the only version that cannot leak a face into
- * a public leaderboard for someone who never chose to publish one.
+ * THIS USED TO SAY "INITIALS RATHER THAN A PROFILE PHOTO, DELIBERATELY", and the two reasons
+ * it gave are kept here because one of them is still a cost: fifty remote avatars is fifty
+ * requests on the screen a player refreshes most often, and a photo can put a face on a public
+ * board. On 11 September 2026 the owner ordered players' avatars shown on the standings, and
+ * the second reason turned out not to apply: the picture used is the one the platform's global
+ * leaderboard has published under `/leaderboard` all along (`profileImage || image`), so
+ * nothing is shown here that is not already shown there. The first is paid knowingly - the
+ * boards are capped at fifty rows, and the chip is drawn at a fixed size so an image arriving
+ * late changes nothing around it.
+ *
+ * `src` is optional and the caller decides whether to pass it. A board that has not looked a
+ * picture up renders initials for everybody, which is the honest rendering of "I do not know",
+ * rather than a broken image for everybody.
+ *
+ * The look is the owner's reference: a round chip with a cyan ring over a violet-to-blue
+ * gradient, which is also what the initials sit on when there is no picture - so a board where
+ * half the players have photos and half do not still reads as one set of chips.
  */
 export function NeonAvatar({
   name,
   size = "md",
+  src,
 }: {
   name: string;
   size?: "sm" | "md";
+  src?: string | null;
 }) {
   const initials =
     name
@@ -134,14 +189,27 @@ export function NeonAvatar({
       .join("")
       .toUpperCase() || "?";
 
+  const chip = `${
+    size === "sm" ? "h-7 w-7 text-[10px]" : "h-8 w-8 text-[11px]"
+  } shrink-0 rounded-full border-2 border-[#32C2FF] bg-gradient-to-br from-[#811AF4] to-[#0C96DB] font-bold text-white`;
+
+  if (src) {
+    return (
+      <ProfileImage
+        src={src}
+        alt=""
+        fallbackLetter={initials}
+        size="sm"
+        className={chip}
+        // Reason: a truthy value, or `ProfileImage` substitutes its own primary-tinted fallback
+        // shell over the chip's gradient when the picture fails to load.
+        fallbackClassName="text-white"
+      />
+    );
+  }
+
   return (
-    <span
-      className={`flex ${
-        size === "sm" ? "h-7 w-7 text-[10px]" : "h-8 w-8 text-[11px]"
-      } shrink-0 items-center justify-center rounded-full border border-sky-500/30 bg-sky-500/15 font-bold text-sky-200`}
-    >
-      {initials}
-    </span>
+    <span className={`flex ${chip} items-center justify-center`}>{initials}</span>
   );
 }
 

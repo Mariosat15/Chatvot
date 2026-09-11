@@ -33,7 +33,7 @@
  * is no attempt left to protect and a dropped mobile connection must not cost one.
  */
 
-import { BOARD_ART, createBoard } from "./board.js";
+import { BOARD_ART, FRAME_ART, createBoard } from "./board.js";
 import {
   BOARD_COMPLETE_MS,
   COUNT_UP_STEP_MS,
@@ -41,6 +41,7 @@ import {
   boardProgress,
   countUpSteps,
   desiredFrameHeight,
+  frameInsetCss,
   hintCopy,
   introCopy,
   playStatTiles,
@@ -255,6 +256,7 @@ function requestHeight() {
   const playing = active === screens.play;
   const height = desiredFrameHeight({
     screen: playing ? "play" : "panel",
+    gridWidth: state && state.board ? state.board.width : undefined,
     gridHeight: state && state.board ? state.board.height : undefined,
     chromeHeight: playing ? chromeHeightOf(active) : undefined,
     contentHeight: playing ? undefined : contentHeightOf(active),
@@ -416,6 +418,8 @@ function renderIntro() {
 }
 
 let artWarmed = false;
+/** Artwork the browser reported it could not load. Read by `dressBoard`; written by the warm. */
+const failedArt = new Set();
 
 /**
  * Fetch the board's artwork before anything asks to draw it.
@@ -443,8 +447,41 @@ function warmBoardArt() {
   for (const url of BOARD_ART) {
     const image = new Image();
     image.decoding = "async";
+    /*
+     * The one thing the warm listens for. A drawn board's picture IS its cells, so if that file
+     * does not arrive the player would be dragging wires over nothing - the vector cells are
+     * transparent under a drawn frame. Recording the failure lets `dressBoard` put them back.
+     * A background image has no error event of its own, which is why it is caught here.
+     */
+    image.onerror = () => {
+      failedArt.add(url);
+      if (state && state.board && screens.play && !screens.play.hidden) dressBoard();
+    };
     image.src = url;
   }
+}
+
+/**
+ * Put the artwork around the current board.
+ *
+ * Three of the grid sizes have a picture with the cells painted in (`DRAWN_BOARD_FRAMES`), and for
+ * those the stage is marked `drawn` and the `<svg>`'s own cells go transparent - the wires,
+ * terminals and numerals still paint on top, because those are the game. Any other shape wears the
+ * generic bezel with its vector cells showing. Either way the inset is written per side from the
+ * measured figures, never from the stylesheet's single fallback number.
+ *
+ * A picture that FAILED to load falls back to the vector board rather than to a blank one: the
+ * alternative is a paid round played on an invisible grid, which is the quietest failure this
+ * screen could have.
+ */
+function dressBoard() {
+  const art = ui.boardStage ? ui.boardStage.querySelector(".board-art") : null;
+  if (!art || !ui.boardStage) return;
+  const frame = board.frame();
+  const usable = frame && !failedArt.has(frame.file) ? frame : null;
+  art.style.backgroundImage = "url('" + (usable ? usable.file : FRAME_ART) + "')";
+  art.style.inset = frameInsetCss(usable);
+  ui.boardStage.classList.toggle("drawn", usable !== null);
 }
 
 /**
@@ -742,6 +779,9 @@ function fitBoard() {
 
 function renderPlay() {
   board.setPuzzle(state.board);
+  // After `setPuzzle`, because the frame is chosen by the puzzle's shape; before `fitBoard`,
+  // because the space the grid may take depends on how deep that frame is.
+  dressBoard();
   // Before `onBoardChange`, which renders the figures this decides: the tiles read `moves` and
   // `bestBoardMs`, and a board that has just been accepted resets the first and may set the
   // second. Rendering first would show the previous board's move count under the new grid.

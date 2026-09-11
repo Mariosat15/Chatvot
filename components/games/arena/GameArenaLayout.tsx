@@ -1,9 +1,18 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, ListOrdered } from "lucide-react";
-import { NEON_PANEL, NEON_LABEL } from "@/components/neon/tokens";
-import { NeonHeadedPanel } from "@/components/neon/Cards";
-import { providerBanner } from "@/components/neon/banners";
+import { ArrowLeft, ArrowRight, Trophy } from "lucide-react";
+import {
+  NEON_DIVIDER,
+  NEON_LABEL,
+  NEON_PANEL_LIT,
+} from "@/components/neon/tokens";
+import {
+  NeonGridBackdrop,
+  NeonHeadedPanel,
+  NeonScopeStrip,
+} from "@/components/neon/Cards";
+import { NeonButton } from "@/components/neon/Buttons";
+import type { NeonHeroBanner } from "@/components/neon/Hero";
 import type { GamePresentation } from "@/lib/services/games/game-presentation.service";
 import { ArenaIdentity } from "./ArenaIdentity";
 
@@ -32,6 +41,22 @@ interface Props {
   competitionId: string;
   competitionName: string;
   presentation: GamePresentation;
+  /**
+   * The hero artwork, already chosen.
+   *
+   * THE CALLER RESOLVES IT AND THAT IS NOT A STYLE CHOICE. This file resolved its own until
+   * 11 September 2026 and resolved it wrongly - it called `providerBanner(undefined)`,
+   * because `GamePresentation` carries no game code, so the arena wore the GENERIC trophy
+   * for every title in the catalogue while the lobby and the results screen, which both pass
+   * the code, drew the game's own artwork. Three callers and one of them forgot.
+   *
+   * The obvious repair - pass the game code in - is **forbidden here by a test**, and the
+   * test is right: `game-content-editor.test.ts` asserts that nothing in this folder names a
+   * game code, a provider key or a game key, because the one way to lose "a new title needs
+   * no code" is a screen that enumerates games. So the page, which already knows which game
+   * it is, picks the picture and hands over data. The layout stays unable to have an opinion.
+   */
+  banner: NeonHeroBanner;
   minParticipants?: number;
   maxParticipants?: number;
   /** The board, the Play button, or the result - whatever phase the player is in. */
@@ -65,6 +90,7 @@ export function GameArenaLayout({
   competitionId,
   competitionName,
   presentation,
+  banner,
   minParticipants,
   maxParticipants,
   stage,
@@ -74,12 +100,18 @@ export function GameArenaLayout({
   rules,
   highlights,
 }: Props) {
-  const banner = presentation.bannerUrl
-    ? { src: presentation.bannerUrl, alt: presentation.gameName }
-    : providerBanner(undefined);
-
   return (
     <div className="mx-auto max-w-[1400px] px-4 py-6">
+      {/*
+        THE PAGE'S OWN SURFACE, and the reason it is a fixed backdrop rather than a class on
+        the app's body: the reference's arena is a lit navy room and the rest of the
+        application is neutral near-black. Restyling the body would change every trading
+        screen through a shared layout, which is the invisible change the kit's notes keep
+        warning about. Fixed rather than absolute, so it covers the viewport however far this
+        page - which is taller than one - is scrolled.
+      */}
+      <NeonGridBackdrop />
+
       <Link
         href={`/competitions/${competitionId}`}
         className="mb-4 inline-flex items-center gap-2 text-sm text-gray-400 transition-colors hover:text-gray-200"
@@ -88,7 +120,7 @@ export function GameArenaLayout({
         Back to {competitionName}
       </Link>
 
-      <div className={`${NEON_PANEL} relative mb-5 overflow-hidden`}>
+      <div className={`${NEON_PANEL_LIT} relative mb-5 overflow-hidden`}>
         {/*
           Decorative and behind the text, so it is `aria-hidden` with an empty alt and the
           heading below carries the meaning. A plain `<img>` because an operator's banner is
@@ -163,16 +195,27 @@ export function GameArenaLayout({
         */}
         <div className="order-2 lg:order-3 xl:order-1">
           <NeonHeadedPanel
-            icon={ListOrdered}
-            title="Standings"
+            icon={Trophy}
+            /*
+              "Leaderboard", the reference's word, since 11 Sep 2026 - it said "Standings" for
+              three days, and the owner's rejection listed the panel by the reference's name.
+              The trophy is the reference's glyph too.
+            */
+            title="Leaderboard"
             /*
               "players", never "traders", and the bare count was the reference's one legible
-              omission - a pill reading `20` beside a heading reading `Standings` says twenty
+              omission - a pill reading `20` beside a heading reading `Leaderboard` says twenty
               of what. The wording now lives with the count in `ArenaLiveCount`, because the
               figure and its noun have to change together.
             */
             action={standingsCount}
           >
+            {/*
+              The reference's scope strip, with the one scope this board can answer. The other
+              two it draws - friends, country - have no data source, and `NeonScopeStrip`'s
+              header says why they are not drawn as dead tabs.
+            */}
+            <NeonScopeStrip scopes={["Global"]} />
             {/*
               Tight padding, because the rows are flush now and their left accent bar is the
               state marker. Padded in from the panel edge as far as a card would be, the bar
@@ -184,16 +227,17 @@ export function GameArenaLayout({
             {/*
               A BUTTON, NOT A TEXT LINK. The reference draws a full-width bordered control at
               the foot of the board, and it is the only way off this panel: a line of small
-              blue text under a scrolling list is the thing a player's eye skips.
+              blue text under a scrolling list is the thing a player's eye skips. It is the
+              kit's `outline` button rather than a class list written here, so the control is
+              the same one the results screen draws and neither can drift from the other.
             */}
-            <div className="border-t border-[#161E36] p-3">
-              <Link
+            <div className={`border-t p-3 ${NEON_DIVIDER}`}>
+              <NeonButton
                 href={`/competitions/${competitionId}?view=details`}
-                className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-[#1B2540] bg-[#0B1120] px-3 py-2 text-xs font-semibold text-sky-300 transition-colors hover:border-sky-500/40 hover:text-sky-200"
-              >
-                Full leaderboard and prizes
-                <ArrowRight className="h-3.5 w-3.5" />
-              </Link>
+                tone="outline"
+                label="View Full Leaderboard"
+                trailingIcon={ArrowRight}
+              />
             </div>
           </NeonHeadedPanel>
         </div>

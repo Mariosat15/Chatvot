@@ -1,5 +1,6 @@
 import { getCompetitionLeaderboard } from "@/lib/actions/trading/competition.actions";
 import { getContestActivity } from "./contest-activity.service";
+import { attachProfileImages, type WithProfileImage } from "./leaderboard-avatars";
 import type { RoundActivitySummary } from "@/lib/utils/round-activity";
 
 /**
@@ -30,8 +31,11 @@ export interface ArenaFeedEntry {
   activity: RoundActivitySummary;
 }
 
+type RankedRow = Awaited<ReturnType<typeof getCompetitionLeaderboard>>[number];
+
 export interface ArenaStandings {
-  rows: Awaited<ReturnType<typeof getCompetitionLeaderboard>>;
+  /** The ranked rows, each with the player's picture attached - see `leaderboard-avatars.ts`. */
+  rows: (RankedRow & WithProfileImage)[];
   /** What each player on the board has been doing, keyed by user id. */
   activity: Record<string, RoundActivitySummary>;
   /** The most recent rounds across the contest, newest first, with names attached. */
@@ -61,7 +65,13 @@ export async function getArenaStandings(
     rather than relying on.
   */
   const leaderboard = await getCompetitionLeaderboard(competitionId, limit);
-  const rows = Array.isArray(leaderboard) ? leaderboard : [];
+  const ranked: RankedRow[] = Array.isArray(leaderboard) ? leaderboard : [];
+
+  // The picture is attached AFTER ranking and never read by it: the rows above are the ranked
+  // truth, and this adds one display field to each. Done here rather than in the page so the
+  // polling route produces the same rows - a board whose avatars vanish on the first refresh
+  // is the "two answers" failure this service exists to prevent.
+  const rows = await attachProfileImages(ranked);
 
   const activity = await getContestActivity(
     competitionId,

@@ -27,6 +27,7 @@ import {
 } from "@/components/games/arena/ArenaLiveStandings";
 import GameRulesPanel from "@/components/games/GameRulesPanel";
 import { NeonCountPill, NeonHeadedPanel } from "@/components/neon/Cards";
+import { providerBanner } from "@/components/neon/banners";
 import { Button } from "@/components/ui/button";
 
 /**
@@ -186,6 +187,22 @@ export default async function PlayPage({ params }: PlayPageProps) {
   const competitionName = contest?.name ?? "this competition";
   const creditSymbol = settings?.credits?.symbol || undefined;
 
+  /*
+    THE HERO ARTWORK IS CHOSEN HERE, NOT IN THE LAYOUT, and the reason is a guard rather than
+    a preference. `GameArenaLayout` used to resolve it and got it wrong - it called
+    `providerBanner(undefined)`, because `GamePresentation` carries no game code, so the arena
+    drew the generic trophy for every title while the lobby drew the game's own. Passing the
+    code down would fix the picture and break the rule that keeps the arena game-agnostic:
+    `game-content-editor.test.ts` forbids a game code anywhere in that folder, because a
+    screen that can name a game is a screen that can special-case one.
+
+    This is the one place that legitimately knows which game it is, so it picks. Precedence:
+    the operator's uploaded banner, then the title's own drawn artwork, then a generic trophy.
+  */
+  const banner = presentation.bannerUrl
+    ? { src: presentation.bannerUrl, alt: presentation.gameName }
+    : providerBanner(contest?.gameConfig?.gameCode);
+
   const prizePositions = Array.isArray(contest?.prizeDistribution)
     ? contest.prizeDistribution.length
     : 0;
@@ -218,6 +235,7 @@ export default async function PlayPage({ params }: PlayPageProps) {
         competitionId={competitionId}
         competitionName={competitionName}
         presentation={presentation}
+        banner={banner}
         minParticipants={contest?.minParticipants}
         maxParticipants={contest?.maxParticipants}
         standingsCount={<ArenaLiveCount />}

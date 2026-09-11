@@ -15,25 +15,37 @@
  * ended the demonstration this phase exists for. So the game got a richer version of its OWN
  * palette - depth, glow, a proper type scale - and still shares nothing.
  *
+ * AMENDED 11 September 2026, and the amendment narrows the paragraph above without reversing it.
+ * The owner supplied a reference for the whole arena and ordered the game's own chrome - the
+ * round header, the timer, the rails, the board's bezel and Submit - to match it, and supplied
+ * the three board pictures below. Those colours and shapes are now COPIED into this stylesheet
+ * as literal values. What still holds is the sentence that matters for the seam: nothing here
+ * IMPORTS anything from the platform (`npm run check:isolation`), so a third party could do
+ * exactly what this file does - read a style sheet and type the values in - and the demonstration
+ * stands. "Not branded" was never the guarantee; "shares no code" is.
+ *
  * No web fonts: a font request is a render-blocking round trip on a mobile connection, and on a
  * timed title the player's clock would pay for it.
  */
 
 :root {
-  --surface: #080d18;
-  --surface-glow: #0e1a30;
-  --panel: #111a2c;
-  --panel-edge: #1e2a45;
-  --cell: #1b2740;
-  --cell-edge: #27334f;
-  --text: #eaf0fd;
-  --muted: #8b9dbd;
-  --accent: #38bdf8;
-  --accent-deep: #0a5f86;
-  --accent-ink: #04121e;
-  --danger: #fb7185;
-  --ready: #4ade80;
-  --radius: 16px;
+  /* The reference sheet's palette (11 Sep 2026): a near-black navy page, deep-blue panels edged
+     in a lit blue, cyan for anything that glows, a red clock. Every value below is one the owner's
+     sheet declares; the names are ours. */
+  --surface: #020b1c;
+  --surface-glow: #071b38;
+  --panel: #05142c;
+  --panel-edge: #0b5b99;
+  --cell: #0b274b;
+  --cell-edge: #58baff;
+  --text: #eaf4ff;
+  --muted: #7fa6d6;
+  --accent: #08dfff;
+  --accent-deep: #0b76d7;
+  --accent-ink: #020b1c;
+  --danger: #ff3c67;
+  --ready: #1ee58f;
+  --radius: 15px;
   --radius-sm: 12px;
 
   /*
@@ -44,16 +56,23 @@
    * browsers we would never see. A literal cannot fail. They are kept next to the colours they
    * are derived from so a palette change is one edit in one place.
    */
-  --panel-soft: rgba(17, 26, 44, 0.82);
-  --accent-soft: rgba(56, 189, 248, 0.18);
-  --accent-faint: rgba(56, 189, 248, 0.1);
-  --accent-line: rgba(56, 189, 248, 0.35);
-  --accent-bright: #7dd8ff;
+  --panel-soft: rgba(11, 40, 80, 0.82);
+  --accent-soft: rgba(8, 223, 255, 0.18);
+  --accent-faint: rgba(8, 223, 255, 0.1);
+  --accent-line: rgba(8, 223, 255, 0.35);
+  --accent-bright: #16dfff;
 
-  /* The brushed-metal edge the artwork's rings are made of. Used on the readouts and the buttons
-     so the chrome around the board belongs to the same machine as the board. */
-  --bezel-top: #3d4b63;
-  --bezel-bottom: #131c2c;
+  /* The lit edge the reference draws round every control: a mid blue on top fading to the
+     panel's own navy. Used on the readouts and the buttons so the chrome around the board belongs
+     to the same machine as the board. */
+  --bezel-top: #1b7dff;
+  --bezel-bottom: #061e3c;
+  /* The reference's three control faces, copied as declared: a stat box, a tool button and the
+     dark glass of the board frame. */
+  --face-stat: linear-gradient(180deg, #0b2850 0%, #071b39 100%);
+  --face-tool: linear-gradient(180deg, #102a4e 0%, #071936 100%);
+  --face-tool-edge: #164f8a;
+  --face-frame: linear-gradient(135deg, #081226 0%, #03315b 46%, #081226 100%);
 
   /*
    * How far the bezel artwork reaches outside the grid, as a fraction of the grid's size.
@@ -81,8 +100,17 @@ body {
      gradients cost nothing to paint once and are never repainted - unlike a box-shadow on the
      board itself, which is re-composited on every drag. */
   background-image:
+    /* The reference's faint 34-pixel circuit grid, under the two lights. Two hairline gradients,
+       painted once with the rest of the page background. */
+    linear-gradient(rgba(0, 169, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 169, 255, 0.025) 1px, transparent 1px),
     radial-gradient(90% 60% at 50% -10%, var(--surface-glow) 0%, transparent 70%),
-    radial-gradient(70% 50% at 50% 110%, #0c1526 0%, transparent 70%);
+    radial-gradient(70% 50% at 50% 110%, #041a36 0%, transparent 70%);
+  background-size:
+    34px 34px,
+    34px 34px,
+    auto,
+    auto;
   font-family:
     system-ui,
     -apple-system,
@@ -162,8 +190,8 @@ h1 {
      tight one for the edge and a wide faint one for the bloom, which is what stops it reading as
      a blurred word. */
   text-shadow:
-    0 0 2px rgba(125, 216, 255, 0.45),
-    0 0 18px rgba(56, 189, 248, 0.22);
+    0 0 2px rgba(22, 223, 255, 0.45),
+    0 0 18px rgba(8, 223, 255, 0.28);
 }
 
 .lead {
@@ -206,13 +234,13 @@ h1 {
   background:
     linear-gradient(90deg, transparent 8%, var(--accent) 30%, var(--accent) 70%, transparent 92%)
       top center / 60% 2px no-repeat,
-    linear-gradient(180deg, rgba(56, 189, 248, 0.07) 0%, transparent 40%),
-    var(--panel-soft);
-  border: 1px solid var(--panel-edge);
+    linear-gradient(180deg, rgba(5, 21, 49, 0.98) 0%, rgba(3, 15, 35, 0.98) 100%);
+  /* The reference's panel: a `#1089dc` rim on a deep-navy face, lit faintly from inside. */
+  border: 1px solid #1089dc;
   border-radius: var(--radius);
   padding: 16px 16px 14px;
   text-align: left;
-  box-shadow: inset 0 1px 0 rgba(190, 220, 255, 0.08);
+  box-shadow: inset 0 0 24px rgba(0, 103, 221, 0.08);
 }
 
 .panel-title {
@@ -382,20 +410,18 @@ button:active:not(:disabled) {
  * that repaints on hover is a button competing with the board for frames.
  */
 button.primary {
-  background:
-    linear-gradient(180deg, rgba(125, 216, 255, 0.22) 0%, rgba(8, 24, 40, 0.9) 62%),
-    linear-gradient(180deg, #0d2135 0%, #071523 100%);
-  color: var(--accent-bright);
+  /* The reference's Submit: a bright-blue-to-navy face inside a cyan rim, lit from within. */
+  background: linear-gradient(180deg, #0b76d7 0%, #074388 55%, #061b40 100%);
+  color: #eafcff;
   font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   font-size: 0.9rem;
-  text-shadow: 0 0 12px rgba(125, 216, 255, 0.55);
+  text-shadow: 0 0 12px rgba(8, 223, 255, 0.55);
   box-shadow:
     inset 0 0 0 1px var(--accent),
-    inset 0 1px 0 rgba(190, 235, 255, 0.45),
-    inset 0 -14px 22px -18px var(--accent),
-    0 8px 26px -12px var(--accent-deep);
+    inset 0 0 20px rgba(0, 221, 255, 0.35),
+    0 0 15px rgba(0, 222, 255, 0.45);
 }
 
 button.primary.large {
@@ -405,7 +431,7 @@ button.primary.large {
 }
 
 button.primary:disabled {
-  background: linear-gradient(180deg, #16203200 0%, #0b1322 100%);
+  background: linear-gradient(180deg, #0a2246 0%, #061632 100%);
   color: var(--muted);
   text-shadow: none;
   box-shadow: inset 0 0 0 1px var(--panel-edge);
@@ -413,12 +439,13 @@ button.primary:disabled {
 }
 
 button.ghost {
-  background: linear-gradient(180deg, rgba(61, 75, 99, 0.35) 0%, rgba(19, 28, 44, 0.6) 100%);
+  /* The reference's tool button: a blue-edged navy face. */
+  background: var(--face-tool);
   border-color: transparent;
   color: var(--text);
   box-shadow:
-    inset 0 0 0 1px var(--panel-edge),
-    inset 0 1px 0 rgba(190, 220, 255, 0.16);
+    inset 0 0 0 1px var(--face-tool-edge),
+    inset 0 1px 0 rgba(120, 190, 255, 0.16);
 }
 
 button.small-btn {
@@ -454,10 +481,11 @@ button.small-btn {
   gap: 1px;
   padding: 5px 12px 6px;
   border-radius: var(--radius-sm);
-  background: linear-gradient(180deg, #101d31 0%, #0a1322 100%);
+  /* The reference's stat box: a blue-edged deep-navy face. */
+  background: var(--face-stat);
   box-shadow:
     inset 0 0 0 1px var(--panel-edge),
-    inset 0 1px 0 rgba(190, 220, 255, 0.14);
+    inset 0 1px 0 rgba(120, 190, 255, 0.14);
   text-align: left;
 }
 
@@ -477,36 +505,48 @@ button.small-btn {
   color: var(--text);
 }
 
+/*
+ * THE CLOCK IS RED FROM THE FIRST SECOND, as the reference draws it - a red-rimmed box with a
+ * large red figure - rather than cyan turning red near the end. `urgent` still exists: it is the
+ * last stretch, and it now brightens the glow instead of changing the colour, so the player's eye
+ * is drawn without the box appearing to become a different instrument.
+ */
 .readout-clock {
+  background: linear-gradient(90deg, rgba(105, 15, 48, 0.28) 0%, rgba(255, 49, 104, 0.12) 100%),
+    var(--face-stat);
   box-shadow:
-    inset 0 0 0 1px var(--accent-line),
-    inset 0 1px 0 rgba(190, 235, 255, 0.2),
-    0 0 22px -10px var(--accent);
+    inset 0 0 0 1px #ff3e75,
+    inset 0 0 18px rgba(255, 34, 103, 0.12),
+    0 0 22px -10px var(--danger);
+}
+
+.readout-clock .readout-label {
+  color: #ff8fa8;
 }
 
 .clock {
   display: inline-block;
   min-width: 3.4ch;
-  font-size: 1.32rem;
+  font-size: 1.5rem;
   font-weight: 800;
   letter-spacing: 0.03em;
-  color: var(--accent-bright);
-  text-shadow: 0 0 14px rgba(125, 216, 255, 0.5);
+  color: var(--danger);
+  text-shadow: 0 0 14px rgba(255, 60, 103, 0.45);
 }
 
 .clock.urgent {
-  color: var(--danger);
-  text-shadow: 0 0 14px rgba(251, 113, 133, 0.55);
+  color: #ff5c82;
+  text-shadow: 0 0 18px rgba(255, 60, 103, 0.8);
 }
 
-/* The rim goes red with the figures. Without it the panel keeps saying "everything is fine" while
-   the number inside it says the opposite, which is the sort of half-signal a player under a clock
-   reads as neither. */
+/* The rim brightens with the figures in the last stretch. Without it the box keeps saying "same
+   as a minute ago" while the number inside it says the opposite, which is the sort of half-signal
+   a player under a clock reads as neither. */
 .readout-clock:has(.clock.urgent) {
   box-shadow:
-    inset 0 0 0 1px rgba(251, 113, 133, 0.6),
-    inset 0 1px 0 rgba(255, 210, 220, 0.2),
-    0 0 22px -10px var(--danger);
+    inset 0 0 0 1px #ff5c82,
+    inset 0 0 22px rgba(255, 34, 103, 0.22),
+    0 0 26px -8px var(--danger);
 }
 
 /* ------------------------------------------------------------------------------------------
@@ -555,6 +595,17 @@ button.icon-btn {
  * both rails are sized to their own contents. `minmax(0, 1fr)` and not `1fr`: a bare `1fr` track
  * is floored by its content, so a wide stat value would push the grid past its container and the
  * board would be the thing that gave way, with nothing on screen to say why.
+ *
+ * THE BOARD'S CELL MUST STRETCH TO THE ROW, AND `align-items: center` HERE IS A DEFECT. `fitBoard`
+ * sizes the grid from the space `.board-wrap` actually has, so the wrap has to be the size of the
+ * row and never the size of the grid inside it. Centred, the wrap shrinks to the `<svg>`, the next
+ * fit measures a wrap the size of the previous grid, takes the bezel's share off it and draws a
+ * smaller grid - and the fit after that measures THAT. It converges on the 34-pixel floor while
+ * `desiredFrameHeight`, which deliberately never reads the current height, keeps asking the host
+ * for a frame tall enough for a full-size board. The result was a tall frame with a postage-stamp
+ * board in the middle of it, reported by the owner on 11 September 2026, with nothing errored and
+ * nothing logged. So the row stretches and the RAILS centre themselves - the centring the owner
+ * sees is the same, and only the element that is measured has changed.
  */
 .arena {
   flex: 1;
@@ -562,8 +613,13 @@ button.icon-btn {
   width: 100%;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 14px;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.action-rail,
+.stat-rail {
+  align-self: center;
 }
 
 .action-rail {
@@ -614,10 +670,10 @@ button.rail-btn:disabled {
   gap: 6px;
   padding: 8px 10px 10px;
   border-radius: var(--radius-sm);
-  background: linear-gradient(180deg, #101d31 0%, #0a1322 100%);
+  background: var(--face-stat);
   box-shadow:
     inset 0 0 0 1px var(--panel-edge),
-    inset 0 1px 0 rgba(190, 220, 255, 0.14);
+    inset 0 1px 0 rgba(120, 190, 255, 0.14);
 }
 
 .board-meter-head {
@@ -646,7 +702,7 @@ button.rail-btn:disabled {
   height: 7px;
   border-radius: 99px;
   overflow: hidden;
-  background: #0a1322;
+  background: #041127;
   box-shadow: inset 0 0 0 1px var(--panel-edge);
 }
 
@@ -680,7 +736,7 @@ button.rail-btn:disabled {
   gap: 1px;
   padding: 6px 10px 7px;
   border-radius: var(--radius-sm);
-  background: var(--panel-soft);
+  background: var(--face-stat);
   box-shadow: inset 0 0 0 1px var(--panel-edge);
   text-align: left;
 }
@@ -710,8 +766,15 @@ button.rail-btn:disabled {
  *
  * `chromeHeightOf` measures the arena and subtracts the board, so the height these two rows add
  * is accounted for here without this query being restated in JavaScript.
+ *
+ * THE WIDTH IS THE FRAME'S, NOT THE DEVICE'S. This page runs inside an iframe in the platform's
+ * arena, and a media query reads the iframe's width - which on a laptop is the middle column
+ * between a standings rail and a sidebar, about 450 to 650 pixels. At 680 this query fired on
+ * every laptop and the rails sat under the board on the one screen the owner was looking at, so
+ * the threshold is the width at which a rail beside the board would genuinely squeeze it: two
+ * rails at their minimum plus a grid at the smallest cell size worth having.
  */
-@media (max-width: 680px) {
+@media (max-width: 520px) {
   .arena {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr) auto auto;
@@ -775,13 +838,48 @@ button.rail-btn:disabled {
 
 .board-art {
   position: absolute;
+  /* The generic bezel's inset and picture. `dressBoard` in `app.js` overrides BOTH inline for the
+     three drawn boards, whose bezels are measured per side - these are what a board wears before
+     that runs and what any shape without a picture of its own keeps. */
   inset: calc(var(--board-art-overhang) * -100%);
   background-image: url("/play/board-frame.webp");
   background-size: 100% 100%;
   background-repeat: no-repeat;
+  /* The reference's frame glows cyan at its outer edge. A drop-shadow rather than a box-shadow,
+     because the pictures have a transparent margin (their black surround was keyed out on 11 Sep
+     2026 so the page shows through), and a box-shadow would draw a rectangle detached from the
+     bezel. The filter follows the artwork's own alpha. It costs a compositing layer and nothing
+     more: the art never moves while a wire is being drawn. */
+  filter: drop-shadow(0 0 14px rgba(0, 204, 255, 0.45));
   /* The artwork is decoration over a board that is already complete without it, so it must never
      intercept a drag - the grid underneath is the hit area, and the bezel overhangs it. */
   pointer-events: none;
+}
+
+/*
+ * A DRAWN board: the owner's 4x4, 6x6 and 8x8 pictures have the cells painted in, so the vector
+ * cells underneath go transparent and the picture is the grid. The wires, terminals, numerals and
+ * the unused-square pips still paint on top - those are the game, and they are what `dressBoard`
+ * puts back in full if the picture fails to load, by taking this class off again.
+ *
+ * `transparent` rather than `display: none` on the cells: they are still the drag targets.
+ */
+.board-stage.drawn svg#board {
+  background: transparent;
+  box-shadow: none;
+}
+
+.board-stage.drawn svg#board .cell {
+  fill: transparent;
+  stroke: transparent;
+}
+
+.board-stage.drawn svg#board .cell-lip {
+  stroke: transparent;
+}
+
+.board-stage.drawn svg#board .junction {
+  display: none;
 }
 
 /*
@@ -801,7 +899,7 @@ svg#board {
      scrolls the page on every touch device and the game is unplayable on a phone. */
   touch-action: none;
   display: block;
-  background: radial-gradient(120% 100% at 50% 0%, #12233d 0%, #091425 100%);
+  background: radial-gradient(120% 100% at 50% 0%, #0b274b 0%, #061a37 100%);
   border-radius: 6px;
   box-shadow: 0 30px 60px -34px #000;
 }
@@ -809,13 +907,13 @@ svg#board {
 /* The soft outer half of a cell's edge. Wide and faint: this is the bloom. */
 svg#board .cell {
   fill: url(#cell-face);
-  stroke: rgba(96, 190, 255, 0.16);
+  stroke: rgba(88, 186, 255, 0.2);
 }
 
-/* The crisp inner half, which is what actually reads as an edge. */
+/* The crisp inner half, which is what actually reads as an edge - the reference's cell border. */
 svg#board .cell-lip {
   fill: none;
-  stroke: rgba(125, 216, 255, 0.55);
+  stroke: rgba(88, 186, 255, 0.65);
 }
 
 /* The four-point stars where the grid lines cross. One path node for all of them - see `build`
@@ -922,9 +1020,9 @@ svg#board .terminal-art {
    submittable, so its turning on is the game telling the player they are finished. */
 .submit-wide:not(:disabled) {
   box-shadow:
-    inset 0 1px 0 rgba(210, 245, 255, 0.4),
-    0 0 0 1px var(--accent-line),
-    0 0 34px -8px var(--accent),
+    inset 0 0 0 1px var(--accent),
+    inset 0 0 20px rgba(0, 221, 255, 0.35),
+    0 0 15px rgba(0, 222, 255, 0.65),
     0 10px 26px -16px rgba(0, 0, 0, 0.9);
 }
 
@@ -993,7 +1091,7 @@ svg#board .terminal-art {
   background:
     linear-gradient(90deg, transparent 10%, var(--accent) 32%, var(--accent) 68%, transparent 90%)
       top center / 55% 2px no-repeat,
-    linear-gradient(180deg, #101d31 0%, #0a1322 100%);
+    var(--face-stat);
   box-shadow:
     inset 0 0 0 1px var(--accent-line),
     0 0 30px -16px var(--accent);
@@ -1005,7 +1103,7 @@ svg#board .terminal-art {
   line-height: 1;
   font-variant-numeric: tabular-nums;
   color: var(--accent-bright);
-  text-shadow: 0 0 18px rgba(125, 216, 255, 0.45);
+  text-shadow: 0 0 18px rgba(8, 223, 255, 0.45);
 }
 
 .stat-label {

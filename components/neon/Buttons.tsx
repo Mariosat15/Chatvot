@@ -36,9 +36,15 @@ const TONES = new Map<NeonButtonTone, string>([
     "action",
     "border-transparent bg-gradient-to-r from-sky-500 to-cyan-400 font-bold uppercase tracking-wide text-[#04101F] shadow-lg shadow-sky-900/50 hover:from-sky-400 hover:to-cyan-300",
   ],
+  /*
+    THE REFERENCE'S "VIEW FULL LEADERBOARD" CONTROL (owner, 11 Sep 2026): a cyan hairline over
+    a deep blue gradient with cyan text. Restyled in place rather than added as a fifth tone,
+    because `outline` had exactly one caller - the game results screen - so nothing on a trading
+    screen changes.
+  */
   [
     "outline",
-    "border-sky-500/40 bg-sky-500/10 text-sky-200 hover:border-sky-400/60 hover:bg-sky-500/20",
+    "border-[#0FB9FF]/80 bg-gradient-to-b from-[#0A3768] to-[#061E3C] text-[#16DFFF] hover:border-[#16DFFF] hover:from-[#0C4480] hover:to-[#082548]",
   ],
   [
     "quiet",
@@ -67,10 +73,12 @@ export function neonButtonClasses(tone: NeonButtonTone): string {
 
 function Inner({
   icon: Icon,
+  trailingIcon: Trailing,
   label,
   sublabel,
 }: {
   icon?: LucideIcon;
+  trailingIcon?: LucideIcon;
   label: string;
   sublabel?: string | null;
 }) {
@@ -85,6 +93,7 @@ function Inner({
           </span>
         )}
       </span>
+      {Trailing && <Trailing className="h-4 w-4 shrink-0" />}
     </>
   );
 }
@@ -93,6 +102,7 @@ export function NeonButton({
   href,
   tone = "primary",
   icon,
+  trailingIcon,
   label,
   sublabel,
   disabled = false,
@@ -101,6 +111,8 @@ export function NeonButton({
   href?: string;
   tone?: NeonButtonTone;
   icon?: LucideIcon;
+  /** An arrow after the label, for a control that leads somewhere ("View Full Leaderboard ->"). */
+  trailingIcon?: LucideIcon;
   label: string;
   sublabel?: string | null;
   disabled?: boolean;
@@ -108,14 +120,14 @@ export function NeonButton({
   if (disabled || !href) {
     return (
       <button type="button" disabled className={`${BASE} ${DISABLED}`}>
-        <Inner icon={icon} label={label} sublabel={sublabel} />
+        <Inner icon={icon} trailingIcon={trailingIcon} label={label} sublabel={sublabel} />
       </button>
     );
   }
 
   return (
     <Link href={href} className={`${BASE} ${TONES.get(tone) ?? ""}`}>
-      <Inner icon={icon} label={label} sublabel={sublabel} />
+      <Inner icon={icon} trailingIcon={trailingIcon} label={label} sublabel={sublabel} />
     </Link>
   );
 }

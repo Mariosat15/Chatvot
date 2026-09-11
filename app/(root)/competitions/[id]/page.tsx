@@ -22,6 +22,7 @@ import { NeonCountPill, NeonPanel } from "@/components/neon/Cards";
 import { NeonPill } from "@/components/neon/Buttons";
 import ProviderContestLobby from "@/components/games/ProviderContestLobby";
 import { hasProviderGameLabel } from "@/lib/services/games/contest-config";
+import { attachProfileImages } from "@/lib/services/games/leaderboard-avatars";
 import { isRegistrationClosed } from "@/lib/utils/registration-deadline";
 import {
   isCompetitionIdShaped,
@@ -187,6 +188,14 @@ const CompetitionDetailsPage = async ({
       lobby behaviour trustworthy evidence that nothing moved.
     */
     if (hasProviderGameLabel(competition)) {
+      /*
+        The players' pictures, attached to the ranked rows here and never by the ranking read
+        itself - `getCompetitionLeaderboard` is mirrored into the admin app, which draws no
+        board. The arena attaches them through the same module, so a player's face is the same
+        on both game screens. See `lib/services/games/leaderboard-avatars.ts`.
+      */
+      const gameLeaderboard = await attachProfileImages(leaderboard);
+
       return (
         <>
           {/*
@@ -218,7 +227,7 @@ const CompetitionDetailsPage = async ({
           <LiveContestRefresher active={competition.status === "active"} />
           <ProviderContestLobby
             competition={competition}
-            leaderboard={leaderboard}
+            leaderboard={gameLeaderboard}
             isUserIn={isUserIn}
             isFull={isFull}
             userId={userId}

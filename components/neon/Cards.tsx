@@ -1,9 +1,11 @@
 import type { LucideIcon } from "lucide-react";
 import {
+  NEON_ARENA_SURFACE,
   NEON_HEADING,
   NEON_HEAD_STRIP,
   NEON_LABEL,
   NEON_PANEL,
+  NEON_PANEL_LIT,
   NEON_SEAM,
   NEON_TILE_SHAPE,
   accentClasses,
@@ -27,6 +29,42 @@ import {
  * used it. Since the owner has decided the trading lobby moves too, the whole platform moves,
  * and the reversal is recorded in `13` s4.1d rather than quietly applied.
  */
+
+/**
+ * The arena page's background: the reference's navy with its faint circuit grid over it.
+ *
+ * INLINE STYLES RATHER THAN TAILWIND CLASSES, and it is not a shortcut. A grid is two
+ * `linear-gradient`s and a `background-size`, which as an arbitrary Tailwind class is a
+ * comma-laden string the compiler either emits or silently does not - the exact trap recorded
+ * at the top of `tokens.ts`, where a class that exists in the TypeScript and in no stylesheet
+ * renders as nothing and sends the next reader to the CSS build. An inline style cannot fail
+ * that way.
+ *
+ * FIXED, NOT ABSOLUTE. The arena is taller than the viewport, and an absolutely-positioned
+ * backdrop inside a scrolling page paints the grid once at the top and leaves the foot bare.
+ *
+ * THE SAME 34px PITCH AND THE SAME TONE AS THE GAME'S OWN PAGE, which is drawn by
+ * `games-service` and shares no code with this repository. The value is copied deliberately -
+ * copying a number across that boundary is allowed and importing across it is not - and it
+ * matters because the board sits in an iframe in the middle of this page: two grids a few
+ * pixels apart in pitch reads as a rendering fault rather than as one screen.
+ */
+export function NeonGridBackdrop() {
+  return (
+    <div
+      className={`pointer-events-none fixed inset-0 -z-10 ${NEON_ARENA_SURFACE}`}
+      aria-hidden
+      style={{
+        backgroundImage: [
+          "linear-gradient(rgba(0,169,255,0.028) 1px, transparent 1px)",
+          "linear-gradient(90deg, rgba(0,169,255,0.028) 1px, transparent 1px)",
+          "radial-gradient(90% 55% at 50% -10%, #071B38 0%, transparent 70%)",
+        ].join(", "),
+        backgroundSize: "34px 34px, 34px 34px, auto",
+      }}
+    />
+  );
+}
 
 /** The tinted rounded square that fronts every figure in the sheet. */
 export function IconTile({
@@ -204,12 +242,25 @@ export function NeonHeadedPanel({
   bodyClassName?: string;
 }) {
   return (
-    <div className={`${className || NEON_PANEL} overflow-hidden`}>
+    /*
+      THE LIT SHELL IS THIS PANEL'S DEFAULT since 11 September 2026, and the one-line change is
+      the point of it. Every caller of this component is a game-arena screen - the leaderboard
+      rail, the contest facts, the recent players, the prize breakdown - so the alternative was
+      passing the same token at four call sites, which is four chances to forget and four
+      copies to drift. The quiet `NEON_PANEL` remains the default everywhere else, so no
+      trading screen moves; that was checked by grep rather than assumed.
+    */
+    <div className={`${className || NEON_PANEL_LIT} overflow-hidden`}>
       <div
         className={`flex items-center justify-between gap-2 px-4 py-2.5 ${NEON_HEAD_STRIP}`}
       >
         <div className="flex items-center gap-2">
-          {Icon && <Icon className="h-3.5 w-3.5 text-sky-400" />}
+          {/*
+            The reference's heading glyphs are the same cyan as its heading text, not a step
+            duller - so the icon takes the heading's own colour rather than a sky tint beside
+            it. One colour, one token, and they cannot drift a shade apart.
+          */}
+          {Icon && <Icon className="h-3.5 w-3.5 text-[#16DFFF]" />}
           <h2 className={NEON_HEADING}>{title}</h2>
         </div>
         {action}
@@ -371,6 +422,34 @@ export function NeonCountPill({
     >
       {children}
     </span>
+  );
+}
+
+/**
+ * The scope strip above the reference's leaderboard - `GLOBAL | FRIENDS | COUNTRY`, with one
+ * lit. Drawn here with the scopes the caller CAN answer, and today that is one: a contest
+ * board is every entrant, and there is no friends graph and no per-country filter behind it.
+ * So the strip is a labelled fact, not a control - the lit chip says what the board is, and the
+ * dead tabs the reference shows are deliberately not drawn, because a tab that does nothing
+ * teaches a player the screen is broken. When a second scope has a data source it gets a
+ * second chip and a handler; until then the shape is here so the day it does, nothing moves.
+ */
+export function NeonScopeStrip({ scopes }: { scopes: string[] }) {
+  return (
+    <div className="flex items-center gap-1.5 px-3 pt-2.5">
+      {scopes.map((scope, index) => (
+        <span
+          key={scope}
+          className={`rounded-md border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider ${
+            index === 0
+              ? "border-sky-500/40 bg-sky-500/10 text-sky-200"
+              : "border-[#1B2540] bg-[#080C18] text-gray-500"
+          }`}
+        >
+          {scope}
+        </span>
+      ))}
+    </div>
   );
 }
 

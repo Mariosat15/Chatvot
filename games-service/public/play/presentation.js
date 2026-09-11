@@ -82,16 +82,86 @@ export const BOARD_FRAME_PX = 16;
  */
 export const BOARD_ART_OVERHANG = 0.072;
 
-/** The grid size that leaves room for the bezel in `available` pixels of layout. */
-export function spaceForGrid(available) {
-  if (!positive(available)) return 0;
-  return Math.floor(available / (1 + 2 * BOARD_ART_OVERHANG));
+/**
+ * THE THREE DRAWN BOARDS, one per grid size the game offers, with their cells painted in.
+ *
+ * The owner supplied one piece of artwork per size on 11 September 2026 - a full bezel with the
+ * blue cell grid already drawn inside it - so for these three shapes the picture IS the board and
+ * the vector cells underneath are made transparent (see `.board-stage.drawn` in `app.css`). The
+ * wires, the terminals and the numerals are still drawn by `board.js` on top, because those are
+ * the game; the artwork is what it looks like.
+ *
+ * THE FOUR INSETS ARE MEASURED OFF THE FILE, NOT CHOSEN, and they are per side because the frames
+ * are not symmetric: the 4x4 art's grid sits lower than it sits left, and its cells are 190 by 178
+ * pixels rather than square. Each figure is the distance from the grid's outer line to the edge of
+ * the image, as a fraction of the grid's own extent on that axis - so `top: 0.2166` means the
+ * artwork reaches 21.66% of the grid's height above the grid. `.board-art` is then positioned
+ * with those four negative insets and stretched to fill (`background-size: 100% 100%`), which
+ * maps the drawn grid exactly onto the `<svg>` grid whatever pixel size the layout chose. The
+ * non-square 4x4 art is stretched 6.7% taller by that mapping; on a bezel it does not show, and
+ * the alternative - drawing our square cells over its rectangular ones - shows on every cell.
+ *
+ * Measured with the white intersection dots along the centre row and column of each 1024x1024
+ * file (`sharp`, raw pixels, threshold 215 on all three channels). Re-measure if the artwork is
+ * replaced; a guess here puts the wires a few pixels off the drawn cells on every board.
+ *
+ * ANY OTHER SHAPE - a rectangular grid, a size added later - falls back to the generic bezel with
+ * its vector cells showing, so a new size is playable on the day it is added and merely looks
+ * plainer until it has artwork. `boardFrameFor` returns null for that case on purpose.
+ */
+export const DRAWN_BOARD_FRAMES = [
+  { cells: 4, file: "/play/board-4.webp", top: 0.2166, right: 0.1737, bottom: 0.2236, left: 0.1737 },
+  { cells: 6, file: "/play/board-6.webp", top: 0.1438, right: 0.1323, bottom: 0.1363, left: 0.1335 },
+  { cells: 8, file: "/play/board-8.webp", top: 0.1184, right: 0.1258, bottom: 0.1319, left: 0.1245 },
+];
+
+/** The drawn frame for a square grid of this size, or null when it has to make do with the bezel. */
+export function boardFrameFor(gridWidth, gridHeight) {
+  if (!positive(gridWidth) || gridWidth !== gridHeight) return null;
+  return DRAWN_BOARD_FRAMES.find((frame) => frame.cells === gridWidth) ?? null;
 }
 
-/** The space a grid of `px` occupies once its bezel is counted. */
-export function framedGridPx(px) {
+/** How far the artwork reaches past the grid on each axis, as a total fraction of the grid. */
+export function frameOverhang(frame) {
+  if (!frame) return { horizontal: 2 * BOARD_ART_OVERHANG, vertical: 2 * BOARD_ART_OVERHANG };
+  return { horizontal: frame.left + frame.right, vertical: frame.top + frame.bottom };
+}
+
+/**
+ * The CSS `inset` that positions the artwork around the grid: negative, one figure per side, as
+ * percentages so they scale with whatever pixel size the grid ends up at. Percent insets resolve
+ * against the containing block's own dimension on that axis, which is exactly how the fractions
+ * above were measured.
+ */
+export function frameInsetCss(frame) {
+  const f = frame ?? {
+    top: BOARD_ART_OVERHANG,
+    right: BOARD_ART_OVERHANG,
+    bottom: BOARD_ART_OVERHANG,
+    left: BOARD_ART_OVERHANG,
+  };
+  const pct = (value) => "-" + (value * 100).toFixed(2) + "%";
+  return [pct(f.top), pct(f.right), pct(f.bottom), pct(f.left)].join(" ");
+}
+
+/**
+ * The grid size that leaves room for the bezel in `available` pixels of layout.
+ *
+ * `overhang` is the total fraction the artwork adds on that axis - both sides together - and it
+ * defaults to the generic bezel's. A drawn frame passes its own, because reserving the generic
+ * 14% for a frame that needs 39% clips the top and bottom of the 4x4 board's bezel off.
+ */
+export function spaceForGrid(available, overhang) {
+  if (!positive(available)) return 0;
+  const total = positive(overhang) ? overhang : 2 * BOARD_ART_OVERHANG;
+  return Math.floor(available / (1 + total));
+}
+
+/** The space a grid of `px` occupies once its bezel is counted. Same `overhang` as above. */
+export function framedGridPx(px, overhang) {
   if (!positive(px)) return 0;
-  return Math.ceil(px * (1 + 2 * BOARD_ART_OVERHANG));
+  const total = positive(overhang) ? overhang : 2 * BOARD_ART_OVERHANG;
+  return Math.ceil(px * (1 + total));
 }
 
 /**
@@ -140,7 +210,7 @@ function clampFrame(height) {
  * it is the defect, not an optimisation of it.
  */
 export function desiredFrameHeight(input) {
-  const { screen, gridHeight, chromeHeight, contentHeight } = input ?? {};
+  const { screen, gridWidth, gridHeight, chromeHeight, contentHeight } = input ?? {};
 
   if (screen === "play") {
     const rows = positive(gridHeight) ? Math.round(gridHeight) : 6;
@@ -148,8 +218,12 @@ export function desiredFrameHeight(input) {
     // The bezel is counted here as well as in `spaceForGrid`, and leaving it out is the version
     // that looks correct: the board still fits, because `boardCellPx` measures what arrived - it
     // just fits a 13% smaller grid, on every screen, for ever. That is the postage-stamp defect
-    // in a new disguise, so the height asked for is the height the framed board needs.
-    return clampFrame(chrome + framedGridPx(rows * TARGET_CELL_PX) + BOARD_FRAME_PX);
+    // in a new disguise, so the height asked for is the height the framed board needs - and it
+    // is THIS board's frame, because the drawn 4x4 bezel is nearly three times as deep as the
+    // generic one.
+    const frame = boardFrameFor(positive(gridWidth) ? Math.round(gridWidth) : rows, rows);
+    const { vertical } = frameOverhang(frame);
+    return clampFrame(chrome + framedGridPx(rows * TARGET_CELL_PX, vertical) + BOARD_FRAME_PX);
   }
 
   return clampFrame(positive(contentHeight) ? contentHeight : 0);

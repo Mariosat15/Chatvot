@@ -136,10 +136,13 @@ Write-Host "The routes that serve it" -ForegroundColor Cyan
 
 # The token is a credential. It has to arrive in the URL, but rendering it into the document as
 # well puts it in every cache that ignores our headers and in every saved copy of the page.
+# RE-AIMED 11 Sep 2026. The document has been served from `PLAY_DOCUMENT` since the fingerprinting
+# of s4.1o, so the old `sendFile(... "index.html")` pattern matched nothing and this probe reported
+# DID NOT APPLY for three days - a moved target, not a quiet run.
 $results += Invoke-Probe -Name 'the launch token is rendered into the page' `
   -Suite $SuitePlay -File $srcPage `
-  -Find '  res.sendFile(path.join(PLAY_ROOT, "index.html"));' `
-  -Replace '  res.send(fs.readFileSync(path.join(PLAY_ROOT, "index.html"), "utf8") + String(_req.query.t ?? ""));' `
+  -Find '  res.send(PLAY_DOCUMENT);' `
+  -Replace '  res.send(PLAY_DOCUMENT + String(_req.query.t ?? ""));' `
   -ExpectRed 'the page never contains the launch token'
 
 # Without this header, any request the page makes to a third party carries the token in `Referer`.
@@ -156,11 +159,16 @@ $results += Invoke-Probe -Name 'the referrer policy is dropped' `
 # stopped existing when R52's second fix derived the set from disk - so it reported DID NOT APPLY,
 # which reads like a broken harness rather than a moved target. The page is the half that can still
 # name a file nobody serves, so that is the half to mutate.
+#
+# FOUR faces, not three, since s4.1o: the immutability test also finds `app.js` by reading the
+# document, so a document naming a ghost fails it too. Each of the four reads the page's script
+# references and each is an honest reading of the one mutation - the limit was raised, not the
+# tests loosened, when the harness reported RED* over the old limit on 11 Sep 2026.
 $results += Invoke-Probe -Name 'the page asks for a script nobody serves' `
   -Suite $SuitePlay -File 'public/play/index.html' `
   -Find '<script type="module" src="/play/app.js"></script>' `
   -Replace '<script type="module" src="/play/app-v2.js"></script>' `
-  -ExpectRed 'every asset the page references is actually served' -MaxRed 3
+  -ExpectRed 'every asset the page references is actually served' -MaxRed 4
 
 # An unserved token is the quietest failure on this screen: the board keeps working, so there is no
 # error anywhere and it merely looks unfinished. Nothing but this test connects `BOARD_ART` to the
@@ -189,6 +197,83 @@ $results += Invoke-Probe -Name 'the stylesheet and the code disagree about the b
   -Find '  --board-art-overhang: 0.072;' `
   -Replace '  --board-art-overhang: 0.1;' `
   -ExpectRed 'the stylesheet and the board agree how far the bezel overhangs the grid'
+
+# The postage-stamp board's second coming, 11 September 2026. Centring the arena's items shrinks
+# `.board-wrap` to the grid inside it, and `fitBoard` then measures a wrap the size of the previous
+# grid on every fit - converging on the 34-pixel floor while the frame stays tall. This restores the
+# exact defect the owner photographed.
+$results += Invoke-Probe -Name 'the arena centres the board cell again' `
+  -Suite $SuitePlay -File 'public/play/app.css' `
+  -Find '  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: stretch;' `
+  -Replace '  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;' `
+  -ExpectRed "the arena stretches the board's cell to the row and centres only the rails"
+
+# And the other half: the rails stacking under the board at a width a laptop's iframe always has.
+$results += Invoke-Probe -Name 'the rails stack under the board inside a laptop iframe again' `
+  -Suite $SuitePlay -File 'public/play/app.css' `
+  -Find '@media (max-width: 520px) {' `
+  -Replace '@media (max-width: 680px) {' `
+  -ExpectRed "the arena stretches the board's cell to the row and centres only the rails"
+
+Write-Host ""
+Write-Host "The three drawn boards" -ForegroundColor Cyan
+
+# A drawn board's picture IS its cells. Leaving the vector cells painted under it draws two grids
+# a few pixels apart, which reads as a rendering fault rather than as a decoration.
+$results += Invoke-Probe -Name 'the vector cells paint under a drawn board again' `
+  -Suite $SuitePlay -File 'public/play/app.css' `
+  -Find '.board-stage.drawn svg#board .cell {
+  fill: transparent;' `
+  -Replace '.board-stage.drawn svg#board .cell {
+  fill: url(#cell-face);' `
+  -ExpectRed 'a drawn board hides the vector cells, keeps the wires, and comes off if its picture fails'
+
+# The wrong extension: hiding the wires too. The picture has no wires in it, so this is a paid
+# round played on a grid that shows nothing the player draws.
+$results += Invoke-Probe -Name 'a drawn-board rule hides the wires' `
+  -Suite $SuitePlay -File 'public/play/app.css' `
+  -Find '.board-stage.drawn svg#board .junction {
+  display: none;
+}' `
+  -Replace '.board-stage.drawn svg#board .junction {
+  display: none;
+}
+
+.board-stage.drawn svg#board .trace {
+  display: none;
+}' `
+  -ExpectRed 'a drawn board hides the vector cells, keeps the wires, and comes off if its picture fails'
+
+# A picture that fails to load must give the vector board back. Without the check, the class stays
+# on and the player drags wires over a blank square - the quietest failure the screen has, and the
+# one R54 proved a stale edge cache can produce for four hours.
+$results += Invoke-Probe -Name 'a picture that failed to load still hides the cells' `
+  -Suite $SuitePlay -File 'public/play/app.js' `
+  -Find '  const usable = frame && !failedArt.has(frame.file) ? frame : null;' `
+  -Replace '  const usable = frame;' `
+  -ExpectRed 'a drawn board hides the vector cells, keeps the wires, and comes off if its picture fails'
+
+# Dressing before `setPuzzle` chooses the frame for the PREVIOUS board's shape - correct on a round
+# whose boards are all one size, which is every round today, and wrong the day that changes.
+$results += Invoke-Probe -Name 'the board is dressed before the puzzle is set' `
+  -Suite $SuitePlay -File 'public/play/app.js' `
+  -Find '  board.setPuzzle(state.board);
+  // After `setPuzzle`, because the frame is chosen by the puzzle''s shape; before `fitBoard`,
+  // because the space the grid may take depends on how deep that frame is.
+  dressBoard();' `
+  -Replace '  dressBoard();
+  board.setPuzzle(state.board);' `
+  -ExpectRed 'a drawn board hides the vector cells, keeps the wires, and comes off if its picture fails'
+
+# A drawn board dropped from `BOARD_ART` is one nothing warms and nothing tests for being served -
+# so the day it is renamed, the game boots and plays on an invisible grid.
+$results += Invoke-Probe -Name 'the drawn boards leave the warmed list' `
+  -Suite $SuitePlay -File $srcBoard `
+  -Find 'export const BOARD_ART = [FRAME_ART, ...DRAWN_BOARD_FRAMES.map((frame) => frame.file), ...TERMINAL_ART];' `
+  -Replace 'export const BOARD_ART = [FRAME_ART, ...TERMINAL_ART];' `
+  -ExpectRed 'every image the board names is served'
 
 # The allowlist is a traversal guard as much as a file list. A path segment cannot contain a
 # literal slash - which is what makes serving the parameter look safe - but Express decodes route

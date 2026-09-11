@@ -51,6 +51,13 @@ interface Presentation {
   HEIGHT_REPORT_THRESHOLD_PX: number;
   boardCellPx(w: number, h: number, gw: number, gh: number): number;
   desiredFrameHeight(input: Record<string, unknown>): number;
+  BOARD_ART_OVERHANG: number;
+  DRAWN_BOARD_FRAMES: DrawnFrame[];
+  boardFrameFor(gridWidth: number, gridHeight: number): DrawnFrame | null;
+  frameOverhang(frame: DrawnFrame | null): { horizontal: number; vertical: number };
+  frameInsetCss(frame: DrawnFrame | null): string;
+  spaceForGrid(available: number, overhang?: number): number;
+  framedGridPx(px: number, overhang?: number): number;
   introCopy(input: Record<string, unknown>): {
     name: string;
     limit: string;
@@ -91,6 +98,16 @@ interface Presentation {
   ): { key: string; label: string; value: string | null }[];
   playStatTiles(input: Record<string, unknown>): { key: string; label: string; value: string }[];
   undoState(input: Record<string, unknown>): { disabled: boolean; title: string };
+}
+
+/** One of the three drawn boards, as `presentation.js` declares it. */
+interface DrawnFrame {
+  cells: number;
+  file: string;
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
 }
 
 /** One synthesised note, as `sound.js` consumes it. */
@@ -156,8 +173,9 @@ async function main(): Promise<void> {
   test("a board always asks for more than a host's usual minimum, at every grid size", () => {
     // The player-visible half of the same defect. The platform clamps a frame to at least 320px
     // and opens there; a request that does not exceed it leaves the board at its floor. Every
-    // grid this service generates is 5, 6 or 7 rows.
-    for (const rows of [5, 6, 7]) {
+    // grid this service generates is 4, 6 or 8 rows (the three drawn boards); 5 and 7 are the
+    // shapes it used to generate, kept so the generic-bezel branch is still exercised.
+    for (const rows of [4, 5, 6, 7, 8]) {
       const height = p.desiredFrameHeight({ screen: "play", gridHeight: rows, chromeHeight: 160 });
       assert.ok(
         height > 320,
@@ -176,6 +194,126 @@ async function main(): Promise<void> {
     assert.ok(seven > five, `7 rows asked for ${seven}px and 5 rows for ${five}px`);
     // Two rows at the target cell size, give or take the rounding.
     assert.ok(seven - five >= 2 * p.TARGET_CELL_PX - 2);
+    // And across the drawn boards, whose frames differ in depth as well as in rows.
+    const four = p.desiredFrameHeight({ screen: "play", gridWidth: 4, gridHeight: 4, chromeHeight: 160 });
+    const eight = p.desiredFrameHeight({ screen: "play", gridWidth: 8, gridHeight: 8, chromeHeight: 160 });
+    assert.ok(eight - four >= 4 * p.TARGET_CELL_PX - 2, `8 rows asked for ${eight}px and 4 rows for ${four}px`);
+  });
+
+  test("the frame height reserves the drawn frame's own depth, not the generic bezel's", () => {
+    /*
+     * The 4x4 artwork reaches 44% of a grid's height past it, top and bottom together; the generic
+     * bezel reaches 14%. A request that reserved the generic share for a drawn board would be
+     * about 85px short, and the host would honour it: the grid inside still fits, the game still
+     * works, and the painted frame is clipped top and bottom on every screen with no error
+     * anywhere. This is the assertion the probe for that mutation had to be re-aimed at, because
+     * "a taller grid asks for a taller frame" is true of both figures.
+     */
+    const chrome = 170;
+    const asked = p.desiredFrameHeight({ screen: "play", gridWidth: 4, gridHeight: 4, chromeHeight: chrome });
+    const gridPx = 4 * p.TARGET_CELL_PX;
+    const drawn = chrome + p.framedGridPx(gridPx, p.frameOverhang(p.boardFrameFor(4, 4)).vertical) + 16;
+    const generic = chrome + p.framedGridPx(gridPx) + 16;
+    assert.ok(Math.abs(asked - drawn) <= 1, `asked ${asked}px, the drawn frame needs ${drawn}px`);
+    assert.ok(asked - generic > 40, `asked ${asked}px, which is the generic bezel's ${generic}px`);
+  });
+
+  console.log("");
+  console.log("The three drawn boards");
+
+  test("each of the three grid sizes has its own drawn frame, and nothing else does", () => {
+    /*
+     * The owner supplied one picture per size with the cells painted in, so for those three
+     * shapes the picture is the board. Anything else - a rectangle, a size added tomorrow - gets
+     * the generic bezel and its vector cells, and is playable on the day it is added. A drawn
+     * frame chosen for the WRONG size would paint a 6x6 grid under an 8x8 game: the wires would
+     * land between the painted cells and the board would read as broken rather than as plain.
+     */
+    for (const cells of [4, 6, 8]) {
+      const frame = p.boardFrameFor(cells, cells);
+      assert.ok(frame, `no drawn frame for ${cells}x${cells}`);
+      assert.equal(frame.cells, cells);
+      // Reason: the pattern is built from the loop's own literal cell counts, so there is no
+      // untrusted input for the rule to protect against. Named rule, not the file.
+      // eslint-disable-next-line security/detect-non-literal-regexp
+      assert.match(frame.file, new RegExp(`board-${cells}\\.webp$`));
+    }
+    for (const [w, h] of [
+      [5, 5],
+      [7, 7],
+      [4, 6],
+      [6, 4],
+      [0, 0],
+      [NaN, 4],
+    ]) {
+      assert.equal(p.boardFrameFor(w, h), null, `${w}x${h} was handed a drawn frame`);
+    }
+  });
+
+  test("the drawn frames' insets are measured fractions, not the generic bezel's", () => {
+    /*
+     * Every drawn frame reaches further past the grid than the generic bezel does, on every side,
+     * and the 4x4 art furthest of all - its grid is 69% of the image's height. A frame declared
+     * with the generic 0.072 would clip the bezel to a thin ring; a side left at zero would pin the
+     * artwork's edge to the grid's edge and cut the frame off flat. Both read as "the art is a bit
+     * off", so both are pinned here.
+     */
+    for (const frame of p.DRAWN_BOARD_FRAMES) {
+      for (const side of ["top", "right", "bottom", "left"] as const) {
+        // Reason: `side` comes from the `as const` tuple two lines up, not from any input, so
+        // the injection the rule guards against cannot occur. Named rule, not the file.
+        // eslint-disable-next-line security/detect-object-injection
+        const value = frame[side] as number;
+        assert.ok(
+          value > p.BOARD_ART_OVERHANG && value < 0.4,
+          `${frame.file} ${side} inset is ${value}`,
+        );
+      }
+    }
+    // The 4x4 frame is the deepest, because its grid occupies the least of its image.
+    const four = p.boardFrameFor(4, 4)!;
+    const eight = p.boardFrameFor(8, 8)!;
+    assert.ok(four.top > eight.top && four.left > eight.left);
+  });
+
+  test("the artwork's inset is written per side, negative, as percentages", () => {
+    // `inset: -A% -B% -C% -D%` in top/right/bottom/left order. Written as one figure the 4x4 art
+    // is off by 2.5% between its sides; written positive the picture shrinks INSIDE the grid.
+    const css = p.frameInsetCss(p.boardFrameFor(4, 4));
+    const parts = css.split(" ");
+    assert.equal(parts.length, 4, css);
+    assert.deepEqual(
+      parts,
+      ["-21.66%", "-17.37%", "-22.36%", "-17.37%"],
+      "the 4x4 inset no longer matches the measured frame",
+    );
+    for (const part of parts) assert.match(part, /^-\d+\.\d\d%$/);
+
+    // With no drawn frame it is the generic bezel's overhang, the same on all four sides.
+    assert.equal(p.frameInsetCss(null), Array(4).fill("-7.20%").join(" "));
+  });
+
+  test("the space reserved for the frame is the frame's own, on each axis", () => {
+    /*
+     * The generic bezel reserves 14.4%. Reserving that for the 4x4 art, which needs 44% of the
+     * grid's height above and below it, clips the drawn bezel top and bottom on every screen -
+     * and the board still fits and still works, so nothing errors.
+     */
+    const generic = p.frameOverhang(null);
+    assert.equal(generic.horizontal, 2 * p.BOARD_ART_OVERHANG);
+    assert.equal(generic.vertical, 2 * p.BOARD_ART_OVERHANG);
+
+    const four = p.frameOverhang(p.boardFrameFor(4, 4));
+    assert.ok(four.vertical > 0.43 && four.vertical < 0.45, `4x4 vertical overhang ${four.vertical}`);
+    assert.ok(four.horizontal > 0.34 && four.horizontal < 0.36, `4x4 horizontal ${four.horizontal}`);
+
+    // A 400px column holds a 4x4 grid of 400 / 1.44 = 277px with its frame, and a generic-bezel
+    // grid of 349px. The old single reserve would have offered the 4x4 board 349px and let its
+    // frame overflow.
+    assert.equal(p.spaceForGrid(400, four.vertical), Math.floor(400 / (1 + four.vertical)));
+    assert.equal(p.spaceForGrid(400), Math.floor(400 / (1 + 2 * p.BOARD_ART_OVERHANG)));
+    assert.equal(p.framedGridPx(277, four.vertical), Math.ceil(277 * (1 + four.vertical)));
+    assert.equal(p.spaceForGrid(400, NaN), p.spaceForGrid(400), "a NaN overhang did not fall back");
   });
 
   test("a panel screen asks for its measured content, and a board screen ignores it", () => {

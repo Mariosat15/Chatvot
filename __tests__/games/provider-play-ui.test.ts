@@ -751,6 +751,23 @@ describe("the two lobbies are built from one design kit", () => {
     */
     "bg-[#16203C]",
     "border-[#16203C]",
+    /*
+      The leader's gold frame and the score gold, from the owner's leaderboard reference
+      (11 Sep 2026). Guarded because they are the two colours most likely to be typed into a
+      screen "to match" - and a frame one shade off its scores is a visible mismatch on the
+      row the whole board is built around.
+    */
+    "border-[#FFC01B]/80",
+    "text-[#FFD72D]",
+    /*
+      The arena's lit chrome, added 11 Sep 2026 on the owner's third reference ("the
+      background, the icons, the colours, more glow blue"). These three are the ones a screen
+      would reach for to "look more like the arena" - the panel rim, the heading cyan and the
+      page's navy - and a panel one shade off its neighbours is the failure nothing reports.
+    */
+    "border-[#1089DC]/55",
+    "text-[#16DFFF]",
+    "bg-[#020B1C]",
   ];
 
   /*
@@ -1043,6 +1060,37 @@ describe("the two lobbies are built from one design kit", () => {
     expect(providerBanner("a-game-nobody-has-drawn-yet").src).toBe(
       providerBanner(null).src,
     );
+  });
+
+  it("picks the arena's hero by game, in the one place allowed to know the game", () => {
+    /*
+      THE DEFECT THIS CLOSES, found 11 September 2026 while comparing our arena with the
+      owner's reference: `GameArenaLayout` called `providerBanner(undefined)`, so the arena
+      drew the GENERIC trophy for every title in the catalogue - while the lobby and the
+      results screen, both of which pass the code, drew the game's own artwork. Three callers
+      and one of them forgot.
+
+      It is the hardest kind of wrong to notice, because a fallback that works looks exactly
+      like a title with no artwork. Nothing failed, nothing logged, and the only symptom was
+      the owner saying the page did not look like his design.
+
+      AND THE OBVIOUS REPAIR IS FORBIDDEN, WHICH IS THE PART WORTH CARRYING. Passing the game
+      code into the layout fixes the picture and turns `game-content-editor.test.ts` red,
+      because that guard asserts nothing in the arena folder names a game code, a provider
+      key or a game key - the one way to lose "a new title needs no code" being a screen that
+      can name a game. The first attempt here did exactly that and the guard caught it.
+
+      So the resolution moved OUT to the page, which is the one place that legitimately knows
+      which game it is, and the layout is handed data. Three assertions: the page asks by
+      game, the page hands the answer over, and the layout has not quietly kept a copy of the
+      decision - the third being the one a test on the page alone cannot see.
+    */
+    const page = readCode("app/(root)/competitions/[id]/play/page.tsx");
+    expect(page).toMatch(/providerBanner\(contest\?\.gameConfig\?\.gameCode\)/);
+    expect(page).toMatch(/banner=\{banner\}/);
+
+    const layout = readCode("components/games/arena/GameArenaLayout.tsx");
+    expect(layout).not.toMatch(/providerBanner/);
   });
 
   it("renders no trading panel on the game lobby", () => {

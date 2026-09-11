@@ -1,4 +1,4 @@
-# Probes for the guards that keep both competition lobbies built from one design kit.
+﻿# Probes for the guards that keep both competition lobbies built from one design kit.
 #
 # WHAT CHANGED HERE, AND WHY IT MATTERS TO THE HARNESS. The previous version of this file probed
 # a guard that compared class strings between two lobby files. Those guards are gone: the kit
@@ -34,6 +34,10 @@ $SIDEBAR = 'components/trading/lobby/TradingLobbySidebar.tsx'
 # sidebar also reads. Both probes below aim at the calculation, so they follow it.
 $PRIZES = 'lib/utils/prize-projection.ts'
 $TRADING_BOARD = 'components/trading/CompetitionLeaderboard.tsx'
+$ARENA_LAYOUT = 'components/games/arena/GameArenaLayout.tsx'
+# The `[id]` in this path is why every read here uses -LiteralPath: PowerShell treats it as a
+# wildcard character class, so `Get-Content` matches nothing and a careless write truncates.
+$PLAY_PAGE = 'app/(root)/competitions/[id]/play/page.tsx'
 
 function Read-Source([string]$Path) {
   $resolved = (Resolve-Path -LiteralPath $Path).Path
@@ -59,31 +63,34 @@ $probes = @(
     File = $LOBBY
     From = 'className={`${NEON_PANEL} flex flex-wrap items-center justify-between gap-3 px-4 py-3`}'
     To   = 'className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#1B2540] bg-[#0A0F1F]/80 px-4 py-3"'
-    # The it.each case names contain the class string, so the -t REGEX has to avoid `[` and `/`.
-    # An earlier version used dots for the brackets and miscounted them, which reported PROBE
-    # BROKEN on a working guard. The hex is unique to one case and contains nothing special.
-    Test = '#1B2540'
+    # THE NAME OF THIS TEST HAS CHANGED TWICE AND BOTH TIMES THE PROBE WENT QUIET. It once
+    # carried the class string, so the fragment was the hex; the `it.each` label is now
+    # numbered (`owns kit literal %i ...`), so no test name contains a colour at all and four
+    # probes here reported PROBE BROKEN against four working guards. That is the reading to
+    # carry: a probe naming a test that no longer exists is indistinguishable from a guard
+    # that does not work, so match the stable part of the name and nothing decorative.
+    Test = 'owns kit literal'
   },
   @{
     Name = 'the trading sidebar hand-rolls a panel instead of using the kit'
     File = $SIDEBAR
     From = '<NeonPanel icon={Target} accent="players" title="Schedule (UTC)">'
     To   = '<div className="rounded-xl border border-[#1B2540] bg-[#0A0F1F]/80 p-4"><NeonPanel icon={Target} accent="players" title="Schedule (UTC)">'
-    Test = '#1B2540'
+    Test = 'owns kit literal'
   },
   @{
     Name = 'the game board hand-rolls the row shell'
     File = $BOARD
     From = '${neonRowClasses('
     To   = '${"border-[#161E36] bg-[#080C18]/80 " + neonRowClasses('
-    Test = '#161E36'
+    Test = 'owns kit literal'
   },
   @{
     Name = 'the kit stops defining the panel shell at all'
     File = $TOKENS
     From = '"rounded-xl border border-[#1B2540] bg-[#0A0F1F]/80 backdrop-blur-sm"'
     To   = '"rounded-xl border border-gray-800 bg-gray-900/40"'
-    Test = '#1B2540'
+    Test = 'owns kit literal'
   },
 
   # ---- Both heroes are the same component, four figures across -----------------------------
@@ -101,6 +108,37 @@ $probes = @(
     To   = '<div className="p-6"><NeonHeroReplacement'
     Test = 'dresses both heroes with the same component'
   },
+  # ---- The arena's hero is picked by game, off the arena ------------------------------------
+  #
+  # This is the defect itself, restored: every title wore the generic trophy because nothing
+  # told the resolver which game it was.
+  @{
+    Name = 'the page asks for the hero with nothing'
+    File = $PLAY_PAGE
+    From = 'providerBanner(contest?.gameConfig?.gameCode)'
+    To   = 'providerBanner(undefined)'
+    Test = 'picks the arena.s hero by game, in the one place allowed to know the game'
+  },
+  # Resolving correctly and then not handing it over is the same screen, differently wrong.
+  @{
+    Name = 'the page resolves the hero and never passes it'
+    File = $PLAY_PAGE
+    From = 'banner={banner}'
+    To   = 'minParticipants={contest?.minParticipants}'
+    Test = 'picks the arena.s hero by game, in the one place allowed to know the game'
+  },
+  # And the layout taking the decision back, which is what `game-content-editor.test.ts`
+  # forbids for a different and better reason - a screen that can name a game can special-case
+  # one. Two guards on one property from two directions, deliberately.
+  @{
+    Name = 'the layout resolves its own hero again'
+    File = $ARENA_LAYOUT
+    From = 'import type { NeonHeroBanner } from "@/components/neon/Hero";'
+    To   = 'import { providerBanner } from "@/components/neon/banners";
+import type { NeonHeroBanner } from "@/components/neon/Hero";'
+    Test = 'picks the arena.s hero by game, in the one place allowed to know the game'
+  },
+
   @{
     Name = 'the game hero widens to five figures across'
     File = $LOBBY
@@ -153,7 +191,10 @@ $probes = @(
   @{
     Name = 'the board reverts to the 3D rank medals'
     File = $BOARD
-    From = '<NeonRankBadge rank={row.currentRank} />'
+    # The call gained `size` and `style` when the board was rebuilt to the owner's leaderboard
+    # reference on 11 Sep 2026, so the old pattern stopped matching and this probe reported
+    # DID NOT APPLY - which reads like a broken harness rather than a moved target.
+    From = '<NeonRankBadge rank={row.currentRank} size="sm" style="plates" />'
     To   = '<RankIcon rank={row.currentRank} size={22} />'
     Test = 'uses the flat icon set from the sheet'
   },
@@ -214,7 +255,9 @@ export function accentClasses('
   @{
     Name = 'the prize table is buried inside the accordion'
     File = $SIDEBAR
-    From = '<PrizeTable competition={competition} unit={unit} />'
+    # `unit` became `creditSymbol` when amounts were relabelled into credits, so this probe had
+    # been silently unapplied since. Same class as the badge above.
+    From = '<PrizeTable competition={competition} creditSymbol={creditSymbol} />'
     To   = '<span data-moved="PrizeTable" />'
     Test = 'keeps the trading sidebar.s decisions open'
   },
@@ -226,10 +269,20 @@ export function accentClasses('
     Test = 'keeps the trading sidebar.s decisions open'
   },
   @{
-    Name = 'the unclaimed-prize split silently changes denominator'
+    # RE-AIMED, NOT REPAIRED, AND THE DIFFERENCE IS THE POINT. This probe used to inject a
+    # wrong denominator into the equal-share bonus - and that expression no longer exists,
+    # because task document 6 replaced equal shares with proportional normalisation on 9 Sep
+    # 2026. Its guard was deliberately dropped rather than re-pinned to the new text, which the
+    # test says in full: a verbatim assertion cannot survive a behaviour change, and re-pinning
+    # one looks identical to the test still working.
+    #
+    # So this now aims at a surviving assertion that nothing else probed - the pool the whole
+    # projection is computed from. Reading a different field is a silent money change: every
+    # figure on the table still renders, and every one of them is wrong.
+    Name = 'the projection reads a different pool than the one that gets paid'
     File = $PRIZES
-    From = 'filledPositions > 0 ? unclaimedPercentage / filledPositions : 0'
-    To   = 'filledPositions > 0 ? unclaimedPercentage / (filledPositions + 1) : 0'
+    From = 'competition.prizePool || competition.prizePoolCredits || 0'
+    To   = 'competition.prizePoolCredits || competition.prizePool || 0'
     Test = 'moves no money computation while restyling or relocating the prize table'
   },
   @{

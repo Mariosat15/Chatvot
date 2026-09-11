@@ -1775,6 +1775,97 @@ R66 were each reported twice for exactly this.
 
 **Never verified by eye.**
 
+### 4.1q The arena rejected a third time - size, standings, chrome, agnosticism (owner instruction, 11 September 2026)
+
+The owner rejected the arena for the **third** time, with eight images and four files from an
+unrelated reference project. That count is the most useful fact in this section: **three
+rejections of one screen is not three misses, it is a signal that the thing being corrected
+each time was not the thing being looked at.** The first pass corrected structure, the second
+corrected the repository boundary, and neither addressed what the owner could see.
+
+Six items, in the owner's own priority order.
+
+**1. The size, which he asked for first.** The frame hosting the board had grown while the
+board inside it had shrunk. The cause was in games-service and it was one line:
+`.arena { align-items: center }` stopped `.board-wrap` stretching, so `fitBoard()` had no
+height to converge on and settled at `MIN_CELL_PX`, which is **34 pixels**. Stretching the
+row and centring the two rails instead fixed it, with the stacking breakpoint moved from 680
+to 520 pixels so the rails stop stealing the board's width sooner. **The board was never
+mis-measured - it was measured against a container that had stopped having a size**, which is
+why every arithmetic review of `desiredFrameHeight` came back clean.
+
+**2. The standings.** Names were squeezed into a narrow column and there were no avatars.
+Rebuilt to the owner's leaderboard crop: a header strip with the trophy and a players pill,
+`#  PLAYER  SCORE  TIME` columns, circular avatars with a cyan ring, a gold-framed leader row,
+a crown for first and numbered blue plates for second and third, gold scores, and a
+full-width exit to the full board. **The avatars are the part with a rule attached**, because
+this is a public board: they come from the same `profileImage || image` path the global
+leaderboard already publishes, and the service picks **only** `profileImage` out of
+`getUsersByIds`, which also returns email, address and city. A test asserts the **whole** row
+object rather than the fields it cares about, and a probe restores the spread - a field you
+did not ask about is the only way to notice one you did not expect.
+
+**3. The chrome, on both sides of the seam.** In-frame: the reference palette copied as
+values (never imported - `check:isolation` forbids it), a red time-left box, blue tool rails,
+a wide blue submit, and the three board artworks below. Platform: a navy grid backdrop, a lit
+panel rim, brighter cyan headings. **`NEON_PANEL` was deliberately not touched.** It is what
+the **trading** lobby renders, so turning it up would have made an unasked-for change to a
+screen nobody mentioned, invisibly, through a shared token - so the arena's chrome is a
+**second** shell, `NEON_PANEL_LIT`, and a test names the three new literals as kit-only
+because they are exactly what a screen would type in to "look more like the arena".
+
+**4. Three board artworks, one per grid size.** `DRAWN_BOARD_FRAMES` maps 4, 6 and 8 to their
+own file with its own inset. The supplied art arrived on a black square; **keying the black
+out to transparency is what made it art rather than a box**, because the surround was
+covering the page's own glow. Verified by eye.
+
+**5. Game-agnosticism, which he asked for explicitly** - *"a tetris game dont have board"*.
+The audit found **no** player-visible game-specific copy on the platform arena: it was already
+agnostic, having been built to render whatever the provider reports. **So the deliverable was
+a guard rather than a fix**, which is worth stating plainly rather than reporting an
+improvement nobody made: 15 tests ban nine game-shaped nouns across 13 files, matched
+**inside quoted strings only**. An identifier may legitimately be `boardsCompleted` - that is
+a provider metric name rendered by `humanizeMetric`, which is the mechanism that keeps this
+agnostic - and a variable name is not something a player reads. The stripper carries a canary
+in **both** directions, because `native-select-legibility.test.ts` established the precedent:
+an over-broad strip leaves every assertion green over a tree nothing examined.
+
+**6. The hero, and the defect found underneath it.** Comparing our arena with the reference
+turned up something nobody was looking for: **`GameArenaLayout` called
+`providerBanner(undefined)`**, so the arena drew the generic trophy for every title in the
+catalogue, while the lobby and the results screen - which both pass the game code - drew the
+game's own artwork. Three callers and one of them forgot. **It is the hardest kind of wrong to
+see, because a fallback that works is indistinguishable from a title with no artwork**:
+nothing failed, nothing logged, and the only symptom was the owner saying the page did not
+look like his design.
+
+**And the obvious repair was forbidden, which is the more useful half.** Passing the game code
+into the layout fixes the picture and turns `game-content-editor.test.ts` red, because that
+guard asserts nothing in the arena folder names a game code, a provider key or a game key -
+the one way to lose "a new title needs no code" being a screen that *can* name a game. The
+first attempt did exactly that and the guard caught it within one full-suite run. So the
+resolution moved **out to the page**, which is the one place that legitimately knows which
+game it is, and the layout is handed an already-chosen picture. **Item 4 of the owner's list
+and item 6 turned out to be the same requirement pulling in opposite directions**, and the
+guard is what settled it. Three assertions pin it - the page asks by game, the page hands the
+answer over, and the layout has not quietly kept a copy of the decision - plus the pre-existing
+folder guard from the other direction. The artwork itself was redrawn as `-r3`; the suffix
+exists because a replacement written over an old filename is answered from a returning
+visitor's cache for hours (R54).
+
+**And seven probes in `tools/probe-lobby-theme.ps1` had been reporting nothing.** Four named a
+test whose `it.each` label had been renumbered, so they said `PROBE BROKEN` against four
+working guards; three named patterns that had moved with unrelated work - a rank badge that
+gained props, a prop renamed from `unit` to `creditSymbol`, and an expression deliberately
+deleted when prize redistribution became proportional. All seven are re-aimed, and the last of
+them at a **surviving** assertion rather than re-pinned to new text, because re-pinning a
+verbatim money assertion after a behaviour change looks identical to the test still working.
+**Carry the general form: a probe naming something that no longer exists is indistinguishable
+from a guard that does not work, and it fails in the quiet direction.**
+
+**Never verified by eye** on the platform half - the arena is behind sign-in and the automated
+browser has no session. The in-frame half **was** seen, through `tools/smoke-play.ts`.
+
 ---
 
 ## 5. Dashboard

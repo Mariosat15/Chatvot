@@ -252,6 +252,24 @@ async function main(): Promise<number> {
     assert.match(page.text, /id="intro-rules"/, "the page has nowhere to render the rules");
   });
 
+  /*
+   * One static `import`/`export ... from "..."` statement, however its specifier list is laid out.
+   *
+   * It used to be `[^;\n]*?from`, which cannot cross a line - and `app.js` has imported
+   * `presentation.js` over fifteen lines since 8 September 2026 without the walk ever noticing,
+   * because `board.js` reached the same file on one line. The day `board.js`'s import was wrapped
+   * (11 September 2026) both walks stopped at `sound.js` and reported the module the whole test
+   * exists to reach as absent. The specifier list is matched as a construct - braces, a default
+   * name, `* as x`, or `*` - rather than as "anything until `from`", so a side-effect `import "x"`
+   * with no `from` cannot swallow the next statement.
+   */
+  // Reason: the rule warns about catastrophic backtracking on hostile input, and the only
+  // input this ever sees is our own committed source files, read off disk by a test. Scoped to
+  // the one rule so a pattern later applied to request data is still reported.
+  const IMPORT_FROM =
+    // eslint-disable-next-line security/detect-unsafe-regex
+    /(?:^|\n)\s*(?:import|export)\s+(?:[\w$]+\s*,\s*)?(?:\{[^}]*\}|\*(?:\s+as\s+[\w$]+)?|[\w$]+)\s+from\s+"([^"]+)"/g;
+
   await test("every module the play surface imports is served", async () => {
     /*
      * The test above walks the DOCUMENT's references, which is `app.js` and `app.css` and nothing
@@ -265,6 +283,7 @@ async function main(): Promise<number> {
      * covered without anybody remembering this test exists.
      */
     const seen = new Set<string>();
+    const importers = new Map<string, Set<string>>();
     const queue = ["/play/app.js"];
 
     while (queue.length > 0) {
@@ -282,15 +301,28 @@ async function main(): Promise<number> {
 
       // Relative specifiers only - the surface loads nothing from a third party, deliberately, so
       // a bare or absolute specifier appearing here is a finding in its own right.
-      for (const match of asset.text.matchAll(/(?:^|\n)\s*(?:import|export)[^;\n]*?from\s+"([^"]+)"/g)) {
+      for (const match of asset.text.matchAll(IMPORT_FROM)) {
         const specifier = match[1];
         assert.ok(
           specifier.startsWith("./"),
           `${path} imports "${specifier}", which is not a relative module in this directory`,
         );
-        queue.push(`/play/${specifier.slice(2)}`);
+        const target = `/play/${specifier.slice(2)}`;
+        queue.push(target);
+        if (!importers.has(target)) importers.set(target, new Set());
+        (importers.get(target) as Set<string>).add(path);
       }
     }
+
+    // `app.js` imports `presentation.js` across many lines and `board.js` on one. A walk that
+    // only reads single-line imports still "reaches" the file through `board.js`, so reaching it
+    // is not proof the walk reads every import - seeing BOTH importers is.
+    const reachedFrom = importers.get("/play/presentation.js") ?? new Set();
+    assert.ok(
+      reachedFrom.has("/play/app.js") && reachedFrom.has("/play/board.js"),
+      `presentation.js was reached only from ${[...reachedFrom].join(", ") || "nowhere"}; ` +
+        "the walk is not reading every import statement",
+    );
 
     /*
      * `sound.js` joined this list on 8 September 2026 and is the proof the walk works as
@@ -366,9 +398,7 @@ async function main(): Promise<number> {
       const asset = await fetchRaw(next);
       assert.equal(asset.status, 200, `${next} is imported but not served at the versioned path`);
 
-      for (const match of asset.text.matchAll(
-        /(?:^|\n)\s*(?:import|export)[^;\n]*?from\s+"([^"]+)"/g,
-      )) {
+      for (const match of asset.text.matchAll(IMPORT_FROM)) {
         queue.push(`${prefix}/${match[1].slice(2)}`);
       }
     }
@@ -452,7 +482,14 @@ async function main(): Promise<number> {
     // @ts-expect-error - untyped browser module, deliberately; see `test-board.ts` for why.
     const board = (await import("../public/play/board.js")) as Record<string, unknown>;
     const named = [...(board.BOARD_ART as string[])];
-    assert.ok(named.length >= 9, `BOARD_ART named only ${named.length} files`);
+    // The generic bezel, the three drawn boards and the eight terminal tokens.
+    assert.ok(named.length >= 12, `BOARD_ART named only ${named.length} files`);
+    for (const cells of [4, 6, 8]) {
+      assert.ok(
+        named.some((url) => url.endsWith(`/board-${cells}.webp`)),
+        `the ${cells}x${cells} drawn board is not in BOARD_ART, so nothing warms or tests it`,
+      );
+    }
 
     for (const url of named) {
       const asset = await fetchRaw(url);
@@ -487,6 +524,109 @@ async function main(): Promise<number> {
       Number(declared[1]),
       presentation.BOARD_ART_OVERHANG,
       "the stylesheet and presentation.js disagree about the bezel",
+    );
+  });
+
+  await test("a drawn board hides the vector cells, keeps the wires, and comes off if its picture fails", async () => {
+    /*
+     * THE THREE DRAWN BOARDS (11 September 2026). The owner's 4x4, 6x6 and 8x8 pictures carry the
+     * cells painted in, so under one of them the `<svg>`'s own cells must be transparent - two
+     * grids a few pixels apart read as a rendering fault - while the wires, terminals and numerals
+     * stay, because they are the game.
+     *
+     * Three things this pins, because each fails quietly. The `drawn` class must be toggled by the
+     * ONE function that also writes the inset, or the class and the picture can disagree; it must
+     * run after `setPuzzle` (the frame is the puzzle's shape) and before `fitBoard` (the reserve is
+     * the frame's depth); and a picture that fails to load must take the class off again, or a
+     * paying player drags wires over a blank square. The last one is the platform's own lesson
+     * from R54: a stale edge cache refused an asset for four hours and nothing on the page knew.
+     */
+    const css = withoutComments(playFile("app.css"));
+    const drawnRules = [...css.matchAll(/\.board-stage\.drawn\s+svg#board([^{]*)\{([^{}]*)\}/g)];
+    const bySelector = new Map(drawnRules.map((m) => [m[1].trim(), m[2]]));
+    assert.match(bySelector.get("") ?? "", /background\s*:\s*transparent/, "the drawn svg keeps its own background");
+    assert.match(bySelector.get(".cell") ?? "", /fill\s*:\s*transparent/, "the drawn cells still paint");
+    assert.match(bySelector.get(".cell-lip") ?? "", /stroke\s*:\s*transparent/, "the drawn cell lips still paint");
+    assert.match(bySelector.get(".junction") ?? "", /display\s*:\s*none/, "the junction stars still paint");
+    // Nothing under `drawn` may touch the wires or the terminals: the picture has no wires in it.
+    for (const [selector] of bySelector) {
+      assert.ok(
+        !/trace|terminal|socket|pip/.test(selector),
+        `a drawn-board rule hides part of the game itself: "${selector}"`,
+      );
+    }
+
+    const js = withoutComments(playFile("app.js"));
+    const dress = /function dressBoard\(\)\s*\{([\s\S]*?)\n\}/.exec(js);
+    assert.ok(dress, "app.js has no dressBoard()");
+    assert.match(dress[1], /classList\.toggle\("drawn"/, "dressBoard does not toggle the drawn class");
+    assert.match(dress[1], /style\.inset\s*=\s*frameInsetCss\(/, "dressBoard does not write the measured inset");
+    assert.match(dress[1], /failedArt\.has\(/, "dressBoard ignores a picture that failed to load");
+    assert.match(dress[1], /FRAME_ART/, "dressBoard has no generic bezel to fall back to");
+    assert.equal(
+      (js.match(/classList\.toggle\("drawn"/g) ?? []).length,
+      1,
+      "the drawn class is toggled in more than one place",
+    );
+
+    const render = /function renderPlay\(\)\s*\{([\s\S]*?)\n\}/.exec(js);
+    assert.ok(render, "app.js has no renderPlay()");
+    const setAt = render[1].indexOf("board.setPuzzle(state.board)");
+    const dressAt = render[1].indexOf("dressBoard()");
+    const fitAt = render[1].indexOf("fitBoard()");
+    assert.ok(setAt >= 0 && dressAt >= 0 && fitAt >= 0, "renderPlay lost one of its three steps");
+    assert.ok(setAt < dressAt && dressAt < fitAt, "renderPlay must set the puzzle, dress it, then fit it");
+
+    const warm = /function warmBoardArt\(\)\s*\{([\s\S]*?)\n\}/.exec(js);
+    assert.ok(warm, "app.js has no warmBoardArt()");
+    assert.match(warm[1], /image\.onerror\s*=/, "the warm does not listen for a failed picture");
+    assert.match(warm[1], /failedArt\.add\(url\)/, "a failed picture is not recorded");
+  });
+
+  await test("the arena stretches the board's cell to the row and centres only the rails", async () => {
+    /*
+     * THE POSTAGE-STAMP BOARD, SECOND COMING (11 September 2026). `fitBoard` sizes the grid from
+     * the space `.board-wrap` has, so the wrap must be the size of its grid ROW. `align-items:
+     * center` on the arena shrinks the wrap to the `<svg>` inside it, and the next fit measures a
+     * wrap the size of the previous grid, reserves the bezel's share, and draws a smaller one -
+     * converging on the 34-pixel floor while `desiredFrameHeight`, which never reads the current
+     * height, keeps the frame tall. A big empty frame with a tiny board in it, no error anywhere.
+     *
+     * Asserted on the `.arena` rule's own body, sliced by position, because `align-items: center`
+     * legitimately appears elsewhere in this stylesheet and a file-wide search is green either
+     * way. The rails must centre THEMSELVES - `align-self` on the rails, never `align-items` on
+     * the row - so the second assertion is what stops the fix being "moved" back onto the arena.
+     */
+    const css = withoutComments(playFile("app.css"));
+    const arenaRules = [...css.matchAll(/(^|[}\s])\.arena\s*\{([^{}]*)\}/g)].map((m) => m[2]);
+    assert.ok(arenaRules.length >= 1, "app.css has no bare .arena rule");
+    for (const body of arenaRules) {
+      assert.ok(
+        !/align-items\s*:\s*center/.test(body),
+        ".arena centres its items again - fitBoard will measure the board's own height",
+      );
+    }
+    assert.match(
+      arenaRules[0],
+      /align-items\s*:\s*stretch/,
+      "the arena's first rule no longer stretches the board's cell to the row",
+    );
+
+    const railRule = /\.action-rail\s*,\s*\.stat-rail\s*\{([^{}]*)\}/.exec(css);
+    assert.ok(railRule, "the two rails no longer share an alignment rule");
+    assert.match(railRule[1], /align-self\s*:\s*center/, "the rails no longer centre themselves");
+
+    /*
+     * And the breakpoint reads the FRAME's width, not the device's. At 680 the rails stacked
+     * under the board inside every laptop-sized iframe, which is the arrangement the owner
+     * photographed. The bound is a ceiling rather than a pinned number: the argument is only
+     * that a laptop's middle column must not trip it.
+     */
+    const stack = /@media\s*\(max-width:\s*(\d+)px\)\s*\{\s*\.arena\s*\{/.exec(css);
+    assert.ok(stack, "the rails' stacking breakpoint is no longer a max-width query on .arena");
+    assert.ok(
+      Number(stack[1]) <= 560,
+      `the rails stack under the board at ${stack[1]}px - that fires inside a laptop's iframe`,
     );
   });
 

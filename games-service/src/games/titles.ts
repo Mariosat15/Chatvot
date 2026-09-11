@@ -100,10 +100,22 @@ export interface TitleDefinition {
 export const GRID_SIZES = ["small", "medium", "large"] as const;
 export type GridSize = (typeof GRID_SIZES)[number];
 
+/**
+ * 4, 6 and 8 since 11 September 2026, matching the three drawn boards in `public/play/`
+ * (`DRAWN_BOARD_FRAMES` in `presentation.js`). They were 5, 6 and 7. The engine handles any
+ * shape and any other shape still plays on the generic bezel, so this is not a constraint the
+ * generator needs - it is the owner's artwork deciding the sizes on offer.
+ *
+ * A round in flight across the deploy sees its boards change once: `puzzleFor` regenerates the
+ * board from the seed and THIS shape on every read, nothing persists the shape, so the first
+ * submission after a restart is refused as not matching and the refusal carries the new board
+ * (`submitBoard` answers with `toClientPuzzle(generated, ...)`). One refusal, no lost attempt.
+ * The pair bands widen with the cell count, as before.
+ */
 const GRID_SHAPES: Record<GridSize, PuzzleShape> = {
-  small: { width: 5, height: 5, minPairs: 3, maxPairs: 5 },
+  small: { width: 4, height: 4, minPairs: 3, maxPairs: 5 },
   medium: { width: 6, height: 6, minPairs: 4, maxPairs: 6 },
-  large: { width: 7, height: 7, minPairs: 5, maxPairs: 8 },
+  large: { width: 8, height: 8, minPairs: 5, maxPairs: 8 },
 };
 
 export function shapeFor(size: GridSize): PuzzleShape {

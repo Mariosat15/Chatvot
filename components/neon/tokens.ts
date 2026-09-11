@@ -171,6 +171,35 @@ export const NEON_ROW_FLUSH_YOU = "border-l-2 border-sky-400 bg-sky-500/10";
 export const NEON_ROW_FLUSH_PODIUM =
   "border-l-2 border-amber-400/70 bg-amber-500/[0.05] transition-colors hover:bg-amber-500/[0.08]";
 
+/**
+ * THE LEADER'S ROW, framed in gold on every side, from the owner's leaderboard reference
+ * (`arena-target-leaderboard.png`, 11 September 2026).
+ *
+ * The reference singles out ONE row - the top of the board - with a full gold outline and a
+ * warm wash fading to the right, and leaves second and third as plain numbered rows. That is
+ * a fourth state rather than a restyle of the podium tint: the podium wash still marks the
+ * three paying positions on the trading board, and this is drawn on top of it for the first.
+ *
+ * The frame is rounded on a flush board even though its neighbours are not, deliberately: a
+ * square gold outline between two hairlines reads as a table cell that happens to be yellow,
+ * and the rounded one reads as the medal it is. The row keeps `border-l-2` so its content sits
+ * exactly where every other row's does - see the note on the flush set above.
+ *
+ * FLUSH ONLY. There is no card-form twin, because the card form is what the trading lobby
+ * renders and the trading board was not part of the request; a gold #1 arriving there through
+ * a shared token would be the invisible change the note above warns about.
+ */
+export const NEON_ROW_FLUSH_LEADER =
+  "rounded-lg border border-l-2 border-[#FFC01B]/80 bg-gradient-to-r from-[#FFB300]/20 to-[#FFB300]/5";
+
+/**
+ * The gold a score is written in on the reference board - every score, not only the podium's,
+ * because on that board the colour says "this is the figure you are ranked on" rather than
+ * "this row is paying". One token, so the leader frame above and the figures inside it are the
+ * same gold and cannot drift a shade apart.
+ */
+export const NEON_SCORE_GOLD = "text-[#FFD72D]";
+
 /** The hairline between flush rows, as a `divide-*` utility rather than a border. */
 export const NEON_DIVIDE = "divide-y divide-[#16203C]";
 
@@ -222,11 +251,40 @@ export const NEON_STAGE_PANEL =
 
 /** The tinted heading strip every panel in the reference wears. */
 export const NEON_HEAD_STRIP =
-  "border-b border-sky-500/20 bg-gradient-to-r from-sky-500/10 via-sky-500/[0.03] to-transparent";
+  "border-b border-[#1089DC]/40 bg-gradient-to-r from-[#0B9FE8]/15 via-[#0B9FE8]/[0.04] to-transparent";
 
 /** The heading text inside that strip: small, heavily tracked, cyan. */
 export const NEON_HEADING =
-  "text-[11px] font-bold uppercase tracking-[0.18em] text-sky-300";
+  "text-[11px] font-bold uppercase tracking-[0.18em] text-[#16DFFF]";
+
+/**
+ * THE ARENA'S OWN CHROME, brightened 11 September 2026 on the owner's third reference
+ * (`arena-target-full.png`), whose words were "the graphics are not like image 2 - the
+ * background, the icons, the colours, more glow blue".
+ *
+ * WHY A SECOND PANEL SHELL RATHER THAN A BRIGHTER `NEON_PANEL`. The base shell is what the
+ * TRADING lobby renders, and the trading lobby was not part of the request; turning it up would
+ * be an unasked-for change to a trading screen made invisibly through a shared token. So the
+ * arena gets its own, and it is the reference's own values - a `#1089DC` rim on a deep-navy
+ * face, lit faintly from inside - rather than a guess at "more blue".
+ *
+ * The two are deliberately close enough to be the same product and far enough apart to tell
+ * which screen you are on. `NEON_PANEL_LIT` belongs to the arena; nothing else may use it,
+ * for the same reason `NEON_STAGE_FRAME` belongs to the board.
+ */
+export const NEON_PANEL_LIT =
+  "rounded-xl border border-[#1089DC]/55 bg-gradient-to-b from-[#05142C]/95 to-[#030F23]/95 shadow-[inset_0_0_24px_rgba(0,103,221,0.10)]";
+
+/**
+ * The arena page's own background: the reference's near-black navy, a shade off the app's
+ * near-black so the page reads as a place rather than as a document.
+ *
+ * The faint circuit grid that goes with it is NOT here, because a grid is a
+ * `background-image` with commas in it and Tailwind compiles only the classes it can see -
+ * see the trap at the top of this file. It is drawn by `NeonGridBackdrop` in `Cards.tsx`,
+ * which uses an inline style and therefore cannot fail silently.
+ */
+export const NEON_ARENA_SURFACE = "bg-[#020B1C]";
 
 /**
  * The hairline that separates two things sharing one surface, in its two forms.

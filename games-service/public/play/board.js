@@ -20,18 +20,32 @@
  * nothing the player can see that the server will not check.
  */
 
-import { boardCellPx, newlyJoined, spaceForGrid } from "./presentation.js";
+import {
+  boardCellPx,
+  boardFrameFor,
+  DRAWN_BOARD_FRAMES,
+  frameOverhang,
+  newlyJoined,
+  spaceForGrid,
+} from "./presentation.js";
 
-/** Eight pairs is the most any grid size produces (`large`: 5-8). */
+/**
+ * Eight pairs is the most any grid size produces (`large`: 5-8).
+ *
+ * The first five are the reference sheet's orb colours (11 Sep 2026), in its order; the last
+ * three are ours, chosen to stay apart from those five on a lit navy board. Every hue here is
+ * paired with a numeral on the terminal, so the palette is decoration and never the only way to
+ * tell two wires apart.
+ */
 const PAIR_COLOURS = [
-  "#38bdf8", // sky
-  "#f472b6", // pink
-  "#4ade80", // green
-  "#fbbf24", // amber
-  "#a78bfa", // violet
-  "#fb7185", // rose
+  "#0bbdff", // blue
+  "#ff2f9b", // pink
+  "#1ee58f", // green
+  "#ff9800", // orange
+  "#9a44ff", // purple
+  "#ff4d6d", // rose
   "#2dd4bf", // teal
-  "#facc15", // yellow
+  "#ffe14d", // yellow
 ];
 
 /**
@@ -62,8 +76,11 @@ const TERMINAL_ART = [
   "/play/token-8.webp",
 ];
 
-/** The bezel around the grid. Drawn by the stylesheet, listed here so `app.js` can warm it. */
-const FRAME_ART = "/play/board-frame.webp";
+/**
+ * The generic bezel around the grid, for any shape without a drawn board of its own. Set by
+ * `app.js` on the `.board-art` element; listed here so it can be warmed with the rest.
+ */
+export const FRAME_ART = "/play/board-frame.webp";
 
 /**
  * Every image the board needs, for `app.js` to fetch while the player is still reading the rules.
@@ -71,8 +88,11 @@ const FRAME_ART = "/play/board-frame.webp";
  * Reason this is worth doing at all: the round's clock starts on the server when Start is pressed,
  * so anything the board downloads AFTER that comes out of the player's score. It is only a few
  * kilobytes, but it is a few kilobytes the player would be paying for.
+ *
+ * The three drawn boards are read from `presentation.js` rather than listed again, so a fourth
+ * size gets warmed and served-tested by existing.
  */
-export const BOARD_ART = [FRAME_ART, ...TERMINAL_ART];
+export const BOARD_ART = [FRAME_ART, ...DRAWN_BOARD_FRAMES.map((frame) => frame.file), ...TERMINAL_ART];
 
 function terminalArt(pairId) {
   return TERMINAL_ART[pairId] ?? null;
@@ -142,9 +162,10 @@ function defs() {
     x2: "0",
     y2: "1",
   });
-  cellFace.appendChild(element("stop", { offset: "0", "stop-color": "#183053" }));
-  cellFace.appendChild(element("stop", { offset: "0.55", "stop-color": "#102340" }));
-  cellFace.appendChild(element("stop", { offset: "1", "stop-color": "#0b1a31" }));
+  // The reference's cell face, `#0b274b` to `#061a37`, with a lit top stop.
+  cellFace.appendChild(element("stop", { offset: "0", "stop-color": "#123a6b" }));
+  cellFace.appendChild(element("stop", { offset: "0.55", "stop-color": "#0b274b" }));
+  cellFace.appendChild(element("stop", { offset: "1", "stop-color": "#061a37" }));
   node.appendChild(cellFace);
 
   const socketFace = element("radialGradient", {
@@ -763,19 +784,30 @@ export function createBoard(svg, onChange) {
    * `spaceForGrid` takes the bezel off first. The artwork overhangs the grid on all four sides, so
    * a grid measured against the raw box would push its own frame off the edge of the viewport - and
    * the frame is the part that gets clipped, so the symptom is decorative and the cause is not.
+   *
+   * It is THIS board's frame that is taken off, per axis. The drawn 4x4 board's bezel is three
+   * times as deep as the generic one, and reserving the generic share for it clips the artwork
+   * top and bottom while the grid inside still fits and still works.
    */
   function resize(availableWidth, availableHeight) {
     if (!puzzle) return;
+    const overhang = frameOverhang(frame());
     cellPx = boardCellPx(
-      spaceForGrid(availableWidth),
-      spaceForGrid(availableHeight),
+      spaceForGrid(availableWidth, overhang.horizontal),
+      spaceForGrid(availableHeight, overhang.vertical),
       puzzle.width,
       puzzle.height,
     );
     render();
   }
 
+  /** The drawn board for the current puzzle's shape, or null for the generic bezel. */
+  function frame() {
+    return puzzle ? boardFrameFor(puzzle.width, puzzle.height) : null;
+  }
+
   return {
+    frame,
     setPuzzle(next) {
       puzzle = next;
       paths = new Map();

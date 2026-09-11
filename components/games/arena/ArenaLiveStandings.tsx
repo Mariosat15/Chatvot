@@ -225,7 +225,9 @@ export function ArenaLiveBoard({ scoreLabel }: { scoreLabel?: string }) {
  */
 export function ArenaLiveCount() {
   const { rows } = useArenaLive();
-  return <NeonCountPill>{rows.length} players</NeonCountPill>;
+  // "Players (24)", the reference's form - the noun first, so the pill reads as a heading for
+  // the figure rather than as a sentence fragment. Still "players", never "traders".
+  return <NeonCountPill>Players ({rows.length})</NeonCountPill>;
 }
 
 /** The recent-players feed, from the same fetch as the board above it. */
