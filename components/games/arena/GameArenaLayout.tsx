@@ -277,10 +277,24 @@ export function GameArenaLayout({
         have content grow to fill the row instead of huddling in the first tracks. One panel
         reads as a full-width panel; three read as the reference.
       */}
-      <div className="mt-5 flex flex-wrap gap-5">
-        <div className="min-w-[300px] flex-1 empty:hidden">{rules}</div>
-        <div className="min-w-[280px] flex-1 empty:hidden">{highlights}</div>
-        <div className="min-w-[280px] flex-1 empty:hidden">{activity}</div>
+      {/*
+        `[&>*]:h-full` IS THE OWNER'S "ONE BIGGER THAN THE OTHER", and the reason it is on the
+        wrapper rather than on the panels is worth stating. The wrappers already stretch -
+        that is the flex default - so they were the same height all along; what differs is
+        the PANEL inside each one, which sizes to its own text and leaves the rest of its
+        stretched wrapper empty. So the fix reaches through the wrapper to whatever it was
+        handed, and it belongs here rather than in the three panels: two of them are also
+        rendered in the lobby sidebar, where a forced full height would stretch one card to
+        the length of the whole column.
+      */}
+      <div className="mt-5 flex flex-wrap items-stretch gap-5">
+        <div className="min-w-[300px] flex-1 empty:hidden [&>*]:h-full">{rules}</div>
+        <div className="min-w-[280px] flex-1 empty:hidden [&>*]:h-full">
+          {highlights}
+        </div>
+        <div className="min-w-[280px] flex-1 empty:hidden [&>*]:h-full">
+          {activity}
+        </div>
       </div>
 
       <p className={`mt-5 text-center ${NEON_LABEL}`}>

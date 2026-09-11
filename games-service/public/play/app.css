@@ -676,8 +676,23 @@ button.rail-btn:disabled {
  * is room for both and the tiles drop to their own line when there is not. A grid of fixed tracks
  * would keep them side by side and shrink the labels instead, and these labels are already at
  * 0.54rem.
+ *
+ * EVERY BOX IN THIS STRIP IS THE SAME SIZE, and `--tiles` is how - the owner's "they don't
+ * align, one bigger than the other" of 11 September 2026.
+ *
+ * The strip has two flex children, the meter and the tile group, and the group is itself a grid
+ * of equal columns. So a fixed share here is only ever right for one tile count: written
+ * `1` against `2` it is correct with two tiles and wrong the moment "best board" appears and
+ * makes three, which is exactly the state the owner was looking at. `app.js` publishes the count
+ * as `--tiles` whenever the set changes, the group claims that many parts against the meter's
+ * one, and each box ends up one part of `1 + n` at any count.
+ *
+ * THE FALLBACK OF 2 IS NOT A GUESS ABOUT THE CONTENT, it is the value that keeps the strip
+ * sensible for the one frame before `renderStatTiles` first runs - and it is the count this
+ * title starts a round with, so nothing visibly resizes on the first draw.
  */
 .stat-rail {
+  --tiles: 2;
   display: flex;
   flex-wrap: wrap;
   align-items: stretch;
@@ -690,12 +705,25 @@ button.rail-btn:disabled {
  * ---------------------------------------------------------------------------------------- */
 
 .board-meter {
-  flex: 1 1 10rem;
+  /* One part against the tile group's `--tiles`, so the meter is exactly one box wide. */
+  flex: 1 1 7rem;
   min-width: 0;
   display: grid;
-  align-content: center;
+  /*
+   * `start` and the tiles' own top padding, so this box's label sits on the same line as every
+   * other label in the strip. Centred, it floated its label down by however tall the track is,
+   * which is the misalignment the owner drew a circle around.
+   */
+  align-content: start;
   gap: 6px;
-  padding: 8px 10px 10px;
+  padding: 6px 10px 7px;
+  /*
+   * `.screen` centres its text, so a box that does not say otherwise sits its caption in the
+   * middle while every tile beside it - which does say otherwise - starts at the left edge. The
+   * boxes were already the same size when the owner's screenshot was taken and this was the
+   * remaining half of "align": one caption in the middle of a row of four that begin at the left.
+   */
+  text-align: left;
   border-radius: var(--radius-sm);
   background: var(--face-stat);
   box-shadow:
@@ -703,15 +731,21 @@ button.rail-btn:disabled {
     inset 0 1px 0 rgba(120, 190, 255, 0.14);
 }
 
+/*
+ * Label above value, exactly like a tile - the second half of the owner's "align" of 11
+ * September 2026. It used to put the label and the figure at opposite ends of one line, so the
+ * one box that is not a tile also read differently from every box beside it: four figures in a
+ * row, one of them at a different height. Same order, same places, and the track still sits
+ * underneath because only this box has one.
+ */
 .board-meter-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
+  display: grid;
+  gap: 1px;
 }
 
+/* The tiles' own label and value type, so four boxes in a row read as four of the same thing. */
 .board-meter-label {
-  font-size: 0.56rem;
+  font-size: 0.54rem;
   font-weight: 700;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -719,7 +753,7 @@ button.rail-btn:disabled {
 }
 
 .board-meter-value {
-  font-size: 0.88rem;
+  font-size: 0.94rem;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   color: var(--accent-bright);
@@ -759,7 +793,8 @@ button.rail-btn:disabled {
  * rendering an empty value, so the count genuinely varies.
  */
 .stat-tiles {
-  flex: 2 1 18rem;
+  /* `--tiles` parts and a basis of the same many boxes, so each column matches the meter. */
+  flex: var(--tiles) 1 calc(var(--tiles) * 7rem);
   min-width: 0;
   display: grid;
   grid-auto-flow: column;

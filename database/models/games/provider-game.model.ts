@@ -27,6 +27,9 @@ export interface IProviderGame extends Document {
   howToPlay?: string;
   bannerUrl?: string;
   highlights?: { title: string; detail: string }[];
+  /** Ours, not the provider's - the arena's two illustrations. See the schema note below. */
+  howToPlayImageUrl?: string;
+  highlightsImageUrl?: string;
   family: "independent" | "head_to_head";
   playMode?: "anytime" | "scheduled";
   /** OUR answer, when the provider's is absent or wrong for how we want to run it. */
@@ -147,6 +150,20 @@ const ProviderGameSchema = new Schema<IProviderGame>(
       ],
       default: undefined,
     },
+    // The two illustrations the arena draws beside this content (owner, 11 September 2026).
+    //
+    // OURS, NOT THE PROVIDER'S, and that is the distinction that decides where they live. A
+    // provider supplies a logo and a hero banner because those identify their title; these
+    // two illustrate OUR panels - the rules block and the feature cards - at the size and in
+    // the style of our arena. So they are in no sync allow-list at all, not even
+    // `firstSyncOnlyFields`, and no provider is asked for them: the requirements document
+    // is unchanged and there is no version to bump.
+    //
+    // ABSENT IS THE NORMAL STATE AND MUST STAY CHEAP. Every title carries neither today, so
+    // the panels draw a recreated emblem instead - which is why a missing value is a
+    // different-looking panel rather than a gap, and why nothing here may become required.
+    howToPlayImageUrl: { type: String, trim: true },
+    highlightsImageUrl: { type: String, trim: true },
 
     // Capability declarations from the catalogue.
     //

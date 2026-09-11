@@ -715,6 +715,17 @@ export function bestBoardTime(previousMs, elapsedMs) {
  * `boardTarget` is absent for Circuit Sprint, which has no fixed set, so the first cell answers
  * "how many have I finished" rather than "which one am I on". Inventing a denominator there would
  * be inventing a finishing line the title does not have.
+ *
+ * ONE LABEL FOR ONE FIGURE, since 11 September 2026: the owner reported "Solved" in this header
+ * and "Boards done" in the strip below the board reading the same number, and asked for one of
+ * them. The surviving name is the clearer of the two - "Solved 3" could be squares, pairs or
+ * boards - and `playStatTiles` no longer returns a tile for it.
+ *
+ * THE TARGETED FORM COUNTS FINISHED BOARDS RATHER THAN NAMING THE CURRENT ONE, which is a change
+ * of meaning and not only of wording. It used to read `Board 3 / 8`, the board in front of you;
+ * under one label that says "Boards done" the same value would be a caption over a figure it does
+ * not describe, and this codebase has already paid for that twice (R7's severity, the admin
+ * "Prize %"). `2 / 8` is the count with its finishing line still visible.
  */
 export function roundHeaderCells(input) {
   const { boardsSolved, boardTarget, used, cells } = input ?? {};
@@ -723,23 +734,31 @@ export function roundHeaderCells(input) {
   const coverage = boardProgress({ used, cells });
 
   return [
-    target === null
-      ? { key: "board", label: "Solved", value: String(solved) }
-      : { key: "board", label: "Board", value: `${Math.min(solved + 1, target)} / ${target}` },
+    {
+      key: "board",
+      label: "Boards done",
+      value: target === null ? String(solved) : `${Math.min(solved, target)} / ${target}`,
+    },
     { key: "clock", label: "Time left", value: null },
     { key: "coverage", label: "Filled", value: `${coverage.percent}%` },
   ];
 }
 
 /**
- * The stat tiles beside the board.
+ * The stat tiles in the strip under the board.
  *
  * A TILE IS OMITTED RATHER THAN SHOWN EMPTY. Best board has no value until a board has been
- * solved, and a tile reading "-" next to three real figures reads as a number that failed to
- * load. The caller renders whatever comes back, so the column shrinks honestly.
+ * solved, and a tile reading "-" next to two real figures reads as a number that failed to
+ * load. The caller renders whatever comes back, so the strip shrinks honestly.
+ *
+ * NO BOARDS-DONE TILE, and its absence is the deliverable rather than a simplification: the
+ * round header carries that figure and the owner reported reading the same number twice on one
+ * screen (11 September 2026). Restoring it here is the whole defect, which is why a test asserts
+ * no tile duplicates a header cell's LABEL rather than asserting a list of three keys - a test
+ * naming the keys is green the moment somebody adds a fourth one that duplicates something else.
  */
 export function playStatTiles(input) {
-  const { boardsSolved, joined, pairs, moves, bestBoardMs } = input ?? {};
+  const { joined, pairs, moves, bestBoardMs } = input ?? {};
   const tiles = [
     {
       key: "paths",
@@ -747,11 +766,6 @@ export function playStatTiles(input) {
       value: `${positive(joined) ? Math.round(joined) : 0} / ${positive(pairs) ? Math.round(pairs) : 0}`,
     },
     { key: "moves", label: "Moves", value: String(positive(moves) ? Math.round(moves) : 0) },
-    {
-      key: "solved",
-      label: "Boards done",
-      value: String(positive(boardsSolved) ? Math.round(boardsSolved) : 0),
-    },
   ];
 
   const best = formatBoardTime(bestBoardTime(null, bestBoardMs));

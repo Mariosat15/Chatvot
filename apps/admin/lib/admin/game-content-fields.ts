@@ -32,6 +32,11 @@ export const EDITABLE_CONTENT_FIELDS: ReadonlySet<string> = new Set([
   "thumbnailUrl",
   "bannerUrl",
   "highlights",
+  // The arena's two illustrations (owner, 11 September 2026). Ours rather than the
+  // provider's - they illustrate OUR panels - so unlike the six above they are seeded by no
+  // sync and are only ever written here.
+  "howToPlayImageUrl",
+  "highlightsImageUrl",
 ]);
 
 /**
@@ -116,6 +121,8 @@ export const AI_NEVER_WRITABLE_CONTENT_FIELDS: ReadonlyMap<string, string> = new
   ["category", "chosen from the genre vocabulary, because it is a grouping key rather than prose"],
   ["thumbnailUrl", "an image address, not prose"],
   ["bannerUrl", "an image address, not prose"],
+  ["howToPlayImageUrl", "an image address, not prose"],
+  ["highlightsImageUrl", "an image address, not prose"],
 ]);
 
 export const CONTENT_LIMITS = {
@@ -148,6 +155,8 @@ export interface GameContentInput {
   category?: string;
   thumbnailUrl?: string;
   bannerUrl?: string;
+  howToPlayImageUrl?: string;
+  highlightsImageUrl?: string;
   highlights?: GameHighlight[];
 }
 
@@ -262,7 +271,15 @@ export function validateGameContent(body: unknown): ContentValidation {
     content.category = typed === "" ? "" : (normaliseCategorySlug(typed) ?? "");
   }
 
-  for (const field of ["thumbnailUrl", "bannerUrl"] as const) {
+  // Every image address on a title goes through the same clause, deliberately. Written as a
+  // second loop for the two arena illustrations, the mixed-content refusal below would exist
+  // twice and the next image field added would be the one that got a weaker check.
+  for (const field of [
+    "thumbnailUrl",
+    "bannerUrl",
+    "howToPlayImageUrl",
+    "highlightsImageUrl",
+  ] as const) {
     if (!(field in raw)) continue;
     const value = trimmedString(raw[field]);
     if (value === null) return { ok: false, error: `"${field}" must be text.` };

@@ -1976,6 +1976,93 @@ until the fix runs against a real database.
 
 ---
 
+### 4.1t The band's pictures, and the panels finally level (owner instruction, 11 September 2026)
+
+The owner sent the band again with all three panels circled: *"still dont like these, first they
+dont align, one bigger than the other, they must be the same"*, beside the reference showing a
+small graphic against each block of copy - *"have images next to letters icons, recreate the
+images and icons, or better create a place in the games add content in admin and when i put
+images there will show them"* - and, last, *"when i have mouse over the buttons need to have the
+hand"*.
+
+**NOTHING HERE WAS COMPUTED WRONGLY AND THERE IS NO RISK NUMBER.** A short panel, an absent
+picture and an arrow cursor all render perfectly and report success, so every guard in this slice
+is structural and **nothing was backfilled**.
+
+#### The heights: the wrappers were never the problem
+
+`13` s4.1r's band is three flex items, and a flex item stretches by default - so the wrappers were
+already the same height while the owner was looking at panels that were not. **What differs is the
+panel inside each wrapper**, which sizes to its own text and leaves the rest of its stretched
+wrapper empty. The fix is therefore `[&>*]:h-full` on each wrapper, reaching through to whatever
+it was handed.
+
+The obvious spelling, `h-full` on the wrapper itself, is a **no-op that reviews as correct**, and
+a guard asserting the band "mentions `h-full`" is green against it. The probe restores it verbatim.
+
+It belongs on the wrapper rather than in the three panels because **two of them are also rendered
+in the lobby sidebar**, where a forced full height would stretch one card to the length of the
+whole column. And `empty:hidden` and `flex-wrap` are asserted alongside it, because s4.1r's revert
+is still the governing fact: all three slots render `null` when their content is absent, which is
+the common case, and a hidden grid item leaves its track behind where a hidden flex item leaves
+the line.
+
+#### The pictures: `NeonIllustration`, and why the fallback is the component
+
+Two new fields on `provider_game`, `howToPlayImageUrl` and `highlightsImageUrl`, uploaded through
+the existing artwork route and edited in the game content dialog under their own heading.
+
+**THEY ARE OURS, NOT THE PROVIDER'S, and that decides everything else about them.** A logo and a
+hero banner identify a provider's *title*; these two illustrate **our** panels, at our size, in
+our style. So they are in **no sync allow-list at all** - not even `firstSyncOnlyFields` - no
+provider is asked for them, `ChartVolt-Game-API-Requirements.html` is unchanged and there is **no
+version to bump**.
+
+**The fallback is the point of the component rather than a courtesy.** No title in the catalogue
+carries either image, so the natural implementation - render the `src`, render nothing otherwise -
+is green against any test that supplies a URL and ships a band that is illustrated on nothing and
+looks broken on everything. `NeonIllustration` draws a two-ring emblem with one of the kit's
+lucide glyphs instead, so **an unset value is a deliberate look and an upload replaces it rather
+than filling a hole** - the same arrangement as `bannerUrl` falling through to `banners.ts`.
+
+**The glyph is chosen by the calling panel, never by the title**: the rules panel always draws the
+rules glyph, whatever game it is describing. Drawing something that depicted the game would be
+per-game code in the layer built to avoid it. The emblem therefore **carries no caption**, asserted
+as "no text-bearing element and no default `alt`" rather than as a list of banned nouns - a noun
+list here would have to permit `classes.tile` and `aspect-square`, which are class names rather
+than anything a player reads, and a guard forced to make that exception will eventually make the
+wrong one. Note this component lives in `components/neon/`, which the arena's own game-agnostic
+guard does not read.
+
+**The rules picture is drawn on both layouts, and the gate that would have looked careful is a
+defect.** The arena passes `layout="column"`, not `"wide"` - so a condition reading
+`layout === "wide"` around the illustration reviews as considered, passes any test that only
+checks the picture exists in the file, and leaves it off the one screen it was asked for.
+
+#### The hand cursor
+
+Tailwind v4's preflight no longer sets `cursor: pointer` on a `<button>`, so **every button in
+both apps lost its hand cursor on the upgrade** and `app/globals.css` had been putting it back one
+component class at a time - which is why it kept reappearing. It is now on
+`components/ui/button.tsx`, its admin copy, and `components/neon/Buttons.tsx`'s `BASE`, which the
+kit's controls use instead of the primitive. `disabled:pointer-events-none` and
+`cursor-not-allowed` are asserted with it: a hand over a disabled control promises a click that
+does nothing.
+
+**13 tests, 15 probes red on exactly one failure. Never verified by eye** - and for a second
+reason on two of the three panels: they render nothing at all until the catalogue is re-synced.
+
+Three probes came back green first time and the three causes were all different, which is worth
+keeping. **A mutation with no observable:** the caption probe first replaced a comment. **An
+import is not a use:** `indexOf("NeonIllustration")` found the import on line two, so the layout
+gate's slice examined the file header and the exact injected defect passed - the
+`canTransitionRound` and `MIN_REASON_LENGTH` trap again. **A weak test:** the projection guard
+counted occurrences of the field name, and deleting it from the `.select(...)` left the interface,
+the lean generic and the return still naming it, so the total never fell below the threshold -
+and the projection is the one of the four that decides whether a value arrives at all.
+
+---
+
 ## 5. Dashboard
 
 `components/dashboard/` is about **15 components** backed by

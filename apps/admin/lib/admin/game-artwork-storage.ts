@@ -1,6 +1,7 @@
 import { writeFile, mkdir, unlink } from "fs/promises";
 import path from "path";
 import { putBrandingAsset } from "@/lib/services/branding-assets.service";
+import type { ArtworkSlot } from "./game-artwork-slots";
 
 /**
  * Store an uploaded game image so that BOTH web servers can serve it.
@@ -73,7 +74,7 @@ export async function storeGameArtwork(
   file: File,
   providerKey: string,
   gameCode: string,
-  slot: "logo" | "banner",
+  slot: ArtworkSlot,
 ): Promise<ArtworkResult> {
   const extension = (file.name.split(".").pop() ?? "").toLowerCase();
   const contentType = IMAGE_TYPES.get(extension);

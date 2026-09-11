@@ -110,6 +110,7 @@ const ui = {
   boardMeterValue: document.getElementById("board-meter-value"),
   boardMeterTrack: document.getElementById("board-meter-track"),
   boardMeterFill: document.getElementById("board-meter-fill"),
+  statRail: document.getElementById("stat-rail"),
   statTiles: document.getElementById("stat-tiles"),
   undo: document.getElementById("undo"),
   leave: document.getElementById("leave"),
@@ -554,7 +555,6 @@ let lastBoardsSolved = null;
 
 function renderStatTiles() {
   const tiles = playStatTiles({
-    boardsSolved: state.boardsSolved,
     joined: board.joinedCount(),
     pairs: board.pairCount(),
     moves,
@@ -565,6 +565,18 @@ function renderStatTiles() {
   // is solved and "best board" appears. Rewriting the nodes on every drag would discard the
   // browser's own text layout sixty times a second for values that mostly have not moved.
   if (ui.statTiles.childElementCount !== tiles.length) {
+    /*
+     * THE COUNT IS PUBLISHED TO THE STYLESHEET, and it is what makes every box in this strip the
+     * same size - the owner's "they don't align, one bigger than the other" of 11 September 2026.
+     *
+     * The meter and the tiles are two flex children of one strip, so a fixed share gives the
+     * meter a third and then divides the rest by however many tiles there are: correct at two,
+     * and visibly wrong the moment "best board" appears and makes it three. `--tiles` lets the
+     * tile group claim exactly its own share, so each box is one part of `1 + n` whatever `n`
+     * turns out to be. Set here rather than in the stylesheet because only this function knows
+     * the count, and set beside the rebuild because that is the one moment it can change.
+     */
+    ui.statRail.style.setProperty("--tiles", String(tiles.length));
     ui.statTiles.replaceChildren(
       ...tiles.map((tile) => {
         const node = document.createElement("div");

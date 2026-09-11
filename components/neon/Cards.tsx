@@ -89,6 +89,84 @@ export function IconTile({
 }
 
 /**
+ * The illustration beside a panel of text: the operator's picture if they uploaded one, and
+ * a drawn emblem if they did not.
+ *
+ * WHY THE FALLBACK IS THE POINT OF THIS COMPONENT. The owner's arena reference draws a small
+ * graphic beside each block of copy, and the obvious implementation renders the uploaded URL
+ * and nothing when there is none - which means every title in the catalogue today, because
+ * none of them carries one. A panel that is illustrated on some titles and bare on others
+ * does not read as "artwork pending", it reads as a broken image. So the absent case has a
+ * deliberate look, and uploading a picture replaces it rather than filling a hole.
+ *
+ * NOTHING HERE NAMES A GAME. The emblem is a tinted ring with one of the kit's lucide glyphs
+ * in it, chosen by the CALLING PANEL rather than by the title - a rules panel always gets
+ * the rules glyph, whatever game it is describing. Drawing something that depicted the game
+ * would be per-game code in the layer built to avoid it, which is what the arena's
+ * game-agnostic guard exists to catch.
+ *
+ * THE IMAGE IS A PLAIN `<img>`, NOT `next/image`. These URLs are served by an API route with
+ * a database fallback, so they are not statically analysable assets and the optimiser 500s
+ * on the one path that matters - the second application server, where the file exists only
+ * in the database. Same reasoning as the admin upload field's preview.
+ */
+export function NeonIllustration({
+  src,
+  alt,
+  icon: Icon,
+  accent,
+  shape = "square",
+}: {
+  /** The operator's upload. Absent - the normal case - draws the emblem instead. */
+  src?: string;
+  /**
+   * Describes the panel, never the picture, because nobody here knows what the picture is.
+   * An operator's upload has no caption field and inventing one from the game's name would
+   * be a claim about an image we have not seen.
+   */
+  alt: string;
+  icon: LucideIcon;
+  accent: NeonAccent;
+  shape?: "square" | "landscape";
+}) {
+  const box = shape === "landscape" ? "aspect-[4/3]" : "aspect-square";
+  const classes = accentClasses(accent);
+
+  if (src) {
+    return (
+      <div
+        className={`overflow-hidden rounded-lg border border-[#161E36] bg-[#080C18]/70 ${box}`}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={src} alt={alt} className="h-full w-full object-cover" />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={`flex items-center justify-center rounded-lg border border-[#161E36] bg-[#080C18]/70 ${box}`}
+      aria-hidden
+    >
+      {/*
+        Two rings and a glyph. The outer ring is the accent at a low opacity and the inner
+        one is brighter, which is what gives the sheet's emblems their lit edge - a single
+        ring reads as a placeholder box with an icon dropped in it.
+      */}
+      <div
+        className={`flex h-[62%] w-[62%] max-h-24 max-w-24 items-center justify-center rounded-full border ${classes.tile}`}
+      >
+        <div
+          className={`flex h-[70%] w-[70%] items-center justify-center rounded-full border ${classes.tile}`}
+        >
+          <Icon className="h-[45%] w-[45%]" strokeWidth={1.75} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
  * A figure with its icon tile - the sheet's `STAT CARDS` row. One component covers the game
  * variants (prize pool, entry fee, players, your score) and the trading variants (total value,
  * total P&L, win rate, position), because they differ only in icon, accent and whether the

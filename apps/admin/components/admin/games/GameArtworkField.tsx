@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Loader2, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import type { ArtworkSlot } from "@/lib/admin/game-artwork-slots";
 
 /**
  * One image slot on a game title: upload, preview, or clear.
@@ -23,12 +24,31 @@ import { Label } from "@/components/ui/label";
 interface Props {
   providerKey: string;
   gameCode: string;
-  slot: "logo" | "banner";
+  slot: ArtworkSlot;
   label: string;
   hint: string;
   value: string;
   onChange: (url: string) => void;
 }
+
+/**
+ * The preview's shape, per slot.
+ *
+ * Reason: the preview crops, so a square frame around a wide banner hides half of it and the
+ * operator approves an image they have not seen. These match the shapes the player-facing
+ * screens draw - a square logo, a wide hero, a landscape illustration beside the rules, and
+ * a square emblem on the feature cards.
+ *
+ * A `Record` keyed by a union rather than a chain of ternaries: the key is a prop of a known
+ * type, so the compiler requires a shape for every slot the moment a fifth one is added,
+ * where a ternary would silently fall through to whatever the last branch says.
+ */
+const PREVIEW_SHAPE: Record<ArtworkSlot, string> = {
+  logo: "aspect-square",
+  banner: "aspect-[3/1]",
+  "how-to-play": "aspect-[4/3]",
+  highlight: "aspect-square",
+};
 
 export default function GameArtworkField({
   providerKey,
@@ -78,9 +98,10 @@ export default function GameArtworkField({
       <Label>{label}</Label>
 
       <div
-        className={`relative flex items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-black/30 ${
-          slot === "logo" ? "aspect-square" : "aspect-[3/1]"
-        }`}
+        /* eslint-disable-next-line security/detect-object-injection -- `slot` is a closed
+           union supplied by the calling screen, never by a request, and the map is a local
+           object literal with an entry for every member of it. */
+        className={`relative flex items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-black/30 ${PREVIEW_SHAPE[slot]}`}
       >
         {value ? (
           // Served by an API route with a database fallback, so it is not a statically

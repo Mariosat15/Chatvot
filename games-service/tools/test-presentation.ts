@@ -967,24 +967,61 @@ async function main(): Promise<void> {
   });
 
   test("a title with a fixed set of boards gets a denominator; one without does not", () => {
-    // Circuit Perfect has a declared number of boards, so "3 / 5" is a true statement. Sprint has
-    // no finishing line at all, and inventing one there would promise a player an end the title
-    // does not have - so the first cell changes its question rather than its number.
+    /*
+     * Circuit Perfect has a declared number of boards, so "2 / 5" is a true statement. Sprint has
+     * no finishing line at all, and inventing one there would promise a player an end the title
+     * does not have - so the cell changes its NUMBER rather than its question.
+     *
+     * FLIPPED ON 11 SEPTEMBER 2026, claim unchanged. It used to assert the labels "Board" and
+     * "Solved" and a targeted value of "3 / 5", the board in front of you. Both cells now read
+     * "Boards done", because the owner reported this figure twice on one screen and the strip
+     * below the board lost its copy - and under that one caption the targeted value has to be
+     * the count of finished boards, or the label describes a figure it does not name.
+     */
     const perfect = p.roundHeaderCells({ boardsSolved: 2, boardTarget: 5, used: 0, cells: 36 });
-    assert.equal(perfect[0].label, "Board");
-    assert.equal(perfect[0].value, "3 / 5");
+    assert.equal(perfect[0].label, "Boards done");
+    assert.equal(perfect[0].value, "2 / 5");
 
     const sprint = p.roundHeaderCells({ boardsSolved: 2, used: 0, cells: 36 });
-    assert.equal(sprint[0].label, "Solved");
+    assert.equal(sprint[0].label, "Boards done");
     assert.equal(sprint[0].value, "2");
   });
 
   test("the board cell never counts past the set it belongs to", () => {
-    // The last board is solved before the round's own state turns terminal, so there is a moment
-    // where `boardsSolved` equals the target. Unclamped this reads "6 / 5", which is the game
-    // telling a player who has just finished everything that there is another board coming.
-    const done = p.roundHeaderCells({ boardsSolved: 5, boardTarget: 5, used: 36, cells: 36 });
+    /*
+     * Seeded ABOVE the target on purpose. The clamp used to guard the `solved + 1` that made the
+     * cell name the current board, where reaching the last one read "6 / 5" - and that reason
+     * left with the `+ 1` on 11 September 2026. What it guards now is a count arriving higher
+     * than the set it belongs to, which is a resumed round or a server bug rather than an
+     * ordinary state, so the fixture has to produce it for the clamp to decide anything at all.
+     */
+    const done = p.roundHeaderCells({ boardsSolved: 7, boardTarget: 5, used: 36, cells: 36 });
     assert.equal(done[0].value, "5 / 5");
+  });
+
+  test("no figure in the strip repeats a caption from the header", () => {
+    /*
+     * THE OWNER'S REPORT OF 11 SEPTEMBER 2026, and asserted as a property rather than as a list
+     * of tile keys. "Boards done" appeared in the header and again in the strip below the board,
+     * the same number twice on one screen, and he asked for one of them.
+     *
+     * A test naming the three surviving keys would be green the day somebody adds a fourth tile
+     * duplicating something else, which is the same defect. Comparing the two caption sets is
+     * the claim itself.
+     */
+    const captions = (entries: { label: string }[]) =>
+      entries.map((entry) => entry.label.trim().toLowerCase());
+
+    const header = captions(p.roundHeaderCells({ boardsSolved: 3, used: 12, cells: 36 }));
+    // With `bestBoardMs`, so the widest set of tiles is the one under test.
+    const strip = captions(p.playStatTiles({ joined: 2, pairs: 4, moves: 8, bestBoardMs: 4200 }));
+
+    for (const caption of strip) {
+      assert.ok(
+        !header.includes(caption),
+        `"${caption}" is a caption in both the header and the strip: ${header.join(", ")}`,
+      );
+    }
   });
 
   test("the clock cell brings its caption and deliberately not its value", () => {
@@ -1038,12 +1075,12 @@ async function main(): Promise<void> {
   });
 
   test("the best-board tile is omitted until there is one, never shown empty", () => {
-    // A tile reading "-" beside three real figures reads as a number that failed to load, and the
-    // first board of every round would show one. The column shrinks instead.
-    const early = p.playStatTiles({ boardsSolved: 0, joined: 1, pairs: 4, moves: 3 });
+    // A tile reading "-" beside two real figures reads as a number that failed to load, and the
+    // first board of every round would show one. The strip shrinks instead.
+    const early = p.playStatTiles({ joined: 1, pairs: 4, moves: 3 });
     assert.ok(!early.some((tile) => tile.key === "best"), "an empty best-board tile was rendered");
 
-    const later = p.playStatTiles({ boardsSolved: 1, joined: 1, pairs: 4, moves: 3, bestBoardMs: 4200 });
+    const later = p.playStatTiles({ joined: 1, pairs: 4, moves: 3, bestBoardMs: 4200 });
     assert.ok(later.some((tile) => tile.key === "best"), "the best-board tile never appears");
   });
 

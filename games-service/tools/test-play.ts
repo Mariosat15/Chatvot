@@ -754,6 +754,45 @@ async function main(): Promise<number> {
     );
   });
 
+  await test("every box in the figures strip is one part of the same whole", async () => {
+    /*
+     * THE OWNER'S "THEY DON'T ALIGN, ONE BIGGER THAN THE OTHER" OF 11 SEPTEMBER 2026, pinned
+     * where it can actually be got wrong.
+     *
+     * The strip has two flex children - the meter and the tile group - and the group divides its
+     * own share between however many tiles `playStatTiles` returns. So any FIXED pair of shares
+     * is right for exactly one tile count and silently wrong for every other: written `1` against
+     * `2` the boxes match while there are two tiles and stop matching the moment "best board"
+     * appears. That is a stylesheet that looks correct in a diff and is wrong on the screen, which
+     * is why the count travels from the one place that knows it.
+     *
+     * Both halves are asserted. The stylesheet reading `--tiles` proves nothing if nobody ever
+     * sets it, and setting it proves nothing if the stylesheet divides by something else.
+     */
+    const css = withoutComments(playFile("app.css"));
+
+    const tiles = /\.stat-tiles\s*\{([^{}]*)\}/.exec(css);
+    assert.ok(tiles, "app.css has no .stat-tiles rule");
+    assert.match(
+      tiles[1],
+      /flex\s*:\s*var\(--tiles\)/,
+      "the tile group takes a fixed share again - it matches the meter at one tile count only",
+    );
+
+    const meter = /\.board-meter\s*\{([^{}]*)\}/.exec(css);
+    assert.ok(meter, "app.css has no .board-meter rule");
+    assert.match(meter[1], /flex\s*:\s*1\s/, "the meter is no longer exactly one box wide");
+
+    const js = withoutComments(playFile("app.js"));
+    const render = /function renderStatTiles\(\)\s*\{([\s\S]*?)\n\}/.exec(js);
+    assert.ok(render, "app.js has no renderStatTiles()");
+    assert.match(
+      render[1],
+      /setProperty\("--tiles",\s*String\(tiles\.length\)\)/,
+      "the tile count is never published, so the stylesheet divides by a stale number",
+    );
+  });
+
   /*
    * The arcade pass - the animations and the synthesised sound.
    *

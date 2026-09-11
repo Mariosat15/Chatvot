@@ -1,5 +1,5 @@
 import { BookOpen, Target } from "lucide-react";
-import { NeonHeadedPanel } from "@/components/neon/Cards";
+import { NeonHeadedPanel, NeonIllustration } from "@/components/neon/Cards";
 import type { GamePresentation } from "@/lib/services/games/game-presentation.service";
 
 /**
@@ -38,7 +38,10 @@ interface Props {
    * pass the description where the rules belong. Both fields are optional on that shape and
    * must stay so - a title synced before they existed carries neither.
    */
-  presentation: Pick<GamePresentation, "rulesSummary" | "howToPlay" | "gameName">;
+  presentation: Pick<
+    GamePresentation,
+    "rulesSummary" | "howToPlay" | "gameName" | "howToPlayImageUrl"
+  >;
   /**
    * Widen the copy on a full-width slot. The arena renders this beneath the board where there
    * is room for two columns; the lobby sidebar has one.
@@ -125,7 +128,34 @@ export default function GameRulesPanel({ presentation, layout = "column" }: Prop
           </div>
         )}
 
-        {playing && <HowToPlay text={playing} />}
+        {playing && (
+          <div>
+            <HowToPlay text={playing} />
+
+            {/*
+              THE ILLUSTRATION SITS WITH THE STEPS, NOT WITH THE SCORING RULE, and that is
+              an ordering decision rather than a layout one. The amber block is the sentence
+              that decides a prize and it is deliberately the loudest thing in the panel; a
+              picture beside it competes with the one line a player must read. The steps are
+              the half a picture actually helps with, which is also what the owner's
+              reference shows.
+
+              BOTH LAYOUTS DRAW IT. The arena's band panel is the one the owner's reference
+              shows and it is the narrower of the two, so gating this on the wide layout
+              would have left the picture off the only screen it was asked for - which is
+              the kind of condition that reads as careful and delivers nothing.
+            */}
+            <div className="mt-4">
+              <NeonIllustration
+                src={presentation.howToPlayImageUrl}
+                alt={`How ${presentation.gameName} is played`}
+                icon={BookOpen}
+                accent="players"
+                shape="landscape"
+              />
+            </div>
+          </div>
+        )}
       </div>
     </NeonHeadedPanel>
   );

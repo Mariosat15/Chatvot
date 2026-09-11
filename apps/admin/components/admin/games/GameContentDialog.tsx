@@ -64,6 +64,8 @@ interface Draft {
   category: string;
   thumbnailUrl: string;
   bannerUrl: string;
+  howToPlayImageUrl: string;
+  highlightsImageUrl: string;
   highlights: { title: string; detail: string }[];
 }
 
@@ -80,6 +82,8 @@ function draftFrom(title: ProviderTitleRow): Draft {
     category: title.category ?? "",
     thumbnailUrl: title.thumbnailUrl ?? "",
     bannerUrl: title.bannerUrl ?? "",
+    howToPlayImageUrl: title.howToPlayImageUrl ?? "",
+    highlightsImageUrl: title.highlightsImageUrl ?? "",
     highlights: title.highlights ? title.highlights.map((row) => ({ ...row })) : [],
   };
 }
@@ -156,6 +160,8 @@ export default function GameContentDialog({
         category: draft.category,
         thumbnailUrl: draft.thumbnailUrl,
         bannerUrl: draft.bannerUrl,
+        howToPlayImageUrl: draft.howToPlayImageUrl,
+        highlightsImageUrl: draft.highlightsImageUrl,
         highlights: draft.highlights,
       });
       onOpenChange(false);
@@ -297,6 +303,48 @@ export default function GameContentDialog({
               value={draft.bannerUrl}
               onChange={(url) => set("bannerUrl", url)}
             />
+          </div>
+
+          {/*
+            THE ARENA'S TWO ILLUSTRATIONS, owner's instruction of 11 September 2026. Kept in
+            their own row under their own heading rather than added to the logo/banner pair
+            above, because those two identify the TITLE everywhere it appears and these two
+            decorate two named panels on one screen - an operator choosing artwork needs to
+            know which is which, and four unlabelled boxes in a row does not tell them.
+
+            BOTH ARE OPTIONAL AND SAYING SO IS THE POINT OF THE HINTS. Leaving one blank is
+            not an unfinished job: the panel draws a recreated emblem instead, which is a
+            deliberate look rather than a gap, and an operator who believes otherwise
+            uploads a stock image to fill a hole that was never there.
+          */}
+          <div className="space-y-3">
+            <div>
+              <Label>Arena illustrations</Label>
+              <p className="text-xs text-white/50">
+                The pictures beside the two text panels under the board. Optional - each one
+                falls back to a drawn emblem.
+              </p>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <GameArtworkField
+                providerKey={providerKey}
+                gameCode={title.gameCode}
+                slot="how-to-play"
+                label="Rules panel picture"
+                hint="Landscape. Sits beside the scoring and how-to-play text."
+                value={draft.howToPlayImageUrl}
+                onChange={(url) => set("howToPlayImageUrl", url)}
+              />
+              <GameArtworkField
+                providerKey={providerKey}
+                gameCode={title.gameCode}
+                slot="highlight"
+                label="Highlights emblem"
+                hint="Square. Sits above the highlight cards, like a badge."
+                value={draft.highlightsImageUrl}
+                onChange={(url) => set("highlightsImageUrl", url)}
+              />
+            </div>
           </div>
 
           <div className="space-y-3">

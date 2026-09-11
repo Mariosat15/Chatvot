@@ -101,6 +101,10 @@ export interface ProviderTitleRow {
   category?: string;
   thumbnailUrl?: string;
   bannerUrl?: string;
+  // Ours rather than the provider's, unlike the six above: these two illustrate the arena's
+  // own panels, so no sync writes them and only the content dialog does.
+  howToPlayImageUrl?: string;
+  highlightsImageUrl?: string;
   highlights?: { title: string; detail: string }[];
 }
 

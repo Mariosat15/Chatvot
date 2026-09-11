@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { guardSection } from "@/lib/admin/section-route-guard";
 import { storeGameArtwork } from "@/lib/admin/game-artwork-storage";
+import { isArtworkSlot } from "@/lib/admin/game-artwork-slots";
 
 /**
  * POST /api/games/providers/[providerKey]/games/artwork - upload a title's logo or banner
@@ -33,11 +34,12 @@ export async function POST(
     if (typeof gameCode !== "string" || gameCode === "") {
       return NextResponse.json({ error: "A game code is required." }, { status: 400 });
     }
-    // Compared against the two literals rather than cast, because the value reaches the
-    // stored filename - an unchecked one is caller-supplied text in a path.
-    if (slot !== "logo" && slot !== "banner") {
+    // Checked against the shared set rather than cast, because the value reaches the stored
+    // filename - an unchecked one is caller-supplied text in a path. The set is imported
+    // rather than restated so the form cannot offer a slot this route refuses.
+    if (!isArtworkSlot(slot)) {
       return NextResponse.json(
-        { error: "An image must be uploaded as either a logo or a banner." },
+        { error: "That is not an image slot on a game title." },
         { status: 400 },
       );
     }

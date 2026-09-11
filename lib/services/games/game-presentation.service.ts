@@ -48,6 +48,17 @@ export interface GamePresentation {
   category?: string;
   logoUrl?: string;
   bannerUrl?: string;
+  /**
+   * The arena's two illustrations, beside the rules panel and the highlight cards.
+   *
+   * OURS RATHER THAN THE PROVIDER'S, which is why they are not seeded by any sync and why
+   * the absent case is the normal one rather than an error: every title carries neither
+   * today. Each panel draws a recreated emblem instead, so an unset value is a different
+   * look and never a gap - the same arrangement as `bannerUrl` falling through to
+   * `components/neon/banners.ts`.
+   */
+  howToPlayImageUrl?: string;
+  highlightsImageUrl?: string;
   highlights: { title: string; detail: string }[];
   /** Declared capability, used to describe the game without naming it. */
   family?: string;
@@ -92,7 +103,7 @@ export async function getGamePresentation(
 
   const title = await ProviderGame.findOne({ providerKey, gameCode })
     .select(
-      "displayName tagline description rulesSummary howToPlay category thumbnailUrl bannerUrl highlights family scoreType scoreDirection maxDurationSeconds",
+      "displayName tagline description rulesSummary howToPlay category thumbnailUrl bannerUrl howToPlayImageUrl highlightsImageUrl highlights family scoreType scoreDirection maxDurationSeconds",
     )
     .lean<{
       displayName?: string;
@@ -103,6 +114,8 @@ export async function getGamePresentation(
       category?: string;
       thumbnailUrl?: string;
       bannerUrl?: string;
+      howToPlayImageUrl?: string;
+      highlightsImageUrl?: string;
       highlights?: { title: string; detail: string }[];
       family?: string;
       scoreType?: string;
@@ -131,6 +144,8 @@ export async function getGamePresentation(
     category: resolveGameCategory(title.category)?.label,
     logoUrl: title.thumbnailUrl || undefined,
     bannerUrl: title.bannerUrl || undefined,
+    howToPlayImageUrl: title.howToPlayImageUrl || undefined,
+    highlightsImageUrl: title.highlightsImageUrl || undefined,
     highlights: Array.isArray(title.highlights) ? title.highlights : [],
     family: title.family || undefined,
     scoreType: title.scoreType || undefined,

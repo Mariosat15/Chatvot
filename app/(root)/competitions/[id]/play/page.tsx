@@ -302,7 +302,11 @@ export default async function PlayPage({ params }: PlayPageProps) {
         */
         rules={<GameRulesPanel presentation={presentation} layout="column" />}
         highlights={
-          <ArenaHighlights highlights={presentation.highlights} layout="list" />
+          <ArenaHighlights
+            highlights={presentation.highlights}
+            layout="list"
+            imageUrl={presentation.highlightsImageUrl}
+          />
         }
         activity={<ArenaLiveFeed />}
       />

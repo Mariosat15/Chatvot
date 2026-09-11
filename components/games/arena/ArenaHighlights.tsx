@@ -1,6 +1,10 @@
-import { Check, Lightbulb, Zap } from "lucide-react";
+import { Check, Crown, Lightbulb, Zap } from "lucide-react";
 import { NEON_PANEL } from "@/components/neon/tokens";
-import { IconTile, NeonHeadedPanel } from "@/components/neon/Cards";
+import {
+  IconTile,
+  NeonHeadedPanel,
+  NeonIllustration,
+} from "@/components/neon/Cards";
 
 /**
  * The operator's "why this game is fun" cards along the bottom of the arena.
@@ -18,6 +22,14 @@ import { IconTile, NeonHeadedPanel } from "@/components/neon/Cards";
 interface Props {
   highlights: { title: string; detail: string }[];
   /**
+   * The operator's emblem for this title, drawn above the cards on the `list` layout.
+   *
+   * OPTIONAL AND NORMALLY ABSENT - no title in the catalogue carries one - so the panel
+   * draws the crown emblem instead rather than leaving the space empty. See
+   * `NeonIllustration`.
+   */
+  imageUrl?: string;
+  /**
    * `list` is the reference's bottom-band panel: a headed box of ticked lines, one per card.
    * `row` is the full-width strip of cards this used to be, kept for the lobby.
    *
@@ -30,12 +42,38 @@ interface Props {
   layout?: "row" | "list";
 }
 
-export function ArenaHighlights({ highlights, layout = "row" }: Props) {
+export function ArenaHighlights({
+  highlights,
+  layout = "row",
+  imageUrl,
+}: Props) {
   if (highlights.length === 0) return null;
 
   if (layout === "list") {
     return (
       <NeonHeadedPanel icon={Lightbulb} title="What to expect">
+        {/*
+          THE EMBLEM IS ABOVE THE LINES, NOT BESIDE THEM, and the reference is what decides
+          that: its badge sits over the ticked list rather than in a column next to it. The
+          side-by-side arrangement also costs the lines about a third of their width in a
+          panel that is already one of three across the band, which is how a two-line card
+          becomes a four-line one.
+
+          `w-24` rather than the panel's full width, because this is a badge and a picture
+          stretched across the whole panel is a banner - which is a different upload slot
+          with a different shape, and mixing them up is what the four labelled slots in the
+          admin dialog exist to prevent.
+        */}
+        <div className="flex justify-center px-4 pt-4">
+          <div className="w-24">
+            <NeonIllustration
+              src={imageUrl}
+              alt="This game's emblem"
+              icon={Crown}
+              accent="prize"
+            />
+          </div>
+        </div>
         <ul className="space-y-3 p-4">
           {highlights.map((highlight) => (
             <li key={highlight.title} className="flex gap-2.5">

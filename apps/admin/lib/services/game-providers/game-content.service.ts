@@ -38,8 +38,8 @@ function buildUpdate(content: GameContentInput) {
 
   // Reason: `field` cannot be caller-chosen. `content` is the output of
   // `validateGameContent`, which refuses any key that is not a member of
-  // `EDITABLE_CONTENT_FIELDS`, so the only keys reaching here are the seven this module
-  // owns - and both targets are fresh local objects, so there is nothing inherited to
+  // `EDITABLE_CONTENT_FIELDS`, so the only keys reaching here are members of that set -
+  // and both targets are fresh local objects, so there is nothing inherited to
   // overwrite. The rule flags the shape, which is correct of it, but not the risk.
   /* eslint-disable security/detect-object-injection */
   for (const [field, value] of Object.entries(content)) {

@@ -52,8 +52,12 @@ const TONES = new Map<NeonButtonTone, string>([
   ],
 ]);
 
+// `cursor-pointer` for the same reason as the shared `Button` primitive: Tailwind v4's
+// preflight no longer sets it on a button, and an anchor styled as a control does not get one
+// either once it has no `href` semantics a browser recognises as a link. The disabled string
+// below overrides it with `cursor-not-allowed`, which is why that class stays there.
 const BASE =
-  "inline-flex w-full items-center justify-center gap-2.5 rounded-xl border px-4 py-3 text-sm font-semibold transition-all";
+  "inline-flex w-full cursor-pointer items-center justify-center gap-2.5 rounded-xl border px-4 py-3 text-sm font-semibold transition-all";
 const DISABLED =
   "cursor-not-allowed border-[#161E36] bg-[#080C18] text-gray-500 shadow-none";
 

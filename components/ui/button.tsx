@@ -4,8 +4,15 @@ import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "@/lib/utils";
 
+// `cursor-pointer` is here because Tailwind v4's preflight dropped it (owner, 11 September
+// 2026: "when I have mouse over the buttons need to have the hand"). A <button> defaults to
+// the arrow cursor in every browser, v3's reset used to override that, and v4's does not - so
+// every button in the application quietly lost its hand cursor on the upgrade. `globals.css`
+// had been putting it back one component class at a time; this is the one place that covers
+// them all, and `disabled:pointer-events-none` above already suppresses it where it would be
+// a lie. It is BEFORE the variants so a caller's own `cursor-` class still wins.
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
+  "inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
   {
     variants: {
       variant: {
