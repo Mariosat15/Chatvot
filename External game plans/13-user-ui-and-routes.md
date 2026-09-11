@@ -1562,6 +1562,38 @@ the service for `SCORE_PRODUCING_ROUND_STATUSES`, which is declared in `round-ty
 matched a single-line literal against a file prettier had wrapped. **`DID NOT APPLY` means the
 target moved, never that the run was quiet.**
 
+#### The three hero banners were redrawn, which the owner asked for explicitly
+
+*"If needed recreate the graphics items yourself to match exactly the image."* The two circuit
+titles and the generic fallback are new artwork, composed to the reference's own layout - glowing
+circuit terminals and paths at the left, a gold trophy with coins (or a neon stopwatch) at the
+right, and **a deliberately near-black middle**.
+
+**That empty middle is a functional requirement, not a stylistic one.** The hero's copy sits on
+top of the picture, so previously the scrim had to be dark enough to rescue legibility over
+*any* image an operator might upload, and at that strength the artwork was invisible - which is
+the complaint. Art drawn with a dark centre lets the scrim drop to a wash, so the banner reads
+at 90% on the arena. **The left edge is still fully opaque**, because that is the guarantee, and
+it must not depend on which picture arrives: a provider's banner carries no such promise.
+
+**The artwork carries no text at all, deliberately.** The reference's hero has `THINK FAST /
+PLAY SMART / WIN BIG` painted into it; the platform renders the contest's own name, tagline and
+description in that space, so lettering in the image would be a second, unrelated heading over
+the first - and it would be wrong in every locale.
+
+**`banner-trading.webp` was NOT touched**, and the lobby hero's scrim was left exactly as it
+was. The trading lobby was not part of the request, its banner is a bright nebula that the
+lighter wash would not survive, and changing how it looks in this commit would smuggle an
+unasked-for change into a game fix - the same reasoning that kept a known one-character defect
+verbatim while settlement was extracted.
+
+**The filenames carry an `-r2` suffix.** A replacement written over the old name is answered
+from a returning visitor's browser cache for as long as the edge's browser TTL says - four
+hours, on R54's evidence, which is what it took to work out why a fixed game would not start. A
+new name is fetched immediately by everybody. The superseded files are deleted, and the
+exhaustive `allNeonBanners()` file-existence test - which exists because artwork committed to
+the wrong directory is something no typecheck and no build can notice - passes on the new set.
+
 ---
 
 ## 5. Dashboard

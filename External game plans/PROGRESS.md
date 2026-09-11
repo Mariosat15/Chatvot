@@ -814,13 +814,24 @@ an upward game and exactly backwards for a time trial.
 **Owner tested:** no. **Never verified by eye.** 28 tests, 13 probes red on exactly 1 failure,
 2,164 tests pass, typecheck at the 194 baseline, `check:mirrors` green.
 
-**Deferred:** the artwork the owner asked to be recreated, and the games-service half (the round
-header strip and `SUBMIT SOLUTION`). Hint, Undo, Moves/Best Time/Combo, the LEVEL bar and the
-GLOBAL/FRIENDS/COUNTRY tabs still have no data source on either side, and a paid Hint is
-forbidden outright.
+**Also shipped, in a second commit:** the **three hero banners redrawn**, which the owner asked
+for explicitly. Composed to the reference's layout - circuit terminals and paths left, gold
+trophy and coins (or a neon stopwatch) right - with **a deliberately near-black middle**, which
+is functional rather than stylistic: the copy sits on top of the picture, so a scrim strong
+enough to rescue legibility over *any* uploaded image is what made the artwork invisible in the
+first place. Art drawn for the scrim lets it drop to a wash. **No text in the artwork** - the
+platform writes the contest's own name there, and painted lettering would be a second heading
+wrong in every locale. **`banner-trading.webp` untouched and the lobby hero's scrim unchanged**:
+trading was not part of the request and its nebula would not survive the lighter wash. Files
+carry an **`-r2` suffix**, because a replacement written over the old name is served from a
+returning visitor's browser cache for hours (R54's four-hour TTL, applied to our own origin).
 
-**Next chat should:** author the missing hero and panel artwork, which the owner explicitly
-asked for, then the games-service half.
+**Deferred:** the games-service half (the round header strip and `SUBMIT SOLUTION`). Hint, Undo,
+Moves/Best Time/Combo, the LEVEL bar and the GLOBAL/FRIENDS/COUNTRY tabs still have no data
+source on either side, and a paid Hint is forbidden outright.
+
+**Next chat should:** ask the owner to look at the screen, then take the games-service half if
+it is wanted.
 
 ---
 

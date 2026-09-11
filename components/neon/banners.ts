@@ -24,9 +24,19 @@ import type { NeonHeroBanner } from "@/components/neon/Hero";
  * defect. **Do not extend this reasoning to anything that produces a number.**
  */
 
+/*
+  THE FILENAMES CARRY A REVISION SUFFIX AND THAT IS DELIBERATE. These three were redrawn on 11
+  September 2026 to match the owner's arena reference, and a replacement written over the old
+  filename is answered from a returning visitor's browser cache for as long as the edge's
+  browser TTL says - four hours, on the evidence of R54, which is what it took to work out why
+  a fixed game would not start. A new name is fetched immediately by everybody. `trading` keeps
+  its original name because its artwork was not touched: the trading lobby was not part of the
+  request, and changing how it looks in the same commit would smuggle an unasked-for change into
+  a game fix.
+*/
 const CHAMPIONSHIP: NeonHeroBanner = {
-  src: "/assets/neon/banner-championship.webp",
-  alt: "A golden championship trophy lit against a dark background",
+  src: "/assets/neon/banner-championship-r2.webp",
+  alt: "A golden championship trophy beside three glowing neon podium blocks on a dark circuit background",
 };
 
 const TRADING: NeonHeroBanner = {
@@ -43,14 +53,14 @@ const BY_GAME_CODE = new Map<string, NeonHeroBanner>([
   [
     "circuit-sprint",
     {
-      src: "/assets/neon/banner-circuit-sprint.webp",
-      alt: "Neon circuit traces curving away like a racetrack towards a chequered flag and a distant city",
+      src: "/assets/neon/banner-circuit-sprint-r2.webp",
+      alt: "Glowing neon circuit terminals joined by curving energy paths, beside a golden trophy and floating coins",
     },
   ],
   [
     "circuit-perfect",
     {
-      src: "/assets/neon/banner-circuit-perfect.webp",
+      src: "/assets/neon/banner-circuit-perfect-r2.webp",
       alt: "A glowing neon puzzle grid with energy paths linking its nodes, beside a neon stopwatch",
     },
   ],

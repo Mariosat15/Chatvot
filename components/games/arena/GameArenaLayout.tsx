@@ -95,15 +95,22 @@ export function GameArenaLayout({
         */}
         <div className="pointer-events-none absolute inset-0" aria-hidden>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={banner.src} alt="" className="h-full w-full object-cover opacity-60" />
+          <img src={banner.src} alt="" className="h-full w-full object-cover opacity-90" />
           {/*
             Two gradients rather than one. The horizontal pass keeps the copy on an opaque
             background, which is the only thing the scrim MUST guarantee; the vertical pass
             darkens the foot so the feature row reads against artwork instead of sitting on a
             bright patch of it. One gradient doing both jobs has to be dark enough for the
             worst case everywhere, which is how the banner ended up invisible before.
+
+            THE SCRIM CAN BE THIS LIGHT ONLY BECAUSE THE ARTWORK WAS DRAWN FOR IT. The three
+            banners redrawn on 11 September 2026 are deliberately bright at the outer thirds and
+            near-black through the middle, so the copy sits on dark paint rather than on a
+            gradient fighting a bright image. A banner supplied by a provider carries no such
+            promise, which is why the horizontal pass is still opaque at the left edge - that is
+            the guarantee, and it does not depend on which picture arrives.
           */}
-          <div className="absolute inset-0 bg-gradient-to-r from-[#070C1A] via-[#070C1A]/85 to-[#070C1A]/20" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#070C1A] via-[#070C1A]/75 to-[#070C1A]/10" />
           <div className="absolute inset-0 bg-gradient-to-t from-[#070C1A] via-transparent to-transparent" />
         </div>
 
