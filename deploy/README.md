@@ -224,7 +224,12 @@ npm run build:admin    # Admin app
 npm run build:api      # API server
 cd websocket-server && npm run build && cd ..  # WebSocket server
 npm run worker:build   # Worker
+npm run build:games    # Games service (ChartVolt Games)
 ```
+
+> All but the WebSocket server are covered by `npm run build:all`. **It assumes every
+> sub-project has already been installed** - the same assumption `build:admin` and `build:api`
+> have always made - so run Step 4 first on a fresh machine.
 
 ### Step 6: Database Setup
 
@@ -656,13 +661,24 @@ npm install
 cd apps/admin && npm install && cd ../..
 cd api-server && npm install && cd ..
 cd websocket-server && npm install && cd ..
+cd games-service && npm install && cd ..
 npm run build
 npm run build:admin
 npm run build:api
 cd websocket-server && npm run build && cd ..
 npm run worker:build
+npm run build:games
 pm2 reload ecosystem.config.js
 ```
+
+> **`npm run build:all` covers every one of those builds except the WebSocket server**, which
+> keeps its own line because it is not wired into the root script. `build:games` was added to
+> `build:all` on **11 September 2026**, and the reason is worth keeping: it was missing, so a
+> deploy that pulled new game source never compiled it and PM2 restarted `chartvolt-games` from
+> a `dist` built weeks earlier. The game then ran old code while every other app ran new code,
+> with nothing failing anywhere - the symptom was a fix that had been shipped, tested and
+> recorded as done still visibly not working in front of the owner. **A build script that omits
+> one service is worse than no build script**, because the deploy reports success.
 
 ### Update Individual Apps
 
@@ -684,6 +700,16 @@ cd /var/www/chartvolt
 git pull origin main
 cd websocket-server && npm run build && cd ..
 pm2 restart chartvolt-websocket
+
+# Update only the games service
+# `npm run build:games` is REQUIRED for any change under `games-service/src`.
+# `games-service/dist` is not tracked, so a pull alone leaves the old build running.
+# A change under `games-service/public/play` is the exception and needs only the restart,
+# because the served file list is read from the directory at boot.
+cd /var/www/chartvolt
+git pull origin main
+npm run build:games
+pm2 restart chartvolt-games
 ```
 
 ---
@@ -1020,6 +1046,24 @@ cd /var/www/chartvolt/games-service
 npm install && npm run build
 pm2 restart chartvolt-games
 ```
+
+> **A HAND-WRITTEN DEPLOY LIST IS WHERE THIS GETS MISSED, AND IT DID.** The sentence above is
+> true of `pm2 deploy` and true of nothing else. On **11 September 2026** the owner deployed
+> with their own sequence — `git reset --hard`, the four `npm install`s, `pm2 stop all`,
+> `rm -rf .next`, `npm run build:all`, the WebSocket build, `pm2 start` — which is correct for
+> every other app and **contained no reference to `games-service` at all**, because
+> `build:all` did not build it either. So the pull brought new game source, nothing compiled
+> it, and PM2 restarted `chartvolt-games` from a `dist` built weeks earlier.
+>
+> The symptom is the part worth remembering: **R66's in-game clock fix had been written,
+> tested, probed, committed and recorded as done, and the owner reported the identical bug the
+> next day.** Nothing failed, nothing was logged, and every other app was running the new code,
+> so the only honest conclusion available from inside the repository was that the fix was
+> wrong. It was not. `build:games` is now part of `build:all`, so the owner's own sequence
+> covers it from that date — but the general rule outlives this instance: **when a fix that is
+> provably correct in the repository is still reported as broken, ask whether the running
+> process has it before reading the code again.** For this service the check is one command:
+> `git show <commit>^:games-service/src/<file>` against what the behaviour implies.
 
 > **`npm run build` is still required, but a missed build no longer breaks the play surface.**
 > Until 8 September 2026 the allowlist authorising the service to serve `public/play` lived in
