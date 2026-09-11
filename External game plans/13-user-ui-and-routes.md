@@ -1589,6 +1589,14 @@ are facts declared in `arena-facts.ts`. `GameRulesPanel`'s *How to play* renders
 steps **from the operator's own paragraph breaks and nothing else**; splitting on sentences would
 invent boundaries, and the common case today is a single paragraph, which renders as prose.
 
+> **AMENDED 11 SEPTEMBER 2026 - s4.1w.** *"The hero is taller"* is correct as history and the
+> opposite of the present fact: the owner rejected it as *"far too tall"* and it is now fixed at
+> **118px**, with a `min-height` forbidden by a test. The artwork is no longer one full-bleed
+> pass either - a 16:9 picture cannot fill a 118px strip under `object-cover` without becoming a
+> sliver - so it is a dim wash plus a right-anchored piece. **The icon-above-label row survives
+> and its reasoning is now enforced rather than merely recorded:** the mock's `BIG REWARDS` is
+> still refused, and a probe puts it back.
+
 **28 tests, 13 probes all red on exactly 1 failure. Typecheck at the 194 baseline. Never
 verified by eye.** Two probes had to be re-aimed before the run could be believed: one searched
 the service for `SCORE_PRODUCING_ROUND_STATUSES`, which is declared in `round-types.ts`, and one
@@ -2284,6 +2292,126 @@ the default one a probe reports "no test matched", which reads like a broken har
 moved target.
 
 **Never verified by eye** - the lobby is behind sign-in.
+
+### 4.1w The hero as one thin banner (owner instruction, 11 September 2026)
+
+The owner sent the built hero beside a reference for it: *"the current banner is far too tall and
+has unnecessary content/cards underneath... TARGET: a single compact horizontal banner,
+approximately 110-125px high on desktop... the banner must stay visually SHORT."*
+
+**This is the second rebuild of this component in a day and the fault was the same both times.**
+The header kept growing until it was the largest thing on a page whose entire purpose is the
+board below it, and the reason it grew is worth stating before anything else, because it is not a
+mistake anybody made in one edit.
+
+#### A MINIMUM HEIGHT IS A FLOOR CONTENT IS FREE TO EXCEED
+
+The previous version set `min-h-[220px]` and then let its content decide. Everything added after
+that was individually reasonable - a genre badge, a heading that wraps to two lines because the
+catalogue's name carries its own subtitle, a three-line description, the contest's own name, and
+three bordered feature cards across the foot - and the sum was the ~400px header in the
+screenshot. **No rule was broken anywhere**, which is precisely why it needed a photograph to
+find, and it is the same mechanism the bottom band was rejected four times for.
+
+So the height is **fixed at 118px**, the middle of the owner's range, and the guard asserts
+`min-h-`, `h-auto` and the old `p-5 sm:p-7` **absent** as well as the fixed height present. A
+floor left beside a ceiling is the ceiling losing, with the ceiling still in the file reading as
+though it governs.
+
+`sm:` only. A phone has no room for a logo, five lines of copy and four features on one row, so
+below that breakpoint the banner stacks and takes the height it needs - a fixed 118 there would
+crop the heading rather than the hero.
+
+#### THE STRUCTURE IS THE OWNER'S, WITH THE THIRD COLUMN HELD EMPTY
+
+`| logo | title and copy | four features | artwork |`, which is a 132px track, a flexible middle
+that itself splits into copy and features, and **a 330px track containing nothing**. The third
+column exists so the copy stops before the artwork rather than running underneath it; the
+alternative - shortening the copy - is a guess that is wrong at the next viewport width. It only
+appears at `xl`, because below that there is not room for both and the copy takes the whole
+banner.
+
+**Every line of copy is clamped to one**, and the assertion **counts** the clamps rather than
+finding one: four of the five lines are operator fields with no practical length limit, and at
+this height a single wrap pushes the line below it out of the banner where `overflow-hidden`
+hides it silently. A test asserting the file contains `truncate` somewhere is satisfied by the
+heading while the tagline beneath it wraps.
+
+**The features are icon and label with no box.** The previous version drew them as bordered,
+padded, tinted cards, which is what made three small facts read as a second section underneath
+the banner rather than as part of it - and a box needs padding, which is height. The labels are
+8px, a **deliberate deviation** from the kit's `NEON_LABEL`: that token is 11px with wide
+tracking, which wraps "Global leaderboard" to three lines in a 68px column and takes the banner
+with it. Recorded here rather than treated as a kit candidate.
+
+**The contest's own name is gone, and that is a removal rather than an omission.** It was a fifth
+line repeating the `Back to {name}` link directly above the banner, so the page now states it
+once. The guard runs in **both** directions, because deleting the link as well would take the
+contest's name off the screen altogether.
+
+#### THE ARTWORK DECISION IS ARITHMETIC, NOT TASTE
+
+The banners are **1280x720**. `object-cover` across a 1350x118 panel shows a **16%-tall
+horizontal slice** through the middle of the picture, so the trophy the owner asked to keep would
+have been reduced to a band of glare. Under `cover`, a box wider than 1.78x its height never
+crops horizontally at all - so there is no value of anything that makes a full-bleed 16:9
+background work in a 118px strip.
+
+Two passes instead. A dim full-width copy at 40% under a left-to-right scrim, so the background
+is the game's rather than flat navy - the owner's *"one continuous graphic"*. Then the picture
+again at **300px tall inside a 330px window anchored to the right edge**, which crops it
+horizontally to roughly its right half, the part carrying the trophy and the pot, at a size a
+player can read. Feathered from the left, because a hard seam between panel and picture is what
+makes artwork look pasted on.
+
+**The order of the two passes is load-bearing and is asserted by position.** They are absolutely
+positioned siblings with no z-index between them, so they paint in document order: written the
+other way round the full-width wash covers the right-hand piece and the trophy disappears behind
+a 40%-opacity copy of itself. That looks like a dim banner rather than like two layers in the
+wrong order, so nothing about the symptom points at the cause.
+
+#### ONE OF THE FOUR REQUESTED LABELS WAS REFUSED
+
+The owner named `FAST ROUNDS`, `REAL PLAYERS`, `BIG REWARDS` and `GLOBAL LEADERBOARD`. Three are
+built and **"Big rewards" is deliberately not**, because **a caption is a claim**: what a contest
+pays depends on its prize pool, the hero receives no prize figure, and a free contest would carry
+the phrase too. The trophy position holds `Skill based` instead - the platform's own guarantee,
+which is the strongest claim that is always true of every contest it will ever run.
+
+The other three are derived rather than written:
+
+- **Fast rounds** comes from `maxDurationSeconds`. That field is a **ceiling, not a length** - the
+  contest's configured round can be shorter - so at or under five minutes the label claims
+  shortness without a figure, above it the label says *"Up to n min"*, and an undeclared ceiling
+  produces **nothing at all**. A guessed length is a deadline the platform never set.
+- **Real players** prefers the contest's actual range, `2-100 players`. The same feature with
+  figures in it, and a figure cannot be a promise.
+- **Global leaderboard** is true of every contest: there is exactly one board and it is on this
+  screen. It also survives the agnostic guard, which bans `board` inside quoted strings -
+  `\bboard\b` does not match inside "leaderboard".
+
+**Four is not padded to.** A title declaring no ceiling loses that slot and gains the interaction
+chip; a title declaring neither renders **three**, because inventing a fourth is how a screen
+starts making claims nothing backs.
+
+#### THE TWO-LINE TITLE WITHOUT PER-GAME CODE
+
+The reference shows a title with a subtitle under it and the catalogue stores **one** name field.
+`splitGameTitle` splits at the **first colon** and nothing else, which is why it is not per-game
+code: the live name is `Circuit Sprint: Fast and Fun Spatial Puzzles`, a title punctuated with
+its own subtitle. Any name without a colon is a single heading; an empty half either side means
+the colon was decorative and the whole name is the title. **Nothing is dropped either way** - the
+same words, in a shape that fits. This is the fault s4.1v fixed on the rules panel, one field
+along.
+
+**15 tests, 18 probes red on exactly one failure.** Two of them were green first time round and
+both were the test's fault rather than the claim's: `overflow-hidden` also sits on the artwork's
+window, so a banner-wide match stayed green while the panel itself let the copy spill - the fifth
+time one identifier has defeated a structural test on this screen - and a slice anchored on the
+bare token `NEON_PANEL_LIT` opened at the **import** two hundred lines early and still satisfied
+its own length assertion.
+
+**Never verified by eye** - the arena is behind sign-in and the automated browser has no session.
 
 ---
 

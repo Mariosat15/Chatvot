@@ -132,50 +132,85 @@ export function GameArenaLayout({
         Back to {competitionName}
       </Link>
 
+      {/*
+        THE HERO IS ONE THIN BANNER AND ITS HEIGHT IS FIXED (owner instruction, 11 September
+        2026: "far too tall and has unnecessary content/cards underneath", with 110-125px
+        named as the range). 118 is the middle of it.
+
+        FIXED RATHER THAN MINIMUM, and that is the whole lesson of the two rebuilds this
+        component has had. A `min-height` is a floor that content is free to exceed, so every
+        individually-reasonable addition - a subtitle, a longer description, a row of facts -
+        made the banner taller than the board it sits above, on a screen a player is paying by
+        the attempt to use. With a fixed height and `overflow-hidden` the ceiling holds no
+        matter what the catalogue contains; what fits is decided here, once, by clamping each
+        line rather than by hoping the copy is short.
+
+        `sm:` ONLY, so a phone stacks instead of cropping. The same rule as the bottom band:
+        a measurement the owner gave for the desktop must not silently become a crop on a
+        narrow screen, where the copy needs two rows and there is no artwork to protect.
+      */}
       <div className={`${NEON_PANEL_LIT} relative mb-5 overflow-hidden`}>
         {/*
-          Decorative and behind the text, so it is `aria-hidden` with an empty alt and the
-          heading below carries the meaning. A plain `<img>` because an operator's banner is
-          served by an API route with a database fallback - see `ArenaIdentity`.
+          THE ARTWORK IS A RIGHT-HAND PIECE NOW, NOT A FULL-BLEED BACKGROUND, and the reason is
+          arithmetic rather than taste. The banners are 1280x720; `object-cover` across a
+          1350x118 panel shows a 16%-tall horizontal slice through the middle of the picture,
+          so the trophy the owner asked to keep would have been reduced to a band of glare.
+
+          So the picture is drawn at 300px tall inside a 330px window anchored to the right
+          edge, which crops it horizontally to roughly its right half - the part carrying the
+          trophy and the pot - at a size a player can actually read. It still bleeds to the
+          edges, and the gradient below feathers its left side into the panel so the banner
+          reads as one continuous graphic rather than as a picture in a box.
+
+          Decorative, so it is `aria-hidden` with an empty alt: the heading beside it carries
+          the meaning. A plain `<img>` because an operator's banner is served by an API route
+          with a database fallback - see `ArenaIdentity`.
         */}
         {/*
-          THE SCRIM IS NAVY, NOT BLACK, and the banner is no longer dimmed to near-nothing.
-          Washing artwork out to 20% under a pure-black gradient made every game's header look
-          the same shade of empty - the operator uploads a banner and cannot see that they
-          did. The gradient still runs opaque behind the text, which is the only thing it has
-          to guarantee, and the artwork survives on the right where nothing is written.
+          A DIM COPY ACROSS THE WHOLE BANNER FIRST, so the background is the game's rather than
+          flat navy - the owner's "one continuous graphic". Heavily scrimmed, because this pass
+          sits under the copy and the only thing a scrim MUST guarantee is that white text on
+          an arbitrary uploaded picture stays legible. That guarantee cannot depend on which
+          image arrives, which is why the left edge is fully opaque.
+
+          FIRST IN THE DOM, AND THAT IS LOAD-BEARING. Both passes are absolutely positioned
+          siblings with no z-index between them, so they paint in document order: written the
+          other way round this full-width wash covers the right-hand piece and the trophy
+          disappears behind a 40%-opacity version of itself - which looks like a dim banner
+          rather than like a layer in the wrong order.
         */}
         <div className="pointer-events-none absolute inset-0" aria-hidden>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={banner.src} alt="" className="h-full w-full object-cover opacity-90" />
-          {/*
-            Two gradients rather than one. The horizontal pass keeps the copy on an opaque
-            background, which is the only thing the scrim MUST guarantee; the vertical pass
-            darkens the foot so the feature row reads against artwork instead of sitting on a
-            bright patch of it. One gradient doing both jobs has to be dark enough for the
-            worst case everywhere, which is how the banner ended up invisible before.
-
-            THE SCRIM CAN BE THIS LIGHT ONLY BECAUSE THE ARTWORK WAS DRAWN FOR IT. The three
-            banners redrawn on 11 September 2026 are deliberately bright at the outer thirds and
-            near-black through the middle, so the copy sits on dark paint rather than on a
-            gradient fighting a bright image. A banner supplied by a provider carries no such
-            promise, which is why the horizontal pass is still opaque at the left edge - that is
-            the guarantee, and it does not depend on which picture arrives.
-          */}
-          <div className="absolute inset-0 bg-gradient-to-r from-[#070C1A] via-[#070C1A]/75 to-[#070C1A]/10" />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#070C1A] via-transparent to-transparent" />
+          <img
+            src={banner.src}
+            alt=""
+            className="h-full w-full object-cover opacity-40"
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#070C1A] via-[#070C1A]/85 to-[#070C1A]/60" />
         </div>
 
-        {/*
-          A MINIMUM HEIGHT, because the hero's size is the owner's point. Without one it is
-          exactly as tall as its text, so a title with no tagline and no description collapses
-          to a strip and the banner behind it is reduced to a stripe - which is the reference's
-          largest element rendered as its smallest.
-        */}
-        <div className="relative min-h-[220px] p-5 sm:p-7">
+        <div
+          className="pointer-events-none absolute inset-y-0 right-0 hidden w-[330px] overflow-hidden xl:block"
+          aria-hidden
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={banner.src}
+            alt=""
+            className="absolute right-0 top-[52%] h-[300px] w-auto max-w-none -translate-y-1/2"
+          />
+          {/*
+            Feathered from the left, because the copy stops at this window's edge and a hard
+            seam between panel and picture is the thing that makes artwork look pasted on. It
+            is opaque where it meets the text and clear at the outer edge, so nothing is
+            written over paint and nothing hides the trophy.
+          */}
+          <div className="absolute inset-0 bg-gradient-to-r from-[#070C1A] via-[#070C1A]/40 to-transparent" />
+        </div>
+
+        <div className="relative px-4 py-3 sm:h-[118px] sm:px-[18px] sm:py-2">
           <ArenaIdentity
             presentation={presentation}
-            contestName={competitionName}
             minParticipants={minParticipants}
             maxParticipants={maxParticipants}
           />

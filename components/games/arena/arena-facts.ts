@@ -65,6 +65,64 @@ export function playersChip(
 }
 
 /**
+ * The game's name split into a title and a subtitle at its first colon.
+ *
+ * THE REFERENCE SHOWS TWO LINES AND THE CATALOGUE STORES ONE FIELD. `displayName` is free
+ * text an operator types, and the live one is `Circuit Sprint: Fast and Fun Spatial Puzzles` -
+ * a name with its own subtitle inside it. Rendered whole at heading size it runs the width of
+ * the page, which is the same fault that made the rules panel's heading unreadable.
+ *
+ * A COLON IS THE ONLY THING THIS LOOKS FOR, and that is why it is not per-game code. Any
+ * title punctuated that way splits; any title without one is a single heading and shows no
+ * subtitle. Nothing is dropped either way - the two halves are both rendered, one above the
+ * other, so a player reads the same words in a shape that fits.
+ *
+ * An empty half on either side means the colon was decorative, so the whole name is the title.
+ */
+export function splitGameTitle(gameName: string): {
+  title: string;
+  subtitle: string | null;
+} {
+  const at = gameName.indexOf(":");
+  if (at <= 0) return { title: gameName.trim(), subtitle: null };
+
+  const title = gameName.slice(0, at).trim();
+  const subtitle = gameName.slice(at + 1).trim();
+  if (!title || !subtitle) return { title: gameName.trim(), subtitle: null };
+
+  return { title, subtitle };
+}
+
+/** A round ceiling at or below this reads as "fast" rather than as a figure. */
+const FAST_ROUND_SECONDS = 300;
+
+/**
+ * How long an attempt can run, in the fewest words that are still true.
+ *
+ * `maxDurationSeconds` IS A CEILING, NOT A LENGTH, which is why the long form says "up to".
+ * The contest's own configured round can be shorter, so stating the catalogue figure as the
+ * round length would be a number no player's clock agrees with. Under five minutes the
+ * ceiling makes every round short, so the claim holds without a figure at all.
+ *
+ * An undeclared ceiling returns nothing. A guessed length here would be a deadline the
+ * platform never set, and the round's own clock is the authority on it.
+ */
+export function roundLengthLabel(
+  maxDurationSeconds: number | undefined,
+): string | null {
+  if (
+    typeof maxDurationSeconds !== "number" ||
+    !Number.isFinite(maxDurationSeconds) ||
+    maxDurationSeconds <= 0
+  ) {
+    return null;
+  }
+
+  if (maxDurationSeconds <= FAST_ROUND_SECONDS) return "Fast rounds";
+  return `Up to ${Math.round(maxDurationSeconds / 60)} min`;
+}
+
+/**
  * Skill, not chance - and this one is a platform constant rather than a per-game fact.
  *
  * Only skill-based games are in scope at all: a chance-determined outcome would invert the
@@ -76,6 +134,58 @@ export const SKILL_CHIP: ArenaChip = {
   label: "Skill based",
   detail: "Outcomes are earned, never drawn",
 };
+
+/** One of the four small items across the middle of the hero. */
+export interface ArenaFeature {
+  label: string;
+  /** Which glyph to draw. A name rather than a component, so this module stays pure. */
+  icon: "speed" | "players" | "skill" | "ranking";
+}
+
+/**
+ * The hero's four features, in the reference's order.
+ *
+ * THE REFERENCE'S FOUR LABELS ARE MARKETING AND THREE OF THEM ARE SAFE. "Fast rounds",
+ * "Real players" and "Global leaderboard" are either derived from a declared field or true of
+ * every contest this platform will ever run - no paid format is single-player, and every
+ * contest has exactly one board, which is on this screen. **The fourth, "Big rewards", is
+ * deliberately not here**: what a contest pays depends on its prize pool, so the phrase is a
+ * promise the hero cannot check, and a free contest would carry it too. The trophy position
+ * holds the platform's skill guarantee instead, which is the strongest claim that is always
+ * true.
+ *
+ * THE PLAYER COUNT PREFERS THE REAL RANGE over the reference's wording. "2-100 players" is
+ * the same feature with the contest's own figures in it, and a figure cannot be a promise.
+ *
+ * FOUR IS NOT PADDED TO. Every entry is either a fact or a platform constant, so a title
+ * declaring nothing renders three rather than inventing a fourth.
+ */
+export function heroFeatures(
+  maxDurationSeconds: number | undefined,
+  family: string | undefined,
+  minParticipants: number | undefined,
+  maxParticipants: number | undefined,
+): ArenaFeature[] {
+  const features: ArenaFeature[] = [];
+
+  // The speed slot falls back to HOW players relate, which is the other thing a declared
+  // field can say about the shape of an attempt.
+  const rounds = roundLengthLabel(maxDurationSeconds);
+  const interaction = rounds ? null : interactionChip(family);
+  if (rounds) features.push({ label: rounds, icon: "speed" });
+  else if (interaction) features.push({ label: interaction.label, icon: "speed" });
+
+  const players = playersChip(minParticipants, maxParticipants);
+  features.push({
+    label: players ? players.label : "Real players",
+    icon: "players",
+  });
+
+  features.push({ label: SKILL_CHIP.label, icon: "skill" });
+  features.push({ label: "Global leaderboard", icon: "ranking" });
+
+  return features;
+}
 
 /**
  * What the score column means, in the player's words.
