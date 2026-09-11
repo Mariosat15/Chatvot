@@ -1,6 +1,6 @@
 # Probes for the guards behind the owner's 11 September 2026 rejection of the arena hero:
 # "the current banner is far too tall and has unnecessary content/cards underneath... TARGET: a
-# single compact horizontal banner, approximately 110-125px high on desktop."
+# single compact horizontal banner, approximately 110-125px high on desktop" - then, on seeing 118, "the icons and info needs to be bigger... you may need to make the banner bigger."
 #
 # EVERY DEFECT PROBED HERE RENDERS PERFECTLY AND REPORTS SUCCESS. A banner that grows to fit
 # its copy, a wrapped heading pushing a tagline out of view, three bordered cards where four
@@ -26,6 +26,9 @@ $Suite = '__tests__/games/arena-hero.test.ts'
 $LAYOUT = 'components/games/arena/GameArenaLayout.tsx'
 $IDENTITY = 'components/games/arena/ArenaIdentity.tsx'
 $FACTS = 'components/games/arena/arena-facts.ts'
+$PRESENTATION = 'lib/services/games/game-presentation.service.ts'
+$ADMIN_FIELDS = 'apps/admin/lib/admin/game-content-fields.ts'
+$DIALOG = 'apps/admin/components/admin/games/GameContentDialog.tsx'
 
 function Read-Source([string]$Path) {
   $resolved = (Resolve-Path -LiteralPath $Path).Path
@@ -52,7 +55,7 @@ $probes = @(
     # became the header the owner photographed, one reasonable addition at a time.
     Name = 'the banner goes back to a minimum height it can exceed'
     File = $LAYOUT
-    From = 'className="relative px-4 py-3 sm:h-[118px] sm:px-[18px] sm:py-2"'
+    From = 'className="relative px-4 py-3 sm:h-[150px] sm:px-[18px] sm:py-2"'
     To   = 'className="relative min-h-[220px] p-5 sm:p-7"'
     Test = 'fixes the height rather than flooring it'
   },
@@ -61,8 +64,8 @@ $probes = @(
     # fixed height stays, reading as though it governs, with a floor beside it that wins.
     Name = 'a minimum height is added beside the fixed one'
     File = $LAYOUT
-    From = 'className="relative px-4 py-3 sm:h-[118px]'
-    To   = 'className="relative min-h-[180px] px-4 py-3 sm:h-[118px]'
+    From = 'className="relative px-4 py-3 sm:h-[150px]'
+    To   = 'className="relative min-h-[180px] px-4 py-3 sm:h-[150px]'
     Test = 'fixes the height rather than flooring it'
   },
   @{
@@ -70,8 +73,8 @@ $probes = @(
     # height, and 28px of it top and bottom is a quarter of the banner.
     Name = 'the generous padding comes back'
     File = $LAYOUT
-    From = 'sm:h-[118px] sm:px-[18px] sm:py-2"'
-    To   = 'sm:h-[118px] p-5 sm:px-[18px]"'
+    From = 'sm:h-[150px] sm:px-[18px] sm:py-2"'
+    To   = 'sm:h-[150px] p-5 sm:px-[18px]"'
     Test = 'fixes the height rather than flooring it'
   },
   @{
@@ -91,9 +94,9 @@ $probes = @(
     # where `overflow-hidden` hides them with nothing on screen to say so.
     Name = 'the heading wraps instead of truncating'
     File = $IDENTITY
-    From = 'className="mt-0.5 truncate text-[19px] font-bold uppercase italic leading-tight tracking-wide text-white sm:text-[22px]"'
-    To   = 'className="mt-0.5 text-[19px] font-bold uppercase italic leading-tight tracking-wide text-white sm:text-[22px]"'
-    Test = 'clamps every line of operator copy to one'
+    From = 'className="mt-0.5 truncate text-[21px] font-bold uppercase italic leading-tight tracking-wide text-white sm:text-[25px]"'
+    To   = 'className="mt-0.5 text-[21px] font-bold uppercase italic leading-tight tracking-wide text-white sm:text-[25px]"'
+    Test = 'clamps the copy to the lines the height affords'
   },
   @{
     # THE CONTROL FOR THE COUNT. `truncate` appears on three lines, so a guard asserting the
@@ -101,18 +104,30 @@ $probes = @(
     # This probe removes a DIFFERENT one, and it must still go red.
     Name = 'the tagline wraps while the heading still truncates'
     File = $IDENTITY
-    From = 'className="mt-0.5 truncate text-[10px] font-semibold text-sky-300 sm:text-[11px]"'
-    To   = 'className="mt-0.5 text-[10px] font-semibold text-sky-300 sm:text-[11px]"'
-    Test = 'clamps every line of operator copy to one'
+    From = 'className="mt-0.5 truncate text-[11px] font-semibold text-sky-300 sm:text-[12px]"'
+    To   = 'className="mt-0.5 text-[11px] font-semibold text-sky-300 sm:text-[12px]"'
+    Test = 'clamps the copy to the lines the height affords'
   },
   @{
-    # The description is a 2,000-character operator field. Three lines of it is three quarters
-    # of the banner, which is what the previous version gave it.
+    # The description is a 2,000-character operator field. It is TWO lines since the owner's
+    # second message - one cut the live title's copy mid-sentence, which reads as a rendering
+    # fault - and a third is three quarters of the banner, which is what the version before
+    # the first rejection gave it.
     Name = 'the description is allowed three lines again'
     File = $IDENTITY
-    From = 'className="mt-0.5 line-clamp-1 text-[9px] leading-snug text-gray-400 sm:text-[10px]"'
-    To   = 'className="mt-0.5 line-clamp-3 text-[9px] leading-snug text-gray-400 sm:text-[10px]"'
-    Test = 'clamps every line of operator copy to one'
+    From = 'className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-gray-400 sm:text-[11px]"'
+    To   = 'className="mt-0.5 line-clamp-3 text-[10px] leading-snug text-gray-400 sm:text-[11px]"'
+    Test = 'clamps the copy to the lines the height affords'
+  },
+  @{
+    # THE CONTROL IN THE OTHER DIRECTION, and it is the one this slice needed. The owner asked
+    # for the description to SHOW; a guard that only forbids three lines is equally happy with
+    # the one line that was cutting it off, so the two-line spelling is asserted present too.
+    Name = 'the description goes back to one clipped line'
+    File = $IDENTITY
+    From = 'className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-gray-400 sm:text-[11px]"'
+    To   = 'className="mt-0.5 line-clamp-1 text-[10px] leading-snug text-gray-400 sm:text-[11px]"'
+    Test = 'clamps the copy to the lines the height affords'
   },
 
   # ---- The features -----------------------------------------------------------------------
@@ -122,19 +137,60 @@ $probes = @(
     # it - and a box needs padding, which is height.
     Name = 'the features go back to being bordered cards'
     File = $IDENTITY
-    From = 'className="flex w-[68px] flex-col items-center gap-1 text-center"'
+    From = 'className="flex w-[92px] flex-col items-center gap-1.5 text-center"'
     To   = 'className="flex flex-col items-center gap-1.5 rounded-lg border border-violet-500/20 bg-black/40 px-2 py-3 text-center"'
     Test = 'draws the features as icon and label, never as cards'
   },
   @{
-    # The owner's range for these labels is 7-9px. The kit's `NEON_LABEL` is 11 with wide
-    # tracking, which is the natural thing to reach for and makes each label three lines in a
-    # 68px column - so the row grows and takes the banner with it.
-    Name = 'the labels go back to the kit size'
+    # THE OWNER'S SECOND MESSAGE WAS THAT THESE ARE TOO SMALL, so the probe now restores the
+    # size that produced that reply rather than the kit's. The kit's `NEON_LABEL` is still
+    # wrong here and for the same reason - 11px with wide tracking needs three lines for
+    # "Global leaderboard" in a column this width - which is why the deviation is recorded in
+    # the component rather than proposed for the kit.
+    Name = 'the labels go back to the size the owner rejected'
     File = $IDENTITY
-    From = 'className="text-[8px] font-bold uppercase leading-tight tracking-wider text-gray-300"'
-    To   = 'className="text-[11px] font-bold uppercase leading-tight tracking-wider text-gray-300"'
+    From = 'className="text-[10px] font-bold uppercase leading-tight tracking-wide text-gray-200"'
+    To   = 'className="text-[8px] font-bold uppercase leading-tight tracking-wider text-gray-300"'
     Test = 'draws the features as icon and label, never as cards'
+  },
+  @{
+    # The glyph half. "The icons and info needs to be bigger" was about the picture first, and
+    # a guard that only reads the label is satisfied while the icon stays at its old size.
+    Name = 'the feature glyph goes back to its old size'
+    File = $IDENTITY
+    From = '<Icon className="h-6 w-6 text-sky-300" />'
+    To   = '<Icon className="h-3.5 w-3.5 text-sky-300" />'
+    Test = 'draws the features as icon and label, never as cards'
+  },
+
+  # ---- The logo ---------------------------------------------------------------------------
+  @{
+    # "the game logo bigger", and the box is only half of it: the picture lives inside a grid
+    # track, so a bigger box in a 132px column is a bigger box that is clipped.
+    Name = 'the logo box shrinks back inside its track'
+    File = $IDENTITY
+    From = 'sm:h-[120px] sm:w-[168px]'
+    To   = 'sm:h-[60px] sm:w-[132px]'
+    Test = 'gives the logo a track the artwork actually fills'
+  },
+  @{
+    # The other half. A track narrowed under a box sized for it leaves the logo cropped by the
+    # column - and the banner still measures 150px, so every height guard stays green.
+    Name = 'the logo track narrows under the box'
+    File = $IDENTITY
+    From = 'sm:grid-cols-[168px_minmax(0,1fr)]'
+    To   = 'sm:grid-cols-[132px_minmax(0,1fr)]'
+    Test = 'gives the logo a track the artwork actually fills'
+  },
+  @{
+    # THE FALLBACK IS THE COMMON CASE. No title in the catalogue has uploaded a logo, so a
+    # monogram left at its old size is a shrunken initial in a box sized for something else -
+    # on every hero rather than on the rare one.
+    Name = 'the monogram is left at its old size'
+    File = $IDENTITY
+    From = 'sm:h-[112px] sm:w-[112px] sm:text-4xl'
+    To   = 'sm:h-[60px] sm:w-[60px] sm:text-4xl'
+    Test = 'gives the logo a track the artwork actually fills'
   },
 
   # ---- The artwork ------------------------------------------------------------------------
@@ -143,8 +199,8 @@ $probes = @(
     # a tagline over a trophy. The banner still measures 118px, so the height guards are silent.
     Name = 'the copy runs under the artwork'
     File = $IDENTITY
-    From = 'xl:grid-cols-[132px_minmax(0,1fr)_330px]'
-    To   = 'xl:grid-cols-[132px_minmax(0,1fr)]'
+    From = 'xl:grid-cols-[168px_minmax(0,1fr)_330px]'
+    To   = 'xl:grid-cols-[168px_minmax(0,1fr)]'
     Test = 'reserves the right-hand track so the copy stops before the artwork'
   },
   @{
@@ -226,6 +282,72 @@ $probes = @(
     From = 'Back to {competitionName}'
     To   = 'Back to the competition'
     Test = 'states the contest name once on the page, not twice'
+  },
+
+  # ---- The strip an operator writes -------------------------------------------------------
+  @{
+    # THE ONE THAT WOULD HAVE SHIPPED AS A DEFECT. No title carries authored features, so
+    # reading an unset field as "show none" strips four facts off every hero in the catalogue
+    # the day it lands - with nothing failing, nothing logged and no wrong number anywhere.
+    Name = 'an empty strip is read as an empty banner'
+    File = $FACTS
+    From = '  if (written.length > 0) return written;'
+    To   = '  if (Array.isArray(authored)) return written;'
+    Test = 'works the four out when nothing is written'
+  },
+  @{
+    # The other direction. A merge reads as generous and leaves an operator unable to tell
+    # which two lines are theirs, or to remove ours.
+    Name = 'the authored strip is merged with the derived four'
+    File = $FACTS
+    From = '  if (written.length > 0) return written;'
+    To   = '  if (written.length >= 4) return written;'
+    Test = 'replaces all four when even one is written'
+  },
+  @{
+    # An unrecognised slug must lose its picture and KEEP its row: the label is the operator's
+    # statement and the icon is decoration beside it.
+    Name = 'a row with an unknown glyph is dropped'
+    File = $FACTS
+    From = '        .filter((row) => row.label !== "")'
+    To   = '        .filter((row) => row.label !== "" && row.icon !== undefined)'
+    Test = 'keeps the words when it does not know the glyph'
+  },
+  @{
+    # A glyph the picker offers and the banner cannot draw renders a neutral mark on the live
+    # page while the admin screen shows the operator the icon they chose.
+    Name = 'a glyph the picker offers is missing from the banner'
+    File = $IDENTITY
+    From = '  ["reward", Trophy],'
+    To   = ''
+    Test = 'offers no glyph the banner cannot draw'
+  },
+  @{
+    # An unknown icon slug must be REFUSED, where an unknown genre is normalised. Nothing but
+    # this dialog has ever written a slug, so there is no legitimate writer to protect.
+    Name = 'an unknown icon is accepted as written'
+    File = $ADMIN_FIELDS
+    From = '      if (!isHeroFeatureIcon(row.icon)) {'
+    To   = '      if (false) {'
+    Test = 'refuses an icon the picker does not offer'
+  },
+  @{
+    # THE PROJECTION IS THE ONE MENTION THAT DECIDES WHETHER A VALUE ARRIVES. Stored,
+    # operator-editable and selected by nothing is the rules-text defect exactly.
+    Name = 'the strip is stored and never read back'
+    File = $PRESENTATION
+    From = 'highlights heroFeatures family'
+    To   = 'highlights family'
+    Test = 'reads the strip back out of the catalogue'
+  },
+  @{
+    # The sentence is the feature: neither "empty means we work them out" nor "one replaces all
+    # four" is guessable from a list of inputs, and both are decisions an operator must make.
+    Name = 'the dialog stops explaining what an empty strip does'
+    File = $DIALOG
+    From = 'works them out'
+    To   = 'leaves them out'
+    Test = 'tells the operator what an empty strip does'
   }
 )
 

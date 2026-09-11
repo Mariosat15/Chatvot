@@ -28,6 +28,10 @@ import {
   CONTENT_LIMITS,
 } from "@/lib/admin/game-content-fields";
 import {
+  HERO_FEATURE_ICONS,
+  HERO_FEATURE_LIMIT,
+} from "@/lib/services/games/hero-features";
+import {
   GAME_CATEGORIES,
   normaliseCategorySlug,
   resolveGameCategory,
@@ -71,6 +75,7 @@ interface Draft {
   howToPlayImageUrl: string;
   highlightsImageUrl: string;
   highlights: { title: string; detail: string }[];
+  heroFeatures: { icon: string; label: string }[];
 }
 
 function draftFrom(title: ProviderTitleRow): Draft {
@@ -89,6 +94,7 @@ function draftFrom(title: ProviderTitleRow): Draft {
     howToPlayImageUrl: title.howToPlayImageUrl ?? "",
     highlightsImageUrl: title.highlightsImageUrl ?? "",
     highlights: title.highlights ? title.highlights.map((row) => ({ ...row })) : [],
+    heroFeatures: title.heroFeatures ? title.heroFeatures.map((row) => ({ ...row })) : [],
   };
 }
 
@@ -123,6 +129,18 @@ export default function GameContentDialog({
         : current,
     );
 
+  const setFeature = (at: number, key: "icon" | "label", value: string) =>
+    setDraft((current) =>
+      current
+        ? {
+            ...current,
+            heroFeatures: current.heroFeatures.map((row, index) =>
+              index === at ? { ...row, [key]: value } : row,
+            ),
+          }
+        : current,
+    );
+
   const handleSave = async () => {
     // Reason: a half-filled card renders as a bug on the player's screen rather than as an
     // operator leaving something out, so it is caught here with a message naming the row
@@ -132,6 +150,14 @@ export default function GameContentDialog({
     );
     if (incomplete >= 0) {
       toast.error(`Highlight ${incomplete + 1} needs both a title and a detail.`);
+      return;
+    }
+
+    // Same reason, one field along. An empty label on the banner is a floating glyph with no
+    // words under it, in a fixed-height column beside three that have them.
+    const blank = draft.heroFeatures.findIndex((row) => row.label.trim() === "");
+    if (blank >= 0) {
+      toast.error(`Banner feature ${blank + 1} needs a label.`);
       return;
     }
 
@@ -167,6 +193,7 @@ export default function GameContentDialog({
         howToPlayImageUrl: draft.howToPlayImageUrl,
         highlightsImageUrl: draft.highlightsImageUrl,
         highlights: draft.highlights,
+        heroFeatures: draft.heroFeatures,
       });
       onOpenChange(false);
     } catch {
@@ -365,6 +392,104 @@ export default function GameContentDialog({
                 onChange={(url) => set("highlightsImageUrl", url)}
               />
             </div>
+          </div>
+
+          {/*
+            The hero banner's strip (owner, 11 September 2026).
+
+            THE EMPTY STATE IS THE INTERESTING ONE and it is the reason this block carries
+            more prose than the fields above it. Leaving the list empty is not "show nothing"
+            - the banner works four features out from the title's own settings - so an
+            operator who adds one row has silently replaced all four, and an operator who
+            deletes their rows has restored them. Neither is guessable from a list of inputs,
+            which is why both sentences are on the screen rather than in a comment.
+          */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>Banner features</Label>
+                <p className="text-xs text-white/50">
+                  The {HERO_FEATURE_LIMIT} icon-and-label items across the middle of the
+                  game&apos;s hero banner. Leave this empty and the banner works them out from
+                  the title&apos;s own settings - the round length, the contest&apos;s player
+                  range and how it is scored. Add even one and yours replace all of them.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={draft.heroFeatures.length >= CONTENT_LIMITS.heroFeatures}
+                onClick={() =>
+                  set("heroFeatures", [
+                    ...draft.heroFeatures,
+                    { icon: HERO_FEATURE_ICONS[0].slug as string, label: "" },
+                  ])
+                }
+              >
+                <Plus className="mr-1.5 h-3.5 w-3.5" />
+                Add
+              </Button>
+            </div>
+
+            {draft.heroFeatures.length === 0 ? (
+              <p className="rounded-lg border border-dashed border-white/10 px-3 py-4 text-center text-xs text-white/40">
+                None written. The banner shows the {HERO_FEATURE_LIMIT} it works out itself.
+              </p>
+            ) : (
+              draft.heroFeatures.map((row, at) => (
+                <div
+                  key={at}
+                  className="flex items-start gap-2 rounded-lg border border-white/10 bg-white/5 p-3"
+                >
+                  <div className="grid flex-1 gap-2 sm:grid-cols-[1fr_2fr]">
+                    {/*
+                      THE SHARED `Select`, never a native `<select>`. This surface's fields are
+                      `bg-white/5 text-white`, and a browser paints a native drop-down list
+                      itself - taking the background from the element and letting the options
+                      inherit the colour - so a translucent white composites over the
+                      browser's light list surface and every option is white on white. That is
+                      R60, reported on this very dialog's genre picker.
+                    */}
+                    <Select
+                      value={row.icon}
+                      onValueChange={(value) => setFeature(at, "icon", value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {HERO_FEATURE_ICONS.map((option) => (
+                          <SelectItem key={option.slug} value={option.slug}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      value={row.label}
+                      maxLength={CONTENT_LIMITS.heroFeatureLabel}
+                      placeholder="Fast rounds"
+                      onChange={(event) => setFeature(at, "label", event.target.value)}
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="text-white/40 hover:text-red-300"
+                    onClick={() =>
+                      set(
+                        "heroFeatures",
+                        draft.heroFeatures.filter((_, index) => index !== at),
+                      )
+                    }
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))
+            )}
           </div>
 
           <div className="space-y-3">

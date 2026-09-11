@@ -106,6 +106,9 @@ export interface ProviderTitleRow {
   howToPlayImageUrl?: string;
   highlightsImageUrl?: string;
   highlights?: { title: string; detail: string }[];
+  // Ours as well, and absent is an instruction rather than a gap: the banner works four
+  // features out from the title's declared settings when this is unset.
+  heroFeatures?: { icon: string; label: string }[];
 }
 
 export interface CatalogueSyncSummary {

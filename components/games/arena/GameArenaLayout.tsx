@@ -135,7 +135,14 @@ export function GameArenaLayout({
       {/*
         THE HERO IS ONE THIN BANNER AND ITS HEIGHT IS FIXED (owner instruction, 11 September
         2026: "far too tall and has unnecessary content/cards underneath", with 110-125px
-        named as the range). 118 is the middle of it.
+        named as the range - then, on seeing 118, "the icons and info needs to be bigger and
+        also the game logo bigger and also the info of the game must show - you may need to
+        make the banner bigger").
+
+        150 IS ARRIVED AT, NOT CHOSEN, which is the only way a second number is any better
+        than the first. It is the badge, a 25px heading, the subtitle, the tagline and two
+        lines of description at the sizes asked for - about 112px - plus the 16px of padding,
+        with the logo at 120 inside the same box. Nothing in it is a guess about the copy.
 
         FIXED RATHER THAN MINIMUM, and that is the whole lesson of the two rebuilds this
         component has had. A `min-height` is a floor that content is free to exceed, so every
@@ -153,7 +160,7 @@ export function GameArenaLayout({
         {/*
           THE ARTWORK IS A RIGHT-HAND PIECE NOW, NOT A FULL-BLEED BACKGROUND, and the reason is
           arithmetic rather than taste. The banners are 1280x720; `object-cover` across a
-          1350x118 panel shows a 16%-tall horizontal slice through the middle of the picture,
+          1350x150 panel shows a 20%-tall horizontal slice through the middle of the picture,
           so the trophy the owner asked to keep would have been reduced to a band of glare.
 
           So the picture is drawn at 300px tall inside a 330px window anchored to the right
@@ -208,7 +215,7 @@ export function GameArenaLayout({
           <div className="absolute inset-0 bg-gradient-to-r from-[#070C1A] via-[#070C1A]/40 to-transparent" />
         </div>
 
-        <div className="relative px-4 py-3 sm:h-[118px] sm:px-[18px] sm:py-2">
+        <div className="relative px-4 py-3 sm:h-[150px] sm:px-[18px] sm:py-2">
           <ArenaIdentity
             presentation={presentation}
             minParticipants={minParticipants}

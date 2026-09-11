@@ -30,6 +30,8 @@ export interface IProviderGame extends Document {
   /** Ours, not the provider's - the arena's two illustrations. See the schema note below. */
   howToPlayImageUrl?: string;
   highlightsImageUrl?: string;
+  /** Ours. The hero banner's four small claims. Absent means the derived four - see below. */
+  heroFeatures?: { icon: string; label: string }[];
   family: "independent" | "head_to_head";
   playMode?: "anytime" | "scheduled";
   /** OUR answer, when the provider's is absent or wrong for how we want to run it. */
@@ -164,6 +166,35 @@ const ProviderGameSchema = new Schema<IProviderGame>(
     // different-looking panel rather than a gap, and why nothing here may become required.
     howToPlayImageUrl: { type: String, trim: true },
     highlightsImageUrl: { type: String, trim: true },
+
+    // The hero banner's four small claims (owner, 11 September 2026).
+    //
+    // OURS, like the two illustrations above, and in no sync allow-list for the same reason:
+    // they are the strip on OUR banner, not a fact about the provider's title, so no provider
+    // is asked for them and the requirements document is unchanged.
+    //
+    // ABSENT MEANS DERIVED, WHICH IS THE OPPOSITE OF AN EMPTY SET. Every title carries none
+    // of these today, and the arena works the four out from declared fields - the round
+    // ceiling, the family, the contest's player range - so an unset value must keep producing
+    // those rather than four blank slots on a fixed-height banner. `game-content.service.ts`
+    // already `$unset`s an empty array, so clearing the list in the dialog restores the
+    // derived four rather than storing `[]`.
+    //
+    // `icon` is a String and NOT an enum, deliberately, on the same reasoning as `category`:
+    // a missing enum value rejects the whole write, and the vocabulary is what we OFFER. The
+    // validator refuses an unknown slug at the door it can be written through, and the arena
+    // draws a neutral mark for anything it does not recognise rather than dropping the row.
+    // `_id: false` because these are content and nothing joins to them.
+    heroFeatures: {
+      type: [
+        {
+          _id: false,
+          icon: { type: String, required: true, trim: true },
+          label: { type: String, required: true, trim: true },
+        },
+      ],
+      default: undefined,
+    },
 
     // Capability declarations from the catalogue.
     //

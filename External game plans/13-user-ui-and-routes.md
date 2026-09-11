@@ -2413,6 +2413,129 @@ its own length assertion.
 
 **Never verified by eye** - the arena is behind sign-in and the automated browser has no session.
 
+> **AMENDED LATER THE SAME DAY by s4.1x, and four of this section's facts are correct as history
+> only.** The owner replied to the 118px banner with *"the icons and info needs to be bigger and
+> also the game logo bigger and also the info of the game must show - you may need to make the
+> banner bigger"*. So: **the height is 150, not 118**; the **feature labels are 10px, not 8**,
+> and their glyphs 24px; the **description is clamped to two lines, not one**; and the logo's
+> track is **168px, not 132**. The mechanism is unchanged and is the part that must not drift -
+> it is still a fixed ceiling with `min-h-`, `h-auto`, `p-5` and `p-7` asserted absent. The
+> refusal of "Big rewards" also stands **as a derived claim** and no longer as an absolute: an
+> operator may now write those words themselves. See s4.1x.
+
+### 4.1x The strip an operator writes, and a banner sized for it (owner instruction, 11 September 2026)
+
+The owner's reply to s4.1w, against a screenshot with the four features circled: *"the icons and
+info needs to be bigger and also the game logo bigger and also the info of the game must show -
+you may need to make the banner bigger - also the info and icons of the banner must be able to
+change them from the games edit content in admin like the others."*
+
+**Five requests, and the last one is the only structural change.** The first four are sizes; the
+fifth turns the strip from something the platform works out into something an operator can write,
+which is the half worth reading carefully.
+
+#### RAISING A HEIGHT IS THE EXACT THING s4.1w WAS BUILT TO PREVENT, SO THE NUMBER IS ARRIVED AT
+
+A second number is no better than the first unless it comes from somewhere. 150 is what the
+requested sizes need: the genre badge at 9px, a 25px heading, the subtitle, the tagline and two
+clamped description lines is about 112px, plus 16px of padding, with the logo at 120 inside the
+same box. Nothing in it is a guess about the copy.
+
+**What must never change is that it is a ceiling.** `min-h-`, `h-auto`, `p-5` and `p-7` stay
+asserted absent, because the fault both rebuilds shared was not the number - it was a floor
+content could exceed, sitting in the file reading as though it decided. A bigger banner is a
+different measurement; a banner that can grow is the defect back.
+
+#### THE DESCRIPTION WAS NOT SMALL, IT WAS CUT OFF
+
+*"the info of the game must show"*. `line-clamp-1` clipped the live title's description at
+*"...quick thinking and precision are key. Connect"*, which reads as a rendering fault rather
+than as a summary. It is two lines now, and **three is still forbidden** - the budget does not
+carry it and nothing on screen would say so. The test was **renamed rather than rewritten**,
+because the claim is unchanged: every line is clamped to a number the height was measured for.
+
+The logo's guard is the one worth copying. *"the game logo bigger"* is **two numbers** - the box
+and the grid track it sits in - and asserting either alone passes a broken screen: a bigger box
+in a 132px column is a bigger box that is clipped, and a wider track under the old box is a small
+logo in a wide gap. The test reads both out of the file and compares them. The **monogram** is
+checked too, because it is the fallback for a title with no uploaded artwork - which is every
+title today - so leaving it at the old size is a shrunken initial on the common case.
+
+#### THE STRIP BECOMES CATALOGUE CONTENT, AND ABSENT MEANS DERIVED
+
+`provider_game.heroFeatures` is a list of `{ icon, label }`, **ours** and therefore in no sync
+allow-list at all - not even `firstSyncOnlyFields`, which the six contractual presentation fields
+use. The provider contract is unchanged and **there is no version to bump**, exactly as with the
+two panel illustrations.
+
+**An unset field means "work the four out", never "show none".** No title in the catalogue
+carries authored features, so the opposite reading would have stripped four facts off every hero
+the day this shipped, with nothing failing and nothing logged. This is the `resolveAllowedGameTypes`
+reading of an empty stored value, and the *opposite* of `entryBlockThreshold`'s "a stored value
+and an absent one are different facts" - the question that decides it is which way the failure
+falls. It also comes free: `game-content.service.ts` already `$unset`s an empty array, so clearing
+the list in the dialog restores the derived four.
+
+**One authored row replaces all four, not two of theirs beside two of ours.** A merge reads as
+generous and leaves an operator unable to tell which lines are theirs or to remove ours. The
+dialog says so beside the field, because a rule an operator cannot see is one they cannot use.
+
+**`resolveHeroFeatures` in `arena-facts.ts` is the only place that decision is taken.** A second
+copy is the "one rule, two copies" shape behind `referenceId`, `failedReason`, `challengeId` and
+the Game Master `||`, and here the two answers are "the operator's strip" and "the platform's",
+on the screen a player reads immediately before paying.
+
+#### THE ICON VOCABULARY IS MIRRORED, MODEL-FREE AND NOT AN ENUM
+
+`lib/services/games/hero-features.ts`, copied byte for byte into
+`apps/admin/lib/services/games/hero-features.ts` - the `game-categories.ts` precedent. Three
+things about its shape are decisions rather than style:
+
+- **Model-free by requirement.** The dialog is `"use client"`, and **R58** is that a client
+  component naming a driver-reaching module in a value-import position cannot build - which no
+  typecheck, no test and no dev server can see.
+- **`icon` is a `String` on the schema and deliberately not an enum.** A missing enum value
+  rejects the **whole write**, so a vocabulary on the model means a slug we have not foreseen
+  costs the entire catalogue row on a scheduled sync, silently.
+- **An unrecognised slug keeps its row and loses its picture.** The label is the operator's
+  statement and the glyph is decoration beside it, so dropping the row to save the picture is the
+  wrong way round - the same answer as showing an unrecognised genre verbatim.
+
+**`check:mirrors` compares models, so it has no opinion about this file**; the guarantee is a
+byte-for-byte test. Two copies disagreeing means a glyph the admin offers is one the banner
+cannot draw - a control that appears to work and renders a blank space on a live page.
+
+**The validator refuses an unknown icon, where the genre field normalises one.** That looks
+inconsistent on the same screen and is the right answer to a different question: a genre arrives
+as free text from provider syncs and from titles predating the vocabulary, so refusing it would
+block an unrelated tagline edit in the same request. **Nothing but this dialog has ever written
+an icon slug.**
+
+**The assistant is barred from the field with a reason recorded**, not merely absent from the
+writable list - a field missing from an allow-list is admitted the moment somebody widens it.
+These read like marketing lines and each one occupies a **fact position**: the slot the platform
+otherwise fills from the round ceiling, the declared family and the contest's player range. A
+model writes *"3 minute rounds"* on a title whose ceiling is ten - right about the genre, wrong
+about the number.
+
+#### "BIG REWARDS" IS NOW AVAILABLE, AND THE REFUSAL IN s4.1w STILL STANDS
+
+The two are not in tension and the distinction is the useful part. The platform still will not
+**derive** a rewards claim: the hero receives no prize figure, and a free contest would carry the
+phrase. But an operator typing it into their own catalogue row is a person making a claim about
+their own contest, with a name and a timestamp against it - **the refusal was never about the
+words.** `reward` is in the picker for that reason, and the guard on the derived set is unchanged
+and still red when anything puts the phrase there automatically.
+
+**30 tests, 30 probes red on exactly one failure.** Two of the new probes are worth keeping for
+their shape: one asserts the **two**-line clamp is present rather than only forbidding three,
+because a guard that bans three lines is equally happy with the one line the owner rejected; and
+one exhausts the vocabulary against the component's glyph map, because a spot check passes while
+the slug somebody adds next renders nothing.
+
+**Never verified by eye** - the arena is behind sign-in, and there is nothing authored to render
+until an operator writes a strip.
+
 ---
 
 ## 5. Dashboard

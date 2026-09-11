@@ -14,6 +14,11 @@
  * the next title silently renders as a slightly wrong version of the last one.
  */
 
+import {
+  resolveHeroFeatureIcon,
+  type HeroFeatureIcon,
+} from "@/lib/services/games/hero-features";
+
 export interface ArenaChip {
   label: string;
   detail: string;
@@ -138,8 +143,15 @@ export const SKILL_CHIP: ArenaChip = {
 /** One of the four small items across the middle of the hero. */
 export interface ArenaFeature {
   label: string;
-  /** Which glyph to draw. A name rather than a component, so this module stays pure. */
-  icon: "speed" | "players" | "skill" | "ranking";
+  /**
+   * Which glyph to draw. A name rather than a component, so this module stays pure - and a
+   * name from the shared vocabulary, so an operator can choose one.
+   *
+   * `undefined` means "a neutral mark". It is not an error state: a slug this build does not
+   * recognise still has an operator's words beside it, and dropping the row to save the
+   * picture is the wrong way round.
+   */
+  icon?: HeroFeatureIcon;
 }
 
 /**
@@ -185,6 +197,47 @@ export function heroFeatures(
   features.push({ label: "Global leaderboard", icon: "ranking" });
 
   return features;
+}
+
+/**
+ * The features the banner actually draws: the operator's, or the derived four.
+ *
+ * THE ONLY PLACE THAT DECISION IS TAKEN, and it must stay that way. A second copy of the
+ * fallback - in the page, or inline in the banner - is how one screen shows an operator's
+ * strip while another shows the derived one for the same title, which is the "one rule, two
+ * copies" shape behind `referenceId`, `failedReason`, `challengeId` and the Game Master `||`.
+ *
+ * AN EMPTY LIST MEANS DERIVED, NOT EMPTY, and the alternative reading is the one that would
+ * have shipped a defect: no title in the catalogue carries authored features, so treating
+ * absent as an empty set would have stripped four facts off every hero the day this landed,
+ * with nothing failing and nothing logged. The dialog says so beside the field, because a
+ * decision an operator cannot see is one they cannot make.
+ *
+ * A LABEL IS TAKEN AS WRITTEN AND THE ICON IS RESOLVED. An unrecognised slug keeps its row
+ * and loses its glyph, which is the same rule as an unrecognised genre being shown verbatim:
+ * the operator's words are the content, and the picture beside them is decoration.
+ */
+export function resolveHeroFeatures(
+  authored: { icon?: string; label?: string }[] | undefined,
+  maxDurationSeconds: number | undefined,
+  family: string | undefined,
+  minParticipants: number | undefined,
+  maxParticipants: number | undefined,
+): ArenaFeature[] {
+  const written = Array.isArray(authored)
+    ? authored
+        .map((row) => ({
+          label: typeof row.label === "string" ? row.label.trim() : "",
+          icon: resolveHeroFeatureIcon(row.icon),
+        }))
+        // A row with no words is a floating glyph. The validator refuses one at the door, so
+        // this only catches a document written before it existed.
+        .filter((row) => row.label !== "")
+    : [];
+
+  if (written.length > 0) return written;
+
+  return heroFeatures(maxDurationSeconds, family, minParticipants, maxParticipants);
 }
 
 /**

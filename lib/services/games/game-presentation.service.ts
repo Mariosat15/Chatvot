@@ -60,6 +60,16 @@ export interface GamePresentation {
   howToPlayImageUrl?: string;
   highlightsImageUrl?: string;
   highlights: { title: string; detail: string }[];
+  /**
+   * The hero banner's four small claims, when an operator has written them.
+   *
+   * AN EMPTY LIST IS THE NORMAL CASE AND MEANS "WORK THEM OUT", never "show none". Every
+   * title carries none of these today and the arena derives four from declared fields, so a
+   * consumer must treat absent as a fallback rather than as an instruction - see
+   * `resolveHeroFeatures` in `components/games/arena/arena-facts.ts`, which is the only
+   * place that decision is taken.
+   */
+  heroFeatures: { icon: string; label: string }[];
   /** Declared capability, used to describe the game without naming it. */
   family?: string;
   scoreType?: string;
@@ -96,14 +106,14 @@ export async function getGamePresentation(
   gameCode: string | undefined,
 ): Promise<GamePresentation> {
   if (!providerKey || !gameCode) {
-    return { gameName: UNKNOWN_GAME_NAME, highlights: [] };
+    return { gameName: UNKNOWN_GAME_NAME, highlights: [], heroFeatures: [] };
   }
 
   await connectToDatabase();
 
   const title = await ProviderGame.findOne({ providerKey, gameCode })
     .select(
-      "displayName tagline description rulesSummary howToPlay category thumbnailUrl bannerUrl howToPlayImageUrl highlightsImageUrl highlights family scoreType scoreDirection maxDurationSeconds",
+      "displayName tagline description rulesSummary howToPlay category thumbnailUrl bannerUrl howToPlayImageUrl highlightsImageUrl highlights heroFeatures family scoreType scoreDirection maxDurationSeconds",
     )
     .lean<{
       displayName?: string;
@@ -117,6 +127,7 @@ export async function getGamePresentation(
       howToPlayImageUrl?: string;
       highlightsImageUrl?: string;
       highlights?: { title: string; detail: string }[];
+      heroFeatures?: { icon: string; label: string }[];
       family?: string;
       scoreType?: string;
       scoreDirection?: string;
@@ -124,7 +135,7 @@ export async function getGamePresentation(
     } | null>();
 
   if (!title) {
-    return { gameName: UNKNOWN_GAME_NAME, highlights: [] };
+    return { gameName: UNKNOWN_GAME_NAME, highlights: [], heroFeatures: [] };
   }
 
   return {
@@ -147,6 +158,7 @@ export async function getGamePresentation(
     howToPlayImageUrl: title.howToPlayImageUrl || undefined,
     highlightsImageUrl: title.highlightsImageUrl || undefined,
     highlights: Array.isArray(title.highlights) ? title.highlights : [],
+    heroFeatures: Array.isArray(title.heroFeatures) ? title.heroFeatures : [],
     family: title.family || undefined,
     scoreType: title.scoreType || undefined,
     scoreDirection: title.scoreDirection || undefined,

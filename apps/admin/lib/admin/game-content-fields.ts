@@ -16,6 +16,11 @@
  */
 
 import { normaliseCategorySlug, CATEGORY_SLUG_MAX_LENGTH } from "@/lib/services/games/game-categories";
+import {
+  HERO_FEATURE_LABEL_MAX_LENGTH,
+  HERO_FEATURE_LIMIT,
+  isHeroFeatureIcon,
+} from "@/lib/services/games/hero-features";
 
 /** Fields an operator owns. A value outside this set is REFUSED, never ignored - see below. */
 export const EDITABLE_CONTENT_FIELDS: ReadonlySet<string> = new Set([
@@ -37,6 +42,11 @@ export const EDITABLE_CONTENT_FIELDS: ReadonlySet<string> = new Set([
   // sync and are only ever written here.
   "howToPlayImageUrl",
   "highlightsImageUrl",
+  // The hero banner's four small claims (owner, 11 September 2026). Ours too, and the only
+  // content field where LEAVING IT EMPTY IS A DIFFERENT INSTRUCTION from filling it in: the
+  // banner works four out from the title's declared settings when nothing is stored, so an
+  // empty list restores those rather than emptying the strip. See `hero-features.ts`.
+  "heroFeatures",
 ]);
 
 /**
@@ -123,6 +133,15 @@ export const AI_NEVER_WRITABLE_CONTENT_FIELDS: ReadonlyMap<string, string> = new
   ["bannerUrl", "an image address, not prose"],
   ["howToPlayImageUrl", "an image address, not prose"],
   ["highlightsImageUrl", "an image address, not prose"],
+  // Barred for a reason worth spelling out, because these ARE short marketing lines and so
+  // look like the assistant's natural territory. Each one occupies a FACT POSITION on the
+  // hero: the slot the assistant would write into is the slot the platform otherwise fills
+  // from the round ceiling, the declared family and the contest's own player range. A model
+  // filling it writes "3 minute rounds" on a title whose ceiling is ten, in the strip a
+  // player reads immediately before paying, and it is right about the genre and wrong about
+  // the number - which is the hardest kind of wrong to notice. An operator typing it is
+  // making their own claim with their own name against it.
+  ["heroFeatures", "the banner's statements of fact about the contest, which a model cannot check"],
 ]);
 
 export const CONTENT_LIMITS = {
@@ -139,6 +158,12 @@ export const CONTENT_LIMITS = {
   highlights: 6,
   highlightTitle: 40,
   highlightDetail: 140,
+  // Reason: imported rather than typed, unlike `highlights` above it. The banner draws
+  // exactly what is stored, so a fifth row is not "stored and not shown" - there is nowhere
+  // for it to go, and a second number here would let the form offer one the banner has no
+  // column for.
+  heroFeatures: HERO_FEATURE_LIMIT,
+  heroFeatureLabel: HERO_FEATURE_LABEL_MAX_LENGTH,
 } as const;
 
 /**
@@ -173,6 +198,12 @@ export interface GameHighlight {
   detail: string;
 }
 
+export interface GameHeroFeature {
+  /** A slug from `HERO_FEATURE_ICONS`. Refused here if it is not one. */
+  icon: string;
+  label: string;
+}
+
 export interface GameContentInput {
   displayName?: string;
   tagline?: string;
@@ -185,6 +216,7 @@ export interface GameContentInput {
   howToPlayImageUrl?: string;
   highlightsImageUrl?: string;
   highlights?: GameHighlight[];
+  heroFeatures?: GameHeroFeature[];
 }
 
 export type ContentValidation =
@@ -351,6 +383,50 @@ export function validateGameContent(body: unknown): ContentValidation {
       highlights.push({ title, detail });
     }
     content.highlights = highlights;
+  }
+
+  // The hero banner's strip. Three differences from `highlights` above, each deliberate.
+  //
+  // AN UNKNOWN ICON IS REFUSED, where an unknown genre is normalised. The opposite answer,
+  // and the question that decides it is whether any legitimate writer can produce the value:
+  // a genre can arrive as free text from a provider sync or from a title that predates the
+  // vocabulary, so refusing it would block an unrelated edit to a field on the same screen.
+  // Nothing but this dialog has ever written an icon slug, so an unrecognised one is a bad
+  // request rather than history - and accepting it would put a neutral mark on a live banner
+  // while the form showed the operator the glyph they picked.
+  //
+  // THE LABEL IS REQUIRED AND THE ICON IS NOT OPTIONAL EITHER, because the banner draws a
+  // fixed-height column: a row with no words is a floating glyph, and a row with no glyph is
+  // a label that no longer lines up with the three beside it.
+  if ("heroFeatures" in raw) {
+    const list = raw.heroFeatures;
+    if (!Array.isArray(list)) return { ok: false, error: "Banner features must be a list." };
+    if (list.length > CONTENT_LIMITS.heroFeatures) {
+      return {
+        ok: false,
+        error: `The banner has room for ${HERO_FEATURE_LIMIT} features.`,
+      };
+    }
+    const features: GameHeroFeature[] = [];
+    for (const entry of list) {
+      if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+        return { ok: false, error: "Each banner feature needs an icon and a label." };
+      }
+      const row = entry as Record<string, unknown>;
+      const label = trimmedString(row.label);
+      if (!label) return { ok: false, error: "Each banner feature needs a label." };
+      if (label.length > CONTENT_LIMITS.heroFeatureLabel) {
+        return {
+          ok: false,
+          error: `A feature label must be ${HERO_FEATURE_LABEL_MAX_LENGTH} characters or fewer - the banner has room for two short lines.`,
+        };
+      }
+      if (!isHeroFeatureIcon(row.icon)) {
+        return { ok: false, error: "Each banner feature needs one of the offered icons." };
+      }
+      features.push({ icon: row.icon, label });
+    }
+    content.heroFeatures = features;
   }
 
   if (Object.keys(content).length === 0) {
