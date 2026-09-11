@@ -1360,6 +1360,98 @@ grep for its importer.**
 **Still trading-shaped, and deliberately not touched:** the trading panels themselves, the
 per-game summary cards, and the mega-action split (R21). Those are the rest of this section.
 
+### 5.1b The contest cards, made live - BUILT 11 September 2026
+
+The last stale surface from the owner's "all pages related to live data" instruction. The cards
+were game-aware from s5.1a and still read their competitions from props frozen at page load,
+with a countdown computed once, at render, from a clock nothing re-read.
+
+Built in **two commits, deliberately**. The first extracted the rank calculation and changed no
+behaviour; the second added the polling. `lib/services/games/dashboard-contest-rank.service.ts`,
+`app/api/competitions/dashboard-live/route.ts`, `COMPETITION_LIVE_DATA` in
+`lib/utils/performance.ts`, and `components/dashboard/ContestsSidebar.tsx`. 21 tests in
+`__tests__/games/provider-dashboard-cards.test.ts` and 15 in
+`__tests__/games/dashboard-live-refresh.test.ts`; 7 probes in `tools/probe-dashboard-rank.ps1`
+and 14 in `tools/probe-dashboard-live.ps1`, every one red on exactly one failure. **None of it
+is mirrored** - `apps/admin` has no player dashboard.
+
+**The reason for two commits is that the extraction's only guarantee is that nothing moved, and
+that guarantee is destroyed by any behaviour change in the same diff.** The comparator was moved
+character for character, the four pre-existing ranking guards were re-pointed at its new home
+with a note that the claims are unchanged and only the location moved, and the typecheck sat at
+the 194-error baseline on both sides of the move. Same reasoning as extracting the settlement
+stages while a known one-character defect was preserved verbatim.
+
+- **COUNT THE WRITERS, and the count was wrong again.** The plan for this slice said "the
+  dashboard sorts its own ranks", which reads as one copy. There are **four**: the dashboard
+  action, and **two more in `app/api/dashboard/competitions/route.ts`** at lines 366 and 439.
+  That route is the **public, unauthenticated broadcast display** behind `/arena`,
+  `TraderChampionshipClient.tsx` and `deploy/competition-dashboard.html`, and it is
+  trading-shaped - it selects neither `score` nor `gameType`, so it would rank a provider contest
+  on `pnl` and tie every player at zero **on a screen with no sign-in in front of it**. It is
+  **recorded as a named exception with a test asserting it is STILL an offender**, not fixed: it
+  is its own finding and its own commit, and a stale exception reads as a known problem long after
+  it is solved while silently re-permitting the defect (the R60 rule). When it is fixed the canary
+  goes red, which is the signal to delete the exception.
+- **The cards could not use the lobbies' answer, and that is a measurement rather than a
+  preference.** Both lobbies re-read their own page on a timer (`LiveContestRefresher`, s1.1j)
+  because a server action holds the direction, the R45 eligibility gate and the tie handling, so
+  an endpoint would be a second reader that can drift. `getComprehensiveDashboardData` cannot be
+  polled at all: upwards of twenty database round trips, unbounded `TradeHistory` and
+  `WalletTransaction` reads, a ten-thousand-row participant fetch, and
+  `getUserGlobalRank` calling `getGlobalLeaderboard(999999)`, which takes seconds cold. **A
+  cheap page is refreshed; an expensive one needs a narrow endpoint** - and a narrow endpoint is
+  exactly the second reader the lobbies avoided, which is why the rank came out first.
+- **The property that matters is AGREEMENT with the action, not liveness, and the strongest
+  guard is a text comparison of the two select strings token for token.** The player sees a
+  figure on load and this endpoint's figure in the same place fifteen seconds later, so any
+  field where the two disagree *looks like the value changed*. The clearest casualty is `pnl`:
+  the endpoint reports the **stored** participant value exactly as the action reads it, and
+  deliberately does **not** recompute unrealized profit from open positions and live forex
+  prices. The challenge endpoint next door does recompute and is right to - a 1v1 is two numbers
+  against each other - but here it would make the number jump on first refresh for every trading
+  contest, **a defect dressed as an improvement**. Making both live is one commit touching the
+  action and the route together.
+- **An absent score stays absent.** `score ?? 0` in the endpoint would claim a score the player
+  has not been given, the read-side form of R50, and it would contradict the card beside it,
+  which renders `-`.
+- **The countdown ticks on the BROWSER clock, and that is the policy rather than an oversight.**
+  s4.1j settled it: trading surfaces read the browser's clock as they always have, the game lobby
+  reads the server's through `useServerClock`, and the dashboard is a trading surface. **Adding a
+  tick is additive; changing the clock is a behaviour change to a screen nobody asked to touch.**
+  The tick also re-reads on `visibilitychange`, because a laptop closed for two hours returns to
+  a card whose next interval has not fired yet.
+- **The asymmetry is why this was missed, and it is the R67 shape one screen along.**
+  `/api/challenges/dashboard-live` has existed since long before games did, and `ContestsSidebar`
+  opens on the challenges tab by default - so refreshing worked on the path everybody tests and
+  the competitions tab was a photograph of page load. **A feature that works on the default tab
+  is not a feature that works.**
+- **The render assertion is the load-bearing half.** A version that fetches correctly, merges
+  correctly and still renders the props it was given satisfies every assertion about the fetch,
+  so a test pins `const activeComps = liveComps;` *and* the absence of
+  `const activeComps = competitions.active`. Same class as importing a shared module and then
+  recomputing beside it.
+- **Three smaller things, each of which fails silently.** A malformed response is ignored rather
+  than rendered - `if (!Array.isArray(data.competitions)) return;` before the setter, or one bad
+  reply empties the sidebar. The merge is order-preserving and **drops a contest the endpoint
+  stops reporting**, or a finished contest sits on the dashboard for ever. And the poll keeps its
+  **own** mounted flag: sharing the challenge poll's would let that effect's cleanup silence this
+  one, with no error and nothing in a log.
+
+**Two incidentals, recorded rather than absorbed.** The new service and the new route each carry
+a **rule-scoped** `no-explicit-any` disable with its reason, not the blanket
+`/* eslint-disable */` the dashboard action opens with - and typing the `.lean()` rows was
+deliberately **not** done, because a hand-written lean generic makes the compiler check an
+invented interface instead of the schema, which is precisely where the missing
+`participant.score` read hid for a day (R32/R33). The select-string comparison is the guard that
+can actually catch divergence. And `lib/utils/performance.ts` carried two pre-existing
+object-injection warnings which the pre-commit hook's `--max-warnings=0` turns into a block on
+any edit to the file; they are silenced in place with a reason, the key coming from
+`Object.keys` of the object being read.
+
+**Never verified by eye** - the dashboard is behind sign-in and the automated browser has no
+session.
+
 ---
 
 ## 6. Results page

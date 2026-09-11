@@ -203,6 +203,11 @@ export function shallowEqual<T extends Record<string, unknown>>(
   if (keys1.length !== keys2.length) return false;
 
   for (const key of keys1) {
+    // Reason: not an injection sink - `key` comes from `Object.keys(obj1)`, so it is an own
+    // enumerable property of the object being read and cannot be caller-supplied. Silenced
+    // here rather than left as a warning because the pre-commit hook lints staged files at
+    // --max-warnings=0, so this pre-existing pair blocks any edit to the file.
+    // eslint-disable-next-line security/detect-object-injection
     if (obj1[key] !== obj2[key]) return false;
   }
 
@@ -265,6 +270,10 @@ export const PERFORMANCE_INTERVALS = {
   COMPETITION_STATUS: 30000, // 30 seconds (was 10s — 3x fewer polls, status changes are predictable)
   CHALLENGE_STATUS: 30000, // 30 seconds (was 10s)
   CHALLENGE_LIVE_DATA: 10000, // 10 seconds (was 5s)
+  // Reason: 15s rather than the challenge's 10s, matching the contest lobby's refresher. A
+  // competition card moves when somebody else trades or a round reports; a 1v1 card is two
+  // numbers against each other and is watched far more closely.
+  COMPETITION_LIVE_DATA: 15000, // 15 seconds
 
   // Admin/Background
   NOTIFICATION_POLL: 60000, // 60 seconds (was 30 seconds)

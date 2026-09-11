@@ -253,8 +253,41 @@ function isCompMetricPositive(comp: CompetitionData): boolean {
   }
 }
 
+/**
+ * The time remaining on a card, which now actually counts down.
+ *
+ * THE DEFECT THIS FIXES IS AN ABSENCE, NOT A WRONG NUMBER. `Date.now()` was read once during
+ * render and nothing ever re-rendered this component, so the figure was correct at page load
+ * and then froze. A player watching a contest end saw "0h 1m left" indefinitely, and the
+ * "Ended" state never arrived at all.
+ *
+ * It stays on the BROWSER's clock, deliberately. The game lobby reads the server's, because
+ * every rule about when an attempt may start is enforced against server time and a visitor's
+ * clock being wrong costs something there. Nothing is gated on this figure - it is a card on
+ * a list - so switching its clock would be a behaviour change to a trading surface nobody
+ * asked to touch. Adding the tick is additive; changing the clock is not.
+ *
+ * Tick is per 30 seconds because the display's smallest unit is a minute. A one-second timer
+ * on every card would re-render the whole list sixty times a minute to change nothing.
+ */
 function TimeLeft({ endTime }: { endTime: Date }) {
-  const ms = new Date(endTime).getTime() - Date.now();
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const tick = setInterval(() => setNow(Date.now()), 30000);
+    // Reason: a background tab is throttled, so the figure is stale on return regardless of
+    // the interval. Re-read on becoming visible rather than trusting the timer fired.
+    const onVisible = () => {
+      if (document.visibilityState === "visible") setNow(Date.now());
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(tick);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, []);
+
+  const ms = new Date(endTime).getTime() - now;
   if (ms <= 0) return <span className="text-red-400 text-[11px]">Ended</span>;
   const h = Math.floor(ms / 3600000);
   const m = Math.floor((ms % 3600000) / 60000);
@@ -387,14 +420,35 @@ export default function ContestsSidebar({
   // matchmaking are the primary engagement feature on the dashboard.
   const [tab, setTab] = useState<"competitions" | "challenges">("challenges");
 
-  const activeComps = competitions.active;
+  /**
+   * Live competition data, polled exactly as the challenges beside it have been all along.
+   *
+   * WHY THIS WAS MISSING FOR SO LONG. `/api/challenges/dashboard-live` has existed since
+   * before games did, and this component opens on the challenges tab by default - so the
+   * refreshing worked on the path everybody tests, and the competitions tab was a photograph
+   * of the moment the page loaded. Rank, score, profit and loss, prize pool and the player
+   * count were all frozen. That is the same shape as the game lobby never mounting the status
+   * monitor (R67): one branch of two got the behaviour.
+   *
+   * The rank in this data is sorted by the same shared resolver the page used, which is not a
+   * tidiness point - a second copy would show one rank on load and another on first refresh.
+   */
+  const [liveComps, setLiveComps] = useState<CompetitionData[]>(
+    competitions.active,
+  );
+  const activeComps = liveComps;
 
   // Reason: Live challenge data from polling replaces static server-side data
   const [liveChallenges, setLiveChallenges] = useState<ChallengeData[]>(
     challenges.active,
   );
   const pollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const compPollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isMountedRef = useRef(true);
+  // Reason: its OWN mounted flag rather than sharing the challenge poll's. The challenge
+  // effect's cleanup sets that one false, and it re-runs whenever its props change - so a
+  // shared flag couples two independent timers through a variable neither one names.
+  const isCompMountedRef = useRef(true);
 
   // Reason: Poll the lightweight dashboard-live endpoint for real-time PnL updates
   const fetchLiveChallengeData = useCallback(async () => {
@@ -433,10 +487,89 @@ export default function ContestsSidebar({
     }
   }, []);
 
+  const fetchLiveCompetitionData = useCallback(async () => {
+    if (!isCompMountedRef.current) return;
+
+    try {
+      const res = await fetch("/api/competitions/dashboard-live");
+      if (!res.ok) return;
+
+      const data = await res.json();
+      // Reason: only a well-formed array is authoritative. A 500, a rate-limit page or a
+      // truncated body must leave the cards exactly as the server rendered them - clearing
+      // the list on a bad response would make a network blip look like every contest ending.
+      if (!Array.isArray(data.competitions)) return;
+
+      setLiveComps((prev) => {
+        const liveMap = new Map<string, CompetitionData>(
+          data.competitions.map((c: CompetitionData) => [c.id, c]),
+        );
+        // Reason: keep the order already on screen and swap the values, rather than adopting
+        // the response's order. The list is short and re-sorting it every fifteen seconds
+        // would make the cards jump about for no reason a player can see.
+        const updated = prev.map((comp) => liveMap.get(comp.id) || comp);
+        // Reason: a contest entered in another tab since this page loaded belongs on the list.
+        for (const live of data.competitions as CompetitionData[]) {
+          if (!updated.find((u) => u.id === live.id)) updated.push(live);
+        }
+        // Reason: the endpoint answers with ACTIVE contests only, so it is authoritative
+        // about which of the player's contests are still running. A contest it stops
+        // mentioning has finished, and a finished one must leave - both so the tab's badge
+        // count stays honest and so nobody reads a live rank off a contest already settled.
+        return updated.filter((c) => liveMap.has(c.id));
+      });
+    } catch {
+      // Fail silently — live data is a nice-to-have enhancement
+    }
+  }, []);
+
+  useEffect(() => {
+    isCompMountedRef.current = true;
+
+    if (competitions.active.length === 0) {
+      setLiveComps(competitions.active);
+      return;
+    }
+
+    fetchLiveCompetitionData();
+
+    const scheduleNextCompPoll = () => {
+      if (compPollTimeoutRef.current) clearTimeout(compPollTimeoutRef.current);
+      compPollTimeoutRef.current = setTimeout(async () => {
+        await fetchLiveCompetitionData();
+        if (isMountedRef.current) scheduleNextCompPoll();
+      }, PERFORMANCE_INTERVALS.COMPETITION_LIVE_DATA);
+    };
+
+    scheduleNextCompPoll();
+
+    // Reason: a hidden tab is throttled, so resume with an immediate read rather than
+    // waiting out an interval that may not have fired.
+    const handleCompVisibility = () => {
+      if (document.visibilityState === "visible") {
+        fetchLiveCompetitionData();
+        scheduleNextCompPoll();
+      } else if (compPollTimeoutRef.current) {
+        clearTimeout(compPollTimeoutRef.current);
+      }
+    };
+    document.addEventListener("visibilitychange", handleCompVisibility);
+
+    return () => {
+      isCompMountedRef.current = false;
+      if (compPollTimeoutRef.current) clearTimeout(compPollTimeoutRef.current);
+      document.removeEventListener("visibilitychange", handleCompVisibility);
+    };
+  }, [competitions.active, fetchLiveCompetitionData]);
+
   useEffect(() => {
     isMountedRef.current = true;
 
-    // Only poll when there are active challenges and we're on the challenges tab
+    // Reason: polling is gated on there BEING active challenges, and deliberately not on the
+    // challenges tab being open - the tab's own badge count has to stay honest while the
+    // player is looking at competitions. The comment here used to claim the tab was part of
+    // the condition, which the code has never done; corrected rather than made true, because
+    // making it true would freeze the badge.
     const hasActiveChallenges = challenges.active.length > 0;
 
     if (!hasActiveChallenges) {
