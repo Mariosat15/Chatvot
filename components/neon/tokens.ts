@@ -202,11 +202,25 @@ export const NEON_HEADING =
   "text-[11px] font-bold uppercase tracking-[0.18em] text-sky-300";
 
 /**
+ * The hairline that separates two things sharing one surface, in its two forms.
+ *
+ * WHY THESE EXIST RATHER THAN THE COLOUR BEING WRITTEN OUT. It had been spelled in full in
+ * four places - the stat strip's seam, this file's own inset, the pre-flight and the arena's
+ * contest panel - which is three consumers holding a copy of a kit colour. The strip's seams
+ * and a divider drawn beside them have to be the SAME tone or the join is visible as a
+ * slightly different grey, and that is not a failure any test would report.
+ *
+ * They are whole class names rather than a bare colour on purpose: Tailwind compiles only
+ * classes it can see in the source, so `bg-[${NEON_SEAM_COLOUR}]` renders unstyled.
+ */
+export const NEON_SEAM = "bg-[#16203C]";
+export const NEON_DIVIDER = "border-[#16203C]";
+
+/**
  * A note or figure box INSIDE a panel - one shade darker than whatever contains it.
  *
  * This exists because the game screens were still using `border-gray-700 bg-gray-900/60`,
  * the app's neutral shell, for exactly this job. On a navy panel a neutral grey inset reads
  * as a piece of a different website, which is what the owner was seeing.
  */
-export const NEON_INSET =
-  "rounded-lg border border-[#16203C] bg-[#070C1A]/70";
+export const NEON_INSET = `rounded-lg border ${NEON_DIVIDER} bg-[#070C1A]/70`;

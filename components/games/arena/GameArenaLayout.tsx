@@ -109,7 +109,13 @@ export function GameArenaLayout({
         </div>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[280px_minmax(0,1fr)_320px]">
+      {/*
+        THE STANDINGS RAIL IS 300px, NOT 280. At 280 the leaderboard's three columns - rank,
+        name, score - left the name about eleven characters, so the reference's readable board
+        rendered as "M..." beside "Andy...". Twenty pixels is the difference between a name and
+        an ellipsis, and it costs the board column nothing at this page width.
+      */}
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[300px_minmax(0,1fr)_320px]">
         {/*
           EVERY BREAKPOINT SETS AN ORDER, and the reason is that grid auto-placement follows
           order-modified document order, so a rule that only fires at `xl` leaves the other two
@@ -144,6 +150,15 @@ export function GameArenaLayout({
         <div className="order-3 space-y-5 lg:order-2 xl:order-3">{sidebar}</div>
       </div>
 
+      {/*
+        THE BOTTOM BAND STAYS STACKED, and the reference's three side-by-side panels were
+        tried and reverted. Both of these render `null` when their content is absent - which
+        is the COMMON case, since no title carries rules text until the catalogue is
+        re-synced - and a two-thirds grid column holding a component that returned null is
+        still a column: the highlights would sit alone on the right with two empty thirds
+        beside them. A layout cannot see that its child rendered nothing, so the shape that
+        survives an empty slot is the one to use.
+      */}
       <div className="mt-5 space-y-5">
         {rules}
         {highlights}

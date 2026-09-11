@@ -1,5 +1,18 @@
-import { Trophy, Ticket, Users, Timer, Target, Info } from "lucide-react";
-import { NEON_LABEL } from "@/components/neon/tokens";
+import {
+  Trophy,
+  Ticket,
+  Users,
+  Timer,
+  Target,
+  Info,
+  Gauge,
+  Medal,
+} from "lucide-react";
+import {
+  NEON_DIVIDER,
+  NEON_LABEL,
+  NEON_SEAM,
+} from "@/components/neon/tokens";
 import { NeonHeadedPanel, NeonStatStrip } from "@/components/neon/Cards";
 import type { PlayState } from "@/components/games/play-state";
 import type { GamePresentation } from "@/lib/services/games/game-presentation.service";
@@ -38,9 +51,20 @@ interface Props {
   facts: ArenaContestFacts;
   state: PlayState;
   presentation: GamePresentation;
+  /**
+   * Where the player currently stands, taken from the row the server already ranked.
+   *
+   * IT IS NOT COMPUTED HERE AND MUST NOT BE. `calculateRankings` resolves the contest's score
+   * direction once from the catalogue, so a screen working out its own position would be a
+   * second place the direction is decided - the exact shape of R37, where the board and the
+   * payout disagreed because each had worked it out separately. Absent renders a dash: a
+   * player with no result holds no rank, and rendering that as `#1` is the read-side form of
+   * the phantom zero R50 removed.
+   */
+  rank?: number;
 }
 
-export function ArenaContestPanel({ facts, state, presentation }: Props) {
+export function ArenaContestPanel({ facts, state, presentation, rank }: Props) {
   const attempt = attemptProgress(state.attemptsUsed, state.attemptsPermitted);
   // The round clock is the CONFIGURED playing time for one attempt, which is what a player
   // wants to know before pressing Play. `maxRoundSeconds` is resolved server-side from the
@@ -50,41 +74,71 @@ export function ArenaContestPanel({ facts, state, presentation }: Props) {
 
   return (
     <NeonHeadedPanel icon={Info} title="Contest info">
-      <NeonStatStrip
-        items={[
-          {
-            icon: Trophy,
-            accent: "prize",
-            label: "Prize pool",
-            value: formatVolts(facts.prizePool, { symbol: facts.creditSymbol }),
-          },
-          {
-            icon: Ticket,
-            accent: "entry",
-            label: "Entry",
-            value: formatVolts(facts.entryFee, { symbol: facts.creditSymbol }),
-          },
-          {
-            icon: Users,
-            accent: "players",
-            label: "Players",
-            value:
-              typeof facts.currentParticipants === "number"
-                ? `${facts.currentParticipants}${facts.maxParticipants ? ` / ${facts.maxParticipants}` : ""}`
-                : "—",
-          },
-          {
-            icon: Timer,
-            accent: "waiting",
-            label: "Round time",
-            // An absent round length says nothing rather than guessing. A default would be
-            // an invented deadline in front of a paying player.
-            value: roundClock ?? "—",
-          },
-        ]}
-      />
+      {/*
+        Two strips rather than one six-cell grid, and the wrapper's background is what draws
+        the hairline between them. The reference separates the contest's own facts from the
+        player's own two figures, which is the difference between "what is this contest" and
+        "how am I doing in it" - and merging them makes the score just another tile.
+      */}
+      <div className={`space-y-px ${NEON_SEAM}`}>
+        <NeonStatStrip
+          items={[
+            {
+              icon: Trophy,
+              accent: "prize",
+              label: "Prize pool",
+              value: formatVolts(facts.prizePool, {
+                symbol: facts.creditSymbol,
+              }),
+            },
+            {
+              icon: Ticket,
+              accent: "entry",
+              label: "Entry",
+              value: formatVolts(facts.entryFee, {
+                symbol: facts.creditSymbol,
+              }),
+            },
+            {
+              icon: Users,
+              accent: "players",
+              label: "Players",
+              value:
+                typeof facts.currentParticipants === "number"
+                  ? `${facts.currentParticipants}${facts.maxParticipants ? ` / ${facts.maxParticipants}` : ""}`
+                  : "—",
+            },
+            {
+              icon: Timer,
+              accent: "waiting",
+              label: "Round time",
+              // An absent round length says nothing rather than guessing. A default
+              // would be an invented deadline in front of a paying player.
+              value: roundClock ?? "—",
+            },
+          ]}
+        />
 
-      <div className="space-y-3 border-t border-[#16203C] px-4 py-3">
+        <NeonStatStrip
+          items={[
+            {
+              icon: Gauge,
+              accent: "score",
+              label: "Your score",
+              value: scoreText(state.participantScore),
+            },
+            {
+              icon: Medal,
+              accent: "prize",
+              label: "Rank",
+              // A dash, never `#—` and never a position. See the `rank` prop.
+              value: typeof rank === "number" ? `#${rank}` : "—",
+            },
+          ]}
+        />
+      </div>
+
+      <div className={`space-y-3 border-t ${NEON_DIVIDER} px-4 py-3`}>
         {attempt && (
           <div>
             <div className="flex items-baseline justify-between">
@@ -109,13 +163,6 @@ export function ArenaContestPanel({ facts, state, presentation }: Props) {
             </div>
           </div>
         )}
-
-        <div className="flex items-center justify-between">
-          <span className={NEON_LABEL}>Your score</span>
-          <span className="text-lg font-bold text-violet-300">
-            {scoreText(state.participantScore)}
-          </span>
-        </div>
 
         {scoring && (
           <div className="flex items-center gap-2 text-xs text-gray-400">

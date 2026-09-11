@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Gift } from "lucide-react";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { unstable_noStore as noStore } from "next/cache";
@@ -21,6 +21,7 @@ import { GameArenaLayout } from "@/components/games/arena/GameArenaLayout";
 import { ArenaContestPanel } from "@/components/games/arena/ArenaContestPanel";
 import { ArenaHighlights } from "@/components/games/arena/ArenaHighlights";
 import GameRulesPanel from "@/components/games/GameRulesPanel";
+import { NeonCountPill, NeonHeadedPanel } from "@/components/neon/Cards";
 import { Button } from "@/components/ui/button";
 
 /**
@@ -170,6 +171,16 @@ export default async function PlayPage({ params }: PlayPageProps) {
   const creditSymbol = settings?.credits?.symbol || undefined;
   const rows = Array.isArray(leaderboard) ? leaderboard : [];
 
+  // The player's own position, READ from the row the server already ranked rather than worked
+  // out here. `calculateRankings` resolves the contest's score direction once from the
+  // catalogue; a second place deciding a position is the shape of R37, where the board and the
+  // payout disagreed because each had computed it separately. Absent when they hold no rank.
+  const yourRank = rows.find((row) => row.userId === session.user.id)?.currentRank;
+
+  const prizePositions = Array.isArray(contest?.prizeDistribution)
+    ? contest.prizeDistribution.length
+    : 0;
+
   return (
     <GameArenaLayout
       competitionId={competitionId}
@@ -211,17 +222,30 @@ export default async function PlayPage({ params }: PlayPageProps) {
             }}
             state={outcome.state}
             presentation={presentation}
+            rank={yourRank}
           />
           {/*
             The ONE implementation of what each place is paid, shared with both lobbies. It is
             not reimplemented here, and it must not be: the four expressions inside it have
             survived two moves character for character, which is the only evidence that no
             payout figure has changed.
+
+            THE HEADING IS THE CALLER'S, and it was missing entirely until 11 Sep 2026 - the
+            prize rows sat under the contest panel with nothing saying what they were, so the
+            amounts read as a continuation of the facts above them. `PrizeTable` deliberately
+            renders no heading of its own, because the lobby puts it inside an accordion that
+            already has one; two headings is worse than none.
           */}
-          {Array.isArray(contest?.prizeDistribution) &&
-            contest.prizeDistribution.length > 0 && (
+          {prizePositions > 0 && (
+            <NeonHeadedPanel
+              icon={Gift}
+              title="Prize breakdown"
+              action={<NeonCountPill>Top {prizePositions} win</NeonCountPill>}
+              bodyClassName="p-4"
+            >
               <PrizeTable competition={contest} creditSymbol={creditSymbol} />
-            )}
+            </NeonHeadedPanel>
+          )}
         </>
       }
       rules={<GameRulesPanel presentation={presentation} layout="wide" />}

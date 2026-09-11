@@ -4,6 +4,7 @@ import {
   NEON_HEAD_STRIP,
   NEON_LABEL,
   NEON_PANEL,
+  NEON_SEAM,
   NEON_TILE_SHAPE,
   accentClasses,
   type NeonAccent,
@@ -241,7 +242,7 @@ export function NeonStatStrip({
 }) {
   return (
     <div
-      className={`grid gap-px bg-[#16203C] ${
+      className={`grid gap-px ${NEON_SEAM} ${
         columns === 4 ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-2"
       }`}
     >

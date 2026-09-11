@@ -759,6 +759,65 @@ Newest at the top.
 
 ---
 
+### 11 Sep 2026 - THE ARENA ON THE OWNER'S REFERENCE
+
+**Shipped:** the play screen's platform half rebuilt on `arena-target-full.png`. The prize
+figures have a heading for the first time; the player's own rank is on the screen; the heading
+block separates the genre, the title and the facts; the standings rail widened to 300px; and the
+kit's hairline colour, which had escaped into three consumers, is now one definition.
+
+**Files touched:** `components/games/arena/{ArenaIdentity,ArenaContestPanel,GameArenaLayout,
+ArenaHighlights}.tsx`, `app/(root)/competitions/[id]/play/page.tsx`,
+`components/neon/{tokens.ts,Cards.tsx}`, `components/games/RoundPreflight.tsx`,
+`__tests__/games/provider-play-ui.test.ts`, `tools/probe-arena-redesign.ps1`,
+`External game plans/design-reference/` (10 images + README rows), `13` s4.1m.
+
+**THE FIRST THING A NEW CHAT NEEDS: THE REFERENCE SPANS TWO REPOSITORIES.** `ProviderGameFrame`
+renders one lit frame around a bare `<iframe>` and nothing inside it, so the round header, the
+board and its bezel, the `Hint / Undo / Clear` rail, the `LEVEL / Moves / Best Time / Combo`
+column and `SUBMIT SOLUTION` are all `games-service/public/play/`, which shares no code with
+this repository by design. **Roughly half the mock cannot be styled from here**, and five of its
+elements have no data source on either side: Hint, Undo, Moves/Best Time/Combo, the
+GLOBAL/FRIENDS/COUNTRY tabs and the RECENT PLAYERS feed. A paid Hint is forbidden outright.
+
+**No risk number and nothing was backfilled.** Every figure on the screen was correct; what was
+wrong was that the prize amounts had no heading, so they read as more contest facts, and the
+player's position was absent. No money logic changed.
+
+**Deviated from plan:** the reference's three side-by-side bottom panels were **tried and
+reverted**, with the reason recorded in the file. `GameRulesPanel` and `ArenaHighlights` both
+return `null` when they have no content, and rules text is absent on every title until the
+catalogue is re-synced - **a layout cannot see that its child rendered nothing**, so a
+two-thirds column holding a null child is still a two-thirds column. A test pins the stacking.
+
+**Three lessons worth carrying:**
+
+1. **A guard that fires on correct code is the kind the first person it inconveniences
+   deletes.** Banning `scoreDirection` anywhere on the arena went red on correct code - the
+   panel must read it to say whether a high score or a low one wins. The rule is now about the
+   *use*, with two control probes that must stay green.
+2. **vitest's `-t` argument is a regular expression.** Three probes aimed at `it.each` names
+   containing `[#1B2540]` matched nothing while reporting no failures, which is
+   indistinguishable from a guard that does not work. The names are ASCII and regex-safe now.
+   And keep probe anchors ASCII for the sibling reason: an em dash in a PowerShell pattern
+   reported `DID NOT APPLY`, because PS 5.1 reads a BOM-less script with the ANSI codepage.
+3. **A slice taken backwards finds a construct that has already closed.** The heading rule
+   sliced back from `<PrizeTable` to the nearest `<NeonHeadedPanel` and passed while the table
+   sat outside it, heading over an empty box. Assert containment, not adjacency.
+
+**Owner tested:** no. **Never verified by eye** - the play screen is behind sign-in and the
+automated browser has no session, so the owner is the first person who will see it. 16 probes
+red on exactly 1 failure, 2 controls green, 2,135 tests pass, typecheck at the 194 baseline.
+
+**Deferred:** the games-service half of the mock (the round header cards, `SUBMIT SOLUTION`'s
+styling, the `Clear` rail - `Clear` already exists in-frame). That is a separate repository and
+a separate decision, and Hint/Undo/Moves/Best Time/Combo would be game-mechanics changes.
+
+**Next chat should:** ask the owner whether the in-frame half is wanted, then go back to the
+35-task list - challenges is the next unstarted item.
+
+---
+
 ### 11 Sep 2026 - ONE CLOCK ON THE GAME LOBBY, NOT TWO
 
 **Shipped.** `13` **s4.1l**. The owner, with the sidebar circled: *"the first one keep that but

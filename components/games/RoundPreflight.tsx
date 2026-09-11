@@ -3,7 +3,11 @@
 import { AlertCircle, Clock, Loader2, Play, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { neonButtonClasses } from "@/components/neon/Buttons";
-import { NEON_INSET, NEON_STAGE_PANEL } from "@/components/neon/tokens";
+import {
+  NEON_DIVIDER,
+  NEON_INSET,
+  NEON_STAGE_PANEL,
+} from "@/components/neon/tokens";
 import { formatRemaining, useServerClock } from "@/hooks/useServerClock";
 import type { PlayState } from "./play-state";
 import { contestReservesFullRound, fullRoundCutoffMs } from "./round-window";
@@ -374,7 +378,7 @@ export function RoundPreflight({
       </Button>
 
       {state.rounds.length > 0 && (
-        <div className="border-t border-[#16203C] pt-4">
+        <div className={`border-t ${NEON_DIVIDER} pt-4`}>
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
             Your rounds
           </p>

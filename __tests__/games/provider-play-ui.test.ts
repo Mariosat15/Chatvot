@@ -739,11 +739,33 @@ describe("the two lobbies are built from one design kit", () => {
     // The leaderboard row shell and its "this is you" variant.
     "border-[#161E36] bg-[#080C18]/80",
     "border-sky-500/40 bg-sky-500/10",
+    /*
+      The hairline, in its two forms, added 11 Sep 2026 because it had escaped into three
+      consumers before anybody noticed - the pre-flight and the arena panel drew a divider
+      with the colour written out, and the arena panel then drew a seam with it too.
+
+      This one is worth guarding for a reason the panel shell is not: the stat strip draws its
+      internal separators with this exact tone, so a divider beside them that is one shade off
+      shows as a visible join. Nothing fails, nothing logs, and it looks like a rendering
+      artefact rather than a colour somebody typed.
+    */
+    "bg-[#16203C]",
+    "border-[#16203C]",
   ];
 
-  it.each(KIT_ONLY_LITERALS)(
-    "defines %s in the kit and nowhere else",
-    (literal) => {
+  /*
+    THE NAME IS ASCII AND REGEX-SAFE ON PURPOSE, since 11 Sep 2026. It used to interpolate the
+    literal - `defines border-[#1B2540] bg-[#0A0F1F]/80 in the kit...` - and vitest's `-t`
+    treats its argument as a REGULAR EXPRESSION, so `[#1B2540]` is a character class and
+    `/80` is a stray slash. Three probes against these assertions came back green because the
+    filter matched nothing while the run still reported no failures, which is indistinguishable
+    from a guard that does not work.
+
+    The index is enough to say which one failed, and the failure message prints the literal.
+  */
+  it.each(KIT_ONLY_LITERALS.map((literal, index) => [index, literal] as const))(
+    "owns kit literal %i in the kit and nowhere else",
+    (_index, literal) => {
       // Reading the kit first is what makes this a comparison rather than a snapshot: if the
       // design changes, the literal moves and this test tells you where it went.
       const kit = readCode(KIT_TOKENS) + readCode(KIT_CARDS);
@@ -755,6 +777,15 @@ describe("the two lobbies are built from one design kit", () => {
         LOBBY_PAGE,
         TRADING_HERO,
         TRADING_SIDEBAR,
+        // The arena joined the list on 11 Sep 2026, which is when two of these literals were
+        // found loose in it. A screen that is not on this list is a screen the rule does not
+        // reach, so the list is the guard's real surface area.
+        "components/games/arena/ArenaContestPanel.tsx",
+        "components/games/arena/ArenaIdentity.tsx",
+        "components/games/arena/ArenaHighlights.tsx",
+        "components/games/arena/GameArenaLayout.tsx",
+        "components/games/RoundPreflight.tsx",
+        "components/games/RoundResultPanel.tsx",
       ]) {
         expect(readCode(consumer)).not.toContain(literal);
       }
@@ -1987,5 +2018,184 @@ describe("the stage is dressed in the same kit as the frame around it", () => {
       expect(code).toMatch(/neonButtonClasses\(["']action["']\)/);
       expect(code).not.toMatch(/bg-gradient-to-r from-/);
     }
+  });
+});
+
+/**
+ * THE ARENA ON THE OWNER'S REFERENCE (`arena-target-full.png`, 11 September 2026).
+ *
+ * The verdict was "the structure is very not professional", and the parts of it that belong to
+ * this repository were three: the heading block put the genre, the title and the facts in one
+ * undifferentiated row; the prize amounts sat under the contest panel with NO heading at all,
+ * so they read as a continuation of the facts above them; and the player's own position was
+ * nowhere on the screen, which on a board showing twenty-five rows is the one figure they are
+ * looking for.
+ *
+ * WHAT IS NOT IN HERE, and must not be added to it. Half of that reference is drawn INSIDE the
+ * games-service iframe - the round header, the board and its bezel, the Hint/Undo/Clear rail,
+ * the LEVEL/Moves/Best Time/Combo column and SUBMIT SOLUTION. `ProviderGameFrame` renders one
+ * lit frame around a bare `<iframe>` and nothing within it, and the two repositories share no
+ * code by design (`npm run check:isolation`). A test in this file asserting anything about the
+ * board's own chrome would be asserting something this repository cannot affect.
+ */
+const ARENA_IDENTITY = "components/games/arena/ArenaIdentity.tsx";
+const PRIZE_TABLE = "components/competitions/PrizeTable.tsx";
+
+describe("the arena states what the prize figures are", () => {
+  it("gives the prize table a heading, and the table still gives itself none", () => {
+    /*
+      BOTH HALVES OR NEITHER. `PrizeTable` is rendered in three places, and on both lobbies it
+      sits inside an accordion that already carries a heading - so a heading added inside the
+      component would read as two headings there and be removed again, at which point the arena
+      loses it. The heading is the caller's, and the negative assertion is what keeps it that
+      way.
+    */
+    const page = readCode(PLAY_PAGE);
+
+    /*
+      THE PANEL MUST CONTAIN THE TABLE, not merely precede it - and the difference is not
+      academic. A first version sliced back from `<PrizeTable` to the nearest preceding
+      `<NeonHeadedPanel`, which is satisfied by a panel that has already CLOSED: a probe moving
+      the table out to sit below the panel came back green, with the heading captioning an empty
+      box and the amounts bare underneath it. So the assertion is containment: opening tag,
+      then the table, then the closing tag, in that order.
+    */
+    const openAt = page.indexOf('title="Prize breakdown"');
+    expect(openAt).toBeGreaterThan(0);
+
+    const closeAt = page.indexOf("</NeonHeadedPanel>", openAt);
+    expect(closeAt).toBeGreaterThan(openAt);
+
+    const inside = page.slice(openAt, closeAt);
+    expect(inside).toContain("<PrizeTable");
+
+    expect(readCode(PRIZE_TABLE)).not.toContain("Prize breakdown");
+  });
+
+  it("counts the paying positions rather than naming a number", () => {
+    /*
+      "Top 3 win" in the reference is three because that mock's contest pays three. An operator
+      can configure any number of positions, so a literal here is a caption that is wrong for
+      every contest but one - and it reads perfectly correctly in a diff.
+    */
+    const page = readCode(PLAY_PAGE);
+    expect(page).toMatch(/Top \{prizePositions\} win/);
+    expect(page).not.toMatch(/Top 3 win/);
+  });
+});
+
+describe("the player's own position is read, never worked out", () => {
+  /*
+    THE DEFECT THIS PREVENTS IS R37 REPEATED. `calculateRankings` resolves a contest's score
+    direction once, from the catalogue title, because a lower-is-better game ranks the other
+    way round. A screen that sorts the rows itself is a second place that decision is made, and
+    the two disagreeing means the board says one thing and the payout does another.
+
+    So the rank is LOOKED UP on the row the server already ranked, and the two assertions are
+    the lookup and the absence of any local ordering.
+  */
+  it("takes currentRank off the matching row", () => {
+    const page = readCode(PLAY_PAGE);
+    expect(page).toMatch(/rows\.find\([\s\S]{0,120}currentRank/);
+  });
+
+  it("orders nothing itself", () => {
+    for (const file of [PLAY_PAGE, ARENA_CONTEST_PANEL]) {
+      expect(readCode(file)).not.toMatch(/\.sort\(/);
+    }
+  });
+
+  it("reads the score direction only to describe it in words", () => {
+    /*
+      THIS ASSERTION WAS FIRST WRITTEN AS A BAN ON `scoreDirection` ANYWHERE, AND IT FAILED ON
+      CORRECT CODE - which is the class of guard the first person it inconveniences deletes, so
+      the narrowing is recorded rather than quietly applied (the same lesson as `13` s4.1g's
+      `GameIcon` ban).
+
+      The panel legitimately reads the direction: `scoringSummary` turns it into the sentence
+      that tells a player whether a high score or a low one wins, which is a thing the screen
+      MUST say and cannot say without it. What it may not do is compare two scores with it -
+      that is `calculateRankings`' single decision, and a second one is R37.
+
+      So: the panel's only use of it is as an argument, and the page - which holds the ranked
+      rows and could therefore actually reorder them - never sees it at all.
+    */
+    const panel = readCode(ARENA_CONTEST_PANEL);
+    const uses = panel.match(/scoreDirection/g) ?? [];
+    expect(uses).toHaveLength(1);
+    expect(panel).toMatch(/scoringSummary\([^)]*scoreDirection/);
+
+    expect(readCode(PLAY_PAGE)).not.toMatch(/scoreDirection/);
+  });
+
+  it("renders a dash for a player who holds no rank", () => {
+    /*
+      A player with no result holds no position, and `#1` there is the read-side form of the
+      phantom `score: 0` that R50 removed - a screen telling somebody they lead a contest they
+      have not played. The `typeof` check is the load-bearing part: a truthiness test would
+      show a dash for a genuine rank of zero if the ranking ever became zero-based.
+    */
+    const code = readCode(ARENA_CONTEST_PANEL);
+
+    /*
+      NOTHING BETWEEN THE TEST AND THE `?`, which is what makes this stronger than it looks. A
+      first version allowed sixty characters of slack between the `typeof` check and the dash,
+      and a probe widening the condition to `typeof rank === "number" || true` came back green:
+      the operator was still there, the dash was still there, and the branch was dead.
+    */
+    expect(code).toMatch(/typeof rank === "number"\s*\?/);
+    expect(code).toMatch(/typeof rank === "number"[\s\S]{0,40}:\s*"—"/);
+  });
+});
+
+describe("the arena header can be read before the board is reached", () => {
+  const code = readCode(ARENA_IDENTITY);
+
+  it("puts the genre above the title, not beside it", () => {
+    /*
+      Position, not presence. Both were in the same flex row before, so the title competed with
+      a badge and a description for one line's worth of attention - which is what "not
+      professional" was describing.
+    */
+    const badgeAt = code.indexOf("competition`");
+    const headingAt = code.indexOf("<h1");
+
+    expect(badgeAt).toBeGreaterThan(0);
+    expect(headingAt).toBeGreaterThan(0);
+    expect(badgeAt).toBeLessThan(headingAt);
+  });
+
+  it("clamps the description rather than letting it push the board down", () => {
+    /*
+      `description` is an operator-written field with no length limit in practice, and this
+      screen's whole point is the board. Unclamped, a long description moves the thing the
+      player came for below the fold - on a screen they are paying by the attempt to use.
+    */
+    expect(code).toMatch(/line-clamp-\d/);
+  });
+});
+
+describe("the arena's bottom band survives a slot that renders nothing", () => {
+  /*
+    THE REFERENCE'S THREE SIDE-BY-SIDE PANELS WERE TRIED AND REVERTED, and the reason is worth
+    keeping because it is not obvious: `GameRulesPanel` and `ArenaHighlights` both return `null`
+    when they have no content, and rules text is absent on EVERY title until the catalogue is
+    re-synced. A layout cannot see that its child rendered nothing, so a two-thirds grid column
+    holding a component that returned null is still a two-thirds column - an empty gap beside a
+    panel squeezed into a third of the width, for the common case.
+
+    Stacked, an absent panel occupies nothing. This pins that, so the grid is not reintroduced
+    by somebody comparing the screen against the mock.
+  */
+  it("stacks the band instead of placing it in grid columns", () => {
+    const code = readCode(ARENA_LAYOUT);
+
+    const rulesAt = code.indexOf("{rules}");
+    expect(rulesAt).toBeGreaterThan(0);
+
+    const band = code.slice(code.lastIndexOf("<div", rulesAt), rulesAt);
+    expect(band.length).toBeGreaterThan(0);
+    expect(band).not.toMatch(/grid-cols-/);
+    expect(band).not.toMatch(/col-span-/);
   });
 });

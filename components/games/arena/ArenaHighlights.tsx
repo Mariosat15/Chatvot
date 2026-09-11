@@ -1,5 +1,6 @@
 import { Zap } from "lucide-react";
 import { NEON_PANEL } from "@/components/neon/tokens";
+import { IconTile } from "@/components/neon/Cards";
 
 /**
  * The operator's "why this game is fun" cards along the bottom of the arena.
@@ -24,13 +25,23 @@ export function ArenaHighlights({ highlights }: Props) {
   return (
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       {highlights.map((highlight) => (
-        <div key={highlight.title} className={`${NEON_PANEL} flex items-start gap-3 px-4 py-3`}>
-          <Zap className="mt-0.5 h-4 w-4 shrink-0 text-sky-400" />
+        <div
+          key={highlight.title}
+          className={`${NEON_PANEL} flex items-center gap-3 px-4 py-3.5`}
+        >
+          {/*
+            The kit's tile rather than a bare glyph, so this row reads as part of the same
+            design as the contest panel above it. The reference gives every icon on the page
+            a tinted rounded ground; a loose icon beside text is the one shape it never uses.
+          */}
+          <IconTile icon={Zap} accent="rate" size="sm" />
           <div className="min-w-0">
             <div className="truncate text-sm font-semibold text-gray-100">
               {highlight.title}
             </div>
-            <div className="text-xs text-gray-500">{highlight.detail}</div>
+            <div className="text-xs leading-relaxed text-gray-500">
+              {highlight.detail}
+            </div>
           </div>
         </div>
       ))}

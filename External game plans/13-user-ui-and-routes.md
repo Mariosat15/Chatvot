@@ -1353,6 +1353,127 @@ accordion, which is a different shape for a screen with four operator-set dates.
 
 ---
 
+### 4.1m The arena on the owner's reference (11 September 2026)
+
+The owner supplied `arena-target-full.png` with one line of verdict: *"the structure is very not
+professional, redo the design, see image 3 as an example, I need that"*. All ten images are
+committed to `External game plans/design-reference/` with a README labelling each one mock or
+capture, because a mock mislabelled as a capture has already cost this programme a day.
+
+**THE FIRST THING TO ESTABLISH IS THAT THE REFERENCE SPANS TWO REPOSITORIES, AND THE BOUNDARY
+RUNS STRAIGHT DOWN THE MIDDLE OF IT.** `ProviderGameFrame` renders one lit frame around a bare
+`<iframe>` and **nothing whatsoever inside it**. So the round header (`ROUND 2/5`, `TIME LEFT`,
+`SCORE`), the board and its bezel, the `Hint / Undo / Clear` rail, the `LEVEL / Moves / Best
+Time / Combo` column and `SUBMIT SOLUTION` are all drawn by `games-service/public/play/`, a
+separate repository sharing no code with this one by design (`npm run check:isolation`). **A
+document describing this slice as a redesign of the arena is describing about half of it**, and
+one proposing to style the board from here is proposing something the isolation guard refuses.
+
+**Five things on the reference have no data source on either side of that boundary**, and are
+recorded rather than invented: **Hint** and **Undo** (both are changes to how the game is
+played, and a *paid* hint is forbidden outright - nothing in the marketplace may improve a
+player's score in a paid contest), **Moves / Best Time / Combo**, the **LEVEL 3** progress bar,
+the **GLOBAL / FRIENDS / COUNTRY** leaderboard tabs, and the **RECENT PLAYERS** activity feed.
+`13` s4.1d already records the live ticker as not built for the same reason.
+
+#### What the platform half actually lacked
+
+Three things, and only the first is a matter of appearance.
+
+**The prize amounts had no heading at all.** They rendered directly beneath the contest facts,
+so `50%` beside a rank badge read as one more fact about the contest rather than as what a
+winner is paid. The heading is now the **caller's**, in a `NeonHeadedPanel` titled *Prize
+breakdown* with a `Top {n} win` pill, and `PrizeTable` still carries none of its own - **both
+halves or neither**, because the component is rendered in three places and on both lobbies it
+sits inside an accordion that already has a heading. A heading inside it reads as two headings
+there, gets deleted, and the arena silently loses it again. The pill **counts** the paying
+positions; the reference's "Top 3 win" is three because that mock pays three, and a literal is
+a caption wrong for every contest but one.
+
+**The player's own position was nowhere on the screen.** On a board of twenty-five rows that is
+the one figure they are looking for. It is **read off the row the server already ranked**, never
+worked out here: `calculateRankings` resolves the contest's score direction once from the
+catalogue title, so a screen deciding its own order is a second place that decision is made -
+**the exact shape of R37**, where the board and the payout disagreed because each had worked it
+out separately. An absent rank renders a **dash**, never `#1`, which is the read-side form of
+the phantom `score: 0` that R50 removed.
+
+> **A guard that fired on correct code, and the narrowing is recorded rather than quietly
+> applied.** The first version of that rule banned `scoreDirection` anywhere on the arena. It
+> went red immediately, and the code was right: `scoringSummary` turns the direction into the
+> sentence telling a player whether a high score or a low one wins, which the screen **must**
+> say and cannot say without reading it. The rule is now that the panel's only use of it is as
+> an argument, the page never sees it at all, and **two control probes must stay green** - the
+> page reading a score for display, and the describing sentence being reworded. Same lesson as
+> s4.1g's `GameIcon` ban: a guard that fires on correct code is the kind the first person it
+> inconveniences deletes.
+
+**The heading block put the genre, the title, the description and the facts in one flex row**,
+so the contest's name competed with a badge and three lines of operator copy for a single line's
+worth of attention. That is what "not professional" was describing. The genre badge now sits
+**above** the heading (asserted by position, not presence, since both were in the same row
+before), the title is larger, the facts became a right-hand column at `lg`, and the description
+is **`line-clamp-3`** - it is an operator field with no practical length limit, and unclamped it
+pushes the board below the fold on a screen the player is paying by the attempt to use.
+
+#### The reference's three-panel bottom band was tried and reverted
+
+This is the part worth keeping, because the reason is not visible in the mock. `GameRulesPanel`
+and `ArenaHighlights` both return `null` when they have no content, and **rules text is absent
+on every title until the catalogue is re-synced**, which is the common case today. **A layout
+cannot see that its child rendered nothing**, so a two-thirds grid column holding a component
+that returned `null` is still a two-thirds column: an empty gap beside a panel squeezed into a
+third of the width. Stacked, an absent panel occupies nothing. A test pins the stacking so the
+grid is not reintroduced by somebody comparing the screen against the mock.
+
+#### One definition of the hairline, which was not one definition
+
+The standings rail went from 280px to 300px, because at 280 the board's three columns left the
+name about eleven characters and the reference's readable board rendered as `M...` beside
+`Andy...`.
+
+And the seam colour had **escaped into three consumers** before anybody noticed: the pre-flight
+and the arena panel each drew a divider with `border-[#16203C]` written out, and the arena panel
+then drew a seam with `bg-[#16203C]` too. It is now `NEON_SEAM` and `NEON_DIVIDER` in
+`components/neon/tokens.ts`, used by `NeonStatStrip` and by both consumers, with the literals
+added to the kit guard's list and the arena files added to its consumer list. **Worth guarding
+for a reason the panel shell is not:** the stat strip draws its internal separators with this
+exact tone, so a divider beside them one shade off shows as a visible join - nothing fails,
+nothing logs, and it reads as a rendering artefact rather than a colour somebody typed.
+
+> **Two whole classes, not a bare colour**, because Tailwind compiles only classes it can see:
+> `bg-[${NEON_SEAM_COLOUR}]` renders unstyled.
+
+#### Two findings about the harness, both of which produced a false result first
+
+**`readCode` strips comments before matching, which is correct and defeated a probe.** Injecting
+`// Prize breakdown` into `PrizeTable` came back green - rightly, since that stripping is what
+stops a file being flagged for discussing the anti-pattern it avoids. Inject real markup.
+
+**vitest's `-t` argument is a REGULAR EXPRESSION.** Three probes aimed at `it.each` assertions
+named `defines border-[#1B2540] bg-[#0A0F1F]/80 in the kit...` came back green because
+`[#1B2540]` is a character class: the filter matched nothing while the run still reported no
+failures, which is indistinguishable from a guard that does not work. The `it.each` names are
+now **ASCII and regex-safe** (`owns kit literal 3 ...`), with the literal still printed in the
+failure message. Related, and the fourth instance of the same family here: a PowerShell probe
+pattern containing an **em dash** reported `DID NOT APPLY`, because PS 5.1 reads a BOM-less
+UTF-8 script with the system ANSI codepage - **keep probe anchors ASCII.**
+
+**One assertion was genuinely weak and a probe found it.** The dash rule allowed sixty
+characters of slack between the `typeof` test and the dash, so widening the condition to
+`typeof rank === "number" || true` left the branch dead and every assertion green. It now
+requires **nothing between the test and the `?`**. Likewise the heading rule sliced *backwards*
+from `<PrizeTable` to the nearest preceding `<NeonHeadedPanel`, which a panel that has already
+**closed** satisfies - a probe sliding the table out past the closing tag left the heading over
+an empty box and reported everything fine. It asserts **containment** now.
+
+**16 probes, all red on exactly 1 failure, plus 2 controls green. 261 tests in `__tests__/games`.
+Typecheck at the 194 baseline exactly. Never verified by eye** - the play screen is behind
+sign-in and the automated browser has no session, so the owner is the first person who will see
+it.
+
+---
+
 ## 5. Dashboard
 
 `components/dashboard/` is about **15 components** backed by
