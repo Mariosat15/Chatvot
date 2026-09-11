@@ -1,5 +1,5 @@
 import { BookOpen, Target } from "lucide-react";
-import { NeonPanel } from "@/components/neon/Cards";
+import { NeonHeadedPanel } from "@/components/neon/Cards";
 import type { GamePresentation } from "@/lib/services/games/game-presentation.service";
 
 /**
@@ -80,10 +80,18 @@ export default function GameRulesPanel({ presentation, layout = "column" }: Prop
   if (!scoring && !playing) return null;
 
   return (
-    <NeonPanel
+    /*
+      THE HEADED SHELL SINCE 11 SEPTEMBER 2026, and the swap is the owner's "the graphics are
+      not like the design" in its smallest form: every panel in the reference carries its
+      heading in a tinted strip running edge to edge, and this one wore the quieter padded
+      shell - so the one panel a player most needs to read looked like the least important
+      thing on the page. The title text is unchanged, because it names the game and a test
+      pins the template.
+    */
+    <NeonHeadedPanel
       icon={BookOpen}
-      accent="players"
       title={`How ${presentation.gameName} is scored`}
+      bodyClassName="p-4 sm:p-5"
     >
       <div
         className={
@@ -119,7 +127,7 @@ export default function GameRulesPanel({ presentation, layout = "column" }: Prop
 
         {playing && <HowToPlay text={playing} />}
       </div>
-    </NeonPanel>
+    </NeonHeadedPanel>
   );
 }
 

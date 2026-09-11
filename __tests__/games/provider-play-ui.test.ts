@@ -2245,25 +2245,45 @@ describe("the arena header can be read before the board is reached", () => {
 
 describe("the arena's bottom band survives a slot that renders nothing", () => {
   /*
-    THE REFERENCE'S THREE SIDE-BY-SIDE PANELS WERE TRIED AND REVERTED, and the reason is worth
-    keeping because it is not obvious: `GameRulesPanel` and `ArenaHighlights` both return `null`
-    when they have no content, and rules text is absent on EVERY title until the catalogue is
-    re-synced. A layout cannot see that its child rendered nothing, so a two-thirds grid column
-    holding a component that returned null is still a two-thirds column - an empty gap beside a
-    panel squeezed into a third of the width, for the common case.
+    FLIPPED, NOT DELETED, on the owner's instruction of 11 September 2026. This used to assert
+    the band was STACKED, because the reference's three side-by-side panels had been tried and
+    reverted that morning: all three slots return `null` when they have no content, rules text
+    is absent on every title until the catalogue is re-synced, and a layout cannot see that its
+    child rendered nothing - so a grid column holding a null child is still a column, and the
+    common case was one panel adrift in an empty row.
 
-    Stacked, an absent panel occupies nothing. This pins that, so the grid is not reintroduced
-    by somebody comparing the screen against the mock.
+    The claim is unchanged and only the mechanism is: the band must survive an empty slot. CSS
+    can see what React cannot, because a wrapper whose child rendered nothing has no child
+    nodes, so `:empty` matches it and the slot leaves the flex line. `flex-wrap` rather than
+    `grid-cols-3` is the other half - a hidden grid item leaves its track empty, so the panels
+    that do have content would still huddle in the first two columns.
+
+    The comment explaining why the band was once stacked is the valuable part of this test, so
+    it stays here rather than being lost with the assertion it justified.
   */
-  it("stacks the band instead of placing it in grid columns", () => {
+  it("hides an empty slot rather than leaving a column for it", () => {
     const code = readCode(ARENA_LAYOUT);
 
     const rulesAt = code.indexOf("{rules}");
     expect(rulesAt).toBeGreaterThan(0);
 
-    const band = code.slice(code.lastIndexOf("<div", rulesAt), rulesAt);
+    /*
+      The band is the wrapper two levels up from the first slot, so the slice runs from the
+      last `<div` BEFORE the slot's own opening tag. Asserting a length first, because a slice
+      that found nothing passes everything asked of it.
+    */
+    const slotAt = code.lastIndexOf("<div", rulesAt);
+    const band = code.slice(code.lastIndexOf("<div", slotAt - 1), rulesAt);
     expect(band.length).toBeGreaterThan(0);
+    expect(band).toMatch(/flex-wrap/);
     expect(band).not.toMatch(/grid-cols-/);
-    expect(band).not.toMatch(/col-span-/);
+
+    /*
+      ALL THREE SLOTS, COUNTED. Two of the three are the ones absent in the common case, so a
+      band where only the rules slot carries the guard is green on a bare match and renders an
+      empty third of the page the moment nobody has played yet.
+    */
+    const guarded = code.match(/empty:hidden/g) ?? [];
+    expect(guarded).toHaveLength(3);
   });
 });

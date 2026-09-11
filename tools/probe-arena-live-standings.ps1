@@ -159,9 +159,13 @@ Invoke-Probe -Name 'the route composes its own board' -File $Route `
 
 # Rendering a panel directly is how half the rail goes back to being a photograph while every
 # assertion about the fetch stays green.
+# RE-AIMED 11 Sep 2026: the feed moved out of the sidebar into the reference's bottom band, so
+# the old pattern carried the sidebar's indentation and reported DID NOT APPLY - which reads like
+# a broken harness rather than a moved target. Matched without leading whitespace now, so the
+# next move of the slot cannot silence it again.
 Invoke-Probe -Name 'the page renders a panel directly' -File $Page `
-  -Find '            <ArenaLiveFeed />' `
-  -Replace '            <ArenaActivityFeed entries={standings.feed} currentUserId={session.user.id} />' `
+  -Find 'activity={<ArenaLiveFeed />}' `
+  -Replace 'activity={<ArenaActivityFeed entries={standings.feed} currentUserId={session.user.id} />}' `
   -ExpectTest 'the page renders the consumers rather than the panels directly'
 
 Write-Host ''

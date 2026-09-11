@@ -84,6 +84,17 @@ interface Props {
    */
   rules: ReactNode;
   highlights: ReactNode;
+  /**
+   * What has just happened in this contest - the reference's third bottom panel.
+   *
+   * IT MOVED OUT OF THE SIDEBAR ON THE OWNER'S INSTRUCTION (11 September 2026). It sat there
+   * because the reference's three-panel band was tried and reverted: two of the three render
+   * nothing until the catalogue is re-synced, and a grid column holding a child that returned
+   * `null` is still a column, so the common case was one panel adrift in an empty row. The
+   * owner asked for the band anyway, and the band below now survives an empty slot - see the
+   * comment on it, which is the part that made this safe rather than merely ordered.
+   */
+  activity: ReactNode;
 }
 
 export function GameArenaLayout({
@@ -99,6 +110,7 @@ export function GameArenaLayout({
   sidebar,
   rules,
   highlights,
+  activity,
 }: Props) {
   return (
     <div className="mx-auto max-w-[1400px] px-4 py-6">
@@ -248,17 +260,27 @@ export function GameArenaLayout({
       </div>
 
       {/*
-        THE BOTTOM BAND STAYS STACKED, and the reference's three side-by-side panels were
-        tried and reverted. Both of these render `null` when their content is absent - which
-        is the COMMON case, since no title carries rules text until the catalogue is
-        re-synced - and a two-thirds grid column holding a component that returned null is
-        still a column: the highlights would sit alone on the right with two empty thirds
-        beside them. A layout cannot see that its child rendered nothing, so the shape that
-        survives an empty slot is the one to use.
+        THE REFERENCE'S THREE-PANEL BAND, on the owner's instruction of 11 September 2026 -
+        and the reason it is safe this time is the two words `empty:hidden`, not the owner's
+        say-so.
+
+        It was tried and reverted the same day. All three of these slots render NOTHING when
+        their content is absent, and that is the common case rather than an edge: no title
+        carries rules text until the catalogue is re-synced, an operator writes the feature
+        cards per title, and a contest nobody has played yet has no activity. A layout cannot
+        see that its child returned `null`, so a grid column holding one is still a column -
+        which is how the first attempt produced one panel adrift in an empty row.
+
+        CSS can see it, even though React cannot: a wrapper whose child rendered nothing has
+        no child nodes, so `:empty` matches it and the slot leaves the flex line entirely.
+        `flex-wrap` with a basis rather than `grid-cols-3`, so the one or two panels that DO
+        have content grow to fill the row instead of huddling in the first tracks. One panel
+        reads as a full-width panel; three read as the reference.
       */}
-      <div className="mt-5 space-y-5">
-        {rules}
-        {highlights}
+      <div className="mt-5 flex flex-wrap gap-5">
+        <div className="min-w-[300px] flex-1 empty:hidden">{rules}</div>
+        <div className="min-w-[280px] flex-1 empty:hidden">{highlights}</div>
+        <div className="min-w-[280px] flex-1 empty:hidden">{activity}</div>
       </div>
 
       <p className={`mt-5 text-center ${NEON_LABEL}`}>

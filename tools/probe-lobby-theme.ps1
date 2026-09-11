@@ -291,6 +291,30 @@ export function accentClasses('
     From = '(1 - platformFeePercentage)'
     To   = '(1 - 0)'
     Test = 'moves no money computation while restyling or relocating the prize table'
+  },
+
+  # ---- The reference's bottom band, which survives a slot that renders nothing --------------
+  #
+  # All three slots are absent in the common case - no title carries rules text until the
+  # catalogue is re-synced, the feature cards are written per title, and a contest nobody has
+  # played has no activity. These two probes are the reason the band could be built at all: the
+  # first attempt was reverted because a grid column holding a null child is still a column.
+  @{
+    Name = 'the band is a grid again, so an absent panel leaves a hole'
+    File = $ARENA_LAYOUT
+    From = 'className="mt-5 flex flex-wrap gap-5"'
+    To   = 'className="mt-5 grid gap-5 lg:grid-cols-3"'
+    Test = 'hides an empty slot rather than leaving a column for it'
+  },
+  @{
+    # Only ONE slot loses the guard, which is the interesting mutation: a bare match for
+    # `empty:hidden` is satisfied by the rules slot alone while the activity panel - the one
+    # absent until somebody plays - renders an empty third of the page.
+    Name = 'one slot loses its empty guard'
+    File = $ARENA_LAYOUT
+    From = '<div className="min-w-[280px] flex-1 empty:hidden">{activity}</div>'
+    To   = '<div className="min-w-[280px] flex-1">{activity}</div>'
+    Test = 'hides an empty slot rather than leaving a column for it'
   }
 )
 

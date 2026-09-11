@@ -285,27 +285,26 @@ export default async function PlayPage({ params }: PlayPageProps) {
               </NeonHeadedPanel>
             )}
 
-            {/*
-              IN THE SIDEBAR RATHER THAN THE REFERENCE'S BOTTOM BAND, and that is a deviation
-              worth recording rather than absorbing. The reference puts Recent Players in a
-              three-panel row across the foot of the page beside How It Works and Game Tips. Two
-              of those three render nothing at all until the catalogue is re-synced, and a CSS
-              grid cannot see that its child returned `null` - so a two-thirds column holding a
-              null child is still a two-thirds column, and the common case is a band with one
-              panel adrift in it. The same attempt was made and reverted on 11 Sep 2026.
-
-              Here it sits under the prize breakdown in a column that already stacks, so the
-              panel simply is not there when nobody has played.
-
-              A CONSUMER OF THE SAME FETCH AS THE BOARD, not a second read: two polls of one
-              endpoint is two answers, so the board could name a rival's finished round while
-              the feed beside it had not heard of it.
-            */}
-            <ArenaLiveFeed />
           </>
         }
-        rules={<GameRulesPanel presentation={presentation} layout="wide" />}
-        highlights={<ArenaHighlights highlights={presentation.highlights} />}
+        /*
+          THE BAND, COLUMN BY COLUMN, in the reference's order: how the game is scored, what to
+          expect, who has just played.
+
+          The rules take `column` rather than `wide` now. `wide` puts the scoring rule and the
+          instructions side by side, which is right across the whole page and wrong in a third
+          of it - two columns of prose about 150px each.
+
+          THE FEED MOVED HERE FROM THE SIDEBAR on the owner's instruction. It is still a
+          CONSUMER OF THE SAME FETCH AS THE BOARD, not a second read: two polls of one endpoint
+          is two answers, so the board could name a rival's finished round while the feed beside
+          it had not heard of it.
+        */
+        rules={<GameRulesPanel presentation={presentation} layout="column" />}
+        highlights={
+          <ArenaHighlights highlights={presentation.highlights} layout="list" />
+        }
+        activity={<ArenaLiveFeed />}
       />
     </ArenaLiveProvider>
   );

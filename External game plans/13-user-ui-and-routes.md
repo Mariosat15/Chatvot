@@ -1445,6 +1445,14 @@ that returned `null` is still a two-thirds column: an empty gap beside a panel s
 third of the width. Stacked, an absent panel occupies nothing. A test pins the stacking so the
 grid is not reintroduced by somebody comparing the screen against the mock.
 
+> **Amended 11 September 2026 (s4.1r).** The owner compared the screen against the mock and
+> asked for the band, so **the band is built** - and the diagnosis above is exactly why it could
+> be. The slots are wrapped in `empty:hidden` on a wrapping flex line, so a wrapper whose child
+> rendered nothing leaves the row: **`:empty` is how CSS sees what a layout cannot.** The test
+> was flipped rather than deleted - the claim is still that the band survives an empty slot - so
+> a document citing the stacking as the present shape is stale, though it is correct as history.
+> **Say which.**
+
 #### One definition of the hairline, which was not one definition
 
 The standings rail went from 280px to 300px, because at 280 the board's three columns left the
@@ -1553,6 +1561,12 @@ The reference puts **RECENT PLAYERS** in a three-panel bottom band. `ArenaActivi
 the sidebar instead, for the reason s4.1m already learned the hard way: **a layout cannot see
 that its child rendered nothing**, and the band's other two members return `null` until the
 catalogue is re-synced. The sidebar already stacks.
+
+> **Amended 11 September 2026 (s4.1r).** The owner asked for the reference's band, so the feed
+> **moved into it** and the band now survives an empty slot through `empty:hidden`. A document
+> placing the feed in the sidebar is correct as history and stale as a present fact - **say
+> which.** The rule underneath is unchanged: it is still a consumer of the board's own fetch,
+> never a second read.
 
 **The score in the feed is printed plain, with no `+` sign.** The reference's `+240 ⚡` is right
 for an upward game and exactly backwards for a time trial, where a *lower* number is the better
@@ -1865,6 +1879,59 @@ from a guard that does not work, and it fails in the quiet direction.**
 
 **Never verified by eye** on the platform half - the arena is behind sign-in and the automated
 browser has no session. The in-frame half **was** seen, through `tools/smoke-play.ts`.
+
+### 4.1r The bottom band, on the reference after all (owner instruction, 11 September 2026)
+
+The owner sent the arena's foot as built beside the reference's foot and asked for the second:
+*"image 1 must look like image 2 recreate the graphics to look like that all the info there must
+be the same do this fast"*.
+
+**The band this asks for was tried and reverted the same day** (s4.1m), and the reason it was
+reverted is the only interesting part of building it: all three slots render **nothing** when
+their content is absent, and absent is the **common** case - no title carries rules text until
+the catalogue is re-synced, the feature cards are written per title, and a contest nobody has
+played has no activity. **A layout cannot see that its child returned `null`**, so a grid column
+holding one is still a column, and the first attempt produced one panel adrift in an empty row.
+
+**CSS can see what React cannot.** A wrapper whose child rendered nothing has no child nodes, so
+`:empty` matches it and Tailwind's `empty:hidden` takes the slot out of the flex line entirely.
+`flex-wrap` with a basis rather than `grid-cols-3` is the other half: a hidden **grid** item
+leaves its track behind, so the panels that do have content would still huddle in the first two
+columns. One panel reads as a full-width panel, three read as the reference.
+
+| Reference panel | What it renders | Where the content comes from |
+|---|---|---|
+| `HOW IT WORKS` | `GameRulesPanel`, unchanged in content - the amber "How you win" block above the numbered instructions | `provider_game.rulesSummary` / `howToPlay` |
+| `GAME TIPS` | `ArenaHighlights` in its new `list` layout - ticked lines rather than a strip of cards | the catalogue's feature cards |
+| `RECENT PLAYERS` | `ArenaActivityFeed`, **moved out of the sidebar**, with the reference's `Live activity` label | `game_round.scoreBreakdown`, through the board's own fetch |
+
+**The heading names what the content is, not what the reference calls it.** The mock's middle
+panel says `GAME TIPS` and these are not tips - they are the operator's "why this game is fun"
+cards, so the panel is headed **What to expect**. A caption is a claim: heading marketing copy
+as advice tells a player those lines will help them play, and **the catalogue has no field that
+would**. The shape is copied; the word is not.
+
+**Two things the mock shows were deliberately not copied.** Its numbered steps and ticked tips
+are written out as game-specific sentences, and the arena may not contain those - a test bans
+game-shaped nouns in quoted strings in this folder, because a screen that can name a game is how
+"a new title needs no code" is lost. They arrive as data or not at all, which also means **the
+numbered list appears the moment an operator writes line breaks** and reads as one paragraph
+until then. And **the score in the feed still carries no `+` sign** (s4.1n): the mock's `+240` is
+right for a game that counts upward and exactly backwards for a time trial, and the direction is
+resolved once, server-side.
+
+**The rules panel took the kit's headed shell**, which is the smallest form of "the graphics are
+not like the design": every panel in the reference carries its heading in a tinted strip running
+edge to edge, and the one panel a player most needs to read wore the quieter padded shell. The
+title text is unchanged. **The lobby gets the same change**, because it renders the same panel -
+which is the point of there being one.
+
+The band test was **flipped, not deleted**: its claim is unchanged - the band must survive an
+empty slot - and only the mechanism moved, so the comment explaining why it was once stacked
+stays with it. Three slots, **counted**, because a bare match for `empty:hidden` is satisfied by
+the rules slot alone while the activity panel renders an empty third of the page.
+
+**Never verified by eye** - the arena is behind sign-in.
 
 ---
 
