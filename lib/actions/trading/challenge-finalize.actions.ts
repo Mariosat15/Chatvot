@@ -7,7 +7,6 @@ import ChallengeSettings from "@/database/models/trading/challenge-settings.mode
 import CreditWallet from "@/database/models/trading/credit-wallet.model";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import TradingPosition from "@/database/models/trading/trading-position.model";
-import { PlatformTransaction } from "@/database/models/platform-financials.model";
 import { fetchRealForexPrices } from "@/lib/services/real-forex-prices.service";
 import { getMultipleSymbolConfigs } from "@/lib/services/symbol-config.service";
 import {
@@ -1324,9 +1323,6 @@ async function _finalizeChallengeAttempt(challengeId: string) {
                 : `Platform fee (${deferredFeeData.platformFeePercentage}%) from ${deferredFeeData.challengerName} vs ${deferredFeeData.challengedName}`,
           });
         } else {
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'challenge-finalize.actions.ts:PLATFORM_FEE_SKIP',message:'Skipped duplicate platform fee',data:{challengeId:deferredFeeData.challengeId},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
-          // #endregion
           console.log(`   ⏩ Platform fee already recorded for challenge ${deferredFeeData.challengeId}, skipping duplicate`);
         }
       }
@@ -1376,9 +1372,6 @@ async function _finalizeChallengeAttempt(challengeId: string) {
               });
 
               if (existingEarning) {
-                // #region agent log
-                fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'challenge-finalize.actions.ts:GM_EARNING_SKIP',message:'Skipped duplicate GM earning',data:{challengeId:deferredFeeData.challengeId,gmId:payment.gmId,userId:payment.userId},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
-                // #endregion
                 console.log(`   ⏩ GM earning already recorded for ${payment.userName} in challenge ${deferredFeeData.challengeId}, skipping duplicate`);
                 continue;
               }

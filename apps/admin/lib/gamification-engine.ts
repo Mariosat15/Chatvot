@@ -209,14 +209,6 @@ export function generateFixes(
   const milestoneFixes: FixResult["milestoneFixes"] = [];
   const badgeIds = new Set(badges.map(b => b.id));
 
-  // #region agent log
-  console.log(`[GEN-FIX] Input: ${badges.length} badges, ${milestones.length} milestones`);
-  if (badges.length > 0) {
-    const sample = badges[0];
-    console.log(`[GEN-FIX] Sample badge: id=${sample.id} rarity=${sample.rarity} cat=${sample.category} minLevel=${sample.minLevel} condType=${sample.condition?.type} minTrades=${sample.condition?.minTrades}`);
-  }
-  // #endregion
-
   // ══════════════════════════════════════════════════════════════════════════
   // SMART minLevel DISTRIBUTION
   // ══════════════════════════════════════════════════════════════════════════
@@ -228,10 +220,6 @@ export function generateFixes(
     if (!byRarity[r]) byRarity[r] = [];
     byRarity[r].push(b);
   }
-
-  // #region agent log
-  console.log(`[GEN-FIX] byRarity: common=${byRarity.common?.length||0} rare=${byRarity.rare?.length||0} epic=${byRarity.epic?.length||0} legendary=${byRarity.legendary?.length||0}`);
-  // #endregion
 
   for (const rarity of RARITY_ORDER) {
     const pool = byRarity[rarity] || [];
@@ -247,17 +235,10 @@ export function generateFixes(
     const belowMin = pool.filter(b => (b.minLevel || 0) < range[0]).length;
     const needsFix = dist.isFlat || (belowMin > pool.length * 0.5);
 
-    // #region agent log
-    console.log(`[GEN-FIX] ${rarity}: pool=${pool.length} range=[${range}] isFlat=${dist.isFlat} dominant=${dist.dominant} unique=${dist.uniqueCount} belowMin=${belowMin} needsFix=${needsFix}`);
-    // #endregion
-
     if (needsFix && pool.length > 0) {
       const sorted = [...pool].sort((a, b) => a.name.localeCompare(b.name));
       const targetLevels = distributeValues(sorted.length, range[0], range[1]);
 
-      // #region agent log
-      let levelFixCount = 0;
-      // #endregion
       for (let i = 0; i < sorted.length; i++) {
         const badge = sorted[i];
         const current = badge.minLevel || 0;
@@ -269,24 +250,14 @@ export function generateFixes(
             oldValue: current,
             newValue: target,
           });
-          // #region agent log
-          levelFixCount++;
-          // #endregion
         }
       }
-      // #region agent log
-      console.log(`[GEN-FIX] ${rarity} minLevel fixes: ${levelFixCount} (targets sample: [${targetLevels.slice(0,5).join(",")}...])`);
-      // #endregion
     } else if (!needsFix && rarity !== "common" && belowMin > 0) {
       // SURGICAL MODE: Distribution is healthy but some badges are below range minimum
       const belowBadges = pool.filter(b => (b.minLevel || 0) < range[0]);
       const lowerEnd = range[0];
       const upperEnd = Math.max(range[0] + 1, Math.round(range[0] + (range[1] - range[0]) * 0.3));
       const targetValues = distributeValues(belowBadges.length, lowerEnd, upperEnd);
-
-      // #region agent log
-      console.log(`[GEN-FIX] ${rarity} minLevel SURGICAL: fixing ${belowBadges.length} below-range → [${lowerEnd},${upperEnd}]`);
-      // #endregion
 
       for (let i = 0; i < belowBadges.length; i++) {
         badgeFixes.push({
@@ -303,10 +274,6 @@ export function generateFixes(
   // SMART minTrades DISTRIBUTION
   // ══════════════════════════════════════════════════════════════════════════
 
-  // #region agent log
-  console.log(`[GEN-FIX] Badge fixes after minLevel phase: ${badgeFixes.length}`);
-  // #endregion
-
   for (const rarity of RARITY_ORDER) {
     const pool = (byRarity[rarity] || []).filter(b =>
       TRADE_CATEGORIES.includes(b.category || "")
@@ -319,10 +286,6 @@ export function generateFixes(
     const currentTrades = pool.map(b => b.condition?.minTrades || 0);
     const dist = detectFlatDistribution(currentTrades);
     const zeroCount = currentTrades.filter(v => v === 0).length;
-
-    // #region agent log
-    console.log(`[GEN-FIX] minTrades ${rarity}: tradePool=${pool.length} zeros=${zeroCount} isFlat=${dist.isFlat}`);
-    // #endregion
 
     if (dist.isFlat || zeroCount > pool.length * 0.5) {
       // BULK MODE: Distribution is broken → redistribute ALL badges in this pool
@@ -350,10 +313,6 @@ export function generateFixes(
       const lowerEnd = range[0];
       const upperEnd = Math.max(range[0] + 1, Math.round(range[0] + (range[1] - range[0]) * 0.4));
       const targetValues = distributeValues(zeroBadges.length, lowerEnd, upperEnd);
-
-      // #region agent log
-      console.log(`[GEN-FIX] minTrades ${rarity} SURGICAL: fixing ${zeroBadges.length} zeros → range [${lowerEnd},${upperEnd}]`);
-      // #endregion
 
       for (let i = 0; i < zeroBadges.length; i++) {
         badgeFixes.push({
@@ -408,10 +367,6 @@ export function generateFixes(
       const lowerEnd = range[0];
       const upperEnd = Math.max(range[0] + 1, Math.round(range[0] + (range[1] - range[0]) * 0.4));
       const targetValues = distributeValues(zeroBadges.length, lowerEnd, upperEnd);
-
-      // #region agent log
-      console.log(`[GEN-FIX] minComps ${rarity} SURGICAL: fixing ${zeroBadges.length} zeros → range [${lowerEnd},${upperEnd}]`);
-      // #endregion
 
       for (let i = 0; i < zeroBadges.length; i++) {
         badgeFixes.push({
@@ -512,13 +467,6 @@ export function generateFixes(
       }
     }
   }
-
-  // #region agent log
-  console.log(`[GEN-FIX] FINAL: ${badgeFixes.length} badge fixes, ${milestoneFixes.length} milestone fixes`);
-  if (badgeFixes.length > 0) {
-    console.log(`[GEN-FIX] Sample badge fix: ${JSON.stringify(badgeFixes[0])}`);
-  }
-  // #endregion
 
   return {
     badgeFixes,

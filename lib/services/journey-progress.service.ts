@@ -4,7 +4,6 @@ import { connectToDatabase } from "@/database/mongoose";
 import JourneyMapConfig from "@/database/models/journey-map-config.model";
 import JourneyMilestone, { IJourneyMilestone, IMilestoneCondition } from "@/database/models/journey-milestone.model";
 import UserJourneyProgress, { IUserJourneyProgress } from "@/database/models/user-journey-progress.model";
-import { awardXPForBadge } from "@/lib/services/xp-level.service";
 
 /**
  * Get the first active map's mapId from JourneyMapConfig.
@@ -20,9 +19,6 @@ export async function getFirstActiveMapId(): Promise<string> {
     .select("mapId")
     .lean();
   if (firstMap?.mapId) {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'journey-progress.service.ts:getFirstActiveMapId',message:'Resolved active mapId from JourneyMapConfig',data:{resolvedMapId:firstMap.mapId},timestamp:Date.now(),hypothesisId:'H-UNIFY',runId:'unified'})}).catch(()=>{});
-    // #endregion
     return firstMap.mapId;
   }
 
@@ -32,16 +28,10 @@ export async function getFirstActiveMapId(): Promise<string> {
     // Prefer non-legacy mapIds
     const nonLegacy = distinctMapIds.filter((id: string) => id !== "traders_journey");
     const resolved = nonLegacy.length > 0 ? nonLegacy[0] : distinctMapIds[0];
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'journey-progress.service.ts:getFirstActiveMapId',message:'Resolved mapId from JourneyMilestone distinct',data:{resolvedMapId:resolved,allMapIds:distinctMapIds},timestamp:Date.now(),hypothesisId:'H-UNIFY',runId:'unified'})}).catch(()=>{});
-    // #endregion
     return resolved;
   }
 
   // Ultimate fallback (shouldn't happen if admin wizard was run)
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'journey-progress.service.ts:getFirstActiveMapId',message:'FALLBACK to pirate_cove - no active maps found!',data:{},timestamp:Date.now(),hypothesisId:'H-UNIFY',runId:'unified'})}).catch(()=>{});
-  // #endregion
   return "pirate_cove";
 }
 
@@ -72,9 +62,6 @@ export async function initializeUserJourney(
   const legacyProgress = await UserJourneyProgress.findOne({ userId });
   if (legacyProgress && legacyProgress.mapId !== mapId) {
     console.log(`🔄 [JOURNEY-MIGRATE] Migrating user ${userId} from mapId="${legacyProgress.mapId}" to "${mapId}"`);
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'journey-progress.service.ts:initializeUserJourney',message:'MIGRATING user from legacy mapId',data:{userId,fromMapId:legacyProgress.mapId,toMapId:mapId,completedCount:legacyProgress.completedMilestones?.length||0},timestamp:Date.now(),hypothesisId:'H-MIGRATE',runId:'unified'})}).catch(()=>{});
-    // #endregion
     legacyProgress.mapId = mapId;
     await legacyProgress.save();
     return legacyProgress;
@@ -898,14 +885,12 @@ export async function completeMilestone(
   // UNIFIED REWARD SYSTEM
   // ============================================
   let leveledUp = false;
-  let totalXPAwarded = 0;
 
   // 1. Award MILESTONE XP directly to user level
   if (milestone.rewards.xp > 0) {
     try {
       const { awardXP } = await import("@/lib/services/xp-level.service");
       const xpResult = await awardXP(userId, milestone.rewards.xp, "milestone", milestoneId);
-      totalXPAwarded += milestone.rewards.xp;
       leveledUp = xpResult.leveledUp;
       console.log(`⭐ [JOURNEY] Awarded ${milestone.rewards.xp} XP for milestone completion`);
     } catch (error) {
@@ -940,7 +925,6 @@ export async function completeMilestone(
         try {
           const { awardXPForBadge } = await import("@/lib/services/xp-level.service");
           const badgeXpResult = await awardXPForBadge(userId, milestone.rewards.badgeId);
-          totalXPAwarded += badgeXpResult.xpGained;
           if (badgeXpResult.leveledUp) leveledUp = true;
           console.log(`⭐ [JOURNEY] Awarded ${badgeXpResult.xpGained} XP for badge`);
         } catch (badgeXpError) {
@@ -1099,9 +1083,6 @@ export async function checkAndUnlockMilestones(
     // Badge-gated check: user must have earned ALL required badges
     if (canUnlock && ms.requiredBadgeIds && ms.requiredBadgeIds.length > 0 && userBadgeIds) {
       const hasAllBadges = ms.requiredBadgeIds.every((bid: string) => userBadgeIds!.has(bid));
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'journey-progress.service.ts:checkAndUnlockMilestones',message:'Badge gate check',data:{milestoneId:milestone.id,milestoneName:milestone.name,requiredBadgeIds:ms.requiredBadgeIds,userBadges:[...userBadgeIds],hasAllBadges,canUnlockBefore:canUnlock},timestamp:Date.now(),hypothesisId:'H-BADGE-GATE',runId:'badge-debug'})}).catch(()=>{});
-      // #endregion
       if (!hasAllBadges) {
         canUnlock = false; // Missing required badges -- stay locked
       }
