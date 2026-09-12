@@ -1,7 +1,6 @@
 import crypto from "crypto";
 
 import {
-  PERFECT,
   findTitle,
   roundDurationMs,
   type RoundConfig,
@@ -207,12 +206,36 @@ export function gameplayEndsAt(round: Pick<RoundDoc, "startedAt" | "config">): D
   return new Date(round.startedAt.getTime() + roundDurationMs(config));
 }
 
-/** The hard ceiling section 6 requires: a round must be impossible to extend beyond it. */
-export function hardDeadline(round: Pick<RoundDoc, "startedAt" | "config" | "expiresAt">): Date {
+/**
+ * The hard ceiling section 6 requires: a round must be impossible to extend beyond it.
+ *
+ * THE CEILING BELONGS TO THE ROUND'S OWN TITLE, and reading one title's constant for every round
+ * is the defect this paragraph exists for. It was `PERFECT.maxDurationSeconds` - 600 seconds -
+ * from the day the file was written, which was correct by accident: Perfect's maximum was then the
+ * largest in the catalogue, so it behaved as a global ceiling. Raising Sprint's maximum to an hour
+ * on 8 September 2026 did not touch this line, and it silently became a TEN-MINUTE CAP ON EVERY
+ * SPRINT ROUND.
+ *
+ * What that cost is worth stating, because a cap reads like a safe direction to be wrong in. This
+ * function decides `endsAt` and `playableSeconds` - the countdown the player watches - and
+ * `playability`, which decides when the round actually ends, did not consult it. So a 60-minute
+ * contest showed a 10-minute clock, the clock reached zero, the client asked the server (which is
+ * the right thing for it to do), the server answered "still playable", and the round sat at 0:00
+ * for the remaining fifty minutes. That is the owner's report: the game did not finish.
+ *
+ * AN UNKNOWN TITLE APPLIES NO CEILING, deliberately, rather than borrowing another title's. The
+ * round is still bounded by `expiresAt`, which always exists, and `finishRound` voids a round whose
+ * title has vanished anyway - so the only thing a borrowed number could add is the mistake above.
+ */
+export function hardDeadline(
+  round: Pick<RoundDoc, "gameCode" | "startedAt" | "config" | "expiresAt">,
+): Date {
   const gameplay = gameplayEndsAt(round);
-  const ceiling = round.startedAt
-    ? new Date(round.startedAt.getTime() + PERFECT.maxDurationSeconds * 1000)
-    : null;
+  const titleMaxSeconds = findTitle(round.gameCode)?.maxDurationSeconds;
+  const ceiling =
+    round.startedAt && titleMaxSeconds
+      ? new Date(round.startedAt.getTime() + titleMaxSeconds * 1000)
+      : null;
 
   const candidates = [round.expiresAt, gameplay, ceiling].filter(
     (date): date is Date => date instanceof Date,
@@ -243,11 +266,12 @@ export function hardDeadline(round: Pick<RoundDoc, "startedAt" | "config" | "exp
  * min is a second place for the three deadlines to be weighed differently.
  */
 export function playableSeconds(
-  round: Pick<RoundDoc, "startedAt" | "config" | "expiresAt">,
+  round: Pick<RoundDoc, "gameCode" | "startedAt" | "config" | "expiresAt">,
   now = new Date(),
 ): number {
   const anchor = round.startedAt ?? now;
   const deadline = hardDeadline({
+    gameCode: round.gameCode,
     startedAt: anchor,
     config: round.config,
     expiresAt: round.expiresAt,
@@ -263,22 +287,36 @@ export function playableSeconds(
  * Called by every play endpoint before it does anything. Reason for returning the owed state
  * rather than a boolean: an endpoint that only learns "no" has to guess whether the round expired
  * or simply ran its clock out, and a guess here is a misreported terminal state.
+ *
+ * IT ASKS `hardDeadline` WHETHER, AND `expiresAt` WHICH, and splitting the question that way is the
+ * structural half of the 10-minute defect. This function used to weigh the deadlines itself - the
+ * contest window, then the gameplay clock - which produced the same answer as `hardDeadline` for as
+ * long as the two lists agreed. They stopped agreeing the moment the ceiling did anything, and the
+ * failure is silent in the worst available direction: the countdown the player watches comes from
+ * `hardDeadline`, so a deadline this function does not know about is a clock that reaches zero and
+ * ends nothing. The client is right to ask the server at zero rather than deciding for itself; the
+ * server has to be able to answer with the same number it sent.
+ *
+ * So there is one deadline, and `expiresAt` only chooses the WORDING: a player whose sprint timer
+ * ran out has played the game to its natural end, which is `completed`; a player still holding an
+ * unfinished board when the contest window shut has not, which is `expired`. Those read very
+ * differently to a player, and the ceiling case - a stored config asking for longer than its title
+ * now permits - is `completed`, because they played for as long as the title allows.
  */
 export function playability(
-  round: Pick<RoundDoc, "status" | "startedAt" | "config" | "expiresAt">,
+  round: Pick<RoundDoc, "gameCode" | "status" | "startedAt" | "config" | "expiresAt">,
   now = new Date(),
 ):
   | { playable: true }
   | { playable: false; owes: FinishOptions["status"] | null } {
   if (isTerminal(round.status)) return { playable: false, owes: null };
 
-  if (now.getTime() >= round.expiresAt.getTime()) {
-    return { playable: false, owes: "expired" };
-  }
-
-  const gameplay = gameplayEndsAt(round);
-  if (gameplay && now.getTime() >= gameplay.getTime()) {
-    return { playable: false, owes: "completed" };
+  const deadline = hardDeadline(round);
+  if (now.getTime() >= deadline.getTime()) {
+    return {
+      playable: false,
+      owes: now.getTime() >= round.expiresAt.getTime() ? "expired" : "completed",
+    };
   }
 
   return { playable: true };
@@ -304,12 +342,18 @@ export async function findOverdueRounds(now = new Date(), limit = 50): Promise<R
  * Rounds still being played whose own gameplay clock has run out.
  *
  * Kept separate from the overdue query because the terminal state differs, and because the
- * filter cannot be expressed in MongoDB: the gameplay deadline is derived from `startedAt` plus a
- * duration held inside `config`. So this fetches in-progress rounds started long enough ago that
- * the longest possible clock could have run out, and the precise decision is made in code.
+ * filter cannot be expressed in MongoDB: the deadline is derived from `startedAt` plus a duration
+ * held inside `config`. So this fetches in-progress rounds started at least a second ago and the
+ * precise decision is made in code.
+ *
+ * IT FILTERS ON `hardDeadline`, NOT ON THE GAMEPLAY CLOCK ALONE, so the sweeper looks for the same
+ * moment the player was counting down to. It used to test `gameplayEndsAt` and then a guard against
+ * "a config that somehow asks for longer than any title allows" - which was two constants compared
+ * for truthiness and could not fail. That is now the ceiling inside `hardDeadline`, where it is a
+ * date rather than a tautology, and this is the third of the three readers (display, gate, sweeper)
+ * to go through the one function.
  */
 export async function findFinishedClocks(now = new Date(), limit = 50): Promise<RoundDocument[]> {
-  const longestPossibleMs = PERFECT.maxDurationSeconds * 1000;
   const candidates = await Round.find({
     status: "in_progress",
     startedAt: { $lte: new Date(now.getTime() - 1000) },
@@ -317,11 +361,7 @@ export async function findFinishedClocks(now = new Date(), limit = 50): Promise<
     .sort({ startedAt: 1 })
     .limit(limit * 4);
 
-  return candidates.filter((round) => {
-    const gameplay = gameplayEndsAt(round);
-    if (!gameplay) return false;
-    if (now.getTime() < gameplay.getTime()) return false;
-    // Guards against a config that somehow asks for longer than any title allows.
-    return now.getTime() - round.startedAt!.getTime() >= 0 && longestPossibleMs > 0;
-  });
+  return candidates.filter(
+    (round) => round.startedAt !== undefined && now.getTime() >= hardDeadline(round).getTime(),
+  );
 }

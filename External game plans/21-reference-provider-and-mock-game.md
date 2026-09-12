@@ -1556,6 +1556,81 @@ callback.
 
 ---
 
+### 4.1t An hour-long round was capped at another title's ten minutes - 12 September 2026
+
+**Owner report**, and he put it first in a message that also carried a leaderboard rejection:
+*"fix problem with more than 10 min game - when i choose 60 round the game didn't finish, check
+all times to work correctly... also make sure that when admin specify time the game respect that
+and finish"*. Pasted with it, two lines from `pm2 logs chartvolt-games`:
+
+```
+⚠️ [sweeper] cv_rnd_1b7abb75e42b4aa72923470e: delivery failed - HTTP 409; will retry
+🔄 [sweeper] expired 1, clocks 0, delivered 0, failed 1
+```
+
+**This is R69.** Six findings, five of them defects, and the primary one is a single line.
+
+**`hardDeadline` read `PERFECT.maxDurationSeconds` for every round, whatever title it belonged
+to.** That is 600 seconds. It was correct by accident from the day the file was written - Perfect's
+maximum was then the largest in the catalogue, so one title's constant behaved as a global ceiling -
+and `12` s2.9 raised Sprint's maximum to an hour on 8 September without touching it. From that
+moment **every Sprint round was capped at ten minutes** however long the operator had configured
+it. The fix is to resolve the ceiling from the round's own title, and **an unknown title applies no
+ceiling** rather than borrowing another one: the round is still bounded by `expiresAt`, which always
+exists, so a borrowed number can only add the mistake above.
+
+- **A cap on a clock reads like a safe direction to be wrong in, and here it produced a HANG.**
+  This is the structural finding and it is the transferable one. `hardDeadline` decides `endsAt`
+  and `playableSeconds` - the countdown the player watches - while **`playability`, which decides
+  when the round actually ends, weighed the deadlines itself** and did not consult it. The two
+  agreed for as long as their lists agreed, and they stopped agreeing the moment the ceiling did
+  anything. So the clock reached zero, the client asked the server (which is the right thing for it
+  to do rather than deciding for itself), the server answered *still playable*, and the board sat at
+  0:00 for the remaining fifty minutes. **That is the owner's sentence: the game did not finish.**
+  It now asks `hardDeadline` **whether**, and `expiresAt` only **which** terminal state - a sprint
+  timer running out is `completed`, an unfinished board caught by the contest window is `expired`.
+- **A guard made of two constants compared for truthiness cannot fail, and it had replaced the real
+  one.** `findFinishedClocks` tested `gameplayEndsAt` and then `longestPossibleMs > 0` as a
+  "guards against a config that somehow asks for longer than any title allows" - both operands
+  constant, so the clause was decoration. It now filters on `hardDeadline`, which makes the sweeper
+  the **third** of the three readers - display, gate, sweeper - to go through one function. A
+  deadline that three pieces of code derive separately is three chances for the player's clock and
+  the server's answer to differ, and only one of those three ever tells anybody.
+- **A stored config asking for longer than its title now permits is `completed`, not `expired`.**
+  It is only reachable by lowering a title's maximum after rounds exist - `resolveConfig` clamps
+  rather than refuses on the way in - and the player did play for as long as the title allows, so
+  reporting an expiry would blame the contest for a limit the catalogue imposed.
+- **The delivery log discarded the platform's own explanation, which is why the pasted 409 could
+  not be diagnosed.** `recordFailure` has always stored the body in `delivery.lastError`, so the
+  information existed - in a database, on a machine, keyed by a round id nobody has - while the
+  operator got `delivery failed - HTTP 409; will retry`. The platform answers 409 to at least three
+  different situations: this round is closed and its result will never be wanted, the contest cannot
+  accept a score *at this moment* and a retry will succeed, and a conflicting score has been flagged
+  for a human. Same code, same line, three different next actions, one of which is "do nothing". The
+  reason string now carries the body. **This is the sweeper's own `classify, never merely count`
+  rule one layer down** - it had been applied to the counter and not to the string the counter
+  replaced.
+
+**The 409 in the owner's log is not diagnosed and must not be written up as though it were.** The
+two round ids point at documents on the production database, which is not reachable from here. The
+most plausible reading is a platform round already terminal with no stored score - a contest
+cancellation voids live rounds - which gate 8 answers `accepted: false` and the route maps to 409,
+after which the game retries for 24 hours and raises a CRITICAL. **The R44 settlement cut-off is
+ruled out**, because `unresolved -> expired` is a legal transition. From the next deploy the reason
+is in the log line itself.
+
+**Verified: 305 tests (was 299), six new**, covering an hour-long round end to end, the deadline
+flipping from gameplay to window, an `expired`-versus-`completed` control, and three on the ceiling
+case through a raw-driver `storeOverlongRound` fixture. `tools/probe-round-clock.ps1` runs 14
+probes, **all red, none failing to apply**.
+
+**Deploy needs a BUILD.** The whole of this is TypeScript, and `games-service/dist` is untracked,
+so `git pull` alone changes nothing on the server - `npm run build` between the pull and
+`pm2 restart chartvolt-games`. **R66 was reported twice for exactly this reason**, which is why it
+is repeated here rather than assumed known.
+
+---
+
 ## 5. What this does NOT prove
 
 Stating this matters, because a green harness invites the conclusion that X4 is a formality.

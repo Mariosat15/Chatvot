@@ -42,6 +42,8 @@ chapter covers risks to the programme and to the application.
 | **R66** | **The game's own countdown ignored the contest.** `stateFor` sent `endsAt = gameplayEndsAt(round)`, the title's length from `startedAt`, while `playability` refuses at `expiresAt` too - so a player starting a ten-minute sprint with five minutes of contest left watched a clock counting from **10:00** and was stopped with **5:00** still showing. The pre-Start sentence read the configured length and was wrong the same way. **`hardDeadline` already returned the right answer and was called by nothing** | Medium | **LIVE and player-visible** whenever a round is started late; scores and payouts were correct throughout | **CLOSED 10 Sep 2026** (`21` s4.1p); nothing stored, so nothing to backfill |
 | **R67** | **A contest lobby was a photograph.** `CompetitionStatusMonitor` was mounted inside the *trading* return of `app/(root)/competitions/[id]/page.tsx`, and the game branch returns the whole page before reaching it - so a player who had already paid watched the countdown reach zero and had to **reload before the Play button appeared**. The monitor also fires only on a status CHANGE, so on **both** lobbies the standings stayed frozen for the whole of a running contest, when the status does not move | Medium | **LIVE and player-visible** on every game contest since the branch was written; no money moved and nothing was stored wrongly | **CLOSED 10 Sep 2026** (`13` s1.1j); nothing stored, so nothing to backfill |
 | **R68** | **The batch user lookup could not find a player at all.** `getUsersByIds` filtered on the `id` FIELD alone while Better Auth's MongoDB adapter keeps the identity in `_id`, so the query matched nothing, the map came back empty, and every game leaderboard drew **initials for everybody** the day after the owner ordered faces shown. `getUserById` beside it has carried three fallbacks since it was written. No error, no log line | Medium | **LIVE and player-visible** on both game boards; the lookup has exactly one caller, so nothing else was affected, and no money or stored value was involved | **CLOSED 11 Sep 2026** (`13` s4.1s); nothing stored, so nothing to backfill |
+| **R69** | **An hour-long round was capped at ten minutes, and the cap made it HANG rather than stop.** `hardDeadline` in the game service resolved its ceiling from `PERFECT.maxDurationSeconds` for every round whatever title it belonged to - correct by accident until Sprint's maximum rose to an hour on 8 Sep 2026. Worse, **`playability` weighed the deadlines itself and never consulted `hardDeadline`**, so the countdown the player watched reached 0:00, the client asked the server, the server answered *still playable*, and the board sat at zero for the rest of the contest. `findFinishedClocks`' own guard against an over-long config was two constants compared for truthiness and could not fire | Medium | **LIVE and player-visible** on any Sprint contest configured longer than ten minutes; scores were correct, no money moved | **CLOSED 12 Sep 2026** (`21` s4.1t); nothing stored, so nothing to backfill |
+| **R70** | **The wizard's Custom playing time could not be reached.** `DurationControl` derived "custom mode" from the value matching no preset, and picking Custom deliberately changed no value so as not to edit a contest somebody was only inspecting. Both rules are right alone: together, the ten-minute default is itself a preset, so the click did nothing, the select snapped back and no box appeared. An operator could only use Custom if they had somehow already used it. Fixed with it: `resolveExpiry`'s documented slack was **borrowed from the gap between the ceiling and the configured length**, and that gap closes at the longest round a title allows, so every full-length round was cut short by the frame's load time and filed as `expired` | Low | **LIVE and operator-visible**; nothing stored wrongly, and the expiry half cost a metric rather than a payment (a partial run counts, R48) | **CLOSED 12 Sep 2026** (`12` s2.13); nothing to backfill |
 | R8 | Bulk find-and-replace on wording | High | Medium | X8 |
 | R9 | Fraud throttle blind to provider entries | High | High | X5 |
 | R11 | Legal wording changed without review | High | Medium | X8 |
@@ -2220,6 +2222,117 @@ one the first person it inconveniences deletes, which is the same reasoning that
 Probed by `tools/probe-client-bundle-guard.ps1`: two probes, one restoring the admin defect
 verbatim and one reverting the main app's `import type` to a plain import, each red on exactly
 the expected test.
+
+---
+
+### R69 - An hour-long round was told it had ten minutes - **CLOSED 12 September 2026**
+
+**What it was.** The owner put it first in a message that also carried a leaderboard rejection:
+*"fix problem with more than 10 min game - when i choose 60 round the game didn't finish, check all
+times to work correctly."*
+
+**One line in the game service capped every round at another title's maximum.** `hardDeadline` mins
+`[expiresAt, gameplay, ceiling]`, and the ceiling was `PERFECT.maxDurationSeconds` - 600 seconds -
+regardless of which title the round belonged to. That was **correct by accident**: Perfect's maximum
+was the largest in the catalogue when the file was written, so one title's constant behaved as a
+global ceiling. `12` s2.9 raised Sprint's maximum to 3,600 seconds on 8 September and did not touch
+this line, and from that moment every Sprint round was capped at ten minutes however long the
+operator had configured it.
+
+**Why a cap became a hang, which is the finding worth carrying.** `hardDeadline` decides `endsAt`
+and `playableSeconds` - the countdown the player watches. `playability`, which decides when the
+round actually ends, **weighed the deadlines itself**: the contest window first, then the gameplay
+clock. Those two lists produced the same answer for as long as they agreed, and they stopped
+agreeing the moment the ceiling did anything. So the clock reached zero, the client asked the server
+rather than deciding for itself - which is the right thing for it to do - the server said *still
+playable*, and the board sat at 0:00 for the remaining fifty minutes. **A clock that reaches zero
+and ends nothing is worse than a clock that is simply wrong**, because there is no state to report
+and nothing to log.
+
+The fix is that there is now one deadline: `playability` asks `hardDeadline` **whether**, and
+`expiresAt` only chooses **which** terminal state. A sprint timer running out is `completed`; an
+unfinished board caught by the contest window is `expired`. Those read very differently to a player.
+
+**A guard made of two constants cannot fail, and it had displaced the real one.**
+`findFinishedClocks` tested `gameplayEndsAt` and then `longestPossibleMs > 0`, commented as
+"guards against a config that somehow asks for longer than any title allows". Both operands are
+constant, so the clause was decoration. The sweeper now filters on `hardDeadline` too, making it the
+**third** of three readers - display, gate, sweeper - to go through one function. A deadline three
+pieces of code derive separately is three chances for the player's clock and the server's answer to
+differ, and only one of the three ever tells anybody.
+
+**An unknown title applies no ceiling**, deliberately, rather than borrowing another one. The round
+is still bounded by `expiresAt`, which always exists, and `finishRound` voids a round whose title has
+vanished - so a borrowed number could only reintroduce the mistake above.
+
+**The 409 in the owner's pasted log is NOT diagnosed and must not be written up as though it were.**
+The two round ids are documents on the production database. The most plausible reading is a platform
+round already terminal with no stored score - a contest cancellation voids live rounds - which gate 8
+answers `accepted: false` and the route maps to 409, after which the game retries for 24 hours and
+raises a CRITICAL. **The R44 settlement cut-off is ruled out**, because `unresolved -> expired` is a
+legal transition. It could not be diagnosed from the logs at all, because `attemptDelivery` threw the
+platform's explanation away and printed only the status - fixed with this, since the platform answers
+409 to at least three situations whose correct next actions differ, one of them being "do nothing".
+**That is the sweeper's own `classify, never merely count` rule one layer down**, applied to the
+counter and not to the string the counter replaced.
+
+**A deploy note, because R66 was reported twice for exactly this.** All of this is TypeScript and
+`games-service/dist` is untracked, so `git pull` alone changes nothing on the server. `npm run build`
+belongs between the pull and `pm2 restart chartvolt-games`.
+
+---
+
+### R70 - The Custom playing time could not be entered - **CLOSED 12 September 2026**
+
+**What it was.** *"when i choose custom in wizard no box comes to add custom round time"*, the
+middle of the owner's three sentences about the clock.
+
+**Two correct rules made the option unreachable.** `DurationControl` offers whole-minute presets
+from a title's declared range and falls back to a number box for a value no preset matches. It
+decided it was in custom mode by **deriving** it - the stored value matches nothing - and the Custom
+menu item deliberately **did nothing**, so that an operator opening it to look did not silently edit
+the contest. Together: the default is ten minutes, ten minutes is a preset, so the click changed no
+value, the derived mode stayed false, the select snapped back to `10 minutes` and no box appeared.
+**The only way in was to already have a value no preset matched**, which is to say an operator could
+only use Custom if they had somehow already used it.
+
+**Keeping the value untouched was never the problem; deriving the MODE from it was.** One piece of
+state fixes it, and both original guarantees survive - a stored seven minutes still opens on the box
+with no click, and picking Custom on a preset value still leaves the value where it was.
+
+**It is the shape this programme keeps finding**: a control that renders correctly, reports nothing
+and does nothing, after a provider enabled with no adapter, a `rankingMethod` a provider game
+ignores, `isPaused` on a provider contest (R41) and the green creation badge over a refused create
+(R47).
+
+**The platform's expiry safety net was fixed with it, and the docblock defending it is what showed
+the fault.** `resolveExpiry` sets `expiresAt` from `maxDurationSeconds`, the catalogue ceiling,
+deliberately not the configured `attemptSeconds` the round-start gate reserves - the file explains
+at length that the gate asks *how much must I reserve* while expiry asks *by when is this certainly
+over*, and that tidying them into one field chooses one of two failures. That is right. But the
+**generosity was borrowed from the gap between the two numbers, and the gap closes**: configure the
+longest round a title allows and `attemptSeconds == maxDurationSeconds`, so the expiry lands one
+round after the round was **created** while the game's clock runs one round from when the player
+pressed **Start**. Every full-length round was then cut off by however long the frame took to load,
+and reported `expired`. Not a wrong payment - a partial run counts (R48) - but
+`lastSuccessfulRoundAt` never refreshes and every full-length round lands in the expiry bucket on
+the screen that decides whether a title keeps running. `ROUND_EXPIRY_HEADROOM_SECONDS` now states
+the slack rather than inferring it, still clamped to `playWindowEnd`.
+
+**Ten probes across two platform harnesses had been reporting nothing, and two guarded these very
+rules.** Nine anchors had been moved by `12` s2.8, s2.9, s2.10 or R61 - `PROBE DID NOT APPLY`, which
+reads like a broken harness rather than a moved target - and two carried stale **claims** as well,
+naming tests s2.9 had flipped out of existence, which the anchor failure hid. Re-aiming them exposed
+two real test weaknesses, both fixed by strengthening the test rather than loosening the probe:
+
+- **A slice whose end marker has moved does not produce an empty slice - it produces a slice so wide
+  that every assertion is trivially true.** `indexOf` returns -1 and `slice(0, -1)` hands back
+  almost the whole file, which contains both identifiers several times over. Assert that **both
+  ends** of a slice exist.
+- **A per-branch claim has to be asserted per branch.** `contest-preflight.ts` states the same fact
+  twice, once as a refusal and once as a warning, so a probe that gutted only the refusal left the
+  warning satisfying every bare match. Count the occurrences. Same class as the play screen's two
+  `!expectedOrigin` copies and the pause list covering for the emergency list.
 
 ---
 

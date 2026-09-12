@@ -97,6 +97,73 @@ $results += Invoke-Probe -Name 'only the timed title reports a length, so Perfec
   -ExpectRed 'a fixed-set title reports a length too, so it can notice being cut short'
 
 Write-Host ""
+Write-Host "The ceiling, and the three readers of it" -ForegroundColor Cyan
+
+# THE 11 SEPTEMBER DEFECT, restored exactly: one title's constant used as a global ceiling. Written
+# as the literal 600 rather than as `PERFECT.maxDurationSeconds`, because that import went with the
+# fix and an undefined identifier takes the suite down on its first test - which the harness reports
+# as DID-NOT-APPLY, and a probe that breaks the suite tells you nothing about the guard.
+#
+# Declared at 2: an hour-long round is capped at ten minutes, which is the owner's report, and the
+# over-long round stops at 600 rather than at its own title's maximum. One line, both cases.
+$results += Invoke-Probe -Name 'the ceiling goes back to one title''s constant for every round' `
+  -Suite $SuitePlay -File $srcLifecycle `
+  -Find '  const titleMaxSeconds = findTitle(round.gameCode)?.maxDurationSeconds;' `
+  -Replace '  const titleMaxSeconds = 600;' `
+  -ExpectRed "an hour-long round is promised an hour, not the shortest title's maximum" -MaxRed 2
+
+# The structural half: the gate weighing its own list of deadlines again, which is what turned a cap
+# into a hang. The countdown comes from `hardDeadline`, so a deadline the gate does not know about
+# is a clock that reaches zero and ends nothing - the client asks the server, the server says "still
+# playable", and the round sits at 0:00 until its contest window passes.
+$results += Invoke-Probe -Name 'the gate weighs its own deadlines instead of asking for the one' `
+  -Suite $SuitePlay -File $srcLifecycle `
+  -Find '  const deadline = hardDeadline(round);
+  if (now.getTime() >= deadline.getTime()) {
+    return {
+      playable: false,
+      owes: now.getTime() >= round.expiresAt.getTime() ? "expired" : "completed",
+    };
+  }' `
+  -Replace '  if (now.getTime() >= round.expiresAt.getTime()) {
+    return { playable: false, owes: "expired" };
+  }
+
+  const gameplay = gameplayEndsAt(round);
+  if (gameplay && now.getTime() >= gameplay.getTime()) {
+    return { playable: false, owes: "completed" };
+  }' `
+  -ExpectRed 'the gate stops it there too, rather than at the length stored on the round'
+
+# The third reader. A round the gate refuses but the sweeper never notices stays `in_progress` until
+# its contest window passes, so the result arrives as an expiry long after the player finished - or,
+# if the window has already gone, not at all.
+$results += Invoke-Probe -Name 'the sweeper looks for the gameplay clock rather than the deadline' `
+  -Suite $SuitePlay -File $srcLifecycle `
+  -Find '  return candidates.filter(
+    (round) => round.startedAt !== undefined && now.getTime() >= hardDeadline(round).getTime(),
+  );' `
+  -Replace '  return candidates.filter((round) => {
+    const gameplay = gameplayEndsAt(round);
+    return gameplay !== null && now.getTime() >= gameplay.getTime();
+  });' `
+  -ExpectRed 'the sweeper closes it there too, rather than leaving it in progress for ever'
+
+Write-Host ""
+Write-Host "What a failed delivery tells whoever is on call" -ForegroundColor Cyan
+
+# The platform's own explanation dropped on the way out of `attemptDelivery`. It is still stored on
+# the round, which is exactly what made this hard to notice: the information exists, in a database,
+# on a machine, keyed by a round id nobody has.
+$results += Invoke-Probe -Name 'the failure reason keeps the status and drops the explanation' `
+  -Suite $SuitePlay -File 'src/callback/deliver.ts' `
+  -Find '    const detail = response.body
+      ? `HTTP ${response.status}: ${response.body}`
+      : `HTTP ${response.status}`;' `
+  -Replace '    const detail = `HTTP ${response.status}`;' `
+  -ExpectRed 'a delivery failure says WHY in the log, not merely that one happened'
+
+Write-Host ""
 Write-Host "The words the player actually reads" -ForegroundColor Cyan
 
 # The client half of the original defect: the state now carries the truth and the panel still reads

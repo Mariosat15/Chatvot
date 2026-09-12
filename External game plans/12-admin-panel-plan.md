@@ -1895,6 +1895,62 @@ Same answer as refusing a game-type change on a zero-participant draft (s2.2).
 
 ---
 
+### 2.13 The Custom playing time could not be entered - BUILT 12 September 2026
+
+**Owner report**, the middle of three sentences about the game clock: *"when i choose custom in
+wizard no box comes to add custom round time"*. The other two are games-service work and are
+**R69** (`21` s4.1t); this half is **R70**, and the platform's expiry safety net was fixed with it.
+
+**s2.9 built the control and its own two rules made the Custom option unreachable.**
+`DurationControl` offers whole-minute presets from the title's declared range and falls back to a
+number box for a value no preset matches. It decided it was in custom mode by **deriving** it -
+the stored value matches nothing - and the Custom menu item deliberately **did nothing**, so that
+an operator opening it to look did not silently edit the contest. Both rules are right on their
+own. Together: the default is ten minutes, ten minutes is a preset, so the click changed no value,
+the derived mode stayed false, the select snapped back to `10 minutes` and no box ever appeared.
+**The only way in was to already have a value no preset matched** - which is to say, an operator
+could only use Custom if they had somehow already used it.
+
+- **Keeping the value untouched was never the problem; deriving the MODE from it was.** The fix is
+  one piece of state. A stored seven minutes still opens on the box with no click, so editing an
+  existing contest is unchanged, and picking Custom on a preset value still leaves the value
+  exactly where it was.
+- **It is the shape this programme keeps finding: a control that renders correctly, reports nothing
+  and does nothing** - after a provider enabled with no adapter, a `rankingMethod` a provider game
+  ignores, `isPaused` on a provider contest (R41) and the green creation badge over a refused
+  create (R47). **Live and operator-visible**, and nothing was stored wrongly, so there is nothing
+  to backfill: an operator who wanted eleven minutes got ten and could see that they had.
+- **The platform's expiry safety net had lost its documented slack, and the docblock explaining why
+  it was generous is what showed it.** `resolveExpiry` sets `expiresAt` from
+  `maxDurationSeconds` - the catalogue ceiling, deliberately not the configured `attemptSeconds`
+  the round-start gate reserves, because the two ask different questions and the file says so in
+  full. The generosity was **borrowed from the gap between the two numbers, and that gap closes**:
+  configure the longest round a title allows and they are equal, so the expiry lands one round
+  after the round was **created** while the game's clock runs one round from when the player pressed
+  **Start**. Every full-length round was then cut off by however long the frame took to load and
+  reported `expired` rather than `completed`. Not a wrong payment - a partial run counts (R48) - but
+  `lastSuccessfulRoundAt` never refreshes and every full-length round lands in the expiry bucket on
+  the screen that decides whether a title keeps running. `ROUND_EXPIRY_HEADROOM_SECONDS` now states
+  the slack instead of inferring it, still clamped to `playWindowEnd`, so nothing can outlive its
+  contest.
+- **Ten probes across the two platform harnesses had been reporting nothing, and two of them were
+  guarding these very clock rules.** Nine had anchors that s2.8, s2.9, s2.10 or R61 had moved -
+  `PROBE DID NOT APPLY`, which reads like a broken harness rather than a moved target - and two had
+  stale **claims** as well, naming tests s2.9 had flipped out of existence, which the anchor failure
+  hid. Re-aiming them turned up two genuine test weaknesses, both fixed by strengthening the test
+  rather than loosening the probe: a slice whose end marker had moved, where `indexOf` returns -1
+  and `slice(0, -1)` hands back **almost the whole file** so every assertion is trivially true; and
+  a per-branch claim asserted file-wide, where `contest-preflight.ts` states the same fact in a
+  refusal and in a warning, so gutting one branch leaves the other satisfying any bare match. Both
+  now assert **both ends of the slice exist** and **count occurrences**.
+
+**The live code:** `DurationControl` in `apps/admin/components/admin/games/ConfigSchemaFields.tsx`
+and `ROUND_EXPIRY_HEADROOM_SECONDS` in `lib/services/games/round.service.ts`. Neither is mirrored -
+the component is admin-only and the round service is main-app only, so `check:mirrors` says nothing
+about either. **Never verified by eye**: the wizard is behind an admin sign-in.
+
+---
+
 ## 5. Stats and analytics
 
 | Screen | Change |

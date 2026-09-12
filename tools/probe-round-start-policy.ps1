@@ -101,13 +101,31 @@ Probe -Name 'the policy is ignored and the ceiling is always reserved' `
 # The opposite mistake, and the more dangerous one: the gate skipped for EVERY contest. A round
 # is then admitted that the contest end cuts short on a title where a partial run means nothing,
 # and the reserving setting silently stops existing.
+#
+# RE-AIMED 11 September 2026. It had been anchored on `(config.maxDurationSeconds ?? 0)`, which is
+# what this line read until `12` s2.9 changed the gate to reserve the configured attempt on
+# 8 September - so for three days it reported DID NOT APPLY, which reads exactly like a broken
+# harness rather than a moved target.
 Probe -Name 'the gate is skipped for every contest, not only permissive ones' `
   -Suite $LIFECYCLE `
   -File $ROUND `
-  -Find '  const maxDuration = (config.maxDurationSeconds ?? 0) * 1000;
-  return now.getTime() + maxDuration <= config.playWindowEnd.getTime();' `
+  -Find '  const attemptMs =
+    (config.attemptSeconds ?? config.maxDurationSeconds ?? 0) * 1000;
+  return now.getTime() + attemptMs <= config.playWindowEnd.getTime();' `
   -Replace '  return true;' `
   -ExpectRed 'refuses to start a round that could not finish inside the play window'
+
+# The safety net going back to the exact configured length, which is slack only while the operator
+# has chosen something SHORTER than the title's ceiling. Pick the longest round the title allows
+# and the two anchors differ - expiry from round creation, the game's clock from Start - so every
+# full-length round is cut off by the frame loading and reported `expired` rather than `completed`.
+Probe -Name 'the expiry safety net has no room for the game to load' `
+  -Suite $LIFECYCLE `
+  -File $ROUND `
+  -Find '  const maxDuration =
+    ((config.maxDurationSeconds ?? 300) + ROUND_EXPIRY_HEADROOM_SECONDS) * 1000;' `
+  -Replace '  const maxDuration = (config.maxDurationSeconds ?? 300) * 1000;' `
+  -ExpectRed "leaves the game's own clock room to be the deadline, not this one"
 
 # THE HALF A STRUCTURAL TEST CANNOT SEE. Permitting the round is not the claim - bounding it is.
 # Without the clamp, a permissive contest launches a round that outlives its own settlement,
@@ -170,17 +188,11 @@ Probe -Name 'editing a contest publishes it as a side effect' `
 Probe -Name 'the publish flag is sent on the create call' `
   -Suite $WIZARD_SUITE `
   -File $DRAFT `
-  -Find '    roundStartPolicy: draft.roundStartPolicy,
-    resultGracePeriodSeconds: draft.resultGracePeriodSeconds,
-    perRoundCostAcknowledged: draft.perRoundCostAcknowledged,
-  };
-}' `
-  -Replace '    roundStartPolicy: draft.roundStartPolicy,
-    resultGracePeriodSeconds: draft.resultGracePeriodSeconds,
-    perRoundCostAcknowledged: draft.perRoundCostAcknowledged,
-    publishOnSave: draft.publishOnSave,
-  };
-}' `
+  -Find '    playMode: draft.playMode,
+    attemptsPolicy: draft.attemptsPolicy,' `
+  -Replace '    publishOnSave: draft.publishOnSave,
+    playMode: draft.playMode,
+    attemptsPolicy: draft.attemptsPolicy,' `
   -ExpectRed 'never sends the flag to the server, at create or at edit'
 
 # Created and then never published, so the checkbox is a control that appears to work and does

@@ -21,6 +21,11 @@ $Editor = Join-Path $Root "apps\admin\components\admin\games\ProviderContestEdit
 $Preflight = Join-Path $Root "lib\services\games\contest-preflight.ts"
 $AdminPreflight = Join-Path $Root "apps\admin\lib\services\games\contest-preflight.ts"
 $Field = Join-Path $Root "apps\admin\components\admin\games\RoundStartPolicyField.tsx"
+$ConfigFields = Join-Path $Root "apps\admin\components\admin\games\ConfigSchemaFields.tsx"
+# `12` s2.8 split the wizard into one file per step, so two probes that used to target the
+# orchestrator now have to target a step. The suite reads all of them together.
+$StepSchedule = Join-Path $Root "apps\admin\components\admin\games\wizard\StepSchedule.tsx"
+$StepReview = Join-Path $Root "apps\admin\components\admin\games\wizard\StepReview.tsx"
 
 $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 
@@ -129,8 +134,10 @@ Invoke-Probe -Name "the last-attempt moment is measured from the wrong end" `
     -Edits @(
     @{
         Target  = $Draft
-        Find    = "? new Date(end.getTime() - maxDurationSeconds * 1000)"
-        Replace = "? new Date(start.getTime() + maxDurationSeconds * 1000)"
+        # RE-AIMED: `12` s2.10 replaced the subtraction here with a call to the one entry-deadline
+        # module, so the wrong-end slip is now spelt by handing it the wrong end.
+        Find    = "          playWindowEnd: end,"
+        Replace = "          playWindowEnd: start,"
     }
 )
 
@@ -141,8 +148,10 @@ Invoke-Probe -Name "an absent round length is guessed instead of declined" `
     -Edits @(
     @{
         Target  = $Draft
-        Find    = "if (typeof maxDurationSeconds !== `"number`" || !(maxDurationSeconds > 0)) {`n    return undefined;`n  }"
-        Replace = "if (false) {`n    return undefined;`n  }"
+        # RE-AIMED: `12` s2.9 moved the absent-duration decision into `resolveAttemptSeconds`, so
+        # the guard here is now the one line that declines what it hands back.
+        Find    = "  if (attemptSeconds === undefined) return undefined;"
+        Replace = "  if (false) return undefined;"
     }
 )
 
@@ -164,8 +173,10 @@ Invoke-Probe -Name "a contest exactly one round long is flagged as too short" `
     -Edits @(
     @{
         Target  = $Draft
-        Find    = "windowTooShort: windowSeconds < maxDurationSeconds,"
-        Replace = "windowTooShort: windowSeconds <= maxDurationSeconds,"
+        # RE-AIMED: the figure compared here is the CONFIGURED attempt since `12` s2.9, not the
+        # catalogue ceiling.
+        Find    = "windowTooShort: windowSeconds < attemptSeconds,"
+        Replace = "windowTooShort: windowSeconds <= attemptSeconds,"
     }
 )
 
@@ -191,9 +202,12 @@ Invoke-Probe -Name "a screen recomputes the deadline for itself" `
     -ExpectTest "derives the deadline in ONE place, not in the screens" `
     -Edits @(
     @{
-        Target  = $Wizard
-        Find    = "function StepTiming({"
-        Replace = "const ownDeadline = (e: number, d: number) => new Date(e - d * maxDurationSeconds * 1000);`n`nfunction StepTiming({"
+        # RE-AIMED: `12` s2.8 moved this step into its own file, and the probe had been reporting
+        # DID NOT APPLY ever since. The suite concatenates the orchestrator with every step, so a
+        # screen recomputing the deadline is caught wherever it does it.
+        Target  = $StepSchedule
+        Find    = "export function StepSchedule({"
+        Replace = "const ownDeadline = (end: number, maxDurationSeconds: number) =>`n  new Date(end - maxDurationSeconds * 1000);`n`nexport function StepSchedule({"
     }
 )
 
@@ -260,36 +274,42 @@ Invoke-Probe -Name "the note grows a special case for one game's config key" `
 #
 #     The mutation deletes the "rather than the length set in its own settings" clause, which is
 #     the whole disclosure, and leaves the ceiling quoted bare - the state the owner reported.
-Invoke-Probe -Name "the refusal goes back to quoting a number the operator never chose" `
-    -ExpectTest "calls the reserved figure the game's longest possible round, in BOTH copies" `
+# RE-AIMED, AND BOTH OF THESE HAD STALE CLAIMS RATHER THAN MERELY STALE ANCHORS. They were
+# written for the world before `12` s2.9, where the gate deliberately reserved the catalogue
+# ceiling and the refusal explained that it was doing so. s2.9 retired both - the ceiling was
+# never a fact about one contest, and once Sprint's clock ran to an hour it would have refused
+# every ten-minute contest outright - and the two tests these named were flipped with it. So the
+# probes named tests that no longer exist AND code that no longer exists, and the anchor failure
+# is what hid the second half. A stale probe fails in the quiet direction.
+Invoke-Probe -Name "the refusal quotes one figure and leaves the contest length out" `
+    -ExpectTest "names the configured playing time AND the contest length, in BOTH copies" `
     -Edits @(
     @{
         Target  = $Preflight
-        Find    = "so no player could finish - and because this contest stops new rounds one full round before the end, nobody could start one either. That is the game's maximum rather than the length set in its own settings. Lengthen the contest, or let players start a round at any time until it ends."
-        Replace = "so no player could finish."
+        Find    = "is longer than the contest itself (`${describeSeconds(Math.floor(windowSeconds))}), so nobody could ever start an attempt."
+        Replace = "is too long, so nobody could ever start an attempt."
     },
     @{
         Target  = $AdminPreflight
-        Find    = "so no player could finish - and because this contest stops new rounds one full round before the end, nobody could start one either. That is the game's maximum rather than the length set in its own settings. Lengthen the contest, or let players start a round at any time until it ends."
-        Replace = "so no player could finish."
+        Find    = "is longer than the contest itself (`${describeSeconds(Math.floor(windowSeconds))}), so nobody could ever start an attempt."
+        Replace = "is too long, so nobody could ever start an attempt."
     }
 )
 
-# 12. The gate "fixed" to read the configured value - the wrong-direction repair this whole
-#     slice exists to prevent. It makes the message honest and lets a round be cut off
-#     mid-play, which chapter 03 section 1.2 forbids.
-Invoke-Probe -Name "the gate reads the configured round length instead of the ceiling" `
-    -ExpectTest "still gates on the ceiling rather than the configured value" `
+# 12. The defect `12` s2.9 fixed, restored in both copies: the gate back on the catalogue ceiling,
+#     so a contest shorter than the title's maximum is refused however short its own attempts are.
+Invoke-Probe -Name "the gate goes back to the catalogue ceiling" `
+    -ExpectTest "gates on the DECLARED play clock, falling back to the ceiling" `
     -Edits @(
     @{
         Target  = $Preflight
-        Find    = "const roundSeconds = input.title.maxDurationSeconds;"
-        Replace = "const roundSeconds = Number(input.settings[`"durationSeconds`"]);"
+        Find    = "  const roundSeconds = resolveAttemptSeconds(`n    input.schemaFields,`n    input.settings,`n    input.title.maxDurationSeconds,`n  );"
+        Replace = "  const roundSeconds = input.title.maxDurationSeconds;"
     },
     @{
         Target  = $AdminPreflight
-        Find    = "const roundSeconds = input.title.maxDurationSeconds;"
-        Replace = "const roundSeconds = Number(input.settings[`"durationSeconds`"]);"
+        Find    = "  const roundSeconds = resolveAttemptSeconds(`n    input.schemaFields,`n    input.settings,`n    input.title.maxDurationSeconds,`n  );"
+        Replace = "  const roundSeconds = input.title.maxDurationSeconds;"
     }
 )
 
@@ -302,7 +322,8 @@ Invoke-Probe -Name "the review step describes an outcome the operator did not ch
     -ExpectTest "tells the operator to publish rather than to wait for a feature" `
     -Edits @(
     @{
-        Target  = $Wizard
+        # RE-AIMED: the review step is its own file since `12` s2.8.
+        Target  = $StepReview
         Find    = "{draft.publishOnSave`n                  ? `"The contest is checked once more against what was actually saved, then made visible. If that second check refuses it, the contest is kept as a draft and the reasons are shown here.`"`n                  : `"The contest is saved as a draft. Players cannot see or join a draft - press Publish on the contest list when you are ready.`"}"
         Replace = "It will be saved as a <strong className=`"text-white`">draft</strong>."
     }
@@ -321,8 +342,10 @@ Invoke-Probe -Name "a cut-off moment is named on a contest that has none" `
     -Edits @(
     @{
         Target  = $Draft
-        Find    = "    lastAttemptStart: reservesFullRound`n      ? new Date(end.getTime() - maxDurationSeconds * 1000)`n      : undefined,"
-        Replace = "    lastAttemptStart: new Date(end.getTime() - maxDurationSeconds * 1000),"
+        # RE-AIMED for the same reason as probe 1: the arithmetic is delegated now, so the slip is
+        # spelt by making the condition always true rather than by moving the subtraction.
+        Find    = "    lastAttemptStart: reservesFullRound`n      ? resolveContestEntryDeadline({"
+        Replace = "    lastAttemptStart: input.roundStartPolicy !== `"no-such-policy`"`n      ? resolveContestEntryDeadline({"
     }
 )
 
@@ -333,8 +356,8 @@ Invoke-Probe -Name "a short contest is silent under until-close" `
     -Edits @(
     @{
         Target  = $Draft
-        Find    = "    windowTooShort: windowSeconds < maxDurationSeconds,"
-        Replace = "    windowTooShort: reservesFullRound && windowSeconds < maxDurationSeconds,"
+        Find    = "    windowTooShort: windowSeconds < attemptSeconds,"
+        Replace = "    windowTooShort: reservesFullRound && windowSeconds < attemptSeconds,"
     }
 )
 
@@ -414,8 +437,36 @@ Invoke-Probe -Name "the policy stays editable once players have entered" `
     -Edits @(
     @{
         Target  = $Editor
-        Find    = "          value={draft.roundStartPolicy}`n          disabled={entered}"
-        Replace = "          value={draft.roundStartPolicy}"
+        # RE-AIMED 11 September 2026: R61 wrapped this control in the play-shape conditional, which
+        # re-indented it by two spaces, and the probe had reported DID NOT APPLY ever since.
+        Find    = "            value={draft.roundStartPolicy}`n            disabled={entered}"
+        Replace = "            value={draft.roundStartPolicy}"
+    }
+)
+
+# 22. THE 11 SEPTEMBER DEFECT, restored exactly: the box gated on the value alone. The mode can be
+#     recorded perfectly and still render nothing, which is the same defect with an extra variable
+#     in front of it - and ten minutes is both the default and a preset, so Custom then does
+#     nothing at all and the select snaps back.
+Invoke-Probe -Name "the custom box appears only when the value matches no preset" `
+    -ExpectTest "opens the box on the remembered choice, not on the value alone" `
+    -Edits @(
+    @{
+        Target  = $ConfigFields
+        Find    = "      {custom && ("
+        Replace = "      {!matched && ("
+    }
+)
+
+# 23. The choice not recorded at all - the original, where declining to change the value was read
+#     as declining to change anything.
+Invoke-Probe -Name "choosing Custom is not remembered" `
+    -ExpectTest "remembers that Custom was chosen, rather than deriving it from the value" `
+    -Edits @(
+    @{
+        Target  = $ConfigFields
+        Find    = "            setCustomChosen(true);"
+        Replace = "            /* the mode is not recorded */"
     }
 )
 

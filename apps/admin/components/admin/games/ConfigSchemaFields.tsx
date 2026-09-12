@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -194,6 +196,18 @@ const CUSTOM = "custom";
  * IT FALLS BACK TO A PLAIN NUMBER BOX when no preset fits inside the declared range - a title
  * allowing at most 45 seconds cannot be expressed in whole minutes, and a dropdown with no
  * usable options is a control that appears to work and offers nothing.
+ *
+ * CHOOSING "CUSTOM" IS REMEMBERED, AND IT HAS TO BE STATE RATHER THAN A DERIVED VALUE. The first
+ * version had none: it decided it was in custom mode when the stored value matched no preset, and
+ * it deliberately did nothing when Custom was picked, so as not to change a value the operator was
+ * only inspecting. Both halves are right on their own and together they made the option
+ * UNREACHABLE - the default is ten minutes, ten minutes is a preset, so picking Custom left the
+ * value alone, the derived mode stayed false, the select snapped back to "10 minutes" and no box
+ * appeared. The operator's only way in was to already have a value no preset matched.
+ *
+ * That is the shape this codebase keeps finding: a control that renders correctly, reports nothing
+ * and does nothing. Keeping the value untouched is still the rule; the MODE is what the click
+ * changes.
  */
 function DurationControl({
   id,
@@ -216,9 +230,14 @@ function DurationControl({
     return seconds >= min && (max === undefined || seconds <= max);
   });
 
+  const [customChosen, setCustomChosen] = useState(false);
+
   const seconds = typeof value === "number" ? value : Number(value);
   const usable = Number.isFinite(seconds) ? seconds : undefined;
   const matched = presets.find((minutes) => minutes * 60 === usable);
+  // A stored value no preset matches is custom whether or not anybody clicked, so an edit of a
+  // contest saved at seven minutes opens on the box.
+  const custom = customChosen || !matched;
 
   if (presets.length === 0) {
     return (
@@ -238,14 +257,16 @@ function DurationControl({
   return (
     <div className="space-y-2">
       <Select
-        value={matched ? String(matched) : CUSTOM}
+        value={custom ? CUSTOM : String(matched)}
         onValueChange={(next) => {
           if (next === CUSTOM) {
             // Reason: switching to Custom must not silently change the stored value. The box
             // opens on whatever is already set, so an operator who opens it to look and then
-            // changes their mind has not edited the contest.
+            // changes their mind has not edited the contest. Only the mode changes.
+            setCustomChosen(true);
             return;
           }
+          setCustomChosen(false);
           onChange(Number(next) * 60);
         }}
         disabled={disabled}
@@ -266,7 +287,7 @@ function DurationControl({
         </SelectContent>
       </Select>
 
-      {!matched && (
+      {custom && (
         <div className="space-y-1">
           <Input
             aria-label="Playing time in minutes"

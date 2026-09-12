@@ -23,7 +23,7 @@ import path from "node:path";
 
 import { generateForPlayer } from "../src/engine/generate";
 import type { Cell } from "../src/engine/puzzle";
-import { shapeFor, type GridSize } from "../src/games/titles";
+import { SPRINT, shapeFor, type GridSize } from "../src/games/titles";
 import { auditPlaySurface, readServableAssets, servedFileNames } from "../src/http/play-page";
 import {
   callApi,
@@ -1790,6 +1790,207 @@ async function main(): Promise<number> {
     assert.equal(state.body.playableSeconds, 120);
   });
 
+  /*
+   * ── the ceiling that belonged to one title ────────────────────────────────────────────────────
+   *
+   * THE OWNER'S REPORT, 11 September 2026: "when i choose 60 round the game didn't finish".
+   *
+   * `hardDeadline` capped every round at `PERFECT.maxDurationSeconds` - 600 seconds - as a stand-in
+   * for "longer than any title allows". That was true when it was written and stopped being true on
+   * 8 September, when Sprint's maximum became an hour, and nothing failed: the cap is a min() over
+   * dates, so it simply started winning.
+   *
+   * The reason a cap becomes a HANG is the second half, and it is the transferable part.
+   * `hardDeadline` decides the countdown; `playability` decided when the round ended, and weighed
+   * its own list of deadlines without the ceiling in it. So the clock reached 0:00 fifty minutes
+   * early, the client asked the server rather than deciding for itself - which is correct - and the
+   * server said "still playable". Refresh, re-enter, clock already zero, refresh. Nothing threw and
+   * nothing logged.
+   *
+   * The rule: the clock a player watches and the gate a server applies must be one function, or a
+   * countdown reaching zero means nothing at all.
+   */
+
+  await test("an hour-long round is promised an hour, not the shortest title's maximum", async () => {
+    await clearRounds();
+    const { token } = await openRound({
+      config: { durationSeconds: 3_600, gridSize: "small" },
+      expiresAt: new Date(Date.now() + 3 * 60 * 60_000).toISOString(),
+    });
+
+    const state = await callPlay<PlayStateBody>("/play/api/session", { t: token });
+    assert.equal(state.status, 200);
+    assert.equal(state.body.durationSeconds, 3_600);
+
+    const promised = state.body.playableSeconds ?? -1;
+    assert.ok(
+      promised > 3_500,
+      `a 60-minute round promised only ${promised}s, so a ceiling is still capping it`,
+    );
+
+    // And the countdown itself, which is the number the player actually watches.
+    const ends = new Date(state.body.endsAt as string).getTime();
+    assert.ok(
+      ends > Date.now() + 3_500_000,
+      `the clock runs out at ${state.body.endsAt}, well before the hour the operator configured`,
+    );
+  });
+
+  await test("the moment the clock reaches zero is the moment the server stops playing", async () => {
+    /*
+     * The structural half, and it holds for every title and every length rather than for 60
+     * minutes. Ask the server for the deadline it reported, then ask it - one millisecond later -
+     * whether the round is still playable. Two functions weighing two lists of deadlines answer
+     * differently here; one function cannot.
+     */
+    const { hardDeadline, playability } = await import("../src/rounds/lifecycle");
+    await clearRounds();
+    const { roundId } = await openRound({
+      config: { durationSeconds: 3_600, gridSize: "small" },
+      expiresAt: new Date(Date.now() + 3 * 60 * 60_000).toISOString(),
+    });
+
+    const { Round } = await import("../src/store/round.model");
+    const round = await Round.findOne({ roundId });
+    assert.ok(round, "no round was stored");
+    round.status = "in_progress";
+    round.startedAt = new Date();
+    await round.save();
+
+    const deadline = hardDeadline(round);
+
+    assert.equal(
+      playability(round, new Date(deadline.getTime() - 1_000)).playable,
+      true,
+      "the round had already stopped a second before the clock the player was shown",
+    );
+
+    const after = playability(round, new Date(deadline.getTime() + 1));
+    assert.equal(
+      after.playable,
+      false,
+      "the clock the player was shown reached zero and the round carried on - this is the hang",
+    );
+    // A sprint timer running out is the game reaching its natural end, not the contest cutting it
+    // off, and the two read very differently to the player who was in the middle of a board.
+    assert.equal(after.playable === false && after.owes, "completed");
+  });
+
+  await test("a contest that shuts first still expires the round rather than completing it", async () => {
+    /*
+     * The control for the assertion above. One deadline decides WHETHER, `expiresAt` decides WHICH -
+     * so a version that answered "completed" for everything would satisfy the test above and quietly
+     * relabel every contest cut-off as a finished game.
+     */
+    const { hardDeadline, playability } = await import("../src/rounds/lifecycle");
+    await clearRounds();
+    const { roundId } = await openRound({
+      config: { durationSeconds: 3_600, gridSize: "small" },
+      expiresAt: new Date(Date.now() + 90_000).toISOString(),
+    });
+
+    const { Round } = await import("../src/store/round.model");
+    const round = await Round.findOne({ roundId });
+    assert.ok(round, "no round was stored");
+    round.status = "in_progress";
+    round.startedAt = new Date();
+    await round.save();
+
+    const deadline = hardDeadline(round);
+    assert.ok(
+      deadline.getTime() <= round.expiresAt.getTime() + 1_000,
+      "the deadline outran the contest window",
+    );
+
+    const after = playability(round, new Date(deadline.getTime() + 1));
+    assert.equal(after.playable, false);
+    assert.equal(after.playable === false && after.owes, "expired");
+  });
+
+  /*
+   * ── the ceiling, in the one case where it is the deadline that binds ──────────────────────────
+   *
+   * A round whose stored config asks for longer than its title now allows. It is the only case that
+   * can tell the three readers of the deadline apart - the countdown, the gate, and the sweeper that
+   * closes a clock nobody came back to - so it is the only case that can prove they agree.
+   *
+   * It is reachable without anybody making a mistake. `resolveConfig` clamps what arrives, so the
+   * way in is a title's maximum being LOWERED while rounds already exist: a one-line edit to
+   * `titles.ts`, and Sprint's maximum has already moved once, upwards, which is what caused the
+   * defect above.
+   */
+  async function storeOverlongRound(startedMinutesAgo: number) {
+    await clearRounds();
+    const { roundId } = await openRound({
+      config: { durationSeconds: 3_600, gridSize: "small" },
+      expiresAt: new Date(Date.now() + 3 * 60 * 60_000).toISOString(),
+    });
+
+    const { Round } = await import("../src/store/round.model");
+    const round = await Round.findOne({ roundId });
+    assert.ok(round, "no round was stored");
+
+    round.status = "in_progress";
+    round.startedAt = new Date(Date.now() - startedMinutesAgo * 60_000);
+    round.expiresAt = new Date(Date.now() + 60 * 60_000);
+    (round.config as { durationSeconds: number }).durationSeconds =
+      SPRINT.maxDurationSeconds * 2;
+    round.markModified("config");
+    await round.save();
+
+    return round;
+  }
+
+  await test("a round asking for longer than its title allows stops at the title's maximum", async () => {
+    const { hardDeadline } = await import("../src/rounds/lifecycle");
+    const round = await storeOverlongRound(10);
+
+    const expected = round.startedAt!.getTime() + SPRINT.maxDurationSeconds * 1_000;
+    assert.equal(
+      hardDeadline(round).getTime(),
+      expected,
+      "the ceiling is not this title's own maximum",
+    );
+  });
+
+  await test("the gate stops it there too, rather than at the length stored on the round", async () => {
+    /*
+     * The agreement, asserted without naming the number - so this stays about the gate reading the
+     * same deadline the player was shown, and does not also fail whenever the ceiling itself is
+     * wrong. That is the test above's job.
+     */
+    const { hardDeadline, playability } = await import("../src/rounds/lifecycle");
+    const round = await storeOverlongRound(10);
+    const deadline = hardDeadline(round);
+
+    assert.equal(
+      playability(round, new Date(deadline.getTime() - 1_000)).playable,
+      true,
+      "the round had stopped before the clock the player was shown reached zero",
+    );
+    assert.equal(
+      playability(round, new Date(deadline.getTime() + 1)).playable,
+      false,
+      "the clock reached zero and the round carried on - the gate is weighing its own deadlines",
+    );
+  });
+
+  await test("the sweeper closes it there too, rather than leaving it in progress for ever", async () => {
+    /*
+     * The third reader, and the one that decides whether anybody is ever paid. A round the gate
+     * refuses but the sweeper never notices sits `in_progress` until its contest window passes -
+     * so the result arrives as an expiry long after the player finished, if at all.
+     */
+    const { findFinishedClocks } = await import("../src/rounds/lifecycle");
+    const round = await storeOverlongRound(90);
+
+    const finished = await findFinishedClocks();
+    assert.ok(
+      finished.some((candidate) => candidate.roundId === round.roundId),
+      "the sweeper does not consider the round finished, so nothing will ever close it",
+    );
+  });
+
   await test("a fixed-set title reports a length too, so it can notice being cut short", async () => {
     /*
      * Circuit Perfect has no clock in its rules, so its intro leads on the board count and makes
@@ -2249,6 +2450,22 @@ async function main(): Promise<number> {
       const line = lines.find((entry) => entry.includes(roundId)) as string;
       assert.match(line, /503/, `the log did not name the failure: ${line}`);
       assert.match(line, /will retry/, `the log did not say what happens next: ${line}`);
+
+      /*
+       * AND THE PLATFORM'S OWN WORDS, which the status alone does not carry - added 11 September
+       * 2026 after the owner pasted two real lines reading `delivery failed - HTTP 409; will retry`
+       * and nothing about them could be diagnosed. The platform answers 409 to a round that is
+       * closed for good, to a contest that cannot accept a score at this instant and will later,
+       * and to a conflicting score flagged for a human. Same code, same line, three different next
+       * actions - and one of them is "do nothing, it resolves itself".
+       *
+       * The body was already being stored on the round; it simply was not being handed back.
+       */
+      assert.match(
+        line,
+        /"received":false/,
+        `the log dropped the platform's own explanation: ${line}`,
+      );
     } finally {
       console.warn = realWarn;
     }

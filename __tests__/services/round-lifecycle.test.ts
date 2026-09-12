@@ -530,6 +530,40 @@ describe("RoundService - creation and attempts", () => {
     expect(lifetime).toBeGreaterThan(600 * 1000);
   });
 
+  it("leaves the game's own clock room to be the deadline, not this one", async () => {
+    /*
+      THE GAP THE TEST ABOVE CANNOT SEE, found on 11 September 2026 while chasing the owner's
+      "I chose 60 and the game didn't finish".
+
+      Expiry is a safety net and is supposed to be the loose one of the two - the comment on
+      `resolveExpiry` says so. But the slack it had was borrowed from the gap between the
+      ceiling and the configured attempt, and that gap closes the moment an operator picks the
+      longest round their title allows. The two anchors are then different: expiry counts from
+      when the round was CREATED, the game's own clock from when the player pressed Start. So
+      every full-length round is cut off by a few seconds of frame loading and intro screen.
+
+      It is not a wrong payment - a partial run counts (R48) - but the round is reported
+      `expired` rather than `completed`, so the title's `lastSuccessfulRoundAt` never refreshes
+      and every full-length round lands in the expiry bucket on the one screen that decides
+      whether a game keeps running.
+    */
+    const contestId = await seedCompetition();
+
+    const created = await launchRound(
+      contestId,
+      contestConfig({
+        playWindowEnd: new Date(Date.now() + 2 * 60 * 60 * 1000),
+        // The operator chose exactly what the title allows, which is the normal thing to do.
+        maxDurationSeconds: 600,
+        attemptSeconds: 600,
+      }),
+    );
+
+    const round = await GameRound.findOne({ roundId: created.roundId });
+    const lifetime = round!.expiresAt.getTime() - round!.createdAt.getTime();
+    expect(lifetime).toBeGreaterThan(600 * 1000);
+  });
+
   it("never sets expiresAt beyond the play window end", async () => {
     const contestId = await seedCompetition();
     const playWindowEnd = new Date(Date.now() + 4 * 60 * 1000);

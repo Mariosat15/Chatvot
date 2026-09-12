@@ -207,6 +207,28 @@ Four things about this third amendment, and the first is the one a summary will 
 >   refusal.** `resolveExpiry` already clamps to `playWindowEnd`. They paid, starting late
 >   cannot help them, and refusing them buys nothing.
 
+> **FIFTH AMENDMENT, 12 September 2026 - the expiry safety net needed its slack stated, because
+> the slack was borrowed from a gap that closes.**
+>
+> Nothing above changes. This is about the *other* number - `expiresAt` rather than the
+> reservation - and about the sentence in `round.service.ts` that defends reading the catalogue
+> **ceiling** there while the round-start gate reserves the **configured** length. That defence is
+> correct and must not be tidied away: the gate asks *how much must I reserve*, where tight is
+> right, and expiry asks *by when is this round certainly over*, where generous is right.
+>
+> The fault was that the generosity had no source of its own. It came from the ceiling being
+> larger than the configured length, and **the two are equal for an operator who picks the longest
+> round a title allows** - at which point the expiry lands one round after the round was
+> **created** while the game's own clock runs one round from when the player pressed **Start**.
+> Every full-length round was therefore cut off by however long the frame took to load, and filed
+> as `expired`.
+>
+> Two things about it. **It is not a wrong payment** - a partial run counts since R48 - but it does
+> mean `lastSuccessfulRoundAt` never refreshes and every full-length round lands in the expiry
+> bucket on the screen that decides whether a title keeps running. And
+> **`ROUND_EXPIRY_HEADROOM_SECONDS` states the slack rather than inferring it**, still clamped to
+> `playWindowEnd`, so nothing here can let a round outlive its contest. See `12` s2.13 and R70.
+
 ### 1.3 Attempts policy - a required per-contest setting
 
 | Policy | Behaviour | Best for |

@@ -179,16 +179,29 @@ export async function attemptDelivery(roundId: string): Promise<DeliveryOutcome>
       return { sent: true, status: response.status };
     }
 
-    await recordFailure(
-      roundId,
-      attempt,
-      now,
-      first,
-      `HTTP ${response.status}: ${response.body}`,
-    );
+    /*
+     * THE PLATFORM'S OWN EXPLANATION TRAVELS WITH THE STATUS, and dropping it is the reason a
+     * real 409 could not be diagnosed from the logs.
+     *
+     * `recordFailure` has always stored the body in `delivery.lastError`, so the information
+     * existed - in a database, on a machine, keyed by a round id nobody has. What reached an
+     * operator was `delivery failed - HTTP 409; will retry`, and the platform answers 409 to at
+     * least three completely different situations: this round is closed and its result will never
+     * be wanted, the contest cannot accept a score *at this moment* and a retry will succeed, and
+     * a conflicting score has been flagged for a human. Same code, same line, three different
+     * next actions - and one of them is "do nothing, it will fix itself".
+     *
+     * This is the sweeper's own `classify, never merely count` rule one layer down: it was applied
+     * to the counter and not to the string the counter replaced.
+     */
+    const detail = response.body
+      ? `HTTP ${response.status}: ${response.body}`
+      : `HTTP ${response.status}`;
+
+    await recordFailure(roundId, attempt, now, first, detail);
     return {
       sent: false,
-      reason: `HTTP ${response.status}`,
+      reason: detail,
       // Every non-2xx is retried, and that is the specification's instruction rather than a
       // guess: it asks for retries "if you do not receive a 2xx from us", without exempting the
       // 4xx range. A 401 during a secret rotation and a 500 during a deployment both recover on

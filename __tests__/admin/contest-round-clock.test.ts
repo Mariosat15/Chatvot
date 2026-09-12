@@ -412,10 +412,24 @@ describe("the refusal stops contradicting the operator's own setting", () => {
       const code = readCode(copy);
       expect(code).toMatch(/playing time you have set/);
       expect(code).toMatch(/longer than the contest itself/);
+      /*
+        COUNTED, BECAUSE THE SAME FACT IS TWO MESSAGES. The reserving branch refuses and the
+        until-close branch warns, and both are read by an operator in the situation this
+        describes - so a bare match on either phrase is satisfied by one branch while the other
+        quotes a single figure. A probe that stripped the contest length out of the REFUSAL
+        alone came back green on 11 September for exactly that reason.
+
+        Same class as the play screen's two `!expectedOrigin` copies and the pause list covering
+        for the emergency list: a per-branch claim has to be asserted per branch.
+      */
+      expect(code.match(/playing time you have set/g)).toHaveLength(2);
+      expect(code.match(/longer than the contest itself/g)).toHaveLength(2);
       // Both figures interpolated, and through the humanising helper - "the playing time you
       // have set (300 seconds)" is the old problem in new words.
-      expect(code).toMatch(/describeSeconds\(roundSeconds\)/);
-      expect(code).toMatch(/describeSeconds\(Math\.floor\(windowSeconds\)\)/);
+      expect(code.match(/describeSeconds\(roundSeconds\)/g)).toHaveLength(2);
+      expect(
+        code.match(/describeSeconds\(Math\.floor\(windowSeconds\)\)/g),
+      ).toHaveLength(2);
       // The phrase that named an invisible ceiling must not come back.
       expect(code).not.toMatch(/longest possible round/);
     }
@@ -552,6 +566,52 @@ describe("the playing time is chosen from a list, not typed in seconds", () => {
     expect(onSelect.length).toBeGreaterThan(60);
     expect(onSelect).toMatch(/if \(next === CUSTOM\)/);
     expect(onSelect).toMatch(/return;/);
+  });
+
+  it("remembers that Custom was chosen, rather than deriving it from the value", () => {
+    /*
+      THE DEFECT, reported by the owner on 11 September 2026: "when i choose custom in wizard no
+      box comes to add custom round time."
+
+      The control had no state. It decided it was in custom mode when the stored value matched no
+      preset, and the handler above deliberately did nothing when Custom was picked so as not to
+      edit a value the operator was only inspecting. Both halves are right on their own, and
+      together they made the option UNREACHABLE: ten minutes is the default, ten minutes is a
+      preset, so picking Custom changed nothing, the derived mode stayed false, the select snapped
+      back and no box ever appeared. The only way in was to already hold a value no preset matched.
+
+      Keeping the value untouched is still the rule. The MODE is what the click changes.
+    */
+    const control = readCode(CONFIG_FIELDS).slice(
+      readCode(CONFIG_FIELDS).indexOf("function DurationControl"),
+    );
+    expect(control.length).toBeGreaterThan(400);
+
+    expect(control).toMatch(/useState\(false\)/);
+    expect(control).toMatch(/const custom = customChosen \|\| !matched/);
+
+    const opens = control.indexOf("onValueChange");
+    const onSelect = control.slice(
+      opens,
+      control.indexOf("disabled={disabled}", opens),
+    );
+    expect(onSelect).toMatch(/setCustomChosen\(true\)/);
+    // And the rule it must not break: opening the box is not an edit.
+    expect(onSelect.slice(0, onSelect.indexOf("return;"))).not.toMatch(/onChange\(/);
+  });
+
+  it("opens the box on the remembered choice, not on the value alone", () => {
+    /*
+      The load-bearing half, and the one a probe can reach. State that nothing renders from is
+      state that changes nothing - the mode can be recorded perfectly and the box still gated on
+      the value, which is the defect with an extra variable in front of it.
+    */
+    const control = readCode(CONFIG_FIELDS).slice(
+      readCode(CONFIG_FIELDS).indexOf("function DurationControl"),
+    );
+
+    expect(control).toMatch(/\{custom && \(/);
+    expect(control).not.toMatch(/\{!matched && \(/);
   });
 });
 
@@ -882,11 +942,25 @@ describe("the round-start policy - the gate became the contest's choice", () => 
       Fourth instance of the class, after the fixed-character Edit guard, `canTransitionRound`
       and the play screen's two `!expectedOrigin` copies: assert position within the construct,
       never a bare identifier.
+
+      RE-AIMED 11 September 2026, AND IT HAD BEEN GREEN AGAINST ITS OWN PROBE. The end marker was
+      "An attempt may be started", wording this component no longer uses, so `indexOf` returned
+      -1 and `slice(0, -1)` handed back almost the whole file - which contains both identifiers
+      twice over, in the settings variant and inside the paragraph being guarded. So the guard
+      passed however the condition was mutilated.
+
+      That is the "assert the slice found something" rule with a sharper edge than the usual one:
+      a marker that has moved does not produce an empty slice here, it produces a slice so wide
+      that every assertion is trivially true. Both ends are now asserted to exist.
     */
-    const timing = note.slice(note.indexOf("Players can join from the moment"));
+    const timingStart = note.indexOf("Players can join from the moment");
+    expect(timingStart).toBeGreaterThan(-1);
+    const timing = note.slice(timingStart);
     expect(timing.length).toBeGreaterThan(400);
 
-    const condition = timing.slice(0, timing.indexOf("An attempt may be started"));
+    const conditionEnd = timing.indexOf("Play lasts");
+    expect(conditionEnd).toBeGreaterThan(-1);
+    const condition = timing.slice(0, conditionEnd);
     expect(condition.length).toBeGreaterThan(100);
     expect(condition).toMatch(/fit\.reservesFullRound/);
     expect(condition).toMatch(/fit\.lastAttemptStart/);

@@ -153,9 +153,36 @@ function roundFitsInWindow(config: RoundContestConfig, now: Date): boolean {
  * round is created, so an expiry set to the exact configured length lands just before the
  * player's last board. Generous is correct for a safety net. Anyone tidying these into one
  * field is choosing one of the two failures.
+ *
+ * THE GENEROSITY HAD TO BE MADE EXPLICIT, because it was borrowed from the gap between the two
+ * fields and that gap closes. The paragraph above is right that the ceiling is the generous
+ * reading - but only while the operator has configured something SHORTER than it. Pick the
+ * longest round the title allows and `attemptSeconds` equals `maxDurationSeconds`, so this
+ * expiry lands one configured length after the round was CREATED while the game's own clock
+ * runs one configured length from when the player pressed Start. The player is then cut off a
+ * few seconds early, every time, and the round is reported `expired` rather than `completed` -
+ * which is not a wrong payment, since a partial run counts (R48), but it does mean the title's
+ * `lastSuccessfulRoundAt` never refreshes and every full-length round lands in the expiry
+ * bucket on the screen that decides whether a game keeps running.
+ *
+ * So the safety net now says how much slack it wants instead of inferring it. This is still
+ * clamped to the window, so nothing here can let a round outlive its contest.
  */
+
+/**
+ * Slack between the longest a round could run and the moment the platform assumes it is over.
+ *
+ * Covers loading the frame and reading the intro screen, which happen after the round exists
+ * and before its clock starts. A player who leaves the intro open for longer than this loses
+ * the difference - disclosed to them, because the game reports the time it will actually
+ * honour rather than the nominal length - and there is deliberately no attempt to cover an
+ * unbounded wait: the alternative is a safety net so loose it stops being one.
+ */
+const ROUND_EXPIRY_HEADROOM_SECONDS = 120;
+
 function resolveExpiry(config: RoundContestConfig, now: Date): Date {
-  const maxDuration = (config.maxDurationSeconds ?? 300) * 1000;
+  const maxDuration =
+    ((config.maxDurationSeconds ?? 300) + ROUND_EXPIRY_HEADROOM_SECONDS) * 1000;
   return new Date(
     Math.min(now.getTime() + maxDuration, config.playWindowEnd.getTime()),
   );

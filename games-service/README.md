@@ -382,7 +382,8 @@ npm run probe:presentation   # the same, for the play surface's sizing and wordi
 npm run probe:deploy-drift   # the same, for the boot audit and the sweeper's failure log
 npm run probe:play-assets    # the same, for the disk-derived asset set - probe 1 reinjects R52
 npm run probe:boot-watchdog  # the same, for the watchdog that names a module which never arrived
-npm run probe:round-clock    # the same, for the clock and the length promised before Start
+npm run probe:round-clock    # the same, for the clock, the length promised before Start, and the
+                             # per-title ceiling - probes 11-14 reinject R69's ten-minute cap
 ```
 
 > **A new front-end file no longer needs a build**, and that is deliberate. Until 8 September 2026
@@ -454,8 +455,11 @@ npm run probe:round-clock    # the same, for the clock and the length promised b
 > the width is safe only because nothing we report changes it, where a height derived from our own
 > reported height is the postage-stamp defect of `21` s4.1f.
 
-`npm test` runs **299 tests**: 15 config, 42 engine, 28 scoring, 41 API, 83 play and delivery,
+`npm test` runs **305 tests**: 15 config, 42 engine, 28 scoring, 41 API, 89 play and delivery,
 11 progress, 20 board client, 59 presentation. (Counted from the suite's own output. Any figure of
+299 predates the ten-minute cap - `hardDeadline` was reading one particular title's maximum for
+every round, so a sixty-minute contest showed a ten-minute clock and then did not end at all
+(`21` s4.1t). Any figure of
 297 predates `BOARDS DONE` moving into the round header - the same figure had been in two places
 at once, headed `SOLVED` above the board and `BOARDS DONE` below it. Any figure of
 285 predates the board filling its frame's width - the rails sat beside it and took about a third
