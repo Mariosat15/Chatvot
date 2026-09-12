@@ -26,6 +26,16 @@ interface CalculateInput {
   db: SettlementDb;
   participants: SettlementParticipantRef[];
   entryFee: number;
+  /**
+   * True when settling a Challenge rather than a Competition.
+   *
+   * Two things change, both preserved from the pre-unification challenge-only code: the
+   * package's `challengeReferralFeePercentage` is preferred over `referralFeePercentage`
+   * (falling back to it when unset, per the schema's own comment), and a Game Master's
+   * subscription must additionally have `limits.canEarnFromChallenges: true` - a package
+   * can grant competition referrals without granting challenge referrals.
+   */
+  challengeMode?: boolean;
 }
 
 /**
@@ -130,9 +140,20 @@ async function buildReferralMap(
  */
 function cachedRateOrDefault(
   gmSubscription: {
-    limits?: { referralFeePercentage?: number };
+    limits?: {
+      referralFeePercentage?: number;
+      challengeReferralFeePercentage?: number;
+    };
   } | null,
+  challengeMode: boolean,
 ): number {
+  const challengeCached = challengeMode
+    ? gmSubscription?.limits?.challengeReferralFeePercentage
+    : undefined;
+  if (typeof challengeCached === "number" && Number.isFinite(challengeCached)) {
+    return challengeCached;
+  }
+
   const cached = gmSubscription?.limits?.referralFeePercentage;
   return typeof cached === "number" && Number.isFinite(cached)
     ? cached
@@ -141,7 +162,14 @@ function cachedRateOrDefault(
 
 async function resolveFeePercentage(
   db: SettlementDb,
-  gmSubscription: { packageId?: string; limits?: { referralFeePercentage?: number } } | null,
+  gmSubscription: {
+    packageId?: string;
+    limits?: {
+      referralFeePercentage?: number;
+      challengeReferralFeePercentage?: number;
+    };
+  } | null,
+  challengeMode: boolean,
 ): Promise<number> {
   if (gmSubscription?.packageId) {
     try {
@@ -149,20 +177,29 @@ async function resolveFeePercentage(
         _id: new Types.ObjectId(gmSubscription.packageId),
       });
 
-      if (
-        currentPackage?.gameMasterConfig?.referralFeePercentage !== undefined
-      ) {
-        return currentPackage.gameMasterConfig.referralFeePercentage;
+      const gmConfig = currentPackage?.gameMasterConfig;
+      // Reason: "Optional separate % for challenges (defaults to referralFeePercentage if
+      // not set)" per the schema comment on `challengeReferralFeePercentage` - so a package
+      // that has not set it must still fall through to the competition rate, not to the
+      // cached/default rate.
+      const challengeRate = challengeMode
+        ? gmConfig?.challengeReferralFeePercentage
+        : undefined;
+      if (challengeRate !== undefined) {
+        return challengeRate;
+      }
+      if (gmConfig?.referralFeePercentage !== undefined) {
+        return gmConfig.referralFeePercentage;
       }
 
-      return cachedRateOrDefault(gmSubscription);
+      return cachedRateOrDefault(gmSubscription, challengeMode);
     } catch {
-      return cachedRateOrDefault(gmSubscription);
+      return cachedRateOrDefault(gmSubscription, challengeMode);
     }
   }
 
   if (gmSubscription) {
-    return cachedRateOrDefault(gmSubscription);
+    return cachedRateOrDefault(gmSubscription, challengeMode);
   }
 
   return DEFAULT_REFERRAL_FEE_PERCENTAGE;
@@ -172,6 +209,7 @@ export async function calculateGameMasterFees({
   db,
   participants,
   entryFee,
+  challengeMode = false,
 }: CalculateInput): Promise<GameMasterFeeCalculation> {
   const payments: GameMasterPayment[] = [];
   const retained: RetainedGmFee[] = [];
@@ -207,16 +245,25 @@ export async function calculateGameMasterFees({
 
     // Must be active AND not paused. Two separate conditions because a paused
     // subscription is a decision the operator can reverse, and it is reported differently.
-    const gmSubscription = await db
-      .collection("gamemastersubscriptions")
-      .findOne({ userId: gmId, status: "active", isPaused: { $ne: true } });
+    // Reason: a challenge additionally requires `canEarnFromChallenges` - a package can
+    // grant competition referrals without granting challenge referrals.
+    const gmSubscription = await db.collection("gamemastersubscriptions").findOne({
+      userId: gmId,
+      status: "active",
+      isPaused: { $ne: true },
+      ...(challengeMode ? { "limits.canEarnFromChallenges": true } : {}),
+    });
 
     const feePercentage = await resolveFeePercentage(
       db,
       gmSubscription as {
         packageId?: string;
-        limits?: { referralFeePercentage?: number };
+        limits?: {
+          referralFeePercentage?: number;
+          challengeReferralFeePercentage?: number;
+        };
       } | null,
+      challengeMode,
     );
 
     if (!gmSubscription) {
@@ -229,6 +276,13 @@ export async function calculateGameMasterFees({
       let subscriptionStatus = anySubscription?.status || "no_subscription";
       if (anySubscription?.status === "active" && anySubscription?.isPaused) {
         subscriptionStatus = "paused";
+      } else if (
+        challengeMode &&
+        anySubscription?.status === "active" &&
+        !anySubscription?.isPaused &&
+        anySubscription?.limits?.canEarnFromChallenges !== true
+      ) {
+        subscriptionStatus = "challenge_earnings_disabled";
       }
 
       console.log(

@@ -1,14 +1,11 @@
-"use server";
+﻿"use server";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { connectToDatabase } from "@/database/mongoose";
 import Challenge from "@/database/models/trading/challenge.model";
 import ChallengeParticipant from "@/database/models/trading/challenge-participant.model";
 import ChallengeSettings from "@/database/models/trading/challenge-settings.model";
-import CreditWallet from "@/database/models/trading/credit-wallet.model";
-import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import TradingPosition from "@/database/models/trading/trading-position.model";
-import { PlatformTransaction } from "@/database/models/platform-financials.model";
 import {
   getRealPrice as _getRealPrice,
   fetchRealForexPrices,
@@ -22,6 +19,7 @@ import {
 import { getMultipleSymbolConfigs } from "@/lib/services/symbol-config.service";
 import mongoose from "mongoose";
 import { routeToTradingSettlement } from "@/lib/games/settlement";
+import { settleChallenge } from "@/lib/services/settlement/challenge-settlement.service";
 
 /**
  * Finalize a single challenge - close positions, determine winner and distribute prizes
@@ -513,441 +511,31 @@ async function _finalizeChallengeAttempt(challengeId: string) {
     // ========== STEP 3: DETERMINE WINNER ==========
     // Get settings for tie resolution
     const settings = await (ChallengeSettings as any).getSingleton();
+    const {
+      winnerId,
+      winnerName,
+      winnerPnL,
+      loserId,
+      loserName,
+      loserPnL,
+      isTie,
+    } = await settleChallenge({
+      session,
+      challenge,
+      challenger,
+      challenged,
+      tiePrizeDistribution: settings?.tiePrizeDistribution || "split_equally",
+    });
 
-    // Check for disqualification (minimum trades)
-    const minTrades = challenge.rules.minimumTrades || 1;
-    const challengerDisqualified = challenger.totalTrades < minTrades;
-    const challengedDisqualified = challenged.totalTrades < minTrades;
-
-    // Update participant statuses
-    if (challengerDisqualified) {
-      challenger.status = "disqualified";
-      challenger.disqualificationReason = `Did not make minimum ${minTrades} trade(s)`;
-      await challenger.save({ session });
-    }
-
-    if (challengedDisqualified) {
-      challenged.status = "disqualified";
-      challenged.disqualificationReason = `Did not make minimum ${minTrades} trade(s)`;
-      await challenged.save({ session });
-    }
-
-    let winnerId: string | null = null;
-    let winnerName: string | null = null;
-    let loserId: string | null = null;
-    let loserName: string | null = null;
-    let isTie = false;
-    let winnerPnL = 0;
-    let loserPnL = 0;
-
-    // Determine winner based on ranking method (supports all 6 competition ranking methods)
-    const getRankingValue = (participant: any) => {
-      switch (challenge.rules.rankingMethod) {
-        case "pnl":
-          return participant.pnl || 0;
-        case "roi":
-          return participant.pnlPercentage || 0;
-        case "total_capital":
-          return participant.currentCapital || 0;
-        case "win_rate":
-          return participant.winRate || 0;
-        case "total_wins":
-          return participant.winningTrades || 0;
-        case "profit_factor":
-          // Profit Factor = Total Wins / Total Losses
-          const totalWins = participant.winningTrades || 0;
-          const totalLosses = participant.losingTrades || 0;
-          if (totalLosses === 0) return totalWins > 0 ? 9999 : 0;
-          return totalWins / totalLosses;
-        default:
-          return participant.pnl || 0;
-      }
-    };
-
-    // Get tiebreaker value (same as competitions)
-    const getTieBreakerValue = (participant: any, tieBreaker: string) => {
-      switch (tieBreaker) {
-        case "trades_count":
-          return -(participant.totalTrades || 0); // Negative because fewer is better
-        case "win_rate":
-          return participant.winRate || 0;
-        case "total_capital":
-          return participant.currentCapital || 0;
-        case "roi":
-          return participant.pnlPercentage || 0;
-        case "join_time":
-          return -new Date(participant.enteredAt || Date.now()).getTime();
-        default:
-          return 0;
-      }
-    };
-
-    const challengerValue = getRankingValue(challenger);
-    const challengedValue = getRankingValue(challenged);
-
-    // Get prize amounts early for use in disqualification handling
-    const prizePool = challenge.prizePool;
-    const calculatedWinnerPrize = challenge.winnerPrize;
-
-    // Handle disqualification cases
-    if (challengerDisqualified && challengedDisqualified) {
-      // Both disqualified - Platform keeps the entire prize pool
-      console.log(
-        `⚠️ Both players disqualified in challenge ${challengeId}, platform keeps pool`,
-      );
-
-      // Reason: routed through the one unclaimed-pool writer on 9 September 2026 (task
-      // document 7). This was its own raw insert, and like the worker's four it booked
-      // `amountEUR` equal to the credit figure, so with the shipped rate of 100 credits to
-      // the euro it overstated the row's euro value a hundredfold. The session is passed
-      // because this row belongs to the transaction that decides the challenge - an abort
-      // must take it with it.
-      const { PlatformFinancialsService: unclaimedWriter } = await import(
-        "@/lib/services/platform-financials.service"
-      );
-      await unclaimedWriter.recordUnclaimedPool({
-        sourceType: "challenge",
-        competitionId: challenge._id.toString(),
-        competitionName: `${challenge.challengerName} vs ${challenge.challengedName}`,
-        poolAmount: calculatedWinnerPrize,
-        originalPoolAmount: prizePool,
-        reason: "all_disqualified",
-        winnersCount: 0,
-        expectedWinnersCount: 1,
-        description: `Both players disqualified in challenge - pool goes to platform`,
-        session,
-      });
-
-      // No winner, no prize distributed
-      winnerId = null;
-      winnerName = null;
-      isTie = false;
-    } else if (challengerDisqualified) {
-      // Challenged wins by default
-      winnerId = challenged.userId;
-      winnerName = challenged.username;
-      loserId = challenger.userId;
-      loserName = challenger.username;
-      winnerPnL = challengedValue;
-      loserPnL = challengerValue;
-    } else if (challengedDisqualified) {
-      // Challenger wins by default
-      winnerId = challenger.userId;
-      winnerName = challenger.username;
-      loserId = challenged.userId;
-      loserName = challenged.username;
-      winnerPnL = challengerValue;
-      loserPnL = challengedValue;
-    } else {
-      // Both qualified - compare values with tie-breaking logic
-      const epsilon = 0.001; // For floating point comparison
-
-      if (Math.abs(challengerValue - challengedValue) < epsilon) {
-        // Primary values are equal - apply tiebreakers
-        let resolved = false;
-
-        // Try tiebreaker 1
-        if (
-          challenge.rules.tieBreaker1 &&
-          challenge.rules.tieBreaker1 !== "split_prize"
-        ) {
-          const challengerTie1 = getTieBreakerValue(
-            challenger,
-            challenge.rules.tieBreaker1,
-          );
-          const challengedTie1 = getTieBreakerValue(
-            challenged,
-            challenge.rules.tieBreaker1,
-          );
-
-          if (Math.abs(challengerTie1 - challengedTie1) >= epsilon) {
-            if (challengerTie1 > challengedTie1) {
-              winnerId = challenger.userId;
-              winnerName = challenger.username;
-              loserId = challenged.userId;
-              loserName = challenged.username;
-              winnerPnL = challengerValue;
-              loserPnL = challengedValue;
-            } else {
-              winnerId = challenged.userId;
-              winnerName = challenged.username;
-              loserId = challenger.userId;
-              loserName = challenger.username;
-              winnerPnL = challengedValue;
-              loserPnL = challengerValue;
-            }
-            resolved = true;
-            console.log(
-              `  Winner determined by tiebreaker 1: ${challenge.rules.tieBreaker1}`,
-            );
-          }
-        }
-
-        // Try tiebreaker 2 if tiebreaker 1 didn't resolve
-        if (
-          !resolved &&
-          challenge.rules.tieBreaker2 &&
-          challenge.rules.tieBreaker2 !== "split_prize"
-        ) {
-          const challengerTie2 = getTieBreakerValue(
-            challenger,
-            challenge.rules.tieBreaker2,
-          );
-          const challengedTie2 = getTieBreakerValue(
-            challenged,
-            challenge.rules.tieBreaker2,
-          );
-
-          if (Math.abs(challengerTie2 - challengedTie2) >= epsilon) {
-            if (challengerTie2 > challengedTie2) {
-              winnerId = challenger.userId;
-              winnerName = challenger.username;
-              loserId = challenged.userId;
-              loserName = challenged.username;
-              winnerPnL = challengerValue;
-              loserPnL = challengedValue;
-            } else {
-              winnerId = challenged.userId;
-              winnerName = challenged.username;
-              loserId = challenger.userId;
-              loserName = challenger.username;
-              winnerPnL = challengedValue;
-              loserPnL = challengerValue;
-            }
-            resolved = true;
-            console.log(
-              `  Winner determined by tiebreaker 2: ${challenge.rules.tieBreaker2}`,
-            );
-          }
-        }
-
-        // Still not resolved - it's a true tie
-        if (!resolved) {
-          isTie = true;
-          console.log(`  Challenge is a TRUE tie - all criteria matched`);
-        }
-      } else if (challengerValue > challengedValue) {
-        winnerId = challenger.userId;
-        winnerName = challenger.username;
-        loserId = challenged.userId;
-        loserName = challenged.username;
-        winnerPnL = challengerValue;
-        loserPnL = challengedValue;
-      } else {
-        winnerId = challenged.userId;
-        winnerName = challenged.username;
-        loserId = challenger.userId;
-        loserName = challenger.username;
-        winnerPnL = challengedValue;
-        loserPnL = challengerValue;
-      }
-    }
-
-    // Update challenge with results
-    challenge.status = "completed";
-    challenge.winnerId = winnerId || undefined;
-    challenge.winnerName = winnerName || undefined;
-    challenge.winnerPnL = winnerPnL;
-    challenge.loserId = loserId || undefined;
-    challenge.loserName = loserName || undefined;
-    challenge.loserPnL = loserPnL;
-    challenge.isTie = isTie;
-    // Mark as no-winner when both are disqualified (neither winner nor tie)
-    challenge.noWinner = !winnerId && !isTie ? true : undefined;
-
-    // Store final stats
-    challenge.challengerFinalStats = {
-      finalCapital: challenger.currentCapital,
-      pnl: challenger.pnl,
-      pnlPercentage: challenger.pnlPercentage,
-      totalTrades: challenger.totalTrades,
-      winRate: challenger.winRate,
-      isDisqualified: challengerDisqualified,
-      disqualificationReason: challenger.disqualificationReason,
-    };
-
-    challenge.challengedFinalStats = {
-      finalCapital: challenged.currentCapital,
-      pnl: challenged.pnl,
-      pnlPercentage: challenged.pnlPercentage,
-      totalTrades: challenged.totalTrades,
-      winRate: challenged.winRate,
-      isDisqualified: challengedDisqualified,
-      disqualificationReason: challenged.disqualificationReason,
-    };
-
-    await challenge.save({ session });
-
-    // Distribute prize
-    const platformFee = challenge.platformFeeAmount;
+    // Reason: read off the persisted final stats rather than `.status`, because a single
+    // disqualified participant who lost by default has their `.status` moved on to
+    // "completed" inside settleChallenge - only `challengerFinalStats.isDisqualified` stays
+    // the permanent record of the disqualification.
+    const challengerDisqualified =
+      challenge.challengerFinalStats?.isDisqualified ?? false;
+    const challengedDisqualified =
+      challenge.challengedFinalStats?.isDisqualified ?? false;
     const winnerPrize = challenge.winnerPrize;
-
-    // Record platform fee
-    await PlatformTransaction.create(
-      [
-        {
-          transactionType: "challenge_platform_fee",
-          amount: platformFee,
-          amountEUR: platformFee, // Assuming 1:1 for credits
-          sourceType: "challenge",
-          sourceId: challenge._id.toString(),
-          sourceName: `${challenge.challengerName} vs ${challenge.challengedName}`,
-          description: `Platform fee from 1v1 challenge: ${challenge.challengerName} vs ${challenge.challengedName}`,
-        },
-      ],
-      { session },
-    );
-
-    // Distribute prize based on outcome
-    // Reason: Use atomic $inc instead of .save() for wallet updates to prevent
-    // lost-update bugs where the transaction record commits but the wallet
-    // balance isn't properly updated.
-    if (winnerId && !isTie) {
-      // Winner takes all — atomic $inc
-      const updatedWinnerWallet = await CreditWallet.findOneAndUpdate(
-        { userId: winnerId },
-        {
-          $inc: {
-            creditBalance: winnerPrize,
-            totalWonFromChallenges: winnerPrize,
-          },
-        },
-        { session, new: true },
-      );
-
-      if (updatedWinnerWallet) {
-        const balanceAfter = updatedWinnerWallet.creditBalance;
-        const balanceBefore = balanceAfter - winnerPrize;
-
-        await WalletTransaction.create(
-          [
-            {
-              userId: winnerId,
-              transactionType: "challenge_win",
-              amount: winnerPrize,
-              balanceBefore,
-              balanceAfter,
-              currency: "EUR",
-              exchangeRate: 1,
-              status: "completed",
-              challengeId: challenge._id.toString(),
-              description: `Won challenge vs ${loserName}`,
-              processedAt: new Date(),
-            },
-          ],
-          { session },
-        );
-
-        // Update winner participant
-        const winnerParticipant =
-          winnerId === challenger.userId ? challenger : challenged;
-        winnerParticipant.isWinner = true;
-        winnerParticipant.prizeReceived = winnerPrize;
-        winnerParticipant.status = "completed";
-        await winnerParticipant.save({ session });
-      }
-
-      // Update loser participant
-      const loserParticipant =
-        loserId === challenger.userId ? challenger : challenged;
-      loserParticipant.status = "completed";
-      await loserParticipant.save({ session });
-    } else if (isTie) {
-      // Handle tie based on settings
-      if (settings.tiePrizeDistribution === "split_equally") {
-        const splitPrize = Math.floor(winnerPrize / 2);
-
-        // Give half to each — atomic $inc
-        for (const participant of [challenger, challenged]) {
-          const updatedWallet = await CreditWallet.findOneAndUpdate(
-            { userId: participant.userId },
-            {
-              $inc: {
-                creditBalance: splitPrize,
-                totalWonFromChallenges: splitPrize,
-              },
-            },
-            { session, new: true },
-          );
-
-          if (updatedWallet) {
-            const balanceAfter = updatedWallet.creditBalance;
-            const balanceBefore = balanceAfter - splitPrize;
-
-            await WalletTransaction.create(
-              [
-                {
-                  userId: participant.userId,
-                  transactionType: "challenge_win",
-                  amount: splitPrize,
-                  balanceBefore,
-                  balanceAfter,
-                  currency: "EUR",
-                  exchangeRate: 1,
-                  status: "completed",
-                  challengeId: challenge._id.toString(),
-                  description: `Tie - split prize in challenge`,
-                  processedAt: new Date(),
-                },
-              ],
-              { session },
-            );
-
-            // Reason: Both participants "won" a split tie — mark isWinner so
-            // dashboard, profile, and leaderboard correctly count these as wins.
-            participant.isWinner = true;
-            participant.prizeReceived = splitPrize;
-            participant.status = "completed";
-            await participant.save({ session });
-          }
-        }
-      } else if (settings.tiePrizeDistribution === "challenger_wins") {
-        // Challenger gets the prize — atomic $inc
-        const updatedChalWallet = await CreditWallet.findOneAndUpdate(
-          { userId: challenger.userId },
-          {
-            $inc: {
-              creditBalance: winnerPrize,
-              totalWonFromChallenges: winnerPrize,
-            },
-          },
-          { session, new: true },
-        );
-
-        if (updatedChalWallet) {
-          const balanceAfter = updatedChalWallet.creditBalance;
-          const balanceBefore = balanceAfter - winnerPrize;
-
-          await WalletTransaction.create(
-            [
-              {
-                userId: challenger.userId,
-                transactionType: "challenge_win",
-                amount: winnerPrize,
-                balanceBefore,
-                balanceAfter,
-                currency: "EUR",
-                exchangeRate: 1,
-                status: "completed",
-                challengeId: challenge._id.toString(),
-                description: `Won challenge (tie - challenger advantage) vs ${challenged.username}`,
-                processedAt: new Date(),
-              },
-            ],
-            { session },
-          );
-
-          challenger.isWinner = true;
-          challenger.prizeReceived = winnerPrize;
-        }
-
-        challenger.status = "completed";
-        challenged.status = "completed";
-        await challenger.save({ session });
-        await challenged.save({ session });
-      }
-      // 'both_lose' - platform keeps prize, already recorded above
-    }
 
     // SAFETY NET: guarantee no position survives finalization, regardless of any
     // per-position error in the close loop above. Force-close any straggler still

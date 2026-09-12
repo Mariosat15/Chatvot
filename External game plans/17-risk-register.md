@@ -44,6 +44,8 @@ chapter covers risks to the programme and to the application.
 | **R68** | **The batch user lookup could not find a player at all.** `getUsersByIds` filtered on the `id` FIELD alone while Better Auth's MongoDB adapter keeps the identity in `_id`, so the query matched nothing, the map came back empty, and every game leaderboard drew **initials for everybody** the day after the owner ordered faces shown. `getUserById` beside it has carried three fallbacks since it was written. No error, no log line | Medium | **LIVE and player-visible** on both game boards; the lookup has exactly one caller, so nothing else was affected, and no money or stored value was involved | **CLOSED 11 Sep 2026** (`13` s4.1s); nothing stored, so nothing to backfill |
 | **R69** | **An hour-long round was capped at ten minutes, and the cap made it HANG rather than stop.** `hardDeadline` in the game service resolved its ceiling from `PERFECT.maxDurationSeconds` for every round whatever title it belonged to - correct by accident until Sprint's maximum rose to an hour on 8 Sep 2026. Worse, **`playability` weighed the deadlines itself and never consulted `hardDeadline`**, so the countdown the player watched reached 0:00, the client asked the server, the server answered *still playable*, and the board sat at zero for the rest of the contest. `findFinishedClocks`' own guard against an over-long config was two constants compared for truthiness and could not fire | Medium | **LIVE and player-visible** on any Sprint contest configured longer than ten minutes; scores were correct, no money moved | **CLOSED 12 Sep 2026** (`21` s4.1t); nothing stored, so nothing to backfill |
 | **R70** | **The wizard's Custom playing time could not be reached.** `DurationControl` derived "custom mode" from the value matching no preset, and picking Custom deliberately changed no value so as not to edit a contest somebody was only inspecting. Both rules are right alone: together, the ten-minute default is itself a preset, so the click did nothing, the select snapped back and no box appeared. An operator could only use Custom if they had somehow already used it. Fixed with it: `resolveExpiry`'s documented slack was **borrowed from the gap between the ceiling and the configured length**, and that gap closes at the longest round a title allows, so every full-length round was cut short by the frame's load time and filed as `expired` | Low | **LIVE and operator-visible**; nothing stored wrongly, and the expiry half cost a metric rather than a payment (a partial run counts, R48) | **CLOSED 12 Sep 2026** (`12` s2.13); nothing to backfill |
+| **R71** | **Neither app paid a Game Master a share of a challenge's entry fees** - the admin app's `challenge-finalize.actions.ts` had **no Game Master fee logic of any kind**, not even the main app's own inline copy, so a referred player entering a challenge earned their referrer nothing on either app | High | **LATENT, not live** - no backfill is possible: no fee row was ever written to attribute | **CLOSED 12 Sep 2026** - both apps now call the shared `settleFeesAndGameMasters()` via `challenge-settlement.service.ts`; see `19` section 4 |
+| **R72** | **Three sibling bugs in the challenge tie/disqualification logic being replaced, present in BOTH apps.** The `"join_time"` tiebreaker read `participant.enteredAt`, a field `ChallengeParticipant` has never declared (it is `joinedAt`), so it always compared `Date.now()` against itself and could never break a tie. Under `challenger_wins`, the challenge document was saved `isTie: true, winnerId: undefined` moments before the challenger was paid the full prize - a permanent stored-vs-paid mismatch. Under `both_lose`, neither participant's `.status` ever moved to `"completed"` and no unclaimed-pool row was recorded despite a comment claiming one had been | Medium | **LIVE** on every affected challenge tie, on both apps, for as long as the inline logic existed | **CLOSED 12 Sep 2026**, found while reading the code being replaced; nothing backfilled - each was a stored-record defect, not a wrong payment |
 | R8 | Bulk find-and-replace on wording | High | Medium | X8 |
 | R9 | Fraud throttle blind to provider entries | High | High | X5 |
 | R11 | Legal wording changed without review | High | Medium | X8 |
@@ -2355,6 +2357,82 @@ two real test weaknesses, both fixed by strengthening the test rather than loose
   twice, once as a refusal and once as a warning, so a probe that gutted only the refusal left the
   warning satisfying every bare match. Count the occurrences. Same class as the play screen's two
   `!expectedOrigin` copies and the pause list covering for the emergency list.
+
+---
+
+### R71 - Neither app paid a Game Master for a challenge - **CLOSED 12 September 2026**
+
+**What it was.** Found while checking whether `19-game-masters.md` s1's "Where it happens" row
+still had an open question - it did: "whether the same referral divergence exists there has not
+been checked" for the challenge path. It had never been checked because the two apps'
+`challenge-finalize.actions.ts` files were being read for an unrelated reason (item 2 of the
+roadmap, unifying challenge settlement onto the shared stages) when the answer fell out.
+
+**The main app had a referral-fee lookup; the admin app had none at all.** Unlike R26 and R42,
+where the admin app's copy of `competition-end.actions.ts` at least *attempted* the wrong thing
+(no dispatch, no Game Master call), the admin app's `challenge-finalize.actions.ts` never read
+`isGmCreated`, never resolved a referral percentage and never credited a referrer's wallet on a
+challenge finalize. A Game Master whose referred player entered a challenge earned nothing from
+it through the admin path, silently, with no ledger row explaining why - the exact shape of R26,
+one settlement path along.
+
+**Latent, not live, and the reason is worth stating precisely.** Unlike R26 (which had actively
+paid nothing on real, already-finalized contests), no evidence surfaced that the admin app's
+challenge finalize path has ever been the one to settle a real challenge in production - the
+main app's cron and page-render callers are the ones normally reached. That does not make it
+safe to leave: it is the same class of gap R26 and R42 found, just not yet caught in the act.
+**No backfill is possible or attempted** - there is no `retained_gm_fee` row or any other stored
+evidence of which challenges, if any, went through the unpaid path, so there is nothing to
+reconcile against.
+
+**Closed by the same fix that closed the challenge-settlement unification (item 2 of the
+roadmap, 12 Sep 2026).** Both apps' `challenge-finalize.actions.ts` now call the shared
+`settleFeesAndGameMasters()` through `lib/services/settlement/challenge-settlement.service.ts`
+(mirrored), the same stage a competition uses, with `contestKind: "challenge"` and support for
+the `challengeReferralFeePercentage` override exactly as the main app's pre-unification inline
+code read it. See `19-game-masters.md` section 4.
+
+---
+
+### R72 - Three sibling bugs in the challenge tie logic, both apps - **CLOSED 12 September 2026**
+
+**What it was.** Found reading the code being replaced for the same unification, not searched
+for. Each is independent and each was present in **both** apps' `challenge-finalize.actions.ts`,
+because the admin app's copy of this section (unlike its Game Master fee logic) had been kept
+in step with the main app's.
+
+**Bug 1 - the tiebreaker that always ties.** The `"join_time"` case of the local
+`getTieBreakerValue` read `participant.enteredAt`. `ChallengeParticipant` has never declared
+that field - the join timestamp is `joinedAt`. Reading an undeclared field on a Mongoose document
+returns `undefined`, `new Date(undefined)` is `Invalid Date`, and the comparison silently fell
+through to comparing `Date.now()` against itself on both sides. A tie using `join_time` as its
+tiebreaker could never be broken by it.
+
+**Bug 2 - a stored record that contradicted the payment made from it.** Under the
+`challenger_wins` tie-resolution rule, the code saved the challenge document with `isTie: true`
+and `winnerId` left `undefined` - and only *after* that save credited the challenger's wallet the
+full prize. The persisted record and the money actually moved disagreed permanently, the same
+shape as the `challengerId`/`competitionId` ledger-attribution defects found earlier in this
+programme, except here the two numbers are the prize amount and the winner field on one document
+rather than two different collections.
+
+**Bug 3 - `both_lose` left both participants stuck and recorded no unclaimed pool.** Neither
+participant's `.status` was ever moved to `"completed"` under this branch, so both stayed at
+whatever status they held before finalization forever - and despite a comment in the code
+claiming an unclaimed-pool entry had been recorded, no such write existed anywhere in the branch.
+
+**Live on both apps, for as long as the inline logic existed, and none of the three moved money
+incorrectly on their own** - bug 1 left a tie unresolved rather than resolving it wrongly, bug 2's
+payment was correct and only the stored record was wrong, and bug 3 left status stale rather than
+paying twice. **No backfill is possible or attempted**: fixing the code does not change what a
+past challenge's document already holds, and there is no reliable way to distinguish a
+historical `both_lose` challenge stuck mid-status from one still legitimately in progress.
+
+**Closed by the same rewrite.** `lib/services/settlement/challenge-settlement.service.ts`
+resolves `join_time` against `joinedAt`, saves the challenge document with a `winnerId` that
+agrees with what gets paid before any wallet credit happens, and moves both participants'
+`.status` to `"completed"` under `both_lose` while recording the unclaimed-pool row the old
+comment only claimed to.
 
 ---
 

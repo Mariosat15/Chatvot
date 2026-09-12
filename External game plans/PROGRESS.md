@@ -378,9 +378,10 @@ embarrass a demo:
   `apps/admin/components/` fetches it. So the whole lifecycle is reachable **by API and by
   test, not by clicking**, and finishing that is X6's remaining slice. Do not read "a
   provider contest can be published" as "an operator can publish one".
-- **The challenge path was not touched.** `lib/actions/trading/challenge-finalize.actions.ts`
-  still carries its own copy of the payout, fee and completion logic, so a provider
-  *challenge* is X10 work and not a by-product of this phase.
+- **The challenge path was not touched** - true on 5 Sep 2026, **correct as history and
+  stale as a present fact since 12 Sep 2026**: `lib/actions/trading/challenge-finalize.actions.ts`
+  no longer carries its own copy of the payout and fee logic. See the "Who pays Game
+  Master earnings at settlement" status row below.
 - **The unresolved-round policies apply to provider settlement only.** Trading has no rounds
   that can go unresolved, so there is nothing to honour there - correct, not a gap, but a
   summary saying "settlement honours the policies" should say *provider* settlement.
@@ -427,7 +428,7 @@ numbers in chapters `01`-`09` remain resolvable. **Plan against the X-phases bel
 | **X7** | Player UI + points, leaderboards, badges, levels, **profile and cross-game stats**, **per-game GM analytics** | `09` E6 + `13` + `05` + `19` | 3-4 weeks | `NOT STARTED` |
 | **X8** | Player wording, `tradingEnabled`, infrastructure gating | `14` + `15` | 1-1.5 weeks | `NOT STARTED` |
 | **X9** | Resilience, reconciliation, monitoring | `09` E7 | 1 week | `NOT STARTED` |
-| **X10** | Challenges - **any game, and any opponent** | `09` E8 + `20` s2 | 1-1.5 weeks | `NOT STARTED` |
+| **X10** | Challenges - **any game, and any opponent** | `09` E8 + `20` s2 | 1-1.5 weeks | `NOT STARTED` as a phase - **one piece pulled forward and built 12 Sep 2026**: both apps' `challenge-finalize.actions.ts` now determine the winner, resolve ties and pay out through the same shared `lib/services/settlement/` stages a competition uses (`challenge-settlement.service.ts`, mirrored), closing the referral-fee divergence `19` s1's "Where it happens" row used to leave unchecked. **This is settlement plumbing only** - it does not touch matchmaking, provider-game challenge creation, or "any opponent"; a provider challenge still cannot be created (`19` s5's economic constraint) |
 | **X11** | Games catalogue + games-first navigation | `16` | ~2 weeks | `NOT STARTED` |
 | **X11.5** | **Smart onboarding and challenge matchmaking** | `20` | 2-3 weeks | `NOT STARTED` |
 | **X12** | Hardening, staged pilot, public launch | `09` E9 + `18` | 3-5 weeks | `NOT STARTED` |
@@ -757,11 +758,16 @@ The **data model is ready and has been since X1**: `Challenge` carries `gameType
 immutable `gameKey` with indexes on both, and `ChallengeParticipant` carries `score` and
 `gameKey` with a game-agnostic ranking index. **The FLOW is what does not exist** -
 `components/challenges/ChallengeCreateDialog.tsx` mentions no game field of any kind, so a
-challenge can only be a trading one, and `challenge-finalize.actions.ts` still holds its own
-inline copy of all three settlement stages in both apps rather than calling the shared ones.
-A document saying challenges are unstarted is right about the product and wrong about the
-schema; one saying the groundwork is done is right about the schema and must not imply a
-player can create one.
+challenge can only be a trading one. **`challenge-finalize.actions.ts` holding its own
+inline copy of the settlement stages was true through 11 Sep 2026 and is stale since 12 Sep
+2026**: both apps now call the shared `payContestPrizes()` and `settleFeesAndGameMasters()`
+through the new `challenge-settlement.service.ts`, exactly as a competition does - only the
+third stage, `completeContest()`, stays unreused, because a challenge has no matching
+lifecycle step. That is a settlement-plumbing fix, not the flow - it does not add a game
+picker to the create dialog or let a provider game be challenged. A document saying
+challenges are unstarted is right about the product and wrong about the schema and the
+settlement code; one saying the groundwork is done is right about the schema and settlement
+but must not imply a player can create a non-trading challenge.
 
 ---
 
@@ -778,6 +784,73 @@ Newest at the top.
 **Deferred:** what was consciously left for later
 **Next chat should:** the single clearest next action
 ```
+
+---
+
+### 12 Sep 2026 - CHALLENGE SETTLEMENT UNIFIED ONTO THE SHARED STAGES
+
+**Shipped:** Both apps' `challenge-finalize.actions.ts` now determine the winner, resolve
+ties, save the challenge document and pay out through the same `lib/services/settlement/`
+stages a competition uses, instead of each holding its own inline copy. A new shared
+`ContestKind`/`ContestVocabulary` layer (`settlement/types.ts`) generalises `payContestPrizes()`
+and `settleFeesAndGameMasters()` to accept `contestKind: "competition" | "challenge"`
+(optional, defaults to competition behaviour, so nothing about a competition's call site
+changed). A new `lib/services/settlement/challenge-settlement.service.ts` (mirrored,
+byte-identical) is the single function both apps now call. `completeContest()` was
+deliberately **not** generalised or reused - a challenge has no matching lifecycle stage,
+so only the payout and fee/GM stages moved.
+
+**Three sibling bugs, present in the pre-unification code in BOTH apps, were found while
+reading the code being replaced and fixed as a side effect of the rewrite rather than as
+separate patches:** the `"join_time"` tiebreaker read `participant.enteredAt`, a field
+`ChallengeParticipant` has never declared (it is `joinedAt`), so it always compared
+`Date.now()` against itself and could never resolve a tie; under `challenger_wins`, the
+challenge document was saved with `isTie: true, winnerId: undefined` moments *before* the
+challenger was paid the full prize, so the stored record permanently disagreed with what was
+paid; and under `both_lose`, neither participant's `.status` was ever moved to `"completed"`
+and no unclaimed-pool row was recorded despite a comment claiming one had been. All three
+were live on every affected challenge tie, on both apps, for as long as the inline logic
+existed.
+
+**Closes the open question in `19-game-masters.md` s1's "Where it happens" row** -
+"whether the same referral divergence exists there has not been checked" for the challenge
+path. It did, on both apps: the admin app's `challenge-finalize.actions.ts` had **no Game
+Master fee logic of any kind**, not even the divergent inline copy the main app had, so a
+Game Master's referred players earned them nothing from a challenge on either app.
+
+**Files touched:** `lib/services/settlement/types.ts`, `prize-payout.service.ts`,
+`game-master-fees/calculate.ts`, `game-master-fees/distribute.ts`, `fees.service.ts` (all
+mirrored, edited to accept the generalised vocabulary); new
+`lib/services/settlement/challenge-settlement.service.ts` (mirrored, byte-identical);
+`lib/actions/trading/challenge-finalize.actions.ts` and
+`apps/admin/lib/actions/trading/challenge-finalize.actions.ts` (both rewritten - the
+position-closing and stats-update steps, which have no competition equivalent, stayed
+inline; only winner determination, tie resolution, the document save and payout/fees moved).
+
+**Deviated from plan:** none - five design decisions (fold the Game Master fee gap into
+this unification rather than patch it separately; keep completion challenge-specific;
+fix the tiebreaker bug now since the code housing it was being rewritten anyway; support
+`challengeReferralFeePercentage` exactly as the pre-unification code did; move settlement
+inside the transaction, matching the battle-tested competition pattern) were confirmed with
+the owner before implementation and followed exactly.
+
+**Owner tested:** not yet. Verified here: admin and main-app typechecks unchanged (223 and
+194 pre-existing errors respectively, none in touched files, confirmed by a git-stash
+baseline diff of the full error list, not just the count); both apps' ESLint clean on every
+touched file; `npm run check:mirrors` - 0 drifted; 120 tests across 8 pre-existing suites
+still passing, including the R26/R42 Game-Master-parity assertions. There is no dedicated
+behavioural test suite exercising either app's full challenge-finalize flow end to end, so
+this rewrite's correctness rests on the type/lint/mirror checks plus the shared code's own
+test coverage (`challenge-settlement.service.ts` inherits every test that already covered
+`payContestPrizes()` and `settleFeesAndGameMasters()`).
+
+**Deferred:** no behavioural test suite for either app's challenge-finalize flow exists or
+was added - a gap that predates this change and was not closed by it. No provider challenge
+exists yet, so the shared service's `contestKind: "challenge"` path has only ever settled a
+trading challenge in production.
+
+**Next chat should:** nothing further on this item unless the owner requests it. Item 2 of
+the roadmap is complete.
 
 ---
 
@@ -7986,6 +8059,10 @@ showed no progress at all. Redirect a child PowerShell process's output to a fil
 **Deferred:** the **challenge** path still holds its own copy of all three settlement stages
 in both apps, and the same referral divergence has not been checked there - it is the obvious
 next place to look, and it is X10. No backfill for historical admin-finalized contests.
+**Correct as history, stale as a present fact since 12 Sep 2026** - the divergence was
+checked, found present on both apps (admin had none at all), and closed: see the "12 Sep
+2026 - CHALLENGE SETTLEMENT UNIFIED ONTO THE SHARED STAGES" work-log entry near the top of
+this file.
 
 **Next chat should:** commercially, find and assess a provider (`08`) - X4 is blocked on it.
 Technically, either provider **health** (X6's last admin destination) or the game-aware

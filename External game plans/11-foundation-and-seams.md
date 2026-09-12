@@ -42,7 +42,7 @@ dispatch point so a provider game can plug in.
 | **Function** | `getRankingValue` at **line 64**. Verified 4 Sep 2026 |
 | **Correction** | The switch near line 95 is **not a duplicate** - it is `getTieBreakerValue`, a second trading-specific switch over `trades_count`, `win_rate`, `total_capital`, `roi`, `join_time`. It needs generalising too |
 | **Bigger than one function** | The `ParticipantData` interface itself is entirely trading-shaped - `currentCapital`, `pnl`, `totalTrades`, `winningTrades`, `winRate`. The seam is the interface plus two switches, not a single function |
-| **Also** | `lib/actions/trading/challenge-finalize.actions.ts` lines ~**491-628** duplicate the winner logic |
+| **Also** | Verified 4 Sep 2026 at `lib/actions/trading/challenge-finalize.actions.ts` lines ~491-628 - **moved, not closed, 12 Sep 2026**: the duplicate winner-determination logic now lives in `lib/services/settlement/challenge-settlement.service.ts` (`getRankingValue` / `getTieBreakerValue`, mirrored), which was a deliberate decision to keep challenge winner-determination challenge-specific rather than dispatch through this seam - a challenge is head-to-head, not a ranked field of participants. The duplication this row describes is real and unclosed; only its address changed |
 | **Today** | A `switch` over six trading metrics: `pnl`, `roi`, `total_capital`, `win_rate`, `total_wins`, `profit_factor` |
 | **Change** | Dispatch to the game module. For a provider game the ranking value is the stored `score`, ordered by the game's declared `scoreDirection` |
 
@@ -128,7 +128,7 @@ Two things to keep right when touching this row again.
 | | |
 |---|---|
 | **File** | `lib/actions/trading/competition-end.actions.ts`, **1,174 lines since X5** - it was ~1,500 when this chapter was written and 1,885 immediately before the extraction. Steps 2-4 are trading-specific |
-| **Also** | `challenge-finalize.actions.ts` repeats the logic |
+| **Also** | `challenge-finalize.actions.ts` repeated the logic - **true when this chapter was written, and true only for the completion stage since 12 Sep 2026**: the payout and fee/Game-Master stages were unified onto the shared code that day (`challenge-settlement.service.ts`), but the position-closing and stats-update work this row is about - the trading-specific step 2-4 equivalent - has no competition counterpart and stays inline in both apps |
 | **Change** | Extract the position-closing block to a trading game module, and dispatch on the game label before it runs |
 | **Danger** | This is the highest-risk change in the whole programme. See risk **R3** in `17` |
 
@@ -243,7 +243,11 @@ else changed at the same time. That is why a **known one-character defect was pr
 verbatim** - the Game Master fee's cached-rate fallback read `limits.referralFeePercentage
 || 5`, so a stored 0% fell through to 5%. It was known to be a genuine bug rather than a
 guess, because `challenge-finalize.actions.ts:994` and `:1000` use `??` for the same
-lookup - **the two money paths disagreed with each other.**
+lookup - **the two money paths disagreed with each other.** (Those line numbers are stale
+since 12 Sep 2026 - the lookup no longer lives in `challenge-finalize.actions.ts` at all,
+having moved with the rest of the fee calculation into the shared
+`game-master-fees/calculate.ts`, which both paths now call - so the disagreement this
+paragraph is about cannot recur by construction rather than by inspection.)
 
 **Fixed in its own commit, 5 September 2026 (R31), and the deferral paid off twice over.**
 Separating it did not merely protect the extraction's proof - it bought the room to check the
@@ -254,8 +258,15 @@ the extraction commit would have shipped the wrong character in the wrong place.
 
 **Three things this did NOT cover**, each easy to assume it did:
 
-- **The challenge path.** `challenge-finalize.actions.ts` is still 1,803 lines with its own
-  copy of all three stages. A provider *challenge* is X10.
+- ~~**The challenge path.** `challenge-finalize.actions.ts` is still 1,803 lines with its own
+  copy of all three stages.~~ **Payout and fees closed 12 September 2026** - both apps'
+  `challenge-finalize.actions.ts` now call the shared `payContestPrizes()` and
+  `settleFeesAndGameMasters()` through `challenge-settlement.service.ts`, the same stages a
+  competition uses, with `completeContest()` deliberately left unshared (no matching
+  lifecycle step) and winner-determination deliberately left challenge-specific (see the
+  Seam 1 note above). **A provider *challenge* is still X10** - this closed the settlement
+  divergence between the two apps and the pre-existing tiebreaker/persistence bugs found
+  while doing so, not the ability to create or play a non-trading challenge.
 - **The admin cron's own finalize copy** paid no Game Masters (R26). ~~The shared services
   exist in `apps/admin` now, so the fix is smaller - not done.~~ **Closed 5 September 2026**
   - it calls `settleFeesAndGameMasters`, and the platform fee it books is now net of the

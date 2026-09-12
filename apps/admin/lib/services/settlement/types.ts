@@ -66,6 +66,59 @@ export interface SettlementContest {
   endTime?: Date;
   gameMasterId?: string | null;
   platformFeePercentage: number;
+  /**
+   * Which money vocabulary this contest writes on the ledger.
+   *
+   * Absent (or "competition") means every existing caller's behaviour is unchanged -
+   * trading and provider contests are both `Competition` documents and share one
+   * vocabulary. "challenge" is the one other shape these stages know about, added when
+   * challenge settlement moved onto this code rather than its own copy. Chapter 05 s10's
+   * rule applies here too: a figure is generalised, explicitly scoped, or removed - this
+   * field is what makes the scoping explicit rather than a silent assumption.
+   */
+  contestKind?: ContestKind;
+}
+
+export type ContestKind = "competition" | "challenge";
+
+/** The ledger vocabulary for one contest kind. See `SettlementContest.contestKind`. */
+export interface ContestVocabulary {
+  kind: ContestKind;
+  /** Field on WalletTransaction carrying the contest's id, for both a win and a GM payment. */
+  idField: "competitionId" | "challengeId";
+  /** Field name used inside a GM payment's metadata object for the contest's display name. */
+  nameField: "competitionName" | "challengeName";
+  winTransactionType: "competition_win" | "challenge_win";
+  gmSourceType: "competition" | "challenge";
+  gmWalletTransactionType: "gamemaster_earning" | "gamemaster_challenge_referral";
+}
+
+const COMPETITION_VOCABULARY: ContestVocabulary = {
+  kind: "competition",
+  idField: "competitionId",
+  nameField: "competitionName",
+  winTransactionType: "competition_win",
+  gmSourceType: "competition",
+  gmWalletTransactionType: "gamemaster_earning",
+};
+
+const CHALLENGE_VOCABULARY: ContestVocabulary = {
+  kind: "challenge",
+  idField: "challengeId",
+  nameField: "challengeName",
+  winTransactionType: "challenge_win",
+  gmSourceType: "challenge",
+  // Reason: kept distinct from "gamemaster_earning" (rather than reusing it) so the
+  // financial dashboard can still separate challenge GM referral income from competition
+  // GM referral income, exactly as the pre-unification challenge code did.
+  gmWalletTransactionType: "gamemaster_challenge_referral",
+};
+
+/** Defaults to the competition vocabulary, so every caller that predates this field is unaffected. */
+export function resolveContestVocabulary(
+  kind: ContestKind | undefined,
+): ContestVocabulary {
+  return kind === "challenge" ? CHALLENGE_VOCABULARY : COMPETITION_VOCABULARY;
 }
 
 export interface SettlementStageContext {

@@ -6,6 +6,7 @@ import type {
   SettlementLeaderboardEntry,
   SettlementPrizeDistribution,
 } from "./types";
+import { resolveContestVocabulary } from "./types";
 
 /**
  * Paying the winners of a contest - the one place credits are awarded for a win.
@@ -62,6 +63,7 @@ export async function payContestPrizes({
   distributions,
   leaderboard,
 }: PrizePayoutInput): Promise<PrizePayoutResult> {
+  const vocabulary = resolveContestVocabulary(contest.contestKind);
   let totalDistributed = 0;
   let winnersPaid = 0;
 
@@ -143,14 +145,15 @@ export async function payContestPrizes({
       [
         {
           userId: winner.userId,
-          transactionType: "competition_win",
+          transactionType: vocabulary.winTransactionType,
           amount: prizeAmount,
           balanceBefore,
           balanceAfter,
-          // Reason: `competitionId` is the declared field and `referenceId` is not. Stage 0
-          // found every entry fee unattributable to its competition because a writer chose
-          // the undeclared name and strict mode discarded it while reporting success.
-          competitionId: contest._id,
+          // Reason: `competitionId`/`challengeId` are the declared fields and `referenceId`
+          // is not. Stage 0 found every entry fee unattributable to its competition because
+          // a writer chose the undeclared name and strict mode discarded it while reporting
+          // success.
+          [vocabulary.idField]: contest._id,
           status: "completed",
           description: dist.isTied
             ? `🏆 Prize for Rank ${winner.rank} (Tied) in ${contest.name}`

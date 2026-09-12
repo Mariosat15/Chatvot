@@ -2,6 +2,7 @@ import type { ClientSession, Types as MongooseTypes } from "mongoose";
 import CreditWallet from "@/database/models/trading/credit-wallet.model";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import type { GameMasterPayment, SettlementDb } from "./types";
+import { resolveContestVocabulary, type ContestKind } from "../types";
 
 /**
  * Paying the Game Masters their referral share.
@@ -26,6 +27,7 @@ export interface DistributeGmFeesInput {
     entryFee: number;
     startTime?: Date;
     endTime?: Date;
+    contestKind?: ContestKind;
   };
   participantCount: number;
   /**
@@ -50,6 +52,8 @@ export async function distributeGameMasterFees({
 }: DistributeGmFeesInput): Promise<void> {
   if (payments.length === 0) return;
 
+  const vocabulary = resolveContestVocabulary(contest.contestKind);
+
   for (const payment of payments) {
     const { gmId, gmSubscription, users, feePercentage, totalEarning } = payment;
 
@@ -72,7 +76,7 @@ export async function distributeGameMasterFees({
         .collection("gamemasterearnings")
         .findOne(
           {
-            sourceType: "competition",
+            sourceType: vocabulary.gmSourceType,
             sourceId: contest._id.toString(),
             gameMasterId: gmId,
             referredUserId: user.userId,
@@ -82,7 +86,7 @@ export async function distributeGameMasterFees({
 
       if (existingEarning) {
         console.log(
-          `   ⏩ GM earning already recorded for ${user.userName} in competition ${contest._id}, skipping duplicate`,
+          `   ⏩ GM earning already recorded for ${user.userName} in ${vocabulary.kind} ${contest._id}, skipping duplicate`,
         );
         continue;
       }
@@ -91,7 +95,7 @@ export async function distributeGameMasterFees({
         {
           gameMasterId: gmId,
           gameMasterEmail: gmSubscription.userEmail,
-          sourceType: "competition",
+          sourceType: vocabulary.gmSourceType,
           sourceId: contest._id.toString(),
           sourceName: contest.name,
           referredUserId: user.userId,
@@ -173,16 +177,16 @@ export async function distributeGameMasterFees({
       [
         {
           userId: gmId,
-          transactionType: "gamemaster_earning",
+          transactionType: vocabulary.gmWalletTransactionType,
           amount: totalEarning,
           balanceBefore,
           balanceAfter,
-          competitionId: contest._id,
+          [vocabulary.idField]: contest._id,
           status: "completed",
           description: `🎮 Game Master referral earnings from ${contest.name} (${users.length} referred users)`,
           metadata: {
-            competitionId: contest._id.toString(),
-            competitionName: contest.name,
+            [vocabulary.idField]: contest._id.toString(),
+            [vocabulary.nameField]: contest.name,
             referredUsersCount: users.length,
             feePercentage,
           },
@@ -195,7 +199,7 @@ export async function distributeGameMasterFees({
       {
         gameMasterId: gmId,
         sourceId: contest._id.toString(),
-        sourceType: "competition",
+        sourceType: vocabulary.gmSourceType,
       },
       { $set: { status: "paid", paidAt: new Date() } },
       { session },

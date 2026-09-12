@@ -8,7 +8,7 @@ import {
   capGameMasterEarnings,
   distributeGameMasterFees,
 } from "./game-master-fees";
-import type { SettlementContest } from "./types";
+import { resolveContestVocabulary, type SettlementContest } from "./types";
 
 /**
  * The platform's cut, the unclaimed pool and the Game Masters' share.
@@ -86,6 +86,7 @@ export async function settleFeesAndGameMasters({
   platformFeeFraction,
   refundedToPlayers = 0,
 }: SettleFeesInput): Promise<SettleFeesResult> {
+  const vocabulary = resolveContestVocabulary(contest.contestKind);
   // The fee is ONLY the percentage, never the whole pool. With winners it is whatever was
   // not distributed; with none it is still just the percentage, and the remainder becomes
   // an unclaimed pool rather than platform income.
@@ -135,6 +136,7 @@ export async function settleFeesAndGameMasters({
       );
 
       await PlatformFinancialsService.recordUnclaimedPool({
+        sourceType: vocabulary.gmSourceType,
         competitionId: contest._id.toString(),
         competitionName: contest.name,
         poolAmount: unclaimedNet,
@@ -168,6 +170,7 @@ export async function settleFeesAndGameMasters({
         db,
         participants,
         entryFee: contest.entryFee,
+        challengeMode: vocabulary.kind === "challenge",
       });
 
       payments = calculation.payments;
@@ -176,7 +179,7 @@ export async function settleFeesAndGameMasters({
       for (const inactiveGm of calculation.retained) {
         try {
           await PlatformFinancialsService.recordRetainedGmFee({
-            sourceType: "competition",
+            sourceType: vocabulary.gmSourceType,
             sourceId: contest._id.toString(),
             sourceName: contest.name,
             gameMasterId: inactiveGm.gmId,
@@ -219,7 +222,7 @@ export async function settleFeesAndGameMasters({
   if (netPlatformFee > 0) {
     await PlatformFinancialsService.recordPlatformFee({
       amount: netPlatformFee,
-      sourceType: "competition",
+      sourceType: vocabulary.gmSourceType,
       sourceId: contest._id.toString(),
       sourceName: contest.name,
       description: `Platform fee (${contest.platformFeePercentage}% - ${totalGmEarnings.toFixed(2)} GM fees) from ${contest.name}`,
