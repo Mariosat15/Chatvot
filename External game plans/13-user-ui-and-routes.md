@@ -1396,11 +1396,13 @@ the **GLOBAL / FRIENDS / COUNTRY** leaderboard tabs, and the **RECENT PLAYERS** 
 > before restating any of this.
 >
 > **A third amendment, same day (`13` s4.1y): the three leaderboard tabs are now DRAWN.** They
-> still cannot be answered - there is no friends model anywhere, and publishing a player's country
-> on a public board is a disclosure decision - so `GLOBAL` is lit and the other two are rendered
-> as disabled labels with the reason in a title attribute. **Drawn and unanswerable is not the
-> same as built**, and a document listing them as absent is stale while one listing them as
-> working is wrong.
+> still cannot be answered *from this rail* - `Friendship.getUserFriends` exists in
+> `database/models/messaging/friend.model.ts` and is not called here, and publishing a player's
+> country on a public board is a disclosure the owner later answered yes to, scheduled as later
+> work. `GLOBAL` is lit and the other two are rendered as disabled labels with the reason in a
+> title attribute. **Drawn and unanswerable is not the same as built**, and a document listing
+> them as absent is stale while one listing them as working is wrong. The sentence that there
+> is no friends model anywhere was **false** and is corrected here rather than deleted.
 
 #### What the platform half actually lacked
 
@@ -2616,11 +2618,14 @@ prop rather than three booleans a caller can get half right:
 
 #### FRIENDS AND COUNTRY ARE DRAWN AND CANNOT BE ANSWERED, WHICH IS A LABELLED FACT
 
-There is **no friends model anywhere in `database/models`**, and while `country` does exist on the
-user card, publishing it per row on a public board is a disclosure decision rather than a
-rendering one. So all three scopes are drawn, `GLOBAL` lit and the other two on `NEON_TAB_DEAD`
-with `aria-disabled`, a title explaining that everyone in the contest is shown, no hover and no
-handler - **rendered as a `<span>`, so there is no control that appears to work.**
+The claim that there is **no friends model anywhere in `database/models`** was **false** - the
+search stopped at the top of that folder and missed `database/models/messaging/friend.model.ts`,
+which holds `Friendship` and `FriendRequest` with `getUserFriends` and `areFriends`. The tabs
+are greyed because this rail does not call them, not because the data does not exist. `country`
+does exist on the user card; the owner answered yes to showing it, scheduled as later work
+rather than this slice. So all three scopes are drawn, `GLOBAL` lit and the other two on
+`NEON_TAB_DEAD` with `aria-disabled`, a title explaining that everyone in the contest is shown,
+no hover and no handler - **rendered as a `<span>`, so there is no control that appears to work.**
 
 **This reverses a decision recorded in s4.1q**, whose guard asserted the rail draws *no* dead
 scope tabs. That test was **flipped rather than deleted**, keeping the original objection verbatim

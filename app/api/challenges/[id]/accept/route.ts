@@ -10,6 +10,7 @@ import mongoose from "mongoose";
 import { canJoinChallenge } from "@/lib/services/market-hours.service";
 import { checkAccountStanding } from "@/lib/services/contest-entry/guards";
 import { gameNeedsMarketHours } from "@/lib/games";
+import { buildChallengeParticipantSeat } from "@/lib/services/challenges/challenge-participant-seat";
 
 // POST - Accept a challenge
 export async function POST(
@@ -261,30 +262,31 @@ export async function POST(
     await challenge.save({ session: dbSession });
 
     // Create participants (ordered: true required for session with multiple docs)
+    // Reason: both seats come from one builder so a test can compare its keys against the
+    // schema's declared paths. See buildChallengeParticipantSeat - it deliberately writes no
+    // `score`, which is the challenge half of R50.
     await ChallengeParticipant.create(
       [
-        {
+        buildChallengeParticipantSeat({
           challengeId: challenge._id.toString(),
           userId: challenge.challengerId,
           username: challenge.challengerName,
           email: challenge.challengerEmail,
           role: "challenger",
+          gameKey: challenge.gameKey,
           startingCapital: challenge.startingCapital,
-          currentCapital: challenge.startingCapital,
-          availableCapital: challenge.startingCapital,
           joinedAt: now,
-        },
-        {
+        }),
+        buildChallengeParticipantSeat({
           challengeId: challenge._id.toString(),
           userId: challenge.challengedId,
           username: challenge.challengedName,
           email: challenge.challengedEmail,
           role: "challenged",
+          gameKey: challenge.gameKey,
           startingCapital: challenge.startingCapital,
-          currentCapital: challenge.startingCapital,
-          availableCapital: challenge.startingCapital,
           joinedAt: now,
-        },
+        }),
       ],
       { session: dbSession, ordered: true },
     );

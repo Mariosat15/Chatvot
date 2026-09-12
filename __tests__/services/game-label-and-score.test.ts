@@ -141,21 +141,34 @@ describe("every participant carries a game-agnostic score", () => {
     expect(doc.validateSync()?.errors?.score).toBeUndefined();
   });
 
-  it("ChallengeParticipant still defaults score, which is deliberate and is E8's to revisit", () => {
+  it("ChallengeParticipant does NOT default score either, closing the asymmetry", () => {
     /*
-      THE ASYMMETRY IS PINNED SO IT READS AS A DECISION RATHER THAN AS DRIFT. Only
-      `CompetitionParticipant` was changed: provider challenges do not exist yet (E8 / X10),
-      nothing reads a challenge participant's score, and the model is touched by dozens of
-      trading files - so widening its contract inside a commit whose whole claim is a provider
-      prize fix would buy nothing and put that claim at risk.
+      THIS TEST WAS FLIPPED ON 12 SEPTEMBER 2026, NOT DELETED, and it used to read
+      "ChallengeParticipant still defaults score, which is deliberate and is E8's to revisit".
+      The reasoning it carried is kept because it is the record of why the trap was left, and
+      of who was supposed to come back for it:
 
-      What it leaves behind is a trap, which is why this is a test and not a silence: the first
-      provider challenge will seat both players with a phantom zero and reproduce R50 exactly.
-      Whoever builds E8 must bring this field with them.
+        "THE ASYMMETRY IS PINNED SO IT READS AS A DECISION RATHER THAN AS DRIFT. Only
+        `CompetitionParticipant` was changed: provider challenges do not exist yet (E8 / X10),
+        nothing reads a challenge participant's score, and the model is touched by dozens of
+        trading files - so widening its contract inside a commit whose whole claim is a
+        provider prize fix would buy nothing and put that claim at risk.
+
+        What it leaves behind is a trap, which is why this is a test and not a silence: the
+        first provider challenge will seat both players with a phantom zero and reproduce R50
+        exactly. Whoever builds E8 must bring this field with them."
+
+      That is exactly what this is. X10 begins with the field rather than with the flow, so the
+      trap is closed before anything can fall into it - and note the prediction was right about
+      the mechanism: both seats are created in one call, so both players would have held a
+      finite score from the moment of acceptance and tied at the top of a two-player board.
     */
     const doc = new ChallengeParticipant({});
 
-    expect(doc.score).toBe(0);
+    expect(doc.score).toBeUndefined();
+
+    // And the field is genuinely optional, so a seat with no score is a valid document.
+    expect(doc.validateSync()?.errors?.score).toBeUndefined();
   });
 });
 

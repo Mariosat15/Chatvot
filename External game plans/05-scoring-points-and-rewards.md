@@ -559,6 +559,13 @@ that makes the next game silently fail while the query runs and the page renders
 > omits `score` to mean "never played", **a shape no production writer could produce**. Pinned
 > now by `provider-score-presence.test.ts`, every test of which goes through the real seat
 > builder, the real schema and `applyResult` rather than through a literal.
+>
+> **THE CHALLENGE HALF CLOSED 12 SEPTEMBER 2026.** `ChallengeParticipant.score` is now
+> optional with no default in both copies, and the accept route's seat builder writes no
+> `score` key. The pinning test was flipped, not deleted. **The read path is still not
+> built** - neither `challenge-finalize.actions.ts` copy mentions `score` - so a document
+> implying a challenge now ranks on score is wrong. No challenge migration: every existing
+> seat is trading and finalization never reads the field.
 
 **Scoped to a completed contest, and this is the part that looks like a bug in the fix.** The
 gate only fires once the contest is over, matching the two trading checks beside it.

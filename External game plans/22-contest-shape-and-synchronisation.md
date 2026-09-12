@@ -419,9 +419,10 @@ tests instead. `apps/admin/lib/admin/` and the wizard components are admin-only.
   `13` section 11's polling recommendation is unimplemented for *any* game.
 - **Challenges are untouched.** Section 5's three options remain a product decision, and the
   scheduling problem there is genuinely different: nobody chooses the gun, because a challenge
-  is accepted at an unknown later moment. It also inherits **R50's warning** —
-  `ChallengeParticipant.score` still defaults to `0`, so the first provider challenge
-  reproduces R50 exactly unless that is dealt with in the same work.
+  is accepted at an unknown later moment. **R50's field half closed 12 September 2026** —
+  `ChallengeParticipant.score` no longer defaults. **The read path is still not built**, so
+  a document implying a challenge now ranks on score is wrong. The scheduling question and
+  the create/play flow remain X10.
 - **No title declares `scheduled`.** Both `games-service` titles are `anytime`, so the whole
   scheduled path is **exercised only by tests** until X4 brings a real one. Say that rather
   than implying a race has run.

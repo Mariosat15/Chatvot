@@ -10,8 +10,9 @@ export interface IChallengeParticipant extends Document {
 
   // Game-agnostic result (X1 foundation)
   // Reason: see the matching block on CompetitionParticipant. `score` is the one number
-  // the ranking engine reads whatever the game.
-  score: number;
+  // the ranking engine reads whatever the game. It is optional because a value means a
+  // result arrived - see the schema path below (R50, challenge half).
+  score?: number;
   gameKey: string; // Denormalised from the challenge for cross-game statistics queries
 
   // Capital & Performance
@@ -87,11 +88,36 @@ const ChallengeParticipantSchema = new Schema<IChallengeParticipant>(
       required: true,
       enum: ["challenger", "challenged"],
     },
-    // Reason: defaults to 0 so existing rows and every current writer stay valid.
+    /*
+      NO DEFAULT, AND NOT REQUIRED - AN ABSENT SCORE IS THE FACT "NO RESULT HAS ARRIVED".
+
+      This was `required: true, default: 0` from X1 until 12 September 2026, on the reasoning
+      that a default keeps existing rows and every current writer valid - the same reasoning,
+      and the same wording, that R50 corrected on `CompetitionParticipant` on 7 September. It
+      was true and it laid the identical trap: `providerHasResult` is
+      `Number.isFinite(participant.score)`, so a stored nought says "this player attempted the
+      game and scored nothing", and Mongoose applied the default at the moment of seating.
+      Both players in a provider challenge would therefore have held a finite score before
+      either had played, tied at the top, and split the pot.
+
+      A default IS a stored value, which is the same rule that made `entryBlockThreshold` and
+      `canEnterChallenges` defects: a stored value and an absent one are different facts, and a
+      schema default erases the difference for every row it touches.
+
+      Two things make this HALF of R50 quieter than the competition half, and both were checked
+      rather than assumed. Nothing reads the field yet - neither copy of
+      `challenge-finalize.actions.ts` mentions `score`, because the winner comes from that
+      file's own private copy of the ranking comparator, which switches over the six trading
+      metrics only. And `IChallengeParticipant` is imported nowhere, so every consumer of the
+      model is untyped and the typecheck cannot protect this change either. The guard is
+      therefore a test, not the compiler: see `__tests__/services/game-label-and-score.test.ts`.
+
+      Trading is unaffected either way - its module answers `hasResult` with an unconditional
+      `true`, because a flat account is a real result, and it ranks on its own metrics.
+    */
     score: {
       type: Number,
-      required: true,
-      default: 0,
+      required: false,
     },
     gameKey: {
       type: String,

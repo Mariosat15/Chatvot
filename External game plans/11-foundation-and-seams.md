@@ -113,10 +113,15 @@ Two things to keep right when touching this row again.
   Same class as `entryBlockThreshold` and `canEnterChallenges` - a stored value and an
   absent one are different facts, and a schema default destroys the difference for every
   row it touches. If a field's absence means anything at all, it cannot have a default.
-- **`ChallengeParticipant` still defaults to 0**, deliberately, pinned by its own test so
-  it reads as a decision rather than as drift. Nothing reads a challenge participant's
-  score, provider challenges are E8, and the model is touched by dozens of trading files.
-  **The first provider challenge will reproduce R50 exactly** unless it is fixed first.
+- **`ChallengeParticipant` no longer defaults, as of 12 September 2026.** The field is
+  `score?: number` with `required: false` and no default in both copies, and the accept
+  route seats both players through `buildChallengeParticipantSeat`, which writes no
+  `score` key. The pinning test was **flipped, not deleted**. **The read path is still
+  not built** - neither copy of `challenge-finalize.actions.ts` mentions `score` - so a
+  document implying a challenge now ranks on score is wrong. No challenge migration: every
+  existing seat is a trading seat, trading's `hasResult` is unconditionally true, and
+  finalization never reads the field. The three capital fields stay unconditionally
+  required; that belongs with the step that actually seats a provider challenge.
 
 ### Seam 3 - Settlement and finalization
 
