@@ -106,14 +106,18 @@ Write-Host '=== The game is outside the subtree that refreshes ===' -ForegroundC
 # element handed down from a server component is the same object on every re-render - so React
 # never descends into it. Making the round host a consumer instead turns a board refresh into a
 # reloaded game, under a player who has paid for the attempt.
+# RE-AIMED 11 Sep 2026: this anchored on `ArenaLiveBoard`, which moved into
+# `ArenaLeaderboardPanel` when the rail became one component that owns its own height. Left
+# alone it reports DID NOT APPLY, which reads like a broken harness rather than a moved target -
+# and a stale probe fails in the quiet direction.
 Invoke-Probe -Name 'the round host reads the live context' -File $Rail `
-  -Find 'export function ArenaLiveBoard({ scoreLabel }: { scoreLabel?: string }) {' `
+  -Find 'export function ArenaLiveFeed() {' `
   -Replace 'export function ProviderRoundHost() {
   useArenaLive();
   return null;
 }
 
-export function ArenaLiveBoard({ scoreLabel }: { scoreLabel?: string }) {' `
+export function ArenaLiveFeed() {' `
   -ExpectTest 'the round host is a child of the live provider, never a consumer of it'
 
 # The provider must actually pass its children through. Rendering only the consumers would drop

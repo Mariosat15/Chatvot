@@ -112,6 +112,25 @@ interface ProviderLeaderboardProps {
    * A player present in the map with no rounds is a different fact and does read as not played.
    */
   activity?: Record<string, RoundActivitySummary>;
+  /**
+   * How much furniture a row carries. Added 11 September 2026 for the arena's rail.
+   *
+   * `detailed` is what this board has always drawn and stays the default, so the lobby is
+   * untouched. `ranking` is the owner's fifth reference: rank, avatar, name, score, clock and
+   * nothing else - no activity line even if a map is passed, no `you` word, no tie glyph.
+   *
+   * IT IS ONE SWITCH RATHER THAN THREE BOOLEANS on purpose. The three removals are one request
+   * and they only make sense together: a row that keeps any one of them is taller than the
+   * reference's 40px and the panel then fits six players instead of ten, which is the thing
+   * being fixed. Three flags is also three chances for a caller to ask for two thirds of a
+   * design.
+   *
+   * NOTHING IS LOST IN `ranking`, and each replacement is named where it happens: the tie is
+   * still stated by two rows sharing a rank plate, the viewer is still tinted sky by
+   * `NeonPlayerName`, and what each player has been doing is still on the screen - in the
+   * recent-players feed, and on the panel's own second tab.
+   */
+  variant?: "detailed" | "ranking";
 }
 
 export default function ProviderLeaderboard({
@@ -119,7 +138,9 @@ export default function ProviderLeaderboard({
   currentUserId,
   scoreLabel = "Score",
   activity,
+  variant = "detailed",
 }: ProviderLeaderboardProps) {
+  const ranking = variant === "ranking";
   if (rows.length === 0) {
     return (
       <div className="rounded-xl border border-[#161E36] bg-[#080C18]/60 p-8 text-center">
@@ -180,7 +201,8 @@ export default function ProviderLeaderboard({
             absent entry is a real answer: this player holds a seat and has not played.
           */
           const entry = activity ? activity[row.userId] : undefined;
-          const phrase = activity ? describeRoundActivity(entry) : undefined;
+          const phrase =
+            activity && !ranking ? describeRoundActivity(entry) : undefined;
           const clock = formatRoundClock(entry?.durationMs);
 
           return (
@@ -232,6 +254,7 @@ export default function ProviderLeaderboard({
                   <NeonPlayerName
                     name={row.username || "Anonymous"}
                     isCurrentUser={isYou}
+                    showYouMarker={!ranking}
                   />
 
                   {phrase && (
@@ -282,7 +305,7 @@ export default function ProviderLeaderboard({
                       position it is, so repeating the number is the same fact twice in one
                       row. The title attribute carries the long form for anyone who needs it.
                     */}
-                    {row.isTied && (
+                    {row.isTied && !ranking && (
                       <span className="mr-0.5 font-semibold text-amber-300" title={`Tied at #${row.currentRank}`}>
                         =
                       </span>

@@ -231,10 +231,21 @@ export function NeonPlayerName({
   name,
   isCurrentUser,
   isLeader = false,
+  showYouMarker = true,
 }: {
   name: string;
   isCurrentUser: boolean;
   isLeader?: boolean;
+  /**
+   * The word `you` after the name. Optional since 11 September 2026, on the owner's fifth
+   * leaderboard reference, which draws a ranking table with no badges in it at all.
+   *
+   * TURNING IT OFF LOSES NOTHING, which is the test for removing furniture rather than hiding
+   * information: `isCurrentUser` also tints the name sky, and that tint is on the name itself
+   * rather than beside it, so it survives on the leader's gold row where a row tint could not.
+   * The default is `true` so the boards that have always drawn it are untouched.
+   */
+  showYouMarker?: boolean;
 }) {
   return (
     <span className="flex min-w-0 items-center gap-1.5">
@@ -248,7 +259,7 @@ export function NeonPlayerName({
       {isLeader && (
         <Crown className="h-3.5 w-3.5 shrink-0 text-amber-300" />
       )}
-      {isCurrentUser && (
+      {isCurrentUser && showYouMarker && (
         <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-sky-400">
           you
         </span>

@@ -7,6 +7,10 @@ import {
   NEON_PANEL,
   NEON_PANEL_LIT,
   NEON_SEAM,
+  NEON_TAB_ACTIVE,
+  NEON_TAB_DEAD,
+  NEON_TAB_IDLE,
+  NEON_TAB_SHAPE,
   NEON_TILE_SHAPE,
   accentClasses,
   type NeonAccent,
@@ -543,25 +547,51 @@ export function NeonCountPill({
 }
 
 /**
- * The scope strip above the reference's leaderboard - `GLOBAL | FRIENDS | COUNTRY`, with one
- * lit. Drawn here with the scopes the caller CAN answer, and today that is one: a contest
- * board is every entrant, and there is no friends graph and no per-country filter behind it.
- * So the strip is a labelled fact, not a control - the lit chip says what the board is, and the
- * dead tabs the reference shows are deliberately not drawn, because a tab that does nothing
- * teaches a player the screen is broken. When a second scope has a data source it gets a
- * second chip and a handler; until then the shape is here so the day it does, nothing moves.
+ * The scope strip above the reference's leaderboard - `GLOBAL | FRIENDS | COUNTRY`, filling the
+ * width, with the one the board can answer lit.
+ *
+ * THE DEAD SCOPES ARE DRAWN, ON THE OWNER'S SECOND INSTRUCTION (11 September 2026). They were
+ * deliberately omitted before, and the reasoning was sound and is worth keeping visible: a tab
+ * that does nothing when clicked teaches a player the screen is broken, and there is no friends
+ * graph behind `FRIENDS` and no per-entrant country on a contest board behind `COUNTRY`. The
+ * owner asked for all three twice. So they are here, and the way they are drawn is the answer to
+ * the original objection - `NEON_TAB_DEAD` is dimmer than an idle tab, has no hover, is not a
+ * button, and carries `aria-disabled` and a title saying what it is waiting for. A player can see
+ * it is not offering them anything, which is the difference between a labelled fact and a control
+ * that appears to work and does nothing.
+ *
+ * The caller passes the scopes it CAN answer first, then the ones it cannot; the first is lit.
  */
-export function NeonScopeStrip({ scopes }: { scopes: string[] }) {
+export function NeonScopeStrip({
+  scopes,
+  unavailable = [],
+  unavailableTitle = "Not available yet",
+}: {
+  scopes: string[];
+  /** Present in the reference, no data source here. Drawn dim and not selectable. */
+  unavailable?: string[];
+  unavailableTitle?: string;
+}) {
+  const size = "px-2 py-1 text-[10px] font-semibold uppercase tracking-wider";
+
   return (
-    <div className="flex items-center gap-1.5 px-3 pt-2.5">
+    <div className="flex items-stretch gap-1.5 px-3 pt-2.5">
       {scopes.map((scope, index) => (
         <span
           key={scope}
-          className={`rounded-md border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider ${
-            index === 0
-              ? "border-sky-500/40 bg-sky-500/10 text-sky-200"
-              : "border-[#1B2540] bg-[#080C18] text-gray-500"
+          className={`${NEON_TAB_SHAPE} ${size} ${
+            index === 0 ? NEON_TAB_ACTIVE : NEON_TAB_IDLE
           }`}
+        >
+          {scope}
+        </span>
+      ))}
+      {unavailable.map((scope) => (
+        <span
+          key={scope}
+          aria-disabled="true"
+          title={unavailableTitle}
+          className={`${NEON_TAB_SHAPE} ${size} ${NEON_TAB_DEAD}`}
         >
           {scope}
         </span>

@@ -49,6 +49,7 @@ const ARENA_FILES = [
   "components/games/arena/ArenaActivityFeed.tsx",
   "components/games/arena/ArenaHighlights.tsx",
   "components/games/arena/ArenaLiveStandings.tsx",
+  "components/games/arena/ArenaLeaderboardPanel.tsx",
   "components/games/arena/arena-facts.ts",
   "components/games/ProviderLeaderboard.tsx",
   "components/games/ProviderGameFrame.tsx",
@@ -107,8 +108,16 @@ describe("the stripper reaches the words a player reads", () => {
   it("keeps the copy and drops the classes and the comments", () => {
     const layout = playerFacingText(read("components/games/arena/GameArenaLayout.tsx"));
 
-    // A heading a player reads.
-    expect(layout).toContain("Leaderboard");
+    /*
+      A heading a player reads.
+
+      RE-POINTED ON 11 SEPTEMBER 2026 FROM "Leaderboard", AND THE CLAIM IS UNCHANGED. That word
+      left this file when the leaderboard rail became one component of its own, so the canary
+      was reading a file that no longer contains it - and a canary that fails says nothing about
+      the stripper. `Back to Competitions` is the layout's own copy and cannot move without the
+      layout's own back link moving with it.
+    */
+    expect(layout).toContain("Back to");
     // A layout class, gone.
     expect(layout).not.toContain("grid-cols");
     // The layout file's comments argue about the board at length; none of it survives.

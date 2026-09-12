@@ -1394,6 +1394,13 @@ the **GLOBAL / FRIENDS / COUNTRY** leaderboard tabs, and the **RECENT PLAYERS** 
 > tabs**, and the first two are refusals of *principle* rather than of effort: `PlayState`
 > carries no score by design, and a hint improves a score in a paid contest. Read `21` s4.1q
 > before restating any of this.
+>
+> **A third amendment, same day (`13` s4.1y): the three leaderboard tabs are now DRAWN.** They
+> still cannot be answered - there is no friends model anywhere, and publishing a player's country
+> on a public board is a disclosure decision - so `GLOBAL` is lit and the other two are rendered
+> as disabled labels with the reason in a title attribute. **Drawn and unanswerable is not the
+> same as built**, and a document listing them as absent is stale while one listing them as
+> working is wrong.
 
 #### What the platform half actually lacked
 
@@ -1703,6 +1710,13 @@ into the present tense.
   rather than a number: a count rendered once on the server disagrees with the list beneath it
   the moment somebody joins, which is one panel with two answers - the failure the live rail
   exists to remove, reintroduced one heading higher.
+
+  > **Amended 11 September 2026 by s4.1y.** The prop is **gone**, and the reasoning that produced
+  > it is what survives: the count is now the second heading tab inside
+  > `ArenaLeaderboardPanel`, which reads the live context itself, so it cannot disagree with the
+  > list. The layout composes no part of the rail's chrome any more, and that split ownership is
+  > exactly what left nothing owning the panel's height. A document describing a `standingsCount`
+  > prop is correct as history and stale as a present fact - **say which**.
 
 #### What this does NOT fix, and it is the third of the owner's three points
 
@@ -2535,6 +2549,103 @@ the slug somebody adds next renders nothing.
 
 **Never verified by eye** - the arena is behind sign-in, and there is nothing authored to render
 until an operator writes a strip.
+
+---
+
+### 4.1y The standings rail as a competitive leaderboard (owner rejection, 11 September 2026)
+
+The owner's fifth rejection in this area, against two images: *"STOP. The leaderboard
+implementation is structurally wrong. The target is not a small player status card. It is a full
+competitive leaderboard sidebar with tabs, filters, many rows, and a bottom CTA. Also make the
+whole sidebar extend to the same bottom edge as the gameplay board so the layout is aligned and
+symmetric."* Then, closing: *"Fix only the leaderboard panel. Do not redesign the rest of the
+page."*
+
+**The live code is `components/games/arena/ArenaLeaderboardPanel.tsx`, the `standings` slot in
+`GameArenaLayout.tsx`, the `variant` prop on `components/games/ProviderLeaderboard.tsx`, and the
+five `NEON_TAB*` tokens plus `NeonScopeStrip` in `components/neon/`.** Nothing here is mirrored.
+**24 tests across two suites, 19 probes red on exactly one failure.**
+
+#### MOST OF THE TARGET WAS ALREADY BUILT, AND SAYING SO IS WHAT MAKES THE REST CREDIBLE
+
+The rail already had a Trophy-headed *Leaderboard* title, a `Players (N)` count, a scope strip, a
+four-column table (`#` / `Player` / score / `Time`), 28px avatars, a gold leader row with a crown
+plate and a full-width `View Full Leaderboard →` button. Four things were genuinely missing or
+wrong: **the height**, **two heading tabs rather than a title and a pill**, **three filter tabs
+rather than one**, and **room for about ten rows**. A document describing this as building a
+leaderboard from nothing is describing a fifth of it.
+
+#### THE HEIGHT WAS A SPLIT-OWNERSHIP FAULT, NOT AN ARITHMETIC ONE
+
+`GameArenaLayout` composed the chrome - heading, scope strip, footer button - while a separate
+consumer supplied the rows. **Nothing owned the panel's height**: a heading at its text height, a
+rows box capped at `max-h-[460px]`, and a footer at its content height, sitting in a grid cell as
+tall as the game board. The arena backdrop showed through underneath, which is the owner's
+*"oversized empty dark area"* - **a fault in the layout, not in the board beside it.**
+
+One component owning the whole panel is what makes the fix expressible, and the fix is two parts:
+
+- **`h-full` on the wrapper is a no-op that reviews as correct.** A grid item already stretches to
+  its row's height, so the wrapper was the right height all along - which is why every reading of
+  the arithmetic came back clean. Only **`[&>*]:h-full`** reaches the panel inside it. The same
+  mistake was already made once, on the bottom band (s4.1t), so carry the rule rather than the two
+  instances.
+- **`xl:` only.** Below that breakpoint the rail is full width beneath the board, and a forced
+  height there stretches a short list down an empty column.
+
+**`min-h-[400px]` is room, never a cap.** How many players a contest has is not ours to decide, so
+what is guaranteed is space for about ten rows; the panel grows past it to fill the row and the
+overflow scrolls. A `max-h` reads as a sensible precaution and **is** the defect. And **exactly
+one child grows** - two `flex-1` children divide the slack, so the footer drifts up from the
+bottom edge by whatever the rows area does not need, which is the same empty area wearing a
+different cause.
+
+#### THE FOUR REMOVALS ARE ONE SWITCH, AND NOT ONE OF THEM LOSES A FACT
+
+The owner's removal list - *"Not played yet / Playing now / YOU badge / yellow = #1 pills"* - is
+right about the **ranking table**, because each of them adds row height and ten compact rows is
+the requirement. Each is honoured somewhere else instead, which is why they are one `variant`
+prop rather than three booleans a caller can get half right:
+
+- **The activity lines moved to a PLAYERS roster tab.** They are the only thing on the screen that
+  says whether a rival is still playing, and they also remain in the recent-players feed.
+- **The `YOU` badge is gone as a word and survives as a tint.** `isCurrentUser` still colours the
+  name, and **a tint on the name is the one marker that survives on the leader's gold row**, where
+  a row background cannot.
+- **The `= #1` pill is suppressed and two rows sharing a rank plate is the statement.**
+
+#### FRIENDS AND COUNTRY ARE DRAWN AND CANNOT BE ANSWERED, WHICH IS A LABELLED FACT
+
+There is **no friends model anywhere in `database/models`**, and while `country` does exist on the
+user card, publishing it per row on a public board is a disclosure decision rather than a
+rendering one. So all three scopes are drawn, `GLOBAL` lit and the other two on `NEON_TAB_DEAD`
+with `aria-disabled`, a title explaining that everyone in the contest is shown, no hover and no
+handler - **rendered as a `<span>`, so there is no control that appears to work.**
+
+**This reverses a decision recorded in s4.1q**, whose guard asserted the rail draws *no* dead
+scope tabs. That test was **flipped rather than deleted**, keeping the original objection verbatim
+as the reason for *how* they are drawn. It is the second time the owner has overridden a recorded
+guard here, so a document citing the old rule as current is stale - **say which.**
+
+#### THE POLLING CONTRACT IS UNTOUCHED, AND THAT IS THE CONSTRAINT THAT SHAPED THE REBUILD
+
+s4.1o's rules all still hold and none of them was relaxed to fit a bigger panel:
+`LiveContestRefresher` stays banned on this page by a test, the round host stays a **child** of
+the live provider rather than a consumer of it, and `getArenaStandings` stays the single producer
+for both the first render and the poll. The new panel is a second **consumer** of the same
+context, which is why the consumer count is now asserted as a sum across two files rather than
+one - and it **fetches nothing of its own**, asserted.
+
+**Three structural guards had to be sliced rather than left file-wide**, and all three had begun
+firing on correct code: the band's wrapper count could not tell its three selectors from the
+rail's, the panel's `flex-1` count caught a legitimate one on a roster row, and a whole-file ban
+on `Standings` was satisfied by an import path. **A guard that fires on correct code is the one
+the next reader deletes**, so slice to the construct and count the construct. Related, and the
+fourth instance: `describeRoundActivity`'s first occurrence in a file is its **import**, so a
+position assertion measured from `indexOf` is trivially true - use `lastIndexOf`.
+
+**Never verified by eye** - the play screen is behind sign-in and the automated browser has no
+session.
 
 ---
 

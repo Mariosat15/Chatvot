@@ -9,10 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import ProviderLeaderboard, {
-  type ProviderLeaderboardRow,
-} from "@/components/games/ProviderLeaderboard";
-import { NeonCountPill } from "@/components/neon/Cards";
+import { type ProviderLeaderboardRow } from "@/components/games/ProviderLeaderboard";
 import {
   ArenaActivityFeed,
   type ArenaActivityEntry,
@@ -53,7 +50,7 @@ import type { RoundActivitySummary } from "@/lib/utils/round-activity";
  * moment AFTER a round lands, which used to require a reload.
  */
 
-interface ArenaLiveState {
+export interface ArenaLiveState {
   rows: ProviderLeaderboardRow[];
   activity: Record<string, RoundActivitySummary>;
   feed: ArenaActivityEntry[];
@@ -62,7 +59,14 @@ interface ArenaLiveState {
 
 const ArenaLiveContext = createContext<ArenaLiveState | null>(null);
 
-function useArenaLive(): ArenaLiveState {
+/**
+ * Exported so the leaderboard panel can be its own file.
+ *
+ * The panel is ~200 lines of tabs, filters and a table; leaving it in here would put this
+ * file over the 500-line limit and mix the polling contract - which is the delicate part,
+ * because of the iframe - with a screen's chrome.
+ */
+export function useArenaLive(): ArenaLiveState {
   const value = useContext(ArenaLiveContext);
   if (!value) {
     // Reason: a consumer rendered outside the provider would silently render an empty board,
@@ -188,46 +192,6 @@ export function ArenaLiveProvider({
       {children}
     </ArenaLiveContext.Provider>
   );
-}
-
-/**
- * The board itself. Renders the same component the lobby does - the live state changes what it
- * is given, never how it draws.
- */
-export function ArenaLiveBoard({ scoreLabel }: { scoreLabel?: string }) {
-  const { rows, activity, currentUserId } = useArenaLive();
-
-  if (rows.length === 0) {
-    return (
-      <p className="px-2 py-6 text-center text-xs text-gray-500">
-        No scores yet. Be the first.
-      </p>
-    );
-  }
-
-  return (
-    <ProviderLeaderboard
-      rows={rows}
-      currentUserId={currentUserId}
-      scoreLabel={scoreLabel}
-      activity={activity}
-    />
-  );
-}
-
-/**
- * The player count beside the Standings heading.
- *
- * A CONSUMER RATHER THAN A NUMBER PASSED IN, because it counts the rows the board is drawing.
- * Left as a server-rendered figure it would disagree with the list beneath it the moment
- * somebody joined - one panel, two answers, which is the failure this whole file exists to
- * avoid rather than to introduce one heading higher.
- */
-export function ArenaLiveCount() {
-  const { rows } = useArenaLive();
-  // "Players (24)", the reference's form - the noun first, so the pill reads as a heading for
-  // the figure rather than as a sentence fragment. Still "players", never "traders".
-  return <NeonCountPill>Players ({rows.length})</NeonCountPill>;
 }
 
 /** The recent-players feed, from the same fetch as the board above it. */

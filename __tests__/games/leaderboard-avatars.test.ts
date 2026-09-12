@@ -47,7 +47,8 @@ const BOARD = "components/games/ProviderLeaderboard.tsx";
 const TRADING_BOARD = "components/trading/CompetitionLeaderboard.tsx";
 const KIT_ROW = "components/neon/LeaderboardRow.tsx";
 const ARENA_LAYOUT = "components/games/arena/GameArenaLayout.tsx";
-const ARENA_LIVE = "components/games/arena/ArenaLiveStandings.tsx";
+const ARENA_PANEL = "components/games/arena/ArenaLeaderboardPanel.tsx";
+const KIT_CARDS = "components/neon/Cards.tsx";
 
 const lookup = vi.fn();
 vi.mock("@/lib/utils/user-lookup", () => ({
@@ -237,32 +238,76 @@ describe("the rank marker and the score colour", () => {
   });
 });
 
+/*
+  RE-POINTED FROM THE LAYOUT TO THE PANEL ON 11 SEPTEMBER 2026, AND EVERY CLAIM BELOW IS
+  UNCHANGED EXCEPT THE LAST. The rail's chrome used to be composed inside `GameArenaLayout`
+  while a separate consumer supplied the rows, and the owner's fifth reference rejected the
+  result as "a small player status card" - the structural half of which is that split, because
+  nothing owned the panel's height. One component owns it now, so these assertions read that
+  file. Only the location moved.
+*/
 describe("the standings panel's chrome", () => {
-  it("is headed Leaderboard, scoped Global, and leaves through the kit's outline button", () => {
-    const layout = readCode(ARENA_LAYOUT);
-    expect(layout).toMatch(/title="Leaderboard"/);
-    expect(layout).not.toMatch(/title="Standings"/);
-    expect(layout).toMatch(/<NeonScopeStrip scopes=\{\["Global"\]\}/);
-    expect(layout).toMatch(
+  it("is headed Leaderboard and leaves through the kit outline button", () => {
+    const panel = readCode(ARENA_PANEL);
+    /*
+      SLICED PAST THE IMPORTS, because the hook this panel reads lives in a file called
+      `ArenaLiveStandings.tsx` - so a whole-file ban on "Standings" fails on a correct file, and
+      a guard that fires on correct code is the one the next reader deletes. The claim is about
+      the heading a player sees, so it is asserted where headings are written.
+    */
+    const rendered = panel.slice(panel.indexOf("export default function"));
+    expect(rendered.length).toBeGreaterThan(500);
+    expect(rendered).toMatch(/Leaderboard/);
+    expect(rendered).not.toMatch(/Standings/);
+    expect(panel).toMatch(
       /<NeonButton[\s\S]{0,300}tone="outline"[\s\S]{0,200}label="View Full Leaderboard"/,
     );
     // The hand-rolled link it replaces is gone - the button is the same one the results screen
     // draws, so the two cannot drift.
-    expect(layout).not.toMatch(/Full leaderboard and prizes/);
-    expect(layout).not.toMatch(/bg-\[#0B1120\]/);
+    expect(panel).not.toMatch(/Full leaderboard and prizes/);
+    expect(panel).not.toMatch(/bg-\[#0B1120\]/);
+    // And the layout no longer draws any of it, which is the half that makes the height rule
+    // possible. A copy left behind renders a second heading above the panel's own.
+    const layout = readCode(ARENA_LAYOUT);
+    expect(layout).not.toMatch(/View Full Leaderboard/);
+    expect(layout).not.toMatch(/NeonScopeStrip/);
   });
 
   it("counts players in the reference's form, and never traders", () => {
-    const live = readCode(ARENA_LIVE);
-    expect(live).toMatch(/Players \(\{rows\.length\}\)/);
-    expect(live).not.toMatch(/traders/i);
+    const panel = readCode(ARENA_PANEL);
+    expect(panel).toMatch(/Players \(\{rows\.length\}\)/);
+    expect(panel).not.toMatch(/traders/i);
   });
 
-  it("draws no dead scope tabs", () => {
-    // The reference shows FRIENDS and COUNTRY; neither has a data source. A tab that does
-    // nothing teaches a player the screen is broken, so only the scope the board can answer
-    // is drawn.
-    const layout = readCode(ARENA_LAYOUT);
-    expect(layout).not.toMatch(/Friends|Country/);
+  it("draws all three of the reference scopes, with the two we cannot answer disabled", () => {
+    /*
+      FLIPPED ON THE OWNER'S SECOND INSTRUCTION, 11 SEPTEMBER 2026, AND THE OLD REASON IS KEPT
+      RATHER THAN DELETED because it is the reason the two are drawn the way they are. This test
+      used to assert `Friends` and `Country` appeared NOWHERE, on the grounds that neither has a
+      data source and a tab that does nothing teaches a player the screen is broken. The owner
+      asked for all three twice.
+
+      So they are drawn, and the objection is answered by HOW: `NEON_TAB_DEAD` rather than
+      `NEON_TAB_IDLE`, `aria-disabled`, a title saying what the board is showing instead, and no
+      handler. The assertion that matters is therefore not that they exist - it is that they are
+      not selectable, because a `<button onClick>` here is precisely the control that appears to
+      work and does nothing.
+    */
+    const panel = readCode(ARENA_PANEL);
+    expect(panel).toMatch(/unavailable=\{\["Friends", "Country"\]\}/);
+
+    const cards = readCode(KIT_CARDS);
+    const stripAt = cards.indexOf("export function NeonScopeStrip");
+    expect(stripAt).toBeGreaterThan(0);
+    const strip = cards.slice(stripAt);
+    const endAt = strip.indexOf("\nexport function");
+    expect(endAt).toBeGreaterThan(0);
+    const body = strip.slice(0, endAt);
+
+    // The dead scopes get the dead token, are announced as disabled, and carry no handler.
+    expect(body).toMatch(/NEON_TAB_DEAD/);
+    expect(body).toMatch(/aria-disabled="true"/);
+    expect(body).not.toMatch(/onClick/);
+    expect(body).not.toMatch(/<button/);
   });
 });

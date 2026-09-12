@@ -123,8 +123,19 @@ describe("the arena's bottom band holds its three panels level", () => {
       item already stretches, so the wrappers were the same height while the owner was looking
       at panels that were not. Only `[&>*]:h-full` reaches the thing that was actually short.
     */
+    /*
+      SCOPED TO THE BAND SINCE 11 SEPTEMBER 2026, AND THE CLAIM IS UNCHANGED. This counted the
+      whole file and read 3, which was the band's three wrappers only because nothing else in
+      the arena needed the selector. The leaderboard rail then needed exactly the same rule for
+      exactly the same reason - see `xl:[&>*]:h-full` on its grid cell - and a file-wide count
+      cannot tell the band's three from anybody else's, so it failed on a correct file. Slice
+      the band, count the band.
+    */
     const code = readCode(LAYOUT);
-    const matches = code.match(/\[&>\*\]:h-full/g) ?? [];
+    const bandAt = code.indexOf("flex flex-wrap items-stretch");
+    expect(bandAt).toBeGreaterThan(0);
+    const band = code.slice(bandAt);
+    const matches = band.match(/\[&>\*\]:h-full/g) ?? [];
 
     expect(matches).toHaveLength(3);
   });

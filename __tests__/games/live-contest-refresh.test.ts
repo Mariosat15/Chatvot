@@ -233,6 +233,7 @@ describe("the refresher cannot leak a timer or refresh a tab nobody is reading",
  */
 describe("the arena's standings rail is live without the page being", () => {
   const LIVE_RAIL = "components/games/arena/ArenaLiveStandings.tsx";
+  const ARENA_PANEL = "components/games/arena/ArenaLeaderboardPanel.tsx";
   const STANDINGS_ROUTE = "app/api/competitions/[id]/standings/route.ts";
   const STANDINGS_SERVICE = "lib/services/games/arena-standings.service.ts";
 
@@ -268,18 +269,30 @@ describe("the arena's standings rail is live without the page being", () => {
     const rail = readCode(LIVE_RAIL);
     expect(countOf(rail, "fetch(")).toBe(1);
 
-    // Reason: the trailing semicolon matters. `useArenaLive()` on its own also matches the hook's
-    // own empty-parameter DECLARATION, so the count came out one too high and the first version
-    // of this assertion was written around the wrong number.
-    expect(countOf(rail, "useArenaLive();")).toBe(3);
+    /*
+      Reason: the trailing semicolon matters. `useArenaLive()` on its own also matches the hook's
+      own empty-parameter DECLARATION, so the count came out one too high and the first version
+      of this assertion was written around the wrong number.
+
+      COUNTED ACROSS BOTH FILES SINCE 11 SEPTEMBER 2026, AND THE CLAIM IS UNCHANGED. The board
+      and the count moved into `ArenaLeaderboardPanel`, which is where the panel's own chrome
+      now lives; the feed stayed. What is being asserted is still that every surface showing
+      these facts reads the ONE fetch, so the sum is what matters rather than which file each
+      consumer sits in - and the hook is exported for exactly that reason.
+    */
+    const panel = readCode(ARENA_PANEL);
+    expect(countOf(rail, "useArenaLive();") + countOf(panel, "useArenaLive();")).toBe(4);
+
+    // Reason: and the panel must not fetch for itself. A second poll here is the two-answers
+    // failure the provider exists to prevent, one component further in.
+    expect(countOf(panel, "fetch(")).toBe(0);
   });
 
   it("the page renders the consumers rather than the panels directly", () => {
     const page = readCode(PLAY_PAGE);
 
-    expect(page).toMatch(/<ArenaLiveBoard/);
+    expect(page).toMatch(/<ArenaLeaderboardPanel/);
     expect(page).toMatch(/<ArenaLiveFeed/);
-    expect(page).toMatch(/standingsCount=\{<ArenaLiveCount/);
 
     // Reason: rendering either panel directly here is how half the rail goes back to being a
     // photograph while every other assertion in this file stays green.

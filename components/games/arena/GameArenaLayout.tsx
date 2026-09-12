@@ -1,17 +1,8 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, Trophy } from "lucide-react";
-import {
-  NEON_DIVIDER,
-  NEON_LABEL,
-  NEON_PANEL_LIT,
-} from "@/components/neon/tokens";
-import {
-  NeonGridBackdrop,
-  NeonHeadedPanel,
-  NeonScopeStrip,
-} from "@/components/neon/Cards";
-import { NeonButton } from "@/components/neon/Buttons";
+import { ArrowLeft } from "lucide-react";
+import { NEON_LABEL, NEON_PANEL_LIT } from "@/components/neon/tokens";
+import { NeonGridBackdrop } from "@/components/neon/Cards";
 import type { NeonHeroBanner } from "@/components/neon/Hero";
 import type { GamePresentation } from "@/lib/services/games/game-presentation.service";
 import { ArenaIdentity } from "./ArenaIdentity";
@@ -61,17 +52,21 @@ interface Props {
   maxParticipants?: number;
   /** The board, the Play button, or the result - whatever phase the player is in. */
   stage: ReactNode;
-  /** The live standings for this contest. */
-  standings: ReactNode;
   /**
-   * The pill beside the Standings heading.
+   * The whole leaderboard rail - tabs, filters, table and footer.
    *
-   * A NODE RATHER THAN A NUMBER since 11 September 2026, because the board below it refreshes
-   * on a timer. A count rendered once on the server disagrees with the list beneath it the
-   * moment somebody joins - one panel with two answers, which is precisely the failure the
-   * live rail exists to remove rather than to reintroduce one heading higher.
+   * THE PANEL'S CHROME USED TO BE COMPOSED HERE and it is not any more, since 11 September
+   * 2026. The heading, the scope strip and the footer button were written in this file while a
+   * separate consumer supplied the rows, so nothing owned the panel's height: a heading sized
+   * to its text, a rows box capped at 460px and a footer at its content height, inside a grid
+   * cell as tall as the game board. The owner's fifth reference calls the result "a small
+   * player status card", and the empty area beneath it was this file's doing rather than the
+   * board's.
+   *
+   * One component owns the panel now, so it can be `h-full` with one `flex-1` inside it. This
+   * file's remaining job is the grid, and the stretch immediately below.
    */
-  standingsCount: ReactNode;
+  standings: ReactNode;
   /** The contest's facts and, beneath them, the prize table. */
   sidebar: ReactNode;
   /**
@@ -106,7 +101,6 @@ export function GameArenaLayout({
   maxParticipants,
   stage,
   standings,
-  standingsCount,
   sidebar,
   rules,
   highlights,
@@ -247,53 +241,21 @@ export function GameArenaLayout({
           Board first everywhere. Phone: board, standings, facts. Laptop: board beside the
           facts, standings full width beneath. Desktop: standings, board, facts.
         */}
-        <div className="order-2 lg:order-3 xl:order-1">
-          <NeonHeadedPanel
-            icon={Trophy}
-            /*
-              "Leaderboard", the reference's word, since 11 Sep 2026 - it said "Standings" for
-              three days, and the owner's rejection listed the panel by the reference's name.
-              The trophy is the reference's glyph too.
-            */
-            title="Leaderboard"
-            /*
-              "players", never "traders", and the bare count was the reference's one legible
-              omission - a pill reading `20` beside a heading reading `Leaderboard` says twenty
-              of what. The wording now lives with the count in `ArenaLiveCount`, because the
-              figure and its noun have to change together.
-            */
-            action={standingsCount}
-          >
-            {/*
-              The reference's scope strip, with the one scope this board can answer. The other
-              two it draws - friends, country - have no data source, and `NeonScopeStrip`'s
-              header says why they are not drawn as dead tabs.
-            */}
-            <NeonScopeStrip scopes={["Global"]} />
-            {/*
-              Tight padding, because the rows are flush now and their left accent bar is the
-              state marker. Padded in from the panel edge as far as a card would be, the bar
-              floats in the middle of a gutter and stops reading as an edge.
-            */}
-            <div className="max-h-[460px] overflow-y-auto px-1.5 py-1">
-              {standings}
-            </div>
-            {/*
-              A BUTTON, NOT A TEXT LINK. The reference draws a full-width bordered control at
-              the foot of the board, and it is the only way off this panel: a line of small
-              blue text under a scrolling list is the thing a player's eye skips. It is the
-              kit's `outline` button rather than a class list written here, so the control is
-              the same one the results screen draws and neither can drift from the other.
-            */}
-            <div className={`border-t p-3 ${NEON_DIVIDER}`}>
-              <NeonButton
-                href={`/competitions/${competitionId}?view=details`}
-                tone="outline"
-                label="View Full Leaderboard"
-                trailingIcon={ArrowRight}
-              />
-            </div>
-          </NeonHeadedPanel>
+        {/*
+          THE RAIL IS FULL HEIGHT FROM `xl` UP, AND THIS IS THE TWO-PART RULE THE OWNER ASKED
+          FOR ("make the whole sidebar extend to the same bottom edge as the gameplay board").
+
+          A grid item already stretches to the row's height, so this wrapper is as tall as the
+          board without being told to - which is exactly why the panel inside it ended early and
+          nobody could see the cause. `[&>*]:h-full` is the half that reaches the panel; `h-full`
+          on the wrapper alone is a no-op that reviews as correct, which is the mistake made once
+          already on the bottom band (`13` s4.1t).
+
+          `xl:` only. At `lg` and below the rail is full width beneath the board, and a stretch
+          there means one grid row as tall as its tallest member for no reason.
+        */}
+        <div className="order-2 lg:order-3 xl:order-1 xl:[&>*]:h-full">
+          {standings}
         </div>
 
         <div className="order-1 lg:order-1 xl:order-2">{stage}</div>

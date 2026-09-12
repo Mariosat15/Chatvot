@@ -309,3 +309,31 @@ export const NEON_DIVIDER = "border-[#16203C]";
  * as a piece of a different website, which is what the owner was seeing.
  */
 export const NEON_INSET = `rounded-lg border ${NEON_DIVIDER} bg-[#070C1A]/70`;
+
+/**
+ * The reference's segmented tabs, in the two sizes it draws: a heading pair across the top of a
+ * panel, and a row of small scope pills beneath them.
+ *
+ * WHY THE TOKENS EXIST RATHER THAN THE CLASSES BEING WRITTEN WHERE THEY ARE USED. There are now
+ * two strips on one panel, three states between them, and a third strip is one screen away. Each
+ * state is a border, a fill and a text colour that have to agree with the panel they sit on, and
+ * the failure when they do not is a tab that reads as a different control rather than as the
+ * inactive half of this one. Nothing fails and nothing logs.
+ *
+ * THE THIRD STATE IS THE ONE WORTH A SENTENCE. `IDLE` is a tab a player can choose and has not;
+ * `DEAD` is a tab drawn because the reference draws it, for a scope this platform has no data
+ * for. They must not look the same: an idle tab that does nothing when clicked teaches a player
+ * the screen is broken, so the dead one is dimmer, carries no hover, and is rendered with
+ * `aria-disabled` and a title saying what it is waiting for. That is a labelled fact rather than
+ * a control that appears to work.
+ */
+export const NEON_TABS_STRIP = `flex items-stretch gap-1.5 border-b p-1.5 ${NEON_DIVIDER}`;
+export const NEON_TAB_ACTIVE =
+  "border-[#1089DC]/55 bg-[#1B7DFF]/15 text-sky-100 shadow-[0_0_12px_rgba(27,125,255,0.25)]";
+export const NEON_TAB_IDLE =
+  "border-[#16203C] bg-[#080C18] text-gray-400 hover:border-[#1B2540] hover:text-gray-200";
+export const NEON_TAB_DEAD =
+  "border-[#16203C] bg-[#050A14] text-gray-600 cursor-not-allowed";
+/** The shape both tab sizes share: the border, the radius and the centring. */
+export const NEON_TAB_SHAPE =
+  "flex flex-1 items-center justify-center gap-1.5 rounded-lg border text-center transition-colors";

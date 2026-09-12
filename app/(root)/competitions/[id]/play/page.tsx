@@ -20,11 +20,10 @@ import { GameArenaLayout } from "@/components/games/arena/GameArenaLayout";
 import { ArenaContestPanel } from "@/components/games/arena/ArenaContestPanel";
 import { ArenaHighlights } from "@/components/games/arena/ArenaHighlights";
 import {
-  ArenaLiveBoard,
-  ArenaLiveCount,
   ArenaLiveFeed,
   ArenaLiveProvider,
 } from "@/components/games/arena/ArenaLiveStandings";
+import ArenaLeaderboardPanel from "@/components/games/arena/ArenaLeaderboardPanel";
 import GameRulesPanel from "@/components/games/GameRulesPanel";
 import { NeonCountPill, NeonHeadedPanel } from "@/components/neon/Cards";
 import { providerBanner } from "@/components/neon/banners";
@@ -238,8 +237,12 @@ export default async function PlayPage({ params }: PlayPageProps) {
         banner={banner}
         minParticipants={contest?.minParticipants}
         maxParticipants={contest?.maxParticipants}
-        standingsCount={<ArenaLiveCount />}
-        standings={<ArenaLiveBoard scoreLabel="Score" />}
+        standings={
+          <ArenaLeaderboardPanel
+            competitionId={competitionId}
+            scoreLabel="Score"
+          />
+        }
         stage={
           <ProviderRoundHost
             competitionId={competitionId}
