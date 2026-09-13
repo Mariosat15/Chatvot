@@ -26,6 +26,14 @@ import { useRouter } from "next/navigation";
 import ActionTermsDialog, {
   ACTION_TERM_SLUGS,
 } from "@/components/ActionTermsDialog";
+import ChallengeGamePicker from "@/components/challenges/ChallengeGamePicker";
+import type { ChallengeableTitle } from "@/lib/services/games/challengeable-titles.service";
+import {
+  challengeSubtitle,
+  challengeQualificationCopy,
+  challengeContentSeedNote,
+  type ChallengeGameSelection,
+} from "@/lib/services/games/challenge-game-copy";
 
 interface ChallengeCreateDialogProps {
   open: boolean;
@@ -55,6 +63,10 @@ export default function ChallengeCreateDialog({
   const [loading, setLoading] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const [settings, setSettings] = useState<ChallengeSettings | null>(null);
+  const [titles, setTitles] = useState<ChallengeableTitle[]>([]);
+  const [selection, setSelection] = useState<ChallengeGameSelection>({
+    type: "trading",
+  });
   const [formData, setFormData] = useState({
     entryFee: 10,
     duration: 60,
@@ -94,6 +106,22 @@ export default function ChallengeCreateDialog({
         }
       } catch (error) {
         console.error("Failed to fetch settings:", error);
+      }
+    };
+
+    // Reason: the picker's own list. An empty result (no provider enabled, or
+    // `externalGamesEnabled` off platform-wide) makes `ChallengeGamePicker` render nothing,
+    // so a failed or empty fetch leaves the dialog exactly as it behaved before this
+    // feature existed - Trading only, no picker visible.
+    const fetchTitles = async () => {
+      try {
+        const res = await fetch("/api/challenges/games");
+        if (res.ok) {
+          const data = await res.json();
+          setTitles(data.titles || []);
+        }
+      } catch (error) {
+        console.error("Failed to fetch challengeable titles:", error);
       }
     };
 
@@ -138,7 +166,11 @@ export default function ChallengeCreateDialog({
     };
 
     if (open) {
+      // Reason: a fresh challenge every time the dialog opens - a player reopening it
+      // after cancelling a provider pick should not find the previous game still chosen.
+      setSelection({ type: "trading" });
       fetchSettings();
+      fetchTitles();
       fetchMarketStatus();
     }
   }, [open]);
@@ -159,6 +191,27 @@ export default function ChallengeCreateDialog({
 
     setLoading(true);
     try {
+      // Reason: the trading-only fields (starting capital, ranking method, tiebreakers,
+      // minimum trades) are meaningless for a provider game and are conditionally required
+      // on the OTHER side (`startingCapital`) or simply unused by settlement (`rules.*`), so
+      // they are sent only for a trading selection rather than being defaulted here and
+      // ignored server-side. `providerKey` / `gameCode` are the lookup key the create route
+      // resolves into `gameType` / `gameKey` / `gameConfig` - never sent for trading, which
+      // has no provider.
+      const gamePayload =
+        selection.type === "trading"
+          ? {
+              startingCapital: formData.startingCapital,
+              rankingMethod: formData.rankingMethod,
+              tieBreaker1: formData.tieBreaker1,
+              tieBreaker2: formData.tieBreaker2 || undefined,
+              minimumTrades: formData.minimumTrades,
+            }
+          : {
+              providerKey: selection.title.providerKey,
+              gameCode: selection.title.gameCode,
+            };
+
       const response = await fetch("/api/challenges", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -166,12 +219,7 @@ export default function ChallengeCreateDialog({
           challengedId: challengedUser.userId,
           entryFee: formData.entryFee,
           duration: formData.duration,
-          startingCapital: formData.startingCapital,
-          rankingMethod: formData.rankingMethod,
-          tieBreaker1: formData.tieBreaker1,
-          tieBreaker2: formData.tieBreaker2 || undefined,
-          minimumTrades: formData.minimumTrades,
-          disqualifyOnLiquidation: formData.disqualifyOnLiquidation,
+          ...gamePayload,
         }),
       });
 
@@ -214,7 +262,7 @@ export default function ChallengeCreateDialog({
                 Challenge {challengedUser.username}
               </h2>
               <p className="text-xs text-gray-400">
-                1v1 Trading Battle &middot; Winner Takes All
+                {challengeSubtitle(selection)}
               </p>
             </div>
           </div>
@@ -222,6 +270,14 @@ export default function ChallengeCreateDialog({
 
         {/* ─── Body ─── */}
         <div className="px-6 py-5 space-y-5 max-h-[calc(100vh-220px)] sm:max-h-[65vh] overflow-y-auto">
+          {/* ═══ Game Picker ═══ */}
+          <ChallengeGamePicker
+            titles={titles}
+            selection={selection}
+            onSelect={setSelection}
+            disabled={loading}
+          />
+
           {/* ═══ Two-column grid on desktop ═══ */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             {/* ─── LEFT: Battle Settings ─── */}
@@ -296,30 +352,59 @@ export default function ChallengeCreateDialog({
                 </div>
               </div>
 
-              {/* Ranking Method */}
-              <div className="space-y-1.5">
-                <Label className="text-gray-300 flex items-center gap-2 text-sm">
-                  <Target className="h-3.5 w-3.5 text-purple-400" />
-                  Ranking Method
-                </Label>
-                <select
-                  value={formData.rankingMethod}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      rankingMethod: e.target.value,
-                    })
-                  }
-                  className="w-full bg-gray-800/60 border border-gray-700 text-white rounded-md px-3 py-2 text-sm h-9 focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/25 transition-colors"
-                >
-                  <option value="pnl">P&L (Profit &amp; Loss)</option>
-                  <option value="roi">ROI (Return on Investment)</option>
-                  <option value="total_capital">Total Capital</option>
-                  <option value="win_rate">Win Rate</option>
-                  <option value="total_wins">Total Wins</option>
-                  <option value="profit_factor">Profit Factor</option>
-                </select>
-              </div>
+              {/* Starting Capital + Ranking Method - trading only. A provider game has no
+                  virtual capital (Challenge.startingCapital is conditionally required and
+                  ChallengeParticipant's capital fields the same way) and no rankingMethod -
+                  settlement ranks it by score via resolveScoreDirection instead. */}
+              {selection.type === "trading" && (
+                <>
+                  <div className="space-y-1.5">
+                    <Label className="text-gray-300 flex items-center gap-2 text-sm">
+                      <DollarSign className="h-3.5 w-3.5 text-yellow-400" />
+                      Starting Capital
+                    </Label>
+                    <Input
+                      type="number"
+                      min={100}
+                      value={formData.startingCapital}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          startingCapital: parseInt(e.target.value) || 100,
+                        })
+                      }
+                      className="bg-gray-800/60 border-gray-700 text-white h-9"
+                    />
+                    <p className="text-[11px] text-gray-500">
+                      Virtual capital both players start trading with
+                    </p>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-gray-300 flex items-center gap-2 text-sm">
+                      <Target className="h-3.5 w-3.5 text-purple-400" />
+                      Ranking Method
+                    </Label>
+                    <select
+                      value={formData.rankingMethod}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          rankingMethod: e.target.value,
+                        })
+                      }
+                      className="w-full bg-gray-800/60 border border-gray-700 text-white rounded-md px-3 py-2 text-sm h-9 focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/25 transition-colors"
+                    >
+                      <option value="pnl">P&L (Profit &amp; Loss)</option>
+                      <option value="roi">ROI (Return on Investment)</option>
+                      <option value="total_capital">Total Capital</option>
+                      <option value="win_rate">Win Rate</option>
+                      <option value="total_wins">Total Wins</option>
+                      <option value="profit_factor">Profit Factor</option>
+                    </select>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* ─── RIGHT: Rules & Conditions ─── */}
@@ -331,104 +416,118 @@ export default function ChallengeCreateDialog({
                 </span>
               </div>
 
-              {/* Tiebreakers */}
-              <div className="grid grid-cols-2 gap-2.5">
-                <div className="space-y-1.5">
-                  <Label className="text-gray-400 text-xs">Tiebreaker 1</Label>
-                  <select
-                    value={formData.tieBreaker1}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        tieBreaker1: e.target.value,
-                      })
-                    }
-                    className="w-full bg-gray-800/60 border border-gray-700 text-white rounded-md px-2.5 py-2 text-xs h-9 focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/25 transition-colors"
-                  >
-                    <option value="trades_count">Most Trades</option>
-                    <option value="win_rate">Higher Win Rate</option>
-                    <option value="total_capital">Higher Capital</option>
-                    <option value="roi">Higher ROI</option>
-                    <option value="join_time">First to Join</option>
-                    <option value="split_prize">Split Prize</option>
-                  </select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-gray-400 text-xs">
-                    Tiebreaker 2 (Opt.)
-                  </Label>
-                  <select
-                    value={formData.tieBreaker2}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        tieBreaker2: e.target.value,
-                      })
-                    }
-                    className="w-full bg-gray-800/60 border border-gray-700 text-white rounded-md px-2.5 py-2 text-xs h-9 focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/25 transition-colors"
-                  >
-                    <option value="">None</option>
-                    <option value="trades_count">Most Trades</option>
-                    <option value="win_rate">Higher Win Rate</option>
-                    <option value="total_capital">Higher Capital</option>
-                    <option value="roi">Higher ROI</option>
-                    <option value="join_time">First to Join</option>
-                    <option value="split_prize">Split Prize</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Minimum Trades */}
-              <div className="space-y-1.5">
-                <Label className="text-gray-300 flex items-center gap-2 text-sm">
-                  <Target className="h-3.5 w-3.5 text-red-400" />
-                  Minimum Trades to Qualify
-                </Label>
-                <Input
-                  type="number"
-                  min={1}
-                  max={100}
-                  value={formData.minimumTrades}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      minimumTrades: Math.max(
-                        1,
-                        parseInt(e.target.value) || 1,
-                      ),
-                    })
-                  }
-                  className="bg-gray-800/60 border-gray-700 text-white h-9"
-                />
-                <p className="text-[11px] text-gray-500">
-                  Players must complete at least this many trades or get
-                  disqualified
-                </p>
-              </div>
-
-              {/* Disqualify on Liquidation — locked */}
-              <div className="flex items-center justify-between bg-gray-800/40 rounded-xl p-3 border border-gray-700/60">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle className="h-3.5 w-3.5 text-orange-400 shrink-0" />
-                    <span className="text-sm text-gray-300">
-                      Liquidation = Auto-Lose
-                    </span>
-                    <span className="text-[10px] bg-orange-500/20 text-orange-400 px-1.5 py-0.5 rounded font-medium shrink-0">
-                      LOCKED
-                    </span>
+              {selection.type === "trading" ? (
+                <>
+                  {/* Tiebreakers */}
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <div className="space-y-1.5">
+                      <Label className="text-gray-400 text-xs">Tiebreaker 1</Label>
+                      <select
+                        value={formData.tieBreaker1}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            tieBreaker1: e.target.value,
+                          })
+                        }
+                        className="w-full bg-gray-800/60 border border-gray-700 text-white rounded-md px-2.5 py-2 text-xs h-9 focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/25 transition-colors"
+                      >
+                        <option value="trades_count">Most Trades</option>
+                        <option value="win_rate">Higher Win Rate</option>
+                        <option value="total_capital">Higher Capital</option>
+                        <option value="roi">Higher ROI</option>
+                        <option value="join_time">First to Join</option>
+                        <option value="split_prize">Split Prize</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-gray-400 text-xs">
+                        Tiebreaker 2 (Opt.)
+                      </Label>
+                      <select
+                        value={formData.tieBreaker2}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            tieBreaker2: e.target.value,
+                          })
+                        }
+                        className="w-full bg-gray-800/60 border border-gray-700 text-white rounded-md px-2.5 py-2 text-xs h-9 focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/25 transition-colors"
+                      >
+                        <option value="">None</option>
+                        <option value="trades_count">Most Trades</option>
+                        <option value="win_rate">Higher Win Rate</option>
+                        <option value="total_capital">Higher Capital</option>
+                        <option value="roi">Higher ROI</option>
+                        <option value="join_time">First to Join</option>
+                        <option value="split_prize">Split Prize</option>
+                      </select>
+                    </div>
                   </div>
-                  <p className="text-[11px] text-gray-500 mt-1 pl-5.5">
-                    Always enabled for 1v1 challenges
+
+                  {/* Minimum Trades */}
+                  <div className="space-y-1.5">
+                    <Label className="text-gray-300 flex items-center gap-2 text-sm">
+                      <Target className="h-3.5 w-3.5 text-red-400" />
+                      Minimum Trades to Qualify
+                    </Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={100}
+                      value={formData.minimumTrades}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          minimumTrades: Math.max(
+                            1,
+                            parseInt(e.target.value) || 1,
+                          ),
+                        })
+                      }
+                      className="bg-gray-800/60 border-gray-700 text-white h-9"
+                    />
+                    <p className="text-[11px] text-gray-500">
+                      Players must complete at least this many trades or get
+                      disqualified
+                    </p>
+                  </div>
+
+                  {/* Disqualify on Liquidation — locked */}
+                  <div className="flex items-center justify-between bg-gray-800/40 rounded-xl p-3 border border-gray-700/60">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="h-3.5 w-3.5 text-orange-400 shrink-0" />
+                        <span className="text-sm text-gray-300">
+                          Liquidation = Auto-Lose
+                        </span>
+                        <span className="text-[10px] bg-orange-500/20 text-orange-400 px-1.5 py-0.5 rounded font-medium shrink-0">
+                          LOCKED
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-gray-500 mt-1 pl-5.5">
+                        Always enabled for 1v1 challenges
+                      </p>
+                    </div>
+                    <div
+                      className="relative w-10 h-5 rounded-full bg-orange-500/80 cursor-not-allowed shrink-0 ml-3"
+                      title="Locked for challenges"
+                    >
+                      <span className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full translate-x-5 shadow-sm" />
+                    </div>
+                  </div>
+                </>
+              ) : (
+                // Reason: a provider round has no tiebreakers, no trade count and no
+                // liquidation - eligibility is `hasResult` at settlement. What a player
+                // needs to know instead is that both sides see identical content.
+                <div className="flex items-start gap-2.5 bg-gray-800/40 rounded-xl p-3 border border-gray-700/60">
+                  <Trophy className="h-3.5 w-3.5 text-orange-400 mt-0.5 shrink-0" />
+                  <p className="text-xs text-gray-400">
+                    {challengeContentSeedNote(selection)}
                   </p>
                 </div>
-                <div
-                  className="relative w-10 h-5 rounded-full bg-orange-500/80 cursor-not-allowed shrink-0 ml-3"
-                  title="Locked for challenges"
-                >
-                  <span className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full translate-x-5 shadow-sm" />
-                </div>
-              </div>
+              )}
             </div>
           </div>
 
@@ -480,31 +579,35 @@ export default function ChallengeCreateDialog({
           </div>
 
           {/* ═══ Warnings ═══ */}
-          {!marketStatus.loading && !marketStatus.isOpen && (
-            <div className="flex items-start gap-2.5 bg-red-500/10 border border-red-500/25 rounded-xl p-3">
-              <AlertTriangle className="h-4 w-4 text-red-400 mt-0.5 shrink-0" />
-              <div>
-                <p className="text-sm font-semibold text-red-400">
-                  Market Closed
-                </p>
-                <p className="text-xs text-red-300/80 mt-0.5">
-                  {marketStatus.message || "Forex market is currently closed."}{" "}
-                  Challenges cannot be created while the market is closed.
-                </p>
+          {/* Reason: a market-hours check only means anything for a game that trades
+              against a live market. A provider round has none, so gating a provider
+              challenge on the forex market being open would refuse a puzzle at 2am on a
+              Saturday for no reason connected to the game being played. */}
+          {selection.type === "trading" &&
+            !marketStatus.loading &&
+            !marketStatus.isOpen && (
+              <div className="flex items-start gap-2.5 bg-red-500/10 border border-red-500/25 rounded-xl p-3">
+                <AlertTriangle className="h-4 w-4 text-red-400 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold text-red-400">
+                    Market Closed
+                  </p>
+                  <p className="text-xs text-red-300/80 mt-0.5">
+                    {marketStatus.message || "Forex market is currently closed."}{" "}
+                    Challenges cannot be created while the market is closed.
+                  </p>
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
           <div className="flex items-start gap-2.5 bg-yellow-500/5 border border-yellow-500/20 rounded-xl p-3">
             <span className="text-sm shrink-0 mt-px">⚠️</span>
             <p className="text-xs text-yellow-300/80">
-              Credits are only deducted if{" "}
-              <span className="font-semibold text-yellow-300">
-                {challengedUser.username}
-              </span>{" "}
-              accepts. Both players need at least {formData.minimumTrades} trade
-              {formData.minimumTrades > 1 ? "s" : ""} to qualify — otherwise
-              they get disqualified!
+              {challengeQualificationCopy(
+                selection,
+                challengedUser.username,
+                formData.minimumTrades,
+              )}
             </p>
           </div>
         </div>
@@ -520,7 +623,11 @@ export default function ChallengeCreateDialog({
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={loading || formData.entryFee < 1 || !marketStatus.isOpen}
+            disabled={
+              loading ||
+              formData.entryFee < 1 ||
+              (selection.type === "trading" && !marketStatus.isOpen)
+            }
             className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold shadow-lg shadow-orange-500/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
           >
             {loading ? (

@@ -1,4 +1,4 @@
-﻿"use server";
+"use server";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { connectToDatabase } from "@/database/mongoose";
@@ -18,8 +18,12 @@ import {
 } from "@/lib/services/pnl-calculator.service";
 import { getMultipleSymbolConfigs } from "@/lib/services/symbol-config.service";
 import mongoose from "mongoose";
-import { routeToTradingSettlement } from "@/lib/games/settlement";
+import {
+  resolveSettlementPath,
+  routeToTradingSettlement,
+} from "@/lib/games/settlement";
 import { settleChallenge } from "@/lib/services/settlement/challenge-settlement.service";
+import { formatChallengeResultLine } from "@/lib/utils/challenge-result-line";
 
 /**
  * Finalize a single challenge - close positions, determine winner and distribute prizes
@@ -27,6 +31,11 @@ import { settleChallenge } from "@/lib/services/settlement/challenge-settlement.
  *
  * X1 seam 3: the game dispatch lives HERE rather than at the call sites, so every caller
  * is correct by construction, including ones nobody has written yet.
+ *
+ * A PROVIDER CHALLENGE SETTLES THROUGH `finalizeProviderChallenge`, mirroring the main
+ * app's three-way dispatch exactly. `routeToTradingSettlement` stays below, inside
+ * `_finalizeChallengeAttempt`, as the defence-in-depth check that runs after the lock in
+ * case something ever calls the private attempt function directly.
  */
 export async function finalizeChallenge(challengeId: string) {
   const MAX_RETRIES = 3;
@@ -39,12 +48,16 @@ export async function finalizeChallenge(challengeId: string) {
     .lean<{ gameType?: string } | null>();
 
   if (label) {
-    const route = routeToTradingSettlement(
-      label.gameType,
-      `challenge ${challengeId}`,
-    );
+    const route = resolveSettlementPath(label.gameType, `challenge ${challengeId}`);
 
-    if (!route.ok) {
+    if (route.path === "provider") {
+      const { finalizeProviderChallenge } = await import(
+        "@/lib/services/settlement/provider-challenge-finalize"
+      );
+      return await finalizeProviderChallenge(challengeId);
+    }
+
+    if (route.path === "none") {
       console.error(`❌ [CHALLENGE] ${route.error}`);
       return { success: false, error: route.error };
     }
@@ -581,7 +594,7 @@ async function _finalizeChallengeAttempt(challengeId: string) {
               challengeId: challenge._id.toString(),
               opponentName: loserName || "opponent",
               prize: winnerPrize,
-              pnl: winnerPnL?.toFixed(2) || "0",
+              resultLine: formatChallengeResultLine(challenge.gameType, winnerPnL),
             },
           })
           .catch((e) =>
@@ -597,7 +610,7 @@ async function _finalizeChallengeAttempt(challengeId: string) {
               variables: {
                 challengeId: challenge._id.toString(),
                 opponentName: winnerName || "opponent",
-                pnl: loserPnL?.toFixed(2) || "0",
+                resultLine: formatChallengeResultLine(challenge.gameType, loserPnL),
               },
             })
             .catch((e) =>

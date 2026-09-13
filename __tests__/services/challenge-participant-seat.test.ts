@@ -126,6 +126,119 @@ describe("a challenge seat records an entry, not a result", () => {
   });
 });
 
+describe("the capital fields are conditional on gameKey, mirroring the competition-side builder", () => {
+  it("omits all three capital fields entirely for a provider participant", () => {
+    /*
+      OMITTED, NOT WRITTEN AS `undefined`. The header is explicit that this matches
+      `CompetitionParticipant`'s own builder - a key present with an `undefined` value still
+      shows up in `Object.keys`, which is exactly what the "declares every key it writes"
+      test above would need to catch if this regressed to writing the three fields anyway.
+    */
+    const provider = seat({
+      gameKey: "provider:acme:trivia-blitz",
+      startingCapital: 10000,
+    });
+
+    expect(provider).not.toHaveProperty("startingCapital");
+    expect(provider).not.toHaveProperty("currentCapital");
+    expect(provider).not.toHaveProperty("availableCapital");
+  });
+
+  it("a provider participant validates cleanly with no capital fields at all", () => {
+    // BEHAVIOURAL, THROUGH THE REAL MODEL. The schema's `required` predicate reads
+    // `this.gameKey`, so this is the one assertion that would fail if either copy's
+    // predicate were ever narrowed back to an unconditional `required: true`.
+    const doc = new ChallengeParticipant(
+      seat({ gameKey: "provider:acme:trivia-blitz", startingCapital: undefined }),
+    );
+    const errors = doc.validateSync()?.errors ?? {};
+
+    expect(errors.startingCapital).toBeUndefined();
+    expect(errors.currentCapital).toBeUndefined();
+    expect(errors.availableCapital).toBeUndefined();
+  });
+
+  it("still seats all three capital fields, all equal to the starting figure, for a trading participant", () => {
+    const trading = seat({ gameKey: "trading", startingCapital: 25000 });
+
+    expect(trading.startingCapital).toBe(25000);
+    expect(trading.currentCapital).toBe(25000);
+    expect(trading.availableCapital).toBe(25000);
+  });
+
+  it("a trading participant FAILS validation with no capital fields - the omission is provider-only", () => {
+    // The mirror image of the provider test above: proves the conditional cuts both ways,
+    // rather than the three fields having quietly become optional for everyone. Built from
+    // the RAW seat rather than through the builder deliberately - the builder's own
+    // `input.startingCapital ?? 0` fallback exists precisely so this never happens in
+    // practice, so going through it here would test the builder's default instead of the
+    // schema's own guard.
+    const raw = seat({ gameKey: "trading" });
+    delete (raw as Record<string, unknown>).startingCapital;
+    delete (raw as Record<string, unknown>).currentCapital;
+    delete (raw as Record<string, unknown>).availableCapital;
+
+    const doc = new ChallengeParticipant(raw);
+    const errors = doc.validateSync()?.errors ?? {};
+
+    expect(errors.startingCapital).toBeDefined();
+    expect(errors.currentCapital).toBeDefined();
+    expect(errors.availableCapital).toBeDefined();
+  });
+
+  it("defaults an unsupplied startingCapital to 0 for a trading participant, never to undefined", () => {
+    // `input.startingCapital ?? 0` in the builder - a trading seat with no starting figure at
+    // all (should not happen in practice, since the accept route always passes the
+    // challenge's own value) must still produce a valid document rather than one relying on
+    // the schema's own absent-field rejection to catch a missing number.
+    const trading = seat({ gameKey: "trading", startingCapital: null });
+
+    expect(trading.startingCapital).toBe(0);
+    expect(trading.currentCapital).toBe(0);
+    expect(trading.availableCapital).toBe(0);
+  });
+
+  it("the admin copy's capital-field REQUIRED PREDICATE matches the main copy byte-for-byte", () => {
+    /*
+      `check:mirrors` COMPARES FIELD PATHS AND ENUM VALUES, NEVER A PREDICATE BODY - the same
+      gap the games-plan rule names for `Competition`'s conditional `startingCapital`. A
+      predicate that differs between the two apps is a validation rule whose outcome depends
+      on which process saved the document, and the model-mirror guard would stay green
+      throughout.
+    */
+    const main = stripComments(
+      readFileSync(
+        join(ROOT, "database", "models", "trading", "challenge-participant.model.ts"),
+        "utf8",
+      ),
+    );
+    const admin = stripComments(
+      readFileSync(
+        join(
+          ROOT,
+          "apps",
+          "admin",
+          "database",
+          "models",
+          "trading",
+          "challenge-participant.model.ts",
+        ),
+        "utf8",
+      ),
+    );
+
+    const predicate =
+      /required:\s*function\s*\(this:\s*\{\s*gameKey\?:\s*string\s*\}\)\s*\{\s*return\s*\(this\.gameKey\s*\|\|\s*"trading"\)\s*===\s*"trading";\s*\}/g;
+
+    const mainMatches = main.match(predicate) ?? [];
+    const adminMatches = admin.match(predicate) ?? [];
+
+    // Three fields, three predicates, in both copies.
+    expect(mainMatches).toHaveLength(3);
+    expect(adminMatches).toHaveLength(3);
+  });
+});
+
 describe("both schema copies leave score without a default", () => {
   it("the admin copy matches the main copy after comments, so a default cannot hide in one", () => {
     /*

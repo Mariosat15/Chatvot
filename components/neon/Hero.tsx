@@ -139,5 +139,49 @@ export function NeonStatusBadge({ status }: { status: string }) {
     );
   }
 
+  /*
+    The three below exist for challenges, which a competition never reaches: nothing here
+    contradicts the reasoning above the `draft` note, since a challenge's `pending`/`declined`/
+    `expired` states ARE player-visible (to the two people party to it) rather than admin-only.
+  */
+  if (status === "pending") {
+    return (
+      <span className="mb-4 inline-flex items-center gap-2 rounded-full border border-yellow-400/40 bg-yellow-500/20 px-3 py-1 text-xs font-bold uppercase tracking-wide text-yellow-300 backdrop-blur-sm">
+        Awaiting response
+      </span>
+    );
+  }
+
+  if (status === "declined") {
+    return (
+      <span className="mb-4 inline-flex items-center gap-2 rounded-full border border-rose-400/40 bg-rose-500/20 px-3 py-1 text-xs font-bold uppercase tracking-wide text-rose-300 backdrop-blur-sm">
+        Declined
+      </span>
+    );
+  }
+
+  if (status === "expired") {
+    return (
+      <span className="mb-4 inline-flex items-center gap-2 rounded-full border border-rose-400/40 bg-rose-500/20 px-3 py-1 text-xs font-bold uppercase tracking-wide text-rose-300 backdrop-blur-sm">
+        Expired
+      </span>
+    );
+  }
+
+  /*
+    A competition and a challenge both pass through this state while the optimistic lock holds
+    it - see the pre-lock/post-lock gate note in the settlement services. Distinct from
+    "completed" because nothing has been paid yet; a player refreshing mid-settlement should not
+    read "Completed" over a screen with no results on it.
+  */
+  if (status === "finalizing") {
+    return (
+      <span className="mb-4 inline-flex items-center gap-2 rounded-full border border-sky-400/40 bg-sky-500/20 px-3 py-1 text-xs font-bold uppercase tracking-wide text-sky-300 backdrop-blur-sm">
+        <span className="h-2 w-2 animate-pulse rounded-full bg-sky-400" />
+        Finalizing
+      </span>
+    );
+  }
+
   return null;
 }

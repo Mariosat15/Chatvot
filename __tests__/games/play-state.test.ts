@@ -36,6 +36,8 @@ import { attemptsPermitted } from "../../lib/services/games/round.service";
 
 const PLAYER = "68b5c1a2d4e5f60718293a4b";
 const RIVAL = "68b5c1a2d4e5f60718293a4c";
+// Long enough that it cannot occur by chance inside a generated round id - see the leak test.
+const RIVAL_SCORE = 987_654_321;
 
 async function seedContest(
   overrides: Record<string, unknown> = {},
@@ -140,10 +142,10 @@ describe("reading a player's own play state", () => {
   it("never returns another player's rounds or score", async () => {
     const contestId = await seedContest();
     await seatPlayer(contestId, PLAYER, 100);
-    await seatPlayer(contestId, RIVAL, 999);
+    await seatPlayer(contestId, RIVAL, RIVAL_SCORE);
 
     await seedRound(contestId, PLAYER, 1, "completed", 100);
-    await seedRound(contestId, RIVAL, 1, "completed", 999);
+    await seedRound(contestId, RIVAL, 1, "completed", RIVAL_SCORE);
 
     const outcome = await getPlayState(contestId.toString(), PLAYER);
     expect(outcome.success).toBe(true);
@@ -154,7 +156,12 @@ describe("reading a player's own play state", () => {
     expect(outcome.state.participantScore).toBe(100);
 
     // The rival's number must appear nowhere in the payload, not merely not in `rounds`.
-    expect(JSON.stringify(outcome.state)).not.toContain("999");
+    //
+    // Reason the score is a long, distinctive number rather than `999`: this assertion reads the
+    // WHOLE serialised payload, which carries generated round ids, and a base-36 id containing
+    // "999" by chance failed this test with no leak of any kind. A short number is not a
+    // distinctive one once it is matched as a substring of arbitrary text.
+    expect(JSON.stringify(outcome.state)).not.toContain(String(RIVAL_SCORE));
   });
 
   /**

@@ -1102,7 +1102,7 @@ function getDefaultTemplates(): Partial<INotificationTemplate>[] {
       type: "challenge_won",
       title: "🏆 You Won the Challenge!",
       message:
-        "Congratulations! You defeated {{opponentName}} and won {{prize}} credits! Final P&L: {{pnl}}",
+        "Congratulations! You defeated {{opponentName}} and won {{prize}} credits! {{resultLine}}",
       icon: "🏆",
       priority: "high",
       color: "#F59E0B",
@@ -1121,7 +1121,7 @@ function getDefaultTemplates(): Partial<INotificationTemplate>[] {
       type: "challenge_lost",
       title: "😞 Challenge Lost",
       message:
-        "{{opponentName}} won this battle. Final P&L: {{pnl}}. Don't give up - challenge them to a rematch!",
+        "{{opponentName}} won this battle. {{resultLine}}. Don't give up - challenge them to a rematch!",
       icon: "😞",
       priority: "normal",
       color: "#EF4444",

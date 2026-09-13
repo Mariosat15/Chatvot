@@ -24,6 +24,8 @@ import InlineCountdown from "@/components/trading/InlineCountdown";
 import LiveCountdown from "@/components/trading/LiveCountdown";
 import ChallengeStatusMonitor from "@/components/trading/ChallengeStatusMonitor";
 import ChallengeEntryActions from "@/components/trading/ChallengeEntryActions";
+import ProviderChallengeLobby from "@/components/games/ProviderChallengeLobby";
+import { hasProviderChallengeGameLabel } from "@/lib/services/games/challenge-round-config";
 import { notFound, redirect } from "next/navigation";
 import { unstable_noStore as noStore } from "next/cache";
 
@@ -118,10 +120,38 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
     }
 
     // Get participants and risk settings in parallel (both independent after challenge validation)
-    const [_participants, _riskSettings] = await Promise.all([
+    const [participants, _riskSettings] = await Promise.all([
       ChallengeParticipant.find({ challengeId: id }).lean(),
       getTradingRiskSettings(),
     ]);
+
+    /*
+      THE GAME BRANCH, mirroring `/competitions/[id]`'s: checked on the LOOSE label
+      (`hasProviderChallengeGameLabel`, `gameType === "provider"` alone) rather than the strict
+      `isProviderChallenge`, because a labelled challenge with no provider keys is still not a
+      trading challenge - it needs `ProviderChallengeLobby`'s own warning card, not the trading
+      page's stats, tie-breakers and leverage settings, none of which a provider game has.
+
+      Returning here means none of the trading-specific computation below runs for a provider
+      challenge, and the trading path beneath this branch is otherwise untouched - which is what
+      keeps the existing challenge page's behaviour trustworthy evidence that nothing moved.
+    */
+    if (hasProviderChallengeGameLabel(challenge)) {
+      return (
+        <>
+          <ChallengeStatusMonitor
+            challengeId={id}
+            initialStatus={challenge.status}
+            userId={session.user.id}
+          />
+          <ProviderChallengeLobby
+            challenge={challenge}
+            participants={participants}
+            userId={session.user.id}
+          />
+        </>
+      );
+    }
 
     const isChallenger = challenge.challengerId === session.user.id;
     const isChallenged = challenge.challengedId === session.user.id;
@@ -500,13 +530,13 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
                   <div className="flex items-center justify-between">
                     <span className="text-gray-400">Ranking Method:</span>
                     <span className="font-semibold text-blue-400">
-                      {/* eslint-disable-next-line security/detect-object-injection */}
+                      { }
                       {RANKING_LABELS[challenge.rules?.rankingMethod] ||
                         "Highest P&L"}
                     </span>
                   </div>
                   <p className="text-[11px] text-gray-500 mt-0.5">
-                    {/* eslint-disable-next-line security/detect-object-injection */}
+                    { }
                     {RANKING_DESCRIPTIONS[challenge.rules?.rankingMethod] ||
                       "Winner is determined by total profit & loss."}
                   </p>
@@ -518,13 +548,13 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
                     <div className="flex items-center justify-between">
                       <span className="text-gray-400">Tie Breaker 1:</span>
                       <span className="font-semibold text-purple-400">
-                        {/* eslint-disable-next-line security/detect-object-injection */}
+                        { }
                         {TIEBREAKER_LABELS[challenge.rules.tieBreaker1] ||
                           challenge.rules.tieBreaker1}
                       </span>
                     </div>
                     <p className="text-[11px] text-gray-500 mt-0.5">
-                      {/* eslint-disable-next-line security/detect-object-injection */}
+                      { }
                       If tied, {(TIEBREAKER_DESCRIPTIONS[challenge.rules.tieBreaker1] ||
                         "used to break ties in the ranking.").toLowerCase()}
                     </p>
@@ -537,13 +567,13 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
                     <div className="flex items-center justify-between">
                       <span className="text-gray-400">Tie Breaker 2:</span>
                       <span className="font-semibold text-purple-400">
-                        {/* eslint-disable-next-line security/detect-object-injection */}
+                        { }
                         {TIEBREAKER_LABELS[challenge.rules.tieBreaker2] ||
                           challenge.rules.tieBreaker2}
                       </span>
                     </div>
                     <p className="text-[11px] text-gray-500 mt-0.5">
-                      {/* eslint-disable-next-line security/detect-object-injection */}
+                      { }
                       If still tied, {(TIEBREAKER_DESCRIPTIONS[challenge.rules.tieBreaker2] ||
                         "used as a secondary tie breaker.").toLowerCase()}
                     </p>

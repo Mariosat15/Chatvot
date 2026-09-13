@@ -248,6 +248,27 @@ describe("the two apps stay in step", () => {
     }
   });
 
+  it("the provider CHALLENGE settlement stack is byte-identical in both apps", () => {
+    // Reason: same shape as the block above, extended to the challenge finalize path added
+    // alongside the challenge game picker. None of these files import a Mongoose model that
+    // differs between the two apps' instances, so a text comparison is both sufficient and the
+    // only guard available - `check:mirrors` compares models, not services.
+    for (const file of [
+      "services/settlement/provider-challenge-finalize.ts",
+      "services/settlement/challenge-settlement.service.ts",
+      "services/settlement/round-cutoff.ts",
+      "services/settlement/unresolved-rounds.ts",
+      "services/games/contest-round-cleanup.ts",
+      "services/games/challenge-window.ts",
+      "utils/challenge-result-line.ts",
+    ]) {
+      expect(
+        sourceOf(`apps/admin/lib/${file}`),
+        `apps/admin/lib/${file} has drifted from lib/${file}`,
+      ).toBe(sourceOf(`lib/${file}`));
+    }
+  });
+
   it("both ranking services dispatch through the registry", () => {
     for (const file of [
       "lib/services/competition-ranking.service.ts",

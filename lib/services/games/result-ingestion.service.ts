@@ -483,7 +483,7 @@ export async function applyResult(args: {
   // and the score would still be missing. Loud log instead, and the recomputation is
   // self-healing: any later result for the same player recomputes from scratch, and the
   // round inspector can force a re-sync.
-  if (!scoreSync.synced && round.contestType === "competition") {
+  if (!scoreSync.synced && (round.contestType === "competition" || round.contestType === "challenge")) {
     console.error(
       `❌ Round ${round.roundId} scored but the participant score was not updated: ${scoreSync.reason}`,
     );

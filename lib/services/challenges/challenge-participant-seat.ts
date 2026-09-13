@@ -24,13 +24,14 @@ import { TRADING_GAME_TYPE } from "@/lib/games";
  * `gameKey` is immutable, an aggregate that groups by it files the player under the wrong
  * game for ever. That is R7's harm, one model along.
  *
- * THE CAPITAL FIELDS ARE STILL UNCONDITIONAL, DELIBERATELY. `startingCapital`,
- * `currentCapital` and `availableCapital` remain `required: true` with no default on both
- * copies of the challenge participant model, so omitting them for a provider game would fail
- * validation rather than produce a game-shaped seat. Making them conditional is a change to
- * TRADING's contract and belongs with the step that actually seats a provider challenge -
- * the same order in which the competition model got `score` in X1 and conditional capital in
- * X5. Until then this builder is honest about being trading-shaped below the label.
+ * THE CAPITAL FIELDS ARE NOW CONDITIONAL, mirroring `buildParticipantSeat`'s competition-side
+ * equivalent. This paragraph used to say they were "still unconditional, deliberately" -
+ * that was true only until this step, which is the "step that actually seats a provider
+ * challenge" the old wording named and deferred to. The old sentence is corrected in place
+ * rather than deleted, because it explained the sequencing this step completes: the model
+ * (`startingCapital`, `currentCapital`, `availableCapital` on `ChallengeParticipant`) went
+ * conditional on `gameKey` first, and a provider participant is now seated with none of the
+ * three, exactly as `CompetitionParticipant`'s builder omits them for a provider entry.
  */
 
 export interface ChallengeParticipantSeatInput {
@@ -40,14 +41,18 @@ export interface ChallengeParticipantSeatInput {
   email: string;
   role: "challenger" | "challenged";
   gameKey?: string | null;
-  startingCapital: number;
+  /** Absent for a provider participant - the model requires it only when `gameKey` is trading. */
+  startingCapital?: number | null;
   joinedAt: Date;
 }
 
 export function buildChallengeParticipantSeat(
   input: ChallengeParticipantSeatInput,
 ): Record<string, unknown> {
-  return {
+  const gameKey = input.gameKey || TRADING_GAME_TYPE;
+  const isTrading = gameKey === TRADING_GAME_TYPE;
+
+  const seat: Record<string, unknown> = {
     challengeId: input.challengeId,
     userId: input.userId,
     username: input.username,
@@ -55,13 +60,24 @@ export function buildChallengeParticipantSeat(
     role: input.role,
 
     // Never defaulted. See the header - a defaulted label is a wrong label.
-    gameKey: input.gameKey || TRADING_GAME_TYPE,
+    gameKey,
 
     // NO `score`. See the header, and the schema path that used to default it.
 
-    startingCapital: input.startingCapital,
-    currentCapital: input.startingCapital,
-    availableCapital: input.startingCapital,
     joinedAt: input.joinedAt,
+  };
+
+  // Trading only, from here down - the three capital fields have no meaning for a game
+  // where the provider reports a single score. Omitted entirely rather than written as
+  // `undefined`, matching CompetitionParticipant's own seat builder.
+  if (!isTrading) return seat;
+
+  const capital = input.startingCapital ?? 0;
+
+  return {
+    ...seat,
+    startingCapital: capital,
+    currentCapital: capital,
+    availableCapital: capital,
   };
 }

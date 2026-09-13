@@ -11,6 +11,7 @@ import { canJoinChallenge } from "@/lib/services/market-hours.service";
 import { checkAccountStanding } from "@/lib/services/contest-entry/guards";
 import { gameNeedsMarketHours } from "@/lib/games";
 import { buildChallengeParticipantSeat } from "@/lib/services/challenges/challenge-participant-seat";
+import { randomBytes } from "crypto";
 
 // POST - Accept a challenge
 export async function POST(
@@ -259,6 +260,18 @@ export async function POST(
     challenge.acceptedAt = now;
     challenge.startTime = now;
     challenge.endTime = endTime;
+
+    // Reason: a provider challenge's content seed is generated HERE, at acceptance, not at
+    // creation - both the challenger and challenged ids are already known at creation, but
+    // the model's own comment is explicit that it is "generated once at acceptance and
+    // shared by both players, so they face the same content". Left unset, each side's round
+    // would ask the provider for independent content, which defeats the reason a 1v1 needs
+    // one seed at all: a puzzle-based challenge must not let one side draw an easier board
+    // than the other. Trading has no `gameConfig`, so this is a no-op for it.
+    if (challenge.gameConfig) {
+      challenge.contentSeed = randomBytes(16).toString("hex");
+    }
+
     await challenge.save({ session: dbSession });
 
     // Create participants (ordered: true required for session with multiple docs)

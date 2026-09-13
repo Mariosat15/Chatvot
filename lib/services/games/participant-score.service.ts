@@ -4,6 +4,8 @@ import GameRound, {
 } from "@/database/models/games/game-round.model";
 import Competition from "@/database/models/trading/competition.model";
 import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
+import Challenge from "@/database/models/trading/challenge.model";
+import ChallengeParticipant from "@/database/models/trading/challenge-participant.model";
 import type { ProviderScoreDirection } from "@/lib/services/game-providers/contract";
 import {
   SCORE_PRODUCING_ROUND_STATUSES,
@@ -159,10 +161,19 @@ export function combineRoundScores(
 }
 
 /**
- * Recompute and store one participant's score for a provider contest.
+ * Recompute and store one participant's score for a provider contest OR challenge.
  *
  * Called only from `applyResult`, and only AFTER the round has been saved - the recomputation
  * reads persisted rounds, so running it first would silently omit the result being ingested.
+ *
+ * BRANCHES ON `contestType` RATHER THAN BEING TWO FUNCTIONS, deliberately - the two paths
+ * differ only in which model holds the attempts policy and which model holds the participant
+ * row, and every piece of arithmetic above this point (`SCORING_ROUND_STATUSES`,
+ * `combineRoundScores`, the nothing-contributed distinction) is shared unchanged. Splitting
+ * it into `syncParticipantScore` and `syncChallengeParticipantScore` would duplicate the one
+ * subtle rule this file exists to hold in one place - the "one rule, two copies" shape this
+ * codebase keeps finding - for a caller (gate 11b) that already knows which kind of contest
+ * it has and would have to call the right one anyway.
  */
 export async function syncParticipantScore(input: {
   contestId: mongoose.Types.ObjectId | null | undefined;
@@ -173,9 +184,7 @@ export async function syncParticipantScore(input: {
   const { contestId, userId, contestType, scoreDirection } = input;
 
   // Practice is free, unranked and prize-less, so it has no participant row to write to.
-  // A challenge is exactly two players and is tracked on the `Challenge` model, not on
-  // `CompetitionParticipant` - provider challenges are E8 and deliberately out of scope.
-  if (contestType !== "competition") {
+  if (contestType !== "competition" && contestType !== "challenge") {
     return { synced: false, reason: `contest type "${contestType}" has no participant row` };
   }
 
@@ -183,9 +192,15 @@ export async function syncParticipantScore(input: {
     return { synced: false, reason: "round carries no contest id" };
   }
 
-  const contest = await Competition.findById(contestId)
-    .select("attemptsPolicy gameType")
-    .lean<{ attemptsPolicy?: string; gameType?: string } | null>();
+  const isChallenge = contestType === "challenge";
+
+  const contest = isChallenge
+    ? await Challenge.findById(contestId)
+        .select("attemptsPolicy gameType")
+        .lean<{ attemptsPolicy?: string; gameType?: string } | null>()
+    : await Competition.findById(contestId)
+        .select("attemptsPolicy gameType")
+        .lean<{ attemptsPolicy?: string; gameType?: string } | null>();
 
   if (!contest) {
     return { synced: false, reason: "contest not found" };
@@ -245,11 +260,19 @@ export async function syncParticipantScore(input: {
   // hold different directions if a title is corrected mid-contest, so half the leaderboard
   // negates and half does not. A uniformly wrong direction is at least coherent and visibly
   // wrong; an incoherent one looks plausible and cannot be explained to a player.
-  const updated = await CompetitionParticipant.findOneAndUpdate(
-    { competitionId: contestId, userId },
-    contributed ? { $set: { score } } : { $unset: { score: "" } },
-    { new: true },
-  );
+  const update = contributed ? { $set: { score } } : { $unset: { score: "" } };
+
+  const updated = isChallenge
+    ? await ChallengeParticipant.findOneAndUpdate(
+        { challengeId: contestId, userId },
+        update,
+        { new: true },
+      )
+    : await CompetitionParticipant.findOneAndUpdate(
+        { competitionId: contestId, userId },
+        update,
+        { new: true },
+      );
 
   if (!updated) {
     return { synced: false, reason: "no participant row for this user in this contest" };

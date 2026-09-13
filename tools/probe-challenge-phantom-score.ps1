@@ -168,18 +168,22 @@ Invoke-Probe -Name 'the seat names the field again, seen through the model' -Fil
 Write-Host ''
 Write-Host '=== The label, which a defaulted seat gets wrong in silence ===' -ForegroundColor Cyan
 
-# A seat that omits `gameKey` is stamped "trading" by the schema default. Nothing throws, the row
-# saves, and because `gameKey` is immutable the player is filed under the wrong game for ever.
+# A seat that omits the `gameKey` KEY is stamped "trading" by the schema default when saved.
+# Nothing throws, the row saves, and because `gameKey` is immutable the player is filed under
+# the wrong game for ever. Targets the shorthand property in the object literal rather than the
+# `const gameKey = ...` computation above it (extracted since this probe was last verified, to
+# feed `isTrading` too) - deleting the whole computation would throw a ReferenceError at every
+# call site instead of producing the single, specific wrong value this probe is about.
 Invoke-Probe -Name 'the label falls back to the schema default' -File $Seat `
-  -Find '    gameKey: input.gameKey || TRADING_GAME_TYPE,' `
+  -Find '    gameKey,' `
   -Replace '' `
   -ExpectTest 'copies the game label from the challenge rather than letting it default'
 
 # The `||` catches three shapes of missing - absent, null and empty string - and `??` catches
 # one. An empty label is what a half-run migration and a form submitting nothing both leave.
 Invoke-Probe -Name 'the fallback stops catching an empty label' -File $Seat `
-  -Find '    gameKey: input.gameKey || TRADING_GAME_TYPE,' `
-  -Replace '    gameKey: input.gameKey ?? TRADING_GAME_TYPE,' `
+  -Find '  const gameKey = input.gameKey || TRADING_GAME_TYPE;' `
+  -Replace '  const gameKey = input.gameKey ?? TRADING_GAME_TYPE;' `
   -ExpectTest 'falls back to trading for an absent or empty label'
 
 Write-Host ''
@@ -250,5 +254,73 @@ Invoke-Probe -Name 'the admin schema default is restored' `
     },
 '@ `
   -ExpectTest 'the admin copy matches the main copy after comments'
+
+Write-Host ''
+Write-Host '=== The capital fields, conditional on gameKey since the step that seated a provider challenge ===' -ForegroundColor Cyan
+
+# THE BUILDER'S OWN GUARD. Deleting the early return makes every seat, provider included, fall
+# through to the trading branch and pick up all three capital fields - a control that appears
+# to work (the fields still read as numbers) and silently costs the "provider participant has
+# no capital" guarantee `CompetitionParticipant`'s own builder carries.
+Invoke-Probe -Name 'the isTrading early return is removed, so a provider seat gets capital fields anyway' -File $Seat `
+  -Find '  if (!isTrading) return seat;' `
+  -Replace '' `
+  -ExpectTest 'omits all three capital fields entirely for a provider participant'
+
+# THE SCHEMA'S OWN GUARD, MAIN COPY. Reverting the predicate to an unconditional `required: true`
+# is the direct sibling of the score-default mutation above, on the field that was ALREADY
+# conditional before this step and is the reason a provider participant can be saved at all.
+Invoke-Probe -Name 'startingCapital reverts to unconditionally required on the main model' -File $Model `
+  -Find @'
+    startingCapital: {
+      type: Number,
+      required: function (this: { gameKey?: string }) {
+        return (this.gameKey || "trading") === "trading";
+      },
+      min: 0,
+    },
+'@ `
+  -Replace @'
+    startingCapital: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+'@ `
+  -ExpectTest 'a provider participant validates cleanly with no capital fields at all'
+
+# THE SAME MUTATION, ADMIN COPY. `check:mirrors` compares field paths and enum values, never a
+# predicate body, so this would leave that guard green - it is caught only by the byte-for-byte
+# text comparison, which is why that test counts three matches in EACH file rather than merely
+# asserting the pattern exists once somewhere.
+Invoke-Probe -Name 'startingCapital reverts to unconditionally required on the admin model' `
+  -File 'apps/admin/database/models/trading/challenge-participant.model.ts' `
+  -Find @'
+    startingCapital: {
+      type: Number,
+      required: function (this: { gameKey?: string }) {
+        return (this.gameKey || "trading") === "trading";
+      },
+      min: 0,
+    },
+'@ `
+  -Replace @'
+    startingCapital: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+'@ `
+  -ExpectTest "the admin copy's capital-field REQUIRED PREDICATE matches the main copy byte-for-byte"
+
+# THE FALLBACK THAT KEEPS A TRADING SEAT NUMERIC. `input.startingCapital ?? 0` is what stops an
+# unsupplied figure from reaching the model as `undefined` - dropping it to a bare pass-through
+# would not fail loudly, since `undefined` still satisfies "a number was requested" right up
+# until the schema's OWN required check fires, at which point the failure reads as a missing
+# challenge field rather than a builder regression.
+Invoke-Probe -Name 'the ?? 0 fallback on startingCapital is removed' -File $Seat `
+  -Find '  const capital = input.startingCapital ?? 0;' `
+  -Replace '  const capital = input.startingCapital;' `
+  -ExpectTest 'defaults an unsupplied startingCapital to 0 for a trading participant, never to undefined'
 
 Write-Host ''

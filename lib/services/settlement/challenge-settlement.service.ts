@@ -351,6 +351,12 @@ export async function settleChallenge({
     prizeAmount: 0, // filled in by payContestPrizes
     pnl: p.pnl,
     finalCapital: p.currentCapital,
+    // Reason: matches `provider-settlement.service.ts`'s leaderboard exactly. Without this,
+    // `buildWinMetadata` (whose own comment says a provider row carries `finalScore`
+    // instead of `finalPnl`/`finalCapital`) had nothing to read, so a provider challenge
+    // winner's wallet transaction recorded no score at all - a number-shaped hole in the
+    // audit trail for the one game family where `pnl`/`finalCapital` are never set.
+    score: p.score,
     qualificationStatus: p.status === "disqualified" ? "disqualified" : "qualified",
     disqualificationReason: p.disqualificationReason,
   }));

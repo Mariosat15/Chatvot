@@ -743,15 +743,29 @@ and neither should be folded into a task above:
   and not a tidy-up. Recorded at the foot of `lib/utils/format-volts.ts`.
 - **Tasks 15/16 optimise on upload only** and leave existing files alone.
 
-**The challenges FLOW is still not started and is gated behind this list** - picking
-trading-or-game, then a title, then a setup page adapting to that title's shape. **R50's
-challenge half is closed, 12 September 2026:** `ChallengeParticipant.score` no longer
-defaults, the accept route's builder writes no `score` key, and the pinning test was
-flipped rather than deleted. **The read path is still not built** - neither
-`challenge-finalize.actions.ts` copy mentions `score` - so a document implying a challenge
-now ranks on score is wrong. No challenge migration: every existing seat is a trading seat
-and finalization never reads the field. The three capital fields stay unconditionally
-required until a provider challenge is actually seated.
+**THE CHALLENGES FLOW IS BUILT AS OF 13 SEPTEMBER 2026**, and the two sentences that used to
+sit here - that the flow was not started, and that the score read path did not exist - are
+correct as history and stale as present facts, so **say which**. A player can now pick
+trading or a game in `ChallengeCreateDialog`, pick a title, be issued a round on
+`/challenges/[id]/play`, have that round's score carried to `ChallengeParticipant.score`, and
+be paid on it. **R50's challenge half closed on 12 September** (`score` no longer defaults,
+the accept route's builder writes no `score` key, the pinning test flipped rather than
+deleted) and **the read path closed on 13 September** through
+`lib/services/settlement/challenge-settlement.service.ts` (mirrored), which resolves the
+direction from the catalogue by `resolveScoreDirection` and admits a seat by the module's own
+`hasResult` rather than by whether a number is present. **No challenge migration**, for the
+same reason as before: every existing seat is a trading seat, and trading's `hasResult` is
+unconditionally true, so a stored zero on an old row is inert. **The three capital fields are
+now conditional on the game**, written explicitly by `buildChallengeParticipantSeat`, because
+a provider challenge participant could not otherwise be saved at all - the trap X5 found on
+`CompetitionParticipant`, one model along.
+
+**What is NOT built, and must not be summarised as done:** the opponent picker and open
+challenges (X10 proper - a challenge is still a direct invitation to a named
+`challengedId`), per-game willingness (`UserPresence.acceptingChallenges` is still one
+platform-wide boolean), and challenge matchmaking (X11.5). A **simultaneous** title is still
+not challengeable at all, by the 8 September owner decision, which `supportsOneVsOne`
+already expresses.
 
 **Say which half, because the two are in opposite states and a summary tends to merge them.**
 The **data model is ready and has been since X1**: `Challenge` carries `gameType` and an
@@ -784,6 +798,77 @@ Newest at the top.
 **Deferred:** what was consciously left for later
 **Next chat should:** the single clearest next action
 ```
+
+---
+
+### 13 Sep 2026 - A PROVIDER GAME CAN BE CHALLENGED, END TO END
+
+**Shipped:** the challenges flow, from picking a game to being paid on a score. A player picks
+trading or a game in `ChallengeCreateDialog` through a new `ChallengeGamePicker`, backed by
+`challengeable-titles.service.ts` and `GET /api/challenges/games`; `POST /api/challenges`
+resolves the title by lookup key, runs the pre-flight in `format: "challenge"` and refuses an
+unchallengeable one; the accept route derives the play window from a single producer
+(`challenge-window.ts`, mirrored) and seats both players through
+`buildChallengeParticipantSeat` with the capital fields written **explicitly per game**; the
+lobby, `/challenges/[id]/play` and the round host issue and host a real round; gate 11b of the
+single ingestion door carries the score to `ChallengeParticipant.score`; and
+`challenge-settlement.service.ts` (mirrored) ranks on it.
+
+**The score read path is the half that decides money**, and it is where every guard went:
+the direction is resolved **once per challenge** from the catalogue by `resolveScoreDirection`
+- never stored per row, on the R32/R33 reasoning that two rows in one board must not be able
+to disagree - and eligibility is the module's own `hasResult`, so a stored zero is refused
+while a title declaring `zeroIsValidResult` admits one. The trade floor and the liquidation
+rule stayed where they were, and **only the trade floor is scoped to trading**: liquidation is
+game-agnostic, which a probe proved by asking the opposite question and coming back green.
+
+**Files touched:** the significant ones are `lib/services/games/challengeable-titles.service.ts`,
+`challenge-provider-resolution.ts`, `challenge-round-launch.service.ts`,
+`challenge-round-status.service.ts`, `challenge-window.ts` (mirrored),
+`challenge-round-config.ts`, `challenge-results.service.ts`,
+`lib/services/settlement/challenge-settlement.service.ts` and `provider-challenge-finalize.ts`
+(both mirrored), `lib/services/challenges/challenge-participant-seat.ts`,
+`participant-score.service.ts`, `app/api/challenges/route.ts`, `[id]/accept/route.ts`,
+`[id]/rounds/route.ts`, `games/route.ts`, `app/(root)/challenges/[id]/{page,play,trade}`,
+`components/challenges/ChallengeGamePicker.tsx` and `components/games/ChallengeRound*.tsx` /
+`ProviderChallengeLobby.tsx`.
+
+**Deviated from plan:** `13`'s design has a single results screen per contest kind; the round
+history is rendered **inside `ProviderChallengeLobby`** instead, because a challenge is two
+players and one board rather than a leaderboard, and a second screen would have duplicated the
+lobby's own reads. Recorded rather than folded into the chapter.
+
+**Tests:** `__tests__/services/challenge-settlement.test.ts` is 17 cases against a real
+database - 6 trading (outright P&L, the trade-count tiebreaker, the join-time tiebreaker, a
+true tie split equally, the trade floor, liquidation) and 11 provider (both directions, the
+three tie policies, an absent score, a stored zero with and without the title's declaration,
+the minimum eligible score measured the right way up, and both seats disqualified) - plus
+`challengeable-titles`, `challenge-provider-resolution`,
+`participant-score-challenge-arrival` and `provider-challenge-finalize`.
+**`tools/probe-challenge-settlement.ps1` is 17 probes, all red on exactly the expected test**,
+three of them restoring the defects that were live in the pre-unification code.
+
+**One probe was green first time and the CLAIM was wrong, not the test:** it asserted that
+`isTrading` scopes the liquidation rule, and it does not - `disqualifyOnLiquidation && status
+=== "liquidated"` reads no game type at all, deliberately, because a wiped-out account is a
+wiped-out account. `isTrading` decides the **trade floor** and the catalogue read and nothing
+else. The trade floor had no trading-side test until the probe went looking for one, so the
+17th test exists because of that green.
+
+**A flaky assertion in `__tests__/games/play-state.test.ts` was fixed in the same pass**, and
+it is worth carrying: the rival's score was `999` and the leak check reads the **whole**
+serialised payload, which carries generated round ids - a base-36 id containing "999" by
+chance failed the test with no leak of any kind. **A short number is not a distinctive one
+once it is matched as a substring of arbitrary text**; it is now `987_654_321`.
+
+**Deferred:** the opponent picker, open challenges, per-game willingness and matchmaking (X10
+and X11.5). A simultaneous title stays unchallengeable, by the 8 Sep decision.
+
+**Owner tested:** not yet. **Never verified by eye** - every screen here is behind sign-in,
+and no provider challenge has been played against a real database outside the test harness.
+
+**Next chat should:** have the owner play one provider challenge end to end through the
+browser, two sessions, which is the only thing that can find what a harness cannot.
 
 ---
 

@@ -9,6 +9,7 @@ import { getUserOrders } from "@/lib/actions/trading/order.actions";
 import Challenge from "@/database/models/trading/challenge.model";
 import ChallengeParticipant from "@/database/models/trading/challenge-participant.model";
 import { connectToDatabase } from "@/database/mongoose";
+import { isProviderChallenge } from "@/lib/services/games/challenge-round-config";
 import TradingInterface, {
   TradingModeProvider,
 } from "@/components/trading/TradingInterface";
@@ -71,6 +72,18 @@ const ChallengeTradingPage = async ({
 
   if (!isChallenger && !isChallenged) {
     redirect("/challenges");
+  }
+
+  /**
+   * A provider-game challenge is not traded, so it must never render this workspace. Same
+   * reasoning as the competition trade page's guard: this route is charts, an order form,
+   * positions and margin, all meaningless for a puzzle or a quiz. `isProviderChallenge` is the
+   * strict predicate - the same one `getChallengePlayState` uses to decide its own
+   * `not_provider_challenge` refusal - so this redirect and `/play`'s outward redirect are exact
+   * complements and cannot loop.
+   */
+  if (isProviderChallenge(challenge)) {
+    redirect(`/challenges/${challengeId}/play`);
   }
 
   // Check challenge status
@@ -158,11 +171,17 @@ const ChallengeTradingPage = async ({
   // Calculate daily realized P&L
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const dailyRealizedPnl = tradeHistory
-    .filter((trade: any) => trade.closedAt && new Date(trade.closedAt) >= today)
+  // Reason: only these three fields are read here, and `pnl` / `realizedPnl` differ
+  // between the closed-position and history shapes this list can hold.
+  type ClosedTrade = {
+    closedAt?: Date | string | null;
+    pnl?: number | null;
+    realizedPnl?: number | null;
+  };
+  const dailyRealizedPnl = (tradeHistory as ClosedTrade[])
+    .filter((trade) => trade.closedAt && new Date(trade.closedAt) >= today)
     .reduce(
-      (sum: number, trade: any) => sum + (trade.pnl ?? trade.realizedPnl ?? 0),
+      (sum: number, trade) => sum + (trade.pnl ?? trade.realizedPnl ?? 0),
       0,
     );
 

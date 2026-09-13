@@ -15,6 +15,14 @@ interface ChallengeEntryActionsProps {
   status: string;
   isChallenger: boolean;
   isChallenged: boolean;
+  /*
+    Reason: this component always said "trading" and always linked to `/trade`, regardless
+    of `challenge.gameType` - the same trading-shaped-control mistake `matchmaking.service.ts`
+    and `GettingStartedCard.tsx` made elsewhere. A provider challenge has no trades to make,
+    so the active state must read "play" and route to `/play`. Defaults to false (trading)
+    so every existing caller is unaffected.
+  */
+  isProviderGame?: boolean;
 }
 
 export default function ChallengeEntryActions({
@@ -22,6 +30,7 @@ export default function ChallengeEntryActions({
   status,
   isChallenger,
   isChallenged,
+  isProviderGame = false,
 }: ChallengeEntryActionsProps) {
   const [responding, setResponding] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
@@ -89,8 +98,9 @@ export default function ChallengeEntryActions({
             ⚔️ Challenge Received!
           </h3>
           <p className="text-sm text-gray-400 mb-4">
-            You&apos;ve been challenged to a 1v1 trading battle. Accept to start
-            trading immediately!
+            {isProviderGame
+              ? "You've been challenged to a 1v1 battle. Accept to start playing immediately!"
+              : "You've been challenged to a 1v1 trading battle. Accept to start trading immediately!"}
           </p>
           <div className="flex gap-2">
             <Button
@@ -161,12 +171,16 @@ export default function ChallengeEntryActions({
           Challenge In Progress!
         </h3>
         <p className="text-sm text-gray-400 mb-4">
-          The battle has begun! Trade now to beat your opponent.
+          {isProviderGame
+            ? "The battle has begun! Play now to beat your opponent."
+            : "The battle has begun! Trade now to beat your opponent."}
         </p>
-        <Link href={`/challenges/${challengeId}/trade`}>
+        <Link
+          href={`/challenges/${challengeId}/${isProviderGame ? "play" : "trade"}`}
+        >
           <Button className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-black py-6 text-lg">
             <Swords className="h-5 w-5 mr-2" />
-            Trade Now
+            {isProviderGame ? "Play Now" : "Trade Now"}
           </Button>
         </Link>
       </div>
@@ -182,8 +196,9 @@ export default function ChallengeEntryActions({
           Challenge Complete
         </h3>
         <p className="text-sm text-gray-400 mb-4">
-          This challenge has ended. View your trading history and final results
-          above.
+          {isProviderGame
+            ? "This challenge has ended. View your final results above."
+            : "This challenge has ended. View your trading history and final results above."}
         </p>
         <Link href="/challenges">
           <Button

@@ -69,10 +69,17 @@ export function routeToTradingSettlement(
  * Which settlement path settles this contest - the X5 replacement for asking only whether
  * trading applies.
  *
- * WHY A SEPARATE FUNCTION RATHER THAN A THIRD OUTCOME ON THE ONE ABOVE. Challenges still
- * have only a trading path, and `routeToTradingSettlement` is what asks them the yes/no
- * question. Widening it would have made every challenge caller handle a "provider" answer
- * it cannot act on, so the narrow question keeps its narrow function.
+ * WHY A SEPARATE FUNCTION RATHER THAN A THIRD OUTCOME ON THE ONE ABOVE. `finalizeChallenge`
+ * dispatches with THIS function now, exactly like `finalizeCompetition` does - a provider
+ * challenge settles through `finalizeProviderChallenge`, which reuses `settleChallenge`'s
+ * ranking and prize stages the same way `finalizeProviderCompetition` reuses the
+ * competition ones. The sentence that used to sit here said challenges had only a trading
+ * path; that stopped being true the day a provider path was added, and it is corrected in
+ * place rather than deleted, on the R7/R31 precedent, so the next reader knows it was once
+ * believed. `routeToTradingSettlement` is kept for the defence-in-depth check inside the
+ * trading attempt function itself - the check that runs AFTER the lock, in case something
+ * ever calls the private attempt function directly - and is not the top-level dispatch for
+ * either contest type any more.
  *
  * IT FAILS CLOSED ON AN UNKNOWN LABEL, and that asymmetry is deliberate. Wrongly refusing
  * to settle leaves a contest visibly stuck and someone reports it within the hour; wrongly

@@ -11,11 +11,16 @@ import { getUserById } from "@/lib/utils/user-lookup";
 import { nanoid } from "nanoid";
 import { trackTiming, errorResponse } from "@/lib/utils/api-utils";
 import { canJoinChallenge } from "@/lib/services/market-hours.service";
-import { contestGameLabel, gameNeedsMarketHours } from "@/lib/games";
+import {
+  contestGameLabel,
+  gameNeedsMarketHours,
+  PROVIDER_GAME_TYPE,
+} from "@/lib/games";
 import {
   isSimulatorRequest,
   getSimulatorUserId,
 } from "@/lib/services/simulator/simulator-mode";
+import { resolveChallengeProviderGame } from "@/lib/services/games/challenge-provider-resolution";
 
 // Request timeout for this route (5 seconds)
 const _REQUEST_TIMEOUT_MS = 5000;
@@ -113,7 +118,18 @@ export async function POST(request: NextRequest) {
       // disqualifyOnLiquidation is always true for challenges (locked)
        
       disqualifyOnLiquidation: _disqualifyOnLiquidationIgnored = true,
+      // Reason: the lookup key for a provider game (`ChallengeGamePicker.tsx`). Absent
+      // for a trading challenge, exactly as `Challenge.gameConfig` being absent IS the
+      // statement "this is not a provider challenge" - see that model's own comment.
+      // `settings` is the provider's raw, possibly-empty config submission; the create
+      // dialog sends none at all today, so this defaults to `{}` and
+      // `resolveChallengeProviderGame` fills the schema's own defaults.
+      providerKey,
+      gameCode,
+      settings: gameSettings = {},
     } = body;
+
+    const isProviderChallenge = Boolean(providerKey && gameCode);
 
     // VALIDATION: Early check for required fields
     if (!challengedId) {
@@ -169,6 +185,13 @@ export async function POST(request: NextRequest) {
     // Skip most validation in simulator mode
     const isInSimulatorMode = allowSimulatorMode;
 
+    // Known in both modes (no DB dependency), because the provider resolver below needs
+    // it to size the synthetic play window before the market-hours gate runs - see
+    // `challenge-provider-resolution.ts`'s own comment for why. Reused at creation and by
+    // the bounds check further down, which re-validates it for a real (non-simulator)
+    // request.
+    const actualDuration = duration ?? settings.minDurationMinutes;
+
     // ✅ CHECK USER RESTRICTIONS - Blocked users cannot create challenges.
     // Reason: check BOTH the competition gate (legacy behaviour) and the
     // dedicated challenge gate so `duplicateKYCBlockChallenges` is honoured
@@ -220,18 +243,37 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // The game this challenge will be stamped with. Trading today, because this route
-    // sets no gameType and the schema defaults to it; X5 takes it from the request once
-    // provider challenges exist. Deriving the gate from the SAME value that gets stored
-    // means the two can never disagree.
-    //
-    // Reason: deliberately not read from the request body. A client-supplied game type
-    // would let anyone skip the market-hours gate on a trading challenge by claiming to
-    // be a different game.
-    const gameLabel = contestGameLabel();
+    // The game this challenge will be stamped with. Resolved from the lookup key
+    // (`providerKey` + `gameCode`), never from a client-supplied game type directly -
+    // that would let anyone skip the market-hours gate on a trading challenge by
+    // claiming to be a different game. Deriving the gate from the SAME value that gets
+    // stored means the two can never disagree.
+    let gameLabel = contestGameLabel();
+    let resolvedGameSettings: Record<string, unknown> | undefined;
 
-    // ⏰ CHECK MARKET STATUS - only for games that trade against a live market.
-    // Skip check in simulator mode for testing
+    if (isProviderChallenge) {
+      // Reason: this is also where the provider-only pre-flight checks live (title
+      // exists, schema valid, `externalGamesEnabled` treated as a HARD refusal rather
+      // than the warning a draft competition gets) - see that module's own comment for
+      // why a challenge has no draft state to hide behind.
+      const resolved = await resolveChallengeProviderGame({
+        providerKey,
+        gameCode,
+        settings: gameSettings,
+        durationMinutes: actualDuration,
+      });
+
+      if (!resolved.ok) {
+        return errorResponse(resolved.error, 400, resolved.errors);
+      }
+
+      gameLabel = contestGameLabel(PROVIDER_GAME_TYPE, resolved.gameKey);
+      resolvedGameSettings = resolved.settings;
+    }
+
+    // ⏰ CHECK MARKET STATUS - only for games that trade against a live market. A
+    // resolved provider game answers false here via `lib/games/provider/config.ts`, so
+    // this needs no game-type branch of its own. Skip check in simulator mode for testing.
     if (!isInSimulatorMode && gameNeedsMarketHours(gameLabel.gameType)) {
       try {
         const marketCheck = await canJoinChallenge();
@@ -304,8 +346,8 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Validate duration (with safe defaults)
-      const actualDuration = duration ?? settings.minDurationMinutes;
+      // Validate duration (with safe defaults) - `actualDuration` was already resolved
+      // above so the provider resolver could use the same value.
       if (
         actualDuration < settings.minDurationMinutes ||
         actualDuration > settings.maxDurationMinutes
@@ -447,15 +489,71 @@ export async function POST(request: NextRequest) {
     // Generate unique slug
     const slug = `challenge-${nanoid(10)}`;
 
-    // Create the challenge - uses universal TradingRiskSettings for trading rules
-    console.log("📊 Using trading risk settings for challenge:", {
-      maxLeverage: tradingRiskSettings.maxLeverage,
-      marginLiquidation: tradingRiskSettings.marginLiquidation,
-      marginCall: tradingRiskSettings.marginCall,
-    });
+    // Reason: every trading-only field below has either a schema default (`rules.*`,
+    // `leverage`, `marginSettings`, `maxPositionSize`, `maxOpenPositions`,
+    // `allowShortSelling`, `marginCallThreshold`) or is conditionally required only for
+    // trading (`startingCapital`) - see `challenge.model.ts`. A provider challenge omits
+    // all of them rather than sending trading defaults for a game with no concept of
+    // leverage or margin, exactly as `provider-contest.service.ts` does for competitions.
+    // `contentSeed` and `startTime`/`endTime` are deliberately NOT set here - all three
+    // are generated once at acceptance, after both players are known
+    // (`app/api/challenges/[id]/accept/route.ts`).
+    let gameSpecificFields: Record<string, unknown>;
+
+    if (isProviderChallenge) {
+      gameSpecificFields = {
+        gameConfig: {
+          providerKey,
+          gameCode,
+          settings: resolvedGameSettings,
+        },
+        // Hard-coded for a 1v1 - see `challenge-provider-resolution.ts`'s own comment
+        // for why this is deliberately narrower than what Competition allows.
+        attemptsPolicy: "single",
+        roundStartPolicy: "reserve_full_round",
+      };
+    } else {
+      // Uses universal TradingRiskSettings for trading rules
+      console.log("📊 Using trading risk settings for challenge:", {
+        maxLeverage: tradingRiskSettings.maxLeverage,
+        marginLiquidation: tradingRiskSettings.marginLiquidation,
+        marginCall: tradingRiskSettings.marginCall,
+      });
+
+      gameSpecificFields = {
+        startingCapital: startingCapital || settings.defaultStartingCapital,
+        assetClasses: assetClasses || settings.defaultAssetClasses,
+        allowedSymbols: [],
+        blockedSymbols: [],
+        leverage: {
+          enabled: tradingRiskSettings.maxLeverage > 1,
+          min: tradingRiskSettings.minLeverage || 1,
+          max: tradingRiskSettings.maxLeverage,
+        },
+        rules: {
+          rankingMethod: rankingMethod || "pnl",
+          tieBreaker1: tieBreaker1 || "trades_count",
+          tieBreaker2: tieBreaker2 || undefined,
+          minimumTrades: Math.max(1, minimumTrades || 1), // At least 1 trade required
+          disqualifyOnLiquidation: true, // LOCKED: liquidation = automatic loss
+        },
+        maxPositionSize: tradingRiskSettings.maxPositionSize,
+        maxOpenPositions: tradingRiskSettings.maxOpenPositions,
+        allowShortSelling: true, // Allow short selling by default
+        marginCallThreshold: tradingRiskSettings.marginCall || 100,
+        // Save all margin settings from risk settings
+        marginSettings: {
+          liquidation: tradingRiskSettings.marginLiquidation || 50,
+          call: tradingRiskSettings.marginCall || 100,
+          warning: tradingRiskSettings.marginWarning || 150,
+          safe: tradingRiskSettings.marginSafe || 200,
+        },
+      };
+    }
 
     const challenge = await Challenge.create({
       ...gameLabel,
+      ...gameSpecificFields,
       slug,
       challengerId,
       challengerName,
@@ -464,7 +562,6 @@ export async function POST(request: NextRequest) {
       challengedName,
       challengedEmail,
       entryFee: actualEntryFee,
-      startingCapital: startingCapital || settings.defaultStartingCapital,
       prizePool,
       platformFeePercentage,
       platformFeeAmount,
@@ -472,34 +569,8 @@ export async function POST(request: NextRequest) {
       acceptDeadline: new Date(
         Date.now() + settings.acceptDeadlineMinutes * 60 * 1000,
       ),
-      duration: duration ?? settings.minDurationMinutes, // Use settings default if not provided
+      duration: actualDuration,
       status: "pending",
-      assetClasses: assetClasses || settings.defaultAssetClasses,
-      allowedSymbols: [],
-      blockedSymbols: [],
-      leverage: {
-        enabled: tradingRiskSettings.maxLeverage > 1,
-        min: tradingRiskSettings.minLeverage || 1,
-        max: tradingRiskSettings.maxLeverage,
-      },
-      rules: {
-        rankingMethod: rankingMethod || "pnl",
-        tieBreaker1: tieBreaker1 || "trades_count",
-        tieBreaker2: tieBreaker2 || undefined,
-        minimumTrades: Math.max(1, minimumTrades || 1), // At least 1 trade required
-        disqualifyOnLiquidation: true, // LOCKED: Always true for challenges - liquidation = automatic loss
-      },
-      maxPositionSize: tradingRiskSettings.maxPositionSize,
-      maxOpenPositions: tradingRiskSettings.maxOpenPositions,
-      allowShortSelling: true, // Allow short selling by default
-      marginCallThreshold: tradingRiskSettings.marginCall || 100,
-      // Save all margin settings from risk settings
-      marginSettings: {
-        liquidation: tradingRiskSettings.marginLiquidation || 50,
-        call: tradingRiskSettings.marginCall || 100,
-        warning: tradingRiskSettings.marginWarning || 150,
-        safe: tradingRiskSettings.marginSafe || 200,
-      },
     });
 
     // Send notification to challenged user (skip in simulator mode)
