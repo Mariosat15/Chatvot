@@ -1854,6 +1854,85 @@ later allow-list edit.
 > Kept rather than rewritten, because the paragraph names the hazard the supported set exists to
 > close.
 
+### 4.2d A fourth per-title control: the challenge defaults - BUILT 13 September 2026
+
+The Games list now carries a **fourth control**, Challenge defaults, beside the two switches
+(s4.1a), the content editor and the play style (s4.2c). It is
+`apps/admin/components/admin/games/GameChallengeDefaultsDialog.tsx`,
+`apps/admin/lib/services/game-providers/challenge-defaults.service.ts` and
+`GET`/`PATCH /api/games/providers/[providerKey]/games/challenge-defaults`, over a
+`challengeDefaults` field on both `provider_game` copies and a mirrored
+`lib/services/games/challenge-defaults.ts`. 54 tests in
+`__tests__/admin/game-challenge-defaults.test.ts`, 23 probes in
+`tools/probe-challenge-defaults.ps1`.
+
+**Why it exists.** Owner request, 13 September 2026, in the same instruction as R73: *"we need to
+be able to specify the default settings for challenges for each specific game from the game
+providers... for example when users can join, like any time or specific, the size of the board
+etc, so it's easier for the user to create challenges."* A player creating a 1v1 is **not** an
+operator drafting a contest - they have no view of the catalogue, no reason to hold an opinion
+about a board size, and no way to tell a sensible answer from a bad one - so every game-shaped
+question on the challenge form wants an answer already in it.
+
+**Seven things about it, each of which is the load-bearing half of a decision.**
+
+- **Nothing here is a second source of truth.** The provider's `configSchema` still decides which
+  settings exist, their names, types and ranges; this only chooses among the answers that schema
+  already permits, and every value is validated against it twice - once when the operator saves,
+  once when a player reads. There is no field an operator can invent, which is what keeps "a new
+  title needs no code" true: a title with a board size, a difficulty and a lives count needs no
+  change to any file here.
+- **The write is STRICT and the read is LENIENT, deliberately.** An operator is sitting in front
+  of the form, so an out-of-range length or a setting the schema rejects is refused with the
+  reason named - a silent clamp would store a number they did not choose and read back as their
+  own. A player is not: a provider may narrow their `configSchema` on a scheduled sync and an
+  administrator may narrow the global duration bounds months later, so a stored setting that no
+  longer validates is **dropped back to the schema's own default** and a stored length outside the
+  bounds is **clamped**. Refusing on the read path would take the challenge dialog down for a
+  title that is otherwise perfectly playable, for a reason no player can act on.
+- **The strict half refuses a reservation the title cannot honour, and that is what stops this
+  control quietly recreating R73.** A `reserve_full_round` default is refused when the title
+  declares no round length at all - the gate would then reserve nothing, so the switch appears to
+  work and does nothing - and refused when the round is at least as long as the whole challenge,
+  which is R73 exactly: both players pay, neither can play, and the refusal names the clock rather
+  than the setting behind it. The check runs against the **submitted** length, not the platform
+  minimum, or an operator lengthening the challenge in the same save is still refused.
+- **Only the keys the operator actually sent are stored.** `validateConfigValues` fills a missing
+  field from its declared default, which is right for reading and wrong for writing: storing what
+  it filled in would freeze the provider's own defaults onto the title, and the frozen copy would
+  then win for ever, even after a later sync changed them. An empty `settings` object therefore
+  stores nothing - the `resolveAllowedGameTypes` reading of an empty value, since nothing offers
+  "answer none of the questions", so nothing means it.
+- **The field is the operator's and is in NO sync allow-list**, not even `firstSyncOnlyFields`,
+  and it is on `NEVER_EDITABLE_CONTENT_FIELDS` for the same reason `playModeOverride` is: one
+  screen labelled "title and description" must not decide how long a paid 1v1 runs, and the join
+  rule R73 removed must not be reinstated as a side effect of fixing a typo in a tagline, with the
+  audit trail recording a content edit. Clearing is `$unset`, never an empty object, so "the
+  platform decides again" is a different stored fact from "the operator chose these".
+- **The bounds are FETCHED, never retyped.** The minimum, maximum and fallback length live on the
+  Challenge settings screen, so the dialog reads them from the route's `GET` - a copy in the
+  component offers a length the save then refuses, and the refusal names a range the form itself
+  said was allowed. A test asserts `1440`, the schema's own maximum, appears nowhere in the
+  dialog.
+- **One reading of the join rule, in `resolveChallengeStartPolicy`.** There were three the moment
+  this shipped: `challengeRoundConfig` reading a stored challenge, `resolveChallengeDefaults`
+  reading a stored title, and the create-time resolver deciding what to store. All three were the
+  same ternary - the "one rule, two copies" shape behind `referenceId`, `failedReason`,
+  `challengeId` and the Game Master `||` - and the drift is the quiet kind: a challenge created
+  under one rule and played under the other. **Absent means permissive**, which is the opposite of
+  `contest-config.ts`'s reading of the same field name.
+
+**The player half.** `listChallengeableTitles` resolves the defaults server-side and hands each
+title a `defaults` object; `ChallengeCreateDialog` seeds both the settings form and the duration
+box from it and re-derives neither. `resolveChallengeProviderGame` pre-flights against the
+title's stored policy and **returns** it, and `POST /api/challenges` stores what was approved
+rather than the constant - otherwise a title whose operator reinstated the reservation is
+approved permissively and stored strictly, and every round of it refused, which is R73 arriving
+through the door built to close it.
+
+**Not built:** no bulk edit, and no per-provider default - the question is per title, because a
+board size and a round length are properties of a game rather than of the company supplying it.
+
 ### 2.12 The operator picks one of the title's supported shapes - BUILT 9 September 2026
 
 **`External game plans/22` section 10 is the authoritative account**, including the design

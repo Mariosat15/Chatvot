@@ -21,9 +21,14 @@ import {
  *
  * `runPreflight` is pure and already has its own suite (`contest-preflight.test.ts` /
  * equivalent); these tests are about what THIS resolver builds and passes to it - the
- * synthetic play window anchored at `now`, the derived result-grace period, and the
- * hard-coded `attemptsPolicy: "single"` / `roundStartPolicy: "reserve_full_round"` - not
- * about re-proving every branch of the checklist itself.
+ * synthetic play window anchored at `now`, the derived result-grace period, the hard-coded
+ * `attemptsPolicy: "single"` and the `CHALLENGE_ROUND_START_POLICY` it threads in - not about
+ * re-proving every branch of the checklist itself.
+ *
+ * THAT LAST ONE USED TO READ `roundStartPolicy: "reserve_full_round"`, and the test below
+ * asserting the resulting refusal is FLIPPED rather than deleted, because the reason it
+ * existed is the record of why the owner overrode the rule on 13 September 2026. See
+ * `CHALLENGE_ROUND_START_POLICY` in `challenge-round-config.ts`.
  */
 
 // No `vi.mock` needed. This service does no I/O beyond the three lean reads it makes
@@ -43,6 +48,15 @@ const { MOCK_PROVIDER_KEY } = await import(
 const { resolveChallengeProviderGame } = await import(
   "@/lib/services/games/challenge-provider-resolution"
 );
+const { CHALLENGE_ROUND_START_POLICY } = await import(
+  "@/lib/services/games/challenge-round-config"
+);
+// Imported for the precedence test only - it runs the same checklist the resolver runs, with
+// and without the policy, which is the only way to show which value reached it.
+const { runPreflight, RESULT_GRACE_MARGIN_SECONDS } = await import(
+  "@/lib/services/games/contest-preflight"
+);
+const { parseConfigSchema } = await import("@/lib/services/games/config-schema");
 
 const COLLECTIONS = ["game_provider", "provider_game", "whitelabels"];
 
@@ -267,7 +281,21 @@ describe("resolveChallengeProviderGame", () => {
     expect(result.errors.some((message) => message.includes("deprecated"))).toBe(true);
   });
 
-  it("refuses when the title's own declared play clock is longer than the requested challenge duration - the synthetic window is anchored at `now` for exactly this check", async () => {
+  it("ALLOWS a challenge shorter than the title's own play clock, warning rather than refusing - flipped 13 Sep 2026, when the reservation stopped being the rule", async () => {
+    /*
+      Reason, kept because it is the whole point of the flip: this test used to assert a
+      REFUSAL, and it was right about the code. `runPreflight` phrases the same fact two ways
+      (`contest-preflight.ts` around the `reservesFullRound` branch) - a refusal when a full
+      round must be reserved, because then nobody could start an attempt at any moment of the
+      contest, and a warning when it may not, because `resolveExpiry` clamps the round to the
+      window and the player is told how long they actually get.
+
+      The resolver now threads `until_window_closes`, so this lands on the warning arm. What
+      that buys is the owner's instruction: a player is never turned away for being late. What
+      it costs is that a challenge CAN now be created whose every round is cut short, which is
+      acceptable only because R48 made a partial run score - so if that ever changes, this is
+      the test to read first.
+    */
     await seedCatalogue({
       title: {
         configSchema: {
@@ -291,11 +319,72 @@ describe("resolveChallengeProviderGame", () => {
       durationMinutes: 1,
     });
 
-    expect(result.ok).toBe(false);
-    if (result.ok) throw new Error("unreachable");
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(`unexpected refusal: ${result.errors.join(" | ")}`);
+    // The fact is still reported - to the creator, as a warning. Asserting the warning and
+    // not merely `ok: true` is what would catch the check being dropped altogether rather
+    // than re-phrased.
     expect(
-      result.errors.some((message) => message.includes("longer than the contest itself")),
+      result.warnings.some((message) => message.includes("cut short when the contest ends")),
     ).toBe(true);
+  });
+
+  it("resolves what the pre-flight would refuse under the reserving policy, proven by running the same checklist both ways", async () => {
+    /*
+      THE PRECEDENCE TEST, and it needs two answers that differ or it proves nothing.
+
+      `runPreflight`'s `roundStartPolicy` is OPTIONAL and an absent value means
+      `reserve_full_round`, matching `competition.model.ts`'s schema default - so a resolver
+      that simply stopped passing the field would refuse exactly as it did before the owner's
+      decision, with nothing in the diff to look at. The test above shows the resolver
+      accepting; this one shows that the SAME facts refuse when the field is absent, which is
+      the only way to attribute the acceptance to the value being threaded through.
+    */
+    const schemaFields = parseConfigSchema({
+      type: "object",
+      properties: {
+        durationSeconds: { type: "integer", format: "duration-seconds", default: 120 },
+      },
+    });
+    if (!schemaFields.ok) throw new Error("fixture schema did not parse");
+
+    const now = new Date();
+    const facts = {
+      format: "challenge" as const,
+      minParticipants: 2,
+      title: {
+        displayName: "Mock Puzzle",
+        providerStatus: "active" as const,
+        supportsCompetition: true,
+        supportsOneVsOne: true,
+        supportsContentSeed: true,
+        maxDurationSeconds: 300,
+      },
+      provider: { enabled: true, adapterInstalled: true },
+      chartvoltEnabled: true,
+      externalGamesEnabled: true,
+      schemaFields: schemaFields.fields,
+      settings: {},
+      playWindowStart: now,
+      // One minute, against a two-minute round - the same shape as the test above.
+      playWindowEnd: new Date(now.getTime() + 60_000),
+      resultGracePeriodSeconds: 120 + RESULT_GRACE_MARGIN_SECONDS,
+      attemptsPolicy: "single" as const,
+      unresolvedRoundPolicy: "score_zero" as const,
+      now,
+    };
+
+    const reserving = runPreflight(facts);
+    const permissive = runPreflight({
+      ...facts,
+      roundStartPolicy: CHALLENGE_ROUND_START_POLICY,
+    });
+
+    expect(reserving.ok).toBe(false);
+    expect(permissive.ok).toBe(true);
+    // And the constant really is the permissive one, so nobody can satisfy this by pointing
+    // it back at the reservation.
+    expect(CHALLENGE_ROUND_START_POLICY).toBe("until_window_closes");
   });
 
   it("resolves successfully when the round fits inside the requested duration, threading a grace period the pre-flight itself demands back into its own check", async () => {

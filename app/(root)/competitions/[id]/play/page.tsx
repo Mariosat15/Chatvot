@@ -231,7 +231,7 @@ export default async function PlayPage({ params }: PlayPageProps) {
       active={outcome.state.contestStatus === "active"}
     >
       <GameArenaLayout
-        competitionId={competitionId}
+        backHref={`/competitions/${competitionId}`}
         competitionName={competitionName}
         presentation={presentation}
         banner={banner}

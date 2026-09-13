@@ -8,7 +8,11 @@ import GameRound, {
 } from "@/database/models/games/game-round.model";
 import ProviderGame from "@/database/models/games/provider-game.model";
 import { attemptsPermitted } from "./round.service";
-import { challengeRoundConfig, isProviderChallenge } from "./challenge-round-config";
+import {
+  CHALLENGE_ROUND_START_POLICY,
+  challengeRoundConfig,
+  isProviderChallenge,
+} from "./challenge-round-config";
 import { deriveChallengeWindow } from "./challenge-window";
 import { resolveAttemptSecondsFromSchema } from "./config-schema";
 import type { ChallengeContestFields } from "./challenge-round-config";
@@ -223,7 +227,12 @@ export async function getChallengePlayState(
         contestStatus: challenge.status,
         serverNow: new Date().toISOString(),
         maxRoundSeconds: attemptSeconds,
-        roundStartPolicy: config.config.roundStartPolicy ?? "reserve_full_round",
+        // The fallback is unreachable - `challengeRoundConfig` always resolves the field - but
+        // it must name the same constant the resolver does. It read `reserve_full_round` while
+        // the resolver had stopped producing it, which is a refusal the player would have been
+        // shown by a branch nobody could reach from the config it claims to be defaulting.
+        roundStartPolicy:
+          config.config.roundStartPolicy ?? CHALLENGE_ROUND_START_POLICY,
         isPaused: false,
         gameKey: challenge.gameKey,
         attemptsPolicy: config.config.attemptsPolicy,

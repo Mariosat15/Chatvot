@@ -229,6 +229,44 @@ Four things about this third amendment, and the first is the one a summary will 
 > **`ROUND_EXPIRY_HEADROOM_SECONDS` states the slack rather than inferring it**, still clamped to
 > `playWindowEnd`, so nothing here can let a round outlive its contest. See `12` s2.13 and R70.
 
+> **SIXTH AMENDMENT, 13 September 2026 - a CHALLENGE never reserves, and the reason is that none
+> of the three things standing behind the reservation exists on one.**
+>
+> Everything above is about a **competition** and is unchanged. A challenge is now permanently
+> `until_window_closes`: a player who presses Play late gets a round shortened by the clamp to
+> `playWindowEnd`, never a refusal. Owner decision, and **R73** is the defect that forced it -
+> a ten-minute challenge on a title whose ceiling is an hour refused **every** attempt for its
+> entire life, and the player was told they were too late with nine minutes on the clock.
+>
+> **The transferable part is why the same value is right on a competition and wrong here.** The
+> reservation reserves `maxDurationSeconds`, the catalogue ceiling, not the configured length -
+> deliberately, because it fails closed (see the second amendment and `12` s2.9). On a
+> competition three things make that safe: an **operator** chooses the policy per contest, a
+> **schema default** keeps a pre-existing contest under the rule its entrants signed up to, and
+> the **pre-flight** refuses a draft whose window cannot hold a full round. A challenge is
+> created by a player from a dialog with no such control, so the value was neither chosen nor
+> checked. **A gate is only as safe as the thing that gets to disagree with it.**
+>
+> Two implementation facts that a summary drops. `CHALLENGE_ROUND_START_POLICY` in
+> `challenge-round-config.ts` is the **one definition**, imported by the config resolver, the
+> pre-flight and the create route - written out three times, a challenge could be created under
+> one rule and played under another, and that disagreement reads as a clock problem rather than a
+> settings one. And **an absent value means PERMISSIVE on a challenge**, the opposite of
+> `contest-config.ts`'s reading of the same field name, because an unset competition policy is an
+> operator's choice with a default behind it while an unset challenge policy is a challenge
+> created before there was a rule. The field is still **stored**, so the per-title challenge
+> defaults the owner asked for in the same message can narrow it later without changing the rule
+> under challenges already in flight.
+>
+> **Amended later the same day, and one of those facts has moved.** The per-title defaults are
+> **built** (`12` s4.2d), so an operator *can* now reinstate the reservation on a title that can
+> honour it, and the one definition is **`resolveChallengeStartPolicy` in `challenge-defaults.ts`**,
+> not the constant in `challenge-round-config.ts` - that constant survives as the permissive answer
+> the helper falls back to, so a document naming it as the reader is stale while one naming it as
+> the value is right. The strict writer **refuses** a reservation the title cannot honour, with no
+> declared round length or a round as long as the whole challenge, which is what stops the new
+> control recreating R73.
+
 ### 1.3 Attempts policy - a required per-contest setting
 
 | Policy | Behaviour | Best for |
@@ -338,6 +376,16 @@ Challenges need an acceptance window as well as a play window:
 
 Without an expiry, credits sit locked in unaccepted challenges indefinitely and
 generate support tickets.
+
+**BUILT 13 SEPTEMBER 2026, and one rule about the play window is now settled.** Both windows are
+derived from a **single producer**, `deriveChallengeWindow` in `challenge-window.ts` (mirrored),
+rather than being stored as separate operator-chosen dates the way a competition's are - there is
+no operator on a challenge. And **a player may start a round for as long as the play window is
+open**: a late presser gets a round shortened by the clamp to `playWindowEnd`, never a refusal.
+That is the sixth amendment to section 1.2 above and **R73**, and it is the load-bearing
+difference from a competition, where the equivalent policy holds a whole round back from the end.
+Do not carry the competition's reservation over to a challenge on consistency grounds - it made
+every ten-minute challenge unplayable.
 
 ### 2.4 Who the opponent is
 

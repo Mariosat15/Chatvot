@@ -38,6 +38,7 @@ to the wrong players, so this is not administrative tidiness.
 | `attemptsPolicy` | string | `single` \| `best_of_n` \| `sum_of_n` |
 | `attemptsAllowed` | number | Default 1 |
 | `unresolvedRoundPolicy` | string | `score_zero` \| `exclude` \| `hold_and_alert` |
+| `roundStartPolicy` | string | **Added 7 September 2026, `12` s2.7.** `reserve_full_round` \| `until_window_closes` - how late a player may start an attempt. **Competition and Challenge read an ABSENT value differently and that is deliberate**: a competition's schema defaults to `reserve_full_round`, because a pre-existing contest must keep the rule its entrants signed up under; a challenge has no operator, no schema default and no pre-flight refusing a too-short window, so absent means **permissive** there. See the challenge note below and **R73** |
 | `playMode` | string | **Added 9 September 2026, task 11.** `anytime` \| `scheduled`, no default. **The shape THIS contest was created as**, which from task 11 onwards is not necessarily its title's - a title may support both. Read through `resolveContestPlayMode`, which falls back to the title for a contest created before the field existed. **Frozen once written**: absent from `EditProviderContestInput`, absent from `toEditRequestBody`, and named in `NEVER_EDITABLE_FIELDS`, because it decides when entry closes and how many attempts a paying entrant gets. See `22` s10 |
 
 Indexes: `{ gameType, status }`, `{ gameKey, status }`, `{ status, playWindowEnd }`.
@@ -74,6 +75,24 @@ The instinct is to read this as "provider games do not need starting capital". W
 actually does is move a guarantee trading relies on from the schema into a predicate, and
 the predicate is now the only thing standing between a trading contest and a missing
 capital figure.
+
+**BUILT ON `Challenge` 13 September 2026, and the differences from the table above are the
+interesting part.** Both copies of `Challenge` now carry `gameType`, `gameKey`, `gameConfig`,
+`contentSeed`, `attemptsPolicy`, `attemptsAllowed` and `roundStartPolicy`, all optional, with
+`gameConfig` being absent *itself* the statement that this is not a provider challenge. Three
+fields on the competition table are deliberately **not** there:
+
+- **No `playWindowStart` / `playWindowEnd`.** A challenge's play window *is* `[startTime,
+  endTime]`, both already stored and both set once, at acceptance, so `deriveChallengeWindow` in
+  `challenge-window.ts` (mirrored) derives the round window from them. Storing a second pair is
+  two sources of truth for "when may this be played" that a later edit can let disagree.
+- **No `unresolvedRoundPolicy` and no `resultGracePeriodSeconds`.** A challenge is two players and
+  settles on the pair, so the three-way competition policy has no meaning here.
+- **`roundStartPolicy` reads its absence the other way round**, as the row above says. New
+  challenges store `CHALLENGE_ROUND_START_POLICY` (`until_window_closes`) rather than relying on
+  the absence, and the model comment asserting the competition's reading was **corrected in place
+  rather than retensed**, because that sentence was believed for six days and is why **R73**
+  made every short provider challenge unplayable.
 
 ### 2.2 Competition / Challenge participant
 
@@ -134,6 +153,7 @@ depend on a live provider call.
 | `playMode` | `anytime` \| `scheduled`, defaulting to `anytime`. Does everybody play at **one appointed moment**? A **different axis from `family`** - a race is `independent` and `scheduled`. Provider-owned, rewritten by every catalogue sync, and on `NEVER_EDITABLE_CONTENT_FIELDS`. Resolved by `lib/services/games/play-shape.ts`, never read raw. See `22` s8 |
 | `playModeOverride` | `anytime` \| `scheduled`, **with no default** - absent means we have taken no decision and the provider's `playMode` stands. **Ours, not the provider's**, and it is a second field precisely because `playMode` is in `providerOwnedFields` and would be reverted by the next sync. Written only by `game-play-style.service.ts`; **cleared with `$unset`, never `""`**, since an empty string read literally would mask a provider's `scheduled` declaration. Also on `NEVER_EDITABLE_CONTENT_FIELDS`. `head_to_head` beats it. See `22` s9 |
 | `supportedPlayModes` | `("anytime" \| "scheduled")[]`, **with no default**, for the same reason as `playModeOverride` - a schema default *is* a stored value, and one here would opt the whole catalogue into a per-contest picker nobody asked for. Which shapes a contest on this title may be **created as** (task 11), so a title can offer both a synchronised race and an async time trial. **Read through `resolveSupportedPlayModes`, never raw**: it unions the resolved default in, because a title's own declared style must not be unselectable and every contest already created on the title was created as it, and it returns `["scheduled"]` alone for a `head_to_head` title. Ours, not the provider's, and on `NEVER_EDITABLE_CONTENT_FIELDS`. See `22` s10 |
+| `challengeDefaults` | `{ durationMinutes?, roundStartPolicy?, settings? }`, **with no default** - absent means the platform's own answers apply, which is a different stored fact from an operator having chosen them. What a player's challenge form opens **pre-filled** with (owner request, 13 Sep 2026). **Ours, not the provider's**, so it is in **no** sync allow-list at all, not even `firstSyncOnlyFields`, and it is on `NEVER_EDITABLE_CONTENT_FIELDS`. Written only by `challenge-defaults.service.ts`; **cleared with `$unset`, never `{}`**. **Read through `resolveChallengeDefaults`, never raw** - it clamps the length to the platform bounds and drops a stored setting the `configSchema` has since stopped accepting, so it can never take the challenge dialog down for a title that is otherwise playable. The strict writer **refuses** a `reserve_full_round` default the title cannot honour, which is what stops the control recreating R73. See `12` s4.2d |
 | `supportsCompetition`, `supportsOneVsOne`, `supportsPractice`, `supportsContentSeed` | Capability flags |
 | `scoreDirection`, `scoreType`, `scoreRange` | Ranking |
 | `typicalDurationSeconds`, `maxDurationSeconds` | Scheduling and grace periods |

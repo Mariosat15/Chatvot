@@ -2,7 +2,15 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, RefreshCw, Gamepad2, Info, Sparkles, Trophy } from "lucide-react";
+import {
+  Loader2,
+  RefreshCw,
+  Gamepad2,
+  Info,
+  Sparkles,
+  Swords,
+  Trophy,
+} from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -23,6 +31,7 @@ import { DIALOG_WIDTH_WIDE } from "@/lib/admin/dialog-widths";
 import GameContentDialog from "./GameContentDialog";
 import GamePlayStyleControl from "./GamePlayStyleControl";
 import GameScoringDialog from "./GameScoringDialog";
+import GameChallengeDefaultsDialog from "./GameChallengeDefaultsDialog";
 
 /**
  * One provider's game catalogue, with our own enable switch per title.
@@ -36,13 +45,14 @@ import GameScoringDialog from "./GameScoringDialog";
  * and updates rows, reports titles the provider has stopped listing without deleting them,
  * and leaves every ChartVolt switch exactly as it was.
  *
- * THERE ARE FOUR CONTROLS PER ROW AND THEY WRITE THROUGH FOUR ROUTES, deliberately. The
- * enable switch, the Play style, the prize eligibility and the player-facing content each
- * have their own endpoint and their own audit line, because one route inferring which edit it
- * was being asked for from the fields present is how a content save silently changes a game's
- * live state - or how a typo fix turns a puzzle into a gun-start race, or moves the bar
- * deciding who gets paid. Play style and prize eligibility also survive a sync where the
- * provider's own declarations do not, which is the whole reason they are separate fields.
+ * THERE ARE FIVE CONTROLS PER ROW AND THEY WRITE THROUGH FIVE ROUTES, deliberately. The
+ * enable switch, the Play style, the prize eligibility, the challenge defaults and the
+ * player-facing content each have their own endpoint and their own audit line, because one
+ * route inferring which edit it was being asked for from the fields present is how a content
+ * save silently changes a game's live state - or how a typo fix turns a puzzle into a gun-start
+ * race, moves the bar deciding who gets paid, or reinstates the late-start refusal R73 removed.
+ * Play style, prize eligibility and challenge defaults also survive a sync where the provider's
+ * own declarations do not, which is the whole reason they are separate fields.
  */
 
 interface Props {
@@ -65,6 +75,7 @@ export default function ProviderCatalogueDialog({
   const [lastSync, setLastSync] = useState<CatalogueSyncSummary | null>(null);
   const [editing, setEditing] = useState<ProviderTitleRow | null>(null);
   const [scoring, setScoring] = useState<ProviderTitleRow | null>(null);
+  const [challenging, setChallenging] = useState<ProviderTitleRow | null>(null);
 
   const providerKey = provider?.providerKey;
 
@@ -209,18 +220,19 @@ export default function ProviderCatalogueDialog({
             this provider.
           </div>
         ) : (
-          // Reason: the dialog is as wide as a large screen allows, but seven columns of
-          // controls still need about 68rem. Below that the TABLE scrolls sideways rather
+          // Reason: the dialog is as wide as a large screen allows, but eight columns of
+          // controls still need about 76rem. Below that the TABLE scrolls sideways rather
           // than the cells compressing - a Play style select squeezed to 90px is unusable,
           // whereas a scrollbar is at least honest about there being more to the right.
           <div className="overflow-x-auto rounded-lg border border-white/10">
-            <table className="w-full min-w-[68rem] text-sm">
+            <table className="w-full min-w-[76rem] text-sm">
               <thead className="bg-white/5 text-left text-xs uppercase tracking-wide text-white/50">
                 <tr>
                   <th className="whitespace-nowrap px-3 py-2">Game</th>
                   <th className="whitespace-nowrap px-3 py-2">Formats</th>
                   <th className="whitespace-nowrap px-3 py-2">Play style</th>
                   <th className="whitespace-nowrap px-3 py-2">Prize eligibility</th>
+                  <th className="whitespace-nowrap px-3 py-2">Challenge defaults</th>
                   <th className="whitespace-nowrap px-3 py-2">Provider says</th>
                   <th className="whitespace-nowrap px-3 py-2">Live on ChartVolt</th>
                   <th className="whitespace-nowrap px-3 py-2">Player-facing content</th>
@@ -292,6 +304,29 @@ export default function ProviderCatalogueDialog({
                         <Trophy className="mr-1.5 h-3.5 w-3.5" />
                         {describeScoringSummary(title)}
                       </Button>
+                    </td>
+                    <td className="px-3 py-2.5 align-top">
+                      {/*
+                        WITHHELD WITH THE REASON on a title nobody can challenge, rather than
+                        offered and refused on save. `supportsOneVsOne` is the provider's
+                        declaration that their game can be played one against one, so a challenge
+                        on this title is never created and there is nothing to pre-fill - and a
+                        disabled button teaches an operator nothing about why.
+                      */}
+                      {title.supportsOneVsOne ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setChallenging(title)}
+                        >
+                          <Swords className="mr-1.5 h-3.5 w-3.5" />
+                          {describeChallengeDefaults(title)}
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-white/40">
+                          Not playable one against one
+                        </span>
+                      )}
                     </td>
                     <td className="px-3 py-2.5 align-top">
                       <ProviderStatusBadge status={title.providerStatus} />
@@ -393,6 +428,33 @@ export default function ProviderCatalogueDialog({
             );
           }}
         />
+
+        <GameChallengeDefaultsDialog
+          providerKey={provider.providerKey}
+          title={challenging}
+          open={challenging !== null}
+          onOpenChange={(next) => {
+            if (!next) setChallenging(null);
+          }}
+          onSaved={(defaults) => {
+            // Reason: merged locally rather than refetched, so the row's summary updates at
+            // once. `onChanged` is deliberately not called - the provider list above counts
+            // titles and enabled titles, and pre-filling a challenge form changes neither.
+            //
+            // Assigned from the SAVED object rather than with a `??` fallback onto the row: the
+            // route answers `stored: null` when the defaults have been cleared, `onSaved` maps
+            // that to `undefined`, and any fallback here would restore what was just deleted -
+            // so the button would keep claiming a length nobody has chosen. Same trap as the
+            // eligibility merge above.
+            setTitles((current) =>
+              current.map((row) =>
+                row.gameCode === challenging?.gameCode
+                  ? { ...row, challengeDefaults: defaults.challengeDefaults }
+                  : row,
+              ),
+            );
+          }}
+        />
       </DialogContent>
     </Dialog>
   );
@@ -451,6 +513,30 @@ function describeScoringSummary(title: ProviderTitleRow): string {
     return `Min ${bar}${title.scoreUnit ? ` ${title.scoreUnit}` : ""}`;
   }
   return title.zeroIsValidResult === true ? "Zero counts" : "Zero wins nothing";
+}
+
+/**
+ * The row's one-line summary of what a player's challenge form will open with.
+ *
+ * It distinguishes "nobody has decided" from a stored answer, because those are different facts
+ * and the whole point of the control is to take a decision. It also reports the reserving join
+ * rule where it is set, since that is the one setting here that can refuse a paying player a
+ * round - the same reasoning as the eligibility summary naming a bar rather than hiding it.
+ *
+ * NO GAME NAME AND NO SETTING NAME. A title's own settings are the provider's, so summarising
+ * them would mean knowing what they are called.
+ */
+function describeChallengeDefaults(title: ProviderTitleRow): string {
+  const defaults = title.challengeDefaults;
+  if (!defaults) return "Set defaults";
+
+  const parts: string[] = [];
+  if (defaults.durationMinutes !== undefined) parts.push(`${defaults.durationMinutes} min`);
+  if (defaults.roundStartPolicy === "reserve_full_round") parts.push("full round");
+  const settingsCount = Object.keys(defaults.settings ?? {}).length;
+  if (settingsCount > 0) parts.push(`${settingsCount} setting${settingsCount === 1 ? "" : "s"}`);
+
+  return parts.length > 0 ? parts.join(" · ") : "Set defaults";
 }
 
 function ProviderStatusBadge({ status }: { status: string }) {

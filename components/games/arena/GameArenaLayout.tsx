@@ -29,7 +29,17 @@ import { ArenaIdentity } from "./ArenaIdentity";
  */
 
 interface Props {
-  competitionId: string;
+  /**
+   * Where the back link goes.
+   *
+   * A HREF RATHER THAN A CONTEST ID, because this layout now renders two kinds of contest: a
+   * competition, whose lobby is `/competitions/[id]`, and a 1v1 challenge, whose lobby is
+   * `/challenges/[id]`. Building the path here would mean the layout knowing which one it is
+   * holding, which is one branch away from the game-specific knowledge this folder is
+   * deliberately kept free of - the caller already knows, so the caller says.
+   */
+  backHref: string;
+  /** What the back link calls the thing it returns to: a contest's name, or "the challenge". */
   competitionName: string;
   presentation: GamePresentation;
   /**
@@ -93,7 +103,7 @@ interface Props {
 }
 
 export function GameArenaLayout({
-  competitionId,
+  backHref,
   competitionName,
   presentation,
   banner,
@@ -119,7 +129,7 @@ export function GameArenaLayout({
       <NeonGridBackdrop />
 
       <Link
-        href={`/competitions/${competitionId}`}
+        href={backHref}
         className="mb-4 inline-flex items-center gap-2 text-sm text-gray-400 transition-colors hover:text-gray-200"
       >
         <ArrowLeft className="h-4 w-4" />

@@ -109,6 +109,37 @@ export interface ProviderTitleRow {
   // Ours as well, and absent is an instruction rather than a gap: the banner works four
   // features out from the title's declared settings when this is unset.
   heroFeatures?: { icon: string; label: string }[];
+  /**
+   * The provider's own declaration of what this title's settings are, RAW.
+   *
+   * Carried so the challenge-defaults control can render the same questions a player will be
+   * asked, through the same `parseConfigSchema` the server validates with. It must stay `unknown`
+   * rather than being typed here: a hand-written shape is where an invented field looks real, and
+   * this one is written by whatever the provider sent.
+   */
+  configSchema?: unknown;
+  /** The catalogue's round ceiling, in seconds. Needed to say whether a reservation can fit. */
+  maxDurationSeconds?: number;
+  /**
+   * OURS: what a player's challenge form opens pre-filled with (task document 13 Sep 2026).
+   *
+   * Optional and it must stay so - absent means nobody has decided, which is the common case and
+   * is a different fact from an empty object. Read through `resolveChallengeDefaults`, never
+   * directly, and note the duration may legitimately be out of the platform's current bounds if
+   * an administrator narrowed them afterwards, which is why the resolver clamps rather than
+   * refusing.
+   */
+  challengeDefaults?: {
+    durationMinutes?: number;
+    /**
+     * The union rather than `string`, because the model declares a Mongoose enum on this path so
+     * a stored value is one of the two or absent. Typed as `string` it would need casting at
+     * every read, and the tempting cast is a second copy of "which value reserves" - a rule
+     * `resolveChallengeDefaults` already owns and the one thing that must not be restated.
+     */
+    roundStartPolicy?: "until_window_closes" | "reserve_full_round";
+    settings?: Record<string, unknown>;
+  };
 }
 
 export interface CatalogueSyncSummary {

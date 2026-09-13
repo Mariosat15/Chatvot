@@ -2654,6 +2654,87 @@ session.
 
 ---
 
+### 4.1z The challenge screens - one arena, a list of games, and a form that adapts (owner instruction, 13 September 2026)
+
+Three owner reports on the challenge screens, all three closed, and only the second one was a
+defect. The first: **the game chooser must be a list, because the games will be many.** The
+second: a ten-minute challenge on Circuit Sprint said **"TOO LATE TO START A ROUND"** with nine
+minutes left - that is **R73**, and it is in the risk register. The third: **the challenge play
+screen must use the competition arena's layout**, because it had almost none of the arena's
+furniture.
+
+**The chooser is now a scrollable vertical list** (`components/challenges/ChallengeGamePicker.tsx`),
+one row per title with the title's own facts beneath its name, and a row that cannot be
+challenged says **why** rather than being greyed out - the same rule as the provider-with-no-adapter
+card in `12` s4.1a. The horizontal pill strip it replaced was correct for the two titles that
+exist and is a control that stops working at the sixth.
+
+**The dialog now renders the title's own settings schema** (`ChallengeSettingsFields.tsx`), which
+is the half that was not asked for in those words but is what "the screen must adapt to any game
+settings" means. It reads the `ConfigField[]` that
+`listChallengeableTitles` now carries on each `ChallengeableTitle`, seeds it with
+`defaultConfigValues` - **the same function the admin wizard's form uses**, moved into
+`lib/services/games/config-schema.ts` for the purpose rather than copied - and submits the result
+as `settings` on `POST /api/challenges`, where the pre-flight re-validates and stores the
+**coerced** values, so `"7"` from a number input never reaches the provider as a string.
+**Nothing here enumerates games:** the renderer branches on the declared field *type* and
+`format`, and a test forbids a game code, provider key or `gameKey` anywhere in the picker, the
+fields component or the dialog. That negative is the load-bearing assertion, exactly as it is for
+the admin wizard's schema-driven step (`12` s2.1) - the one way to lose the no-developer-needed
+claim is a screen that *can* name a game.
+
+**Two things about the settings form drift easily.** A malformed or absent `configSchema` yields
+an **empty field list**, never a refusal and never a guessed form - `schemaOk` already carries
+whether the schema parsed, and a form invented for a schema the platform could not read is
+settings no player chose. And **the game and its settings move together**: every `setSelection`
+call is paired with a `setGameSettings` reseed, asserted **per call site** rather than by counting,
+because a third legitimate `setGameSettings` (the per-field change) makes a count pass while one
+reseed is missing - which is exactly what a probe proved before the assertion was tightened.
+
+**The arena is now the same component.** `GameArenaLayout` took a `competitionId` and built the
+back link from it; it now takes **`backHref`** and `competitionName`, which is the whole of what
+made it competition-only. Two facts about that:
+
+- **The standings panel is NOT shared.** `ArenaLeaderboardPanel` is a ranked board with rank
+  plates, a crown and a leader row; a challenge has **two players and no rank until settlement**,
+  so `components/games/arena/ChallengeStandingsPanel.tsx` shows the viewer then the opponent with
+  **no positions at all**, and a dash where a score is absent (R45's read-side form, for the sixth
+  screen running). Reusing the ranked panel would have invented a `#1` before anybody had won.
+- **The live-standings poll and the round host keep their relationship.** The round host stays a
+  **child** of the live provider rather than a consumer of it, for `13` s4.1o's reason: a
+  re-render that descends into the frame reloads a round somebody paid for.
+
+**A probing note worth carrying.** 21 probes in `tools/probe-challenge-game-picker.ps1`, all red on
+exactly the expected test - but two came back green first, for two different reasons, and only
+running them separated the two. The reseed probe was a **weak test**, fixed by asserting per call
+site as above. The malformed-schema probe was the **fourth cause, a mutation with no observable**:
+it replaced `parsed.ok ? parsed.fields : []` with `(parsed as { fields?: unknown[] }).fields ?? []`,
+and a `ParseResult` failure carries `error` and **no `fields` at all**, so both spellings produce
+the identical empty list. The guard was never absent; the mutation now fabricates a field, which is
+what a partial list would actually look like on the wire.
+
+**Never verified by eye** - both screens are behind sign-in.
+
+> **EXTENDED 13 SEPTEMBER 2026 - the form now opens pre-filled.** This section ends "the settings
+> are choosable, not pre-chosen", naming the per-title challenge defaults the owner asked for in
+> the same instruction as not built. **They are built**, so that sentence is correct as history and
+> stale as a present fact - **say which**. `12` **s4.2d** is the authoritative account and holds the
+> admin surface; three facts about the player's half drift easily. **The defaults are resolved on
+> the SERVER**, in `listChallengeableTitles`, and travel on each `ChallengeableTitle` as a
+> `defaults` object - the resolver clamps to the platform's duration bounds and drops a stored
+> setting the `configSchema` has since stopped accepting, so a second copy of either in the browser
+> pre-fills a value the create route then refuses, naming a control the player never chose, and a
+> test asserts `ChallengeCreateDialog` re-derives neither. **A pick moves the settings AND the
+> length together**, because pre-chosen settings arriving in a window nobody chose for them is the
+> owner's own report one field along; picking Trading again goes back to the platform's own default
+> length, since a trading challenge has no title to ask. And **the create path stores the policy the
+> pre-flight was RUN against** - `resolveChallengeProviderGame` returns it rather than leaving the
+> route to import the constant - or a title whose operator reinstated the reservation is approved
+> permissively and stored strictly, and every round of it is refused, which is **R73 arriving
+> through the door built to close it**.
+
+---
+
 ## 5. Dashboard
 
 `components/dashboard/` is about **15 components** backed by

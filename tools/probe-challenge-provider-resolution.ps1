@@ -72,25 +72,36 @@ Probe -Name 'externalGamesEnabled no longer refuses outright' `
 
 Write-Host "`n=== the hard-coded attempts/round-start policy ===" -ForegroundColor Cyan
 
-# A challenge is exactly two players facing one round each - `single` / `reserve_full_round`
-# is not a default, it is the only policy this shape supports. Widening it here without also
-# widening the model and the accept-route seat builder is real scope for a later phase, so
-# this pins that nobody quietly does it by editing one literal.
+# A challenge is exactly two players facing one round each - `single` is not a default, it is
+# the only policy this shape supports. Widening it here without also widening the model and
+# the accept-route seat builder is real scope for a later phase, so this pins that nobody
+# quietly does it by editing one literal.
 Probe -Name 'attemptsPolicy is no longer hard-coded to "single"' `
   -File $RESOLVER `
   -Find '    attemptsPolicy: "single",' `
   -Replace '    attemptsPolicy: "best_of_n",' `
   -ExpectRed 'resolves successfully when the round fits inside the requested duration'
 
-# `until_window_closes` turns the SAME fact (round longer than the window) from a refusal
-# into a warning - `runPreflight`'s own `reservesFullRound` branch. Silently switching this
-# would let a challenge be created that no attempt could ever complete inside, with nothing
-# telling the player.
-Probe -Name 'roundStartPolicy is no longer hard-coded to "reserve_full_round"' `
+# RE-AIMED 13 SEPTEMBER 2026, because the target moved: this probe used to inject
+# `until_window_closes` over a hard-coded `reserve_full_round`, and that is now the shipped
+# value. Left alone it would have reported PROBE DID NOT APPLY, which reads like a broken
+# harness rather than a guard whose subject changed - so the mutation is reversed and points at
+# the flipped test instead. The reservation is the DEFAULT inside `runPreflight`, so writing it
+# back here is a one-word edit that returns the owner's original complaint in full.
+Probe -Name 'the permissive start policy is replaced by the reservation' `
   -File $RESOLVER `
-  -Find '    roundStartPolicy: "reserve_full_round",' `
-  -Replace '    roundStartPolicy: "until_window_closes",' `
-  -ExpectRed "refuses when the title's own declared play clock is longer than the requested challenge duration"
+  -Find '    roundStartPolicy: CHALLENGE_ROUND_START_POLICY,' `
+  -Replace '    roundStartPolicy: "reserve_full_round",' `
+  -ExpectRed "ALLOWS a challenge shorter than the title's own play clock"
+
+# And the same mutation the other way round: simply DROPPING the field is indistinguishable
+# from the reservation, because `runPreflight`'s own parameter is optional and an absent value
+# means `reserve_full_round`. That is the version with nothing in the diff to see.
+Probe -Name 'the start policy is not passed to the pre-flight at all' `
+  -File $RESOLVER `
+  -Find '    roundStartPolicy: CHALLENGE_ROUND_START_POLICY,' `
+  -Replace '' `
+  -ExpectRed "ALLOWS a challenge shorter than the title's own play clock"
 
 Write-Host "`n=== the adapter check is wired to the REQUESTED provider, not a fixed one ===" -ForegroundColor Cyan
 

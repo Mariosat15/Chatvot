@@ -257,6 +257,42 @@ decided. Note it inherits **R50's warning**: `ChallengeParticipant.score` still 
 `0`, so **the first provider challenge reproduces R50 exactly** unless that default is dealt
 with in the same work.
 
+> **AMENDED 13 September 2026, and two of the paragraphs above are now history rather than
+> plan.** The last one is closed: **`ChallengeParticipant.score` no longer defaults** (R50's
+> challenge half, 12 Sep 2026), so the first provider challenge does not reproduce R50 — a
+> document repeating that warning as a present fact is stale, and **say which**. And the
+> "everything else" list is **built**: a provider challenge can be created, accepted, played,
+> scored and settled, with the game chooser a scrollable list of titles and the create dialog
+> rendering each title's own `configSchema` (`13` s4.1z). What remains genuinely undecided here
+> is only the **synchronisation** question this section is about — nobody chooses the gun — and
+> the shipped answer is the honest interim one: a challenge is **`anytime` in every case**, its
+> window derived from acceptance by `deriveChallengeWindow`, and it **never reserves a round out
+> of that window** (`CHALLENGE_ROUND_START_POLICY`, **R73**, and the sixth amendment to `03`
+> s1.2). The third row of the table above — *`scheduled` titles cannot be challenged* — is
+> therefore the live position by construction: no title declares `scheduled` yet, and a
+> challenge does not ask.
+>
+> **The per-title challenge DEFAULTS the owner asked for on the same day are NOT built** — a
+> join policy, a round length and a board size chosen per title in admin, so a player creating a
+> challenge does not have to. The settings form makes them *choosable*; it does not make them
+> *pre-chosen*. `roundStartPolicy` was deliberately kept a **stored** field rather than becoming
+> a hard-coded read precisely so such a default can narrow it later without changing the rule
+> underneath challenges already in flight.
+>
+> **AMENDED LATER THE SAME DAY — the paragraph above is history.** The defaults **are** built
+> (`12` **s4.2d**, the authoritative account), so a document citing that paragraph as a present
+> fact is stale and **must say which**. The prediction in its last sentence is exactly what
+> happened: a title may now store a `reserve_full_round` default, and because the policy was a
+> stored field the narrowing needed no change to any gate. **Two things about it belong here
+> rather than in `12`.** The strict writer **refuses** such a default when the title declares no
+> round length, or when the round is at least as long as the whole challenge — the second is
+> **R73 exactly**, so without that refusal the new control would recreate the defect it was asked
+> for alongside. And **absent still means permissive**: `resolveChallengeStartPolicy` is the one
+> reader of the field, and it treats absent, `null`, `""` and an unrecognised value alike, which
+> is the **opposite** of `contest-config.ts`'s reading of the same field name — a competition's
+> policy is an operator's choice with a schema default behind it, whereas an unset value on a
+> challenge is a challenge created before there was a rule.
+
 ---
 
 ## 6. What needs deciding

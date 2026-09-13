@@ -31,7 +31,14 @@ export interface IChallenge extends Document {
   contentSeed?: string;
   attemptsPolicy?: "single" | "best_of_n" | "sum_of_n";
   attemptsAllowed?: number;
-  /** Add-only. Absent means `reserve_full_round`, matching Competition's own default. */
+  /**
+   * Add-only. This said "Absent means `reserve_full_round`, matching Competition's own
+   * default" until 13 Sep 2026, and that reading made every provider challenge shorter than
+   * the title's round ceiling refuse a round for its whole life (R73). Absent now means
+   * PERMISSIVE - see `CHALLENGE_ROUND_START_POLICY` in `challenge-round-config.ts`, which is
+   * what new challenges store and the one definition of the rule. Only an explicit
+   * `reserve_full_round` reserves.
+   */
   roundStartPolicy?: "reserve_full_round" | "until_window_closes";
 
   // Participants

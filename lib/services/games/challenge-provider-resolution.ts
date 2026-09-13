@@ -11,7 +11,11 @@ import {
   runPreflight,
   RESULT_GRACE_MARGIN_SECONDS,
 } from "@/lib/services/games/contest-preflight";
-import { DEFAULT_RESULT_GRACE_SECONDS } from "@/lib/services/games/round-types";
+import {
+  DEFAULT_RESULT_GRACE_SECONDS,
+  type RoundStartPolicy,
+} from "@/lib/services/games/round-types";
+import { resolveChallengeStartPolicy } from "@/lib/services/games/challenge-defaults";
 
 /**
  * Resolving and pre-flighting a provider game for a NEW challenge (X10/E8, item 3 of the
@@ -49,12 +53,30 @@ import { DEFAULT_RESULT_GRACE_SECONDS } from "@/lib/services/games/round-types";
  * immediately after. Nothing here is a second copy of a stored value, because nothing here is
  * stored.
  *
- * ATTEMPTS POLICY AND ROUND START POLICY ARE HARD-CODED TO "single" / "reserve_full_round" for
- * a provider challenge, deliberately narrower than what Competition allows. A challenge is
- * exactly two players facing one round each; multi-attempt policies and the permissive
- * until-close start policy both exist to give an operator control over a many-player contest's
- * economics, which has no equivalent question for a 1v1. Widening this is real scope for a
- * later phase, not an oversight here.
+ * THE ATTEMPTS POLICY IS HARD-CODED TO "single" for a provider challenge, deliberately
+ * narrower than what Competition allows: a challenge is exactly two players facing one round
+ * each, and multi-attempt policies exist to give an operator control over a many-player
+ * contest's economics, which has no equivalent question for a 1v1.
+ *
+ * THE ROUND START POLICY IS NOT, AND IT IS THE ONE THING HERE THAT COMES FROM THE CATALOGUE.
+ * Owner decision, 13 September 2026: a challenge does not reserve a whole round out of its own
+ * window unless an operator has said so for that title (`challengeDefaults.roundStartPolicy`),
+ * so `until_window_closes` is the rule for every game we run and a player who presses Play late
+ * gets a SHORTENED round rather than a refusal. Two properties of that read matter. It is taken
+ * from the STORED title and never from the request, so a client cannot choose its own play rule
+ * - the same reasoning as deriving the market-hours gate's game type from the stored label. And
+ * the value resolved here is passed to `runPreflight` AND returned for the route to store, from
+ * one resolution: a pre-flight approving a challenge under the permissive rule while the strict
+ * one is stored is exactly the defect below, arriving through the control built to prevent it.
+ * It used to be
+ * `reserve_full_round`, which is correct code enforcing a rule nobody had chosen, and the
+ * arithmetic made it far worse than it reads: the reservation is the game's own configured
+ * play clock, so a fifteen-minute challenge of a ten-minute game refused every round from the
+ * fifth minute onwards - both players paid, neither could play, and the refusal named the
+ * clock rather than the setting behind it. The premise `03` s1.2 argues from - that a
+ * cut-short round is worth nothing - stopped holding when R48 made a partial run count, and a
+ * 1v1 has the additional property that both players face the same window, so a late start
+ * costs the person who was late and nobody else.
  */
 
 export interface ChallengeProviderGameInput {
@@ -73,6 +95,15 @@ export interface ChallengeProviderGameResolved {
   displayName: string;
   /** Coerced, schema-defaulted settings - what gets stored in `gameConfig.settings`. */
   settings: Record<string, unknown>;
+  /**
+   * How late a player may start a round, resolved from the title's own operator-set default.
+   *
+   * RETURNED RATHER THAN LEFT TO THE ROUTE to import the constant, because the pre-flight above
+   * has already been run against this exact value. If the route decided for itself, a title
+   * whose operator reinstated the reservation would be approved permissively and then stored
+   * strictly - and every round of it refused, which is R73.
+   */
+  roundStartPolicy: RoundStartPolicy;
   warnings: string[];
 }
 
@@ -135,9 +166,11 @@ export async function resolveChallengeProviderGame(
     };
   }
 
-  // Re-validated with the coerced result kept, not the submitted one - the client sends no
-  // `settings` object at all for a provider challenge (`ChallengeCreateDialog.tsx`), so this
-  // is what turns an empty submission into the schema's own defaults.
+  // Re-validated with the coerced result kept, not the submitted one, so `"7"` from a number
+  // input never reaches the provider as a string. The dialog sends the player's own choices
+  // since 13 Sep 2026 (`ChallengeSettingsFields.tsx`) - it sent nothing at all before that -
+  // and this is still what turns an empty submission into the schema's own defaults, which is
+  // what an API caller sending no settings gets.
   const validated = validateConfigValues(parsedSchema.fields, input.settings ?? {});
   if (!validated.ok) {
     return {
@@ -146,6 +179,10 @@ export async function resolveChallengeProviderGame(
       errors: validated.errors,
     };
   }
+
+  // Resolved BEFORE the pre-flight, so one value governs both the checks below and what the
+  // route stores. Read off the stored title, never the request - see the module comment.
+  const roundStartPolicy = resolveChallengeStartPolicy(title.challengeDefaults);
 
   const durationSeconds = Math.max(1, Math.round(input.durationMinutes * 60));
   const playWindowStart = now;
@@ -186,7 +223,11 @@ export async function resolveChallengeProviderGame(
     playWindowEnd,
     resultGracePeriodSeconds,
     attemptsPolicy: "single",
-    roundStartPolicy: "reserve_full_round",
+    // Passed to the pre-flight as well as stored, from the one resolution above: otherwise
+    // creation refuses a title whose round is longer than the challenge while play would have
+    // permitted it, or approves one permissively that play then refuses - one gate answering a
+    // question the other has stopped asking.
+    roundStartPolicy,
     unresolvedRoundPolicy: "score_zero",
     lastSandboxRoundAt: title.lastSuccessfulRoundAt ?? null,
     now,
@@ -205,6 +246,7 @@ export async function resolveChallengeProviderGame(
     gameKey: title.gameKey,
     displayName: title.displayName,
     settings: validated.values,
+    roundStartPolicy,
     warnings: preflight.warnings,
   };
 }

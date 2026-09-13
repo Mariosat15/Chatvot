@@ -1,5 +1,18 @@
 import type { RoundContestConfig } from "./round-types";
 import { deriveChallengeWindow, type ChallengeWindowFields } from "./challenge-window";
+import { resolveChallengeStartPolicy } from "./challenge-defaults";
+
+/**
+ * Re-exported, not defined here.
+ *
+ * IT MOVED TO `challenge-defaults.ts` ON 13 SEPTEMBER 2026, in the same piece of work that gave
+ * an operator a per-title way to reinstate the reservation - which is what the paragraph this
+ * replaces anticipated. That module is mirrored into `apps/admin` and this file is not, so the
+ * constant has to live on the mirrored side or the admin half of the new control would carry a
+ * second copy of it. Every existing importer keeps working, on the precedent
+ * `reconciliation.service.ts` already set with `DEFAULT_RESULT_GRACE_SECONDS`.
+ */
+export { CHALLENGE_ROUND_START_POLICY } from "./challenge-defaults";
 
 /**
  * Reads a stored challenge's round settings, the challenge-side sibling of
@@ -118,10 +131,11 @@ export function challengeRoundConfig(
         attemptsPolicy === "single" ? undefined : challenge.attemptsAllowed,
       playWindowEnd: window.playWindowEnd,
       contentSeed: challenge.contentSeed,
-      roundStartPolicy:
-        challenge.roundStartPolicy === "until_window_closes"
-          ? "until_window_closes"
-          : "reserve_full_round",
+      // Read through the shared helper rather than inline: absent means PERMISSIVE here, the
+      // opposite of `contest-config.ts`'s reading of the same field name, and the create-time
+      // resolver has to answer the identical question when it decides what to store. See
+      // `resolveChallengeStartPolicy` for why that must be one definition.
+      roundStartPolicy: resolveChallengeStartPolicy(challenge),
       settings: challenge.gameConfig?.settings,
     },
   };

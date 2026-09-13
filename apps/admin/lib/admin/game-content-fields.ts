@@ -93,6 +93,12 @@ export const NEVER_EDITABLE_CONTENT_FIELDS: ReadonlyMap<string, string> = new Ma
   ["zeroIsValidResult", "changed with the Prize eligibility control, which has its own audit line"],
   ["minimumEligibleScore", "changed with the Prize eligibility control, which has its own audit line"],
   ["scoreUnit", "changed with the Prize eligibility control, which has its own audit line"],
+  // Ours, and barred for the same reason as `playModeOverride` and the two prize-eligibility
+  // fields above: it has its own control and its own audit line, and it decides how long a paid
+  // 1v1 runs and how late a player may start their round. Accepting it here would let the join
+  // rule that R73 removed be reinstated as a side effect of fixing a typo in a tagline, with the
+  // audit trail recording a content edit.
+  ["challengeDefaults", "changed with the Challenge defaults control, which has its own audit line"],
   ["configSchema", "declared by the provider and rewritten by every catalogue sync"],
   ["supportsCompetition", "declared by the provider and rewritten by every catalogue sync"],
   ["supportsOneVsOne", "declared by the provider and rewritten by every catalogue sync"],

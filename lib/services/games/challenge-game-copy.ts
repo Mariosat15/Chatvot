@@ -72,6 +72,44 @@ export function challengeContentSeedNote(selection: ChallengeGameSelection): str
   return `Both players face the exact same ${selection.title.displayName} round, so the comparison is fair even though you may not play at the same time.`;
 }
 
+/**
+ * The one-line summary under a title's name in the picker.
+ *
+ * FACTS THE CATALOGUE DECLARES, AND NOTHING ELSE. Every part is read off the row - the
+ * provider's own name, the operator's genre, the round ceiling, the direction the game scores
+ * in - so a title the platform has never seen describes itself. Naming a game, a metric or a
+ * provider key here is the one way the no-developer-needed claim stops being true, so a test
+ * forbids it.
+ *
+ * THE CEILING IS SAID AS "UP TO", never as a length. `maxDurationSeconds` is the longest round
+ * a title permits, not the one this challenge will run - the playing time comes from the
+ * title's own settings, which the dialog renders below - and stating it flatly is a deadline
+ * the platform never set (the same rule as the arena hero's `Fast rounds`).
+ *
+ * AN UNDECLARED FIELD SAYS NOTHING rather than a placeholder, so a sparse catalogue row reads
+ * as a short line and never as "Unknown".
+ */
+export function challengeTitleFacts(title: ChallengeableTitle): string[] {
+  const facts: string[] = [title.providerName];
+
+  if (title.category) facts.push(title.category);
+
+  if (title.maxDurationSeconds && title.maxDurationSeconds > 0) {
+    const minutes = Math.round(title.maxDurationSeconds / 60);
+    facts.push(
+      minutes >= 1
+        ? `Up to ${minutes} min per round`
+        : `Up to ${title.maxDurationSeconds}s per round`,
+    );
+  }
+
+  facts.push(
+    title.scoreDirection === "lower_is_better" ? "Lowest wins" : "Highest wins",
+  );
+
+  return facts;
+}
+
 /** Why a title's card is disabled in the picker. Mirrors admin's `StepChooseGame.tsx`. */
 export function challengeUnavailableReason(title: ChallengeableTitle): string | undefined {
   if (!title.supportsOneVsOne) return "Does not support 1v1 challenges";

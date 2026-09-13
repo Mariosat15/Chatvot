@@ -17,6 +17,7 @@ import {
   Trophy,
   Loader2,
   Target,
+  Gamepad2,
   Zap,
   AlertTriangle,
   Shield,
@@ -27,6 +28,7 @@ import ActionTermsDialog, {
   ACTION_TERM_SLUGS,
 } from "@/components/ActionTermsDialog";
 import ChallengeGamePicker from "@/components/challenges/ChallengeGamePicker";
+import ChallengeSettingsFields from "@/components/challenges/ChallengeSettingsFields";
 import type { ChallengeableTitle } from "@/lib/services/games/challengeable-titles.service";
 import {
   challengeSubtitle,
@@ -67,6 +69,49 @@ export default function ChallengeCreateDialog({
   const [selection, setSelection] = useState<ChallengeGameSelection>({
     type: "trading",
   });
+  /**
+   * The chosen game's own settings - board size, difficulty, playing time, whatever this title
+   * happens to take.
+   *
+   * SEEDED FROM THE TITLE'S OWN DEFAULTS AND REPLACED WHOLE when the game changes, never
+   * merged: values from the previous game's schema are meaningless against the new one, so
+   * carrying them over submits keys the new schema does not declare - which the create route
+   * then refuses, naming a field the player never saw.
+   */
+  const [gameSettings, setGameSettings] = useState<Record<string, unknown>>({});
+
+  /**
+   * The one place a pick changes the form, and it moves THREE things together: the game, its
+   * settings and the length.
+   *
+   * THE LENGTH IS PART OF THE PICK because an operator may set one per title (13 Sep 2026) - a
+   * ten-minute game and a two-hour one want different challenge windows, and the owner's report
+   * was a player choosing ten minutes for a game whose round could not fit inside it. Leaving
+   * the duration behind would mean the pre-chosen settings arrived with a window nobody chose
+   * for them, which is the same defect one field along.
+   *
+   * GOING BACK TO TRADING RESTORES THE PLATFORM DEFAULT rather than keeping the game's. A
+   * trading challenge has no title to ask, so a length inherited from a game the player has
+   * since deselected is a value with no author - and it is silent, because any duration inside
+   * the bounds is accepted.
+   *
+   * THE VALUES ARE READ OFF THE TITLE, NEVER RECOMPUTED HERE. `defaults` is resolved by
+   * `listChallengeableTitles`, which clamps to the platform bounds and drops a stored setting
+   * the schema no longer accepts; re-deriving either in the browser is a second copy of a rule
+   * the server enforces, and the two disagree in the direction that pre-fills a value the create
+   * route then refuses.
+   */
+  const chooseGame = (next: ChallengeGameSelection) => {
+    setSelection(next);
+    setGameSettings(next.type === "provider" ? next.title.defaults.settings : {});
+    setFormData((prev) => ({
+      ...prev,
+      duration:
+        next.type === "provider"
+          ? next.title.defaults.durationMinutes
+          : settings?.defaultDurationMinutes ?? prev.duration,
+    }));
+  };
   const [formData, setFormData] = useState({
     entryFee: 10,
     duration: 60,
@@ -169,6 +214,7 @@ export default function ChallengeCreateDialog({
       // Reason: a fresh challenge every time the dialog opens - a player reopening it
       // after cancelling a provider pick should not find the previous game still chosen.
       setSelection({ type: "trading" });
+      setGameSettings({});
       fetchSettings();
       fetchTitles();
       fetchMarketStatus();
@@ -210,6 +256,11 @@ export default function ChallengeCreateDialog({
           : {
               providerKey: selection.title.providerKey,
               gameCode: selection.title.gameCode,
+              // Reason: the game's own settings, validated server-side against the STORED
+              // schema by `resolveChallengeProviderGame` - never trusted as sent, and never
+              // silently dropped either: an unknown or out-of-range value is refused with the
+              // field named, so the player is told which control to change.
+              settings: gameSettings,
             };
 
       const response = await fetch("/api/challenges", {
@@ -274,7 +325,7 @@ export default function ChallengeCreateDialog({
           <ChallengeGamePicker
             titles={titles}
             selection={selection}
-            onSelect={setSelection}
+            onSelect={chooseGame}
             disabled={loading}
           />
 
@@ -351,6 +402,26 @@ export default function ChallengeCreateDialog({
                   ))}
                 </div>
               </div>
+
+              {/* The chosen game's OWN settings, rendered from its schema - provider only.
+                  Trading's equivalents are the fields below (capital, ranking method), which
+                  are the trading module's settings and are not schema-driven. */}
+              {selection.type === "provider" && (
+                <div className="space-y-1.5 border-t border-gray-800 pt-4">
+                  <Label className="flex items-center gap-2 text-sm text-gray-300">
+                    <Gamepad2 className="h-3.5 w-3.5 text-orange-400" />
+                    {selection.title.displayName} Settings
+                  </Label>
+                  <ChallengeSettingsFields
+                    fields={selection.title.settingsFields}
+                    values={gameSettings}
+                    onChange={(name, value) =>
+                      setGameSettings((prev) => ({ ...prev, [name]: value }))
+                    }
+                    disabled={loading}
+                  />
+                </div>
+              )}
 
               {/* Starting Capital + Ranking Method - trading only. A provider game has no
                   virtual capital (Challenge.startingCapital is conditionally required and

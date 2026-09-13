@@ -69,6 +69,26 @@ export function guardCallPattern(): RegExp {
   return /guardSection\(\s*["'`]([a-z0-9-]+)["'`]\s*\)/g;
 }
 
+/**
+ * One slice of source per exported handler, each running to the next handler or the end.
+ *
+ * Reason: a file-wide position comparison cannot see an ordering defect in the SECOND handler.
+ * `code.search(...)` returns the first match anywhere, so a route whose `GET` guards first and
+ * whose `PATCH` reads its body before guarding passes "the guard comes before the body" while
+ * being exactly the thing that assertion exists to forbid - the file-wide form of the
+ * count-per-handler rule above, and it cost a green probe to find.
+ */
+export function handlerSlices(code: string): { method: string; body: string }[] {
+  const starts = [...code.matchAll(handlerPattern())].map((match) => ({
+    method: match[1],
+    at: match.index ?? 0,
+  }));
+  return starts.map((start, index) => ({
+    method: start.method,
+    body: code.slice(start.at, starts[index + 1]?.at ?? code.length),
+  }));
+}
+
 /** The section ids a folder's routes name, in source order. */
 export function guardedSections(code: string): string[] {
   return [...code.matchAll(guardCallPattern())].map((match) => match[1]);

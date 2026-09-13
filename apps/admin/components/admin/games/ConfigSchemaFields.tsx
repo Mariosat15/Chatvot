@@ -385,17 +385,10 @@ function RangeHint({ field }: { field: ConfigField }) {
 /**
  * Seeds the form with each field's declared default.
  *
- * Exported because the wizard needs it when the operator picks a different game: the values
- * from the previous game's schema are meaningless against the new one, and carrying them
- * over would submit keys the new schema does not declare.
+ * RE-EXPORTED, NOT DEFINED HERE, since 13 September 2026. The wizard needs it when the operator
+ * picks a different game - the values from the previous game's schema are meaningless against
+ * the new one - and the player's challenge dialog now needs exactly the same answer. It lives in
+ * `config-schema.ts` beside the parser and the validator it has to agree with; the re-export
+ * keeps this module's importers unchanged rather than being a second definition.
  */
-export function defaultConfigValues(
-  fields: ConfigField[],
-): Record<string, unknown> {
-  const values: Record<string, unknown> = {};
-  for (const field of fields) {
-    if (field.default !== undefined) values[field.name] = field.default;
-    else if (field.type === "boolean") values[field.name] = false;
-  }
-  return values;
-}
+export { defaultConfigValues } from "@/lib/services/games/config-schema";

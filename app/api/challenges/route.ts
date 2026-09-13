@@ -21,6 +21,8 @@ import {
   getSimulatorUserId,
 } from "@/lib/services/simulator/simulator-mode";
 import { resolveChallengeProviderGame } from "@/lib/services/games/challenge-provider-resolution";
+import { CHALLENGE_ROUND_START_POLICY } from "@/lib/services/games/challenge-round-config";
+import type { RoundStartPolicy } from "@/lib/services/games/round-types";
 
 // Request timeout for this route (5 seconds)
 const _REQUEST_TIMEOUT_MS = 5000;
@@ -121,9 +123,12 @@ export async function POST(request: NextRequest) {
       // Reason: the lookup key for a provider game (`ChallengeGamePicker.tsx`). Absent
       // for a trading challenge, exactly as `Challenge.gameConfig` being absent IS the
       // statement "this is not a provider challenge" - see that model's own comment.
-      // `settings` is the provider's raw, possibly-empty config submission; the create
-      // dialog sends none at all today, so this defaults to `{}` and
-      // `resolveChallengeProviderGame` fills the schema's own defaults.
+      // `settings` is the provider's raw config submission, validated and coerced against the
+      // STORED schema by `resolveChallengeProviderGame` - never trusted as sent. The `{}`
+      // default is no longer the ordinary case: since 13 Sep 2026 the dialog renders the
+      // title's own settings form and submits them (`ChallengeSettingsFields.tsx`). It stays
+      // because an API caller may still send none, and the resolver then fills the schema's
+      // own defaults - the same values an untouched form would have submitted.
       providerKey,
       gameCode,
       settings: gameSettings = {},
@@ -250,6 +255,9 @@ export async function POST(request: NextRequest) {
     // stored means the two can never disagree.
     let gameLabel = contestGameLabel();
     let resolvedGameSettings: Record<string, unknown> | undefined;
+    // How late a player may start a round. Resolved by the same call that pre-flighted the
+    // challenge, so what is stored is what was checked - see `ChallengeProviderGameResolved`.
+    let resolvedRoundStartPolicy: RoundStartPolicy | undefined;
 
     if (isProviderChallenge) {
       // Reason: this is also where the provider-only pre-flight checks live (title
@@ -269,6 +277,7 @@ export async function POST(request: NextRequest) {
 
       gameLabel = contestGameLabel(PROVIDER_GAME_TYPE, resolved.gameKey);
       resolvedGameSettings = resolved.settings;
+      resolvedRoundStartPolicy = resolved.roundStartPolicy;
     }
 
     // ⏰ CHECK MARKET STATUS - only for games that trade against a live market. A
@@ -510,7 +519,12 @@ export async function POST(request: NextRequest) {
         // Hard-coded for a 1v1 - see `challenge-provider-resolution.ts`'s own comment
         // for why this is deliberately narrower than what Competition allows.
         attemptsPolicy: "single",
-        roundStartPolicy: "reserve_full_round",
+        // Taken from the resolver that just approved the challenge, never resolved again here:
+        // this is the title's own operator-set rule, and a second read is a second chance for
+        // the stored rule and the checked rule to differ. `??` and not `||` - both values are
+        // strings, so the fallback is only for the impossible case of the resolver not having
+        // run, and the permissive default is what every game we run uses.
+        roundStartPolicy: resolvedRoundStartPolicy ?? CHALLENGE_ROUND_START_POLICY,
       };
     } else {
       // Uses universal TradingRiskSettings for trading rules

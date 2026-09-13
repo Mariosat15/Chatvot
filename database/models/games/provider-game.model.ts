@@ -53,6 +53,12 @@ export interface IProviderGame extends Document {
   minimumEligibleScore?: number;
   typicalDurationSeconds?: number;
   maxDurationSeconds?: number;
+  /** Ours. What a player's challenge form opens pre-filled with. See the schema note below. */
+  challengeDefaults?: {
+    durationMinutes?: number;
+    roundStartPolicy?: "until_window_closes" | "reserve_full_round";
+    settings?: Record<string, unknown>;
+  };
   /** JSON Schema from the provider. The admin contest form is generated from this. */
   configSchema?: Record<string, unknown>;
   providerStatus: "active" | "deprecated" | "maintenance";
@@ -358,6 +364,47 @@ const ProviderGameSchema = new Schema<IProviderGame>(
 
     typicalDurationSeconds: { type: Number },
     maxDurationSeconds: { type: Number },
+
+    // What a player gets pre-filled when they challenge somebody at this title.
+    //
+    // OPERATOR-OWNED and in NO sync allow-list, like `playModeOverride` and `supportedPlayModes`
+    // above and for the same reason - a provider declares what their game is, we declare how we
+    // are willing to run a 1v1 of it. That survival is a property of the allow-list rather than
+    // of anything written here, so a test asserts it rather than trusting it. Nothing here is in
+    // the provider contract either, so `01` and the requirements HTML need no version bump.
+    //
+    // NO DEFAULTS ANYWHERE INSIDE IT, on the `playModeOverride` precedent: absence means "nobody
+    // has decided", and a schema default IS a stored value (R50, `entryBlockThreshold`,
+    // `canEnterChallenges`), so a default would write a decision nobody took onto every row the
+    // next sync creates and make a deliberate answer indistinguishable from silence.
+    //
+    // READ THROUGH `resolveChallengeDefaults` IN `lib/services/games/challenge-defaults.ts`,
+    // never directly, and note the two halves are deliberately asymmetric. The WRITE path is
+    // strict - an out-of-range duration or a setting the schema rejects is refused with the
+    // reason, because an operator is sitting in front of it. The READ path is lenient - a
+    // provider may narrow their own `configSchema` or an administrator may narrow the global
+    // duration bounds long after these were stored, and refusing then would take the challenge
+    // dialog down for a title that is otherwise perfectly playable. It drops what no longer
+    // validates and falls back to the schema's own defaults, which is what the dialog did
+    // before this field existed.
+    //
+    // `roundStartPolicy` HERE IS THE ONLY WAY TO REINSTATE THE LATE-START REFUSAL, and it is
+    // absent by default, which is the whole point. The owner's instruction of 13 September 2026
+    // was that a late player gets a shortened round rather than a refusal (R73), so the
+    // permissive rule is the platform's and this field is the "or specific" half of the same
+    // instruction's "any time or specific" - one title an operator deliberately wants a whole
+    // round reserved for, chosen per title rather than imposed on every game at once.
+    challengeDefaults: {
+      durationMinutes: { type: Number },
+      roundStartPolicy: {
+        type: String,
+        enum: ["until_window_closes", "reserve_full_round"],
+      },
+      // Mixed for the same reason `configSchema` is: these are answers to a schema whose shape
+      // the provider owns. Validated against that schema on the way in and again on the way
+      // out, never trusted because it is stored.
+      settings: { type: Schema.Types.Mixed },
+    },
 
     // Reason: Mixed because this is a JSON Schema supplied by the provider, whose shape we
     // do not control and must not constrain. It is never executed and never trusted - the

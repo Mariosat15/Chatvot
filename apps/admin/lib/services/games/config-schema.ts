@@ -470,6 +470,32 @@ export function resolveAttemptSecondsFromSchema(
   );
 }
 
+/**
+ * Seeds a settings form with each field's declared default.
+ *
+ * HERE RATHER THAN BESIDE A FORM, because there are now two forms - the admin contest wizard
+ * and the player's challenge dialog - and a second copy of "what does an untouched form
+ * contain" is the shape behind `referenceId`, `failedReason` and the Game Master `||`. The
+ * consequence of drifting is quiet: one screen submits a key the other does not, and
+ * `validateConfigValues` fills the gap from the same defaults, so the two produce different
+ * stored settings for the same game while both look correct.
+ *
+ * A BOOLEAN WITH NO DECLARED DEFAULT SEEDS `false`, and every other type seeds nothing. A
+ * switch has to render in one position or the other, so there is no "unset" to show; a number
+ * or a string box can legitimately open empty, and inventing a value there would submit a
+ * setting nobody chose.
+ */
+export function defaultConfigValues(
+  fields: ConfigField[],
+): Record<string, unknown> {
+  const values: Record<string, unknown> = {};
+  for (const field of fields) {
+    if (field.default !== undefined) values[field.name] = field.default;
+    else if (field.type === "boolean") values[field.name] = false;
+  }
+  return values;
+}
+
 function numberOrUndefined(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }

@@ -46,6 +46,7 @@ chapter covers risks to the programme and to the application.
 | **R70** | **The wizard's Custom playing time could not be reached.** `DurationControl` derived "custom mode" from the value matching no preset, and picking Custom deliberately changed no value so as not to edit a contest somebody was only inspecting. Both rules are right alone: together, the ten-minute default is itself a preset, so the click did nothing, the select snapped back and no box appeared. An operator could only use Custom if they had somehow already used it. Fixed with it: `resolveExpiry`'s documented slack was **borrowed from the gap between the ceiling and the configured length**, and that gap closes at the longest round a title allows, so every full-length round was cut short by the frame's load time and filed as `expired` | Low | **LIVE and operator-visible**; nothing stored wrongly, and the expiry half cost a metric rather than a payment (a partial run counts, R48) | **CLOSED 12 Sep 2026** (`12` s2.13); nothing to backfill |
 | **R71** | **Neither app paid a Game Master a share of a challenge's entry fees** - the admin app's `challenge-finalize.actions.ts` had **no Game Master fee logic of any kind**, not even the main app's own inline copy, so a referred player entering a challenge earned their referrer nothing on either app | High | **LATENT, not live** - no backfill is possible: no fee row was ever written to attribute | **CLOSED 12 Sep 2026** - both apps now call the shared `settleFeesAndGameMasters()` via `challenge-settlement.service.ts`; see `19` section 4 |
 | **R72** | **Three sibling bugs in the challenge tie/disqualification logic being replaced, present in BOTH apps.** The `"join_time"` tiebreaker read `participant.enteredAt`, a field `ChallengeParticipant` has never declared (it is `joinedAt`), so it always compared `Date.now()` against itself and could never break a tie. Under `challenger_wins`, the challenge document was saved `isTie: true, winnerId: undefined` moments before the challenger was paid the full prize - a permanent stored-vs-paid mismatch. Under `both_lose`, neither participant's `.status` ever moved to `"completed"` and no unclaimed-pool row was recorded despite a comment claiming one had been | Medium | **LIVE** on every affected challenge tie, on both apps, for as long as the inline logic existed | **CLOSED 12 Sep 2026**, found while reading the code being replaced; nothing backfilled - each was a stored-record defect, not a wrong payment |
+| **R73** | **A provider challenge refused every attempt for its whole life, and the player was told they were too late.** `POST /api/challenges` stored `roundStartPolicy: "reserve_full_round"`, which reserves the **catalogue ceiling** rather than the configured length (`12` s2.9) - so any challenge whose window is shorter than the title's maximum round refused a round at every moment of its existence, not merely near the end. Circuit Sprint's ceiling is an hour, so the owner's ten-minute challenge could never be played. The rule is correct for a competition, which has an operator who chooses it, a schema default behind them and a pre-flight that refuses a too-short contest; **a challenge has none of the three.** The unreachable `?? "reserve_full_round"` fallback in `challenge-round-status.service.ts` named the value the resolver had stopped producing | Medium | **LIVE and player-visible** on every provider challenge, and reported by a real player; the round was refused before it was created, so no attempt was consumed, no money moved and nothing was stored wrongly | **CLOSED 13 Sep 2026** - a challenge never reserves (`CHALLENGE_ROUND_START_POLICY`, owner decision); nothing to backfill |
 | R8 | Bulk find-and-replace on wording | High | Medium | X8 |
 | R9 | Fraud throttle blind to provider entries | High | High | X5 |
 | R11 | Legal wording changed without review | High | Medium | X8 |
@@ -2391,6 +2392,89 @@ roadmap, 12 Sep 2026).** Both apps' `challenge-finalize.actions.ts` now call the
 (mirrored), the same stage a competition uses, with `contestKind: "challenge"` and support for
 the `challengeReferralFeePercentage` override exactly as the main app's pre-unification inline
 code read it. See `19-game-masters.md` section 4.
+
+---
+
+### R73 - A challenge that could never be played - **CLOSED 13 September 2026**
+
+**What it was.** The owner set a ten-minute challenge on Circuit Sprint, opened it, and read
+**"TOO LATE TO START A ROUND"** above a disabled button, with nine minutes still on the play
+clock. It is the report a real player would make, and every figure on the screen was correct.
+
+**The cause, and both halves are needed or it sounds like an edge case.** `POST /api/challenges`
+stored `roundStartPolicy: "reserve_full_round"` for every provider challenge. That policy holds
+back a whole round from the end of the window so an attempt can never be cut short - and
+`12` s2.9 records that the gate reserves **`maxDurationSeconds`, the catalogue ceiling**, not the
+configured playing time, deliberately, because it fails closed. So the reservation is not a thin
+band at the end of a challenge: **if the challenge's whole window is shorter than the title's
+maximum round, the gate refuses at every moment of the challenge's existence.** Circuit Sprint's
+ceiling rose to an hour on 8 September 2026 (`12` s2.9), so a ten-minute challenge was
+unplayable from the instant it was accepted.
+
+**Why the same value is correct on a competition.** Three things stand behind it there and none
+of them exists on a challenge: an **operator** picks the policy per contest
+(`RoundStartPolicyField`), a **schema default** keeps a pre-existing contest under the rule its
+entrants signed up to, and the **pre-flight** refuses a draft whose window cannot hold a full
+round in the first place. A challenge is created by a player from a dialog with no such control,
+so the value was neither chosen nor checked - it was simply the string somebody typed into the
+create route, copied from the shape beside it.
+
+**The owner's decision, which is a policy rather than a repair: a challenge never reserves.**
+`CHALLENGE_ROUND_START_POLICY = "until_window_closes"` lives in `challenge-round-config.ts` as
+the one definition, imported by the three writers that have to agree - the config resolver, the
+pre-flight in `challenge-provider-resolution.ts`, and the create route that stores the field.
+Written out separately in each, a challenge could be **created** under one rule and **played**
+under another, and the symptom of that disagreement is a clock that looks broken rather than a
+setting that looks wrong. A player who presses Play late gets a round shortened by
+`resolveExpiry`'s existing clamp to `playWindowEnd` - which `RoundPreflight` already discloses -
+and since **R48** a partial run counts, so the cost is a worse score rather than a wasted fee.
+
+**Absent means permissive here, which inverts `contest-config.ts`'s reading of the same field
+name.** That file resolves anything other than `until_window_closes` to `reserve_full_round`;
+this one resolves anything other than `reserve_full_round` to the permissive constant. The
+difference is what an unset value *means*: on a competition it is an operator's choice with a
+schema default behind it, and on a challenge it is a challenge created before there was a rule.
+The field is **kept stored rather than replaced by a hard-coded read**, so the per-title
+challenge defaults the owner asked for in the same message can narrow it later without every
+existing challenge changing rule underneath its two players.
+
+> **Amended later the same day.** Those per-title defaults are **built** (`12` s4.2d), so an
+> operator can now reinstate the reservation on a title that can honour it, and the sentence above
+> is history where it says "can narrow it later". Two things about that are load-bearing here.
+> The ternary had **three** writers by then - the round config, the resolver and the create-time
+> pre-flight - so it became `resolveChallengeStartPolicy`, and the guard's negative half is the one
+> that matters, importing the helper being trivially satisfied by a file that spells the comparison
+> out again five lines later. And **the strict write refuses a reservation the title cannot
+> honour**: with no declared round length there is nothing to reserve, and with a round as long as
+> the whole challenge every round is refused from the first second, which is this report verbatim.
+> Without that refusal the new control would be a way to reintroduce R73 through a form labelled
+> "make it easier for players".
+
+**The sibling nobody would have found by reading the fix.**
+`challenge-round-status.service.ts` resolved the play state with
+`config.config.roundStartPolicy ?? "reserve_full_round"`. The fallback is **unreachable** -
+`challengeRoundConfig` always resolves the field - but it named a value the resolver had stopped
+producing, so it was a refusal reachable from no configuration at all, sitting inside the branch
+that claims to be defaulting *from* that configuration. It names the constant now, which is the
+general rule: **a fallback beside a resolver must name what the resolver produces, or the two
+disagree the moment either changes.**
+
+**Live, player-visible, and nothing to backfill.** The refusal happened *before* a round was
+created, so no attempt was consumed, no fee moved and no document holds a wrong value. What it
+cost is a paid challenge nobody could play, which is why it is not filed as cosmetic - and it is
+not a payment defect either, so do not round it in that direction.
+
+**Pinned by** `__tests__/services/challenge-provider-resolution.test.ts` and
+`tools/probe-challenge-provider-resolution.ps1`, whose two probes on this attack it from both
+sides: one **writes the reserving string back**, which returns the owner's complaint in full, and
+one **drops the field entirely**, which is indistinguishable from the reservation because
+`runPreflight`'s own parameter is optional and an absent value means `reserve_full_round` - the
+version with nothing in the diff to see. **The pre-existing probe had to be RE-AIMED, not left**:
+it used to inject `until_window_closes` over the hard-coded reservation, which is now the shipped
+value, so left alone it would have reported `PROBE DID NOT APPLY` - and that reads like a broken
+harness rather than a guard whose subject moved. The two probes cover the **resolver**; the create
+route's stored value and the status service's fallback are held by the imported constant and by
+the tests above them rather than by their own probes.
 
 ---
 
