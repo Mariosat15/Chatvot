@@ -8,6 +8,12 @@ import type {
   SettlementLeaderboardEntry,
   SettlementPrizeDistribution,
 } from "./types";
+import { getGameModuleOrTrading } from "@/lib/games/registry";
+import type { GameModule, RankableParticipant } from "@/lib/games/types";
+import {
+  resolveScoringRules,
+  type ContestScoringRules,
+} from "@/lib/services/games/score-direction.service";
 
 /**
  * Settling a finished 1v1 challenge onto the shared payout and fee code.
@@ -48,50 +54,53 @@ import type {
 
 type TieBreaker = NonNullable<IChallenge["rules"]["tieBreaker1"]>;
 
-function getRankingValue(
-  participant: HydratedDocument<IChallengeParticipant>,
-  method: string,
-): number {
-  switch (method) {
-    case "pnl":
-      return participant.pnl || 0;
-    case "roi":
-      return participant.pnlPercentage || 0;
-    case "total_capital":
-      return participant.currentCapital || 0;
-    case "win_rate":
-      return participant.winRate || 0;
-    case "total_wins":
-      return participant.winningTrades || 0;
-    case "profit_factor": {
-      const totalWins = participant.winningTrades || 0;
-      const totalLosses = participant.losingTrades || 0;
-      if (totalLosses === 0) return totalWins > 0 ? 9999 : 0;
-      return totalWins / totalLosses;
-    }
-    default:
-      return participant.pnl || 0;
+/**
+ * Resolve the game module for a challenge's ranking value, tie-breaker value and result
+ * eligibility - the three questions `RankableParticipant` exists to let a module answer for
+ * itself instead of a `switch` on `gameType` living here.
+ *
+ * THROWS on an unknown game type, matching `competition-ranking.service.ts`'s own
+ * `resolveScoringModule` exactly: the alternative is falling back to trading, which reads
+ * a provider score as zero, ties the pair at rank 1, and pays a prize to whichever
+ * participant's `_id` happens to sort first - silently, with the page still rendering.
+ */
+function resolveScoringModule(gameType?: string): GameModule {
+  const gameModule = getGameModuleOrTrading(gameType);
+  if (!gameModule) {
+    throw new Error(
+      `Cannot settle a challenge for unknown game type "${gameType}". No module is registered for it, and settling it as trading would pay the wrong player.`,
+    );
   }
+  return gameModule;
 }
 
-function getTieBreakerValue(
+/**
+ * Build the module-agnostic view of one side of the challenge.
+ *
+ * `scoringRules` is `undefined` for trading (the module never reads `score`/`scoreDirection`
+ * for it, and skipping the lookup avoids an unnecessary catalogue read on every trading
+ * settlement, which is by far the more frequent case).
+ */
+function toRankableParticipant(
   participant: HydratedDocument<IChallengeParticipant>,
-  tieBreaker: string,
-): number {
-  switch (tieBreaker) {
-    case "trades_count":
-      return -(participant.totalTrades || 0); // Negative because fewer is better
-    case "win_rate":
-      return participant.winRate || 0;
-    case "total_capital":
-      return participant.currentCapital || 0;
-    case "roi":
-      return participant.pnlPercentage || 0;
-    case "join_time":
-      return -new Date(participant.joinedAt || Date.now()).getTime();
-    default:
-      return 0;
-  }
+  scoringRules?: ContestScoringRules,
+): RankableParticipant {
+  return {
+    userId: participant.userId,
+    status: participant.status,
+    enteredAt: participant.joinedAt,
+    score: participant.score,
+    scoreDirection: scoringRules?.direction,
+    zeroIsValidResult: scoringRules?.zeroIsValidResult,
+    minimumEligibleScore: scoringRules?.minimumEligibleScore,
+    currentCapital: participant.currentCapital,
+    pnl: participant.pnl,
+    pnlPercentage: participant.pnlPercentage,
+    totalTrades: participant.totalTrades,
+    winningTrades: participant.winningTrades,
+    losingTrades: participant.losingTrades,
+    winRate: participant.winRate,
+  };
 }
 
 export interface SettleChallengeInput {
@@ -121,31 +130,60 @@ export async function settleChallenge({
   challenged,
   tiePrizeDistribution = "split_equally",
 }: SettleChallengeInput): Promise<SettleChallengeResult> {
-  // ---------- Disqualification (minimum trades OR liquidation, matching competitions) ----------
+  // ---------- Resolve the game module and this contest's scoring rules ----------
+  // Reason `scoringRules` is only fetched off the trading path: `resolveScoringRules` reads
+  // `ProviderGame` inside the transaction, and trading's module never consults `score` or
+  // `scoreDirection` - fetching it anyway would be a wasted catalogue read on every trading
+  // challenge settlement, which is the overwhelmingly more common case.
+  const gameModule = resolveScoringModule(challenge.gameType);
+  const isTrading = challenge.gameType === "trading";
+  const scoringRules = isTrading
+    ? undefined
+    : await resolveScoringRules(challenge.gameKey, session);
+
+  const challengerRankable = toRankableParticipant(challenger, scoringRules);
+  const challengedRankable = toRankableParticipant(challenged, scoringRules);
+
+  // ---------- Disqualification ----------
+  // Reason this mirrors `checkQualification` in `competition-ranking.service.ts` rather than
+  // inventing a second design: `hasResult()` is the module's own answer to "did this
+  // participant produce a result worth paying on" (`true`, unconditionally, for trading - a
+  // flat, untraded account is still a real result), while the minimum-trades and liquidation
+  // checks are contest RULES a module has no opinion about and stay here, scoped to trading
+  // only. Applying `minimumTrades` to a provider participant would disqualify every one of
+  // them, since `totalTrades` is never populated for a non-trading game.
   const minTrades = challenge.rules.minimumTrades || 1;
   const disqualifyOnLiquidation = challenge.rules.disqualifyOnLiquidation !== false;
 
-  const challengerMinTradesFail = challenger.totalTrades < minTrades;
-  const challengedMinTradesFail = challenged.totalTrades < minTrades;
+  const challengerMinTradesFail = isTrading && challenger.totalTrades < minTrades;
+  const challengedMinTradesFail = isTrading && challenged.totalTrades < minTrades;
   const challengerLiquidated =
     disqualifyOnLiquidation && challenger.status === "liquidated";
   const challengedLiquidated =
     disqualifyOnLiquidation && challenged.status === "liquidated";
-  const challengerDisqualified = challengerMinTradesFail || challengerLiquidated;
-  const challengedDisqualified = challengedMinTradesFail || challengedLiquidated;
+  const challengerNoResult = !gameModule.hasResult(challengerRankable);
+  const challengedNoResult = !gameModule.hasResult(challengedRankable);
+  const challengerDisqualified =
+    challengerMinTradesFail || challengerLiquidated || challengerNoResult;
+  const challengedDisqualified =
+    challengedMinTradesFail || challengedLiquidated || challengedNoResult;
 
   if (challengerDisqualified && challenger.status !== "disqualified") {
     challenger.status = "disqualified";
     challenger.disqualificationReason = challengerLiquidated
       ? "Account liquidated"
-      : `Did not make minimum ${minTrades} trade(s)`;
+      : challengerMinTradesFail
+        ? `Did not make minimum ${minTrades} trade(s)`
+        : "No score recorded";
     await challenger.save({ session });
   }
   if (challengedDisqualified && challenged.status !== "disqualified") {
     challenged.status = "disqualified";
     challenged.disqualificationReason = challengedLiquidated
       ? "Account liquidated"
-      : `Did not make minimum ${minTrades} trade(s)`;
+      : challengedMinTradesFail
+        ? `Did not make minimum ${minTrades} trade(s)`
+        : "No score recorded";
     await challenged.save({ session });
   }
 
@@ -158,8 +196,14 @@ export async function settleChallenge({
   let winnerPnL = 0;
   let loserPnL = 0;
 
-  const challengerValue = getRankingValue(challenger, challenge.rules.rankingMethod);
-  const challengedValue = getRankingValue(challenged, challenge.rules.rankingMethod);
+  const challengerValue = gameModule.getRankingValue(
+    challengerRankable,
+    challenge.rules.rankingMethod,
+  );
+  const challengedValue = gameModule.getRankingValue(
+    challengedRankable,
+    challenge.rules.rankingMethod,
+  );
   const bothDisqualified = challengerDisqualified && challengedDisqualified;
 
   if (bothDisqualified) {
@@ -193,8 +237,8 @@ export async function settleChallenge({
       for (const tieBreaker of tieBreakers) {
         if (resolved || !tieBreaker || tieBreaker === "split_prize") continue;
 
-        const challengerTie = getTieBreakerValue(challenger, tieBreaker);
-        const challengedTie = getTieBreakerValue(challenged, tieBreaker);
+        const challengerTie = gameModule.getTieBreakerValue(challengerRankable, tieBreaker);
+        const challengedTie = gameModule.getTieBreakerValue(challengedRankable, tieBreaker);
 
         if (Math.abs(challengerTie - challengedTie) >= epsilon) {
           if (challengerTie > challengedTie) {

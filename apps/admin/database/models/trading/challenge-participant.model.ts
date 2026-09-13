@@ -16,9 +16,9 @@ export interface IChallengeParticipant extends Document {
   gameKey: string; // Denormalised from the challenge for cross-game statistics queries
 
   // Capital & Performance
-  startingCapital: number;
-  currentCapital: number;
-  availableCapital: number;
+  startingCapital?: number; // Absent on a provider participant
+  currentCapital?: number; // Absent on a provider participant
+  availableCapital?: number; // Absent on a provider participant
   usedMargin: number;
 
   // P&L Metrics
@@ -125,19 +125,34 @@ const ChallengeParticipantSchema = new Schema<IChallengeParticipant>(
       default: "trading",
       index: true,
     },
+    // The three virtual-capital fields, required only for a trading participant.
+    //
+    // Reason: mirrors `CompetitionParticipant` exactly (X5). A provider-game player has no
+    // starting capital - `Challenge.startingCapital` is not even set on a provider
+    // challenge - so an unconditional requirement made a provider participant unsaveable.
+    //
+    // The `|| "trading"` is load-bearing, exactly as on `CompetitionParticipant`: `gameKey`
+    // defaults to "trading", but a row written before that default existed has none, and
+    // such a row IS a trading participant.
     startingCapital: {
       type: Number,
-      required: true,
+      required: function (this: { gameKey?: string }) {
+        return (this.gameKey || "trading") === "trading";
+      },
       min: 0,
     },
     currentCapital: {
       type: Number,
-      required: true,
+      required: function (this: { gameKey?: string }) {
+        return (this.gameKey || "trading") === "trading";
+      },
       min: 0,
     },
     availableCapital: {
       type: Number,
-      required: true,
+      required: function (this: { gameKey?: string }) {
+        return (this.gameKey || "trading") === "trading";
+      },
       min: 0,
     },
     usedMargin: {

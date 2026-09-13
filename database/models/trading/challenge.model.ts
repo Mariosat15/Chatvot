@@ -11,6 +11,29 @@ export interface IChallenge extends Document {
   gameType: string; // "trading" | "provider" - selects the game MODULE
   gameKey: string; // e.g. "trading" or "provider:acme:trivia-blitz" - IMMUTABLE once written
 
+  // Provider round settings, mirroring Competition's own block (X5). ALL OPTIONAL, and for
+  // the same reason as Competition's: a trading challenge has no play window and no
+  // attempts policy, and `gameConfig` being absent IS the statement "this is not a provider
+  // challenge".
+  //
+  // UNLIKE Competition, there is deliberately no stored `playWindowStart`/`playWindowEnd`
+  // here. A challenge's play window is [startTime, endTime], both already stored and both
+  // set once, at acceptance - so deriving the round window from them (in
+  // `challenge-round-config.ts`) keeps exactly one source of truth for "when may this
+  // challenge be played", rather than two pairs of dates a future edit could let disagree.
+  gameConfig?: {
+    providerKey: string;
+    gameCode: string;
+    /** Operator/challenger answers, already validated against the title's `configSchema`. */
+    settings?: Record<string, unknown>;
+  };
+  /** Generated once at acceptance and shared by both players, so they face the same content. */
+  contentSeed?: string;
+  attemptsPolicy?: "single" | "best_of_n" | "sum_of_n";
+  attemptsAllowed?: number;
+  /** Add-only. Absent means `reserve_full_round`, matching Competition's own default. */
+  roundStartPolicy?: "reserve_full_round" | "until_window_closes";
+
   // Participants
   challengerId: string; // User who created the challenge
   challengerName: string;
@@ -110,21 +133,27 @@ export interface IChallenge extends Document {
   earlyEndReason?: string;
 
   // Final Stats
+  // Reason all five metrics are optional rather than the schema being wrong: none of them
+  // was ever `required: true` below - Mongoose already allowed a missing value on every
+  // field - so this interface was asserting a runtime guarantee that never existed. A
+  // provider challenge's participants carry no trading capital or trade count at all (see
+  // `ChallengeParticipant`'s conditional requirement), so settlement genuinely has nothing
+  // to put in these fields for that game type, and the corrected type says so honestly.
   challengerFinalStats?: {
-    finalCapital: number;
-    pnl: number;
-    pnlPercentage: number;
-    totalTrades: number;
-    winRate: number;
+    finalCapital?: number;
+    pnl?: number;
+    pnlPercentage?: number;
+    totalTrades?: number;
+    winRate?: number;
     isDisqualified: boolean;
     disqualificationReason?: string;
   };
   challengedFinalStats?: {
-    finalCapital: number;
-    pnl: number;
-    pnlPercentage: number;
-    totalTrades: number;
-    winRate: number;
+    finalCapital?: number;
+    pnl?: number;
+    pnlPercentage?: number;
+    totalTrades?: number;
+    winRate?: number;
     isDisqualified: boolean;
     disqualificationReason?: string;
   };
@@ -154,6 +183,32 @@ const ChallengeSchema = new Schema<IChallenge>(
       required: true,
       default: "trading",
       index: true,
+    },
+    // Provider round settings - see the interface for why every one is optional, and why
+    // there is no playWindowStart/playWindowEnd here.
+    gameConfig: {
+      type: {
+        providerKey: { type: String, required: true },
+        gameCode: { type: String, required: true },
+        settings: { type: Schema.Types.Mixed },
+      },
+      required: false,
+      default: undefined,
+      _id: false,
+    },
+    contentSeed: { type: String },
+    attemptsPolicy: {
+      type: String,
+      enum: ["single", "best_of_n", "sum_of_n"],
+      default: undefined,
+    },
+    attemptsAllowed: { type: Number, min: 1, default: undefined },
+    // Add-only. Default preserves the pre-existing gate for every stored challenge, matching
+    // Competition's own default.
+    roundStartPolicy: {
+      type: String,
+      enum: ["reserve_full_round", "until_window_closes"],
+      default: "reserve_full_round",
     },
     challengerId: {
       type: String,
@@ -186,9 +241,15 @@ const ChallengeSchema = new Schema<IChallenge>(
       required: true,
       min: 1,
     },
+    // Reason: mirrors `Competition.startingCapital` exactly. A provider challenge has no
+    // virtual trading capital, so an unconditional requirement made it unsaveable. Trading
+    // is unaffected - the predicate is true for every existing document, because `gameType`
+    // defaults to "trading".
     startingCapital: {
       type: Number,
-      required: true,
+      required: function (this: { gameType?: string }) {
+        return (this.gameType ?? "trading") === "trading";
+      },
       min: 100,
     },
     prizePool: {
