@@ -1,0 +1,66 @@
+---
+alwaysApply: true
+description: Debugging rules for ChartVolt — tracing errors, logging, profiling, and issue isolation
+---
+
+# Debugging — ChartVolt
+
+## 🔎 Before Debugging
+
+1. **Reproduce first.** Never guess — confirm the bug is reproducible and identify the exact trigger.
+2. **Read the error message and stack trace fully** before looking at code.
+3. **Identify which process** the bug lives in:
+   - `next dev` — Main Next.js app (port 3000)
+   - `apps/admin` — Admin Next.js app (separate process)
+   - `worker/index.ts` — Agenda-based background worker (`IS_WORKER=true`)
+   - `websocket-server/index.ts` — WS server for real-time messaging (port 3003)
+   - `api-server/index.ts` — Standalone Express API server
+
+## 🧵 Error Handling Patterns
+
+- **Server Actions** (`lib/actions/`) return `{ success: boolean; error?: string; message?: string }` — they do **NOT** throw.
+  - // Reason: Next.js strips thrown error messages in production builds.
+  - When adding new server actions, always follow this pattern.
+- **Frontend** displays errors via `toast.error()` from the `sonner` library.
+- Generic fallback: `"Something went wrong. Please contact support."` — always include this.
+
+## 🛠️ Debugging Checklist
+
+1. **Server-side errors:** Check the terminal running the process (Next.js, worker, WS server).
+2. **Client-side errors:** Check the browser DevTools Console and Network tab.
+3. **Database errors:** Look for `🐢 SLOW QUERY` warnings in logs (`database/mongoose.ts` slow query profiler, threshold: 500ms).
+4. **Price feed issues:** Check `price-health-monitor.service.ts` — it tracks connection status and price staleness.
+5. **Redis issues:** Redis is optional. Check `redisDisabled` flag in `lib/services/redis.service.ts`. If Redis is down, the app should still work (graceful degradation).
+6. **WebSocket issues:** Check Massive.com WS state in `websocket-price-streamer.ts` — look for `reconnectAttempts` and the `on("close")` / `on("error")` handlers.
+
+## 🧪 Common Bug Sources
+
+| Symptom | Likely Cause | Where to Look |
+|---|---|---|
+| "An error occurred in Server Components render" | Server action is throwing instead of returning | `lib/actions/trading/*.ts` |
+| Chart frozen / "Waiting for price data" | Price key mismatch (`EUR/USD` vs `EURUSD`) or WebSocket disconnect | `contexts/PriceProvider.tsx`, `websocket-price-streamer.ts` |
+| Stale prices after deploy | Worker/secondary server not receiving Redis relay | `redis.service.ts`, `startRedisPriceRelay()` |
+| Missing candles for a timeframe | Higher-TF cache not seeded after restart | `seedHigherTimeframeCaches()` in streamer |
+| Position PnL showing NaN | Spread or pip value lookup failed | `pnl-calculator.service.ts`, `FOREX_PAIRS` map |
+| Trade not executing | Market hours, user restriction, margin, or competition status check failed | `order.actions.ts` — follow the guard chain |
+
+## 📋 Logging Standards
+
+- Use `console.warn("⚠️ ...")` for recoverable issues (retries, fallbacks).
+- Use `console.error("❌ ...")` for unrecoverable errors.
+- Use `console.log("📊/📡/🔄 ...")` with emoji prefixes for system lifecycle events.
+- **Never** leave `console.log` debug statements in committed code — remove them after debugging.
+
+## 🔁 Retry & Fallback Awareness
+
+- MongoDB connection: 3 retries with 1s delay (`database/mongoose.ts`).
+- `safeDbOperation()`: Generic retry wrapper with timeout — use for any risky DB call.
+- Price fetching fallback chain: WS cache → in-memory → Redis → MongoDB → REST API.
+- Redis failure: Graceful — app continues without caching.
+
+## 🐛 When Fixing Bugs
+
+- Fix the **root cause**, not the symptom.
+- If the bug is in a server action, check **both** `lib/actions/` and `apps/admin/lib/actions/` — they often mirror each other.
+- After fixing, verify the fix works in **production build mode** (`next build && next start`), not just dev mode.
+- Add a `// Reason:` comment explaining why the fix was needed if not obvious.

@@ -1,0 +1,1460 @@
+/*
+ * Circuit - the play surface's styling.
+ *
+ * DARK, SELF-CONTAINED, AND DELIBERATELY NOT CHARTVOLT-BRANDED
+ * -----------------------------------------------------------
+ * This service is an arm's-length provider. Its frame carries no platform logo, colour token or
+ * font, because the whole value of X4a is that it proves the seam works for a third party - and a
+ * third party's game cannot import our design system. The one concession is a neutral dark
+ * surface, which sits acceptably inside either a light or a dark host.
+ *
+ * That decision SURVIVED the 7 September 2026 pass over the look of the game, and the distinction
+ * is the point: the owner asked for better graphics, which is not the same as asking for the
+ * platform's graphics. Copying `components/neon/tokens.ts` by hand would have been a second copy
+ * of somebody else's design system with no way to keep it in step, and it would have quietly
+ * ended the demonstration this phase exists for. So the game got a richer version of its OWN
+ * palette - depth, glow, a proper type scale - and still shares nothing.
+ *
+ * AMENDED 11 September 2026, and the amendment narrows the paragraph above without reversing it.
+ * The owner supplied a reference for the whole arena and ordered the game's own chrome - the
+ * round header, the timer, the rails, the board's bezel and Submit - to match it, and supplied
+ * the three board pictures below. Those colours and shapes are now COPIED into this stylesheet
+ * as literal values. What still holds is the sentence that matters for the seam: nothing here
+ * IMPORTS anything from the platform (`npm run check:isolation`), so a third party could do
+ * exactly what this file does - read a style sheet and type the values in - and the demonstration
+ * stands. "Not branded" was never the guarantee; "shares no code" is.
+ *
+ * No web fonts: a font request is a render-blocking round trip on a mobile connection, and on a
+ * timed title the player's clock would pay for it.
+ */
+
+:root {
+  /* The reference sheet's palette (11 Sep 2026): a near-black navy page, deep-blue panels edged
+     in a lit blue, cyan for anything that glows, a red clock. Every value below is one the owner's
+     sheet declares; the names are ours. */
+  --surface: #020b1c;
+  --surface-glow: #071b38;
+  --panel: #05142c;
+  --panel-edge: #0b5b99;
+  --cell: #0b274b;
+  --cell-edge: #58baff;
+  --text: #eaf4ff;
+  --muted: #7fa6d6;
+  --accent: #08dfff;
+  --accent-deep: #0b76d7;
+  --accent-ink: #020b1c;
+  --danger: #ff3c67;
+  --ready: #1ee58f;
+  --radius: 15px;
+  --radius-sm: 12px;
+
+  /*
+   * The translucent variants are written out as `rgba` literals rather than derived with
+   * `color-mix`, and the duplication is deliberate. An unsupported colour function makes the whole
+   * declaration invalid, so a panel loses its background entirely and the fallback is a
+   * transparent card on a dark page - legible enough to pass a glance and wrong on exactly the
+   * browsers we would never see. A literal cannot fail. They are kept next to the colours they
+   * are derived from so a palette change is one edit in one place.
+   */
+  --panel-soft: rgba(11, 40, 80, 0.82);
+  --accent-soft: rgba(8, 223, 255, 0.18);
+  --accent-faint: rgba(8, 223, 255, 0.1);
+  --accent-line: rgba(8, 223, 255, 0.35);
+  --accent-bright: #16dfff;
+
+  /* The lit edge the reference draws round every control: a mid blue on top fading to the
+     panel's own navy. Used on the readouts and the buttons so the chrome around the board belongs
+     to the same machine as the board. */
+  --bezel-top: #1b7dff;
+  --bezel-bottom: #061e3c;
+  /* The reference's three control faces, copied as declared: a stat box, a tool button and the
+     dark glass of the board frame. */
+  --face-stat: linear-gradient(180deg, #0b2850 0%, #071b39 100%);
+  --face-tool: linear-gradient(180deg, #102a4e 0%, #071936 100%);
+  --face-tool-edge: #164f8a;
+  --face-frame: linear-gradient(135deg, #081226 0%, #03315b 46%, #081226 100%);
+
+  /*
+   * How far the bezel artwork reaches outside the grid, as a fraction of the grid's size.
+   *
+   * THE SECOND OF TWO COPIES. The first is `BOARD_ART_OVERHANG` in `presentation.js`, which is
+   * where the reasoning lives; a stylesheet cannot import a number, and a pinned pair is better
+   * than the grid measuring its own frame at runtime. `__tests__` compares them, because if they
+   * drift the opening stops landing on the grid's edge and the result reads as "the artwork is
+   * slightly wrong" rather than as a bug with a cause.
+   */
+  --board-art-overhang: 0.072;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  color: var(--text);
+  background: var(--surface);
+  /* A single soft light behind the board, so the surface is not a flat rectangle. Two radial
+     gradients cost nothing to paint once and are never repainted - unlike a box-shadow on the
+     board itself, which is re-composited on every drag. */
+  background-image:
+    /* The reference's faint 34-pixel circuit grid, under the two lights. Two hairline gradients,
+       painted once with the rest of the page background. */
+    linear-gradient(rgba(0, 169, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 169, 255, 0.025) 1px, transparent 1px),
+    radial-gradient(90% 60% at 50% -10%, var(--surface-glow) 0%, transparent 70%),
+    radial-gradient(70% 50% at 50% 110%, #041a36 0%, transparent 70%);
+  background-size:
+    34px 34px,
+    34px 34px,
+    auto,
+    auto;
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  /* Reason: a long-press on a grid cell must not raise the browser's text-selection handles. */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#app {
+  /* `dvh` rather than `vh`: on a phone the address bar collapses on scroll, and `vh` keeps the
+     old height, which pushes the Submit button under the browser chrome exactly when it is
+     needed.
+
+     Inside an iframe this is the frame's own height, which is why the height REQUEST in
+     `presentation.js` must never be derived from a measurement of this page - see the note there
+     about the two sides agreeing on 320 pixels for ever. */
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+.screen {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 22px 20px;
+  text-align: center;
+}
+
+/*
+ * A panel screen that is taller than the space it was given scrolls rather than clipping.
+ *
+ * The auto margins are the load-bearing part. A centred flex column with overflow clips BOTH
+ * ends, so the title and the Start button would both be unreachable - and a host is entitled to
+ * clamp our height request to less than we asked for. Auto margins absorb the free space when
+ * there is any and collapse to nothing when there is not, which centres a short screen and
+ * scrolls a tall one with no media query and no measurement.
+ */
+.screen.scroll {
+  justify-content: flex-start;
+  overflow-y: auto;
+}
+
+.screen.scroll > :first-child {
+  margin-top: auto;
+}
+
+.screen.scroll > :last-child {
+  margin-bottom: auto;
+}
+
+.screen[hidden] {
+  display: none;
+}
+
+.screen.play {
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 12px 14px;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(1.5rem, 5vw, 2rem);
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  /* The same lit-glass treatment as the sockets and the clock. Two shadows rather than one: a
+     tight one for the edge and a wide faint one for the bloom, which is what stops it reading as
+     a blurred word. */
+  text-shadow:
+    0 0 2px rgba(22, 223, 255, 0.45),
+    0 0 18px rgba(8, 223, 255, 0.28);
+}
+
+.lead {
+  margin: 0;
+  max-width: 32rem;
+  color: var(--text);
+  line-height: 1.55;
+}
+
+.muted {
+  color: var(--muted);
+  margin: 0;
+}
+
+.small {
+  font-size: 0.8rem;
+}
+
+/* ------------------------------------------------------------------------------------------
+ * The pre-round panel
+ * ---------------------------------------------------------------------------------------- */
+
+.panels {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+  max-width: 32rem;
+}
+
+/*
+ * A panel is a lit plate: a dark face, a rim, and a bright bracket along its top edge.
+ *
+ * The bracket is a gradient on the background rather than a pseudo-element, so it costs no extra
+ * node and cannot be knocked out of place by the panel's own content. It is the same motif as the
+ * corner brackets in the board's bezel, which is what ties the two screens together without this
+ * file having to know anything about the artwork.
+ */
+.panel {
+  position: relative;
+  background:
+    linear-gradient(90deg, transparent 8%, var(--accent) 30%, var(--accent) 70%, transparent 92%)
+      top center / 60% 2px no-repeat,
+    linear-gradient(180deg, rgba(5, 21, 49, 0.98) 0%, rgba(3, 15, 35, 0.98) 100%);
+  /* The reference's panel: a `#1089dc` rim on a deep-navy face, lit faintly from inside. */
+  border: 1px solid #1089dc;
+  border-radius: var(--radius);
+  padding: 16px 16px 14px;
+  text-align: left;
+  box-shadow: inset 0 0 24px rgba(0, 103, 221, 0.08);
+}
+
+.panel-title {
+  margin: 0 0 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.panel-body {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
+.rules {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+  counter-reset: rule;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.rules li {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  gap: 10px;
+  align-items: start;
+}
+
+/* Numbered from the markup's own order, so the list cannot disagree with itself when a rule is
+   added or removed server-side. */
+.rules li::before {
+  counter-increment: rule;
+  content: counter(rule);
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  /* A miniature of the board's sockets, so the numbering reads as part of the same machine. */
+  background: radial-gradient(circle at 50% 34%, #16233c 0%, #05090f 100%);
+  box-shadow:
+    inset 0 0 0 1.5px var(--accent),
+    0 0 10px -2px var(--accent-soft);
+  color: var(--text);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+/*
+ * The drawn rules. Sized against the type scale rather than the viewport, so it stays in
+ * proportion to the text it illustrates.
+ *
+ * `aspect-ratio` and `flex: none` are both load-bearing, and leaving either out collapses the
+ * artwork to a few pixels of blue while every other element on the screen looks correct. An
+ * `<svg>` with `height: auto` has no definite height for a flex item to keep, so a column flex
+ * container shrinks it to its minimum - and because it is a graphic rather than text, nothing
+ * inside pushes back. The symptom is not a broken layout, which is what makes it easy to ship:
+ * the screen reads perfectly well, it just has a hairline where the illustration should be.
+ */
+.diagram {
+  width: min(16rem, 72vw);
+  aspect-ratio: 180 / 100;
+  height: auto;
+  flex: 0 0 auto;
+}
+
+.diagram-grid rect {
+  fill: url(#cell-face-flat);
+  stroke: rgba(125, 216, 255, 0.5);
+  stroke-width: 1.4;
+}
+
+.diagram-trace {
+  stroke: var(--accent);
+  stroke-width: 13;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  /* The path draws itself along the route a finger would take. `stroke-dasharray` has to be at
+     least the path length or the tail reappears at the start; 300 comfortably exceeds it. */
+  stroke-dasharray: 300;
+  animation: draw 3.4s ease-in-out infinite;
+}
+
+.diagram-trace-halo {
+  stroke-width: 26;
+  opacity: 0.2;
+}
+
+.diagram-trace-core {
+  stroke: #eaf6ff;
+  stroke-width: 3;
+  opacity: 0.42;
+}
+
+.diagram-bloom {
+  fill: var(--accent);
+  opacity: 0.16;
+}
+
+.diagram-rim {
+  fill: #0a1524;
+  stroke: var(--accent);
+  stroke-width: 2.6;
+}
+
+.diagram-ring {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.4;
+  stroke-opacity: 0.35;
+}
+
+.diagram-terminals text {
+  fill: var(--text);
+  font-size: 15px;
+  font-weight: 800;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+@keyframes draw {
+  0% {
+    stroke-dashoffset: 300;
+  }
+  55%,
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* ------------------------------------------------------------------------------------------
+ * Buttons and bars
+ * ---------------------------------------------------------------------------------------- */
+
+button {
+  font: inherit;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  padding: 12px 20px;
+  /* 44px is the smallest reliable touch target, and this is a timed game: a missed tap is the
+     player's time. */
+  min-height: 44px;
+  cursor: pointer;
+  transition: transform 0.12s ease, filter 0.12s ease;
+}
+
+button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+/*
+ * The lit-panel button, built to match the sockets on the board: a dark glass face, a bright rim,
+ * and a bloom underneath.
+ *
+ * The rim is an `inset` box-shadow rather than a border, so the glow can sit outside the same
+ * element without a second wrapper - and so a disabled button drops the whole treatment by
+ * overriding one property. Cheap to paint and never animated: this is a timed game and a button
+ * that repaints on hover is a button competing with the board for frames.
+ */
+button.primary {
+  /* The reference's Submit: a bright-blue-to-navy face inside a cyan rim, lit from within. */
+  background: linear-gradient(180deg, #0b76d7 0%, #074388 55%, #061b40 100%);
+  color: #eafcff;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 0.9rem;
+  text-shadow: 0 0 12px rgba(8, 223, 255, 0.55);
+  box-shadow:
+    inset 0 0 0 1px var(--accent),
+    inset 0 0 20px rgba(0, 221, 255, 0.35),
+    0 0 15px rgba(0, 222, 255, 0.45);
+}
+
+button.primary.large {
+  min-width: 13rem;
+  padding: 14px 28px;
+  font-size: 1.02rem;
+}
+
+button.primary:disabled {
+  background: linear-gradient(180deg, #0a2246 0%, #061632 100%);
+  color: var(--muted);
+  text-shadow: none;
+  box-shadow: inset 0 0 0 1px var(--panel-edge);
+  cursor: default;
+}
+
+button.ghost {
+  /* The reference's tool button: a blue-edged navy face. */
+  background: var(--face-tool);
+  border-color: transparent;
+  color: var(--text);
+  box-shadow:
+    inset 0 0 0 1px var(--face-tool-edge),
+    inset 0 1px 0 rgba(120, 190, 255, 0.16);
+}
+
+button.small-btn {
+  min-height: 36px;
+  padding: 6px 14px;
+  font-size: 0.85rem;
+}
+
+.bar {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.bar.footer {
+  flex-direction: column;
+  gap: 8px;
+}
+
+/*
+ * The two instrument readouts. Same construction as the board's sockets and the primary button:
+ * a dark glass face inside a lit rim.
+ *
+ * `min-width` on the clock's value, not on the readout, and tabular figures on both: a countdown
+ * crossing from 10:00 to 9:59 loses a character, and without a reserved width it drags the whole
+ * header sideways once a second in the player's peripheral vision while they are concentrating on
+ * the grid.
+ */
+.readout {
+  display: grid;
+  gap: 1px;
+  padding: 5px 12px 6px;
+  border-radius: var(--radius-sm);
+  /* The reference's stat box: a blue-edged deep-navy face. */
+  background: var(--face-stat);
+  box-shadow:
+    inset 0 0 0 1px var(--panel-edge),
+    inset 0 1px 0 rgba(120, 190, 255, 0.14);
+  text-align: left;
+}
+
+.readout-label {
+  font-size: 0.56rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.readout-value {
+  font-size: 0.98rem;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+/*
+ * THE CLOCK IS RED FROM THE FIRST SECOND, as the reference draws it - a red-rimmed box with a
+ * large red figure - rather than cyan turning red near the end. `urgent` still exists: it is the
+ * last stretch, and it now brightens the glow instead of changing the colour, so the player's eye
+ * is drawn without the box appearing to become a different instrument.
+ */
+.readout-clock {
+  background: linear-gradient(90deg, rgba(105, 15, 48, 0.28) 0%, rgba(255, 49, 104, 0.12) 100%),
+    var(--face-stat);
+  box-shadow:
+    inset 0 0 0 1px #ff3e75,
+    inset 0 0 18px rgba(255, 34, 103, 0.12),
+    0 0 22px -10px var(--danger);
+}
+
+.readout-clock .readout-label {
+  color: #ff8fa8;
+}
+
+.clock {
+  display: inline-block;
+  min-width: 3.4ch;
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  color: var(--danger);
+  text-shadow: 0 0 14px rgba(255, 60, 103, 0.45);
+}
+
+.clock.urgent {
+  color: #ff5c82;
+  text-shadow: 0 0 18px rgba(255, 60, 103, 0.8);
+}
+
+/* The rim brightens with the figures in the last stretch. Without it the box keeps saying "same
+   as a minute ago" while the number inside it says the opposite, which is the sort of half-signal
+   a player under a clock reads as neither. */
+.readout-clock:has(.clock.urgent) {
+  box-shadow:
+    inset 0 0 0 1px #ff5c82,
+    inset 0 0 22px rgba(255, 34, 103, 0.22),
+    0 0 26px -8px var(--danger);
+}
+
+/* ------------------------------------------------------------------------------------------
+ * The round header, and the rails either side of the board
+ * ---------------------------------------------------------------------------------------- */
+
+.round-bar {
+  gap: 10px;
+}
+
+/*
+ * The instrument cells.
+ *
+ * `1fr` per cell rather than auto widths, so the three stay put as their contents change: the
+ * clock loses a character crossing 10:00 to 9:59 and the coverage figure gains one at 100%, and
+ * with auto widths each of those drags the whole strip sideways in the player's peripheral vision
+ * while they are concentrating on the grid.
+ */
+.round-cells {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+.round-controls {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+button.icon-btn {
+  min-height: 36px;
+  min-width: 40px;
+  padding: 6px 10px;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+/*
+ * THE ARENA. The board, then the figures under it.
+ *
+ * IT WAS `auto minmax(0, 1fr) auto` - a rail, the board, a rail - UNTIL 11 SEPTEMBER 2026, and
+ * the owner's second report about this board's size is why it is one column now: *"when we choose
+ * medium and large the system makes the board smaller"*. The board is WIDTH-BOUND here. This page
+ * runs in an iframe that is the middle column of the platform's arena, 450 to 650 pixels, and a
+ * cell is square - so `boardCellPx` takes the width's answer on every laptop. Two rails at their
+ * own content widths plus two gaps came to about 220 of those pixels, which an 8x8 then divided
+ * into cells at their floor while a 4x4, dividing the same remainder four ways, looked perfectly
+ * healthy. Nothing errored and nothing logged: the large board was simply drawn small, which is
+ * exactly how the owner described it.
+ *
+ * So the single column is the fix, and it is a layout change rather than an arithmetic one -
+ * `boardCellPx` was right all along and was being handed a third of the room. The actions are in
+ * the footer beside Submit and the figures are a strip under the board.
+ *
+ * `minmax(0, 1fr)` and not `1fr`, on both axes: a bare `fr` track is floored by its content, so a
+ * wide stat value or a tall meter would push the grid past its container and the board would be
+ * the thing that gave way, with nothing on screen to say why.
+ *
+ * THE BOARD'S CELL MUST STRETCH TO ITS ROW, AND `align-items: center` HERE IS A DEFECT. `fitBoard`
+ * sizes the grid from the space `.board-wrap` actually has, so the wrap has to be the size of the
+ * row and never the size of the grid inside it. Centred, the wrap shrinks to the `<svg>`, the next
+ * fit measures a wrap the size of the previous grid, takes the bezel's share off it and draws a
+ * smaller grid - and the fit after that measures THAT. It converges on the 34-pixel floor while
+ * `desiredFrameHeight`, which deliberately never reads the current height, keeps asking the host
+ * for a frame tall enough for a full-size board. The result was a tall frame with a postage-stamp
+ * board in the middle of it, reported by the owner earlier the same day, also with nothing
+ * errored. The wrap centres the board inside itself; the ROW is what must not be centred.
+ */
+.arena {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  align-items: stretch;
+  gap: 10px;
+}
+
+/*
+ * The actions, now a row in the footer.
+ *
+ * `flex-wrap` rather than a fixed direction: on a very narrow frame the two buttons drop under
+ * Submit instead of squeezing its label to two characters.
+ */
+.action-rail {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+}
+
+button.rail-btn {
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+  min-height: 58px;
+  min-width: 62px;
+  padding: 8px 10px;
+}
+
+.rail-btn-icon {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.rail-btn-label {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+button.rail-btn:disabled {
+  color: var(--muted);
+  box-shadow: inset 0 0 0 1px var(--panel-edge);
+  cursor: default;
+}
+
+/*
+ * The figures, now a strip under the board rather than a column beside it.
+ *
+ * `flex-wrap` with a basis on each half, so the meter and the tiles sit side by side while there
+ * is room for both and the tiles drop to their own line when there is not. A grid of fixed tracks
+ * would keep them side by side and shrink the labels instead, and these labels are already at
+ * 0.54rem.
+ *
+ * EVERY BOX IN THIS STRIP IS THE SAME SIZE, and `--tiles` is how - the owner's "they don't
+ * align, one bigger than the other" of 11 September 2026.
+ *
+ * The strip has two flex children, the meter and the tile group, and the group is itself a grid
+ * of equal columns. So a fixed share here is only ever right for one tile count: written
+ * `1` against `2` it is correct with two tiles and wrong the moment "best board" appears and
+ * makes three, which is exactly the state the owner was looking at. `app.js` publishes the count
+ * as `--tiles` whenever the set changes, the group claims that many parts against the meter's
+ * one, and each box ends up one part of `1 + n` at any count.
+ *
+ * THE FALLBACK OF 2 IS NOT A GUESS ABOUT THE CONTENT, it is the value that keeps the strip
+ * sensible for the one frame before `renderStatTiles` first runs - and it is the count this
+ * title starts a round with, so nothing visibly resizes on the first draw.
+ */
+.stat-rail {
+  --tiles: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* ------------------------------------------------------------------------------------------
+ * The board's own meter, and the figures under it
+ * ---------------------------------------------------------------------------------------- */
+
+.board-meter {
+  /* One part against the tile group's `--tiles`, so the meter is exactly one box wide. */
+  flex: 1 1 7rem;
+  min-width: 0;
+  display: grid;
+  /*
+   * `start` and the tiles' own top padding, so this box's label sits on the same line as every
+   * other label in the strip. Centred, it floated its label down by however tall the track is,
+   * which is the misalignment the owner drew a circle around.
+   */
+  align-content: start;
+  gap: 6px;
+  padding: 6px 10px 7px;
+  /*
+   * `.screen` centres its text, so a box that does not say otherwise sits its caption in the
+   * middle while every tile beside it - which does say otherwise - starts at the left edge. The
+   * boxes were already the same size when the owner's screenshot was taken and this was the
+   * remaining half of "align": one caption in the middle of a row of four that begin at the left.
+   */
+  text-align: left;
+  border-radius: var(--radius-sm);
+  background: var(--face-stat);
+  box-shadow:
+    inset 0 0 0 1px var(--panel-edge),
+    inset 0 1px 0 rgba(120, 190, 255, 0.14);
+}
+
+/*
+ * Label above value, exactly like a tile - the second half of the owner's "align" of 11
+ * September 2026. It used to put the label and the figure at opposite ends of one line, so the
+ * one box that is not a tile also read differently from every box beside it: four figures in a
+ * row, one of them at a different height. Same order, same places, and the track still sits
+ * underneath because only this box has one.
+ */
+.board-meter-head {
+  display: grid;
+  gap: 1px;
+}
+
+/* The tiles' own label and value type, so four boxes in a row read as four of the same thing. */
+.board-meter-label {
+  font-size: 0.54rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.board-meter-value {
+  font-size: 0.94rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent-bright);
+}
+
+.board-meter-track {
+  height: 7px;
+  border-radius: 99px;
+  overflow: hidden;
+  background: #041127;
+  box-shadow: inset 0 0 0 1px var(--panel-edge);
+}
+
+/*
+ * The fill is scaled with a transform rather than by setting `width`, because a width change
+ * re-runs layout on every drag - and on this screen a drag is the one moment the board must not
+ * stutter. `transform-origin: left` so it grows from the start of the track.
+ */
+.board-meter-fill {
+  height: 100%;
+  width: 100%;
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 160ms ease-out;
+  background: linear-gradient(90deg, var(--accent-deep) 0%, var(--accent) 60%, var(--accent-bright) 100%);
+  box-shadow: 0 0 16px -4px var(--accent);
+}
+
+.board-meter-fill.full {
+  background: linear-gradient(90deg, #15803d 0%, var(--ready) 100%);
+  box-shadow: 0 0 16px -4px var(--ready);
+}
+
+/*
+ * `grid-auto-flow: column` with `minmax(0, 1fr)` columns: however many tiles `playStatTiles`
+ * returns, they share the strip equally and none of them widens it. It omits a tile rather than
+ * rendering an empty value, so the count genuinely varies.
+ */
+.stat-tiles {
+  /* `--tiles` parts and a basis of the same many boxes, so each column matches the meter. */
+  flex: var(--tiles) 1 calc(var(--tiles) * 7rem);
+  min-width: 0;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+.stat-tile {
+  display: grid;
+  gap: 1px;
+  padding: 6px 10px 7px;
+  border-radius: var(--radius-sm);
+  background: var(--face-stat);
+  box-shadow: inset 0 0 0 1px var(--panel-edge);
+  text-align: left;
+}
+
+.stat-tile-label {
+  font-size: 0.54rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.stat-tile-value {
+  font-size: 0.94rem;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+/*
+ * NARROW FRAMES.
+ *
+ * THIS QUERY USED TO FOLD THE TWO RAILS ABOVE AND BELOW THE BOARD, and it is much smaller now
+ * because the wide arrangement it existed to escape has gone: since 11 September 2026 the board
+ * has the whole width at every frame size, the figures are already a strip under it and the
+ * actions are already a row in the footer, so there is no side-by-side arrangement left to
+ * undo. What remains is the two things that genuinely need a narrower frame to look right.
+ *
+ * Still written as a max-width query rather than by reordering with `order`: grid auto-placement
+ * follows order-modified document order, so an `order` rule that fires only on a wide screen
+ * leaves a phone arranged by DOM order. That exact mistake was made on the platform's own arena
+ * layout, and the arena above is now in document order precisely so nothing needs `order` at all.
+ *
+ * THE WIDTH IS THE FRAME'S, NOT THE DEVICE'S. This page runs inside an iframe in the platform's
+ * arena, and a media query reads the iframe's width - which on a laptop is the middle column
+ * between a standings rail and a sidebar, about 450 to 650 pixels. A threshold in that band fires
+ * on every laptop, which is how the rails came to be stacked on the one screen the owner was
+ * looking at, so this one stays well below it.
+ */
+@media (max-width: 420px) {
+  /* Submit takes its own line; two icon buttons beside it leave it about five characters. */
+  .footer-actions {
+    flex-wrap: wrap;
+  }
+
+  .action-rail {
+    flex: 1 1 100%;
+  }
+
+  button.rail-btn {
+    flex: 1;
+    min-height: 48px;
+  }
+}
+
+/* ------------------------------------------------------------------------------------------
+ * The board
+ * ---------------------------------------------------------------------------------------- */
+
+.board-wrap {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/*
+ * The grid and the bezel drawn around it.
+ *
+ * The stage is sized by the `<svg>`, which carries explicit `width`/`height` attributes written by
+ * `board.js`. The artwork is then positioned against the stage with a NEGATIVE inset, so it
+ * overhangs by the same fraction the grid reserved for it - see `--board-art-overhang`.
+ */
+.board-stage {
+  position: relative;
+  /* Reason: an inline `<svg>` sits on the text baseline, which leaves a few pixels of descender
+     space below it - enough to push the bezel off centre against the grid. */
+  line-height: 0;
+}
+
+.board-art {
+  position: absolute;
+  /* The generic bezel's inset and picture. `dressBoard` in `app.js` overrides BOTH inline for the
+     three drawn boards, whose bezels are measured per side - these are what a board wears before
+     that runs and what any shape without a picture of its own keeps. */
+  inset: calc(var(--board-art-overhang) * -100%);
+  background-image: url("/play/board-frame.webp");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  /* The reference's frame glows cyan at its outer edge. A drop-shadow rather than a box-shadow,
+     because the pictures have a transparent margin (their black surround was keyed out on 11 Sep
+     2026 so the page shows through), and a box-shadow would draw a rectangle detached from the
+     bezel. The filter follows the artwork's own alpha. It costs a compositing layer and nothing
+     more: the art never moves while a wire is being drawn. */
+  filter: drop-shadow(0 0 14px rgba(0, 204, 255, 0.45));
+  /* The artwork is decoration over a board that is already complete without it, so it must never
+     intercept a drag - the grid underneath is the hit area, and the bezel overhangs it. */
+  pointer-events: none;
+}
+
+/*
+ * A DRAWN board: the owner's 4x4, 6x6 and 8x8 pictures have the cells painted in, so the vector
+ * cells underneath go transparent and the picture is the grid. The wires, terminals, numerals and
+ * the unused-square pips still paint on top - those are the game, and they are what `dressBoard`
+ * puts back in full if the picture fails to load, by taking this class off again.
+ *
+ * `transparent` rather than `display: none` on the cells: they are still the drag targets.
+ */
+.board-stage.drawn svg#board {
+  background: transparent;
+  box-shadow: none;
+}
+
+.board-stage.drawn svg#board .cell {
+  fill: transparent;
+  stroke: transparent;
+}
+
+.board-stage.drawn svg#board .cell-lip {
+  stroke: transparent;
+}
+
+.board-stage.drawn svg#board .junction {
+  display: none;
+}
+
+/*
+ * The grid paints ABOVE the bezel, which needs saying because the markup has the bezel first and
+ * the natural reading is that DOM order settles it. It does not: an absolutely positioned element
+ * paints over a static one whatever the order, so without this the artwork covered the board - and
+ * since the frame's opening is transparent, it covered it faintly enough to look like a rendering
+ * bug rather than a stacking one. The tokens are the visible casualty, being nearest the edge.
+ */
+.board-stage svg#board {
+  position: relative;
+  z-index: 1;
+}
+
+svg#board {
+  /* The one rule in this file that is load-bearing rather than cosmetic: without it a drag
+     scrolls the page on every touch device and the game is unplayable on a phone. */
+  touch-action: none;
+  display: block;
+  background: radial-gradient(120% 100% at 50% 0%, #0b274b 0%, #061a37 100%);
+  border-radius: 6px;
+  box-shadow: 0 30px 60px -34px #000;
+}
+
+/* The soft outer half of a cell's edge. Wide and faint: this is the bloom. */
+svg#board .cell {
+  fill: url(#cell-face);
+  stroke: rgba(88, 186, 255, 0.2);
+}
+
+/* The crisp inner half, which is what actually reads as an edge - the reference's cell border. */
+svg#board .cell-lip {
+  fill: none;
+  stroke: rgba(88, 186, 255, 0.65);
+}
+
+/* The four-point stars where the grid lines cross. One path node for all of them - see `build`
+   in `board.js`, which explains why they are not one element each. */
+svg#board .junction {
+  fill: var(--accent);
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+/* The unused-square marker. See `board.js` - it is how the coverage rule becomes visible instead
+   of being a number in the hint line. */
+svg#board .pip {
+  fill: rgba(125, 216, 255, 0.4);
+  pointer-events: none;
+}
+
+svg#board .trace,
+svg#board .trace-halo,
+svg#board .trace-core {
+  pointer-events: none;
+}
+
+svg#board .trace-halo {
+  opacity: 0.2;
+}
+
+/* A pale line down the middle of the conductor, which is what makes a wire read as lit from the
+   inside rather than as a coloured stripe. Kept faint: at full strength it washes the pair's own
+   colour out, and the colour is what tells two crossing paths apart. */
+svg#board .trace-core {
+  opacity: 0.42;
+}
+
+svg#board .terminal {
+  pointer-events: none;
+}
+
+/* The bloom under a socket, so a terminal sits in its own pool of light rather than on top of the
+   cell. Low enough not to tint the neighbouring squares. */
+svg#board .socket-bloom {
+  opacity: 0.16;
+}
+
+svg#board .socket-rim {
+  stroke-opacity: 0.9;
+}
+
+svg#board .socket-ring {
+  stroke-opacity: 0.35;
+}
+
+/*
+ * The numeral, drawn UNDER the artwork and visible only when the artwork is absent.
+ *
+ * It is what makes the board playable for a colour-blind player and playable with no language at
+ * all, so it must not depend on an image arriving - this platform has had two production faults
+ * caused by an asset a stale cache refused to fetch. A terminal that loses its picture loses
+ * decoration; a terminal that loses its number loses its meaning.
+ */
+svg#board .terminal-label {
+  pointer-events: none;
+  fill: var(--text);
+  font-weight: 800;
+}
+
+svg#board .terminal-art {
+  pointer-events: none;
+}
+
+.hint {
+  margin: 0;
+  min-height: 1.25rem;
+  font-size: 0.92rem;
+  color: var(--muted);
+}
+
+.hint.ready {
+  color: var(--ready);
+  font-weight: 650;
+}
+
+.hint.refused {
+  color: var(--danger);
+}
+
+/*
+ * The footer's row of actions: Undo, Clear, and the wide Submit.
+ *
+ * THE SAFETY ARGUMENT THAT PUT CLEAR BESIDE THE BOARD IS PRESERVED, AND IT WAS NEVER ABOUT THE
+ * ROW. Until 11 September 2026 this comment read that Clear had moved to the rail beside the
+ * board, leaving the control that ENDS a board down here on its own - because "a destructive
+ * control sharing a row with the confirming one, BOTH THE SAME WIDTH, is how a player wipes a
+ * finished grid instead of sending it". The rails then had to leave the board's row, since they
+ * were taking a third of the width the grid divides into cells (see `.arena`), so Clear is back
+ * on this row - and the clause that matters is the one about width. It is a 62-pixel ghost icon
+ * button; Submit takes everything left over, stands 52 pixels tall and lights up cyan the moment
+ * the board is submittable. Nothing about them invites the same tap. Equalising their widths, or
+ * giving Clear the primary style, reinstates the hazard this paragraph exists to record.
+ */
+.footer-actions {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.submit-wide {
+  flex: 1 1 auto;
+  max-width: 26rem;
+  min-height: 52px;
+  font-size: 1.02rem;
+  letter-spacing: 0.04em;
+}
+
+/* The lit state is the whole point: the button is disabled until the board is genuinely
+   submittable, so its turning on is the game telling the player they are finished. */
+.submit-wide:not(:disabled) {
+  box-shadow:
+    inset 0 0 0 1px var(--accent),
+    inset 0 0 20px rgba(0, 221, 255, 0.35),
+    0 0 15px rgba(0, 222, 255, 0.65),
+    0 10px 26px -16px rgba(0, 0, 0, 0.9);
+}
+
+/* ------------------------------------------------------------------------------------------
+ * The result panel
+ * ---------------------------------------------------------------------------------------- */
+
+.result-art {
+  width: 96px;
+  height: 96px;
+}
+
+.art {
+  width: 100%;
+  height: 100%;
+}
+
+/* One of the two is shown, chosen by `renderResult`. Both ship in the document so neither costs
+   a request, and the class lives on the screen rather than on the artwork so the whole panel can
+   respond to the outcome later without moving this rule. */
+.art-win {
+  display: none;
+}
+
+#screen-result.won .art-win {
+  display: block;
+}
+
+#screen-result.won .art-neutral {
+  display: none;
+}
+
+.art-halo {
+  fill: var(--accent-faint);
+  stroke: var(--accent-line);
+  stroke-width: 2;
+}
+
+.art-trace {
+  stroke: var(--accent);
+  stroke-width: 9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+}
+
+#screen-result.won .art-trace {
+  stroke-dasharray: 120;
+  animation: draw 0.7s ease-out 1 both;
+}
+
+.art-neutral .art-trace {
+  stroke: var(--muted);
+}
+
+/*
+ * The one figure on the result screen, and there is deliberately no score beside it - see
+ * `resultCopy`. It gets the readout treatment for the same reason the clock does: it is an
+ * instrument reading, and the player has just spent the whole round looking at two of them.
+ */
+.stat {
+  display: grid;
+  gap: 2px;
+  padding: 14px 30px;
+  border-radius: var(--radius);
+  background:
+    linear-gradient(90deg, transparent 10%, var(--accent) 32%, var(--accent) 68%, transparent 90%)
+      top center / 55% 2px no-repeat,
+    var(--face-stat);
+  box-shadow:
+    inset 0 0 0 1px var(--accent-line),
+    0 0 30px -16px var(--accent);
+}
+
+.stat-value {
+  font-size: clamp(2rem, 9vw, 2.8rem);
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent-bright);
+  text-shadow: 0 0 18px rgba(8, 223, 255, 0.45);
+}
+
+.stat-label {
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* ------------------------------------------------------------------------------------------
+ * Movement
+ *
+ * EVERY ANIMATION DECLARED BELOW IS SWITCHED OFF IN THE `prefers-reduced-motion` BLOCK AT THE
+ * FOOT OF THIS FILE, and a test compares the two lists. Adding one here and forgetting the other
+ * half is invisible to everybody who has not asked for reduced motion, which is almost everybody
+ * who would review it - so the pairing is asserted rather than remembered.
+ *
+ * They are all CSS, and that is a constraint rather than a preference. A drag repaints the wires
+ * on every pointer move, so a JavaScript animation on this screen would be competing with the
+ * board for the same frames on the one screen where dropping them is felt.
+ * ---------------------------------------------------------------------------------------- */
+
+/*
+ * Screens rise into place rather than appearing.
+ *
+ * Keyed on `:not([hidden])` and nothing else. A screen is shown by clearing `hidden`, which takes
+ * it out of `display: none` and restarts its animations for free - so this needs no class to add,
+ * no class to remove, and cannot be left switched on by a path that forgot to clean up.
+ */
+.screen:not([hidden]) {
+  animation: screen-in 220ms ease-out 1 both;
+}
+
+@keyframes screen-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+/*
+ * The clock breathes in the last ten seconds.
+ *
+ * Scaled and dimmed rather than blinked. A hard blink on a countdown means the number is absent
+ * for part of every second, and the number is the thing the player is reading.
+ */
+.clock.urgent {
+  animation: clock-pulse 1s ease-in-out infinite;
+}
+
+@keyframes clock-pulse {
+  50% {
+    transform: scale(1.09);
+    opacity: 0.72;
+  }
+}
+
+/*
+ * A ring out of each end of a pair that has just landed. Created by `pulseTerminals` in
+ * `board.js` and removed by its own timer.
+ *
+ * `transform-box: fill-box` is load-bearing: without it an SVG transform is measured against the
+ * whole viewBox, so the ring scales away from the corner of the board instead of out of the
+ * terminal - which looks like a stray graphic rather than a confirmation.
+ */
+svg#board .join-pulse {
+  pointer-events: none;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: join-pulse 480ms ease-out 1 both;
+}
+
+@keyframes join-pulse {
+  from {
+    transform: scale(0.5);
+    opacity: 0.9;
+  }
+  to {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+/*
+ * The wire brightens once as it lands, then settles to its resting strength.
+ *
+ * The end of each keyframe pair is the value the plain rule already carries, so the animation
+ * finishing looks identical to it never having run - which matters because these nodes are
+ * recreated on the next pointer move and a mid-drag join would otherwise flicker back.
+ */
+svg#board .trace-halo.arrived {
+  animation: halo-surge 360ms ease-out 1 both;
+}
+
+svg#board .trace-core.arrived {
+  animation: core-surge 360ms ease-out 1 both;
+}
+
+@keyframes halo-surge {
+  from {
+    opacity: 0.7;
+  }
+  to {
+    opacity: 0.2;
+  }
+}
+
+@keyframes core-surge {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.42;
+  }
+}
+
+/*
+ * A light sweeping over a board that was accepted, and a shake for one that was refused.
+ *
+ * Both live on the stage rather than on the `<svg>`, because accepting a board replaces the grid
+ * with the next one in the same tick - an animation started on the SVG is discarded before a
+ * single frame of it is drawn. The stage survives.
+ */
+.board-stage.solved::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  border-radius: 6px;
+  background: linear-gradient(
+      105deg,
+      transparent 38%,
+      rgba(190, 235, 255, 0.55) 50%,
+      transparent 62%
+    )
+    0 0 / 300% 100% no-repeat;
+  animation: board-sweep 520ms ease-out 1 both;
+}
+
+@keyframes board-sweep {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0 0;
+    opacity: 0;
+  }
+}
+
+.board-stage.refused {
+  animation: board-shake 420ms ease-in-out 1 both;
+}
+
+/* The rim goes red for as long as the class is on, with no animation of its own - so a player who
+   has asked for less motion still gets the signal, just without the movement. */
+.board-stage.refused svg#board {
+  box-shadow:
+    0 30px 60px -34px #000,
+    0 0 0 2px var(--danger);
+}
+
+@keyframes board-shake {
+  15% {
+    transform: translateX(-6px);
+  }
+  30% {
+    transform: translateX(5px);
+  }
+  45% {
+    transform: translateX(-4px);
+  }
+  60% {
+    transform: translateX(3px);
+  }
+  80% {
+    transform: translateX(-2px);
+  }
+}
+
+/* A press the finger can feel it landed. The transition is already declared on `button`; this is
+   only the target, so it costs no new property to animate. */
+button.primary:active:not(:disabled) {
+  transform: translateY(2px) scale(0.985);
+  filter: brightness(1.18);
+}
+
+/*
+ * The mute control.
+ *
+ * Dimmed while muted, which is the state `aria-pressed="true"` describes - see `soundControlCopy`.
+ * A glyph alone would leave a sighted player squinting at two similar speaker icons, so the
+ * opacity is the fast signal and the icon is the confirmation.
+ */
+.sound-btn {
+  min-width: 42px;
+  padding: 6px 10px;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.sound-btn[aria-pressed="true"] {
+  opacity: 0.62;
+}
+
+/* ------------------------------------------------------------------------------------------
+ * Loading
+ * ---------------------------------------------------------------------------------------- */
+
+.spinner {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 3px solid var(--cell-edge);
+  border-top-color: var(--accent);
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 3s;
+  }
+
+  /* The diagram is the one animation carrying information rather than decoration, so it is shown
+     finished rather than removed - a player who has asked for less motion still needs to see
+     which two circles the path runs between. */
+  .diagram-trace,
+  #screen-result.won .art-trace {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+
+  button {
+    transition: none;
+  }
+
+  /*
+   * Everything added by the arcade pass, switched off in one place.
+   *
+   * SWITCHED OFF, NOT SLOWED. Each of these is a flourish over information the player already
+   * has: the wire is drawn in the pair's colour, the clock's figures are already red, the board
+   * is already replaced, the figure is already correct. Nothing here is the only way to learn
+   * anything, so removing the movement removes nothing.
+   *
+   * The refusal's red rim is deliberately NOT in this list - it is a static box-shadow, and it
+   * is the one part of that reaction carrying the signal rather than decorating it.
+   */
+  .screen:not([hidden]),
+  .clock.urgent,
+  svg#board .join-pulse,
+  svg#board .trace-halo.arrived,
+  svg#board .trace-core.arrived,
+  .board-stage.solved::after,
+  .board-stage.refused {
+    animation: none;
+  }
+
+  /*
+   * These two are DRAWN by the animation rather than merely moved by it, so "no animation" would
+   * leave a ring frozen on the board and a pale bar across the grid until their timers removed
+   * them - a stuck graphic reads as a broken game, which is a worse outcome than the movement
+   * this block exists to remove. `flashBoard` refuses outright as well; `pulseTerminals` does
+   * not, deliberately, because `board.js` has no business reading a media query mid-drag.
+   */
+  svg#board .join-pulse,
+  .board-stage.solved::after {
+    display: none;
+  }
+
+  button.primary:active:not(:disabled) {
+    transform: none;
+    filter: none;
+  }
+
+  /* The bar still fills, it simply arrives rather than sliding. Removing the transition and not
+     the transform would freeze it at zero, which is a meter that never moves. */
+  .board-meter-fill {
+    transition: none;
+  }
+}

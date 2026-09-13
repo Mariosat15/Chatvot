@@ -1,0 +1,57 @@
+name: Unit Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    # Run every Sunday at 00:00 UTC
+    - cron: "0 0 * * 0"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Reason: run before the tests so drift fails with a message naming the fields,
+      # rather than as an assertion inside the suite. The suite checks it too, so this
+      # step is for readability, not coverage.
+      - name: Check admin model mirrors
+        run: npm run check:mirrors
+
+      # Reason: mongodb-memory-server downloads a MongoDB binary on first use. Without
+      # a cache that is a fresh ~100MB download on every run, which is slow and makes
+      # the suite depend on an external host being up.
+      - name: Cache MongoDB binaries
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/mongodb-binaries
+          key: mongodb-binaries-${{ runner.os }}
+
+      - name: Run unit tests
+        run: npx vitest run --reporter=json --reporter=default --outputFile=test-results.json
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results.json
+          retention-days: 30

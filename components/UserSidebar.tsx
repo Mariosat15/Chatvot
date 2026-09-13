@@ -1,0 +1,621 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+
+import { usePathname, useRouter } from "next/navigation";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useWhiteLabelImages } from "@/hooks/useWhiteLabelImages";
+import { useUserProfileImage } from "@/hooks/useUserProfileImage";
+import { signOut } from "@/lib/actions/auth.actions";
+import NotificationDropdown from "@/components/notifications/NotificationDropdown";
+import { GameIcon } from "@/components/ui/GameIcon";
+import { useUnreadMessages } from "@/hooks/useUnreadMessages";
+import { GM_SUBSCRIPTION_CHANGED } from "@/lib/events/gm-subscription";
+import {
+  LogOut,
+  Menu,
+  X,
+  ChevronRight,
+} from "lucide-react";
+
+interface SidebarUser {
+  id: string;
+  name: string;
+  email: string;
+}
+
+interface UserSidebarProps {
+  user: SidebarUser;
+}
+
+interface NavItem {
+  href: string;
+  label: string;
+  icon: React.ReactNode;
+  color: string;
+  gradient: string;
+  badge?: string;
+  numericBadge?: number;
+}
+
+const mainNavItems: NavItem[] = [
+  {
+    href: "/dashboard",
+    label: "Dashboard",
+    icon: <GameIcon name="headset" size={22} />,
+    color: "text-blue-400",
+    gradient: "from-blue-500/20 to-blue-600/5",
+  },
+  {
+    href: "/competitions",
+    label: "Competitions",
+    icon: <GameIcon name="trophy" size={22} />,
+    color: "text-yellow-400",
+    gradient: "from-yellow-500/20 to-yellow-600/5",
+    badge: "HOT",
+  },
+  {
+    href: "/challenges",
+    label: "1v1 Challenges",
+    icon: <GameIcon name="sword" size={22} />,
+    color: "text-red-400",
+    gradient: "from-red-500/20 to-red-600/5",
+  },
+  {
+    href: "/marketplace",
+    label: "Marketplace",
+    icon: <GameIcon name="pouch1" size={22} />,
+    color: "text-purple-400",
+    gradient: "from-purple-500/20 to-purple-600/5",
+  },
+  {
+    href: "/leaderboard",
+    label: "Leaderboard",
+    icon: <GameIcon name="goldMedal" size={22} />,
+    color: "text-emerald-400",
+    gradient: "from-emerald-500/20 to-emerald-600/5",
+  },
+  {
+    href: "/arena",
+    label: "Live Arena",
+    icon: <GameIcon name="crown" size={22} />,
+    color: "text-cyan-300",
+    gradient: "from-cyan-500/20 to-blue-600/5",
+    badge: "LIVE",
+  },
+  {
+    href: "/messaging",
+    label: "Messages",
+    icon: <GameIcon name="flag" size={22} />,
+    color: "text-pink-400",
+    gradient: "from-pink-500/20 to-pink-600/5",
+  },
+];
+
+const accountNavItems: NavItem[] = [
+  {
+    href: "/profile",
+    label: "Profile",
+    icon: <GameIcon name="helmet1" size={22} />,
+    color: "text-cyan-400",
+    gradient: "from-cyan-500/20 to-cyan-600/5",
+  },
+  {
+    href: "/wallet",
+    label: "Wallet",
+    icon: <GameIcon name="chest1" size={22} />,
+    color: "text-green-400",
+    gradient: "from-green-500/20 to-green-600/5",
+  },
+  {
+    href: "/help",
+    label: "Help Center",
+    icon: <GameIcon name="guideBook" size={22} />,
+    color: "text-orange-400",
+    gradient: "from-orange-500/20 to-orange-600/5",
+  },
+];
+
+const UserSidebar = ({ user }: UserSidebarProps) => {
+  const pathname = usePathname();
+  const router = useRouter();
+  const { images } = useWhiteLabelImages();
+  const { profileImage: userProfileImage } = useUserProfileImage();
+  const { unreadCount: unreadMessages } = useUnreadMessages();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isGameMaster, setIsGameMaster] = useState(false);
+  const [arenaEnabled, setArenaEnabled] = useState(true);
+  const [userLevel, setUserLevel] = useState<{ title: string; level: number; color: string; icon: string } | null>(null);
+
+  // Reason: Pulled out so we can re-invoke it from the GM_SUBSCRIPTION_CHANGED
+  // event listener below without re-doing all the other fetches.
+  const isMountedRef = useRef(true);
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  const checkGameMasterStatus = useCallback(async () => {
+    try {
+      const response = await fetch("/api/gamemaster/status");
+      const data = await response.json();
+      if (!isMountedRef.current) return;
+      setIsGameMaster(data.success && data.isGameMaster);
+    } catch {
+      if (!isMountedRef.current) return;
+      setIsGameMaster(false);
+    }
+  }, []);
+
+  // Fetch feature flags and game master status on mount
+  useEffect(() => {
+    const fetchFeatureFlags = async () => {
+      try {
+        const response = await fetch("/api/settings");
+        const data = await response.json();
+        if (data.success && data.settings) {
+          setArenaEnabled(data.settings.arenaEnabled ?? true);
+        }
+      } catch {
+        // Default to enabled if settings fetch fails
+      }
+    };
+    const fetchUserLevel = async () => {
+      try {
+        const response = await fetch("/api/user/level");
+        if (response.ok) {
+          const data = await response.json();
+          setUserLevel({
+            title: data.currentTitle || "Trader",
+            level: data.currentLevel || 1,
+            color: data.currentColor || "#22c55e",
+            icon: data.currentIcon || "⚔️",
+          });
+        }
+      } catch { /* Silent fail */ }
+    };
+    checkGameMasterStatus();
+    fetchFeatureFlags();
+    fetchUserLevel();
+  }, [checkGameMasterStatus]);
+
+  // Refresh GM status when something elsewhere mutates it (purchase,
+  // renewal, deletion) and when the tab regains focus (catches cross-tab
+  // / admin-side changes on the next visit).
+  useEffect(() => {
+    const handleGmChanged = () => {
+      void checkGameMasterStatus();
+    };
+    window.addEventListener(GM_SUBSCRIPTION_CHANGED, handleGmChanged);
+    window.addEventListener("focus", handleGmChanged);
+    return () => {
+      window.removeEventListener(GM_SUBSCRIPTION_CHANGED, handleGmChanged);
+      window.removeEventListener("focus", handleGmChanged);
+    };
+  }, [checkGameMasterStatus]);
+
+  // Close mobile menu on route change
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [pathname]);
+
+  // Close mobile menu on escape key
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsMobileMenuOpen(false);
+    };
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, []);
+
+  // Prevent body scroll when mobile menu is open
+  useEffect(() => {
+    if (isMobileMenuOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isMobileMenuOpen]);
+
+  const isActive = (path: string) => {
+    if (path === "/") return pathname === "/";
+    return pathname.startsWith(path);
+  };
+
+  const handleSignOut = async () => {
+    if (!confirm("Are you sure you want to sign out?")) return;
+    await signOut();
+    router.push("/sign-in");
+  };
+
+  const NavLink = ({ item }: { item: NavItem }) => {
+    const active = isActive(item.href);
+    return (
+      <Link href={item.href}>
+        <div
+          className={cn(
+            "group relative flex items-center rounded-xl transition-all duration-300 cursor-pointer",
+            isCollapsed ? "justify-center px-2 py-2" : "gap-3 px-3 py-2.5",
+            active
+              ? `bg-gradient-to-r ${item.gradient} border border-gray-700/50 shadow-lg`
+              : "hover:bg-gray-800/50 border border-transparent hover:border-gray-700/30",
+          )}
+        >
+          {/* Active indicator */}
+          {active && (
+            <div
+              className={cn(
+                "absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 rounded-r-full",
+                item.color.replace("text-", "bg-"),
+              )}
+            />
+          )}
+
+          <div className="relative">
+            <div
+              className={cn(
+                "flex items-center justify-center rounded-lg transition-all duration-300",
+                isCollapsed ? "w-8 h-8 [&_img]:!w-[18px] [&_img]:!h-[18px]" : "w-9 h-9",
+                active
+                  ? `${item.color.replace("text-", "bg-")}/20 ${item.color}`
+                  : "bg-gray-800/50 text-gray-400 group-hover:text-gray-200",
+              )}
+            >
+              {item.icon}
+            </div>
+            {item.numericBadge != null && item.numericBadge > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                {item.numericBadge > 9 ? "9+" : item.numericBadge}
+              </span>
+            )}
+          </div>
+
+          {!isCollapsed && (
+            <>
+              <span
+                className={cn(
+                  "flex-1 font-medium transition-colors duration-300",
+                  active
+                    ? "text-white"
+                    : "text-gray-300 group-hover:text-white",
+                )}
+              >
+                {item.label}
+              </span>
+
+              {item.badge && (
+                <span className="px-2 py-0.5 text-[11px] font-bold bg-gradient-to-r from-yellow-500 to-orange-500 text-gray-900 rounded-full animate-pulse">
+                  {item.badge}
+                </span>
+              )}
+
+              <ChevronRight
+                className={cn(
+                  "h-4 w-4 transition-all duration-300",
+                  active
+                    ? "text-gray-400 translate-x-0 opacity-100"
+                    : "text-gray-600 -translate-x-2 opacity-0 group-hover:translate-x-0 group-hover:opacity-100",
+                )}
+              />
+            </>
+          )}
+        </div>
+      </Link>
+    );
+  };
+
+  const SidebarContent = () => (
+    <div className="flex flex-col h-full">
+      {/* Logo */}
+      <div className="p-4 border-b border-gray-800/50">
+        <Link
+          href="/dashboard"
+          className={cn(
+            "flex items-center",
+            isCollapsed ? "justify-center" : "gap-3",
+          )}
+        >
+          {isCollapsed ? (
+            /* Reason: When collapsed, show the square favicon/icon instead of the
+               full text logo to prevent squishing in the narrow w-20 sidebar. */
+            <div className="relative w-10 h-10 flex items-center justify-center">
+              <div className="absolute inset-0 bg-yellow-500/20 blur-xl rounded-full" />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={images.favicon}
+                alt="logo"
+                width={32}
+                height={32}
+                className="relative z-10 cursor-pointer rounded-lg object-contain"
+                style={{ width: "32px", height: "32px" }}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = "/assets/icons/logo.svg";
+                }}
+              />
+            </div>
+          ) : (
+            <div className="relative">
+              <div className="absolute inset-0 bg-yellow-500/20 blur-xl rounded-full" />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={images.appLogo}
+                alt="logo"
+                width={140}
+                height={32}
+                className="relative z-10 cursor-pointer"
+                style={{ width: "auto", height: "32px" }}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = "/assets/icons/logo.svg";
+                }}
+              />
+            </div>
+          )}
+        </Link>
+      </div>
+
+      {/* User Profile Card */}
+      <div className={cn("border-b border-gray-800/50", isCollapsed ? "p-2" : "p-4")}>
+        <div
+          className={cn(
+            "relative overflow-hidden rounded-2xl bg-gradient-to-br from-gray-800/80 via-gray-800/50 to-gray-900/80 border border-gray-700/50",
+            isCollapsed ? "p-2" : "p-4",
+          )}
+        >
+          {/* Decorative elements */}
+          <div className="absolute top-0 right-0 w-20 h-20 bg-yellow-500/10 rounded-full blur-2xl" />
+          <div className="absolute bottom-0 left-0 w-16 h-16 bg-blue-500/10 rounded-full blur-2xl" />
+
+          <div
+            className={cn(
+              "relative flex items-center gap-3",
+              isCollapsed && "justify-center",
+            )}
+          >
+            <div className="relative group">
+              <div className={cn(
+                "absolute bg-gradient-to-r from-yellow-500 to-orange-500 rounded-full opacity-50 group-hover:opacity-75 blur transition-opacity",
+                isCollapsed ? "-inset-0.5" : "-inset-1",
+              )} />
+              <Avatar className={cn(
+                "relative ring-2 ring-gray-900 transition-all duration-300",
+                isCollapsed ? "h-9 w-9" : "h-12 w-12",
+              )}>
+                <AvatarImage src={userProfileImage} />
+                <AvatarFallback className={cn(
+                  "bg-gradient-to-br from-yellow-500 to-orange-500 text-gray-900 font-bold",
+                  isCollapsed ? "text-sm" : "text-lg",
+                )}>
+                  {user?.name?.[0] || user?.email?.[0]?.toUpperCase() || "U"}
+                </AvatarFallback>
+              </Avatar>
+              <div className={cn(
+                "absolute bg-green-500 rounded-full border-2 border-gray-900",
+                isCollapsed ? "-bottom-0.5 -right-0.5 w-3 h-3" : "-bottom-0.5 -right-0.5 w-4 h-4",
+              )} />
+            </div>
+
+            {!isCollapsed && (
+              <div className="flex-1 min-w-0">
+                <h3 className="font-bold text-white truncate flex items-center gap-1">
+                  {user?.name || "Trader"}
+                  <GameIcon name="star1" size={14} />
+                </h3>
+                <p className="text-xs text-gray-400 truncate">{user?.email}</p>
+                <div className="flex items-center gap-1 mt-1">
+                  <GameIcon name={(userLevel?.icon as any) || "sword"} size={12} />
+                  <span className="text-[11px] font-medium" style={{ color: userLevel?.color || "#22c55e" }}>
+                    {userLevel ? `${userLevel.title} • Lv ${userLevel.level}` : "Loading..."}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Navigation */}
+      <div className={cn("flex-1 overflow-y-auto custom-scrollbar py-4", isCollapsed ? "px-2" : "px-3")}>
+        {/* Main Navigation */}
+        <div className="space-y-1">
+          {!isCollapsed && (
+            <h4 className="px-3 mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              Trading
+            </h4>
+          )}
+          {mainNavItems
+            .filter((item) => item.href !== "/arena" || arenaEnabled)
+            .map((item) => (
+              <NavLink
+                key={item.href}
+                item={
+                  item.href === "/messaging"
+                    ? { ...item, numericBadge: unreadMessages }
+                    : item
+                }
+              />
+            ))}
+        </div>
+
+        {/* Game Master Section - Only show if user is a Game Master */}
+        {isGameMaster && (
+          <div className="mt-6 space-y-1">
+            {!isCollapsed && (
+              <h4 className="px-3 mb-2 text-xs font-semibold text-yellow-500/80 uppercase tracking-wider flex items-center gap-1">
+                <GameIcon name="crown" size={14} />
+                Game Master
+              </h4>
+            )}
+            <NavLink
+              item={{
+                href: "/gamemaster",
+                label: "GM Dashboard",
+                icon: <GameIcon name="crown" size={22} />,
+                color: "text-yellow-400",
+                gradient: "from-yellow-500/20 to-amber-600/5",
+                badge: "GM",
+              }}
+            />
+          </div>
+        )}
+
+        {/* Account Navigation */}
+        <div className="mt-6 space-y-1">
+          {!isCollapsed && (
+            <h4 className="px-3 mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              Account
+            </h4>
+          )}
+          {accountNavItems.map((item) => (
+            <NavLink key={item.href} item={item} />
+          ))}
+        </div>
+      </div>
+
+      {/* Footer Actions */}
+      <div className={cn("border-t border-gray-800/50 space-y-2", isCollapsed ? "p-2" : "p-4")}>
+        {/* Notifications - Desktop Only */}
+        <div className={cn(
+          "hidden lg:flex items-center rounded-xl bg-gray-800/30 border border-gray-700/30",
+          isCollapsed ? "justify-center px-1 py-1" : "justify-between px-3 py-2",
+        )}>
+          {!isCollapsed && (
+            <span className="text-sm text-gray-400">Notifications</span>
+          )}
+          <NotificationDropdown />
+        </div>
+
+        {/* Logout Button */}
+        <Button
+          onClick={handleSignOut}
+          variant="ghost"
+          className={cn(
+            "w-full group flex items-center rounded-xl text-gray-400 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/30 transition-all duration-300",
+            isCollapsed ? "justify-center px-2 py-2" : "gap-3 px-3 py-2.5",
+          )}
+        >
+          <div className={cn(
+            "flex items-center justify-center rounded-lg bg-gray-800/50 group-hover:bg-red-500/20 transition-colors",
+            isCollapsed ? "w-8 h-8" : "w-9 h-9",
+          )}>
+            <LogOut className={cn(isCollapsed ? "h-4 w-4" : "h-5 w-5")} />
+          </div>
+          {!isCollapsed && <span className="font-medium">Sign Out</span>}
+        </Button>
+      </div>
+    </div>
+  );
+
+  return (
+    <>
+      {/* Desktop Sidebar */}
+      <aside
+        className={cn(
+          "hidden lg:flex flex-col fixed left-0 top-0 h-screen bg-gradient-to-b from-gray-900 via-gray-900 to-gray-950 border-r border-gray-800/50 z-40 transition-all duration-300",
+          isCollapsed ? "w-20" : "w-72",
+        )}
+      >
+        <SidebarContent />
+
+        {/* Collapse Toggle */}
+        <button
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-expanded={!isCollapsed}
+          className="absolute -right-3 top-20 w-6 h-6 bg-gray-800 border border-gray-700 rounded-full flex items-center justify-center hover:bg-gray-700 transition-colors z-50"
+        >
+          <ChevronRight
+            className={cn(
+              "h-3 w-3 text-gray-400 transition-transform",
+              isCollapsed ? "" : "rotate-180",
+            )}
+          />
+        </button>
+      </aside>
+
+      {/* Mobile Header */}
+      <header className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-gray-900/95 backdrop-blur-xl border-b border-gray-800/50 z-50 px-4 flex items-center justify-between">
+        <Link href="/dashboard" className="flex items-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={images.appLogo}
+            alt="logo"
+            width={120}
+            height={28}
+            style={{ width: "auto", height: "28px" }}
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = "/assets/icons/logo.svg";
+            }}
+          />
+        </Link>
+
+        <div className="flex items-center gap-2">
+          <NotificationDropdown />
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setIsMobileMenuOpen(true)}
+            aria-label="Open navigation menu"
+            className="h-10 w-10 rounded-xl bg-gray-800/50 border border-gray-700/50 hover:bg-gray-800 hover:border-yellow-500/30"
+          >
+            <Menu className="h-5 w-5 text-gray-300" />
+          </Button>
+        </div>
+      </header>
+
+      {/* Mobile Menu Overlay */}
+      <div
+        className={cn(
+          "lg:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 transition-opacity duration-300",
+          isMobileMenuOpen
+            ? "opacity-100 pointer-events-auto"
+            : "opacity-0 pointer-events-none",
+        )}
+        onClick={() => setIsMobileMenuOpen(false)}
+      />
+
+      {/* Mobile Menu Drawer */}
+      <aside
+        className={cn(
+          "lg:hidden fixed right-0 top-0 h-full w-80 max-w-[85vw] bg-gradient-to-b from-gray-900 via-gray-900 to-gray-950 border-l border-gray-800/50 z-50 transition-transform duration-300 ease-out",
+          isMobileMenuOpen ? "translate-x-0" : "translate-x-full",
+        )}
+      >
+        {/* Mobile Menu Header */}
+        <div className="h-16 px-4 flex items-center justify-between border-b border-gray-800/50">
+          <span className="font-semibold text-white">Menu</span>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="h-9 w-9 rounded-xl hover:bg-gray-800"
+          >
+            <X className="h-5 w-5 text-gray-400" />
+          </Button>
+        </div>
+
+        <div className="h-[calc(100%-4rem)] overflow-y-auto">
+          <SidebarContent />
+        </div>
+      </aside>
+
+      {/* Spacer for content - adjusts based on sidebar state */}
+      <div
+        className={cn(
+          "hidden lg:block transition-all duration-300",
+          isCollapsed ? "w-20" : "w-72",
+        )}
+      />
+    </>
+  );
+};
+
+export default UserSidebar;

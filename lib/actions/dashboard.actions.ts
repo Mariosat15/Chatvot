@@ -1,78 +1,120 @@
-'use server';
+"use server";
 
-import { auth } from '@/lib/better-auth/auth';
-import { headers } from 'next/headers';
-import { redirect } from 'next/navigation';
-import { connectToDatabase } from '@/database/mongoose';
-import CompetitionParticipant from '@/database/models/trading/competition-participant.model';
-import Competition from '@/database/models/trading/competition.model';
-import TradingPosition from '@/database/models/trading/trading-position.model';
-import TradeHistory from '@/database/models/trading/trade-history.model';
-import { getRealPrice } from '@/lib/services/real-forex-prices.service';
-import { ForexSymbol, calculateUnrealizedPnL } from '@/lib/services/pnl-calculator.service';
+import { auth } from "@/lib/better-auth/auth";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { connectToDatabase } from "@/database/mongoose";
+import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
+import Competition from "@/database/models/trading/competition.model";
+import TradingPosition from "@/database/models/trading/trading-position.model";
+import TradeHistory from "@/database/models/trading/trade-history.model";
+import { getRealPrice, fetchRealForexPrices } from "@/lib/services/real-forex-prices.service";
+import {
+  computeProfitFactor,
+  computeWinRate,
+} from "@/lib/services/trading-metrics";
+import {
+  ForexSymbol,
+  calculateUnrealizedPnL,
+  getQuoteToUsdRate,
+  getConversionPairSymbols,
+} from "@/lib/services/pnl-calculator.service";
+import {
+  getSymbolConfig,
+  getMultipleSymbolConfigs,
+} from "@/lib/services/symbol-config.service";
+
+// Disable verbose logging in production
+const DEBUG = false;
+const log = (...args: unknown[]): void => {
+  if (DEBUG) log(...args);
+};
 
 // Get user's dashboard data (for API routes - takes userId directly, no redirect)
 export const getUserDashboardDataForApi = async (userId: string) => {
   try {
     await connectToDatabase();
-    
-    console.log('📊 Dashboard API: Fetching data for user:', userId);
+
+    log("📊 Dashboard API: Fetching data for user:", userId);
 
     // Get all active competitions the user is participating in (only LIVE competitions)
     const activeParticipations = await CompetitionParticipant.find({
       userId: userId,
-      status: 'active',
+      status: "active",
     }).lean();
-    
-    console.log('📊 Active participations found:', activeParticipations.length);
 
-    // Filter to only include competitions that are currently active (live now)
-    const liveCompetitionIds = await Competition.find({
-      status: 'active',
+    log("📊 Active participations found:", activeParticipations.length);
+
+    // PERF: Batch-fetch all live competitions in ONE query instead of N findById calls
+    const liveCompetitions = await Competition.find({
+      status: "active",
       startTime: { $lte: new Date() },
       endTime: { $gte: new Date() },
-    }).distinct('_id');
+    }).lean();
 
-    const liveParticipations = activeParticipations.filter((participation: any) =>
-      liveCompetitionIds.some((id) => id.toString() === participation.competitionId.toString())
+    const liveCompetitionMap = new Map(
+      liveCompetitions.map((c: any) => [c._id.toString(), c]),
+    );
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const liveParticipations = activeParticipations.filter(
+      (participation: any) =>
+        liveCompetitionMap.has(participation.competitionId.toString()),
     );
 
     // Same logic as getUserDashboardData but with userId parameter
     const competitionsWithStats = await Promise.all(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       liveParticipations.map(async (participation: any) => {
         try {
-          const competition = await Competition.findById(participation.competitionId).lean();
+          const competition = liveCompetitionMap.get(participation.competitionId.toString());
           if (!competition) return null;
 
           const openPositions = await TradingPosition.find({
             participantId: participation._id,
-            status: 'open',
+            status: "open",
           }).lean();
 
-          // Calculate unrealized PnL for open positions
-          let totalUnrealizedPnL = 0;
-          const positionsWithPnL = await Promise.all(
-            openPositions.map(async (pos: any) => {
-              try {
-                const currentPrice = await getRealPrice(pos.symbol as ForexSymbol);
-                if (currentPrice) {
-                  const unrealizedPnL = calculateUnrealizedPnL(
-                    pos.type,
-                    pos.size,
-                    pos.entryPrice,
-                    currentPrice
-                  );
-                  totalUnrealizedPnL += unrealizedPnL;
-                  return { ...pos, currentPrice, unrealizedPnL };
-                }
-                return pos;
-              } catch {
-                return pos;
-              }
-            })
-          );
+          const uniqueSymbols = [...new Set(openPositions.map((p: any) => p.symbol as ForexSymbol))];
+          const dashConv = getConversionPairSymbols(uniqueSymbols);
+          const dashAll = [...new Set([...uniqueSymbols, ...dashConv])] as ForexSymbol[];
+          const pricesMap = dashAll.length > 0 ? await fetchRealForexPrices(dashAll) : new Map();
+          const symbolCfgMap = await getMultipleSymbolConfigs(uniqueSymbols);
 
-          const currentCapital = (participation.currentCapital || competition.startingCapital) + totalUnrealizedPnL;
+          let totalUnrealizedPnL = 0;
+          const positionsWithPnL = openPositions.map((pos: any) => {
+            try {
+              const priceQuote = pricesMap.get(pos.symbol as ForexSymbol);
+              if (priceQuote) {
+                const currentPrice =
+                  pos.side === "long" ? priceQuote.bid : priceQuote.ask;
+                const dRate = getQuoteToUsdRate(
+                  pos.symbol as ForexSymbol,
+                  pricesMap as Map<string, { bid: number; ask: number }>,
+                );
+                const symbolCfg = symbolCfgMap.get(pos.symbol)!;
+                const unrealizedPnL = calculateUnrealizedPnL(
+                  pos.side,
+                  pos.entryPrice,
+                  currentPrice,
+                  pos.quantity,
+                  pos.symbol as ForexSymbol,
+                  dRate,
+                  symbolCfg,
+                );
+                totalUnrealizedPnL += unrealizedPnL;
+                return { ...pos, currentPrice, unrealizedPnL };
+              }
+              return pos;
+            } catch {
+              return pos;
+            }
+          });
+
+          const comp = competition as { startingCapital?: number };
+          const currentCapital =
+            (participation.currentCapital || comp.startingCapital || 0) +
+            totalUnrealizedPnL;
 
           return {
             competition: JSON.parse(JSON.stringify(competition)),
@@ -85,39 +127,63 @@ export const getUserDashboardDataForApi = async (userId: string) => {
             openPositionsCount: openPositions.length,
           };
         } catch (error) {
-          console.error(`❌ Error processing competition ${participation.competitionId}:`, error);
+          console.error(
+            `❌ Error processing competition ${participation.competitionId}:`,
+            error,
+          );
           return null;
         }
-      })
+      }),
     );
 
     const validCompetitions = competitionsWithStats.filter(Boolean);
 
     const totalCapital = validCompetitions.reduce(
       (sum, comp) => sum + (comp?.participation.currentCapital || 0),
-      0
+      0,
     );
     const totalPnL = validCompetitions.reduce(
       (sum, comp) => sum + (comp?.participation.pnl || 0),
-      0
+      0,
     );
     const totalPositions = validCompetitions.reduce(
       (sum, comp) => sum + (comp?.openPositionsCount || 0),
-      0
+      0,
     );
-    const totalTrades = validCompetitions.reduce(
-      (sum, comp) => sum + (comp?.participation.totalTrades || 0),
-      0
+
+    // Get REAL stats from TradeHistory - SINGLE SOURCE OF TRUTH
+    // This ensures consistency between admin panel and customer dashboard
+    const allCompetitionIds = validCompetitions.map(
+      (comp) => comp?.competition._id,
     );
-    const totalWinningTrades = validCompetitions.reduce(
-      (sum, comp) => sum + (comp?.participation.winningTrades || 0),
-      0
-    );
-    const totalLosingTrades = validCompetitions.reduce(
-      (sum, comp) => sum + (comp?.participation.losingTrades || 0),
-      0
-    );
-    const overallWinRate = totalTrades > 0 ? (totalWinningTrades / totalTrades) * 100 : 0;
+
+    const tradeStats = await TradeHistory.aggregate([
+      {
+        $match: {
+          userId,
+          competitionId: { $in: allCompetitionIds },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalTrades: { $sum: 1 },
+          winningTrades: { $sum: { $cond: [{ $gt: ["$realizedPnl", 0] }, 1, 0] } },
+          // Reason: only genuine losses (PnL < 0); breakeven excluded.
+          losingTrades: { $sum: { $cond: [{ $lt: ["$realizedPnl", 0] }, 1, 0] } },
+        },
+      },
+    ]);
+
+    const stats = tradeStats[0] || {
+      totalTrades: 0,
+      winningTrades: 0,
+      losingTrades: 0,
+    };
+    const totalTrades = stats.totalTrades;
+    const totalWinningTrades = stats.winningTrades;
+    const totalLosingTrades = stats.losingTrades;
+    const overallWinRate = computeWinRate(totalWinningTrades, totalLosingTrades);
 
     return {
       activeCompetitions: validCompetitions,
@@ -137,7 +203,7 @@ export const getUserDashboardDataForApi = async (userId: string) => {
       },
     };
   } catch (error) {
-    console.error('❌ Error getting dashboard data for API:', error);
+    console.error("❌ Error getting dashboard data for API:", error);
     return null;
   }
 };
@@ -146,202 +212,267 @@ export const getUserDashboardDataForApi = async (userId: string) => {
 export const getUserDashboardData = async () => {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
-    if (!session?.user) redirect('/sign-in');
+    if (!session?.user) redirect("/sign-in");
 
     await connectToDatabase();
-    
-    console.log('📊 Dashboard: Fetching data for user:', session.user.id, session.user.name);
+
+    log(
+      "📊 Dashboard: Fetching data for user:",
+      session.user.id,
+      session.user.name,
+    );
 
     // Get all active competitions the user is participating in (only LIVE competitions)
     const activeParticipations = await CompetitionParticipant.find({
       userId: session.user.id,
-      status: 'active',
+      status: "active",
     }).lean();
-    
-    console.log('📊 Active participations found:', activeParticipations.length);
 
-    // Filter to only include competitions that are currently active (live now)
-    const liveCompetitionIds = await Competition.find({
-      status: 'active', // Only competitions that are currently live
+    log("📊 Active participations found:", activeParticipations.length);
+
+    // PERF: Batch-fetch all live competitions in ONE query instead of N findById calls
+    const liveCompetitions = await Competition.find({
+      status: "active", // Only competitions that are currently live
       startTime: { $lte: new Date() }, // Started
       endTime: { $gte: new Date() }, // Not ended yet
-    }).distinct('_id');
+    }).lean();
+
+    const liveCompetitionMap = new Map(
+      liveCompetitions.map((c: any) => [c._id.toString(), c]),
+    );
 
     // Filter participations to only include live competitions
-    const liveParticipations = activeParticipations.filter((participation: any) =>
-      liveCompetitionIds.some((id) => id.toString() === participation.competitionId.toString())
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const liveParticipations = activeParticipations.filter(
+      (participation: any) =>
+        liveCompetitionMap.has(participation.competitionId.toString()),
     );
-    
-    console.log('📊 Live competitions:', liveCompetitionIds.length);
-    console.log('📊 Live participations:', liveParticipations.length);
+
+    log("📊 Live competitions:", liveCompetitionMap.size);
+    log("📊 Live participations:", liveParticipations.length);
 
     // Get competition details for each participation (only live ones)
     const competitionsWithStats = await Promise.all(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       liveParticipations.map(async (participation: any) => {
         try {
-          console.log(`📊 Processing competition for user ${session.user.id}, participationId: ${participation._id}`);
-          
-          const competition = await Competition.findById(participation.competitionId).lean();
-          
+          log(
+            `📊 Processing competition for user ${session.user.id}, participationId: ${participation._id}`,
+          );
+
+          const competition = liveCompetitionMap.get(participation.competitionId.toString());
+
           if (!competition) {
-            console.log(`⚠️ Competition not found: ${participation.competitionId}`);
+            log(`⚠️ Competition not found: ${participation.competitionId}`);
             return null;
           }
-          
-          console.log(`✅ Competition found: ${competition.name}`);
 
-        // Get participant statistics for this competition
-        const participantStats = await CompetitionParticipant.aggregate([
-          {
-            $match: { competitionId: participation.competitionId }
-          },
-          {
-            $group: {
-              _id: '$status',
-              count: { $sum: 1 }
+          const comp = competition as { name?: string };
+          log(`✅ Competition found: ${comp.name || "Unknown"}`);
+
+          // Get participant statistics for this competition
+          const participantStats = await CompetitionParticipant.aggregate([
+            {
+              $match: { competitionId: participation.competitionId },
+            },
+            {
+              $group: {
+                _id: "$status",
+                count: { $sum: 1 },
+              },
+            },
+          ]);
+
+          const stats = {
+            active: 0,
+            liquidated: 0,
+            completed: 0,
+            disqualified: 0,
+            total: 0,
+          };
+
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          participantStats.forEach((stat: { _id: string; count: number }) => {
+            stats[stat._id as keyof typeof stats] = stat.count;
+            stats.total += stat.count;
+          });
+
+          // PERF: .select() to only fetch display fields (participant docs have 30+ fields)
+          const participantSelect = "userId username currentCapital startingCapital pnl pnlPercentage currentRank status totalTrades winningTrades losingTrades winRate updatedAt";
+
+          // Get detailed participant lists
+          const activeParticipants = await CompetitionParticipant.find({
+            competitionId: participation.competitionId,
+            status: "active",
+          })
+            .select(participantSelect)
+            .sort({ currentRank: 1 })
+            .limit(20)
+            .lean();
+
+          const liquidatedParticipants = await CompetitionParticipant.find({
+            competitionId: participation.competitionId,
+            status: "liquidated",
+          })
+            .select(participantSelect)
+            .sort({ updatedAt: -1 })
+            .limit(20)
+            .lean();
+
+          const disqualifiedParticipants = await CompetitionParticipant.find({
+            competitionId: participation.competitionId,
+            status: "disqualified",
+          })
+            .select(participantSelect)
+            .sort({ updatedAt: -1 })
+            .limit(20)
+            .lean();
+
+          // Get open positions count and value
+          const openPositions = await TradingPosition.find({
+            competitionId: participation.competitionId,
+            userId: session.user.id,
+            status: "open",
+          }).lean();
+
+          const posSymbols = [...new Set(openPositions.map((p: any) => p.symbol as ForexSymbol))];
+          const posConv = getConversionPairSymbols(posSymbols);
+          const posAll = [...new Set([...posSymbols, ...posConv])] as ForexSymbol[];
+          const posPricesMap = posAll.length > 0 ? await fetchRealForexPrices(posAll) : new Map();
+          const symbolCfgMap = await getMultipleSymbolConfigs(posSymbols);
+
+          let totalUnrealizedPnL = 0;
+          for (const position of openPositions) {
+            const currentPrice = posPricesMap.get(position.symbol as ForexSymbol);
+            if (currentPrice) {
+              const marketPrice =
+                position.side === "long" ? currentPrice.bid : currentPrice.ask;
+              const dRate2 = getQuoteToUsdRate(
+                position.symbol as ForexSymbol,
+                posPricesMap as Map<string, { bid: number; ask: number }>,
+              );
+              const symbolCfg = symbolCfgMap.get(position.symbol)!;
+              const pnl = calculateUnrealizedPnL(
+                position.side,
+                position.entryPrice,
+                marketPrice,
+                position.quantity,
+                position.symbol as ForexSymbol,
+                dRate2,
+                symbolCfg,
+              );
+              totalUnrealizedPnL += pnl;
             }
           }
-        ]);
 
-        const stats = {
-          active: 0,
-          liquidated: 0,
-          completed: 0,
-          disqualified: 0,
-          total: 0
-        };
+          // Get recent CLOSED trades (last 10)
+          const recentClosedTrades = await TradeHistory.find({
+            competitionId: participation.competitionId,
+            userId: session.user.id,
+          })
+            .sort({ closedAt: -1 })
+            .limit(10)
+            .lean();
 
-        participantStats.forEach((stat: any) => {
-          stats[stat._id as keyof typeof stats] = stat.count;
-          stats.total += stat.count;
-        });
+          // Get open positions with current prices (reuse batch-fetched prices)
+          const openPositionsWithPrices = [];
+          for (const pos of openPositions) {
+            const livePrices = posPricesMap.get(pos.symbol as ForexSymbol);
+            const currentPrice = livePrices
+              ? pos.side === "long"
+                ? livePrices.bid
+                : livePrices.ask
+              : pos.entryPrice;
 
-        // Get detailed participant lists
-        const activeParticipants = await CompetitionParticipant.find({
-          competitionId: participation.competitionId,
-          status: 'active'
-        })
-          .sort({ currentRank: 1 })
-          .limit(20)
-          .lean();
-
-        const liquidatedParticipants = await CompetitionParticipant.find({
-          competitionId: participation.competitionId,
-          status: 'liquidated'
-        })
-          .sort({ updatedAt: -1 })
-          .limit(20)
-          .lean();
-
-        const disqualifiedParticipants = await CompetitionParticipant.find({
-          competitionId: participation.competitionId,
-          status: 'disqualified'
-        })
-          .sort({ updatedAt: -1 })
-          .limit(20)
-          .lean();
-
-        // Get open positions count and value
-        const openPositions = await TradingPosition.find({
-          competitionId: participation.competitionId,
-          userId: session.user.id,
-          status: 'open',
-        }).lean();
-
-        // Calculate total unrealized P&L from open positions
-        let totalUnrealizedPnL = 0;
-        for (const position of openPositions) {
-          const currentPrice = await getRealPrice(position.symbol as ForexSymbol);
-          if (currentPrice) {
-            const marketPrice = position.side === 'long' ? currentPrice.bid : currentPrice.ask;
-            const pnl = calculateUnrealizedPnL(
-              position.side,
-              position.entryPrice,
-              marketPrice,
-              position.quantity,
-              position.symbol as ForexSymbol
+            const dRate3 = getQuoteToUsdRate(
+              pos.symbol as ForexSymbol,
+              posPricesMap as Map<string, { bid: number; ask: number }>,
             );
-            totalUnrealizedPnL += pnl;
+            const symbolCfg = symbolCfgMap.get(pos.symbol)!;
+            const unrealizedPnl = calculateUnrealizedPnL(
+              pos.side,
+              pos.entryPrice,
+              currentPrice,
+              pos.quantity,
+              pos.symbol as ForexSymbol,
+              dRate3,
+              symbolCfg,
+            );
+
+            const unrealizedPnlPercentage =
+              pos.marginUsed > 0 ? (unrealizedPnl / pos.marginUsed) * 100 : 0;
+
+            openPositionsWithPrices.push({
+              ...pos,
+              currentPrice,
+              unrealizedPnl,
+              unrealizedPnlPercentage,
+            });
           }
-        }
 
-        // Get recent CLOSED trades (last 10)
-        const recentClosedTrades = await TradeHistory.find({
-          competitionId: participation.competitionId,
-          userId: session.user.id,
-        })
-          .sort({ closedAt: -1 })
-          .limit(10)
-          .lean();
-
-        // Get open positions with current prices
-        const openPositionsWithPrices = [];
-        for (const pos of openPositions) {
-          const livePrices = await getRealPrice(pos.symbol as ForexSymbol);
-          const currentPrice = livePrices ? 
-            (pos.side === 'long' ? livePrices.bid : livePrices.ask) : 
-            pos.entryPrice;
-          
-          const unrealizedPnl = calculateUnrealizedPnL(
-            pos.side,
-            pos.entryPrice,
-            currentPrice,
-            pos.quantity,
-            pos.symbol as ForexSymbol
+          log(
+            `📊 User ${session.user.id} - Competition ${participation.competitionId}:`,
           );
-          
-          const unrealizedPnlPercentage = pos.marginUsed > 0 ? (unrealizedPnl / pos.marginUsed) * 100 : 0;
-          
-          openPositionsWithPrices.push({
-            ...pos,
-            currentPrice,
-            unrealizedPnl,
-            unrealizedPnlPercentage
-          });
-        }
+          log(`   - Open positions: ${openPositions.length}`);
+          log(
+            `   - Open positions with prices: ${openPositionsWithPrices.length}`,
+          );
+          log(`   - Closed trades: ${recentClosedTrades.length}`);
+          log(`   - Win rate: ${participation.winRate}%`);
+          log(`   - Total trades: ${participation.totalTrades}`);
+          log(`   - Unrealized P&L: $${totalUnrealizedPnL.toFixed(2)}`);
 
-        console.log(`📊 User ${session.user.id} - Competition ${participation.competitionId}:`);
-        console.log(`   - Open positions: ${openPositions.length}`);
-        console.log(`   - Open positions with prices: ${openPositionsWithPrices.length}`);
-        console.log(`   - Closed trades: ${recentClosedTrades.length}`);
-        console.log(`   - Win rate: ${participation.winRate}%`);
-        console.log(`   - Total trades: ${participation.totalTrades}`);
-        console.log(`   - Unrealized P&L: $${totalUnrealizedPnL.toFixed(2)}`);
+          // We've removed the heavy chart data generation for performance
 
-        // We've removed the heavy chart data generation for performance
+          // Get ALL participants for win probability calculation
+          const allCompetitionParticipants = await CompetitionParticipant.find({
+            competitionId: participation.competitionId,
+          })
+            .select(
+              "userId currentCapital startingCapital pnl pnlPercentage totalTrades winningTrades losingTrades winRate averageWin averageLoss currentRank status",
+            )
+            .lean();
 
-        // Get ALL participants for win probability calculation
-        const allCompetitionParticipants = await CompetitionParticipant.find({
-          competitionId: participation.competitionId,
-        })
-          .select('userId currentCapital startingCapital pnl pnlPercentage totalTrades winningTrades losingTrades winRate averageWin averageLoss currentRank status')
-          .lean();
-
-        return {
-          competition: JSON.parse(JSON.stringify(competition)),
-          participation: JSON.parse(JSON.stringify({
-            ...participation,
-            unrealizedPnl: totalUnrealizedPnL,
-          })),
-          openPositionsCount: openPositions.length,
-          recentClosedTrades: JSON.parse(JSON.stringify(recentClosedTrades)),
-          openPositions: JSON.parse(JSON.stringify(openPositionsWithPrices)),
-          participantStats: {
-            counts: stats,
-            active: JSON.parse(JSON.stringify(activeParticipants)),
-            liquidated: JSON.parse(JSON.stringify(liquidatedParticipants)),
-            disqualified: JSON.parse(JSON.stringify(disqualifiedParticipants)),
-          },
-          // Add all participants for win probability calculation
-          allParticipants: JSON.parse(JSON.stringify(allCompetitionParticipants)),
-        };
+          return {
+            competition: JSON.parse(JSON.stringify(competition)),
+            participation: JSON.parse(
+              JSON.stringify({
+                ...participation,
+                unrealizedPnl: totalUnrealizedPnL,
+              }),
+            ),
+            openPositionsCount: openPositions.length,
+            recentClosedTrades: JSON.parse(JSON.stringify(recentClosedTrades)),
+            openPositions: JSON.parse(JSON.stringify(openPositionsWithPrices)),
+            participantStats: {
+              counts: stats,
+              active: JSON.parse(JSON.stringify(activeParticipants)),
+              liquidated: JSON.parse(JSON.stringify(liquidatedParticipants)),
+              disqualified: JSON.parse(
+                JSON.stringify(disqualifiedParticipants),
+              ),
+            },
+            // Add all participants for win probability calculation
+            allParticipants: JSON.parse(
+              JSON.stringify(allCompetitionParticipants),
+            ),
+          };
         } catch (error) {
-          console.error(`❌ Error processing competition ${participation.competitionId} for user ${session.user.id}:`, error);
-          console.error('Error details:', error instanceof Error ? error.message : 'Unknown error');
-          console.error('Participation data:', JSON.stringify(participation, null, 2));
+          console.error(
+            `❌ Error processing competition ${participation.competitionId} for user ${session.user.id}:`,
+            error,
+          );
+          console.error(
+            "Error details:",
+            error instanceof Error ? error.message : "Unknown error",
+          );
+          console.error(
+            "Participation data:",
+            JSON.stringify(participation, null, 2),
+          );
           return null;
         }
-      })
+      }),
     );
 
     // Filter out null values
@@ -350,39 +481,55 @@ export const getUserDashboardData = async () => {
     // Get overall stats across all competitions
     const totalCapital = validCompetitions.reduce(
       (sum, comp) => sum + (comp?.participation.currentCapital || 0),
-      0
+      0,
     );
 
     const totalPnL = validCompetitions.reduce(
       (sum, comp) => sum + (comp?.participation.pnl || 0),
-      0
+      0,
     );
 
     const totalPositions = validCompetitions.reduce(
       (sum, comp) => sum + (comp?.openPositionsCount || 0),
-      0
+      0,
     );
 
-    // Calculate aggregate trading stats (same method as profile)
-    const totalTrades = validCompetitions.reduce(
-      (sum, comp) => sum + (comp?.participation.totalTrades || 0),
-      0
+    // Calculate aggregate trading stats from TradeHistory (SINGLE SOURCE OF TRUTH)
+    // This ensures consistency between admin panel and customer dashboard
+    const allCompetitionIds = validCompetitions.map(
+      (comp) => comp?.competition._id,
     );
 
-    const totalWinningTrades = validCompetitions.reduce(
-      (sum, comp) => sum + (comp?.participation.winningTrades || 0),
-      0
-    );
+    // Get REAL stats from TradeHistory - not from potentially stale participant records
+    const tradeStats = await TradeHistory.aggregate([
+      {
+        $match: {
+          userId: session.user.id,
+          competitionId: { $in: allCompetitionIds },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalTrades: { $sum: 1 },
+          winningTrades: { $sum: { $cond: [{ $gt: ["$realizedPnl", 0] }, 1, 0] } },
+          // Reason: only genuine losses (PnL < 0); breakeven excluded.
+          losingTrades: { $sum: { $cond: [{ $lt: ["$realizedPnl", 0] }, 1, 0] } },
+        },
+      },
+    ]);
 
-    const totalLosingTrades = validCompetitions.reduce(
-      (sum, comp) => sum + (comp?.participation.losingTrades || 0),
-      0
-    );
+    const stats = tradeStats[0] || {
+      totalTrades: 0,
+      winningTrades: 0,
+      losingTrades: 0,
+    };
+    const totalTrades = stats.totalTrades;
+    const totalWinningTrades = stats.winningTrades;
+    const totalLosingTrades = stats.losingTrades;
 
-    // Calculate true overall win rate (not average of win rates)
-    const overallWinRate = totalTrades > 0 
-      ? (totalWinningTrades / totalTrades) * 100 
-      : 0;
+    // Calculate true overall win rate (decisive trades only, excl. breakeven)
+    const overallWinRate = computeWinRate(totalWinningTrades, totalLosingTrades);
 
     // Calculate profit factor
     let totalGrossProfit = 0;
@@ -396,24 +543,28 @@ export const getUserDashboardData = async () => {
         totalGrossLoss += Math.abs(p.averageLoss) * p.losingTrades;
       }
     });
-    const profitFactor = totalGrossLoss > 0 
-      ? totalGrossProfit / totalGrossLoss 
-      : totalWinningTrades > 0 ? 9999 : 0;
+    const profitFactor = computeProfitFactor(totalGrossProfit, totalGrossLoss);
 
     // Generate global daily P&L across all competitions
-    const aggregatedDailyPnL = new Map<string, { pnl: number; trades: number }>();
+    const aggregatedDailyPnL = new Map<
+      string,
+      { pnl: number; trades: number }
+    >();
     const now = new Date();
-    
+
     // Initialize last 7 days
     for (let i = 6; i >= 0; i--) {
       const date = new Date(now);
       date.setDate(date.getDate() - i);
-      const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const dateStr = date.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      });
       aggregatedDailyPnL.set(dateStr, { pnl: 0, trades: 0 });
     }
 
     // Fetch all closed trades from all competitions for daily P&L calculation
-    const allCompetitionIds = validCompetitions.map(comp => comp?.competition._id);
+    // (allCompetitionIds already defined above for stats aggregation)
     const allTrades = await TradeHistory.find({
       competitionId: { $in: allCompetitionIds },
       userId: session.user.id,
@@ -425,42 +576,54 @@ export const getUserDashboardData = async () => {
     for (let i = 6; i >= 0; i--) {
       const date = new Date(now);
       date.setDate(date.getDate() - i);
-      const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      
+      const dateStr = date.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      });
+
       const startOfDay = new Date(date);
       startOfDay.setHours(0, 0, 0, 0);
       const endOfDay = new Date(date);
       endOfDay.setHours(23, 59, 59, 999);
-      
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const dayTrades = allTrades.filter((t: any) => {
         const tradeDate = new Date(t.closedAt);
         return tradeDate >= startOfDay && tradeDate <= endOfDay;
       });
-      
-      const dayPnL = dayTrades.reduce((sum: number, t: any) => sum + (t.realizedPnl || 0), 0);
-      
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const dayPnL = dayTrades.reduce(
+        (sum: number, t: any) => sum + (t.realizedPnl || 0),
+        0,
+      );
+
       aggregatedDailyPnL.set(dateStr, {
         pnl: dayPnL,
-        trades: dayTrades.length
+        trades: dayTrades.length,
       });
     }
 
-    const globalDailyPnL = Array.from(aggregatedDailyPnL.entries()).map(([date, data]) => ({
-      date,
-      pnl: data.pnl,
-      trades: data.trades
-    }));
+    const globalDailyPnL = Array.from(aggregatedDailyPnL.entries()).map(
+      ([date, data]) => ({
+        date,
+        pnl: data.pnl,
+        trades: data.trades,
+      }),
+    );
 
-    console.log('📊 Dashboard Summary:');
-    console.log(`   - Total Capital: $${totalCapital.toFixed(2)}`);
-    console.log(`   - Total P&L: $${totalPnL.toFixed(2)}`);
-    console.log(`   - Total Positions: ${totalPositions}`);
-    console.log(`   - Total Trades: ${totalTrades}`);
-    console.log(`   - Winning Trades: ${totalWinningTrades}`);
-    console.log(`   - Losing Trades: ${totalLosingTrades}`);
-    console.log(`   - Overall Win Rate: ${overallWinRate.toFixed(2)}%`);
-    console.log(`   - Profit Factor: ${profitFactor === 9999 ? '∞' : profitFactor.toFixed(2)}`);
-    
+    log("📊 Dashboard Summary:");
+    log(`   - Total Capital: $${totalCapital.toFixed(2)}`);
+    log(`   - Total P&L: $${totalPnL.toFixed(2)}`);
+    log(`   - Total Positions: ${totalPositions}`);
+    log(`   - Total Trades: ${totalTrades}`);
+    log(`   - Winning Trades: ${totalWinningTrades}`);
+    log(`   - Losing Trades: ${totalLosingTrades}`);
+    log(`   - Overall Win Rate: ${overallWinRate.toFixed(2)}%`);
+    log(
+      `   - Profit Factor: ${profitFactor === 9999 ? "∞" : profitFactor.toFixed(2)}`,
+    );
+
     return {
       activeCompetitions: validCompetitions,
       overallStats: {
@@ -480,12 +643,15 @@ export const getUserDashboardData = async () => {
     };
   } catch (error) {
     // Don't log NEXT_REDIRECT as an error (it's expected for redirects)
-    if (error instanceof Error && error.message === 'NEXT_REDIRECT') {
+    if (error instanceof Error && error.message === "NEXT_REDIRECT") {
       throw error; // Re-throw to allow redirect to happen
     }
-    
-    console.error('❌ Error getting dashboard data:', error);
-    console.error('Error details:', error instanceof Error ? error.message : 'Unknown error');
+
+    console.error("❌ Error getting dashboard data:", error);
+    console.error(
+      "Error details:",
+      error instanceof Error ? error.message : "Unknown error",
+    );
     return {
       activeCompetitions: [],
       overallStats: {
@@ -505,4 +671,3 @@ export const getUserDashboardData = async () => {
     };
   }
 };
-

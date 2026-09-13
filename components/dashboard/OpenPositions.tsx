@@ -1,14 +1,18 @@
-'use client';
+"use client";
 
-import { Activity, TrendingUp, TrendingDown } from 'lucide-react';
-import { formatCurrency } from '@/lib/utils';
+import { Activity, TrendingUp, TrendingDown } from "lucide-react";
+import { formatCurrency } from "@/lib/utils";
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 interface OpenPositionsProps {
   positions: any[];
   competitionName: string;
 }
 
-export default function OpenPositions({ positions, competitionName }: OpenPositionsProps) {
+export default function OpenPositions({
+  positions,
+  competitionName,
+}: OpenPositionsProps) {
   if (positions.length === 0) {
     return (
       <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-6 text-center">
@@ -24,25 +28,29 @@ export default function OpenPositions({ positions, competitionName }: OpenPositi
         <p className="text-sm font-semibold text-gray-300">Open Positions</p>
         <p className="text-xs text-gray-500">{competitionName}</p>
       </div>
-      
+
       <div className="max-h-64 overflow-y-auto scrollbar-hide">
         <div className="divide-y divide-gray-700/50">
           {positions.map((position, index) => {
             const isProfitable = position.unrealizedPnl >= 0;
-            
+
             return (
-              <div 
+              <div
                 key={index}
                 className="px-4 py-3 hover:bg-gray-700/30 transition-colors"
               >
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-gray-200">{position.symbol}</span>
-                    <span className={`px-2 py-0.5 rounded text-xs font-bold ${
-                      position.side === 'long'
-                        ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                        : 'bg-red-500/20 text-red-400 border border-red-500/30'
-                    }`}>
+                    <span className="text-sm font-bold text-gray-200">
+                      {position.symbol}
+                    </span>
+                    <span
+                      className={`px-2 py-0.5 rounded text-xs font-bold ${
+                        position.side === "long"
+                          ? "bg-green-500/20 text-green-400 border border-green-500/30"
+                          : "bg-red-500/20 text-red-400 border border-red-500/30"
+                      }`}
+                    >
                       {position.side.toUpperCase()}
                     </span>
                     <span className="text-xs text-gray-500">
@@ -55,19 +63,26 @@ export default function OpenPositions({ positions, competitionName }: OpenPositi
                     ) : (
                       <TrendingDown className="h-3 w-3 text-red-500" />
                     )}
-                    <span className={`text-sm font-bold ${
-                      isProfitable ? 'text-green-500' : 'text-red-500'
-                    }`}>
+                    <span
+                      className={`text-sm font-bold ${
+                        isProfitable ? "text-green-500" : "text-red-500"
+                      }`}
+                    >
                       {formatCurrency(position.unrealizedPnl || 0)}
                     </span>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center justify-between text-xs text-gray-500">
                   <span>Entry: {position.entryPrice.toFixed(5)}</span>
-                  <span>Current: {(position.currentPrice || position.entryPrice).toFixed(5)}</span>
-                  <span className={isProfitable ? 'text-green-500' : 'text-red-500'}>
-                    {(position.unrealizedPnlPercentage || 0) >= 0 ? '+' : ''}
+                  <span>
+                    Current:{" "}
+                    {(position.currentPrice || position.entryPrice).toFixed(5)}
+                  </span>
+                  <span
+                    className={isProfitable ? "text-green-500" : "text-red-500"}
+                  >
+                    {(position.unrealizedPnlPercentage || 0) >= 0 ? "+" : ""}
                     {(position.unrealizedPnlPercentage || 0).toFixed(2)}%
                   </span>
                 </div>
@@ -79,4 +94,3 @@ export default function OpenPositions({ positions, competitionName }: OpenPositi
     </div>
   );
 }
-

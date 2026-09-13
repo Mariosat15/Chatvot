@@ -1,0 +1,767 @@
+import { Schema, model, models, Document } from "mongoose";
+
+// Competition Structure
+export interface ICompetition extends Document {
+  name: string; // "Weekly Forex Challenge"
+  description: string;
+  slug: string; // URL-friendly name
+
+  // Game identity (X1 foundation)
+  // Reason: the contest engine is game-agnostic; these two fields are how it knows which
+  // game module settles, ranks and scores a contest. Defaulted to trading so every
+  // existing document and every writer that predates the games work stays correct.
+  gameType: string; // "trading" | "provider" - selects the game MODULE
+  gameKey: string; // e.g. "trading" or "provider:acme:trivia-blitz" - IMMUTABLE once written
+
+  // Provider-game round settings ("External game plans/04" section 2.1).
+  //
+  // X3 deliberately passed these in as a `RoundContestConfig` rather than storing them,
+  // because nothing created a provider contest yet and six unread fields on a mirrored
+  // model would have been dead weight. The admin contest wizard is that caller, so they
+  // land here now.
+  //
+  // ALL OPTIONAL, AND THAT IS NOT LAZINESS. A trading contest has no play window and no
+  // attempts policy; making any of these required would make every existing document
+  // invalid and every trading writer wrong. `gameConfig` being absent IS the statement
+  // "this is not a provider contest".
+  gameConfig?: {
+    providerKey: string;
+    gameCode: string;
+    /** Operator answers, already validated against the title's `configSchema`. */
+    settings?: Record<string, unknown>;
+  };
+  /** Generated once at creation and shared by every round, so all players get the same content. */
+  contentSeed?: string;
+  /** When play may happen. Distinct from registration close and from contest end. */
+  playWindowStart?: Date;
+  playWindowEnd?: Date;
+  /** How long after the play window a late provider result is still accepted. */
+  resultGracePeriodSeconds?: number;
+  attemptsPolicy?: "single" | "best_of_n" | "sum_of_n";
+  attemptsAllowed?: number;
+  unresolvedRoundPolicy?: "score_zero" | "exclude" | "hold_and_alert";
+
+  // Entry & Capital
+  entryFee: number; // Credits required to enter
+  startingCapital: number; // Trading points (virtual capital)
+  minParticipants: number; // Minimum to start
+  maxParticipants: number; // Maximum allowed
+  currentParticipants: number; // Current count
+
+  // Timing
+  startTime: Date;
+  endTime: Date;
+  registrationDeadline: Date;
+
+  // Status
+  status:
+    | "draft"
+    | "upcoming"
+    | "active"
+    | "finalizing"
+    | "completed"
+    | "cancelled"
+    | "emergency_ended";
+  cancellationReason?: string; // Reason if cancelled (e.g., "Did not meet minimum participants")
+
+  // Pause State (for risk mitigation)
+  isPaused: boolean;
+  pausedAt?: Date;
+  pauseReason?: string;
+  totalPauseDuration: number; // Total milliseconds the competition was paused
+  pauseHistory: {
+    pausedAt: Date;
+    resumedAt?: Date;
+    duration?: number; // milliseconds
+    reason: string;
+    pausedBy: string; // Admin ID
+    resumedBy?: string;
+  }[];
+
+  // Emergency End (for price feed issues)
+  emergencyEndedAt?: Date;
+  emergencyEndReason?: string;
+  emergencyEndedBy?: string; // Admin ID
+  usedSnapshotId?: string; // ID of price snapshot used for emergency finalization
+
+  // Trading Rules
+  assetClasses: ("stocks" | "forex" | "crypto" | "indices")[];
+  allowedSymbols: string[]; // Whitelist (empty = all allowed)
+  blockedSymbols: string[]; // Blacklist
+  leverage: {
+    enabled: boolean;
+    min: number;
+    max: number;
+    default: number;
+  };
+
+  // Competition Type
+  competitionType: "time_based" | "goal_based" | "hybrid";
+  goalConfig?: {
+    targetReturn: number; // First to reach X% wins
+    targetCapital: number; // First to reach X capital wins
+  };
+
+  // Prize Distribution
+  prizePool: number; // Total credits in pool
+  platformFeePercentage: number; // % taken by platform
+  prizeDistribution: {
+    rank: number;
+    percentage: number;
+  }[]; // e.g., [{ rank: 1, percentage: 70 }, { rank: 2, percentage: 20 }, ...]
+
+  /**
+   * Where the pot goes when the contest finishes and NOBODY recorded a score.
+   *
+   * Owner decision, 7 September 2026, answering open question 17. Only reachable for a game
+   * that can express "no result" - trading's module answers `hasResult` true unconditionally,
+   * so a trading contest can never take this branch whatever the field says. See
+   * `lib/services/settlement/unscored-refund.ts`.
+   *
+   * The default is `unclaimed_pool` because that is what every contest did before the field
+   * existed, and a default that changes the destination of money on documents already in the
+   * database is not a default, it is a migration. The provider wizard offers
+   * `refund_entry_fees` and defaults its own draft to it.
+   *
+   * It does NOT cover a disqualification: a player who broke a rule has a result, so their
+   * fee stays with the contest exactly as it does in a trading contest.
+   */
+  unscoredContestPolicy?: "unclaimed_pool" | "refund_entry_fees";
+
+  /**
+   * How late in the contest a player may still start a round.
+   *
+   * Owner decision, 7 September 2026. `reserve_full_round` stops new rounds one full round
+   * before the end - the title's LONGEST round, from the catalogue, not the length the
+   * operator configured - and `until_window_closes` lets a player start at any time, with the
+   * round closed and scored when the contest closes.
+   *
+   * The default is `reserve_full_round` because that is what every contest did before the
+   * field existed. The provider wizard defaults its own draft to `until_window_closes`, which
+   * is the answer the owner wants for new contests; see `lib/services/games/round-types.ts`
+   * for why the rule changed at all.
+   */
+  roundStartPolicy?: "reserve_full_round" | "until_window_closes";
+  /**
+   * Which shape this contest was created as (task 11).
+   *
+   * Read through `resolveContestPlayShape`, never directly, and never re-derived from the
+   * title: once a title supports both shapes the title's answer is a default, and re-deriving
+   * it rewrites the entry rules of a contest people have paid into. Absent for any contest
+   * created before the choice existed, which is when a title had exactly one shape - so the
+   * fallback to the title is a correct answer rather than a guess.
+   */
+  playMode?: "anytime" | "scheduled";
+
+  // Competition Rules & Ranking
+  rules: {
+    rankingMethod:
+      | "pnl"
+      | "roi"
+      | "total_capital"
+      | "win_rate"
+      | "total_wins"
+      | "profit_factor";
+    tieBreaker1:
+      | "trades_count"
+      | "win_rate"
+      | "total_capital"
+      | "roi"
+      | "join_time"
+      | "split_prize";
+    tieBreaker2?:
+      | "trades_count"
+      | "win_rate"
+      | "total_capital"
+      | "roi"
+      | "join_time"
+      | "split_prize";
+    minimumTrades: number;
+    minimumWinRate?: number;
+    tiePrizeDistribution: "split_equally" | "split_weighted" | "first_gets_all";
+    disqualifyOnLiquidation: boolean;
+  };
+
+  // Level Requirements
+  levelRequirement: {
+    enabled: boolean;
+    minLevel: number; // 1-10 (1=Novice, 10=Trading God)
+    maxLevel?: number; // Optional max level (for beginner-only competitions)
+  };
+
+  // Difficulty Settings
+  difficulty?: {
+    mode: "auto" | "manual";
+    manualLevel?:
+      | "beginner"
+      | "intermediate"
+      | "advanced"
+      | "expert"
+      | "extreme";
+  };
+
+  // Restrictions
+  maxPositionSize: number; // Max % of capital per position
+  maxOpenPositions: number; // Max simultaneous positions
+  allowShortSelling: boolean;
+  marginCallThreshold: number; // % of capital before forced close
+
+  // Margin Settings (copied from trading risk settings at creation time)
+  marginSettings?: {
+    liquidation: number; // Stopout level %
+    call: number; // Margin call level %
+    warning: number; // Warning level %
+    safe: number; // Safe level %
+  };
+
+  // Risk Limits (per-competition)
+  riskLimits: {
+    maxDrawdownPercent: number; // Max drawdown from starting capital before trading blocked
+    dailyLossLimitPercent: number; // Max daily loss before trading blocked for the day
+    equityDrawdownPercent: number; // Max equity drawdown (includes unrealized PnL) - anti-fraud
+    equityCheckEnabled: boolean; // Enable equity-based checks (anti-mirror trading)
+    enabled: boolean; // Whether to enforce these limits
+  };
+
+  // Results
+  winnerId?: string;
+  winnerPnL?: number;
+  noWinners?: boolean;
+  earlyEndReason?: string;
+  /**
+   * The stored result of a finished contest.
+   *
+   * FOUR FIELDS WERE BEING DISCARDED HERE UNTIL X5, and three of them were trading's.
+   * Finalization has always written `isTied`, `qualificationStatus` and
+   * `disqualificationReason` into this array, and this schema declared none of them - so
+   * Mongoose's strict mode dropped them on every save while reporting success. The stored
+   * leaderboard has therefore never recorded whether a rank was shared or why a player was
+   * disqualified, and every screen reading it back has shown neither.
+   *
+   * `score` is the X5 addition. Without it a provider contest's stored leaderboard would
+   * hold ranks and prizes but no results at all.
+   *
+   * The trading fields stay optional because a game with no virtual account has no capital
+   * and no profit - chapter 05 section 10: generalised, explicitly scoped, or absent.
+   */
+  finalLeaderboard?: {
+    rank: number;
+    userId: string;
+    username: string;
+    prizeAmount: number;
+    /** Trading. */
+    finalCapital?: number;
+    pnl?: number;
+    pnlPercentage?: number;
+    totalTrades?: number;
+    winRate?: number;
+    /** Score-reporting games. Stored RAW, never the negated comparison value. */
+    score?: number;
+    isTied?: boolean;
+    qualificationStatus?: string;
+    disqualificationReason?: string;
+  }[];
+
+  // Admin
+  createdBy: string; // Admin ID
+  imageUrl?: string;
+  tags: string[]; // 'beginner', 'advanced', 'forex', etc.
+
+  // Game Master (if created by a game master)
+  gameMasterId?: string; // User ID of the game master who created this
+  gameMasterName?: string; // Cached for display
+
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const CompetitionSchema = new Schema<ICompetition>(
+  {
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    description: {
+      type: String,
+      required: true,
+    },
+    slug: {
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
+      trim: true,
+    },
+    // Reason: default rather than required. A rolling deploy has old code writing
+    // contests with no game label, and an unlabelled contest would later be settled by
+    // whichever module the reader guessed - invariant 5 in "External game plans/11".
+    gameType: {
+      type: String,
+      required: true,
+      default: "trading",
+      index: true,
+    },
+      gameKey: {
+        type: String,
+        required: true,
+        default: "trading",
+        index: true,
+      },
+      // Provider round settings - see the interface for why every one is optional.
+      gameConfig: {
+        type: {
+          providerKey: { type: String, required: true },
+          gameCode: { type: String, required: true },
+          settings: { type: Schema.Types.Mixed },
+        },
+        required: false,
+        default: undefined,
+        _id: false,
+      },
+      contentSeed: { type: String },
+      playWindowStart: { type: Date },
+      playWindowEnd: { type: Date },
+      resultGracePeriodSeconds: { type: Number, min: 0, default: undefined },
+      attemptsPolicy: {
+        type: String,
+        enum: ["single", "best_of_n", "sum_of_n"],
+        default: undefined,
+      },
+      attemptsAllowed: { type: Number, min: 1, default: undefined },
+      unresolvedRoundPolicy: {
+        type: String,
+        enum: ["score_zero", "exclude", "hold_and_alert"],
+        default: undefined,
+      },
+    entryFee: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+    // CONDITIONALLY REQUIRED, so a provider contest can exist at all.
+    //
+    // Virtual trading capital is meaningless for a chess puzzle or a reflex game, but this
+    // was `required: true, min: 100` - so a provider contest could not be saved without
+    // inventing a number, and an invented number is worse than an absent one: it renders in
+    // any summary that has not yet learned about games.
+    //
+    // Trading is unaffected. The predicate is true for every existing document, because
+    // `gameType` defaults to "trading", so nothing already stored becomes invalid.
+    startingCapital: {
+      type: Number,
+      required: function (this: { gameType?: string }) {
+        return (this.gameType ?? "trading") === "trading";
+      },
+      min: 100,
+    },
+    minParticipants: {
+      type: Number,
+      required: true,
+      default: 2,
+      min: 2,
+    },
+    maxParticipants: {
+      type: Number,
+      required: true,
+      default: 100,
+      min: 2,
+    },
+    currentParticipants: {
+      type: Number,
+      required: true,
+      default: 0,
+      min: 0,
+    },
+    startTime: {
+      type: Date,
+      required: true,
+    },
+    endTime: {
+      type: Date,
+      required: true,
+    },
+    registrationDeadline: {
+      type: Date,
+      required: true,
+    },
+    status: {
+      type: String,
+      required: true,
+      enum: [
+        "draft",
+        "upcoming",
+        "active",
+        "finalizing",
+        "completed",
+        "cancelled",
+        "emergency_ended",
+      ],
+      default: "draft",
+    },
+    cancellationReason: {
+      type: String,
+    },
+    // Pause State
+    isPaused: {
+      type: Boolean,
+      default: false,
+    },
+    pausedAt: {
+      type: Date,
+    },
+    pauseReason: {
+      type: String,
+    },
+    totalPauseDuration: {
+      type: Number,
+      default: 0,
+    },
+    pauseHistory: [
+      {
+        pausedAt: { type: Date, required: true },
+        resumedAt: { type: Date },
+        duration: { type: Number },
+        reason: { type: String, required: true },
+        pausedBy: { type: String, required: true },
+        resumedBy: { type: String },
+      },
+    ],
+    // Emergency End
+    emergencyEndedAt: {
+      type: Date,
+    },
+    emergencyEndReason: {
+      type: String,
+    },
+    emergencyEndedBy: {
+      type: String,
+    },
+    usedSnapshotId: {
+      type: String,
+    },
+    assetClasses: [
+      {
+        type: String,
+        enum: ["stocks", "forex", "crypto", "indices"],
+      },
+    ],
+    allowedSymbols: [String],
+    blockedSymbols: [String],
+    leverage: {
+      enabled: { type: Boolean, default: false },
+      min: { type: Number, default: 1, min: 1 },
+      max: { type: Number, default: 10, min: 1, max: 500 },
+      default: { type: Number, default: 1, min: 1 },
+    },
+    competitionType: {
+      type: String,
+      required: true,
+      enum: ["time_based", "goal_based", "hybrid"],
+      default: "time_based",
+    },
+    goalConfig: {
+      targetReturn: { type: Number },
+      targetCapital: { type: Number },
+    },
+    prizePool: {
+      type: Number,
+      required: true,
+      default: 0,
+      min: 0,
+    },
+    platformFeePercentage: {
+      type: Number,
+      required: true,
+      default: 20,
+      min: 0,
+      max: 50,
+    },
+    prizeDistribution: [
+      {
+        rank: { type: Number, required: true },
+        percentage: { type: Number, required: true, min: 0, max: 100 },
+      },
+    ],
+    // Add-only. Default preserves the pre-7-Sep-2026 behaviour for every existing document.
+    unscoredContestPolicy: {
+      type: String,
+      enum: ["unclaimed_pool", "refund_entry_fees"],
+      default: "unclaimed_pool",
+    },
+    // Add-only. Default preserves the pre-7-Sep-2026 gate for every existing document.
+    roundStartPolicy: {
+      type: String,
+      enum: ["reserve_full_round", "until_window_closes"],
+      default: "reserve_full_round",
+    },
+    // WHICH SHAPE THIS CONTEST WAS CREATED AS - task 11, 9 Sep 2026.
+    //
+    // It is on the contest rather than only on the title because task 11 lets one title
+    // support both shapes, and from that moment the title's own `playMode` is a DEFAULT rather
+    // than a fact about any particular contest. `resolvePlayShape(title)` was being called by
+    // the edit service, so without this an ordinary edit to a contest created as an async time
+    // trial would re-force `single` attempts and close entry at the start - because the title's
+    // default happens to be the synchronous race - silently, under people who have already
+    // paid to enter. Read through `resolveContestPlayShape`, which falls back to the title.
+    //
+    // NO DEFAULT, deliberately, and this one is the opposite reasoning to `roundStartPolicy`
+    // two lines up. That field needed a default because it changed a gate every existing
+    // contest passes through; this one is only ever read to answer "what was chosen", and an
+    // absent value is a true and useful answer - the contest predates the choice, so the
+    // title's single shape IS what it was created as. A default of `anytime` would assert that
+    // a scheduled contest created last week was staggered.
+    //
+    // NOT EDITABLE, ever, on the `gameKey` precedent rather than the freeze-on-entry one: the
+    // shape decides when entry closes and how many attempts a paying player gets, so changing
+    // it mid-contest changes the deal people bought into. A draft is cheap to delete and
+    // recreate, which is the same answer `12` s2.2 gave to changing a draft's game type.
+    playMode: {
+      type: String,
+      enum: ["anytime", "scheduled"],
+    },
+    rules: {
+      rankingMethod: {
+        type: String,
+        enum: [
+          "pnl",
+          "roi",
+          "total_capital",
+          "win_rate",
+          "total_wins",
+          "profit_factor",
+        ],
+        required: true,
+        default: "pnl",
+      },
+      tieBreaker1: {
+        type: String,
+        enum: [
+          "trades_count",
+          "win_rate",
+          "total_capital",
+          "roi",
+          "join_time",
+          "split_prize",
+        ],
+        required: true,
+        default: "trades_count",
+      },
+      tieBreaker2: {
+        type: String,
+        enum: [
+          "trades_count",
+          "win_rate",
+          "total_capital",
+          "roi",
+          "join_time",
+          "split_prize",
+        ],
+      },
+      minimumTrades: {
+        type: Number,
+        required: true,
+        default: 0,
+        min: 0,
+      },
+      minimumWinRate: {
+        type: Number,
+        min: 0,
+        max: 100,
+      },
+      tiePrizeDistribution: {
+        type: String,
+        enum: ["split_equally", "split_weighted", "first_gets_all"],
+        required: true,
+        default: "split_equally",
+      },
+      disqualifyOnLiquidation: {
+        type: Boolean,
+        required: true,
+        default: true,
+      },
+    },
+    levelRequirement: {
+      enabled: {
+        type: Boolean,
+        required: true,
+        default: false,
+      },
+      minLevel: {
+        type: Number,
+        min: 1,
+        max: 10,
+        default: 1,
+      },
+      maxLevel: {
+        type: Number,
+        min: 1,
+        max: 10,
+      },
+    },
+    difficulty: {
+      mode: {
+        type: String,
+        enum: ["auto", "manual"],
+        default: "auto",
+      },
+      manualLevel: {
+        type: String,
+        enum: ["beginner", "intermediate", "advanced", "expert", "extreme"],
+      },
+    },
+    maxPositionSize: {
+      type: Number,
+      required: true,
+      default: 20, // 20% of capital per position
+      min: 1,
+      max: 100,
+    },
+    maxOpenPositions: {
+      type: Number,
+      required: true,
+      default: 10,
+      min: 1,
+      max: 100,
+    },
+    allowShortSelling: {
+      type: Boolean,
+      required: true,
+      default: false,
+    },
+    marginCallThreshold: {
+      type: Number,
+      required: true,
+      default: 100, // Margin call level from risk settings (can be 100%+)
+      min: 10,
+      max: 1000, // Allow high margin call levels
+    },
+    marginSettings: {
+      type: {
+        liquidation: { type: Number, default: 50 },
+        call: { type: Number, default: 100 },
+        warning: { type: Number, default: 150 },
+        safe: { type: Number, default: 200 },
+      },
+      required: false,
+    },
+    riskLimits: {
+      maxDrawdownPercent: {
+        type: Number,
+        default: 50, // 50% max drawdown by default
+        min: 1,
+        max: 100,
+      },
+      dailyLossLimitPercent: {
+        type: Number,
+        default: 20, // 20% daily loss limit by default
+        min: 1,
+        max: 100,
+      },
+      equityDrawdownPercent: {
+        type: Number,
+        default: 30, // 30% equity drawdown by default (stricter than balance)
+        min: 1,
+        max: 100,
+      },
+      equityCheckEnabled: {
+        type: Boolean,
+        default: false, // Equity check disabled by default
+      },
+      enabled: {
+        type: Boolean,
+        default: false, // Disabled by default
+      },
+    },
+    winnerId: {
+      type: String,
+    },
+    winnerPnL: {
+      type: Number,
+    },
+    noWinners: {
+      type: Boolean,
+    },
+    earlyEndReason: {
+      type: String,
+    },
+    finalLeaderboard: [
+      {
+        rank: Number,
+        userId: String,
+        username: String,
+        prizeAmount: Number,
+        finalCapital: Number,
+        pnl: Number,
+        pnlPercentage: Number,
+        totalTrades: Number,
+        winRate: Number,
+        // Add-only, X5. `score` is what a provider contest's result IS; the other three
+        // have been written by trading finalization all along and silently discarded.
+        score: Number,
+        isTied: Boolean,
+        qualificationStatus: String,
+        disqualificationReason: String,
+      },
+    ],
+    createdBy: {
+      type: String,
+      required: true,
+    },
+    imageUrl: {
+      type: String,
+    },
+    tags: [String],
+    gameMasterId: {
+      type: String,
+      index: true, // For finding competitions by game master
+    },
+    gameMasterName: {
+      type: String,
+    },
+  },
+  {
+    timestamps: true,
+  },
+);
+
+// Indexes for fast queries
+CompetitionSchema.index({ status: 1, startTime: -1 });
+// Note: slug already has unique index from schema definition (unique: true)
+CompetitionSchema.index({ createdBy: 1 });
+CompetitionSchema.index({ status: 1, registrationDeadline: 1 });
+// Game-scoped queries: contest lists filtered by game, and the finalization sweeps
+CompetitionSchema.index({ gameType: 1, status: 1 });
+CompetitionSchema.index({ gameKey: 1, status: 1 });
+// Reason: the reconciliation sweep asks "which contests have a play window closing soon",
+// which without this index is a collection scan on the hot path ("04" section 2.1).
+CompetitionSchema.index({ status: 1, playWindowEnd: 1 });
+
+// Virtual for days until start
+CompetitionSchema.virtual("daysUntilStart").get(function () {
+  if (this.status !== "upcoming") return 0;
+  const now = new Date();
+  const diff = this.startTime.getTime() - now.getTime();
+  return Math.ceil(diff / (1000 * 60 * 60 * 24));
+});
+
+// Virtual for competition duration
+CompetitionSchema.virtual("durationDays").get(function () {
+  const diff = this.endTime.getTime() - this.startTime.getTime();
+  return Math.ceil(diff / (1000 * 60 * 60 * 24));
+});
+
+// Virtual for is registration open
+CompetitionSchema.virtual("isRegistrationOpen").get(function () {
+  const now = new Date();
+  return (
+    this.status === "upcoming" &&
+    now < this.registrationDeadline &&
+    this.currentParticipants < this.maxParticipants
+  );
+});
+
+const Competition =
+  models?.Competition || model<ICompetition>("Competition", CompetitionSchema);
+
+export default Competition;

@@ -1,9 +1,12 @@
-'use client';
+"use client";
 
-import { TrendingUp, TrendingDown, DollarSign, Shield, Zap, Target } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { getMarginStatus } from '@/lib/services/risk-manager.service';
-import { MarginStatusIndicator } from './MarginStatusIndicator';
+import { TrendingUp, TrendingDown } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { getMarginStatus } from "@/lib/services/risk-manager.service";
+import { MarginStatusIndicator } from "./MarginStatusIndicator";
+import { GameIcon } from "@/components/ui/GameIcon";
+import { InfoTooltip } from "@/components/ui/InfoTooltip";
+import { TRADING_TERMS } from "@/lib/constants/trading-terms";
 
 interface AccountInfoPanelProps {
   balance: number;
@@ -11,7 +14,7 @@ interface AccountInfoPanelProps {
   unrealizedPnl: number;
   usedMargin: number;
   availableCapital: number;
-  mode?: 'professional' | 'game';
+  mode?: "professional" | "game";
   openPositionsCount?: number;
   marginThresholds?: {
     LIQUIDATION: number;
@@ -30,41 +33,47 @@ export function AccountInfoPanel({
   unrealizedPnl,
   usedMargin,
   availableCapital,
-  mode = 'professional',
+  mode = "professional",
   openPositionsCount = 0,
   marginThresholds,
   startingCapital = 0,
   dailyRealizedPnl = 0,
 }: AccountInfoPanelProps) {
-  const isGame = mode === 'game';
-  
+  const isGame = mode === "game";
+
   // Calculate metrics
   const freeMargin = equity - usedMargin;
   // Check for both zero and very small numbers to avoid huge margin levels
   const marginLevel = usedMargin > 0.01 ? (equity / usedMargin) * 100 : 0;
   const pnlPercentage = balance > 0 ? (unrealizedPnl / balance) * 100 : 0;
   const isProfit = unrealizedPnl >= 0;
-  
+
   // NEW: Calculate Total Competition P&L (from starting capital)
   const totalPnl = startingCapital > 0 ? balance - startingCapital : 0;
-  const totalPnlPercent = startingCapital > 0 ? ((balance - startingCapital) / startingCapital) * 100 : 0;
+  const totalPnlPercent =
+    startingCapital > 0
+      ? ((balance - startingCapital) / startingCapital) * 100
+      : 0;
   const isTotalProfit = totalPnl >= 0;
-  
+
   // NEW: Calculate Daily P&L (realized + unrealized)
   const dailyTotalPnl = dailyRealizedPnl + unrealizedPnl;
-  const dailyPnlPercent = startingCapital > 0 ? (dailyTotalPnl / startingCapital) * 100 : 0;
+  const dailyPnlPercent =
+    startingCapital > 0 ? (dailyTotalPnl / startingCapital) * 100 : 0;
   const isDailyProfit = dailyTotalPnl >= 0;
-  
+
   // Get margin status with admin thresholds
   const marginStatus = getMarginStatus(
-    balance, 
-    unrealizedPnl, 
+    balance,
+    unrealizedPnl,
     usedMargin,
-    marginThresholds ? {
-      liquidation: marginThresholds.LIQUIDATION,
-      marginCall: marginThresholds.MARGIN_CALL,
-      warning: marginThresholds.WARNING,
-    } : undefined
+    marginThresholds
+      ? {
+          liquidation: marginThresholds.LIQUIDATION,
+          marginCall: marginThresholds.MARGIN_CALL,
+          warning: marginThresholds.WARNING,
+        }
+      : undefined,
   );
 
   // Professional Mode - Detailed Technical Display
@@ -85,7 +94,7 @@ export function AccountInfoPanel({
           {/* Header */}
           <div className="flex items-center justify-between mb-5">
             <h3 className="text-sm font-bold text-light-900 uppercase tracking-wider flex items-center gap-2">
-              <DollarSign className="size-4 text-primary" />
+              <GameIcon name="coin" size={16} />
               Account Overview
             </h3>
             <div className="size-2 bg-green-400 rounded-full animate-pulse shadow-lg shadow-green-400/50" />
@@ -99,9 +108,12 @@ export function AccountInfoPanel({
               <div className="relative">
                 <div className="flex items-center gap-2 mb-2">
                   <div className="p-1.5 bg-primary/20 rounded-lg">
-                    <DollarSign className="size-3.5 text-primary" />
+                    <GameIcon name="coin" size={14} />
                   </div>
-                  <p className="text-xs font-semibold text-dark-600 uppercase tracking-wide">Balance</p>
+                  <p className="text-xs font-semibold text-dark-600 uppercase tracking-wide">
+                    Balance
+                  </p>
+                  <InfoTooltip text={TRADING_TERMS.balance} side="right" />
                 </div>
                 <p className="text-xl md:text-2xl font-bold text-white tabular-nums">
                   ${balance.toFixed(2)}
@@ -115,9 +127,12 @@ export function AccountInfoPanel({
               <div className="relative">
                 <div className="flex items-center gap-2 mb-2">
                   <div className="p-1.5 bg-blue-500/20 rounded-lg">
-                    <Target className="size-3.5 text-blue-400" />
+                    <GameIcon name="target" size={14} />
                   </div>
-                  <p className="text-xs font-semibold text-dark-600 uppercase tracking-wide">Equity</p>
+                  <p className="text-xs font-semibold text-dark-600 uppercase tracking-wide">
+                    Equity
+                  </p>
+                  <InfoTooltip text={TRADING_TERMS.equity} side="right" />
                 </div>
                 <p className="text-xl md:text-2xl font-bold text-blue-400 tabular-nums">
                   ${equity.toFixed(2)}
@@ -131,9 +146,12 @@ export function AccountInfoPanel({
               <div className="relative">
                 <div className="flex items-center gap-2 mb-2">
                   <div className="p-1.5 bg-emerald-500/20 rounded-lg">
-                    <Zap className="size-3.5 text-emerald-400" />
+                    <GameIcon name="profit" size={14} />
                   </div>
-                  <p className="text-xs font-semibold text-dark-600 uppercase tracking-wide">Available</p>
+                  <p className="text-xs font-semibold text-dark-600 uppercase tracking-wide">
+                    Available
+                  </p>
+                  <InfoTooltip text={TRADING_TERMS.availableCapital} side="right" />
                 </div>
                 <p className="text-xl md:text-2xl font-bold text-emerald-400 tabular-nums">
                   ${availableCapital.toFixed(2)}
@@ -142,42 +160,49 @@ export function AccountInfoPanel({
             </div>
 
             {/* P&L Card */}
-            <div className={cn(
-              "group relative bg-gradient-to-br rounded-xl p-4 border transition-all duration-300 shadow-lg",
-              isProfit
-                ? "from-green-500/10 to-green-500/5 border-green-500/30 hover:border-green-500/50"
-                : "from-red-500/10 to-red-500/5 border-red-500/30 hover:border-red-500/50"
-            )}>
+            <div
+              className={cn(
+                "group relative bg-gradient-to-br rounded-xl p-4 border transition-all duration-300 shadow-lg",
+                isProfit
+                  ? "from-green-500/10 to-green-500/5 border-green-500/30 hover:border-green-500/50"
+                  : "from-red-500/10 to-red-500/5 border-red-500/30 hover:border-red-500/50",
+              )}
+            >
               <div className="relative">
                 <div className="flex items-center gap-2 mb-2">
-                  <div className={cn(
-                    "p-1.5 rounded-lg",
-                    isProfit ? "bg-green-500/20" : "bg-red-500/20"
-                  )}>
+                  <div
+                    className={cn(
+                      "p-1.5 rounded-lg",
+                      isProfit ? "bg-green-500/20" : "bg-red-500/20",
+                    )}
+                  >
                     {isProfit ? (
-                      <TrendingUp className="size-3.5 text-green-400" />
+                      <GameIcon name="profit" size={14} />
                     ) : (
-                      <TrendingDown className="size-3.5 text-red-400" />
+                      <GameIcon name="loss" size={14} />
                     )}
                   </div>
-                  <p className="text-xs font-semibold text-dark-600 uppercase tracking-wide">P&L</p>
+                  <p className="text-xs font-semibold text-dark-600 uppercase tracking-wide">
+                    P&L
+                  </p>
                 </div>
                 <div className="flex flex-col">
                   <p
                     className={cn(
-                      'text-xl md:text-2xl font-bold tabular-nums',
-                      isProfit ? 'text-green-400' : 'text-red-400'
+                      "text-xl md:text-2xl font-bold tabular-nums",
+                      isProfit ? "text-green-400" : "text-red-400",
                     )}
                   >
-                    {isProfit ? '+' : ''}${unrealizedPnl.toFixed(2)}
+                    {isProfit ? "+" : ""}${unrealizedPnl.toFixed(2)}
                   </p>
                   <p
                     className={cn(
-                      'text-xs font-semibold tabular-nums',
-                      isProfit ? 'text-green-400/70' : 'text-red-400/70'
+                      "text-xs font-semibold tabular-nums",
+                      isProfit ? "text-green-400/70" : "text-red-400/70",
                     )}
                   >
-                    {isProfit ? '+' : ''}{pnlPercentage.toFixed(2)}%
+                    {isProfit ? "+" : ""}
+                    {pnlPercentage.toFixed(2)}%
                   </p>
                 </div>
               </div>
@@ -188,63 +213,83 @@ export function AccountInfoPanel({
           {startingCapital > 0 && (
             <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-dark-400/30">
               {/* Daily P&L */}
-              <div className={cn(
-                "p-3 rounded-xl border",
-                isDailyProfit 
-                  ? "bg-green-500/10 border-green-500/30" 
-                  : "bg-red-500/10 border-red-500/30"
-              )}>
+              <div
+                className={cn(
+                  "p-3 rounded-xl border",
+                  isDailyProfit
+                    ? "bg-green-500/10 border-green-500/30"
+                    : "bg-red-500/10 border-red-500/30",
+                )}
+              >
                 <div className="flex items-center gap-2 mb-1">
                   {isDailyProfit ? (
-                    <TrendingUp className="size-3.5 text-green-400" />
+                    <GameIcon name="profit" size={14} />
                   ) : (
-                    <TrendingDown className="size-3.5 text-red-400" />
+                    <GameIcon name="loss" size={14} />
                   )}
-                  <p className="text-xs text-dark-600 font-medium uppercase tracking-wide">Daily P&L</p>
+                  <p className="text-xs text-dark-600 font-medium uppercase tracking-wide">
+                    Daily P&L
+                  </p>
                 </div>
                 <div className="flex items-baseline gap-2">
-                  <p className={cn(
-                    "text-lg font-bold tabular-nums",
-                    isDailyProfit ? "text-green-400" : "text-red-400"
-                  )}>
-                    {isDailyProfit ? '+' : ''}{dailyPnlPercent.toFixed(2)}%
+                  <p
+                    className={cn(
+                      "text-lg font-bold tabular-nums",
+                      isDailyProfit ? "text-green-400" : "text-red-400",
+                    )}
+                  >
+                    {isDailyProfit ? "+" : ""}
+                    {dailyPnlPercent.toFixed(2)}%
                   </p>
-                  <p className={cn(
-                    "text-xs tabular-nums",
-                    isDailyProfit ? "text-green-400/70" : "text-red-400/70"
-                  )}>
-                    ({isDailyProfit ? '+' : ''}${dailyTotalPnl.toFixed(2)})
+                  <p
+                    className={cn(
+                      "text-xs tabular-nums",
+                      isDailyProfit ? "text-green-400/70" : "text-red-400/70",
+                    )}
+                  >
+                    ({isDailyProfit ? "+" : ""}${dailyTotalPnl.toFixed(2)})
                   </p>
                 </div>
               </div>
 
               {/* Total Competition P&L */}
-              <div className={cn(
-                "p-3 rounded-xl border",
-                isTotalProfit 
-                  ? "bg-emerald-500/10 border-emerald-500/30" 
-                  : "bg-rose-500/10 border-rose-500/30"
-              )}>
+              <div
+                className={cn(
+                  "p-3 rounded-xl border",
+                  isTotalProfit
+                    ? "bg-emerald-500/10 border-emerald-500/30"
+                    : "bg-rose-500/10 border-rose-500/30",
+                )}
+              >
                 <div className="flex items-center gap-2 mb-1">
                   {isTotalProfit ? (
-                    <TrendingUp className="size-3.5 text-emerald-400" />
+                    <GameIcon name="profit" size={14} />
                   ) : (
-                    <TrendingDown className="size-3.5 text-rose-400" />
+                    <GameIcon name="loss" size={14} />
                   )}
-                  <p className="text-xs text-dark-600 font-medium uppercase tracking-wide">Total P&L</p>
+                  <p className="text-xs text-dark-600 font-medium uppercase tracking-wide">
+                    Total P&L
+                  </p>
                 </div>
                 <div className="flex items-baseline gap-2">
-                  <p className={cn(
-                    "text-lg font-bold tabular-nums",
-                    isTotalProfit ? "text-emerald-400" : "text-rose-400"
-                  )}>
-                    {isTotalProfit ? '+' : ''}{totalPnlPercent.toFixed(2)}%
+                  <p
+                    className={cn(
+                      "text-lg font-bold tabular-nums",
+                      isTotalProfit ? "text-emerald-400" : "text-rose-400",
+                    )}
+                  >
+                    {isTotalProfit ? "+" : ""}
+                    {totalPnlPercent.toFixed(2)}%
                   </p>
-                  <p className={cn(
-                    "text-xs tabular-nums",
-                    isTotalProfit ? "text-emerald-400/70" : "text-rose-400/70"
-                  )}>
-                    ({isTotalProfit ? '+' : ''}${totalPnl.toFixed(2)})
+                  <p
+                    className={cn(
+                      "text-xs tabular-nums",
+                      isTotalProfit
+                        ? "text-emerald-400/70"
+                        : "text-rose-400/70",
+                    )}
+                  >
+                    ({isTotalProfit ? "+" : ""}${totalPnl.toFixed(2)})
                   </p>
                 </div>
               </div>
@@ -255,7 +300,10 @@ export function AccountInfoPanel({
           <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-dark-400/30">
             {/* Margin Used */}
             <div className="text-center">
-              <p className="text-xs text-dark-600 mb-1.5 font-medium uppercase tracking-wide">Margin Used</p>
+              <p className="text-xs text-dark-600 mb-1.5 font-medium uppercase tracking-wide flex items-center justify-center gap-1">
+                Margin Used
+                <InfoTooltip text={TRADING_TERMS.marginUsed} />
+              </p>
               <p className="text-base md:text-lg font-bold text-orange-400 tabular-nums">
                 ${usedMargin.toFixed(2)}
               </p>
@@ -263,7 +311,10 @@ export function AccountInfoPanel({
 
             {/* Free Margin */}
             <div className="text-center">
-              <p className="text-xs text-dark-600 mb-1.5 font-medium uppercase tracking-wide">Free Margin</p>
+              <p className="text-xs text-dark-600 mb-1.5 font-medium uppercase tracking-wide flex items-center justify-center gap-1">
+                Free Margin
+                <InfoTooltip text={TRADING_TERMS.freeMargin} />
+              </p>
               <p className="text-base md:text-lg font-bold text-purple-400 tabular-nums">
                 ${freeMargin.toFixed(2)}
               </p>
@@ -271,22 +322,25 @@ export function AccountInfoPanel({
 
             {/* Margin Level */}
             <div className="text-center">
-              <p className="text-xs text-dark-600 mb-1.5 font-medium uppercase tracking-wide">Margin Level</p>
+              <p className="text-xs text-dark-600 mb-1.5 font-medium uppercase tracking-wide flex items-center justify-center gap-1">
+                Margin Level
+                <InfoTooltip text={TRADING_TERMS.marginLevel} />
+              </p>
               <p
                 className={cn(
-                  'text-base md:text-lg font-bold tabular-nums',
-                  usedMargin <= 0.01 ? 'text-dark-600' : '',
-                  marginStatus.status === 'safe' && 'text-green-400',
-                  marginStatus.status === 'warning' && 'text-yellow-400',
-                  marginStatus.status === 'danger' && 'text-orange-400',
-                  marginStatus.status === 'liquidation' && 'text-red-400'
+                  "text-base md:text-lg font-bold tabular-nums",
+                  usedMargin <= 0.01 ? "text-dark-600" : "",
+                  marginStatus.status === "safe" && "text-green-400",
+                  marginStatus.status === "warning" && "text-yellow-400",
+                  marginStatus.status === "danger" && "text-orange-400",
+                  marginStatus.status === "liquidation" && "text-red-400",
                 )}
               >
                 {usedMargin <= 0.01
-                  ? 'N/A'
+                  ? "N/A"
                   : Number.isFinite(marginLevel) && marginLevel > 0
-                  ? `${marginLevel.toFixed(1)}%`
-                  : 'N/A'}
+                    ? `${marginLevel.toFixed(1)}%`
+                    : "N/A"}
               </p>
             </div>
           </div>
@@ -322,7 +376,10 @@ export function AccountInfoPanel({
           <div className="grid grid-cols-2 gap-3">
             {/* Balance */}
             <div className="bg-gradient-to-br from-yellow-500/10 to-amber-500/10 border border-yellow-500/30 rounded-lg p-3">
-              <p className="text-xs text-yellow-400 font-semibold mb-1 uppercase">💰 Your Money</p>
+              <p className="text-xs text-yellow-400 font-semibold mb-1 uppercase flex items-center gap-1">
+                💰 Your Money
+                <InfoTooltip text={TRADING_TERMS.balance} side="right" iconSize={11} />
+              </p>
               <p className="text-2xl font-black text-yellow-400 tabular-nums">
                 ${balance.toFixed(2)}
               </p>
@@ -330,7 +387,10 @@ export function AccountInfoPanel({
 
             {/* Available */}
             <div className="bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border border-blue-500/30 rounded-lg p-3">
-              <p className="text-xs text-blue-400 font-semibold mb-1 uppercase">⚡ Can Trade</p>
+              <p className="text-xs text-blue-400 font-semibold mb-1 uppercase flex items-center gap-1">
+                ⚡ Can Trade
+                <InfoTooltip text={TRADING_TERMS.availableCapital} side="right" iconSize={11} />
+              </p>
               <p className="text-2xl font-black text-blue-400 tabular-nums">
                 ${availableCapital.toFixed(2)}
               </p>
@@ -338,12 +398,14 @@ export function AccountInfoPanel({
           </div>
 
           {/* P&L - Full Width Highlight */}
-          <div className={cn(
-            "rounded-lg p-3 border-2",
-            isProfit 
-              ? "bg-gradient-to-br from-green-500/10 to-emerald-500/10 border-green-500/50" 
-              : "bg-gradient-to-br from-red-500/10 to-rose-500/10 border-red-500/50"
-          )}>
+          <div
+            className={cn(
+              "rounded-lg p-3 border-2",
+              isProfit
+                ? "bg-gradient-to-br from-green-500/10 to-emerald-500/10 border-green-500/50"
+                : "bg-gradient-to-br from-red-500/10 to-rose-500/10 border-red-500/50",
+            )}
+          >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 {isProfit ? (
@@ -352,16 +414,16 @@ export function AccountInfoPanel({
                   <TrendingDown className="size-5 text-red-400" />
                 )}
                 <p className="text-sm font-bold text-white uppercase">
-                  {isProfit ? '🎉 You\'re Winning!' : '💔 You\'re Losing'}
+                  {isProfit ? "🎉 You're Winning!" : "💔 You're Losing"}
                 </p>
               </div>
               <p
                 className={cn(
-                  'text-3xl font-black tabular-nums',
-                  isProfit ? 'text-green-400' : 'text-red-400'
+                  "text-3xl font-black tabular-nums",
+                  isProfit ? "text-green-400" : "text-red-400",
                 )}
               >
-                {isProfit ? '+' : ''}${Math.abs(unrealizedPnl).toFixed(2)}
+                {isProfit ? "+" : ""}${Math.abs(unrealizedPnl).toFixed(2)}
               </p>
             </div>
           </div>
@@ -370,50 +432,64 @@ export function AccountInfoPanel({
           {startingCapital > 0 && (
             <div className="grid grid-cols-2 gap-3">
               {/* Daily P&L */}
-              <div className={cn(
-                "rounded-lg p-3 border",
-                isDailyProfit 
-                  ? "bg-gradient-to-br from-green-500/10 to-green-600/10 border-green-500/40" 
-                  : "bg-gradient-to-br from-red-500/10 to-red-600/10 border-red-500/40"
-              )}>
+              <div
+                className={cn(
+                  "rounded-lg p-3 border",
+                  isDailyProfit
+                    ? "bg-gradient-to-br from-green-500/10 to-green-600/10 border-green-500/40"
+                    : "bg-gradient-to-br from-red-500/10 to-red-600/10 border-red-500/40",
+                )}
+              >
                 <p className="text-xs font-bold mb-1 uppercase">
-                  {isDailyProfit ? '📈' : '📉'} Today
+                  {isDailyProfit ? "📈" : "📉"} Today
                 </p>
-                <p className={cn(
-                  "text-xl font-black tabular-nums",
-                  isDailyProfit ? "text-green-400" : "text-red-400"
-                )}>
-                  {isDailyProfit ? '+' : ''}{dailyPnlPercent.toFixed(2)}%
+                <p
+                  className={cn(
+                    "text-xl font-black tabular-nums",
+                    isDailyProfit ? "text-green-400" : "text-red-400",
+                  )}
+                >
+                  {isDailyProfit ? "+" : ""}
+                  {dailyPnlPercent.toFixed(2)}%
                 </p>
-                <p className={cn(
-                  "text-xs font-semibold tabular-nums",
-                  isDailyProfit ? "text-green-400/70" : "text-red-400/70"
-                )}>
-                  {isDailyProfit ? '+' : ''}${dailyTotalPnl.toFixed(2)}
+                <p
+                  className={cn(
+                    "text-xs font-semibold tabular-nums",
+                    isDailyProfit ? "text-green-400/70" : "text-red-400/70",
+                  )}
+                >
+                  {isDailyProfit ? "+" : ""}${dailyTotalPnl.toFixed(2)}
                 </p>
               </div>
 
               {/* Total Competition P&L */}
-              <div className={cn(
-                "rounded-lg p-3 border",
-                isTotalProfit 
-                  ? "bg-gradient-to-br from-emerald-500/10 to-teal-500/10 border-emerald-500/40" 
-                  : "bg-gradient-to-br from-rose-500/10 to-pink-500/10 border-rose-500/40"
-              )}>
+              <div
+                className={cn(
+                  "rounded-lg p-3 border",
+                  isTotalProfit
+                    ? "bg-gradient-to-br from-emerald-500/10 to-teal-500/10 border-emerald-500/40"
+                    : "bg-gradient-to-br from-rose-500/10 to-pink-500/10 border-rose-500/40",
+                )}
+              >
                 <p className="text-xs font-bold mb-1 uppercase">
-                  {isTotalProfit ? '🏆' : '💸'} Total
+                  {isTotalProfit ? "🏆" : "💸"} Total
                 </p>
-                <p className={cn(
-                  "text-xl font-black tabular-nums",
-                  isTotalProfit ? "text-emerald-400" : "text-rose-400"
-                )}>
-                  {isTotalProfit ? '+' : ''}{totalPnlPercent.toFixed(2)}%
+                <p
+                  className={cn(
+                    "text-xl font-black tabular-nums",
+                    isTotalProfit ? "text-emerald-400" : "text-rose-400",
+                  )}
+                >
+                  {isTotalProfit ? "+" : ""}
+                  {totalPnlPercent.toFixed(2)}%
                 </p>
-                <p className={cn(
-                  "text-xs font-semibold tabular-nums",
-                  isTotalProfit ? "text-emerald-400/70" : "text-rose-400/70"
-                )}>
-                  {isTotalProfit ? '+' : ''}${totalPnl.toFixed(2)}
+                <p
+                  className={cn(
+                    "text-xs font-semibold tabular-nums",
+                    isTotalProfit ? "text-emerald-400/70" : "text-rose-400/70",
+                  )}
+                >
+                  {isTotalProfit ? "+" : ""}${totalPnl.toFixed(2)}
                 </p>
               </div>
             </div>
@@ -423,7 +499,10 @@ export function AccountInfoPanel({
           <div className="grid grid-cols-2 gap-3">
             {/* Used Margin */}
             <div className="bg-dark-400/50 rounded-lg p-3 border border-dark-500">
-              <p className="text-xs text-dark-600 font-semibold mb-1 uppercase">🎲 In Play</p>
+              <p className="text-xs text-dark-600 font-semibold mb-1 uppercase flex items-center gap-1">
+                🎲 In Play
+                <InfoTooltip text={TRADING_TERMS.marginUsed} iconSize={11} />
+              </p>
               <p className="text-lg font-bold text-purple-400 tabular-nums">
                 ${usedMargin.toFixed(2)}
               </p>
@@ -431,7 +510,10 @@ export function AccountInfoPanel({
 
             {/* Free Margin */}
             <div className="bg-dark-400/50 rounded-lg p-3 border border-dark-500">
-              <p className="text-xs text-dark-600 font-semibold mb-1 uppercase">🆓 Free Cash</p>
+              <p className="text-xs text-dark-600 font-semibold mb-1 uppercase flex items-center gap-1">
+                🆓 Free Cash
+                <InfoTooltip text={TRADING_TERMS.freeMargin} iconSize={11} />
+              </p>
               <p className="text-lg font-bold text-cyan-400 tabular-nums">
                 ${freeMargin.toFixed(2)}
               </p>
@@ -439,37 +521,49 @@ export function AccountInfoPanel({
 
             {/* Equity */}
             <div className="bg-dark-400/50 rounded-lg p-3 border border-dark-500">
-              <p className="text-xs text-dark-600 font-semibold mb-1 uppercase">💎 Total Value</p>
+              <p className="text-xs text-dark-600 font-semibold mb-1 uppercase flex items-center gap-1">
+                💎 Total Value
+                <InfoTooltip text={TRADING_TERMS.equity} iconSize={11} />
+              </p>
               <p className="text-lg font-bold text-amber-400 tabular-nums">
                 ${equity.toFixed(2)}
               </p>
             </div>
 
             {/* Safety Level */}
-            <div className={cn(
-              "rounded-lg p-3 border",
-              usedMargin <= 0.01 ? 'bg-dark-400/50 border-dark-500' : '',
-              marginStatus.status === 'safe' && 'bg-green-500/10 border-green-500/50',
-              marginStatus.status === 'warning' && 'bg-yellow-500/10 border-yellow-500/50',
-              marginStatus.status === 'danger' && 'bg-orange-500/10 border-orange-500/50',
-              marginStatus.status === 'liquidation' && 'bg-red-500/10 border-red-500/50'
-            )}>
-              <p className="text-xs text-dark-600 font-semibold mb-1 uppercase">🛡️ Health</p>
+            <div
+              className={cn(
+                "rounded-lg p-3 border",
+                usedMargin <= 0.01 ? "bg-dark-400/50 border-dark-500" : "",
+                marginStatus.status === "safe" &&
+                  "bg-green-500/10 border-green-500/50",
+                marginStatus.status === "warning" &&
+                  "bg-yellow-500/10 border-yellow-500/50",
+                marginStatus.status === "danger" &&
+                  "bg-orange-500/10 border-orange-500/50",
+                marginStatus.status === "liquidation" &&
+                  "bg-red-500/10 border-red-500/50",
+              )}
+            >
+              <p className="text-xs text-dark-600 font-semibold mb-1 uppercase flex items-center gap-1">
+                🛡️ Health
+                <InfoTooltip text={TRADING_TERMS.marginLevel} iconSize={11} />
+              </p>
               <p
                 className={cn(
-                  'text-lg font-bold tabular-nums',
-                  usedMargin <= 0.01 ? 'text-dark-600' : '',
-                  marginStatus.status === 'safe' && 'text-green-400',
-                  marginStatus.status === 'warning' && 'text-yellow-400',
-                  marginStatus.status === 'danger' && 'text-orange-400',
-                  marginStatus.status === 'liquidation' && 'text-red-400'
+                  "text-lg font-bold tabular-nums",
+                  usedMargin <= 0.01 ? "text-dark-600" : "",
+                  marginStatus.status === "safe" && "text-green-400",
+                  marginStatus.status === "warning" && "text-yellow-400",
+                  marginStatus.status === "danger" && "text-orange-400",
+                  marginStatus.status === "liquidation" && "text-red-400",
                 )}
               >
-                {usedMargin <= 0.01 
-                  ? 'N/A' 
+                {usedMargin <= 0.01
+                  ? "N/A"
                   : Number.isFinite(marginLevel) && marginLevel > 0
-                  ? `${marginLevel.toFixed(2)}%` 
-                  : 'N/A'}
+                    ? `${marginLevel.toFixed(2)}%`
+                    : "N/A"}
               </p>
             </div>
           </div>
@@ -479,32 +573,34 @@ export function AccountInfoPanel({
             <p className="text-center text-xs text-purple-200 font-semibold">
               {usedMargin > 0 ? (
                 <>
-                  💡 You're using <span className="text-white font-bold">${Math.floor(usedMargin)}</span> for open trades.
-                  {marginStatus.status === 'liquidation' && (
+                  💡 You&apos;re using{" "}
+                  <span className="text-white font-bold">
+                    ${Math.floor(usedMargin)}
+                  </span>{" "}
+                  for open trades.
+                  {marginStatus.status === "liquidation" && (
                     <span className="block mt-1 text-red-300">
                       ⚠️ All positions will close automatically!
                     </span>
                   )}
-                  {marginStatus.status === 'danger' && (
+                  {marginStatus.status === "danger" && (
                     <span className="block mt-1 text-orange-300">
                       🚨 Margin Call! Close some trades now!
                     </span>
                   )}
-                  {marginStatus.status === 'warning' && (
+                  {marginStatus.status === "warning" && (
                     <span className="block mt-1 text-yellow-300">
                       ⚠️ Close some trades or add more money to be safe!
                     </span>
                   )}
-                  {marginStatus.status === 'safe' && (
+                  {marginStatus.status === "safe" && (
                     <span className="block mt-1 text-green-300">
-                      ✅ You're safe! Keep trading!
+                      ✅ You&apos;re safe! Keep trading!
                     </span>
                   )}
                 </>
               ) : (
-                <>
-                  ✨ No open trades yet! Your Safety Level is perfect!
-                </>
+                <>✨ No open trades yet! Your Safety Level is perfect!</>
               )}
             </p>
           </div>
@@ -513,4 +609,3 @@ export function AccountInfoPanel({
     </div>
   );
 }
-

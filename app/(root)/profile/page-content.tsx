@@ -1,11 +1,12 @@
-'use client';
+"use client";
 
-import ProfileTabs from '@/components/profile/ProfileTabs';
-import BadgesDisplay from '@/components/profile/BadgesDisplay';
-import ProfileSettingsSection from '@/components/profile/ProfileSettingsSection';
-import NotificationSettings from '@/components/notifications/NotificationSettings';
-import TradingArsenalSection from '@/components/profile/TradingArsenalSection';
-import { Badge } from '@/lib/constants/badges';
+import ProfileTabs from "@/components/profile/ProfileTabs";
+import BadgesDisplay from "@/components/profile/BadgesDisplay";
+import ProfileSettingsSection from "@/components/profile/ProfileSettingsSection";
+import NotificationCenter from "@/components/notifications/NotificationCenter";
+import TradingArsenalSection from "@/components/profile/TradingArsenalSection";
+import KYCVerification from "@/components/kyc/KYCVerification";
+import { Badge } from "@/lib/constants/badges";
 
 interface ProfilePageContentProps {
   overviewContent: React.ReactNode;
@@ -32,11 +33,13 @@ export default function ProfilePageContent({
   return (
     <ProfileTabs
       overviewContent={overviewContent}
-      badgesContent={<BadgesDisplay badges={badges} stats={badgeStats as any} />}
-      notificationsContent={<NotificationSettings />}
+      badgesContent={
+        <BadgesDisplay badges={badges} stats={badgeStats as any} />
+      }
+      notificationsContent={<NotificationCenter />}
       arsenalContent={<TradingArsenalSection />}
+      verificationContent={<KYCVerification />}
       settingsContent={<ProfileSettingsSection />}
     />
   );
 }
-

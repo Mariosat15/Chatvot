@@ -1,4 +1,4 @@
-import { Schema, model, models, Document } from 'mongoose';
+import { Schema, model, models, Document } from "mongoose";
 
 export interface IUserLevel extends Document {
   userId: string;
@@ -32,11 +32,11 @@ const UserLevelSchema = new Schema<IUserLevel>(
       type: Number,
       default: 1,
       min: 1,
-      max: 10,
+      max: 20, // Supports all 20 levels in TITLE_LEVELS
     },
     currentTitle: {
       type: String,
-      default: 'Novice Trader',
+      default: "Novice Trader",
     },
     totalBadgesEarned: {
       type: Number,
@@ -60,10 +60,15 @@ const UserLevelSchema = new Schema<IUserLevel>(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
-const UserLevel = models.UserLevel || model<IUserLevel>('UserLevel', UserLevelSchema);
+// Reason: Leaderboard queries sort/filter by level and XP across all users.
+// Without these indexes, such queries would require a full collection scan.
+UserLevelSchema.index({ currentLevel: -1, currentXP: -1 });
+UserLevelSchema.index({ currentXP: -1 });
+
+const UserLevel =
+  models.UserLevel || model<IUserLevel>("UserLevel", UserLevelSchema);
 
 export default UserLevel;
-

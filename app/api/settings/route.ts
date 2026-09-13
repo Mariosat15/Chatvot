@@ -1,54 +1,91 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { connectToDatabase } from '@/database/mongoose';
-import AppSettings from '@/database/models/app-settings.model';
+import { NextResponse } from "next/server";
+import { connectToDatabase } from "@/database/mongoose";
+import AppSettings from "@/database/models/app-settings.model";
+import { WhiteLabel } from "@/database/models/whitelabel.model";
+
+// Disable Next.js caching for this route
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 // GET - Fetch app settings (public endpoint)
 export async function GET() {
   try {
     await connectToDatabase();
-    
-    let settings = await AppSettings.findById('app-settings');
-    
+
+    let settings = await AppSettings.findById("app-settings");
+
     // Create default settings if none exist
     if (!settings) {
       settings = await AppSettings.create({
-        _id: 'app-settings',
+        _id: "app-settings",
         currency: {
-          code: 'EUR',
-          symbol: '€',
-          name: 'Euro',
+          code: "EUR",
+          symbol: "€",
+          name: "Euro",
           exchangeRateToEUR: 1.0,
         },
         credits: {
-          name: 'Volt Credits',
-          symbol: '⚡',
-          icon: 'zap',
+          name: "Volt Credits",
+          symbol: "⚡",
+          icon: "zap",
           valueInEUR: 1.0,
           showEUREquivalent: true,
           decimals: 2,
         },
         transactions: {
           minimumDeposit: 10,
+          maximumDeposit: 10000,
           minimumWithdrawal: 20,
           withdrawalFeePercentage: 2,
         },
         branding: {
-          primaryColor: '#EAB308',
-          accentColor: '#F59E0B',
+          primaryColor: "#EAB308",
+          accentColor: "#F59E0B",
         },
       });
     }
-    
-    return NextResponse.json({
-      success: true,
-      settings: JSON.parse(JSON.stringify(settings)),
-    });
-  } catch (error) {
-    console.error('Error fetching app settings:', error);
+
+    // Also fetch WhiteLabel settings for branding assets (no cache)
+    const whiteLabel = await WhiteLabel.findOne().lean();
+
+    // Merge branding assets into settings
+    const mergedSettings = {
+      ...JSON.parse(JSON.stringify(settings)),
+      branding: {
+        ...JSON.parse(JSON.stringify(settings)).branding,
+        appLogo: whiteLabel?.appLogo || "/assets/images/logo.png",
+        emailLogo: whiteLabel?.emailLogo || "/assets/images/logo.png",
+        favicon: whiteLabel?.favicon || "/favicon.ico",
+        profileImage: whiteLabel?.profileImage || "/assets/images/PROFILE.png",
+        // SEO / Open Graph — editable from admin > Settings > Branding
+        seoTitle: whiteLabel?.seoTitle || "",
+        seoDescription: whiteLabel?.seoDescription || "",
+        ogImageUrl: whiteLabel?.ogImageUrl || "",
+        siteUrl: whiteLabel?.siteUrl || "",
+      },
+      // Feature Toggles
+      arenaEnabled: whiteLabel?.arenaEnabled ?? true,
+    };
+
     return NextResponse.json(
-      { error: 'Failed to fetch settings' },
-      { status: 500 }
+      {
+        success: true,
+        settings: mergedSettings,
+      },
+      {
+        headers: {
+          "Cache-Control":
+            "no-store, no-cache, must-revalidate, proxy-revalidate",
+          Pragma: "no-cache",
+          Expires: "0",
+        },
+      },
+    );
+  } catch (error) {
+    console.error("Error fetching app settings:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch settings" },
+      { status: 500 },
     );
   }
 }
-

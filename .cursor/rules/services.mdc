@@ -1,0 +1,94 @@
+---
+globs: lib/services/**,worker/**
+description: Business logic services layer rules for ChartVolt
+---
+
+# Services Layer — ChartVolt
+
+## 🏗️ Architecture Overview
+
+- **Location:** `lib/services/*.service.ts` — all business logic lives here.
+- **Pattern:** Services are stateless utility modules (exported functions), **not** class instances with constructors.
+- **Consumers:** Server actions (`lib/actions/`), API routes (`app/api/`), and worker jobs (`worker/jobs/`).
+- **Services never import from `components/`** — the dependency flows one way: components → actions → services → models.
+
+## 📁 Key Services Reference
+
+### 💰 Trading & Finance
+
+| Service | File | Purpose |
+|---|---|---|
+| `pnl-calculator` | `pnl-calculator.service.ts` | PnL, margin, pip values, `FOREX_PAIRS` master list |
+| `risk-manager` | `risk-manager.service.ts` | Max drawdown, daily loss limits, margin checks |
+| `margin-safety` | `margin-safety.service.ts` | Margin level calculations and safety checks |
+| `competition-ranking` | `competition-ranking.service.ts` | Leaderboard scoring and ranking logic |
+| `matchmaking` | `matchmaking.service.ts` | Challenge/1v1 matchmaking |
+| `win-probability` | `win-probability.service.ts` | Win probability calculations |
+| `platform-financials` | `platform-financials.service.ts` | Platform revenue and financial tracking |
+
+### 📈 Price Data & Markets
+
+| Service | File | Purpose |
+|---|---|---|
+| `websocket-price-streamer` | `websocket-price-streamer.ts` | **Core** — Massive.com WebSocket, candle aggregation, broadcast |
+| `real-forex-prices` | `real-forex-prices.service.ts` | Multi-layer price fetching (WS → memory → Redis → Mongo → REST) |
+| `forex-historical` | `forex-historical.service.ts` | Historical candle data from Massive.com REST API |
+| `candle-aggregator` | `candle-aggregator.service.ts` | Candle aggregation utilities |
+| `market-hours` | `market-hours.service.ts` | Forex market open/close schedule |
+| `market-data` | `market-data.service.ts` | Market data configuration |
+| `price-health-monitor` | `price-health-monitor.service.ts` | Feed health tracking and alerts |
+| `tpsl-realtime` | `tpsl-realtime.service.ts` | Real-time TP/SL trigger on price updates |
+| `price-snapshot` | `price-snapshot.service.ts` | Periodic price snapshots to MongoDB |
+
+### 👤 User & Auth
+
+| Service | File | Purpose |
+|---|---|---|
+| `user-restriction` | `user-restriction.service.ts` | Ban/restrict/limit user actions |
+| `user-stats` | `user-stats.service.ts` | Aggregated user trading statistics |
+| `xp-level` | `xp-level.service.ts` | XP and leveling system |
+| `badge-evaluation` | `badge-evaluation.service.ts` | Achievement badge logic |
+| `device-fingerprint` | `device-fingerprint.service.ts` | Device fingerprinting |
+| `registration-security` | `registration-security.service.ts` | Registration fraud prevention |
+
+### 🔧 Infrastructure
+
+| Service | File | Purpose |
+|---|---|---|
+| `redis` | `redis.service.ts` | Redis singleton, caching, pub/sub |
+| `audit-log` | `audit-log.service.ts` | Admin action audit trail |
+| `notification` | `notification.service.ts` | Push/email/in-app notification dispatch |
+| `settings` | `settings.service.ts` | App settings reader |
+| `indicators` | `indicators.service.ts` | Technical indicator calculations (Fibonacci, etc.) |
+
+## 📐 Service Rules
+
+1. **Pure functions preferred** — services should be stateless where possible.
+2. **Always `connectToDatabase()`** at the start if the service reads/writes MongoDB.
+3. **Error handling:** Services should throw descriptive errors — the calling action/route handles user-facing messages.
+4. **No direct HTTP responses** — services return data or throw; routes/actions format the response.
+5. **Singleton caches** (like `priceCache`, `formingCandles` in the streamer) must be module-scoped `Map` objects — never recreate them.
+
+## 🔄 Worker Jobs
+
+Worker jobs (`worker/jobs/*.job.ts`) run via **Agenda** scheduler:
+
+| Job | File | Schedule |
+|---|---|---|
+| `margin-check` | `margin-check.job.ts` | Every minute — checks margin levels |
+| `competition-end` | `competition-end.job.ts` | Periodic — finalizes ended competitions |
+| `price-cache` | `price-cache.job.ts` | Periodic — writes prices to MongoDB for workers |
+| `market-data-maintenance` | `market-data-maintenance.job.ts` | Daily — cleanup and maintenance |
+| `withdrawal-process` | `withdrawal-process.job.ts` | Periodic — processes pending withdrawals |
+| `evaluate-badges` | `evaluate-badges.job.ts` | Periodic — evaluates user badge criteria |
+| `trade-queue` | `trade-queue.job.ts` | Continuous — processes queued limit orders |
+
+- Worker runs with `IS_WORKER=true` env — this affects pool sizes and behavior.
+- Worker reads prices from MongoDB `PriceCache` (written by main app), not directly from WebSocket.
+
+## ⚠️ Common Pitfalls
+
+- **`FOREX_PAIRS`** in `pnl-calculator.service.ts` is the master list of supported symbols with pip values, lot sizes, and categories. Always check here before adding a new pair.
+- **Price streamer** (`websocket-price-streamer.ts`) runs only on the **primary server**. Secondary servers receive prices via Redis pub/sub (`startRedisPriceRelay()`).
+- **Candle aggregation** uses BID price for OHLC — this is intentional and consistent throughout.
+- **Higher-timeframe candles** are augmented with MongoDB 1m data on save to ensure completeness after restarts.

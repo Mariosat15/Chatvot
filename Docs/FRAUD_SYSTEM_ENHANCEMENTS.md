@@ -531,7 +531,9 @@ Go to: **Admin Panel → Fraud (top of page)**
 2. **Configure settings:**
    - Go to Admin → Fraud → Settings
    - Adjust "Max Accounts Per Device"
-   - Adjust "Alert Threshold" and "Entry Block Threshold"
+   - Adjust "Alert Threshold" and "Review Threshold" (called "Entry Block Threshold"
+     before 2 September 2026, when it stopped blocking — it now escalates for review only.
+     Blocking is done by a suspension or ban, or automatically by Auto-Suspend)
 
 3. **Monitor and act:**
    - Review "Suspicious Devices" regularly

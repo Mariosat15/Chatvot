@@ -1,90 +1,95 @@
-'use client';
+"use client";
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from "react";
+import { usePathname } from "next/navigation";
+import { PERFORMANCE_INTERVALS } from "@/lib/utils/performance";
 
 /**
  * Global presence tracker component that should be added to the root layout.
  * This tracks user online/offline status across all pages.
+ *
+ * IMPORTANT: This is the ONLY presence tracker in the app. Page-specific
+ * trackers (LeaderboardPresenceTracker, challenges usePresence) have been
+ * removed to avoid duplicate heartbeats and conflicting offline signals.
+ *
+ * Users stay ONLINE as long as they are logged in, even if the
+ * browser tab is in the background. They only go offline when:
+ * - They close the browser/tab completely
+ * - They log out
+ * - Session expires (server-side timeout)
+ *
+ * Reason: Browsers throttle setInterval in background tabs (often to ~60-120s).
+ * The visibilitychange listener sends an immediate heartbeat when the user
+ * returns to the tab, preventing false "offline" status in the admin panel.
  */
 export default function GlobalPresenceTracker({ userId }: { userId?: string }) {
   const heartbeatRef = useRef<NodeJS.Timeout | null>(null);
-  const isActiveRef = useRef(true);
+  const pathname = usePathname();
+  const pathnameRef = useRef(pathname);
+  pathnameRef.current = pathname;
+
+  const sendHeartbeat = useCallback(async () => {
+    try {
+      await fetch("/api/user/presence", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: "online",
+          currentPage: pathnameRef.current,
+        }),
+      });
+    } catch {
+      // Silently fail - presence is non-critical
+    }
+  }, []);
 
   useEffect(() => {
     if (!userId) return;
 
-    const sendHeartbeat = async () => {
-      if (!isActiveRef.current) return;
-      
-      try {
-        await fetch('/api/user/presence', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'online' }),
-        });
-      } catch (error) {
-        // Silently fail - presence is non-critical
-      }
-    };
-
-    // Send initial heartbeat
     sendHeartbeat();
 
-    // Set up interval for heartbeats every 10 seconds
-    heartbeatRef.current = setInterval(sendHeartbeat, 10000);
+    heartbeatRef.current = setInterval(
+      sendHeartbeat,
+      PERFORMANCE_INTERVALS.PRESENCE_HEARTBEAT,
+    );
 
-    // Handle visibility change
+    // Reason: When the user returns to this tab after it was backgrounded,
+    // the interval may have been throttled past the offline threshold.
+    // Sending an immediate heartbeat re-establishes "online" status.
     const handleVisibilityChange = () => {
-      if (document.hidden) {
-        isActiveRef.current = false;
-        // Send offline status when tab is hidden
-        navigator.sendBeacon('/api/user/presence', JSON.stringify({ status: 'offline' }));
-      } else {
-        isActiveRef.current = true;
+      if (document.visibilityState === "visible") {
         sendHeartbeat();
       }
     };
 
-    // Handle window focus/blur
-    const handleFocus = () => {
-      isActiveRef.current = true;
-      sendHeartbeat();
-    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
-    const handleBlur = () => {
-      // Keep online but note window lost focus
-    };
-
-    // Handle page unload - mark as offline
     const handleBeforeUnload = () => {
-      navigator.sendBeacon('/api/user/presence', JSON.stringify({ status: 'offline' }));
+      navigator.sendBeacon(
+        "/api/user/presence",
+        JSON.stringify({ status: "offline" }),
+      );
     };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('focus', handleFocus);
-    window.addEventListener('blur', handleBlur);
-    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener("beforeunload", handleBeforeUnload);
 
-    // Cleanup
     return () => {
       if (heartbeatRef.current) {
         clearInterval(heartbeatRef.current);
       }
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', handleFocus);
-      window.removeEventListener('blur', handleBlur);
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      
-      // Try to send offline status on cleanup
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+
       try {
-        navigator.sendBeacon('/api/user/presence', JSON.stringify({ status: 'offline' }));
-      } catch (e) {
+        navigator.sendBeacon(
+          "/api/user/presence",
+          JSON.stringify({ status: "offline" }),
+        );
+      } catch {
         // Ignore errors on cleanup
       }
     };
-  }, [userId]);
+  }, [userId, sendHeartbeat]);
 
-  // This component doesn't render anything visible
   return null;
 }
-

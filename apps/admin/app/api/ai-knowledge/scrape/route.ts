@@ -1,0 +1,269 @@
+import { NextRequest, NextResponse } from "next/server";
+import dns from "dns/promises";
+import { requireAdminAuth } from "@/lib/admin/auth";
+import { aiKnowledgeService } from "@/lib/services/ai-knowledge.service";
+import { isValidSsrfUrl } from "@/lib/utils/url-validator";
+import DOMPurify from "isomorphic-dompurify";
+
+// Reason: SSRF protection must check the *resolved* IP, not just the hostname,
+// to prevent DNS rebinding attacks (e.g. attacker.com → 169.254.169.254).
+function isPrivateIp(ip: string): boolean {
+  if (ip === "127.0.0.1" || ip === "::1" || ip === "0.0.0.0") return true;
+  if (ip.startsWith("10.")) return true;
+  if (ip.startsWith("192.168.")) return true;
+  if (ip.startsWith("169.254.")) return true;
+  if (/^172\.(1[6-9]|2\d|3[01])\./.test(ip)) return true;
+  if (ip.startsWith("fc00:") || ip.startsWith("fe80:")) return true;
+  if (ip.startsWith("0.") || ip.startsWith("224.") || ip.startsWith("255."))
+    return true;
+  return false;
+}
+
+function isBlockedHost(hostname: string): boolean {
+  const h = hostname.toLowerCase();
+  if (h === "localhost" || h === "127.0.0.1" || h === "::1") return true;
+  if (h.endsWith(".internal") || h === "metadata.google.internal") return true;
+  if (
+    h.startsWith("10.") ||
+    h.startsWith("192.168.") ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(h)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+// POST - Scrape a URL and add to knowledge base
+export async function POST(request: NextRequest) {
+  try {
+    const admin = await requireAdminAuth();
+
+    const body = await request.json();
+    const {
+      url,
+      name,
+      category,
+      description,
+      followLinks,
+      maxPages,
+      audience: audienceRaw,
+    } = body;
+
+    // Validate audience - default to customer for safety
+    const validAudiences = ["customer", "admin", "both"];
+    const audience = validAudiences.includes(audienceRaw)
+      ? audienceRaw
+      : "customer";
+
+    if (!url) {
+      return NextResponse.json({ error: "URL is required" }, { status: 400 });
+    }
+
+    // Validate URL format and parse it
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(url);
+    } catch {
+      return NextResponse.json(
+        { error: "Invalid URL format" },
+        { status: 400 },
+      );
+    }
+
+    // Only allow http and https protocols
+    if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+      return NextResponse.json(
+        { error: "Only HTTP and HTTPS URLs are allowed" },
+        { status: 400 },
+      );
+    }
+
+    if (isBlockedHost(parsedUrl.hostname)) {
+      return NextResponse.json(
+        { error: "Requests to internal or private hosts are not allowed" },
+        { status: 400 },
+      );
+    }
+
+    const safeUrl = parsedUrl.toString();
+    const ssrfValidation = isValidSsrfUrl(safeUrl);
+    if (!ssrfValidation.valid) {
+      return NextResponse.json(
+        { error: `URL validation failed: ${ssrfValidation.reason}` },
+        { status: 400 },
+      );
+    }
+
+    // Reason: Resolve DNS and verify the IP is not private/internal.
+    // Hostname-only checks are vulnerable to DNS rebinding (attacker.com → 169.254.169.254).
+    try {
+      const { address } = await dns.lookup(parsedUrl.hostname);
+      if (isPrivateIp(address)) {
+        return NextResponse.json(
+          { error: "URL resolves to a private/internal IP address" },
+          { status: 400 },
+        );
+      }
+    } catch {
+      return NextResponse.json(
+        { error: "Could not resolve hostname" },
+        { status: 400 },
+      );
+    }
+
+    const response = await fetch(safeUrl, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (compatible; ChartVolt-Bot/1.0; Knowledge Indexer)",
+      },
+    });
+
+    if (!response.ok) {
+      return NextResponse.json(
+        { error: `Failed to fetch URL: ${response.statusText}` },
+        { status: 400 },
+      );
+    }
+
+    const html = await response.text();
+
+    // Extract text content from HTML
+    const content = extractTextFromHtml(html, safeUrl);
+
+    if (!content || content.trim().length < 50) {
+      return NextResponse.json(
+        { error: "Could not extract meaningful content from the URL" },
+        { status: 400 },
+      );
+    }
+
+    // Create knowledge source with audience
+    const source = await aiKnowledgeService.createSource({
+      name: name || extractTitleFromHtml(html) || parsedUrl.hostname,
+      type: "url",
+      audience: audience as "customer" | "admin" | "both", // Include audience
+      content,
+      websiteUrl: safeUrl,
+      metadata: {
+        title: extractTitleFromHtml(html),
+        description: description || extractDescriptionFromHtml(html),
+        category: category || "General",
+      },
+      createdBy: admin.adminId || "system",
+    });
+
+    return NextResponse.json({
+      success: true,
+      source,
+      message: "URL scraped and indexed successfully",
+      contentLength: content.length,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    console.error("Error scraping URL:", error);
+    return NextResponse.json(
+      {
+        error: error instanceof Error ? error.message : "Failed to scrape URL",
+      },
+      { status: 500 },
+    );
+  }
+}
+
+/**
+ * Extract text content from HTML, preserving structure
+ * Uses DOMPurify for safe HTML sanitization
+ */
+function extractTextFromHtml(html: string, url: string): string {
+  // Use DOMPurify to strip all dangerous content while preserving safe structural tags
+  // This handles script, style, event handlers, and dangerous URLs safely
+  let text = DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: ["h1", "h2", "h3", "h4", "h5", "h6", "p", "br", "hr", "ul", "ol", "li", "a", "strong", "b", "em", "i", "pre", "code"],
+    ALLOWED_ATTR: ["href"],
+  });
+
+  // Convert headings to markdown
+  text = text
+    .replace(/<h1[^>]*>([\s\S]*?)<\/h1>/gi, "\n# $1\n")
+    .replace(/<h2[^>]*>([\s\S]*?)<\/h2>/gi, "\n## $1\n")
+    .replace(/<h3[^>]*>([\s\S]*?)<\/h3>/gi, "\n### $1\n")
+    .replace(/<h4[^>]*>([\s\S]*?)<\/h4>/gi, "\n#### $1\n")
+    .replace(/<h5[^>]*>([\s\S]*?)<\/h5>/gi, "\n##### $1\n")
+    .replace(/<h6[^>]*>([\s\S]*?)<\/h6>/gi, "\n###### $1\n");
+
+  // Convert lists
+  text = text
+    .replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, "\n- $1")
+    .replace(/<ul[^>]*>|<\/ul>|<ol[^>]*>|<\/ol>/gi, "\n");
+
+  // Convert paragraphs and breaks
+  text = text
+    .replace(/<p[^>]*>([\s\S]*?)<\/p>/gi, "\n$1\n")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<hr\s*\/?>/gi, "\n---\n");
+
+  // Convert links (keep text and URL)
+  text = text.replace(
+    /<a[^>]*href=["']([^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi,
+    "$2 ($1)",
+  );
+
+  // Convert strong/em
+  text = text
+    .replace(/<(strong|b)[^>]*>([\s\S]*?)<\/\1>/gi, "**$2**")
+    .replace(/<(em|i)[^>]*>([\s\S]*?)<\/\1>/gi, "*$2*");
+
+  // Convert code blocks
+  text = text
+    .replace(
+      /<pre[^>]*><code[^>]*>([\s\S]*?)<\/code><\/pre>/gi,
+      "\n```\n$1\n```\n",
+    )
+    .replace(/<code[^>]*>([\s\S]*?)<\/code>/gi, "`$1`");
+
+  // Strip any remaining HTML tags (shouldn't be many after DOMPurify)
+  text = DOMPurify.sanitize(text, { ALLOWED_TAGS: [] });
+
+  // Clean up whitespace
+  text = text
+    .replace(/\n\s*\n\s*\n/g, "\n\n")
+    .replace(/[ \t]+/g, " ")
+    .trim();
+
+  // Add source URL as metadata
+  text = `[Source URL: ${url}]\n\n${text}`;
+
+  return text;
+}
+
+/**
+ * Extract title from HTML using safe parsing
+ */
+function extractTitleFromHtml(html: string): string | undefined {
+  const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  if (titleMatch) {
+    // Use DOMPurify to safely strip any HTML and get plain text
+    const cleanTitle = DOMPurify.sanitize(titleMatch[1], { ALLOWED_TAGS: [] });
+    return cleanTitle.trim() || undefined;
+  }
+  return undefined;
+}
+
+/**
+ * Extract meta description from HTML
+ */
+function extractDescriptionFromHtml(html: string): string | undefined {
+  const metaMatch =
+    html.match(
+      /<meta[^>]*name=["']description["'][^>]*content=["']([^"']*)["'][^>]*>/i,
+    ) ||
+    html.match(
+      /<meta[^>]*content=["']([^"']*)["'][^>]*name=["']description["'][^>]*>/i,
+    );
+  if (metaMatch) {
+    return metaMatch[1].trim();
+  }
+  return undefined;
+}

@@ -1,0 +1,211 @@
+---
+description: Advanced bug hunting and elimination — systematic approaches to find, isolate, and permanently fix bugs
+globs:
+  - "**/*.ts"
+  - "**/*.tsx"
+---
+
+# Bug Hunting & Elimination — ChartVolt
+
+## 🎯 Philosophy
+
+> "A bug found by the developer costs 10x less than one found by the user."
+
+The goal is not just to fix bugs — it's to **prevent entire categories** of bugs from ever occurring again.
+
+---
+
+## 🔍 Systematic Bug Detection (Run These Checks Proactively)
+
+### 1. Type Safety Audit
+Before any PR or major change, check for type-safety gaps:
+```bash
+# Find all 'any' types (each one is a potential bug)
+grep -rn ": any" --include="*.ts" --include="*.tsx" lib/ components/ app/
+
+# Find all type assertions (each one bypasses the compiler)
+grep -rn "as any\|as unknown" --include="*.ts" --include="*.tsx" lib/ components/
+
+# Find all non-null assertions (each one is a "trust me" to the compiler)
+grep -rn "!\." --include="*.ts" --include="*.tsx" lib/ components/
+```
+
+### 2. Error Handling Audit
+```bash
+# Find empty catch blocks (swallowed errors = hidden bugs)
+grep -rn "catch.*{}" --include="*.ts" --include="*.tsx"
+
+# Find catch blocks that only log (should return error to user)
+grep -rn "catch.*console\.\(log\|error\)" --include="*.ts" --include="*.tsx" lib/actions/
+
+# Find server actions that throw instead of returning
+grep -rn "throw new Error" --include="*.ts" lib/actions/
+```
+
+### 3. Race Condition Audit
+```bash
+# Find concurrent state updates without proper synchronization
+grep -rn "setState.*await\|await.*setState" --include="*.tsx" components/
+
+# Find MongoDB operations without transactions that should have them
+grep -rn "\.updateOne\|\.deleteOne\|\.findOneAndUpdate" --include="*.ts" lib/actions/trading/
+```
+
+### 4. Memory Leak Audit
+```bash
+# Find useEffect without cleanup (potential memory leaks)
+grep -rn "useEffect.*=>" --include="*.tsx" -A 5 | grep -v "return\|cleanup"
+
+# Find setInterval without clearInterval
+grep -rn "setInterval" --include="*.ts" --include="*.tsx"
+
+# Find addEventListener without removeEventListener
+grep -rn "addEventListener" --include="*.tsx"
+```
+
+### 5. Null/Undefined Safety Audit
+```bash
+# Find optional chaining that might hide bugs
+grep -rn "\?\.\[" --include="*.ts" --include="*.tsx"
+
+# Find direct property access on potentially null values
+grep -rn "\.length\|\.map\|\.filter\|\.forEach" --include="*.ts" --include="*.tsx" | grep -v "?\."
+```
+
+---
+
+## 🧬 Bug Categories & Prevention
+
+### Category 1: Data Flow Bugs
+**Symptoms**: Wrong values, stale data, NaN, undefined.
+**Hunt**: Trace every variable from source to sink. Check:
+- Is the data fetched correctly? (Check the query)
+- Is the data transformed correctly? (Check maps, reduces, calculations)
+- Is the data displayed correctly? (Check formatting, rounding)
+
+**Prevention**:
+- Use TypeScript strict mode with `noUncheckedIndexedAccess`.
+- Never use `any` — it defeats the entire type system.
+- Validate at boundaries: API inputs, DB reads, user events.
+
+### Category 2: Timing Bugs
+**Symptoms**: Works sometimes, fails under load, race conditions.
+**Hunt**: Look for:
+- Concurrent MongoDB writes to the same document.
+- `setState` called after component unmounts.
+- Multiple WebSocket reconnections creating duplicate subscriptions.
+
+**Prevention**:
+- Use MongoDB transactions for multi-document operations.
+- Use `AbortController` for fetch cleanup in effects.
+- Use `useRef` for mutable values in effects.
+- Debounce/throttle rapid user actions.
+
+### Category 3: Integration Bugs
+**Symptoms**: Works in dev, fails in production. Works alone, fails together.
+**Hunt**: Look for:
+- Environment-dependent behavior (`NODE_ENV`, API URLs).
+- Missing environment variables in production.
+- Different MongoDB connection pool settings.
+- Redis available in dev but not in CI/staging.
+
+**Prevention**:
+- Test with `next build && next start` (not just `next dev`).
+- Use the fallback chain pattern: Primary → Cache → Default.
+- Never rely on a single external service without a fallback.
+
+### Category 4: UI/UX Bugs
+**Symptoms**: Layout broken, text overflow, element overlap, missing data.
+**Hunt**: Look for:
+- Long text without `truncate` or `overflow-hidden`.
+- Dynamic content without loading/error/empty states.
+- Components not responsive on mobile.
+- Z-index conflicts between overlays.
+
+**Prevention**:
+- Always handle 3 states: loading, error, empty.
+- Use `clamp()` or dynamic sizing for numbers that vary in length.
+- Test with extreme data: very long strings, very large numbers, zero items.
+
+### Category 5: Security Bugs
+**Symptoms**: Unauthorized access, data leaks, injection.
+**Hunt**: See `security.mdc` — run the full checklist.
+
+**Prevention**:
+- Auth check is ALWAYS the first line of every server action.
+- Never trust client-sent IDs — derive from session.
+- Validate all inputs — type, range, format.
+
+---
+
+## 🔬 Advanced Debugging Techniques
+
+### 1. Binary Search Debugging
+When a bug appears in a large change:
+1. Identify the last known good commit (`git log`).
+2. Use `git bisect` to find the exact commit that introduced it.
+3. Read only the diff of that commit to find the bug.
+
+### 2. Invariant Assertions
+Add runtime checks for conditions that should ALWAYS be true:
+```typescript
+// Reason: If pipValue is ever 0 or negative, all PnL calculations are wrong.
+if (pipValue <= 0) {
+  console.error("❌ INVARIANT VIOLATION: pipValue <= 0", { symbol, pipValue });
+  return { success: false, error: "Trading calculation error. Please contact support." };
+}
+```
+
+### 3. Differential Debugging
+When the same code works in one context but not another:
+1. Log the exact inputs in both contexts.
+2. Compare them side-by-side.
+3. The difference in inputs IS the bug (or reveals it).
+
+### 4. Canary Values
+When debugging data flow, inject a unique recognizable value at the source and trace it through every transformation step:
+```typescript
+// Temporary debug: inject a canary value
+const canaryPrice = 99999.12345;
+console.log("🐦 Canary injected at:", new Date().toISOString());
+// Follow canaryPrice through the pipeline to see where it gets lost/transformed
+```
+
+### 5. Snapshot Comparison
+When UI looks wrong, capture the data at each layer:
+```
+1. Database query result → log it
+2. Server action return → log it
+3. Component props → log it
+4. Rendered output → inspect in DevTools
+```
+The layer where the data changes incorrectly IS the bug location.
+
+---
+
+## 🛠️ Post-Fix Protocol
+
+After every bug fix:
+1. **Verify the fix** — test the exact scenario that triggered the bug.
+2. **Check for siblings** — if this pattern is buggy here, is it buggy elsewhere? Search for similar code.
+3. **Add a guard** — can we add a type check, validation, or assertion to prevent recurrence?
+4. **Add a comment** — `// Reason:` explaining why this fix was needed.
+5. **Consider a test** — if the bug is in business logic, write a regression test.
+6. **Update memory** — if the bug reveals a non-obvious constraint or pattern.
+
+---
+
+## 📊 Bug Severity Triage
+
+| Severity | Description | Action |
+|---|---|---|
+| **P0 — Critical** | Data loss, security breach, money-affecting bug | Fix immediately, skip all other work |
+| **P1 — High** | Feature broken, user cannot proceed | Fix within current session |
+| **P2 — Medium** | Feature degraded, workaround exists | Fix in next session |
+| **P3 — Low** | Cosmetic, minor UX issue | Fix when convenient |
+
+For ChartVolt specifically:
+- **P0**: Wrong PnL calculation, unauthorized trade execution, balance corruption.
+- **P1**: Chart not loading, prices frozen, competition rank wrong.
+- **P2**: UI overlap, slow query, missing animation.
+- **P3**: Tooltip misaligned, icon wrong color.

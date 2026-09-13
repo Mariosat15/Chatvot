@@ -1,0 +1,474 @@
+# Probes for the contest-clock explanation on the operator's screens (`12` s2.5).
+#
+# Each probe reinstates one defect and expects ONE named test to go red. Naming the expected
+# test is the point: a probe aimed at the wrong test is indistinguishable from a test that does
+# not work - and on 7 September a probe in `probe-lobby-theme.ps1` reported green for a whole
+# day because the guard beside it had been narrowed and the probe was never re-aimed.
+#
+# THIS HARNESS TARGETS SIX FILES, so the target is a parameter. Two of them are the mirrored
+# pre-flights, where a guard has to be broken in BOTH copies at once or the surviving one keeps
+# the test green - the same reason R42's game gates could not be probed one at a time.
+
+$ErrorActionPreference = "Continue"
+
+$Root = Split-Path -Parent $PSScriptRoot
+$Suite = "__tests__/admin/contest-round-clock.test.ts"
+
+$Note = Join-Path $Root "apps\admin\components\admin\games\RoundClockNote.tsx"
+$Draft = Join-Path $Root "apps\admin\components\admin\games\contest-draft.ts"
+$Wizard = Join-Path $Root "apps\admin\components\admin\games\ProviderContestWizard.tsx"
+$Editor = Join-Path $Root "apps\admin\components\admin\games\ProviderContestEditor.tsx"
+$Preflight = Join-Path $Root "lib\services\games\contest-preflight.ts"
+$AdminPreflight = Join-Path $Root "apps\admin\lib\services\games\contest-preflight.ts"
+$Field = Join-Path $Root "apps\admin\components\admin\games\RoundStartPolicyField.tsx"
+$ConfigFields = Join-Path $Root "apps\admin\components\admin\games\ConfigSchemaFields.tsx"
+# `12` s2.8 split the wizard into one file per step, so two probes that used to target the
+# orchestrator now have to target a step. The suite reads all of them together.
+$StepSchedule = Join-Path $Root "apps\admin\components\admin\games\wizard\StepSchedule.tsx"
+$StepReview = Join-Path $Root "apps\admin\components\admin\games\wizard\StepReview.tsx"
+
+$Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+
+function Read-Source([string]$Path) {
+    # -LiteralPath equivalent: ReadAllText never globs, which matters because sibling harnesses
+    # touch `[id]` paths and a silent empty read there once emptied a route and "restored" it
+    # to nothing while every probe went red on the expected test for the wrong reason.
+    $text = [System.IO.File]::ReadAllText($Path, $Utf8NoBom)
+    if ([string]::IsNullOrWhiteSpace($text)) {
+        throw "ABORT: read of $Path came back empty. Refusing to continue."
+    }
+    return $text
+}
+
+function Write-Source([string]$Path, [string]$Text) {
+    if ([string]::IsNullOrWhiteSpace($Text)) {
+        throw "ABORT: refusing to write empty content to $Path"
+    }
+    [System.IO.File]::WriteAllText($Path, $Text, $Utf8NoBom)
+}
+
+function To-Relaxed([string]$Literal) {
+    return ([regex]::Escape($Literal) -replace "\\r\\n|\\n", "\r?\n")
+}
+
+# One or more edits, applied together, then all restored together.
+function Invoke-Probe {
+    param(
+        [string]$Name,
+        [string]$ExpectTest,
+        # Each edit: @{ Target = <path>; Find = <literal>; Replace = <literal> }
+        [array]$Edits
+    )
+
+    Write-Host ""
+    Write-Host "=== PROBE: $Name" -ForegroundColor Cyan
+    Write-Host "    expects red: $ExpectTest"
+
+    $originals = @{}
+    $applied = $true
+
+    foreach ($edit in $Edits) {
+        $target = $edit.Target
+        if (-not $originals.ContainsKey($target)) {
+            $originals[$target] = Read-Source $target
+        }
+    }
+
+    foreach ($edit in $Edits) {
+        $target = $edit.Target
+        $current = Read-Source $target
+        $pattern = To-Relaxed $edit.Find
+        $patched = [regex]::Replace($current, $pattern, { param($m) $edit.Replace }, 1)
+        if ($patched -eq $current) {
+            Write-Host "    PROBE DID NOT APPLY - pattern never matched in $(Split-Path -Leaf $target). Result is meaningless." -ForegroundColor Red
+            $applied = $false
+            break
+        }
+        Write-Source $target $patched
+    }
+
+    try {
+        if ($applied) {
+            $out = & npx vitest run $Suite -t $ExpectTest 2>&1 | Out-String
+            $flat = ($out -replace "\s+", " ")
+
+            if ($flat -match "Tests\s+(\d+)\s+failed") {
+                $failed = [int]$Matches[1]
+                if ($failed -eq 1) {
+                    Write-Host "    RED as expected (1 failed)" -ForegroundColor Green
+                }
+                else {
+                    Write-Host "    RED but $failed tests failed - expected exactly 1. Suspect collateral damage, not a guard." -ForegroundColor Yellow
+                }
+            }
+            elseif ($flat -match "No test found") {
+                Write-Host "    NO TEST RAN - the expected test name does not match. Probe is mis-aimed." -ForegroundColor Red
+            }
+            elseif ($flat -match "Tests\s+.*(passed|skipped)") {
+                Write-Host "    GREEN - the guard is NOT held by this test. Investigate: weak test, wrong claim, unreachable, missing test, or a defect the COMPILER refuses." -ForegroundColor Red
+            }
+            else {
+                Write-Host "    UNKNOWN result - read the output." -ForegroundColor Yellow
+                Write-Host $out
+            }
+        }
+    }
+    finally {
+        foreach ($target in $originals.Keys) {
+            Write-Source $target $originals[$target]
+            if ((Read-Source $target) -ne $originals[$target]) {
+                Write-Host "    !! RESTORE FAILED - fix $target by hand before continuing." -ForegroundColor Red
+            }
+        }
+    }
+}
+
+Write-Host "Probing the contest-clock explanation" -ForegroundColor White
+
+# --- describeRoundFit ---------------------------------------------------------------------
+
+# 1. The deadline computed from the start rather than the end, which is the plausible slip and
+#    puts the cut-off at the beginning of the contest.
+Invoke-Probe -Name "the last-attempt moment is measured from the wrong end" `
+    -ExpectTest "says when the last attempt can start" `
+    -Edits @(
+    @{
+        Target  = $Draft
+        # RE-AIMED: `12` s2.10 replaced the subtraction here with a call to the one entry-deadline
+        # module, so the wrong-end slip is now spelt by handing it the wrong end.
+        Find    = "          playWindowEnd: end,"
+        Replace = "          playWindowEnd: start,"
+    }
+)
+
+# 2. An absent duration guessed rather than declined. This is the one that would contradict the
+#    server: `RoundPreflight.tsx` applies no gate, so a screen stating a cut-off invents one.
+Invoke-Probe -Name "an absent round length is guessed instead of declined" `
+    -ExpectTest "says nothing at all when the catalogue declares no duration" `
+    -Edits @(
+    @{
+        Target  = $Draft
+        # RE-AIMED: `12` s2.9 moved the absent-duration decision into `resolveAttemptSeconds`, so
+        # the guard here is now the one line that declines what it hands back.
+        Find    = "  if (attemptSeconds === undefined) return undefined;"
+        Replace = "  if (false) return undefined;"
+    }
+)
+
+# 3. Half-typed dates rendered as "Invalid Date" into a sentence about the operator's contest.
+Invoke-Probe -Name "an unparseable date is rendered rather than skipped" `
+    -ExpectTest "says nothing while the dates are still half-typed" `
+    -Edits @(
+    @{
+        Target  = $Draft
+        Find    = "if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {"
+        Replace = "if (false) {"
+    }
+)
+
+# 4. The too-short boundary made inclusive, refusing a contest exactly one round long that the
+#    server accepts. A guard stricter than the server it mirrors is still a wrong answer.
+Invoke-Probe -Name "a contest exactly one round long is flagged as too short" `
+    -ExpectTest "does not flag a contest exactly one round long" `
+    -Edits @(
+    @{
+        Target  = $Draft
+        # RE-AIMED: the figure compared here is the CONFIGURED attempt since `12` s2.9, not the
+        # catalogue ceiling.
+        Find    = "windowTooShort: windowSeconds < attemptSeconds,"
+        Replace = "windowTooShort: windowSeconds <= attemptSeconds,"
+    }
+)
+
+# --- one definition, both screens ---------------------------------------------------------
+
+# 5. The editor stops explaining the clock. Probed on the EDITOR rather than the wizard,
+#    because a test that mentions only one screen is green when the other loses it - the same
+#    reason the withholding test in `12` s2.2 swaps its two destinations rather than deleting
+#    one.
+Invoke-Probe -Name "only the wizard explains the clock" `
+    -ExpectTest "is rendered by the wizard AND the editor" `
+    -Edits @(
+    @{
+        Target  = $Editor
+        Find    = "import { RoundClockNote } from `"./RoundClockNote`";"
+        Replace = ""
+    }
+)
+
+# 6. A screen derives the deadline itself beside the shared note. This is the drift the shared
+#    module exists to prevent, and importing the note does not prevent it.
+Invoke-Probe -Name "a screen recomputes the deadline for itself" `
+    -ExpectTest "derives the deadline in ONE place, not in the screens" `
+    -Edits @(
+    @{
+        # RE-AIMED: `12` s2.8 moved this step into its own file, and the probe had been reporting
+        # DID NOT APPLY ever since. The suite concatenates the orchestrator with every step, so a
+        # screen recomputing the deadline is caught wherever it does it.
+        Target  = $StepSchedule
+        Find    = "export function StepSchedule({"
+        Replace = "const ownDeadline = (end: number, maxDurationSeconds: number) =>`n  new Date(end - maxDurationSeconds * 1000);`n`nexport function StepSchedule({"
+    }
+)
+
+# 7. The actionable half dropped, leaving the rule without the moment. "Reserves 300 seconds"
+#    on its own is the formula the owner already could not relate to the contest.
+Invoke-Probe -Name "the rule is stated without the wall-clock moment" `
+    -ExpectTest "names the reserved seconds and the wall-clock moment, not a formula" `
+    -Edits @(
+    @{
+        Target  = $Note
+        Find    = "{fit.lastAttemptStart.toLocaleString()}"
+        Replace = "{fit.reservedSeconds}"
+    }
+)
+
+# 8. The settings/timing split collapsed, so one generic paragraph appears in both places -
+#    which is the copy people learn to skip.
+Invoke-Probe -Name "both screens get the same generic paragraph" `
+    -ExpectTest "explains the game's settings and the contest clock in BOTH places" `
+    -Edits @(
+    @{
+        Target  = $Editor
+        Find    = "variant=`"timing`""
+        Replace = "variant=`"settings`""
+    }
+)
+
+# 9. The too-short warning removed from the point of cause, so the operator meets it only on
+#    review, having already set the dates that caused it.
+Invoke-Probe -Name "the too-short contest is not flagged beside the dates" `
+    -ExpectTest "warns about a contest too short for its own game before the review step" `
+    -Edits @(
+    @{
+        Target  = $Note
+        Find    = "{fit?.windowTooShort && ("
+        Replace = "{false && ("
+    }
+)
+
+# --- no game named -------------------------------------------------------------------------
+
+# 10. A per-game special case, which is the one failure mode of the "no developer needed for a
+#     new title" claim. Written the obvious way: read the sprint's own config key.
+#
+#     RE-AIMED. The first version injected `const configured = 120; // durationSeconds` and
+#     reported GREEN, which is the guard behaving correctly rather than a hole: `readCode`
+#     strips comments before matching, deliberately, because these files EXPLAIN the mistakes
+#     they forbid and a test that reads prose fails in both directions. A mention in a comment
+#     is not per-game code. The mutation has to be code, so it now reads the config key.
+Invoke-Probe -Name "the note grows a special case for one game's config key" `
+    -ExpectTest "names no game, provider or config field anywhere in the explanation" `
+    -Edits @(
+    @{
+        Target  = $Note
+        Find    = "  const fit = describeRoundFit({"
+        Replace = "  const configuredRound = Number(settings[`"durationSeconds`"]);`n  const fit = describeRoundFit({"
+    }
+)
+
+# --- the refusal ---------------------------------------------------------------------------
+
+# 11. The old wording restored, in BOTH copies at once. One copy alone leaves the test green,
+#     because the assertion loops over the pair - so this proves the pair, not one file.
+#
+#     The mutation deletes the "rather than the length set in its own settings" clause, which is
+#     the whole disclosure, and leaves the ceiling quoted bare - the state the owner reported.
+# RE-AIMED, AND BOTH OF THESE HAD STALE CLAIMS RATHER THAN MERELY STALE ANCHORS. They were
+# written for the world before `12` s2.9, where the gate deliberately reserved the catalogue
+# ceiling and the refusal explained that it was doing so. s2.9 retired both - the ceiling was
+# never a fact about one contest, and once Sprint's clock ran to an hour it would have refused
+# every ten-minute contest outright - and the two tests these named were flipped with it. So the
+# probes named tests that no longer exist AND code that no longer exists, and the anchor failure
+# is what hid the second half. A stale probe fails in the quiet direction.
+Invoke-Probe -Name "the refusal quotes one figure and leaves the contest length out" `
+    -ExpectTest "names the configured playing time AND the contest length, in BOTH copies" `
+    -Edits @(
+    @{
+        Target  = $Preflight
+        Find    = "is longer than the contest itself (`${describeSeconds(Math.floor(windowSeconds))}), so nobody could ever start an attempt."
+        Replace = "is too long, so nobody could ever start an attempt."
+    },
+    @{
+        Target  = $AdminPreflight
+        Find    = "is longer than the contest itself (`${describeSeconds(Math.floor(windowSeconds))}), so nobody could ever start an attempt."
+        Replace = "is too long, so nobody could ever start an attempt."
+    }
+)
+
+# 12. The defect `12` s2.9 fixed, restored in both copies: the gate back on the catalogue ceiling,
+#     so a contest shorter than the title's maximum is refused however short its own attempts are.
+Invoke-Probe -Name "the gate goes back to the catalogue ceiling" `
+    -ExpectTest "gates on the DECLARED play clock, falling back to the ceiling" `
+    -Edits @(
+    @{
+        Target  = $Preflight
+        Find    = "  const roundSeconds = resolveAttemptSeconds(`n    input.schemaFields,`n    input.settings,`n    input.title.maxDurationSeconds,`n  );"
+        Replace = "  const roundSeconds = input.title.maxDurationSeconds;"
+    },
+    @{
+        Target  = $AdminPreflight
+        Find    = "  const roundSeconds = resolveAttemptSeconds(`n    input.schemaFields,`n    input.settings,`n    input.title.maxDurationSeconds,`n  );"
+        Replace = "  const roundSeconds = input.title.maxDurationSeconds;"
+    }
+)
+
+# --- the stale caution ---------------------------------------------------------------------
+
+# 13. The false promise restored. It told operators publishing did not exist yet, two days
+#     after it shipped - and since 7 September the same test also forbids the version that
+#     described an unconditional draft, which became false when publishing became a checkbox.
+Invoke-Probe -Name "the review step describes an outcome the operator did not choose" `
+    -ExpectTest "tells the operator to publish rather than to wait for a feature" `
+    -Edits @(
+    @{
+        # RE-AIMED: the review step is its own file since `12` s2.8.
+        Target  = $StepReview
+        Find    = "{draft.publishOnSave`n                  ? `"The contest is checked once more against what was actually saved, then made visible. If that second check refuses it, the contest is kept as a draft and the reasons are shown here.`"`n                  : `"The contest is saved as a draft. Players cannot see or join a draft - press Publish on the contest list when you are ready.`"}"
+        Replace = "It will be saved as a <strong className=`"text-white`">draft</strong>."
+    }
+)
+
+# --- the round-start policy ----------------------------------------------------------------
+#
+# The setting exists because the gate reserved the CATALOGUE ceiling unconditionally, so a
+# contest shorter than that ceiling refused every round from the instant it opened. Circuit
+# Sprint's ceiling is 300 seconds, so anything under five minutes was unplayable.
+
+# 14. The derived deadline printed under until-close, where there is no deadline. This is the
+#     plausible slip: the arithmetic is still correct, it is simply about the other setting.
+Invoke-Probe -Name "a cut-off moment is named on a contest that has none" `
+    -ExpectTest "names no cut-off moment when the contest lets players start at any time" `
+    -Edits @(
+    @{
+        Target  = $Draft
+        # RE-AIMED for the same reason as probe 1: the arithmetic is delegated now, so the slip is
+        # spelt by making the condition always true rather than by moving the subtraction.
+        Find    = "    lastAttemptStart: reservesFullRound`n      ? resolveContestEntryDeadline({"
+        Replace = "    lastAttemptStart: input.roundStartPolicy !== `"no-such-policy`"`n      ? resolveContestEntryDeadline({"
+    }
+)
+
+# 15. The short-contest fact reported only on the reserving branch, so an operator creating a
+#     two-minute Circuit Sprint contest is told nothing about every attempt being cut off.
+Invoke-Probe -Name "a short contest is silent under until-close" `
+    -ExpectTest "still reports a short contest under BOTH policies, because the fact is the same" `
+    -Edits @(
+    @{
+        Target  = $Draft
+        Find    = "    windowTooShort: windowSeconds < attemptSeconds,"
+        Replace = "    windowTooShort: reservesFullRound && windowSeconds < attemptSeconds,"
+    }
+)
+
+# 16. The refusal left hard for both policies, in BOTH copies - which makes the setting
+#     unusable for exactly the contests it exists to allow.
+Invoke-Probe -Name "a short contest is refused even when it permits shortened rounds" `
+    -ExpectTest "refuses a short contest that reserves, and only warns about one that does not" `
+    -Edits @(
+    @{
+        Target  = $Preflight
+        Find    = "      if (reservesFullRound) {"
+        Replace = "      if (true) {"
+    },
+    @{
+        Target  = $AdminPreflight
+        Find    = "      if (reservesFullRound) {"
+        Replace = "      if (true) {"
+    }
+)
+
+# 17. The grace period demanded for the full ceiling regardless, which refuses a short contest
+#     for a round length it cannot produce - the ceiling-versus-reality confusion again.
+Invoke-Probe -Name "grace is demanded for a round the contest cannot produce" `
+    -ExpectTest "asks the grace period to cover a round this contest can actually produce" `
+    -Edits @(
+    @{
+        Target  = $Preflight
+        Find    = "      reservesFullRound || !(windowSeconds > 0)`n        ? roundSeconds`n        : Math.min(roundSeconds, Math.ceil(windowSeconds));"
+        Replace = "      roundSeconds;"
+    },
+    @{
+        Target  = $AdminPreflight
+        Find    = "      reservesFullRound || !(windowSeconds > 0)`n        ? roundSeconds`n        : Math.min(roundSeconds, Math.ceil(windowSeconds));"
+        Replace = "      roundSeconds;"
+    }
+)
+
+# 18. The control offered on the wizard only, so an operator can never correct the choice on a
+#     draft. Probed on the EDITOR for the same reason as probe 5.
+Invoke-Probe -Name "only the wizard offers the round-start policy" `
+    -ExpectTest "is one control, shared by the wizard and the editor" `
+    -Edits @(
+    @{
+        Target  = $Editor
+        Find    = "        <RoundStartPolicyField"
+        Replace = "        <div hidden"
+    }
+)
+
+# 19. The field growing its own copy of the option text, which is the "one rule, two copies"
+#     shape: the screen then describes a rule `round.service.ts` does not enforce.
+Invoke-Probe -Name "the control writes its own option wording" `
+    -ExpectTest "is one control, shared by the wizard and the editor" `
+    -Edits @(
+    @{
+        Target  = $Field
+        Find    = "  const copy = ROUND_START_POLICY_COPY.get(value);"
+        Replace = "  const local = { `"reserve_full_round`": { label: `"Reserve a full round`" } };`n  const copy = ROUND_START_POLICY_COPY.get(value);"
+    }
+)
+
+# 20. The note ignoring the policy and always describing the reserving rule, so it contradicts
+#     the setting the operator just chose two fields above it.
+Invoke-Probe -Name "the clock note describes the other setting" `
+    -ExpectTest "changes what the clock note SAYS, not just what it emphasises" `
+    -Edits @(
+    @{
+        Target  = $Note
+        Find    = "            {fit && fit.reservesFullRound && fit.lastAttemptStart ? ("
+        Replace = "            {fit ? ("
+    }
+)
+
+# 21. The policy editable after players have paid, which withdraws play time somebody bought.
+Invoke-Probe -Name "the policy stays editable once players have entered" `
+    -ExpectTest "frozen once anyone has paid to enter" `
+    -Edits @(
+    @{
+        Target  = $Editor
+        # RE-AIMED 11 September 2026: R61 wrapped this control in the play-shape conditional, which
+        # re-indented it by two spaces, and the probe had reported DID NOT APPLY ever since.
+        Find    = "            value={draft.roundStartPolicy}`n            disabled={entered}"
+        Replace = "            value={draft.roundStartPolicy}"
+    }
+)
+
+# 22. THE 11 SEPTEMBER DEFECT, restored exactly: the box gated on the value alone. The mode can be
+#     recorded perfectly and still render nothing, which is the same defect with an extra variable
+#     in front of it - and ten minutes is both the default and a preset, so Custom then does
+#     nothing at all and the select snaps back.
+Invoke-Probe -Name "the custom box appears only when the value matches no preset" `
+    -ExpectTest "opens the box on the remembered choice, not on the value alone" `
+    -Edits @(
+    @{
+        Target  = $ConfigFields
+        Find    = "      {custom && ("
+        Replace = "      {!matched && ("
+    }
+)
+
+# 23. The choice not recorded at all - the original, where declining to change the value was read
+#     as declining to change anything.
+Invoke-Probe -Name "choosing Custom is not remembered" `
+    -ExpectTest "remembers that Custom was chosen, rather than deriving it from the value" `
+    -Edits @(
+    @{
+        Target  = $ConfigFields
+        Find    = "            setCustomChosen(true);"
+        Replace = "            /* the mode is not recorded */"
+    }
+)
+
+Write-Host ""
+Write-Host "Done. Every probe should read RED as expected (1 failed)." -ForegroundColor White

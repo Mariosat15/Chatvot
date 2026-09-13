@@ -1,0 +1,282 @@
+import { NextRequest, NextResponse } from "next/server";
+import { connectToDatabase } from "@/database/mongoose";
+import JourneyMapConfig from "@/database/models/journey-map-config.model";
+import JourneyMilestone from "@/database/models/journey-milestone.model";
+
+/** Resolve active mapId dynamically instead of hardcoding */
+async function resolveMapId(): Promise<string> {
+  const first = await JourneyMapConfig.findOne({ isActive: true }).sort({ sequenceOrder: 1 }).select("mapId").lean();
+  if (first?.mapId) return first.mapId;
+  const ids = await JourneyMilestone.distinct("mapId", { isActive: true });
+  const nonLegacy = ids.filter((id: string) => id !== "traders_journey");
+  return nonLegacy.length > 0 ? nonLegacy[0] : ids[0] || "pirate_cove";
+}
+
+/**
+ * GET /api/journey-map
+ * Get the journey map configuration
+ */
+export async function GET(request: NextRequest) {
+  try {
+    await connectToDatabase();
+
+    const { searchParams } = new URL(request.url);
+    const mapId = searchParams.get("mapId") || await resolveMapId();
+
+    const mapConfig = await JourneyMapConfig.findOne({ mapId }).lean();
+
+    if (!mapConfig) {
+      // Return empty config instead of 404 for better UX
+      // The UI can then prompt to generate the map
+      return NextResponse.json({
+        success: true,
+        mapConfig: null,
+        exists: false,
+        message: `Map "${mapId}" not found. Please generate it first.`,
+      });
+    }
+
+    return NextResponse.json({
+      success: true,
+      mapConfig,
+      exists: true,
+    });
+  } catch (error) {
+    console.error("Error fetching journey map:", error);
+    return NextResponse.json(
+      { success: false, error: "Failed to fetch journey map" },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * POST /api/journey-map
+ * Create or update a journey map configuration (upsert)
+ */
+export async function POST(request: NextRequest) {
+  try {
+    await connectToDatabase();
+    const data = await request.json();
+
+    const mapId = data.mapId || await resolveMapId();
+
+    // Upsert: Create if not exists, update if exists
+    const mapConfig = await JourneyMapConfig.findOneAndUpdate(
+      { mapId },
+      {
+        $set: {
+          mapId,
+          name: data.name || "Trader's Journey",
+          description: data.description || "",
+          zones: data.zones || [],
+          defaultStartNode: data.defaultStartNode || "account_created",
+          backgroundColor: data.backgroundColor || "#0F172A",
+          backgroundImage: data.backgroundImage,
+          isActive: data.isActive ?? true,
+          sequenceOrder: data.sequenceOrder,
+          theme: data.theme,
+          difficulty: data.difficulty,
+          estimatedXP: data.estimatedXP,
+          totalMilestones: data.totalMilestones,
+          requiredLevelToStart: data.requiredLevelToStart || 1,
+        },
+        $inc: { version: 1 },
+      },
+      { 
+        upsert: true, 
+        new: true,
+        setDefaultsOnInsert: true,
+      }
+    );
+
+    return NextResponse.json({
+      success: true,
+      message: "Journey map saved successfully",
+      mapConfig,
+    });
+  } catch (error) {
+    console.error("Error saving journey map:", error);
+    return NextResponse.json(
+      { success: false, error: "Failed to save journey map" },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * PUT /api/journey-map
+ * Update journey map configuration
+ */
+export async function PUT(request: NextRequest) {
+  try {
+    await connectToDatabase();
+    const data = await request.json();
+
+    if (!data.mapId) {
+      return NextResponse.json(
+        { success: false, error: "Map ID is required" },
+        { status: 400 }
+      );
+    }
+
+    const mapConfig = await JourneyMapConfig.findOneAndUpdate(
+      { mapId: data.mapId },
+      {
+        name: data.name,
+        description: data.description,
+        zones: data.zones,
+        defaultStartNode: data.defaultStartNode,
+        backgroundColor: data.backgroundColor,
+        backgroundImage: data.backgroundImage,
+        isActive: data.isActive,
+        $inc: { version: 1 },
+      },
+      { new: true }
+    );
+
+    if (!mapConfig) {
+      return NextResponse.json(
+        { success: false, error: "Map not found" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: "Journey map updated successfully",
+      mapConfig,
+    });
+  } catch (error) {
+    console.error("Error updating journey map:", error);
+    return NextResponse.json(
+      { success: false, error: "Failed to update journey map" },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * DELETE /api/journey-map
+ * Delete a journey map, zones, or specific zone
+ * Query params:
+ * - mapId: the map to operate on (required unless deleteAllMaps=true)
+ * - zoneId: delete specific zone from the map
+ * - clearZones=true: delete all zones from the map
+ * - permanent=true: permanently delete the map (not just deactivate)
+ * - deleteAllMaps=true: delete ALL journey maps
+ */
+export async function DELETE(request: NextRequest) {
+  try {
+    await connectToDatabase();
+    const { searchParams } = new URL(request.url);
+    const mapId = searchParams.get("mapId");
+    const zoneId = searchParams.get("zoneId");
+    const clearZones = searchParams.get("clearZones") === "true";
+    const permanent = searchParams.get("permanent") === "true";
+    const deleteAllMaps = searchParams.get("deleteAllMaps") === "true";
+
+    // Delete ALL journey maps
+    if (deleteAllMaps) {
+      const result = await JourneyMapConfig.deleteMany({});
+      return NextResponse.json({
+        success: true,
+        message: `Deleted ${result.deletedCount} journey maps`,
+        deletedCount: result.deletedCount,
+      });
+    }
+
+    if (!mapId) {
+      return NextResponse.json(
+        { success: false, error: "Map ID is required" },
+        { status: 400 }
+      );
+    }
+
+    // Delete specific zone
+    if (zoneId) {
+      const mapConfig = await JourneyMapConfig.findOneAndUpdate(
+        { mapId },
+        { $pull: { zones: { id: zoneId } } },
+        { new: true }
+      );
+
+      if (!mapConfig) {
+        return NextResponse.json(
+          { success: false, error: "Map not found" },
+          { status: 404 }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: `Zone '${zoneId}' deleted successfully`,
+        mapConfig,
+      });
+    }
+
+    // Clear all zones
+    if (clearZones) {
+      const mapConfig = await JourneyMapConfig.findOneAndUpdate(
+        { mapId },
+        { zones: [] },
+        { new: true }
+      );
+
+      if (!mapConfig) {
+        return NextResponse.json(
+          { success: false, error: "Map not found" },
+          { status: 404 }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: "All zones cleared successfully",
+        mapConfig,
+      });
+    }
+
+    // Permanent delete
+    if (permanent) {
+      const result = await JourneyMapConfig.deleteOne({ mapId });
+      
+      if (result.deletedCount === 0) {
+        return NextResponse.json(
+          { success: false, error: "Map not found" },
+          { status: 404 }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: "Journey map permanently deleted",
+      });
+    }
+
+    // Soft delete by setting isActive to false
+    const mapConfig = await JourneyMapConfig.findOneAndUpdate(
+      { mapId },
+      { isActive: false },
+      { new: true }
+    );
+
+    if (!mapConfig) {
+      return NextResponse.json(
+        { success: false, error: "Map not found" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: "Journey map deactivated successfully",
+    });
+  } catch (error) {
+    console.error("Error deleting journey map:", error);
+    return NextResponse.json(
+      { success: false, error: "Failed to delete journey map" },
+      { status: 500 }
+    );
+  }
+}

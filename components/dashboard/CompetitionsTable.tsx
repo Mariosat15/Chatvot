@@ -1,14 +1,26 @@
-'use client';
+"use client";
 
-import { Trophy, TrendingUp, TrendingDown, Target, Activity, AlertTriangle, Shield, Skull } from 'lucide-react';
-import { formatCurrency } from '@/lib/utils';
-import Link from 'next/link';
+import {
+  Trophy,
+  TrendingUp,
+  TrendingDown,
+  Target,
+  Activity,
+  AlertTriangle,
+  Shield,
+  Skull,
+} from "lucide-react";
+import { formatCurrency } from "@/lib/utils";
+import Link from "next/link";
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 interface CompetitionsTableProps {
   competitions: any[];
 }
 
-export default function CompetitionsTable({ competitions }: CompetitionsTableProps) {
+export default function CompetitionsTable({
+  competitions,
+}: CompetitionsTableProps) {
   if (competitions.length === 0) {
     return (
       <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-8 text-center">
@@ -26,7 +38,9 @@ export default function CompetitionsTable({ competitions }: CompetitionsTablePro
             <Trophy className="h-4 w-4 text-yellow-500" />
           </div>
           <div>
-            <h3 className="text-sm font-bold text-gray-100">Active Competitions</h3>
+            <h3 className="text-sm font-bold text-gray-100">
+              Active Competitions
+            </h3>
             <p className="text-xs text-gray-400">Performance Overview</p>
           </div>
         </div>
@@ -37,84 +51,160 @@ export default function CompetitionsTable({ competitions }: CompetitionsTablePro
         <table className="w-full">
           <thead className="bg-gray-900/50 border-b border-gray-700">
             <tr>
-              <th className="px-2 py-2 text-left text-xs font-semibold text-gray-400">Competition</th>
-              <th className="px-1 py-2 text-center text-xs font-semibold text-gray-400">Rank</th>
-              <th className="px-1 py-2 text-center text-xs font-semibold text-gray-400">Risk</th>
-              <th className="px-2 py-2 text-right text-xs font-semibold text-gray-400">Capital</th>
-              <th className="px-2 py-2 text-right text-xs font-semibold text-gray-400">P&L</th>
-              <th className="px-1 py-2 text-center text-xs font-semibold text-gray-400">ROI</th>
-              <th className="px-1 py-2 text-center text-xs font-semibold text-gray-400">Margin</th>
-              <th className="px-1 py-2 text-center text-xs font-semibold text-gray-400">DD</th>
-              <th className="px-1 py-2 text-center text-xs font-semibold text-gray-400">Pos</th>
-              <th className="px-1 py-2 text-center text-xs font-semibold text-gray-400">Trades</th>
-              <th className="px-1 py-2 text-center text-xs font-semibold text-gray-400">Win%</th>
-              <th className="px-1 py-2 text-center text-xs font-semibold text-gray-400">PF</th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-gray-400">Action</th>
+              <th className="px-2 py-2 text-left text-xs font-semibold text-gray-400">
+                Competition
+              </th>
+              <th className="px-1 py-2 text-center text-xs font-semibold text-gray-400">
+                Rank
+              </th>
+              <th className="px-1 py-2 text-center text-xs font-semibold text-gray-400">
+                Risk
+              </th>
+              <th className="px-2 py-2 text-right text-xs font-semibold text-gray-400">
+                Capital
+              </th>
+              <th className="px-2 py-2 text-right text-xs font-semibold text-gray-400">
+                P&L
+              </th>
+              <th className="px-1 py-2 text-center text-xs font-semibold text-gray-400">
+                ROI
+              </th>
+              <th className="px-1 py-2 text-center text-xs font-semibold text-gray-400">
+                Margin
+              </th>
+              <th className="px-1 py-2 text-center text-xs font-semibold text-gray-400">
+                DD
+              </th>
+              <th className="px-1 py-2 text-center text-xs font-semibold text-gray-400">
+                Pos
+              </th>
+              <th className="px-1 py-2 text-center text-xs font-semibold text-gray-400">
+                Trades
+              </th>
+              <th className="px-1 py-2 text-center text-xs font-semibold text-gray-400">
+                Win%
+              </th>
+              <th className="px-1 py-2 text-center text-xs font-semibold text-gray-400">
+                PF
+              </th>
+              <th className="px-2 py-2 text-center text-xs font-semibold text-gray-400">
+                Action
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-700/50">
-            {competitions.map((comp, index) => {
+            {competitions.map((comp, _index) => {
+              // Reason: ten of this table's thirteen columns are trading measurements -
+              // capital, P&L, ROI, margin, drawdown, positions, trades, win rate, profit
+              // factor - and none of them exists for a provider game. Left alone they do
+              // not crash: `capitalHealth` divides undefined by undefined and renders
+              // "NaN%", and the margin maths lands on Infinity and paints a green "safe"
+              // shield for a contest with no margin at all. A confident wrong answer.
+              // A provider contest therefore gets one row spanning those columns.
+              if (comp.competition?.gameType === "provider") {
+                return (
+                  <ProviderCompetitionRow
+                    key={comp.competition._id}
+                    competition={comp.competition}
+                    participation={comp.participation}
+                  />
+                );
+              }
+
               const isProfitable = comp.participation.pnl >= 0;
-              const capitalHealth = (comp.participation.currentCapital / comp.participation.startingCapital) * 100;
-              
+              const capitalHealth =
+                (comp.participation.currentCapital /
+                  comp.participation.startingCapital) *
+                100;
+
               // CORRECT margin level calculation (equity / usedMargin * 100)
               // Higher is better: 200%+ = safe, 150% = warning, 100% = margin call, 50% = liquidation
-              const equity = comp.participation.currentCapital + (comp.participation.unrealizedPnl || 0);
-              const marginLevel = comp.participation.usedMargin > 0 ? 
-                (equity / comp.participation.usedMargin) * 100 : Infinity;
-              
+              const equity =
+                comp.participation.currentCapital +
+                (comp.participation.unrealizedPnl || 0);
+              const marginLevel =
+                comp.participation.usedMargin > 0
+                  ? (equity / comp.participation.usedMargin) * 100
+                  : Infinity;
+
               // Also calculate margin usage percentage for display
-              const marginUsagePercent = comp.participation.currentCapital > 0 ? 
-                (comp.participation.usedMargin / comp.participation.currentCapital) * 100 : 0;
-              
+              const _marginUsagePercent =
+                comp.participation.currentCapital > 0
+                  ? (comp.participation.usedMargin /
+                      comp.participation.currentCapital) *
+                    100
+                  : 0;
+
               // Risk calculation based on ACTUAL margin levels (matching risk-manager.service thresholds)
               // 50% = Liquidation, 100% = Margin Call, 150% = Warning/Safe threshold
               const isLiquidationDanger = marginLevel < 100; // Below margin call = danger (RED)
               const isHighRisk = marginLevel < 150; // Below warning threshold (ORANGE/YELLOW)
               const isMediumRisk = false; // Removed - anything >= 150% is safe
-              
+
               let RiskIcon = Shield;
-              let riskColor = 'text-green-500';
-              
+              let riskColor = "text-green-500";
+
               if (isLiquidationDanger) {
                 RiskIcon = Skull;
-                riskColor = 'text-red-500';
+                riskColor = "text-red-500";
               } else if (isHighRisk) {
                 RiskIcon = AlertTriangle;
-                riskColor = 'text-orange-500';
+                riskColor = "text-orange-500";
               } else if (isMediumRisk) {
                 RiskIcon = AlertTriangle;
-                riskColor = 'text-yellow-500';
+                riskColor = "text-yellow-500";
               }
 
               // Profit Factor calculation
-              const totalWins = comp.participation.winningTrades > 0 ? 
-                (comp.participation.averageWin * comp.participation.winningTrades) : 0;
-              const totalLosses = comp.participation.losingTrades > 0 ? 
-                Math.abs(comp.participation.averageLoss * comp.participation.losingTrades) : 0;
-              const profitFactor = totalLosses > 0 ? totalWins / totalLosses : totalWins > 0 ? 999 : 0;
+              const totalWins =
+                comp.participation.winningTrades > 0
+                  ? comp.participation.averageWin *
+                    comp.participation.winningTrades
+                  : 0;
+              const totalLosses =
+                comp.participation.losingTrades > 0
+                  ? Math.abs(
+                      comp.participation.averageLoss *
+                        comp.participation.losingTrades,
+                    )
+                  : 0;
+              const profitFactor =
+                totalLosses > 0
+                  ? totalWins / totalLosses
+                  : totalWins > 0
+                    ? 999
+                    : 0;
 
               return (
-                <tr 
-                  key={comp.competition._id} 
+                <tr
+                  key={comp.competition._id}
                   className={`hover:bg-gray-700/30 transition-colors ${
-                    isLiquidationDanger ? 'bg-red-500/5' : ''
+                    isLiquidationDanger ? "bg-red-500/5" : ""
                   }`}
                 >
                   {/* Competition Name */}
                   <td className="px-2 py-2">
                     <div className="flex items-center gap-1.5">
-                      <div className={`w-1.5 h-1.5 rounded-full ${
-                        isLiquidationDanger ? 'bg-red-500 animate-pulse' : 
-                        isHighRisk ? 'bg-orange-500 animate-pulse' : 
-                        'bg-green-500'
-                      }`} />
+                      <div
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          isLiquidationDanger
+                            ? "bg-red-500 animate-pulse"
+                            : isHighRisk
+                              ? "bg-orange-500 animate-pulse"
+                              : "bg-green-500"
+                        }`}
+                      />
                       <div>
                         <p className="text-xs font-semibold text-gray-200">
                           {comp.competition.name}
                         </p>
                         <p className="text-xs text-gray-500">
-                          {Math.floor((new Date(comp.competition.endTime).getTime() - Date.now()) / (1000 * 60 * 60))}h left
+                          {Math.floor(
+                            (new Date(comp.competition.endTime).getTime() -
+                              Date.now()) /
+                              (1000 * 60 * 60),
+                          )}
+                          h left
                         </p>
                       </div>
                     </div>
@@ -132,9 +222,11 @@ export default function CompetitionsTable({ competitions }: CompetitionsTablePro
 
                   {/* Risk Status */}
                   <td className="px-1 py-2 text-center">
-                    <div className={`inline-flex items-center justify-center ${
-                      isLiquidationDanger ? 'animate-pulse' : ''
-                    }`}>
+                    <div
+                      className={`inline-flex items-center justify-center ${
+                        isLiquidationDanger ? "animate-pulse" : ""
+                      }`}
+                    >
                       <RiskIcon className={`h-4 w-4 ${riskColor}`} />
                     </div>
                   </td>
@@ -157,9 +249,11 @@ export default function CompetitionsTable({ competitions }: CompetitionsTablePro
                       ) : (
                         <TrendingDown className="h-2.5 w-2.5 text-red-500" />
                       )}
-                      <span className={`text-xs font-bold ${
-                        isProfitable ? 'text-green-500' : 'text-red-500'
-                      }`}>
+                      <span
+                        className={`text-xs font-bold ${
+                          isProfitable ? "text-green-500" : "text-red-500"
+                        }`}
+                      >
                         {formatCurrency(comp.participation.pnl)}
                       </span>
                     </div>
@@ -167,10 +261,12 @@ export default function CompetitionsTable({ competitions }: CompetitionsTablePro
 
                   {/* ROI % */}
                   <td className="px-1 py-2 text-center">
-                    <span className={`text-xs font-bold ${
-                      isProfitable ? 'text-green-500' : 'text-red-500'
-                    }`}>
-                      {comp.participation.pnlPercentage >= 0 ? '+' : ''}
+                    <span
+                      className={`text-xs font-bold ${
+                        isProfitable ? "text-green-500" : "text-red-500"
+                      }`}
+                    >
+                      {comp.participation.pnlPercentage >= 0 ? "+" : ""}
                       {comp.participation.pnlPercentage.toFixed(1)}%
                     </span>
                   </td>
@@ -178,28 +274,43 @@ export default function CompetitionsTable({ competitions }: CompetitionsTablePro
                   {/* Margin Level (higher is better: 150%+ safe, 100% margin call, 50% liquidation) */}
                   <td className="px-1 py-2 text-center">
                     <div className="flex flex-col items-center gap-0.5">
-                      <span className={`text-xs font-bold ${
-                        marginLevel < 100 ? 'text-red-500' : // Below margin call = danger
-                        marginLevel < 150 ? 'text-orange-500' : // Below 150% = warning
-                        'text-green-500' // 150%+ = safe
-                      }`}>
-                        {marginLevel === Infinity ? '∞' : marginLevel.toFixed(0)}%
+                      <span
+                        className={`text-xs font-bold ${
+                          marginLevel < 100
+                            ? "text-red-500" // Below margin call = danger
+                            : marginLevel < 150
+                              ? "text-orange-500" // Below 150% = warning
+                              : "text-green-500" // 150%+ = safe
+                        }`}
+                      >
+                        {marginLevel === Infinity
+                          ? "∞"
+                          : marginLevel.toFixed(0)}
+                        %
                       </span>
                       <span className="text-xs text-gray-500">
-                        {marginLevel < 100 ? 'Call' : 
-                         marginLevel < 150 ? 'Warn' : 'Safe'}
+                        {marginLevel < 100
+                          ? "Call"
+                          : marginLevel < 150
+                            ? "Warn"
+                            : "Safe"}
                       </span>
                     </div>
                   </td>
 
                   {/* Max Drawdown */}
                   <td className="px-1 py-2 text-center">
-                    <span className={`text-xs font-bold ${
-                      comp.participation.maxDrawdownPercentage > 20 ? 'text-red-500' :
-                      comp.participation.maxDrawdownPercentage > 10 ? 'text-orange-500' :
-                      comp.participation.maxDrawdownPercentage > 5 ? 'text-yellow-500' :
-                      'text-green-500'
-                    }`}>
+                    <span
+                      className={`text-xs font-bold ${
+                        comp.participation.maxDrawdownPercentage > 20
+                          ? "text-red-500"
+                          : comp.participation.maxDrawdownPercentage > 10
+                            ? "text-orange-500"
+                            : comp.participation.maxDrawdownPercentage > 5
+                              ? "text-yellow-500"
+                              : "text-green-500"
+                      }`}
+                    >
                       {comp.participation.maxDrawdownPercentage.toFixed(1)}%
                     </span>
                   </td>
@@ -209,7 +320,10 @@ export default function CompetitionsTable({ competitions }: CompetitionsTablePro
                     <div className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-purple-500/10">
                       <Activity className="h-2.5 w-2.5 text-purple-500" />
                       <span className="text-xs font-semibold text-purple-500">
-                        {comp.participation?.currentOpenPositions || comp.openPositionsCount || comp.openPositions?.length || 0}
+                        {comp.participation?.currentOpenPositions ||
+                          comp.openPositionsCount ||
+                          comp.openPositions?.length ||
+                          0}
                       </span>
                     </div>
                   </td>
@@ -227,18 +341,24 @@ export default function CompetitionsTable({ competitions }: CompetitionsTablePro
                   {/* Win Rate */}
                   <td className="px-1 py-2 text-center">
                     <span className="text-xs font-semibold text-yellow-500">
-                      {comp.participation.winRate.toFixed(0)}%
+                      {comp.participation.winRate.toFixed(1)}%
                     </span>
                   </td>
 
                   {/* Profit Factor */}
                   <td className="px-1 py-2 text-center">
-                    <span className={`text-xs font-bold ${
-                      profitFactor >= 2 ? 'text-green-500' :
-                      profitFactor >= 1 ? 'text-yellow-500' :
-                      profitFactor > 0 ? 'text-red-500' : 'text-gray-500'
-                    }`}>
-                      {profitFactor > 99 ? '∞' : profitFactor.toFixed(1)}
+                    <span
+                      className={`text-xs font-bold ${
+                        profitFactor >= 2
+                          ? "text-green-500"
+                          : profitFactor >= 1
+                            ? "text-yellow-500"
+                            : profitFactor > 0
+                              ? "text-red-500"
+                              : "text-gray-500"
+                      }`}
+                    >
+                      {profitFactor > 99 ? "∞" : profitFactor.toFixed(1)}
                     </span>
                   </td>
 
@@ -258,5 +378,82 @@ export default function CompetitionsTable({ competitions }: CompetitionsTablePro
         </table>
       </div>
     </div>
+  );
+}
+
+/**
+ * One row for a contest played through a game provider.
+ *
+ * Name, rank and score, then a single cell spanning the ten trading columns that say what
+ * the row is instead of filling them with zeroes. Reason: an empty numeric cell reads as a
+ * value of nothing, and a dash in ten columns reads as a broken query - saying "scored by
+ * the game" once is the only version a player can act on.
+ *
+ * The action goes to the contest page, not to `/play`: launching a round consumes an
+ * attempt, and Next.js prefetches link targets on hover.
+ */
+function ProviderCompetitionRow({
+  competition,
+  participation,
+}: {
+  competition: any;
+  participation: any;
+}) {
+  const hoursLeft = Math.floor(
+    (new Date(competition.endTime).getTime() - Date.now()) / (1000 * 60 * 60),
+  );
+  // Reason: undefined and 0 are different facts. No round has reported yet, versus a
+  // genuine score of nothing.
+  const hasScore =
+    participation?.score !== undefined && participation?.score !== null;
+
+  return (
+    <tr className="hover:bg-gray-700/30 transition-colors">
+      <td className="px-2 py-2">
+        <div className="flex items-center gap-1.5">
+          <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+          <div>
+            <p className="text-xs font-semibold text-gray-200">
+              {competition.name}
+            </p>
+            <p className="text-xs text-gray-500">{hoursLeft}h left</p>
+          </div>
+        </div>
+      </td>
+
+      <td className="px-1 py-2 text-center">
+        <div className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-yellow-500/10">
+          <Trophy className="h-2.5 w-2.5 text-yellow-500" />
+          <span className="text-xs font-bold text-yellow-500">
+            #{participation?.currentRank || "–"}
+          </span>
+        </div>
+      </td>
+
+      {/* Reason: 10 columns - risk, capital, P&L, ROI, margin, drawdown, positions,
+          trades, win rate, profit factor - replaced by the one number this game has. */}
+      <td colSpan={10} className="px-2 py-2">
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] uppercase tracking-wide text-gray-500">
+            Score
+          </span>
+          <span className="text-xs font-bold text-gray-200">
+            {hasScore ? Number(participation.score).toLocaleString() : "–"}
+          </span>
+          <span className="text-[11px] text-gray-500">
+            {hasScore ? "· scored by the game" : "· no round yet"}
+          </span>
+        </div>
+      </td>
+
+      <td className="px-2 py-2 text-center">
+        <Link
+          href={`/competitions/${competition._id}`}
+          className="inline-flex items-center px-2 py-1 bg-yellow-500 hover:bg-yellow-600 text-gray-900 text-xs font-bold rounded transition-colors"
+        >
+          View
+        </Link>
+      </td>
+    </tr>
   );
 }

@@ -1,0 +1,11 @@
+#!/usr/bin/env sh
+
+# Reason: the two apps keep separate copies of every Mongoose model. When they drift,
+# the app with the narrower copy cannot WRITE the fields it does not declare, and a
+# missing enum value rejects the write outright. Both failures are silent, so they are
+# caught here rather than in production.
+#
+# If this blocks you: run `npm run check:mirrors:list` to see the detail. Add the
+# missing field or enum value to the copy that lacks it - only ever add. If the
+# difference is deliberate, record it in tools/model-mirror/allowlist.ts with a reason.
+npm run check:mirrors

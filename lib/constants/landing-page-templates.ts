@@ -1,0 +1,59 @@
+/**
+ * Master index of all 20 landing page templates.
+ * Reason: Separate index file keeps the import clean and allows
+ * adding more templates without modifying consumer code.
+ */
+import type { TemplateDefinition } from "./landing-page-templates-1";
+import {
+  TEMPLATE_TRADING_ARENA,
+  TEMPLATE_CRYPTO_CHALLENGE,
+  TEMPLATE_FOREX_MASTERS,
+  TEMPLATE_PRO_TRADER,
+  TEMPLATE_MARKET_PULSE,
+} from "./landing-page-templates-1";
+import {
+  TEMPLATE_VICTORY_LANE,
+  TEMPLATE_TRADE_EARN,
+  TEMPLATE_CHART_CHAMPIONS,
+  TEMPLATE_RISK_FREE,
+  TEMPLATE_TOURNAMENT_HUB,
+} from "./landing-page-templates-2";
+import {
+  TEMPLATE_PROFIT_RACE,
+  TEMPLATE_SMART_TRADING,
+  TEMPLATE_MONEY_MOVES,
+  TEMPLATE_BULL_RUN,
+  TEMPLATE_GLOBAL_MARKETS,
+} from "./landing-page-templates-3";
+import {
+  TEMPLATE_DAY_TRADER,
+  TEMPLATE_WEALTH_BUILDER,
+  TEMPLATE_TRADE_WARS,
+  TEMPLATE_MARKET_MASTERS,
+  TEMPLATE_LUCKY_TRADER,
+} from "./landing-page-templates-4";
+
+export type { TemplateDefinition };
+
+export const ALL_LANDING_PAGE_TEMPLATES: TemplateDefinition[] = [
+  TEMPLATE_TRADING_ARENA,
+  TEMPLATE_CRYPTO_CHALLENGE,
+  TEMPLATE_FOREX_MASTERS,
+  TEMPLATE_PRO_TRADER,
+  TEMPLATE_MARKET_PULSE,
+  TEMPLATE_VICTORY_LANE,
+  TEMPLATE_TRADE_EARN,
+  TEMPLATE_CHART_CHAMPIONS,
+  TEMPLATE_RISK_FREE,
+  TEMPLATE_TOURNAMENT_HUB,
+  TEMPLATE_PROFIT_RACE,
+  TEMPLATE_SMART_TRADING,
+  TEMPLATE_MONEY_MOVES,
+  TEMPLATE_BULL_RUN,
+  TEMPLATE_GLOBAL_MARKETS,
+  TEMPLATE_DAY_TRADER,
+  TEMPLATE_WEALTH_BUILDER,
+  TEMPLATE_TRADE_WARS,
+  TEMPLATE_MARKET_MASTERS,
+  TEMPLATE_LUCKY_TRADER,
+];

@@ -1,0 +1,2059 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chartvolt Infrastructure Guide</title>
+<style>
+/* ============================================
+   CSS RESET & BASE
+   ============================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg-primary: #0f1117;
+  --bg-secondary: #1a1d27;
+  --bg-card: #1e2130;
+  --bg-code: #151821;
+  --bg-hover: #252838;
+  --border: #2a2d3a;
+  --border-light: #353849;
+  --text-primary: #e4e6ef;
+  --text-secondary: #9ca0b0;
+  --text-muted: #6b7084;
+  --accent-cyan: #22d3ee;
+  --accent-cyan-dim: rgba(34,211,238,0.15);
+  --accent-orange: #f97316;
+  --accent-orange-dim: rgba(249,115,22,0.15);
+  --accent-green: #22c55e;
+  --accent-green-dim: rgba(34,197,94,0.15);
+  --accent-red: #ef4444;
+  --accent-red-dim: rgba(239,68,68,0.15);
+  --accent-purple: #a855f7;
+  --accent-purple-dim: rgba(168,85,247,0.15);
+  --accent-yellow: #eab308;
+  --accent-yellow-dim: rgba(234,179,8,0.15);
+  --radius: 8px;
+  --radius-lg: 12px;
+  --shadow: 0 4px 24px rgba(0,0,0,0.3);
+  --sidebar-width: 280px;
+  --font-mono: 'Consolas', 'Monaco', 'Courier New', monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--font-sans);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.7;
+  font-size: 15px;
+}
+
+/* ============================================
+   SIDEBAR NAVIGATION
+   ============================================ */
+.sidebar {
+  position: fixed;
+  top: 0; left: 0;
+  width: var(--sidebar-width);
+  height: 100vh;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  z-index: 100;
+  padding: 24px 0;
+}
+
+.sidebar-logo {
+  padding: 0 20px 20px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+
+.sidebar-logo h1 {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--accent-cyan);
+  letter-spacing: -0.5px;
+}
+
+.sidebar-logo .subtitle {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin-top: 4px;
+}
+
+.nav-group { margin-bottom: 8px; }
+
+.nav-group-title {
+  padding: 8px 20px 4px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 20px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 13px;
+  transition: all 0.15s;
+  border-left: 3px solid transparent;
+}
+
+.nav-link:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.nav-link.active {
+  color: var(--accent-cyan);
+  background: var(--accent-cyan-dim);
+  border-left-color: var(--accent-cyan);
+}
+
+.nav-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+/* ============================================
+   MAIN CONTENT
+   ============================================ */
+.main {
+  margin-left: var(--sidebar-width);
+  padding: 40px 48px 80px;
+  max-width: 1000px;
+}
+
+.section {
+  margin-bottom: 64px;
+  scroll-margin-top: 24px;
+}
+
+h2 {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+  letter-spacing: -0.5px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+h2 .section-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--accent-cyan-dim);
+  color: var(--accent-cyan);
+  font-size: 16px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.section-desc {
+  color: var(--text-secondary);
+  font-size: 15px;
+  margin-bottom: 32px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+h3 {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 32px 0 16px;
+}
+
+h4 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 24px 0 12px;
+}
+
+p { margin-bottom: 12px; }
+
+ul, ol {
+  margin: 0 0 16px 24px;
+}
+
+li { margin-bottom: 6px; }
+
+strong { color: var(--text-primary); }
+
+/* ============================================
+   CARDS
+   ============================================ */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  margin-bottom: 16px;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.card-header h4 {
+  margin: 0;
+  font-size: 17px;
+}
+
+/* ============================================
+   STEP CARDS (numbered)
+   ============================================ */
+.steps { counter-reset: step-counter; }
+
+.step {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 24px;
+  position: relative;
+}
+
+.step::before {
+  counter-increment: step-counter;
+  content: counter(step-counter);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  border-radius: 50%;
+  background: var(--accent-cyan-dim);
+  color: var(--accent-cyan);
+  font-weight: 700;
+  font-size: 15px;
+  border: 2px solid var(--accent-cyan);
+  z-index: 1;
+}
+
+.step:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  left: 17px;
+  top: 40px;
+  bottom: -20px;
+  width: 2px;
+  background: var(--border-light);
+}
+
+.step-content {
+  flex: 1;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px 24px;
+}
+
+.step-content h4 {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+
+.step-content p:last-child { margin-bottom: 0; }
+
+/* ============================================
+   BADGES
+   ============================================ */
+.badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  vertical-align: middle;
+}
+
+.badge-required { background: var(--accent-red-dim); color: var(--accent-red); }
+.badge-critical { background: var(--accent-orange-dim); color: var(--accent-orange); }
+.badge-optional { background: var(--accent-purple-dim); color: var(--accent-purple); }
+.badge-auto { background: var(--accent-green-dim); color: var(--accent-green); }
+.badge-primary { background: var(--accent-cyan-dim); color: var(--accent-cyan); }
+.badge-secondary { background: var(--accent-yellow-dim); color: var(--accent-yellow); }
+
+/* ============================================
+   CODE BLOCKS
+   ============================================ */
+.code-block {
+  position: relative;
+  margin: 12px 0 16px;
+}
+
+.code-block pre {
+  background: var(--bg-code);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-primary);
+  -webkit-overflow-scrolling: touch;
+}
+
+.code-block .copy-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: var(--font-sans);
+}
+
+.code-block .copy-btn:hover {
+  background: var(--border);
+  color: var(--text-primary);
+}
+
+.code-block .copy-btn.copied {
+  background: var(--accent-green-dim);
+  color: var(--accent-green);
+  border-color: var(--accent-green);
+}
+
+.code-block .lang-tag {
+  position: absolute;
+  top: 8px;
+  left: 12px;
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-family: var(--font-mono);
+}
+
+.inline-code {
+  background: var(--bg-code);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--accent-cyan);
+}
+
+/* ============================================
+   TABLES
+   ============================================ */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  font-size: 14px;
+}
+
+thead th {
+  background: var(--bg-code);
+  padding: 10px 16px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 2px solid var(--border);
+}
+
+tbody td {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-primary);
+}
+
+tbody tr:hover { background: var(--bg-hover); }
+
+/* ============================================
+   SVG DIAGRAMS
+   ============================================ */
+.diagram-container {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 32px;
+  margin: 24px 0;
+  overflow-x: auto;
+  text-align: center;
+}
+
+.diagram-container svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* ============================================
+   COLLAPSIBLE SECTIONS
+   ============================================ */
+.collapsible {
+  margin: 16px 0;
+}
+
+.collapsible-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: left;
+  font-family: var(--font-sans);
+}
+
+.collapsible-toggle:hover {
+  background: var(--bg-hover);
+}
+
+.collapsible-toggle .arrow {
+  transition: transform 0.2s;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.collapsible-toggle.open .arrow {
+  transform: rotate(90deg);
+}
+
+.collapsible-content {
+  display: none;
+  border: 1px solid var(--border);
+  border-top: 0;
+  border-radius: 0 0 var(--radius) var(--radius);
+  padding: 16px 20px;
+  background: var(--bg-secondary);
+}
+
+.collapsible-content.open { display: block; }
+
+/* ============================================
+   CHECKLIST
+   ============================================ */
+.checklist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.checklist li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  margin: 0;
+}
+
+.checklist li:last-child { border-bottom: 0; }
+
+.check-icon {
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--border-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2px;
+}
+
+.check-icon.done {
+  background: var(--accent-green-dim);
+  border-color: var(--accent-green);
+  color: var(--accent-green);
+}
+
+/* ============================================
+   ALERT / INFO BOXES
+   ============================================ */
+.alert {
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  margin: 16px 0;
+  font-size: 14px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.alert-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+
+.alert-info {
+  background: var(--accent-cyan-dim);
+  border: 1px solid rgba(34,211,238,0.3);
+  color: #b0e9f3;
+}
+
+.alert-warning {
+  background: var(--accent-orange-dim);
+  border: 1px solid rgba(249,115,22,0.3);
+  color: #fdd0a2;
+}
+
+.alert-danger {
+  background: var(--accent-red-dim);
+  border: 1px solid rgba(239,68,68,0.3);
+  color: #fca5a5;
+}
+
+.alert-success {
+  background: var(--accent-green-dim);
+  border: 1px solid rgba(34,197,94,0.3);
+  color: #a7f3d0;
+}
+
+/* ============================================
+   PROCESS TABLE (colored rows)
+   ============================================ */
+.process-table td:first-child { font-weight: 600; font-family: var(--font-mono); font-size: 13px; }
+
+/* ============================================
+   CONFIG GRID
+   ============================================ */
+.config-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.config-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  transition: border-color 0.15s;
+}
+
+.config-card:hover { border-color: var(--border-light); }
+
+.config-card h4 {
+  margin: 0 0 4px;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.config-card .config-where {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.config-card p { font-size: 13px; color: var(--text-secondary); margin: 0; }
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+@media (max-width: 1100px) {
+  .config-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 900px) {
+  .sidebar { display: none; }
+  .main { margin-left: 0; padding: 24px; }
+}
+
+/* ============================================
+   PRINT
+   ============================================ */
+@media print {
+  .sidebar { display: none; }
+  .main { margin-left: 0; padding: 20px; max-width: 100%; }
+  .copy-btn { display: none; }
+  body { background: #fff; color: #111; font-size: 12px; }
+  .card, .step-content, .diagram-container { border: 1px solid #ccc; background: #fafafa; }
+  .code-block pre { background: #f4f4f4; border: 1px solid #ddd; color: #111; }
+  h2 { page-break-before: always; }
+  h2:first-of-type { page-break-before: avoid; }
+  .alert { border: 1px solid #ccc; }
+}
+
+/* ============================================
+   SCROLLBAR
+   ============================================ */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--bg-primary); }
+::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* Flow diagram specific */
+.flow-row { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 12px 0; flex-wrap: wrap; }
+.flow-box { background: var(--bg-code); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 16px; font-size: 13px; font-family: var(--font-mono); text-align: center; }
+.flow-box.primary { border-color: var(--accent-cyan); color: var(--accent-cyan); }
+.flow-box.secondary { border-color: var(--accent-orange); color: var(--accent-orange); }
+.flow-arrow { color: var(--text-muted); font-size: 18px; }
+</style>
+</head>
+<body>
+
+<!-- ============================================
+     SIDEBAR
+     ============================================ -->
+<nav class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <h1>Chartvolt</h1>
+    <div class="subtitle">Infrastructure Guide</div>
+  </div>
+
+  <div class="nav-group">
+    <div class="nav-group-title">Overview</div>
+    <a href="#architecture" class="nav-link">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+      Architecture
+    </a>
+  </div>
+
+  <div class="nav-group">
+    <div class="nav-group-title">Deployment</div>
+    <a href="#single-server" class="nav-link">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><circle cx="6" cy="6" r="1"/><circle cx="6" cy="18" r="1"/></svg>
+      Single Server
+    </a>
+    <a href="#post-deploy" class="nav-link">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+      Post-Deploy Config
+    </a>
+    <a href="#multi-server" class="nav-link">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="7" height="6" rx="1"/><rect x="16" y="3" width="7" height="6" rx="1"/><rect x="8.5" y="15" width="7" height="6" rx="1"/><path d="M4.5 9v3.5a1 1 0 001 1h13a1 1 0 001-1V9M12 13.5V15"/></svg>
+      Add Secondary Server
+    </a>
+  </div>
+
+  <div class="nav-group">
+    <div class="nav-group-title">Infrastructure</div>
+    <a href="#multi-arch" class="nav-link">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
+      Multi-Server Architecture
+    </a>
+    <a href="#cloudflare" class="nav-link">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.5 19H9a7 7 0 110-14h.5M17.5 19a4.5 4.5 0 100-9H17A7 7 0 009.5 5"/></svg>
+      Cloudflare Setup
+    </a>
+    <a href="#whitelabel" class="nav-link">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      White-Label Deploy
+    </a>
+  </div>
+
+  <div class="nav-group">
+    <div class="nav-group-title">Operations</div>
+    <a href="#updates" class="nav-link">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0018 9h-1.26A8 8 0 103 16.3"/></svg>
+      Deploying Updates
+    </a>
+    <a href="#management" class="nav-link">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      Management
+    </a>
+    <a href="#env-vars" class="nav-link">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+      Environment Variables
+    </a>
+  </div>
+</nav>
+
+<!-- ============================================
+     MAIN CONTENT
+     ============================================ -->
+<div class="main">
+
+<!-- ============================================
+     SECTION 1: ARCHITECTURE
+     ============================================ -->
+<div class="section" id="architecture">
+  <h2><span class="section-number">1</span> Architecture Overview</h2>
+  <p class="section-desc">Chartvolt is a Next.js monorepo running 5 PM2 processes behind an NGINX reverse proxy, with MongoDB Atlas and Redis as data stores.</p>
+
+  <!-- SVG Architecture Diagram -->
+  <div class="diagram-container">
+    <svg viewBox="0 0 800 520" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif">
+      <!-- Background -->
+      <rect x="20" y="10" width="760" height="500" rx="16" fill="#1a1d27" stroke="#2a2d3a" stroke-width="1.5"/>
+      <text x="40" y="38" font-size="14" fill="#6b7084" font-weight="600" letter-spacing="1">YOUR VPS SERVER</text>
+
+      <!-- NGINX box -->
+      <rect x="60" y="55" width="680" height="70" rx="10" fill="#151821" stroke="#22d3ee" stroke-width="1.5" stroke-dasharray="4"/>
+      <text x="80" y="80" font-size="13" fill="#22d3ee" font-weight="700">NGINX (Reverse Proxy + SSL)</text>
+      <text x="80" y="100" font-size="11" fill="#9ca0b0">yourdomain.com &#8594; :3000</text>
+      <text x="280" y="100" font-size="11" fill="#9ca0b0">yourdomain.com/ws &#8594; :3003</text>
+      <text x="500" y="100" font-size="11" fill="#9ca0b0">admin.yourdomain.com &#8594; :3001</text>
+
+      <!-- Connection lines from NGINX to apps -->
+      <line x1="140" y1="125" x2="140" y2="170" stroke="#2a2d3a" stroke-width="1.5"/>
+      <line x1="300" y1="125" x2="300" y2="170" stroke="#2a2d3a" stroke-width="1.5"/>
+      <line x1="460" y1="125" x2="460" y2="170" stroke="#2a2d3a" stroke-width="1.5"/>
+      <line x1="620" y1="125" x2="620" y2="170" stroke="#2a2d3a" stroke-width="1.5"/>
+
+      <!-- App boxes -->
+      <!-- User App -->
+      <rect x="70" y="170" width="140" height="90" rx="10" fill="#151821" stroke="#22c55e" stroke-width="1.5"/>
+      <text x="98" y="200" font-size="14" fill="#22c55e" font-weight="700">User App</text>
+      <text x="107" y="218" font-size="11" fill="#9ca0b0">Next.js 16</text>
+      <text x="113" y="245" font-size="20" fill="#22c55e" font-weight="700">:3000</text>
+
+      <!-- Admin App -->
+      <rect x="230" y="170" width="140" height="90" rx="10" fill="#151821" stroke="#a855f7" stroke-width="1.5"/>
+      <text x="254" y="200" font-size="14" fill="#a855f7" font-weight="700">Admin App</text>
+      <text x="267" y="218" font-size="11" fill="#9ca0b0">Next.js 16</text>
+      <text x="273" y="245" font-size="20" fill="#a855f7" font-weight="700">:3001</text>
+
+      <!-- API Server -->
+      <rect x="390" y="170" width="140" height="90" rx="10" fill="#151821" stroke="#f97316" stroke-width="1.5"/>
+      <text x="413" y="200" font-size="14" fill="#f97316" font-weight="700">API Server</text>
+      <text x="425" y="218" font-size="11" fill="#9ca0b0">Express.js</text>
+      <text x="433" y="245" font-size="20" fill="#f97316" font-weight="700">:4000</text>
+
+      <!-- WebSocket Server -->
+      <rect x="550" y="170" width="140" height="90" rx="10" fill="#151821" stroke="#eab308" stroke-width="1.5"/>
+      <text x="564" y="200" font-size="14" fill="#eab308" font-weight="700">WebSocket</text>
+      <text x="589" y="218" font-size="11" fill="#9ca0b0">ws + HTTP</text>
+      <text x="593" y="245" font-size="20" fill="#eab308" font-weight="700">:3003</text>
+
+      <!-- Worker (below, centered) -->
+      <rect x="310" y="290" width="180" height="70" rx="10" fill="#151821" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="6 3"/>
+      <text x="354" y="318" font-size="14" fill="#ef4444" font-weight="700">Worker</text>
+      <text x="340" y="340" font-size="11" fill="#9ca0b0">Agenda.js (cron jobs)</text>
+      <text x="340" y="354" font-size="10" fill="#6b7084">Primary server only</text>
+
+      <!-- Lines from apps down to DB area -->
+      <line x1="140" y1="260" x2="140" y2="400" stroke="#2a2d3a" stroke-width="1" stroke-dasharray="3"/>
+      <line x1="300" y1="260" x2="300" y2="400" stroke="#2a2d3a" stroke-width="1" stroke-dasharray="3"/>
+      <line x1="460" y1="260" x2="460" y2="400" stroke="#2a2d3a" stroke-width="1" stroke-dasharray="3"/>
+      <line x1="620" y1="260" x2="620" y2="400" stroke="#2a2d3a" stroke-width="1" stroke-dasharray="3"/>
+      <line x1="400" y1="360" x2="400" y2="400" stroke="#2a2d3a" stroke-width="1" stroke-dasharray="3"/>
+
+      <!-- Horizontal connector -->
+      <line x1="140" y1="400" x2="620" y2="400" stroke="#2a2d3a" stroke-width="1"/>
+
+      <!-- MongoDB -->
+      <rect x="120" y="430" width="200" height="60" rx="10" fill="#151821" stroke="#22c55e" stroke-width="1.5"/>
+      <text x="155" y="458" font-size="14" fill="#22c55e" font-weight="700">MongoDB Atlas</text>
+      <text x="165" y="478" font-size="11" fill="#9ca0b0">Cloud (shared DB)</text>
+
+      <!-- Redis -->
+      <rect x="480" y="430" width="200" height="60" rx="10" fill="#151821" stroke="#ef4444" stroke-width="1.5"/>
+      <text x="543" y="458" font-size="14" fill="#ef4444" font-weight="700">Redis</text>
+      <text x="515" y="478" font-size="11" fill="#9ca0b0">Cache + Pub/Sub</text>
+
+      <!-- Lines down to DBs -->
+      <line x1="220" y1="400" x2="220" y2="430" stroke="#22c55e" stroke-width="1.5"/>
+      <line x1="580" y1="400" x2="580" y2="430" stroke="#ef4444" stroke-width="1.5"/>
+    </svg>
+  </div>
+
+  <h3>PM2 Process Overview</h3>
+  <table class="process-table">
+    <thead>
+      <tr><th>Process Name</th><th>Port</th><th>Runtime</th><th>Role</th></tr>
+    </thead>
+    <tbody>
+      <tr><td style="color:var(--accent-green)">chartvolt-web</td><td>3000</td><td>Next.js 16</td><td>Main user-facing application (trading, charts, marketplace)</td></tr>
+      <tr><td style="color:var(--accent-purple)">chartvolt-admin</td><td>3001</td><td>Next.js 16</td><td>Admin dashboard (user management, settings, monitoring)</td></tr>
+      <tr><td style="color:var(--accent-orange)">chartvolt-api</td><td>4000</td><td>Express.js</td><td>CPU-intensive auth operations (bcrypt hashing in worker threads)</td></tr>
+      <tr><td style="color:var(--accent-yellow)">chartvolt-websocket</td><td>3003</td><td>Node.js + ws</td><td>Real-time messaging, chat, price streaming relay</td></tr>
+      <tr><td style="color:var(--accent-red)">chartvolt-worker</td><td>--</td><td>Agenda.js</td><td>Background cron jobs (margin checks, competition finalization, badges) -- <strong>primary only</strong></td></tr>
+    </tbody>
+  </table>
+
+  <h3>How NGINX Routes Traffic</h3>
+  <table>
+    <thead>
+      <tr><th>URL Pattern</th><th>Routes To</th><th>Notes</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><span class="inline-code">yourdomain.com/*</span></td><td>User App (:3000)</td><td>All user pages and API routes</td></tr>
+      <tr><td><span class="inline-code">yourdomain.com/ws</span></td><td>WebSocket (:3003)</td><td>Upgraded to WebSocket connection</td></tr>
+      <tr><td><span class="inline-code">yourdomain.com/api/auth/sign-up</span></td><td>API Server (:4000)</td><td>Rate-limited, bcrypt-heavy operations</td></tr>
+      <tr><td><span class="inline-code">yourdomain.com/api/auth/sign-in</span></td><td>API Server (:4000)</td><td>Rate-limited, bcrypt-heavy operations</td></tr>
+      <tr><td><span class="inline-code">admin.yourdomain.com/*</span></td><td>Admin App (:3001)</td><td>Separate subdomain, extra security headers</td></tr>
+      <tr><td><span class="inline-code">admin.yourdomain.com/ws</span></td><td>WebSocket (:3003)</td><td>Admin real-time messaging</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Data Storage</h3>
+  <table>
+    <thead>
+      <tr><th>Store</th><th>Purpose</th><th>Location</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>MongoDB Atlas</strong></td><td>All application data (users, trades, competitions, settings, images)</td><td>Cloud-hosted, shared across all servers</td></tr>
+      <tr><td><strong>Redis</strong></td><td>Price caching, trade queue, rate limiting, pub/sub for multi-server sync</td><td>Local on primary, accessible from all servers</td></tr>
+      <tr><td><strong>Filesystem</strong></td><td>Uploaded images (auto-restored from DB if missing)</td><td>Local disk per server</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ============================================
+     SECTION 2: SINGLE SERVER DEPLOYMENT
+     ============================================ -->
+<div class="section" id="single-server">
+  <h2><span class="section-number">2</span> Single Server Deployment</h2>
+  <p class="section-desc">Step-by-step guide to deploy Chartvolt on a fresh Hostinger VPS (Ubuntu/Debian). Estimated time: 15-20 minutes.</p>
+
+  <h3>Prerequisites</h3>
+  <div class="card">
+    <ul class="checklist">
+      <li><span class="check-icon">&#9744;</span><div><strong>Hostinger VPS</strong> -- Ubuntu 22.04+, 4GB RAM minimum (KVM 4 plan or higher)</div></li>
+      <li><span class="check-icon">&#9744;</span><div><strong>Domain name</strong> -- purchased and ready to configure DNS</div></li>
+      <li><span class="check-icon">&#9744;</span><div><strong>MongoDB Atlas</strong> -- account with cluster created at <a href="https://cloud.mongodb.com" style="color:var(--accent-cyan)">cloud.mongodb.com</a></div></li>
+      <li><span class="check-icon">&#9744;</span><div><strong>GitHub access</strong> -- HTTPS clone URL for the Chartvolt repository</div></li>
+      <li><span class="check-icon">&#9744;</span><div><strong>SSH access</strong> -- root or sudo user on your VPS</div></li>
+    </ul>
+  </div>
+
+  <h3>Option A: Automated Setup (Recommended)</h3>
+  <div class="alert alert-info">
+    <span class="alert-icon">&#128161;</span>
+    <div>A single script handles everything: server software, Redis, repo clone, <span class="inline-code">.env</span> generation, build, database, NGINX, PM2, and SSL.</div>
+  </div>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-content">
+        <h4>SSH into your VPS</h4>
+        <div class="code-block">
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          <pre>ssh root@YOUR_SERVER_IP</pre>
+        </div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-content">
+        <h4>Download and run the setup script</h4>
+        <p>The script will prompt you for: domain, MongoDB URI, admin email/password, and GitHub repo URL.</p>
+        <div class="code-block">
+          <span class="lang-tag">bash</span>
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          <pre>curl -O https://raw.githubusercontent.com/YOUR_GITHUB_USER/YOUR_REPO/main/deploy/setup-new-customer.sh
+chmod +x setup-new-customer.sh
+sudo ./setup-new-customer.sh</pre>
+        </div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-content">
+        <h4>The script automatically does all of this</h4>
+        <ul class="checklist">
+          <li><span class="check-icon done">&#10003;</span><div>Installs Node.js 20 LTS, PM2, NGINX, Certbot, Redis</div></li>
+          <li><span class="check-icon done">&#10003;</span><div>Configures Redis with a generated password</div></li>
+          <li><span class="check-icon done">&#10003;</span><div>Clones your repository to <span class="inline-code">/var/www/chartvolt</span></div></li>
+          <li><span class="check-icon done">&#10003;</span><div>Generates <span class="inline-code">.env</span> from your inputs (with random secrets)</div></li>
+          <li><span class="check-icon done">&#10003;</span><div>Creates <span class="inline-code">.env</span> symlink for admin app</div></li>
+          <li><span class="check-icon done">&#10003;</span><div>Installs dependencies and builds all 5 apps</div></li>
+          <li><span class="check-icon done">&#10003;</span><div>Sets up database indexes + seed data</div></li>
+          <li><span class="check-icon done">&#10003;</span><div>Configures NGINX with your domain and rate limiting</div></li>
+          <li><span class="check-icon done">&#10003;</span><div>Starts all services with PM2</div></li>
+          <li><span class="check-icon done">&#10003;</span><div>Sets up SSL certificates (if DNS is ready)</div></li>
+          <li><span class="check-icon done">&#10003;</span><div>Prints a summary with all credentials</div></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <h3>Option B: Step-by-Step Manual Setup</h3>
+
+  <div class="collapsible">
+    <button class="collapsible-toggle" onclick="toggleCollapsible(this)">
+      <span class="arrow">&#9654;</span> Click to expand manual setup steps
+    </button>
+    <div class="collapsible-content">
+
+      <h4>Step 1: Install Server Software</h4>
+      <div class="code-block">
+        <span class="lang-tag">bash</span>
+        <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        <pre>ssh root@YOUR_SERVER_IP
+
+# Run the server setup script (installs Node.js, PM2, NGINX, Redis, Certbot)
+curl -O https://raw.githubusercontent.com/YOUR_GITHUB_USER/YOUR_REPO/main/deploy/setup-server.sh
+chmod +x setup-server.sh
+sudo ./setup-server.sh</pre>
+      </div>
+      <p>Save the Redis password printed at the end.</p>
+
+      <h4>Step 2: Clone Repository</h4>
+      <div class="code-block">
+        <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        <pre>cd /var/www/chartvolt
+git clone https://github.com/YOUR_GITHUB_USER/YOUR_REPO.git .</pre>
+      </div>
+
+      <h4>Step 3: Configure Environment</h4>
+      <div class="code-block">
+        <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        <pre>cp env_minimal_example.txt .env
+nano .env</pre>
+      </div>
+      <p>Fill in required values (see <a href="#env-vars" style="color:var(--accent-cyan)">Environment Variables</a> section).</p>
+      <div class="code-block">
+        <span class="lang-tag">bash</span>
+        <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        <pre># Generate random secrets
+openssl rand -hex 32
+
+# Create .env symlink for admin app
+ln -sf /var/www/chartvolt/.env /var/www/chartvolt/apps/admin/.env</pre>
+      </div>
+
+      <h4>Step 4: Install Dependencies</h4>
+      <div class="code-block">
+        <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        <pre>cd /var/www/chartvolt
+
+# Main app
+npm install
+
+# Admin app
+cd apps/admin && npm install && cd ../..
+
+# API server
+cd api-server && npm install && cd ..
+
+# WebSocket server
+cd websocket-server && npm install && cd ..</pre>
+      </div>
+
+      <h4>Step 5: Build All Apps</h4>
+      <div class="code-block">
+        <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        <pre>npm run build          # Main app
+npm run build:admin    # Admin app
+npm run build:api      # API server
+cd websocket-server && npm run build && cd ..  # WebSocket server
+npm run worker:build   # Worker</pre>
+      </div>
+
+      <h4>Step 6: Database Setup</h4>
+      <div class="code-block">
+        <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        <pre># Creates indexes and seeds default data
+node scripts/setup-database.js</pre>
+      </div>
+
+      <h4>Step 7: Configure NGINX</h4>
+      <div class="code-block">
+        <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        <pre># Copy the template config
+sudo cp deploy/nginx.conf /etc/nginx/sites-available/chartvolt
+
+# Replace domain placeholders with your actual domain
+sudo sed -i 's/ADMIN_DOMAIN_PLACEHOLDER/admin.yourdomain.com/g' /etc/nginx/sites-available/chartvolt
+sudo sed -i 's/DOMAIN_PLACEHOLDER/yourdomain.com/g' /etc/nginx/sites-available/chartvolt
+
+# Enable site
+sudo ln -s /etc/nginx/sites-available/chartvolt /etc/nginx/sites-enabled/
+sudo rm -f /etc/nginx/sites-enabled/default
+
+# Add rate limiting to /etc/nginx/nginx.conf (inside http {} block):
+#   limit_req_zone $binary_remote_addr zone=admin_limit:10m rate=1r/s;
+#   limit_req_zone $binary_remote_addr zone=api_limit:10m rate=10r/s;
+#   limit_req_status 429;
+
+# Test and reload
+sudo nginx -t
+sudo systemctl reload nginx</pre>
+      </div>
+
+      <h4>Step 8: Start Services</h4>
+      <div class="code-block">
+        <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        <pre>pm2 start ecosystem.config.js
+pm2 save
+pm2 startup systemd -u root --hp /root</pre>
+      </div>
+
+      <h4>Step 9: SSL Certificates</h4>
+      <div class="code-block">
+        <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        <pre>sudo certbot --nginx \
+  -d yourdomain.com \
+  -d www.yourdomain.com \
+  -d admin.yourdomain.com
+
+# Verify auto-renewal
+sudo certbot renew --dry-run</pre>
+      </div>
+
+    </div>
+  </div>
+
+  <h3>DNS Configuration</h3>
+  <p>Configure these DNS A records at your domain registrar:</p>
+  <table>
+    <thead><tr><th>Type</th><th>Name</th><th>Value</th><th>TTL</th></tr></thead>
+    <tbody>
+      <tr><td>A</td><td>@</td><td>YOUR_SERVER_IP</td><td>3600</td></tr>
+      <tr><td>A</td><td>www</td><td>YOUR_SERVER_IP</td><td>3600</td></tr>
+      <tr><td>A</td><td>admin</td><td>YOUR_SERVER_IP</td><td>3600</td></tr>
+    </tbody>
+  </table>
+  <div class="alert alert-info">
+    <span class="alert-icon">&#9200;</span>
+    <div>DNS propagation can take 5 minutes to 48 hours. Verify with: <span class="inline-code">dig yourdomain.com +short</span></div>
+  </div>
+</div>
+
+<!-- ============================================
+     SECTION 3: POST-DEPLOYMENT CONFIG
+     ============================================ -->
+<div class="section" id="post-deploy">
+  <h2><span class="section-number">3</span> Post-Deployment Configuration</h2>
+  <p class="section-desc">After deployment, configure these services via the admin panel. Estimated time: 15-25 minutes.</p>
+
+  <div class="config-grid">
+    <div class="config-card">
+      <h4><span style="color:var(--accent-red)">&#9679;</span> MongoDB Atlas IP Whitelist <span class="badge badge-required">Required</span></h4>
+      <div class="config-where">MongoDB Atlas &rarr; Security &rarr; Network Access</div>
+      <p>Add your VPS public IP address. Without this, the app cannot connect to the database. For multiple servers, whitelist each IP separately (or use <span class="inline-code">0.0.0.0/0</span> for simplicity).</p>
+    </div>
+
+    <div class="config-card">
+      <h4><span style="color:var(--accent-purple)">&#9679;</span> First Admin Login <span class="badge badge-required">Required</span></h4>
+      <div class="config-where">https://admin.yourdomain.com</div>
+      <p>Login with the credentials you set during setup. If login fails, verify the <span class="inline-code">.env</span> symlink: <span class="inline-code">ls -la /var/www/chartvolt/apps/admin/.env</span></p>
+    </div>
+
+    <div class="config-card">
+      <h4><span style="color:var(--accent-cyan)">&#9679;</span> Massive.com API Keys <span class="badge badge-required">Required</span></h4>
+      <div class="config-where">Admin &rarr; Settings &rarr; Environment Variables</div>
+      <p>Set <span class="inline-code">massiveApiKey</span> (server-side) and <span class="inline-code">nextPublicMassiveApiKey</span> (client-side). Without these, charts won't load and prices won't stream. Restart <span class="inline-code">pm2 restart chartvolt-web</span> after saving.</p>
+    </div>
+
+    <div class="config-card">
+      <h4><span style="color:var(--accent-red)">&#9679;</span> Redis Configuration <span class="badge badge-required">Required</span></h4>
+      <div class="config-where">Admin &rarr; Settings &rarr; Redis</div>
+      <p>Host: <span class="inline-code">127.0.0.1</span>, Port: <span class="inline-code">6379</span>, Password: from setup script output. Click "Test Connection" then toggle "Enable Redis Cache" ON. Leave "Multi-Server Price Sync" OFF for single server.</p>
+    </div>
+
+    <div class="config-card">
+      <h4><span style="color:var(--accent-green)">&#9679;</span> Email (Nodemailer) <span class="badge badge-required">Required</span></h4>
+      <div class="config-where">Admin &rarr; Settings &rarr; Environment Variables</div>
+      <p>Set <span class="inline-code">nodemailerEmail</span> (Gmail address) and <span class="inline-code">nodemailerPassword</span> (Gmail App Password -- NOT your regular password). Users won't receive emails without this.</p>
+    </div>
+
+    <div class="config-card">
+      <h4><span style="color:var(--accent-purple)">&#9679;</span> Branding &amp; Appearance <span class="badge badge-required">Required</span></h4>
+      <div class="config-where">Admin &rarr; Settings &rarr; Branding</div>
+      <p>Upload App Logo, Favicon, Email Logo. Set App Name, theme colors, and footer text. Images are automatically backed up to the database for persistence across servers.</p>
+    </div>
+
+    <div class="config-card">
+      <h4><span style="color:var(--accent-orange)">&#9679;</span> Payment Providers <span class="badge badge-optional">If Selling</span></h4>
+      <div class="config-where">Admin &rarr; Settings &rarr; Payment Providers</div>
+      <p>Configure Stripe, Paddle, or Nuvei credentials. Set up webhook URLs in the provider's dashboard. Credentials are stored in MongoDB (shared across servers).</p>
+    </div>
+
+    <div class="config-card">
+      <h4><span style="color:var(--accent-yellow)">&#9679;</span> KYC Provider (Veriff) <span class="badge badge-optional">Optional</span></h4>
+      <div class="config-where">Admin &rarr; Settings &rarr; KYC</div>
+      <p>API keys for identity verification. Only needed if your platform requires KYC checks.</p>
+    </div>
+
+    <div class="config-card">
+      <h4><span style="color:var(--accent-cyan)">&#9679;</span> OpenAI <span class="badge badge-optional">Optional</span></h4>
+      <div class="config-where">Admin &rarr; Settings &rarr; Environment Variables</div>
+      <p>Set <span class="inline-code">openaiApiKey</span> for AI-powered email personalization, content generation, and the AI customer service agent.</p>
+    </div>
+
+    <div class="config-card">
+      <h4><span style="color:var(--accent-green)">&#9679;</span> Inngest <span class="badge badge-optional">Optional</span></h4>
+      <div class="config-where">Admin &rarr; Settings &rarr; Environment Variables</div>
+      <p>Set <span class="inline-code">inngestSigningKey</span> and <span class="inline-code">inngestEventKey</span> for event-driven background jobs (email delivery, competition status updates).</p>
+    </div>
+  </div>
+
+  <h3>Final Verification Checklist</h3>
+  <div class="card">
+    <ul class="checklist">
+      <li><span class="check-icon">&#9744;</span><div><strong>Homepage loads</strong> -- <span class="inline-code">https://yourdomain.com</span> shows the landing page</div></li>
+      <li><span class="check-icon">&#9744;</span><div><strong>Admin loads</strong> -- <span class="inline-code">https://admin.yourdomain.com</span> shows the admin dashboard</div></li>
+      <li><span class="check-icon">&#9744;</span><div><strong>User registration works</strong> -- Register a test user, verify welcome email arrives</div></li>
+      <li><span class="check-icon">&#9744;</span><div><strong>Charts work</strong> -- Open a trading chart, candles load, prices stream in real-time</div></li>
+      <li><span class="check-icon">&#9744;</span><div><strong>Marketplace visible</strong> -- Items displayed (avatars, indicators, Game Master packages)</div></li>
+      <li><span class="check-icon">&#9744;</span><div><strong>Redis connected</strong> -- Admin &gt; Redis shows "Connected" with green badge</div></li>
+      <li><span class="check-icon">&#9744;</span><div><strong>All services online</strong> -- SSH and run <span class="inline-code">pm2 status</span> -- all 5 services show "online"</div></li>
+      <li><span class="check-icon">&#9744;</span><div><strong>SSL working</strong> -- Browser shows padlock icon on both domains</div></li>
+    </ul>
+  </div>
+
+  <div class="code-block">
+    <span class="lang-tag">bash</span>
+    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+    <pre># Quick health check from VPS:
+curl -s http://localhost:3000/health && echo " ✅ User App"
+curl -s http://localhost:3001/health && echo " ✅ Admin App"
+curl -s http://localhost:4000/api/health && echo " ✅ API Server"
+curl -s http://localhost:3003/health && echo " ✅ WebSocket"
+systemctl is-active redis-server && echo "✅ Redis"</pre>
+  </div>
+</div>
+
+<!-- ============================================
+     SECTION 4: ADDING SECONDARY SERVER
+     ============================================ -->
+<div class="section" id="multi-server">
+  <h2><span class="section-number">4</span> Adding a Secondary Server</h2>
+  <p class="section-desc">Scale horizontally by adding more VPS instances. Each secondary server runs the same code but with <span class="inline-code">IS_PRIMARY=false</span>.</p>
+
+  <div class="alert alert-warning">
+    <span class="alert-icon">&#9888;&#65039;</span>
+    <div><strong>Before adding a second server</strong>, consider using PM2 cluster mode first: set <span class="inline-code">WEB_INSTANCES=4</span> in <span class="inline-code">.env</span> to use all CPU cores on a single VPS. This gives ~3-4x more capacity with zero code changes.</div>
+  </div>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-content">
+        <h4>Open Redis on Primary Server <span class="badge badge-critical">One-Time</span></h4>
+        <p>SSH into your primary server and allow the secondary to connect to Redis:</p>
+        <div class="code-block">
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          <pre># 1. Allow the new VPS IP through firewall
+sudo ufw allow from NEW_VPS_IP to any port 6379
+
+# 2. Make Redis listen on all interfaces (first secondary only)
+sudo sed -i 's/^bind 127.0.0.1.*/bind 0.0.0.0/' /etc/redis/redis.conf
+
+# 3. Restart Redis and verify
+sudo systemctl restart redis-server
+redis-cli -a YOUR_REDIS_PASSWORD ping   # Should return: PONG</pre>
+        </div>
+        <p>For future secondary servers, you only need the firewall rule (step 1).</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-content">
+        <h4>Whitelist New IP in MongoDB Atlas</h4>
+        <ol>
+          <li>Go to <a href="https://cloud.mongodb.com" style="color:var(--accent-cyan)">cloud.mongodb.com</a></li>
+          <li>Security &rarr; Network Access &rarr; "+ Add IP Address"</li>
+          <li>Enter the new VPS IP, wait 1-2 minutes</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-content">
+        <h4>Deploy Secondary Server</h4>
+        <p>SSH into the new VPS and run:</p>
+        <div class="code-block">
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          <pre>apt update && apt install -y curl git
+curl -O https://raw.githubusercontent.com/YOUR_GITHUB_USER/YOUR_REPO/main/deploy/setup-new-customer.sh
+chmod +x setup-new-customer.sh
+sudo ./setup-new-customer.sh --secondary</pre>
+        </div>
+        <p>The script will ask for: domain, MongoDB URI, admin credentials, and the <strong>primary server's Redis host/port/password</strong>. Use the primary's public IP as Redis host. The worker process will NOT start on secondary servers.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-content">
+        <h4>Copy Shared Secrets from Primary <span class="badge badge-critical">Critical</span></h4>
+        <div class="alert alert-danger">
+          <span class="alert-icon">&#128680;</span>
+          <div>Both servers <strong>MUST</strong> share the same JWT secrets. Without this, users will get authentication errors when Cloudflare routes them to the other server.</div>
+        </div>
+        <p>On the <strong>primary</strong> server, get the secrets:</p>
+        <div class="code-block">
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          <pre>grep -E "AUTH_SECRET|ADMIN_JWT_SECRET|BETTER_AUTH_SECRET" /var/www/chartvolt/.env</pre>
+        </div>
+        <p>On the <strong>secondary</strong> server, replace the auto-generated values:</p>
+        <div class="code-block">
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          <pre>nano /var/www/chartvolt/.env
+# Replace AUTH_SECRET=... with the primary's value
+# Replace ADMIN_JWT_SECRET=... with the primary's value
+# Replace BETTER_AUTH_SECRET=... with the primary's value
+# Save and restart:
+pm2 restart all</pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-content">
+        <h4>Set Server Identity in .env</h4>
+        <p>Ensure these are set on the secondary server's <span class="inline-code">.env</span>:</p>
+        <div class="code-block">
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          <pre>SERVER_ID=secondary-yourname-01    # Unique per server
+IS_PRIMARY=false                   # Disables worker, enables Redis relay
+REDIS_HOST=148.230.124.57          # Primary server's public IP</pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-content">
+        <h4>Install Cloudflare Origin SSL Certificate</h4>
+        <p>Since Cloudflare proxies traffic, use a Cloudflare Origin Certificate (free, 15-year validity):</p>
+        <ol>
+          <li>Cloudflare Dashboard &rarr; SSL/TLS &rarr; Origin Server &rarr; Create Certificate</li>
+          <li>Keep defaults: RSA 2048, hostnames <span class="inline-code">*.yourdomain.com</span>, 15 years</li>
+          <li>Copy the <strong>Origin Certificate</strong> and <strong>Private Key</strong> (key shown only once!)</li>
+        </ol>
+        <div class="code-block">
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          <pre># On the secondary server:
+sudo nano /etc/ssl/cloudflare-origin.pem      # Paste Origin Certificate
+sudo nano /etc/ssl/cloudflare-origin-key.pem  # Paste Private Key
+sudo chmod 600 /etc/ssl/cloudflare-origin-key.pem</pre>
+        </div>
+        <p>Update NGINX to use these certs (replace any Certbot SSL lines in both server blocks):</p>
+        <div class="code-block">
+          <span class="lang-tag">nginx</span>
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          <pre>server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    ssl_certificate /etc/ssl/cloudflare-origin.pem;
+    ssl_certificate_key /etc/ssl/cloudflare-origin-key.pem;
+    server_name yourdomain.com www.yourdomain.com;
+    # ... rest of config ...
+}</pre>
+        </div>
+        <div class="code-block">
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          <pre>sudo nginx -t
+sudo systemctl reload nginx</pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-content">
+        <h4>Add DNS Records in Cloudflare</h4>
+        <p>In Cloudflare Dashboard &rarr; DNS &rarr; Records, add 3 A records for the new VPS IP:</p>
+        <table>
+          <thead><tr><th>Type</th><th>Name</th><th>Content</th><th>Proxy</th></tr></thead>
+          <tbody>
+            <tr><td>A</td><td>@</td><td>NEW_VPS_IP</td><td>Proxied (orange cloud)</td></tr>
+            <tr><td>A</td><td>www</td><td>NEW_VPS_IP</td><td>Proxied</td></tr>
+            <tr><td>A</td><td>admin</td><td>NEW_VPS_IP</td><td>Proxied</td></tr>
+          </tbody>
+        </table>
+        <p>Cloudflare will automatically distribute traffic between all server IPs.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-content">
+        <h4>Enable Multi-Server Price Sync</h4>
+        <p>In admin panel: <strong>Settings &rarr; Redis &rarr; Toggle "Multi-Server Price Sync" ON</strong>.</p>
+        <p>This only needs to be done once (setting is stored in the shared database).</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-content">
+        <h4>Verify in Server Fleet Dashboard</h4>
+        <p>Go to admin panel &rarr; <strong>Server Fleet</strong>. The new server should appear within 30 seconds with status "online" and role "secondary".</p>
+        <p>Also verify charts are working on the secondary by opening the trading page -- prices should stream in real-time via Redis relay.</p>
+      </div>
+    </div>
+  </div>
+
+  <h3>Removing a Secondary Server</h3>
+  <div class="alert alert-danger">
+    <span class="alert-icon">&#9888;&#65039;</span>
+    <div><strong>Always remove DNS records BEFORE shutting down a server.</strong> Otherwise Cloudflare routes traffic to a dead server and ~50% of requests fail.</div>
+  </div>
+  <ol>
+    <li>Cloudflare DNS: Delete the 3 A records pointing to the server's IP</li>
+    <li>Wait 1-2 minutes for DNS propagation</li>
+    <li>Shut down the server (or <span class="inline-code">pm2 stop all</span>)</li>
+    <li>MongoDB Atlas: Optionally remove the server's IP from Network Access</li>
+    <li>Primary firewall: Optionally remove the rule: <span class="inline-code">sudo ufw delete allow from OLD_VPS_IP to any port 6379</span></li>
+  </ol>
+</div>
+
+<!-- ============================================
+     SECTION 5: MULTI-SERVER ARCHITECTURE
+     ============================================ -->
+<div class="section" id="multi-arch">
+  <h2><span class="section-number">5</span> Multi-Server Architecture</h2>
+  <p class="section-desc">How multiple servers work together with shared MongoDB, Redis pub/sub, and Cloudflare load balancing.</p>
+
+  <!-- Multi-server SVG diagram -->
+  <div class="diagram-container">
+    <svg viewBox="0 0 800 480" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif">
+      <!-- Cloudflare -->
+      <rect x="250" y="10" width="300" height="50" rx="10" fill="#151821" stroke="#f97316" stroke-width="2"/>
+      <text x="330" y="42" font-size="15" fill="#f97316" font-weight="700">Cloudflare CDN</text>
+
+      <!-- Arrows down -->
+      <line x1="350" y1="60" x2="200" y2="100" stroke="#f97316" stroke-width="1.5"/>
+      <line x1="450" y1="60" x2="600" y2="100" stroke="#f97316" stroke-width="1.5"/>
+
+      <!-- Primary Server -->
+      <rect x="50" y="100" width="300" height="220" rx="12" fill="#1a1d27" stroke="#22d3ee" stroke-width="2"/>
+      <text x="120" y="128" font-size="14" fill="#22d3ee" font-weight="700">PRIMARY SERVER</text>
+      <text x="260" y="128" font-size="10" fill="#6b7084">IS_PRIMARY=true</text>
+
+      <rect x="70" y="140" width="120" height="30" rx="6" fill="#151821" stroke="#22c55e" stroke-width="1"/>
+      <text x="90" y="160" font-size="11" fill="#22c55e">Web App :3000</text>
+
+      <rect x="210" y="140" width="120" height="30" rx="6" fill="#151821" stroke="#a855f7" stroke-width="1"/>
+      <text x="227" y="160" font-size="11" fill="#a855f7">Admin :3001</text>
+
+      <rect x="70" y="180" width="120" height="30" rx="6" fill="#151821" stroke="#eab308" stroke-width="1"/>
+      <text x="80" y="200" font-size="11" fill="#eab308">WebSocket :3003</text>
+
+      <rect x="210" y="180" width="120" height="30" rx="6" fill="#151821" stroke="#f97316" stroke-width="1"/>
+      <text x="230" y="200" font-size="11" fill="#f97316">API :4000</text>
+
+      <rect x="130" y="225" width="140" height="30" rx="6" fill="#151821" stroke="#ef4444" stroke-width="1" stroke-dasharray="4"/>
+      <text x="150" y="245" font-size="11" fill="#ef4444">Worker (Agenda)</text>
+
+      <rect x="80" y="270" width="110" height="35" rx="6" fill="#151821" stroke="#ef4444" stroke-width="1"/>
+      <text x="103" y="292" font-size="11" fill="#ef4444">Redis</text>
+
+      <text x="100" y="260" font-size="9" fill="#6b7084">Local instance</text>
+
+      <!-- Massive.com connection -->
+      <rect x="210" y="270" width="120" height="35" rx="6" fill="#151821" stroke="#22d3ee" stroke-width="1"/>
+      <text x="225" y="292" font-size="10" fill="#22d3ee">Massive.com WS</text>
+
+      <!-- Secondary Server -->
+      <rect x="450" y="100" width="300" height="220" rx="12" fill="#1a1d27" stroke="#f97316" stroke-width="2"/>
+      <text x="505" y="128" font-size="14" fill="#f97316" font-weight="700">SECONDARY SERVER</text>
+      <text x="640" y="128" font-size="10" fill="#6b7084">IS_PRIMARY=false</text>
+
+      <rect x="470" y="140" width="120" height="30" rx="6" fill="#151821" stroke="#22c55e" stroke-width="1"/>
+      <text x="490" y="160" font-size="11" fill="#22c55e">Web App :3000</text>
+
+      <rect x="610" y="140" width="120" height="30" rx="6" fill="#151821" stroke="#a855f7" stroke-width="1"/>
+      <text x="627" y="160" font-size="11" fill="#a855f7">Admin :3001</text>
+
+      <rect x="470" y="180" width="120" height="30" rx="6" fill="#151821" stroke="#eab308" stroke-width="1"/>
+      <text x="480" y="200" font-size="11" fill="#eab308">WebSocket :3003</text>
+
+      <rect x="610" y="180" width="120" height="30" rx="6" fill="#151821" stroke="#f97316" stroke-width="1"/>
+      <text x="630" y="200" font-size="11" fill="#f97316">API :4000</text>
+
+      <text x="530" y="240" font-size="11" fill="#6b7084" font-style="italic">No Worker process</text>
+      <text x="510" y="255" font-size="10" fill="#6b7084">(cron jobs run on primary only)</text>
+
+      <!-- Redis pub/sub arrow -->
+      <line x1="190" y1="287" x2="470" y2="287" stroke="#ef4444" stroke-width="2" stroke-dasharray="6"/>
+      <text x="280" y="308" font-size="10" fill="#ef4444">Redis Pub/Sub (prices + WS events)</text>
+      <polygon points="465,283 475,287 465,291" fill="#ef4444"/>
+
+      <!-- MongoDB at bottom -->
+      <rect x="250" y="370" width="300" height="60" rx="10" fill="#151821" stroke="#22c55e" stroke-width="2"/>
+      <text x="330" y="398" font-size="15" fill="#22c55e" font-weight="700">MongoDB Atlas</text>
+      <text x="340" y="418" font-size="11" fill="#9ca0b0">Shared Database</text>
+
+      <!-- Lines to MongoDB -->
+      <line x1="200" y1="320" x2="350" y2="370" stroke="#22c55e" stroke-width="1" stroke-dasharray="4"/>
+      <line x1="600" y1="320" x2="450" y2="370" stroke="#22c55e" stroke-width="1" stroke-dasharray="4"/>
+
+      <!-- Heartbeat label -->
+      <text x="155" y="350" font-size="9" fill="#6b7084">Heartbeat every 30s</text>
+      <text x="555" y="350" font-size="9" fill="#6b7084">Heartbeat every 30s</text>
+
+      <!-- Users -->
+      <text x="140" y="85" font-size="11" fill="#9ca0b0">&#128100; Users A</text>
+      <text x="555" y="85" font-size="11" fill="#9ca0b0">&#128100; Users B</text>
+    </svg>
+  </div>
+
+  <h3>Primary vs Secondary Roles</h3>
+  <table>
+    <thead><tr><th>Capability</th><th><span class="badge badge-primary">Primary</span></th><th><span class="badge badge-secondary">Secondary</span></th></tr></thead>
+    <tbody>
+      <tr><td>Serves web pages and API requests</td><td>&#10003;</td><td>&#10003;</td></tr>
+      <tr><td>Admin dashboard</td><td>&#10003;</td><td>&#10003;</td></tr>
+      <tr><td>WebSocket messaging</td><td>&#10003;</td><td>&#10003;</td></tr>
+      <tr><td>Connects to Massive.com for prices</td><td>&#10003;</td><td>&#10007; (gets prices via Redis)</td></tr>
+      <tr><td>Worker (cron jobs)</td><td>&#10003;</td><td>&#10007; (runs only on primary)</td></tr>
+      <tr><td>Redis instance</td><td>Hosts Redis</td><td>Connects to primary's Redis</td></tr>
+      <tr><td>Publishes prices to Redis</td><td>&#10003;</td><td>&#10007;</td></tr>
+      <tr><td>Subscribes to Redis for prices</td><td>&#10007;</td><td>&#10003;</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Redis Pub/Sub Channels</h3>
+  <table>
+    <thead><tr><th>Channel</th><th>Purpose</th><th>Publisher</th><th>Subscribers</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><span class="inline-code">chartvolt:price-broadcast</span></td>
+        <td>Real-time price data from Massive.com</td>
+        <td>Primary (Web App)</td>
+        <td>All secondaries</td>
+      </tr>
+      <tr>
+        <td><span class="inline-code">chartvolt:ws-events</span></td>
+        <td>Chat messages, transfers, notifications</td>
+        <td>Any server (Admin App)</td>
+        <td>All other servers</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>How Price Streaming Works</h3>
+  <div class="card">
+    <div class="flow-row">
+      <div class="flow-box primary">Massive.com WebSocket</div>
+      <span class="flow-arrow">&rarr;</span>
+      <div class="flow-box primary">Primary Web App</div>
+      <span class="flow-arrow">&rarr;</span>
+      <div class="flow-box" style="border-color:var(--accent-red);color:var(--accent-red)">Redis (price-broadcast)</div>
+      <span class="flow-arrow">&rarr;</span>
+      <div class="flow-box secondary">Secondary Web App</div>
+      <span class="flow-arrow">&rarr;</span>
+      <div class="flow-box secondary">Local WebSocket :3003</div>
+      <span class="flow-arrow">&rarr;</span>
+      <div class="flow-box">Client Browsers</div>
+    </div>
+  </div>
+
+  <h3>Image Persistence Across Servers</h3>
+  <p>All uploaded images (branding, marketplace, hero) are backed up to MongoDB. When a server needs an image that's not on its local disk:</p>
+  <ol>
+    <li>The API route checks multiple filesystem paths</li>
+    <li>If not found on disk, it fetches the image from the <span class="inline-code">WhiteLabel.brandingFiles</span> or <span class="inline-code">MarketplaceItem.imageData</span> in MongoDB</li>
+    <li>The image is served to the client AND automatically restored to disk for future requests</li>
+  </ol>
+
+  <h3>Server Heartbeat</h3>
+  <p>Every server sends a heartbeat to MongoDB every 30 seconds, reporting CPU, memory, disk, PM2 processes, Redis connectivity, and WebSocket connections. The admin panel's <strong>Server Fleet</strong> dashboard reads this data. Servers missing heartbeat for 90+ seconds are marked "offline".</p>
+</div>
+
+<!-- ============================================
+     SECTION 6: CLOUDFLARE SETUP
+     ============================================ -->
+<div class="section" id="cloudflare">
+  <h2><span class="section-number">6</span> Cloudflare Setup</h2>
+  <p class="section-desc">Cloudflare provides DNS management, SSL, CDN, DDoS protection, and load balancing across your server fleet.</p>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-content">
+        <h4>Create Cloudflare Account &amp; Add Site</h4>
+        <ol>
+          <li>Go to <a href="https://cloudflare.com" style="color:var(--accent-cyan)">cloudflare.com</a> and create an account</li>
+          <li>Click "Add a Site" and enter your domain (e.g., <span class="inline-code">yourdomain.com</span>)</li>
+          <li>Select a plan (Free works for basic, Pro for advanced load balancing)</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-content">
+        <h4>Change Nameservers</h4>
+        <ol>
+          <li>Cloudflare will show you two nameservers (e.g., <span class="inline-code">ada.ns.cloudflare.com</span>)</li>
+          <li>Go to your domain registrar (Hostinger) &rarr; DNS settings</li>
+          <li>Change nameservers from Hostinger's to Cloudflare's</li>
+          <li>Wait for propagation (usually ~30 minutes, up to 24 hours)</li>
+        </ol>
+        <div class="alert alert-info">
+          <span class="alert-icon">&#128161;</span>
+          <div>During propagation, your site continues to work normally. Cloudflare sends an email when the domain is active.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-content">
+        <h4>Configure DNS Records</h4>
+        <p>In Cloudflare DNS dashboard, add A records for each VPS:</p>
+        <table>
+          <thead><tr><th>Type</th><th>Name</th><th>Content</th><th>Proxy</th></tr></thead>
+          <tbody>
+            <tr><td>A</td><td>@</td><td>PRIMARY_VPS_IP</td><td>Proxied (orange cloud)</td></tr>
+            <tr><td>A</td><td>www</td><td>PRIMARY_VPS_IP</td><td>Proxied</td></tr>
+            <tr><td>A</td><td>admin</td><td>PRIMARY_VPS_IP</td><td>Proxied</td></tr>
+          </tbody>
+        </table>
+        <p>When you add secondary servers, add more A records with the same names pointing to the new IPs. Cloudflare will round-robin between them automatically.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-content">
+        <h4>SSL/TLS Configuration</h4>
+        <ol>
+          <li>Go to SSL/TLS in Cloudflare dashboard</li>
+          <li>Set mode to <strong>Full (Strict)</strong></li>
+          <li>Enable "Always Use HTTPS"</li>
+        </ol>
+        <div class="alert alert-warning">
+          <span class="alert-icon">&#9888;&#65039;</span>
+          <div>Each VPS must have a valid SSL certificate (Certbot or Cloudflare Origin Certificate) for Full (Strict) mode to work.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-content">
+        <h4>Cloudflare Origin Certificate (Recommended for Multi-Server)</h4>
+        <ol>
+          <li>SSL/TLS &rarr; Origin Server &rarr; Create Certificate</li>
+          <li>RSA 2048, hostnames: <span class="inline-code">yourdomain.com</span> + <span class="inline-code">*.yourdomain.com</span></li>
+          <li>Validity: 15 years</li>
+          <li>Copy the certificate and private key (key shown only once!)</li>
+          <li>Save as <span class="inline-code">/etc/ssl/cloudflare-origin.pem</span> and <span class="inline-code">/etc/ssl/cloudflare-origin-key.pem</span> on each server</li>
+        </ol>
+        <p>Use the same certificate files on ALL servers (the wildcard covers everything).</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-content">
+        <h4>Load Balancing (Pro Plan -- Optional)</h4>
+        <p>For proper health-check-based load balancing:</p>
+        <ol>
+          <li>Traffic &rarr; Load Balancing &rarr; Create Origin Pool</li>
+          <li>Add all VPS IPs as origins</li>
+          <li>Health check: HTTP, path <span class="inline-code">/health</span>, interval 30s</li>
+          <li>Create Load Balancer with <strong>Session Affinity</strong> (cookie-based) for WebSocket support</li>
+          <li>Steering policy: "Least connections" or "Random"</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================
+     SECTION 7: WHITE-LABEL DEPLOYMENT
+     ============================================ -->
+<div class="section" id="whitelabel">
+  <h2><span class="section-number">7</span> White-Label Deployment</h2>
+  <p class="section-desc">Deploy a new branded instance of the platform for each client. Same codebase, different configuration.</p>
+
+  <h3>What Changes Per Client</h3>
+  <table>
+    <thead><tr><th>Item</th><th>Changes To</th></tr></thead>
+    <tbody>
+      <tr><td>Domain</td><td>Client's domain (e.g., <span class="inline-code">tradingclient.com</span>)</td></tr>
+      <tr><td>Admin Domain</td><td><span class="inline-code">admin.tradingclient.com</span></td></tr>
+      <tr><td>MongoDB</td><td>New database or cluster per client</td></tr>
+      <tr><td>Admin Credentials</td><td>Client's admin email/password</td></tr>
+      <tr><td>Redis Password</td><td>Auto-generated per server</td></tr>
+      <tr><td>SSL Certificates</td><td>Auto-generated via Certbot or Cloudflare Origin</td></tr>
+      <tr><td>Auth Secrets</td><td>Auto-generated per deployment</td></tr>
+      <tr><td>Branding</td><td>Logos, colors, app name (configured via admin panel)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>What Stays the Same</h3>
+  <ul>
+    <li>All application code (same Git repository)</li>
+    <li>NGINX template (domains replaced by script)</li>
+    <li>PM2 ecosystem config</li>
+    <li>Redis configuration structure</li>
+    <li>Database schema and seed data</li>
+  </ul>
+
+  <h3>Quick Deploy for New Client</h3>
+  <div class="code-block">
+    <span class="lang-tag">bash</span>
+    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+    <pre># On a fresh VPS:
+sudo ./deploy/setup-new-customer.sh
+# Follow the prompts -- done in ~10 minutes</pre>
+  </div>
+  <p>Then follow the <a href="#post-deploy" style="color:var(--accent-cyan)">Post-Deployment Configuration</a> checklist to set up providers and branding.</p>
+</div>
+
+<!-- ============================================
+     SECTION 8: DEPLOYING UPDATES
+     ============================================ -->
+<div class="section" id="updates">
+  <h2><span class="section-number">8</span> Deploying Updates</h2>
+  <p class="section-desc">How to push code updates to existing installations.</p>
+
+  <h3>Single Server Update</h3>
+  <div class="code-block">
+    <span class="lang-tag">bash</span>
+    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+    <pre># Standard update (pull, build, reload)
+./deploy/deploy.sh
+
+# Options:
+./deploy/deploy.sh --new        # New install (includes DB setup)
+./deploy/deploy.sh --db-only    # Only run database setup
+./deploy/deploy.sh --force-db   # Force re-seed database</pre>
+  </div>
+
+  <h3>Manual Update (Individual Apps)</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+    <pre># Update everything manually
+cd /var/www/chartvolt
+git pull origin main
+npm install
+cd apps/admin && npm install && cd ../..
+cd api-server && npm install && cd ..
+cd websocket-server && npm install && npm run build && cd ..
+npm run build
+npm run build:admin
+npm run build:api
+npm run worker:build
+pm2 reload ecosystem.config.js</pre>
+  </div>
+
+  <div class="collapsible">
+    <button class="collapsible-toggle" onclick="toggleCollapsible(this)">
+      <span class="arrow">&#9654;</span> Update individual apps only
+    </button>
+    <div class="collapsible-content">
+      <div class="code-block">
+        <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        <pre># Update only admin app
+cd /var/www/chartvolt && git pull origin main
+npm run build:admin
+pm2 restart chartvolt-admin
+
+# Update only worker
+cd /var/www/chartvolt && git pull origin main
+npm run worker:build
+pm2 restart chartvolt-worker
+
+# Update only WebSocket server
+cd /var/www/chartvolt && git pull origin main
+cd websocket-server && npm run build && cd ..
+pm2 restart chartvolt-websocket</pre>
+      </div>
+    </div>
+  </div>
+
+  <h3>Multi-Server Rolling Update</h3>
+  <p>Use the <span class="inline-code">deploy-multi.sh</span> script for zero-downtime rolling updates across all servers. It deploys to secondaries first, health-checks each, then updates the primary last.</p>
+  <div class="code-block">
+    <span class="lang-tag">bash</span>
+    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+    <pre># Configure servers in the script, then:
+./deploy/deploy-multi.sh</pre>
+  </div>
+
+  <h3>PM2 Ecosystem Reference</h3>
+  <p>The <span class="inline-code">ecosystem.config.js</span> file manages all 5 processes. Key settings:</p>
+  <table>
+    <thead><tr><th>Environment Variable</th><th>Default</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td><span class="inline-code">WEB_INSTANCES</span></td><td>1</td><td>PM2 cluster mode instances for web app (use CPU core count)</td></tr>
+      <tr><td><span class="inline-code">IS_PRIMARY</span></td><td>true</td><td>Set to <span class="inline-code">false</span> on secondaries (disables worker)</td></tr>
+      <tr><td><span class="inline-code">ADMIN_HEAP_MB</span></td><td>4096</td><td>Max heap size for admin app (increase for large datasets)</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ============================================
+     SECTION 9: MANAGEMENT & TROUBLESHOOTING
+     ============================================ -->
+<div class="section" id="management">
+  <h2><span class="section-number">9</span> Management &amp; Troubleshooting</h2>
+  <p class="section-desc">Common commands, monitoring tools, and solutions to frequent issues.</p>
+
+  <h3>PM2 Commands</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+    <pre>pm2 status                        # View all app statuses
+pm2 logs                          # All logs (live)
+pm2 logs chartvolt-web            # User app logs
+pm2 logs chartvolt-admin          # Admin app logs
+pm2 logs chartvolt-api            # API server logs
+pm2 logs chartvolt-websocket      # WebSocket server logs
+pm2 logs chartvolt-worker         # Worker logs
+pm2 restart all                   # Restart all apps
+pm2 restart chartvolt-web         # Restart specific app
+pm2 monit                         # Real-time monitoring dashboard
+pm2 save                          # Save current process list
+pm2 resurrect                     # Restore saved process list</pre>
+  </div>
+
+  <h3>NGINX Commands</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+    <pre>sudo nginx -t                     # Test configuration
+sudo systemctl reload nginx       # Reload without downtime
+sudo systemctl restart nginx      # Full restart
+tail -f /var/log/nginx/app-access.log     # User app access logs
+tail -f /var/log/nginx/admin-access.log   # Admin access logs</pre>
+  </div>
+
+  <h3>Health Checks</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+    <pre># Local (on the server)
+curl http://localhost:3000/health      # User app
+curl http://localhost:3001/health      # Admin app
+curl http://localhost:4000/api/health  # API server
+curl http://localhost:3003/health      # WebSocket server
+redis-cli -a YOUR_REDIS_PASSWORD ping  # Redis
+
+# External (after SSL)
+curl https://yourdomain.com/health
+curl https://admin.yourdomain.com/health
+curl https://yourdomain.com/ws-health</pre>
+  </div>
+
+  <h3>Common Issues &amp; Solutions</h3>
+
+  <div class="collapsible">
+    <button class="collapsible-toggle" onclick="toggleCollapsible(this)">
+      <span class="arrow">&#9654;</span> App Not Starting (PM2 shows errored/stopped)
+    </button>
+    <div class="collapsible-content">
+      <div class="code-block">
+        <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        <pre>pm2 logs chartvolt-web --lines 100    # Check logs for errors
+lsof -i :3000                         # Check if port is in use
+pm2 restart chartvolt-web             # Restart the app</pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="collapsible">
+    <button class="collapsible-toggle" onclick="toggleCollapsible(this)">
+      <span class="arrow">&#9654;</span> NGINX 502 Bad Gateway
+    </button>
+    <div class="collapsible-content">
+      <p>Usually means PM2 apps are not running or crashed.</p>
+      <div class="code-block">
+        <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        <pre>pm2 status                             # Are apps running?
+tail -100 /var/log/nginx/app-error.log # Check NGINX error log
+curl http://127.0.0.1:3000             # Can you reach the app directly?</pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="collapsible">
+    <button class="collapsible-toggle" onclick="toggleCollapsible(this)">
+      <span class="arrow">&#9654;</span> Admin Can't Login (JWT errors)
+    </button>
+    <div class="collapsible-content">
+      <p>Most common cause: missing <span class="inline-code">.env</span> symlink, or mismatched JWT secrets across servers.</p>
+      <div class="code-block">
+        <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        <pre># Check symlink exists
+ls -la /var/www/chartvolt/apps/admin/.env
+# Should show: .env -> /var/www/chartvolt/.env
+
+# If missing, create it:
+ln -sf /var/www/chartvolt/.env /var/www/chartvolt/apps/admin/.env
+pm2 restart chartvolt-admin
+
+# For multi-server: verify secrets match between servers
+grep -E "AUTH_SECRET|ADMIN_JWT_SECRET" /var/www/chartvolt/.env</pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="collapsible">
+    <button class="collapsible-toggle" onclick="toggleCollapsible(this)">
+      <span class="arrow">&#9654;</span> Redis Connection Issues
+    </button>
+    <div class="collapsible-content">
+      <div class="code-block">
+        <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        <pre>systemctl status redis-server          # Check service status
+redis-cli -a YOUR_PASSWORD ping        # Test connection (should return PONG)
+sudo journalctl -u redis-server -n 50  # View Redis logs
+sudo systemctl restart redis-server    # Restart Redis
+
+# For secondary servers connecting to primary:
+redis-cli -h PRIMARY_IP -p 6379 -a PASSWORD ping</pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="collapsible">
+    <button class="collapsible-toggle" onclick="toggleCollapsible(this)">
+      <span class="arrow">&#9654;</span> Charts Not Loading / Prices Not Streaming
+    </button>
+    <div class="collapsible-content">
+      <p>Check if Massive.com API keys are set:</p>
+      <div class="code-block">
+        <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        <pre># Check for price streaming in logs
+pm2 logs chartvolt-web --lines 30
+# Should show: "WebSocket connected" and price updates
+
+# If you see "MASSIVE_API_KEY is not set":
+# Go to Admin > Settings > Environment Variables
+# Set massiveApiKey and nextPublicMassiveApiKey
+# Then: pm2 restart chartvolt-web</pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="collapsible">
+    <button class="collapsible-toggle" onclick="toggleCollapsible(this)">
+      <span class="arrow">&#9654;</span> SSL Certificate Issues
+    </button>
+    <div class="collapsible-content">
+      <div class="code-block">
+        <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        <pre>sudo certbot certificates              # Check certificate status
+sudo certbot renew --dry-run           # Test auto-renewal
+
+# For Cloudflare Origin Certificate issues:
+# Verify SSL/TLS mode is "Full (Strict)" in Cloudflare
+# Verify cert files exist:
+ls -la /etc/ssl/cloudflare-origin.pem
+ls -la /etc/ssl/cloudflare-origin-key.pem</pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="collapsible">
+    <button class="collapsible-toggle" onclick="toggleCollapsible(this)">
+      <span class="arrow">&#9654;</span> WebSocket Not Connecting
+    </button>
+    <div class="collapsible-content">
+      <div class="code-block">
+        <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        <pre># Check if WebSocket server is running
+pm2 logs chartvolt-websocket --lines 50
+
+# Test WebSocket health
+curl http://localhost:3003/health
+
+# Verify NGINX is proxying /ws correctly
+grep -A5 "location /ws" /etc/nginx/sites-available/chartvolt</pre>
+      </div>
+    </div>
+  </div>
+
+  <h3>Backup Procedures</h3>
+  <table>
+    <thead><tr><th>What</th><th>How</th></tr></thead>
+    <tbody>
+      <tr><td>MongoDB</td><td>MongoDB Atlas automatic backups (or manual: <span class="inline-code">mongodump --uri="YOUR_URI"</span>)</td></tr>
+      <tr><td>PM2 Config</td><td><span class="inline-code">pm2 save</span> / <span class="inline-code">pm2 resurrect</span></td></tr>
+      <tr><td>NGINX Config</td><td>Stored in git at <span class="inline-code">deploy/nginx.conf</span></td></tr>
+      <tr><td>.env file</td><td>Back up manually (contains secrets -- do not commit to git)</td></tr>
+      <tr><td>Images</td><td>Backed up to MongoDB automatically on upload</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Security Checklist</h3>
+  <div class="card">
+    <ul class="checklist">
+      <li><span class="check-icon">&#9744;</span><div>SSH key authentication enabled</div></li>
+      <li><span class="check-icon">&#9744;</span><div>Password authentication disabled in SSH</div></li>
+      <li><span class="check-icon">&#9744;</span><div>UFW firewall enabled (HTTP, HTTPS, SSH only)</div></li>
+      <li><span class="check-icon">&#9744;</span><div>SSL/TLS certificates installed</div></li>
+      <li><span class="check-icon">&#9744;</span><div>Redis bound to localhost with password (or firewall-protected for multi-server)</div></li>
+      <li><span class="check-icon">&#9744;</span><div>Admin subdomain rate-limited</div></li>
+      <li><span class="check-icon">&#9744;</span><div>MongoDB Atlas IP whitelist configured</div></li>
+      <li><span class="check-icon">&#9744;</span><div>Strong admin password set</div></li>
+      <li><span class="check-icon">&#9744;</span><div>Environment variables secured (not in git)</div></li>
+      <li><span class="check-icon">&#9744;</span><div>Regular system updates applied</div></li>
+    </ul>
+  </div>
+</div>
+
+<!-- ============================================
+     SECTION 10: ENVIRONMENT VARIABLES
+     ============================================ -->
+<div class="section" id="env-vars">
+  <h2><span class="section-number">10</span> Environment Variables Reference</h2>
+  <p class="section-desc">Complete reference of all <span class="inline-code">.env</span> variables and database-managed settings.</p>
+
+  <h3>Required .env Variables <span class="badge badge-required">Must Set</span></h3>
+  <table>
+    <thead><tr><th>Variable</th><th>Example</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><span class="inline-code">NODE_ENV</span></td><td>production</td><td>Environment mode</td></tr>
+      <tr><td><span class="inline-code">MONGODB_URI</span></td><td>mongodb+srv://...</td><td>MongoDB Atlas connection string</td></tr>
+      <tr><td><span class="inline-code">BETTER_AUTH_SECRET</span></td><td>(32+ char random)</td><td>User authentication secret</td></tr>
+      <tr><td><span class="inline-code">BETTER_AUTH_URL</span></td><td>https://yourdomain.com</td><td>Auth callback URL</td></tr>
+      <tr><td><span class="inline-code">ADMIN_EMAIL</span></td><td>admin@yourdomain.com</td><td>First admin account email</td></tr>
+      <tr><td><span class="inline-code">ADMIN_PASSWORD</span></td><td>(secure password)</td><td>First admin account password</td></tr>
+      <tr><td><span class="inline-code">ADMIN_JWT_SECRET</span></td><td>(32+ char random)</td><td>Admin panel JWT signing secret</td></tr>
+      <tr><td><span class="inline-code">NEXT_PUBLIC_BASE_URL</span></td><td>https://yourdomain.com</td><td>Public base URL</td></tr>
+      <tr><td><span class="inline-code">NEXT_PUBLIC_APP_URL</span></td><td>https://yourdomain.com</td><td>Public app URL</td></tr>
+      <tr><td><span class="inline-code">ADMIN_URL</span></td><td>https://admin.yourdomain.com</td><td>Admin panel URL</td></tr>
+      <tr><td><span class="inline-code">NEXT_PUBLIC_WEBSOCKET_URL</span></td><td>wss://yourdomain.com/ws</td><td>Public WebSocket URL</td></tr>
+      <tr><td><span class="inline-code">WEBSOCKET_INTERNAL_URL</span></td><td>http://localhost:3003</td><td>Internal WebSocket URL</td></tr>
+      <tr><td><span class="inline-code">API_PORT</span></td><td>4000</td><td>API server port</td></tr>
+      <tr><td><span class="inline-code">WEBSOCKET_PORT</span></td><td>3003</td><td>WebSocket server port</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Multi-Server Variables <span class="badge badge-critical">Match Across Servers</span></h3>
+  <div class="alert alert-danger">
+    <span class="alert-icon">&#128680;</span>
+    <div>The secrets below <strong>MUST be identical</strong> on all servers. Different values cause authentication failures when Cloudflare routes users between servers.</div>
+  </div>
+  <table>
+    <thead><tr><th>Variable</th><th>Primary</th><th>Secondary</th></tr></thead>
+    <tbody>
+      <tr><td><span class="inline-code">BETTER_AUTH_SECRET</span></td><td>Generated once</td><td>Copy from primary</td></tr>
+      <tr><td><span class="inline-code">ADMIN_JWT_SECRET</span></td><td>Generated once</td><td>Copy from primary</td></tr>
+      <tr><td><span class="inline-code">AUTH_SECRET</span></td><td>Generated once</td><td>Copy from primary</td></tr>
+      <tr><td><span class="inline-code">SERVER_ID</span></td><td>primary-name-01</td><td>secondary-name-01 (unique)</td></tr>
+      <tr><td><span class="inline-code">IS_PRIMARY</span></td><td>true (or omit)</td><td>false</td></tr>
+      <tr><td><span class="inline-code">MONGODB_URI</span></td><td>Same across all</td><td>Same as primary</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Database-Managed Settings (Admin Panel)</h3>
+  <p>These settings are stored in MongoDB (WhiteLabel model) and configured via the admin panel. They do NOT need to be in <span class="inline-code">.env</span>.</p>
+  <table>
+    <thead><tr><th>Setting</th><th>Admin Panel Location</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td>Redis (host, port, password)</td><td>Settings &rarr; Redis</td><td>Cache, pub/sub, trade queue</td></tr>
+      <tr><td>Massive API Keys</td><td>Settings &rarr; Environment Variables</td><td>Price data streaming</td></tr>
+      <tr><td>Nodemailer credentials</td><td>Settings &rarr; Environment Variables</td><td>Email delivery</td></tr>
+      <tr><td>OpenAI API Key</td><td>Settings &rarr; Environment Variables</td><td>AI features</td></tr>
+      <tr><td>Inngest Keys</td><td>Settings &rarr; Environment Variables</td><td>Background jobs</td></tr>
+      <tr><td>Payment Provider credentials</td><td>Settings &rarr; Payment Providers</td><td>Stripe, Paddle, Nuvei</td></tr>
+      <tr><td>KYC Provider credentials</td><td>Settings &rarr; KYC</td><td>Identity verification</td></tr>
+      <tr><td>Branding (logos, colors)</td><td>Settings &rarr; Branding</td><td>White-label appearance</td></tr>
+      <tr><td>Trading risk settings</td><td>Settings &rarr; Trading</td><td>Max leverage, margins</td></tr>
+      <tr><td>Company settings</td><td>Settings &rarr; Company</td><td>Company name, address</td></tr>
+    </tbody>
+  </table>
+  <div class="alert alert-success">
+    <span class="alert-icon">&#9989;</span>
+    <div><strong>Database-first design</strong>: Most settings are stored in MongoDB and loaded at runtime. This means all servers automatically share the same configuration without needing to sync <span class="inline-code">.env</span> files.</div>
+  </div>
+
+  <h3>Generate Secrets</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+    <pre># Generate a random 32-byte hex secret:
+openssl rand -hex 32
+
+# Or using Node.js:
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"</pre>
+  </div>
+</div>
+
+<!-- ============================================
+     FOOTER
+     ============================================ -->
+<div style="text-align:center; padding:40px 0 20px; border-top:1px solid var(--border); margin-top:40px; color:var(--text-muted); font-size:13px;">
+  <p>Chartvolt Infrastructure Guide &mdash; Generated from codebase documentation</p>
+  <p style="margin-top:4px;">Files referenced: deploy/README.md, deploy/*.sh, ecosystem.config.js, deploy/nginx.conf</p>
+</div>
+
+</div><!-- end .main -->
+
+<!-- ============================================
+     JAVASCRIPT
+     ============================================ -->
+<script>
+// Copy to clipboard
+function copyCode(btn) {
+  const pre = btn.parentElement.querySelector('pre');
+  const text = pre.textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = 'Copy';
+      btn.classList.remove('copied');
+    }, 2000);
+  }).catch(() => {
+    // Fallback for older browsers
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textarea);
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = 'Copy';
+      btn.classList.remove('copied');
+    }, 2000);
+  });
+}
+
+// Collapsible sections
+function toggleCollapsible(btn) {
+  btn.classList.toggle('open');
+  const content = btn.nextElementSibling;
+  content.classList.toggle('open');
+}
+
+// Active nav link on scroll
+const sections = document.querySelectorAll('.section');
+const navLinks = document.querySelectorAll('.nav-link');
+
+function updateActiveNav() {
+  let current = '';
+  sections.forEach(section => {
+    const rect = section.getBoundingClientRect();
+    if (rect.top <= 100) {
+      current = section.id;
+    }
+  });
+  navLinks.forEach(link => {
+    link.classList.remove('active');
+    if (link.getAttribute('href') === '#' + current) {
+      link.classList.add('active');
+    }
+  });
+}
+
+window.addEventListener('scroll', updateActiveNav);
+window.addEventListener('load', updateActiveNav);
+
+// Smooth scroll for nav links
+navLinks.forEach(link => {
+  link.addEventListener('click', (e) => {
+    e.preventDefault();
+    const target = document.querySelector(link.getAttribute('href'));
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  });
+});
+</script>
+
+</body>
+</html>

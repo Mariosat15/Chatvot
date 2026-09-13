@@ -1,0 +1,83 @@
+---
+globs: lib/services/websocket-price-streamer*,lib/services/real-forex-prices*,lib/services/redis*,lib/services/tpsl-realtime*,lib/services/price-*,contexts/PriceProvider*,websocket-server/**,hooks/useWebSocket*
+description: Real-time data, WebSocket, price streaming, and live updates rules for ChartVolt
+---
+
+# Real-Time & Price Streaming — ChartVolt
+
+## 🏗️ Architecture Overview
+
+```
+Massive.com WebSocket (wss://socket.massive.com/forex)
+       │
+       ▼
+websocket-price-streamer.ts (PRIMARY server only)
+       │
+       ├──→ priceCache (in-memory Map)
+       ├──→ formingCandles (in-memory 1m OHLC aggregation)
+       ├──→ higherTFCaches (5m, 15m, 30m, 1h, 4h, 1d, 1w, 1M)
+       ├──→ Redis pub/sub (relay to secondary servers)
+       ├──→ MongoDB Candle1m / CandleHistorical (completed candles)
+       ├──→ tpsl-realtime.service.ts (instant TP/SL checks)
+       └──→ SSE broadcast to connected browsers
+              │
+              ▼
+       PriceProvider.tsx (React Context → components)
+```
+
+## 📡 Price Flow — Step by Step
+
+1. **Massive.com WebSocket** sends `C.*` (forex quotes), `CAS.*` (second aggregates), `CA.*` (minute aggregates).
+2. **`handleQuoteMessage()`** normalizes the symbol (`EUR-USD` → `EURUSD`), validates bid < ask, applies fixed spread if configured, rounds to 5 decimals.
+3. **`updateFormingCandle()`** aggregates quotes into 1-minute OHLC bars using the **BID price**.
+4. When a new minute starts, the previous candle is saved to MongoDB (`Candle1m`) and the buffer is reset.
+5. **`updateHigherTimeframeCaches()`** rolls 1m candles up into 5m, 15m, 30m, 1h, 4h, 1d, 1w, 1M.
+6. When a higher-TF period ends, the candle is saved to MongoDB (`CandleHistorical`) — **augmented with stored 1m data** for accuracy after restarts.
+7. **Broadcast timer** (every 1s) pushes latest prices + forming candles to connected SSE clients.
+8. **`PriceProvider.tsx`** receives SSE events and updates React state for all consuming components.
+
+## 🔌 Multi-Server Setup
+
+- **Primary server:** Connects to Massive.com WebSocket, aggregates candles, broadcasts via SSE and Redis pub/sub.
+- **Secondary servers:** Subscribe to Redis pub/sub (`startRedisPriceRelay()`) and relay to their local SSE clients.
+- Determined by `autoInitialize()` which checks a `server` lock document in MongoDB.
+
+## 📈 Price Fetching Priority
+
+When any code calls `fetchRealForexPrices()`:
+
+1. **WebSocket cache** — fastest, real-time (~0ms).
+2. **In-memory `lastKnownPrices`** — fast per-server fallback.
+3. **Redis cache** — checked on cold start only.
+4. **MongoDB `PriceCache`** — fallback for worker processes.
+5. **Massive.com REST API** — slowest, blocking on first load.
+
+## 🕯️ Candle Data API
+
+- **Endpoint:** `GET /api/trading/candles?symbol=EURUSD&timeframe=1m&limit=300`
+- **Source:** Reads from `Candle1m` (for 1m) or `CandleHistorical` (for higher TFs) in MongoDB, then appends the current forming candle from the WebSocket streamer's in-memory cache.
+- **Historical backfill:** `forex-historical.service.ts` fetches from Massive.com REST API (`/v2/aggs/ticker/`) for data not yet in MongoDB.
+
+## 🔄 SSE (Server-Sent Events) for Browsers
+
+- The main app broadcasts prices via SSE from the price streamer.
+- `PriceProvider.tsx` connects to the SSE endpoint and normalizes incoming price quotes.
+- Quotes include: `symbol`, `bid`, `ask`, `mid`, `spread`, `timestamp`.
+- The provider recalculates `mid = (bid + ask) / 2` on every update to prevent mid from lagging.
+
+## 🛡️ Resilience
+
+- **WebSocket reconnect:** Auto-reconnects on close/error with exponential backoff.
+- **Redis optional:** If Redis is down, the app continues — only multi-server relay is affected.
+- **Candle buffer seeding:** On startup, `seedCompletedCandlesBuffer()` and `seedHigherTimeframeCaches()` pre-load recent candles from MongoDB to ensure continuity.
+- **Price health monitor:** Tracks per-symbol last update time; alerts if a symbol goes stale.
+
+## ⚠️ Rules for Modifying Real-Time Code
+
+1. **Never break the candle aggregation pipeline.** Candle integrity is critical — incorrect OHLC data affects PnL, charts, and indicators.
+2. **Always use BID price** for candle OHLC — this is consistent throughout and must not change.
+3. **Symbol normalization** must be applied consistently: `EUR-USD` → `EURUSD`, `EUR/USD` → `EURUSD`.
+4. **Test with live data** — real-time bugs only appear under real market conditions.
+5. **The WebSocket streamer is a singleton** — never instantiate a second connection.
+6. **Changes to the broadcast format** affect every connected browser — coordinate carefully.
+7. **TP/SL checks** happen on every price tick — keep `checkTPSLOnPriceUpdate()` fast (< 5ms).
