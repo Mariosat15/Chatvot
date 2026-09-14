@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+﻿import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
@@ -7,6 +7,7 @@ import {
 } from "@/lib/services/games/config-schema";
 import { challengeTitleFacts } from "@/lib/services/games/challenge-game-copy";
 import type { ChallengeableTitle } from "@/lib/services/games/challengeable-titles.service";
+import { readChallengeCreateScreen } from "../helpers/challenge-create-screen";
 
 /**
  * The first half of the owner's 13 September 2026 report about creating a challenge:
@@ -34,12 +35,6 @@ const FIELDS = join(
   "components",
   "challenges",
   "ChallengeSettingsFields.tsx",
-);
-const DIALOG = join(
-  ROOT,
-  "components",
-  "challenges",
-  "ChallengeCreateDialog.tsx",
 );
 const ADMIN_FIELDS = join(
   ROOT,
@@ -282,7 +277,7 @@ describe("the dialog carries the chosen settings, and only the chosen game's", (
     // because a THIRD `setGameSettings` exists legitimately - the per-field onChange that
     // merges one value - so 2 >= 2 held with the defect in place. A tally cannot tell a paired
     // writer from an unrelated one, so each `setSelection` is required to carry a seed with it.
-    const code = readCode(DIALOG);
+    const code = readChallengeCreateScreen();
     const selects = [...code.matchAll(/setSelection\(/g)];
     expect(selects).toHaveLength(2);
     for (const at of selects) {
@@ -296,7 +291,7 @@ describe("the dialog carries the chosen settings, and only the chosen game's", (
     // schema's declared ones - an operator may pre-choose a board size per title (13 Sep 2026),
     // and `listChallengeableTitles` resolves that answer server-side. The property under test is
     // unchanged: whatever seeds it, the previous game's keys must not survive the change.
-    const code = readCode(DIALOG);
+    const code = readChallengeCreateScreen();
     const chooser = code.slice(
       code.indexOf("const chooseGame"),
       code.indexOf("const [formData"),
@@ -307,7 +302,7 @@ describe("the dialog carries the chosen settings, and only the chosen game's", (
   });
 
   it("sends them to the create route, and reads the field list off the chosen title", () => {
-    const code = readCode(DIALOG);
+    const code = readChallengeCreateScreen();
     expect(code).toMatch(/settings: gameSettings/);
     expect(code).toMatch(/fields=\{selection\.title\.settingsFields\}/);
   });
@@ -315,7 +310,7 @@ describe("the dialog carries the chosen settings, and only the chosen game's", (
   it("routes every pick through the one handler rather than setting state from the picker", () => {
     // Reason: `onSelect={setSelection}` compiles, reviews as correct and silently skips the
     // seeding - the form then renders the new title's controls over the old title's values.
-    const code = readCode(DIALOG);
+    const code = readChallengeCreateScreen();
     expect(code).toMatch(/onSelect=\{chooseGame\}/);
     expect(code).not.toMatch(/onSelect=\{setSelection\}/);
   });
