@@ -24,6 +24,7 @@
     "lint": "eslint",
     "check:mirrors": "tsx tools/model-mirror/cli.ts",
     "check:mirrors:list": "tsx tools/model-mirror/cli.ts --list",
+    "check:cross-app": "node tools/check-cross-app-aliases.mjs",
     "clean": "rimraf .next && rimraf apps/admin/.next",
     "test:db": "node scripts/test-db.mjs",
     "worker": "npx cross-env IS_WORKER=true tsx worker/index.ts",

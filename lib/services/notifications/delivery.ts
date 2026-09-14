@@ -23,8 +23,12 @@ async function emailNotification(
   notification: DeliverableNotification,
 ): Promise<void> {
   const [{ getUserById }, { emailNotificationBridge }] = await Promise.all([
-    import("@/lib/utils/user-lookup"),
-    import("@/lib/services/email-notification-bridge"),
+    // Reason: relative, not "@/". An admin route reaches this file through
+    // worker/jobs, and inside that build "@/" resolves to apps/admin, where
+    // the bridge does not exist. A relative path always finds the main app's
+    // own module whichever root the alias points at.
+    import("../../utils/user-lookup"),
+    import("../email-notification-bridge"),
   ]);
 
   const user = await getUserById(notification.userId);

@@ -9,3 +9,12 @@
 # missing field or enum value to the copy that lacks it - only ever add. If the
 # difference is deliberate, record it in tools/model-mirror/allowlist.ts with a reason.
 npm run check:mirrors
+
+# Reason: admin routes import main-app files directly, and inside the admin build
+# "@/" resolves to apps/admin. A main-app module that reaches a "@/" path the admin
+# app does not own compiles fine here and fails `next build` over there, which
+# surfaces as a server that will not start rather than as a code error.
+#
+# If this blocks you: change the offending import to a relative path so it always
+# finds the main app's own module, or mirror the module into apps/admin.
+npm run check:cross-app

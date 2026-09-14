@@ -9,7 +9,11 @@ import { connectToDatabase } from "@/database/mongoose";
 // as on screen. The default unit applies - see the note in the module about why a server-composed
 // string does not read the operator's configured name.
 import { formatVolts } from "@/lib/utils/format-volts";
-import { deliverNotification } from "@/lib/services/notifications/delivery";
+// Reason: relative, not "@/". An admin route reaches this file through
+// worker/jobs, and inside that build "@/" resolves to apps/admin, which has no
+// delivery module - the admin copy of this service pushes through the mirrored
+// notification-push instead. A relative path always finds the main app's own.
+import { deliverNotification } from "./notifications/delivery";
 
 export interface NotificationData {
   userId: string;

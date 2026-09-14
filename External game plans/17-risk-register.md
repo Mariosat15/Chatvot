@@ -48,6 +48,7 @@ chapter covers risks to the programme and to the application.
 | **R72** | **Three sibling bugs in the challenge tie/disqualification logic being replaced, present in BOTH apps.** The `"join_time"` tiebreaker read `participant.enteredAt`, a field `ChallengeParticipant` has never declared (it is `joinedAt`), so it always compared `Date.now()` against itself and could never break a tie. Under `challenger_wins`, the challenge document was saved `isTie: true, winnerId: undefined` moments before the challenger was paid the full prize - a permanent stored-vs-paid mismatch. Under `both_lose`, neither participant's `.status` ever moved to `"completed"` and no unclaimed-pool row was recorded despite a comment claiming one had been | Medium | **LIVE** on every affected challenge tie, on both apps, for as long as the inline logic existed | **CLOSED 12 Sep 2026**, found while reading the code being replaced; nothing backfilled - each was a stored-record defect, not a wrong payment |
 | **R73** | **A provider challenge refused every attempt for its whole life, and the player was told they were too late.** `POST /api/challenges` stored `roundStartPolicy: "reserve_full_round"`, which reserves the **catalogue ceiling** rather than the configured length (`12` s2.9) - so any challenge whose window is shorter than the title's maximum round refused a round at every moment of its existence, not merely near the end. Circuit Sprint's ceiling is an hour, so the owner's ten-minute challenge could never be played. The rule is correct for a competition, which has an operator who chooses it, a schema default behind them and a pre-flight that refuses a too-short contest; **a challenge has none of the three.** The unreachable `?? "reserve_full_round"` fallback in `challenge-round-status.service.ts` named the value the resolver had stopped producing | Medium | **LIVE and player-visible** on every provider challenge, and reported by a real player; the round was refused before it was created, so no attempt was consumed, no money moved and nothing was stored wrongly | **CLOSED 13 Sep 2026** - a challenge never reserves (`CHALLENGE_ROUND_START_POLICY`, owner decision); nothing to backfill |
 | **R74** | **A player's wallet quoted a euro figure a hundred times what they could withdraw.** The platform stored what a credit is worth **twice, in two collections, with the two defaults disagreeing by a factor of a hundred**: `CreditConversionSettings.eurToCreditsRate` at 100 credits = EUR 1, which every path that moves money reads, and `AppSettings.credits.valueInEUR` at 1 credit = EUR 1, which drove the client context's `creditsToEUR` / `eurToCredits` and therefore every figure a player was **shown**. A player holding 1,000 credits saw `EUR 1,000.00` under their balance and could withdraw `EUR 10`; the deposit modal quoted 10 credits for EUR 10 while the processor credited 1,000; `/help` rendered **both** numbers, from both models, on one page. **Neither number was miscalculated** - each was correct against the source its site happened to pick - so nothing threw, nothing logged, and every figure reconciled against its own model | High | **LIVE and player-visible** on the wallet, the transaction rows, the profile summary, the deposit modal and the help centre, for as long as both fields have existed. No payment was ever wrong: withdrawals and deposits ran on the rate throughout, so the harm is a **quoted figure**, not a moved balance | **CLOSED 14 Sep 2026** - `lib/utils/credit-value.ts` (mirrored) is the one resolver, both `/api/settings` routes and `/api/help-settings` serve a **derived** `valueInEUR`, the admin PUT refuses to write the path and the currency screen shows it read-only. **Nothing backfilled and the stored field is deliberately left in place** - it may hold a value an operator typed on purpose, and nothing reads it now |
+| **R75** | **The admin app could not be built, and the symptom named a missing `.next` directory rather than a broken import.** `apps/admin/app/api/admin/end-logic-tests/run/route.ts` imports `worker/jobs/early-end-check.job` by a relative path that escapes `apps/admin`, so the admin build compiles **main-app** files - and inside that build `@/` resolves to `apps/admin`. The notification work of 14 Sep added `import { deliverNotification } from "@/lib/services/notifications/delivery"` to the main app's `notification.service.ts`, and `delivery.ts` is **deliberately not mirrored**, because it reaches the email bridge and the user lookup that only the main app has. Every other `@/` specifier on that path happens to exist in both apps, which is why the hazard had never fired. `next build` failed, so nothing was written, and `next start` reported `Could not find a production build` - **a message about the output, not about the cause** | Medium | **LIVE deployment outage** - the admin app crash-looped under PM2 and served nothing. No data, no money and no player surface involved; the main app, the worker and the websocket server were unaffected | **CLOSED 14 Sep 2026** - the three offending specifiers are relative, so a main-app file always finds the main app's own module whichever root the alias points at. `npm run check:cross-app` walks the graph from every real boundary crossing and fails on any `@/` path `apps/admin` does not own; it runs in `.husky/pre-push` beside `check:mirrors`. Nothing backfilled |
 | R8 | Bulk find-and-replace on wording | High | Medium | X8 |
 | R9 | Fraud throttle blind to provider entries | High | High | X5 |
 | R11 | Legal wording changed without review | High | Medium | X8 |
@@ -2476,6 +2477,65 @@ green against `toMatch(/creditValueInBaseCurrency/)`, because **both identifiers
 import line**. The assertion now matches the **call with its argument** - the fifth instance of
 "an import is not a use", after `canTransitionRound`, `MIN_REASON_LENGTH`, `!expectedOrigin` and
 `describeRoundActivity`.
+
+---
+
+### R75 - The admin app could not be built - **CLOSED 14 September 2026**
+
+**What the owner saw.** After deploying the 14 September notification work, PM2 crash-looped
+`chartvolt-admin`, and every restart printed the same line:
+
+> `Error: Could not find a production build in the '.next' directory. Try building your app
+> with 'next build' before starting the production server.`
+
+**That message is about the output, not the cause, and it is the first thing to get right.**
+It reads as a missing or skipped build step - a deployment mistake. The build had run; it had
+**failed**, so nothing was written for `next start` to serve. Chasing the message leads to the
+deploy script. The error was one line up, in the build log.
+
+**What it actually was.** `apps/admin/app/api/admin/end-logic-tests/run/route.ts` imports
+`worker/jobs/early-end-check.job` by a relative path that escapes `apps/admin`. So the admin
+build compiles **main-app files** - and inside that build, the `@/` alias resolves to
+`apps/admin`, not to the repository root. The notification work added this to the main app's
+`notification.service.ts`:
+
+```ts
+import { deliverNotification } from "@/lib/services/notifications/delivery";
+```
+
+`delivery.ts` is **deliberately not mirrored**: it reaches the email bridge and the user lookup,
+which exist only in the main app, and the admin copy of the service pushes through the mirrored
+`notification-push.ts` instead. That decision was right and it is not what is being reversed
+here. The mistake was reaching for it through an alias whose meaning changes depending on which
+app is compiling.
+
+**Why it had never fired before.** Every other `@/` specifier on that path - the models,
+`@/database/mongoose`, `@/lib/utils/format-volts`, `@/lib/services/notification-seed.service` -
+**happens to exist in both apps**, because they are all mirrored. The hazard has been present for
+as long as an admin route has imported a worker job; nothing had ever crossed it with a main-app-
+only module until now. A convention that works because of a coincidence is not a convention.
+
+**The fix.** Three specifiers became relative, so a main-app file always finds the main app's own
+module whichever root the alias points at - `./notifications/delivery` in `notification.service.ts`,
+and `../../utils/user-lookup` / `../email-notification-bridge` in `delivery.ts`. This is the rule
+already recorded for R58, arrived at from the opposite direction: there, a client bundle could not
+resolve a server module; here, one app's build cannot resolve the other app's alias.
+
+**The guard, and the one thing about it worth carrying.** `npm run check:cross-app`
+(`tools/check-cross-app-aliases.mjs`) seeds from every **real** boundary crossing - an
+`apps/admin` file whose relative import resolves outside `apps/admin`, currently 24 of them - and
+walks the main-app graph from there. On a `@/` edge it **prunes into the admin copy when one
+exists**, because that is what the admin build compiles and that graph is already known good; only
+an **absent** copy is reported. Getting that wrong is instructive: the first version followed the
+*main* app's resolution of every `@/` edge and reported **eleven** more "missing" modules, none of
+which the build minds, because the admin build never sees those files. A checker that
+over-reports is the kind the first person it inconveniences switches off. It runs in
+`.husky/pre-push` beside `check:mirrors`, and it was probed by restoring the exact defect - one
+finding, the right one, green again on restore.
+
+**Nothing was backfilled and nothing could be.** No data, no money and no player surface was
+involved; the main app, the worker and the websocket server were unaffected throughout. The harm
+was an admin app that served nothing for as long as the broken build was deployed.
 
 ---
 

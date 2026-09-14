@@ -814,6 +814,47 @@ Newest at the top.
 
 ---
 
+### 14 Sep 2026 - THE ADMIN APP COULD NOT BE BUILT (R75)
+
+**Shipped:** the admin app builds again, and a guard that fails on push rather than on a
+server. Three imports in the main app became relative, and
+`npm run check:cross-app` now walks the graph from every real boundary crossing.
+
+**What the owner saw:** PM2 crash-looping `chartvolt-admin` with
+`Could not find a production build in the '.next' directory`. **That message is about the
+output, not the cause.** It reads like a skipped deploy step; the build had run and
+**failed**, so there was nothing to serve. The real error was one line up in the build log.
+
+**Root cause:** an admin route imports `worker/jobs/early-end-check.job` by a relative path
+that escapes `apps/admin`, so the admin build compiles **main-app files** - and inside that
+build `@/` means `apps/admin`. Yesterday's notification work added
+`@/lib/services/notifications/delivery` to the main app's `notification.service.ts`, and
+`delivery.ts` is **deliberately not mirrored** (it reaches the email bridge and the user
+lookup, which only the main app has; the admin copy pushes through the mirrored
+`notification-push.ts`). That decision stands. The mistake was reaching for it through an
+alias whose meaning depends on which app is compiling.
+
+**Why it had never fired:** every other `@/` specifier on that path exists in both apps
+because it is mirrored. **A convention that works because of a coincidence is not a
+convention** - the hazard has been there for as long as an admin route has imported a worker
+job.
+
+**The guard, and the mistake worth carrying:** the first version of the checker followed the
+*main* app's resolution of every `@/` edge and reported **eleven** extra "missing" modules the
+build does not mind, because the admin build prunes into the admin copy and never sees them.
+An over-reporting checker is the kind the first person it inconveniences switches off. It now
+prunes there too, and reports only an absent copy - one finding, the right one.
+
+**Verified:** `apps/admin` `next build` green, main app `next build` green, the two challenge
+suites still 89 passing, the checker probed by restoring the exact defect.
+
+**Deferred:** nothing. **Nothing backfilled** - no data, money or player surface was involved.
+
+**Next chat should:** return to X6's two remaining admin items - `adjust-results` (guarded
+route, no UI caller) and `emergency_ended` (a status the model declares that nothing stores).
+
+---
+
 ### 14 Sep 2026 - A CHALLENGE THAT TELLS YOU WHAT HAPPENED TO IT
 
 **Shipped:** three gaps the open-challenge slice left, all reported by the owner in one
