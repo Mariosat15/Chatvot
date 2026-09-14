@@ -61,6 +61,22 @@ export interface ICompetition extends Document {
     | "finalizing"
     | "completed"
     | "cancelled"
+    /*
+      HISTORICAL AND WRITTEN BY NOTHING. Do not build on it, and do not make a writer produce it.
+
+      `emergencyCancelActiveCompetition` stores `"cancelled"` and records the emergency in
+      `emergencyEndedAt` / `emergencyEndReason` / `emergencyEndedBy` below. No commit has ever
+      assigned this value, so no document holds it.
+
+      It is kept rather than deleted because removing an enum value would reject any write to a
+      document that somehow held it, and kept *documented* because the obvious-looking repair -
+      making the writer store it - is wrong in three places: the public arena board groups it
+      with `completed`, so a refunded contest with a zero pool would appear there with rankings
+      and prize figures; `adjust-results` would begin permitting prize changes on a contest whose
+      every entry fee has been refunded; and the operator's own status card would stop saying the
+      players were refunded. An emergency end IS a cancellation - that is what the status field
+      is for, and the manner of it is the three fields alongside.
+    */
     | "emergency_ended";
   cancellationReason?: string; // Reason if cancelled (e.g., "Did not meet minimum participants")
 
@@ -395,6 +411,7 @@ const CompetitionSchema = new Schema<ICompetition>(
         "finalizing",
         "completed",
         "cancelled",
+        // Historical, written by nothing, kept deliberately. See the interface above.
         "emergency_ended",
       ],
       default: "draft",

@@ -100,6 +100,9 @@ rediscovered as new findings later.
 | **Eight sections missing from `ADMIN_SECTIONS`** - `journey-map`, `gamification-wizard`, `system-announcements`, `vendors`, `mdb-cluster` and three others | Owner decision 2 Sep 2026: **do later.** It is a pre-existing defect, not caused by any games work, and it is add-only | `12` section 1, "RBAC - do not forget this" |
 | **Sidebar clicks do not write the URL** | Pre-existing across all ~60 admin sections. Deep links work *inbound*; the address bar just does not track the current section. Belongs with the X6.5 admin pass | `12` s1.1a, "One pre-existing limitation" |
 | **The `tradingEnabled` conditional that hides the Trading destination** | Genuinely blocked - the flag does not exist until X1 introduces it. **"Built" does not include it** | `12` s1, target grouping |
+| **A popup when an open challenge is CREATED** | Owner request 14 Sep 2026, taken after the notification seam shipped. Deferred one step because the seam delivers to **one named recipient** and this is a fan-out to strangers, so it needs a who-gets-told decision before a writer - and an unbounded broadcast is the fastest way to make every other challenge notification get muted | `13` s11.1a; the seam is `lib/services/notifications/delivery.ts` |
+| **A screen for `adjust-results`** | The route is guarded, correct and API-only. Belongs with X6.5 - the four defects under it were closed as **R76** on 14 Sep 2026, so what remains is genuinely a screen and not a repair | `12` s3.2b |
+| **`closePosition` permits a close on a `completed` or `finalizing` contest** | Pre-existing on the trading path and a real hazard - a close after the leaderboard snapshot - so it needs its own regression evidence rather than arriving inside R77's fix | `12` s3.2b; `17` R77 |
 
 **The first is invisible-by-default, which is why it is worth stating rather than listing.**
 `ADMIN_SECTIONS` is what allows a section to be granted to an employee at all, so those
@@ -811,6 +814,80 @@ Newest at the top.
 **Deferred:** what was consciously left for later
 **Next chat should:** the single clearest next action
 ```
+
+---
+
+### 14 Sep 2026 - EVERY PRIZE CORRECTION MOVED CREDITS AND RECORDED NOTHING (R76, R77)
+
+**Shipped:** `adjust-results` writes a ledger row again, prices a correction against what the
+player was actually paid, refuses instead of silently skipping, and keeps the stored leaderboard
+in step. Separately, the trading exit has a status guard that can fire, and an emergency end is
+visible to the operator who ordered it.
+
+**Files touched:** `apps/admin/app/api/competitions/[id]/adjust-results/route.ts`, both copies of
+`database/models/trading/wallet-transaction.model.ts` and `competition.model.ts`,
+`lib/actions/trading/position.actions.ts`, `lib/actions/trading/order.actions.ts`,
+`apps/admin/components/admin/CompetitionAdminActions.tsx`,
+`apps/admin/app/competitions/view/[id]/page.tsx`, `vitest.config.ts`,
+`__tests__/admin/adjust-results.test.ts`, `tools/probe-adjust-results.ps1`.
+
+**The finding, because the scope was meant to be a paragraph.** `12` s3.2a had recorded two
+things as "belonging with X6.5" - `adjust-results` having no UI, and `emergency_ended` being a
+status nothing writes. Both were read before being scheduled, and **neither was what it looked
+like.**
+
+`adjust-results` was not merely unusable by clicking. The three ledger types it writes -
+`prize_reclaim`, `prize_adjustment_add`, `prize_adjustment_deduct` - **were declared on
+`WalletTransaction` in neither app**, and a missing enum value rejects the *whole document* rather
+than dropping the field, so `create` threw every time. The throw landed in the per-adjustment
+`catch`, which recorded the row as an error and carried on; the wallet `$inc` immediately above
+had already run in the same transaction, and the transaction committed. So **every clawback and
+every adjustment ever performed moved credits with no ledger row at all**, and never reached
+`participant.save()` either. On top of that, `previousPrize` read `participant.prizeWon` and the
+rank wrote `participant.finalRank`, **neither declared on `CompetitionParticipant`** - so a
+disqualification could never reclaim anything (the operator was told the credits had come back)
+and a correction priced every change against zero, meaning "set this winner to 40" *credited* 40
+to a player already holding 100.
+
+`emergency_ended`'s six harmless readers were not the point. **`closePosition` refused that status
+and tested nothing else**, so the only status guard on the trading exit could never fire and a
+player could keep closing positions on a contest already cancelled with every entry fee refunded.
+
+**Deviated from plan:** the gate was narrowed to `completed` alone rather than kept as
+`["completed", "emergency_ended"]` - the second was unreachable *and* wrong, an emergency end
+having refunded every entry fee. The enum value itself is **kept and documented inert in both
+copies** rather than deleted: removing it would reject a write to any document holding one, and
+making a writer store it is wrong in three places (the public arena board groups it with
+`completed`, `adjust-results` would permit prize changes on a refunded contest, and the operator's
+card would stop saying the players were refunded).
+
+**Owner tested:** nothing - both screens are behind an admin sign-in, and the adjustment route
+has no screen at all. 21 tests, 19 probes, every one red on exactly the expected test.
+
+**Deferred:** the `adjust-results` **screen** (X6.5, unchanged - the route is guarded, correct
+and API-only); and `closePosition` still permits a close on a `completed` or `finalizing` contest,
+which is a real pre-existing hazard on the trading path and needs its own regression evidence
+rather than arriving inside this fix. **Nothing was backfilled** - the credits that moved are
+visible only as a balance that disagrees with the sum of the ledger, so the affected set cannot be
+queried for, and which players to compensate is an owner decision.
+
+**Three things generalise.** *A money route with no test is not "probably fine because it is
+small"* - this was the first test `adjust-results` has ever had, and nine of its first-run
+failures were defects rather than wrong expectations. *Ask what a status is written by before
+trusting a branch that reads it* - `git log -S` answered it in one command, and this is the sixth
+declared-and-never-written value here, the first where a reader was the *only* guard on its path.
+And *testing an admin route needs one alias, added one module at a time* - `@` resolves to the
+repository root in vitest, so an admin route's own `@/lib/admin/...` import is unresolvable and
+throws while the module loads even when the test mocks it, and a **wildcard** would silently
+resolve any admin-only module a main-app file reaches for, which is the R58 / R75 class of failure
+only `next build` can see.
+
+**Next chat should:** open-challenge **creation** still broadcasts no popup. A player creating an
+open challenge should put a notice in front of everybody else - "a new open challenge is waiting",
+linking to the open list, fastest accept wins the seat. The notification seam built on 14 Sep
+already carries it; what is missing is the writer and a fan-out decision (who gets told, and how
+that is not spam). Then X10's two remaining items - per-game challenge willingness, and moving
+the challenge payout onto the shared settlement stages - then X6.5.
 
 ---
 

@@ -301,10 +301,20 @@ export const closePosition = async (
         `⏸️ Competition is PAUSED: ${pauseReason}\n\nAll positions are frozen. You cannot close trades until the competition resumes.`,
       );
     }
-    if (competition?.status === "emergency_ended") {
-      throw new Error(
-        `Competition was emergency ended. Trading is not available.`,
-      );
+    /*
+      Reason: this used to test `status === "emergency_ended"`, which is declared on the model
+      and written by nothing - `emergencyCancelActiveCompetition` stores `"cancelled"` and puts
+      the emergency facts in `emergencyEndedAt` / `emergencyEndReason` / `emergencyEndedBy`
+      alongside. So the only status guard on this path could never fire, and a player could
+      close positions on a contest that had already been cancelled and every entry fee refunded.
+      `order.actions.ts` refuses `cancelled` on the way in; this is the same rule on the way out.
+
+      Deliberately NOT widened to `completed` or `finalizing`. Closing after the leaderboard
+      snapshot is a real hazard and a pre-existing one on the trading path, so it needs its own
+      regression evidence rather than arriving inside this fix. Recorded in `12` section 3.2a.
+    */
+    if (competition?.status === "cancelled") {
+      throw new Error(`Competition was cancelled. Trading is not available.`);
     }
 
     // Determine exit price - use locked price from frontend if provided and fresh

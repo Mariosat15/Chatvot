@@ -316,11 +316,15 @@ export const placeOrder = async (params: {
         throw new Error(
           `${contestName} hasn't started yet. Please wait for it to begin.`,
         );
-      } else if (contestData.status === "emergency_ended") {
-        throw new Error(
-          `${contestName} was emergency ended. Trading is not available.`,
-        );
       }
+      /*
+        Reason: an `emergency_ended` branch used to sit here and could never be reached -
+        `emergencyCancelActiveCompetition` stores `"cancelled"`, so an emergency end arrives at
+        the branch above, whose wording already covers it. Removed rather than left in place
+        because a dead branch makes reintroducing the illusion a one-line change that reads
+        like using an existing API. An unexpected status still falls through to the generic
+        message below, which names it.
+      */
       throw new Error(
         `${contestName} is not active (Status: ${contestData.status})`,
       );

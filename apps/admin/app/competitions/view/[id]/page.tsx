@@ -697,6 +697,9 @@ const AdminCompetitionViewPage = async ({
                   participantCount={competition.currentParticipants || 0}
                   isPaused={competition.isPaused}
                   pauseReason={competition.pauseReason}
+                  emergencyEndedAt={competition.emergencyEndedAt}
+                  emergencyEndReason={competition.emergencyEndReason}
+                  emergencyEndedBy={competition.emergencyEndedBy}
                   isProviderGame={isProviderGame}
                 />
               </div>

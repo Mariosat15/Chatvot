@@ -25,7 +25,28 @@ export interface IWalletTransaction extends Document {
     | "gamemaster_earning" // Game master earnings from referred users
     | "gamemaster_challenge_referral" // Game master challenge referral earnings
     | "incident_compensation" // Compensation issued for incident resolution
-    | "chargeback_clawback"; // Credits reversed from user wallet after a lost chargeback
+    | "chargeback_clawback" // Credits reversed from user wallet after a lost chargeback
+    /*
+      The three rows `adjust-results` writes when an operator corrects a finalised result.
+
+      Declared 14 Sep 2026. All three were being written already and NONE of them was declared,
+      so Mongoose rejected the whole write - a missing enum value fails the document, it does
+      not drop the field. The throw landed in that route's per-adjustment `catch`, which
+      reported the row as an error and carried on, and the route then COMMITTED: the wallet
+      `$inc` immediately above had already run inside the same transaction. So every prize
+      clawback and every prize adjustment ever performed moved credits with no ledger row at
+      all, and left `prizeWon` on the participant at its old value because the throw happened
+      before `participant.save()`.
+
+      Kept as three values rather than folded into `admin_adjustment`, which would have needed
+      no model change: these are the only rows that reverse or amend a SETTLED prize, and
+      telling them apart is the whole of a payout reconciliation. Historical rows cannot be
+      recovered - nothing was stored - so the credits that moved are visible only as a balance
+      that disagrees with the sum of the ledger.
+    */
+    | "prize_reclaim" // Settled prize taken back after a disqualification
+    | "prize_adjustment_add" // Settled prize increased by an operator
+    | "prize_adjustment_deduct"; // Settled prize reduced by an operator
   amount: number; // Amount of credits (+/-)
   balanceBefore: number; // Balance before transaction
   balanceAfter: number; // Balance after transaction
@@ -86,6 +107,11 @@ const WalletTransactionSchema = new Schema<IWalletTransaction>(
         "gamemaster_challenge_referral",
         "incident_compensation",
         "chargeback_clawback",
+        // Written by `adjust-results` since it was created and declared nowhere until
+        // 14 Sep 2026. See the interface above for what that cost.
+        "prize_reclaim",
+        "prize_adjustment_add",
+        "prize_adjustment_deduct",
       ],
     },
     amount: {

@@ -33,6 +33,26 @@ export default defineConfig({
   },
   resolve: {
     alias: {
+      /**
+       * ADMIN-ONLY MODULES AN ADMIN ROUTE UNDER TEST REACHES THROUGH `@`.
+       *
+       * Reason: `@` maps to the repository ROOT here, because almost everything under test is
+       * main-app code and every mirrored model resolves to the root copy. An admin API route
+       * imported into a test resolves its own `@/lib/admin/...` against that root and fails,
+       * even when the test mocks it - Vitest keys a mock by resolved id, so an unresolvable
+       * specifier throws while the route module is still being loaded.
+       *
+       * Listed ONE MODULE AT A TIME rather than mapping `@/lib/admin/*` wholesale. A wildcard
+       * would silently resolve any admin-only module a main-app file reaches for, which is
+       * exactly the R58 / R75 class of build failure that only `next build` can see - the
+       * suite would go green on an app that cannot be built at all.
+       *
+       * More specific entries must stay ABOVE `@`: Vite tries aliases in order.
+       */
+      "@/lib/admin/section-route-guard": path.resolve(
+        __dirname,
+        "apps/admin/lib/admin/section-route-guard.ts",
+      ),
       "@": path.resolve(__dirname, "."),
     },
     /**

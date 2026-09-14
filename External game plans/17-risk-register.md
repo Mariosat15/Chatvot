@@ -49,6 +49,8 @@ chapter covers risks to the programme and to the application.
 | **R73** | **A provider challenge refused every attempt for its whole life, and the player was told they were too late.** `POST /api/challenges` stored `roundStartPolicy: "reserve_full_round"`, which reserves the **catalogue ceiling** rather than the configured length (`12` s2.9) - so any challenge whose window is shorter than the title's maximum round refused a round at every moment of its existence, not merely near the end. Circuit Sprint's ceiling is an hour, so the owner's ten-minute challenge could never be played. The rule is correct for a competition, which has an operator who chooses it, a schema default behind them and a pre-flight that refuses a too-short contest; **a challenge has none of the three.** The unreachable `?? "reserve_full_round"` fallback in `challenge-round-status.service.ts` named the value the resolver had stopped producing | Medium | **LIVE and player-visible** on every provider challenge, and reported by a real player; the round was refused before it was created, so no attempt was consumed, no money moved and nothing was stored wrongly | **CLOSED 13 Sep 2026** - a challenge never reserves (`CHALLENGE_ROUND_START_POLICY`, owner decision); nothing to backfill |
 | **R74** | **A player's wallet quoted a euro figure a hundred times what they could withdraw.** The platform stored what a credit is worth **twice, in two collections, with the two defaults disagreeing by a factor of a hundred**: `CreditConversionSettings.eurToCreditsRate` at 100 credits = EUR 1, which every path that moves money reads, and `AppSettings.credits.valueInEUR` at 1 credit = EUR 1, which drove the client context's `creditsToEUR` / `eurToCredits` and therefore every figure a player was **shown**. A player holding 1,000 credits saw `EUR 1,000.00` under their balance and could withdraw `EUR 10`; the deposit modal quoted 10 credits for EUR 10 while the processor credited 1,000; `/help` rendered **both** numbers, from both models, on one page. **Neither number was miscalculated** - each was correct against the source its site happened to pick - so nothing threw, nothing logged, and every figure reconciled against its own model | High | **LIVE and player-visible** on the wallet, the transaction rows, the profile summary, the deposit modal and the help centre, for as long as both fields have existed. No payment was ever wrong: withdrawals and deposits ran on the rate throughout, so the harm is a **quoted figure**, not a moved balance | **CLOSED 14 Sep 2026** - `lib/utils/credit-value.ts` (mirrored) is the one resolver, both `/api/settings` routes and `/api/help-settings` serve a **derived** `valueInEUR`, the admin PUT refuses to write the path and the currency screen shows it read-only. **Nothing backfilled and the stored field is deliberately left in place** - it may hold a value an operator typed on purpose, and nothing reads it now |
 | **R75** | **The admin app could not be built, and the symptom named a missing `.next` directory rather than a broken import.** `apps/admin/app/api/admin/end-logic-tests/run/route.ts` imports `worker/jobs/early-end-check.job` by a relative path that escapes `apps/admin`, so the admin build compiles **main-app** files - and inside that build `@/` resolves to `apps/admin`. The notification work of 14 Sep added `import { deliverNotification } from "@/lib/services/notifications/delivery"` to the main app's `notification.service.ts`, and `delivery.ts` is **deliberately not mirrored**, because it reaches the email bridge and the user lookup that only the main app has. Every other `@/` specifier on that path happens to exist in both apps, which is why the hazard had never fired. `next build` failed, so nothing was written, and `next start` reported `Could not find a production build` - **a message about the output, not about the cause** | Medium | **LIVE deployment outage** - the admin app crash-looped under PM2 and served nothing. No data, no money and no player surface involved; the main app, the worker and the websocket server were unaffected | **CLOSED 14 Sep 2026** - the three offending specifiers are relative, so a main-app file always finds the main app's own module whichever root the alias points at. `npm run check:cross-app` walks the graph from every real boundary crossing and fails on any `@/` path `apps/admin` does not own; it runs in `.husky/pre-push` beside `check:mirrors`. Nothing backfilled |
+| **R76** | **Every prize correction an operator has ever made moved credits and recorded no ledger row.** `adjust-results` writes `prize_reclaim`, `prize_adjustment_add` and `prize_adjustment_deduct` and **none of the three was declared** on `WalletTransaction`, in either app - a missing enum value rejects the whole document rather than dropping the field, so `create` threw *after* the wallet `$inc` had already run in the same transaction, the per-adjustment `catch` recorded the row as an error, and the transaction committed. Compounded by two phantom fields: `previousPrize` read `participant.prizeWon` and the rank wrote `participant.finalRank`, **neither declared on `CompetitionParticipant`**, so a disqualification could never reclaim anything (the clawback block was skipped and the operator was told the credits had come back) and a correction priced every change against 0 - "set this winner to 40" *credited* 40 to a player already paid 100. Two further refusals - a short balance and a missing wallet - were silent `continue`s reported as success | High | **LIVE on every adjustment ever performed.** Credits moved; nothing recorded them, so the affected set **cannot be queried for** - only reconciled from wallet balances against settled prizes | **CLOSED 14 Sep 2026** - the three types declared in both apps, rank on `currentRank`, the prize read from the contest's stored `finalLeaderboard` (refused outright when no row exists), every refusal now refusing, the snapshot updated in the same transaction, the gate narrowed to `completed`. 21 tests, 19 probes. **Nothing backfilled** - which players to compensate is an owner decision |
+| **R77** | **A competition status nothing writes, and the only guard on the trading exit read it.** `Competition.status` declares `"emergency_ended"` and **no commit has ever assigned it** - `emergencyCancelActiveCompetition` stores `"cancelled"` and puts the emergency in `emergencyEndedAt` / `emergencyEndReason` / `emergencyEndedBy` alongside. Six of the seven readers were merely dead weight, `cancelled` reaching the same outcome. The seventh was the hole: `closePosition` refused `emergency_ended` **and tested nothing else**, so a player could keep closing positions on a contest already cancelled with every entry fee refunded. Separately the operator's orange EMERGENCY ENDED card could never render, so an emergency end looked like an ordinary cancellation with the reason, the time and the administrator nowhere on screen | Medium | **LIVE on both halves.** No document holds the value, so nothing to migrate; whether anybody closed a position on a refunded contest cannot be answered from the data | **CLOSED 14 Sep 2026** - `closePosition` refuses `cancelled` (deliberately not widened to `completed` / `finalizing`, which is a separate pre-existing hazard), the dead branch in `order.actions.ts` deleted, one CANCELLED card that turns orange and names all three stored facts. **The enum value is kept and documented inert in both copies** - removing it would reject a write to any document holding it, and making a writer store it is wrong in three places |
 | R8 | Bulk find-and-replace on wording | High | Medium | X8 |
 | R9 | Fraud throttle blind to provider entries | High | High | X5 |
 | R11 | Legal wording changed without review | High | Medium | X8 |
@@ -2536,6 +2538,124 @@ finding, the right one, green again on restore.
 **Nothing was backfilled and nothing could be.** No data, no money and no player surface was
 involved; the main app, the worker and the websocket server were unaffected throughout. The harm
 was an admin app that served nothing for as long as the broken build was deployed.
+
+---
+
+### R76 - Every prize correction moved credits and recorded nothing - **CLOSED 14 September 2026**
+
+**What it was.** `POST /api/competitions/[id]/adjust-results` is how an operator corrects a
+settled result - reclaim a cheat's prize, move somebody up a rank, amend a payout. Every one of
+those actions moved credits in a wallet and then **threw before writing its ledger row**, and the
+route committed anyway.
+
+Three causes, and the order matters because each one hides the next.
+
+**The ledger types were undeclared.** The route writes `prize_reclaim`,
+`prize_adjustment_add` and `prize_adjustment_deduct`, and **none of the three was in
+`WalletTransaction`'s enum**, in either app. A missing enum value does not drop the field - it
+**rejects the whole document** - so `WalletTransaction.create` threw every time. The throw landed
+in the route's per-adjustment `catch`, which recorded the row as an error and carried on to the
+next one; the wallet `$inc` immediately above had already run inside the same transaction, and the
+transaction committed at the end. So the credits moved, no row recorded them, and
+`participant.save()` never ran either, because the throw happened first.
+
+**The two fields it priced against do not exist.** `previousPrize` read
+`participant.prizeWon` and the rank read `participant.finalRank`. **`CompetitionParticipant`
+declares neither**, in either app - Mongoose defines getters only for declared paths, so both
+reads returned `undefined` however much had been paid, and both writes were discarded by strict
+mode while `save()` reported success. What that cost, worst first: a **disqualification could
+never reclaim anything**, because `previousPrize` was always 0 and the clawback block was skipped
+entirely, so the player kept the credits and the operator was told they had come back; a **prize
+correction priced every change against 0**, so "set this winner to 40" *credited* 40 to a player
+already holding 100 instead of taking 60 back; and a rank change moved nothing at all, including
+the win and podium counts, which read `currentRank`.
+
+**Two refusals were silent skips.** A clawback against a short balance or a missing wallet, and
+an increase for a player with no wallet, both fell through to `continue` - reported as success.
+
+**What it is now.** Rank reads and writes **`currentRank`**, which is what `completeContest`
+stores and what every win statistic counts. The prize comes from the contest's stored
+**`finalLeaderboard`** row, which is what finalization recorded and what the operator's own
+settled-results panel renders - deliberately **not** a new `prizeWon` field, which would be a
+second source for a figure nothing else maintains. A participant with **no** snapshot row is
+**refused** rather than read as a zero prize, because a zero is indistinguishable from "we do not
+know" and the wrong reading either lets a paid prize stand after a disqualification or credits a
+player twice; a contest finalized before X5 stored no leaderboard at all, which is exactly the
+case that catches. Every refusal now refuses, naming the missing wallet or the short balance. The
+snapshot is updated in the same transaction, so the panel and the participant cannot disagree. And
+the reported figure is what **moved**, not what was asked for.
+
+**Two smaller things went with it.** The gate was `["completed", "emergency_ended"]` and is now
+`completed` alone - see R77 for why the second was unreachable, and note it would have been wrong
+even if it fired, because an emergency end refunds every entry fee and so has no prize to adjust.
+Two early validation returns left the transaction open until the `finally` block.
+
+**Live, and nothing can be backfilled.** Every clawback and every adjustment an operator has ever
+performed is affected. The credits that moved are visible only as a balance that disagrees with
+the sum of the ledger - **nothing was stored**, so the affected set cannot be found by querying
+`wallettransactions`, only by reconciling wallet balances against settled prizes. Which players to
+compensate is an owner decision, and a script that credits wallets from inferred history is an
+unreviewed money writer.
+
+**How it was found, and the general form.** Not by reading the route - by writing the first test
+that had ever exercised it. Nine tests failed on their first run, and the failures were not the
+ones being looked for: prizes that should have been reclaimed were still there, wallets that
+should have been reduced were untouched. **A money route with no test is not "probably fine
+because it is small"** - this one is 400 lines, has run in production, and was wrong in every
+branch. `__tests__/admin/adjust-results.test.ts` (21 tests) and
+`tools/probe-adjust-results.ps1` (19 probes, all red on exactly the expected test) are the guard,
+including a structural one forbidding `participant.prizeWon` and `participant.finalRank` from ever
+returning.
+
+---
+
+### R77 - A status nothing writes, and the only guard that read it - **CLOSED 14 September 2026**
+
+**What it was.** `Competition.status` declares `"emergency_ended"` and **no commit in the
+repository's history has ever assigned it.** `emergencyCancelActiveCompetition` stores
+`"cancelled"` and records the emergency in `emergencyEndedAt` / `emergencyEndReason` /
+`emergencyEndedBy` alongside. Seven places read the value.
+
+Six of those reads were harmless - `cancelled` already reaches the same outcome, so the branch was
+dead weight. **The seventh was a live hole.** `closePosition` in
+`lib/actions/trading/position.actions.ts` refused a contest whose status was `emergency_ended` and
+**tested nothing else**, so it was the only status guard on that path and it could never fire: a
+player could keep closing positions on a contest that had already been cancelled and every entry
+fee refunded. `order.actions.ts` refuses `cancelled` on the way in; this was the same rule missing
+on the way out.
+
+**And the operator could not see what had happened.** `CompetitionAdminActions.tsx` had two status
+cards, one for `cancelled` and an orange one for `emergency_ended`. The orange one never rendered,
+so an emergency end looked like an ordinary cancellation and the reason, the time and the
+administrator who did it were nowhere on the screen, despite all three being stored.
+
+**What it is now.** `closePosition` refuses `cancelled` - deliberately **not** widened to
+`completed` or `finalizing`, which is a real and pre-existing hazard on the trading path and needs
+its own regression evidence rather than arriving inside this fix. The dead branch in
+`order.actions.ts` is deleted, on the `shouldBlockEntry` precedent: a dead branch makes
+reintroducing the illusion a one-line change that reads like using an existing API. The operator's
+card is **one** CANCELLED card that turns orange and names the reason, the time and the
+administrator when `emergencyEndedAt` is present - derived from the stored fact, never from the
+status.
+
+**The enum value is KEPT and documented inert, in both model copies.** Removing it would reject
+any write to a document that somehow held one, and the obvious-looking repair - making the writer
+store it - is wrong in three places: the public arena board groups it with `completed`, so a
+refunded contest with a zero pool would appear there with rankings and prize figures;
+`adjust-results` would begin permitting prize changes on a contest whose every entry fee has been
+refunded; and the operator's card would stop saying the players were refunded. **An emergency end
+is a cancellation** - that is what the status field is for, and the manner of it is the three
+fields alongside.
+
+**Live on both halves, nothing backfilled.** No document holds the value, so there is nothing to
+migrate. Whether anybody closed a position on a refunded contest cannot be answered from the data.
+
+**The general form, which is the fourth instance here.** After `requiresSyncPlay`, `isPaused`,
+`lastSuccessfulRoundAt`, `family` and `playModeOverride` on a head-to-head title, this is a
+**declared-and-never-written value whose readers look correct** - and it is the first one where a
+reader was the *only* guard on its path, so the dead value was not merely inert but actively
+standing in for a check nobody had noticed was absent. **Ask what a status is written by before
+trusting a branch that reads it**, and `git log -S` answers it in one command.
 
 ---
 

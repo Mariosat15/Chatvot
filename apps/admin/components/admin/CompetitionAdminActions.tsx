@@ -35,6 +35,17 @@ interface CompetitionAdminActionsProps {
   participantCount: number;
   isPaused?: boolean;
   pauseReason?: string;
+  /*
+    THE EMERGENCY FACTS, WHICH ARE FIELDS AND NOT A STATUS.
+
+    `emergencyCancelActiveCompetition` stores `status: "cancelled"` and puts these three
+    alongside it. They are passed in rather than the component testing for an
+    `"emergency_ended"` status, because nothing has ever written that status - see the cancelled
+    card below.
+  */
+  emergencyEndedAt?: string | Date | null;
+  emergencyEndReason?: string | null;
+  emergencyEndedBy?: string | null;
   /**
    * Derived server-side from the stored game label by `hasProviderGameLabel`.
    *
@@ -55,6 +66,9 @@ export default function CompetitionAdminActions({
   participantCount,
   isPaused: initialIsPaused = false,
   pauseReason: initialPauseReason = "",
+  emergencyEndedAt,
+  emergencyEndReason,
+  emergencyEndedBy,
   isProviderGame = false,
 }: CompetitionAdminActionsProps) {
   const router = useRouter();
@@ -80,7 +94,14 @@ export default function CompetitionAdminActions({
   const isActive = status === "active";
   const isCancelled = status === "cancelled";
   const isCompleted = status === "completed";
-  const isEmergencyEnded = status === "emergency_ended";
+  /*
+    Reason: keyed on `emergencyEndedAt` rather than on a status. A cancellation is an emergency
+    one exactly when the emergency writer ran, and that writer's evidence is this timestamp -
+    it sets no distinguishing status. Testing `emergencyEndReason` instead would be wrong in the
+    one direction that matters: the reason is operator free text, so a blank one would silently
+    downgrade a genuine emergency end to an ordinary cancellation.
+  */
+  const wasEmergencyEnded = isCancelled && Boolean(emergencyEndedAt);
 
   // Live countdown
   useEffect(() => {
@@ -303,16 +324,54 @@ export default function CompetitionAdminActions({
         </div>
       )}
 
-      {/* Cancelled Status */}
+      {/*
+        CANCELLED, AND WHETHER IT WAS AN EMERGENCY.
+
+        This used to be two cards: a red CANCELLED one here and an orange EMERGENCY ENDED one at
+        the foot of the file, gated on `status === "emergency_ended"`. That status is declared on
+        the model and written by nothing, so the orange card could never render and an operator
+        who had just emergency-cancelled a contest was shown the generic red card - never told it
+        was an emergency, by whom, or why, although all three facts are on the document in
+        `emergencyEndedAt` / `emergencyEndReason` / `emergencyEndedBy`.
+
+        The fix reads the fields the writer actually writes rather than a status nobody stores.
+        One card, because an emergency end IS a cancellation and both mean the same thing about
+        the money: every entry fee has been refunded. Keeping two cards would mean the emergency
+        one has to repeat that sentence or drop it, and dropping it is what the old orange card
+        did - the operator lost the one line that mattered at the moment it mattered most.
+      */}
       {isCancelled && (
-        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30">
-          <div className="flex items-center gap-3">
-            <XCircle className="h-5 w-5 text-red-400" />
-            <div>
-              <p className="text-sm font-semibold text-red-400">CANCELLED</p>
-              <p className="text-xs text-red-300/70">
+        <div
+          className={`p-4 rounded-xl ${wasEmergencyEnded ? "bg-orange-500/10 border border-orange-500/30" : "bg-red-500/10 border border-red-500/30"}`}
+        >
+          <div className="flex items-start gap-3">
+            {wasEmergencyEnded ? (
+              <ShieldAlert className="h-5 w-5 text-orange-400 shrink-0 mt-0.5" />
+            ) : (
+              <XCircle className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
+            )}
+            <div className="min-w-0">
+              <p
+                className={`text-sm font-semibold ${wasEmergencyEnded ? "text-orange-400" : "text-red-400"}`}
+              >
+                {wasEmergencyEnded ? "EMERGENCY ENDED" : "CANCELLED"}
+              </p>
+              <p
+                className={`text-xs ${wasEmergencyEnded ? "text-orange-300/70" : "text-red-300/70"}`}
+              >
                 All participants have been refunded
               </p>
+              {emergencyEndReason && (
+                <p className="text-xs text-orange-200/80 mt-2 break-words">
+                  Reason: {emergencyEndReason}
+                </p>
+              )}
+              {emergencyEndedAt && (
+                <p className="text-[11px] text-orange-300/60 mt-1">
+                  Ended {new Date(emergencyEndedAt).toLocaleString()}
+                  {emergencyEndedBy ? ` by ${emergencyEndedBy}` : ""}
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -632,22 +691,6 @@ export default function CompetitionAdminActions({
         </div>
       )}
 
-      {/* Emergency Ended Status */}
-      {isEmergencyEnded && (
-        <div className="p-4 rounded-xl bg-orange-500/10 border border-orange-500/30">
-          <div className="flex items-center gap-3">
-            <ShieldAlert className="h-5 w-5 text-orange-400" />
-            <div>
-              <p className="text-sm font-semibold text-orange-400">
-                EMERGENCY ENDED
-              </p>
-              <p className="text-xs text-orange-300/70">
-                Competition was terminated due to critical issues
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

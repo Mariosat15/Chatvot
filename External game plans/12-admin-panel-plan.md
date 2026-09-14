@@ -1503,6 +1503,76 @@ with an `emergencyEndedAt` alongside, so **`emergency_ended` is a state the mode
 nothing ever stores.** Both belong with X6.5's admin pass rather than here - the first needs a
 screen, the second is a mirrored status decision - and neither is closed.
 
+> **AMENDED 14 September 2026, and both halves are now correct as history rather than as
+> present facts - see s3.2b.** The `emergency_ended` half was examined and closed as **R77**;
+> the `adjust-results` half was examined, found to be four defects rather than an absent
+> screen, and closed as **R76**. **The screen is still not built**, so the "no UI caller"
+> sentence above survives - the route is guarded, correct and API-only. What has changed is
+> that it no longer moves money without recording it.
+
+---
+
+### 3.2b What was built - the adjust-results route and the dead status (14 September 2026)
+
+**The scope was meant to be a paragraph and turned into two risk entries.** Both items s3.2a
+recorded were read before being scheduled, and neither was what it looked like.
+
+**`adjust-results` was not "guarded but unusable" - it was guarded, usable by API, and wrong in
+every branch.** R76 has the whole account; the three sentences to carry are that the three ledger
+types it writes were **declared nowhere**, so a missing enum value rejected the whole document
+while the wallet `$inc` above it had already committed; that `participant.prizeWon` and
+`participant.finalRank` **do not exist on `CompetitionParticipant`**, so a disqualification could
+never reclaim a prize and a correction priced every change against zero; and that two refusals
+were silent `continue`s reported to the operator as success. Rank now reads and writes
+**`currentRank`**, the prize comes from the contest's stored **`finalLeaderboard`** row, a
+participant with no snapshot row is **refused** rather than read as a zero prize, and the snapshot
+is updated in the same transaction so the panel and the participant cannot disagree.
+
+**The gate is `completed` alone.** It was `["completed", "emergency_ended"]`, and the second was
+both unreachable *and* wrong - an emergency end refunds every entry fee, so there is no prize to
+adjust. The comment claiming otherwise is corrected in place rather than retensed.
+
+**`emergency_ended`'s six harmless readers were not the point - the seventh was.**
+`closePosition` refused that status **and tested nothing else**, so the only status guard on the
+trading exit could never fire and a player could keep closing positions on a refunded contest. It
+refuses `cancelled` now, deliberately **not** widened to `completed` or `finalizing`, which is a
+real pre-existing hazard needing its own evidence rather than arriving inside this fix. The dead
+branch in `order.actions.ts` is **deleted** on the `shouldBlockEntry` precedent.
+
+**The operator's card is one card, not two.** The orange EMERGENCY ENDED card could never render,
+so an emergency end read as an ordinary cancellation with the reason, the time and the
+administrator nowhere on screen despite all three being stored. There is now one CANCELLED card
+that turns orange and names all three, **derived from `emergencyEndedAt` and never from the
+status** - which is the general shape: when a status cannot be trusted, classify by the fact that
+was actually written.
+
+**The enum value is kept and documented inert in both model copies**, with the reasoning in the
+schema rather than only here, because the obvious repair - making the writer store it - is wrong
+in three places at once.
+
+**Two things are still outstanding and must not be summarised as done.** There is **no screen**
+for `adjust-results`, which is X6.5 and unchanged; and the `completed` / `finalizing` gap on
+`closePosition` is recorded, not fixed.
+
+**Guarded by `__tests__/admin/adjust-results.test.ts` (21 tests) and
+`tools/probe-adjust-results.ps1` (19 probes, every one red on exactly the expected test).** Two
+things about that suite generalise. It is the **first test this route has ever had**, and nine of
+its first-run failures were defects rather than wrong expectations - **a money route with no test
+is not "probably fine because it is small"**. And one probe is deliberately re-aimed with its
+reason in the file: mutating `appliedPrizeChange` to `adj.newPrize - previousPrize` came back
+**green**, the fourth cause, a mutation with no observable, because now that both silent skips
+refuse there is no surviving path on which the requested figure and the applied one can differ -
+so the probe reports the new prize instead, which is not a change at all.
+
+**Testing an admin route at all needed one config line**, recorded because it is a trap: `@`
+resolves to the repository **root** in vitest, so an admin route's own `@/lib/admin/...` imports
+are unresolvable and throw while the module is still loading, *even when the test mocks them* -
+Vitest keys a mock by resolved id. `vitest.config.ts` now aliases
+`@/lib/admin/section-route-guard` explicitly, **one module at a time and never a wildcard**: a
+wildcard would silently resolve any admin-only module a main-app file reaches for, which is the
+R58 / R75 class of failure only `next build` can see, and the suite would go green on an app that
+cannot be built.
+
 ---
 
 ## 4. Provider-specific sections
