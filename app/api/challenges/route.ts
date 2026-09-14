@@ -21,6 +21,11 @@ import {
   getSimulatorUserId,
 } from "@/lib/services/simulator/simulator-mode";
 import { resolveChallengeProviderGame } from "@/lib/services/games/challenge-provider-resolution";
+import { getWillingnessByGameKey } from "@/lib/services/games/challenge-availability.service";
+import {
+  gameWillingnessRefusal,
+  isWillingToBeChallengedAt,
+} from "@/lib/services/games/challenge-willingness";
 import { CHALLENGE_ROUND_START_POLICY } from "@/lib/services/games/challenge-round-config";
 import { resolveAcceptDeadline } from "@/lib/services/challenges/accept-deadline";
 import type { RoundStartPolicy } from "@/lib/services/games/round-types";
@@ -287,6 +292,11 @@ export async function POST(request: NextRequest) {
     // stored means the two can never disagree.
     let gameLabel = contestGameLabel();
     let resolvedGameSettings: Record<string, unknown> | undefined;
+    // Reason: only used in the per-game willingness refusal below, which names the game
+    // so the challenger knows to try a different one rather than to give up. "Trading"
+    // matches `ChallengeGamePicker`'s own hard-coded first row - trading has no catalogue
+    // entry to read a display name from.
+    let gameDisplayName = "Trading";
     // How late a player may start a round. Resolved by the same call that pre-flighted the
     // challenge, so what is stored is what was checked - see `ChallengeProviderGameResolved`.
     let resolvedRoundStartPolicy: RoundStartPolicy | undefined;
@@ -308,6 +318,7 @@ export async function POST(request: NextRequest) {
       }
 
       gameLabel = contestGameLabel(PROVIDER_GAME_TYPE, resolved.gameKey);
+      gameDisplayName = resolved.displayName;
       resolvedGameSettings = resolved.settings;
       resolvedRoundStartPolicy = resolved.roundStartPolicy;
     }
@@ -415,6 +426,7 @@ export async function POST(request: NextRequest) {
         pendingChallenges,
         activeChallenges,
         recentChallenge,
+        challengedWillingness,
       ] = await withTimeout(
         Promise.all([
           CreditWallet.findOne({ userId: challengerId })
@@ -450,6 +462,12 @@ export async function POST(request: NextRequest) {
                 .lean()
                 .exec()
             : Promise.resolve(null),
+          // Reason: withheld for an open challenge for the same reason as the three
+          // opponent reads above - there is nobody to ask. An empty map rather than
+          // null, so the predicate below reads the default without a null branch.
+          isOpenChallenge
+            ? Promise.resolve(new Map<string, boolean>())
+            : getWillingnessByGameKey(challengedId),
         ]),
         DB_TIMEOUT_MS,
         "Validation queries",
@@ -491,6 +509,17 @@ export async function POST(request: NextRequest) {
           challengedPresence.acceptingChallenges === false
         ) {
           return errorResponse("User is not accepting challenges", 400);
+        }
+
+        // Then the same question about THIS game. Two switches, not one: the check above
+        // is the master - every game at once - and this one is the player saying they
+        // will trade but not race. The order is deliberate, because a player who has
+        // switched challenges off entirely has not said anything about games, so telling
+        // the challenger to try a different one would be false.
+        if (
+          !isWillingToBeChallengedAt(challengedWillingness, gameLabel.gameKey)
+        ) {
+          return errorResponse(gameWillingnessRefusal(gameDisplayName), 400);
         }
       }
 

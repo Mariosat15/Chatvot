@@ -2798,14 +2798,22 @@ stored on the challenge is right whatever the list said.
 
 #### Not built
 
-~~**Open challenges** - one with nobody named - and~~ **per-game willingness**. **Open challenges
-were built later the same day and that clause is correct as history and stale as a present fact,
-so say which** - `03` s2.4a is the authoritative account. They needed `challengedId`,
+~~**Open challenges** - one with nobody named - and~~ ~~**per-game willingness**~~. **BOTH were
+built later, so this whole section is correct as history and stale as a present fact - say
+which.** Open challenges shipped the same day; `03` s2.4a is the authoritative account. They
+needed `challengedId`,
 `challengedName` and `challengedEmail`
 to become conditional in both model copies, an **atomic claim on accept** so a simultaneous
 second accepter is refused rather than both being debited, and a pass over the sites that assume
-two named players; all three are done. Per-game willingness needs the opt-out storage the owner chose on 13 September
-2026, the create and accept gates that read it, and the toggle the help page already promises.
+two named players; all three are done. **Per-game willingness shipped 14 September 2026** and
+`20` **s1.1a** is the authoritative account - the opt-out storage the owner chose on 13
+September 2026, the create gate that reads it, and a settings screen that also, for the first
+time, exposes the platform-wide master switch `UserPresence.acceptingChallenges`, which had been
+enforced by this very route with no UI anywhere. Two facts from it bear on this section: the
+**opponent list still does not filter on willingness**, deliberately and exactly as the
+paragraph above says, because the create route refuses and names the reason; and the read is
+**withheld for an open challenge**, since there is nobody to ask and asking would answer from
+the creator's own declarations, so opting out of a game would stop you offering it.
 
 **Never verified by eye** - the dialog is behind sign-in and the automated browser has no session.
 

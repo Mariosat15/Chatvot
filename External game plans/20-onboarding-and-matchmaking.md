@@ -88,6 +88,132 @@ Reasons for a separate collection rather than fields on `UserPresence`:
 turns it off is unmatchable regardless of per-game rows. Do not delete it and do not
 reinterpret it - existing rows carry real player intent.
 
+> **AMENDED 14 September 2026 - three of the four fields above were NOT built, and the
+> mirroring claim is reversed.** See section 1.1a, which is the authoritative account of
+> what exists. `interestLevel`, `inferredAt` and `skillBand` all belong to the inference
+> engine in section 3, which is X11.5 and unbuilt - declaring them now would produce the
+> fifth declared-written-dead field after `requiresSyncPlay`, `isPaused`,
+> `lastSuccessfulRoundAt` and `family`. And the model is **main-app only**: `apps/admin`
+> reads nothing from this collection yet, and R42 is the case that shows why mirroring
+> ahead of a caller is worse than not - two copies agreeing while only one of them runs.
+> The recommendation for a separate collection, and both of its reasons, were correct and
+> are what shipped.
+
+### 1.1a What was built (14 September 2026)
+
+X10's second item. A player can now say which games they are happy to be challenged at,
+and - for the first time - can reach the master switch at all.
+
+**The master switch existed, was enforced, and had no UI anywhere.**
+`UserPresence.acceptingChallenges` has been read by `POST /api/challenges` since long
+before this programme, and no screen in either app ever wrote it. It defaults to `true`,
+which is exactly why nobody had noticed: the setting was unreachable and the platform
+behaved as though everybody had opted in. So half of this slice is a control that was
+already being obeyed, and a document describing the master switch as new is wrong.
+
+**THE DEFAULT IS THE WHOLE EXPOSURE.** Every player on the platform has zero rows in the
+new collection. Reading absence as "not willing" refuses **every challenge on the
+platform**, and it does so silently - a refusal is a 400, not an error, so nothing is
+thrown and nothing is logged - while every structural test stays green. The rule lives in
+one place, `WILLING_TO_BE_CHALLENGED_BY_DEFAULT` in
+`lib/services/games/challenge-willingness.ts`, and the schema default is asserted equal to
+it by a test, because a schema default **is** a stored value as far as the next reader is
+concerned (the R50 rule). Note the deliberate contrast with `entryBlockThreshold` and
+`canEnterChallenges`, where a stored value and an absent one are different facts: there a
+stored value was being over-trusted, and here the question is whether any legitimate
+writer can produce the absent case. Every writer is a player pressing a switch, so
+absence only ever means "nobody has said".
+
+**TWO SWITCHES, AND THE ORDER THEY ARE ASKED IN IS LOAD-BEARING.** The master switch is
+checked first and the per-game one second, with two different refusals. A player who has
+switched challenges off entirely has not said anything about *games*, so the per-game
+message - which names the game, precisely so the challenger knows to try a different one -
+would be a false statement about why they were refused. A shared message makes the finer
+setting indistinguishable from the master one, which is the failure the `creationDecidedBy`
+work on Game Master limits was built to avoid. The ordering is pinned by a test, and a
+probe deleting the master check turns it red.
+
+**The rules module is model-free by requirement, not by preference.** The settings screen
+is a `"use client"` component and the create route is a server route, and both have to
+agree about what an absent row means - so the rule cannot live beside a Mongoose model.
+**R58** is the case: a client component naming a driver-reaching module took the admin
+app's build down, and a clean typecheck, a green suite and a working dev server are all
+consistent with an app that cannot build at all. A probe adds a model import to the rules
+module and the R58 guard turns red.
+
+**Declarations are indexed in a `Map`, never an object.** The key is a stored `gameKey`,
+and an object lookup walks the prototype chain, so a row keyed `"__proto__"` returns a
+truthy `Object.prototype` that survives a `!row` test. Fourth instance of that trap after
+the round-inspector action map, `competition-update-fields.ts` and
+`UNSCORED_CONTEST_POLICY_COPY`.
+
+**An unrecognised `gameKey` is REFUSED, never stored.** `gameKey` is immutable and is the
+join key for every historical statistic, so a row under a key nothing resolves is a setting
+the player can see, toggle and never have honoured - and it is indistinguishable from a game
+that has been retired. Same rule as the contest-edit allow-list refusing an unknown field
+rather than dropping it. A blank key is dropped at indexing rather than stored, or it
+answers for a game nobody named.
+
+**Trading is always first and is never fetched**, matching `ChallengeGamePicker`. It has no
+catalogue row, so a list built from `listChallengeableTitles` alone silently offers no way
+to opt out of the one game every player on the platform can already be challenged at. Both
+halves are probed - dropping it, and listing it last.
+
+**A title that cannot be played one against one is listed and disabled, not hidden.** A
+control that vanishes reads as lost rather than as inapplicable, the same reasoning as the
+game picker disabling a title instead of hiding it. The per-game rows are likewise dimmed
+rather than removed when the master switch is off.
+
+**A live defect was found and fixed on the way: the master switch could not be saved by a
+new player.** `PUT /api/user/presence` did a plain `findOneAndUpdate` and 404ed on a
+missing document - so the one player most likely to be setting this *before* they start
+playing was the one it refused. Worse than a plain failure, because the create route reads
+the **absence** of the presence row as "accepting": the refusal left them reachable while
+the screen reported the switch had been saved. It now upserts, with `$setOnInsert` matching
+the heartbeat's minus the status and timestamps, since changing a setting is not evidence of
+activity. It also now refuses a non-boolean with `typeof` rather than a truthiness check -
+switching challenges **off** is the entire point of the route, and
+`$set: { acceptingChallenges: undefined }` is a no-op that still reports success (the R31
+rule). This was reachable in production and **nothing was backfilled**, because there is
+nothing to backfill: no row was written, so the affected set is "every player who tried",
+which is unqueryable.
+
+**The screen writes each field through the route that owns it.** The master switch goes to
+`PUT /api/user/presence`; only the per-game rows go through the new
+`/api/user/challenge-availability`, whose `PATCH` deliberately refuses to touch
+`acceptingChallenges` at all. A second writer of one field is the "one rule, two copies"
+shape in its smallest form, after `referenceId`, `failedReason`, `challengeId` and the Game
+Master `||`. And it must be `PUT`, never `PATCH`: `PATCH` on the presence route is the
+**heartbeat**, so using it would make changing a setting indistinguishable from playing.
+
+**The read is withheld for an open challenge**, for the same reason as the three opponent
+reads beside it - there is nobody to ask. An empty map rather than `null`, so the predicate
+reads the default without a null branch. Unconditionally, it would be answered from the
+*creator's own* declarations, and opting out of a game would stop you **offering** it.
+
+**The opponent list still does not filter on willingness**, deliberately and unchanged from
+`13` s4.1aa: the create route refuses and names the reason, where a list that quietly omits
+people is indistinguishable from the person not existing.
+
+| Piece | Where |
+|---|---|
+| The rules - default, index, predicate, refusal | `lib/services/games/challenge-willingness.ts` (model-free) |
+| The rows | `database/models/games/user-game-preference.model.ts` (**main app only**) |
+| The database half | `lib/services/games/challenge-availability.service.ts` |
+| Read and write for the screen | `GET` / `PATCH /api/user/challenge-availability` |
+| The enforcement | `POST /api/challenges`, after the master switch and **before any wallet read** |
+| The screen | `components/profile/ChallengeAvailabilitySection.tsx`, mounted in `ProfileSettingsSection.tsx` |
+| The master switch fix | `PUT /api/user/presence` |
+
+30 tests in `__tests__/challenges/game-willingness.test.ts`, 23 probes in
+`tools/probe-game-willingness.ps1`, every one red on exactly the expected test. **Never
+verified by eye** - the profile screen is behind sign-in.
+
+**Not built:** the interest inference of section 3, the onboarding step of section 1.2, and
+matchmaking suggestions - all X11.5. The distinction section 3.2 draws is untouched and
+still matters: **inference is not consent**, so inferred interest drives *suggestions* while
+this explicit opt-in drives *invitations*.
+
 ### 1.2 The onboarding step itself
 
 **Open question 16 is unresolved and this section does not pre-empt it:** whether
@@ -355,8 +481,12 @@ the entry-path writers before unifying them and found four instead of two.
 
 ## 9. Definition of done
 
-- [ ] A player can declare, per game, whether they are willing to be challenged, and an
-      explicit "no" is distinguishable from never having answered.
+- [x] A player can declare, per game, whether they are willing to be challenged, and an
+      explicit "no" is distinguishable from never having answered. **Done 14 September 2026,
+      section 1.1a.** Note the second clause is satisfied by an **opt-out**: the stored
+      `false` is the declaration and absence is the default, which is the right way round
+      here because reading absence as "not willing" would refuse every challenge on the
+      platform the moment the collection existed.
 - [ ] Matchmaking returns opponents for a **non-trading** game, proven by a test that
       fails against the current trading-only service.
 - [ ] A player who has declared nothing still receives sensible suggestions, derived from

@@ -202,20 +202,34 @@ export async function PUT(request: NextRequest) {
     const body = await request.json();
     const { acceptingChallenges } = body;
 
+    // Reason: `typeof`, not a truthiness check. Switching challenges OFF is the
+    // whole point of this route, and `$set: { acceptingChallenges: undefined }`
+    // is a no-op that still reports success.
+    if (typeof acceptingChallenges !== "boolean") {
+      return NextResponse.json(
+        { error: "acceptingChallenges must be true or false" },
+        { status: 400 },
+      );
+    }
+
+    // Reason: upserts, where this used to 404 on a missing document. A player
+    // who has never been online has no presence row, so the one player most
+    // likely to be setting this before they start playing was the one it
+    // refused - and the challenge create route reads the ABSENCE of the row as
+    // "accepting", so the refusal left them reachable while telling them the
+    // switch had been saved. `$setOnInsert` matches the heartbeat's, minus the
+    // status and timestamps: changing a setting is not evidence of activity.
     const presence = await UserPresence.findOneAndUpdate(
       { userId: session.user.id },
       {
         $set: { acceptingChallenges },
+        $setOnInsert: {
+          userId: session.user.id,
+          username: session.user.name || "Unknown",
+        },
       },
-      { new: true },
+      { upsert: true, new: true },
     );
-
-    if (!presence) {
-      return NextResponse.json(
-        { error: "Presence not found" },
-        { status: 404 },
-      );
-    }
 
     return NextResponse.json({
       success: true,

@@ -48,6 +48,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { isEUCountry } from "@/lib/utils/country-vat";
 import TwoFactorSection from "@/components/profile/TwoFactorSection";
+import ChallengeAvailabilitySection from "@/components/profile/ChallengeAvailabilitySection";
 
 interface UserProfile {
   id: string;
@@ -1097,6 +1098,10 @@ export default function ProfileSettingsSection() {
           </div>
         </div>
       </div>
+
+      {/* Challenge Requests — mounted here rather than on the two profile page
+          shells, so both of them get it from one edit. */}
+      <ChallengeAvailabilitySection />
 
       {/* Account Information */}
       <div className="bg-dark-700/50 rounded-2xl p-6 shadow-xl border border-dark-600">

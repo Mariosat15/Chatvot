@@ -464,7 +464,14 @@ the money path, the windows and the resolution table above are all unaffected.
 >
 > **Answering open question 15 for this slice only:** an open challenge may be claimed by
 > **any signed-in player except its creator**, subject to the same standing, balance and
-> fraud gates a directed accept passes. Per-game willingness is still outstanding.
+> fraud gates a directed accept passes. ~~Per-game willingness is still outstanding.~~
+> **Per-game willingness shipped 14 September 2026 (`20` s1.1a), so that clause is correct
+> as history and stale as a present fact - say which.** It deliberately does **not** apply
+> to an open challenge, for the reason this very paragraph gives about notifications and
+> declining: there is nobody to ask. The create route withholds the read entirely when
+> `openToAnyone` is set, because asking would answer from the **creator's own**
+> declarations, and opting out of a game would then stop you offering it. What a claimer
+> passes is the standing, balance and fraud gates above, exactly as written.
 >
 > Six screens assumed two named players and were swept: the card, the challenges list
 > (a new **Open** tab), the detail page, the provider lobby, the entry actions and the
