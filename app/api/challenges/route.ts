@@ -22,6 +22,7 @@ import {
 } from "@/lib/services/simulator/simulator-mode";
 import { resolveChallengeProviderGame } from "@/lib/services/games/challenge-provider-resolution";
 import { CHALLENGE_ROUND_START_POLICY } from "@/lib/services/games/challenge-round-config";
+import { resolveAcceptDeadline } from "@/lib/services/challenges/accept-deadline";
 import type { RoundStartPolicy } from "@/lib/services/games/round-types";
 
 // Request timeout for this route (5 seconds)
@@ -642,9 +643,7 @@ export async function POST(request: NextRequest) {
       platformFeePercentage,
       platformFeeAmount,
       winnerPrize,
-      acceptDeadline: new Date(
-        Date.now() + settings.acceptDeadlineMinutes * 60 * 1000,
-      ),
+      acceptDeadline: resolveAcceptDeadline(settings, isOpenChallenge),
       duration: actualDuration,
       status: "pending",
     });

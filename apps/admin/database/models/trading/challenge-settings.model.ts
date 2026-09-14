@@ -28,6 +28,11 @@ export interface IChallengeSettings extends Document {
 
   // Accept Deadline
   acceptDeadlineMinutes: number; // How long challenged user has to accept
+  // How long a challenge left open to anyone stays claimable. Deliberately
+  // separate from the line above: one waits on a named friend, the other is a
+  // public notice board. No schema default, so an absent value means the
+  // operator has never chosen one - see `resolveAcceptDeadlineMinutes`.
+  openChallengeExpiryMinutes?: number;
 
   // Asset Classes allowed in challenges
   defaultAssetClasses: ("stocks" | "forex" | "crypto" | "indices")[];
@@ -110,6 +115,11 @@ const ChallengeSettingsSchema = new Schema<IChallengeSettings>(
       type: Number,
       required: true,
       default: 30,
+      min: 1,
+    },
+    openChallengeExpiryMinutes: {
+      type: Number,
+      required: false,
       min: 1,
     },
     defaultAssetClasses: [

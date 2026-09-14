@@ -84,7 +84,19 @@ function Cell({
   );
 }
 
-function Cells({
+/**
+ * The four cells on their own.
+ *
+ * Exported for the challenge dialog's fixed-length clocks, which show a duration that is not
+ * counting down and therefore cannot use the panel around them: that panel reads a length under
+ * an hour as "ENDING SOON" and a length of zero as "Competition has ended!", both of which are
+ * correct for a contest clock and nonsense for "this challenge runs for 30 minutes".
+ *
+ * Reason for sharing the cells rather than restyling them there: this is the one definition of
+ * what a clock on this platform looks like, and the whole point of the extraction above was that
+ * a second copy drifts on the first edit with nobody able to see it.
+ */
+export function CountdownCells({
   parts,
   secondsClassName,
 }: {
@@ -170,7 +182,7 @@ export default function CountdownPanel({
           <Timer className="h-5 w-5 text-yellow-400 animate-pulse" />
           <span className="text-sm font-semibold text-yellow-400">{label}</span>
         </div>
-        <Cells
+        <CountdownCells
           parts={parts}
           secondsClassName="text-yellow-400 animate-pulse"
         />
@@ -216,7 +228,7 @@ export default function CountdownPanel({
           </span>
         )}
       </div>
-      <Cells
+      <CountdownCells
         parts={parts}
         secondsClassName={
           isWarning ? "text-red-400 animate-pulse" : "text-blue-400"

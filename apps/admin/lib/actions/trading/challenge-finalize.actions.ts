@@ -23,6 +23,10 @@ import {
   routeToTradingSettlement,
 } from "@/lib/games/settlement";
 import { settleChallenge } from "@/lib/services/settlement/challenge-settlement.service";
+import {
+  notifyChallengesExpired,
+  type ExpiredChallengeSummary,
+} from "@/lib/services/challenges/expiry-notifications";
 import { formatChallengeResultLine } from "@/lib/utils/challenge-result-line";
 
 /**
@@ -765,6 +769,15 @@ export async function expirePendingChallenges() {
 
     const now = new Date();
 
+    // Reason: read before the write, because `updateMany` reports how many rows
+    // moved and not which ones, and the creator of each has to be told.
+    const expiring = await Challenge.find({
+      status: "pending",
+      acceptDeadline: { $lte: now },
+    })
+      .select("_id challengerId challengedName slug entryFee openToAnyone")
+      .lean<ExpiredChallengeSummary[]>();
+
     const result = await Challenge.updateMany(
       {
         status: "pending",
@@ -776,6 +789,8 @@ export async function expirePendingChallenges() {
     );
 
     console.log(`Expired ${result.modifiedCount} pending challenges`);
+
+    await notifyChallengesExpired(expiring);
 
     return { expired: result.modifiedCount };
   } catch (error) {

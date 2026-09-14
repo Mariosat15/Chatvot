@@ -859,7 +859,7 @@ export async function expirePendingChallenges() {
       status: "pending",
       acceptDeadline: { $lte: now },
     })
-      .select("_id challengerId challengedName slug entryFee")
+      .select("_id challengerId challengedName slug entryFee openToAnyone")
       .lean();
 
     if (expiredChallenges.length === 0) {
@@ -867,7 +867,7 @@ export async function expirePendingChallenges() {
     }
 
     // Reason: Cast lean() results to typed shapes to avoid `any` in map callbacks.
-    interface ExpiredChallengeLean { _id: string; challengerId: string; challengedName: string; slug: string; entryFee: number }
+    interface ExpiredChallengeLean { _id: string; challengerId: string; challengedName: string; slug: string; entryFee: number; openToAnyone?: boolean }
     interface WalletLean { userId: string; creditBalance: number }
     const typedExpired = expiredChallenges as unknown as ExpiredChallengeLean[];
 
@@ -881,6 +881,13 @@ export async function expirePendingChallenges() {
     );
 
     console.log(`Expired ${result.modifiedCount} pending challenges`);
+
+    // Reason: the ledger row below gives the challenger a record after the
+    // fact; this is the only thing that tells them at the time.
+    const { notifyChallengesExpired } = await import(
+      "@/lib/services/challenges/expiry-notifications"
+    );
+    await notifyChallengesExpired(typedExpired);
 
     // Record informational €0 transactions for challengers (fire and forget)
     try {

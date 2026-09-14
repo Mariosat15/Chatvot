@@ -472,6 +472,61 @@ the money path, the windows and the resolution table above are all unaffected.
 > shared answer is `lib/utils/open-challenge.ts`, which is **model-free by requirement**
 > rather than by preference - its callers are `"use client"` (**R58**).
 
+> **AMENDED 14 September 2026.** Two sentences above are correct as history and stale as
+> present facts, and **say which**. "No notification is sent" was written about
+> *creating* an open challenge and is still true of that - there is nobody to notify -
+> but the creator is now told **the moment somebody claims the seat**, and told again if
+> nobody ever does. And an open challenge no longer inherits `acceptDeadlineMinutes`; it
+> has a lifetime of its own. See **s2.4b** below.
+
+### 2.4b How long an open seat stays up, and who is told - BUILT 14 September 2026
+
+Two gaps left by s2.4a, both reported by the owner in the same instruction.
+
+**The lifetime.** Every challenge carries an `acceptDeadline` computed at creation from
+`ChallengeSettings.acceptDeadlineMinutes`. An open challenge reused that number, and
+**nobody chose it with a public notice board in mind** - it answers "how long do I hold a
+seat for one specific person who has been told about it", which is not the same question
+as "how long do I leave a notice up for any passer-by". They were forced to be equal.
+
+`ChallengeSettings` gains `openChallengeExpiryMinutes` and
+`lib/services/challenges/accept-deadline.ts` (mirrored) is the one place either number is
+resolved. Three things about it are load-bearing.
+
+- **The open fallback is its own default (24 hours), never the directed one.** Every
+  existing platform holds no configured value for a field that did not exist yesterday,
+  so a fallback onto `acceptDeadlineMinutes` would make the whole change invisible on
+  every deployment that has not been reconfigured - with every structural test still
+  green, because the branch is there and merely answers the same thing.
+- **A non-positive or non-finite stored value reads as unset.** These arrive from
+  `parseFloat` on an admin form, so a `0` or a `NaN` is one keystroke away, and either
+  one expires an open challenge on creation or never. Same rule as R31.
+- **It is resolved once, at every writer.** Two copies of the arithmetic let a challenge
+  be created under one rule and expired under the other, and a probe aimed at either
+  copy stays green.
+
+The admin control sends `null` when cleared rather than omitting the field, because
+`JSON.stringify` drops `undefined` and an omitted field cannot unset a stored one - so
+without that an operator could raise the number and never lower it back to the default.
+The player-facing settings route exposes the **resolved** figure rather than the stored
+one, so the dialog cannot show a blank where the platform has a real answer.
+
+**Who is told.** The full lifecycle now reports itself - see `13` **s11.1a** for the push
+seam, the banners and the click targets. Two templates exist because of this section
+specifically. `challenge_seat_taken` is sent when an open seat is claimed, deliberately
+not `challenge_accepted`, whose stored message says the opponent "accepted your
+challenge" and implies the creator invited them. `challenge_open_expired` is sent when
+nobody came, deliberately not `challenge_expired`, whose stored message says a named
+opponent "did not respond in time" - **a false statement about a challenge nobody was
+invited to**, and one that rewording could not fix afterwards, because seeding is
+`$setOnInsert` and never reaches a row that already exists.
+
+Expiry is written in **three** places - the main app's server action, the worker job and
+the admin action - so the notification is a shared helper,
+`lib/services/challenges/expiry-notifications.ts`, rather than three copies. The worker
+is the one that runs in production, which is why leaving it out is the version where
+nothing fires and every test about the other two passes.
+
 ---
 
 ## 3. Where the money moves

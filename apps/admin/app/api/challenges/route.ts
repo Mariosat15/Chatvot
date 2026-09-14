@@ -6,6 +6,74 @@ import CreditWallet from "@/database/models/trading/credit-wallet.model";
 import mongoose from "mongoose";
 
 /**
+ * Tell both seats that an operator cancelled their challenge.
+ *
+ * Reason: the refund and the status change were both silent. A player whose
+ * entry fee came back learned it from their balance, and one whose challenge
+ * simply disappeared learned nothing at all.
+ *
+ * Fire-and-forget by construction: the money has already committed, so a
+ * notification that cannot be written must not turn a successful cancellation
+ * into an error the operator retries.
+ */
+async function notifyChallengeCancelled(
+  challenge: {
+    _id: unknown;
+    challengerId: string;
+    challengedId?: string | null;
+    challengerName?: string | null;
+    challengedName?: string | null;
+  },
+  refunded: boolean,
+): Promise<void> {
+  try {
+    const { notificationService } = await import(
+      "@/lib/services/notification.service"
+    );
+
+    const refundLine = refunded
+      ? "Your entry fee has been returned to your wallet."
+      : "No entry fee had been charged.";
+
+    const recipients: Array<{ userId: string; opponent?: string | null }> = [
+      { userId: challenge.challengerId, opponent: challenge.challengedName },
+    ];
+    // Reason: an open challenge nobody claimed has no second seat, and a
+    // pending directed one has a named opponent who was never charged and
+    // never agreed to anything - only a seat that exists is told.
+    if (challenge.challengedId) {
+      recipients.push({
+        userId: challenge.challengedId,
+        opponent: challenge.challengerName,
+      });
+    }
+
+    for (const recipient of recipients) {
+      try {
+        await notificationService.send({
+          userId: recipient.userId,
+          templateId: "challenge_cancelled",
+          variables: {
+            challengeId: String(challenge._id),
+            opponentClause: recipient.opponent
+              ? ` against ${recipient.opponent}`
+              : "",
+            refundLine,
+          },
+        });
+      } catch (error) {
+        console.warn(
+          `⚠️ Failed to notify ${recipient.userId} of cancellation:`,
+          error,
+        );
+      }
+    }
+  } catch (error) {
+    console.warn("⚠️ Failed to send cancellation notifications:", error);
+  }
+}
+
+/**
  * GET - Fetch all challenges with filters (Admin only)
  */
 export async function GET(request: NextRequest) {
@@ -218,6 +286,12 @@ export async function POST(request: NextRequest) {
           );
 
           await session.commitTransaction();
+
+          // Reason: after the commit, so nobody is told a challenge was
+          // cancelled by a transaction that then aborted. Both seats are told
+          // rather than only the creator - the other player had entered and,
+          // on an accepted challenge, had been charged.
+          await notifyChallengeCancelled(challenge, refundedCount > 0);
 
           return NextResponse.json({
             success: true,

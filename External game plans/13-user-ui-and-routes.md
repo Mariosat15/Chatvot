@@ -2809,6 +2809,51 @@ two named players; all three are done. Per-game willingness needs the opt-out st
 
 **Never verified by eye** - the dialog is behind sign-in and the automated browser has no session.
 
+### 4.1ab The two clocks on the create dialog, stated rather than offered (owner instruction, 14 September 2026)
+
+The owner's screenshot pointed at the setup form for a **game** challenge and asked for
+three things: the challenge length and the game's playing time locked to the defaults
+rather than editable, both shown **as clocks like the competition page**, and the label
+`durationSeconds` corrected, "its duration in minutes".
+
+**Nothing was computed wrongly.** Every figure was right, the defaults were already
+resolved from the title, and a player who left both controls alone got exactly the
+contest the operator had configured - so a document describing a fixed calculation, a
+wrong duration or a payout defect is describing something nobody found, and **nothing was
+backfilled**. What the form did was **offer** two decisions the operator had already
+taken, which is how a challenge ends up shorter than the round it contains.
+
+**A locked control and a removed control are not the same thing, and the removal is the
+wrong one.** A player deciding whether to pay needs to know how long this thing runs, so
+the fields do not disappear - they become a statement. `ChallengeDurationClock` renders
+the value in the same four-cell shape the contest lobby uses, reusing `CountdownCells`
+extracted from `components/competitions/CountdownPanel.tsx`. **Extracted, not copied**:
+`splitDuration` and the cell styling are the same rule, and a second copy is how one
+screen ends up disagreeing with the other about what an hour looks like.
+
+Four facts drift easily.
+
+- **It is a duration, never a countdown.** The competition panel ticks towards an
+  instant; this states a length. Feeding it a target would make it count down to a
+  challenge that has not been created yet, which renders perfectly and is nonsense.
+- **Trading keeps its editable input and its chips.** A trading challenge has no provider
+  title and therefore nothing to inherit, so locking it would refuse a choice nobody has
+  made on the player's behalf. The lock is scoped to the provider branch, and a document
+  describing both branches as locked is describing a control taken away for no reason.
+- **The game's own playing time is locked by `format`, never by field name.**
+  `ChallengeSettingsFields` takes a `lockPlayClock` prop and renders a clock for any field
+  declaring `format: "duration-seconds"`. Matching on `durationSeconds` would be per-game
+  code in the layer built to avoid it, and `12` s2.9's rule already forbids it - written
+  by lower-casing it also matches inside `maxDurationSeconds`.
+- **The label fix is a fallback, not a rename.** The provider's schema may carry no
+  `title`, in which case the old code printed the raw field name; a `fieldLabel` helper
+  names the playing-time field and humanises anything else. The stored unit is still
+  seconds, because that is what the contract declares - **only what a player reads
+  changed**, and a document describing a field renamed to minutes is describing a
+  protocol change nobody made.
+
+**Never verified by eye** - the dialog is behind sign-in.
+
 ---
 
 ## 5. Dashboard
@@ -3285,6 +3330,81 @@ round status**.
 
 Start with polling. Provider scores arrive by webhook, not continuously, so a live
 push channel adds infrastructure for very little perceived gain.
+
+### 11.1a Telling a player what happened to their challenge - BUILT 14 September 2026
+
+The owner's report was that somebody taking your open seat tells you nothing - "no
+email, no in-app alert, no badge. Your challenge quietly goes from waiting to active,
+playing against Maria, and you find out by opening the page" - and then, before the work
+finished, that a **pop-up** is wanted for every challenge event and not only a row in a
+list, each one clicking through to the right place.
+
+**Most of the pieces existed and none of them were connected.** That is the finding, and
+it is why the report read as three separate absences:
+
+- The in-app rows were written all along. `notificationService.send()` stored a
+  `Notification` for the creator on accept, and the bell counted it on its next poll.
+- `NotificationTemplate` declares a `channels: { inApp, email, push }` object on every
+  template, and **nothing read it**. An operator could switch email on for a template and
+  the switch did nothing - the "appears to work and does nothing" shape this programme
+  keeps finding, here on a control an operator can see.
+- `emailNotificationBridge` had a `challengeReceived` method and, checked with `rg`,
+  **zero production callers**. The whole bridge did.
+- The websocket server had no case for a notification at all, so the bell's count only
+  moved when its poll came round.
+
+So the deliverable is **one seam rather than four features**. `notificationService.send()`
+now hands every notification it stores to `deliverNotification`, which pushes it over the
+websocket and, when the template's own `channels.email` says so, emails it. Eight facts
+about that are load-bearing.
+
+- **The push is generic and the socket server must stay that way.** `websocket-server/`
+  deploys as its own process, so a `case` per template would mean redeploying it to add a
+  notification. There is one `user-notification` case and the payload passes through
+  untouched. A test forbids a challenge event name appearing in that file.
+- **The push is fire-and-forget.** It sits inside `POST /api/challenges/[id]/accept`,
+  which debits two wallets, so awaiting it makes a slow or dead socket server into
+  latency on a money path. `void` plus a warning, never `await`.
+- **Email goes through one generic template, `notification_alert`**, rather than one per
+  event. The alternative enumerates events in a second place, which is the same failure
+  shape as an aggregate that enumerates game types: the next template is silently
+  email-less and nothing reports it.
+- **`shouldSendEmail` was reading the wrong category and that is why the opt-out was
+  being bypassed rather than honoured.** User preferences are plural (`challenges`),
+  `NotificationTemplate` categories are singular (`challenge`), so the lookup missed and
+  fell through - a real defect found only because the bridge was being given its first
+  caller. Aliased explicitly.
+- **`send()` seeds templates on demand.** It used to return silently when a template was
+  not found, so a newly added template is a notification nobody gets, on every deployment
+  whose database predates it - and the silence is the whole problem, because the call site
+  reports success. Seeding is `findOneAndUpdate` with `$setOnInsert`, so it never
+  overwrites an operator's edit.
+- **`notification-push.ts` is deliberately dependency-free and mirrored.** The admin app
+  triggers notifications too and has no copy of the user lookup or the email bridge, so
+  the push was split out of `delivery.ts` rather than the whole of `delivery.ts` being
+  mirrored. Held byte-identical by a test; `check:mirrors` compares models and says
+  nothing about it.
+- **Every challenge template carries an `actionUrl` and an `actionText`.** Two did not,
+  and a template's stored row is what a popup reads, so `NotificationPopupCard` also
+  falls back per category - because seeding cannot repair a row that already exists, and
+  those two rows exist on every deployment older than today.
+- **The popup is a category filter, not a challenge feature.** `ChallengePopup` already
+  existed for an incoming invitation; it now also renders any pushed notification whose
+  `category` is `challenge` through `NotificationPopupCard`, which knows nothing about
+  challenges. `challenge_received` is the one template suppressed, because it has its own
+  accept/decline card. A continuous trading event must never reach this path.
+
+**The bell updates without a second websocket connection.** `useWebSocket` opens a socket
+per call, so having the dropdown listen directly would double every signed-in player's
+connections. `ChallengePopup` broadcasts a browser event (`NOTIFICATION_PUSH_EVENT`) and
+the dropdown listens for that - and it broadcasts **before** applying the popup filter, or
+a notification that is correctly not worth a popup silently stops incrementing the count.
+A test pins the ordering.
+
+`03` **s2.4b** covers the two templates this created (`challenge_seat_taken`,
+`challenge_open_expired`) and why neither could reuse an existing one.
+
+**Never verified by eye** - every screen here is behind sign-in.
 
 ---
 

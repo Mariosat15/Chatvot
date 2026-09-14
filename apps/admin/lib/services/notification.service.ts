@@ -8,6 +8,7 @@ import Notification, {
   INotification,
 } from "@/database/models/notification.model";
 import UserNotificationPreferences from "@/database/models/user-notification-preferences.model";
+import { deliverPush } from "@/lib/services/notifications/notification-push";
 
 interface SendNotificationParams {
   userId: string;
@@ -167,6 +168,26 @@ class NotificationService {
     console.log(
       `📬 Notification sent: [${template.type}] to user ${params.userId}`,
     );
+
+    // Reason: an operator's action — cancelling a challenge, adjusting a
+    // result — is written by this process, so without this the player is told
+    // only when they next reload. Email stays with the main app, which is the
+    // only one holding the bridge and the user lookup it needs.
+    deliverPush({
+      _id: notification._id,
+      userId: params.userId,
+      templateId: params.templateId,
+      type: template.type,
+      category: template.category,
+      title,
+      message,
+      icon: template.icon,
+      color: template.color,
+      priority: template.priority,
+      actionUrl,
+      actionText: template.actionText,
+      createdAt: notification.createdAt,
+    });
 
     return notification;
   }

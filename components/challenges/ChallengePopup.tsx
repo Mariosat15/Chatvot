@@ -14,6 +14,11 @@ import {
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import useWebSocket from "@/hooks/useWebSocket";
+import NotificationPopupCard, {
+  popupHref,
+  type PushedNotification,
+} from "@/components/notifications/NotificationPopupCard";
+import { broadcastNotificationPush } from "@/lib/utils/notification-events";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -37,6 +42,33 @@ interface ChallengePopupProps {
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const ANIMATION_DURATION_MS = 400;
+
+/**
+ * How long a lifecycle card stays on screen.
+ *
+ * Reason: an incoming challenge card persists until its accept deadline because
+ * it is asking a question. A card reporting something that has already happened
+ * is not, so it clears itself — but slowly enough to be read and clicked, since
+ * the click is the whole point of it.
+ */
+const EVENT_CARD_LIFETIME_MS = 15_000;
+
+/**
+ * Which pushed notifications become a banner.
+ *
+ * Reason: every notification is now pushed over the socket, and most must not
+ * pop up — `position_closed` and `order_filled` fire continuously while somebody
+ * trades, so showing all of them would bury the ones a player has to act on.
+ * The bell still receives all of them.
+ */
+const POPUP_CATEGORIES = new Set(["challenge"]);
+
+/**
+ * A challenge invitation already has its own card, with Accept and Decline on
+ * it. Reason: without this the same event would appear twice, once as a banner
+ * that can only be read and once as one that can be answered.
+ */
+const SUPPRESSED_TEMPLATE_IDS = new Set(["challenge_received"]);
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -78,6 +110,13 @@ export default function ChallengePopup({ userId }: ChallengePopupProps) {
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
   const [decliningId, setDecliningId] = useState<string | null>(null);
   const [exitingId, setExitingId] = useState<string | null>(null);
+  const [events, setEvents] = useState<PushedNotification[]>([]);
+  const [exitingEventIds, setExitingEventIds] = useState<Set<string>>(
+    new Set(),
+  );
+  const eventTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
+    new Map(),
+  );
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [, setTick] = useState(0); // Force re-render for countdown
   const initialFetchDone = useRef(false);
@@ -86,6 +125,26 @@ export default function ChallengePopup({ userId }: ChallengePopupProps) {
 
   const handleWsMessage = useCallback(
     (message: { type: string; data: any }) => {
+      // A stored notification, pushed the instant it was created. One case
+      // covers every template, so a new one needs no change here.
+      if (message.type === "notification") {
+        const n = message.data as PushedNotification;
+        if (!n?._id) return;
+
+        // Reason: relayed before the popup filter, so the bell's badge updates
+        // for every category while only some become banners.
+        broadcastNotificationPush(n);
+
+        if (!n.category || !POPUP_CATEGORIES.has(n.category)) return;
+        if (n.templateId && SUPPRESSED_TEMPLATE_IDS.has(n.templateId)) return;
+
+        setEvents((prev) => {
+          if (prev.some((existing) => existing._id === n._id)) return prev;
+          return [n, ...prev];
+        });
+        return;
+      }
+
       if (message.type !== "challenge_received") return;
 
       const c = message.data as PendingChallenge;
@@ -185,6 +244,58 @@ export default function ChallengePopup({ userId }: ChallengePopupProps) {
     }, ANIMATION_DURATION_MS);
   }, []);
 
+  const dismissEvent = useCallback((id: string) => {
+    setExitingEventIds((prev) => new Set([...prev, id]));
+    setTimeout(() => {
+      setEvents((prev) => prev.filter((e) => e._id !== id));
+      setExitingEventIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }, ANIMATION_DURATION_MS);
+  }, []);
+
+  const openEvent = useCallback(
+    (notification: PushedNotification) => {
+      // Reason: the destination is the notification's own actionUrl, resolved by
+      // the same helper the fallback lives in, so the banner and the bell cannot
+      // send a player to two different places for one event.
+      const href = popupHref(notification);
+      dismissEvent(notification._id);
+      router.push(href);
+    },
+    [dismissEvent, router],
+  );
+
+  // ─── Lifecycle cards clear themselves ────────────────────────────────────
+
+  useEffect(() => {
+    // Reason: a card is scheduled once and remembered, because this effect
+    // re-runs whenever another notification arrives — rescheduling every card
+    // on each run would let a steady trickle keep the oldest one on screen for
+    // ever. The timers are cleared on unmount only, in the effect below.
+    const timers = eventTimers.current;
+    for (const event of events) {
+      if (timers.has(event._id)) continue;
+      timers.set(
+        event._id,
+        setTimeout(() => {
+          timers.delete(event._id);
+          dismissEvent(event._id);
+        }, EVENT_CARD_LIFETIME_MS),
+      );
+    }
+  }, [events, dismissEvent]);
+
+  useEffect(() => {
+    const timers = eventTimers.current;
+    return () => {
+      timers.forEach(clearTimeout);
+      timers.clear();
+    };
+  }, []);
+
   const handleAccept = useCallback(
     async (challengeId: string) => {
       setAcceptingId(challengeId);
@@ -260,14 +371,28 @@ export default function ChallengePopup({ userId }: ChallengePopupProps) {
       new Date(c.acceptDeadline).getTime() > Date.now(),
   );
 
-  // Don't render anything if popups are disabled or no visible challenges
-  if (!popupEnabled || visibleChallenges.length === 0) return null;
+  // Reason: `popupEnabled` gates the lifecycle cards as well as the invitation
+  // cards. Both are challenge popups, and a player who switched them off did
+  // not ask to keep half of them.
+  if (!popupEnabled) return null;
+  if (visibleChallenges.length === 0 && events.length === 0) return null;
 
   return (
     <div
       className="fixed top-4 right-4 z-[9999] flex flex-col gap-3 max-w-sm w-full pointer-events-none"
       style={{ maxHeight: "calc(100vh - 2rem)" }}
     >
+      {events.map((event) => (
+        <NotificationPopupCard
+          key={event._id}
+          notification={event}
+          exiting={exitingEventIds.has(event._id)}
+          animationMs={ANIMATION_DURATION_MS}
+          onOpen={() => openEvent(event)}
+          onDismiss={() => dismissEvent(event._id)}
+        />
+      ))}
+
       {visibleChallenges.map((challenge) => {
         const isExiting = exitingId === challenge._id;
         const isAccepting = acceptingId === challenge._id;

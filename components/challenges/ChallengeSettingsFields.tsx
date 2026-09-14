@@ -3,6 +3,7 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { ConfigField } from "@/lib/services/games/config-schema";
+import ChallengeDurationClock from "@/components/challenges/create/ChallengeDurationClock";
 
 /**
  * A provider game's own settings, on the player's "create a challenge" dialog.
@@ -33,6 +34,33 @@ interface Props {
   values: Record<string, unknown>;
   onChange: (name: string, value: unknown) => void;
   disabled?: boolean;
+  /**
+   * Show the play clock as a clock rather than a box (owner instruction, 14 September 2026).
+   *
+   * Reason it is a prop rather than the only behaviour: the operator's own defaults screen uses
+   * the admin form, but this component is also the shape a future "advanced" challenge form
+   * would want, and a locked control is a decision about the player's screen rather than about
+   * what the field is.
+   */
+  lockPlayClock?: boolean;
+}
+
+/**
+ * The control's label.
+ *
+ * KEYED ON THE DECLARED `format`, NEVER ON A FIELD NAME. A title that supplies no `title` for
+ * its play clock used to render the raw key - `durationSeconds` - above a box holding MINUTES,
+ * which is an internal name and the wrong unit in one line. Everything else falls back to the
+ * key with its word boundaries restored, because an unlabelled field is still better identified
+ * by "lives count" than by nothing.
+ */
+function fieldLabel(field: ConfigField): string {
+  if (field.title) return field.title;
+  if (field.format === "duration-seconds") return "How long the game runs";
+  return field.name
+    .replace(/[_-]+/g, " ")
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/^./, (character) => character.toUpperCase());
 }
 
 export default function ChallengeSettingsFields({
@@ -40,6 +68,7 @@ export default function ChallengeSettingsFields({
   values,
   onChange,
   disabled,
+  lockPlayClock,
 }: Props) {
   if (fields.length === 0) {
     // Reason: said rather than left blank. A player who saw settings on the previous game
@@ -53,13 +82,25 @@ export default function ChallengeSettingsFields({
 
   return (
     <div className="space-y-3">
-      {fields.map((field) => (
+      {fields.map((field) =>
+        lockPlayClock && field.format === "duration-seconds" ? (
+          <ChallengeDurationClock
+            key={field.name}
+            label={fieldLabel(field)}
+            seconds={
+              typeof values[field.name] === "number"
+                ? (values[field.name] as number)
+                : undefined
+            }
+            note="Set by the game. Both players get the same round."
+          />
+        ) : (
         <div key={field.name} className="space-y-1.5">
           <Label
             htmlFor={`chal-cfg-${field.name}`}
             className="text-sm text-gray-300"
           >
-            {field.title ?? field.name}
+            {fieldLabel(field)}
           </Label>
 
           <FieldControl
@@ -71,7 +112,8 @@ export default function ChallengeSettingsFields({
 
           <Hint field={field} />
         </div>
-      ))}
+        ),
+      )}
     </div>
   );
 }

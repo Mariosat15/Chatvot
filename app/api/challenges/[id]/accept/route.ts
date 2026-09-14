@@ -412,10 +412,16 @@ export async function POST(
       const { notificationService } =
         await import("@/lib/services/notification.service");
 
-      // Notify challenger that their challenge was accepted
+      // Notify challenger that their challenge was accepted.
+      //
+      // Reason: an open challenge gets its own template, because the two events
+      // are different facts from the creator's seat. "Maria accepted your
+      // challenge" implies they had invited Maria; nobody was invited to an open
+      // one, so the creator needs to be told WHO has turned up as well as that
+      // the clock has started.
       await notificationService.send({
         userId: challenge.challengerId,
-        templateId: "challenge_accepted",
+        templateId: claimable ? "challenge_seat_taken" : "challenge_accepted",
         variables: {
           // Changed from 'metadata' to 'variables'
           challengeId: challenge._id.toString(),

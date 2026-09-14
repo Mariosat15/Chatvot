@@ -57,6 +57,7 @@ export async function PUT(request: NextRequest) {
       "maxDurationMinutes",
       "defaultDurationMinutes",
       "acceptDeadlineMinutes",
+      "openChallengeExpiryMinutes",
       "defaultAssetClasses",
       "challengesEnabled",
       "requireBothOnline",
@@ -88,6 +89,15 @@ export async function PUT(request: NextRequest) {
       settings.defaultDurationMinutes = 60;
     if (isNaN(settings.acceptDeadlineMinutes))
       settings.acceptDeadlineMinutes = 30;
+    // Reason: a cleared box sends null and an empty numeric input can arrive as
+    // NaN, which Mongoose rejects on a Number path. Both are unset rather than
+    // replaced with a number, because absent means "the operator has never
+    // chosen one" and the resolver's own default answers it - writing 1440 here
+    // would make a cleared field indistinguishable from a deliberate 1440.
+    const openExpiry = (settings as any).openChallengeExpiryMinutes;
+    if (openExpiry == null || !Number.isFinite(openExpiry)) {
+      settings.set("openChallengeExpiryMinutes", undefined);
+    }
     if (isNaN(settings.challengeCooldownMinutes))
       settings.challengeCooldownMinutes = 5;
     if (isNaN(settings.maxPendingChallenges)) settings.maxPendingChallenges = 5;

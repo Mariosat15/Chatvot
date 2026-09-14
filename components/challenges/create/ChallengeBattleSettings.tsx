@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { BarChart3, Clock, DollarSign, Gamepad2, Target } from "lucide-react";
 import ChallengeSettingsFields from "@/components/challenges/ChallengeSettingsFields";
+import ChallengeDurationClock from "./ChallengeDurationClock";
 import type { ChallengeGameSelection } from "@/lib/services/games/challenge-game-copy";
 import type { ChallengeFormData, ChallengeSettings } from "./types";
 
@@ -63,39 +64,58 @@ export default function ChallengeBattleSettings({
         <p className="text-[11px] text-gray-500">Both players pay this amount</p>
       </div>
 
-      {/* Duration */}
-      <div className="space-y-1.5">
-        <Label className="text-gray-300 flex items-center gap-2 text-sm">
-          <Clock className="h-3.5 w-3.5 text-blue-400" />
-          Duration (Minutes)
-        </Label>
-        <Input
-          type="number"
-          min={settings?.minDurationMinutes || 15}
-          max={settings?.maxDurationMinutes || 1440}
-          value={formData.duration}
-          onChange={(e) =>
-            onChange({ duration: parseInt(e.target.value) || 60 })
-          }
-          className="bg-gray-800/60 border-gray-700 text-white h-9"
+      {/*
+        HOW LONG THE CHALLENGE RUNS.
+
+        A GAME CHALLENGE IS A CLOCK, A TRADING CHALLENGE IS A CONTROL, and the asymmetry is the
+        deliverable rather than an inconsistency. Owner instruction, 14 September 2026: the
+        length must be locked to the default and shown as a clock, "as it will respect what the
+        game providers specify in admin". A title carries an operator-set challenge length and a
+        round ceiling, so a player choosing ten minutes for a game whose round cannot fit inside
+        it is the report that began this - and the platform's own gate then refuses every
+        attempt, which is R73's shape. Trading has no title to ask, so its window is genuinely
+        the player's to pick and its input and chips are untouched.
+      */}
+      {selection.type === "provider" ? (
+        <ChallengeDurationClock
+          label="How long the challenge runs"
+          seconds={formData.duration * 60}
+          note={`Set for ${selection.title.displayName}. Both players get the same window.`}
         />
-        <div className="flex flex-wrap gap-1.5 mt-1.5">
-          {DURATION_CHIPS.map((mins) => (
-            <button
-              key={mins}
-              type="button"
-              onClick={() => onChange({ duration: mins })}
-              className={`px-2.5 py-1 text-xs rounded-full transition-all ${
-                formData.duration === mins
-                  ? "bg-blue-500 text-white shadow-md shadow-blue-500/25"
-                  : "bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-gray-200"
-              }`}
-            >
-              {mins < 60 ? `${mins}m` : `${mins / 60}h`}
-            </button>
-          ))}
+      ) : (
+        <div className="space-y-1.5">
+          <Label className="text-gray-300 flex items-center gap-2 text-sm">
+            <Clock className="h-3.5 w-3.5 text-blue-400" />
+            Duration (Minutes)
+          </Label>
+          <Input
+            type="number"
+            min={settings?.minDurationMinutes || 15}
+            max={settings?.maxDurationMinutes || 1440}
+            value={formData.duration}
+            onChange={(e) =>
+              onChange({ duration: parseInt(e.target.value) || 60 })
+            }
+            className="bg-gray-800/60 border-gray-700 text-white h-9"
+          />
+          <div className="flex flex-wrap gap-1.5 mt-1.5">
+            {DURATION_CHIPS.map((mins) => (
+              <button
+                key={mins}
+                type="button"
+                onClick={() => onChange({ duration: mins })}
+                className={`px-2.5 py-1 text-xs rounded-full transition-all ${
+                  formData.duration === mins
+                    ? "bg-blue-500 text-white shadow-md shadow-blue-500/25"
+                    : "bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-gray-200"
+                }`}
+              >
+                {mins < 60 ? `${mins}m` : `${mins / 60}h`}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* The chosen game's OWN settings, rendered from its schema - provider only.
           Trading's equivalents are the fields below (capital, ranking method), which
@@ -111,6 +131,7 @@ export default function ChallengeBattleSettings({
             values={gameSettings}
             onChange={onGameSettingChange}
             disabled={disabled}
+            lockPlayClock
           />
         </div>
       )}

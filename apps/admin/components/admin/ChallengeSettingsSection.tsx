@@ -33,6 +33,7 @@ import {
   Info,
   Scale,
 } from "lucide-react";
+import { DEFAULT_OPEN_CHALLENGE_EXPIRY_MINUTES } from "@/lib/services/challenges/accept-deadline";
 
 interface ChallengeSettings {
   platformFeePercentage: number;
@@ -45,6 +46,10 @@ interface ChallengeSettings {
   maxDurationMinutes: number;
   defaultDurationMinutes: number;
   acceptDeadlineMinutes: number;
+  // Optional because absent means "never chosen" - the resolver's own default
+  // answers it, and storing a number would erase that distinction. `null` is
+  // what a cleared box sends, so the PUT can tell it from an unsent field.
+  openChallengeExpiryMinutes?: number | null;
   defaultAssetClasses: string[];
   challengesEnabled: boolean;
   requireBothOnline: boolean;
@@ -363,7 +368,33 @@ export default function ChallengeSettingsSection() {
                 className="bg-gray-800 border-gray-600 text-white"
               />
               <p className="text-xs text-gray-500 mt-1">
-                Time to accept a challenge
+                Time a named opponent has to accept
+              </p>
+            </div>
+            <div>
+              <Label className="text-gray-400 text-xs">
+                Open Challenge Expiry (mins)
+              </Label>
+              <Input
+                type="number"
+                min="1"
+                value={settings.openChallengeExpiryMinutes ?? ""}
+                placeholder={String(DEFAULT_OPEN_CHALLENGE_EXPIRY_MINUTES)}
+                onChange={(e) =>
+                  // Reason: `null` rather than `undefined` for a cleared box.
+                  // `JSON.stringify` drops an undefined key, so the PUT would
+                  // never see it and the previously stored number would
+                  // survive a clear that looked like it worked.
+                  updateSetting(
+                    "openChallengeExpiryMinutes",
+                    e.target.value === "" ? null : parseInt(e.target.value),
+                  )
+                }
+                className="bg-gray-800 border-gray-600 text-white"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                How long a challenge left open to anyone stays claimable. Leave
+                blank for {DEFAULT_OPEN_CHALLENGE_EXPIRY_MINUTES} minutes.
               </p>
             </div>
           </CardContent>

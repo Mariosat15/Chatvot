@@ -9,6 +9,7 @@ import { connectToDatabase } from "@/database/mongoose";
 // as on screen. The default unit applies - see the note in the module about why a server-composed
 // string does not read the operator's configured name.
 import { formatVolts } from "@/lib/utils/format-volts";
+import { deliverNotification } from "@/lib/services/notifications/delivery";
 
 export interface NotificationData {
   userId: string;
@@ -56,10 +57,27 @@ class NotificationService {
     try {
       await connectToDatabase();
 
-      const template = await NotificationTemplate.findOne({
+      let template = await NotificationTemplate.findOne({
         templateId: options.templateId,
         isEnabled: true,
       });
+
+      // Reason: seeding uses $setOnInsert, so a template added to the defaults
+      // reaches an existing database only when something runs the seed. Nothing
+      // on the send path did, so a newly added templateId returned null here and
+      // the notification was silently dropped - which is how a player would have
+      // been told nothing at all when their open seat was claimed. The admin
+      // copy of this service has always retried this way; the player copy did not.
+      if (!template) {
+        const { checkAndSeedTemplates } = await import(
+          "@/lib/services/notification-seed.service"
+        );
+        await checkAndSeedTemplates();
+        template = await NotificationTemplate.findOne({
+          templateId: options.templateId,
+          isEnabled: true,
+        });
+      }
 
       if (!template) {
         console.warn(
@@ -97,6 +115,17 @@ class NotificationService {
           : undefined,
         isInstant: false,
       });
+
+      // Reason: one seam for every template. `channels` has been declared on
+      // NotificationTemplate since it was written and read by nothing, so a
+      // template marked `email: true` sent no email and an operator toggling
+      // that switch changed nothing. Pushing here — rather than at each call
+      // site — is also what gives every notification type a live popup, so a
+      // template added later needs no change to the socket server or the client.
+      deliverNotification(
+        { ...notification.toObject(), _id: notification._id },
+        { email: template.channels?.email === true },
+      );
 
       return notification;
     } catch (error) {
@@ -140,6 +169,11 @@ class NotificationService {
         metadata: data.metadata || {},
         isInstant: true,
       });
+
+      // Reason: a template-free notification has no `channels` to consult, so it
+      // is pushed and never emailed. Sending one would mean deciding on the
+      // caller's behalf that an ad-hoc message is worth an email.
+      deliverNotification({ ...notification.toObject(), _id: notification._id });
 
       return notification;
     } catch (error) {

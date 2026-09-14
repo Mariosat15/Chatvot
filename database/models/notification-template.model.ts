@@ -34,8 +34,13 @@ export type NotificationType =
   // 1v1 Challenges
   | "challenge_received"
   | "challenge_accepted"
+  // Reason: an open challenge is claimed rather than accepted - there was no
+  // invitation, so "X accepted your challenge" names a decision nobody made.
+  | "challenge_seat_taken"
   | "challenge_started"
   | "challenge_declined"
+  | "challenge_cancelled"
+  | "challenge_open_expired"
   | "challenge_expired"
   | "challenge_won"
   | "challenge_lost"
@@ -1040,6 +1045,46 @@ function getDefaultTemplates(): Partial<INotificationTemplate>[] {
       actionText: "Start Trading",
     },
     {
+      templateId: "challenge_seat_taken",
+      name: "Open Challenge Claimed",
+      description:
+        "Sent to the creator of an open challenge when any player claims the empty seat",
+      category: "challenge",
+      type: "challenge_seat_taken",
+      title: "⚡ Your Open Challenge Was Claimed!",
+      message:
+        "{{challengedName}} took the open seat in your challenge. The battle begins NOW. Winner takes {{winnerPrize}} credits!",
+      icon: "⚡",
+      priority: "urgent",
+      color: "#10B981",
+      isEnabled: true,
+      isDefault: true,
+      isCustom: false,
+      channels: { inApp: true, email: true, push: false },
+      actionUrl: "/challenges/{{challengeId}}",
+      actionText: "View Challenge",
+    },
+    {
+      templateId: "challenge_cancelled",
+      name: "Challenge Cancelled",
+      description:
+        "Sent when a challenge is cancelled before it was played and the entry fee returned",
+      category: "challenge",
+      type: "challenge_cancelled",
+      title: "🚫 Challenge Cancelled",
+      message:
+        "Your challenge{{opponentClause}} was cancelled. {{refundLine}}",
+      icon: "🚫",
+      priority: "normal",
+      color: "#6B7280",
+      isEnabled: true,
+      isDefault: true,
+      isCustom: false,
+      channels: { inApp: true, email: true, push: false },
+      actionUrl: "/challenges",
+      actionText: "View Challenges",
+    },
+    {
       templateId: "challenge_started",
       name: "Challenge Started",
       description: "Sent to both players when challenge starts",
@@ -1092,7 +1137,34 @@ function getDefaultTemplates(): Partial<INotificationTemplate>[] {
       isEnabled: true,
       isDefault: true,
       isCustom: false,
-      channels: { inApp: true, email: false, push: false },
+      channels: { inApp: true, email: true, push: false },
+      actionUrl: "/challenges",
+      actionText: "View Challenges",
+    },
+    {
+      templateId: "challenge_open_expired",
+      name: "Open Challenge Expired",
+      description:
+        "Sent to the creator of an open challenge when nobody claimed the seat before the deadline",
+      category: "challenge",
+      type: "challenge_open_expired",
+      // Reason: a separate template rather than parameterised wording on
+      // `challenge_expired`. Seeding is `$setOnInsert`, so an existing
+      // deployment keeps the old message text for ever — rewording that one to
+      // cover both cases would leave every live platform telling the creator of
+      // an open challenge that a named opponent "did not respond in time".
+      title: "⏰ Open Challenge Expired",
+      message:
+        "Nobody took the open seat in your challenge before the deadline. No credits were charged.",
+      icon: "⏰",
+      priority: "low",
+      color: "#6B7280",
+      isEnabled: true,
+      isDefault: true,
+      isCustom: false,
+      channels: { inApp: true, email: true, push: false },
+      actionUrl: "/challenges",
+      actionText: "Create Another",
     },
     {
       templateId: "challenge_won",
@@ -1167,6 +1239,8 @@ function getDefaultTemplates(): Partial<INotificationTemplate>[] {
       isDefault: true,
       isCustom: false,
       channels: { inApp: true, email: true, push: false },
+      actionUrl: "/challenges/{{challengeId}}",
+      actionText: "View Results",
     },
 
     // ========== KYC ==========

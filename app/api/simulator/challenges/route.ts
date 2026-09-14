@@ -5,6 +5,7 @@ import ChallengeSettings from "@/database/models/trading/challenge-settings.mode
 import TradingRiskSettings from "@/database/models/trading-risk-settings.model";
 import { nanoid } from "nanoid";
 import { guardSimulatorRoute } from "@/lib/services/simulator/simulator-mode";
+import { resolveAcceptDeadline } from "@/lib/services/challenges/accept-deadline";
 
 /**
  * POST /api/simulator/challenges
@@ -65,9 +66,11 @@ export async function POST(request: NextRequest) {
           platformFeePercentage,
           platformFeeAmount,
           winnerPrize,
-          acceptDeadline: new Date(
-            now.getTime() + settings.acceptDeadlineMinutes * 60 * 1000,
-          ),
+          // Reason: `false` because the simulator only ever seeds directed
+          // challenges. Routed through the resolver rather than reading the
+          // field, so a change to how a deadline is chosen cannot leave this
+          // writer behind.
+          acceptDeadline: resolveAcceptDeadline(settings, false, now),
           duration: c.duration ?? 30,
           status: "pending",
           assetClasses: settings.defaultAssetClasses,

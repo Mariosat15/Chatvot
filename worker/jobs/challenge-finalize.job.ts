@@ -14,6 +14,7 @@
 
 import { connectToDatabase } from "../config/database";
 import mongoose from "mongoose";
+import type { ExpiredChallengeSummary } from "../../lib/services/challenges/expiry-notifications";
 
 export interface ChallengeFinalizeResult {
   checkedChallenges: number;
@@ -101,6 +102,7 @@ export async function runChallengeFinalizeCheck(): Promise<ChallengeFinalizeResu
       .toArray();
 
     if (expiredPendingChallenges.length > 0) {
+      const notifiedExpired: ExpiredChallengeSummary[] = [];
 
       for (const challenge of expiredPendingChallenges) {
         try {
@@ -122,12 +124,29 @@ export async function runChallengeFinalizeCheck(): Promise<ChallengeFinalizeResu
           // was never charged. Refunding here would give free credits.
 
           result.expiredPendingChallenges++;
+          notifiedExpired.push({
+            _id: challenge._id,
+            challengerId: String(challenge.challengerId),
+            challengedName: challenge.challengedName,
+            slug: challenge.slug,
+            entryFee: challenge.entryFee,
+            openToAnyone: challenge.openToAnyone,
+          });
         } catch (error) {
           result.failedChallenges.push(
             `${challenge._id}: Failed to expire - ${error instanceof Error ? error.message : "Unknown error"}`,
           );
         }
       }
+
+      // Reason: collected inside the loop and sent after it, so only challenges
+      // whose write actually succeeded are reported as expired — notifying
+      // beside the update would tell a creator their challenge lapsed when the
+      // write threw and it is still pending.
+      const { notifyChallengesExpired } = await import(
+        "../../lib/services/challenges/expiry-notifications"
+      );
+      await notifyChallengesExpired(notifiedExpired);
     }
 
     // ============================================

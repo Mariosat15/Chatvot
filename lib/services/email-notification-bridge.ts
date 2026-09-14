@@ -21,18 +21,62 @@ interface EmailTarget {
   name: string;
 }
 
-const ALLOWED_CATEGORIES = new Set(["competitions", "trading", "challenges"]);
+/**
+ * This bridge's own call sites name categories in the plural; the stored
+ * preference — and every `NotificationTemplate` — names them in the singular.
+ *
+ * Reason: the two spellings were never reconciled, which is half of why the
+ * preference check below could not work. Normalising here keeps the existing
+ * plural callers unchanged while the lookup reads the field the schema declares.
+ */
+const CATEGORY_ALIASES = new Map<string, string>([
+  ["competitions", "competition"],
+  ["challenges", "challenge"],
+  ["purchases", "purchase"],
+  ["achievements", "achievement"],
+]);
 
-async function shouldSendEmail(userId: string, category: string): Promise<boolean> {
+async function shouldSendEmail(
+  userId: string,
+  category: string,
+  templateId?: string,
+): Promise<boolean> {
   try {
-    if (!ALLOWED_CATEGORIES.has(category)) return true;
     const prefs = await UserNotificationPreferences.findOne({ userId }).lean();
     if (!prefs) return true;
-     
-    const p = prefs as Record<string, unknown>;
-    if (p.emailNotifications === false) return false;
-    const catPrefs = p[category] as { email?: boolean } | undefined; // eslint-disable-line security/detect-object-injection
-    if (catPrefs?.email === false) return false;
+
+    const p = prefs as {
+      notificationsEnabled?: boolean;
+      emailNotificationsEnabled?: boolean;
+      categoryPreferences?: Record<string, boolean>;
+      disabledNotifications?: string[];
+    };
+
+    // Reason: this function used to read `p.emailNotifications` and
+    // `p[category]`, and `UserNotificationPreferences` declares neither —
+    // the master email switch is `emailNotificationsEnabled` and the category
+    // flags live nested under `categoryPreferences`, keyed in the singular. Both
+    // reads were therefore always `undefined`, so every opt-out was ignored and
+    // the function could only ever return true. Latent until now only because
+    // nothing in the application called this bridge.
+    if (p.notificationsEnabled === false) return false;
+    if (p.emailNotificationsEnabled === false) return false;
+
+    // Security alerts ignore the category switch, matching
+    // UserNotificationPreferences.isNotificationEnabled.
+    const key = CATEGORY_ALIASES.get(category) ?? category;
+    if (key === "security") return true;
+
+    if (p.categoryPreferences) {
+      // Reason: `key` derives from a stored document, so a computed index is a
+      // dynamic property read. Reflect.get is the same lookup without the sink.
+      if (Reflect.get(p.categoryPreferences, key) === false) return false;
+    }
+
+    if (templateId && p.disabledNotifications?.includes(templateId)) {
+      return false;
+    }
+
     return true;
   } catch {
     return true;
@@ -190,6 +234,51 @@ export const emailNotificationBridge = {
       name: target.name,
       challengerName,
       stakeAmount: stakeAmount.toString(),
+    });
+  },
+
+  /**
+   * Email a notification using its own stored wording.
+   *
+   * Called for every notification whose template declares `channels.email`, so
+   * it must not know what the event was: the title and message are the
+   * operator's, written on the NotificationTemplate, and the link is the
+   * notification's own `actionUrl`.
+   */
+  async notificationAlert(
+    target: EmailTarget,
+    notification: {
+      category?: string;
+      templateId?: string;
+      title: string;
+      message: string;
+      actionUrl?: string;
+      actionText?: string;
+    },
+  ): Promise<void> {
+    if (
+      !(await shouldSendEmail(
+        target.userId,
+        notification.category || "system",
+        notification.templateId,
+      ))
+    ) {
+      return;
+    }
+
+    const { baseUrl } = await getEmailContext();
+    // Reason: actionUrl is stored as an app-relative path. An email needs an
+    // absolute one, and a button with an empty href looks broken, so a
+    // notification with no action falls back to the notification centre.
+    const path = notification.actionUrl || "/notifications";
+    const absoluteUrl = path.startsWith("http") ? path : `${baseUrl}${path}`;
+
+    await sendTemplateEmail("notification_alert", target.email, {
+      name: target.name,
+      notificationTitle: notification.title,
+      notificationMessage: notification.message,
+      actionUrl: absoluteUrl,
+      actionText: notification.actionText || "Open ChartVolt",
     });
   },
 };

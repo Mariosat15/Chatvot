@@ -23,6 +23,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { PERFORMANCE_INTERVALS } from "@/lib/utils/performance";
+import { NOTIFICATION_PUSH_EVENT } from "@/lib/utils/notification-events";
 
 interface Notification {
   _id: string;
@@ -144,6 +145,25 @@ export default function NotificationDropdown() {
     if (open) {
       fetchNotifications();
     }
+  }, [open, fetchNotifications]);
+
+  // ─── Instant badge on a pushed notification ──────────────────────────────
+
+  useEffect(() => {
+    // Reason: the poll below is up to 60 seconds behind, so a notification that
+    // has just arrived is invisible until then. The socket listener in
+    // ChallengePopup re-broadcasts every push locally; the count is raised here
+    // rather than trusted from the payload, and the list is only re-read when
+    // the dropdown is open, so a closed bell costs one increment and no request.
+    const handlePush = () => {
+      setUnreadCount((count) => count + 1);
+      if (open) fetchNotifications();
+    };
+
+    window.addEventListener(NOTIFICATION_PUSH_EVENT, handlePush);
+    return () => {
+      window.removeEventListener(NOTIFICATION_PUSH_EVENT, handlePush);
+    };
   }, [open, fetchNotifications]);
 
   const handleMarkAsRead = async (notificationId: string) => {

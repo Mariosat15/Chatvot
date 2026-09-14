@@ -16,7 +16,8 @@ export interface IEmailTemplate extends Document {
     | "competition_starting"
     | "competition_ended"
     | "margin_warning"
-    | "challenge_received";
+    | "challenge_received"
+    | "notification_alert";
   name: string;
   subject: string;
   fromName: string;
@@ -70,6 +71,10 @@ const EmailTemplateSchema = new Schema<IEmailTemplate>(
         "competition_ended",
         "margin_warning",
         "challenge_received",
+        // Reason: one template carrying any notification's own wording, so a new
+        // NotificationTemplate marked `channels.email` needs no enum value here.
+        // A missing enum value rejects the whole write, so this list is add-only.
+        "notification_alert",
       ],
       required: true,
       unique: true,
@@ -415,6 +420,25 @@ function getTemplateDefaults(type: string): Partial<IEmailTemplate> {
           "Log in to accept or decline the challenge before it expires.",
         ctaButtonText: "View Challenge",
         ctaButtonUrl: "{{baseUrl}}/challenges",
+        useAIPersonalization: false,
+      };
+
+    case "notification_alert":
+      // Reason: the body is the notification's own title and message, so this
+      // template carries the frame and the operator's wording of it — not a
+      // description of any one event. Switching it off silences every
+      // notification email at once, which is why it is a single template.
+      return {
+        name: "Notification Alert",
+        subject: "{{notificationTitle}}",
+        headingText: "{{notificationTitle}}",
+        introText: "{{notificationMessage}}",
+        featureListLabel: "",
+        featureItems: [],
+        closingText:
+          "You can change which notifications reach you by email in your account settings.",
+        ctaButtonText: "{{actionText}}",
+        ctaButtonUrl: "{{actionUrl}}",
         useAIPersonalization: false,
       };
 

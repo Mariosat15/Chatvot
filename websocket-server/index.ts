@@ -583,6 +583,22 @@ const server = createServer(async (req, res) => {
             }
             break;
 
+          case "user-notification":
+            // Forward a stored notification to its owner the instant it is created.
+            // Reason: one case for every notification type. The payload is passed
+            // through untouched, so a new template needs no change to this server —
+            // which matters because it deploys separately from the Next.js app.
+            if (data.userId && data.notification) {
+              broadcastToParticipant(data.userId, {
+                type: "notification",
+                data: data.notification,
+              });
+              console.log(
+                `🔔 Notification pushed to ${data.userId} (${data.notification.templateId || data.notification.type || "custom"})`,
+              );
+            }
+            break;
+
           case "data_updated":
             // Broadcast data update notification to all price viewers
             // Called when: seeding completes, gap fill completes, historical download completes

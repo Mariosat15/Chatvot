@@ -3,6 +3,7 @@ import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import { connectToDatabase } from "@/database/mongoose";
 import ChallengeSettings from "@/database/models/trading/challenge-settings.model";
+import { resolveAcceptDeadlineMinutes } from "@/lib/services/challenges/accept-deadline";
 
 // GET - Get challenge settings for users
 export async function GET(request: NextRequest) {
@@ -30,6 +31,11 @@ export async function GET(request: NextRequest) {
         maxDurationMinutes: settings.maxDurationMinutes,
         defaultDurationMinutes: settings.defaultDurationMinutes,
         acceptDeadlineMinutes: settings.acceptDeadlineMinutes,
+        // Reason: resolved rather than passed through, so the dialog quotes the
+        // lifetime the create route will actually stamp. Sending the raw field
+        // makes an unset value render as blank on the one screen where a player
+        // is deciding whether to leave a paid seat on a public board.
+        openChallengeExpiryMinutes: resolveAcceptDeadlineMinutes(settings, true),
         defaultAssetClasses: settings.defaultAssetClasses,
       },
     });
