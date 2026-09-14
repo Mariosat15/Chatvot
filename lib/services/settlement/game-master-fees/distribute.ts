@@ -57,6 +57,34 @@ export async function distributeGameMasterFees({
   for (const payment of payments) {
     const { gmId, gmSubscription, users, feePercentage, totalEarning } = payment;
 
+    // IDEMPOTENCY, and it must cover the WHOLE per-GM block rather than the earning rows
+    // alone. Read in the session so it is snapshot-consistent with the transaction.
+    //
+    // Reason: R85. This check used to sit inside the per-user loop below and `continue`d
+    // only the row insert, so a second run skipped the rows and then fell through to the
+    // subscription increment, the wallet credit and the ledger row — paying the Game Master
+    // a second time while leaving `gamemasterearnings` with exactly one row per referral.
+    // A guard that is only ever reached in order to make a double payment silent is worse
+    // than no guard, because it reads as idempotency.
+    //
+    // The rows and the payment commit together, so a single surviving row for this Game
+    // Master on this contest is proof the whole block already ran.
+    const alreadyPaid = await db.collection("gamemasterearnings").findOne(
+      {
+        sourceType: vocabulary.gmSourceType,
+        sourceId: contest._id.toString(),
+        gameMasterId: gmId,
+      },
+      { session },
+    );
+
+    if (alreadyPaid) {
+      console.log(
+        `   ⏩ GM ${gmId} already paid for ${vocabulary.kind} ${contest._id}, skipping duplicate payment`,
+      );
+      continue;
+    }
+
     // Divided from the possibly-capped total, so a scaled-down commission is shared
     // proportionally across the referred players rather than paid in full to the first.
     const perUserEarning = totalEarning / users.length;
@@ -69,27 +97,6 @@ export async function distributeGameMasterFees({
       const platformFee = 0;
       const netEarning = grossEarning - platformFee;
       const effectivePercentage = (perUserEarning / entryFee) * 100;
-
-      // IDEMPOTENCY. Read in the session so it is snapshot-consistent with the
-      // transaction, which is what makes a retried finalization safe.
-      const existingEarning = await db
-        .collection("gamemasterearnings")
-        .findOne(
-          {
-            sourceType: vocabulary.gmSourceType,
-            sourceId: contest._id.toString(),
-            gameMasterId: gmId,
-            referredUserId: user.userId,
-          },
-          { session },
-        );
-
-      if (existingEarning) {
-        console.log(
-          `   ⏩ GM earning already recorded for ${user.userName} in ${vocabulary.kind} ${contest._id}, skipping duplicate`,
-        );
-        continue;
-      }
 
       await db.collection("gamemasterearnings").insertOne(
         {
@@ -167,7 +174,11 @@ export async function distributeGameMasterFees({
 
     const updatedGmWallet = await CreditWallet.findOneAndUpdate(
       { userId: gmId },
-      { $inc: { creditBalance: totalEarning } },
+      // Reason: R82. `totalGmEarnings` was declared on CreditWallet, rendered on
+      // the reconciliation screen and incremented by NOTHING — this is the one
+      // site that pays a Game Master, so it is the one site that can maintain it.
+      // It must move in the same $inc as the balance, or the two can diverge.
+      { $inc: { creditBalance: totalEarning, totalGmEarnings: totalEarning } },
       { session, new: true },
     );
     const balanceAfter = updatedGmWallet?.creditBalance || totalEarning;

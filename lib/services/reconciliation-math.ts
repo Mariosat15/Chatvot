@@ -8,9 +8,15 @@
  *
  * It has NO database, network, or framework dependencies on purpose, so the
  * exact financial logic can be unit-tested deterministically. The DB-bound
- * services (reconciliation.service.ts, the admin reconciliation route, and the
- * Atlas clawback route) call into / mirror these functions, so the tests here
+ * callers — the admin reconciliation route, the Atlas clawback route and the
+ * chargeback clawback writer — call into these functions, so the tests here
  * guard the real behaviour rather than a throwaway copy.
+ *
+ * There used to be a fourth caller, `lib/services/reconciliation.service.ts`.
+ * It was deleted on 14 September 2026: nothing imported it, and it carried its
+ * own copy of the balance fix WITHOUT the downward guard R81 added to the admin
+ * route — so reviving it would have reintroduced a fix that could lower a
+ * player's balance.
  */
 
 /** Tolerance (in credits) below which two money values are treated as equal. */
@@ -172,11 +178,17 @@ export interface ClawbackResult {
 }
 
 /**
- * Decide whether a refund clawback can be applied, mirroring the safety rules
- * in the Atlas clawback route:
+ * Decide whether a clawback can be applied:
  *   - amount must be a positive number,
  *   - cannot exceed the credits originally granted,
  *   - must never force the balance negative (user already spent the credits).
+ *
+ * This is the one decision, used by both clawback writers: the Atlas refund
+ * clawback route and the chargeback completion writer. Its docblock used to say
+ * it "mirrored" the Atlas route, which was true and was the problem — it was
+ * extracted from that route and then called by nothing for as long as it
+ * existed, while the chargeback writer went its own way and clamped the balance
+ * at zero instead of refusing (R84). Do not add a third reading of this rule.
  */
 export function evaluateClawback({
   currentBalance,
@@ -211,8 +223,10 @@ export function evaluateClawback({
       ok: false,
       amount,
       newBalance: round2(currentBalance),
-      error:
-        "Cannot claw back — user already spent the refunded credits; handle as a loss or fraud case.",
+      // Reason: the figures are in the message because every caller shows this
+      // string to an operator who then has to decide what to do about it, and
+      // "how short is it" is the first thing they need.
+      error: `Cannot claw back ${round2(amount)} credits — the wallet only holds ${round2(currentBalance || 0)}. The user has already spent the refunded credits; handle as a loss or fraud case.`,
     };
   }
 

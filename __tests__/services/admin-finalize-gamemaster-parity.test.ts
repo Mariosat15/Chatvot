@@ -121,6 +121,13 @@ const { finalizeCompetition: finalizeInMainApp } = await import(
   "@/lib/actions/trading/competition-end.actions"
 );
 
+// Reason: R85. The fee stage is called DIRECTLY by one test, because the only path that can
+// pay a Game Master twice is the stage being re-run - and both finalize functions refuse a
+// second attempt at the status guard, long before the referral stage is reached.
+const { distributeGameMasterFees } = await import(
+  "@/lib/services/settlement/game-master-fees/distribute"
+);
+
 /**
  * Resolved through a variable, deliberately, and this is the one piece of machinery in the file.
  *
@@ -400,6 +407,14 @@ async function moneySnapshot(competitionId: string) {
     unclaimedRows: unclaimed.length,
     unclaimedTotal: round(unclaimed.reduce((s, r) => s + ((r.amount as number) ?? 0), 0)),
     gmBalance: round(((gmWallet?.creditBalance as number) ?? 0) - START_BALANCE),
+    // Reason: R82. `totalGmEarnings` was declared on CreditWallet, rendered on the
+    // reconciliation screen and incremented by nothing, so it read zero for every Game
+    // Master on the platform while the reconciliation route masked the discrepancy by
+    // substituting the calculated figure. It is in the SNAPSHOT rather than in one
+    // assertion because the snapshot is compared between the two apps - which is the
+    // only thing that can catch one copy of `distribute.ts` learning the $inc and the
+    // other not.
+    gmLifetimeEarnings: round((gmWallet?.totalGmEarnings as number) ?? 0),
     gmLedgerRows: gmLedger.length,
     gmLedgerTotal: round(gmLedger.reduce((s, r) => s + ((r.amount as number) ?? 0), 0)),
     subscriptionTotalEarnings: round((subscription?.totalEarnings as number) ?? 0),
@@ -481,6 +496,27 @@ describe("R26 - the admin app must pay Game Masters exactly as the main app does
     expect(admin.gmBalance).toBe(REFERRED.length * ENTRY_FEE * (GM_RATE / 100));
   });
 
+  it("maintains the Game Master's LIFETIME earnings counter as it pays them", async () => {
+    // Reason: R82. The balance and the ledger row were both correct; the lifetime counter
+    // the reconciliation screen reads was not maintained at all. Asserted against the
+    // ledger total rather than a literal, so this is the same equality reconciliation
+    // checks - if the two can disagree here they can disagree in production.
+    const admin = await settleWith(finalizeInAdminApp);
+
+    expect(admin.gmLedgerTotal).toBeGreaterThan(0);
+    expect(admin.gmLifetimeEarnings).toBe(admin.gmLedgerTotal);
+  });
+
+  it("leaves the lifetime counter alone when the share is RETAINED", async () => {
+    // The other branch of the referral stage. A counter incremented on the retained path
+    // would report earnings to a Game Master who was paid nothing, which reads as a
+    // payment the partner can ask about and no ledger row can explain.
+    const admin = await settleWith(finalizeInAdminApp, "cancelled");
+
+    expect(admin.retainedRows).toBe(REFERRED.length);
+    expect(admin.gmLifetimeEarnings).toBe(0);
+  });
+
   it("books the platform fee NET of the commission, not gross", async () => {
     // Asserted separately from the earnings above because it is the half a partial fix
     // forgets. The admin block recorded `prizePool - totalDistributed` and stopped, so
@@ -541,6 +577,90 @@ describe("R26 - the admin app must pay Game Masters exactly as the main app does
     const afterSecond = await moneySnapshot(competitionId);
 
     expect(afterFirst.earningRows).toBe(REFERRED.length);
+    expect(afterSecond).toEqual(afterFirst);
+  });
+
+  it("pays a Game Master once when the fee stage itself is re-run", async () => {
+    // R85, and this is the case the test above explicitly records as NOT covered: the status
+    // guard refuses a second finalize long before the referral stage, so nothing in this suite
+    // could reach `distributeGameMasterFees`' own idempotency check. It is reached here by
+    // calling the stage directly, twice, in two committed transactions - which is exactly the
+    // shape of a retry after `UnknownTransactionCommitResult`, where the first attempt may
+    // already have committed and the retry runs against the rows it wrote.
+    //
+    // WHY THE ASSERTION IS THE WALLET AND NOT THE EARNING ROWS. Under the defect the check sat
+    // INSIDE the per-referred-player loop and `continue`d only the row insert, while the
+    // subscription increment, the wallet credit and the ledger row all sit after that loop. So
+    // `earningRows` was correct on both runs - the one artefact an operator would check for a
+    // double payment was the one the guard kept clean - and the money doubled underneath it.
+    const competitionId = await seedFinishedCompetition();
+    await seedGameMaster("active");
+
+    const db = mongoose.connection.db;
+    const subscription = await db
+      ?.collection("gamemastersubscriptions")
+      .findOne({ userId: GM_ID });
+    expect(subscription, "the Game Master fixture did not seed a subscription").toBeTruthy();
+
+    const contest = await db
+      ?.collection("competitions")
+      .findOne({ _id: new mongoose.Types.ObjectId(competitionId) });
+    expect(contest, "the contest fixture is missing").toBeTruthy();
+
+    const perUser = ENTRY_FEE * (GM_RATE / 100);
+    const totalEarning = round(perUser * REFERRED.length);
+
+    const payments = [
+      {
+        gmId: GM_ID,
+        gmSubscription: subscription as { _id: unknown; [key: string]: unknown },
+        users: REFERRED.map((p) => ({
+          userId: p.id,
+          userName: p.name,
+          userEmail: `${p.name.replace(/\s+/g, "").toLowerCase()}@example.test`,
+        })),
+        feePercentage: GM_RATE,
+        totalEarning,
+      },
+    ];
+
+    async function runFeeStage() {
+      const session = await mongoose.startSession();
+      try {
+        // Two separate COMMITTED transactions rather than two calls inside one: a retry
+        // re-executes the callback after an abort, so writes from the first attempt are only
+        // visible to the second if the first actually committed - which is the case the guard
+        // exists for, and the only one where a second payment is possible.
+        await session.withTransaction(async () => {
+          await distributeGameMasterFees({
+            session,
+            db: db as NonNullable<typeof db>,
+            payments,
+            contest: {
+              _id: new mongoose.Types.ObjectId(competitionId),
+              name: (contest as { name: string }).name,
+              entryFee: ENTRY_FEE,
+            },
+            participantCount: PLAYERS.length,
+            walletMap: new Map(),
+          });
+        });
+      } finally {
+        await session.endSession();
+      }
+    }
+
+    await runFeeStage();
+    const afterFirst = await moneySnapshot(competitionId);
+    await runFeeStage();
+    const afterSecond = await moneySnapshot(competitionId);
+
+    // The stage paid, or the equality below is trivially satisfied by it never having run.
+    expect(afterFirst.gmBalance).toBe(totalEarning);
+    expect(afterFirst.gmLedgerRows).toBe(1);
+    expect(afterFirst.gmLifetimeEarnings).toBe(totalEarning);
+    expect(afterFirst.subscriptionTotalEarnings).toBe(totalEarning);
+
     expect(afterSecond).toEqual(afterFirst);
   });
 });

@@ -20,6 +20,19 @@ import CreditWallet from "../../../database/models/trading/credit-wallet.model";
 import { PlatformTransaction } from "../../../database/models/platform-financials.model";
 import AuditLog from "../../../database/models/audit-log.model";
 import { invalidateLeaderboardCache } from "../leaderboard-cache.invalidator";
+import { evaluateClawback } from "../reconciliation-math";
+
+/**
+ * Thrown when the clawback cannot be applied because the wallet does not hold
+ * the credits any more. Its own class so `completeChargeback` can record the
+ * refused attempt on the case before rethrowing, rather than failing silently.
+ */
+export class ClawbackRefusedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ClawbackRefusedError";
+  }
+}
 
 export interface CompleteChargebackInput {
   userWallet?: { amount: number };
@@ -57,6 +70,61 @@ async function safeAudit(
   } catch (err) {
     console.error("⚠️ [chargeback] AuditLog.logAction failed:", err);
   }
+}
+
+/**
+ * Leave a record that a clawback was attempted and refused. Best-effort: the
+ * caller is already throwing, so a failure here must not replace the reason.
+ */
+async function recordRefusedClawback(
+  c: IChargeback,
+  admin: IChargebackActor,
+  actorName: string,
+  input: CompleteChargebackInput,
+  err: Error,
+  at: Date,
+): Promise<void> {
+  try {
+    c.timeline.push({
+      at,
+      actorId: admin.id,
+      actorName,
+      action: "clawback_refused",
+      notes: [
+        `wallet clawback refused: ${input.userWallet?.amount}`,
+        err.message,
+        input.notes,
+      ]
+        .filter(Boolean)
+        .join(" | "),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mongoose doc shape
+    await (c as any).save();
+  } catch (saveErr) {
+    console.error(
+      "⚠️ [chargeback] failed to record refused clawback on the case:",
+      saveErr,
+    );
+  }
+
+  await safeAudit({
+    userId: admin.id || "admin",
+    userName: admin.name || "Admin",
+    userEmail: admin.email || "admin@chartvolt",
+    userRole: "admin",
+    action: "chargeback_clawback_refused",
+    actionCategory: "financial",
+    description: `Chargeback clawback refused (case ${String(c._id)}): ${err.message}`,
+    targetType: "user",
+    targetId: c.userId,
+    metadata: {
+      chargebackId: String(c._id),
+      userWalletAmount: input.userWallet?.amount,
+      platformBankAmount: input.platformBank?.amount,
+      notes: input.notes,
+    },
+    status: "failed",
+  });
 }
 
 /**
@@ -117,9 +185,27 @@ export async function completeChargeback(
 
       const amount = input.userWallet.amount;
       const balanceBefore = wallet.creditBalance;
-      // Reason: allow wallet to go negative in accounting, clamp to 0 on
-      // the user-visible balance — admin can true-up via admin_adjustment.
-      const balanceAfter = balanceBefore - amount;
+
+      // Reason: this used to clamp the stored balance at zero while still
+      // writing the full negative amount to the ledger, which left a
+      // permanent balance_mismatch that reconciliation cannot repair (its
+      // fix refuses to reduce a player's balance, R81). Refuse instead, the
+      // same answer the canonical rule has always given the Atlas clawback.
+      // `grantedCredits` is the requested amount because the operator enters
+      // the disputed figure by hand here: the "exceeds what was granted"
+      // clause is the Atlas route's question, not this one's, so it is
+      // deliberately a no-op and only the negative-balance clause can bite.
+      const decision = evaluateClawback({
+        currentBalance: balanceBefore,
+        grantedCredits: amount,
+        requestedAmount: amount,
+      });
+      if (!decision.ok) {
+        throw new ClawbackRefusedError(
+          `${decision.error} Chargeback case ${String(c._id)} has not been closed — record the loss on the platform side, or open a fraud case.`,
+        );
+      }
+      const balanceAfter = decision.newBalance;
 
       const [tx] = await WalletTransaction.create(
         [
@@ -128,7 +214,7 @@ export async function completeChargeback(
             transactionType: "chargeback_clawback",
             amount: -amount,
             balanceBefore,
-            balanceAfter: Math.max(0, balanceAfter),
+            balanceAfter,
             currency: c.currency,
             exchangeRate: 1,
             status: "completed",
@@ -148,7 +234,7 @@ export async function completeChargeback(
       );
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mongoose doc shape
-      (wallet as any).creditBalance = Math.max(0, balanceAfter);
+      (wallet as any).creditBalance = balanceAfter;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (wallet as any).totalRefunded = (wallet.totalRefunded || 0) + amount;
       await wallet.save({ session: session || undefined });
@@ -229,6 +315,16 @@ export async function completeChargeback(
       } catch {
         // ignore
       }
+    }
+    if (session) session.endSession();
+    session = null;
+    // Reason: a refusal leaves the case open, so the only record that anybody
+    // tried would otherwise be the error toast the operator dismisses. Write
+    // it on the case and in the audit log, outside the aborted transaction.
+    // The refusal fires before `run()` mutates `c`, so this saves a document
+    // carrying nothing but the note.
+    if (err instanceof ClawbackRefusedError) {
+      await recordRefusedClawback(c, admin, actorName, input, err, now);
     }
     throw err;
   } finally {

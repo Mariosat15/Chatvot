@@ -121,12 +121,16 @@ export async function payContestPrizes({
 
     // `new: true` so `balanceAfter` is the real post-credit balance rather than one
     // derived from a read that another writer may already have overtaken.
+    // Reason: R78. The counter is taken from the vocabulary, never named literally here.
+    // Written as `totalWonFromCompetitions` this stage booked every challenge prize
+    // against the competition counter - correct balance, two wrong lifetime figures, and
+    // no error anywhere, because both fields are plain numbers on the same document.
     const updatedWinnerWallet = await CreditWallet.findOneAndUpdate(
       { userId: winner.userId },
       {
         $inc: {
           creditBalance: prizeAmount,
-          totalWonFromCompetitions: prizeAmount,
+          [vocabulary.walletWinField]: prizeAmount,
         },
       },
       { session, new: true },

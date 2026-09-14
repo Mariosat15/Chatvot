@@ -51,6 +51,15 @@ chapter covers risks to the programme and to the application.
 | **R75** | **The admin app could not be built, and the symptom named a missing `.next` directory rather than a broken import.** `apps/admin/app/api/admin/end-logic-tests/run/route.ts` imports `worker/jobs/early-end-check.job` by a relative path that escapes `apps/admin`, so the admin build compiles **main-app** files - and inside that build `@/` resolves to `apps/admin`. The notification work of 14 Sep added `import { deliverNotification } from "@/lib/services/notifications/delivery"` to the main app's `notification.service.ts`, and `delivery.ts` is **deliberately not mirrored**, because it reaches the email bridge and the user lookup that only the main app has. Every other `@/` specifier on that path happens to exist in both apps, which is why the hazard had never fired. `next build` failed, so nothing was written, and `next start` reported `Could not find a production build` - **a message about the output, not about the cause** | Medium | **LIVE deployment outage** - the admin app crash-looped under PM2 and served nothing. No data, no money and no player surface involved; the main app, the worker and the websocket server were unaffected | **CLOSED 14 Sep 2026** - the three offending specifiers are relative, so a main-app file always finds the main app's own module whichever root the alias points at. `npm run check:cross-app` walks the graph from every real boundary crossing and fails on any `@/` path `apps/admin` does not own; it runs in `.husky/pre-push` beside `check:mirrors`. Nothing backfilled |
 | **R76** | **Every prize correction an operator has ever made moved credits and recorded no ledger row.** `adjust-results` writes `prize_reclaim`, `prize_adjustment_add` and `prize_adjustment_deduct` and **none of the three was declared** on `WalletTransaction`, in either app - a missing enum value rejects the whole document rather than dropping the field, so `create` threw *after* the wallet `$inc` had already run in the same transaction, the per-adjustment `catch` recorded the row as an error, and the transaction committed. Compounded by two phantom fields: `previousPrize` read `participant.prizeWon` and the rank wrote `participant.finalRank`, **neither declared on `CompetitionParticipant`**, so a disqualification could never reclaim anything (the clawback block was skipped and the operator was told the credits had come back) and a correction priced every change against 0 - "set this winner to 40" *credited* 40 to a player already paid 100. Two further refusals - a short balance and a missing wallet - were silent `continue`s reported as success | High | **LIVE on every adjustment ever performed.** Credits moved; nothing recorded them, so the affected set **cannot be queried for** - only reconciled from wallet balances against settled prizes | **CLOSED 14 Sep 2026** - the three types declared in both apps, rank on `currentRank`, the prize read from the contest's stored `finalLeaderboard` (refused outright when no row exists), every refusal now refusing, the snapshot updated in the same transaction, the gate narrowed to `completed`. 21 tests, 19 probes. **Nothing backfilled** - which players to compensate is an owner decision |
 | **R77** | **A competition status nothing writes, and the only guard on the trading exit read it.** `Competition.status` declares `"emergency_ended"` and **no commit has ever assigned it** - `emergencyCancelActiveCompetition` stores `"cancelled"` and puts the emergency in `emergencyEndedAt` / `emergencyEndReason` / `emergencyEndedBy` alongside. Six of the seven readers were merely dead weight, `cancelled` reaching the same outcome. The seventh was the hole: `closePosition` refused `emergency_ended` **and tested nothing else**, so a player could keep closing positions on a contest already cancelled with every entry fee refunded. Separately the operator's orange EMERGENCY ENDED card could never render, so an emergency end looked like an ordinary cancellation with the reason, the time and the administrator nowhere on screen | Medium | **LIVE on both halves.** No document holds the value, so nothing to migrate; whether anybody closed a position on a refunded contest cannot be answered from the data | **CLOSED 14 Sep 2026** - `closePosition` refuses `cancelled` (deliberately not widened to `completed` / `finalizing`, which is a separate pre-existing hazard), the dead branch in `order.actions.ts` deleted, one CANCELLED card that turns orange and names all three stored facts. **The enum value is kept and documented inert in both copies** - removing it would reject a write to any document holding it, and making a writer store it is wrong in three places |
+| **R78** | **A challenge prize incremented the COMPETITION lifetime counter.** `payContestPrizes` resolves a contest vocabulary for the ledger row, the attribution field and the Game Master metadata - and then named `totalWonFromCompetitions` literally, for both kinds of contest. The wallet **balance** was always right and only the two lifetime figures were wrong, one over by exactly what the other was under, so nothing threw and nothing logged. Identical in both copies | Medium | **LIVE for challenges since 12 Sep 2026** (R71 put them on the shared stages; the inline copy it replaced had the same defect). A reporting figure, never a payment | **CLOSED 14 Sep 2026** - `[vocabulary.walletWinField]`, declared beside the transaction type it already carried, both copies in one commit. **Nothing backfilled**; the `challenge_win` rows exist, so the reconciliation screen's Fix recomputes both counters per user |
+| **R79** | **The admin challenge cancel credited two wallets and wrote no ledger row.** A bare `$inc` per seat, no `WalletTransaction` at all - so the balance moved and the ledger could never explain it, leaving the wallet permanently ABOVE the sum of its transactions and the reconciliation screen correctly reporting a critical mismatch that no re-run can clear. `challenge_refund` was a declared type every reader already listed; **the type was not missing, the writer was** | High | **LIVE on every admin challenge cancellation ever performed** | **CLOSED 14 Sep 2026** - one `refundChallengeSeat` helper called inside a loop over both seats, attributed by `challengeId` (never `referenceId`), `totalRefunded` incremented, no fee withheld because the contest never ran. **Nothing backfilled** - which balances to correct is an owner decision |
+| **R80** | **A second challenge settlement path with no authorization at all.** `action: "force_complete"` on the same route picked a winner and credited a prize with **no ledger row, no platform fee, no Game Master share, no lock and no transaction** - disagreeing with `challenge-settlement.service.ts` on all five. Both handlers of the route were unguarded; the comment said "Admin only" and nothing checked. **Tenth instance** of that class | High | **LIVE.** A route with no guard has no attribution, so whether it was ever called **cannot be answered** | **CLOSED 14 Sep 2026 - deleted, not fixed**, on the `shouldBlockEntry` precedent: nothing called it, and a correct force-complete is `settleChallenge` with a manual trigger. Both handlers now `guardSection("challenges")`, guarding before the body is read. **Nothing backfilled** - a prize paid this way left no row to find it by |
+| **R81** | **The reconciliation Fix button would have deleted a player's credits.** `balance_mismatch` sets the wallet to the ledger figure in **both** directions, and the too-high direction destroys credits the player holds, irreversibly, with no record of what they had - which is precisely the state R79 produces, on the very screen that surfaces it | High | **Latent as harm, live as an offer** - the button was presented on the account in the owner's report, proposing to remove 20 credits | **CLOSED 14 Sep 2026** - refuses with a 409 **before** the write and names the real repair (add the missing row; if the credits are genuinely unearned, remove them with an attributable admin debit). The too-low direction still applies, because there the ledger already explains the new balance |
+| **R82** | **A lifetime counter incremented by nothing, masked by its own screen.** `CreditWallet.totalGmEarnings` is declared, rendered and **written by no code path anywhere** - the sixth declared-written-dead field. The route then returned `stored \|\| calculated`, substituting the computed figure whenever the stored one was falsy, which it always was, so the row always agreed with itself and was always wrong; the cell printed a fixed `💰` rather than a verdict, so it could not have disagreed either way | Medium | **LIVE since the field was declared.** A reporting figure - no Game Master was underpaid, only under-recorded | **CLOSED 14 Sep 2026** - the counter moves in the **same `$inc` as the balance** in both copies of `game-master-fees/distribute.ts`, the route reports the stored value, and a new `gm_earnings_mismatch` issue with a Fix recomputes it from **both** payout row types. Scoped to users who actually have GM rows, or the screen warns about every account. **Nothing backfilled**; the per-payment rows exist |
+| **R83** | **The every-minute early-end worker paid challenge prizes out of nowhere.** One raw-driver `$inc` credited the **gross** pool (overpaying the winner by the platform fee), wrote **no `WalletTransaction`**, never touched `totalWonFromChallenges`, booked **no platform fee and no Game Master share**, and recorded the no-winner pool gross. The missing ledger row also made these challenges invisible to `challenge-finalize.job.ts`'s `challenge_win` crash-recovery key - an absent row is a missing lock, not only a reporting gap | High | **LIVE**, on every challenge that ended early - the only path that ends one before its `endTime` | **CLOSED 14 Sep 2026** - the money now moves through `payContestPrizes` and `settleFeesAndGameMasters` via the shared `applyChallengeOutcome`. **The winner DECISION is deliberately not shared**: `finalizeChallenge` was tried and reverted because its ranking rules (incl. `minimumTrades`) would silently pay a different person in three branches. The test harness pays through the same helper. **Fix-forward only, nothing backfilled** - the data is pre-launch test data and the overpayments left no row to find them by |
+| **R84** | **A chargeback clawback booked the full amount and clamped the wallet at zero.** The ledger row said `-100` while the balance moved by 20, which is the *normal* case for a chargeback - and the mismatch is unrepairable, because **R81**'s Fix button refuses to reduce a player's balance. The canonical rule, `evaluateClawback`, has always said refuse; it had **no caller**, and the Atlas route carried a second inline copy that agreed with it by luck - **one rule, three readings** | Medium | **Latent for the ledger** (no mismatched pair found, **nothing backfilled**), **live as a behaviour** - any clawback exceeding the balance produced one | **CLOSED 14 Sep 2026** - both writers decide through `evaluateClawback`, **before any write**; a refusal throws `ClawbackRefusedError`, leaves the case **open**, and is recorded on the timeline and in the audit log, because otherwise the whole event is an error toast. Letting the balance go negative was rejected: it has no meaning anywhere else on the platform |
+| **R85** | **An idempotency guard that only ever made a double payment quiet.** The Game Master fee stage checked `gamemasterearnings` for an existing row *inside* the per-referred-player loop and `continue`d only the row insert - while the subscription increment, the wallet credit and the ledger row all sit **after** that loop. A retried transaction therefore skipped the rows and **paid the Game Master a second time**, leaving `gamemasterearnings` with exactly one row per referral: the guard kept clean the one artefact an operator would check. **The question to ask of an idempotency check is not whether it exists but which writes are on its far side** | High | **Latent** - no duplicated pair found, **nothing backfilled**. Reachable rather than theoretical: both apps run the finalize cron every minute inside a retried transaction, and `UnknownTransactionCommitResult` is exactly the case where the first attempt may already have committed | **CLOSED 14 Sep 2026** - the check is hoisted to the **per-Game-Master** level and reads `{ session }`, so one surviving row skips the whole payment block. The `cleanup-duplicates` route that existed to mop this up was **deleted, not fixed**: it debited wallets and **deleted** the duplicate ledger rows instead of writing a compensating adjustment, left `totalGmEarnings` untouched, had no guard on either handler and no caller - and could not have detected R85's duplicates anyway |
+| **R86** | **The reset that manufactured the mismatches it then reported.** `user-data-reset` empties the ledger collections and zeroes the wallets - naming **nine** of the fourteen numeric paths `CreditWallet` declares. The five it missed were all added to the model after it was written, and **two of them are equality-checked by reconciliation**, so every reset account came back reporting an `incident_compensation_mismatch` and a `gm_earnings_mismatch` for activity that no longer existed. The reset reported success and the screen reported defects; neither was wrong | Medium | **LIVE on every "Reset All Data" ever run.** No money moved - a teardown of test data that left phantom findings behind, which is how an operator learns to distrust the instrument | **CLOSED 14 Sep 2026** - all fourteen zeroed, and the guard **reads the numeric paths off `CreditWallet.schema`** rather than listing them, so the fifteenth field is caught the day it is declared. It also pins **which branch** it examines, because "Reset All Users" deletes the wallets outright and legitimately needs no counter list. **Fix-forward** - the remedy for an already-reset wallet is to run it again |
 | R8 | Bulk find-and-replace on wording | High | Medium | X8 |
 | R9 | Fraud throttle blind to provider entries | High | High | X5 |
 | R11 | Legal wording changed without review | High | Medium | X8 |
@@ -2606,6 +2615,386 @@ branch. `__tests__/admin/adjust-results.test.ts` (21 tests) and
 `tools/probe-adjust-results.ps1` (19 probes, all red on exactly the expected test) are the guard,
 including a structural one forbidding `participant.prizeWon` and `participant.finalRank` from ever
 returning.
+
+---
+
+### R78 - A challenge prize credited the competition counter - **CLOSED 14 September 2026**
+
+**What it was.** `payContestPrizes` in `lib/services/settlement/prize-payout.service.ts` resolves
+a `ContestVocabulary` so that the ledger row, the attribution field and the Game Master metadata
+all say "challenge" for a challenge - and then incremented **`totalWonFromCompetitions`**
+literally, for both kinds of contest. Every challenge prize ever paid was booked against the
+competition counter.
+
+**Why nothing failed.** Both fields are plain numbers on the same `CreditWallet` document, so the
+wallet **balance** was always right and only the two lifetime figures were wrong - one over by
+exactly the amount the other was under. There is no error, no log line and no failing read. It
+surfaced on the financial reconciliation screen as `Competition Wins: stored 406.65, calculated
+262.65` sitting directly above `Challenge Wins: stored 0, calculated 144` on one account, which is
+the same 144 credits appearing twice with opposite signs.
+
+**What it is now.** `[vocabulary.walletWinField]: prizeAmount`, with the field declared on
+`ContestVocabulary` beside the transaction type it already carried. Both copies of the file
+changed in the same commit - **the defect was identical in both, so fixing one is not a fix**, and
+`check:mirrors` compares models and has never had an opinion about this file pair.
+
+**Latent for challenges until 12 September**, when R71 first put challenges on the shared
+settlement stages; before that the challenge payout was inline and had the same defect. **Nothing
+backfilled**: the per-prize `challenge_win` ledger rows exist, so the two counters *can* be
+recomputed, and the reconciliation screen's Fix buttons now do exactly that per user.
+
+**The general form.** A function that takes a vocabulary *and then hard-codes one of its words* is
+worse than one that hard-codes all of them, because the resolved vocabulary in front of it reads
+as evidence the whole function is generic. The guard is scoped to the `$inc` and bans
+`totalWonFrom` inside it - **not file-wide**, because the wallet-creation branch a few lines above
+legitimately seeds both counters at zero, and a guard that fires on correct code is the one the
+next reader deletes.
+
+---
+
+### R79 - An admin challenge cancel credited a wallet and recorded nothing - **CLOSED 14 September 2026**
+
+**What it was.** `POST /api/challenges` with `action: "cancel"` refunded both seats with a bare
+`$inc` on `CreditWallet` and wrote **no `WalletTransaction` row at all**. The balance moved and the
+ledger could not explain it.
+
+**That is worse than a wrong number, and the direction matters.** The wallet ends up *above* the
+sum of its transactions, permanently, for every cancelled challenge - and the reconciliation screen
+correctly reports it as a **critical balance mismatch** that no amount of re-running will clear,
+because the missing thing is a row rather than a sum. On the account that prompted this work it was
+`stored 78.65, expected 58.65` beside `Challenge Spent: stored 160, calculated 180`: one cancelled
+20-credit challenge, both halves visible.
+
+**`challenge_refund` was already a declared transaction type that nothing had ever written.** The
+financial dashboard, the user history, the CSV export and the reconciliation all listed it. The
+type was not missing - the writer was.
+
+**What it is now.** One `refundChallengeSeat` helper, called once inside a loop over both seat
+ids, which credits the wallet, decrements `totalSpentOnChallenges`, increments `totalRefunded` and
+writes the `challenge_refund` row attributed by **`challengeId`** - the declared field, not
+`referenceId`, which is the name Stage 0 found nine writers using and strict mode silently
+discarding. The refund is the whole entry fee with no platform fee withheld, matching the
+competition cancel path, because the contest never ran.
+
+**One helper rather than two blocks is the deliverable.** The first draft duplicated the block per
+seat and gave the challenger a ledger row and the challenged user none - so the test **counts** the
+call sites and asserts the loop, rather than asserting a row is written somewhere in the file.
+
+**Live on every admin challenge cancellation ever performed. Nothing backfilled** - which balances
+to correct is an owner decision, and the screen's Fix button now refuses the destructive direction
+(R81) rather than resolving it by deleting the credits.
+
+---
+
+### R80 - An unauthenticated second money writer - **CLOSED 14 September 2026 (deleted)**
+
+**What it was.** The same route carried `action: "force_complete"`, which read both participants'
+capital, picked a winner, computed a prize and **credited it** - with no ledger row, no platform
+fee, no Game Master share, no optimistic lock and no transaction of its own. A second settlement
+path beside `challenge-settlement.service.ts`, disagreeing with it on every one of those five
+points.
+
+**And the route had no authorization of any kind.** Both handlers. The comment said "Admin only"
+and nothing checked - **the tenth instance** of that class after Prerequisite A, the
+internal-secret fallbacks, the suspicion-score route, the provider admin routes, the contest-edit
+route, the lifecycle routes, `sync-referrals`, the AI routes and the Image Optimizer. The `GET`
+handed out every challenge on the platform; the `POST` paid prizes.
+
+**It was deleted, not fixed.** Nothing called it - no admin component fetches the action - and a
+"force complete" that settled correctly would be `settleChallenge` with a manual trigger, which is
+a different feature. Leaving a stub would make reintroducing a second money writer a one-line
+change that reads like using an existing API, the `shouldBlockEntry` precedent. Both handlers are
+now `guardSection("challenges")`, guarded **before** the request body is read.
+
+**Live, and there is no way to know whether it was ever called** - a route with no guard has no
+attribution, so do not let the absence of evidence read as reassurance. **Nothing backfilled**: a
+prize paid this way left no row to find it by, which is the same argument as R26.
+
+---
+
+### R81 - The Fix button that would have deleted a player's credits - **CLOSED 14 September 2026**
+
+**What it was.** The reconciliation screen's `balance_mismatch` fix sets the wallet balance to the
+ledger's figure, in both directions. In the balance-too-**high** direction that **destroys credits
+the player is holding**, irreversibly, with no record of what they had.
+
+**And that direction is exactly the one R79 produces.** A wallet above its ledger is the signature
+of a writer that moved money without recording a row - so the button's most likely use, on the very
+screen that surfaces the defect, was to confiscate a legitimate refund. The account in the owner's
+screenshot was in precisely that state, with the Fix button offering to remove 20 credits.
+
+**Setting balance := ledger cannot write a compensating row either**, because a compensating row
+would break the invariant the fix has just restored. There is no safe automatic answer in that
+direction, which is why the fix now **refuses with a 409 and names the real repair**: add the
+missing ledger row, check the refund paths, and if the credits really are unearned remove them with
+an explicit admin debit so the change is attributable. The too-low direction still applies, because
+there the ledger already explains the new balance.
+
+**A guard that merely exists is not the property.** Written `rounded > previousBalance` it refuses
+every safe repair and applies every destructive one, so the test asserts **the direction** and
+asserts the refusal sits **before** the write - an abort after the update is an audit note on a
+change already made.
+
+**Latent as harm** - no evidence it was ever pressed in the destructive direction - **and live as
+an offer**, which is the honest way to say it. Nothing backfilled.
+
+---
+
+### R82 - A lifetime counter incremented by nothing, and masked by its own screen - **CLOSED 14 September 2026**
+
+**What it was, and it is two defects that hid each other.** `CreditWallet.totalGmEarnings` is
+declared, rendered on the reconciliation screen and **was incremented by no code path anywhere** -
+the sixth declared-written-dead field after `requiresSyncPlay`, `isPaused`,
+`lastSuccessfulRoundAt`, `family` and `playModeOverride`. Every Game Master on the platform stored
+zero however much they had been paid.
+
+**And the screen could not report it**, because the route returned
+`walletData.totalGmEarnings || gmEarningsTotal` - substituting the **calculated** figure whenever
+the stored one was falsy, which it always was. The row therefore always agreed with itself and was
+always wrong. The display half did the same thing independently: that cell printed a fixed `💰`
+rather than a verdict, so it could not have disagreed even if the route had let it.
+
+**What it is now.** The counter moves in the **same `$inc` as the balance** in
+`game-master-fees/distribute.ts` - both copies - because two updates can diverge on any partial
+failure and each write still reads as correct afterwards. The route reports the stored value. The
+screen answers ✓ or ⚠ like every other row, and a new `gm_earnings_mismatch` issue with a Fix
+button recomputes the counter from the ledger.
+
+**The check is scoped to `gmEarningsTotal > 0`**, deliberately: a player who has never been a Game
+Master legitimately stores zero, and without the scope the screen warns about nearly every account
+on the platform - **a screen that warns about everybody is one nobody reads.** The repair sums
+**both** payout row types, `gamemaster_earning` and `gamemaster_challenge_referral`, because a
+Game Master earns from referred players' entry fees in competitions *and* challenges and summing
+one silently halves a partner's recorded lifetime earnings.
+
+**Live since the field was declared; nothing backfilled automatically.** Historical earnings are
+recoverable, because the per-payment ledger rows exist - the screen now reports the gap and the Fix
+button closes it per user.
+
+**Three counters are deliberately NOT equality-checked and the reasons are recorded in the route**,
+so that nobody "finishes off" the list. `totalAdminCredits` / `totalAdminDebits` are already
+consumed by the deposit and withdrawal checks as a legacy allowance, so an equality check would
+fire on exactly the rows that allowance exists to tolerate and the two assertions could not both
+hold; they are also written inconsistently, a cancelled withdrawal writing a positive
+`admin_adjustment` that touches neither counter. And **`totalRefunded` has two definitions** -
+every contest path counts credits returned to a *wallet*, while the chargeback writer counts money
+returned to a *card*, which credits no wallet and writes no ledger row - so no single expression
+can validate it and a check would be wrong in one of the two directions.
+
+---
+
+### R83 - The early-end worker paid challenge prizes out of nowhere - **CLOSED 14 September 2026**
+
+**What it was, and it is FIVE defects in one `updateOne`.** `worker/jobs/early-end-check.job.ts`
+runs **every minute** and ends a challenge as soon as every remaining player is liquidated or
+disqualified. It then paid the winner itself, with the raw MongoDB driver:
+
+```ts
+await walletsCollection.updateOne(
+  { userId: winnerId },
+  { $inc: { creditBalance: prizePool } },   // prizePool = entryFee * 2
+);
+```
+
+One line, and every one of the following is wrong with it:
+
+1. **It credited the GROSS pool.** The winner is owed `challenge.winnerPrize`, which the create
+   route stores as `prizePool - platformFeeAmount`. Every early-ended challenge **overpaid its
+   winner by exactly the platform fee**, 10% by default.
+2. **It wrote no `WalletTransaction`.** Reconciliation compares a wallet's balance against the sum
+   of its ledger rows, so every early-ended challenge left its winner with a permanent
+   `balance_mismatch` - and that is precisely the state **R81** now refuses to "fix", because the
+   only honest repair is to add the missing row.
+3. **It never incremented `totalWonFromChallenges`**, so the player's lifetime winnings
+   under-reported by the prize.
+4. **It booked no platform fee and no Game Master referral commission.** The platform's own books
+   had no record of the contest at all - the same shape as **R26** one contest type along.
+5. **In the no-winner case it recorded the GROSS pool as unclaimed**, where the shared stage
+   records it net of the fee, overstating unclaimed funds and understating revenue.
+
+**A sixth consequence, and it is the one a summary drops.** `challenge-finalize.job.ts` uses the
+existence of a `challenge_win` `WalletTransaction` as its **crash-recovery idempotency key**. A
+challenge completed by this path has none, so it is invisible to that recovery - the absence of a
+ledger row is not only a reporting gap, it is a missing lock.
+
+**What it is now.** The money moves through `payContestPrizes` and `settleFeesAndGameMasters`, the
+same two stages the ordinary end-of-challenge path uses, reached through a new shared
+`applyChallengeOutcome` (`lib/services/settlement/challenge-outcome.ts`, mirrored) and a worker-side
+`payOutEarlyEndedChallenge`.
+
+**THE DECISION IS DELIBERATELY NOT SHARED, and that is the load-bearing part.** The obvious repair
+- call `finalizeChallenge` - was written and then **reverted**: that function ranks players under
+the rules that apply at a challenge's `endTime`, and an early end has cases those rules do not
+express. A liquidated-but-fair player beats an explicitly disqualified one; two liquidated players
+are separated on final equity; and `settleChallenge` enforces `minimumTrades`, which would turn
+several of the worker's winners into no-winner settlements. Routing the decision through it would
+have **silently paid a different person** in three branches. So the caller decides who won and only
+the payout is shared. A document describing this as "early end now uses `finalizeChallenge`" is
+describing the version that was reverted.
+
+**Two things the fix had to preserve, both invisible to a typecheck.** `winnerRole` and
+`completedAt` are **not declared on the `Challenge` schema** - the old code only stored them because
+the raw driver bypasses Mongoose strict mode - and the admin end-logic harness reads `winnerRole`
+back, also with the raw driver, so dropping it would make every early-end scenario report
+`undefined`. They are still written with the raw driver, for that reason, rather than declared: a
+mirrored model change for two fields the ordinary finalize path has never written does not belong in
+a money fix. And **`isDisqualified` has two meanings here**: the outcome flags decide whether a
+participant row stays `disqualified` and how many qualified winners the fee stage is told about,
+while the stored final-stats blob is what an operator *reads* -
+`apps/admin/app/challenges/view/[id]/page.tsx` renders it as a badge and strikes the score through.
+With `disqualifyOnLiquidation` on, a liquidated player must be reported as disqualified **and** can
+still win on final equity, so folding liquidation into the outcome flags would have left that
+winner's row unmarked and their `prizeReceived` unrecorded. Hence the separate
+`reportedDisqualified` input.
+
+**The test harness now pays through the same helper.** It had its own copy of the payout, which
+means the end-logic tests exercised a path *adjacent* to the real one and could never have caught
+any of the five defects - the harness lesson from R7, in its most expensive form.
+
+**LIVE, and nothing backfilled.** Historical early-ended challenges overpaid their winners and left
+no ledger row to find them by; the owner's instruction is that the data is test data and will be
+deleted before launch, so this is **fix-forward only**. A document describing a backfill or a
+reporting script is describing something nobody wrote.
+
+---
+
+### R84 - The chargeback clawback that clamped a wallet and booked the whole amount - **CLOSED 14 September 2026**
+
+**What it was.** `completeChargeback` in `lib/services/security/chargeback-case.writers.ts` wrote a
+`chargeback_clawback` ledger row for the **full** disputed amount and then stored
+`Math.max(0, balanceBefore - amount)` on the wallet. When the player had already spent the credits
+the bank was taking back - which is the *normal* case for a chargeback, because a player who still
+held the money would rarely be disputing it - the row said `-100` and the balance moved by 20.
+
+**The mismatch is permanent, and that is what makes it worse than a wrong number.** Reconciliation
+compares a wallet against the sum of its rows, so the account is flagged for ever; and **R81's fix
+refuses to reduce a player's balance**, so the one button on the screen deliberately cannot repair
+it. The two defects were written days apart and compose into an account no operator can settle.
+
+**The rule already existed and had no caller.** `evaluateClawback` in
+`lib/services/reconciliation-math.ts` has always said a clawback that would drive the balance
+negative is **refused** - "handle as a loss or fraud case". Nothing called it. The Atlas refund
+clawback route carried its own inline copy of the same three checks, which agreed with the
+canonical rule by luck, and this writer carried a third reading that did not. **One rule, three
+copies**, the shape behind `referenceId`, `failedReason`, `challengeId` and the Game Master `||` -
+and note `check:mirrors` compares models and has never had an opinion about any of them.
+
+**What it is now**, on the owner's decision of 14 September 2026 (refuse, do not clamp):
+
+- `evaluateClawback` is the single decision, called by **both** writers. The Atlas route's inline
+  copy is gone.
+- The decision runs **before any write**, so a refusal leaves no row, no balance change and no
+  closed case. That ordering is asserted by position rather than by presence: a guard that fires
+  after `WalletTransaction.create` has already stored the row on the non-transactional path.
+- A refusal throws `ClawbackRefusedError`, a distinct class so callers can tell "this is not
+  allowed" from "the database fell over". The admin route surfaces its message.
+- **The case stays open.** A closed case with no clawback reads as settled, which is the thing an
+  operator would act on next.
+- The refusal is **recorded on the case timeline and in the audit log**, outside the transaction
+  that aborted. Without it the whole event is an error toast: R40's no-guard-no-attribution rule
+  one layer along, where the second operator repeats the attempt because the first left no trace.
+- The error message carries **the figures** - "Cannot claw back 100 credits - the wallet only holds
+  20" - because every caller shows it to a person who then has to decide what to do about it, and
+  "how short is it" is the first thing they need.
+
+**The rejected repair, because it is the one that looks obvious.** Letting the balance go negative
+makes the ledger and the wallet agree, and it is wrong: a negative credit balance has no meaning
+anywhere else in the platform, every screen that renders it would show a debt the player cannot
+pay off, and entry gates compare against zero. Refusing keeps the loss where it actually is - on
+the platform - and puts a human on it.
+
+**Two scope notes.** `grantedCredits` is passed as the requested amount here, deliberately: the
+operator types the disputed figure by hand on a chargeback, so the "exceeds what was granted"
+clause is the Atlas route's question and is a no-op on this path - only the negative-balance clause
+can bite. And all five chargeback routes authenticate with `getAdminSession` and **no**
+`guardSection`, which is a system-wide pattern in that folder rather than something this fix
+introduced; recorded as a tripwire on the **R57** precedent, not silently swept in.
+
+**Latent for the ledger, live for the refusal.** No mismatched pair has been found in the current
+data, and **nothing was backfilled** - a clamped clawback leaves a row whose `balanceAfter` is a
+plausible number, so the affected set is found by reconciliation rather than by a query, which is
+exactly what the screen now does.
+
+---
+
+### R85 - An idempotency guard that only ever made a double payment quiet - **CLOSED 14 September 2026**
+
+**What it was.** `lib/services/settlement/game-master-fees/distribute.ts` checked
+`gamemasterearnings` for an existing row before inserting one, and `continue`d the **inner**
+loop when it found one. The check sat *inside* the per-referred-player loop, and the three
+writes that actually move money sit **after** that loop: the subscription's
+`totalEarnings` / `currentMonthEarnings` increment, the Game Master's `CreditWallet` credit,
+and the `WalletTransaction` row.
+
+So a second run over the same contest skipped the earning rows and then **paid the Game Master
+again** - a second wallet credit, a second ledger row, a second subscription increment - while
+`gamemasterearnings` still held exactly one row per referral. The thing an operator would look
+at to detect a double payment is the one thing the guard kept clean.
+
+**A guard that is only ever reached in order to make a double payment silent is worse than no
+guard**, because it reads as idempotency to everybody who opens the file. That is the
+transferable form, and it generalises past this codebase: **the question to ask of an
+idempotency check is not "does it exist" but "which writes are on its far side".**
+
+**Reachable rather than theoretical.** Both apps register `checkAndFinalizeCompetitions` on an
+every-minute cron and the stages run inside a retried transaction, so a
+`TransientTransactionError` or an `UnknownTransactionCommitResult` re-enters the function -
+and `UnknownTransactionCommitResult` is precisely the case where the first attempt may already
+have committed.
+
+**What it is now.** The check is **hoisted to the top of the per-Game-Master loop**, so one
+surviving earning row for that Game Master on that contest skips the entire payment block. The
+rows and the payment commit together in one transaction, which is what makes a single row
+sufficient proof. It reads `{ session }`, so it is snapshot-consistent with the transaction it
+is protecting rather than with whatever another process committed a moment ago.
+
+**And the route that existed to mop this up was deleted.**
+`apps/admin/app/api/admin/cleanup-duplicates/route.ts` found duplicate GM earnings, debited the
+wallet by the over-credited total and then **deleted** the duplicate `wallettransactions` rows
+rather than writing a compensating `admin_adjustment` - so it moved money and destroyed the
+record of why, left `totalGmEarnings` untouched, and had **no `guardSection` on either
+handler** and no caller anywhere. It could not have fixed R85's duplicates either, since those
+leave no duplicate row to find. Deleted on the `shouldBlockEntry` precedent: a dead money
+writer is an invitation, and the correct repair for an over-credited wallet is an attributable
+admin debit through `/api/users/credit`, which already exists and already records one.
+
+**Latent, and nothing backfilled** - no duplicated pair has been found, and by construction a
+double payment through this path leaves two ledger rows and one earning row, so the affected
+set is found by reconciliation rather than by querying for duplicates.
+
+---
+
+### R86 - The reset that manufactured the mismatches it then reported - **CLOSED 14 September 2026**
+
+**What it was.** `apps/admin/lib/services/user-data-reset.service.ts` empties the ledger
+collections and then zeroes the wallets - and its `$set` named **nine** of the fourteen numeric
+paths `CreditWallet` declares. The five it missed are `totalAdminCredits`, `totalAdminDebits`,
+`totalIncidentCompensation`, `totalGmEarnings` and `totalRefunded`, all of which were added to
+the model **after** the reset was written.
+
+**Two of the five are equality-checked by reconciliation.** So a reset left
+`totalIncidentCompensation` and `totalGmEarnings` at their old non-zero values with no rows
+left to justify them, and every affected account came back reporting an
+`incident_compensation_mismatch` and a `gm_earnings_mismatch` for activity that no longer
+existed. The reset reported success; the screen reported defects; neither was wrong.
+
+**The general form, which is the reason this is recorded rather than quietly fixed: a
+teardown that names its fields is stale the moment the model gains one, and it fails by
+manufacturing exactly the kind of finding that teaches an operator to distrust the
+instrument.** Same family as R82's `stored || calculated`, where a reporting screen was
+structurally incapable of contradicting itself.
+
+**What it is now.** All fourteen are zeroed, and the guard in
+`__tests__/admin/reconciliation-money-guards.test.ts` **reads the numeric paths off
+`CreditWallet.schema`** rather than listing them, so the fifteenth field is caught on the day
+it is declared. Two things about that test are load-bearing. It asserts the path count has not
+collapsed, because a filter that stops matching makes every assertion below it trivially true.
+And it pins **which branch** it is examining: "Reset All Users" deletes the wallets outright and
+legitimately needs no counter list at all, so a guard that cannot tell the two apart is
+satisfied by the delete branch and says nothing about the one that resets.
+
+**Fix-forward, nothing backfilled** - a reset is an operator action on test data, and the
+remedy for an already-reset wallet is to run it again.
 
 ---
 

@@ -440,16 +440,45 @@ export async function POST(request: NextRequest) {
           completedWithdrawalCredits;
         const wallet = await CreditWallet.findOne({ userId }).session(session);
         const previousBalance = wallet?.creditBalance || 0;
+        const rounded = Math.round(correctBalance * 100) / 100;
+
+        // Reason: R81. This fix trusts the ledger absolutely, so in the
+        // balance-too-HIGH direction it DESTROYS credits the player is holding.
+        // A wallet over the ledger is the exact signature of a writer that moved
+        // money without recording a row (R79 was one: the admin challenge-cancel
+        // refund credited a wallet and wrote no transaction). Overwriting the
+        // balance then confiscates a legitimate refund, irreversibly, and leaves
+        // no trace of what the player used to hold. Setting balance := ledger
+        // cannot write a compensating transaction either, because that would
+        // break the very invariant it just restored — so the only safe answer in
+        // this direction is to refuse and name the real repair, which is to add
+        // the missing ledger row. The too-LOW direction is safe to apply: the
+        // ledger already explains the new balance.
+        if (rounded < previousBalance - 0.01) {
+          await session.abortTransaction();
+          const shortfall = Math.round((previousBalance - rounded) * 100) / 100;
+          return NextResponse.json(
+            {
+              success: false,
+              error:
+                `Refused: this would REMOVE ${shortfall} credits from the player (${previousBalance} → ${rounded}). ` +
+                `A balance above the ledger means money reached the wallet without a transaction row — the repair is to add the missing row, not to delete the credits. ` +
+                `Check refund paths (competition/challenge cancellation, withdrawal reversal) and admin credit adjustments for this user, then re-run reconciliation. ` +
+                `If the credits really are unearned, remove them with an explicit admin debit so the change is attributable.`,
+            },
+            { status: 409 },
+          );
+        }
 
         await CreditWallet.updateOne(
           { userId },
-          { $set: { creditBalance: Math.round(correctBalance * 100) / 100 } },
+          { $set: { creditBalance: rounded } },
           { session },
         );
 
         result = {
           success: true,
-          message: `Balance corrected from ${previousBalance} to ${Math.round(correctBalance * 100) / 100} credits (${pendingWithdrawalCredits} pending + ${completedWithdrawalCredits} completed withdrawal credits accounted for)`,
+          message: `Balance corrected from ${previousBalance} to ${rounded} credits (${pendingWithdrawalCredits} pending + ${completedWithdrawalCredits} completed withdrawal credits accounted for)`,
         };
         break;
       }
@@ -673,6 +702,70 @@ export async function POST(request: NextRequest) {
         result = {
           success: true,
           message: `Challenge spent corrected from ${previousValue} to ${Math.round(correctTotal * 100) / 100} credits (${grossEntries} entries - ${totalRefunds} refunds)`,
+        };
+        break;
+      }
+
+      case "incident_compensation_mismatch": {
+        const compTx = await WalletTransaction.find({
+          userId,
+          transactionType: "incident_compensation",
+          status: "completed",
+        }).session(session);
+
+        const correctTotal = compTx.reduce(
+          (sum, tx) => sum + Math.abs(tx.amount || 0),
+          0,
+        );
+        const wallet = await CreditWallet.findOne({ userId }).session(session);
+        const previousValue =
+          (wallet as any)?.totalIncidentCompensation || 0;
+
+        await CreditWallet.updateOne(
+          { userId },
+          {
+            $set: {
+              totalIncidentCompensation: Math.round(correctTotal * 100) / 100,
+            },
+          },
+          { session },
+        );
+
+        result = {
+          success: true,
+          message: `Incident compensation corrected from ${previousValue} to ${Math.round(correctTotal * 100) / 100} credits`,
+        };
+        break;
+      }
+
+      case "gm_earnings_mismatch": {
+        // Reason: R82. Both GM payout row types count — a Game Master earns from
+        // referred players' entry fees in BOTH competitions and challenges, and
+        // summing only one silently halves a partner's recorded lifetime earnings.
+        const gmTx = await WalletTransaction.find({
+          userId,
+          transactionType: {
+            $in: ["gamemaster_earning", "gamemaster_challenge_referral"],
+          },
+          status: "completed",
+        }).session(session);
+
+        const correctTotal = gmTx.reduce(
+          (sum, tx) => sum + Math.abs(tx.amount || 0),
+          0,
+        );
+        const wallet = await CreditWallet.findOne({ userId }).session(session);
+        const previousValue = (wallet as any)?.totalGmEarnings || 0;
+
+        await CreditWallet.updateOne(
+          { userId },
+          { $set: { totalGmEarnings: Math.round(correctTotal * 100) / 100 } },
+          { session },
+        );
+
+        result = {
+          success: true,
+          message: `Game Master earnings corrected from ${previousValue} to ${Math.round(correctTotal * 100) / 100} credits`,
         };
         break;
       }
@@ -1590,6 +1683,76 @@ async function getDetailedUserReconciliation(
     });
   }
 
+  // Check incident compensation.
+  // Reason: both writers (incidents/[id]/compensate and incidents/[id]/resolve)
+  // $inc this field and creditBalance in a single update, so the stored counter
+  // and the ledger sum of incident_compensation rows must agree exactly.
+  const incidentCompDiff = Math.abs(
+    walletData.totalIncidentCompensation - incidentCompensationTotal,
+  );
+  if (incidentCompDiff > 0.01) {
+    issues.push({
+      type: "incident_compensation_mismatch",
+      severity: "warning",
+      userId,
+      userEmail,
+      details: {
+        expected: Math.round(incidentCompensationTotal * 100) / 100,
+        actual: walletData.totalIncidentCompensation,
+        difference:
+          Math.round(
+            (walletData.totalIncidentCompensation - incidentCompensationTotal) *
+              100,
+          ) / 100,
+        description: `Incident compensation mismatch: stored ${walletData.totalIncidentCompensation}, calculated ${Math.round(incidentCompensationTotal * 100) / 100}`,
+      },
+    });
+  }
+
+  // Check Game Master lifetime earnings.
+  // Reason: R82. Only raised for a user who actually has GM earnings on the
+  // ledger — a player who has never been a Game Master legitimately stores 0,
+  // and reporting that would be noise on every account on the platform.
+  // Historical earnings paid before the distribute.ts fix will show here once
+  // and clear on Fix; the counter is maintained from then on.
+  const gmEarningsDiff = Math.abs(walletData.totalGmEarnings - gmEarningsTotal);
+  if (gmEarningsTotal > 0 && gmEarningsDiff > 0.01) {
+    issues.push({
+      type: "gm_earnings_mismatch",
+      severity: "warning",
+      userId,
+      userEmail,
+      details: {
+        expected: Math.round(gmEarningsTotal * 100) / 100,
+        actual: walletData.totalGmEarnings,
+        difference:
+          Math.round((walletData.totalGmEarnings - gmEarningsTotal) * 100) / 100,
+        description: `Game Master earnings mismatch: stored ${walletData.totalGmEarnings}, calculated ${Math.round(gmEarningsTotal * 100) / 100} (${breakdown.gmCompetitionEarnings} competition + ${breakdown.gmChallengeEarnings} challenge payout rows)`,
+      },
+    });
+  }
+
+  // Reason: THREE stored counters are deliberately NOT equality-checked, and the
+  // reasons differ. Do not "finish off" this list without reading them.
+  //
+  // `totalAdminCredits` / `totalAdminDebits`: the deposit and withdrawal checks
+  // above already consume the gap between these counters and the admin_adjustment
+  // ledger as a legacy allowance (legacyAdminCreditsInDeposit /
+  // legacyAdminDebitsInWithdrawals), on the grounds that older data put admin
+  // credits into totalDeposited. An equality check here would therefore fire on
+  // exactly the rows that allowance exists to tolerate, and the two assertions
+  // cannot both be satisfied — one of the pair must report a discrepancy. They
+  // are also written inconsistently: a cancelled or rejected withdrawal writes a
+  // positive `admin_adjustment` and does NOT touch totalAdminCredits, while
+  // atlas/refund/clawback writes a negative one and DOES touch totalAdminDebits.
+  //
+  // `totalRefunded`: its writers do not agree on what it means. Competition
+  // cancellation, exclusion refunds, unscored refunds and admin challenge-cancel
+  // all count credits returned to the WALLET; chargeback-case.writers counts
+  // money returned to a CARD, which credits no wallet and writes no matching
+  // ledger row. No single ledger expression can validate a counter with two
+  // definitions, so a check would be wrong in one of the two directions.
+
   // Check if user is a Game Master (has GM earnings)
   const isGameMaster =
     gmEarningsTotal > 0 ||
@@ -1606,10 +1769,12 @@ async function getDetailedUserReconciliation(
     userId,
     userEmail,
     userName,
-    wallet: {
-      ...walletData,
-      totalGmEarnings: walletData.totalGmEarnings || gmEarningsTotal,
-    },
+    // Reason: R82. This used to read `walletData.totalGmEarnings || gmEarningsTotal`,
+    // which substituted the CALCULATED figure whenever the stored one was zero —
+    // so the screen always showed a plausible number and the counter could never
+    // be reported as wrong. It was zero for everybody, because nothing incremented
+    // it until the fix in game-master-fees/distribute.ts. Report the stored value.
+    wallet: { ...walletData },
     calculated: {
       // Reason: expectedBalance is the pending-adjusted figure (what the wallet
       // SHOULD hold right now, after in-flight withdrawal debits) — this matches

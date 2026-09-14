@@ -302,6 +302,23 @@ export async function wipeUserData(
       deleted.set("orphanWallets", 0);
     }
 
+    // EVERY numeric counter on CreditWallet is zeroed here, not just the seven
+    // this list originally carried.
+    //
+    // Reason: R86. The five below were added to the model after this reset was
+    // written, and the list was never extended — they are exactly the counters
+    // declared without `required: true`, which is what makes them easy to miss.
+    // The reset deletes `wallettransactions`, `gamemasterearnings` and
+    // `incidents`, so leaving a stale non-zero value here makes the ledger sum
+    // 0 while the wallet still claims a total: reconciliation then reports an
+    // `incident_compensation_mismatch` and a `gm_earnings_mismatch` on every
+    // affected wallet, for activity that no longer exists anywhere. A reset that
+    // manufactures reconciliation issues is worse than one that refuses, because
+    // the issues look real.
+    //
+    // If a counter is added to the model, it belongs in this list. The guard is
+    // `__tests__/admin/reconciliation-money-guards.test.ts`, which compares this
+    // `$set` against the model's own numeric paths.
     const walletResetResult = await CreditWallet.updateMany(
       {},
       {
@@ -314,6 +331,11 @@ export async function wipeUserData(
           totalSpentOnChallenges: 0,
           totalWonFromChallenges: 0,
           totalSpentOnMarketplace: 0,
+          totalAdminCredits: 0,
+          totalAdminDebits: 0,
+          totalIncidentCompensation: 0,
+          totalGmEarnings: 0,
+          totalRefunded: 0,
           kycVerified: false,
           kycStatus: "none",
           kycAttempts: 0,

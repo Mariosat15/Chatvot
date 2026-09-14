@@ -89,6 +89,17 @@ export interface ContestVocabulary {
   /** Field name used inside a GM payment's metadata object for the contest's display name. */
   nameField: "competitionName" | "challengeName";
   winTransactionType: "competition_win" | "challenge_win";
+  /**
+   * Which lifetime-winnings counter on `CreditWallet` a prize increments.
+   *
+   * Reason: R78. The payout stage resolved this vocabulary for the ledger row's
+   * transaction type and then incremented `totalWonFromCompetitions` unconditionally, so
+   * every challenge prize was booked against the competition counter. The wallet balance
+   * was always right and only the two lifetime figures were wrong, which is why nothing
+   * failed - it surfaced on the financial reconciliation screen as one user's competition
+   * wins being over-reported by exactly the amount their challenge wins were under.
+   */
+  walletWinField: "totalWonFromCompetitions" | "totalWonFromChallenges";
   gmSourceType: "competition" | "challenge";
   gmWalletTransactionType: "gamemaster_earning" | "gamemaster_challenge_referral";
 }
@@ -98,6 +109,7 @@ const COMPETITION_VOCABULARY: ContestVocabulary = {
   idField: "competitionId",
   nameField: "competitionName",
   winTransactionType: "competition_win",
+  walletWinField: "totalWonFromCompetitions",
   gmSourceType: "competition",
   gmWalletTransactionType: "gamemaster_earning",
 };
@@ -107,6 +119,7 @@ const CHALLENGE_VOCABULARY: ContestVocabulary = {
   idField: "challengeId",
   nameField: "challengeName",
   winTransactionType: "challenge_win",
+  walletWinField: "totalWonFromChallenges",
   gmSourceType: "challenge",
   // Reason: kept distinct from "gamemaster_earning" (rather than reusing it) so the
   // financial dashboard can still separate challenge GM referral income from competition

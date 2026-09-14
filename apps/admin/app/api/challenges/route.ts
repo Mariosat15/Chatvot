@@ -1,9 +1,74 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import Challenge from "@/database/models/trading/challenge.model";
 import ChallengeParticipant from "@/database/models/trading/challenge-participant.model";
 import CreditWallet from "@/database/models/trading/credit-wallet.model";
+import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import mongoose from "mongoose";
+
+/**
+ * Return one seat's entry fee and record that it happened.
+ *
+ * Reason: R79. This refund used to be a bare `$inc` on the wallet with no ledger row at
+ * all, which is worse than a wrong number: the balance was correct and the ledger could
+ * never explain it, so the two disagreed permanently and the financial reconciliation
+ * screen reported the user as having a critical balance mismatch for ever. It surfaced
+ * exactly that way - one player's stored balance sat 20 credits above the sum of their
+ * transactions, with challenge spending 20 below, which is one cancelled challenge.
+ *
+ * `challenge_refund` was a declared transaction type that nothing had ever written, and
+ * every reader (the financial dashboard, the user history, the export, the reconciliation)
+ * already listed it. So the type was not missing - the writer was.
+ *
+ * Two details are taken from the competition cancel path rather than invented here, so the
+ * two kinds of contest cancel agree: `totalRefunded` is incremented, and the refund is
+ * the whole entry fee with no platform fee withheld, because the contest never ran.
+ */
+async function refundChallengeSeat(
+  session: mongoose.ClientSession,
+  userId: string,
+  challengeId: mongoose.Types.ObjectId | unknown,
+  challengeName: string,
+  entryFee: number,
+  reason: string,
+): Promise<void> {
+  // `new: true` so `balanceAfter` is the real post-credit balance rather than one derived
+  // from a read another writer may already have overtaken.
+  const wallet = await CreditWallet.findOneAndUpdate(
+    { userId },
+    {
+      $inc: {
+        creditBalance: entryFee,
+        totalSpentOnChallenges: -entryFee,
+        totalRefunded: entryFee,
+      },
+    },
+    { session, new: true },
+  );
+
+  const balanceAfter = wallet?.creditBalance ?? entryFee;
+
+  await WalletTransaction.create(
+    [
+      {
+        userId,
+        transactionType: "challenge_refund",
+        amount: entryFee,
+        balanceBefore: balanceAfter - entryFee,
+        balanceAfter,
+        // Reason: `challengeId` is the declared field and `referenceId` is not. Stage 0
+        // found the whole challenge money trail unattributable because nine writers chose
+        // the undeclared name and strict mode discarded it while reporting success.
+        challengeId,
+        status: "completed",
+        description: `↩️ Entry fee refunded - ${challengeName} cancelled`,
+        metadata: { cancellationReason: reason, cancelledBy: "admin" },
+      },
+    ],
+    { session },
+  );
+}
 
 /**
  * Tell both seats that an operator cancelled their challenge.
@@ -74,9 +139,18 @@ async function notifyChallengeCancelled(
 }
 
 /**
- * GET - Fetch all challenges with filters (Admin only)
+ * GET - Fetch all challenges with filters
+ *
+ * Reason both handlers are guarded: neither had any authorization of any kind. The
+ * comment said "Admin only" and nothing checked - the same class as Prerequisite A, the
+ * internal-secret fallbacks, the unprotected suspicion-score route and the Image
+ * Optimizer. `requireAdminAuth` would not be enough either: it asks only whether the
+ * caller is an admin at all, so an employee granted one unrelated section passes it.
  */
 export async function GET(request: NextRequest) {
+  const guard = await guardSection("challenges");
+  if (!guard.ok) return guard.response;
+
   try {
     await connectToDatabase();
 
@@ -194,6 +268,9 @@ export async function GET(request: NextRequest) {
  * POST - Admin actions on challenges (cancel, refund)
  */
 export async function POST(request: NextRequest) {
+  const guard = await guardSection("challenges");
+  if (!guard.ok) return guard.response;
+
   try {
     await connectToDatabase();
 
@@ -238,31 +315,32 @@ export async function POST(request: NextRequest) {
           // Reason: Credits are only deducted when the challenged user ACCEPTS.
           // Pending challenges have zero financial impact — no refund needed.
           if (["accepted", "active"].includes(challenge.status)) {
-            // Refund challenger
-            await CreditWallet.updateOne(
-              { userId: challenge.challengerId },
-              {
-                $inc: {
-                  creditBalance: challenge.entryFee,
-                  totalSpentOnChallenges: -challenge.entryFee,
-                },
-              },
-              { session },
-            );
-            refundedCount++;
+            const cancellationReason = reason || "Cancelled by admin";
+            // Reason: a challenge has no name field. This is the exact wording
+            // `challenge-settlement.service.ts` gives the same contest, so a refund row
+            // and a win row for one challenge read as the same contest on the ledger.
+            const challengeName = `${challenge.challengerName} vs ${challenge.challengedName}`;
 
-            // Refund challenged user
-            await CreditWallet.updateOne(
-              { userId: challenge.challengedId },
-              {
-                $inc: {
-                  creditBalance: challenge.entryFee,
-                  totalSpentOnChallenges: -challenge.entryFee,
-                },
-              },
-              { session },
-            );
-            refundedCount++;
+            // Reason: both seats go through one function rather than two near-identical
+            // blocks. The duplicated version is how the challenger got a ledger row and
+            // the challenged user did not, in the first draft of this fix.
+            for (const userId of [
+              challenge.challengerId,
+              challenge.challengedId,
+            ]) {
+              // An accepted challenge has both seats filled, so a missing id here means
+              // the document is malformed - refunding nobody is the safe answer.
+              if (!userId) continue;
+              await refundChallengeSeat(
+                session,
+                userId,
+                challenge._id,
+                challengeName,
+                challenge.entryFee,
+                cancellationReason,
+              );
+              refundedCount++;
+            }
           }
           // Pending challenges: no refund needed — entry fee was never charged
 
@@ -306,127 +384,19 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      case "force_complete": {
-        // Force complete an active challenge (for testing or stuck challenges)
-        if (challenge.status !== "active") {
-          return NextResponse.json(
-            { error: "Can only force complete active challenges" },
-            { status: 400 },
-          );
-        }
-
-        // Get participants
-        const participants = await ChallengeParticipant.find({
-          challengeId: challenge._id,
-        }).lean();
-
-        if (participants.length !== 2) {
-          return NextResponse.json(
-            { error: "Challenge does not have exactly 2 participants" },
-            { status: 400 },
-          );
-        }
-
-        // Determine winner based on P&L
-        const challenger = participants.find(
-          (p) => p.userId === challenge.challengerId,
-        );
-        const challenged = participants.find(
-          (p) => p.userId === challenge.challengedId,
-        );
-
-        if (!challenger || !challenged) {
-          return NextResponse.json(
-            { error: "Could not find both participants" },
-            { status: 400 },
-          );
-        }
-
-        const challengerPnL =
-          challenger.currentCapital - challenge.startingCapital;
-        const challengedPnL =
-          challenged.currentCapital - challenge.startingCapital;
-
-        let winnerId: string | undefined;
-        let winnerName: string | undefined;
-        let winnerPnL: number | undefined;
-        let loserId: string | undefined;
-        let loserName: string | undefined;
-        let loserPnL: number | undefined;
-        let isTie = false;
-
-        if (challengerPnL > challengedPnL) {
-          winnerId = challenge.challengerId;
-          winnerName = challenge.challengerName;
-          winnerPnL = challengerPnL;
-          loserId = challenge.challengedId;
-          loserName = challenge.challengedName;
-          loserPnL = challengedPnL;
-        } else if (challengedPnL > challengerPnL) {
-          winnerId = challenge.challengedId;
-          winnerName = challenge.challengedName;
-          winnerPnL = challengedPnL;
-          loserId = challenge.challengerId;
-          loserName = challenge.challengerName;
-          loserPnL = challengerPnL;
-        } else {
-          isTie = true;
-        }
-
-        // Award prize to winner
-        if (winnerId) {
-          await CreditWallet.updateOne(
-            { userId: winnerId },
-            { $inc: { creditBalance: challenge.winnerPrize } },
-          );
-        }
-
-        // Update challenge
-        await Challenge.updateOne(
-          { _id: challengeId },
-          {
-            $set: {
-              status: "completed",
-              winnerId,
-              winnerName,
-              winnerPnL,
-              loserId,
-              loserName,
-              loserPnL,
-              isTie,
-              endTime: new Date(),
-              challengerFinalStats: {
-                finalCapital: challenger.currentCapital,
-                pnl: challengerPnL,
-                pnlPercentage:
-                  (challengerPnL / challenge.startingCapital) * 100,
-                totalTrades: challenger.totalTrades || 0,
-                winRate: challenger.winRate || 0,
-                isDisqualified: challenger.isDisqualified || false,
-              },
-              challengedFinalStats: {
-                finalCapital: challenged.currentCapital,
-                pnl: challengedPnL,
-                pnlPercentage:
-                  (challengedPnL / challenge.startingCapital) * 100,
-                totalTrades: challenged.totalTrades || 0,
-                winRate: challenged.winRate || 0,
-                isDisqualified: challenged.isDisqualified || false,
-              },
-            },
-          },
-        );
-
-        return NextResponse.json({
-          success: true,
-          message: isTie
-            ? "Challenge completed as a tie."
-            : `Challenge completed. Winner: ${winnerName}`,
-          winnerId,
-          winnerName,
-          isTie,
-        });
-      }
+      // Reason: R80. `force_complete` used to live here and was DELETED rather than
+      // repaired. It credited `winnerPrize` straight onto the winner's wallet with no
+      // ledger row, no `totalWonFromChallenges`, no platform fee, no Game Master
+      // referral share and no lock - a second money writer beside `settleChallenge`,
+      // on a route that had no authorization of any kind. Nothing in the admin UI
+      // called it, so it was reachable only over HTTP.
+      //
+      // Deleted on the `shouldBlockEntry` precedent: a dead helper that does the thing
+      // just removed makes reintroducing the defect a one-line change that reads like
+      // using an existing API. Ending a challenge EARLY is a genuine operational gap
+      // and is recorded as one - it belongs with the lifecycle controls in X6.5, beside
+      // `adjust-results` and `emergency_ended`, and must go through `settleChallenge`.
+      // The reversible operation, cancel-with-refund, is above and now writes a ledger.
 
       default:
         return NextResponse.json(

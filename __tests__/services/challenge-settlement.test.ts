@@ -239,7 +239,12 @@ async function seedChallenge(options: SeedOptions = {}): Promise<string> {
       userId,
       creditBalance: START_BALANCE,
       totalDeposited: START_BALANCE,
+      // BOTH lifetime-winnings counters are seeded at zero, because the R78 tests below
+      // need to distinguish "the challenge counter moved" from "the competition counter
+      // moved" - seeding only one leaves the other absent, and an absent field reads as
+      // a plausible zero whichever one the code actually incremented.
       totalWonFromCompetitions: 0,
+      totalWonFromChallenges: 0,
       createdAt: new Date(),
       updatedAt: new Date(),
     })),
@@ -882,5 +887,81 @@ describe("challenge settlement decides prize eligibility from the title's rules"
     // Different reason from the both_lose tie: there, two qualified players simply were not
     // paid; here nobody qualified at all.
     expect(unclaimed?.unclaimedReason).toBe("all_disqualified");
+  });
+});
+
+/**
+ * R78. The prize payout stage is SHARED between competitions and challenges, and it
+ * incremented `totalWonFromCompetitions` unconditionally - the one field in the stage
+ * that had been left hard-coded when the rest of it was parameterised by
+ * `resolveContestVocabulary`.
+ *
+ * Nothing about it is visible from a settlement's own result: the wallet balance, the
+ * ledger row, the platform fee and the participant's `prizeReceived` are all correct. It
+ * surfaces only where the two counters are read side by side, which is the reconciliation
+ * screen - and it presents there as TWO issues on one account, competition winnings
+ * over-reported and challenge winnings under-reported by exactly the same amount.
+ *
+ * These assertions belong to a challenge suite rather than a reconciliation one because
+ * the defect is in the writer. A reconciliation test would have agreed with whatever the
+ * writer did.
+ */
+describe("R78 - a challenge prize counts as challenge winnings, not competition winnings", () => {
+  it("credits totalWonFromChallenges and leaves the competition counter at zero", async () => {
+    const challengeId = await seedChallenge({
+      challenger: { pnl: 500, totalTrades: 10 },
+      challenged: { pnl: 200, totalTrades: 8 },
+    });
+
+    await runSettlement(challengeId);
+
+    const winner = await readWallet(CHALLENGER.id);
+    expect(winner?.creditBalance).toBe(START_BALANCE + WINNER_PRIZE);
+    expect(winner?.totalWonFromChallenges).toBe(WINNER_PRIZE);
+    // The defect in one line. Before the fix this held WINNER_PRIZE and the line above
+    // held zero, with every other money fact identical.
+    expect(winner?.totalWonFromCompetitions).toBe(0);
+
+    // The loser's counters must not move either - a fix that incremented BOTH fields
+    // would satisfy the assertion above while double-counting every prize.
+    const loser = await readWallet(CHALLENGED.id);
+    expect(loser?.totalWonFromChallenges).toBe(0);
+    expect(loser?.totalWonFromCompetitions).toBe(0);
+  });
+
+  it("splits the counter the same way it splits the prize on a tie", async () => {
+    // The tie path pays through the same stage twice, so it is where a fix applied to one
+    // call site and not the other would show.
+    const challengeId = await seedChallenge({
+      tieBreaker1: "trades_count",
+      challenger: { pnl: 300, totalTrades: 5 },
+      challenged: { pnl: 300, totalTrades: 5 },
+    });
+
+    await runSettlement(challengeId, "split_equally");
+
+    const half = WINNER_PRIZE / 2;
+    for (const who of [CHALLENGER, CHALLENGED]) {
+      const wallet = await readWallet(who.id);
+      expect(wallet?.totalWonFromChallenges).toBe(half);
+      expect(wallet?.totalWonFromCompetitions).toBe(0);
+    }
+  });
+
+  it("leaves both counters untouched when nobody is paid", async () => {
+    await seedTitle();
+    const challengeId = await seedChallenge({
+      gameType: "provider",
+      challenger: {},
+      challenged: {},
+    });
+
+    await runSettlement(challengeId);
+
+    for (const who of [CHALLENGER, CHALLENGED]) {
+      const wallet = await readWallet(who.id);
+      expect(wallet?.totalWonFromChallenges).toBe(0);
+      expect(wallet?.totalWonFromCompetitions).toBe(0);
+    }
   });
 });

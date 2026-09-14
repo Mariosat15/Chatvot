@@ -77,6 +77,7 @@
 | **How long does an open seat stay up?** | **Its own setting from 14 Sep 2026** (`03` **s2.4b**) - `ChallengeSettings.openChallengeExpiryMinutes`, resolved by the mirrored `lib/services/challenges/accept-deadline.ts`. Until then it reused `acceptDeadlineMinutes`, **a number nobody chose with a public notice board in mind**: it answers how long to hold a seat for one specific person who has been told, which is not the question "how long do I leave a notice up for any passer-by", and the two were forced to be equal. **NOTHING WAS COMPUTED WRONGLY** and **nothing was backfilled**. ~~**The open fallback is its own default of 24 hours, never the directed one** - no deployment holds a value for a field that did not exist yesterday, so falling back to `acceptDeadlineMinutes` makes the whole change invisible everywhere with every structural test still green, the branch being present and merely answering the same thing.~~ **REVERSED BY THE OWNER LATER THE SAME DAY, so that clause is correct as history and stale as a present fact - say which. An unset open expiry now falls back to `acceptDeadlineMinutes`** and only then to the 30-minute constant, because the visibility argument stopped holding the moment the control existed: with both numbers on Settings -> 1v1 Challenges, a hidden third number nobody configured sits between two they did, and an operator lowering the Accept Deadline to five minutes gets an open seat outliving it by a day. **What did not change is that a SAVED open expiry always wins**, so the two remain free to differ and the field is not a merge; the pinning test was **flipped, not deleted**, and the admin hint now says "Leave blank to use the Accept Deadline". **A non-positive or non-finite stored value reads as unset**, these arriving from `parseFloat` on an admin form where a `0` expires an open challenge on creation (R31's rule). **It is resolved once, at every writer**, or a challenge is created under one rule and expired under the other with a probe aimed at either copy staying green. **The admin control sends `null` when cleared**, because `JSON.stringify` drops `undefined` and an omitted field cannot unset a stored one - without it an operator can raise the number and never lower it. **The player route exposes the resolved figure**, not the stored one. Two templates exist because of this: **`challenge_seat_taken`**, because `challenge_accepted` says the opponent "accepted your challenge" and implies an invitation, and **`challenge_open_expired`**, because `challenge_expired` says a named opponent "did not respond in time" - a false statement about a challenge nobody was invited to, and unfixable by rewording afterwards since seeding never touches an existing row. **Expiry is written in three places** - server action, worker, admin - so the notification is a shared helper; **the worker is the one that runs in production**, which is why leaving it out is the version where nothing fires and every test about the other two passes |
 | **"How long the challenge runs" - a choice or a statement?** | **A statement, from 14 Sep 2026** (`13` **s4.1ab**) - on a **game** challenge the challenge length and the game's playing time are locked to the title's defaults and shown as clocks in the contest lobby's four-cell shape, and the `durationSeconds` label the owner called out reads as playing time. **NOTHING WAS COMPUTED WRONGLY**: every figure was right, the defaults were already resolved from the title, and a player who touched nothing got exactly the contest the operator configured - so a document describing a fixed calculation or a wrong duration is describing something nobody found, and **nothing was backfilled**. What the form did was **offer two decisions the operator had already taken**, which is how a challenge ends up shorter than the round inside it. **A locked control and a removed control are not the same thing and the removal is the wrong one** - a player deciding whether to pay needs the length - so `ChallengeDurationClock` states it, **reusing `CountdownCells` extracted from `CountdownPanel.tsx` rather than a second copy**, since `splitDuration` and the cells are one rule and two copies are how two screens disagree about what an hour looks like. **It is a duration, never a countdown** - feeding it a target counts down to a challenge that does not exist yet, which renders perfectly and is nonsense. **Trading keeps its editable input and chips**, having no title to inherit from, so a document describing both branches as locked is describing a choice taken away for no reason. **The game's playing time is locked by `format: "duration-seconds"`, never by field name** - matching `durationSeconds` is per-game code in the layer built to avoid it, and lower-casing the guard also matches inside `maxDurationSeconds` (`12` s2.9). And **the label is a fallback, not a rename**: the stored unit is still seconds because that is what the contract declares, so only what a player reads changed. **Never verified by eye** |
 | **Can a player say which games they will be challenged at?** | **Yes, from 14 Sep 2026** (`20` **s1.1a**) - X10's last opponent item. A profile section lists every challengeable title with a switch each, above the platform-wide master switch. **THE MASTER SWITCH ALREADY EXISTED, WAS ALREADY ENFORCED, AND HAD NO UI IN EITHER APP**: `POST /api/challenges` has read `UserPresence.acceptingChallenges` since long before this programme and no screen ever wrote it, so the only way to be unchallengeable was to have a document somebody had edited by hand - which is worth stating because it makes this slice **two features in one**, and a document describing it as only the per-game half is describing the smaller one. **NOTHING WAS COMPUTED WRONGLY and there is no risk number** - the gate that existed worked - and **nothing was backfilled**, because absent means willing and every player is already in that state. **Willingness is stored as an OPT-OUT on a separate collection**, `UserGamePreference` keyed `{ userId, gameKey }` unique, **not** on `UserPresence`: that document is written by a presence heartbeat, so a per-game row on it is a hot-document write on a field that changes twice a year. **It is main-app only and deliberately NOT mirrored** - `apps/admin` reads nothing from this collection, and **R42** is the case that shows mirroring ahead of a caller is worse than not, two copies agreeing while only one of them runs. **`20` s1's field list was wrong in two ways and is amended rather than rewritten**: `interestLevel`, `inferredAt` and `skillBand` all belong to the inference engine in that chapter's section 3, which is **X11.5 and unbuilt**, so declaring them now produces the next declared-written-dead field after `requiresSyncPlay`, `isPaused`, `lastSuccessfulRoundAt` and `family`. **The rules live in a model-free module** (`lib/services/games/challenge-willingness.ts`) because the settings screen is `"use client"` (**R58**), and the **default is one exported constant** read by the rules, the model's schema default and the screen's `useState` - three places that must agree, so the test asserts the constant appears **in the `useState` call** rather than merely in the file, a probe having proved the weaker form green. **Declarations are indexed into a `Map`**, never an object, because the key is a stored `gameKey` and `ACTIONS["__proto__"]` returns a truthy `Object.prototype` (fourth instance). **The gate runs AFTER the master switch and BEFORE any wallet read**, so a refusal cannot leave one of two debits applied - the sub-defect 1b ordering - and the **read is withheld entirely for an open challenge**, because there is nobody to ask and the only id in hand is the creator's, so asking would refuse you for opting out of a game you are *offering*. That test needed tightening too: a backwards slice for `isOpenChallenge ?` matched a **sibling** ternary, so it now anchors on the empty-map resolution unique to the right branch. **An unknown or empty `gameKey` is REFUSED, never upserted**, or a typo writes a row that matches no title and can never be found again. **Trading is always first and always offered**, from `TRADING_GAME_TYPE`, with provider titles from `listChallengeableTitles`; a title that cannot be played 1v1 is **disabled with the reason rather than hidden**, since a game a player can see in the catalogue and not in this list reads as a bug. **Willingness is still NOT filtered out of the opponent picker** (`13` s4.1aa), deliberately - a list that quietly omits people is indistinguishable from the person not existing. **One live defect was found on the way**: `PUT /api/user/presence` had no upsert, so the master switch **404ed for any player with no presence document** - which is every player who has never been seen online - and the toggle simply would not save; fixed to upsert with `$setOnInsert` exactly as the heartbeat `PATCH` does, and to refuse a non-boolean. **Never verified by eye** - the profile screen is behind sign-in |
+| **Is the reconciliation screen correct?** | **YES, and four of the things it was reporting were real - closed 14 Sep 2026** as **R78-R82** (`17`). The owner opened Financials -> Reconciliation, saw four issues on one account and asked whether to trust the instrument. **Three of the four were defects in code that writes money, correctly detected; one was a stored counter the screen was structurally incapable of reporting; and the Fix button offered for the largest issue would have confiscated 20 credits the player legitimately held.** The transferable form: **a monitoring screen that has been reporting the same thing for months is evidence, not noise**, and the reason it gets ignored is that its findings look like its own bugs. **Reading it row by row is what separated them, and the rows are not independent** - `Competition Wins 406.65 vs 262.65` and `Challenge Wins 0 vs 144` are the same 144 credits with opposite signs (one defect), and `Balance 78.65 vs 58.65` and `Challenge Spent 160 vs 180` are one cancelled 20-credit challenge (one defect). **R78**: the shared prize stage resolves a contest vocabulary for the ledger row, the attribution field and the Game Master metadata, and then named `totalWonFromCompetitions` **literally** - so every challenge prize ever paid was booked against the competition counter, balance always right, both lifetime figures wrong by the same amount in opposite directions; **a function that takes a vocabulary and hard-codes one of its words is worse than one that hard-codes all of them**, because the resolved vocabulary in front of it reads as evidence the whole function is generic. **R79**: the admin challenge cancel credited two wallets and wrote **no ledger row** - `challenge_refund` was a declared transaction type that **nothing had ever written** while every reader already listed it, so the type was not missing, the writer was; both seats now go through one helper inside a loop, the duplicated-block version having given one seat a row and the other none. **R80**: `force_complete` on the same route paid a prize with no ledger, no fee, no Game Master share, no lock and no transaction, on a route with **no authorization on either handler** - deleted rather than fixed, and found by **counting exported handlers against guards** (tenth instance). **R81**: the balance Fix set the wallet to the ledger figure in **both** directions, and the too-high direction destroys credits - **which is exactly what R79 produces**, so the button's most likely use, on the screen that surfaces the defect, was to delete a legitimate refund; it now refuses with a 409 **before** the write and names the real repair, and the test asserts the **direction and the ordering**, because the comparison written backwards refuses every safe repair and applies every destructive one. **R82**: `totalGmEarnings` was declared, rendered and incremented by nothing, while the route returned `stored || calculated` so the row always agreed with itself and was always wrong - **two defects hiding each other**, with the display half doing it independently by printing a fixed icon where every other row prints a verdict. **Three counters are deliberately NOT equality-checked and the reasons are in the route** so nobody finishes off the list: `totalAdminCredits` / `totalAdminDebits` are already consumed by the deposit and withdrawal checks as a legacy allowance, and **`totalRefunded` has two definitions** - contest credits returned to a wallet, and chargeback money returned to a card - so no single expression validates it. **Nothing was backfilled for any of the five**: R78's and R82's counters can be recomputed per user by the screen's own Fix buttons because the per-payment rows exist, R79's balances need an owner decision about which side is right, and R80 left no row to find its payments by. **36 tests, 17 probes red on exactly one failing test each** - and **three of those probes came back green first**, one because a presence check was satisfied by the interface's own union type, one because swapping `WalletTransaction.create(` for `Promise.resolve(` left every field literal in place, and two because the test's name contained **`$inc`** and vitest's `-t` is a **regular expression**, so it matched nothing and a passing run over zero tests read exactly like a broken guard. **Never verified by eye** - the screen is behind an admin sign-in. **AMENDED: the answer to "is the screen right" turned out to be the smaller question.** Asked whether the numbers could be trusted generally, the sweep enumerated **every** wallet-balance writer in both apps and the worker - 82 sites, audited in four parallel passes - and found **four more**, so a document citing R78-R82 as the whole finding is describing half of it: **R83**, the every-minute early-end worker paying a challenge prize with no ledger row and overpaying by the platform fee; **R84**, a chargeback clawback booking the full amount while clamping the wallet at zero, producing exactly the mismatch R81 now refuses to repair; **R85**, an idempotency guard sitting on the wrong side of the money so a retry paid a Game Master twice while keeping the earning rows clean; and **R86**, the data reset zeroing nine of fourteen counters and thereby manufacturing two of the mismatches this screen reports. Two files were **deleted rather than fixed** along the way - the dead 892-line `lib/services/reconciliation.service.ts`, which carried its own copy of the balance fix **without** R81's downward guard, and the unauthenticated `cleanup-duplicates` route. **The pattern across all nine is one sentence: a balance moved and the row explaining it did not get written**, and there is still **no structural tripwire** that a new wallet writer cannot skip its ledger row - that is the next thing to build |
 | **"Image 1 must look like image 2... all the info there must be the same"** | **Built 11 Sep 2026** (`13` **s4.1r**) - the arena's foot, rebuilt as the reference's three-panel band: how the game is scored, what to expect, who has just played. **THE BAND HAD BEEN TRIED AND REVERTED THE SAME MORNING, and the reason it was reverted is the only interesting part of building it.** All three slots render **nothing** when their content is absent, and absent is the **common** case - no title carries rules text until the catalogue is re-synced, the feature cards are written per title, and a contest nobody has played has no activity - and **a layout cannot see that its child returned `null`**, so a grid column holding one is still a column and the first attempt put one panel adrift in an empty row. **CSS can see what React cannot:** a wrapper whose child rendered nothing has no child nodes, so `:empty` matches it and `empty:hidden` takes the slot out of the line. **`flex-wrap` rather than `grid-cols-3` is the other half** - a hidden *grid* item leaves its track behind, so the panels that do have content would still huddle in the first two columns - and the guard **counts three** slots, because a bare match is satisfied by the rules slot alone while the activity panel renders an empty third of the page. **NOTHING WAS BROKEN and there is no risk number**: every fact on the old band was correct and is still there, so a document describing a fixed figure or a lost panel is describing something nobody found, and **nothing was backfilled**. **Two things the mock shows were deliberately not copied.** Its numbered steps and ticked tips are game-specific sentences, and a test bans game-shaped nouns in quoted strings in the arena folder, so they arrive **as data or not at all** - which means the numbered list appears the moment an operator writes line breaks and reads as one paragraph until then; and **the feed's score still carries no `+` sign** (s4.1n), because the mock's `+240` is right for a game counting upward and exactly backwards for a time trial. **The middle panel is headed `What to expect`, not the reference's `GAME TIPS`** - these are the operator's "why this game is fun" cards, not advice, and **a caption is a claim**: heading marketing copy as tips tells a player it will help them play, and the catalogue has no field that would. **The rules panel took the kit's headed shell**, which is the smallest form of the graphics complaint - every panel in the reference wears its heading in a tinted strip and the one panel a player most needs to read wore the quiet padded one - and **the lobby gets the same change**, because it renders the same panel. The band test was **flipped, not deleted**: same claim, new mechanism, so the comment explaining why it was once stacked stays with it. **2235 tests green, typecheck at the 194 baseline exactly, lint clean, 28/28 theme probes and 17/17 live-standings probes red** - one of the latter **re-aimed**, because the feed's move left its old pattern reporting `DID NOT APPLY`, which reads like a broken harness rather than a moved target. **Never verified by eye** - the arena is behind sign-in |
 | **"You made the window big and the board small... this is my last order"** | **Built 11 Sep 2026** (`13` **s4.1q**), the owner's **third** rejection of the arena, with eight images. **That count is the most useful fact here: three rejections of one screen is not three misses, it is a signal that the thing being corrected each time was not the thing being looked at** - the first pass corrected structure, the second corrected the repository boundary, and neither addressed what he could see. Six items, in his order. **(1) The size, asked for first, and the cause was one line in games-service**: `.arena { align-items: center }` stopped `.board-wrap` stretching, so `fitBoard()` had no height to converge on and settled at `MIN_CELL_PX`, **34 pixels** - so **the board was never mis-measured, it was measured against a container that had stopped having a size**, which is why every arithmetic review of `desiredFrameHeight` came back clean. Stretch the row, centre the two rails, move the stacking breakpoint from 680 to 520. **(2) The standings**, rebuilt to his leaderboard crop: header strip with trophy and players pill, `#  PLAYER  SCORE  TIME`, circular avatars with a cyan ring, gold-framed leader row, crown for first and numbered plates for second and third, full-width exit. **The avatars carry a rule**, this being a public board: the same `profileImage || image` path the global leaderboard already publishes, and the service picks **only** `profileImage` out of `getUsersByIds`, which also returns email, address and city - so a test asserts the **whole** row object rather than the fields it cares about, and a probe restores the spread. **(3) The chrome, on both sides of the seam** - in-frame palette, red timer, blue rails, wide submit; platform navy grid backdrop, lit panel rim, brighter cyan headings. **`NEON_PANEL` was deliberately NOT touched**: it is what the **trading** lobby renders, so turning it up would make an unasked-for change to a screen nobody mentioned, invisibly, through a shared token - hence a **second** shell, `NEON_PANEL_LIT`, with the three new literals named kit-only because they are exactly what a screen would type in to "look more like the arena". **(4) Game-agnosticism, asked for explicitly** - *"a tetris game dont have board"* - and **the audit found none to fix**: the platform arena was already agnostic, so **the deliverable is a guard rather than a repair**, which is worth saying plainly rather than reporting an improvement nobody made. 15 tests ban nine game-shaped nouns across 13 files, matched **inside quoted strings only**, because `boardsCompleted` is a provider metric name rendered by `humanizeMetric` - the very mechanism that keeps this agnostic - and a variable name is not something a player reads; the stripper carries a canary in **both** directions on the `native-select-legibility` precedent. **(5) Three board artworks, one per grid size**, with the supplied black surround **keyed out to transparency** - that is what made it art rather than a box, since the surround was covering the page's own glow. **(6) The hero, and the defect underneath it: `GameArenaLayout` called `providerBanner(undefined)`**, so the arena drew the generic trophy for **every** title while the lobby and the results screen, which both pass the game code, drew the game's own - three callers and one forgot, **and a fallback that works is indistinguishable from a title with no artwork**, so nothing failed, nothing logged, and the only symptom was the owner saying the page did not look like his design. **The obvious repair is FORBIDDEN**, which is the transferable half: passing the code in turns `game-content-editor.test.ts` red, because that guard bans a game code anywhere in the arena folder - the one way to lose "a new title needs no code" being a screen that *can* name a game - so **items 4 and 6 were the same requirement pulling opposite ways** and the guard settled it: resolution moved out to the page, the layout is handed an already-chosen picture. **And seven probes in `tools/probe-lobby-theme.ps1` had been reporting nothing** - four named a test whose `it.each` label had been renumbered, three named patterns that had moved with unrelated work, and the last is **re-aimed at a surviving assertion rather than re-pinned to new text**, because re-pinning a verbatim money assertion after a behaviour change looks identical to the test still working. **A probe naming something that no longer exists is indistinguishable from a guard that does not work, and it fails in the quiet direction.** **Platform: 2235 tests green, typecheck at the 194 baseline exactly, 26/26 theme probes and 19/19 avatar probes red. games-service: 292 tests.** **Never verified by eye on the platform half** - the arena is behind sign-in; the in-frame half **was** seen, through `tools/smoke-play.ts`. **Deploy needs BOTH repos**, and games-service needs `npm run build` because `titles.ts` changed |
 | **"When we choose medium and large the system makes the board smaller"** | **Fixed 11 Sep 2026** (`21` **s4.1r**), and **the direction of the fault is the fact to carry: a bigger grid really did get a smaller board.** The frame is the arena's middle column, 450-650px; a cell is square, so `boardCellPx` takes whichever axis answers smaller. s4.1q had put a rail on each side of the board **inside the same `.arena` grid**, each sized to its own content, plus two gaps - roughly **220 pixels of a 500-pixel frame** - so an 8x8 divided what was left into cells at their **34-pixel floor** while a 4x4, dividing the same remainder four ways, looked perfectly healthy. **`boardCellPx` was correct throughout and was being handed a third of the room**, which is why nothing errored, nothing logged, and every arithmetic review came back clean. **It is TWO faults in one report**: separately, `desiredFrameHeight` asked the platform for room for a 72-pixel cell the width would never permit, and that surplus is the empty band the owner's vertical arrows point at. **This is the THIRD distinct cause of a small board on this screen**, after s4.1f's frame-height feedback loop and s4.1m's `align-items: center`, and the pattern across all three is the transferable part - **every one was a layout fault that presented as an arithmetic one.** **The safe axis and the unsafe axis is the rule:** `desiredFrameHeight` now takes `availableWidth`, and reading the **width** is safe because nothing we report changes it, while reading the **height** is the original defect, because the height *is* what we report - so a height derived from it settles at whatever the host opened with. No loop is possible the other way either: only a scrollbar can move the width, worth a pixel or two, and `HEIGHT_REPORT_THRESHOLD_PX` swallows it. **The rearrangement the owner asked for**: one column, the board a stretching row, the figures an `auto` strip beneath it, the actions moved out of the arena into the footer beside Submit - and **the board is first in document order so nothing needs an `order` rule at any width** (`13` s1.1h). **`chromeHeightOf` needed no change and that is by construction**: it sums the bars then adds `arena - board`, so a strip inside the arena is counted by the subtraction and buttons in the footer by the sum, while what it could never count was a rail beside the board as a *column* - no taller than the board, so worth nothing in height and costing a third of the width. **s4.1q's recorded hazard is honoured rather than discarded**: that section put Clear in the rail because "a destructive control beside the confirming one, **both the same width**, is how a player wipes a finished grid instead of sending it", and **the clause that carries the argument is the width** - Clear is a 62px ghost icon, Submit takes the leftover and lights cyan - so the comment was rewritten in place to say that equalising them reinstates the hazard, because a reader seeing them share a row will otherwise assume the rule was abandoned. **`fitBoard` and the height request now share `boardSpace()`**, the "one rule, two copies" shape in its smallest form: two measurements of one box drift on the first margin, and the symptom of that drift **is this defect arriving by a different road**. **6 new tests (297 in the service, from 291), 13 probes red on exactly the named test** - one green first time on two guards covering each other, **recorded in the probe file as unprobed with the reason** rather than shipped green, since the width half of one guard changes no answer while the `cols` half genuinely does. **Verified by eye** through `tools/smoke-play.ts` at an emulated 500-pixel frame: **large draws 460 of 468 available, medium 463 of 468**. **Deploy: `public/play` needs only a pull and a `pm2 restart`** - no build for this change - though `npm run build` is still owed for R66 and the progress callback |
@@ -819,6 +820,289 @@ Newest at the top.
 **Deferred:** what was consciously left for later
 **Next chat should:** the single clearest next action
 ```
+
+---
+
+### 14 Sep 2026 - TWO GUARDS THAT MADE THINGS QUIETER RATHER THAN SAFER (R85, R86)
+
+**Shipped:** the Game Master fee stage can no longer pay twice, the dead route that existed to
+clean up after it is gone, and "Reset All Data" no longer manufactures reconciliation findings.
+
+**Files touched:** `lib/services/settlement/game-master-fees/distribute.ts` (+ mirror),
+`apps/admin/app/api/admin/cleanup-duplicates/route.ts` (deleted),
+`apps/admin/lib/services/user-data-reset.service.ts`,
+`__tests__/admin/reconciliation-money-guards.test.ts`,
+`tools/probe-reconciliation-money.ps1`, `External game plans/17-risk-register.md`.
+
+**R85 - the idempotency check was on the wrong side of the money.** `distribute.ts` looked for
+an existing `gamemasterearnings` row and `continue`d - but the check sat **inside** the
+per-referred-player loop, and the subscription increment, the wallet credit and the ledger row
+all sit **after** that loop. A retried transaction therefore skipped the rows and paid the Game
+Master a second time, leaving `gamemasterearnings` with exactly one row per referral. **The one
+artefact an operator would check for a double payment was the one the guard kept clean.** The
+transferable form: **the question to ask of an idempotency check is not whether it exists but
+which writes are on its far side.** Hoisted to the per-Game-Master level, reading `{ session }`
+so it is snapshot-consistent with the transaction it protects; the rows and the payment commit
+together, which is what makes one surviving row sufficient proof.
+
+**Reachable rather than theoretical:** both apps run `checkAndFinalizeCompetitions` on an
+every-minute cron inside a retried transaction, and `UnknownTransactionCommitResult` is exactly
+the case where the first attempt may already have committed.
+
+**And the route that existed to mop it up was deleted rather than fixed.**
+`cleanup-duplicates` debited the wallet by the over-credited total and then **deleted** the
+duplicate `wallettransactions` rows instead of writing a compensating `admin_adjustment` - so
+it moved money and destroyed the record of why - left `totalGmEarnings` untouched, had **no
+`guardSection` on either handler** and **no caller anywhere**, and could not have detected
+R85's duplicates in the first place, since those leave one earning row and two ledger rows.
+`shouldBlockEntry` precedent: the correct repair for an over-credited wallet is an attributable
+admin debit through `/api/users/credit`, which already exists and already records one.
+
+**R86 - the reset manufactured the mismatches the screen then reported.**
+`user-data-reset.service.ts` empties the ledger collections and zeroes the wallets, and its
+`$set` named **nine** of the fourteen numeric paths `CreditWallet` declares. The five missing
+ones were all added to the model *after* the reset was written, and **two of them
+(`totalIncidentCompensation`, `totalGmEarnings`) are equality-checked by reconciliation** - so
+every reset account came back reporting two mismatches for activity that no longer existed.
+The reset reported success and the screen reported defects and **neither was wrong**, which is
+how an operator learns to distrust the instrument. Same family as R82's `stored || calculated`.
+
+**The guard reads the schema rather than a list**, so the fifteenth field is caught the day it
+is declared, and two things about it are load-bearing: it asserts the path count has not
+collapsed, because a filter that stops matching makes every assertion below it trivially true;
+and it pins **which branch** it examines, because "Reset All Users" deletes the wallets outright
+and legitimately needs no counter list, so a guard that cannot tell the two apart is satisfied
+by the delete branch and says nothing about the one that resets.
+
+**Owner tested:** not yet. 20 tests in the guard suite, **22 probes red on exactly one failing
+test each** including the two new R86 mutations - one removing all five counters, one removing a
+single counter, because a list-based guard could have passed the second.
+
+**A recovered mistake worth recording.** Deleting `cleanup-duplicates` took the whole
+`apps/admin/app/api/admin/` folder with it - 15 unrelated routes - restored immediately with
+`git checkout -- apps/admin/app/api/admin` and then re-deleted one file. **Delete the file, not
+the folder**, and check `git status` after any deletion rather than after the next edit.
+
+**Deferred:** nothing backfilled for either. R85 leaves no duplicate row to query for, so the
+affected set is found by reconciliation; R86 is fix-forward, the remedy for an already-reset
+wallet being to run the reset again.
+
+**Next chat should:** add the structural guard that a **new** wallet writer cannot skip its
+ledger row - the one thing the R78-R86 sweep found nine separate times and still has no
+tripwire for - then X6.5.
+
+---
+
+### 14 Sep 2026 - A PRIZE PAID OUT OF NOWHERE, EVERY MINUTE (R83)
+
+**Shipped:** `worker/jobs/early-end-check.job.ts` no longer pays challenge prizes itself. The
+money goes through the same two settlement stages the ordinary end-of-challenge path uses.
+
+**Files touched:** `lib/services/settlement/challenge-outcome.ts` (new, mirrored),
+`lib/services/settlement/challenge-settlement.service.ts` (+ mirror),
+`worker/jobs/early-end-challenge-payout.ts` (new),
+`worker/jobs/early-end-check.job.ts`, `External game plans/17-risk-register.md`.
+
+**The finding, and it is five defects in one `updateOne`.** The job runs **every minute** and
+ends a challenge the moment every remaining player is liquidated or disqualified. It then
+credited the winner with a raw-driver `$inc` of `entryFee * 2`. That one line credited the
+**gross** pool where `winnerPrize` is net of the platform fee, so **every early-ended challenge
+overpaid its winner by 10%**; wrote **no `WalletTransaction`**, leaving a permanent
+`balance_mismatch` that R81 now correctly refuses to "fix"; never incremented
+`totalWonFromChallenges`; booked **no platform fee and no Game Master referral share**, so the
+platform's books had no record of the contest at all; and in the no-winner case recorded the
+**gross** pool as unclaimed where the shared stage records it net.
+
+**The sixth consequence is the one a summary drops.** `challenge-finalize.job.ts` uses the
+existence of a `challenge_win` row as its **crash-recovery idempotency key**. A challenge
+completed by this path has none, so it was invisible to that recovery - **an absent ledger row
+is a missing lock, not only a reporting gap.**
+
+**Deviated from plan:** the obvious repair - call `finalizeChallenge` with an `allowEarlyEnd`
+flag - was written and then **reverted**. That function ranks players under the rules that apply
+at a challenge's `endTime`, and an early end has cases those rules do not express: a
+liquidated-but-fair player beats an explicitly disqualified one, two liquidated players are
+separated on final equity, and `settleChallenge` enforces `minimumTrades`, which would turn
+several of the worker's winners into no-winner settlements. It would have **silently paid a
+different person** in three branches. So the payout was extracted into `applyChallengeOutcome`
+instead: **two deciders, one payout.** A document saying early end now uses `finalizeChallenge`
+is describing the version that was reverted.
+
+**Two things the fix had to preserve, both invisible to a typecheck.** `winnerRole` and
+`completedAt` are **not declared on the `Challenge` schema** - the old code only stored them
+because the raw driver bypasses strict mode - and the admin end-logic harness reads `winnerRole`
+back, so they are still written with the raw driver rather than declared; a mirrored model change
+for two fields the ordinary finalize path never writes does not belong in a money fix. And
+**`isDisqualified` is two questions**: the outcome flags decide whether a participant row stays
+`disqualified` and how many qualified winners the fee stage is told about, while the stored
+final-stats blob is what an operator *reads* - the admin challenge view renders it as a badge and
+strikes the score through. With `disqualifyOnLiquidation` on, a liquidated player must be
+**reported** as disqualified and can still **win** on final equity, so folding liquidation into
+the outcome flags would leave that winner's row unmarked and their `prizeReceived` unrecorded.
+Hence the separate `reportedDisqualified` input.
+
+**The test harness now pays through the same helper.** It had its own copy of the payout, so the
+end-logic tests exercised a path *adjacent* to the real one and could never have caught any of
+the five - the R7 harness lesson in its most expensive form.
+
+**Owner tested:** not yet. The path only runs when a live challenge has every remaining player
+liquidated or disqualified.
+
+**Deferred:** no backfill, on the owner's instruction that the data is pre-launch test data and
+will be deleted - and there is nothing to find the overpayments by in any case, since they left
+no ledger row. Fix-forward only.
+
+**Next chat should:** continue the wallet-writer audit - the chargeback clawback that clamps at
+zero while recording the full negative amount, `cleanup-duplicates`, the dead
+`lib/services/reconciliation.service.ts`, and the five counters `user-data-reset` leaves unset.
+
+---
+
+### 14 Sep 2026 - A LEDGER ROW FOR 100 AND A BALANCE THAT MOVED BY 20 (R84)
+
+**Shipped:** a chargeback clawback the wallet cannot cover is now **refused** rather than
+clamped, and both clawback writers decide through the one canonical rule.
+
+**Files touched:** `lib/services/security/chargeback-case.writers.ts`,
+`apps/admin/app/api/atlas/refund/clawback/route.ts`,
+`lib/services/reconciliation-math.ts`, `__tests__/services/chargeback-clawback-refusal.test.ts`
+(new), `tools/probe-chargeback-clawback.ps1` (new), `External game plans/17-risk-register.md`.
+
+**The finding.** `completeChargeback` wrote a `chargeback_clawback` row for the full disputed
+amount and then stored `Math.max(0, balanceBefore - amount)`. For a player who had already spent
+the credits the bank was taking back - **the normal case, since a player still holding the money
+would rarely dispute it** - the row said `-100` and the balance moved by 20. Reconciliation
+compares a wallet against the sum of its rows, so the account is flagged for ever, and **R81's
+fix refuses to reduce a balance**, so the one button on that screen deliberately cannot repair
+it. Two fixes written days apart compose into an account no operator can settle.
+
+**The rule existed and had no caller.** `evaluateClawback` has always said a clawback that would
+drive the balance negative is refused. Nothing called it. The Atlas refund route carried its own
+inline copy of the same three checks - which agreed with the canonical rule **by luck** - and
+this writer carried a third reading that did not. **One rule, three readings**, after
+`referenceId`, `failedReason`, `challengeId` and the Game Master `||`, and `check:mirrors`
+compares models so it has never had an opinion about any of them.
+
+**Deviated from plan:** nothing, but the rejected repair is worth recording because it is the
+one that looks obvious. Letting the balance go negative makes the wallet and the ledger agree -
+and a negative credit balance has no meaning anywhere else on the platform: every screen would
+render a debt the player cannot pay off and the entry gates compare against zero. Refusing keeps
+the loss where it actually is, on the platform, and puts a human on it. Owner's decision,
+14 Sep 2026.
+
+**Four properties of the refusal, each of which would be easy to leave out.** It decides
+**before any write**, so nothing is stored and the case is not closed - asserted by **position**,
+because a guard placed after `WalletTransaction.create` has already written the row on the
+non-transactional path. It throws a distinct `ClawbackRefusedError`, so a caller can tell "not
+allowed" from "the database fell over". The case stays **open**, since a closed case with no
+clawback reads as settled. And the attempt is recorded on the **case timeline and in the audit
+log**, outside the aborted transaction - without it the entire event is an error toast, which is
+R40's no-guard-no-attribution rule one layer along, and the next operator simply repeats it. The
+message now carries the figures, because every caller shows it to a person who has to decide
+what to do next and "how short is it" is the first thing they need.
+
+**Owner tested:** not yet. 8 tests (4 behavioural against a real replica set, 4 structural),
+6 probes, each red on exactly the expected test.
+
+**Deferred:** nothing backfilled - a clamped clawback leaves a row whose `balanceAfter` is a
+plausible number, so the affected set is found by reconciliation rather than by a query, which
+is what that screen now does. Separately, all five chargeback routes authenticate with
+`getAdminSession` and **no** `guardSection`; that is a system-wide pattern in the folder rather
+than something this fix introduced, recorded as a tripwire on the **R57** precedent.
+
+**Next chat should:** `cleanup-duplicates` - it debits a balance from an independently derived
+quantity, **deletes** the duplicate ledger rows instead of writing a compensating adjustment,
+and never decrements `totalGmEarnings`, which reconciliation now checks.
+
+---
+
+### 14 Sep 2026 - THE RECONCILIATION SCREEN WAS RIGHT, AND FOUR OF ITS FINDINGS WERE REAL (R78-R82)
+
+**Shipped:** the three writer defects the financial reconciliation screen had correctly
+detected, the counter it could never report, and the Fix button that would have destroyed a
+player's credits.
+
+**Files touched:** `lib/services/settlement/prize-payout.service.ts`, `types.ts` and
+`game-master-fees/distribute.ts` (all three mirrored, both copies),
+`apps/admin/app/api/challenges/route.ts`, `apps/admin/app/api/reconciliation/route.ts`,
+`apps/admin/components/admin/ReconciliationSection.tsx`,
+`__tests__/admin/reconciliation-money-guards.test.ts` (new),
+`__tests__/services/challenge-settlement.test.ts`,
+`__tests__/services/admin-finalize-gamemaster-parity.test.ts`,
+`tools/probe-reconciliation-money.ps1` (new). 36 tests, 17 probes red on exactly one
+failing test each.
+
+**The question was "is the reconciliation correct", and the answer is the finding.** An
+operator opened the screen, saw four issues on one account and asked whether to trust it.
+**Three of the four were real defects in code that writes money, correctly detected.** One
+was a stored counter the screen was structurally incapable of reporting. And the Fix button
+offered for the largest issue would have confiscated 20 credits the player legitimately
+held. **The instrument was working; nobody had believed it.** Carry that: a monitoring
+screen that has been reporting the same thing for months is evidence, not noise, and the
+reason it gets ignored is that its findings look like its own bugs.
+
+**Reading the screen row by row is what separated them, and the rows were not independent.**
+`Competition Wins: stored 406.65, calculated 262.65` and `Challenge Wins: stored 0,
+calculated 144` are the same 144 credits with opposite signs - one defect, not two (R78).
+`Balance: stored 78.65, expected 58.65` and `Challenge Spent: stored 160, calculated 180`
+are one cancelled 20-credit challenge (R79). **Two pairs of symptoms, two causes.**
+
+**The five, and what each one teaches.**
+
+- **R78** - the shared prize stage resolves a contest vocabulary for the ledger row, the
+  attribution field and the Game Master metadata, and then named `totalWonFromCompetitions`
+  **literally**. A function that takes a vocabulary and hard-codes one of its words is worse
+  than one that hard-codes all of them: the resolved vocabulary in front of it reads as
+  evidence the whole function is generic.
+- **R79** - the admin challenge cancel credited two wallets and wrote no ledger row.
+  `challenge_refund` was a **declared type that nothing had ever written** while every reader
+  already listed it, so the type was not missing - the writer was. Both seats now go through
+  one helper inside a loop, because the first draft duplicated the block and gave one seat a
+  row and the other none.
+- **R80** - `force_complete` on the same route paid a prize with no ledger, no fee, no Game
+  Master share, no lock and no transaction, on a route with **no authorization on either
+  handler**. Deleted rather than fixed, on the `shouldBlockEntry` precedent. Tenth instance
+  of the unguarded-handler class, and found the same way as the others: by counting exported
+  handlers against guards, never by reading routes.
+- **R81** - the balance Fix sets the wallet to the ledger figure in **both** directions, and
+  the too-high direction destroys credits. **That direction is exactly what R79 produces**,
+  so the button's most likely use, on the screen that surfaces the defect, was to delete a
+  legitimate refund. It now refuses with a 409 *before* the write and names the real repair.
+  A guard that merely exists is not the property - written with the comparison reversed it
+  refuses every safe repair and applies every destructive one, so the test asserts the
+  direction and the ordering.
+- **R82** - `totalGmEarnings` was declared, rendered and incremented by nothing, and the
+  route returned `stored || calculated`, so the row always agreed with itself and was always
+  wrong. **Two defects that hid each other**, and the display half did it independently by
+  printing a fixed icon where every other row prints a verdict.
+
+**Three counters are deliberately NOT checked and the reasons are in the route**, so nobody
+finishes off the list: `totalAdminCredits` / `totalAdminDebits` are already consumed by the
+deposit and withdrawal checks as a legacy allowance, so an equality check would fire on
+exactly the rows that allowance tolerates; and **`totalRefunded` has two definitions** -
+every contest path counts credits returned to a wallet, the chargeback writer counts money
+returned to a card - so no single expression can validate it.
+
+**Three probing notes, all from probes that came back green.** A presence check on both
+counter names was satisfied by the interface's own union type, so the test now reads the
+value out of **each vocabulary object**. A probe swapping `WalletTransaction.create(` for
+`Promise.resolve(` left every field literal in place, so the test now matches **the call**,
+not the fields it is given. And two probes reported STILL GREEN for a reason that was
+neither the test nor the claim: the test's name contained **`$inc`**, and vitest's `-t` is a
+**regular expression**, so it matched nothing and a passing run over zero tests read exactly
+like a broken guard. The test was renamed rather than the probe escaped.
+
+**Owner tested:** not yet. Every fix is on an admin surface or a settlement path; the
+reconciliation screen is behind an admin sign-in.
+
+**Deferred:** no backfill for any of the five. R78's counters and R82's can be recomputed
+per user with the screen's Fix buttons, because the per-payment ledger rows exist; R79's
+balances cannot be corrected automatically without deciding which side is right, which is an
+owner decision; R80 left no row to find its payments by.
+
+**Next chat should:** audit every remaining wallet-balance writer in both apps and the worker
+against the same rule - **a balance change without a matching ledger row is a defect** - before
+X6.5. (Done: that audit found R83 and four more, listed in the entry above.)
 
 ---
 

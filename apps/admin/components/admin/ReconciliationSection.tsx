@@ -92,6 +92,7 @@ interface UserReconciliationDetail {
     totalSpentOnChallenges: number;
     totalSpentOnMarketplace: number;
     totalGmEarnings?: number; // GM referral earnings
+    totalIncidentCompensation?: number; // Credits issued for incident resolution
   };
   calculated: {
     expectedBalance: number;
@@ -106,6 +107,7 @@ interface UserReconciliationDetail {
     challengeSpentTotal: number;
     marketplaceSpentTotal: number;
     gmEarningsTotal?: number; // GM referral earnings from transactions
+    incidentCompensationTotal?: number; // Incident credits from transactions
   };
   transactionBreakdown: {
     deposits: number;
@@ -243,6 +245,17 @@ const ISSUE_TYPES: Record<
   challenge_spent_mismatch: {
     label: "Challenge Spent Mismatch",
     description: "Challenge spent counter is incorrect",
+    fixable: true,
+  },
+  incident_compensation_mismatch: {
+    label: "Incident Compensation Mismatch",
+    description: "Incident compensation counter doesn't match the ledger",
+    fixable: true,
+  },
+  gm_earnings_mismatch: {
+    label: "Game Master Earnings Mismatch",
+    description:
+      "Lifetime Game Master earnings counter doesn't match referral payout rows",
     fixable: true,
   },
 };
@@ -1197,10 +1210,82 @@ export default function ReconciliationSection() {
                                           user.calculated.gmEarningsTotal || 0
                                         ).toFixed(2)}
                                       </td>
+                                      {/* Reason: R82. This cell printed a fixed
+                                          💰 rather than a verdict, so the row
+                                          could not report a discrepancy however
+                                          far apart the two figures were — the
+                                          display half of the `|| calculated`
+                                          mask that was removed from the route.
+                                          Every other row answers ✓ or ⚠; so
+                                          does this one now. */}
                                       <td className="py-2 px-3 text-right">
-                                        <span className="text-amber-400">
-                                          💰
-                                        </span>
+                                        {Math.abs(
+                                          (user.wallet.totalGmEarnings || 0) -
+                                            (user.calculated.gmEarningsTotal ||
+                                              0),
+                                        ) < 0.01 ? (
+                                          <span className="text-green-400">
+                                            ✓
+                                          </span>
+                                        ) : (
+                                          <span className="text-yellow-400">
+                                            ⚠{" "}
+                                            {(
+                                              (user.wallet.totalGmEarnings ||
+                                                0) -
+                                              (user.calculated
+                                                .gmEarningsTotal || 0)
+                                            ).toFixed(2)}
+                                          </span>
+                                        )}
+                                      </td>
+                                    </tr>
+                                  )}
+                                  {/* Incident compensation — only rendered when
+                                      this user has been compensated, or it would
+                                      be a row of zeros on every account. */}
+                                  {((user.wallet.totalIncidentCompensation ||
+                                    0) > 0 ||
+                                    (user.calculated
+                                      .incidentCompensationTotal || 0) > 0) && (
+                                    <tr className="border-t border-blue-500/30 bg-blue-500/5">
+                                      <td className="py-2 px-3 text-blue-400 font-medium">
+                                        🛟 Incident Compensation
+                                      </td>
+                                      <td className="py-2 px-3 text-right text-blue-400 font-mono">
+                                        {(
+                                          user.wallet
+                                            .totalIncidentCompensation || 0
+                                        ).toFixed(2)}
+                                      </td>
+                                      <td className="py-2 px-3 text-right text-blue-400 font-mono">
+                                        {(
+                                          user.calculated
+                                            .incidentCompensationTotal || 0
+                                        ).toFixed(2)}
+                                      </td>
+                                      <td className="py-2 px-3 text-right">
+                                        {Math.abs(
+                                          (user.wallet
+                                            .totalIncidentCompensation || 0) -
+                                            (user.calculated
+                                              .incidentCompensationTotal || 0),
+                                        ) < 0.01 ? (
+                                          <span className="text-green-400">
+                                            ✓
+                                          </span>
+                                        ) : (
+                                          <span className="text-yellow-400">
+                                            ⚠{" "}
+                                            {(
+                                              (user.wallet
+                                                .totalIncidentCompensation ||
+                                                0) -
+                                              (user.calculated
+                                                .incidentCompensationTotal || 0)
+                                            ).toFixed(2)}
+                                          </span>
+                                        )}
                                       </td>
                                     </tr>
                                   )}

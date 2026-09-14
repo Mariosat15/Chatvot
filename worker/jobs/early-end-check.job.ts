@@ -433,133 +433,63 @@ export async function runEarlyEndCheck(): Promise<EarlyEndCheckResult> {
           continue;
         }
 
-        // Resolve winner/loser participant objects for final stats
-        const winnerParticipant = winnerId === challenger.userId.toString() ? challenger : opponent;
-        const loserParticipant = winnerId === challenger.userId.toString() ? opponent : challenger;
+        // End the challenge early.
+        //
+        // Reason: every credit that moves here - the winner's prize, its `WalletTransaction`
+        // ledger row, their `totalWonFromChallenges` counter, the platform fee, the Game Master
+        // referral commission and any unclaimed pool - is handled by the shared settlement
+        // stages, exactly as the ordinary end-of-challenge path handles them. This job used to
+        // pay the winner itself with the raw driver and got five separate things wrong; see
+        // `payOutEarlyEndedChallenge` for the list. What stays here is the DECISION above, which
+        // an early end makes under rules the ranking path does not express.
+        const { payOutEarlyEndedChallenge } = await import(
+          "./early-end-challenge-payout"
+        );
+        const payout = await payOutEarlyEndedChallenge({
+          challengeId: challenge._id.toString(),
+          winnerRole: noWinner ? null : winnerRole,
+          earlyEndReason: endReason,
+          challengerDisqualified,
+          challengedDisqualified: opponentDisqualified,
+          challengerReportedDisqualified:
+            challengerDisqualified ||
+            (disqualifyOnLiquidation && challengerLiquidated),
+          challengedReportedDisqualified:
+            opponentDisqualified ||
+            (disqualifyOnLiquidation && opponentLiquidated),
+        });
 
-        // Build final stats (same structure as challenge-finalize.actions.ts)
-        const challengerFinalStats = {
-          finalCapital: challenger.currentCapital || 0,
-          pnl: challenger.pnl || 0,
-          pnlPercentage: challenger.pnlPercentage || 0,
-          totalTrades: challenger.totalTrades || 0,
-          winRate: challenger.winRate || 0,
-          isDisqualified: challenger.status === "disqualified" || (disqualifyOnLiquidation && challenger.status === "liquidated"),
-          disqualificationReason: challenger.status === "liquidated" ? "Account liquidated" : challenger.status === "disqualified" ? "Disqualified by admin" : undefined,
-        };
-        const challengedFinalStats = {
-          finalCapital: opponent.currentCapital || 0,
-          pnl: opponent.pnl || 0,
-          pnlPercentage: opponent.pnlPercentage || 0,
-          totalTrades: opponent.totalTrades || 0,
-          winRate: opponent.winRate || 0,
-          isDisqualified: opponent.status === "disqualified" || (disqualifyOnLiquidation && opponent.status === "liquidated"),
-          disqualificationReason: opponent.status === "liquidated" ? "Account liquidated" : opponent.status === "disqualified" ? "Disqualified by admin" : undefined,
-        };
-
-        // End the challenge early
         if (noWinner) {
-          // Both disqualified - prize pool goes to platform (NO refund)
-          const prizePool = (challenge.entryFee || 0) * 2;
-
-          if (prizePool > 0) {
-            await recordUnclaimedPoolForWorker({
-              sourceType: "challenge",
-              competitionId: challenge._id.toString(),
-              competitionName: `${challenge.challengerName || "Challenger"} vs ${challenge.challengedName || "Opponent"}`,
-              poolAmount: prizePool,
-              reason: "all_disqualified",
-              winnersCount: 0,
-              expectedWinnersCount: 1,
-              description: `Both players disqualified in challenge - pool goes to platform`,
-            });
-            console.log(
-              `      💰 Recorded ${prizePool} credits to unclaimed pools`,
-            );
-          }
-
-          await challengesCollection.updateOne(
-            { _id: challenge._id },
-            {
-              $set: {
-                status: "completed",
-                completedAt: now,
-                earlyEndReason: endReason,
-                noWinner: true,
-                challengerFinalStats,
-                challengedFinalStats,
-              },
-            },
+          console.log(
+            `      💰 No winner - pool recorded to unclaimed funds (net of platform fee)`,
           );
-        } else if (winnerId && winnerRole) {
-          // Award winner the prize pool
-          const prizePool = (challenge.entryFee || 0) * 2;
-          const walletsCollection = db.collection("creditwallets");
-
-          await walletsCollection.updateOne(
-            { userId: winnerId },
-            { $inc: { creditBalance: prizePool } },
+        } else {
+          console.log(
+            `      💰 Awarded ${payout.prizePaid} credits to winner (${payout.winnerName})`,
           );
-
-          const loserId = winnerId === challenger.userId.toString()
-            ? opponent.userId.toString()
-            : challenger.userId.toString();
-          const winnerName = winnerParticipant.username || "Winner";
-          const loserName = loserParticipant.username || "Loser";
-          const winnerPnL = (winnerParticipant.pnl || 0);
-          const loserPnL = (loserParticipant.pnl || 0);
-
-          // Reason: winnerId must be stored as String, not ObjectId,
-          // to match the schema and allow string equality comparison
-          // in the challenge details page (challenge.winnerId === session.user.id).
-          await challengesCollection.updateOne(
-            { _id: challenge._id },
-            {
-              $set: {
-                status: "completed",
-                completedAt: now,
-                winnerId,
-                winnerRole,
-                winnerName,
-                winnerPnL,
-                loserId,
-                loserName,
-                loserPnL,
-                earlyEndReason: endReason,
-                challengerFinalStats,
-                challengedFinalStats,
-              },
-            },
-          );
-
-          // Update participants
-          await challengeParticipantsCollection.updateOne(
-            { challengeId: challenge._id.toString(), role: winnerRole },
-            { $set: { isWinner: true } },
-          );
-
-          console.log(`      💰 Awarded ${prizePool} credits to winner (${winnerName})`);
 
           // Send notifications
           try {
             const { sendNotification } =
               await import("../../lib/services/notification.service");
             await sendNotification({
-              userId: winnerId,
+              userId: winnerId!,
               type: "challenge_won",
               metadata: {
                 challengeId: challenge._id.toString(),
-                prize: prizePool,
+                prize: payout.prizePaid,
               },
             });
-            await sendNotification({
-              userId: loserId,
-              type: "challenge_lost",
-              metadata: {
-                challengeId: challenge._id.toString(),
-                opponentName: winnerName,
-              },
-            });
+            if (payout.loserId) {
+              await sendNotification({
+                userId: payout.loserId,
+                type: "challenge_lost",
+                metadata: {
+                  challengeId: challenge._id.toString(),
+                  opponentName: payout.winnerName,
+                },
+              });
+            }
           } catch {
             // Notification failure is not critical
           }
@@ -757,7 +687,9 @@ export async function runEarlyEndCheckForTest(
 
         console.log(`\n   🧪 [TEST EARLY END] Challenge ${challenge._id}`);
 
-        let winnerId: string | null = null;
+        // Reason: only the ROLE is tracked here, where the production path above also keeps a
+        // user id for its notifications. The harness sends none, and the payout helper takes the
+        // role, so carrying an id as well would be a second answer to "who won" that nothing reads.
         let winnerRole: "challenger" | "challenged" | null = null;
         let noWinner = false;
 
@@ -768,28 +700,24 @@ export async function runEarlyEndCheckForTest(
           challengerDisqualified &&
           (opponentActive || (!disqualifyOnLiquidation && opponentLiquidated))
         ) {
-          winnerId = opponent.userId.toString();
           winnerRole = "challenged";
         } else if (
           opponentDisqualified &&
           (challengerActive ||
             (!disqualifyOnLiquidation && challengerLiquidated))
         ) {
-          winnerId = challenger.userId.toString();
           winnerRole = "challenger";
         } else if (
           disqualifyOnLiquidation &&
           challengerLiquidated &&
           opponentActive
         ) {
-          winnerId = opponent.userId.toString();
           winnerRole = "challenged";
         } else if (
           disqualifyOnLiquidation &&
           opponentLiquidated &&
           challengerActive
         ) {
-          winnerId = challenger.userId.toString();
           winnerRole = "challenger";
         } else if (
           disqualifyOnLiquidation &&
@@ -798,110 +726,37 @@ export async function runEarlyEndCheckForTest(
         ) {
           const challengerEquity = challenger.currentCapital;
           const opponentEquity = opponent.currentCapital;
-          if (challengerEquity >= opponentEquity) {
-            winnerId = challenger.userId.toString();
-            winnerRole = "challenger";
-          } else {
-            winnerId = opponent.userId.toString();
-            winnerRole = "challenged";
-          }
+          winnerRole =
+            challengerEquity >= opponentEquity ? "challenger" : "challenged";
         } else if (challengerLiquidated && opponentDisqualified) {
-          winnerId = challenger.userId.toString();
           winnerRole = "challenger";
         } else if (opponentLiquidated && challengerDisqualified) {
-          winnerId = opponent.userId.toString();
           winnerRole = "challenged";
         } else {
           continue; // No early end condition
         }
 
-        const prizePool = (challenge.entryFee || 0) * 2;
-
-        // Build final stats for test challenges too
-        const testChallengerStats = {
-          finalCapital: challenger.currentCapital || 0,
-          pnl: challenger.pnl || 0,
-          pnlPercentage: challenger.pnlPercentage || 0,
-          totalTrades: challenger.totalTrades || 0,
-          winRate: challenger.winRate || 0,
-          isDisqualified: challenger.status === "disqualified" || (disqualifyOnLiquidation && challenger.status === "liquidated"),
-          disqualificationReason: challenger.status === "liquidated" ? "Account liquidated" : challenger.status === "disqualified" ? "Disqualified" : undefined,
-        };
-        const testChallengedStats = {
-          finalCapital: opponent.currentCapital || 0,
-          pnl: opponent.pnl || 0,
-          pnlPercentage: opponent.pnlPercentage || 0,
-          totalTrades: opponent.totalTrades || 0,
-          winRate: opponent.winRate || 0,
-          isDisqualified: opponent.status === "disqualified" || (disqualifyOnLiquidation && opponent.status === "liquidated"),
-          disqualificationReason: opponent.status === "liquidated" ? "Account liquidated" : opponent.status === "disqualified" ? "Disqualified" : undefined,
-        };
-
-        if (noWinner) {
-          if (prizePool > 0) {
-            await recordUnclaimedPoolForWorker({
-              sourceType: "challenge",
-              competitionId: challenge._id.toString(),
-              competitionName: `${challenge.challengerName} vs ${challenge.challengedName}`,
-              poolAmount: prizePool,
-              reason: "all_disqualified",
-              winnersCount: 0,
-              expectedWinnersCount: 1,
-              description: `Both players disqualified - pool goes to platform`,
-              testRunId,
-            });
-          }
-
-          await challengesCollection.updateOne(
-            { _id: challenge._id },
-            {
-              $set: {
-                status: "completed",
-                completedAt: now,
-                noWinner: true,
-                challengerFinalStats: testChallengerStats,
-                challengedFinalStats: testChallengedStats,
-              },
-            },
-          );
-        } else if (winnerId && winnerRole) {
-          const walletsCollection = db.collection("creditwallets");
-          await walletsCollection.updateOne(
-            { userId: winnerId },
-            { $inc: { creditBalance: prizePool } },
-          );
-
-          const testLoserId = winnerId === challenger.userId.toString()
-            ? opponent.userId.toString()
-            : challenger.userId.toString();
-          const winnerP = winnerId === challenger.userId.toString() ? challenger : opponent;
-          const loserP = winnerId === challenger.userId.toString() ? opponent : challenger;
-
-          // Reason: winnerId stored as String to match schema and UI comparison
-          await challengesCollection.updateOne(
-            { _id: challenge._id },
-            {
-              $set: {
-                status: "completed",
-                completedAt: now,
-                winnerId,
-                winnerRole,
-                winnerName: winnerP.username || "Winner",
-                winnerPnL: winnerP.pnl || 0,
-                loserId: testLoserId,
-                loserName: loserP.username || "Loser",
-                loserPnL: loserP.pnl || 0,
-                challengerFinalStats: testChallengerStats,
-                challengedFinalStats: testChallengedStats,
-              },
-            },
-          );
-
-          await challengeParticipantsCollection.updateOne(
-            { challengeId: challenge._id.toString(), role: winnerRole },
-            { $set: { isWinner: true } },
-          );
-        }
+        // Reason: the harness pays through exactly the code production pays through. It used
+        // to have its own copy of the payout, which meant the end-logic tests exercised a path
+        // adjacent to the real one and could never have caught the five defects that copy
+        // carried. `testRunId` is not passed to the unclaimed-pool row because the shared stage
+        // does not take one - cleanup finds those rows by `sourceId` against the test challenge
+        // ids, not by tag, so nothing is left behind.
+        const { payOutEarlyEndedChallenge } = await import(
+          "./early-end-challenge-payout"
+        );
+        await payOutEarlyEndedChallenge({
+          challengeId: challenge._id.toString(),
+          winnerRole: noWinner ? null : winnerRole,
+          challengerDisqualified,
+          challengedDisqualified: opponentDisqualified,
+          challengerReportedDisqualified:
+            challengerDisqualified ||
+            (disqualifyOnLiquidation && challengerLiquidated),
+          challengedReportedDisqualified:
+            opponentDisqualified ||
+            (disqualifyOnLiquidation && opponentLiquidated),
+        });
 
         result.challengesEnded++;
       } catch (error) {

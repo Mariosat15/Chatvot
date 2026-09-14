@@ -20,6 +20,9 @@ import WalletTransaction from "@/database/models/trading/wallet-transaction.mode
 import { requireAdminAuth, getAdminSession } from "@/lib/admin/auth";
 import { auditLogService } from "@/lib/services/audit-log.service";
 import { isValidObjectId } from "@/lib/utils/url-validator";
+// Reason: relative, not "@/" — the alias resolves to the admin app root, and
+// this module lives in the repository root's lib/ (one copy, R58's trap).
+import { evaluateClawback } from "../../../../../../../lib/services/reconciliation-math";
 
 export async function POST(request: Request) {
   try {
@@ -83,21 +86,6 @@ export async function POST(request: Request) {
     // Credits to remove: default to the credits originally granted by the deposit
     // (its positive `amount`). Allow an explicit override for partial refunds.
     const grantedCredits = Math.abs(deposit.amount || 0);
-    const amount =
-      requestedAmount !== undefined ? Math.abs(requestedAmount) : grantedCredits;
-
-    if (!amount || isNaN(amount) || amount <= 0) {
-      return NextResponse.json(
-        { error: "Invalid clawback amount" },
-        { status: 400 },
-      );
-    }
-    if (amount > grantedCredits + 0.01) {
-      return NextResponse.json(
-        { error: `Clawback exceeds the credits originally granted (${grantedCredits})` },
-        { status: 400 },
-      );
-    }
 
     const wallet = await CreditWallet.findOne({ userId: deposit.userId });
     if (!wallet) {
@@ -108,21 +96,23 @@ export async function POST(request: Request) {
     }
 
     const previousBalance = wallet.creditBalance;
-    const newBalance = previousBalance - amount;
-    if (newBalance < 0) {
-      // Reason: the user has already spent the refunded credits — clawing back
-      // would force a negative balance. This is now a loss/fraud decision.
-      return NextResponse.json(
-        {
-          error: `Cannot claw back ${amount} credits — user only has ${previousBalance.toFixed(2)}. They likely already spent the refunded credits; handle as a loss or open a fraud case.`,
-        },
-        { status: 400 },
-      );
+    // Reason: the three safety rules this route used to spell out inline are
+    // the canonical `evaluateClawback` — which was extracted FROM this route
+    // and then called by nothing, while the chargeback writer grew a second,
+    // wrong answer (R84). One reading, imported by both writers.
+    const decision = evaluateClawback({
+      currentBalance: previousBalance,
+      grantedCredits,
+      requestedAmount,
+    });
+    if (!decision.ok) {
+      return NextResponse.json({ error: decision.error }, { status: 400 });
     }
+    const amount = decision.amount;
 
     // Apply the debit using the dedicated admin-debit tracking field so we don't
     // pollute totalDeposited/totalWithdrawn (avoids false reconciliation warnings).
-    wallet.creditBalance = Math.round(newBalance * 100) / 100;
+    wallet.creditBalance = decision.newBalance;
     wallet.totalAdminDebits = (wallet.totalAdminDebits || 0) + amount;
     await wallet.save();
 

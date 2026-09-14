@@ -1,13 +1,7 @@
 import type { ClientSession, HydratedDocument } from "mongoose";
 import type { IChallenge } from "@/database/models/trading/challenge.model";
 import type { IChallengeParticipant } from "@/database/models/trading/challenge-participant.model";
-import { payContestPrizes } from "./prize-payout.service";
-import { settleFeesAndGameMasters } from "./fees.service";
-import type {
-  SettlementContest,
-  SettlementLeaderboardEntry,
-  SettlementPrizeDistribution,
-} from "./types";
+import { applyChallengeOutcome } from "./challenge-outcome";
 import { getGameModuleOrTrading } from "@/lib/games/registry";
 import type { GameModule, RankableParticipant } from "@/lib/games/types";
 import {
@@ -296,122 +290,26 @@ export async function settleChallenge({
 
   const noWinner = !winnerId && !isTie;
 
-  // ---------- Persist the challenge's own record of the outcome ----------
-  challenge.winnerId = winnerId || undefined;
-  challenge.winnerName = winnerName || undefined;
-  challenge.winnerPnL = winnerPnL;
-  challenge.loserId = loserId || undefined;
-  challenge.loserName = loserName || undefined;
-  challenge.loserPnL = loserPnL;
-  challenge.isTie = isTie;
-  challenge.noWinner = noWinner ? true : undefined;
-
-  challenge.challengerFinalStats = {
-    finalCapital: challenger.currentCapital,
-    pnl: challenger.pnl,
-    pnlPercentage: challenger.pnlPercentage,
-    totalTrades: challenger.totalTrades,
-    winRate: challenger.winRate,
-    isDisqualified: challengerDisqualified,
-    disqualificationReason: challenger.disqualificationReason,
-  };
-  challenge.challengedFinalStats = {
-    finalCapital: challenged.currentCapital,
-    pnl: challenged.pnl,
-    pnlPercentage: challenged.pnlPercentage,
-    totalTrades: challenged.totalTrades,
-    winRate: challenged.winRate,
-    isDisqualified: challengedDisqualified,
-    disqualificationReason: challenged.disqualificationReason,
-  };
-  challenge.status = "completed";
-  await challenge.save({ session });
-
-  // ---------- Build what the shared stages need ----------
-  const winnerPrize = challenge.winnerPrize;
-  let distributions: SettlementPrizeDistribution[] = [];
-
-  if (winnerId && !isTie) {
-    distributions = [{ rank: 1, userId: winnerId, prizeAmount: winnerPrize, isTied: false }];
-  } else if (isTie && tiePrizeDistribution === "split_equally") {
-    // First participant gets ceiling, second gets floor - no credits lost to rounding.
-    const halfPrize = winnerPrize / 2;
-    distributions = [
-      { rank: 1, userId: challenger.userId, prizeAmount: Math.ceil(halfPrize), isTied: true },
-      { rank: 1, userId: challenged.userId, prizeAmount: Math.floor(halfPrize), isTied: true },
-    ];
-  }
-  // Both disqualified, or a true tie under "both_lose": no distributions. The unclaimed
-  // pool this leaves is recorded by `settleFeesAndGameMasters` itself, below.
-
-  const leaderboard: SettlementLeaderboardEntry[] = [challenger, challenged].map((p) => ({
-    rank: isTie || !winnerId ? 1 : p.userId === winnerId ? 1 : 2,
-    userId: p.userId,
-    username: p.username,
-    prizeAmount: 0, // filled in by payContestPrizes
-    pnl: p.pnl,
-    finalCapital: p.currentCapital,
-    // Reason: matches `provider-settlement.service.ts`'s leaderboard exactly. Without this,
-    // `buildWinMetadata` (whose own comment says a provider row carries `finalScore`
-    // instead of `finalPnl`/`finalCapital`) had nothing to read, so a provider challenge
-    // winner's wallet transaction recorded no score at all - a number-shaped hole in the
-    // audit trail for the one game family where `pnl`/`finalCapital` are never set.
-    score: p.score,
-    qualificationStatus: p.status === "disqualified" ? "disqualified" : "qualified",
-    disqualificationReason: p.disqualificationReason,
-  }));
-
-  const contest: SettlementContest = {
-    _id: challenge._id,
-    name: `${challenge.challengerName} vs ${challenge.challengedName}`,
-    entryFee: challenge.entryFee,
-    startTime: challenge.startTime,
-    endTime: challenge.endTime,
-    // Reason: a challenge is never "created by" a Game Master the way a competition can be -
-    // there is no such field on the model - so this is always absent and `isGmCreated`
-    // naturally evaluates false in the fee stage below.
-    gameMasterId: null,
-    platformFeePercentage: challenge.platformFeePercentage,
-    contestKind: "challenge",
-  };
-
-  const totalDistributed = distributions.reduce((sum, d) => sum + d.prizeAmount, 0);
-
-  const { walletMap } =
-    distributions.length > 0
-      ? await payContestPrizes({ session, contest, distributions, leaderboard })
-      : { walletMap: new Map() };
-
-  await settleFeesAndGameMasters({
+  // ---------- Persist the outcome and pay it out ----------
+  await applyChallengeOutcome({
     session,
-    contest,
-    prizePool: challenge.prizePool,
-    totalDistributed,
-    prizeWinnerCount: distributions.length,
-    expectedWinners: 1,
-    qualifiedWinnersCount: [challengerDisqualified, challengedDisqualified].filter(
-      (d) => !d,
-    ).length,
-    participants: [{ userId: challenger.userId }, { userId: challenged.userId }],
-    walletMap,
-    platformFeeFraction: challenge.platformFeePercentage / 100,
+    challenge,
+    challenger,
+    challenged,
+    tiePrizeDistribution,
+    outcome: {
+      winnerId,
+      winnerName,
+      winnerPnL,
+      loserId,
+      loserName,
+      loserPnL,
+      isTie,
+      noWinner,
+      challengerDisqualified,
+      challengedDisqualified,
+    },
   });
-
-  // ---------- Mark participants by what was actually paid ----------
-  // Reason: the both-disqualified case leaves both rows at "disqualified" (already saved
-  // above) rather than overwriting that with "completed" - every other outcome (a winner,
-  // any resolved tie, or a genuine "both_lose" tie) moves both participants to "completed".
-  if (!bothDisqualified) {
-    for (const participant of [challenger, challenged]) {
-      const dist = distributions.find((d) => d.userId === participant.userId);
-      if (dist) {
-        participant.isWinner = true;
-        participant.prizeReceived = dist.prizeAmount;
-      }
-      participant.status = "completed";
-      await participant.save({ session });
-    }
-  }
 
   return { winnerId, winnerName, winnerPnL, loserId, loserName, loserPnL, isTie, noWinner };
 }
