@@ -7,6 +7,7 @@ import {
 import { connectToDatabase } from "@/database/mongoose";
 import { WhiteLabel } from "@/database/models/whitelabel.model";
 import { getSettings } from "@/lib/services/settings.service";
+import { mayEmailAddress } from "@/lib/services/email-preferences";
 import InvoiceSettings from "@/database/models/invoice-settings.model";
 import CompanySettings, {
   COUNTRY_NAMES,
@@ -495,6 +496,14 @@ export const sendInvoiceEmail = async ({
   customerName,
 }: InvoiceEmailData) => {
   await connectToDatabase();
+
+  // A receipt the player has asked us to stop sending. See `mayEmailAddress`.
+  if (!(await mayEmailAddress(customerEmail, "transactional"))) {
+    console.log(
+      `ℹ️ [INVOICE] Recipient has transactional emails off, skipping ${customerEmail}`,
+    );
+    return;
+  }
 
   // Get invoice
   const invoice = await Invoice.findById(invoiceId);
@@ -1096,6 +1105,14 @@ export const sendDepositCompletedEmail = async (
   data: DepositCompletedEmailData,
 ) => {
   try {
+    // A receipt the player has asked us to stop sending. See `mayEmailAddress`.
+    if (!(await mayEmailAddress(data.email, "transactional"))) {
+      console.log(
+        `ℹ️ [DEPOSIT] Recipient has transactional emails off, skipping ${data.email}`,
+      );
+      return;
+    }
+
     const config = await getEmailConfig("deposit_completed");
     const {
       template,
@@ -1289,6 +1306,14 @@ export const sendRefundCompletedEmail = async (data: {
   refundId?: string;
 }) => {
   try {
+    // A receipt the player has asked us to stop sending. See `mayEmailAddress`.
+    if (!(await mayEmailAddress(data.email, "transactional"))) {
+      console.log(
+        `ℹ️ [REFUND] Recipient has transactional emails off, skipping ${data.email}`,
+      );
+      return;
+    }
+
     const config = await getEmailConfig("refund_completed");
     const {
       template,
@@ -1380,6 +1405,14 @@ export const sendWithdrawalCompletedEmail = async (
   data: WithdrawalCompletedEmailData,
 ) => {
   try {
+    // A receipt the player has asked us to stop sending. See `mayEmailAddress`.
+    if (!(await mayEmailAddress(data.email, "transactional"))) {
+      console.log(
+        `ℹ️ [WITHDRAWAL] Recipient has transactional emails off, skipping ${data.email}`,
+      );
+      return;
+    }
+
     const config = await getEmailConfig("withdrawal_completed");
     const {
       template,

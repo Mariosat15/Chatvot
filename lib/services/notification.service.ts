@@ -14,6 +14,7 @@ import { formatVolts } from "@/lib/utils/format-volts";
 // delivery module - the admin copy of this service pushes through the mirrored
 // notification-push instead. A relative path always finds the main app's own.
 import { deliverNotification } from "./notifications/delivery";
+import UserNotificationPreferences from "@/database/models/user-notification-preferences.model";
 
 export interface NotificationData {
   userId: string;
@@ -90,6 +91,30 @@ class NotificationService {
         return null;
       }
 
+      /*
+        THE PLAYER'S OWN SWITCHES. Read here, before anything is written.
+
+        Reason: this service ignored `UserNotificationPreferences` entirely. Every switch
+        on the profile settings screen - the master toggle, the eight category switches and
+        the per-notification list - was stored, shown back to the player and read by
+        nothing on this path, so a player who turned competition alerts off kept receiving
+        them. The admin app's copy of this service has always checked. Nothing failed and
+        nothing logged, which is why it survived: an unwanted notification arriving looks
+        exactly like one somebody asked for.
+
+        It runs before `Notification.create` on purpose. Suppressing after the write leaves
+        the row in the bell, so the player sees the thing they declined every time they
+        open the page, with no popup to explain where it came from.
+      */
+      const delivery = await UserNotificationPreferences.resolveDelivery(
+        options.userId,
+        template.category,
+        template.templateId,
+      );
+      if (!delivery.store) {
+        return null;
+      }
+
       const variables = options.variables || {};
       const title = replaceVariables(template.title, variables);
       const message = replaceVariables(template.message, variables);
@@ -126,9 +151,17 @@ class NotificationService {
       // that switch changed nothing. Pushing here — rather than at each call
       // site — is also what gives every notification type a live popup, so a
       // template added later needs no change to the socket server or the client.
+      /*
+        `push` is separately false during quiet hours, which is the whole reason delivery
+        is three answers rather than one: the row above is still written, so the
+        notification exists and the bell count moves, and only the interruption is held.
+      */
       deliverNotification(
         { ...notification.toObject(), _id: notification._id },
-        { email: template.channels?.email === true },
+        {
+          email: template.channels?.email === true && delivery.email,
+          push: delivery.push,
+        },
       );
 
       return notification;

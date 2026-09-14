@@ -12,6 +12,7 @@ import { getEmailTemplate, IEmailTemplate } from "@/database/models/email-templa
 import { getTransporter } from "@/lib/nodemailer";
 import { getSettings } from "@/lib/services/settings.service";
 import UserNotificationPreferences from "@/database/models/user-notification-preferences.model";
+import { NotificationCategory } from "@/database/models/notification-template.model";
 import { WhiteLabel } from "@/database/models/whitelabel.model";
 import CompanySettings, { COUNTRY_NAMES } from "@/database/models/company-settings.model";
 
@@ -36,51 +37,30 @@ const CATEGORY_ALIASES = new Map<string, string>([
   ["achievements", "achievement"],
 ]);
 
+/**
+ * Whether this player's preferences allow an email about this event.
+ *
+ * Reason: this function used to carry its own copy of the precedence rules, and the copy
+ * was wrong - it read `p.emailNotifications` and `p[category]`, and the model declares
+ * neither, so every read was `undefined` and it could only ever return true. Once it was
+ * corrected it was still a second copy of a rule the model also held, which is the shape
+ * behind several defects here, so it now delegates and only the category spelling
+ * (`CATEGORY_ALIASES` below) is this module's own business.
+ */
 async function shouldSendEmail(
   userId: string,
   category: string,
   templateId?: string,
 ): Promise<boolean> {
-  try {
-    const prefs = await UserNotificationPreferences.findOne({ userId }).lean();
-    if (!prefs) return true;
-
-    const p = prefs as {
-      notificationsEnabled?: boolean;
-      emailNotificationsEnabled?: boolean;
-      categoryPreferences?: Record<string, boolean>;
-      disabledNotifications?: string[];
-    };
-
-    // Reason: this function used to read `p.emailNotifications` and
-    // `p[category]`, and `UserNotificationPreferences` declares neither —
-    // the master email switch is `emailNotificationsEnabled` and the category
-    // flags live nested under `categoryPreferences`, keyed in the singular. Both
-    // reads were therefore always `undefined`, so every opt-out was ignored and
-    // the function could only ever return true. Latent until now only because
-    // nothing in the application called this bridge.
-    if (p.notificationsEnabled === false) return false;
-    if (p.emailNotificationsEnabled === false) return false;
-
-    // Security alerts ignore the category switch, matching
-    // UserNotificationPreferences.isNotificationEnabled.
-    const key = CATEGORY_ALIASES.get(category) ?? category;
-    if (key === "security") return true;
-
-    if (p.categoryPreferences) {
-      // Reason: `key` derives from a stored document, so a computed index is a
-      // dynamic property read. Reflect.get is the same lookup without the sink.
-      if (Reflect.get(p.categoryPreferences, key) === false) return false;
-    }
-
-    if (templateId && p.disabledNotifications?.includes(templateId)) {
-      return false;
-    }
-
-    return true;
-  } catch {
-    return true;
-  }
+  const key = CATEGORY_ALIASES.get(category) ?? category;
+  const delivery = await UserNotificationPreferences.resolveDelivery(
+    userId,
+    key as NotificationCategory,
+    templateId,
+  );
+  // `store` as well as `email`: a notification the player declined outright must not
+  // arrive by email either, and `resolveDelivery` answers both from one reading.
+  return delivery.store && delivery.email;
 }
 
 async function getEmailContext() {

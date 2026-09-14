@@ -493,11 +493,14 @@ as "how long do I leave a notice up for any passer-by". They were forced to be e
 `lib/services/challenges/accept-deadline.ts` (mirrored) is the one place either number is
 resolved. Three things about it are load-bearing.
 
-- **The open fallback is its own default (24 hours), never the directed one.** Every
+- ~~**The open fallback is its own default (24 hours), never the directed one.** Every
   existing platform holds no configured value for a field that did not exist yesterday,
   so a fallback onto `acceptDeadlineMinutes` would make the whole change invisible on
   every deployment that has not been reconfigured - with every structural test still
-  green, because the branch is there and merely answers the same thing.
+  green, because the branch is there and merely answers the same thing.~~
+  **REVERSED by the owner later the same day - see the amendment at the foot of this
+  section. An unset open expiry now falls back to the Accept Deadline, and the
+  pinning test was flipped rather than deleted.**
 - **A non-positive or non-finite stored value reads as unset.** These arrive from
   `parseFloat` on an admin form, so a `0` or a `NaN` is one keystroke away, and either
   one expires an open challenge on creation or never. Same rule as R31.
@@ -526,6 +529,26 @@ the admin action - so the notification is a shared helper,
 `lib/services/challenges/expiry-notifications.ts`, rather than three copies. The worker
 is the one that runs in production, which is why leaving it out is the version where
 nothing fires and every test about the other two passes.
+
+> **AMENDED 14 September 2026, same day, owner decision.** The hidden 24-hour constant is
+> gone: **an unset `openChallengeExpiryMinutes` now falls back to `acceptDeadlineMinutes`**,
+> and only then to `DEFAULT_ACCEPT_DEADLINE_MINUTES`. The owner's words were that an open
+> challenge should take its expiry from the same Duration Settings card as a directed one
+> unless told otherwise.
+>
+> **The argument the original rule made was about visibility and it stopped holding the
+> moment the control existed.** A separate constant was defensible while the number was
+> invisible; with `Open Challenge Expiry (mins)` sitting on Settings -> 1v1 Challenges
+> beside `Accept Deadline (mins)`, it is a third number nobody configured wedged between
+> two they did - so an operator lowering the Accept Deadline to five minutes gets an open
+> seat that outlives it by a day, with nothing on the screen saying so.
+>
+> **What did not change is the part that makes the two questions separate:** a *saved*
+> open expiry still always wins, so the two numbers are free to differ and the field is
+> not a merge. Only the unchosen case moved. The test pinning the old constant was
+> **flipped rather than deleted**, because the reason a separate lifetime exists is the
+> most valuable thing in it, and the admin hint now reads "Leave blank to use the Accept
+> Deadline" rather than naming 1440 minutes.
 
 ---
 

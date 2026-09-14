@@ -281,13 +281,23 @@ Probe -Name 'an open challenge inherits the directed deadline' `
   -Replace '  if (false) {' `
   -ExpectRed 'uses its own setting'
 
-# The fallback pointed at the directed default. Every existing platform holds no configured
-# value, so the change would be invisible on all of them with every structural test still green.
-Probe -Name 'the open fallback borrows the directed default' `
+# RE-AIMED 14 Sep 2026 - the claim it protected was reversed by owner decision, so the mutation
+# is now its mirror image. The old behaviour was a hidden 24-hour constant between two numbers the
+# operator configured; reintroducing it is the defect, and an operator who lowers the Accept
+# Deadline to five minutes would silently keep leaving open seats up for a day.
+Probe -Name 'the open fallback uses a hidden constant instead of the directed deadline' `
   -File $DEADLINE `
-  -Find '      DEFAULT_OPEN_CHALLENGE_EXPIRY_MINUTES' `
-  -Replace '      (positiveMinutes(settings.acceptDeadlineMinutes) ?? 30)' `
-  -ExpectRed 'falls back to its own default and never to the directed one'
+  -Find '  return positiveMinutes(settings.openChallengeExpiryMinutes) ?? directed;' `
+  -Replace '  return positiveMinutes(settings.openChallengeExpiryMinutes) ?? 1440;' `
+  -ExpectRed 'falls back to the directed deadline when the operator has chosen none'
+
+# The two collapse into one number, so a saved open expiry stops winning and the operator can no
+# longer set them apart at all - which is the whole reason the field exists.
+Probe -Name 'a saved open expiry is ignored in favour of the directed deadline' `
+  -File $DEADLINE `
+  -Find '  return positiveMinutes(settings.openChallengeExpiryMinutes) ?? directed;' `
+  -Replace '  return directed;' `
+  -ExpectRed 'uses its own setting, not the one chosen for a named friend'
 
 # The positive check collapsed to truthiness plus a null test, which admits NaN. These arrive
 # from parseFloat on an admin form, and a NaN deadline makes every comparison false - so an open

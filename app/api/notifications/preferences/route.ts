@@ -65,6 +65,7 @@ export async function PUT(request: NextRequest) {
       notificationsEnabled,
       emailNotificationsEnabled,
       pushNotificationsEnabled,
+      transactionalEmailsEnabled,
       categoryPreferences,
       disabledNotifications,
       quietHoursEnabled,
@@ -85,6 +86,10 @@ export async function PUT(request: NextRequest) {
     }
     if (typeof pushNotificationsEnabled === "boolean") {
       updates.pushNotificationsEnabled = pushNotificationsEnabled;
+    }
+    // Receipts and statements. Its own switch - see the preferences model for why.
+    if (typeof transactionalEmailsEnabled === "boolean") {
+      updates.transactionalEmailsEnabled = transactionalEmailsEnabled;
     }
     if (categoryPreferences && typeof categoryPreferences === "object") {
       // Merge with existing preferences
@@ -198,6 +203,7 @@ export async function POST(request: NextRequest) {
             notificationsEnabled: true,
             emailNotificationsEnabled: true,
             pushNotificationsEnabled: false,
+            transactionalEmailsEnabled: true,
             categoryPreferences: {
               purchase: true,
               competition: true,

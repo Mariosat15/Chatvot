@@ -3406,6 +3406,84 @@ A test pins the ordering.
 
 **Never verified by eye** - every screen here is behind sign-in.
 
+### 11.1b What a player can actually switch off - BUILT 14 September 2026
+
+s11.1a gave the platform a push seam and a popup. The owner's next instruction was the
+other half of it: *"be able to disable specific notifications and pop ups but also emails
+that sent to him"*. Two of those three were already possible. **The third was not, and
+the first was not enforced.**
+
+**The settings screen was a form over a model nothing read.** `UserNotificationPreferences`
+has carried `notificationsEnabled`, `emailNotificationsEnabled`, `categoryPreferences`,
+`disabledNotifications` and quiet hours for a long time, and the screen wrote all of them
+faithfully. `notificationService.send()` - the one door every in-app notification goes
+through - **never opened the document.** So a player could switch every category off,
+watch the switches save, and keep receiving every notification, with nothing failing and
+nothing in a log. Only the email bridge consulted preferences, which is why the feature
+looked implemented from the one place anybody checks.
+
+**Three things fall out of fixing it, and the middle one is the interesting one.**
+
+- **Delivery is three answers, not one.** `resolveDelivery` returns `{ store, push, email }`
+  rather than a boolean, because the old boolean made **quiet hours throw the stored row
+  away**. A player who asked not to be buzzed at 3am lost the fact that their open
+  challenge had been claimed, permanently, with nothing on any screen to explain the gap.
+  *Do not interrupt me* and *do not tell me at all* are two requests and the platform had
+  one answer for both. Quiet hours now suppress the push only; the row is written and the
+  bell moves when the page is next opened. **This is a deliberate behaviour change**, not
+  a refactor, and it is the only one in the slice.
+- **Security bypasses the category switch and the per-template override, and deliberately
+  not the master switch.** The screen renders an **Always On** badge beside that group, so
+  the code and the badge have to agree - but the master switch predates this work and
+  turning *it* into a bypass would start sending mail to accounts that had asked for
+  silence, which is a larger decision than the one being made.
+- **`isNotificationEnabled` survives as `delivery.store`**, so every existing caller keeps
+  its meaning apart from the quiet-hours change above. Two answers to one question is the
+  shape behind `referenceId`, `challengeId` and the Game Master `||`, and there are three
+  consumers here.
+
+**The email half is a different problem, because the senders have no user.** The four money
+emails - invoice, deposit completed, refund completed, withdrawal completed - are composed
+in `lib/nodemailer` from an invoice or a payment webhook and are handed **an address and a
+name, never an id**, so they bypassed preferences entirely. `lib/services/email-preferences.ts`
+(mirrored) resolves the id from the address and answers `mayEmailAddress(email, group)`.
+Four facts about it drift easily.
+
+- **The guard is inside each sender, never at the call sites.** Those four emails are sent
+  from **eleven** places across both apps and three events send the same email twice by two
+  different routes; gating callers means forgetting one, and a forgotten one is silent.
+  Count the writers, again.
+- **It fails open in every direction** - unknown address, absent document, database error -
+  because a receipt that never arrives is a missing financial record and **nobody can report
+  the absence of something they were never told about**. An explicit stored `false` is the
+  only thing that stops a send. This is the opposite default to a permission and it is
+  deliberate.
+- **The address lookup reads `_id` as well as `id`.** Better Auth's MongoDB adapter keeps the
+  identity in `_id` and only sometimes carries a duplicate `id`, so the obvious single-field
+  query returns an id matching no preferences document **while reporting success** - which is
+  exactly R68, where every avatar on the contest leaderboard was invisible for a day.
+- **`account` is a value, not an absent case.** Password resets, verification and security
+  mail take no reading at all, but a caller who must *name* the group cannot forget to ask,
+  and the grep for who bypasses the switches then returns nothing rather than returning every
+  sender that simply never called.
+
+**There are three email groups because two would be wrong.** `transactionalEmailsEnabled` is
+its own switch and is deliberately **not** gated on `notificationsEnabled` or
+`emailNotificationsEnabled`: a receipt records money moving, the notification switches are
+about notices, and folding them together means a player who turned off competition alerts
+stops receiving deposit confirmations with no way to tell which switch did it. On the screen
+the receipts switch therefore sits in an **Email** card placed *outside* the master
+notifications conditional - nested inside it, the control vanishes for exactly the player who
+most needs to find it - and an absent stored flag reads as **on** (`!== false`), because a
+schema default fixes future rows only and every account predating this change has no stored
+value.
+
+**Deliberately not built:** the master switch still governs stored rows as well as email, and
+`challengePopupEnabled` is now written only by the settings screen - the preferences route
+stopped accepting it, because two writers of one toggle is the same shape as everything above.
+
+28 tests, 25 probes red on exactly the expected test. **Never verified by eye.**
+
 ---
 
 ## 12. Effort

@@ -17,6 +17,14 @@ export type DeliverableNotification = PushableNotification;
 
 export interface DeliveryChannels {
   email?: boolean;
+  /**
+   * Push over the socket, which is what raises the popup and moves the bell count.
+   *
+   * Defaults to true so every existing caller is unchanged. It is false only while the
+   * player has asked not to be interrupted - the row has already been stored by then, so
+   * withholding the push holds the interruption and never the record.
+   */
+  push?: boolean;
 }
 
 async function emailNotification(
@@ -56,7 +64,9 @@ export function deliverNotification(
   notification: DeliverableNotification,
   channels: DeliveryChannels = {},
 ): void {
-  deliverPush(notification);
+  if (channels.push !== false) {
+    deliverPush(notification);
+  }
 
   if (channels.email) {
     void emailNotification(notification).catch((error) => {

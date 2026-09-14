@@ -217,7 +217,8 @@ export async function POST(
           a second source for a figure nothing else maintains.
         */
         const snapshotRow = competition.finalLeaderboard?.find(
-          (row) => String(row.userId) === participant.userId.toString(),
+          (row: { userId?: unknown; prizeAmount?: number }) =>
+            String(row.userId) === participant.userId.toString(),
         );
 
         /*

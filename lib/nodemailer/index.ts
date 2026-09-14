@@ -3,6 +3,7 @@ import { INVOICE_EMAIL_TEMPLATE } from "@/lib/nodemailer/templates";
 import { connectToDatabase } from "@/database/mongoose";
 import { WhiteLabel } from "@/database/models/whitelabel.model";
 import { getSettings } from "@/lib/services/settings.service";
+import { mayEmailAddress } from "@/lib/services/email-preferences";
 import InvoiceSettings from "@/database/models/invoice-settings.model";
 import CompanySettings, {
   COUNTRY_NAMES,
@@ -503,6 +504,14 @@ export const sendInvoiceEmail = async ({
 }: InvoiceEmailData) => {
   await connectToDatabase();
 
+  // A receipt the player has asked us to stop sending. See `mayEmailAddress`.
+  if (!(await mayEmailAddress(customerEmail, "transactional"))) {
+    console.log(
+      `ℹ️ [INVOICE] Recipient has transactional emails off, skipping ${customerEmail}`,
+    );
+    return;
+  }
+
   // Get invoice
   const invoice = await Invoice.findById(invoiceId);
   if (!invoice) {
@@ -958,6 +967,14 @@ export const sendDepositCompletedEmail = async (
   try {
     await connectToDatabase();
 
+    // A receipt the player has asked us to stop sending. See `mayEmailAddress`.
+    if (!(await mayEmailAddress(data.email, "transactional"))) {
+      console.log(
+        `ℹ️ [DEPOSIT] Recipient has transactional emails off, skipping ${data.email}`,
+      );
+      return;
+    }
+
     // Get settings and template
     const [companySettings, settings, whiteLabelSettings, template] =
       await Promise.all([
@@ -1185,6 +1202,14 @@ export const sendRefundCompletedEmail = async (
 ) => {
   try {
     await connectToDatabase();
+
+    // A receipt the player has asked us to stop sending. See `mayEmailAddress`.
+    if (!(await mayEmailAddress(data.email, "transactional"))) {
+      console.log(
+        `ℹ️ [REFUND] Recipient has transactional emails off, skipping ${data.email}`,
+      );
+      return;
+    }
 
     const [companySettings, settings, whiteLabelSettings, template] =
       await Promise.all([
@@ -1514,6 +1539,14 @@ export const sendWithdrawalCompletedEmail = async (
 
   try {
     await connectToDatabase();
+
+    // A receipt the player has asked us to stop sending. See `mayEmailAddress`.
+    if (!(await mayEmailAddress(data.email, "transactional"))) {
+      console.log(
+        `ℹ️ [WITHDRAWAL] Recipient has transactional emails off, skipping ${data.email}`,
+      );
+      return;
+    }
 
     // Get settings and template
     const [companySettings, settings, whiteLabelSettings, template] =

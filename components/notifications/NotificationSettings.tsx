@@ -49,6 +49,7 @@ interface Preferences {
   notificationsEnabled: boolean;
   emailNotificationsEnabled: boolean;
   pushNotificationsEnabled: boolean;
+  transactionalEmailsEnabled: boolean;
   challengePopupEnabled: boolean;
   categoryPreferences: CategoryPreferences;
   disabledNotifications: string[];
@@ -308,6 +309,60 @@ export default function NotificationSettings() {
             />
           </div>
         </CardHeader>
+      </Card>
+
+      {/*
+        EMAIL. Deliberately OUTSIDE the master switch below.
+
+        Reason: every other switch on this screen is hidden once notifications are off,
+        which is right for them - they are notices. It is wrong for these two, because a
+        receipt is not a notice: welding them together means the switch for "stop emailing
+        me my deposit confirmations" is reachable only while notifications are ON, so a
+        player who turned everything off cannot find the one email they are still getting.
+        The same mistake one layer out would have been to hide the whole card.
+      */}
+      <Card className="bg-gray-900/50 border-gray-800">
+        <CardHeader>
+          <CardTitle className="text-white text-lg">Email</CardTitle>
+          <CardDescription>
+            What we are allowed to send to your email address
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Mail className="h-5 w-5 text-gray-400" />
+              <div>
+                <Label className="text-white">Receipts &amp; statements</Label>
+                <p className="text-xs text-gray-500">
+                  Deposits, withdrawals, refunds and invoices. Turning this off
+                  does not stop the money moving — only the email about it.
+                </p>
+              </div>
+            </div>
+            <Switch
+              checked={preferences.transactionalEmailsEnabled !== false}
+              onCheckedChange={(enabled) =>
+                updatePreferences({ transactionalEmailsEnabled: enabled })
+              }
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Mail className="h-5 w-5 text-gray-400" />
+              <div>
+                <Label className="text-white">Account &amp; security</Label>
+                <p className="text-xs text-gray-500">
+                  Email verification, sign-in codes and password resets. These
+                  are how you prove the address is yours, so they cannot be
+                  switched off.
+                </p>
+              </div>
+            </div>
+            <Badge className="bg-red-500/20 text-red-400">Always On</Badge>
+          </div>
+        </CardContent>
       </Card>
 
       {preferences.notificationsEnabled && (

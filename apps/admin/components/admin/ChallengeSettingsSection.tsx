@@ -33,7 +33,7 @@ import {
   Info,
   Scale,
 } from "lucide-react";
-import { DEFAULT_OPEN_CHALLENGE_EXPIRY_MINUTES } from "@/lib/services/challenges/accept-deadline";
+import { DEFAULT_ACCEPT_DEADLINE_MINUTES } from "@/lib/services/challenges/accept-deadline";
 
 interface ChallengeSettings {
   platformFeePercentage: number;
@@ -379,7 +379,18 @@ export default function ChallengeSettingsSection() {
                 type="number"
                 min="1"
                 value={settings.openChallengeExpiryMinutes ?? ""}
-                placeholder={String(DEFAULT_OPEN_CHALLENGE_EXPIRY_MINUTES)}
+                /*
+                  Reason: the placeholder shows what a blank box actually
+                  produces, which since 14 Sep 2026 is the Accept Deadline
+                  beside it rather than a fixed 24 hours. Reading the live
+                  value rather than restating a constant is what stops the
+                  hint going stale the first time an operator edits the field
+                  above it.
+                */
+                placeholder={String(
+                  settings.acceptDeadlineMinutes ||
+                    DEFAULT_ACCEPT_DEADLINE_MINUTES,
+                )}
                 onChange={(e) =>
                   // Reason: `null` rather than `undefined` for a cleared box.
                   // `JSON.stringify` drops an undefined key, so the PUT would
@@ -394,7 +405,7 @@ export default function ChallengeSettingsSection() {
               />
               <p className="text-xs text-gray-500 mt-1">
                 How long a challenge left open to anyone stays claimable. Leave
-                blank for {DEFAULT_OPEN_CHALLENGE_EXPIRY_MINUTES} minutes.
+                blank to use the Accept Deadline above.
               </p>
             </div>
           </CardContent>

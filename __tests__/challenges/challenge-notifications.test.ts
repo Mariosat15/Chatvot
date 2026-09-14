@@ -6,7 +6,7 @@ import {
   type PushedNotification,
 } from "@/components/notifications/NotificationPopupCard";
 import {
-  DEFAULT_OPEN_CHALLENGE_EXPIRY_MINUTES,
+  DEFAULT_ACCEPT_DEADLINE_MINUTES,
   resolveAcceptDeadline,
   resolveAcceptDeadlineMinutes,
 } from "@/lib/services/challenges/accept-deadline";
@@ -309,14 +309,37 @@ describe("how long an open challenge waits", () => {
     ).toBe(30);
   });
 
-  it("falls back to its own default and never to the directed one", () => {
-    // Reason: an unset value is what every existing platform holds, so inheriting
-    // `acceptDeadlineMinutes` here is exactly the behaviour being replaced - the
-    // change would be invisible on every deployment that has not been reconfigured.
-    expect(resolveAcceptDeadlineMinutes({ acceptDeadlineMinutes: 30 }, true)).toBe(
-      DEFAULT_OPEN_CHALLENGE_EXPIRY_MINUTES,
+  /*
+    FLIPPED 14 September 2026, owner decision, not deleted.
+
+    This test used to assert the opposite - that an unset open expiry fell back
+    to a fixed 24 hours and NEVER to `acceptDeadlineMinutes` - on the grounds
+    that inheriting it would make the feature invisible on every deployment that
+    had not been reconfigured. That reasoning is kept here because it is the
+    reason the branch exists at all, and it stopped applying once the operator
+    could see both numbers on one admin screen. A hidden third number between
+    two configured ones is the worse of the two options.
+  */
+  it("falls back to the directed deadline when the operator has chosen none", () => {
+    expect(
+      resolveAcceptDeadlineMinutes({ acceptDeadlineMinutes: 45 }, true),
+    ).toBe(45);
+    // And a saved value still wins, or the two could not be set apart at all.
+    expect(
+      resolveAcceptDeadlineMinutes(
+        { acceptDeadlineMinutes: 45, openChallengeExpiryMinutes: 720 },
+        true,
+      ),
+    ).toBe(720);
+  });
+
+  it("falls back to the platform default when neither is configured", () => {
+    expect(resolveAcceptDeadlineMinutes({}, true)).toBe(
+      DEFAULT_ACCEPT_DEADLINE_MINUTES,
     );
-    expect(DEFAULT_OPEN_CHALLENGE_EXPIRY_MINUTES).not.toBe(30);
+    expect(resolveAcceptDeadlineMinutes({}, false)).toBe(
+      DEFAULT_ACCEPT_DEADLINE_MINUTES,
+    );
   });
 
   it("treats a non-positive or absent stored value as unset", () => {
@@ -324,8 +347,17 @@ describe("how long an open challenge waits", () => {
     // keystroke away and would make every open challenge expire on creation.
     for (const bad of [0, -5, Number.NaN, null, undefined]) {
       expect(
-        resolveAcceptDeadlineMinutes({ openChallengeExpiryMinutes: bad as never }, true),
-      ).toBe(DEFAULT_OPEN_CHALLENGE_EXPIRY_MINUTES);
+        resolveAcceptDeadlineMinutes(
+          { acceptDeadlineMinutes: 45, openChallengeExpiryMinutes: bad as never },
+          true,
+        ),
+      ).toBe(45);
+    }
+    // The same reading on the directed side, which shares the guard.
+    for (const bad of [0, -5, Number.NaN, null, undefined]) {
+      expect(
+        resolveAcceptDeadlineMinutes({ acceptDeadlineMinutes: bad as never }, false),
+      ).toBe(DEFAULT_ACCEPT_DEADLINE_MINUTES);
     }
   });
 
