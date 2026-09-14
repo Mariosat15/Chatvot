@@ -37,6 +37,11 @@ export type NotificationType =
   // Reason: an open challenge is claimed rather than accepted - there was no
   // invitation, so "X accepted your challenge" names a decision nobody made.
   | "challenge_seat_taken"
+  // Reason: the announcement to everybody else, which is a different event from
+  // `challenge_received` - nobody has been invited, so it asks nothing and carries no
+  // Accept. It is also the only challenge notification a player gets about somebody
+  // else's challenge, which is why it has its own switch on the settings screen.
+  | "challenge_open_posted"
   | "challenge_started"
   | "challenge_declined"
   | "challenge_cancelled"
@@ -1063,6 +1068,40 @@ function getDefaultTemplates(): Partial<INotificationTemplate>[] {
       channels: { inApp: true, email: true, push: false },
       actionUrl: "/challenges/{{challengeId}}",
       actionText: "View Challenge",
+    },
+    {
+      templateId: "challenge_open_posted",
+      name: "New Open Challenge Posted",
+      description:
+        "Sent to every player accepting challenges when somebody posts a challenge with an open seat",
+      category: "challenge",
+      type: "challenge_open_posted",
+      title: "🎯 New Open Challenge",
+      message:
+        "{{challengerName}} has posted an open {{gameName}} challenge. Entry: {{entryFee}} credits. Winner takes {{winnerPrize}} credits. First to take the seat gets it.",
+      icon: "🎯",
+      // Reason: normal, not urgent. It is an opportunity rather than a demand, and an
+      // urgent priority on the one notification that reaches the whole player base is how
+      // every other urgent notification stops being believed.
+      priority: "normal",
+      color: "#8B5CF6",
+      isEnabled: true,
+      isDefault: true,
+      isCustom: false,
+      /*
+        THE ONLY CHALLENGE TEMPLATE WITH EMAIL OFF, and deliberately.
+
+        Every other one is addressed to a participant about their own challenge. This one
+        goes to everybody, so leaving email on means one player creating five open
+        challenges mails the entire player base five times - a deliverability problem as
+        much as an annoyance, and the kind of mail that trains people to mark us as spam
+        and so lose the receipts they do want.
+      */
+      channels: { inApp: true, email: false, push: true },
+      // The challenge itself, never the list. The detail page is where the seat can
+      // actually be taken, and it admits any signed-in player while the seat is empty.
+      actionUrl: "/challenges/{{challengeId}}",
+      actionText: "Take the Seat",
     },
     {
       templateId: "challenge_cancelled",

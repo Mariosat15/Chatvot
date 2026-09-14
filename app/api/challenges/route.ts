@@ -729,6 +729,35 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    /*
+      AND THE OPEN CASE, WHICH IS THE OTHER HALF OF THE SAME SENTENCE.
+
+      Reason: "there is nobody to tell" was true of the *recipient* and read as though it
+      settled the whole question. It did not - an open seat is worth nothing if nobody
+      knows it is there, so the feature shipped reachable, correct and undiscovered, the
+      same shape as the help page still telling players every challenge is an invitation.
+
+      Not awaited, deliberately. Two wallets have already been committed by this point, so
+      a slow or failing fan-out must not turn a created challenge into an error response.
+    */
+    if (!isInSimulatorMode && isOpenChallenge) {
+      void import("@/lib/services/challenges/open-challenge-announcement")
+        .then(({ announceOpenChallenge }) =>
+          announceOpenChallenge({
+            challengeId: challenge._id.toString(),
+            challengerId,
+            challengerName: challenge.challengerName,
+            gameKey: gameLabel.gameKey,
+            gameName: gameDisplayName,
+            entryFee: actualEntryFee,
+            winnerPrize,
+          }),
+        )
+        .catch((error) => {
+          console.warn("⚠️ Open-challenge announcement failed:", error);
+        });
+    }
+
     timing.end(300); // Log if slower than 300ms
 
     return NextResponse.json({

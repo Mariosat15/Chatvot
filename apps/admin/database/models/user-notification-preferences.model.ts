@@ -83,6 +83,33 @@ export interface NotificationDelivery {
 /** Which switch governs an email. See `transactionalEmailsEnabled` for why there are three. */
 export type EmailGroup = "notification" | "transactional" | "account";
 
+/**
+ * The fields `resolveDeliveryFrom` reads, as a structural type so a projected `.lean()` row
+ * satisfies it without being a full document.
+ */
+export interface DeliveryPreferenceFacts {
+  notificationsEnabled?: boolean;
+  emailNotificationsEnabled?: boolean;
+  categoryPreferences?: Record<string, boolean | undefined>;
+  disabledNotifications?: string[];
+  quietHoursEnabled?: boolean;
+  quietHoursStart?: string;
+  quietHoursEnd?: string;
+}
+
+/**
+ * The projection a bulk reader must use, next to the function that reads it.
+ *
+ * Reason: a fan-out cannot afford one `findOne` per recipient, so it fetches many documents
+ * at once - and the tempting shape is a narrowed filter matching only the players whose
+ * settings could refuse. That filter is a second copy of the precedence rules, in the worst
+ * possible place: add a rule to `resolveDeliveryFrom` and the fan-out silently keeps using
+ * the old one, delivering to people who have declined with nothing failing anywhere. Naming
+ * the fields here, beside the only function that reads them, is what keeps one rule.
+ */
+export const DELIVERY_PREFERENCE_FIELDS =
+  "userId notificationsEnabled emailNotificationsEnabled categoryPreferences disabledNotifications quietHoursEnabled quietHoursStart quietHoursEnd";
+
 export interface IUserNotificationPreferencesModel extends Model<IUserNotificationPreferences> {
   getOrCreatePreferences(userId: string): Promise<IUserNotificationPreferences>;
   isNotificationEnabled(
@@ -217,8 +244,6 @@ UserNotificationPreferencesSchema.statics.resolveDelivery = async function (
   category: NotificationCategory,
   templateId?: string,
 ): Promise<NotificationDelivery> {
-  const ALL: NotificationDelivery = { store: true, push: true, email: true };
-
   let prefs: IUserNotificationPreferences | null = null;
   try {
     prefs = await this.findOne({ userId });
@@ -227,11 +252,27 @@ UserNotificationPreferencesSchema.statics.resolveDelivery = async function (
       `⚠️ Could not read notification preferences for ${userId}, delivering everything:`,
       error,
     );
-    return ALL;
+    return { store: true, push: true, email: true };
   }
+  return resolveDeliveryFrom(prefs, category, templateId);
+};
+
+/**
+ * The precedence itself, with the read taken out.
+ *
+ * Split from `resolveDelivery` so a fan-out that has already fetched many documents can ask
+ * the same question without restating the rules. `null` means "this player has never opened
+ * the settings screen", which is the overwhelming majority, and answers everything.
+ */
+export function resolveDeliveryFrom(
+  prefs: DeliveryPreferenceFacts | null | undefined,
+  category: NotificationCategory,
+  templateId?: string,
+): NotificationDelivery {
+  const ALL: NotificationDelivery = { store: true, push: true, email: true };
   if (!prefs) return ALL;
 
-  if (!prefs.notificationsEnabled) {
+  if (prefs.notificationsEnabled === false) {
     return { store: false, push: false, email: false };
   }
 
@@ -275,10 +316,10 @@ UserNotificationPreferencesSchema.statics.resolveDelivery = async function (
     push,
     email: prefs.emailNotificationsEnabled !== false,
   };
-};
+}
 
 /** True while the player has asked not to be interrupted. Same-day spans only, as before. */
-function isWithinQuietHours(prefs: IUserNotificationPreferences): boolean {
+function isWithinQuietHours(prefs: DeliveryPreferenceFacts): boolean {
   if (!prefs.quietHoursEnabled || !prefs.quietHoursStart || !prefs.quietHoursEnd) {
     return false;
   }

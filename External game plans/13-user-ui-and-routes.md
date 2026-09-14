@@ -3492,6 +3492,64 @@ stopped accepting it, because two writers of one toggle is the same shape as eve
 
 28 tests, 25 probes red on exactly the expected test. **Never verified by eye.**
 
+### 11.1c Telling anybody that a seat is open - BUILT 14 September 2026
+
+The owner's report: creating an open challenge notified nobody. It did not, and the reason
+is one line in `POST /api/challenges` - the notification was wrapped in
+`if (!isInSimulatorMode && !isOpenChallenge)`, and the comment beside it said there was
+nobody to tell.
+
+**That sentence was true about the recipient and was read as settling the whole question.**
+A directed challenge has exactly one addressee; an open challenge has none, which is why it
+is the one challenge event that needs an *audience* rather than a reason to skip the step.
+So open challenges shipped reachable, correct and undiscovered - the same shape as the help
+page telling players there is no public lobby.
+
+**It is the only notification on the platform addressed to the whole player base**, and that
+is what shaped every decision in it.
+
+- **The audience is computed, never "everybody".** It is the players who have
+  `UserPresence.acceptingChallenges` set, minus the creator, minus **both directions** of any
+  `BlockedUser` relationship with the creator, minus anyone who has set
+  `willingToBeChallenged: false` for that `gameKey`. The block direction is the one nobody
+  checks: the block was created against a *challenge*, and an announcement is not one, so a
+  blocked player's name reappearing in somebody's bell reads as the block not working.
+- **The per-game opt-out answers this question even though the create route deliberately
+  does not read it.** `20` s1.1a withholds the willingness read for an open challenge,
+  because there is nobody to ask. The audience question is the same declaration the other
+  way round, and it is exactly the right filter here.
+- **The precedence rules are imported, not restated.** `resolveDeliveryFrom` was extracted
+  out of `UserNotificationPreferences.resolveDelivery` so that a bulk sender can answer
+  *may this player be notified* from facts it has already read. A bulk path is the natural
+  place to reimplement that rule, because the per-user static takes a `userId` and does its
+  own `findOne` - and two copies of it is the shape behind `referenceId`, `failedReason`,
+  `challengeId` and the Game Master `||`, reading to a player as a switch they set being
+  ignored. The static now delegates to the same function, so the popular path cannot be the
+  only correct one.
+- **One projected query, indexed in a `Map`.** `DELIVERY_PREFERENCE_FIELDS` is the projection
+  the rules need and nothing else, and the key is a stored user id, so an object lookup walks
+  the prototype chain - fifth instance of that trap after the round-inspector action map, the
+  contest-edit field list, the Game Master allow-list and `UNSCORED_CONTEST_POLICY_COPY`.
+- **The template sends no email, and it is the only challenge template that does not.** Every
+  other one is addressed to a participant about their own challenge. Five open challenges
+  with email on is five platform-wide mailings, which costs deliverability and therefore
+  costs the receipts people do want.
+- **It is capped at 5,000 recipients** and warns when it truncates. This is the only
+  notification whose batch grows with the size of the platform, so an uncapped `insertMany`
+  is a request that gets slower every month with nothing to attribute it to.
+- **It is `void`ed, never awaited.** Two wallets are committed by the time it runs; a slow or
+  failing fan-out must not turn a created challenge into an error response.
+
+**The switch the owner asked for needed no new UI.** The template is in the `challenge`
+category, and the settings screen renders whatever templates the database holds, grouped by
+category - so the master switch, the challenge category switch and a per-template toggle all
+cover it the moment it is seeded. The service seeds on a miss for that reason: seeding is
+`$setOnInsert`, so a template added to the defaults reaches an existing database only when
+something runs the seed, and without the retry every deployment older than this template
+announces nothing and reports success.
+
+23 tests, 11 probes red on exactly the expected test. **Never verified by eye.**
+
 ---
 
 ## 12. Effort

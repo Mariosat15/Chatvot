@@ -481,10 +481,13 @@ the money path, the windows and the resolution table above are all unaffected.
 
 > **AMENDED 14 September 2026.** Two sentences above are correct as history and stale as
 > present facts, and **say which**. "No notification is sent" was written about
-> *creating* an open challenge and is still true of that - there is nobody to notify -
-> but the creator is now told **the moment somebody claims the seat**, and told again if
-> nobody ever does. And an open challenge no longer inherits `acceptDeadlineMinutes`; it
-> has a lifetime of its own. See **s2.4b** below.
+> *creating* an open challenge and was defended on the grounds that there is nobody to
+> notify - true of the *recipient*, and **wrong about the event**, because an open seat is
+> the one challenge that needs an audience rather than an addressee. The creator is now
+> told the moment somebody claims the seat, told again if nobody ever does, and **every
+> player accepting challenges is told when the seat goes up**. And an open challenge no
+> longer inherits `acceptDeadlineMinutes`; it has a lifetime of its own. See **s2.4b**
+> below and `13` **s11.1c**.
 
 ### 2.4b How long an open seat stays up, and who is told - BUILT 14 September 2026
 

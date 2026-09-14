@@ -42,7 +42,7 @@ export interface GetNotificationsOptions {
 /**
  * Replace template variables with actual values
  */
-function replaceVariables(
+export function replaceVariables(
   text: string,
   variables: Record<string, any>,
 ): string {
