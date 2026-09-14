@@ -45,9 +45,14 @@ import {
   MessageSquare,
   UserPlus,
   Headphones,
+  Gamepad2,
 } from "lucide-react";
 import { GameIcon } from "@/components/ui/GameIcon";
 import type { GameIconName } from "@/lib/constants/game-icons";
+import {
+  DEFAULT_CREDIT_VALUE_IN_BASE_CURRENCY,
+  DEFAULT_EUR_TO_CREDITS_RATE,
+} from "@/lib/utils/credit-value";
 
 interface HelpPageContentProps {
   isLoggedIn: boolean;
@@ -179,8 +184,10 @@ const defaultSettings: HelpSettings = {
   credits: {
     name: "Credits",
     symbol: "⚡",
-    valueInEUR: 1,
-    eurToCreditsRate: 100,
+    // Reason: these two are the same fact and used to contradict each other by a hundredfold
+    // on one screen. Derive the first from the second rather than writing both by hand.
+    valueInEUR: DEFAULT_CREDIT_VALUE_IN_BASE_CURRENCY,
+    eurToCreditsRate: DEFAULT_EUR_TO_CREDITS_RATE,
     minimumDeposit: 10,
     minimumWithdrawal: 20,
     withdrawalFee: 2,
@@ -1861,16 +1868,22 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
 
             <div className="space-y-6 text-gray-300">
               <p className="leading-relaxed">
-                A 1v1 Challenge is a direct head-to-head trading duel between
-                two players. You pick a specific opponent, both of you stake
-                the same entry fee in{" "}
+                A 1v1 Challenge is a head-to-head contest between exactly two
+                players. Both of you stake the same entry fee in{" "}
                 <strong>{settings.credits.name.toLowerCase()}</strong>{" "}
                 (<span className="text-yellow-400">{settings.credits.symbol}</span>),
-                you each trade a fresh virtual starting capital for the
-                challenge&apos;s duration, and the better performer takes the
-                pot minus a small platform fee. Unlike Competitions there&apos;s
-                no public lobby — every challenge is an invitation from one
-                player to another.
+                and the better performer takes the pot minus a small platform
+                fee. A challenge can be played at <strong>trading</strong> —
+                you each get a fresh virtual starting capital and trade it for
+                the challenge&apos;s duration — or at any{" "}
+                <strong>game</strong> the platform offers, where you each play
+                your own round and the score decides it.
+              </p>
+              <p className="leading-relaxed">
+                You can name the person you want to play, or leave the second
+                seat <strong className="text-white">open to anyone</strong> and
+                let the first player who takes it claim it. Competitions are
+                many players sharing a prize pool; a challenge is always two.
               </p>
 
               {/* How it works */}
@@ -1883,35 +1896,58 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                   <li className="flex items-start gap-2">
                     <CheckCircle2 className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
                     <span>
-                      <strong className="text-white">Direct invite.</strong>{" "}
-                      You pick the opponent from a leaderboard, a Match Card
-                      swipe or a profile page, then send a challenge. There is
-                      no public &quot;open challenges&quot; list — your
-                      opponent has to be chosen before you can create the
-                      challenge.
+                      <strong className="text-white">Named opponent, or open to anyone.</strong>{" "}
+                      Pick someone from your friends list, a leaderboard row, a
+                      Match Card swipe or a profile page and send them an
+                      invitation. Or create it{" "}
+                      <strong className="text-white">open</strong> — nobody is
+                      named, it appears in the{" "}
+                      <em>Open</em> tab on{" "}
+                      <Link
+                        href="/challenges"
+                        className="text-yellow-400 hover:text-yellow-300 underline underline-offset-2"
+                      >
+                        /challenges
+                      </Link>{" "}
+                      for any player to take, and the first to accept claims
+                      the seat.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Trading or a game.</strong>{" "}
+                      You choose when you create the challenge. Pick a game and
+                      the setup form changes to that game&apos;s own settings —
+                      how long a round lasts, how many attempts you each get,
+                      and whatever else the game defines. Pick trading and you
+                      get the starting capital and scoring method instead.
                     </span>
                   </li>
                   <li className="flex items-start gap-2">
                     <CheckCircle2 className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
                     <span>
                       <strong className="text-white">No money locked at create.</strong>{" "}
-                      Entry fees are <em>only</em> debited when your opponent{" "}
-                      <strong>accepts</strong>. Both stakes are deducted in the
-                      same atomic step — if your opponent declines, lets the
-                      invite expire, or you don&apos;t have enough{" "}
+                      Entry fees are <em>only</em> debited when the challenge is{" "}
+                      <strong>accepted</strong>. Both stakes are deducted in the
+                      same atomic step — if your opponent declines, the invite
+                      expires, or either side is short of{" "}
                       {settings.credits.name.toLowerCase()} on accept,{" "}
-                      <strong>nothing</strong> is taken from either wallet.
+                      <strong>nothing</strong> is taken from either wallet. On an
+                      open challenge, if two players press Accept at the same
+                      moment only one takes the seat, and the other is turned
+                      away <em>before</em> anything is debited.
                     </span>
                   </li>
                   <li className="flex items-start gap-2">
                     <CheckCircle2 className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
                     <span>
-                      <strong className="text-white">Sandbox capital.</strong>{" "}
-                      Each side starts the duel with the configured{" "}
-                      <em>starting capital</em> (virtual). Your real{" "}
-                      {settings.credits.name.toLowerCase()} balance only moves
-                      twice: on accept (stake out) and at settlement (prize
-                      in, if you win).
+                      <strong className="text-white">Your real balance moves twice only.</strong>{" "}
+                      On accept (stake out) and at settlement (prize in, if you
+                      win). On a trading challenge each side also gets a
+                      configured <em>starting capital</em>, which is virtual and
+                      never touches your wallet. A game challenge has no
+                      starting capital at all — you play the game.
                     </span>
                   </li>
                   <li className="flex items-start gap-2">
@@ -1920,7 +1956,7 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                       <strong className="text-white">Auto-settlement.</strong>{" "}
                       When the duration ends (or whenever a participant opens
                       the challenge afterwards), the system closes any open
-                      positions, ranks both players, applies the platform fee
+                      trading positions, ranks both players, applies the platform fee
                       and credits the winner&apos;s wallet automatically as a{" "}
                       <code className="bg-gray-800 px-1 rounded text-xs">
                         challenge_win
@@ -1943,8 +1979,9 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                       🟡 Pending
                     </span>
                     <p className="text-gray-400 mt-1">
-                      Invite sent, waiting for the opponent to Accept or
-                      Decline before the <em>accept deadline</em>. No credits
+                      Waiting to be accepted before the{" "}
+                      <em>accept deadline</em> — by the player you named, or by
+                      whoever takes the seat first if it is open. No credits
                       have moved yet.
                     </p>
                   </div>
@@ -1953,9 +1990,10 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                       🔴 Active
                     </span>
                     <p className="text-gray-400 mt-1">
-                      Both stakes have been taken, both sandboxes are loaded,
-                      trading is live. The detail page shows live P&amp;L and
-                      countdown.
+                      Both stakes have been taken and play is live — trading in
+                      both sandboxes, or the game round each of you can now
+                      start. The detail page shows the countdown and how each
+                      side is doing.
                     </p>
                   </div>
                   <div className="p-3 bg-green-500/10 rounded-lg border border-green-500/30 text-sm">
@@ -1964,7 +2002,8 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                     </span>
                     <p className="text-gray-400 mt-1">
                       End time hit and the winner was paid. Both players keep
-                      access to the trade view in read-only mode.
+                      read-only access — the trade view, or the round history
+                      on a game challenge.
                     </p>
                   </div>
                   <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600 text-sm">
@@ -1972,8 +2011,10 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                       ⚪ Declined
                     </span>
                     <p className="text-gray-400 mt-1">
-                      Opponent rejected the invite. No credits taken; you can
-                      challenge someone else.
+                      The player you named rejected the invite. No credits
+                      taken; you can challenge someone else. An open challenge
+                      is never declined — nobody is named, so there is nobody
+                      to refuse it, and it simply runs to its accept deadline.
                     </p>
                   </div>
                   <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600 text-sm sm:col-span-2">
@@ -2000,7 +2041,17 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                 </h3>
                 <ol className="space-y-2 text-sm list-decimal list-inside marker:text-red-400">
                   <li>
-                    Find an opponent — from a{" "}
+                    Open the <strong className="text-white">Create Challenge</strong>{" "}
+                    dialog — from the{" "}
+                    <strong className="text-white">New Challenge</strong>{" "}
+                    button on{" "}
+                    <Link
+                      href="/challenges"
+                      className="text-yellow-400 hover:text-yellow-300 underline underline-offset-2"
+                    >
+                      /challenges
+                    </Link>
+                    , or straight from a{" "}
                     <Link
                       href="/leaderboard"
                       className="text-yellow-400 hover:text-yellow-300 underline underline-offset-2"
@@ -2008,23 +2059,35 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                       Match Card
                     </Link>{" "}
                     swipe (Leaderboard → Match Cards tab), a leaderboard row,
-                    or their profile page.
+                    or someone&apos;s profile page — those three already know
+                    who you mean.
                   </li>
                   <li>
-                    Open the <strong className="text-white">Create Challenge</strong>{" "}
-                    dialog. Pick the entry fee (within the admin-configured
-                    min/max), the duration, the ranking method (P&amp;L, ROI,
-                    Total Capital, Win Rate, Total Wins or Profit Factor) and
-                    optionally a primary / secondary tie-breaker.
+                    Choose the opponent. From the New Challenge button you can
+                    pick a friend by name, or choose{" "}
+                    <strong className="text-white">open to anyone</strong> and
+                    name nobody. Arriving from a profile or a leaderboard row,
+                    the opponent is already set and the picker is not shown.
                   </li>
                   <li>
-                    Accept the challenge terms when prompted. The invite is
-                    posted to the opponent — <strong>no credits leave your
-                    wallet at this point</strong>.
+                    Choose <strong className="text-white">trading or a game</strong>.
+                    Pick the entry fee (within the admin-configured min/max) and
+                    the duration. For trading you also set the starting capital,
+                    the ranking method (P&amp;L, ROI, Total Capital, Win Rate,
+                    Total Wins or Profit Factor) and optionally a primary /
+                    secondary tie-breaker. For a game you set that game&apos;s
+                    own settings instead — the form is built from what the game
+                    declares, so it differs from title to title.
                   </li>
                   <li>
-                    Your opponent has until the <em>accept deadline</em> to
-                    Accept or Decline. They&apos;ll see your invite as a
+                    Accept the challenge terms when prompted. The challenge is
+                    then posted — to your named opponent, or to the{" "}
+                    <em>Open</em> tab if you named nobody. Either way,{" "}
+                    <strong>no credits leave your wallet at this point</strong>.
+                  </li>
+                  <li>
+                    The challenge now has until the <em>accept deadline</em> to
+                    be taken. A named opponent sees your invite as a
                     notification, an in-app popup, and an entry in their{" "}
                     <Link
                       href="/challenges"
@@ -2060,8 +2123,11 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                       <span>
                         Challenges must be{" "}
                         <strong className="text-white">enabled</strong>{" "}
-                        platform-wide (admin toggle) and the relevant market
-                        must currently be open.
+                        platform-wide (admin toggle). A{" "}
+                        <strong>trading</strong> challenge also needs the
+                        relevant market to be open — a{" "}
+                        <strong>game</strong> challenge does not, because no
+                        game is priced off a live market.
                       </span>
                     </li>
                     <li className="flex items-start gap-2">
@@ -2090,10 +2156,13 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                     <li className="flex items-start gap-2">
                       <ChevronRight className="h-4 w-4 text-amber-400 mt-0.5 flex-shrink-0" />
                       <span>
-                        The opponent must have{" "}
+                        A <strong>named</strong> opponent must have{" "}
                         <em>accepting challenges</em> enabled in their
                         preferences (and, depending on admin config, be
-                        online).
+                        online). This is checked when you send it, and the
+                        refusal says which of the two it was. An open challenge
+                        has nobody to check — instead, the check runs on
+                        whoever tries to take the seat.
                       </span>
                     </li>
                   </ul>
@@ -2110,7 +2179,8 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                   <li className="flex items-start gap-2">
                     <ChevronRight className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
                     <span>
-                      You&apos;ll see a popup{" "}
+                      <strong className="text-white">If you were named,</strong>{" "}
+                      you&apos;ll see a popup{" "}
                       <em>Challenge Received!</em>, a notification, and a
                       pending entry in your{" "}
                       <Link
@@ -2119,8 +2189,23 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                       >
                         /challenges
                       </Link>{" "}
-                      list with the full terms (stake, duration, scoring,
-                      tie-breakers).
+                      list with the full terms (which game, stake, duration,
+                      scoring, tie-breakers).
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">If nobody was named,</strong>{" "}
+                      the challenge sits in the <em>Open</em> tab on{" "}
+                      <Link
+                        href="/challenges"
+                        className="text-yellow-400 hover:text-yellow-300 underline underline-offset-2"
+                      >
+                        /challenges
+                      </Link>{" "}
+                      and any player can take it. There is no notification —
+                      you find it by looking.
                     </span>
                   </li>
                   <li className="flex items-start gap-2">
@@ -2137,16 +2222,29 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                   <li className="flex items-start gap-2">
                     <ChevronRight className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
                     <span>
-                      You can <strong className="text-white">Decline</strong>{" "}
-                      instead — that closes the invite cleanly and no credits
-                      move. The challenger is notified.
+                      <strong className="text-white">On an open challenge, the seat is claimed once.</strong>{" "}
+                      If two players accept at the same instant, one gets it and
+                      the other is told it has already been taken — before any
+                      money moves. Nobody is ever charged for a seat they
+                      didn&apos;t get.
                     </span>
                   </li>
                   <li className="flex items-start gap-2">
                     <ChevronRight className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
                     <span>
-                      If you ignore the invite past the accept deadline, the
-                      system marks it <em>Expired</em> automatically.
+                      If you were named, you can{" "}
+                      <strong className="text-white">Decline</strong> instead —
+                      that closes the invite cleanly and no credits move. The
+                      challenger is notified. Open challenges have no Decline
+                      button, because nobody was asked.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      If nobody accepts by the accept deadline, the system marks
+                      it <em>Expired</em> automatically. Open challenges use the
+                      same deadline — they do not last indefinitely.
                     </span>
                   </li>
                 </ul>
@@ -2156,8 +2254,12 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
               <div>
                 <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
                   <Shield className="h-4 w-4 text-orange-400" />
-                  Trading rules inside a challenge
+                  Rules inside a <em>trading</em> challenge
                 </h3>
+                <p className="text-sm mb-3 text-gray-400">
+                  These apply when the challenge is played at trading. A game
+                  challenge has none of them — see the block below it.
+                </p>
                 <ul className="space-y-2 text-sm">
                   <li className="flex items-start gap-2">
                     <ChevronRight className="h-4 w-4 text-orange-400 mt-0.5 flex-shrink-0" />
@@ -2165,7 +2267,7 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                       <strong className="text-white">Dedicated trade screen</strong>{" "}
                       at <code className="bg-gray-800 px-1 rounded text-xs">/challenges/[id]/trade</code>{" "}
                       — chart, order ticket, your live PnL, your opponent&apos;s
-                      live PnL and the countdown to the end of the duel.
+                      live PnL and the countdown to the end of the challenge.
                     </span>
                   </li>
                   <li className="flex items-start gap-2">
@@ -2206,6 +2308,63 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                 </ul>
               </div>
 
+              {/* Game rules inside a challenge */}
+              <div>
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <Gamepad2 className="h-4 w-4 text-cyan-400" />
+                  Rules inside a <em>game</em> challenge
+                </h3>
+                <ul className="space-y-2 text-sm">
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-cyan-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Dedicated play screen</strong>{" "}
+                      at <code className="bg-gray-800 px-1 rounded text-xs">/challenges/[id]/play</code>{" "}
+                      — the game itself, the countdown, and a standings panel
+                      showing you and your opponent.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-cyan-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Attempts.</strong>{" "}
+                      How many rounds you each get is set when the challenge is
+                      created. An attempt is spent the moment a round{" "}
+                      <em>starts</em>, not when it finishes — so walking out of
+                      a bad round does not give it back.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-cyan-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Round length, and how late you can start.</strong>{" "}
+                      Each round has its own clock, and no round can outlive the
+                      challenge — start one near the end and it is shortened to
+                      the time that is left. The play screen tells you how much
+                      that is before you commit an attempt.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-cyan-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">A part-finished round still counts.</strong>{" "}
+                      If the clock catches you mid-round, whatever you achieved
+                      is scored — it is not thrown away.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-cyan-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Both of you play your own round.</strong>{" "}
+                      You are not in the same session and you do not have to be
+                      online at the same time — you each play within the
+                      challenge&apos;s window and the scores are compared at the
+                      end.
+                    </span>
+                  </li>
+                </ul>
+              </div>
+
               {/* Ranking & tie rules */}
               <div>
                 <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
@@ -2213,18 +2372,30 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                   Ranking &amp; tie rules
                 </h3>
                 <p className="text-sm mb-3">
-                  Challenges use the <strong>same six scoring methods</strong>{" "}
-                  as Competitions (P&amp;L, ROI, Total Capital, Win Rate, Total
-                  Wins, Profit Factor) — see the Competitions section for the
-                  full breakdown of each formula.
+                  A <strong>trading</strong> challenge uses the{" "}
+                  <strong>same six scoring methods</strong> as Competitions
+                  (P&amp;L, ROI, Total Capital, Win Rate, Total Wins, Profit
+                  Factor) — see the Competitions section for the full breakdown
+                  of each formula.
+                </p>
+                <p className="text-sm mb-3">
+                  A <strong>game</strong> challenge has none of them, because a
+                  game reports a single score. The higher score wins, unless the
+                  game is one where <em>lower is better</em> — a time trial, say
+                  — in which case the lower one does. Which way round it counts
+                  is a property of the game, not something either player or the
+                  challenge&apos;s creator can set, and it is shown on the
+                  challenge before you accept. Tie-breakers are not offered on a
+                  game challenge either: two equal scores are a genuine tie.
                 </p>
                 <div className="p-3 bg-gray-900/40 border border-gray-700 rounded-lg text-sm space-y-2">
                   <p>
-                    <strong className="text-white">Tie-breakers.</strong> The
+                    <strong className="text-white">Tie-breakers (trading).</strong> The
                     challenge optionally has a primary and secondary
                     tie-breaker (trades count, win rate, total capital, ROI,
                     join time, or split-prize). If both players are still
-                    exactly tied after that, the admin&apos;s{" "}
+                    exactly tied after that — or on a game challenge, if both
+                    scores are equal — the admin&apos;s{" "}
                     <em>tie prize distribution</em> rule decides:
                   </p>
                   <ul className="space-y-1 pl-4">
@@ -2297,6 +2468,15 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                   <li className="flex items-start gap-2">
                     <CheckCircle2 className="h-4 w-4 text-yellow-400 mt-0.5 flex-shrink-0" />
                     <span>
+                      <strong className="text-white">If one of you never scored.</strong>{" "}
+                      On a game challenge, a player who never recorded a result
+                      is not eligible for the prize, and the other player wins
+                      by finishing. Not playing is not a draw.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-yellow-400 mt-0.5 flex-shrink-0" />
+                    <span>
                       <strong className="text-white">Game Master cut.</strong>{" "}
                       If you (or your opponent) joined ChartVolt through a
                       Game Master, that GM may earn a configurable percentage
@@ -2312,7 +2492,7 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
               <div className="bg-rose-500/10 border border-rose-500/30 rounded-lg p-4">
                 <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4 text-rose-400" />
-                  Liquidation &amp; disqualification
+                  Liquidation &amp; disqualification (trading)
                 </h3>
                 <ul className="space-y-2 text-sm">
                   <li className="flex items-start gap-2">
@@ -2335,7 +2515,7 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                         disqualify-on-liquidation
                       </strong>{" "}
                       enabled by design — once you&apos;re liquidated, you
-                      lose the duel for prize purposes and the other player
+                      lose the challenge for prize purposes and the other player
                       becomes the winner if they finish qualified.
                     </span>
                   </li>
@@ -2373,10 +2553,12 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                       /challenges
                     </div>
                     <p className="text-gray-400 mt-1">
-                      All your invites and duels in one place. Tabs for{" "}
-                      <em>All</em>, <em>Pending</em>, <em>Active</em> and{" "}
-                      <em>Completed</em> (which also covers declined / expired
-                      / cancelled).
+                      All your challenges in one place, plus the{" "}
+                      <strong className="text-white">New Challenge</strong>{" "}
+                      button. Tabs for <em>All</em>, <em>Open</em> (challenges
+                      nobody has taken yet — anyone&apos;s to claim),{" "}
+                      <em>Pending</em>, <em>Active</em> and <em>Completed</em>{" "}
+                      (which also covers declined / expired / cancelled).
                     </p>
                   </Link>
                   <div className="p-3 bg-gray-900/40 border border-gray-700 rounded-lg">
@@ -2384,9 +2566,10 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                       /challenges/[id]
                     </div>
                     <p className="text-gray-400 mt-1">
-                      Detail page — terms, opponent profile, live PnL of both
-                      sides, status badge, accept/decline buttons or the Trade
-                      Now CTA.
+                      Detail page — terms, opponent profile, status badge,
+                      accept/decline buttons and the CTA into play. On a
+                      trading challenge it also shows both sides&apos; live
+                      PnL; on a game challenge, the scores and round history.
                     </p>
                   </div>
                   <div className="p-3 bg-gray-900/40 border border-gray-700 rounded-lg">
@@ -2394,8 +2577,18 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                       /challenges/[id]/trade
                     </div>
                     <p className="text-gray-400 mt-1">
-                      The in-duel trading screen — chart, order ticket, open
+                      The trading screen — chart, order ticket, open
                       positions, your sandbox balance and the opponent ticker.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-gray-900/40 border border-gray-700 rounded-lg">
+                    <div className="font-semibold text-red-300">
+                      /challenges/[id]/play
+                    </div>
+                    <p className="text-gray-400 mt-1">
+                      The play screen for a game challenge — the game itself,
+                      your attempts, the countdown, and how you stand against
+                      your opponent.
                     </p>
                   </div>
                   <Link
@@ -2420,14 +2613,16 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                   Fair play
                 </h3>
                 <p className="text-sm text-gray-300">
-                  Both players trade independently — there is no shared book
-                  or position copying. Coordinated entries, mirror-trading
+                  Both players play independently — on a trading challenge
+                  there is no shared book or position copying, and on a game
+                  challenge you each get your own round. Coordinated entries,
+                  mirror-trading
                   with related accounts, and other manipulation patterns are
                   monitored at the platform level and can result in
                   disqualification and prize reversal. Per-opponent cooldowns
                   and per-user pending/active limits prevent grinding the
-                  same matchup. Keep duels clean and your stats become a real
-                  reputation builder.
+                  same matchup. Keep your challenges clean and your stats
+                  become a real reputation builder.
                 </p>
               </div>
             </div>
@@ -2483,7 +2678,7 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                       <strong className="text-white">Dashboard sidebar.</strong>{" "}
                       A compact Match Cards deck is also embedded in the
                       Contests sidebar on the dashboard so you can quickly
-                      find a duel without leaving the home screen.
+                      find a challenge without leaving the home screen.
                     </span>
                   </li>
                   <li className="flex items-start gap-2">
@@ -2961,7 +3156,7 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                         </p>
                         <p className="text-xs text-gray-500">
                           Total trading PnL ÷ total virtual starting capital ×
-                          100, across all contests/duels you&apos;ve entered.
+                          100, across all contests and challenges you&apos;ve entered.
                           This is Trade ROI (not your wallet&apos;s Net ROI).
                         </p>
                       </div>
@@ -3170,7 +3365,7 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                     <span>
                       <strong className="text-white">Win Rate and Profit Factor</strong>{" "}
                       come from your unified <em>trade history</em> (every
-                      closed trade across every contest/duel). They&apos;re
+                      closed trade across every contest and challenge). They&apos;re
                       the same numbers shown on your dashboard and profile
                       analytics, so all surfaces stay consistent.
                     </span>

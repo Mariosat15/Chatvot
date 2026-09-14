@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import mongoose from "mongoose";
+import {
+  OPEN_CHALLENGE_OPPONENT_LABEL,
+  isUnclaimedOpenChallenge,
+} from "@/lib/utils/open-challenge";
 
 /**
  * GET /api/landing/challenges
@@ -56,7 +60,21 @@ export async function GET() {
       return {
         id: challenge._id.toString(),
         challenger: anonymizeName(challenge.challengerName || "Player 1"),
-        challenged: anonymizeName(challenge.challengedName || "Player 2"),
+        /*
+          Reason: this endpoint includes `pending` challenges, so an unclaimed open
+          challenge reaches it with no opponent - and the old `|| "Player 2"` fallback
+          invented one on the public landing page. `challengeOpponentLabel` is the shared
+          answer, so a visitor and a signed-in player read the same thing about one seat.
+        */
+        challenged: isUnclaimedOpenChallenge({
+          // Reason: these rows come off the raw driver as `WithId<Document>`, which shares
+          // no declared property with the helper's input type. Picking the two fields it
+          // reads keeps the shared rule shared rather than restating it inline here.
+          openToAnyone: challenge.openToAnyone,
+          challengedId: challenge.challengedId,
+        })
+          ? OPEN_CHALLENGE_OPPONENT_LABEL
+          : anonymizeName(challenge.challengedName || "Player 2"),
         stake: challenge.entryFee || 0,
         stakeFormatted: `$${(challenge.entryFee || 0).toLocaleString()}`,
         status: challenge.status,

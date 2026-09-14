@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
-    const type = searchParams.get("type"); // 'sent', 'received', 'all'
+    const type = searchParams.get("type"); // 'sent', 'received', 'open', 'all'
 
     const query: Record<string, unknown> = {};
 
@@ -52,6 +52,17 @@ export async function GET(request: NextRequest) {
       query.challengerId = session.user.id;
     } else if (type === "received") {
       query.challengedId = session.user.id;
+    } else if (type === "open") {
+      // Reason: challenges anybody may claim, which is the ONE list here that is not
+      // about the caller. Three clauses, and dropping any of them shows a challenge that
+      // cannot be accepted: still open (the flag), still unclaimed (all three shapes of
+      // an empty seat, because a `$exists` filter alone reads a stored `""` as taken),
+      // and not the caller's own - a player cannot take their own seat, so listing it
+      // offers a button the accept route refuses.
+      query.openToAnyone = true;
+      query.challengedId = { $in: [null, ""] };
+      query.challengerId = { $ne: session.user.id };
+      query.status = "pending";
     } else {
       query.$or = [
         { challengerId: session.user.id },
@@ -59,8 +70,11 @@ export async function GET(request: NextRequest) {
       ];
     }
 
-    // Filter by status
-    if (status) {
+    // Filter by status. Reason: the open list pins `pending` itself and must not be
+    // overridable from the query string - an accepted or completed challenge has a named
+    // opponent and is nobody's to claim, so honouring `?type=open&status=active` would
+    // list other people's live matches under a heading that invites you to join them.
+    if (status && type !== "open") {
       query.status = status;
     }
 
@@ -132,12 +146,29 @@ export async function POST(request: NextRequest) {
       providerKey,
       gameCode,
       settings: gameSettings = {},
+      // Reason: offer the challenge to anybody rather than to one named player. An
+      // explicit flag, never inferred from an absent `challengedId` - see
+      // `lib/utils/open-challenge.ts` for which way each reading fails.
+      openToAnyone = false,
     } = body;
 
     const isProviderChallenge = Boolean(providerKey && gameCode);
+    const isOpenChallenge = openToAnyone === true;
 
     // VALIDATION: Early check for required fields
-    if (!challengedId) {
+    //
+    // Reason: refused rather than silently preferring one, because a request carrying both
+    // is a caller with two intentions and we cannot tell which they meant - and guessing
+    // "directed" would quietly turn an open challenge into a private one while guessing
+    // "open" would offer a named friend's seat to a stranger. Either way a real entry fee
+    // is debited by somebody nobody chose.
+    if (isOpenChallenge && challengedId) {
+      return errorResponse(
+        "A challenge is either open to anyone or sent to one player, not both",
+        400,
+      );
+    }
+    if (!isOpenChallenge && !challengedId) {
       return errorResponse("challengedId is required", 400);
     }
 
@@ -338,8 +369,10 @@ export async function POST(request: NextRequest) {
         return errorResponse("Challenges are currently disabled", 400);
       }
 
-      // Can't challenge yourself
-      if (challengedId === challengerId) {
+      // Can't challenge yourself. Reason: an open challenge has nobody to compare against
+      // here, so the same rule is enforced at the moment somebody claims the seat - see
+      // the accept route. The check is not skipped, it moves to where the answer exists.
+      if (!isOpenChallenge && challengedId === challengerId) {
         return errorResponse("You cannot challenge yourself", 400);
       }
 
@@ -388,17 +421,26 @@ export async function POST(request: NextRequest) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             .exec() as Promise<any>,
           getUserById(challengerId),
-          getUserById(challengedId),
-          UserPresence.findOne({ userId: challengedId })
-            .lean()
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            .exec() as Promise<any>,
+          // Reason: the next three all ask a question about the opponent - who are they,
+          // are they online, have we challenged them recently - and an open challenge has
+          // no opponent to ask about. They resolve to null rather than being queried with
+          // `undefined`, which would silently match documents that have no `challengedId`
+          // at all: every other open challenge on the platform.
+          isOpenChallenge ? Promise.resolve(null) : getUserById(challengedId),
+          isOpenChallenge
+            ? Promise.resolve(null)
+            : (UserPresence.findOne({ userId: challengedId })
+                .lean()
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                .exec() as Promise<any>),
           Challenge.countDocuments({ challengerId, status: "pending" }),
           Challenge.countDocuments({
-            $or: [{ challengerId }, { challengedId }],
+            $or: isOpenChallenge
+              ? [{ challengerId }]
+              : [{ challengerId }, { challengedId }],
             status: "active",
           }),
-          cooldownTime
+          cooldownTime && !isOpenChallenge
             ? Challenge.findOne({
                 challengerId,
                 challengedId,
@@ -424,26 +466,31 @@ export async function POST(request: NextRequest) {
         return errorResponse("Insufficient credits", 400);
       }
 
-      // Validate challenged user exists
-      if (!challengedUser) {
-        return errorResponse("User not found", 404);
-      }
+      // Validate challenged user exists. Reason: the three opponent checks below are
+      // withheld for an open challenge rather than answered "no" - there is no opponent
+      // to be absent, offline or unwilling, and `requireBothOnline` in particular would
+      // refuse every open challenge ever created.
+      if (!isOpenChallenge) {
+        if (!challengedUser) {
+          return errorResponse("User not found", 404);
+        }
 
-      // Check if challenged user is online (if required)
-      if (
-        settings.requireBothOnline &&
-        (!challengedPresence || challengedPresence.status !== "online")
-      ) {
-        return errorResponse("User is not online", 400);
-      }
+        // Check if challenged user is online (if required)
+        if (
+          settings.requireBothOnline &&
+          (!challengedPresence || challengedPresence.status !== "online")
+        ) {
+          return errorResponse("User is not online", 400);
+        }
 
-      // Check if challenged user is accepting challenges
-      // FIX: Only check if presence exists AND explicitly set to false
-      if (
-        challengedPresence &&
-        challengedPresence.acceptingChallenges === false
-      ) {
-        return errorResponse("User is not accepting challenges", 400);
+        // Check if challenged user is accepting challenges
+        // FIX: Only check if presence exists AND explicitly set to false
+        if (
+          challengedPresence &&
+          challengedPresence.acceptingChallenges === false
+        ) {
+          return errorResponse("User is not accepting challenges", 400);
+        }
       }
 
       // Check pending challenges limit
@@ -487,9 +534,19 @@ export async function POST(request: NextRequest) {
       challengerEmail = challengerUser.email || challengerEmail;
     }
 
-    // Get challenged user name (use placeholder in simulator mode)
-    let challengedName = `SimUser_${challengedId.slice(-6)}`;
-    let challengedEmail = `simuser_${challengedId.slice(-6)}@test.simulator`;
+    // Get challenged user name (use placeholder in simulator mode).
+    //
+    // Reason: an open challenge stores no name at all rather than a placeholder such as
+    // "Open" or "TBD". A placeholder is indistinguishable from a real display name once
+    // stored, so every downstream screen would have to know which strings are fake, and
+    // `isUnclaimedOpenChallenge` would stop being able to answer. The seat is filled with
+    // the claimer's real name at accept time.
+    let challengedName = isOpenChallenge
+      ? undefined
+      : `SimUser_${challengedId.slice(-6)}`;
+    let challengedEmail = isOpenChallenge
+      ? undefined
+      : `simuser_${challengedId.slice(-6)}@test.simulator`;
     if (!isInSimulatorMode && challengedUser) {
       challengedName = challengedUser.name || challengedName;
       challengedEmail = challengedUser.email || challengedEmail;
@@ -572,9 +629,14 @@ export async function POST(request: NextRequest) {
       challengerId,
       challengerName,
       challengerEmail,
-      challengedId,
-      challengedName,
-      challengedEmail,
+      // Reason: the three opponent keys are OMITTED for an open challenge rather than set
+      // to undefined or "". `isUnclaimedOpenChallenge` treats all three shapes as empty,
+      // but the accept-time claim filter is the reason to be exact here - an empty string
+      // stored on the document is what a later `$exists` filter reads as taken.
+      openToAnyone: isOpenChallenge,
+      ...(isOpenChallenge
+        ? {}
+        : { challengedId, challengedName, challengedEmail }),
       entryFee: actualEntryFee,
       prizePool,
       platformFeePercentage,
@@ -587,8 +649,13 @@ export async function POST(request: NextRequest) {
       status: "pending",
     });
 
-    // Send notification to challenged user (skip in simulator mode)
-    if (!isInSimulatorMode) {
+    // Send notification to challenged user (skip in simulator mode).
+    //
+    // Reason: skipped for an open challenge, because there is nobody to tell. Sending
+    // with an undefined recipient is the failure worth naming - `notificationService.send`
+    // would either throw into the catch below and log a false error, or write a row
+    // addressed to nobody that the notifications screen then renders for no user.
+    if (!isInSimulatorMode && !isOpenChallenge) {
       try {
         const { notificationService } =
           await import("@/lib/services/notification.service");
@@ -641,6 +708,7 @@ export async function POST(request: NextRequest) {
       challenge: {
         _id: challenge._id,
         slug: challenge.slug,
+        openToAnyone: challenge.openToAnyone,
         challengedName: challenge.challengedName,
         entryFee: challenge.entryFee,
         duration: challenge.duration,

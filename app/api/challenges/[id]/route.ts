@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { connectToDatabase } from "@/database/mongoose";
 import Challenge from "@/database/models/trading/challenge.model";
 import ChallengeParticipant from "@/database/models/trading/challenge-participant.model";
+import { isUnclaimedOpenChallenge } from "@/lib/utils/open-challenge";
 
 // GET - Get specific challenge details
 export async function GET(
@@ -28,10 +29,18 @@ export async function GET(
       );
     }
 
-    // Only participants can view
+    // Only participants can view - plus anybody signed in, while the challenge is an
+    // unclaimed open one.
+    //
+    // Reason: an open challenge has to be readable by the person deciding whether to take
+    // it, or the only way to accept one is to press a button on a list without ever seeing
+    // the entry fee, the game or the rules. The widening is bounded by
+    // `isUnclaimedOpenChallenge`: the moment somebody claims the seat, the third clause
+    // stops being true and the challenge is private to its two players again.
     if (
       challenge.challengerId !== session.user.id &&
-      challenge.challengedId !== session.user.id
+      challenge.challengedId !== session.user.id &&
+      !isUnclaimedOpenChallenge(challenge)
     ) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }

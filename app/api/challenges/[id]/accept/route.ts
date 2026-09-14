@@ -11,6 +11,7 @@ import { canJoinChallenge } from "@/lib/services/market-hours.service";
 import { checkAccountStanding } from "@/lib/services/contest-entry/guards";
 import { gameNeedsMarketHours } from "@/lib/games";
 import { buildChallengeParticipantSeat } from "@/lib/services/challenges/challenge-participant-seat";
+import { isUnclaimedOpenChallenge } from "@/lib/utils/open-challenge";
 import { randomBytes } from "crypto";
 
 // POST - Accept a challenge
@@ -78,7 +79,7 @@ export async function POST(
       );
     }
 
-    const challenge = await Challenge.findById(id).session(dbSession);
+    let challenge = await Challenge.findById(id).session(dbSession);
 
     if (!challenge) {
       await dbSession.abortTransaction();
@@ -88,8 +89,25 @@ export async function POST(
       );
     }
 
-    // Only the challenged user can accept
-    if (challenge.challengedId !== session.user.id) {
+    const claimable = isUnclaimedOpenChallenge(challenge);
+
+    if (claimable) {
+      // Reason: the self-challenge rule that the create path could not apply, because an
+      // open challenge names nobody at creation. The check did not disappear - it moved
+      // to the only moment the second player is known.
+      if (challenge.challengerId === session.user.id) {
+        await dbSession.abortTransaction();
+        return NextResponse.json(
+          { error: "You cannot accept your own challenge" },
+          { status: 400 },
+        );
+      }
+    } else if (challenge.challengedId !== session.user.id) {
+      // Only the challenged user can accept. Reason: this also refuses a DIRECTED
+      // challenge whose `challengedId` somehow went missing - `undefined !== id` for
+      // every caller - which is why openness is an explicit flag rather than inferred
+      // from the absent field. The gate fails closed on a damaged document instead of
+      // opening the seat to the whole platform.
       await dbSession.abortTransaction();
       return NextResponse.json(
         { error: "Only the challenged user can accept" },
@@ -141,6 +159,79 @@ export async function POST(
           { status: 400 },
         );
       }
+    }
+
+    // Claim the empty seat on an open challenge.
+    //
+    // Reason: this is the lock, and it is the "setting the final status up front IS the
+    // lock" pattern applied to the seat rather than the status. Two players pressing
+    // Accept at the same moment both read `status: "pending"` and an empty seat, and
+    // without an atomic claim both would be debited a real entry fee for a challenge only
+    // one of them is in. The filter demands the seat still be empty, so the second
+    // `findOneAndUpdate` matches nothing and that player is refused before any wallet is
+    // touched.
+    //
+    // All three shapes of an empty seat are matched: absent, `null` and `""`. `$exists:
+    // false` alone reads a stored empty string as taken, which would make the challenge
+    // permanently unclaimable rather than double-claimable - quieter, but still wrong.
+    //
+    // Placed here, after every refusal that does not write and before every wallet read,
+    // for the same reason as `checkAccountStanding` above: a later refusal aborts the
+    // transaction and rolls the claim back, so a player who is turned away for an empty
+    // wallet has not silently consumed somebody else's opportunity.
+    if (claimable) {
+      const claimed = await Challenge.findOneAndUpdate(
+        {
+          _id: challenge._id,
+          status: "pending",
+          openToAnyone: true,
+          $or: [
+            { challengedId: { $exists: false } },
+            { challengedId: null },
+            { challengedId: "" },
+          ],
+        },
+        {
+          $set: {
+            challengedId: session.user.id,
+            challengedName: session.user.name || "Unknown",
+            challengedEmail: session.user.email || "",
+          },
+        },
+        { session: dbSession, new: true },
+      );
+
+      if (!claimed) {
+        await dbSession.abortTransaction();
+        return NextResponse.json(
+          { error: "Somebody else has already taken this challenge" },
+          { status: 409 },
+        );
+      }
+
+      // Reason: continue from the claimed document, not the one read before the claim -
+      // everything below reads `challenge.challengedId` to debit a wallet, write a ledger
+      // row and build a participant seat, and the stale copy still has no opponent on it.
+      challenge = claimed;
+    }
+
+    // Reason: a tripwire, not a reachable refusal. Every path above either matched the
+    // caller against a stored `challengedId` or has just written one, so this cannot
+    // fire today - it exists because the three fields became optional on the model when
+    // open challenges arrived, and without it the compiler would be satisfied by a
+    // future branch that reaches the debit with an empty seat.
+    const challengedId = challenge.challengedId;
+    const challengedName = challenge.challengedName;
+    const challengedEmail = challenge.challengedEmail;
+    if (!challengedId || !challengedName) {
+      await dbSession.abortTransaction();
+      console.error(
+        `❌ Challenge ${id} reached acceptance with no opponent on it`,
+      );
+      return NextResponse.json(
+        { error: "Something went wrong. Please contact support." },
+        { status: 500 },
+      );
     }
 
     // Check challenged user's wallet balance
@@ -210,7 +301,7 @@ export async function POST(
           exchangeRate: 1,
           status: "completed",
           challengeId: challenge._id.toString(),
-          description: `Challenge entry vs ${challenge.challengedName}`,
+          description: `Challenge entry vs ${challengedName}`,
           processedAt: new Date(),
         },
       ],
@@ -220,7 +311,7 @@ export async function POST(
     // Challenged — atomic debit
     const challengedBalanceBefore = challengedWallet.creditBalance;
     const updatedChallengedWallet = await CreditWallet.findOneAndUpdate(
-      { userId: challenge.challengedId },
+      { userId: challengedId },
       {
         $inc: {
           creditBalance: -challenge.entryFee,
@@ -236,7 +327,7 @@ export async function POST(
     await WalletTransaction.create(
       [
         {
-          userId: challenge.challengedId,
+          userId: challengedId,
           transactionType: "challenge_entry",
           amount: -challenge.entryFee,
           balanceBefore: challengedBalanceBefore,
@@ -292,9 +383,9 @@ export async function POST(
         }),
         buildChallengeParticipantSeat({
           challengeId: challenge._id.toString(),
-          userId: challenge.challengedId,
-          username: challenge.challengedName,
-          email: challenge.challengedEmail,
+          userId: challengedId,
+          username: challengedName,
+          email: challengedEmail ?? "",
           role: "challenged",
           gameKey: challenge.gameKey,
           startingCapital: challenge.startingCapital,
@@ -329,8 +420,8 @@ export async function POST(
           // Changed from 'metadata' to 'variables'
           challengeId: challenge._id.toString(),
           challengeSlug: challenge.slug, // Added for actionUrl
-          challengedName: challenge.challengedName,
-          opponentName: challenge.challengedName, // Alias for template compatibility
+          challengedName,
+          opponentName: challengedName, // Alias for template compatibility
           entryFee: challenge.entryFee,
           duration: challenge.duration,
           winnerPrize: challenge.winnerPrize,
@@ -340,7 +431,7 @@ export async function POST(
 
       // Notify challenged (confirmation) that the challenge started
       await notificationService.send({
-        userId: challenge.challengedId,
+        userId: challengedId,
         templateId: "challenge_started",
         variables: {
           // Changed from 'metadata' to 'variables'

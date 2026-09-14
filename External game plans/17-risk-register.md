@@ -47,6 +47,7 @@ chapter covers risks to the programme and to the application.
 | **R71** | **Neither app paid a Game Master a share of a challenge's entry fees** - the admin app's `challenge-finalize.actions.ts` had **no Game Master fee logic of any kind**, not even the main app's own inline copy, so a referred player entering a challenge earned their referrer nothing on either app | High | **LATENT, not live** - no backfill is possible: no fee row was ever written to attribute | **CLOSED 12 Sep 2026** - both apps now call the shared `settleFeesAndGameMasters()` via `challenge-settlement.service.ts`; see `19` section 4 |
 | **R72** | **Three sibling bugs in the challenge tie/disqualification logic being replaced, present in BOTH apps.** The `"join_time"` tiebreaker read `participant.enteredAt`, a field `ChallengeParticipant` has never declared (it is `joinedAt`), so it always compared `Date.now()` against itself and could never break a tie. Under `challenger_wins`, the challenge document was saved `isTie: true, winnerId: undefined` moments before the challenger was paid the full prize - a permanent stored-vs-paid mismatch. Under `both_lose`, neither participant's `.status` ever moved to `"completed"` and no unclaimed-pool row was recorded despite a comment claiming one had been | Medium | **LIVE** on every affected challenge tie, on both apps, for as long as the inline logic existed | **CLOSED 12 Sep 2026**, found while reading the code being replaced; nothing backfilled - each was a stored-record defect, not a wrong payment |
 | **R73** | **A provider challenge refused every attempt for its whole life, and the player was told they were too late.** `POST /api/challenges` stored `roundStartPolicy: "reserve_full_round"`, which reserves the **catalogue ceiling** rather than the configured length (`12` s2.9) - so any challenge whose window is shorter than the title's maximum round refused a round at every moment of its existence, not merely near the end. Circuit Sprint's ceiling is an hour, so the owner's ten-minute challenge could never be played. The rule is correct for a competition, which has an operator who chooses it, a schema default behind them and a pre-flight that refuses a too-short contest; **a challenge has none of the three.** The unreachable `?? "reserve_full_round"` fallback in `challenge-round-status.service.ts` named the value the resolver had stopped producing | Medium | **LIVE and player-visible** on every provider challenge, and reported by a real player; the round was refused before it was created, so no attempt was consumed, no money moved and nothing was stored wrongly | **CLOSED 13 Sep 2026** - a challenge never reserves (`CHALLENGE_ROUND_START_POLICY`, owner decision); nothing to backfill |
+| **R74** | **A player's wallet quoted a euro figure a hundred times what they could withdraw.** The platform stored what a credit is worth **twice, in two collections, with the two defaults disagreeing by a factor of a hundred**: `CreditConversionSettings.eurToCreditsRate` at 100 credits = EUR 1, which every path that moves money reads, and `AppSettings.credits.valueInEUR` at 1 credit = EUR 1, which drove the client context's `creditsToEUR` / `eurToCredits` and therefore every figure a player was **shown**. A player holding 1,000 credits saw `EUR 1,000.00` under their balance and could withdraw `EUR 10`; the deposit modal quoted 10 credits for EUR 10 while the processor credited 1,000; `/help` rendered **both** numbers, from both models, on one page. **Neither number was miscalculated** - each was correct against the source its site happened to pick - so nothing threw, nothing logged, and every figure reconciled against its own model | High | **LIVE and player-visible** on the wallet, the transaction rows, the profile summary, the deposit modal and the help centre, for as long as both fields have existed. No payment was ever wrong: withdrawals and deposits ran on the rate throughout, so the harm is a **quoted figure**, not a moved balance | **CLOSED 14 Sep 2026** - `lib/utils/credit-value.ts` (mirrored) is the one resolver, both `/api/settings` routes and `/api/help-settings` serve a **derived** `valueInEUR`, the admin PUT refuses to write the path and the currency screen shows it read-only. **Nothing backfilled and the stored field is deliberately left in place** - it may hold a value an operator typed on purpose, and nothing reads it now |
 | R8 | Bulk find-and-replace on wording | High | Medium | X8 |
 | R9 | Fraud throttle blind to provider entries | High | High | X5 |
 | R11 | Legal wording changed without review | High | Medium | X8 |
@@ -2392,6 +2393,89 @@ roadmap, 12 Sep 2026).** Both apps' `challenge-finalize.actions.ts` now call the
 (mirrored), the same stage a competition uses, with `contestKind: "challenge"` and support for
 the `challengeReferralFeePercentage` override exactly as the main app's pre-unification inline
 code read it. See `19-game-masters.md` section 4.
+
+---
+
+### R74 - The wallet quoted a hundred times what it could pay - **CLOSED 14 September 2026**
+
+**What it was.** A player holding 1,000 credits read **`≈ €1,000.00`** under their balance and
+could withdraw **€10**. The deposit modal offered them 10 credits for €10 while the processor
+credited 1,000. The `/help` page rendered **both** answers, from two different models, on one
+screen.
+
+**The cause, and the reason it survived so long.** The platform stored what a credit is worth
+twice, and the two schema defaults disagreed by a factor of a hundred:
+
+    CreditConversionSettings.eurToCreditsRate   default 100   (100 credits = EUR 1)
+    AppSettings.credits.valueInEUR              default 1     (1 credit  = EUR 1)
+
+The first is the one **money moves on** - deposits, withdrawals, the financial dashboard,
+transaction exports, the admin analytics. The second drove `AppSettingsContext`'s `creditsToEUR`
+and `eurToCredits`, which is **every figure a player is shown**. So the two populations of code
+were each internally consistent and each correct against the source it happened to read.
+**Nothing was miscalculated**, nothing threw, nothing logged, and every number reconciled
+perfectly against its own model - which is exactly why a defect of this size sat in front of
+players rather than being caught.
+
+**It was not a tie between two defaults - one side was live and wrong.** That distinction was
+recorded at the foot of `format-volts.ts` on 9 September 2026 and then believed to be an open
+question for five days. It was not: the money is what the withdrawal route pays, so the display
+was the wrong one, and the owner confirmed **100 credits = EUR 1 is authoritative** the same day.
+
+**The fix is one resolver and one direction of derivation.** `lib/utils/credit-value.ts`
+(mirrored, held byte-identical by a test, because `check:mirrors` compares **models** and has
+never had an opinion about a utility module) exports `resolveEurToCreditsRate` and
+`creditValueInBaseCurrency`. Both `/api/settings` routes and `/api/help-settings` now serve a
+`valueInEUR` **derived** from the rate rather than read from the collection - which is the
+smallest possible surface, because the client context builds every conversion out of that one
+field, so a single override reaches the wallet, the transaction rows, the profile summary and
+the deposit modal at once and **no screen can pick the other number**.
+
+**`||` was wrong about zero and accidentally right about `NaN`, so the one-character fix is
+wrong.** The rate reaches the resolver from `parseFloat` on an admin form and from a `.lean()`
+read, so `?? DEFAULT` passes `NaN` straight through and every downstream multiplication becomes
+`NaN`. It also has to catch what neither operator catches: a **negative** rate is neither falsy
+nor `NaN`, and it would flip the sign of every conversion on the platform. `Number.isFinite(rate)
+|| rate <= 0`, and the enumeration is the point - R31's rule in a new place.
+
+**A fallback is a stored value as far as the player reading it is concerned.** Five client sites
+carried a hard-coded `valueInEUR: 1`, so a slow or failed settings fetch reinstated the
+hundredfold figure - briefly, silently, on the one screen where it matters. They now import
+`DEFAULT_CREDIT_VALUE_IN_BASE_CURRENCY`, which is computed from the default rate rather than
+written out, so the two cannot drift. The `/help` page's own fallback was the defect in
+miniature: `valueInEUR: 1` on one line and `eurToCreditsRate: 100` on the next.
+
+**The admin control had to go, not merely be corrected.** `CurrencySettingsSection.tsx` offered
+`valueInEUR` as an editable input, which is a second stored number by another name - leave it and
+the fix holds only until the next operator saves that screen. It is now a **read-only display of
+the derived figure that names the screen owning the rate**, because withholding a control without
+saying where the value went teaches an operator the setting no longer exists. The PUT handler
+strips the field as well, or an operator saving any unrelated currency setting persists the
+derived value into the collection that must not hold it - and a stored `0.01` is then
+indistinguishable from one somebody typed.
+
+**Nothing was backfilled, and the stored field is deliberately left in place.** No payment was
+ever wrong - withdrawals and deposits ran on the rate throughout - so there is nothing to
+correct; and `AppSettings.credits.valueInEUR` may hold a value an operator entered on purpose,
+so overwriting it would destroy the only record of that. It is inert either way. The model
+comment claiming it to be the conversion is **corrected in place with the old wording quoted**,
+on the R7/R31 precedent, because it was believed.
+
+**What this does NOT change, and a summary will merge them.** `format-volts.ts` still refuses to
+convert, and that refusal never depended on the rate being wrong: a competition is denominated in
+credits and has no business quoting a second unit at all. The Volts work removed the fiat
+equivalent from contest surfaces; this corrects it on the wallet and deposit surfaces, where it
+belongs. Two different answers to two different questions.
+
+**Pinned by** `__tests__/services/credit-value.test.ts` (26 tests) and
+`tools/probe-credit-value.ps1` (16 probes, all red on exactly the expected test). The guards are
+**structural rather than behavioural for the most part, deliberately** - there is no wrong number
+to assert on, so what has to be pinned is *which source each site reads*. One probe found a weak
+test the usual way: injecting a route that keeps its imports and stops consulting the rate stayed
+green against `toMatch(/creditValueInBaseCurrency/)`, because **both identifiers are still on the
+import line**. The assertion now matches the **call with its argument** - the fifth instance of
+"an import is not a use", after `canTransitionRound`, `MIN_REASON_LENGTH`, `!expectedOrigin` and
+`describeRoundActivity`.
 
 ---
 

@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import { connectToDatabase } from "@/database/mongoose";
 import AppSettings from "@/database/models/app-settings.model";
+import CreditConversionSettings from "@/database/models/credit-conversion-settings.model";
 import { getAdminJwtSecret } from "@/lib/admin/jwt-secret";
+import { creditValueInBaseCurrency } from "@/lib/utils/credit-value";
 
 const JWT_SECRET = getAdminJwtSecret();
 
@@ -60,9 +62,24 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    /*
+      Derived, never stored — the same override the player app applies, so an operator and a
+      player are looking at one number. See `lib/utils/credit-value.ts`.
+    */
+    const conversionSettings = await CreditConversionSettings.getSingleton();
+    const serialised = JSON.parse(JSON.stringify(settings));
+
     return NextResponse.json({
       success: true,
-      settings: JSON.parse(JSON.stringify(settings)),
+      settings: {
+        ...serialised,
+        credits: {
+          ...serialised.credits,
+          valueInEUR: creditValueInBaseCurrency(
+            conversionSettings?.eurToCreditsRate,
+          ),
+        },
+      },
     });
   } catch (error) {
     console.error("Error fetching app settings:", error);
@@ -96,7 +113,18 @@ export async function PUT(request: NextRequest) {
       settings.currency = { ...settings.currency, ...updateData.currency };
     }
     if (updateData.credits) {
-      settings.credits = { ...settings.credits, ...updateData.credits };
+      /*
+        `valueInEUR` is derived and must never be written back.
+
+        // Reason: the GET above serves the derived figure, so the currency form holds it in
+        // state and would post it straight back on the next save of an unrelated field. That
+        // would re-establish the second stored number as a fact — the same value today, and
+        // a stale one the moment somebody edits the conversion rate. Dropping it silently is
+        // right here rather than refusing, because the client is echoing our own response
+        // rather than asking for a change.
+      */
+      const { valueInEUR: _derived, ...creditsUpdate } = updateData.credits;
+      settings.credits = { ...settings.credits, ...creditsUpdate };
     }
     if (updateData.transactions) {
       settings.transactions = {

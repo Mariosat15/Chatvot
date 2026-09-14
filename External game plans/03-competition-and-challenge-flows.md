@@ -420,6 +420,58 @@ the money path, the windows and the resolution table above are all unaffected.
    players who opted in for that game? It is an owner decision and it changes this flow's
    entry conditions.
 
+#### 2.4a BUILT - open challenges, 14 September 2026
+
+> **This amends point 1 above rather than overriding it silently.** `challengedId`,
+> `challengedName` and `challengedEmail` are now **conditionally** required on both
+> `Challenge` copies, and there is **no `OpenChallenge` collection**. A document
+> proposing to build one is describing the plan, not the code.
+>
+> **Why the chapter's recommendation was not followed.** A second collection makes an
+> open challenge a different kind of object until the moment somebody takes it, so every
+> list, every notification, every cancellation and the whole entry-fee path would have
+> had to learn about a second shape - and the materialising step is a *second writer* of
+> a money document, which is the shape this programme has spent weeks removing (four
+> competition entry paths, ten finalize sites, two settlement copies). Conditional
+> requirement keeps one collection, one writer and one lifecycle, and costs one
+> predicate. The predicate is not `required: false`: a **directed** challenge with no
+> opponent is still a bug, and the schema is the only thing that catches it.
+>
+> **Openness is an explicit stored flag (`openToAnyone`), never inferred from
+> `challengedId` being absent**, and the direction of failure is the whole argument.
+> Inferred, a bug that drops the opponent from a *directed* challenge turns it into one
+> anybody may claim - a stranger takes a seat offered to a named friend and a real entry
+> fee is debited. With the flag, the same bug produces a challenge nobody can accept,
+> which is visible, refundable and complained about. The flag **stays true after the seat
+> is claimed**, because it is how the challenge was created rather than what state it is
+> in, which is what lets a screen explain why a stranger is in it.
+>
+> **The claim is atomic and that is the money-critical part.** Accept does a single
+> `findOneAndUpdate` filtered on `status: "pending"`, `openToAnyone: true` and an empty
+> seat, then continues from the **returned** document - so a simultaneous second accepter
+> matches nothing and is refused before any wallet is read. Continuing from the
+> pre-claim copy is the natural spelling and would debit both players. "Empty" is matched
+> in **all three** of its shapes - absent, `null` and `""` - because only the first is
+> what the create path writes and the other two are what a bad edit or a half-run
+> migration leaves behind, and both look correct in a document dump.
+>
+> **The create route refuses a request carrying both facts** rather than letting one win:
+> a precedence rule stated in the browser and again on the server is one rule in two
+> copies, and the browser's is the one nobody tests. The three opponent fields are
+> **omitted**, never stored empty. **No notification is sent**, because there is nobody
+> to notify - and **declining is impossible by construction**, the decline route already
+> requiring the caller to be the named opponent.
+>
+> **Answering open question 15 for this slice only:** an open challenge may be claimed by
+> **any signed-in player except its creator**, subject to the same standing, balance and
+> fraud gates a directed accept passes. Per-game willingness is still outstanding.
+>
+> Six screens assumed two named players and were swept: the card, the challenges list
+> (a new **Open** tab), the detail page, the provider lobby, the entry actions and the
+> public landing feed, which invented a "Player 2" for a seat nobody had taken. The
+> shared answer is `lib/utils/open-challenge.ts`, which is **model-free by requirement**
+> rather than by preference - its callers are `"use client"` (**R58**).
+
 ---
 
 ## 3. Where the money moves

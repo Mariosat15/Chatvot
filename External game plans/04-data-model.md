@@ -94,6 +94,22 @@ fields on the competition table are deliberately **not** there:
   rather than retensed**, because that sentence was believed for six days and is why **R73**
   made every short provider challenge unplayable.
 
+**ALSO BUILT ON `Challenge`, 14 September 2026 - the open-challenge fields.** `openToAnyone`
+is a `Boolean` defaulting to `false`, and `challengedId` / `challengedName` /
+`challengedEmail` became **conditionally required** on both copies, the predicate being
+`this.openToAnyone !== true`. Four facts drift easily. The predicate is **not** a drop to
+`required: false`: a *directed* challenge with no opponent is still a bug and the schema is
+the only thing that catches it. **Both copies must carry the same predicate body** -
+`check:mirrors` compares field paths and enum values and **not** predicate bodies, so a
+conditional requirement that differs between the apps is a validation rule whose outcome
+depends on which process saved the document, with the guard staying green; a byte-comparison
+test pins them. `openToAnyone` **stays true after the seat is claimed**, so it is not a
+"is this joinable" flag and a reader wanting that question must ask whether `challengedId`
+is empty as well - `isUnclaimedOpenChallenge` in `lib/utils/open-challenge.ts` is the one
+answer. And there is **no `OpenChallenge` collection**, which reverses the recommendation in
+`03` s2.4 point 1 - see `03` **s2.4a** for why. One index was added,
+`{ openToAnyone: 1, status: 1, createdAt: -1 }`, for the discovery list.
+
 ### 2.2 Competition / Challenge participant
 
 | Field | Type | Notes |

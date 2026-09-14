@@ -275,6 +275,24 @@ acceptance, which keeps the money path untouched at the cost of a second model.
 mirrored, and Stage 0 spent significant effort proving how easily that path breaks.
 Loosening a required field there to add a browsing feature is the wrong trade.
 
+> **BUILT 14 September 2026, AND THIS RECOMMENDATION WAS REVERSED.** The three opponent fields
+> are **conditionally** required on `Challenge` itself, keyed on an explicit stored
+> `openToAnyone` flag, and there is **no `OpenChallenge` collection**. `03` s2.4a is the
+> authoritative account; a document proposing the collection is describing the plan rather
+> than the code. The reasoning above is not wrong about `Challenge` being fragile - it is
+> wrong about which option is riskier. **Materialising a `Challenge` on acceptance makes the
+> materialising step a second writer of a money document**, which is precisely the shape this
+> programme has spent weeks removing (four competition entry paths, ten finalize sites, two
+> copies of the challenge payout). The conditional-field version has one writer and one atomic
+> claim. What survives of the caution is the part that was actually load-bearing: **every
+> reader assuming `challengedId` is present had to be found first**, which is why that count
+> was the first step of the build, and why a runtime tripwire narrows the field back before
+> any money moves. Two consequences follow. `check:mirrors` compares field paths and enum
+> values and **cannot see a `required` predicate**, so the two copies are held by a
+> byte-for-byte test instead. And the acceptance criterion in section 9 - *"open challenges
+> cannot loosen a required field on `Challenge`"* - is **deliberately not met**, and should be
+> read as the question it was raised to ask rather than as a rule that was broken.
+
 ### 6.1 Nothing here changes what we ask of a provider
 
 Checked deliberately, because it decides whether this chapter is gated on a commercial
@@ -308,7 +326,7 @@ game is pointless, and the catalogue is what makes several games visible.
 | Generalise `matchmaking.service.ts` from trading-only to per-game | 3-5 days | The core work. Includes the per-game skill-rating fix from section 4 |
 | Inference from `UserGameStats` | 2-3 days | Cheap because `UserGameStats` already exists |
 | Opponent picker on challenge create | 2-3 days | Search endpoint already exists |
-| Open challenges - `OpenChallenge` collection, list, accept | 4-5 days | The only genuinely new mechanic. Counted in X10, not here |
+| ~~Open challenges - `OpenChallenge` collection, list, accept~~ **BUILT 14 Sep 2026, and with no such collection** - see the amendment in section 6 | ~~4-5 days~~ done | The only genuinely new mechanic. Counted in X10, not here |
 | Abuse controls - rate-limit preset, block checks, opt-out surface | 1-2 days | Utilities exist |
 | Onboarding card made game-aware | 1-2 days | |
 
@@ -353,4 +371,10 @@ the entry-path writers before unifying them and found four instead of two.
       `checkAccountStanding` guard rather than a second implementation.
 - [ ] The getting-started card contains no trading-only step when `tradingEnabled` is
       false.
-- [ ] Open challenges cannot loosen a required field on `Challenge`, per section 6.
+- [x] ~~Open challenges cannot loosen a required field on `Challenge`, per section 6.~~
+      **Deliberately not met, 14 September 2026** - the three opponent fields are
+      conditionally required on `Challenge` and there is no `OpenChallenge` collection. See
+      the amendment in section 6 for why the separate collection was the riskier option, and
+      what the caution is replaced by: a counted sweep of every reader that assumed a named
+      opponent, a runtime tripwire before any money moves, and a byte-for-byte mirror test,
+      since `check:mirrors` cannot see a `required` predicate.

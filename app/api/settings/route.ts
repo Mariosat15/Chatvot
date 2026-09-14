@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import AppSettings from "@/database/models/app-settings.model";
+import CreditConversionSettings from "@/database/models/credit-conversion-settings.model";
 import { WhiteLabel } from "@/database/models/whitelabel.model";
+import { creditValueInBaseCurrency } from "@/lib/utils/credit-value";
 
 // Disable Next.js caching for this route
 export const dynamic = "force-dynamic";
@@ -48,9 +50,28 @@ export async function GET() {
     // Also fetch WhiteLabel settings for branding assets (no cache)
     const whiteLabel = await WhiteLabel.findOne().lean();
 
+    /*
+      What a credit is worth is DERIVED from the conversion rate the money actually moves on,
+      and the stored `credits.valueInEUR` is deliberately not served.
+
+      // Reason: this is the single place that reaches every client conversion. The context's
+      // `creditsToEUR` / `eurToCredits` are built from this field, so the wallet balance, the
+      // transaction rows, the profile summary and the deposit modal's "you will receive" line
+      // were all a hundred times out against the withdrawal route. Overriding here fixes all
+      // of them at once, and means no screen can pick the other number.
+    */
+    const conversionSettings = await CreditConversionSettings.getSingleton();
+    const derivedCreditValue = creditValueInBaseCurrency(
+      conversionSettings?.eurToCreditsRate,
+    );
+
     // Merge branding assets into settings
     const mergedSettings = {
       ...JSON.parse(JSON.stringify(settings)),
+      credits: {
+        ...JSON.parse(JSON.stringify(settings)).credits,
+        valueInEUR: derivedCreditValue,
+      },
       branding: {
         ...JSON.parse(JSON.stringify(settings)).branding,
         appLogo: whiteLabel?.appLogo || "/assets/images/logo.png",

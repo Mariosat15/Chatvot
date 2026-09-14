@@ -42,7 +42,20 @@ const AppSettingsSchema = new Schema({
       type: String,
       default: "zap", // Lucide icon name
     },
-    // Conversion: 1 credit = X EUR
+    /*
+      HISTORICAL. Stored, and read by nothing since 14 September 2026.
+
+      The comment here used to say "Conversion: 1 credit = X EUR", and it was believed — the
+      client context built `creditsToEUR` and `eurToCredits` from it, while every path that
+      moves money used `CreditConversionSettings.eurToCreditsRate` instead. The two defaults
+      disagreed by a factor of a hundred, so a wallet balance and a withdrawal quoted
+      different euro figures for the same credits.
+
+      // Reason: the field is kept rather than dropped because an operator may have typed a
+      // deliberate value into it, and because removing it is a mirrored migration for a
+      // cosmetic gain. Both `/api/settings` routes now serve a value DERIVED from the rate
+      // and the admin PUT refuses to write this path. See `lib/utils/credit-value.ts`.
+    */
     valueInEUR: {
       type: Number,
       default: 1.0,

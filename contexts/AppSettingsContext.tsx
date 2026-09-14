@@ -8,6 +8,8 @@ import React, {
   ReactNode,
 } from "react";
 
+import { DEFAULT_CREDIT_VALUE_IN_BASE_CURRENCY } from "@/lib/utils/credit-value";
+
 export interface AppSettings {
   currency: {
     code: string;
@@ -60,7 +62,8 @@ const defaultSettings: AppSettings = {
     name: "Volt Credits",
     symbol: "⚡",
     icon: "zap",
-    valueInEUR: 1.0,
+    // Reason: the fallback must match the derived rate, not the historical stored default.
+    valueInEUR: DEFAULT_CREDIT_VALUE_IN_BASE_CURRENCY,
     showEUREquivalent: true,
     decimals: 2,
   },

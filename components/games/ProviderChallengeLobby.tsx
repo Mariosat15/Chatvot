@@ -35,6 +35,10 @@ import { formatVolts } from "@/lib/utils/format-volts";
 import { getChallengePlayState } from "@/lib/services/games/challenge-round-status.service";
 import { isProviderChallenge } from "@/lib/services/games/challenge-round-config";
 import {
+  challengeOpponentLabel,
+  isUnclaimedOpenChallenge,
+} from "@/lib/utils/open-challenge";
+import {
   getGamePresentation,
   UNKNOWN_GAME_NAME,
 } from "@/lib/services/games/game-presentation.service";
@@ -165,8 +169,17 @@ export default async function ProviderChallengeLobby({
   const canLaunch = isProviderChallenge(challenge);
 
   const isChallenger = challenge.challengerId === userId;
+  /*
+    `isChallenged` was `!isChallenger`, which is only the same question while a challenge
+    names two players. On an OPEN challenge a browsing player satisfies it and was shown
+    "Challenge Received!" with a Decline button the route refuses - so the seat is resolved
+    here, from the same predicate the accept route's atomic claim uses.
+  */
+  const openSeat = isUnclaimedOpenChallenge(challenge);
+  const isChallenged =
+    !isChallenger && String(challenge.challengedId ?? "") === String(userId);
   const opponentName = isChallenger
-    ? challenge.challengedName
+    ? challengeOpponentLabel(challenge.challengedName, challenge)
     : challenge.challengerName;
   const isWinner = challenge.winnerId === userId;
   const isLoser = challenge.loserId === userId;
@@ -261,7 +274,15 @@ export default async function ProviderChallengeLobby({
         banner={providerBanner(challenge?.gameConfig?.gameCode)}
         badge={{ icon: Gamepad2, label: gameName }}
         title={`Challenge vs ${opponentName ?? "opponent"}`}
-        subtitle={isChallenger ? "You challenged" : "Challenged you"}
+        subtitle={
+          isChallenger
+            ? openSeat
+              ? "You opened this to anyone"
+              : "You challenged"
+            : openSeat
+              ? "Open to anyone"
+              : "Challenged you"
+        }
         status={<NeonStatusBadge status={status} />}
       >
         <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4">
@@ -520,7 +541,8 @@ export default async function ProviderChallengeLobby({
             challengeId={String(challenge._id)}
             status={challenge.status}
             isChallenger={isChallenger}
-            isChallenged={!isChallenger}
+            isChallenged={isChallenged}
+            openSeat={openSeat}
             isProviderGame
           />
 

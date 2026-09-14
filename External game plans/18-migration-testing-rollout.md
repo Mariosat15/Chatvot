@@ -323,7 +323,7 @@ production for the first time.
 | X7 leaderboard | Flag back to the computed path |
 | X8 terminology | Revert, or override via `WhiteLabel.terminologyOverrides` **with no deploy** |
 | X8 `tradingEnabled` | Set back to `true` |
-| X10 open challenges | Stop accepting new ones; existing `Challenge` rows are untouched, because `20` s6 keeps open challenges in a separate collection rather than loosening `Challenge` |
+| X10 open challenges | **AMENDED 14 September 2026 - the separate collection was not built, so the old rollback does not apply.** Open challenges live on `Challenge` itself behind an explicit `openToAnyone` flag, with the three opponent fields conditionally required (`03` s2.4a). Rollback is therefore: **stop offering the option on the create form**, which leaves the flag unwritten and every subsequent challenge directed as before. **Do not restore the unconditional `required`** while any open row is still `pending` - it would refuse the very write that claims the seat, stranding a player who had already been shown the challenge. Rows already claimed are indistinguishable from ordinary challenges and need nothing |
 | X11 catalogue | Hide the entries; `/competitions` is untouched |
 | X11.5 matchmaking | Flag off suggestions. `UserGamePreference` rows are additive and harmless; **do not delete declared rows** on rollback - they are player intent, and re-collecting them is not free |
 

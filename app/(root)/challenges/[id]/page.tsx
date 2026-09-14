@@ -26,6 +26,10 @@ import ChallengeStatusMonitor from "@/components/trading/ChallengeStatusMonitor"
 import ChallengeEntryActions from "@/components/trading/ChallengeEntryActions";
 import ProviderChallengeLobby from "@/components/games/ProviderChallengeLobby";
 import { hasProviderChallengeGameLabel } from "@/lib/services/games/challenge-round-config";
+import {
+  challengeOpponentLabel,
+  isUnclaimedOpenChallenge,
+} from "@/lib/utils/open-challenge";
 import { notFound, redirect } from "next/navigation";
 import { unstable_noStore as noStore } from "next/cache";
 
@@ -90,10 +94,17 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
       notFound();
     }
 
-    // Only participants can view
+    /*
+      Only participants can view - plus anybody at all while the seat on an OPEN challenge
+      is still empty, because a prospective accepter has to read the stake and the rules
+      before paying to take it. `isUnclaimedOpenChallenge` is the same predicate the API
+      read and the accept route's claim use, so the page and the claim cannot disagree
+      about which challenges are open.
+    */
     if (
       challenge.challengerId !== session.user.id &&
-      challenge.challengedId !== session.user.id
+      challenge.challengedId !== session.user.id &&
+      !isUnclaimedOpenChallenge(challenge)
     ) {
       notFound();
     }
@@ -156,7 +167,7 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
     const isChallenger = challenge.challengerId === session.user.id;
     const isChallenged = challenge.challengedId === session.user.id;
     const opponentName = isChallenger
-      ? challenge.challengedName
+      ? challengeOpponentLabel(challenge.challengedName, challenge)
       : challenge.challengerName;
     const isWinner = challenge.winnerId === session.user.id;
     const isLoser = challenge.loserId === session.user.id;
@@ -627,6 +638,7 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
               status={challenge.status}
               isChallenger={isChallenger}
               isChallenged={isChallenged}
+              openSeat={isUnclaimedOpenChallenge(challenge)}
             />
 
             {/* Live Countdown */}

@@ -15,11 +15,9 @@ import {
   Target,
   Zap,
   ChevronDown,
-  Clock,
-  DollarSign,
-  ArrowDownUp,
 } from "lucide-react";
 import ChallengeCard from "@/components/trading/ChallengeCard";
+import ChallengeCreateDialog from "@/components/challenges/ChallengeCreateDialog";
 
 interface Challenge {
   _id: string;
@@ -49,13 +47,26 @@ export default function ChallengesPageContent({
   userId,
 }: ChallengesPageContentProps) {
   const [challenges, setChallenges] = useState<Challenge[]>([]);
+  /*
+    Reason: open challenges are deliberately a SECOND list rather than a filter over the
+    first. `GET /api/challenges` returns the challenges this player is in; an open
+    challenge somebody else created is not one of them, so filtering the same array could
+    never surface it however the tab was written.
+  */
+  const [openChallenges, setOpenChallenges] = useState<Challenge[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<
-    "all" | "pending" | "active" | "completed"
+    "all" | "open" | "pending" | "active" | "completed"
   >("all");
   const [responding, setResponding] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"card" | "list">("card");
   const [isRefreshing, setIsRefreshing] = useState(false);
+  /*
+    Reason: the dialog is opened here with NO opponent, which is the point of it. Every other
+    caller reaches it from a screen already about one person; this is the entry point for a
+    player who wants to challenge somebody and has not decided who.
+  */
+  const [createOpen, setCreateOpen] = useState(false);
   const [sortBy, setSortBy] = useState<
     "newest" | "starting" | "prize" | "entry"
   >("newest");
@@ -63,10 +74,17 @@ export default function ChallengesPageContent({
   const fetchChallenges = useCallback(async (showSpinner = false) => {
     if (showSpinner) setIsRefreshing(true);
     try {
-      const res = await fetch("/api/challenges");
+      const [res, openRes] = await Promise.all([
+        fetch("/api/challenges"),
+        fetch("/api/challenges?type=open"),
+      ]);
       if (res.ok) {
         const data = await res.json();
         setChallenges(data.challenges || []);
+      }
+      if (openRes.ok) {
+        const data = await openRes.json();
+        setOpenChallenges(data.challenges || []);
       }
     } catch (error) {
       console.error("Failed to fetch challenges:", error);
@@ -135,9 +153,9 @@ export default function ChallengesPageContent({
     }
   };
 
-  const filteredChallenges = challenges
+  const filteredChallenges = (activeTab === "open" ? openChallenges : challenges)
     .filter((c) => {
-      if (activeTab === "all") return true;
+      if (activeTab === "all" || activeTab === "open") return true;
       if (activeTab === "pending") return c.status === "pending";
       if (activeTab === "active") return c.status === "active";
       if (activeTab === "completed")
@@ -272,24 +290,48 @@ export default function ChallengesPageContent({
           </div>
         </div>
 
-        {/* Find Opponents Button - Full width on mobile */}
-        <Link href="/leaderboard" className="block sm:hidden">
-          <Button className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 font-semibold">
-            <User className="h-4 w-4 mr-2" />
-            Find Opponents
+        {/* New Challenge / Find Opponents - Full width on mobile */}
+        <div className="grid grid-cols-1 gap-2 sm:hidden">
+          <Button
+            onClick={() => setCreateOpen(true)}
+            className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 font-semibold"
+          >
+            <Swords className="h-4 w-4 mr-2" />
+            New Challenge
           </Button>
-        </Link>
+          <Link href="/leaderboard" className="block">
+            <Button
+              variant="outline"
+              className="w-full border-gray-700 text-gray-300 hover:text-white"
+            >
+              <User className="h-4 w-4 mr-2" />
+              Find Opponents
+            </Button>
+          </Link>
+        </div>
 
-        {/* Desktop: Find Opponents Button */}
+        {/* Desktop */}
         <div className="hidden sm:flex items-center gap-3">
+          <Button
+            onClick={() => setCreateOpen(true)}
+            className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
+          >
+            <Swords className="h-4 w-4 mr-2" />
+            New Challenge
+          </Button>
           <Link href="/leaderboard">
-            <Button className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600">
+            <Button
+              variant="outline"
+              className="border-gray-700 text-gray-300 hover:text-white"
+            >
               <User className="h-4 w-4 mr-2" />
               Find Opponents
             </Button>
           </Link>
         </div>
       </div>
+
+      <ChallengeCreateDialog open={createOpen} onOpenChange={setCreateOpen} />
 
       {/* Stats Cards - Mobile Optimized */}
       <div className="grid grid-cols-4 gap-2 sm:gap-4">
@@ -354,7 +396,7 @@ export default function ChallengesPageContent({
       {/* Tabs - Scrollable on mobile */}
       <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
         <div className="flex gap-1.5 sm:gap-2 border-b border-gray-700 pb-2 min-w-max">
-          {(["all", "pending", "active", "completed"] as const).map((tab) => (
+          {(["all", "open", "pending", "active", "completed"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -370,6 +412,11 @@ export default function ChallengesPageContent({
                   {pendingReceived.length}
                 </span>
               )}
+              {tab === "open" && openChallenges.length > 0 && (
+                <span className="ml-1.5 sm:ml-2 bg-green-500 text-white text-[11px] px-1.5 py-0.5 rounded-full">
+                  {openChallenges.length}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -380,10 +427,14 @@ export default function ChallengesPageContent({
         <div className="text-center py-8 sm:py-12">
           <Swords className="h-12 w-12 sm:h-16 sm:w-16 text-gray-600 mx-auto mb-3 sm:mb-4" />
           <h3 className="text-lg sm:text-xl text-gray-400 mb-2">
-            No challenges yet
+            {activeTab === "open"
+              ? "No open challenges right now"
+              : "No challenges yet"}
           </h3>
           <p className="text-sm text-gray-500 mb-4 px-4">
-            Head to the leaderboard to challenge other traders!
+            {activeTab === "open"
+              ? "Nobody has left a seat open. Create one and let anyone take it."
+              : "Head to the leaderboard to challenge other traders!"}
           </p>
           <Link href="/leaderboard">
             <Button className="bg-orange-500 hover:bg-orange-600">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useAppSettings } from "@/contexts/AppSettingsContext";
+import { DEFAULT_CREDIT_VALUE_IN_BASE_CURRENCY } from "@/lib/utils/credit-value";
 
 interface WalletBalanceDisplayProps {
   balance: number;
@@ -29,7 +30,11 @@ export default function WalletBalanceDisplay({
         {settings?.credits.showEUREquivalent && (
           <span className="text-[10px] text-yellow-300/70 tabular-nums">
             ≈ {settings?.currency?.symbol || "€"}
-            {(balance * (settings?.credits.valueInEUR || 1)).toFixed(2)}
+            {(
+              balance *
+              (settings?.credits.valueInEUR ??
+                DEFAULT_CREDIT_VALUE_IN_BASE_CURRENCY)
+            ).toFixed(2)}
           </span>
         )}
       </div>

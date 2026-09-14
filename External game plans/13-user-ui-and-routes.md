@@ -2735,6 +2735,82 @@ what a partial list would actually look like on the wire.
 
 ---
 
+### 4.1aa The opponent picker - choosing who you are challenging (14 September 2026)
+
+**BUILT.** Until now a challenge could only be started from a screen that already knew the
+opponent - a profile, a chat header, a leaderboard row - so "challenge somebody" had no entry
+point at all. `ChallengeCreateDialog`'s `challengedUser` prop is now **optional**, and when it is
+absent the dialog opens on an opponent picker: the player's friends first, then a search box for
+anybody else. A **New Challenge** button on `/challenges` is the entry point.
+
+**Nothing was broken.** Every existing caller passes an opponent and behaves exactly as it did,
+so a document describing a fixed calculation, a wrong opponent or a payout defect is describing
+something nobody found, and nothing was backfilled.
+
+**The live code** is `components/challenges/create/OpponentPicker.tsx`,
+`app/api/challenges/opponents/route.ts`, the `opponent` derivation in
+`components/challenges/ChallengeCreateDialog.tsx` and the button in
+`app/(root)/challenges/page-content.tsx`. **None of it is mirrored** - `apps/admin` has no
+challenge creation screen - so `check:mirrors` says nothing about any of it.
+
+#### What drifts easily
+
+**Precedence is the load-bearing decision, and it is the one that costs money.** The effective
+opponent is `challengedUser ?? pickedOpponent`, so a prop-supplied opponent always wins and the
+picker is withheld entirely when the caller named somebody. Written the other way round - which
+is the natural spelling if you think of the picker as "the newer source" - a player opening the
+dialog from somebody's profile could have leftover picker state shadow the prop and **send the
+challenge to a different person**, debiting two wallets with nothing thrown and nothing logged.
+Both directions are asserted, because the positive test alone is green on the reversal.
+
+**`null` and absent are deliberately the same fact here**, which inverts this codebase's usual
+rule that a stored value and an absent one are different facts. Every existing caller passes
+`null` while its own user record is still loading, and that is genuinely indistinguishable from
+not knowing who the opponent is - both mean *ask*. The opposite reading makes three live screens
+open a dialog that renders nothing.
+
+**The search is the messaging one, reused rather than reimplemented.**
+`GET /api/messaging/search/users` already applies both directions of the block list and the
+friend-request privacy setting, and returns only id, name and avatar. A second search written for
+this screen would be a second answer to "may I see this person", and the copy that forgets is the
+one that shows somebody who has blocked you - the "one rule, two copies" shape. One consequence
+is **inherited rather than chosen**: that endpoint matches on email and falls back to the email
+when a player has no name, so a searcher can confirm an address is registered. That is unchanged
+from the friend search every signed-in player already reaches, and narrowing it here would change
+a screen nobody asked to touch.
+
+**Friends come from `Friendship.getUserFriends`, never from matchmaking.**
+`lib/services/matchmaking.service.ts` exists and ranks opponents by **trading** skill, so for a
+provider game it returns a happy, well-ordered list sorted by something with no bearing on the
+game being played - no error, no empty state, no log line. That is risk **X13**, and suggesting
+opponents belongs with X11.5 rather than with a picker. The route returns the **other** party of
+each friendship, pinned by a test: `userDetails` holds both, so taking the first entry puts the
+player in their own opponent list, which reads as a rendering oddity and is a way to challenge
+yourself.
+
+**Willingness is not filtered here, deliberately.** Whether a player accepts challenges at all is
+enforced by the create route, which refuses and names the reason. A list that quietly omits
+people is indistinguishable, from the searcher's seat, from the person not existing.
+
+**The friends list shows the snapshot name stored on the friendship**, so a renamed player reads
+stale. Accepted: the create route resolves the current name from the user record, so what is
+stored on the challenge is right whatever the list said.
+
+#### Not built
+
+~~**Open challenges** - one with nobody named - and~~ **per-game willingness**. **Open challenges
+were built later the same day and that clause is correct as history and stale as a present fact,
+so say which** - `03` s2.4a is the authoritative account. They needed `challengedId`,
+`challengedName` and `challengedEmail`
+to become conditional in both model copies, an **atomic claim on accept** so a simultaneous
+second accepter is refused rather than both being debited, and a pass over the sites that assume
+two named players; all three are done. Per-game willingness needs the opt-out storage the owner chose on 13 September
+2026, the create and accept gates that read it, and the toggle the help page already promises.
+
+**Never verified by eye** - the dialog is behind sign-in and the automated browser has no session.
+
+---
+
 ## 5. Dashboard
 
 `components/dashboard/` is about **15 components** backed by
@@ -3121,6 +3197,66 @@ The help article on **what happens when a round does not finish** carries real w
 here. With an in-house game, failures are rare and ours. With a provider, they are
 someone else's and will happen. Explaining the policy in advance is far cheaper than
 arguing it afterwards.
+
+### s9.1a What the help page says a challenge IS - BUILT 14 September 2026
+
+The `1v1 Challenges` section of `app/(root)/help/page-content.tsx` described a feature the
+platform had stopped having. This is **documentation, not code** - no calculation changed,
+no route changed, **nothing was backfilled** - and it is recorded here because a help page is
+the one screen whose readers cannot tell it is wrong.
+
+**Three claims were false, and the first is the one that cost something.** The page said
+*"there's no public lobby - every challenge is an invitation from one player to another"*,
+which stopped being true when open challenges shipped earlier the same day. A player who
+believes that sentence never looks for the `Open` tab, so the feature is built, reachable and
+undiscovered. The second: challenges were framed throughout as **trading** contests with
+virtual starting capital, six ranking methods and liquidation rules - every word of which is
+false for a game challenge, which has no capital, ignores `rankingMethod` entirely
+(`getProviderRankingValue`) and always returns `0` from `getProviderTieBreakerValue`. The
+third: **`duel`**, a banned noun, used nine times.
+
+**Five facts drift easily.**
+
+- **The market-hours guard is scoped, and that was already true in the code.**
+  `POST /api/challenges` gates on `gameNeedsMarketHours(gameLabel.gameType)`, so a game
+  challenge can be created at the weekend. The page said otherwise, which means a player
+  waiting until Monday to start a puzzle - a capability withheld by a sentence.
+- **Decline is refused BY CONSTRUCTION and the page now says so.** The decline route admits
+  only the named `challengedId`, so an open seat has nobody who may decline it. Unsaid, the
+  missing button reads as a bug and generates a support ticket.
+- **The trading blocks were SCOPED, never deleted.** `Rules inside a *trading* challenge` and
+  `Liquidation & disqualification (trading)` are correct and valuable, exactly as the table
+  above says of the trading guide; what was wrong was presenting them as the rules of a
+  challenge. A document describing this as trading content removed is wrong.
+- **Nine `duel` uses remain OUTSIDE this file and are recorded rather than swept**:
+  `lib/constants/landing-page-templates-4.ts` (5),
+  `apps/admin/components/admin/landing-builder/defaults.ts` (5),
+  `database/models/hero-settings.defaults.ts` (2),
+  `components/landing/sections/LiveChallenges.tsx` (2),
+  `components/landing/sections/challenge-arena-extras.tsx` (2),
+  `components/arena/scenes/H2HScene.tsx` (1), `lib/themes/theme-unique-data.ts` (1). Three of
+  those are **seeded defaults**, so editing the constant does not change rows already written -
+  that sweep is a migration question, not a wording one, which is why the guard is scoped to
+  the help page. **A document implying the vocabulary is clean platform-wide is wrong.**
+- **Never verified by eye.** The page renders behind no sign-in but was not opened.
+
+**Guarded by `__tests__/challenges/help-page-challenges.test.ts` (14 tests) and
+`tools/probe-help-page-challenges.ps1` (11 probes, all red on exactly one failure).** Two
+guard-craft findings came out of it, both from probes that came back green:
+
+- **Prose inside JSX wraps wherever the line runs out**, so `no Decline\n   button` and
+  `needs the\n   relevant market` matched nothing when written as they read on screen. The
+  reader collapses whitespace before matching. A guard that fails while the page is correct is
+  the kind the first person it inconveniences deletes.
+- **`<em>Open</em>` appears four times and `open to anyone` three**, so destroying the one
+  occurrence carrying the claim left the others satisfying a bare page-wide match - **weak
+  test, not a wrong claim**. Both are now asserted inside a slice of their own construct, with
+  **both ends of the slice proven to exist**, because `indexOf` returning `-1` yields a slice
+  that passes everything asked of it. Same trap as `!expectedOrigin` and `MIN_REASON_LENGTH`.
+- **One probe is deliberately absent with its reason in the file.** The route-existence test
+  asserts four `page.tsx` files are on disk; injecting that defect means deleting a live route
+  directory, which a harness that restores by rewriting one file cannot put back. All four were
+  checked by hand on 14 September 2026.
 
 ---
 

@@ -13,6 +13,9 @@ import ChallengeGamePicker from "@/components/challenges/ChallengeGamePicker";
 import ChallengeBattleSettings from "@/components/challenges/create/ChallengeBattleSettings";
 import ChallengeRulesColumn from "@/components/challenges/create/ChallengeRulesColumn";
 import ChallengePrizeSummary from "@/components/challenges/create/ChallengePrizeSummary";
+import OpponentPicker, {
+  type ChallengeOpponent,
+} from "@/components/challenges/create/OpponentPicker";
 import type {
   ChallengeFormData,
   ChallengeSettings,
@@ -27,7 +30,19 @@ import {
 interface ChallengeCreateDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  challengedUser: {
+  /**
+   * The opponent, when the caller already knows who it is.
+   *
+   * OPTIONAL SINCE 14 SEPTEMBER 2026. Every existing caller opens this dialog from a screen
+   * that is already about one person - a profile, a friends list, a leaderboard row - and
+   * passes them. Omitting it asks the player instead, which is what makes "challenge someone"
+   * reachable from a place that is not already about a person.
+   *
+   * `null` and absent are the same fact here, deliberately: the existing callers pass `null`
+   * while their own user is still loading, and that is indistinguishable from not knowing who
+   * the opponent is - both mean "ask".
+   */
+  challengedUser?: {
     userId: string;
     username: string;
   } | null;
@@ -40,6 +55,35 @@ export default function ChallengeCreateDialog({
 }: ChallengeCreateDialogProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [pickedOpponent, setPickedOpponent] =
+    useState<ChallengeOpponent | null>(null);
+  /*
+    Reason: only reachable when the caller named nobody. A screen that opened this dialog
+    about one person is not offering "anyone", and `openToAnyone` is forced false in that
+    case so a stale flag cannot turn a directed challenge into an open one.
+  */
+  const [openToAnyone, setOpenToAnyone] = useState(false);
+
+  /*
+    Reason: one answer to "who is this challenge for", so every consumer below - the heading,
+    the qualification sentence, the submit gate and the request body - reads the same value.
+    A prop-supplied opponent always wins, because a screen that already knows the person is
+    not offering a choice, and letting the picker's state shadow it would let a player open
+    the dialog from somebody's profile and silently send the challenge to somebody else.
+  */
+  const opponent = challengedUser ?? pickedOpponent;
+  /*
+    The one answer to "is this challenge open", read by the submit gate, the request body
+    and every sentence below. Scoped to `!challengedUser` for the same reason the picker
+    itself is: a prop-supplied opponent is not a choice being offered.
+  */
+  const isOpen = !challengedUser && openToAnyone;
+  /*
+    A challenge needs an addressee OR an explicitly open seat - never neither, and never
+    both. `opponent` is ignored while the seat is open so a player who picked somebody and
+    then chose "anyone" cannot send both facts.
+  */
+  const hasRecipient = isOpen || Boolean(opponent);
   const [showTerms, setShowTerms] = useState(false);
   const [settings, setSettings] = useState<ChallengeSettings | null>(null);
   const [titles, setTitles] = useState<ChallengeableTitle[]>([]);
@@ -196,6 +240,8 @@ export default function ChallengeCreateDialog({
       // after cancelling a provider pick should not find the previous game still chosen.
       setSelection({ type: "trading" });
       setGameSettings({});
+      setPickedOpponent(null);
+      setOpenToAnyone(false);
       fetchSettings();
       fetchTitles();
       fetchMarketStatus();
@@ -208,13 +254,13 @@ export default function ChallengeCreateDialog({
   const winnerPrize = prizePool - platformFeeAmount;
 
   const handleSubmit = async () => {
-    if (!challengedUser) return;
+    if (!hasRecipient) return;
     setShowTerms(true);
   };
 
   const proceedAfterTerms = async () => {
     setShowTerms(false);
-    if (!challengedUser) return;
+    if (!hasRecipient) return;
 
     setLoading(true);
     try {
@@ -248,7 +294,15 @@ export default function ChallengeCreateDialog({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          challengedId: challengedUser.userId,
+          /*
+            Exactly one of these reaches the route: `openToAnyone` alone for an open seat,
+            `challengedId` alone otherwise. Sending both would let the create route's own
+            refusal decide, which is a rule stated twice - and the browser's copy is the
+            one nobody tests.
+          */
+          ...(isOpen
+            ? { openToAnyone: true }
+            : { challengedId: opponent!.userId }),
           entryFee: formData.entryFee,
           duration: formData.duration,
           ...gamePayload,
@@ -261,7 +315,11 @@ export default function ChallengeCreateDialog({
         throw new Error(data.error || "Failed to create challenge");
       }
 
-      toast.success(`Challenge sent to ${challengedUser.username}!`);
+      toast.success(
+        isOpen
+          ? "Challenge opened - the first player to take the seat is your opponent!"
+          : `Challenge sent to ${opponent!.username}!`,
+      );
       onOpenChange(false);
       router.push("/challenges");
     } catch (error) {
@@ -272,8 +330,6 @@ export default function ChallengeCreateDialog({
       setLoading(false);
     }
   };
-
-  if (!challengedUser) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -291,7 +347,11 @@ export default function ChallengeCreateDialog({
             </div>
             <div>
               <h2 className="text-lg font-bold text-white">
-                Challenge {challengedUser.username}
+                {isOpen
+                  ? "Open challenge"
+                  : opponent
+                    ? `Challenge ${opponent.username}`
+                    : "New challenge"}
               </h2>
               <p className="text-xs text-gray-400">
                 {challengeSubtitle(selection)}
@@ -302,6 +362,26 @@ export default function ChallengeCreateDialog({
 
         {/* ─── Body ─── */}
         <div className="px-6 py-5 space-y-5 max-h-[calc(100vh-220px)] sm:max-h-[65vh] overflow-y-auto">
+          {/* Reason: rendered only when the caller did not name an opponent. A picker on a
+              screen that is already about one person is a way to send the challenge to
+              somebody else by accident, and `opponent` ignores the picker's state anyway -
+              so a control that appears to work and does nothing. */}
+          {!challengedUser && (
+            <OpponentPicker
+              value={pickedOpponent}
+              onSelect={setPickedOpponent}
+              disabled={loading}
+              openToAnyone={openToAnyone}
+              /* Picking "anyone" clears any earlier pick, so the two facts cannot both be
+                 held - the submit body would otherwise depend on which state was written
+                 last rather than on what the player chose. */
+              onOpenToAnyoneChange={(next) => {
+                setOpenToAnyone(next);
+                if (next) setPickedOpponent(null);
+              }}
+            />
+          )}
+
           <ChallengeGamePicker
             titles={titles}
             selection={selection}
@@ -361,9 +441,16 @@ export default function ChallengeCreateDialog({
           <div className="flex items-start gap-2.5 bg-yellow-500/5 border border-yellow-500/20 rounded-xl p-3">
             <span className="text-sm shrink-0 mt-px">⚠️</span>
             <p className="text-xs text-yellow-300/80">
+              {/* Reason: the sentence is about what happens on accept, which is true before
+                  an opponent is chosen - so it names one generically rather than being
+                  withheld until the pick. Hiding it would mean the one warning about when
+                  credits leave the wallet appears only after the player has decided who to
+                  send it to. */}
               {challengeQualificationCopy(
                 selection,
-                challengedUser.username,
+                isOpen
+                  ? "whoever takes the seat"
+                  : opponent?.username ?? "your opponent",
                 formData.minimumTrades,
               )}
             </p>
@@ -383,6 +470,7 @@ export default function ChallengeCreateDialog({
             onClick={handleSubmit}
             disabled={
               loading ||
+              !hasRecipient ||
               formData.entryFee < 1 ||
               (selection.type === "trading" && !marketStatus.isOpen)
             }
@@ -391,12 +479,14 @@ export default function ChallengeCreateDialog({
             {loading ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Sending...
+                {isOpen ? "Opening..." : "Sending..."}
               </>
             ) : (
               <>
                 <Swords className="h-4 w-4 mr-2" />
-                Send Challenge
+                {/* Nothing is sent to anybody on an open challenge, so "Send" names an act
+                    that does not happen and leaves the player waiting for a reply. */}
+                {isOpen ? "Open Challenge" : "Send Challenge"}
               </>
             )}
           </Button>

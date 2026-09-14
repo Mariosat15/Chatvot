@@ -165,11 +165,14 @@ describe("formatVolts writes a credit amount", () => {
 
   it("never converts to a national currency", () => {
     /*
-      Load-bearing rather than pedantic. The platform stores what a credit is worth TWICE and
-      the two defaults disagree by a factor of a hundred - `AppSettings.credits.valueInEUR` at
-      1, `CreditConversionSettings.eurToCreditsRate` at 100. A formatter that could convert
-      would be a formatter that could quietly pick the wrong one, so this one takes no rate
-      argument at all and its output contains no fiat symbol for any input.
+      Load-bearing rather than pedantic. The platform used to store what a credit is worth
+      TWICE, with the two defaults disagreeing by a factor of a hundred - and a formatter that
+      could convert would have been one that could quietly pick the wrong one.
+
+      That disagreement was closed on 14 September 2026 (R74): `lib/utils/credit-value.ts` is
+      the one resolver and `valueInEUR` is derived. THE ASSERTION STAYS, and its reasoning
+      does not depend on the old defect - a competition is denominated in credits and has no
+      business quoting a second unit at all, so this takes no rate argument for any input.
     */
     const source = read("lib/utils/format-volts.ts");
     const code = stripComments(source);

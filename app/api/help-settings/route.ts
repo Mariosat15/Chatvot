@@ -9,6 +9,10 @@ import InvoiceSettings from "@/database/models/invoice-settings.model";
 import PaymentProvider from "@/database/models/payment-provider.model";
 import { getPaymentProviderCredentials } from "@/lib/services/settings.service";
 import { isPaddleConfigured } from "@/lib/paddle/config";
+import {
+  creditValueInBaseCurrency,
+  resolveEurToCreditsRate,
+} from "@/lib/utils/credit-value";
 import { nuveiService } from "@/lib/services/nuvei.service";
 import {
   getBadgeXPValues,
@@ -48,7 +52,8 @@ export async function GET() {
     const appSettingsDoc = await AppSettings.findById("app-settings").lean();
     const appSettings = appSettingsDoc || {
       currency: { code: "EUR", symbol: "€", name: "Euro" },
-      credits: { name: "Credits", symbol: "⚡", valueInEUR: 1, decimals: 2 },
+      // No `valueInEUR` here on purpose — it is derived below and never read from this shape.
+      credits: { name: "Credits", symbol: "⚡", decimals: 2 },
     };
 
     // Format the response
@@ -97,8 +102,13 @@ export async function GET() {
       credits: {
         name: (appSettings as any)?.credits?.name || "Credits",
         symbol: (appSettings as any)?.credits?.symbol || "⚡",
-        valueInEUR: (appSettings as any)?.credits?.valueInEUR ?? 1,
-        eurToCreditsRate: creditSettings.eurToCreditsRate ?? 100,
+        // Derived from the rate below, never read from AppSettings — see
+        // `lib/utils/credit-value.ts`. The help page renders both figures, so serving the
+        // stored one put two contradictory answers on a single screen.
+        valueInEUR: creditValueInBaseCurrency(creditSettings.eurToCreditsRate),
+        eurToCreditsRate: resolveEurToCreditsRate(
+          creditSettings.eurToCreditsRate,
+        ),
         minimumDeposit: creditSettings.minimumDeposit ?? 10,
         minimumWithdrawal: creditSettings.minimumWithdrawal ?? 20,
         withdrawalFee:

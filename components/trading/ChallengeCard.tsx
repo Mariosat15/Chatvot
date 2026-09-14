@@ -14,6 +14,10 @@ import { GameIcon } from "@/components/ui/GameIcon";
 import { useState, useEffect } from "react";
 import { useAppSettings } from "@/contexts/AppSettingsContext";
 import { formatVolts } from "@/lib/utils/format-volts";
+import {
+  challengeOpponentLabel,
+  isUnclaimedOpenChallenge,
+} from "@/lib/utils/open-challenge";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 interface ChallengeCardProps {
@@ -99,10 +103,24 @@ export default function ChallengeCard({
   const { settings } = useAppSettings();
 
   const isChallenger = challenge.challengerId === userId;
+  /*
+    Reason: an unclaimed open challenge has no opponent, so the card would render
+    "vs undefined" - which reads as a rendering fault rather than as an invitation to
+    take the seat. `challengeOpponentLabel` is shared with every other screen that writes
+    an opponent's name, so the two cannot disagree about what an empty seat is called.
+  */
+  const isOpenSeat = isUnclaimedOpenChallenge(challenge);
   const opponentName = isChallenger
-    ? challenge.challengedName
+    ? challengeOpponentLabel(challenge.challengedName, challenge)
     : challenge.challengerName;
   const canRespond = !isChallenger && challenge.status === "pending";
+  /*
+    Reason: declining is refusing an invitation addressed to you, and nobody is addressed
+    on an open challenge - the decline route refuses it with a 403. Offering the button
+    anyway is a control that appears to work and does nothing, so the seat offers Accept
+    alone.
+  */
+  const canDecline = canRespond && !isOpenSeat;
   const isWinner = challenge.winnerId === userId;
   const isLoser = challenge.loserId === userId;
   const isNoWinner = challenge.noWinner === true; // Both disqualified - no winner
@@ -450,7 +468,19 @@ export default function ChallengeCard({
           vs {opponentName}
         </h3>
         <p className="text-sm text-gray-400 text-center mb-4">
-          {isChallenger ? "You challenged" : "Challenged you"}
+          {/*
+            Reason: "Challenged you" is false on an open challenge - nobody was named, so
+            a viewer is being offered a seat rather than answering an invitation. Deciding
+            this from `isChallenger` alone tells every browsing player they were singled
+            out.
+          */}
+          {isChallenger
+            ? isOpenSeat
+              ? "You opened this to anyone"
+              : "You challenged"
+            : isOpenSeat
+              ? "Open to anyone"
+              : "Challenged you"}
         </p>
 
         {/* Winner Prize Pool - Casino Style */}
@@ -580,7 +610,7 @@ export default function ChallengeCard({
         )}
 
         {/* Action Buttons */}
-        {canRespond && onAccept && onDecline ? (
+        {canRespond && onAccept ? (
           <div className="flex gap-2">
             <Button
               onClick={() => onAccept(challenge._id)}
@@ -588,16 +618,18 @@ export default function ChallengeCard({
               className="flex-1 font-black py-6 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white shadow-lg shadow-green-500/30 transition-all duration-300 transform hover:scale-105"
             >
               <CheckCircle className="h-5 w-5 mr-2" />
-              Accept
+              {isOpenSeat ? "Take this seat" : "Accept"}
             </Button>
-            <Button
-              onClick={() => onDecline(challenge._id)}
-              disabled={responding}
-              variant="outline"
-              className="flex-1 font-bold py-6 rounded-xl border-2 border-red-600 text-red-400 hover:bg-red-500 hover:text-white transition-all duration-300"
-            >
-              Decline
-            </Button>
+            {canDecline && onDecline && (
+              <Button
+                onClick={() => onDecline(challenge._id)}
+                disabled={responding}
+                variant="outline"
+                className="flex-1 font-bold py-6 rounded-xl border-2 border-red-600 text-red-400 hover:bg-red-500 hover:text-white transition-all duration-300"
+              >
+                Decline
+              </Button>
+            )}
           </div>
         ) : (
           <Link href={`/challenges/${challenge._id}`} className="block">

@@ -45,9 +45,23 @@ export interface IChallenge extends Document {
   challengerId: string; // User who created the challenge
   challengerName: string;
   challengerEmail: string;
-  challengedId: string; // User who was challenged
-  challengedName: string;
-  challengedEmail: string;
+  /**
+   * Was this offered to anybody, rather than to one named player?
+   *
+   * Explicit rather than inferred from `challengedId` being absent, and the direction of
+   * failure is the reason - see `lib/utils/open-challenge.ts`. Stays true after the seat
+   * is claimed, because it is how the challenge was created, not what state it is in.
+   */
+  openToAnyone?: boolean;
+  /**
+   * The second player. Absent until somebody claims an open challenge, which is why these
+   * three are conditionally required rather than always: an open challenge has no
+   * opponent at creation, by definition. Required for a directed challenge, so a writer
+   * that forgets them is still refused.
+   */
+  challengedId?: string; // User who was challenged
+  challengedName?: string;
+  challengedEmail?: string;
 
   // Entry & Capital
   entryFee: number; // Credits each player pays
@@ -230,18 +244,37 @@ const ChallengeSchema = new Schema<IChallenge>(
       type: String,
       required: true,
     },
+    openToAnyone: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    // Reason: conditionally required, the same shape as `startingCapital` above. An open
+    // challenge genuinely has no opponent until somebody claims it, and `required: true`
+    // made that unsaveable. Written as a predicate rather than dropped to `required:
+    // false`, because a DIRECTED challenge with no opponent is still a bug and the schema
+    // is the only thing that catches it. Both model copies must carry the same predicate:
+    // `check:mirrors` compares field paths and enum values, NOT predicate bodies, so a
+    // conditional requirement that differs between the apps is a validation rule whose
+    // outcome depends on which process saved the document, with the guard staying green.
     challengedId: {
       type: String,
-      required: true,
+      required: function (this: { openToAnyone?: boolean }) {
+        return this.openToAnyone !== true;
+      },
       index: true,
     },
     challengedName: {
       type: String,
-      required: true,
+      required: function (this: { openToAnyone?: boolean }) {
+        return this.openToAnyone !== true;
+      },
     },
     challengedEmail: {
       type: String,
-      required: true,
+      required: function (this: { openToAnyone?: boolean }) {
+        return this.openToAnyone !== true;
+      },
     },
     entryFee: {
       type: Number,
@@ -458,6 +491,8 @@ ChallengeSchema.index({ status: 1, endTime: 1 });
 ChallengeSchema.index({ challengerId: 1, challengedId: 1, createdAt: -1 });
 // Combined $or query optimization for active challenges count
 ChallengeSchema.index({ challengerId: 1, challengedId: 1, status: 1 });
+// Open-challenge discovery: the lobby lists unclaimed open challenges newest first
+ChallengeSchema.index({ openToAnyone: 1, status: 1, createdAt: -1 });
 // Game-scoped queries: challenge lists filtered by game, and the finalization sweeps
 ChallengeSchema.index({ gameType: 1, status: 1 });
 ChallengeSchema.index({ gameKey: 1, status: 1 });

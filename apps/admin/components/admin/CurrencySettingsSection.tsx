@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DollarSign, Zap, Save, Loader2, Palette } from "lucide-react";
 import { toast } from "sonner";
+import { DEFAULT_CREDIT_VALUE_IN_BASE_CURRENCY } from "@/lib/utils/credit-value";
 
 export default function CurrencySettingsSection() {
   const [loading, setLoading] = useState(true);
@@ -23,7 +24,8 @@ export default function CurrencySettingsSection() {
       name: "Volt Credits",
       symbol: "⚡",
       icon: "zap",
-      valueInEUR: 1.0,
+      // Reason: the fallback must match the derived rate, not the historical stored default.
+      valueInEUR: DEFAULT_CREDIT_VALUE_IN_BASE_CURRENCY,
       showEUREquivalent: true,
       decimals: 2,
     },
@@ -262,29 +264,29 @@ export default function CurrencySettingsSection() {
               </select>
             </div>
 
+            {/*
+              READ-ONLY, AND THAT IS THE POINT.
+
+              This used to be an editable second opinion on what a credit is worth, sitting
+              alongside the conversion rate that deposits and withdrawals actually move on.
+              The two disagreed by a factor of a hundred. It is now derived from that rate —
+              see `lib/utils/credit-value.ts` — so the control names where the real setting
+              lives instead of quietly competing with it.
+            */}
             <div>
               <Label className="text-gray-300">
                 Value in Base Currency ({settings.currency.symbol}{" "}
                 {settings.currency.code})
               </Label>
-              <Input
-                type="number"
-                step="0.01"
-                value={settings.credits.valueInEUR}
-                onChange={(e) =>
-                  setSettings((prev) => ({
-                    ...prev,
-                    credits: {
-                      ...prev.credits,
-                      valueInEUR: parseFloat(e.target.value),
-                    },
-                  }))
-                }
-                className="mt-2 bg-gray-700 border-gray-600 text-gray-100"
-              />
+              <div className="mt-2 rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-gray-100">
+                {settings.currency.symbol}
+                {settings.credits.valueInEUR.toFixed(4)}
+              </div>
               <p className="text-xs text-gray-500 mt-1">
                 1 {settings.credits.name} = {settings.currency.symbol}
-                {settings.credits.valueInEUR}
+                {settings.credits.valueInEUR.toFixed(4)} · Derived from the
+                deposit rate in <strong>Settings → Credit Conversion</strong>,
+                which is the one place to change it.
               </p>
             </div>
 
