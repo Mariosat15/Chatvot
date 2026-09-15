@@ -41,6 +41,7 @@ import {
 } from "lucide-react";
 import { creditsToEUR } from "@/lib/utils/credit-conversion";
 import { useAppSettings } from "@/contexts/AppSettingsContext";
+import { useTerms } from "@/contexts/TerminologyContext";
 import GameRevenueBreakdown from "./competitions/GameRevenueBreakdown";
 import { formatVolts, DEFAULT_CREDIT_SYMBOL } from "@/lib/utils/format-volts";
 import {
@@ -184,6 +185,18 @@ interface ChallengeStats {
 
 export default function CompetitionAnalytics() {
   const { settings } = useAppSettings();
+  /*
+    X6.5 A3 reached this screen ahead of A4, and deliberately so. `resolvePlayerMetric` now
+    takes the pack as a REQUIRED argument, because an optional one with the old literal as a
+    default is the silent failure the whole pass exists to remove - the caller that forgets it
+    compiles and shows an operator the word they renamed away from. Requiring it means the
+    compiler names every consumer, which is how this call site was found rather than left for
+    A4 to discover on a screen that reads correctly.
+
+    Only the metric labels are tokenised here. The rest of this screen's wording is A4's, per
+    `05` section 10.
+  */
+  const terms = useTerms();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [competitions, setCompetitions] = useState<CompetitionAnalytic[]>([]);
@@ -866,6 +879,7 @@ export default function CompetitionAnalytics() {
                                   const metric = resolvePlayerMetric(
                                     winner,
                                     badge.isProviderGame,
+                                    terms,
                                   );
                                   const share = resolveShareOfPool(
                                     winner.amount,
@@ -969,6 +983,7 @@ export default function CompetitionAnalytics() {
                                 const metric = resolvePlayerMetric(
                                   dq,
                                   badge.isProviderGame,
+                                  terms,
                                 );
                                 return (
                                 <TableRow

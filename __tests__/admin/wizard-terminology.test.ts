@@ -28,15 +28,26 @@
  *   4. The route ids stay literal. `activeTab=competitions` is an `ADMIN_SECTIONS` value and a
  *      Mongoose enum, so it is on the never-rename list; tokenising it would route an operator
  *      who renamed the noun to a screen that does not exist.
+ *
+ * THE SCANNER MOVED OUT ON 15 SEP 2026, when A3 needed the identical rules on the contest list
+ * and detail screens. It lives in `__tests__/helpers/terminology-scan.ts`; a second copy would
+ * have been the "one rule, two copies" shape, and the copy that loses a rule keeps passing.
  */
 
 import { describe, it, expect } from "vitest";
-import { readFileSync, readdirSync } from "node:fs";
+import { readdirSync } from "node:fs";
 import { join } from "node:path";
-import { TERMS, type TerminologyToken } from "../../lib/constants/terminology";
+import { TERMS } from "../../lib/constants/terminology";
+import {
+  ADMIN,
+  code,
+  literalNounHits,
+  relative,
+  report,
+  tradingWordHits,
+  walk,
+} from "../helpers/terminology-scan";
 
-const ROOT = join(__dirname, "..", "..");
-const ADMIN = join(ROOT, "apps", "admin");
 const GAMES = join(ADMIN, "components/admin/games");
 const WIZARD_STEPS = join(GAMES, "wizard");
 
@@ -60,50 +71,6 @@ const SURFACE = [
     .filter((name) => name.endsWith(".tsx"))
     .map((name) => join(WIZARD_STEPS, name)),
 ];
-
-/**
- * Source with comments stripped, WITHOUT changing the line count.
- *
- * Stripping is required for the same reason as every other structural suite here: these files
- * explain the mistakes they avoid, naming "Competition" and "toLowerCase" in prose, so a test
- * that reads comments flags a correct file for discussing the trap and passes a broken one
- * whose only mention of the token layer is a note.
- *
- * The line count is preserved because these assertions REPORT a location. A first cut of the
- * scan behind this suite collapsed block comments, which shifted every number after them, and
- * reading the line it named showed a comment that had already been removed - indistinguishable
- * from the scan being wrong about the file.
- */
-function code(file: string): string {
-  return readFileSync(file, "utf8")
-    .replace(/\/\*[\s\S]*?\*\//g, (block) =>
-      "\n".repeat((block.match(/\n/g) || []).length),
-    )
-    .replace(/^[ \t]*\/\/.*$/gm, "");
-}
-
-interface Line {
-  file: string;
-  number: number;
-  text: string;
-}
-
-function lines(): Line[] {
-  const out: Line[] = [];
-  for (const file of SURFACE) {
-    const relative = file.slice(ADMIN.length + 1).replace(/\\/g, "/");
-    code(file)
-      .split(/\r?\n/)
-      .forEach((text, index) => {
-        out.push({ file: relative, number: index + 1, text });
-      });
-  }
-  return out;
-}
-
-function report(hits: Line[]): string {
-  return hits.map((h) => `${h.file}:${h.number}: ${h.text.trim()}`).join("\n");
-}
 
 // =======================================================================================
 // The surface exists and the reader reaches it
@@ -147,9 +114,7 @@ describe("the wizard surface reads its nouns from useTerms", () => {
       const source = code(file);
       const usesTokens = /\bterms\.[a-zA-Z]/.test(source);
       const callsHook = /\buseTerms\(\)/.test(source);
-      if (usesTokens && !callsHook) {
-        missing.push(file.slice(ADMIN.length + 1).replace(/\\/g, "/"));
-      }
+      if (usesTokens && !callsHook) missing.push(relative(file));
     }
     expect(missing).toEqual([]);
   });
@@ -193,118 +158,19 @@ describe("the wizard surface reads its nouns from useTerms", () => {
 // 2. No renameable noun survives as a literal - the assertion that can fail
 // =======================================================================================
 
-/**
- * The words an operator can rename, in the shapes a label would use them in.
- *
- * Built from `TERMS` rather than hand-listed, so a token added later is policed the day it is
- * added. The default VALUE is what is searched for, because that is what a literal caption
- * would say - the token NAME (`entryFee`) never appears in prose.
- */
-// `Object.entries` rather than `Object.keys` plus an index, which is a
-// `security/detect-object-injection` sink - and the pre-commit hook lints at
-// `--max-warnings=0`, so a warning here is a block on any later edit to this file.
-const RENAMEABLE: { token: TerminologyToken; word: string }[] = Object.entries(
-  TERMS,
-).map(([token, word]) => ({ token: token as TerminologyToken, word }));
-
-/**
- * Words that mean a token but are not spelled like its default value.
- *
- * WITHOUT THIS THE GUARD IS BLIND TO EXACTLY THE WORD THIS CODEBASE PREFERS. `contest`
- * defaults to "Competition" because that is what every route and screen already says, so a
- * search for token VALUES never looks for "Contest" - and "contest" is the platform-neutral
- * noun the services, the files and every docblock use, which makes it the spelling somebody
- * reaches for when writing a new caption. It found a live one on the first run:
- * `ProviderContestEditor.tsx` answered a successful save with `toast.success("Contest
- * saved.")`, so an operator who had renamed the noun to "Tournament" saved a Tournament and
- * was told a Contest had been saved.
- *
- * The general form, and the reason this is a list rather than one entry: a guard built from a
- * token's default value polices one spelling of a concept the codebase has several names for.
- * Add the synonym, not a looser pattern.
- */
-const SYNONYMS: { token: TerminologyToken; word: string }[] = [
-  { token: "contest", word: "Contest" },
-  { token: "contests", word: "Contests" },
-];
-
-const BANNED_NOUNS = [...RENAMEABLE, ...SYNONYMS];
-
 describe("no renameable noun is a literal in displayed text", () => {
   /*
     THE LOAD-BEARING GUARD. Adding `<Label>Competition Name</Label>` beside a perfectly
     correct `terms.contest` elsewhere in the file satisfies every positive assertion above,
     and is precisely what a later edit does when somebody adds a field and copies the shape
     of the trading form rather than the shape of the file they are in.
-
-    Scoped to Title Case only, and that is a deliberate limit rather than an oversight. The
-    lowercase forms appear legitimately in three places - route ids (`activeTab=competitions`,
-    a never-rename `ADMIN_SECTIONS` value), mid-sentence prose that A2 left alone because a
-    Title Case token cannot sit behind an article, and identifiers. Banning them outright
-    fires on correct code, and a guard that fires on correct code is the one the next reader
-    deletes.
   */
   it("has no Title Case noun as a JSX literal or a quoted caption", () => {
-    const hits: Line[] = [];
-    for (const line of lines()) {
-      for (const { word } of BANNED_NOUNS) {
-        /*
-          Word-bounded, so "Competitions" does not also report as "Competition", and
-          `Prize` inside `PrizeDistributionEditor` or `prizeTotal` is not a caption.
-        */
-        // Reason: the pattern is built from `TERMS`, a hard-coded catalogue in this
-        // repository, never from a request or a stored value - so the rule's concern does not
-        // arise. Scoped to the one rule rather than the blanket disable, or the next genuine
-        // injection sink added to this file goes unreported.
-        // eslint-disable-next-line security/detect-non-literal-regexp
-        const boundary = new RegExp(`(?<![A-Za-z])${word}(?![A-Za-z])`);
-        if (!boundary.test(line.text)) continue;
-        /*
-          An identifier or a type, not a caption: `PrizeSlice`, `MIN_PRIZE_RANKS`,
-          `prizeDistribution`. Checked by requiring the word to be adjacent to text rather
-          than to code punctuation.
-
-          `<` IS DELIBERATELY NOT IN THAT PUNCTUATION CLASS, and it was on the first run -
-          which made the guard silently blind to the commonest caption shape there is.
-          `<Label>Attempts</Label>` puts the word immediately before the `<` of its own
-          closing tag, so the heuristic read the caption as a generic type parameter and
-          skipped it: the file was reported clean while a bare Title Case noun sat in it. It
-          was found only because the hits this guard DID report were in a file that also
-          contained one it had not. Nothing renameable is plausibly a generic (`Record`,
-          `Map` and `ReadonlyMap` are not operator vocabulary), and the other three
-          alternatives already cover a word touching an identifier or a dot - so the class
-          costs nothing and the omission cost the whole assertion.
-        */
-        // Reason: same as the boundary pattern above - `word` comes from the catalogue.
-        // eslint-disable-next-line security/detect-non-literal-regexp
-        const isIdentifier = new RegExp(
-          `[A-Za-z0-9_$]${word}|${word}[A-Za-z0-9_$]|\\.${word}|${word}\\s*[:=(]`,
-        ).test(line.text);
-        if (isIdentifier) continue;
-        hits.push(line);
-      }
-    }
-    expect(report(hits)).toBe("");
+    expect(report(literalNounHits(SURFACE))).toBe("");
   });
 
   it("has no trading vocabulary in a caption, tokenised or not", () => {
-    /*
-      Separate from the noun check because these are not renameable - there is no token for
-      them and there must not be. They are the words A2 exists to remove from a screen an
-      operator uses for a puzzle contest.
-
-      "trading" and "trader" ARE permitted in the lowercase, because two captions name
-      trading deliberately: the unscored policy compares its refund rule against trading's,
-      and only a trading account can be liquidated. Title Case is what a label would use.
-    */
-    const hits: Line[] = [];
-    const BANNED = /(?<![A-Za-z])(Trading|Trader|Traders|Participant|Participants|Portfolio|Equity)(?![A-Za-z])/;
-    for (const line of lines()) {
-      if (!BANNED.test(line.text)) continue;
-      if (/[A-Za-z0-9_$"]\s*(Trading|Trader)/.test(line.text)) continue;
-      hits.push(line);
-    }
-    expect(report(hits)).toBe("");
+    expect(report(tradingWordHits(SURFACE))).toBe("");
   });
 });
 
@@ -328,21 +194,7 @@ describe("nothing transforms a token", () => {
     Asserted across the WHOLE admin component tree, not just the wizard, because the rule is
     platform-wide and the next consumer to break it will be a screen A3 or A4 touches.
   */
-  const ADMIN_COMPONENTS = join(ADMIN, "components");
-
-  function walk(dir: string): string[] {
-    const out: string[] = [];
-    for (const entry of readdirSync(dir, { withFileTypes: true })) {
-      const full = join(dir, entry.name);
-      if (entry.isDirectory()) out.push(...walk(full));
-      else if (entry.name.endsWith(".tsx") || entry.name.endsWith(".ts")) {
-        out.push(full);
-      }
-    }
-    return out;
-  }
-
-  const ALL = walk(ADMIN_COMPONENTS);
+  const ALL = walk(join(ADMIN, "components"));
 
   it("reads the component tree, so the claims below are not vacuous", () => {
     expect(ALL.length).toBeGreaterThan(100);
@@ -360,9 +212,7 @@ describe("nothing transforms a token", () => {
               text,
             )
           ) {
-            hits.push(
-              `${file.slice(ADMIN.length + 1).replace(/\\/g, "/")}:${index + 1}: ${text.trim()}`,
-            );
+            hits.push(`${relative(file)}:${index + 1}: ${text.trim()}`);
           }
         });
     }
@@ -385,9 +235,7 @@ describe("nothing transforms a token", () => {
             /\bterms\.[a-zA-Z]+\s*\.\s*(replace|concat|padEnd)\s*\(/.test(text);
           const added = /\bterms\.[a-zA-Z]+\s*\+\s*"[a-z]/.test(text);
           if (suffixed || conjugated || added) {
-            hits.push(
-              `${file.slice(ADMIN.length + 1).replace(/\\/g, "/")}:${index + 1}: ${text.trim()}`,
-            );
+            hits.push(`${relative(file)}:${index + 1}: ${text.trim()}`);
           }
         });
     }

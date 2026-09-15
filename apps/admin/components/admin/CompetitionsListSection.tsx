@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useAppSettings } from "@/contexts/AppSettingsContext";
+import { useTerms } from "@/contexts/TerminologyContext";
 import { Button } from "@/components/ui/button";
 import {
   Trophy,
@@ -144,6 +145,7 @@ export default function CompetitionsListSection() {
   // Reason: an entry fee and a prize pool are credits, so this read `credits.name` rather than
   // the fiat symbol configured for deposits.
   const creditSymbol = settings?.credits?.symbol;
+  const terms = useTerms();
   const [competitions, setCompetitions] = useState<Competition[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -198,13 +200,15 @@ export default function CompetitionsListSection() {
         throw new Error(data.error || "Failed to delete");
       }
 
-      toast.success("Competition deleted successfully");
+      toast.success(`${terms.contest} deleted successfully`);
       setCompetitions(
         competitions.filter((c) => c._id !== competitionToDelete._id),
       );
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Failed to delete competition",
+        error instanceof Error
+          ? error.message
+          : `Failed to delete this ${terms.contest}`,
       );
     } finally {
       setDeletingId(null);
@@ -240,11 +244,11 @@ export default function CompetitionsListSection() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to cancel competition");
+        throw new Error(data.error || `Failed to cancel this ${terms.contest}`);
       }
 
       toast.success(
-        `Competition cancelled! ${data.refundedCount} participants refunded.`,
+        `${terms.contest} cancelled! ${data.refundedCount} ${terms.players} refunded.`,
       );
 
       // Update local state
@@ -261,7 +265,9 @@ export default function CompetitionsListSection() {
       setCancelReason("");
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Failed to cancel competition",
+        error instanceof Error
+          ? error.message
+          : `Failed to cancel this ${terms.contest}`,
       );
     } finally {
       setIsCancelling(false);
@@ -317,14 +323,20 @@ export default function CompetitionsListSection() {
       <div className="bg-gray-800/50 border border-gray-700 rounded-2xl p-12 text-center">
         <Trophy className="h-16 w-16 text-gray-600 mx-auto mb-4" />
         <h3 className="text-xl font-semibold text-gray-300 mb-2">
-          No Competitions Yet
+          No {terms.contests} Yet
         </h3>
+        {/*
+          This used to read "Create your first TRADING competition" on a screen that lists
+          every game's contests, which is the trading-shaped default this pass exists to
+          remove - and the empty state is the one an operator sees on a fresh deployment,
+          before any game has been set up, so it was the first sentence a new operator read.
+        */}
         <p className="text-gray-500 mb-6">
-          Create your first trading competition to get started
+          Create your first one to get started
         </p>
         <Link href="/competitions/new">
           <Button className="bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-gray-900 font-bold">
-            Create Competition
+            Create {terms.contest}
           </Button>
         </Link>
       </div>
@@ -477,12 +489,16 @@ export default function CompetitionsListSection() {
 
                   <div className="flex items-center gap-1 text-xs text-gray-500">
                     <DollarSign className="h-3 w-3" />
-                    Entry: {formatVolts(competition.entryFee, { symbol: creditSymbol })}
+                    {terms.entryFee}:{" "}
+                    {formatVolts(competition.entryFee, { symbol: creditSymbol })}
                   </div>
 
                   <div className="flex items-center gap-1 text-xs text-gray-500">
                     <Trophy className="h-3 w-3" />
-                    Pool: {formatVolts(competition.prizePool ?? 0, { symbol: creditSymbol })}
+                    {terms.prizePool}:{" "}
+                    {formatVolts(competition.prizePool ?? 0, {
+                      symbol: creditSymbol,
+                    })}
                   </div>
 
                   <div className="flex items-center gap-1 text-xs text-gray-500">
@@ -586,7 +602,7 @@ export default function CompetitionsListSection() {
           <AlertDialogHeader>
             <AlertDialogTitle className="text-gray-100 flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-red-500" />
-              Delete Competition?
+              Delete this {terms.contest}?
             </AlertDialogTitle>
             <AlertDialogDescription className="text-gray-400">
               Are you sure you want to delete &quot;
@@ -596,8 +612,8 @@ export default function CompetitionsListSection() {
               &quot;?
               <br />
               <br />
-              This action cannot be undone. All participants and related data
-              will be removed.
+              This action cannot be undone. All {terms.players} and related
+              data will be removed.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -608,7 +624,7 @@ export default function CompetitionsListSection() {
               onClick={handleDeleteConfirm}
               className="bg-red-500 hover:bg-red-600 text-white"
             >
-              Delete Competition
+              Delete {terms.contest}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -620,7 +636,7 @@ export default function CompetitionsListSection() {
           <DialogHeader>
             <DialogTitle className="text-orange-400 flex items-center gap-2">
               <Ban className="h-5 w-5" />
-              Cancel Competition & Refund
+              Cancel {terms.contest} & Refund
             </DialogTitle>
             <DialogDescription className="text-gray-400">
               Are you sure you want to cancel{" "}
@@ -637,15 +653,15 @@ export default function CompetitionsListSection() {
                 <strong>⚠️ This action will:</strong>
               </p>
               <ul className="mt-2 space-y-1 text-sm text-orange-300/80 list-disc list-inside">
-                <li>Immediately cancel the competition</li>
+                <li>Immediately cancel this {terms.contest}</li>
                 <li>
                   Refund{" "}
                   <strong>
                     {competitionToCancel?.currentParticipants || 0}
                   </strong>{" "}
-                  participant(s) their full entry fees
+                  {terms.players} their full {terms.entryFee}
                 </li>
-                <li>Send notification to all participants</li>
+                <li>Notify every one of the {terms.players}</li>
                 <li>This action cannot be undone</li>
               </ul>
             </div>
@@ -658,7 +674,7 @@ export default function CompetitionsListSection() {
                 id="cancelReason"
                 value={cancelReason}
                 onChange={(e) => setCancelReason(e.target.value)}
-                placeholder="e.g., Not enough participants, Technical issues, Schedule conflict..."
+                placeholder={`e.g., Not enough ${terms.players}, Technical issues, Schedule conflict...`}
                 className="mt-2 bg-gray-800 border-gray-600 text-gray-100"
                 rows={3}
               />
@@ -671,7 +687,7 @@ export default function CompetitionsListSection() {
               onClick={() => setCancelDialogOpen(false)}
               className="border-gray-600"
             >
-              Keep Competition
+              Keep {terms.contest}
             </Button>
             <Button
               onClick={handleCancelConfirm}

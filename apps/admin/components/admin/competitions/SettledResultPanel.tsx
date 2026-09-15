@@ -5,6 +5,7 @@ import {
   resolveSettledResultRows,
   type SettledLeaderboardEntry,
 } from "@/lib/admin/contest-result-presentation";
+import type { TerminologyPack } from "@/lib/constants/terminology";
 
 /**
  * The settled snapshot, which was rendered by no admin screen at all.
@@ -34,11 +35,20 @@ export default function SettledResultPanel({
   finalLeaderboard,
   isProviderGame,
   creditSymbol,
+  terms,
 }: {
   finalLeaderboard?: SettledLeaderboardEntry[] | null;
   isProviderGame: boolean;
   /** `AppSettings.credits.symbol`. A prize is paid in credits, never in fiat. */
   creditSymbol?: string;
+  /**
+   * Passed in rather than read here. This is a server component, so it COULD call `getTerms()`
+   * - and that is precisely the mistake: the page above it already resolves the pack, and a
+   * second read is a second database round trip per render plus a place the two can disagree
+   * within one screen. Same reasoning as the contest-control panel taking its provider flag
+   * from the server rather than deciding in the browser.
+   */
+  terms: TerminologyPack;
 }) {
   const rows = resolveSettledResultRows(finalLeaderboard);
   if (!rows) return null;
@@ -50,8 +60,9 @@ export default function SettledResultPanel({
         Settled Result
       </h2>
       <p className="text-xs text-gray-500 mb-4 leading-relaxed">
-        Recorded when prizes were paid. The board above is recalculated on every
-        visit, so if the two disagree this one is what the payouts were based on.
+        Recorded when {terms.prizes} were paid. The board above is recalculated
+        on every visit, so if the two disagree this one is what the payouts were
+        based on.
       </p>
 
       <div className="space-y-2 max-h-[500px] overflow-y-auto">
@@ -59,7 +70,7 @@ export default function SettledResultPanel({
           // The same resolver the live board uses, so a provider contest shows its score here
           // and a trading contest shows its P&L - and neither screen can drift into showing
           // the other game's metric.
-          const metric = resolveResultMetric(row, isProviderGame);
+          const metric = resolveResultMetric(row, isProviderGame, terms);
           const wasDisqualified = row.qualificationStatus === "disqualified";
 
           return (

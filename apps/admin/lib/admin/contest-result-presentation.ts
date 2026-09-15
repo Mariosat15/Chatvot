@@ -27,7 +27,20 @@
  * pull Mongoose into a browser bundle.
  *
  * NOT MIRRORED. `apps/admin/lib/admin/` is admin-only, so `check:mirrors` says nothing about it.
+ *
+ * X6.5 A3: EVERY FUNCTION HERE THAT PRODUCES PROSE TAKES A `TerminologyPack`, and it takes it
+ * as a REQUIRED parameter rather than an optional one with the old literal as a default. An
+ * optional pack is the silent-default failure this whole pass exists to remove - the caller
+ * that forgets it compiles, renders, logs nothing, and shows an operator the word they renamed
+ * away from. The same reasoning made `AppSettingsProvider`'s absence invisible for months
+ * (R75) and is why `credit-value.ts` chose `?? DEFAULT` over `|| 1`.
+ *
+ * THE MODULE STAYS PURE - it does not call `getTerms()` itself. The accessor reads a Mongoose
+ * document, so importing it here would put a model one hop from a client bundle (R58) and make
+ * every one of these functions async for a word.
  */
+
+import type { TerminologyPack } from "@/lib/constants/terminology";
 
 /** The subset of a leaderboard row this module reads. Deliberately not the model's type. */
 export interface ResultRow {
@@ -63,6 +76,7 @@ export interface MetricDisplay {
 export function resolveResultMetric(
   row: ResultRow,
   isProviderGame: boolean,
+  terms: TerminologyPack,
 ): MetricDisplay {
   if (isProviderGame) {
     const hasScore = typeof row.score === "number" && Number.isFinite(row.score);
@@ -74,7 +88,12 @@ export function resolveResultMetric(
       // reader wondering what they did wrong.
       sub: null,
       tone: "neutral",
-      label: hasScore ? "Score" : "No score recorded",
+      // The absent case reads "No <token> recorded" and the token keeps its own capitalisation,
+      // so an operator who renamed it to "Points" gets "No Points recorded". Deliberately NOT
+      // lower-cased to fit the sentence: case-folding a word an operator typed is us editing
+      // their vocabulary - "eSports" becomes "esports" - which is the rule A2 established and
+      // `wizard-terminology.test.ts` now polices across the whole admin component tree.
+      label: hasScore ? terms.score : `No ${terms.score} recorded`,
     };
   }
 
@@ -154,16 +173,30 @@ export function resolveEditHref(
  * amount here" is a caution that has become false - the same failure as the play screen's
  * play-window note and the wizard's publishing note, both of which sent somebody looking for
  * something that was not there. `resolvePrizeBasisNote` picks between the two.
+ *
+ * X6.5 A3 TURNED THESE FROM CONSTANTS INTO FUNCTIONS OF THE PACK, and the shape change is the
+ * point rather than a side effect. Both sentences name a rank and a player several times, so as
+ * constants they were unreachable by the token layer - and a caution about a payout is the last
+ * place on the screen that should be speaking a vocabulary the operator has renamed away from.
+ * They remain ONE definition each, for the reason they were extracted in the first place: two
+ * screens describing a payout differently is the defect.
  */
-export const PRIZE_REDISTRIBUTION_NOTE =
-  "These are the configured shares. A rank nobody places in is not kept by the platform - its share is split among the players who did place, and a player who recorded no result holds no rank. Actual payouts can therefore be higher than the amounts here.";
+export function prizeRedistributionNote(terms: TerminologyPack): string {
+  return `These are the configured shares. A ${terms.rank} nobody places in is not kept by the platform - its share is split among the ${terms.players} who did place, and a ${terms.player} who recorded no result holds no ${terms.rank}. Actual payouts can therefore be higher than the amounts here.`;
+}
 
 /** The same slot once the money has moved. */
-export const PRIZE_SETTLED_NOTE =
-  "These are the amounts actually paid, read from the settled result rather than from the configured shares - so they already include any share redistributed away from a rank nobody claimed. A rank showing no payment is one nobody placed in.";
+export function prizeSettledNote(terms: TerminologyPack): string {
+  return `These are the amounts actually paid, read from the settled result rather than from the configured shares - so they already include any share redistributed away from a ${terms.rank} nobody claimed. A ${terms.rank} showing no payment is one nobody placed in.`;
+}
 
-export function resolvePrizeBasisNote(basis: PrizeBasis): string {
-  return basis === "settled" ? PRIZE_SETTLED_NOTE : PRIZE_REDISTRIBUTION_NOTE;
+export function resolvePrizeBasisNote(
+  basis: PrizeBasis,
+  terms: TerminologyPack,
+): string {
+  return basis === "settled"
+    ? prizeSettledNote(terms)
+    : prizeRedistributionNote(terms);
 }
 
 /**
@@ -222,6 +255,7 @@ export interface SettledPrizeRow {
 export function resolveSettledPrizeRows(input: {
   distribution: { rank?: number | null; percentage: number }[];
   finalLeaderboard?: SettledLeaderboardEntry[] | null;
+  terms: TerminologyPack;
 }): SettledPrizeRow[] | null {
   const settled = input.finalLeaderboard ?? [];
   if (settled.length === 0) return null;
@@ -244,7 +278,7 @@ export function resolveSettledPrizeRows(input: {
           ? paidEntries.reduce((sum, entry) => sum + (entry.prizeAmount ?? 0), 0)
           : null,
       names: atRank.map(
-        (entry) => entry.username || entry.userId || "Unknown player",
+        (entry) => entry.username || entry.userId || `Unknown ${input.terms.player}`,
       ),
       isTied: atRank.length > 1 || atRank.some((entry) => entry.isTied === true),
     };
@@ -281,13 +315,20 @@ export function resolveSettledResultRows(
 export function resolveNoWinnersNotice(input: {
   isCompleted: boolean;
   noWinners?: boolean | null;
+  /**
+   * The seat count. The FIELD keeps its name - `currentParticipants` is a schema path and on
+   * chapter 14's never-rename list - while the word shown to an operator comes from the pack.
+   */
   participantCount: number;
+  terms: TerminologyPack;
 }): string | null {
   if (!input.isCompleted || !input.noWinners) return null;
 
+  const { terms } = input;
+
   if (input.participantCount === 0) {
-    return "This competition finished with no participants, so no prizes were awarded.";
+    return `This ${terms.contest} finished with no ${terms.players}, so no ${terms.prizes} were awarded.`;
   }
 
-  return "No prizes were awarded. Nobody finished in a paying position - on a game competition that usually means nobody recorded a score. The prize pool, less the platform fee, was recorded as an unclaimed pool rather than paid out.";
+  return `No ${terms.prizes} were awarded. Nobody finished in a paying position - on a ${terms.game} ${terms.contest} that usually means nobody recorded a ${terms.score}. The ${terms.prizePool}, less the platform fee, was recorded as an unclaimed pool rather than paid out.`;
 }

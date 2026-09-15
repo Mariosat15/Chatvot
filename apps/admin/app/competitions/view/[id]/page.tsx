@@ -36,6 +36,7 @@ import ContestPrizePanel from "@/components/admin/competitions/ContestPrizePanel
 import SettledResultPanel from "@/components/admin/competitions/SettledResultPanel";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import { formatVolts } from "@/lib/utils/format-volts";
+import { getTerms } from "@/lib/services/terminology.service";
 
 // Derived from the actions rather than hand-written. Reason: a hand-written row interface is
 // where an invented field survives a typecheck - the compiler checks the annotation, not the
@@ -81,6 +82,13 @@ const AdminCompetitionViewPage = async ({
   // read here at all any more.
   const creditSymbol = appSettings?.credits?.symbol;
 
+  // Resolved ONCE, here, and passed down. Reason: both sidebar panels are server components
+  // and so could each call `getTerms()` themselves - which is exactly the mistake, because
+  // that is a second settings read per render and a place two halves of one screen can
+  // disagree about what a rank is called. Same reasoning as the contest-control panel taking
+  // its provider flag from the server rather than deciding in the browser.
+  const terms = await getTerms();
+
   try {
     // Get competition data
     const competition = await getCompetitionById(id);
@@ -109,6 +117,7 @@ const AdminCompetitionViewPage = async ({
       isCompleted,
       noWinners: competition.noWinners,
       participantCount: competition.currentParticipants ?? 0,
+      terms,
     });
 
     // Get actual prizes won from database (WalletTransaction)
@@ -215,7 +224,7 @@ const AdminCompetitionViewPage = async ({
               <Link href={resolveEditHref(id, isProviderGame)}>
                 <Button className="bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-semibold">
                   <Edit className="h-4 w-4 mr-2" />
-                  Edit Competition
+                  Edit {terms.contest}
                 </Button>
               </Link>
             </div>
@@ -258,7 +267,7 @@ const AdminCompetitionViewPage = async ({
                   <Trophy className="h-5 w-5 text-yellow-400" />
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">Prize Pool</p>
+                  <p className="text-xs text-gray-500">{terms.prizePool}</p>
                   <p className="text-2xl font-bold text-yellow-400">
                     {formatVolts(
                       competition.prizePool || competition.prizePoolCredits || 0,
@@ -275,7 +284,7 @@ const AdminCompetitionViewPage = async ({
                   <DollarSign className="h-5 w-5 text-green-400" />
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">Entry Fee</p>
+                  <p className="text-xs text-gray-500">{terms.entryFee}</p>
                   <p className="text-2xl font-bold text-green-400">
                     {formatVolts(
                       competition.entryFee || competition.entryFeeCredits || 0,
@@ -292,7 +301,15 @@ const AdminCompetitionViewPage = async ({
                   <Users className="h-5 w-5 text-blue-400" />
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">Participants</p>
+                  {/*
+                    "PARTICIPANTS" IS TREATED AS A SYNONYM OF THE `players` TOKEN rather than
+                    getting a token of its own (owner decision, 15 Sep 2026). It is the same
+                    fact: how many people are in this contest. The admin app was already
+                    contradicting itself - the Game Master dashboard counts the identical
+                    number and calls them "Players" - so a second token would have let an
+                    operator rename one and not the other and keep the contradiction.
+                  */}
+                  <p className="text-xs text-gray-500">{terms.players}</p>
                   <p className="text-2xl font-bold text-blue-400">
                     {competition.currentParticipants}/
                     {competition.maxParticipants}
@@ -343,7 +360,7 @@ const AdminCompetitionViewPage = async ({
               <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700 rounded-xl p-6 shadow-xl">
                 <h2 className="text-xl font-bold text-gray-100 mb-4 flex items-center gap-2">
                   <Target className="h-5 w-5 text-blue-400" />
-                  Competition Configuration
+                  {terms.contest} Configuration
                 </h2>
 
                 {/*
@@ -442,9 +459,9 @@ const AdminCompetitionViewPage = async ({
               <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700 rounded-xl p-6 shadow-xl">
                 <h2 className="text-xl font-bold text-gray-100 mb-4 flex items-center gap-2">
                   <Trophy className="h-5 w-5 text-yellow-400" />
-                  {isCompleted ? "Final Results" : "Current Leaderboard"}
+                  {isCompleted ? "Final Results" : `Current ${terms.leaderboard}`}
                   <span className="text-sm font-normal text-gray-500">
-                    ({leaderboard.length} participants)
+                    ({leaderboard.length} {terms.players})
                   </span>
                 </h2>
 
@@ -503,6 +520,7 @@ const AdminCompetitionViewPage = async ({
                             const metric = resolveResultMetric(
                               participant,
                               isProviderGame,
+                              terms,
                             );
                             const subline = resolveParticipantSubline(
                               participant,
@@ -632,7 +650,7 @@ const AdminCompetitionViewPage = async ({
                         </div>
                       ) : (
                         <div className="text-center py-8 text-gray-500">
-                          No participants yet
+                          No {terms.players} yet
                         </div>
                       )}
 
@@ -642,7 +660,7 @@ const AdminCompetitionViewPage = async ({
                           <div className="grid grid-cols-3 gap-4 text-center text-sm">
                             <div>
                               <p className="text-gray-500">
-                                Total Participants
+                                Total {terms.players}
                               </p>
                               <p className="text-xl font-bold text-white">
                                 {leaderboard.length}
@@ -677,6 +695,7 @@ const AdminCompetitionViewPage = async ({
                 finalLeaderboard={competition.finalLeaderboard}
                 isProviderGame={isProviderGame}
                 creditSymbol={creditSymbol}
+                terms={terms}
               />
             </div>
 
@@ -686,7 +705,7 @@ const AdminCompetitionViewPage = async ({
               <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700 rounded-xl p-6 shadow-xl">
                 <h3 className="text-lg font-semibold text-gray-100 mb-4 flex items-center gap-2">
                   <Clock className="h-5 w-5 text-blue-400" />
-                  Competition Status
+                  {terms.contest} Status
                 </h3>
                 <CompetitionAdminActions
                   competitionId={id}
@@ -717,6 +736,7 @@ const AdminCompetitionViewPage = async ({
                 competition={competition}
                 creditSymbol={creditSymbol}
                 platformFeePercentage={competition.platformFeePercentage || 0}
+                terms={terms}
               />
 
               {/* Rules */}

@@ -7,6 +7,7 @@ import {
 } from "@/lib/admin/contest-result-presentation";
 import { projectPrizeDistribution } from "@/lib/utils/prize-projection";
 import { formatVolts } from "@/lib/utils/format-volts";
+import type { TerminologyPack } from "@/lib/constants/terminology";
 
 /**
  * The operator's prize panel, which reports one of two genuinely different things.
@@ -42,6 +43,7 @@ export default function ContestPrizePanel({
   competition,
   creditSymbol,
   platformFeePercentage,
+  terms,
 }: {
   distribution: { rank?: number | null; percentage: number }[];
   finalLeaderboard?: SettledLeaderboardEntry[] | null;
@@ -56,10 +58,13 @@ export default function ContestPrizePanel({
   /** `AppSettings.credits.symbol`. Pools and prizes are credits, never fiat. */
   creditSymbol?: string;
   platformFeePercentage: number;
+  /** Resolved once by the page above; see the note on `SettledResultPanel`. */
+  terms: TerminologyPack;
 }) {
   const settledRows = resolveSettledPrizeRows({
     distribution,
     finalLeaderboard,
+    terms,
   });
   const basis: PrizeBasis = settledRows ? "settled" : "projected";
   const projected = projectPrizeDistribution(competition);
@@ -75,7 +80,9 @@ export default function ContestPrizePanel({
         */}
         <h3 className="text-lg font-semibold text-gray-100 flex items-center gap-2">
           <Award className="h-5 w-5 text-yellow-400" />
-          {basis === "settled" ? "Prizes Paid" : "Prize Distribution"}
+          {basis === "settled"
+            ? `${terms.prizes} Paid`
+            : `${terms.prize} Distribution`}
         </h3>
         {platformFeePercentage > 0 && (
           <div className="px-3 py-1 bg-blue-500/20 border border-blue-500/30 rounded-lg">
@@ -120,7 +127,7 @@ export default function ContestPrizePanel({
                 <div className="flex items-center gap-2">
                   <RankTrophy index={index} />
                   <span className="text-sm font-bold text-gray-300">
-                    Rank #{row.rank}
+                    {terms.rank} #{row.rank}
                   </span>
                   <span className="px-2 py-0.5 rounded bg-yellow-500/20 text-yellow-400 text-xs font-semibold">
                     {row.configuredPercentage}%
@@ -152,7 +159,7 @@ export default function ContestPrizePanel({
               <p className="text-xs text-gray-500 pt-2 border-t border-gray-700/50">
                 {row.names.length > 0
                   ? row.names.join(", ")
-                  : "Nobody placed at this rank"}
+                  : `Nobody placed at this ${terms.rank}`}
               </p>
             </div>
           ))}
@@ -182,7 +189,7 @@ export default function ContestPrizePanel({
                   <div className="flex items-center gap-2">
                     <RankTrophy index={index} />
                     <span className="text-sm font-bold text-gray-300">
-                      Rank #{row.rank}
+                      {terms.rank} #{row.rank}
                     </span>
                     <span className="px-2 py-0.5 rounded bg-yellow-500/20 text-yellow-400 text-xs font-semibold">
                       {row.configuredPercentage}%
@@ -218,7 +225,9 @@ export default function ContestPrizePanel({
 
                 {platformFeePercentage > 0 && row.filled && (
                   <div className="flex items-center justify-between text-xs text-gray-500 pt-2 border-t border-gray-700/50">
-                    <span>From pool: {grossAmount.toFixed(2)}</span>
+                    <span>
+                      From {terms.prizePool}: {grossAmount.toFixed(2)}
+                    </span>
                     <span className="text-red-400">
                       Fee: -{feeAmount.toFixed(2)}
                     </span>
@@ -234,7 +243,8 @@ export default function ContestPrizePanel({
         <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
           <p className="text-xs text-blue-300">
             Winners receive net amounts after {platformFeePercentage}% platform
-            fee. Total pool: {formatVolts(projected.prizePool, { symbol: creditSymbol })}.
+            fee. Total {terms.prizePool}:{" "}
+            {formatVolts(projected.prizePool, { symbol: creditSymbol })}.
           </p>
         </div>
       )}
@@ -247,7 +257,7 @@ export default function ContestPrizePanel({
         somebody looking for something that no longer existed.
       */}
       <p className="text-xs text-gray-500 mt-4 leading-relaxed">
-        {resolvePrizeBasisNote(basis)}
+        {resolvePrizeBasisNote(basis, terms)}
       </p>
     </div>
   );

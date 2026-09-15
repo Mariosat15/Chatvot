@@ -37,6 +37,7 @@
 
 import { hasProviderGameLabel } from "./contest-game-label";
 import { resolveResultMetric, type MetricDisplay } from "./contest-result-presentation";
+import type { TerminologyPack } from "@/lib/constants/terminology";
 
 /** The game label as it arrives from the analytics route. */
 export interface AnalyticsGameLabel {
@@ -151,10 +152,12 @@ export interface AnalyticsPlayerRow {
 export function resolvePlayerMetric(
   row: AnalyticsPlayerRow,
   isProviderGame: boolean,
+  terms: TerminologyPack,
 ): MetricDisplay {
   const metric = resolveResultMetric(
     { score: row.finalScore, pnl: row.finalPnl, pnlPercentage: null, totalTrades: null },
     isProviderGame,
+    terms,
   );
   return { ...metric, sub: null };
 }
