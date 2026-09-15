@@ -63,6 +63,8 @@ chapter covers risks to the programme and to the application.
 | **R87** | **The reset that reported success for collections it never touched.** R86 one layer out: not fields it had stopped naming but **twenty-two collections of per-user activity it had never named** - `chargebacks` (the owner's report), `termsacceptances`, the whole messaging feature, X3's game rounds and provider events, stored payment instruments, security and price alerts, the dev-zone run histories. Two things made the list look complete: messaging declares its **own** `user_presence`, a *different* collection from the `userpresences` already covered by a model, and **a name in the list is not evidence the collection exists** - `deleteMany` against a missing name returns 0 and the reset still reports success, which is how `"alerts"` sat there for months while `pricehealthalerts` was never touched | Medium | **LIVE on every reset ever run.** No money moved; a teardown that leaves a player's disputes, messages, consents and game history behind while reporting that it cleared everything | **CLOSED 15 Sep 2026** - every collection either app's models declare is now classified into exactly one of four lists (deleted / **zeroed** / preserved / legacy raw name), and `user-data-reset-coverage.test.ts` **parses both model trees and the service** so a model added later cannot end up in none of them. `ZEROED_COLLECTIONS` is a third category on purpose - calling a wallet "preserved" hides R86. **Fix-forward** - run the reset again |
 | **R88** | **The level ladder an operator can rename everywhere except the leaderboard.** Two functions share the name `getTitleByXP`: an **async** one in `xp-config.service.ts` reading `XPConfig` from the database, and a **synchronous** one in `lib/constants/levels.ts` reading a hard-coded twenty-entry array. **Six read sites used the constant** - `app/api/leaderboard/route.ts`, both apps' `competition.actions.ts`, the admin global leaderboard, the contest-entry level gate, and the main-app competition page - plus **about twenty-five hard-coded `"Novice Trader"` defaults** in fallback branches. So renaming the ladder in admin changed the profile while **every leaderboard row kept saying "Novice Trader"**, with nothing thrown and nothing logged, and a player refused paid entry was told the name of a level nobody had configured | Medium | **Latent, and it is a REPORTING defect with no money anywhere near it** - no operator has renamed the ladder, so nothing has ever displayed inconsistently. What it cost is chapter 14's pass 2, which is costed as a free admin edit and is not one | **CLOSED 15 Sep 2026** - `lib/utils/level-title.ts` (mirrored, byte-identical test) resolves the display from the **operator's ladder**, read once per board. **This entry's own prescribed fix was wrong and is corrected rather than retensed:** it said to read the stored `currentTitle`, which is an **award-time cache** and is stale from the rename until the player next earns XP - so the cache answers only for a rung an operator saved with a blank title. **Icon and colour still come from the code ladder**, which is the one thing an operator must not be able to break. **Nothing backfilled.** Note `lib/constants/levels.ts` and its admin copy are byte-identical and `check:mirrors` compares **models**, so it has never had an opinion about either |
 | **R89** | **Four unauthenticated routes over the level ladder, its XP values and every player's identity.** Found while fixing R88, by **counting exported handlers against guards** rather than by reading routes. `badges-xp/manage` (GET **and POST**), `seed-badges-xp` (GET and POST), `debug-levels` (GET) and `badges-xp` (GET) had **no authorization of any kind**. Two of them write: `manage` rewrites level thresholds and badge XP values, and **`seed-badges-xp` force-resets the whole configuration - on its GET**, so a URL in a browser was enough. `badges-xp`'s GET handed out a paginated list of real users. **A route with no guard has no attribution**, so whether any of it was ever called is unanswerable | High | **LIVE.** No money moved and no prize was paid - these decide names, thresholds and XP - but a rewritten ladder changes **who may enter a paid contest**, since the level gate compares against it, and the reset is destructive. **Nothing backfilled**, because an edit through these leaves a configuration indistinguishable from an operator's own | **CLOSED 15 Sep 2026** - every handler calls `guardSection("badges")`, the section that owns the calling screen rather than a general grant. **Tenth instance of this class** after Prerequisite A, the internal-secret fallbacks, the suspicion-score route, the provider admin routes, the contest-edit PUT, R40, R47, R51 and R57. The guard **counts handlers against guard calls** and **strips comments first**, because these files now name `guardSection` in prose |
+| **R90** | **Six screens named the rungs themselves and got the names wrong by position.** One question earlier than R88: these did not read the *wrong* ladder, they read **no ladder at all**. `CompetitionEntryButton.tsx`, `CompetitionCard.tsx`, `TradingLobbySidebar.tsx`, `app/(root)/competitions/page-content.tsx` and the Game Master create page each held their own list, and **the list was the DIFFICULTY-BAND vocabulary mislabelled as levels** - Novice / Apprentice / Skilled / Expert / Elite / Master / Grand Master / Champion / Legend. So it was not stale, it was **wrong by position in every row**: a contest gated at rung 3 said "Skilled Trader", which is rung 6, and every map stopped at 10 of 20 | Medium | **LIVE and player-facing, and independent of any renaming feature** - the copies disagreed with the canonical ladder from the day they were written. **A display defect only:** the gate itself compares numbers, so nobody was wrongly admitted or refused; what a player got was the wrong name for the rung they needed. **Nothing backfilled** | **PARTLY CLOSED 15 Sep 2026** - four of the six resolve through `resolveLevelName`, and the two admin competition forms now render the **operator's** ladder handed down from the server. **`app/(root)/gamemaster/create-competition/page.tsx` is the recorded remainder**, exempt with its reason and a **canary asserting it is still an offender**, so the day it is fixed the exemption goes red. **A vocabulary guard is impossible here** and that is why the guard is by *reach*: the same file holds `DIFFICULTY_STYLES` keyed on those identical words, legitimately, so banning them fires on correct code in the file containing the defect |
+| **R91** | **The ladder editor could destroy the ladder it failed to load.** `BadgeXPManagementSection.tsx` seeded state with a hard-coded **ten-rung** ladder carrying the old trading names, and `saveLevels` POSTs whatever state holds to a handler that does `findOneAndUpdate(..., { data: { levels } })` - **a whole-document replacement with no merge and no length check**. So one failed GET, which the code already anticipated with a toast, followed by one save, **replaced a renamed twenty-rung ladder with ten stale rungs**, and every player above rung ten then had no rung at all | Medium | **The only WRITE in the R88/R90/R91 family** - the rest were reads showing a wrong name. Reachable in production and **no attribution says whether it ever happened**. Nothing backfilled, because the result is a configuration document indistinguishable from an operator's own | **CLOSED 15 Sep 2026** - the editor holds no ladder of its own, and the save **refuses** when the fetch has not landed or returned nothing. **The fix is a refusal, not a better default:** seeding the canonical twenty would still overwrite an operator's renames with ours, and a stored value and an absent one are different facts. Two probes, because the guard has two clauses and two ways to lose it - and the toast-and-fall-through shape is probed explicitly, being the one this same file already had on its XP tab |
 | R8 | Bulk find-and-replace on wording | High | Medium | X8 |
 | R9 | Fraud throttle blind to provider entries | High | High | X5 |
 | R11 | Legal wording changed without review | High | Medium | X8 |
@@ -3186,6 +3188,120 @@ mutation open - which is precisely `seed-badges-xp`'s shape. And it **strips com
 because all four files now explain in prose why `guardSection` is the right helper, and a test
 that reads prose flags a correct file for discussing the anti-pattern while passing a broken one
 whose only mention of the right thing is in a comment.
+
+---
+
+### R90 - Six screens that named the rungs themselves - **PARTLY CLOSED 15 September 2026**
+
+**How it was found.** While fixing R88, and the interesting part is that it was found **twice**.
+The first pass found two files, fixed them, and shipped **with no test at all** - which is exactly
+how sites three to six outlived a fix, a commit and a register entry. The directory-scanned guard
+that now covers this was written because of that, not in spite of it.
+
+**What it is, and the framing was wrong for a day.** R88 asks *which ladder does this site read*.
+This is one question earlier: these screens read **no ladder**. Each held its own array, and the
+array was not a stale copy of `TITLE_LEVELS` - it was the **difficulty-band vocabulary**
+mislabelled as levels: Novice / Apprentice / Skilled / Expert / Elite / Master / Grand Master /
+Champion / Legend. That is why every entry was **wrong by position** rather than merely out of
+date. Rung 3 is "Trainee"; these said "Skilled", which is rung 6. And every map had **ten entries
+against a twenty-rung ladder**, so a gate above halfway had no name at all.
+
+| Screen | What it showed |
+|---|---|
+| `components/trading/CompetitionEntryButton.tsx` | the refusal a player reads when they are below the level |
+| `components/trading/CompetitionCard.tsx` | the rung on every contest card |
+| `components/trading/lobby/TradingLobbySidebar.tsx` | the lobby's entry requirement |
+| `app/(root)/competitions/page-content.tsx` | the browse list's level filter |
+| `apps/admin/components/admin/CompetitionCreatorForm.tsx` | the whole ladder, as the operator's choices |
+| `apps/admin/components/admin/CompetitionEditorForm.tsx` | the same, on edit |
+| `app/(root)/gamemaster/create-competition/page.tsx` | **still an offender** - see below |
+
+**Severity, stated in both directions.** It is **live and player-facing**, and unlike R88 it does
+not wait for an operator to rename anything - the copies disagreed with the canonical ladder from
+the day they were written. But it is **a display defect only**: every gate compares level
+*numbers*, so nobody was wrongly admitted or refused. **Nothing backfilled.**
+
+**A vocabulary guard is impossible here, and that is the whole reason the guard has the shape it
+does.** `TradingLobbySidebar.tsx` held the offending `LEVEL_NAMES` array and, thirty lines below
+it, `DIFFICULTY_STYLES` keyed on those same words - **legitimately**, because there they really
+are the difficulty bands. Banning the words fires on correct code **in the same file as the
+defect**, and "Grand Master" appears in both lists, so even restricting the ban to multi-word
+names does not separate them. **A guard that fails on correct code is the one the next reader
+deletes.** So the guard asks a different question: a screen that renders a level gate must be
+**able to reach the ladder** - and it is **directory-scanned**, so a new screen is covered on the
+day it appears rather than on the day somebody remembers to list it.
+
+**The reach regex had to be narrowed, and the direction of that failure is the dangerous one.**
+Written with bare identifiers, it was satisfied by a `useState` local in
+`BadgeXPManagementSection.tsx` **literally named `TITLE_LEVELS`** which held the hard-coded
+ten-rung ladder of R91. It now matches the helpers **as calls** and `TITLE_LEVELS` **only inside
+an import**. This is the sibling of "an import is not a use" and it is worse, because the guard
+reported the offending file as safe.
+
+**Three legitimate routes to the ladder, and each carries its own assertion** rather than being
+waved through: a server read passed down as `levelLadder`, a call to the shared resolvers, or - for
+the ladder **editor**, which must be able to write it and therefore cannot use the read-only
+helpers - a **client fetch**, with the endpoint itself asserted so a file that loses the fetch and
+falls back to its own list turns red.
+
+**The two admin forms are a third shape and were deliberately not folded into R88's `READ_SITES`.**
+They render the *whole* ladder as choices, so they never call the resolver at all; what they must
+not do is **value-import the constant**, which is what they did until X6.5. Each page now reads
+the ladder **once** and hands it down, asserted as a count, because the per-component version
+reviews as correct and issues a read per form.
+
+#### The recorded remainder
+
+`app/(root)/gamemaster/create-competition/page.tsx` names rungs inline as JSX options, is wrong by
+position in the same way, and its `maxLevel` dropdown caps at 10 - so **no Game Master can gate a
+contest above halfway.** It is **exempt rather than fixed**, and the reason is not effort-by-feel:
+it is a 2,798-line client component with no route to the operator's ladder, so closing it means
+threading a server read in and lifting the cap, which is a substantial change to a page nobody
+asked for inside a wording pass. **The canary is the important half** - the test asserts the file
+*is* still an offender, on both counts, so the day somebody fixes it the exemption is deleted with
+it rather than quietly re-permitting the defect. Same device as the
+`app/api/dashboard/competitions/route.ts` comparator exception.
+
+---
+
+### R91 - The ladder editor that could destroy the ladder - **CLOSED 15 September 2026**
+
+**How it was found.** By the R90 guard reporting the ladder editor as *safe* - which it was not.
+Chasing why a directory scan had cleared it turned up the `useState` local named `TITLE_LEVELS`,
+and the hard-coded ladder inside it.
+
+**What it was.** `BadgeXPManagementSection.tsx` seeded its level state with a **ten-rung** array
+carrying the old trading names. `saveLevels` POSTs whatever that state holds, and the handler does
+`findOneAndUpdate({ configType: "level_progression" }, { data: { levels } })` - **a whole-document
+replacement, with no merge and no length check**. The initial GET can fail, and **the code already
+anticipated that with a toast**. So: one failed fetch, one save, and a renamed twenty-rung ladder
+became ten stale rungs - after which **every player above rung ten had no rung at all**, and the
+paid-entry gate compared against thresholds nobody had configured.
+
+**It is the only WRITE in this family.** R88 and R90 were reads showing a wrong name. This one
+changes the stored configuration, is reachable in production, and **no attribution says whether it
+ever happened.** Nothing was backfilled, for the R89 reason: the result is a configuration document
+indistinguishable from an operator's own edit.
+
+**The fix is a REFUSAL, not a better default.** Seeding the canonical twenty rungs reads as the
+careful choice and is wrong - it would overwrite an operator's renames with ours, silently, and
+**a stored value and an absent one are different facts** (the `entryBlockThreshold` rule, one
+screen along). The editor now holds no ladder, and the save refuses when the fetch has not landed
+or returned nothing.
+
+**Two clauses, two probes, and a third shape probed on purpose.** `!ladderLoaded` and
+`levels.length === 0` are two ways to lose the guard, so each is probed separately. The third is
+the **toast-and-fall-through**: the condition present, correct and complete, and no `return` - so
+the operator is told the ladder did not load and the save proceeds anyway. That is the shape this
+same file already had on its XP tab, which makes it the likely edit, and **every positive
+assertion about the condition passes on it.**
+
+**And one probe is deliberately absent, with its reason in the harness.** Making the condition
+unreachable while leaving it readable - `if (!ladderLoaded && false)` - was written, came back
+green, and is **not** in the file: catching it means pinning the condition character for character,
+which would then fail on any legitimate rewording. Nobody writes `&& false` by accident, whereas
+the three probes that are there are all edits somebody makes on purpose while believing they are
+simplifying.
 
 ---
 

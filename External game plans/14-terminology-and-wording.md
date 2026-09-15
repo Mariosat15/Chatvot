@@ -203,6 +203,20 @@ and it can happen in parallel with X7.
 > stating because `check:mirrors` cannot: `lib/constants/levels.ts` and
 > `apps/admin/lib/constants/levels.ts` are two copies of that array, **byte-identical
 > today**, and the guard compares models, so it has never had an opinion about them.
+>
+> **AMENDED 15 September 2026 on fixing it, and the paragraph above is wrong twice.** There
+> were **six** read sites, not five - `app/(root)/competitions/[id]/page.tsx` recomputes from
+> the constant too - and `comprehensive-dashboard.actions.ts` is the same disagreement facing
+> the other way, having scanned the operator's ladder and then taken the stored title anyway.
+> **And the prescription is wrong: `currentTitle` is a cache written at XP-award time**, so
+> reading it leaves a renamed ladder stale on every row until each player next earns XP, and a
+> player who has stopped playing keeps the old name for ever - *some* rows renamed and some
+> not, which is worse than a uniformly old name because it is the version a player reports as
+> a bug. The fix reads the **ladder**, through `lib/utils/level-title.ts`, **once per board and
+> passed in**; the `await` this paragraph was avoiding costs one read per board, not per row.
+> Icon and colour still come from the code ladder, matched on the level **number**, because an
+> operator owns words and does not own a `GAME_ICONS` key or a Tailwind class. **CLOSED**, with
+> R89, R90 and R91 found on the way.
 
 **One player-side item is deliberately *not* in this chapter.** The getting-started card
 (`components/dashboard/GettingStartedCard.tsx`) has a step "place your first trade". That
@@ -238,6 +252,14 @@ change.
 > first place. Risk **R88**, and the full mechanism is in the amendment under section 3.2. The
 > sentence is left standing rather than rewritten because it was believed, and a document
 > that claims this is free is how somebody schedules it as an admin task.
+>
+> **CLOSED 15 September 2026**, scoped into X6.5 by the owner rather than deferred to X7. It
+> was **six** read sites and not five, and three further defects came with the fix: four
+> unauthenticated routes over the ladder (**R89**), six screens holding their own list of rung
+> names - the **difficulty-band vocabulary mislabelled as levels**, so wrong by position rather
+> than stale (**R90**) - and the ladder **editor** able to replace a renamed twenty-rung ladder
+> with ten stale rungs after one failed fetch (**R91**). So the row is now genuinely a database
+> edit; it was three code changes and a refusal away from being one.
 
 ---
 
