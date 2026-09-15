@@ -43,6 +43,7 @@ import { creditsToEUR } from "@/lib/utils/credit-conversion";
 import { useAppSettings } from "@/contexts/AppSettingsContext";
 import { useTerms } from "@/contexts/TerminologyContext";
 import GameRevenueBreakdown from "./competitions/GameRevenueBreakdown";
+import ChallengePlayerCard from "./competitions/ChallengePlayerCard";
 import { formatVolts, DEFAULT_CREDIT_SYMBOL } from "@/lib/utils/format-volts";
 import {
   ALL_GAMES,
@@ -138,6 +139,13 @@ interface OverallStats {
 interface ChallengeAnalytic {
   _id: string;
   status: string;
+  // R92. Raw label, resolved through `resolveGameBadge` exactly as a competition row is,
+  // so an absent `gameType` becomes trading in one place (invariant 5) rather than two.
+  gameType?: string;
+  gameKey?: string;
+  gameDisplayName?: string | null;
+  challengerId?: string;
+  challengedId?: string;
   challengerName: string;
   challengedName: string;
   entryFee: number;
@@ -157,16 +165,24 @@ interface ChallengeAnalytic {
   createdAt: string;
   startTime: string;
   endTime: string;
-  challengerStats?: {
-    totalTrades: number;
-    totalPnL: number;
-    isDisqualified?: boolean;
-  };
-  challengedStats?: {
-    totalTrades: number;
-    totalPnL: number;
-    isDisqualified?: boolean;
-  };
+  // The settled snapshot, named as the MODEL names it. R92.
+  //
+  // This interface used to declare `totalPnL`, a field `challengerFinalStats` has never
+  // had, so the read was `undefined` on every challenge of every game and the card showed
+  // a red `0.00` beside a real result. A hand-written interface over an API payload is
+  // exactly where an invented field survives a typecheck - the compiler had nothing to
+  // disagree with - which is the same trap as an explicitly-typed `.lean<{...}>()`.
+  challengerStats?: ChallengeFinalStats;
+  challengedStats?: ChallengeFinalStats;
+}
+
+interface ChallengeFinalStats {
+  totalTrades?: number;
+  pnl?: number;
+  pnlPercentage?: number;
+  /** A provider challenge's settled score. Absent on a trading challenge. R92. */
+  score?: number;
+  isDisqualified?: boolean;
 }
 
 interface ChallengeStats {
@@ -193,8 +209,16 @@ export default function CompetitionAnalytics() {
     compiler names every consumer, which is how this call site was found rather than left for
     A4 to discover on a screen that reads correctly.
 
-    Only the metric labels are tokenised here. The rest of this screen's wording is A4's, per
-    `05` section 10.
+    A3 tokenised only the metric labels and this comment used to end by saying the rest of the
+    screen was A4's. A4 has since done it, so the sentence is corrected rather than retensed:
+    every renameable noun an operator reads on this screen now comes from the pack.
+
+    Two things are deliberately NOT tokenised, and both look like omissions. "Trading" in the
+    game badge's title attribute is the GAME's name, which `14` section 5 puts on the
+    never-rename list - it is not the word for a contest. And "P&L", "trades" and the minimum
+    trade requirement are trading's own vocabulary on trading's own branch; they are withheld
+    entirely for a provider game rather than renamed, because the mechanism does not exist
+    there and a reworded sentence would send an operator looking for a setting to change.
   */
   const terms = useTerms();
   const [loading, setLoading] = useState(true);
@@ -285,7 +309,7 @@ export default function CompetitionAnalytics() {
         setContestLimit(result.data.contestLimit);
       }
     } catch (error) {
-      toast.error("Failed to load competition analytics");
+      toast.error(`Failed to load ${terms.contest} analytics`);
       console.error(error);
     } finally {
       setLoading(false);
@@ -315,7 +339,7 @@ export default function CompetitionAnalytics() {
       <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700 rounded-2xl p-12">
         <div className="flex items-center justify-center">
           <div className="text-cyan-400 text-lg">
-            Loading competition analytics...
+            Loading {terms.contest} analytics...
           </div>
         </div>
       </div>
@@ -341,10 +365,11 @@ export default function CompetitionAnalytics() {
               </div>
               <div>
                 <h2 className="text-3xl font-bold text-white flex items-center gap-2">
-                  🏆 Competition Analytics
+                  🏆 {terms.contest} Analytics
                 </h2>
                 <p className="text-cyan-100 mt-1">
-                  Track earnings, prizes, refunds & disqualifications
+                  Track earnings, {terms.prizes}, refunds &amp;
+                  disqualifications
                 </p>
               </div>
             </div>
@@ -383,7 +408,7 @@ export default function CompetitionAnalytics() {
               <div className="h-8 w-8 bg-purple-500/20 rounded-lg flex items-center justify-center">
                 <Trophy className="h-4 w-4 text-purple-400" />
               </div>
-              Total Competitions
+              Total {terms.contests}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -407,7 +432,13 @@ export default function CompetitionAnalytics() {
               <div className="h-8 w-8 bg-green-500/20 rounded-lg flex items-center justify-center">
                 <DollarSign className="h-4 w-4 text-green-400" />
               </div>
-              Total Prize Pools
+              {/* A plural of "Prize Pool" is composed from the `prize` token plus our own
+                  word "Pools", NOT from `prizePool` - the pack declares that token with no
+                  plural on purpose, so a consumer reaching for one has to suffix it, and
+                  `replace(/$/, "s")` on a word an operator typed is us editing their
+                  vocabulary. The singular label elsewhere on this screen is `prizePool`,
+                  matching `CompetitionsListSection` and `ContestPrizePanel`. */}
+              Total {terms.prize} Pools
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -487,7 +518,7 @@ export default function CompetitionAnalytics() {
               {creditSymbol} {overallStats.totalRefunds.toLocaleString()}
             </div>
             <p className="text-sm text-gray-400 mt-2">
-              From cancelled competitions
+              From cancelled {terms.contests}
             </p>
           </CardContent>
         </Card>
@@ -536,14 +567,16 @@ export default function CompetitionAnalytics() {
               <div className="h-8 w-8 bg-slate-500/20 rounded-lg flex items-center justify-center">
                 <Users className="h-4 w-4 text-slate-400" />
               </div>
-              Avg Participants
+              Avg {terms.players}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-white tabular-nums">
               {overallStats.averageParticipantsPerComp.toFixed(1)}
             </div>
-            <p className="text-xs text-gray-400 mt-1">per competition</p>
+            <p className="text-xs text-gray-400 mt-1">
+              per {terms.contest}
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -561,10 +594,10 @@ export default function CompetitionAnalytics() {
             <div className="h-10 w-10 bg-cyan-500/20 rounded-lg flex items-center justify-center">
               <Trophy className="h-5 w-5 text-cyan-400" />
             </div>
-            Competition Financial Details
+            {terms.contest} Financial Details
           </CardTitle>
           <CardDescription className="text-sm">
-            Expand each competition to see winner distributions,
+            Expand each {terms.contest} to see winner distributions,
             disqualifications, and refunds
           </CardDescription>
           {/*
@@ -673,7 +706,7 @@ export default function CompetitionAnalytics() {
                           </span>
                           <span className="flex items-center gap-1">
                             <Users className="h-3 w-3" />
-                            {comp.participants} participants
+                            {comp.participants} {terms.players}
                           </span>
                           {/*
                             The only figure on this screen that wore the fiat symbol. Every
@@ -710,7 +743,7 @@ export default function CompetitionAnalytics() {
                         ) : (
                           <>
                             <div className="text-sm font-semibold text-gray-300">
-                              Prize Pool: {creditSymbol}{" "}
+                              {terms.prizePool}: {creditSymbol}{" "}
                               {comp.prizePool.toLocaleString()}
                             </div>
                             <div className="text-xs text-gray-500">
@@ -831,14 +864,15 @@ export default function CompetitionAnalytics() {
                           <div className="flex items-center gap-2 mb-3">
                             <Award className="h-4 w-4 text-yellow-500" />
                             <span className="text-sm font-semibold text-gray-300">
-                              Prize Distribution ({comp.winnersCount} winners)
+                              {terms.prize} Distribution ({comp.winnersCount}{" "}
+                              winners)
                             </span>
                           </div>
                           <Table>
                             <TableHeader>
                               <TableRow className="border-gray-700">
                                 <TableHead className="text-gray-400">
-                                  Rank
+                                  {terms.rank}
                                 </TableHead>
                                 <TableHead className="text-gray-400">
                                   User
@@ -851,7 +885,7 @@ export default function CompetitionAnalytics() {
                                   score they were ranked on sat unread in the same ledger row.
                                 */}
                                 <TableHead className="text-gray-400">
-                                  {badge.isProviderGame ? "Score" : "Final P&L"}
+                                  {badge.isProviderGame ? terms.score : "Final P&L"}
                                 </TableHead>
                                 {/*
                                   "Share of pool" replaces a "Prize %" column that has read 0%
@@ -865,7 +899,7 @@ export default function CompetitionAnalytics() {
                                   Share of pool
                                 </TableHead>
                                 <TableHead className="text-gray-400">
-                                  Prize Amount
+                                  {terms.prize} Amount
                                 </TableHead>
                                 <TableHead className="text-gray-400">
                                   {currencyCode} Value
@@ -960,7 +994,7 @@ export default function CompetitionAnalytics() {
                           <div className="flex items-center gap-2 mb-3">
                             <Ban className="h-4 w-4 text-red-500" />
                             <span className="text-sm font-semibold text-gray-300">
-                              Disqualified Participants (
+                              Disqualified {terms.players} (
                               {comp.disqualifiedCount})
                             </span>
                           </div>
@@ -971,7 +1005,7 @@ export default function CompetitionAnalytics() {
                                   User
                                 </TableHead>
                                 <TableHead className="text-gray-400">
-                                  {badge.isProviderGame ? "Score" : "Final P&L"}
+                                  {badge.isProviderGame ? terms.score : "Final P&L"}
                                 </TableHead>
                                 <TableHead className="text-gray-400">
                                   Reason
@@ -1123,7 +1157,7 @@ export default function CompetitionAnalytics() {
             {competitions.length === 0 && (
               <div className="text-center py-12 text-gray-500">
                 <Trophy className="h-12 w-12 mx-auto mb-3 opacity-30" />
-                <p>No completed or cancelled competitions yet</p>
+                <p>No completed or cancelled {terms.contests} yet</p>
               </div>
             )}
           </div>
@@ -1142,10 +1176,10 @@ export default function CompetitionAnalytics() {
             </div>
             <div>
               <h2 className="text-3xl font-bold text-white flex items-center gap-2">
-                ⚔️ 1v1 Challenge Analytics
+                ⚔️ 1v1 {terms.challenge} Analytics
               </h2>
               <p className="text-orange-100 mt-1">
-                Track challenge fees, wins, ties & disqualifications
+                Track {terms.challenge} fees, wins, ties &amp; disqualifications
               </p>
             </div>
           </div>
@@ -1160,7 +1194,7 @@ export default function CompetitionAnalytics() {
               <div className="h-8 w-8 bg-orange-500/20 rounded-lg flex items-center justify-center">
                 <Swords className="h-4 w-4 text-orange-400" />
               </div>
-              Total Challenges
+              Total {terms.challenges}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -1187,7 +1221,7 @@ export default function CompetitionAnalytics() {
               <div className="h-8 w-8 bg-green-500/20 rounded-lg flex items-center justify-center">
                 <DollarSign className="h-4 w-4 text-green-400" />
               </div>
-              Challenge Prize Pools
+              {terms.challenge} {terms.prize} Pools
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -1211,7 +1245,7 @@ export default function CompetitionAnalytics() {
               <div className="h-8 w-8 bg-yellow-500/20 rounded-lg flex items-center justify-center">
                 <TrendingUp className="h-4 w-4 text-yellow-400" />
               </div>
-              Challenge Platform Fees
+              {terms.challenge} Platform Fees
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -1270,7 +1304,7 @@ export default function CompetitionAnalytics() {
               {challengeStats.tieChallenges}
             </div>
             <p className="text-sm text-gray-400 mt-2">
-              Challenges ending in a tie
+              {terms.challenges} ending in a tie
             </p>
           </CardContent>
         </Card>
@@ -1316,7 +1350,7 @@ export default function CompetitionAnalytics() {
               <div className="h-8 w-8 bg-slate-500/20 rounded-lg flex items-center justify-center">
                 <Target className="h-4 w-4 text-slate-400" />
               </div>
-              Avg Entry Fee
+              Avg {terms.entryFee}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -1324,7 +1358,9 @@ export default function CompetitionAnalytics() {
               {creditSymbol}{" "}
               {challengeStats.averageChallengeEntryFee.toFixed(0)}
             </div>
-            <p className="text-xs text-gray-400 mt-1">per player</p>
+            <p className="text-xs text-gray-400 mt-1">
+              per {terms.player}
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -1336,10 +1372,11 @@ export default function CompetitionAnalytics() {
             <div className="h-10 w-10 bg-orange-500/20 rounded-lg flex items-center justify-center">
               <Swords className="h-5 w-5 text-orange-400" />
             </div>
-            Challenge Details
+            {terms.challenge} Details
           </CardTitle>
           <CardDescription className="text-sm">
-            Expand each challenge to see player stats and outcomes
+            Expand each {terms.challenge} to see {terms.player} stats and
+            outcomes
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -1349,6 +1386,13 @@ export default function CompetitionAnalytics() {
               const isCompleted = challenge.status === "completed";
               const isTie = challenge.isTie;
               const bothDisqualified = challenge.bothDisqualified;
+              // R92. The same resolver the competition rows use, so an absent label becomes
+              // trading in one place (invariant 5) rather than once per table.
+              const challengeBadge = resolveGameBadge({
+                gameType: challenge.gameType,
+                gameKey: challenge.gameKey,
+                gameDisplayName: challenge.gameDisplayName,
+              });
 
               return (
                 <div
@@ -1399,8 +1443,26 @@ export default function CompetitionAnalytics() {
                             className={`h-4 w-4 ${bothDisqualified ? "text-red-500" : isTie ? "text-purple-500" : "text-orange-500"}`}
                           />
                           <span className="font-semibold text-white">
-                            {challenge.challengerName || "Player 1"} vs{" "}
-                            {challenge.challengedName || "Player 2"}
+                            {challenge.challengerName || `${terms.player} 1`}{" "}
+                            vs{" "}
+                            {challenge.challengedName || `${terms.player} 2`}
+                          </span>
+                          {/* Which game, on every row including trading - same reasoning as
+                              the competition rows above: a badge that appears only on the
+                              unusual case leaves the reader to assume what the rest are. */}
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-xs font-medium border ${
+                              challengeBadge.isProviderGame
+                                ? "bg-purple-500/20 text-purple-300 border-purple-500/30"
+                                : "bg-blue-500/20 text-blue-300 border-blue-500/30"
+                            }`}
+                            title={
+                              challengeBadge.provider
+                                ? `${challengeBadge.label} - supplied by ${challengeBadge.provider}`
+                                : "Trading"
+                            }
+                          >
+                            {challengeBadge.label}
                           </span>
                           {/* Status Badge */}
                           {isCompleted && !isTie && !bothDisqualified && (
@@ -1451,7 +1513,7 @@ export default function CompetitionAnalytics() {
                       {/* Prize Pool */}
                       <div className="text-right">
                         <div className="text-sm font-semibold text-gray-300">
-                          Prize: {creditSymbol}{" "}
+                          {terms.prize}: {creditSymbol}{" "}
                           {challenge.prizePool?.toLocaleString() || 0}
                         </div>
                         <div className="text-xs text-gray-500">
@@ -1514,7 +1576,7 @@ export default function CompetitionAnalytics() {
                         </div>
                         <div className="bg-gray-800/50 rounded-lg p-3">
                           <div className="text-xs text-gray-500">
-                            Winner Prize
+                            Winner {terms.prize}
                           </div>
                           <div className="text-lg font-bold text-green-400">
                             {creditSymbol}{" "}
@@ -1546,107 +1608,28 @@ export default function CompetitionAnalytics() {
                       {/* Player Stats */}
                       {isCompleted && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {/* Challenger */}
-                          <div
-                            className={`rounded-lg p-4 ${
-                              challenge.winnerId ===
-                              challenge.challengerStats?.toString()
-                                ? "bg-green-900/20 border border-green-500/30"
-                                : challenge.challengerStats?.isDisqualified
-                                  ? "bg-red-900/20 border border-red-500/30"
-                                  : "bg-gray-800/50"
-                            }`}
-                          >
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="font-semibold text-white">
-                                {challenge.challengerName || "Challenger"}
-                              </span>
-                              {challenge.challengerStats?.isDisqualified && (
-                                <span className="px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 text-xs">
-                                  Disqualified
-                                </span>
-                              )}
-                            </div>
-                            <div className="space-y-1 text-sm">
-                              <div className="flex justify-between">
-                                <span className="text-gray-400">Trades:</span>
-                                <span className="text-white">
-                                  {challenge.challengerStats?.totalTrades || 0}
-                                </span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-gray-400">P&L:</span>
-                                <span
-                                  className={
-                                    challenge.challengerStats?.totalPnL &&
-                                    challenge.challengerStats.totalPnL >= 0
-                                      ? "text-green-400"
-                                      : "text-red-400"
-                                  }
-                                >
-                                  {challenge.challengerStats?.totalPnL &&
-                                  challenge.challengerStats.totalPnL >= 0
-                                    ? "+"
-                                    : ""}
-                                  {creditSymbol}{" "}
-                                  {(
-                                    challenge.challengerStats?.totalPnL || 0
-                                  ).toFixed(2)}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Challenged */}
-                          <div
-                            className={`rounded-lg p-4 ${
-                              challenge.winnerId ===
-                              challenge.challengedStats?.toString()
-                                ? "bg-green-900/20 border border-green-500/30"
-                                : challenge.challengedStats?.isDisqualified
-                                  ? "bg-red-900/20 border border-red-500/30"
-                                  : "bg-gray-800/50"
-                            }`}
-                          >
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="font-semibold text-white">
-                                {challenge.challengedName || "Challenged"}
-                              </span>
-                              {challenge.challengedStats?.isDisqualified && (
-                                <span className="px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 text-xs">
-                                  Disqualified
-                                </span>
-                              )}
-                            </div>
-                            <div className="space-y-1 text-sm">
-                              <div className="flex justify-between">
-                                <span className="text-gray-400">Trades:</span>
-                                <span className="text-white">
-                                  {challenge.challengedStats?.totalTrades || 0}
-                                </span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-gray-400">P&L:</span>
-                                <span
-                                  className={
-                                    challenge.challengedStats?.totalPnL &&
-                                    challenge.challengedStats.totalPnL >= 0
-                                      ? "text-green-400"
-                                      : "text-red-400"
-                                  }
-                                >
-                                  {challenge.challengedStats?.totalPnL &&
-                                  challenge.challengedStats.totalPnL >= 0
-                                    ? "+"
-                                    : ""}
-                                  {creditSymbol}{" "}
-                                  {(
-                                    challenge.challengedStats?.totalPnL || 0
-                                  ).toFixed(2)}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
+                          <ChallengePlayerCard
+                            name={challenge.challengerName || "Challenger"}
+                            stats={challenge.challengerStats}
+                            isWinner={
+                              !!challenge.winnerId &&
+                              challenge.winnerId === challenge.challengerId
+                            }
+                            isProviderGame={challengeBadge.isProviderGame}
+                            creditSymbol={creditSymbol}
+                            terms={terms}
+                          />
+                          <ChallengePlayerCard
+                            name={challenge.challengedName || "Challenged"}
+                            stats={challenge.challengedStats}
+                            isWinner={
+                              !!challenge.winnerId &&
+                              challenge.winnerId === challenge.challengedId
+                            }
+                            isProviderGame={challengeBadge.isProviderGame}
+                            creditSymbol={creditSymbol}
+                            terms={terms}
+                          />
                         </div>
                       )}
 
@@ -1655,11 +1638,20 @@ export default function CompetitionAnalytics() {
                         <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-4">
                           <div className="flex items-center gap-2 text-red-400 font-semibold mb-2">
                             <AlertTriangle className="h-4 w-4" />
-                            Both Players Disqualified
+                            Both {terms.players} Disqualified
                           </div>
                           <p className="text-gray-300">
-                            Neither player met the minimum trade requirements.
-                            The prize pool of{" "}
+                            {/* Reason this sentence is branched rather than reworded once:
+                                "the minimum trade requirements" is a REAL rule on a trading
+                                challenge and naming it is what tells the operator which
+                                setting produced the outcome. On a provider game there is no
+                                such rule, so the same sentence is a statement about a
+                                mechanism that does not exist - it does not merely read
+                                oddly, it sends somebody looking for a setting to change. */}
+                            {challengeBadge.isProviderGame
+                              ? `Neither ${terms.player} produced a qualifying result.`
+                              : `Neither ${terms.player} met the minimum trade requirements.`}{" "}
+                            The {terms.prizePool} of{" "}
                             <strong>
                               {creditSymbol}{" "}
                               {challenge.unclaimedPool?.toLocaleString()}
@@ -1677,7 +1669,7 @@ export default function CompetitionAnalytics() {
             {challenges.length === 0 && (
               <div className="text-center py-12 text-gray-500">
                 <Swords className="h-12 w-12 mx-auto mb-3 opacity-30" />
-                <p>No completed or processed challenges yet</p>
+                <p>No completed or processed {terms.challenges} yet</p>
               </div>
             )}
           </div>

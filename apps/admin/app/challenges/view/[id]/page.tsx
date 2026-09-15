@@ -19,6 +19,9 @@ import { connectToDatabase } from "@/database/mongoose";
 import AppSettings from "@/database/models/app-settings.model";
 import Challenge from "@/database/models/trading/challenge.model";
 import { formatVolts } from "@/lib/utils/format-volts";
+import { getTerms } from "@/lib/services/terminology.service";
+import { hasProviderGameLabel } from "@/lib/admin/contest-game-label";
+import ChallengeStatRows from "@/components/admin/competitions/ChallengeStatRows";
 
 interface AdminChallengeViewPageProps {
   params: Promise<{ id: string }>;
@@ -143,6 +146,24 @@ const AdminChallengeViewPage = async ({
     // Get final stats
     const challengerStats = challenge.challengerFinalStats;
     const challengedStats = challenge.challengedFinalStats;
+
+    // R92. `hasProviderGameLabel` asks about the LABEL alone, deliberately not the stricter
+    // `isProviderContest`: a provider challenge missing its keys cannot launch a round, but
+    // it is still not a trading challenge, and reporting it as one is the defect being fixed.
+    const isProviderGame = hasProviderGameLabel(challenge);
+    const terms = await getTerms();
+
+    // The winning side's settled score, for the winner banner on a provider game. Derived
+    // from `winnerId` against the two player ids, never from a separate stored field -
+    // there is no `winnerScore` on the model, and adding one would be a second copy of a
+    // figure the snapshot already carries.
+    const winnerScore = challenge.winnerId
+      ? challenge.winnerId === challenge.challengerId
+        ? challengerStats?.score
+        : challenge.winnerId === challenge.challengedId
+          ? challengedStats?.score
+          : undefined
+      : undefined;
     const challengerGm = gmMap.get(challenge.challengerId);
     const challengedGm = gmMap.get(challenge.challengedId);
 
@@ -175,8 +196,14 @@ const AdminChallengeViewPage = async ({
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
+                      {/* "1v1" stays: it is the format's arity, which an operator does not
+                          get to rename - a challenge is exactly two players by hard
+                          constraint, so a deployment calling it something else would be
+                          describing a format the platform does not offer. The NOUN is
+                          theirs. Same split as "GM Referral" below, where the role is fixed
+                          and only the contest word moves. */}
                       <h1 className="text-3xl font-bold text-white">
-                        1v1 Challenge
+                        1v1 {terms.challenge}
                       </h1>
                       <span
                         className={`px-3 py-1 rounded-full text-xs font-bold ${getStatusColor(challenge.status)}`}
@@ -201,7 +228,7 @@ const AdminChallengeViewPage = async ({
                   <Trophy className="h-5 w-5 text-yellow-400" />
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">Prize Pool</p>
+                  <p className="text-xs text-gray-500">{terms.prizePool}</p>
                   <p className="text-2xl font-bold text-yellow-400">
                     {formatVolts(challenge.prizePool, { symbol: creditSymbol })}
                   </p>
@@ -215,7 +242,7 @@ const AdminChallengeViewPage = async ({
                   <DollarSign className="h-5 w-5 text-green-400" />
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">Entry Fee</p>
+                  <p className="text-xs text-gray-500">{terms.entryFee}</p>
                   <p className="text-2xl font-bold text-green-400">
                     {formatVolts(challenge.entryFee, { symbol: creditSymbol })}
                   </p>
@@ -229,7 +256,7 @@ const AdminChallengeViewPage = async ({
                   <Award className="h-5 w-5 text-orange-400" />
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">Winner Prize</p>
+                  <p className="text-xs text-gray-500">Winner {terms.prize}</p>
                   <p className="text-2xl font-bold text-orange-400">
                     {formatVolts(challenge.winnerPrize, { symbol: creditSymbol })}
                   </p>
@@ -277,11 +304,11 @@ const AdminChallengeViewPage = async ({
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Main Content */}
             <div className="lg:col-span-2 space-y-6">
-              {/* Challenge Configuration */}
+              {/* Configuration */}
               <div className="bg-linear-to-br from-gray-800 to-gray-900 border border-gray-700 rounded-xl p-6 shadow-xl">
                 <h2 className="text-xl font-bold text-gray-100 mb-4 flex items-center gap-2">
                   <Target className="h-5 w-5 text-blue-400" />
-                  Challenge Configuration
+                  {terms.challenge} Configuration
                 </h2>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -311,13 +338,26 @@ const AdminChallengeViewPage = async ({
                   <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
                     <p className="text-xs text-gray-500 mb-1">Ranking Method</p>
                     <p className="text-lg font-semibold text-gray-100">
-                      {challenge.rules?.rankingMethod === "pnl" &&
-                        "Highest P&L"}
-                      {challenge.rules?.rankingMethod === "roi" &&
-                        "Highest ROI %"}
-                      {challenge.rules?.rankingMethod === "total_capital" &&
-                        "Highest Capital"}
-                      {!challenge.rules?.rankingMethod && "Highest P&L"}
+                      {/* R92. The provider module ignores `rankingMethod` entirely - the six
+                          trading methods are six questions you can ask of a trading account
+                          and a provider game reports one number - so printing "Highest P&L"
+                          here states the rule a contest was decided by and names the wrong
+                          one. The direction is deliberately NOT claimed: it lives on the
+                          catalogue title, this screen has not read it, and a title that
+                          ranks a time trial lowest-first would make "Highest" a lie. */}
+                      {isProviderGame ? (
+                        `By ${terms.score}`
+                      ) : (
+                        <>
+                          {challenge.rules?.rankingMethod === "pnl" &&
+                            "Highest P&L"}
+                          {challenge.rules?.rankingMethod === "roi" &&
+                            "Highest ROI %"}
+                          {challenge.rules?.rankingMethod === "total_capital" &&
+                            "Highest Capital"}
+                          {!challenge.rules?.rankingMethod && "Highest P&L"}
+                        </>
+                      )}
                     </p>
                   </div>
                 </div>
@@ -368,7 +408,7 @@ const AdminChallengeViewPage = async ({
               <div className="bg-linear-to-br from-gray-800 to-gray-900 border border-gray-700 rounded-xl p-6 shadow-xl">
                 <h2 className="text-xl font-bold text-gray-100 mb-4 flex items-center gap-2">
                   <Users className="h-5 w-5 text-blue-400" />
-                  {isCompleted ? "Final Results" : "Participants"}
+                  {isCompleted ? "Final Results" : terms.players}
                 </h2>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -422,40 +462,15 @@ const AdminChallengeViewPage = async ({
 
                         {isCompleted && challengerStats && (
                           <div className="space-y-2 pt-4 border-t border-gray-600">
-                            <div className="flex justify-between text-sm">
-                              <span className="text-gray-400">P&L:</span>
-                              <span
-                                className={`font-bold ${challengerStats.pnl >= 0 ? "text-green-400" : "text-red-400"}`}
-                              >
-                                {challengerStats.pnl >= 0 ? "+" : ""}
-                                {challengerStats.pnl?.toFixed(2)}
-                              </span>
-                            </div>
-                            <div className="flex justify-between text-sm">
-                              <span className="text-gray-400">ROI:</span>
-                              <span
-                                className={`${challengerStats.pnlPercentage >= 0 ? "text-green-400" : "text-red-400"}`}
-                              >
-                                {challengerStats.pnlPercentage >= 0 ? "+" : ""}
-                                {challengerStats.pnlPercentage?.toFixed(2)}%
-                              </span>
-                            </div>
-                            <div className="flex justify-between text-sm">
-                              <span className="text-gray-400">Trades:</span>
-                              <span className="text-white">
-                                {challengerStats.totalTrades}
-                              </span>
-                            </div>
-                            <div className="flex justify-between text-sm">
-                              <span className="text-gray-400">Win Rate:</span>
-                              <span className="text-white">
-                                {challengerStats.winRate?.toFixed(1)}%
-                              </span>
-                            </div>
+                            <ChallengeStatRows
+                              stats={challengerStats}
+                              isProviderGame={isProviderGame}
+                              terms={terms}
+                            />
                             {isWinner && (
                               <div className="flex justify-between text-sm pt-2 border-t border-gray-600">
                                 <span className="text-gray-400">
-                                  Prize Won:
+                                  {terms.prize} Won:
                                 </span>
                                 <span className="text-yellow-400 font-bold">
                                   {formatVolts(challenge.winnerPrize, { symbol: creditSymbol })}
@@ -543,40 +558,15 @@ const AdminChallengeViewPage = async ({
 
                         {isCompleted && challengedStats && (
                           <div className="space-y-2 pt-4 border-t border-gray-600">
-                            <div className="flex justify-between text-sm">
-                              <span className="text-gray-400">P&L:</span>
-                              <span
-                                className={`font-bold ${challengedStats.pnl >= 0 ? "text-green-400" : "text-red-400"}`}
-                              >
-                                {challengedStats.pnl >= 0 ? "+" : ""}
-                                {challengedStats.pnl?.toFixed(2)}
-                              </span>
-                            </div>
-                            <div className="flex justify-between text-sm">
-                              <span className="text-gray-400">ROI:</span>
-                              <span
-                                className={`${challengedStats.pnlPercentage >= 0 ? "text-green-400" : "text-red-400"}`}
-                              >
-                                {challengedStats.pnlPercentage >= 0 ? "+" : ""}
-                                {challengedStats.pnlPercentage?.toFixed(2)}%
-                              </span>
-                            </div>
-                            <div className="flex justify-between text-sm">
-                              <span className="text-gray-400">Trades:</span>
-                              <span className="text-white">
-                                {challengedStats.totalTrades}
-                              </span>
-                            </div>
-                            <div className="flex justify-between text-sm">
-                              <span className="text-gray-400">Win Rate:</span>
-                              <span className="text-white">
-                                {challengedStats.winRate?.toFixed(1)}%
-                              </span>
-                            </div>
+                            <ChallengeStatRows
+                              stats={challengedStats}
+                              isProviderGame={isProviderGame}
+                              terms={terms}
+                            />
                             {isWinner && (
                               <div className="flex justify-between text-sm pt-2 border-t border-gray-600">
                                 <span className="text-gray-400">
-                                  Prize Won:
+                                  {terms.prize} Won:
                                 </span>
                                 <span className="text-yellow-400 font-bold">
                                   {formatVolts(challenge.winnerPrize, { symbol: creditSymbol })}
@@ -619,10 +609,17 @@ const AdminChallengeViewPage = async ({
                 {isCompleted && challenge.isTie && (
                   <div className="mt-6 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg text-center">
                     <p className="text-blue-400 font-semibold">
-                      🤝 This challenge ended in a TIE
+                      🤝 This {terms.challenge} ended in a TIE
                     </p>
+                    {/* Rewritten from "Entry fees were refunded to both participants" rather
+                        than tokenised in place. The old wording needed a PLURAL of
+                        `entryFee`, and the pack declares that token with no plural on
+                        purpose - deriving one with `+ "s"` is us editing a word the operator
+                        typed, the same mistake `replace(/s$/, "")` was on the credit symbol.
+                        Recasting the sentence so each noun appears in the number the pack
+                        actually declares costs nothing and needs no string surgery. */}
                     <p className="text-blue-300/70 text-sm">
-                      Entry fees were refunded to both participants
+                      Both {terms.players} were refunded their {terms.entryFee}
                     </p>
                   </div>
                 )}
@@ -631,11 +628,11 @@ const AdminChallengeViewPage = async ({
 
             {/* Sidebar */}
             <div className="space-y-6">
-              {/* Challenge Status */}
+              {/* Status */}
               <div className="bg-linear-to-br from-gray-800 to-gray-900 border border-gray-700 rounded-xl p-6 shadow-xl">
                 <h3 className="text-lg font-semibold text-gray-100 mb-4 flex items-center gap-2">
                   <Clock className="h-5 w-5 text-blue-400" />
-                  Challenge Status
+                  {terms.challenge} Status
                 </h3>
                 <div
                   className={`p-4 rounded-lg ${
@@ -674,15 +671,24 @@ const AdminChallengeViewPage = async ({
                       {challenge.status.toUpperCase()}
                     </span>
                   </div>
+                  {/* Seven mutually exclusive sentences, each naming the noun. They are
+                      written as template literals rather than as one composed sentence
+                      because the verb differs per state and an operator's noun may not be a
+                      single word - "Head to Head has ended" has to read as written, not as a
+                      fragment glued to a fixed suffix. `opponent` is its own token: the other
+                      party to a two-player format is a different renameable noun from the
+                      generic word for a person in a contest. */}
                   <p className="text-xs text-gray-400 mt-2">
-                    {isActive && "Challenge is currently in progress"}
-                    {isPending && "Waiting for opponent to accept"}
-                    {isAccepted && "Challenge accepted, waiting to start"}
-                    {isCompleted && "Challenge has ended"}
-                    {isCancelled && "Challenge was cancelled"}
+                    {isActive && `${terms.challenge} is currently in progress`}
+                    {isPending && `Waiting for ${terms.opponent} to accept`}
+                    {isAccepted &&
+                      `${terms.challenge} accepted, waiting to start`}
+                    {isCompleted && `${terms.challenge} has ended`}
+                    {isCancelled && `${terms.challenge} was cancelled`}
                     {challenge.status === "declined" &&
-                      "Challenge was declined"}
-                    {challenge.status === "expired" && "Challenge expired"}
+                      `${terms.challenge} was declined`}
+                    {challenge.status === "expired" &&
+                      `${terms.challenge} expired`}
                   </p>
                 </div>
               </div>
@@ -694,23 +700,46 @@ const AdminChallengeViewPage = async ({
                   <p className="text-2xl font-bold text-yellow-400 mb-1">
                     🏆 {challenge.winnerName}
                   </p>
-                  <p className="text-yellow-300/70 mb-3">Challenge Winner</p>
+                  <p className="text-yellow-300/70 mb-3">
+                    {terms.challenge} Winner
+                  </p>
                   <div className="bg-yellow-500/20 px-4 py-3 rounded-lg">
                     <p className="text-yellow-400 font-bold text-xl">
                       Earned {formatVolts(challenge.winnerPrize, { symbol: creditSymbol })}
                     </p>
                   </div>
-                  {challenge.winnerPnL !== undefined && (
-                    <p className="text-sm text-yellow-300/70 mt-2">
-                      Final P&L: {challenge.winnerPnL >= 0 ? "+" : ""}
-                      {challenge.winnerPnL?.toFixed(2)}
-                    </p>
+                  {/* R92. `winnerPnL` is stored on every settled challenge of every game,
+                      and on a provider game it is the participant's `pnl`, which is zero
+                      because nothing trades - so the banner read "Final P&L: +0.00" under
+                      the winner's name. The score is read off the winning side's settled
+                      snapshot rather than from a second field, and an absent score renders
+                      NOTHING rather than a zero: R45/R50's rule, one screen along. */}
+                  {isProviderGame ? (
+                    typeof winnerScore === "number" && (
+                      <p className="text-sm text-yellow-300/70 mt-2">
+                        {terms.score}: {winnerScore}
+                      </p>
+                    )
+                  ) : (
+                    challenge.winnerPnL !== undefined && (
+                      <p className="text-sm text-yellow-300/70 mt-2">
+                        Final P&L: {challenge.winnerPnL >= 0 ? "+" : ""}
+                        {challenge.winnerPnL?.toFixed(2)}
+                      </p>
+                    )
                   )}
                 </div>
               )}
 
-              {/* Rules */}
-              {challenge.rules && (
+              {/* Rules. R92: withheld entirely on a provider game rather than reworded.
+                  All three rows are trading rules - a ranking method the provider module
+                  ignores, a minimum trade count, and a liquidation disqualification - and
+                  the liquidation row is the one that would have shipped a false statement,
+                  because its condition is `!== false`, so a provider challenge that has
+                  never stored the flag reads "Liquidation: Disqualifies" for a game that
+                  has no positions to liquidate. Withholding beats zeroing: there is no
+                  honest value to print, and a rule nobody set is worse than a blank. */}
+              {challenge.rules && !isProviderGame && (
                 <div className="bg-linear-to-br from-gray-800 to-gray-900 border border-gray-700 rounded-xl p-6 shadow-xl">
                   <h3 className="text-lg font-semibold text-gray-100 mb-4 flex items-center gap-2">
                     <Settings className="h-5 w-5 text-blue-400" />

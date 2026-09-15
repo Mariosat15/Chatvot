@@ -332,7 +332,14 @@ function PerformanceCard({ row }: { row: PerformanceRow }) {
           */}
           {row.entrantsWhoNeverPlayed !== null && row.entrantsWhoNeverPlayed > 0 && (
             <span className="text-amber-300/80">
-              {row.entrantsWhoNeverPlayed} entrants never started a {terms.round}
+              {/* "entrants" resolves to the `players` token - a third synonym for the same
+                  people, like `GameRevenueBreakdown`'s column heading. The token is written
+                  as stored, Title Case and all, rather than lower-cased to suit the sentence:
+                  case-folding is string surgery on a word an operator typed, and it is the
+                  same mistake `replace(/s$/, "")` was on the credit symbol. The plural is
+                  used unconditionally because this line only renders above zero. */}
+              {row.entrantsWhoNeverPlayed} {terms.players} never started a{" "}
+              {terms.round}
             </span>
           )}
           {/*

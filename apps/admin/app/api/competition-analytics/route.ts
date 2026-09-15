@@ -181,11 +181,24 @@ export async function GET() {
     // every historical figure joins on, so the name is presentation only. A title renamed or
     // retired keeps its row (R29) - which is why the presentation module falls back to the code
     // and then the key rather than to "Unknown".
+    // Reason the challenge query is fetched HERE rather than beside the challenge analytics
+    // block far below: the catalogue lookup underneath needs every provider `gameKey` on the
+    // screen, and a challenge carries one too. Looked up separately, the two halves would each
+    // build their own name map - the "one rule, two copies" shape - and the version that
+    // forgets is the one where a title renamed in the catalogue reads correctly in the
+    // competition table and shows its raw key in the challenge table on the same page.
+    const challenges = await Challenge.find({
+      status: { $in: ["completed", "declined", "expired"] },
+    })
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .lean();
+
     const providerGameKeys = [
       ...new Set(
-        (competitions as GameLabelled[])
-          .filter((comp) => comp.gameType === "provider")
-          .map((comp) => comp.gameKey)
+        [...(competitions as GameLabelled[]), ...(challenges as GameLabelled[])]
+          .filter((contest) => contest.gameType === "provider")
+          .map((contest) => contest.gameKey)
           .filter((key): key is string => typeof key === "string" && key.length > 0),
       ),
     ];
@@ -541,13 +554,8 @@ export async function GET() {
     );
 
     // ========== 1v1 CHALLENGE ANALYTICS ==========
-    const challenges = await Challenge.find({
-      status: { $in: ["completed", "declined", "expired"] },
-    })
-      .sort({ createdAt: -1 })
-      .limit(50)
-      .lean();
-
+    // `challenges` is fetched above, beside the competitions, so both halves of this screen
+    // share one catalogue name map. See the comment there.
     const challengeIds = challenges.map((c) => String(c._id));
 
     // Get challenge-related wallet transactions
@@ -601,9 +609,36 @@ export async function GET() {
         challenge.challengedFinalStats?.isDisqualified;
       const bothDisqualified = challengerDisqualified && challengedDisqualified;
 
+      const chalLabel = challenge as GameLabelled;
+
       return {
         _id: challenge._id,
         status: challenge.status,
+        // The game this challenge was played at. R92.
+        //
+        // WHY IT WAS ABSENT AND WHAT THAT COST: the competition half of this route has passed
+        // its label since the analytics screen was made game-aware, and the challenge half
+        // never did - so every challenge row rendered the trading shape unconditionally,
+        // captioning a provider challenge's outcome with `Trades:` and `P&L:` and telling an
+        // operator that neither player "met the minimum trade requirements" for a game that
+        // has no trades. Nothing failed, because the absent trading fields read as `+0.00`
+        // over `0 trades`, which is a plausible result for a real trading challenge.
+        //
+        // Passed raw rather than resolved, exactly as the competition row does, because
+        // `resolveContestGameType` in the presentation module is the one place an absent label
+        // becomes trading (invariant 5) and two resolvers is two answers.
+        gameType: chalLabel.gameType,
+        gameKey: chalLabel.gameKey,
+        gameDisplayName: chalLabel.gameKey
+          ? titleNameByKey.get(chalLabel.gameKey) ?? null
+          : null,
+        // The two player ids. Sent because the screen's winner highlight compared
+        // `winnerId` against `challengerStats?.toString()` - a STATS OBJECT stringified,
+        // which is `"[object Object]"` - so the condition was false for every challenge
+        // ever settled and the winner's card was never highlighted. There was no id on the
+        // row to compare against, which is why the wrong thing was reached for.
+        challengerId: challenge.challengerId,
+        challengedId: challenge.challengedId,
         challengerName: challenge.challengerName,
         challengedName: challenge.challengedName,
         entryFee: challenge.entryFee,

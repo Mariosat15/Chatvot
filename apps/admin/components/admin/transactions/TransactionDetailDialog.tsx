@@ -29,6 +29,7 @@ import {
   DollarSign,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useTerms } from "@/contexts/TerminologyContext";
 
 export interface TxDetail {
   _id: string;
@@ -137,6 +138,7 @@ export default function TransactionDetailDialog({
   currencySymbol = "€",
   onActionComplete,
 }: Props) {
+  const terms = useTerms();
   const [invoice, setInvoice] = useState<InvoiceSummary | null>(null);
   const [loadingInvoice, setLoadingInvoice] = useState(false);
   const [refundActionLoading, setRefundActionLoading] = useState<
@@ -379,10 +381,14 @@ export default function TransactionDetailDialog({
               </div>
             )}
 
-            {/* Competition */}
+            {/* The label is the renameable noun; the VALUE beside it is a raw
+                `competitionId` and stays untouched. This dialog is rendered by both the
+                Financials tab and the per-user Transactions tab, which is exactly why the
+                word had to come from the pack rather than from either caller - one string
+                here, two screens, and no way for them to disagree. */}
             {tx.competitionId && (
               <div className="bg-gray-800 rounded-lg p-4">
-                <div className="text-xs text-gray-500 mb-1">Competition</div>
+                <div className="text-xs text-gray-500 mb-1">{terms.contest}</div>
                 <div className="text-white text-sm font-mono">
                   {tx.competitionId}
                 </div>

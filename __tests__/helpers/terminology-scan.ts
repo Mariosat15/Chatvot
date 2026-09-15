@@ -137,6 +137,18 @@ export const BANNED_NOUNS = [...RENAMEABLE, ...SYNONYMS];
 export function literalNounHits(surface: string[]): Line[] {
   const hits: Line[] = [];
   for (const line of lines(surface)) {
+    /*
+      AN IMPORT SPECIFIER IS AN IDENTIFIER, and it took the A4 surface to expose that this
+      scan had never said so. `lowercaseNounHits` has skipped import lines since it was
+      written; this one did not, so `import Challenge from "@/database/models/trading/
+      challenge.model"` was reported as a caption. A default import's local name is
+      surrounded by spaces, which is exactly the adjacency test below looking for prose.
+
+      It matters more than a single false report: a guard that fires on correct code is the
+      one the next reader deletes, and the deletion takes the twenty real hits with it.
+    */
+    if (/^\s*(?:import|export)\b.*\bfrom\b/.test(line.text)) continue;
+
     for (const { word } of BANNED_NOUNS) {
       /*
         Word-bounded, so "Competitions" does not also report as "Competition", and
@@ -164,10 +176,22 @@ export function literalNounHits(surface: string[]): Line[] {
         an identifier or a dot - so the class costs nothing and the omission cost the whole
         assertion.
       */
-      // Reason: same as the boundary pattern above - `word` comes from the catalogue.
+      /*
+        `${word}\\.[A-Za-z_$]` IS A MEMBER ACCESS, NOT A SENTENCE ENDING, and the distinction
+        is the whole reason it is spelled that way. `\\.${word}` already covered
+        `foo.Competition`; the mirror case `Challenge.findById(id)` was not covered, so the
+        model's own static call read as prose. A bare `${word}\\.` would have covered it and
+        also exempted every sentence that ends in the noun - "...refunded to the
+        Competition." - which is the commonest caption shape there is. Requiring an
+        identifier character immediately after the dot separates the two exactly: a sentence
+        ending has a space or the end of the line there, never a letter.
+      */
+      // Reason: same as the boundary pattern above - `word` comes from the token catalogue,
+      // not from anything a request or a file can supply.
       // eslint-disable-next-line security/detect-non-literal-regexp
       const isIdentifier = new RegExp(
-        `[A-Za-z0-9_$]${word}|${word}[A-Za-z0-9_$]|\\.${word}|${word}\\s*[:=(]`,
+        `[A-Za-z0-9_$]${word}|${word}[A-Za-z0-9_$]|\\.${word}` +
+          `|${word}\\s*[:=(]|${word}\\.[A-Za-z_$]`,
       ).test(line.text);
       if (isIdentifier) continue;
       /*
@@ -243,14 +267,52 @@ function quotedSpanWithSpace(text: string, start: number, end: number): boolean 
   return false;
 }
 
-/** Runs of three or more plain words - the shape of a sentence rather than a signature. */
+/**
+ * Runs of three or more plain words - the shape of a sentence rather than a signature.
+ *
+ * Written as a tokenise-then-merge rather than the obvious single pattern, which was
+ * `/[A-Za-z]{2,}(?:[ ]+[A-Za-z]{2,}){2,}/g`. That spelling nests a `+` inside a `{2,}`, so a
+ * long run of spaces that never completes a word can be split between the two quantifiers in
+ * many ways and the matcher tries them all - polynomial backtracking on an input this helper
+ * reads from every file in the admin app. `security/detect-unsafe-regex` flagged it as an
+ * error, correctly.
+ *
+ * Tokenising is linear and says the same thing more plainly: find the words, then join the
+ * neighbours whose gap is nothing but spaces.
+ */
 function wordRuns(text: string): { start: number; end: number }[] {
   const out: { start: number; end: number }[] = [];
-  const run = /[A-Za-z]{2,}(?:[ ]+[A-Za-z]{2,}){2,}/g;
+
+  const word = /[A-Za-z]{2,}/g;
+  const words: { start: number; end: number }[] = [];
   let match: RegExpExecArray | null;
-  while ((match = run.exec(text)) !== null) {
-    out.push({ start: match.index, end: match.index + match[0].length });
+  while ((match = word.exec(text)) !== null) {
+    words.push({ start: match.index, end: match.index + match[0].length });
   }
+
+  /*
+    Reason for the rule-scoped disables: every index below is a loop counter bounded by
+    `words.length`, so there is no external key to inject. Scoped to the one rule rather than
+    disabling the file, and never the blanket `eslint-disable` - a helper that has switched
+    every check off is the next place a real problem hides.
+  */
+  let i = 0;
+  while (i < words.length) {
+    let last = i;
+    // Reason: the gap must be spaces ONLY. A comma, a tag or an operator between two words
+    // means this is punctuation or code, not the running prose the scan is looking for.
+    while (
+      last + 1 < words.length &&
+      // eslint-disable-next-line security/detect-object-injection
+      /^[ ]+$/.test(text.slice(words[last].end, words[last + 1].start))
+    ) {
+      last += 1;
+    }
+    // eslint-disable-next-line security/detect-object-injection
+    if (last - i >= 2) out.push({ start: words[i].start, end: words[last].end });
+    i = last + 1;
+  }
+
   return out;
 }
 

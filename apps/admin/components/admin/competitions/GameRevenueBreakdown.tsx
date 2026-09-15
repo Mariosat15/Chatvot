@@ -117,7 +117,12 @@ function SummaryTable({
             <TableRow className="border-gray-700">
               <TableHead className="text-gray-400">{firstColumn}</TableHead>
               <TableHead className="text-gray-400 text-right">{terms.contests}</TableHead>
-              <TableHead className="text-gray-400 text-right">Entrants</TableHead>
+              {/* "Entrants" was a third synonym for the same people, after "Participants" and
+                  "Traders". It resolves to the `players` token for the reason chapter 14
+                  section 4 gives: the noun for a person in a contest is one operator decision,
+                  and a synonym left untokenised is a column heading that keeps the old
+                  vocabulary on the one screen where the money is compared. */}
+              <TableHead className="text-gray-400 text-right">{terms.players}</TableHead>
               <TableHead className="text-gray-400 text-right">Collected</TableHead>
               <TableHead className="text-gray-400 text-right">{terms.prizes} paid</TableHead>
               <TableHead className="text-gray-400 text-right">Platform fee</TableHead>

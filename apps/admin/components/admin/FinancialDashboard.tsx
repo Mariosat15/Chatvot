@@ -67,6 +67,7 @@ import {
   UserCog,
 } from "lucide-react";
 import { useAppSettings } from "@/contexts/AppSettingsContext";
+import { useTerms } from "@/contexts/TerminologyContext";
 import ReconciliationSection from "./ReconciliationSection";
 import {
   LineChart,
@@ -332,6 +333,7 @@ interface Transaction {
 
 export default function FinancialDashboard() {
   const { settings } = useAppSettings();
+  const terms = useTerms();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
@@ -1298,20 +1300,33 @@ export default function FinancialDashboard() {
     return colorMap.get(type) || "bg-gray-500";
   };
 
+  // The ledger, as an operator reads it. X6.5 A4.
+  //
+  // THE KEYS ARE NEVER RENAMED AND THE LABELS ALWAYS ARE, and the split is the whole point.
+  // `competition_entry`, `platform_fee`, `challenge_win` and the rest are stored
+  // `WalletTransaction.type` enum values - chapter 14 section 6's never-rename list - and
+  // renaming one orphans every historical row that holds it (R13). The right-hand side is
+  // read by a human and by nothing else, so an operator who renamed Competition to Event
+  // reads "Event Entry" in their own ledger view while the row underneath is untouched.
+  //
+  // Reason the map is built inside the component rather than hoisted to module scope: it
+  // closes over `terms`. Hoisted, it would have to take the pack as an argument or freeze
+  // the defaults at import time - and the frozen version reads correctly and silently
+  // ignores every override, which is the failure this phase exists to prevent.
   const txTypeLabelMap = new Map<string, string>([
     ["deposit", "User Deposit"], ["withdrawal", "User Withdrawal"],
-    ["competition_entry", "Competition Entry"], ["competition_win", "Competition Win"],
-    ["competition_refund", "Refund"], ["platform_fee", "Competition Fee"],
+    ["competition_entry", `${terms.contest} Entry`], ["competition_win", `${terms.contest} Win`],
+    ["competition_refund", "Refund"], ["platform_fee", `${terms.contest} Fee`],
     ["admin_adjustment", "Admin Adjustment"], ["withdrawal_fee", "Withdrawal Fee"],
     ["admin_withdrawal", "💰 Admin Withdrawal"], ["vat_payment", "🏛️ VAT Payment"],
     ["vendor_payment", "🏢 Vendor Payment"], ["admin_balance_add", "💵 Balance Addition"],
     ["custom_expense", "📝 Custom Expense"], ["unclaimed_pool", "🎯 Unclaimed Pool"],
     ["deposit_fee", "Deposit Fee"],
-    ["challenge_entry", "⚔️ Challenge Entry"], ["challenge_win", "⚔️ Challenge Win"],
-    ["challenge_platform_fee", "⚔️ Challenge Fee"], ["challenge_refund", "⚔️ Challenge Refund"],
-    ["challenge_declined", "⚔️ Challenge Declined"], ["challenge_expired", "⚔️ Challenge Expired"],
-    ["retained_gm_fee", "🎮 Retained GM Fee"], ["gamemaster_referral", "🎮 GM Referral (Comp)"],
-    ["gamemaster_earning", "🎮 GM Referral (Comp)"], ["gamemaster_challenge_referral", "🎮 GM Referral (Challenge)"],
+    ["challenge_entry", `⚔️ ${terms.challenge} Entry`], ["challenge_win", `⚔️ ${terms.challenge} Win`],
+    ["challenge_platform_fee", `⚔️ ${terms.challenge} Fee`], ["challenge_refund", `⚔️ ${terms.challenge} Refund`],
+    ["challenge_declined", `⚔️ ${terms.challenge} Declined`], ["challenge_expired", `⚔️ ${terms.challenge} Expired`],
+    ["retained_gm_fee", "🎮 Retained GM Fee"], ["gamemaster_referral", `🎮 GM Referral (${terms.contest})`],
+    ["gamemaster_earning", `🎮 GM Referral (${terms.contest})`], ["gamemaster_challenge_referral", `🎮 GM Referral (${terms.challenge})`],
   ]);
   const getTransactionTypeLabel = (type: string) =>
     txTypeLabelMap.get(type) || type.replace(/_/g, " ");
@@ -1480,7 +1495,7 @@ export default function FinancialDashboard() {
                           </span>
                           {poolObligationEUR > 0 && (
                             <span className="block">
-                              🏆 {currencySymbol}{poolObligationEUR.toFixed(2)} active pool prizes
+                              🏆 {currencySymbol}{poolObligationEUR.toFixed(2)} active pool {terms.prizes}
                             </span>
                           )}
                           {outstandingVAT > 0 && (
@@ -1585,7 +1600,7 @@ export default function FinancialDashboard() {
                     {/* Competition Fees */}
                     <div className="flex justify-between items-center py-2 border-b border-green-500/10">
                       <div>
-                        <span className="text-gray-300">Competition Fees</span>
+                        <span className="text-gray-300">{terms.contest} Fees</span>
                         {/* Reason: Show admin vs GM breakdown so admins can see revenue attribution */}
                         {platformFinancials?.competitionFeeBreakdown && (
                           <div className="text-xs text-gray-500">
@@ -1614,7 +1629,7 @@ export default function FinancialDashboard() {
                     </div>
                     {/* Challenge Fees */}
                     <div className="flex justify-between items-center py-2 border-b border-green-500/10">
-                      <span className="text-gray-300">Challenge Fees</span>
+                      <span className="text-gray-300">{terms.challenge} Fees</span>
                       <span className="text-green-400 font-semibold">
                         +{currencySymbol}
                         {(platformFinancials?.totalChallengeFees || 0).toFixed(
@@ -1840,12 +1855,16 @@ export default function FinancialDashboard() {
                         👑 Game Master Referral Fees (internal credits)
                       </span>
                       <p className="text-xs text-gray-500">
-                        Paid to GMs from prize pools — not a bank outflow, increases user liabilities
+                        Paid to GMs from {terms.prize} pools — not a bank
+                        outflow, increases user liabilities
                       </p>
+                      {/* The two abbreviations were "Comp:" and "Chall:". An abbreviation of a
+                          renameable noun cannot be derived - there is no short form of an
+                          operator's own word - so the full singular token is written instead. */}
                       <p className="text-xs text-gray-500">
-                        Comp: {currencySymbol}
+                        {terms.contest}: {currencySymbol}
                         {(platformFinancials?.gmFeesFromCompetitions || 0).toFixed(2)}{" "}
-                        | Chall: {currencySymbol}
+                        | {terms.challenge}: {currencySymbol}
                         {(platformFinancials?.gmFeesFromChallenges || 0).toFixed(2)}
                       </p>
                     </div>
@@ -2549,9 +2568,9 @@ export default function FinancialDashboard() {
                     </div>
                     <div className="flex justify-between items-center py-2 border-b border-green-500/10">
                       <div>
-                        <span className="text-gray-300">Competition Fees</span>
+                        <span className="text-gray-300">{terms.contest} Fees</span>
                         <p className="text-xs text-gray-500">
-                          % of prize pools
+                          % of {terms.prize} pools
                         </p>
                         {/* Reason: Show admin vs GM breakdown for detailed revenue attribution */}
                         {platformFinancials?.competitionFeeBreakdown && (
@@ -2561,14 +2580,16 @@ export default function FinancialDashboard() {
                               platformFinancials.competitionFeeBreakdown
                                 .adminCompetitionFees || 0
                             ).toFixed(2)}{" "}
-                            ({platformFinancials.competitionFeeBreakdown.adminCompetitionFeeCount || 0} comps)
+                            ({platformFinancials.competitionFeeBreakdown.adminCompetitionFeeCount || 0}{" "}
+                            {terms.contests})
                             {" · "}
                             👑 GM: {currencySymbol}
                             {(
                               platformFinancials.competitionFeeBreakdown
                                 .gmCompetitionFees || 0
                             ).toFixed(2)}{" "}
-                            ({platformFinancials.competitionFeeBreakdown.gmCompetitionFeeCount || 0} comps)
+                            ({platformFinancials.competitionFeeBreakdown.gmCompetitionFeeCount || 0}{" "}
+                            {terms.contests})
                           </p>
                         )}
                       </div>
@@ -2581,7 +2602,7 @@ export default function FinancialDashboard() {
                     </div>
                     <div className="flex justify-between items-center py-2 border-b border-green-500/10">
                       <div>
-                        <span className="text-gray-300">Challenge Fees</span>
+                        <span className="text-gray-300">{terms.challenge} Fees</span>
                         <p className="text-xs text-gray-500">
                           1v1 platform fees
                         </p>
@@ -2829,11 +2850,21 @@ export default function FinancialDashboard() {
                       {poolObl > 0 && (
                         <div className="flex justify-between items-center py-2 border-b border-gray-700">
                           <div>
-                            <span className="text-gray-300">🏆 Active Pool Prizes</span>
+                            <span className="text-gray-300">
+                              🏆 Active Pool {terms.prizes}
+                            </span>
+                            {/* Reason the counts are singular/plural-agnostic rather than
+                                switched on the number: the noun is an operator's own word,
+                                and choosing between their singular and plural tokens by
+                                counting is us deciding which of the two they meant. The
+                                count is beside it, so "1 Competitions" is legible where a
+                                wrongly-derived plural is not. */}
                             <p className="text-[10px] text-gray-500">
-                              Winners&apos; share of {liabilityMetrics?.activeCompetitionCount || 0} competition(s)
+                              Winners&apos; share of{" "}
+                              {liabilityMetrics?.activeCompetitionCount || 0}{" "}
+                              {terms.contests}
                               {(liabilityMetrics?.activeChallengeCount || 0) > 0
-                                ? ` + ${liabilityMetrics?.activeChallengeCount} challenge(s)`
+                                ? ` + ${liabilityMetrics?.activeChallengeCount} ${terms.challenges}`
                                 : ""}
                             </p>
                           </div>
@@ -2971,7 +3002,7 @@ export default function FinancialDashboard() {
                           </div>
                           {poolObl > 0 && (
                             <div className="flex justify-between text-sm">
-                              <span className="text-gray-400">🏆 Pool Prizes</span>
+                              <span className="text-gray-400">🏆 Pool {terms.prizes}</span>
                               <span className="text-orange-400">{currencySymbol}{poolObl.toFixed(2)}</span>
                             </div>
                           )}
@@ -3049,7 +3080,7 @@ export default function FinancialDashboard() {
                     Unclaimed Pools Detail
                   </CardTitle>
                   <CardDescription>
-                    Pools from competitions where all participants were
+                    Pools from {terms.contests} where all {terms.players} were
                     disqualified
                   </CardDescription>
                 </CardHeader>
@@ -4252,26 +4283,29 @@ export default function FinancialDashboard() {
                       <SelectItem value="withdrawal">
                         User Withdrawals
                       </SelectItem>
+                      {/* The `value` on each item is the stored ledger enum and is sent
+                          straight to the transactions query - never renameable (chapter 14
+                          section 6). Only the text between the tags is a display word. */}
                       <SelectItem value="competition_entry">
-                        Competition Entry
+                        {terms.contest} Entry
                       </SelectItem>
                       <SelectItem value="competition_win">
-                        Competition Win
+                        {terms.contest} Win
                       </SelectItem>
                       <SelectItem value="competition_refund">
                         Refunds
                       </SelectItem>
                       <SelectItem value="platform_fee">
-                        Competition Fees
+                        {terms.contest} Fees
                       </SelectItem>
                       <SelectItem value="challenge_entry">
-                        Challenge Entry
+                        {terms.challenge} Entry
                       </SelectItem>
                       <SelectItem value="challenge_win">
-                        Challenge Win
+                        {terms.challenge} Win
                       </SelectItem>
                       <SelectItem value="challenge_platform_fee">
-                        Challenge Fees
+                        {terms.challenge} Fees
                       </SelectItem>
                       <SelectItem value="admin_adjustment">
                         Admin Adjustments
@@ -4286,10 +4320,10 @@ export default function FinancialDashboard() {
                         Retained GM Fees
                       </SelectItem>
                       <SelectItem value="gamemaster_earning">
-                        GM Referrals (Comps)
+                        GM Referrals ({terms.contests})
                       </SelectItem>
                       <SelectItem value="gamemaster_challenge_referral">
-                        GM Referrals (Challenges)
+                        GM Referrals ({terms.challenges})
                       </SelectItem>
                       <SelectItem value="admin_withdrawal">
                         Admin Withdrawals
@@ -5402,7 +5436,7 @@ export default function FinancialDashboard() {
                         <Area
                           type="monotone"
                           dataKey="competitionFees"
-                          name="Competition Fees"
+                          name={`${terms.contest} Fees`}
                           stackId="1"
                           stroke="#10b981"
                           fill="url(#compFeeGradient)"
@@ -5410,7 +5444,7 @@ export default function FinancialDashboard() {
                         <Area
                           type="monotone"
                           dataKey="challengeFees"
-                          name="Challenge Fees"
+                          name={`${terms.challenge} Fees`}
                           stackId="1"
                           stroke="#f97316"
                           fill="url(#challFeeGradient)"
@@ -6682,7 +6716,9 @@ export default function FinancialDashboard() {
               {/* Competition Info */}
               {selectedTransaction.competitionId && (
                 <div className="bg-gray-800 rounded-lg p-4">
-                  <div className="text-xs text-gray-500 mb-1">Competition</div>
+                  <div className="text-xs text-gray-500 mb-1">
+                    {terms.contest}
+                  </div>
                   <div className="text-white text-sm font-mono">
                     {selectedTransaction.competitionId}
                   </div>

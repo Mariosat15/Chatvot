@@ -117,12 +117,23 @@ export async function applyChallengeOutcome({
   challenge.isTie = isTie;
   challenge.noWinner = noWinner ? true : undefined;
 
+  // Reason `score` is here at all, and why it is passed through rather than defaulted: R92.
+  // The five trading metrics above are all `undefined` on a provider challenge, so before
+  // this line the stored snapshot carried nothing but `isDisqualified` - and both admin
+  // challenge screens, reading `pnl` and `totalTrades` off it, reported `+0.00` over
+  // `0 trades` for a contest that had ranked correctly on a score they never showed. The
+  // leaderboard built forty lines below has passed `p.score` to the payout stage since the
+  // provider challenge shipped, so the number was in this function the whole time with
+  // nowhere to be stored. `?? 0` here would be the same defect as R50's participant default:
+  // it makes "scored nothing" and "this game has no score" one stored fact, and on a
+  // lower-is-better title that zero sorts first.
   challenge.challengerFinalStats = {
     finalCapital: challenger.currentCapital,
     pnl: challenger.pnl,
     pnlPercentage: challenger.pnlPercentage,
     totalTrades: challenger.totalTrades,
     winRate: challenger.winRate,
+    score: challenger.score,
     isDisqualified: reportedDisqualified?.challenger ?? challengerDisqualified,
     disqualificationReason: challenger.disqualificationReason,
   };
@@ -132,6 +143,7 @@ export async function applyChallengeOutcome({
     pnlPercentage: challenged.pnlPercentage,
     totalTrades: challenged.totalTrades,
     winRate: challenged.winRate,
+    score: challenged.score,
     isDisqualified: reportedDisqualified?.challenged ?? challengedDisqualified,
     disqualificationReason: challenged.disqualificationReason,
   };

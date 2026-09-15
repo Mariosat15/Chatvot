@@ -155,18 +155,50 @@ export interface IChallenge extends Document {
   earlyEndReason?: string;
 
   // Final Stats
-  // Reason all five metrics are optional rather than the schema being wrong: none of them
-  // was ever `required: true` below - Mongoose already allowed a missing value on every
-  // field - so this interface was asserting a runtime guarantee that never existed. A
-  // provider challenge's participants carry no trading capital or trade count at all (see
-  // `ChallengeParticipant`'s conditional requirement), so settlement genuinely has nothing
-  // to put in these fields for that game type, and the corrected type says so honestly.
+  // Reason every metric is optional rather than the schema being wrong: none of them was
+  // ever `required: true` below - Mongoose already allowed a missing value on every field -
+  // so this interface was asserting a runtime guarantee that never existed. A provider
+  // challenge's participants carry no trading capital or trade count at all (see
+  // `ChallengeParticipant`'s conditional requirement).
+  //
+  // CORRECTED 15 September 2026 (R92). This comment used to say "all FIVE metrics" and that
+  // "settlement genuinely has nothing to put in these fields for that game type". The count
+  // is now six, and the second half was the claim that hid the defect: settlement had the
+  // provider score all along and there was no field to put it in, so both admin challenge
+  // screens read the absent trading fields and reported `+0.00` over `0 trades`. The
+  // sentence is left visible rather than retensed, because it was believed.
   challengerFinalStats?: {
     finalCapital?: number;
     pnl?: number;
     pnlPercentage?: number;
     totalTrades?: number;
     winRate?: number;
+    /**
+     * What a PROVIDER challenge's participant actually scored. R92.
+     *
+     * WHY IT WAS MISSING AND WHY THAT MATTERED. Every other field here is a trading metric,
+     * and none of them is `required`, so a provider challenge settled with all five absent
+     * and this block carrying nothing but `isDisqualified`. Both admin challenge screens
+     * then read `pnl` and `totalTrades` off it, got `undefined`, rendered `+0.00` and
+     * `0 trades`, and presented that as the outcome of a contest that had ranked correctly
+     * on a score they never showed. **This is R46 one game-shape along** - the competition
+     * view screen had exactly this defect and was fixed on 7 September 2026, the
+     * notification templates were fixed by `challenge-result-line.ts`, and the two admin
+     * challenge surfaces were the third writer nobody had counted.
+     *
+     * NO DEFAULT, DELIBERATELY, and this is the load-bearing half. `default: 0` would write
+     * a real zero onto every trading challenge that settles, at which point "this player
+     * scored nothing" and "this game has no score" are the same stored fact - and on a
+     * lower-is-better title that zero sorts FIRST. Same reasoning as R50, where a
+     * `default: 0` on `CompetitionParticipant.score` made every entrant look eligible for a
+     * prize. An absent score renders `-`, never `0`.
+     *
+     * NOT the ranking input. `challenge-settlement.service.ts` ranks on
+     * `ChallengeParticipant.score`; this is the settled SNAPSHOT of it, the same
+     * relationship `finalCapital` has to the live participant row. Nothing reads this to
+     * decide a winner.
+     */
+    score?: number;
     isDisqualified: boolean;
     disqualificationReason?: string;
   };
@@ -176,6 +208,8 @@ export interface IChallenge extends Document {
     pnlPercentage?: number;
     totalTrades?: number;
     winRate?: number;
+    /** The opponent's settled score. See `challengerFinalStats.score` - R92. */
+    score?: number;
     isDisqualified: boolean;
     disqualificationReason?: string;
   };
@@ -464,6 +498,9 @@ const ChallengeSchema = new Schema<IChallenge>(
       pnlPercentage: Number,
       totalTrades: Number,
       winRate: Number,
+      // R92. No `default` - see the interface above. A stored 0 and an absent score are
+      // different facts and only one of them is a result.
+      score: Number,
       isDisqualified: Boolean,
       disqualificationReason: String,
     },
@@ -473,6 +510,7 @@ const ChallengeSchema = new Schema<IChallenge>(
       pnlPercentage: Number,
       totalTrades: Number,
       winRate: Number,
+      score: Number,
       isDisqualified: Boolean,
       disqualificationReason: String,
     },
