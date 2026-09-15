@@ -34,6 +34,7 @@ import {
   DifficultyLevel,
   getAllDifficultyLevels,
 } from "@/lib/utils/competition-difficulty";
+import type { TitleLevel } from "@/lib/constants/levels";
 
 // Adaptive poll intervals (ms) — speeds up when a competition is about to start
 const POLL_FAST = 5_000; // Within 2 min of a start time
@@ -87,6 +88,15 @@ interface CompetitionsPageContentProps {
   initialCompetitions: Competition[];
   initialBalance: number;
   userInCompetitionIds: string[];
+  /**
+   * The operator's level ladder, read on the server and passed down for the level-requirement
+   * badges on every card (R88/R90).
+   *
+   * It is a prop rather than a fetch because `getTitleLevels()` reads the database and this is
+   * a client component; the alternative - an endpoint of its own - would be a second reader of
+   * a value the server already has in hand while rendering the page.
+   */
+  levelLadder: TitleLevel[];
 }
 
 // Storage key for filter preferences
@@ -133,6 +143,7 @@ export default function CompetitionsPageContent({
   initialCompetitions,
   initialBalance,
   userInCompetitionIds,
+  levelLadder,
 }: CompetitionsPageContentProps) {
   // App settings for credits symbol
   const { settings } = useAppSettings();
@@ -1293,6 +1304,7 @@ export default function CompetitionsPageContent({
                 isUserIn={userInCompetitions.has(competition._id)}
                 viewMode={viewMode}
                 platformLeverage={platformLeverage}
+                levelLadder={levelLadder}
               />
             ))}
           </div>
@@ -1339,6 +1351,7 @@ export default function CompetitionsPageContent({
                 isUserIn={userInCompetitions.has(competition._id)}
                 viewMode={viewMode}
                 platformLeverage={platformLeverage}
+                levelLadder={levelLadder}
               />
             ))}
           </div>

@@ -21,20 +21,9 @@ import {
   calculateCompetitionDifficulty,
   DifficultyAnalysis,
 } from "@/lib/utils/competition-difficulty";
-
-// Level names mapping
-const LEVEL_NAMES: Record<number, { emoji: string; name: string }> = {
-  1: { emoji: "🌱", name: "Novice Trader" },
-  2: { emoji: "📚", name: "Apprentice Trader" },
-  3: { emoji: "⚔️", name: "Skilled Trader" },
-  4: { emoji: "🎯", name: "Expert Trader" },
-  5: { emoji: "💎", name: "Elite Trader" },
-  6: { emoji: "👑", name: "Master Trader" },
-  7: { emoji: "🔥", name: "Grand Master" },
-  8: { emoji: "⚡", name: "Trading Champion" },
-  9: { emoji: "🌟", name: "Market Legend" },
-  10: { emoji: "👑", name: "Trading God" },
-};
+import { resolveLevelName } from "@/lib/utils/level-title";
+import type { TitleLevel } from "@/lib/constants/levels";
+import { levelEmoji } from "@/components/trading/level-emoji";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 interface CompetitionCardProps {
@@ -46,6 +35,14 @@ interface CompetitionCardProps {
   viewMode?: "card" | "list";
   /** Platform leverage fetched once by the parent — avoids N+1 API calls */
   platformLeverage?: number;
+  /**
+   * The operator's level ladder, for naming a level REQUIREMENT (R88/R90).
+   *
+   * Required rather than defaulted, for the reason given on `CompetitionEntryButton`: a
+   * default silently names rungs from the code ladder, which looks right until somebody
+   * renames one.
+   */
+  levelLadder: TitleLevel[];
 }
 
 // Competition type images and colors
@@ -122,6 +119,7 @@ export default function CompetitionCard({
   isUserIn = false,
   viewMode = "card",
   platformLeverage = 100,
+  levelLadder,
 }: CompetitionCardProps) {
   const [entering, setEntering] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
@@ -993,19 +991,22 @@ export default function CompetitionCard({
                 {(() => {
                   const minLevel = competition.levelRequirement.minLevel || 1;
                   const maxLevel = competition.levelRequirement.maxLevel;
+                  // R90: the name comes from the operator's ladder. The two hard-coded
+                  // fallbacks that used to sit here were the worst part of the defect -
+                  // an unlisted rung was named "Novice Trader" at the bottom and
+                  // "Trading God" at the top, so a contest gated at level 15 advertised
+                  // rung one's name while the gate refused everyone below fifteen.
                   const minLvl = Number(minLevel);
-                  // eslint-disable-next-line security/detect-object-injection
-                  const minInfo = LEVEL_NAMES[minLvl] || {
-                    emoji: "🌱",
-                    name: "Novice Trader",
+                  const minInfo = {
+                    emoji: levelEmoji(minLvl),
+                    name: resolveLevelName(minLvl, levelLadder),
                   };
 
                   if (maxLevel && maxLevel !== minLevel) {
                     const maxLvl = Number(maxLevel);
-                    // eslint-disable-next-line security/detect-object-injection
-                    const maxInfo = LEVEL_NAMES[maxLvl] || {
-                      emoji: "👑",
-                      name: "Trading God",
+                    const maxInfo = {
+                      emoji: levelEmoji(maxLvl),
+                      name: resolveLevelName(maxLvl, levelLadder),
                     };
                     return `${minInfo.emoji} ${minInfo.name} to ${maxInfo.emoji} ${maxInfo.name}`;
                   }

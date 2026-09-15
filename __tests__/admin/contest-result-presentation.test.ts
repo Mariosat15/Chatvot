@@ -23,14 +23,26 @@ import {
   showsTradingConfiguration,
   resolveEditHref,
   resolveNoWinnersNotice,
-  PRIZE_REDISTRIBUTION_NOTE,
+  prizeRedistributionNote,
 } from "../../apps/admin/lib/admin/contest-result-presentation";
+import { resolveTerms } from "@/lib/constants/terminology";
+
+/*
+  The canonical pack, with no operator overrides.
+
+  Reason it is `resolveTerms()` rather than a hand-written object: this suite's claims are about
+  the SHAPE of each string - which fact goes in which slot - and they must keep holding as the
+  dictionary grows. A literal fixture would be a second copy of the defaults, and the day a
+  token's default changes it would assert the old word while the screen showed the new one.
+*/
+const terms = resolveTerms();
 
 describe("admin contest result presentation - the metric column", () => {
   it("shows a provider participant's SCORE, not their zero P&L", () => {
     const metric = resolveResultMetric(
       { score: 1840, pnl: 0, pnlPercentage: 0, totalTrades: 0 },
       true,
+      terms,
     );
 
     expect(metric.value).toBe("1,840");
@@ -45,9 +57,9 @@ describe("admin contest result presentation - the metric column", () => {
     // Reason: a puzzle score is not a gain. Colouring 1,840 green claims the player made
     // money, and colouring a low score red claims they lost some.
     expect(
-      resolveResultMetric({ score: 1840 }, true).tone,
+      resolveResultMetric({ score: 1840 }, true, terms).tone,
     ).toBe("neutral");
-    expect(resolveResultMetric({ score: 0 }, true).tone).toBe("neutral");
+    expect(resolveResultMetric({ score: 0 }, true, terms).tone).toBe("neutral");
   });
 
   it("distinguishes NO SCORE from a score of zero", () => {
@@ -56,11 +68,18 @@ describe("admin contest result presentation - the metric column", () => {
       is not a player who scored nothing, and printing `0` for the first is what made unscored
       players look like legitimate last-place finishers holding a prize rank.
     */
-    const absent = resolveResultMetric({ score: undefined }, true);
-    const zero = resolveResultMetric({ score: 0 }, true);
+    const absent = resolveResultMetric({ score: undefined }, true, terms);
+    const zero = resolveResultMetric({ score: 0 }, true, terms);
 
     expect(absent.value).toBe("-");
-    expect(absent.label).toBe("No score recorded");
+    /*
+      Title Case mid-sentence is deliberate, not a slip. The label is composed from the `score`
+      token, and case-folding a word an operator typed is us editing their vocabulary - it turns
+      "eSports" into "esports". So the sentence carries the token exactly as configured, which
+      for the default pack reads "No Score recorded".
+    */
+    expect(absent.label).toBe(`No ${terms.score} recorded`);
+    expect(absent.label).toBe("No Score recorded");
 
     expect(zero.value).toBe("0");
     expect(zero.label).toBe("Score");
@@ -69,15 +88,16 @@ describe("admin contest result presentation - the metric column", () => {
   it("treats null and a non-finite score as absent, not as zero", () => {
     // `Number.isFinite` rather than a truthiness check, for the same reason the ranking module
     // uses it: `if (!score)` folds 0 in with absent and that is the defect, not the guard.
-    expect(resolveResultMetric({ score: null }, true).value).toBe("-");
-    expect(resolveResultMetric({ score: NaN }, true).value).toBe("-");
-    expect(resolveResultMetric({ score: Infinity }, true).value).toBe("-");
+    expect(resolveResultMetric({ score: null }, true, terms).value).toBe("-");
+    expect(resolveResultMetric({ score: NaN }, true, terms).value).toBe("-");
+    expect(resolveResultMetric({ score: Infinity }, true, terms).value).toBe("-");
   });
 
   it("leaves the trading column exactly as it was", () => {
     const profit = resolveResultMetric(
       { pnl: 1234.5, pnlPercentage: 12.345, totalTrades: 9 },
       false,
+      terms,
     );
     expect(profit.value).toBe("+1234.50");
     expect(profit.sub).toBe("+12.35%");
@@ -86,6 +106,7 @@ describe("admin contest result presentation - the metric column", () => {
     const loss = resolveResultMetric(
       { pnl: -80.2, pnlPercentage: -8.02 },
       false,
+      terms,
     );
     expect(loss.value).toBe("-80.20");
     expect(loss.sub).toBe("-8.02%");
@@ -139,6 +160,7 @@ describe("admin contest result presentation - nobody was paid", () => {
       isCompleted: true,
       noWinners: true,
       participantCount: 4,
+      terms,
     });
 
     expect(notice).toBeTruthy();
@@ -151,8 +173,14 @@ describe("admin contest result presentation - nobody was paid", () => {
       isCompleted: true,
       noWinners: true,
       participantCount: 0,
+      terms,
     });
-    expect(empty).toMatch(/no participants/i);
+    /*
+      "Participants" is a SYNONYM of the `players` token rather than a token of its own, so the
+      empty-contest sentence reads "with no Players". Asserted through the token rather than as
+      a literal, so renaming it cannot leave this claim passing against the old word.
+    */
+    expect(empty.toLowerCase()).toContain(`no ${terms.players.toLowerCase()}`);
     expect(empty).not.toMatch(/unclaimed pool/i);
   });
 
@@ -167,6 +195,7 @@ describe("admin contest result presentation - nobody was paid", () => {
         isCompleted: false,
         noWinners: true,
         participantCount: 4,
+        terms,
       }),
     ).toBeNull();
 
@@ -175,6 +204,7 @@ describe("admin contest result presentation - nobody was paid", () => {
         isCompleted: true,
         noWinners: false,
         participantCount: 4,
+        terms,
       }),
     ).toBeNull();
 
@@ -183,6 +213,7 @@ describe("admin contest result presentation - nobody was paid", () => {
         isCompleted: true,
         noWinners: undefined,
         participantCount: 4,
+        terms,
       }),
     ).toBeNull();
   });
@@ -195,8 +226,10 @@ describe("admin contest result presentation - the prize caution", () => {
       broken. Both reasons the figures move must be named, because naming only one still leaves
       a gap the reader fills with "the payout is wrong".
     */
-    expect(PRIZE_REDISTRIBUTION_NOTE).toMatch(/split among the players who did place/i);
-    expect(PRIZE_REDISTRIBUTION_NOTE).toMatch(/no result holds no rank/i);
-    expect(PRIZE_REDISTRIBUTION_NOTE).toMatch(/higher than the amounts here/i);
+    const note = prizeRedistributionNote(terms);
+
+    expect(note).toMatch(/split among the players who did place/i);
+    expect(note).toMatch(/no result holds no rank/i);
+    expect(note).toMatch(/higher than the amounts here/i);
   });
 });

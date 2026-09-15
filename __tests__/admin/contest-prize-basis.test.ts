@@ -9,9 +9,17 @@ import {
   resolveSettledPrizeRows,
   resolveSettledResultRows,
   resolvePrizeBasisNote,
-  PRIZE_REDISTRIBUTION_NOTE,
-  PRIZE_SETTLED_NOTE,
+  prizeRedistributionNote,
+  prizeSettledNote,
 } from "../../apps/admin/lib/admin/contest-result-presentation";
+import { resolveTerms } from "@/lib/constants/terminology";
+
+/*
+  The canonical pack, with no operator overrides. `resolveTerms()` rather than a literal fixture
+  so these claims stay pinned to the dictionary as it grows - see the note in
+  `contest-result-presentation.test.ts`.
+*/
+const terms = resolveTerms();
 
 /**
  * The admin prize sidebar: a projection while the outcome is unknown, the recorded amounts once
@@ -211,6 +219,7 @@ describe("a settled contest reports what was paid, not what was projected", () =
   it("reads each rank's real prizeAmount out of finalLeaderboard", () => {
     const rows = resolveSettledPrizeRows({
       distribution,
+      terms,
       finalLeaderboard: [
         { rank: 1, username: "ada", prizeAmount: 67.5 },
         { rank: 2, username: "grace", prizeAmount: 22.5 },
@@ -228,6 +237,7 @@ describe("a settled contest reports what was paid, not what was projected", () =
     // rank stood empty, and only the second is true here.
     const rows = resolveSettledPrizeRows({
       distribution,
+      terms,
       finalLeaderboard: [{ rank: 1, username: "ada", prizeAmount: 90 }],
     });
 
@@ -243,6 +253,7 @@ describe("a settled contest reports what was paid, not what was projected", () =
     */
     const rows = resolveSettledPrizeRows({
       distribution,
+      terms,
       finalLeaderboard: [
         { rank: 1, username: "ada", prizeAmount: 40.5, isTied: true },
         { rank: 1, username: "grace", prizeAmount: 40.5, isTied: true },
@@ -259,6 +270,7 @@ describe("a settled contest reports what was paid, not what was projected", () =
     // hold tied rows with the flag unset. Two rows at one rank IS the tie.
     const rows = resolveSettledPrizeRows({
       distribution,
+      terms,
       finalLeaderboard: [
         { rank: 1, username: "ada", prizeAmount: 40.5 },
         { rank: 1, username: "grace", prizeAmount: 40.5 },
@@ -271,6 +283,7 @@ describe("a settled contest reports what was paid, not what was projected", () =
   it("names a player by id when the username was never stored", () => {
     const rows = resolveSettledPrizeRows({
       distribution,
+      terms,
       finalLeaderboard: [{ rank: 1, userId: "6a44fbe8", prizeAmount: 90 }],
     });
 
@@ -285,12 +298,12 @@ describe("a settled contest reports what was paid, not what was projected", () =
       column of blanks as the amounts paid, which is worse than the projection it replaced.
     */
     expect(
-      resolveSettledPrizeRows({ distribution, finalLeaderboard: [] }),
+      resolveSettledPrizeRows({ distribution, finalLeaderboard: [], terms }),
     ).toBeNull();
     expect(
-      resolveSettledPrizeRows({ distribution, finalLeaderboard: null }),
+      resolveSettledPrizeRows({ distribution, finalLeaderboard: null, terms }),
     ).toBeNull();
-    expect(resolveSettledPrizeRows({ distribution })).toBeNull();
+    expect(resolveSettledPrizeRows({ distribution, terms })).toBeNull();
   });
 
   it("does not tell an operator a recorded payment might be higher", () => {
@@ -299,12 +312,15 @@ describe("a settled contest reports what was paid, not what was projected", () =
       payments. Same class as the play screen's play-window note and the wizard's publishing
       note: a warning that has quietly become untrue reads as though somebody checked it.
     */
-    expect(resolvePrizeBasisNote("projected")).toBe(PRIZE_REDISTRIBUTION_NOTE);
-    expect(resolvePrizeBasisNote("settled")).toBe(PRIZE_SETTLED_NOTE);
+    const projectedNote = prizeRedistributionNote(terms);
+    const settledNote = prizeSettledNote(terms);
 
-    expect(PRIZE_REDISTRIBUTION_NOTE).toMatch(/higher/i);
-    expect(PRIZE_SETTLED_NOTE).not.toMatch(/higher/i);
-    expect(PRIZE_SETTLED_NOTE).toMatch(/actually paid/i);
+    expect(resolvePrizeBasisNote("projected", terms)).toBe(projectedNote);
+    expect(resolvePrizeBasisNote("settled", terms)).toBe(settledNote);
+
+    expect(projectedNote).toMatch(/higher/i);
+    expect(settledNote).not.toMatch(/higher/i);
+    expect(settledNote).toMatch(/actually paid/i);
   });
 });
 
@@ -363,7 +379,10 @@ describe("finalLeaderboard is rendered somewhere at last", () => {
     // one would repeat R46 - the defect where a provider contest showed 0 trades and +0.00%
     // while the number it ranked on sat unrendered on the same row.
     const code = readCode(SETTLED_PANEL);
-    expect(code).toMatch(/resolveResultMetric\(row,\s*isProviderGame\)/);
+    // The third argument is the terminology pack (X6.5 A3): the metric's LABEL is a renameable
+    // noun, so the resolver composes it from the operator's vocabulary rather than hard-coding
+    // "Score". Asserted as part of the call so a panel that stops passing it cannot pass here.
+    expect(code).toMatch(/resolveResultMetric\(row,\s*isProviderGame,\s*terms\)/);
     expect(code).not.toContain("row.pnl");
     expect(code).not.toContain("row.totalTrades");
   });
@@ -375,7 +394,9 @@ describe("the panel structure holds the properties the resolvers cannot", () => 
     // the figures are meant to match the ledger and reports a defect when they do not.
     const code = readCode(PANEL);
     const heading = code.indexOf('basis === "settled"');
-    const paid = code.indexOf('"Prizes Paid"');
+    // Both headings are composed from the `prizes` / `prize` tokens (X6.5 A3), so the literal
+    // to find is the template rather than the finished English.
+    const paid = code.indexOf("${terms.prizes} Paid");
 
     expect(heading).toBeGreaterThan(-1);
     expect(paid).toBeGreaterThan(heading);

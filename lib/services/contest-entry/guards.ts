@@ -91,24 +91,36 @@ export async function checkLevelRequirement(
   if (!requirement?.enabled) return null;
 
   const { getUserLevel } = await import("@/lib/services/xp-level.service");
-  const { getTitleByXP, TITLE_LEVELS } = await import("@/lib/constants/levels");
+  const { getTitleLevels } = await import("@/lib/services/xp-config.service");
+  const { resolveLevelTitle, resolveLevelName } = await import(
+    "@/lib/utils/level-title"
+  );
 
-  const level = await getUserLevel(userId);
-  const current = getTitleByXP((level as { currentXP?: number })?.currentXP || 0);
+  // Reason: this gate decides whether a paying player may enter, so it has to read the
+  // OPERATOR'S ladder (R88) - both for the thresholds it compares against and for the
+  // names it quotes. Against the hard-coded array it refused on the wrong XP the moment
+  // an operator moved a threshold, and the message named a level nobody had configured.
+  const ladder = await getTitleLevels();
+  const current = resolveLevelTitle(
+    (await getUserLevel(userId)) as { currentXP?: number } | null,
+    ladder,
+  );
 
   if (requirement.minLevel && current.level < requirement.minLevel) {
-    const required = TITLE_LEVELS[requirement.minLevel - 1];
+    // Named by level NUMBER, not by array position: `ladder[minLevel - 1]` throws on a
+    // ladder an operator has shortened and names the wrong rung on a reordered one.
+    const name = resolveLevelName(requirement.minLevel, ladder);
     return fail(
       "level_requirement",
-      `This competition requires ${required.title} (Level ${required.level}) or higher. You are currently ${current.title} (Level ${current.level}).`,
+      `This competition requires ${name} (Level ${requirement.minLevel}) or higher. You are currently ${current.title} (Level ${current.level}).`,
     );
   }
 
   if (requirement.maxLevel && current.level > requirement.maxLevel) {
-    const max = TITLE_LEVELS[requirement.maxLevel - 1];
+    const name = resolveLevelName(requirement.maxLevel, ladder);
     return fail(
       "level_requirement",
-      `This competition is only for traders up to ${max.title} (Level ${max.level}). You are ${current.title} (Level ${current.level}).`,
+      `This competition is only for players up to ${name} (Level ${requirement.maxLevel}). You are ${current.title} (Level ${current.level}).`,
     );
   }
 

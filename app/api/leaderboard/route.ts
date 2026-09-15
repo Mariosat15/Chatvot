@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/better-auth/auth";
 import { getGlobalLeaderboard } from "@/lib/actions/leaderboard/global-leaderboard.actions";
 import { getUsersWithTitles } from "@/lib/services/xp-level.service";
-import { getTitleByXP } from "@/lib/constants/levels";
+import { getTitleLevels } from "@/lib/services/xp-config.service";
+import { resolveLevelTitle } from "@/lib/utils/level-title";
 import type { GlobalLeaderboardEntry } from "@/lib/actions/leaderboard/global-leaderboard.actions";
 
 const DEFAULT_LIMIT = 50;
@@ -41,14 +42,16 @@ export async function GET(request: NextRequest) {
       ? await getUsersWithTitles(pageUserIds)
       : new Map();
 
+    // Read the operator's ladder once for the page, not once per row (R88).
+    const ladder = await getTitleLevels();
+
     const entries: GlobalLeaderboardEntry[] = pageEntries.map((entry) => {
-      const level = userLevels.get(entry.userId);
-      const titleLevel = level ? getTitleByXP(level.currentXP) : getTitleByXP(0);
+      const display = resolveLevelTitle(userLevels.get(entry.userId), ladder);
       return {
         ...entry,
-        userTitle: titleLevel.title,
-        userTitleIcon: titleLevel.icon,
-        userTitleColor: titleLevel.color,
+        userTitle: display.title,
+        userTitleIcon: display.icon,
+        userTitleColor: display.color,
       };
     });
 

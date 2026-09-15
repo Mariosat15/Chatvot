@@ -1,5 +1,6 @@
 import { Crown, Target, Trophy } from "lucide-react";
 import type { DifficultyLevel } from "@/lib/utils/competition-difficulty";
+import type { TitleLevel } from "@/lib/constants/levels";
 import { NeonAccordion } from "@/components/neon/Accordion";
 import { NeonNote, NeonPanel, NeonRow } from "@/components/neon/Cards";
 import CompetitionEntryButton from "@/components/trading/CompetitionEntryButton";
@@ -114,6 +115,8 @@ export interface TradingLobbySidebarProps {
   userLevel: { level: number; title: string; icon: string };
   registrationClosed: boolean;
   formatUTCDate: (date: Date) => string;
+  /** The operator's level ladder, passed straight through to the entry button (R88/R90). */
+  levelLadder: TitleLevel[];
 }
 
 export default function TradingLobbySidebar({
@@ -131,6 +134,7 @@ export default function TradingLobbySidebar({
   userLevel,
   registrationClosed,
   formatUTCDate,
+  levelLadder,
 }: TradingLobbySidebarProps) {
   const difficulty =
     DIFFICULTY_STYLES.get(difficultyData.level) ?? {
@@ -156,6 +160,7 @@ export default function TradingLobbySidebar({
           participantStatus={participantStatus}
           userLevel={userLevel}
           registrationClosed={registrationClosed}
+          levelLadder={levelLadder}
         />
       )}
 

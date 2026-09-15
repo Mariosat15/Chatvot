@@ -354,23 +354,20 @@ export async function getGlobalLeaderboard(
     // Fetch titles for all users
     const { getUsersWithTitles } =
       await import("@/lib/services/xp-level.service");
-    const { getTitleByXP } = await import("@/lib/constants/levels");
+    const { resolveLevelTitle } = await import("@/lib/utils/level-title");
+    const { getTitleLevels } = await import("@/lib/services/xp-config.service");
 
     const userIds = topEntries.map((entry) => entry.userId);
     const userLevels = await getUsersWithTitles(userIds);
 
+    // Read the operator's ladder once for the board, not once per row (R88).
+    const ladder = await getTitleLevels();
+
     // Add title information to each entry
     const entriesWithTitles = topEntries.map((entry) => {
-      const userLevel = userLevels.get(entry.userId);
-
-      // Get title info - always show at least default level
-      let titleLevel;
-      if (userLevel) {
-        titleLevel = getTitleByXP(userLevel.currentXP);
-      } else {
-        // Default to Novice Trader for users without levels
-        titleLevel = getTitleByXP(0);
-      }
+      // A player with no UserLevel document still gets the first rung's name, so
+      // the row renders rather than being omitted.
+      const titleLevel = resolveLevelTitle(userLevels.get(entry.userId), ladder);
 
       return {
         ...entry,

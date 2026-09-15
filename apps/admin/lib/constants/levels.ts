@@ -225,12 +225,42 @@ export const TITLE_LEVELS: TitleLevel[] = [
  * Get title level by XP amount
  */
 export function getTitleByXP(xp: number): TitleLevel {
-  for (let i = TITLE_LEVELS.length - 1; i >= 0; i--) {
-    if (xp >= TITLE_LEVELS[i].minXP) {
-      return TITLE_LEVELS[i];
+  return levelEntryForXP(xp);
+}
+
+/**
+ * Find the ladder entry a given XP total sits in.
+ *
+ * The one definition of the XP -> level rule. It used to exist three times: here, in
+ * `lib/services/xp-config.service.ts` against the database ladder, and in both apps'
+ * admin copies. Reason: an operator can rename and re-threshold the ladder (R88), so
+ * every reader has to be able to run the scan against *their* ladder rather than only
+ * against the constant below.
+ *
+ * `ladder` is assumed sorted ascending by `minXP`, as both the constant and the seeded
+ * `XPConfig` document are. An empty ladder falls back to the constant, because an
+ * operator who saves an empty level list would otherwise take down every leaderboard
+ * and the paid-entry level gate with an undefined read.
+ */
+export function levelEntryForXP(
+  xp: number,
+  ladder: TitleLevel[] = TITLE_LEVELS,
+): TitleLevel {
+  const entries = ladder.length > 0 ? ladder : TITLE_LEVELS;
+
+  // Reason: walked highest-first so the answer is the top rung the player has reached, which
+  // is the same rule the hard-coded scan this replaced applied. Iterated over a reversed copy
+  // rather than by index purely so no indexed read of a caller-supplied array remains here -
+  // the operator's ladder arrives from the database and this module is client-importable.
+  const highestFirst = [...entries].reverse();
+  for (const entry of highestFirst) {
+    if (xp >= entry.minXP) {
+      return entry;
     }
   }
-  return TITLE_LEVELS[0];
+
+  const [lowest] = entries;
+  return lowest;
 }
 
 /**

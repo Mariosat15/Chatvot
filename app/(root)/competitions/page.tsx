@@ -7,6 +7,7 @@ import {
 import { getWalletBalance } from "@/lib/actions/trading/wallet.actions";
 import CompetitionsPageContent from "./page-content";
 import { redirectIfRestricted } from "@/lib/services/restriction-guard.service";
+import { getTitleLevels } from "@/lib/services/xp-config.service";
 
 // Force dynamic rendering - this page uses authentication
 export const dynamic = "force-dynamic";
@@ -38,6 +39,10 @@ const CompetitionsPage = async () => {
 
   const walletBalance = await getWalletBalance();
 
+  // Reason: the level-requirement badge on every card names a rung, and the operator may have
+  // renamed it (R88). Read here rather than in the client child, which cannot reach the database.
+  const levelLadder = await getTitleLevels();
+
   // Single batch query for user's participations (avoids N+1)
   const session = await auth.api.getSession({ headers: await headers() });
   const competitionIds = allCompetitions.map((c) => c._id.toString());
@@ -50,6 +55,7 @@ const CompetitionsPage = async () => {
       initialCompetitions={allCompetitions}
       initialBalance={walletBalance.balance}
       userInCompetitionIds={userInCompetitionIds}
+      levelLadder={levelLadder}
     />
   );
 };

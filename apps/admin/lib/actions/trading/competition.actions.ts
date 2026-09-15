@@ -456,7 +456,8 @@ export const getCompetitionLeaderboard = async (
       await import("@/lib/services/competition-ranking.service");
     const { getUsersWithTitles } =
       await import("@/lib/services/xp-level.service");
-    const { getTitleByXP } = await import("@/lib/constants/levels");
+    const { resolveLevelTitle } = await import("@/lib/utils/level-title");
+    const { getTitleLevels } = await import("@/lib/services/xp-config.service");
     const { resolveScoreDirection } = await import(
       "@/lib/services/games/score-direction.service"
     );
@@ -523,21 +524,17 @@ export const getCompetitionLeaderboard = async (
     const userIds = limitedParticipants.map((p) => p.userId);
     const userLevels = await getUsersWithTitles(userIds);
 
+    // Read the operator's ladder once for the board, not once per row (R88).
+    const ladder = await getTitleLevels();
+
     // Map to include tie information and titles
     const result = limitedParticipants.map((p) => {
       const originalParticipant = participants.find(
         (orig) => orig.userId === p.userId,
       );
-      const userLevel = userLevels.get(p.userId);
-
-      // Get title info - always show at least default level
-      let titleLevel;
-      if (userLevel) {
-        titleLevel = getTitleByXP(userLevel.currentXP);
-      } else {
-        // Default to Novice Trader for users without levels
-        titleLevel = getTitleByXP(0);
-      }
+      // A player with no UserLevel document still gets the first rung's name, so
+      // the row renders rather than being omitted.
+      const titleLevel = resolveLevelTitle(userLevels.get(p.userId), ladder);
 
       return {
         ...originalParticipant,

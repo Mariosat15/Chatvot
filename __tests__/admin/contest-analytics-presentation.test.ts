@@ -25,6 +25,14 @@ import {
   TRADING_GAME_KEY,
   type AnalyticsContestRow,
 } from "../../apps/admin/lib/admin/contest-analytics-presentation";
+import { resolveTerms } from "@/lib/constants/terminology";
+
+/*
+  The canonical pack, with no operator overrides. `resolveTerms()` rather than a literal fixture
+  so these claims stay pinned to the dictionary as it grows - see the note in
+  `contest-result-presentation.test.ts`.
+*/
+const terms = resolveTerms();
 
 const ADMIN = join(process.cwd(), "apps", "admin");
 
@@ -128,17 +136,17 @@ describe("the player metric is the one the contest was actually ranked on", () =
    * document. An absent fact presented as a measured zero.
    */
   it("shows a score for a provider game and P&L for trading", () => {
-    const game = resolvePlayerMetric({ finalScore: 8420 }, true);
+    const game = resolvePlayerMetric({ finalScore: 8420 }, true, terms);
     expect(game.label).toMatch(/score/i);
     expect(game.value).toContain("8,420");
 
-    const trading = resolvePlayerMetric({ finalPnl: -12.5 }, false);
+    const trading = resolvePlayerMetric({ finalPnl: -12.5 }, false, terms);
     expect(trading.label).toMatch(/p&l/i);
     expect(trading.value).toContain("12.5");
   });
 
   it("renders an absent score as a dash and never as zero", () => {
-    const absent = resolvePlayerMetric({}, true);
+    const absent = resolvePlayerMetric({}, true, terms);
     expect(absent.value).toBe("-");
     expect(absent.tone).toBe("neutral");
   });
@@ -152,8 +160,8 @@ describe("the player metric is the one the contest was actually ranked on", () =
    * consumer reads a seat.
    */
   it("drops the percentage sub-line, which a ledger row cannot carry", () => {
-    expect(resolvePlayerMetric({ finalPnl: 340.2 }, false).sub).toBeNull();
-    expect(resolvePlayerMetric({ finalScore: 12 }, true).sub).toBeNull();
+    expect(resolvePlayerMetric({ finalPnl: 340.2 }, false, terms).sub).toBeNull();
+    expect(resolvePlayerMetric({ finalScore: 12 }, true, terms).sub).toBeNull();
   });
 });
 

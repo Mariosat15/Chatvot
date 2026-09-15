@@ -2,12 +2,24 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import XPConfig from "@/database/models/xp-config.model";
 import { getXPConfigFromDB } from "@/lib/services/badge-config-seed.service";
+import { guardSection } from "@/lib/admin/section-route-guard";
+
+/*
+  R89 - both handlers had no authorization of any kind.
+
+  Granted by `badges`, the section owning the calling screen (BadgeXPManagementSection),
+  never by a general grant: the POST rewrites the level ladder and every badge's XP value,
+  which decides the level gate on paid contest entry.
+*/
 
 /**
  * GET /api/admin/badges-xp/manage
  * Get badge XP values and level progression configuration from database
  */
 export async function GET() {
+  const guard = await guardSection("badges");
+  if (!guard.ok) return guard.response;
+
   try {
     await connectToDatabase();
     const config = await getXPConfigFromDB();
@@ -31,6 +43,9 @@ export async function GET() {
  * Update badge XP values and/or level progression in database
  */
 export async function POST(request: NextRequest) {
+  const guard = await guardSection("badges");
+  if (!guard.ok) return guard.response;
+
   try {
     await connectToDatabase();
     const { badgeXP, levels } = await request.json();

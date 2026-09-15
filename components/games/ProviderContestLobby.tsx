@@ -39,6 +39,7 @@ import {
 } from "@/lib/services/games/game-presentation.service";
 import { isProviderContest } from "@/lib/services/games/contest-config";
 import { getContestActivity } from "@/lib/services/games/contest-activity.service";
+import { getTitleLevels } from "@/lib/services/xp-config.service";
 import {
   contestReservesFullRound,
   fullRoundCutoffMs,
@@ -192,6 +193,15 @@ export default async function ProviderContestLobby({
     competition._id,
     leaderboard.map((row) => String(row.userId)),
   );
+
+  /*
+    The operator's level ladder, for the entry button's level-requirement line (R88/R90).
+
+    Read here rather than taken as a prop, matching this component's own self-contained
+    fetching: the page above renders this lobby OR the trading sidebar and never both, so a
+    prop would make the page fetch a ladder that one of its two branches always discards.
+  */
+  const levelLadder = await getTitleLevels();
 
   /*
     THE LABEL DECIDES THE SCREEN; THE KEYS DECIDE WHETHER PLAY CAN WORK. The page routes here on
@@ -534,6 +544,7 @@ export default async function ProviderContestLobby({
             isFull={isFull}
             participantStatus={participantStatus}
             registrationClosed={registrationClosed}
+            levelLadder={levelLadder}
           />
 
           {/*

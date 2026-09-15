@@ -6,6 +6,7 @@ import {
   BADGE_XP_VALUES,
   TITLE_LEVELS,
   TitleLevel,
+  levelEntryForXP,
 } from "@/lib/constants/levels";
 
 /**
@@ -65,14 +66,10 @@ export async function getTitleLevels(): Promise<TitleLevel[]> {
  * Get title level by XP amount (from database)
  */
 export async function getTitleByXP(xp: number): Promise<TitleLevel> {
-  const levels = await getTitleLevels();
-
-  for (let i = levels.length - 1; i >= 0; i--) {
-    if (xp >= levels[i].minXP) {
-      return levels[i];
-    }
-  }
-  return levels[0];
+  // Reason: the XP -> level scan has one definition, in `lib/constants/levels.ts`.
+  // This copy also read `levels[0]` unguarded, so an operator saving an empty ladder
+  // took down every caller of this function (R88).
+  return levelEntryForXP(xp, await getTitleLevels());
 }
 
 /**

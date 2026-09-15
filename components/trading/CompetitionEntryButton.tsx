@@ -34,20 +34,9 @@ import {
 } from "@/lib/utils/registration-deadline";
 import { formatRemaining } from "@/hooks/useServerClock";
 import { formatVolts } from "@/lib/utils/format-volts";
-
-// Level names for display
-const LEVEL_NAMES: Record<number, { icon: string; title: string }> = {
-  1: { icon: "🌱", title: "Novice Trader" },
-  2: { icon: "📚", title: "Apprentice Trader" },
-  3: { icon: "⚔️", title: "Skilled Trader" },
-  4: { icon: "🎯", title: "Expert Trader" },
-  5: { icon: "💎", title: "Elite Trader" },
-  6: { icon: "👑", title: "Master Trader" },
-  7: { icon: "🔥", title: "Grand Master" },
-  8: { icon: "⚡", title: "Trading Champion" },
-  9: { icon: "🌟", title: "Market Legend" },
-  10: { icon: "👑", title: "Trading God" },
-};
+import { resolveLevelName } from "@/lib/utils/level-title";
+import type { TitleLevel } from "@/lib/constants/levels";
+import { levelEmoji } from "@/components/trading/level-emoji";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 interface CompetitionEntryButtonProps {
@@ -59,6 +48,15 @@ interface CompetitionEntryButtonProps {
   participantStatus?: string; // 'active' | 'liquidated' | 'disqualified' | 'completed' | 'cancelled'
   userLevel?: { level: number; title: string; icon: string };
   registrationClosed?: boolean; // Whether registration deadline has passed
+  /**
+   * The operator's level ladder, for naming a level REQUIREMENT (R88/R90).
+   *
+   * Required rather than defaulted to `TITLE_LEVELS`, deliberately: a default would make
+   * every call site that forgets it silently name rungs from the code ladder, which is the
+   * correct-looking answer right up until an operator renames one. There are two call sites
+   * and the compiler names them, so the guarantee costs nothing and needs no test.
+   */
+  levelLadder: TitleLevel[];
 }
 
 export default function CompetitionEntryButton({
@@ -67,8 +65,9 @@ export default function CompetitionEntryButton({
   isUserIn,
   isFull,
   participantStatus,
-  userLevel = { level: 1, title: "Novice Trader", icon: "🌱" },
+  userLevel,
   registrationClosed = false,
+  levelLadder,
 }: CompetitionEntryButtonProps) {
   const [entering, setEntering] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
@@ -79,6 +78,17 @@ export default function CompetitionEntryButton({
   // they were paying euros for something the ledger debits in credits.
   const creditSymbol = settings?.credits?.symbol;
   const volts = (amount: number) => formatVolts(amount, { symbol: creditSymbol });
+
+  // Reason: the caller omits this for a signed-out visitor and for a player with no
+  // `UserLevel` document. The old default was the literal `"Novice Trader"`, which is rung
+  // one's name in the CODE ladder and therefore wrong the moment an operator renames it -
+  // and this line sits directly beneath "Requires <name> or higher", so the two disagreed
+  // about the same rung on the same panel. `resolveLevelName` answers from the operator's.
+  const viewerLevel = userLevel ?? {
+    level: 1,
+    title: resolveLevelName(1, levelLadder),
+    icon: levelEmoji(1),
+  };
 
   const entryFee = competition.entryFee || competition.entryFeeCredits || 0;
   const startingCapital =
@@ -111,32 +121,35 @@ export default function CompetitionEntryButton({
   const maxLevel = levelReq?.maxLevel;
 
   // Determine if user meets level requirements
-  const meetsMinLevel = !hasLevelReq || userLevel.level >= minLevel;
+  const meetsMinLevel = !hasLevelReq || viewerLevel.level >= minLevel;
   const meetsMaxLevel =
-    !hasLevelReq || !maxLevel || userLevel.level <= maxLevel;
+    !hasLevelReq || !maxLevel || viewerLevel.level <= maxLevel;
   const meetsLevelReq = meetsMinLevel && meetsMaxLevel;
 
   // Get level requirement message
   const getLevelReqMessage = () => {
     if (!hasLevelReq) return null;
 
+    // R90: names come from the operator's ladder, never from a map in this file.
+    // `resolveLevelName` already carries the whole fallback chain - configured rung, then
+    // the code rung, then a plain `Level N` - so there is nothing to default here.
     const minLvl = Number(minLevel);
-    // eslint-disable-next-line security/detect-object-injection
-    const minLevelInfo = LEVEL_NAMES[minLvl] || {
-      icon: "🌱",
-      title: `Level ${minLevel}`,
+    const minLevelInfo = {
+      icon: levelEmoji(minLvl),
+      title: resolveLevelName(minLvl, levelLadder),
     };
     const maxLvl = maxLevel ? Number(maxLevel) : null;
-    // eslint-disable-next-line security/detect-object-injection
-    const maxLevelInfo = maxLvl ? LEVEL_NAMES[maxLvl] : null;
+    const maxLevelInfo = maxLvl
+      ? { icon: levelEmoji(maxLvl), title: resolveLevelName(maxLvl, levelLadder) }
+      : null;
 
     if (!meetsMinLevel) {
       return {
         type: "too_low",
         message: `Requires ${minLevelInfo.icon} ${minLevelInfo.title} or higher`,
         detailText: `Your level: `,
-        detailIcon: userLevel.icon,
-        detailTitle: userLevel.title,
+        detailIcon: viewerLevel.icon,
+        detailTitle: viewerLevel.title,
       };
     }
 
@@ -145,8 +158,8 @@ export default function CompetitionEntryButton({
         type: "too_high",
         message: `Only for traders up to ${maxLevelInfo.icon} ${maxLevelInfo.title}`,
         detailText: `Your level: `,
-        detailIcon: userLevel.icon,
-        detailTitle: userLevel.title,
+        detailIcon: viewerLevel.icon,
+        detailTitle: viewerLevel.title,
       };
     }
 

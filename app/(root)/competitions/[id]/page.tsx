@@ -104,15 +104,28 @@ const CompetitionDetailsPage = async ({
     const userParticipant = isUserIn ? await getUserParticipant(id) : null;
 
     // Get user level for level requirement check (client-side)
-    let userLevel = { level: 1, title: "Novice Trader", icon: "🌱" };
+    const { getTitleLevels } = await import("@/lib/services/xp-config.service");
+    const { resolveLevelTitle } = await import("@/lib/utils/level-title");
+    // Reason: the ladder is read here rather than inside the branch below so that the
+    // DEFAULT is named from it too (R88). The old default was the literal "Novice
+    // Trader", which is what a signed-out visitor and anyone whose level document failed
+    // to load were shown - a rung name the operator may have renamed months ago.
+    const ladder = await getTitleLevels();
+    const firstRung = resolveLevelTitle(null, ladder);
+    let userLevel = { level: firstRung.level, title: firstRung.title, icon: "🌱" };
     if (userId) {
       try {
         const { getUserLevel: fetchUserLevel } =
           await import("@/lib/services/xp-level.service");
         const levelData = await fetchUserLevel(userId);
+        // Reason: `currentTitle` is a cache written at XP-award time, so it is stale from
+        // the instant an operator renames the ladder until the player next earns XP (R88).
+        // The icon stays the stored emoji - this panel renders it as text, where the
+        // resolver's `GameIconName` would draw the literal string "starBadge".
+        const resolved = resolveLevelTitle(levelData, ladder);
         userLevel = {
-          level: levelData.currentLevel || 1,
-          title: levelData.currentTitle || "Novice Trader",
+          level: resolved.level,
+          title: resolved.title,
           icon: levelData.currentIcon || "🌱",
         };
       } catch {
@@ -467,6 +480,7 @@ const CompetitionDetailsPage = async ({
             userLevel={userLevel}
             registrationClosed={registrationClosed}
             formatUTCDate={formatUTCDate}
+            levelLadder={ladder}
           />
         </div>
       </div>

@@ -5,6 +5,7 @@ import XPConfig from "@/database/models/xp-config.model";
 import { BADGES } from "@/lib/constants/badges";
 import { BADGE_XP_VALUES, TITLE_LEVELS } from "@/lib/constants/levels";
 import { getDefaultBadges, getDefaultXPConfig } from "@/lib/services/whitelabel-defaults.service";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 /**
  * Shared function to reset and reseed badges/XP
@@ -106,8 +107,17 @@ async function reseedBadgesAndXP() {
 /**
  * GET /api/seed-badges-xp
  * Reset and re-seed badge and XP configurations from constants (easy browser access)
+ *
+ * R89: this handler `deleteMany({})`s every badge and XP config before reseeding, and it
+ * had no authorization at all - so any unauthenticated GET destroyed the operator's level
+ * ladder and badge set. It remains a destructive GET, which is its own hazard (anything
+ * that issues one, including a prefetch, reseeds), recorded rather than changed here
+ * because removing the handler is an operator-workflow decision.
  */
 export async function GET() {
+  const guard = await guardSection("badges");
+  if (!guard.ok) return guard.response;
+
   try {
     const result = await reseedBadgesAndXP();
 
@@ -135,6 +145,9 @@ export async function GET() {
  * This will DELETE existing configs and INSERT fresh ones from the code
  */
 export async function POST() {
+  const guard = await guardSection("badges");
+  if (!guard.ok) return guard.response;
+
   try {
     const result = await reseedBadgesAndXP();
 

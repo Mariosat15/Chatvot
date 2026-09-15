@@ -1313,11 +1313,15 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
     },
     streaks,
     player: {
-      level: (userLevelData as any).currentLevel || 1,
+      // Reason: `calculateXPProgress` has already scanned the OPERATOR'S ladder, so its
+      // answer is the renameable one. The stored `currentTitle`/`currentLevel` are a cache
+      // written at XP-award time and are stale from the instant the ladder changes (R88) -
+      // taking them here is what made the dashboard disagree with the profile.
+      level: actualXPProgress.currentLevel.level,
       currentXP: (userLevelData as any).currentXP || 0,
       xpToNextLevel: actualXPProgress.xpToNext,
       progressPercent: actualXPProgress.progressPercent,
-      title: (userLevelData as any).currentTitle || "Novice Trader",
+      title: actualXPProgress.currentLevel.title,
       titleColor: (userLevelData as any).currentColor || "#9ca3af",
       titleIcon: (userLevelData as any).currentIcon || "⚔️",
       globalRank: rankData.rank,

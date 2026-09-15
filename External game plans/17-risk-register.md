@@ -61,7 +61,8 @@ chapter covers risks to the programme and to the application.
 | **R85** | **An idempotency guard that only ever made a double payment quiet.** The Game Master fee stage checked `gamemasterearnings` for an existing row *inside* the per-referred-player loop and `continue`d only the row insert - while the subscription increment, the wallet credit and the ledger row all sit **after** that loop. A retried transaction therefore skipped the rows and **paid the Game Master a second time**, leaving `gamemasterearnings` with exactly one row per referral: the guard kept clean the one artefact an operator would check. **The question to ask of an idempotency check is not whether it exists but which writes are on its far side** | High | **Latent** - no duplicated pair found, **nothing backfilled**. Reachable rather than theoretical: both apps run the finalize cron every minute inside a retried transaction, and `UnknownTransactionCommitResult` is exactly the case where the first attempt may already have committed | **CLOSED 14 Sep 2026** - the check is hoisted to the **per-Game-Master** level and reads `{ session }`, so one surviving row skips the whole payment block. The `cleanup-duplicates` route that existed to mop this up was **deleted, not fixed**: it debited wallets and **deleted** the duplicate ledger rows instead of writing a compensating adjustment, left `totalGmEarnings` untouched, had no guard on either handler and no caller - and could not have detected R85's duplicates anyway |
 | **R86** | **The reset that manufactured the mismatches it then reported.** `user-data-reset` empties the ledger collections and zeroes the wallets - naming **nine** of the fourteen numeric paths `CreditWallet` declares. The five it missed were all added to the model after it was written, and **two of them are equality-checked by reconciliation**, so every reset account came back reporting an `incident_compensation_mismatch` and a `gm_earnings_mismatch` for activity that no longer existed. The reset reported success and the screen reported defects; neither was wrong | Medium | **LIVE on every "Reset All Data" ever run.** No money moved - a teardown of test data that left phantom findings behind, which is how an operator learns to distrust the instrument | **CLOSED 14 Sep 2026** - all fourteen zeroed, and the guard **reads the numeric paths off `CreditWallet.schema`** rather than listing them, so the fifteenth field is caught the day it is declared. It also pins **which branch** it examines, because "Reset All Users" deletes the wallets outright and legitimately needs no counter list. **Fix-forward** - the remedy for an already-reset wallet is to run it again |
 | **R87** | **The reset that reported success for collections it never touched.** R86 one layer out: not fields it had stopped naming but **twenty-two collections of per-user activity it had never named** - `chargebacks` (the owner's report), `termsacceptances`, the whole messaging feature, X3's game rounds and provider events, stored payment instruments, security and price alerts, the dev-zone run histories. Two things made the list look complete: messaging declares its **own** `user_presence`, a *different* collection from the `userpresences` already covered by a model, and **a name in the list is not evidence the collection exists** - `deleteMany` against a missing name returns 0 and the reset still reports success, which is how `"alerts"` sat there for months while `pricehealthalerts` was never touched | Medium | **LIVE on every reset ever run.** No money moved; a teardown that leaves a player's disputes, messages, consents and game history behind while reporting that it cleared everything | **CLOSED 15 Sep 2026** - every collection either app's models declare is now classified into exactly one of four lists (deleted / **zeroed** / preserved / legacy raw name), and `user-data-reset-coverage.test.ts` **parses both model trees and the service** so a model added later cannot end up in none of them. `ZEROED_COLLECTIONS` is a third category on purpose - calling a wallet "preserved" hides R86. **Fix-forward** - run the reset again |
-| **R88** | **The level ladder an operator can rename everywhere except the leaderboard.** Two functions share the name `getTitleByXP`: an **async** one in `xp-config.service.ts` reading `XPConfig` from the database, and a **synchronous** one in `lib/constants/levels.ts` reading a hard-coded twenty-entry array. The XP award path uses the database one and stores its answer on `UserLevel.currentTitle`; **five read sites use the constant** - `app/api/leaderboard/route.ts`, both apps' `competition.actions.ts`, the admin global leaderboard, and the contest-entry level gate. So renaming the ladder in admin changes the profile while **every leaderboard row keeps saying "Novice Trader"**, with nothing thrown and nothing logged. The leaderboard route is the sharpest instance: it calls `getUsersWithTitles`, receives the `UserLevel` documents **carrying the stored title**, and discards that field to recompute from the constant | Medium | **Latent, and it is a REPORTING defect with no money anywhere near it** - no operator has renamed the ladder, so nothing has ever displayed inconsistently. What it costs is chapter 14's pass 2, which is costed as a free admin edit and is not one | **OPEN**, X8. **Nothing to backfill** - `currentTitle` is stored correctly, the readers ignore it. The fix is to read the stored field rather than to make five call sites `await` a second database read. Note `lib/constants/levels.ts` and its admin copy are byte-identical today and `check:mirrors` compares **models**, so it has never had an opinion about either |
+| **R88** | **The level ladder an operator can rename everywhere except the leaderboard.** Two functions share the name `getTitleByXP`: an **async** one in `xp-config.service.ts` reading `XPConfig` from the database, and a **synchronous** one in `lib/constants/levels.ts` reading a hard-coded twenty-entry array. **Six read sites used the constant** - `app/api/leaderboard/route.ts`, both apps' `competition.actions.ts`, the admin global leaderboard, the contest-entry level gate, and the main-app competition page - plus **about twenty-five hard-coded `"Novice Trader"` defaults** in fallback branches. So renaming the ladder in admin changed the profile while **every leaderboard row kept saying "Novice Trader"**, with nothing thrown and nothing logged, and a player refused paid entry was told the name of a level nobody had configured | Medium | **Latent, and it is a REPORTING defect with no money anywhere near it** - no operator has renamed the ladder, so nothing has ever displayed inconsistently. What it cost is chapter 14's pass 2, which is costed as a free admin edit and is not one | **CLOSED 15 Sep 2026** - `lib/utils/level-title.ts` (mirrored, byte-identical test) resolves the display from the **operator's ladder**, read once per board. **This entry's own prescribed fix was wrong and is corrected rather than retensed:** it said to read the stored `currentTitle`, which is an **award-time cache** and is stale from the rename until the player next earns XP - so the cache answers only for a rung an operator saved with a blank title. **Icon and colour still come from the code ladder**, which is the one thing an operator must not be able to break. **Nothing backfilled.** Note `lib/constants/levels.ts` and its admin copy are byte-identical and `check:mirrors` compares **models**, so it has never had an opinion about either |
+| **R89** | **Four unauthenticated routes over the level ladder, its XP values and every player's identity.** Found while fixing R88, by **counting exported handlers against guards** rather than by reading routes. `badges-xp/manage` (GET **and POST**), `seed-badges-xp` (GET and POST), `debug-levels` (GET) and `badges-xp` (GET) had **no authorization of any kind**. Two of them write: `manage` rewrites level thresholds and badge XP values, and **`seed-badges-xp` force-resets the whole configuration - on its GET**, so a URL in a browser was enough. `badges-xp`'s GET handed out a paginated list of real users. **A route with no guard has no attribution**, so whether any of it was ever called is unanswerable | High | **LIVE.** No money moved and no prize was paid - these decide names, thresholds and XP - but a rewritten ladder changes **who may enter a paid contest**, since the level gate compares against it, and the reset is destructive. **Nothing backfilled**, because an edit through these leaves a configuration indistinguishable from an operator's own | **CLOSED 15 Sep 2026** - every handler calls `guardSection("badges")`, the section that owns the calling screen rather than a general grant. **Tenth instance of this class** after Prerequisite A, the internal-secret fallbacks, the suspicion-score route, the provider admin routes, the contest-edit PUT, R40, R47, R51 and R57. The guard **counts handlers against guard calls** and **strips comments first**, because these files now name `guardSection` in prose |
 | R8 | Bulk find-and-replace on wording | High | Medium | X8 |
 | R9 | Fraud throttle blind to provider entries | High | High | X5 |
 | R11 | Legal wording changed without review | High | Medium | X8 |
@@ -3000,7 +3001,7 @@ remedy for an already-reset wallet is to run it again.
 
 ---
 
-### R88 - The level ladder an operator can rename everywhere except the leaderboard - **OPEN, found 15 September 2026**
+### R88 - The level ladder an operator can rename everywhere except the leaderboard - **CLOSED 15 September 2026**
 
 **How it was found.** Not by planned work. Chapter 14 says the twenty level titles are "a
 **database edit**, not a code change", and calls the ladder the highest-value single string
@@ -3027,6 +3028,21 @@ answer** on `UserLevel.currentTitle`, so the stored value is correct and current
 | `apps/admin/lib/actions/leaderboard/global-leaderboard.actions.ts` | the global board |
 | `lib/services/contest-entry/guards.ts` | the **level requirement** refusal on paid entry |
 
+> **Amended while fixing it, 15 September 2026: there were SIX, and the sixth is the shape
+> that makes the count worth stating.** `app/(root)/competitions/[id]/page.tsx` recomputes
+> from the constant too. And `lib/actions/comprehensive-dashboard.actions.ts` is the same
+> disagreement facing the *other* way - it had already scanned the operator's ladder through
+> `calculateXPProgress` and then took `currentTitle` and `currentLevel` off the stored
+> document anyway, which is what made the dashboard and the profile disagree with each other
+> rather than both being wrong together. **Fifth instance of the counting rule** after four
+> entry paths, ten finalize sites, six raw inserts and seven writers of the referral rate:
+> before fixing the readers a document names, count them.
+>
+> Separately, `"Novice Trader"` appears as a hard-coded default in **about twenty-five**
+> further places - fallback branches for a signed-out visitor, a failed level fetch, a player
+> with no `UserLevel` document. Those are not readers of the wrong ladder; they are readers of
+> **no** ladder, and a rename leaves every one of them naming a rung that no longer exists.
+
 So an operator renaming the ladder in admin changes the profile and the XP service, and every
 leaderboard row keeps saying "Novice Trader" - and a player refused entry for being below a level
 is told the name of a level that no longer exists. **Nothing throws and nothing logs**, which is
@@ -3038,6 +3054,25 @@ this codebase's recurring shape: the system reports success while doing the wron
 correct value was in hand and was thrown away.** That is what decides the fix: read the stored
 field, rather than making five synchronous call sites `await` a second database read per row on a
 paginated board.
+
+> **THAT PRESCRIPTION IS WRONG, and it is corrected here rather than quietly rewritten,
+> because it was believed for long enough to be costed.** `currentTitle` is not the correct
+> value - it is a **cache written at XP-award time**. An operator who renames the ladder
+> leaves it stale on every row until each player next earns XP, and a player who has stopped
+> playing keeps the old name for ever. Reading it would have moved the defect rather than
+> closed it, and the symptom would have been *worse*: some rows renamed and some not,
+> depending on who had been active since the edit, which is the inconsistency a player
+> reports as a bug rather than a uniformly old name nobody questions.
+>
+> The same argument disposes of `currentLevel`, which is the identical cache one field along -
+> so a `stored.currentLevel` fallback written for safety is not merely dead code, it is the
+> defect with a plausible reason attached.
+>
+> **What it actually decided is the opposite:** the resolver reads the **ladder**, and the
+> stored title answers only for a rung an operator has saved with a blank name. The `await`
+> the prescription was trying to avoid costs **one read per board, not per row** - the ladder
+> is fetched once and passed in, which a test asserts, because reading it inside the row map
+> is the version that reviews as correct and issues a query per player.
 
 **Severity, stated in both directions.** It is **latent** - no operator has renamed the ladder, so
 nothing has ever displayed inconsistently, and **there is nothing to backfill** because
@@ -3052,6 +3087,105 @@ inconsistency is the version a player reports as a bug.
 **byte-identical today** - verified rather than assumed. The guard compares model field paths and
 enum values, so it has never had an opinion about either, and the fix must touch both or the two
 apps will render different ladders.
+
+#### What was built
+
+`lib/utils/level-title.ts`, mirrored into `apps/admin/lib/utils/`, is the one answer to *what is
+this player's level called*. It is **model-free by requirement** (R58) - a client component
+reaches it - so it takes the stored row and the ladder as arguments and reads nothing itself.
+Three exports, and the split between them is the design rather than decomposition for its own
+sake:
+
+| Export | Question it answers |
+|---|---|
+| `levelEntryForXP` | which rung does this XP total land on - and it lives in `lib/constants/levels.ts`, not here, because `getTitleByXP` needed the same scan and importing it the other way is a cycle |
+| `resolveLevelName` | what is rung *n* called, for a threshold an operator configured - **matched on the level NUMBER, never the array position**, because `ladder[n - 1]` throws on a ladder somebody has shortened and names the wrong rung on a reordered one |
+| `resolveLevelTitle` | the whole display triple for a player |
+
+Four things about it are load-bearing and easy to undo:
+
+- **Icon and colour come from the code ladder, always, and the title does not.** A title is
+  words and an operator owns them; an icon is a key into `GAME_ICONS` and a colour is a
+  Tailwind class, so an operator's value there renders a broken image or no colour at all.
+  This is the one place the constant still wins, and a probe restores the operator's entry.
+- **`resolveLevelTitle` cannot fail to return a rung.** `levelEntryForXP` falls back to the
+  code ladder and then to its first entry, so a signed-out visitor, a failed fetch and a
+  player with no `UserLevel` document all get rung one's **configured** name. That is what
+  lets a fallback branch stop naming a rung: they were all the same missing default.
+- **The `StoredUserLevel` interface is `unknown`-valued with an index signature**, and both
+  halves are forced rather than chosen. Every caller hands it a `.lean()` row typed
+  `FlattenMaps<any>`, so a declared `currentXP: number` would be a claim the compiler cannot
+  check - which is exactly where the missing `participant.score` read hid for a day (R32/R33).
+  And with only optional members it is a **weak type**, which TypeScript refuses to accept an
+  argument for unless it shares a property name, and `FlattenMaps<any>` declares none: without
+  the index signature the call sites do not compile.
+- **The ladder is read once per board and passed in.** Asserted, because the per-row version
+  is correct in every output and issues a query per player.
+
+**The paid-entry gate is the site that matters most** and it is not a display. `checkLevelRequirement`
+compared the player's level against `minLevel`/`maxLevel` using the constant, so an operator who
+moved a threshold got refusals computed on thresholds nobody had configured - and the message
+named the old rung. It now resolves both the player and the two threshold names from the
+operator's ladder.
+
+**50 tests, 19 probes, every one red on exactly the expected test.** Three probes are
+deliberately absent with their reasons in `tools/probe-level-ladder.ps1`, and one of them is
+worth carrying: removing the `numeric()` coercion around `currentXP` **changes no answer**,
+because JavaScript's relational operators coerce a numeric string themselves, so `"600" >= 500`
+is true either way. The helper is kept for clarity and the probe was dropped rather than left
+reporting green - the fourth cause of a green probe, a mutation with no observable.
+
+**One structural ban had to be narrowed, and it is the recurring shape.** A blanket ban on the
+literal `"Novice Trader"` in the six read sites **fails on correct code**: the competition page
+has a contest **difficulty** map whose bands are named after level titles, which is a different
+subject entirely. The ban now excises that map first - and carries a **canary asserting the map
+is still an offender**, so when the difficulty bands are tokenised in their own right the
+exemption goes red instead of silently re-permitting the defect. Same device as the
+`app/api/dashboard/competitions/route.ts` comparator exception.
+
+---
+
+### R89 - Four unauthenticated routes over the level ladder and every player's identity - **CLOSED 15 September 2026**
+
+**How it was found.** While fixing R88, and not by reading the routes - by **counting exported
+handlers against `guardSection` calls** across `apps/admin/app/api/`. That is the only method
+that finds this class, for the reason it has found it nine times before: the neighbours are
+guarded, so a reader working through the folder goes straight past the file that is not.
+
+**What it was.** Four routes, **no authorization of any kind** on any handler:
+
+| Route | Handlers | What it does |
+|---|---|---|
+| `badges-xp/manage` | GET, **POST** | reads and **rewrites** level thresholds, titles and badge XP values |
+| `seed-badges-xp` | **GET**, POST | **force-resets** the whole badge and XP configuration |
+| `debug-levels` | GET | dumps the configured ladder against the defaults |
+| `badges-xp` | GET | a paginated list of real users with their XP and badges |
+
+**Two of them write, and one of those writes on its GET** - so a URL pasted into a browser
+resets the configuration. A document calling this a content-exposure defect is describing half
+of it, and the folder names are what hid it: `debug-levels` and `seed-badges-xp` both read as
+development scaffolding, and scaffolding is what a reviewer skips.
+
+**Stated in both directions.** No money moved and no prize was paid - these routes decide names,
+thresholds and XP values. But the level gate in `checkLevelRequirement` **compares against this
+ladder**, so rewriting it changes who may enter a paid contest, and `badges-xp`'s GET handed out
+user identities. It is **live**, and **there is no way to know whether it was ever called**,
+because a route with no guard records no attribution - so do not let the absence of evidence read
+as reassurance. **Nothing was backfilled**: an edit made through these leaves a configuration
+document indistinguishable from an operator's own.
+
+**The fix is `guardSection("badges")` on every handler** - the section that owns the calling
+screen, never a general grant, which is the R51 rule. `seed-badges-xp`'s GET is **still
+destructive and is deliberately left that way**: making it safe is a behaviour change to a route
+an operator may rely on, and it is now at least authorized and attributable. Recorded rather than
+quietly scoped.
+
+**Two things about the guard.** It **counts** handlers against guard calls, because a file whose
+`POST` is guarded and whose `GET` is not passes any mention-based check while leaving the
+mutation open - which is precisely `seed-badges-xp`'s shape. And it **strips comments first**,
+because all four files now explain in prose why `guardSection` is the right helper, and a test
+that reads prose flags a correct file for discussing the anti-pattern while passing a broken one
+whose only mention of the right thing is in a comment.
 
 ---
 

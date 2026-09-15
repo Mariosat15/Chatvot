@@ -16,7 +16,8 @@ import mongoose from "mongoose";
 import { calculateRankings } from "@/lib/services/competition-ranking.service";
 import { resolveScoreDirection } from "@/lib/services/games/score-direction.service";
 import { getUsersWithTitles } from "@/lib/services/xp-level.service";
-import { getTitleByXP } from "@/lib/constants/levels";
+import { getTitleLevels } from "@/lib/services/xp-config.service";
+import { resolveLevelTitle } from "@/lib/utils/level-title";
 import { isCompetitionIdShaped } from "@/lib/utils/competition-id";
 
 // Get all competitions with filters
@@ -566,13 +567,13 @@ export const getCompetitionLeaderboard = async (
     const userIds = limitedParticipants.map((p) => p.userId);
     const userLevels = await getUsersWithTitles(userIds);
 
+    // Read the operator's ladder once for the board, not once per row (R88).
+    const ladder = await getTitleLevels();
+
     // OPTIMIZATION: O(n) mapping with Map lookup instead of O(n²) with .find()
     const result = limitedParticipants.map((p) => {
       const originalParticipant = participantMap.get(p.userId); // O(1) instead of O(n)
-      const userLevel = userLevels.get(p.userId);
-      const titleLevel = userLevel
-        ? getTitleByXP(userLevel.currentXP)
-        : getTitleByXP(0);
+      const titleLevel = resolveLevelTitle(userLevels.get(p.userId), ladder);
 
       return {
         ...originalParticipant,

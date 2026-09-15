@@ -4,6 +4,7 @@ import UserLevel from "@/database/models/user-level.model";
 import UserBadge from "@/database/models/user-badge.model";
 import { BADGES } from "@/lib/constants/badges";
 import { ObjectId } from "mongodb";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 /**
  * Build a query that matches user by various ID formats.
@@ -35,7 +36,12 @@ function buildBatchUserQuery(uids: string[]) {
   };
 }
 
+// R89: this handler had no authorization and returns every player's name and email, with a
+// free-text search over both - so it was the PII half of the same exposure.
 export async function GET(request: NextRequest) {
+  const guard = await guardSection("badges");
+  if (!guard.ok) return guard.response;
+
   try {
     await connectToDatabase();
 
