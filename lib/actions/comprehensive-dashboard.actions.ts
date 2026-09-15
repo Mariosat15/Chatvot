@@ -31,7 +31,11 @@ import {
   getDashboardRankingValue,
 } from "@/lib/services/games/dashboard-contest-rank.service";
 import { getUserLevel } from "@/lib/services/xp-level.service";
-import { calculateXPProgress } from "@/lib/services/xp-config.service";
+import {
+  calculateXPProgress,
+  getTitleLevels,
+} from "@/lib/services/xp-config.service";
+import { resolveLevelTitle } from "@/lib/utils/level-title";
 import { getUserGlobalRank } from "@/lib/actions/leaderboard/global-leaderboard.actions";
 import UserBadge from "@/database/models/user-badge.model";
 import BadgeConfig from "@/database/models/badge-config.model";
@@ -978,32 +982,60 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
   const totalPnLPercentage =
     totalStartingCapital > 0 ? (totalPnL / totalStartingCapital) * 100 : 0;
 
-  // Fetch player profile data (XP, level, badges, rank) in parallel
-  const [userLevelData, xpProgress, rankData, earnedBadges] = await Promise.all([
-    getUserLevel(userId).catch(() => ({
-      currentXP: 0, currentLevel: 1, currentTitle: "Novice Trader",
-      currentIcon: "⚔️", currentColor: "#9ca3af", totalBadgesEarned: 0,
-    })),
-    calculateXPProgress(0).then(async (fallback) => {
-      // Reason: We need the user's actual XP to calculate progress, but getUserLevel
-      // is already fetching it. Use the result after it resolves.
-      return fallback;
-    }).catch(() => ({
-      currentLevel: { level: 1, title: "Novice Trader", minXP: 0, icon: "⚔️", color: "#9ca3af", description: "" },
-      nextLevel: null, progressPercent: 0, xpToNext: 100,
-    })),
+  /*
+    Fetch player profile data (XP, badges, rank) in parallel.
+
+    There used to be a fourth member here, `calculateXPProgress(0)`, whose result was
+    destructured as `xpProgress` and then read by nothing - the progress figures are
+    recomputed below against the player's real XP, which this call cannot know because it
+    runs beside the `getUserLevel` that fetches it. Its own comment said so and returned
+    the value anyway. It is deleted rather than left: `calculateXPProgress` awaits two
+    `XPConfig` reads, so it cost this action two round trips per load to produce a number
+    that was thrown away.
+
+    The `getUserLevel` fallback carries only the two fields that are read. `currentLevel`,
+    `currentIcon` and `currentColor` were dropped with the same reasoning that closed R88
+    on this file - `resolveLevelTitle` reads `currentXP`, so those three were a dead shape
+    sitting beside a live one, which is how the next person to fix a dashboard bug ends up
+    reading a colour out of the award-time cache because it was right there.
+  */
+  const [userLevelData, rankData, earnedBadges] = await Promise.all([
+    getUserLevel(userId).catch(() => ({ currentXP: 0, totalBadgesEarned: 0 })),
     getUserGlobalRank(userId).catch(() => ({ rank: 0, totalUsers: 0, percentile: 0 })),
     // Reason: Fetch ALL earned badges (no limit) so dashboard can show them with expand/collapse
     UserBadge.find({ userId }).sort({ earnedAt: -1 }).lean().catch(() => []),
   ]);
 
-  // Recalculate XP progress with actual user XP
-  const actualXPProgress = await calculateXPProgress(
+  /*
+    Progress against the ladder, computed from the player's actual XP.
+
+    Only the two progress figures are destructured, which is what keeps the failure shape
+    honest: the full return carries a `currentLevel` entry, and a `.catch` supplying one
+    has to invent a rung name, an icon and a colour. Those three inventions were the last
+    "Novice Trader" literals in this file, and they were unreadable anyway - presentation
+    comes from `resolveLevelTitle` below, never from here.
+  */
+  const { progressPercent, xpToNext } = await calculateXPProgress(
     (userLevelData as any).currentXP || 0
-  ).catch(() => ({
-    currentLevel: { level: 1, title: "Novice Trader", minXP: 0, icon: "⚔️", color: "#9ca3af", description: "" },
-    nextLevel: null, progressPercent: 0, xpToNext: 100,
-  }));
+  ).catch(() => ({ progressPercent: 0, xpToNext: 100 }));
+
+  /*
+    R88 - the one resolver for what this player's rung is CALLED and how it is drawn.
+
+    `calculateXPProgress` above answers the progress questions (how far to the next rung,
+    what percentage) and its `currentLevel` is deliberately not destructured: that entry's
+    icon and colour come from the operator's database row, which `resolveLevelTitle`
+    refuses on purpose because neither is renameable content - see its header.
+
+    The ladder is read once here rather than once per field. No `.catch` is wrapped round
+    it deliberately: `getTitleLevels` already swallows its own failure and returns the code
+    ladder, so a `.catch(() => [])` here would be unreachable code reading as though this
+    call could reject.
+  */
+  const levelDisplay = resolveLevelTitle(
+    userLevelData as Record<string, unknown> | null,
+    await getTitleLevels(),
+  );
 
   // Fetch badge details for earned badges
   const badgeIds = (earnedBadges as any[]).map((b: any) => b.badgeId);
@@ -1313,17 +1345,35 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
     },
     streaks,
     player: {
-      // Reason: `calculateXPProgress` has already scanned the OPERATOR'S ladder, so its
-      // answer is the renameable one. The stored `currentTitle`/`currentLevel` are a cache
-      // written at XP-award time and are stale from the instant the ladder changes (R88) -
-      // taking them here is what made the dashboard disagree with the profile.
-      level: actualXPProgress.currentLevel.level,
+      // Reason: the OPERATOR'S ladder is authoritative. The stored `currentTitle` and
+      // `currentLevel` are a cache written at XP-award time and are stale from the
+      // instant the ladder changes (R88) - taking them here is what made the dashboard
+      // disagree with the profile. All four fields below come from the one resolver so
+      // they cannot disagree with each other either.
+      level: levelDisplay.level,
       currentXP: (userLevelData as any).currentXP || 0,
-      xpToNextLevel: actualXPProgress.xpToNext,
-      progressPercent: actualXPProgress.progressPercent,
-      title: actualXPProgress.currentLevel.title,
-      titleColor: (userLevelData as any).currentColor || "#9ca3af",
-      titleIcon: (userLevelData as any).currentIcon || "⚔️",
+      xpToNextLevel: xpToNext,
+      progressPercent,
+      title: levelDisplay.title,
+      // Reason: a rung's name, colour and icon are one fact and must come from one place.
+      // These two read the award-time cache until 15 Sep 2026, so this object named the
+      // new rung in the operator's ladder while painting it in the old one's colour -
+      // R88 surviving on the very site the rest of R88 had just been fixed on.
+      //
+      // They deliberately do NOT read `actualXPProgress.currentLevel.color`/`.icon`,
+      // which is the obvious repair and is wrong: that entry comes from the DATABASE
+      // ladder, and `resolveLevelTitle` exists partly to refuse it. `GameIconName` is a
+      // union of committed SVG assets and the colour is a Tailwind class that has to be
+      // in the compiled stylesheet, so an operator-typed value for either draws nothing
+      // while reviewing as correct - pinned by "takes the icon and colour from the code
+      // ladder, never the operator's entry" in `level-ladder-rename.test.ts`.
+      //
+      // The old `|| "⚔️"` was an emoji standing in for a `GameIconName`, and
+      // `components/ui/GameIcon.tsx` does not render an unknown name as text the way the
+      // admin copy does - it substitutes `starBadge`, so that fallback silently drew a
+      // generic badge rather than the sword it appears to promise.
+      titleColor: levelDisplay.color,
+      titleIcon: levelDisplay.icon,
       globalRank: rankData.rank,
       totalUsers: rankData.totalUsers,
       recentBadges,

@@ -174,10 +174,14 @@ Invoke-Probe -Name '9  the empty-ladder fallback removed' -File $LEVELS `
 
 # 10. Below the first threshold answering nothing. A brand-new player has 0 XP, so this is
 #     the common case rather than an edge one.
+#
+#     RE-AIMED 15 Sep 2026. The pattern read `return entries[0];` and the line is now
+#     `const [lowest] = entries;` - destructured to satisfy the object-injection rule - so
+#     this probe had been reporting DID NOT APPLY and the guard beneath it sat unexercised.
+#     A probe naming something that no longer exists fails in the quiet direction.
 Invoke-Probe -Name '10 the below-first-threshold answer removed' -File $LEVELS `
-  -From '  return entries[0];
-}' -To '  return undefined as unknown as TitleLevel;
-}' `
+  -From '  const [lowest] = entries;
+  return lowest;' -To '  return undefined as unknown as TitleLevel;' `
   -ExpectRed 'places an XP total below the first threshold on the first rung'
 
 Write-Host "`n=== every read site goes through the resolver ===" -ForegroundColor Cyan
@@ -271,6 +275,62 @@ Invoke-Probe -Name '20 the section grant weakened to admin-at-all' -File 'apps/a
   -From 'const guard = await guardSection("badges");' `
   -To 'const guard = await guardSection("overview");' `
   -ExpectRed 'asks for the badges section, not admin-at-all'
+
+Write-Host "`n=== R88 on the dashboard - one rung from one place ===" -ForegroundColor Cyan
+
+$DASH = 'lib/actions/comprehensive-dashboard.actions.ts'
+
+# 21. THE DEFECT AS IT ACTUALLY SHIPPED, and the reason this site needed a guard of its own:
+#     `level` and `title` were moved onto the resolver and the two ARTWORK fields beside them
+#     were left on the award-time cache, so the fix reviewed as complete. A renamed rung
+#     reached the heading and the colour and icon stayed at whatever the player last earned.
+Invoke-Probe -Name '21 the artwork left on the award-time cache' -File $DASH `
+  -From '      titleColor: levelDisplay.color,
+      titleIcon: levelDisplay.icon,' `
+  -To '      titleColor: (userLevelData as any).currentColor || "#9ca3af",
+      titleIcon: (userLevelData as any).currentIcon || "*",' `
+  -ExpectRed 'comes from the resolver'
+
+# 22. ONE FIELD OF THE FOUR. The partial form is the one to prove, because a guard asserting
+#     the object "mentions levelDisplay" is green against it - three correct fields cover for
+#     the fourth, which is exactly how this defect survived review the first time.
+Invoke-Probe -Name '22 a single field back on the cache' -File $DASH `
+  -From '      title: levelDisplay.title,' `
+  -To '      title: (userLevelData as any).currentTitle || "Novice Trader",' `
+  -ExpectRed 'does not read currentTitle off the award-time cache'
+
+# 23. PRESENTATION TAKEN FROM THE PROGRESS CALCULATION. `calculateXPProgress` returns a
+#     `currentLevel` carrying a title, icon and colour straight off the operator's row, so
+#     this is the OTHER road to the same defect - it never mentions the cache, it calls no
+#     legacy helper, and it reads as using the value already in hand.
+#
+#     AIMED AT THE READ, NOT THE DESTRUCTURING. The first spelling only added `currentLevel`
+#     to the destructured list and came back GREEN - correctly, and it is the fourth cause of
+#     a green probe rather than a weak test: a value pulled out and never consumed changes no
+#     observable, and the assertion is about what the object is BUILT from. Two tests go red
+#     here, the field's own and this one, which is the honest number for one edit.
+Invoke-Probe -Name '23 the rung taken from the progress calculation' -File $DASH `
+  -From '      titleIcon: levelDisplay.icon,' `
+  -To '      titleIcon: currentLevel.icon,' `
+  -ExpectRed 'does not take presentation from the progress calculation'
+
+# 24. THE DISCARDED SECOND READ RESTORED. Not a correctness defect - the result was thrown
+#     away - but it awaited two database reads per dashboard load for nothing, on the one
+#     action already too heavy to poll (`13` s5.1b). The canary keeps it from drifting back
+#     in as a harmless-looking parallel fetch.
+Invoke-Probe -Name '24 the redundant progress read restored' -File $DASH `
+  -From '    getUserGlobalRank(userId).catch(() => ({ rank: 0, totalUsers: 0, percentile: 0 })),' `
+  -To '    calculateXPProgress(0).catch(() => ({ progressPercent: 0, xpToNext: 100 })),
+    getUserGlobalRank(userId).catch(() => ({ rank: 0, totalUsers: 0, percentile: 0 })),' `
+  -ExpectRed 'computes progress once'
+
+# NO PROBE FOR THE SLICE HELPER ITSELF, and it is worth saying why rather than leaving the
+# gap to be noticed: `dashboardPlayerObject` uses `lastIndexOf` because this file has TWO
+# `player: {` - the return type declaration and the object literal - and the first spelling
+# of it sliced the TYPE and reported `titleIcon: string;` as failing to read the resolver.
+# The mutation that proves the helper is a third `player: {` between the two, which is not a
+# defect any reviewer would write. It carries an inline assertion instead: the slice must not
+# match `level: number;`, so it cannot silently go back to examining a type declaration.
 
 # NO PROBE FOR 'apps/admin/lib/constants/levels.ts matches the main copy', and the reason
 # rather than the omission left to be noticed: probe 10 already mutates the main copy of

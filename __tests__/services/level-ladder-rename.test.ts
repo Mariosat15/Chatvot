@@ -241,6 +241,15 @@ const READ_SITES = [
   "app/(root)/competitions/[id]/page.tsx",
   "apps/admin/lib/actions/leaderboard/global-leaderboard.actions.ts",
   "apps/admin/lib/actions/trading/competition.actions.ts",
+  /*
+    The sixth site, and it was absent from this list while the suite passed 50 tests -
+    which is how half of R88 survived on it. `getComprehensiveDashboardData` was fixed to
+    resolve `level` and `title` through the helper and left `titleColor` and `titleIcon`
+    reading the award-time cache, so the dashboard named the operator's new rung and
+    painted it in the old one's colour. The list is the guard; a site missing from it is
+    not guarded, whatever the total test count says.
+  */
+  "lib/actions/comprehensive-dashboard.actions.ts",
 ];
 
 describe("every read site resolves through the shared helper", () => {
@@ -310,6 +319,89 @@ describe("no read site names a hard-coded rung", () => {
     // Both halves, or the slice silently covering nothing looks like a working exemption.
     expect(code).toMatch(/Novice Trader/);
     expect(withoutDifficultyMap(code)).not.toBe(code);
+  });
+});
+
+/*
+  The dashboard's `player` object, guarded per FIELD rather than per file.
+
+  Calling the resolver is not using its answer. This site called `resolveLevelTitle`, read
+  `level` and `title` off it, and then took `titleColor` and `titleIcon` from the
+  award-time cache two lines below - so every assertion above passes against it, because
+  the resolver is named and the ladder is read. A rung's name, colour and icon are one
+  fact; the only guard that can see them disagree is one that reads all four.
+
+  The negative half is the load-bearing one: a version that resolves correctly and then
+  overrides a field from the cache satisfies the positive assertions exactly.
+*/
+const DASHBOARD_SITE = "lib/actions/comprehensive-dashboard.actions.ts";
+
+function dashboardPlayerObject(code: string): string {
+  /*
+    `lastIndexOf`, not `indexOf`. There are two `player: {` in this file - the RETURN TYPE
+    declaration near the top and the object literal at the bottom - and `indexOf` matches
+    leftmost-first, so the first spelling of this helper sliced the type declaration and
+    reported `titleIcon: string;` as failing to read the resolver. A guard that fails on
+    correct code is the one the next reader deletes.
+  */
+  const open = code.lastIndexOf("player: {");
+  // Reason: `globalRank` is the last field of the object. Sliced to a marker inside it
+  // rather than to a closing brace, because the object contains nested ones.
+  const close = code.indexOf("globalRank", open + 1);
+
+  // Both ends proven. A slice against a marker that has moved returns -1, and the
+  // resulting `slice(0, -1)` hands back almost the whole file with every assertion
+  // trivially true - the same trap that made three guards useless in `21` s4.1r.
+  expect(open).toBeGreaterThan(-1);
+  expect(close).toBeGreaterThan(open);
+
+  const slice = code.slice(open, close);
+  // And proven to be the LITERAL rather than the type, so a third `player: {` appearing
+  // below cannot quietly send this back to asserting things about a type declaration.
+  expect(slice).not.toMatch(/level:\s*number;/);
+  return slice;
+}
+
+describe("R88 - the dashboard's rung is one fact from one place", () => {
+  it.each(["level", "title", "titleColor", "titleIcon"])(
+    "%s comes from the resolver",
+    (field) => {
+      const player = dashboardPlayerObject(readCode(DASHBOARD_SITE));
+      expect(player).toMatch(
+        new RegExp(`${field}:\\s*(levelDisplay\\.|levelDisplay\\b)`),
+      );
+    },
+  );
+
+  it.each(["currentTitle", "currentColor", "currentIcon", "currentLevel"])(
+    "does not read %s off the award-time cache",
+    (cached) => {
+      const player = dashboardPlayerObject(readCode(DASHBOARD_SITE));
+      expect(player).not.toMatch(new RegExp(`\\.${cached}\\b`));
+    },
+  );
+
+  /*
+    The icon and colour must not come from the PROGRESS entry either, which is the obvious
+    repair and is wrong: `calculateXPProgress` returns a `TitleLevel` read out of the
+    operator's `XPConfig` row, and an operator-typed `GameIconName` is not a committed SVG
+    while an operator-typed colour is not in the compiled stylesheet. Both draw nothing
+    while reviewing as correct.
+  */
+  it("does not take presentation from the progress calculation", () => {
+    const code = readCode(DASHBOARD_SITE);
+    expect(code).not.toMatch(/currentLevel\s*\.\s*(icon|color|title)/);
+  });
+
+  /*
+    A canary for the deletion beside the fix. The discarded `calculateXPProgress(0)` in
+    the parallel fetch cost two `XPConfig` round trips for a value nothing read. If a
+    second call reappears, this action is paying for the ladder twice again.
+  */
+  it("computes progress once", () => {
+    const code = readCode(DASHBOARD_SITE);
+    const calls = code.match(/calculateXPProgress\s*\(/g) ?? [];
+    expect(calls.length).toBe(1);
   });
 });
 

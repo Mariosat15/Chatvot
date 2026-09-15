@@ -179,7 +179,16 @@ describe("admin contest result presentation - nobody was paid", () => {
       "Participants" is a SYNONYM of the `players` token rather than a token of its own, so the
       empty-contest sentence reads "with no Players". Asserted through the token rather than as
       a literal, so renaming it cannot leave this claim passing against the old word.
+
+      Compared case-insensitively rather than with a built regular expression, because the token
+      is a runtime value and `new RegExp(token)` trips `security/detect-non-literal-regexp` - and
+      a lint rule disabled in a test is a rule somebody disables in a route next.
     */
+    if (empty === null) {
+      // Reason: narrows `string | null` for the compiler. A silent `String(empty)` would compare
+      // the word "null" and fail with a message that says nothing about the notice being absent.
+      throw new Error("expected a no-winners notice for a contest nobody entered");
+    }
     expect(empty.toLowerCase()).toContain(`no ${terms.players.toLowerCase()}`);
     expect(empty).not.toMatch(/unclaimed pool/i);
   });
