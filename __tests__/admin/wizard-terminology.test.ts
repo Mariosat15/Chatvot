@@ -207,6 +207,29 @@ const RENAMEABLE: { token: TerminologyToken; word: string }[] = Object.entries(
   TERMS,
 ).map(([token, word]) => ({ token: token as TerminologyToken, word }));
 
+/**
+ * Words that mean a token but are not spelled like its default value.
+ *
+ * WITHOUT THIS THE GUARD IS BLIND TO EXACTLY THE WORD THIS CODEBASE PREFERS. `contest`
+ * defaults to "Competition" because that is what every route and screen already says, so a
+ * search for token VALUES never looks for "Contest" - and "contest" is the platform-neutral
+ * noun the services, the files and every docblock use, which makes it the spelling somebody
+ * reaches for when writing a new caption. It found a live one on the first run:
+ * `ProviderContestEditor.tsx` answered a successful save with `toast.success("Contest
+ * saved.")`, so an operator who had renamed the noun to "Tournament" saved a Tournament and
+ * was told a Contest had been saved.
+ *
+ * The general form, and the reason this is a list rather than one entry: a guard built from a
+ * token's default value polices one spelling of a concept the codebase has several names for.
+ * Add the synonym, not a looser pattern.
+ */
+const SYNONYMS: { token: TerminologyToken; word: string }[] = [
+  { token: "contest", word: "Contest" },
+  { token: "contests", word: "Contests" },
+];
+
+const BANNED_NOUNS = [...RENAMEABLE, ...SYNONYMS];
+
 describe("no renameable noun is a literal in displayed text", () => {
   /*
     THE LOAD-BEARING GUARD. Adding `<Label>Competition Name</Label>` beside a perfectly
@@ -224,7 +247,7 @@ describe("no renameable noun is a literal in displayed text", () => {
   it("has no Title Case noun as a JSX literal or a quoted caption", () => {
     const hits: Line[] = [];
     for (const line of lines()) {
-      for (const { word } of RENAMEABLE) {
+      for (const { word } of BANNED_NOUNS) {
         /*
           Word-bounded, so "Competitions" does not also report as "Competition", and
           `Prize` inside `PrizeDistributionEditor` or `prizeTotal` is not a caption.

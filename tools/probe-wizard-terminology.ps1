@@ -204,6 +204,19 @@ Invoke-Probe -Name '10 the surface list narrowed to the orchestrator' -File $Sui
   -ExpectRed 'finds the step bodies, not just the orchestrator' `
   -AllowRed 3
 
+Write-Host "`n=== the guard knows the codebase's own word for a contest ===" -ForegroundColor Cyan
+
+# 11. THE LIVE DEFECT THIS ASSERTION WAS ADDED FOR. `toast.success("Contest saved.")` stood in
+#     the editor through the whole of A2 and every probe above stayed green on it, because the
+#     guard was built from token VALUES and `contest` defaults to "Competition" - so nothing
+#     ever looked for the word "Contest". It is the spelling the services, the filenames and
+#     every docblock use, which makes it the one a new caption reaches for. An operator who had
+#     renamed the noun to "Tournament" saved a Tournament and was told a Contest had been saved.
+Invoke-Probe -Name '11 the codebase''s own synonym for the contest token' -File $EDITOR `
+  -From 'toast.success(`${terms.contest} saved.`);' `
+  -To 'toast.success("Contest saved.");' `
+  -ExpectRed 'has no Title Case noun as a JSX literal or a quoted caption'
+
 Write-Host ""
 if ($script:fail -eq 0) {
   Write-Host "all $($script:pass) probes red on the expected test" -ForegroundColor Green

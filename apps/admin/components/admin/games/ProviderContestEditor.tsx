@@ -133,7 +133,7 @@ export function ProviderContestEditor({
       const response = await fetch(`/api/games/contests/${competitionId}`);
       const data = await response.json();
       if (!response.ok) {
-        toast.error(data.error ?? "That contest could not be loaded.");
+        toast.error(data.error ?? `That ${terms.contest} could not be loaded.`);
         return;
       }
       setStored(data.contest);
@@ -147,7 +147,14 @@ export function ProviderContestEditor({
     } finally {
       setLoading(false);
     }
-  }, [competitionId]);
+    // `terms` because the failure toast names the noun, and exhaustive-deps is enforced here
+    // (`--max-warnings=0` in the pre-commit hook). It does not cause a re-fetch: the pack
+    // reaches `TerminologyProvider` as a prop from the server layout and is deserialised once
+    // per client tree, so its identity is stable for the life of the screen. Note there is no
+    // `useMemo` guaranteeing that - it holds because the provider is fed by a server
+    // component. Should the pack ever become client state, this dependency is what stops the
+    // toast naming the previous vocabulary.
+  }, [competitionId, terms]);
 
   useEffect(() => {
     void load();
@@ -187,14 +194,14 @@ export function ProviderContestEditor({
 
       if (!response.ok || !data.success) {
         setErrors(data.errors ?? []);
-        toast.error(data.error ?? "The contest could not be saved.");
+        toast.error(data.error ?? `The ${terms.contest} could not be saved.`);
         return;
       }
 
       if (data.warnings?.length) {
         toast.warning(data.warnings[0]);
       }
-      toast.success("Contest saved.");
+      toast.success(`${terms.contest} saved.`);
       router.push("/?activeTab=competitions");
     } catch {
       toast.error("Something went wrong. Please contact support.");
@@ -207,7 +214,7 @@ export function ProviderContestEditor({
     return (
       <div className="flex items-center gap-3 text-gray-400 p-8">
         <Loader2 className="h-5 w-5 animate-spin" />
-        Loading contest...
+        Loading {terms.contest}...
       </div>
     );
   }
@@ -215,7 +222,7 @@ export function ProviderContestEditor({
   if (!stored) {
     return (
       <div className="p-8 text-gray-300">
-        That contest could not be loaded.{" "}
+        That {terms.contest} could not be loaded.{" "}
         <Button variant="link" onClick={() => router.back()}>
           Go back
         </Button>
@@ -228,11 +235,12 @@ export function ProviderContestEditor({
       <div className="max-w-2xl p-6 rounded-xl border border-red-500/30 bg-red-500/10 text-red-200 space-y-3">
         <div className="flex items-center gap-2 font-semibold">
           <Lock className="h-4 w-4" />
-          This contest is {stored.status.replace("_", " ")} and cannot be edited.
+          This {terms.contest} is {stored.status.replace("_", " ")} and cannot be
+          edited.
         </div>
         <p className="text-sm text-red-200/80">
-          Its results and payouts are settled or void. Create a new contest
-          instead.
+          Its results and payouts are settled or void. Create a new{" "}
+          {terms.contest} instead.
         </p>
         <Button variant="outline" onClick={() => router.back()}>
           <ArrowLeft className="h-4 w-4 mr-2" />
