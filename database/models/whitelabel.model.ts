@@ -147,6 +147,59 @@ export interface WhiteLabelDocument extends Document {
     rotatedAt?: Date;
   }[];
 
+  // ── Operator-facing vocabulary (X6.5, chapter 14 section 2) ──────────────────────────
+  //
+  // A PARTIAL set of display-word overrides, keyed by the token names in
+  // `lib/constants/terminology.ts`. An absent or blank token falls through to the default,
+  // so an operator renaming one noun inherits the other twenty-two and a later correction
+  // to a default still reaches this deployment.
+  //
+  // NOTHING HERE IS AN IDENTIFIER. These are words a human reads. `contests` may render as
+  // "Tournaments" while the route stays `/api/competitions/*` and the ledger row stays
+  // `competition_entry` - chapter 14 section 6, and renaming either of those orphans
+  // financial history (R13).
+  //
+  // WHY TWENTY-THREE EXPLICIT FIELDS RATHER THAN ONE `Map` OR A `Mixed`, because one field
+  // is obviously tidier and is the wrong answer:
+  //
+  //   - A Mongoose `Map` is read back as a `MongooseMap` when the document is HYDRATED and
+  //     as a plain object under `.lean()`. `resolveTerms` walks it with `Object.entries`,
+  //     which yields `[]` for a MongooseMap - so overrides would be silently ignored on
+  //     one of the three read paths while every screen rendered perfectly in defaults. No
+  //     error, no log line. That is the `brandingFiles` failure from the other direction.
+  //   - `Schema.Types.Mixed` loses change tracking, so an edit needs `markModified` and a
+  //     writer that forgets it saves nothing while reporting success.
+  //
+  // The cost of being explicit is that a new token is a mirrored model edit. That is paid
+  // deliberately: a token absent from the schema would be DISCARDED by strict mode on
+  // write, silently, which is the mirror-drift failure mode - so a test pins these paths
+  // against `TERMINOLOGY_TOKENS` in both directions and turns red instead.
+  terminologyOverrides?: {
+    contest?: string;
+    contests?: string;
+    challenge?: string;
+    challenges?: string;
+    practice?: string;
+    player?: string;
+    players?: string;
+    opponent?: string;
+    score?: string;
+    leaderboard?: string;
+    rank?: string;
+    entryFee?: string;
+    prizePool?: string;
+    prize?: string;
+    round?: string;
+    rounds?: string;
+    attempt?: string;
+    attempts?: string;
+    game?: string;
+    games?: string;
+    level?: string;
+    levels?: string;
+    points?: string;
+  };
+
   updatedAt: Date;
   createdAt: Date;
 }
@@ -442,6 +495,40 @@ const WhiteLabelSchema = new Schema<WhiteLabelDocument>(
       // client - cannot leak provider secrets. A caller that genuinely needs them must ask
       // with `.select("+gameProviderCredentials")`, which is greppable and reviewable.
       select: false,
+    },
+
+    // ── Operator-facing vocabulary (X6.5, chapter 14 section 2) ──────────────────────────
+    //
+    // See the interface comment for why these are twenty-three declared paths rather than a
+    // `Map`. No `default` on any of them, and none on the parent: an unset token must read
+    // as ABSENT so it falls through to the catalogue default. A `default: ""` would store a
+    // real empty string on every row, which `resolveTerms` then has to treat as absent
+    // anyway - and a stored value that has to be reinterpreted is indistinguishable from an
+    // operator who meant it (the `zeroIsValidResult` and `playModeOverride` reading).
+    terminologyOverrides: {
+      contest: { type: String, trim: true },
+      contests: { type: String, trim: true },
+      challenge: { type: String, trim: true },
+      challenges: { type: String, trim: true },
+      practice: { type: String, trim: true },
+      player: { type: String, trim: true },
+      players: { type: String, trim: true },
+      opponent: { type: String, trim: true },
+      score: { type: String, trim: true },
+      leaderboard: { type: String, trim: true },
+      rank: { type: String, trim: true },
+      entryFee: { type: String, trim: true },
+      prizePool: { type: String, trim: true },
+      prize: { type: String, trim: true },
+      round: { type: String, trim: true },
+      rounds: { type: String, trim: true },
+      attempt: { type: String, trim: true },
+      attempts: { type: String, trim: true },
+      game: { type: String, trim: true },
+      games: { type: String, trim: true },
+      level: { type: String, trim: true },
+      levels: { type: String, trim: true },
+      points: { type: String, trim: true },
     },
   },
   {

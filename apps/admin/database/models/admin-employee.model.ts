@@ -87,6 +87,10 @@ export const ADMIN_SECTIONS = [
   "credentials",
   "environment",
   "branding",
+  // Reason: the display-word overrides (X6.5). Its own grant rather than a slice of
+  // "branding", because renaming "Competition" to "Tournament" changes every operator and
+  // player screen at once, where a logo upload changes a picture.
+  "terminology",
   "company",
   "invoices",
   "email-templates",

@@ -26,6 +26,7 @@ import {
   Building2,
   FileText,
   Palette,
+  Languages,
   Key,
   Globe,
   Gauge,
@@ -77,6 +78,7 @@ import { toast } from "sonner";
 import CredentialsSection from "@/components/admin/CredentialsSection";
 import EnvironmentSection from "@/components/admin/EnvironmentSection";
 import ImagesSection from "@/components/admin/ImagesSection";
+import TerminologySettingsSection from "@/components/admin/TerminologySettingsSection";
 import TradingRiskSection from "@/components/admin/TradingRiskSection";
 import SymbolsSection from "@/components/admin/SymbolsSection";
 import CurrencySettingsSection from "@/components/admin/CurrencySettingsSection";
@@ -635,6 +637,11 @@ const menuGroups: MenuGroup[] = [
             icon: <Palette className="h-4 w-4" />,
           },
           {
+            id: "terminology",
+            label: "Wording",
+            icon: <Languages className="h-4 w-4" />,
+          },
+          {
             id: "company",
             label: "Company",
             icon: <Building2 className="h-4 w-4" />,
@@ -1165,6 +1172,8 @@ export default function AdminDashboard({
         return <VendorSubscriptionsSection key={currentRefreshKey} />;
       case "branding":
         return <ImagesSection key={currentRefreshKey} />;
+      case "terminology":
+        return <TerminologySettingsSection key={currentRefreshKey} />;
       case "company":
         return <CompanyDetailsSection key={currentRefreshKey} />;
       case "invoices":
