@@ -314,3 +314,76 @@ describe("the ledger's stored values are not renameable", () => {
     expect(source).toMatch(/challenge_entry\s*:/);
   });
 });
+
+// =======================================================================================
+// R92's open remainder
+// =======================================================================================
+
+/*
+  These five files read the same snapshot fields A4 made game-aware and are STILL
+  unconditionally trading-shaped. They are listed as named exceptions, each carrying an
+  assertion that it is STILL an offender, for the R60 reason: a stale exception reads as a
+  known problem long after it is solved, and silently re-permits the defect in that file.
+  When one is fixed its line here goes red, which is the point.
+
+  The count matters. A4's task named two screens; `rg` over the two field names found seven
+  readers. That is the counting rule after four entry paths, ten finalize sites, six raw
+  inserts and seven lifecycle routes - so the number in the risk register was measured here
+  rather than estimated, and this suite is what keeps it honest.
+*/
+describe("R92's remaining readers are still trading-shaped", () => {
+  const PLAYER_PAGE = join(ROOT, "app/(root)/challenges/[id]/page.tsx");
+  const ADMIN_LIST = join(ADMIN, "components/admin/ChallengesAdminSection.tsx");
+  const PROFILE = join(ROOT, "lib/actions/user/profile.actions.ts");
+  const PROFILE_ADMIN = join(ADMIN, "lib/actions/user/profile.actions.ts");
+  const AI_AGENT = join(ADMIN, "app/api/ai-agent/chat/route.ts");
+
+  it("the PLAYER's own result page renders four trading figures with no game branch", () => {
+    /*
+      The worst of the five, because this is the person who paid. A provider challenge shows
+      them $0.00 capital and 0 trades for a game that has neither. X7 by phase.
+    */
+    const source = code(PLAYER_PAGE);
+    expect(source).toMatch(/myStats\.pnl/);
+    expect(source).toMatch(/myStats\.totalTrades/);
+    expect(source).toMatch(/myStats\.winRate/);
+    // The tell: no provider-game question is asked anywhere on the page.
+    expect(source).not.toMatch(/hasProviderGameLabel|isProviderGame/);
+  });
+
+  it("the admin challenge LIST drawer renders them twice, once per side", () => {
+    const source = code(ADMIN_LIST);
+    // Counted, not merely found: a fix to one side leaves the other reading as correct.
+    const hits = source.match(/stats\.pnlPercentage/g) ?? [];
+    expect(hits.length).toBeGreaterThanOrEqual(2);
+    expect(source).not.toMatch(/hasProviderGameLabel|isProviderGame/);
+  });
+
+  it.each([
+    ["main app", PROFILE],
+    ["admin app", PROFILE_ADMIN],
+  ])(
+    "%s's profile action collapses an absent score to zero at the action",
+    (_label, path) => {
+      /*
+        This one is upstream of every component, so no screen downstream CAN tell absent from
+        zero - R50's phantom-zero shape one layer up. Both copies, because a fix to one is the
+        "one rule, two copies" drift this programme keeps finding.
+      */
+      const source = code(path);
+      expect(source).toMatch(/myStats\?\.pnl\s*\|\|\s*0/);
+      expect(source).toMatch(/myStats\?\.totalTrades\s*\|\|\s*0/);
+    },
+  );
+
+  it("the AI agent is handed a P&L it will state in a sentence", () => {
+    /*
+      The worst-READING of the five: asked about a puzzle challenge the agent answers with a
+      confident P&L figure. This is X6.5 A6, still pending in this same phase, which is why
+      it is recorded here rather than left for somebody to rediscover.
+    */
+    const source = code(AI_AGENT);
+    expect(source).toMatch(/challenger_pnl\s*:/);
+    expect(source).toMatch(/challenged_pnl\s*:/);
+  });
+});

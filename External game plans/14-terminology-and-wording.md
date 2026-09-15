@@ -192,7 +192,51 @@ who has to think in games rather than trades.
 > with every other game, and a trading prompt that ignored it would produce the only copy on
 > the platform still using the old word.
 >
-> **Still outstanding:** A4, A5 and A6.
+> **Still outstanding:** A5 and A6.
+
+> **A4 is BUILT as of 15 September 2026, and the pass found a defect larger than the wording
+> it set out to fix.** The table above sizes A4 at ~30 strings; **61 sites were tokenised**,
+> across `CompetitionAnalytics.tsx`, `FinancialDashboard.tsx`, the transaction dialog and the
+> admin challenge detail page. That undercount is not the interesting part.
+>
+> **Opening these screens to tokenise them is the sixth time that has been a better
+> bug-finding instrument than looking for bugs**, and what it found is **R92**: every
+> challenge on both screens reported a P&L, an ROI, a trade count and a win rate - four
+> figures a puzzle or a race does not have - because `challengerFinalStats` /
+> `challengedFinalStats` declared only trading's numbers and **nothing had ever written a
+> score into them.** Both halves of the seam were missing at once, so the read side had
+> nothing to read and the write side had nowhere to put it. It is the **competition** score
+> seam (R32/R33) one contest type along.
+>
+> **The write half is closed and the read half is not, and the count is the finding.** `score`
+> is now declared on both `challenge.model.ts` copies with **no default** (R50 - a stored zero
+> is a phantom result) and written from both `challenge-outcome.ts` copies; the two screens
+> A4 owns render it behind a **shared** subline rule, so the analytics card and the detail
+> page cannot answer the game question differently, and an absent score renders **`-`, never
+> `0`**. But `rg` over the two field names found **seven** readers where the task named two.
+> The five that remain are named in `17` R92 with a **canary asserting each is still an
+> offender**, and the two worth knowing here are that **the player's own result page** shows
+> the person who *paid* `$0.00` and `0 trades` (X7 by phase), and that **the AI agent is handed
+> a `challenger_pnl`** it will state in a confident sentence - which is **A6, still pending in
+> this very phase**.
+>
+> **The ledger's labels are tokenised and its KEYS are not**, which is the one assertion in
+> A4's suite that fails when somebody is helpful. `FinancialDashboard` maps a
+> `WalletTransaction.type` to a caption, so an operator who renamed Competition reads "Event
+> Entry" in their own ledger view. The keys beside those captions are **stored enum values on
+> documents already written**: renaming one orphans every row holding it and the screen then
+> shows a blank label against real money, with nothing in a log.
+>
+> **Two scanner faults were fixed on the way, and both were blind spots rather than false
+> alarms.** The literal scan was reading `import` / `export` specifiers as untokenised prose,
+> and its identifier test mistook member access - `Challenge.findById` - for a caption. Both
+> are now covered by a **fixture-based** suite over the helper itself, because a scanner
+> loosened to stop a false positive is the most dangerous file in a terminology pass: it goes
+> quiet rather than wrong, and every guard built on it keeps reporting green.
+>
+> Separately, `wordRuns` was rewritten from a single pattern to a tokenise-then-merge, because
+> the original nested a `+` inside a `{2,}` and backtracked polynomially - `security/detect-unsafe-regex`
+> was right, on a helper that reads every file in the admin app.
 
 **A5 and A6 are the two that get forgotten, and both are worse than a stale label.** The
 wiki is what an operator reads when they are unsure, and the AI agent actively advises
