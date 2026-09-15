@@ -61,6 +61,7 @@ chapter covers risks to the programme and to the application.
 | **R85** | **An idempotency guard that only ever made a double payment quiet.** The Game Master fee stage checked `gamemasterearnings` for an existing row *inside* the per-referred-player loop and `continue`d only the row insert - while the subscription increment, the wallet credit and the ledger row all sit **after** that loop. A retried transaction therefore skipped the rows and **paid the Game Master a second time**, leaving `gamemasterearnings` with exactly one row per referral: the guard kept clean the one artefact an operator would check. **The question to ask of an idempotency check is not whether it exists but which writes are on its far side** | High | **Latent** - no duplicated pair found, **nothing backfilled**. Reachable rather than theoretical: both apps run the finalize cron every minute inside a retried transaction, and `UnknownTransactionCommitResult` is exactly the case where the first attempt may already have committed | **CLOSED 14 Sep 2026** - the check is hoisted to the **per-Game-Master** level and reads `{ session }`, so one surviving row skips the whole payment block. The `cleanup-duplicates` route that existed to mop this up was **deleted, not fixed**: it debited wallets and **deleted** the duplicate ledger rows instead of writing a compensating adjustment, left `totalGmEarnings` untouched, had no guard on either handler and no caller - and could not have detected R85's duplicates anyway |
 | **R86** | **The reset that manufactured the mismatches it then reported.** `user-data-reset` empties the ledger collections and zeroes the wallets - naming **nine** of the fourteen numeric paths `CreditWallet` declares. The five it missed were all added to the model after it was written, and **two of them are equality-checked by reconciliation**, so every reset account came back reporting an `incident_compensation_mismatch` and a `gm_earnings_mismatch` for activity that no longer existed. The reset reported success and the screen reported defects; neither was wrong | Medium | **LIVE on every "Reset All Data" ever run.** No money moved - a teardown of test data that left phantom findings behind, which is how an operator learns to distrust the instrument | **CLOSED 14 Sep 2026** - all fourteen zeroed, and the guard **reads the numeric paths off `CreditWallet.schema`** rather than listing them, so the fifteenth field is caught the day it is declared. It also pins **which branch** it examines, because "Reset All Users" deletes the wallets outright and legitimately needs no counter list. **Fix-forward** - the remedy for an already-reset wallet is to run it again |
 | **R87** | **The reset that reported success for collections it never touched.** R86 one layer out: not fields it had stopped naming but **twenty-two collections of per-user activity it had never named** - `chargebacks` (the owner's report), `termsacceptances`, the whole messaging feature, X3's game rounds and provider events, stored payment instruments, security and price alerts, the dev-zone run histories. Two things made the list look complete: messaging declares its **own** `user_presence`, a *different* collection from the `userpresences` already covered by a model, and **a name in the list is not evidence the collection exists** - `deleteMany` against a missing name returns 0 and the reset still reports success, which is how `"alerts"` sat there for months while `pricehealthalerts` was never touched | Medium | **LIVE on every reset ever run.** No money moved; a teardown that leaves a player's disputes, messages, consents and game history behind while reporting that it cleared everything | **CLOSED 15 Sep 2026** - every collection either app's models declare is now classified into exactly one of four lists (deleted / **zeroed** / preserved / legacy raw name), and `user-data-reset-coverage.test.ts` **parses both model trees and the service** so a model added later cannot end up in none of them. `ZEROED_COLLECTIONS` is a third category on purpose - calling a wallet "preserved" hides R86. **Fix-forward** - run the reset again |
+| **R88** | **The level ladder an operator can rename everywhere except the leaderboard.** Two functions share the name `getTitleByXP`: an **async** one in `xp-config.service.ts` reading `XPConfig` from the database, and a **synchronous** one in `lib/constants/levels.ts` reading a hard-coded twenty-entry array. The XP award path uses the database one and stores its answer on `UserLevel.currentTitle`; **five read sites use the constant** - `app/api/leaderboard/route.ts`, both apps' `competition.actions.ts`, the admin global leaderboard, and the contest-entry level gate. So renaming the ladder in admin changes the profile while **every leaderboard row keeps saying "Novice Trader"**, with nothing thrown and nothing logged. The leaderboard route is the sharpest instance: it calls `getUsersWithTitles`, receives the `UserLevel` documents **carrying the stored title**, and discards that field to recompute from the constant | Medium | **Latent, and it is a REPORTING defect with no money anywhere near it** - no operator has renamed the ladder, so nothing has ever displayed inconsistently. What it costs is chapter 14's pass 2, which is costed as a free admin edit and is not one | **OPEN**, X8. **Nothing to backfill** - `currentTitle` is stored correctly, the readers ignore it. The fix is to read the stored field rather than to make five call sites `await` a second database read. Note `lib/constants/levels.ts` and its admin copy are byte-identical today and `check:mirrors` compares **models**, so it has never had an opinion about either |
 | R8 | Bulk find-and-replace on wording | High | Medium | X8 |
 | R9 | Fraud throttle blind to provider entries | High | High | X5 |
 | R11 | Legal wording changed without review | High | Medium | X8 |
@@ -2996,6 +2997,61 @@ satisfied by the delete branch and says nothing about the one that resets.
 
 **Fix-forward, nothing backfilled** - a reset is an operator action on test data, and the
 remedy for an already-reset wallet is to run it again.
+
+---
+
+### R88 - The level ladder an operator can rename everywhere except the leaderboard - **OPEN, found 15 September 2026**
+
+**How it was found.** Not by planned work. Chapter 14 says the twenty level titles are "a
+**database edit**, not a code change", and calls the ladder the highest-value single string
+change in the programme - shown on every profile and leaderboard row. That claim was checked
+before being carried into X8's estimate, and it is false. **Third instance of a chapter's claim
+about the code being wrong** after R7's severity and R31's branch, so carry the class rather than
+the cases: **a plan's statement about how something is stored is a hypothesis until a grep
+confirms it**, and the cheapest moment to check is while costing the work rather than while doing
+it.
+
+**What it is.** Two functions share the name `getTitleByXP`. The **async** one in
+`lib/services/xp-config.service.ts` reads the `XPConfig` document and falls back to the constant;
+the **synchronous** one in `lib/constants/levels.ts` reads the hard-coded twenty-entry
+`TITLE_LEVELS` array and nothing else. The XP award path uses the database one and **stores its
+answer** on `UserLevel.currentTitle`, so the stored value is correct and current.
+
+**Five read sites use the constant**, counted with `rg` rather than taken from the chapter:
+
+| Reader | What it renders |
+|---|---|
+| `app/api/leaderboard/route.ts` | the public paginated leaderboard |
+| `lib/actions/trading/competition.actions.ts` | the contest leaderboard |
+| `apps/admin/lib/actions/trading/competition.actions.ts` | the admin copy of the same |
+| `apps/admin/lib/actions/leaderboard/global-leaderboard.actions.ts` | the global board |
+| `lib/services/contest-entry/guards.ts` | the **level requirement** refusal on paid entry |
+
+So an operator renaming the ladder in admin changes the profile and the XP service, and every
+leaderboard row keeps saying "Novice Trader" - and a player refused entry for being below a level
+is told the name of a level that no longer exists. **Nothing throws and nothing logs**, which is
+this codebase's recurring shape: the system reports success while doing the wrong thing.
+
+**The leaderboard route is the sharpest instance and the most instructive.** It already calls
+`getUsersWithTitles`, which returns the `UserLevel` documents **carrying the stored
+`currentTitle`** - and then discards that field and recomputes the title from the constant. **The
+correct value was in hand and was thrown away.** That is what decides the fix: read the stored
+field, rather than making five synchronous call sites `await` a second database read per row on a
+paginated board.
+
+**Severity, stated in both directions.** It is **latent** - no operator has renamed the ladder, so
+nothing has ever displayed inconsistently, and **there is nothing to backfill** because
+`currentTitle` is stored correctly and the readers ignore it. A document rounding this up to a live
+defect is wrong. What it actually costs is that chapter 14 schedules pass 2 as a free admin edit
+with no engineering time against it, and **a wording pass that ships this way is worse than not
+doing it**: the titles become inconsistent across screens rather than uniformly trading-themed, and
+inconsistency is the version a player reports as a bug.
+
+**A related fact `check:mirrors` cannot see.** `lib/constants/levels.ts` and
+`apps/admin/lib/constants/levels.ts` are two copies of the same twenty-entry array,
+**byte-identical today** - verified rather than assumed. The guard compares model field paths and
+enum values, so it has never had an opinion about either, and the fix must touch both or the two
+apps will render different ladders.
 
 ---
 

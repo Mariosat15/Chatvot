@@ -49,6 +49,36 @@ dictionary for the shared shell gets most of the benefit for a fraction of the c
 `AppSettingsProvider` already carries currency and credit labels from `AppSettings`, so
 the delivery mechanism exists and is proven. Follow it rather than inventing a second one.
 
+> **AMENDED 15 September 2026, during X6.5 A1. Three rows of that table are wrong, and the
+> paragraph under it is wrong in the most expensive direction available - it is an
+> instruction to follow a mechanism that does not run.**
+>
+> **The delivery claim is false for `apps/admin`.** `AppSettingsProvider` exists, and it is
+> **mounted nowhere in the admin app** - nineteen admin components call `useAppSettings()`
+> and every one of them receives the `createContext` defaults, so the configured credit
+> symbol and base currency have never reached a single admin screen. That is its own live
+> defect, recorded separately, and the thing to carry from it here is that **"the mechanism
+> exists and is proven" was a claim about a file, never about a render tree.** Delivering
+> terminology through it would have shipped a wording layer that silently served defaults
+> on every screen it was written for, with nothing thrown and nothing logged. What was
+> built instead is `apps/admin/contexts/TerminologyContext.tsx` with `TerminologyProvider`
+> mounted in the admin **root layout**, and the guard suite carries a **canary** asserting
+> `AppSettingsProvider` is still unmounted - so the day somebody fixes that defect, the test
+> goes red and this decision gets re-read rather than quietly outliving its reason.
+>
+> **`useTerms(gameType?)` takes no argument as built.** The per-game layer is not built, so
+> a parameter accepted and ignored is the seventh declared-written-dead field in this
+> programme. It arrives with the per-game home below or not at all.
+>
+> **`module.terminology` is the wrong home for a per-game override**, and the reason
+> generalises: a game **module** is per *category* - `["trading", "provider"]`, asserted by
+> a registry tripwire - and **one provider module backs the whole catalogue**, so a
+> module-level dictionary can express one vocabulary for a chess puzzle, a trivia round and
+> a time trial at once. Exactly the mistake `requiresSyncPlay` was deleted for. The per-game
+> override belongs on the **catalogue row** (`provider_game`), which is also where section 2
+> already says it should be populated from - so the storage and the sourcing agree there and
+> disagree in the table above.
+
 ### Why per-game overrides matter more here
 
 With provider games the vocabulary varies by title in ways an in-house plan would not
@@ -83,6 +113,37 @@ who has to think in games rather than trades.
 | A5 | **Admin wiki** - `AdminWikiSection.tsx` | Content | Developer or admin |
 | A6 | **AI agent knowledge base** - `apps/admin/app/api/ai-agent/chat/route.ts` | Content | Developer |
 
+> **A1, A2 and A3 are BUILT as of 15 September 2026.** A1 shipped the token layer itself
+> rather than only the labels the table describes: `lib/constants/terminology.ts`,
+> `WhiteLabel.terminologyOverrides` on both model copies, `getTerms()`, the admin
+> `TerminologyProvider` and a Settings -> Wording screen an operator edits with no deploy.
+> A2 tokenised the provider contest wizard and its six step bodies; A3 tokenised the contest
+> list, the contest detail screen and the prose in `contest-result-presentation.ts`. Each
+> carries a structural guard and a PowerShell probe harness.
+>
+> **The guard asserts more than "the token is used", and the extra assertions are the
+> load-bearing ones.** It bans each renameable noun as a **literal** in displayed text, bans
+> case-folding and pluralisation of a token (`terms.prize + "s"` is how one operator's
+> renamed noun becomes a word they never chose), and asserts that route ids and status values
+> stay **literal** - `activeTab=competitions` and `"completed"` are on the never-rename list,
+> so a pass that tokenises them is a production defect wearing a copy change.
+>
+> **Two decisions were taken on 15 September 2026 and both narrow the case-folding rule.**
+> A token may appear mid-sentence after a determiner - "this Competition still settles on
+> time" - accepting Title Case rather than restructuring every sentence around it; and
+> **"Participant(s)" is treated as a synonym of the `players` token** rather than earning a
+> token of its own, so an operator has one noun to rename instead of two that can disagree.
+>
+> **Two scanner exemptions exist and are not laxity.** A Title Case match in a **TypeScript
+> type position** is skipped (`interface Competition` is a type name, not something a player
+> reads), and **"Game Master"** is exempt, being a protected role name rather than the `game`
+> token followed by a word. Without both, the guard fires on correct code, and a guard that
+> fires on correct code is the one the next reader deletes.
+>
+> **Still outstanding:** A3b, the ~139 lines of lowercase renameable nouns in running prose
+> across 32 files, plus extending the guard to ban lowercase literals; A3c, appending a
+> vocabulary clause to the AI prompt; and A4-A6.
+
 **A5 and A6 are the two that get forgotten, and both are worse than a stale label.** The
 wiki is what an operator reads when they are unsure, and the AI agent actively advises
 them - a knowledge base that still describes a trading-only platform will confidently give
@@ -111,6 +172,38 @@ Passes 2, 7, 8 and 9 are **database content, editable in admin by someone who is
 developer**. That is roughly three days of work that does not consume engineering time,
 and it can happen in parallel with X7.
 
+> **AMENDED 15 September 2026. Two rows of that table describe something other than the
+> codebase, and pass 2 is the more serious of the two because it is costed as free.**
+>
+> **`components/contest/` does not exist**, in either app - checked. The player contest
+> surface is `components/games/` (the provider lobby, the play screen, the arena) and
+> `components/trading/lobby/` (the trading lobby), which is also what section 7's proposed
+> ESLint rule names, so that rule as written would police an empty path and report nothing.
+> Scope pass 3 against the two real directories, and note the split is not cosmetic: the
+> trading lobby **deliberately keeps** trading language under section 5, so a single rule
+> over one merged path would be wrong in one half whichever way it was written.
+>
+> **Pass 2 is not a database edit, and the sentence below the section 4 table saying it is
+> "the highest-value single change" is right about the value and wrong about the mechanism.**
+> Two functions share the name `getTitleByXP`: an **async** one in `xp-config.service.ts`
+> that reads `XPConfig` from the database, and a **synchronous** one in
+> `lib/constants/levels.ts` that reads the hard-coded twenty-entry `TITLE_LEVELS` array. The
+> XP award path uses the database one and stores its answer on `UserLevel.currentTitle`.
+> **Five read sites use the hard-coded one** - `app/api/leaderboard/route.ts`, both apps'
+> `competition.actions.ts`, the admin global leaderboard, and the contest-entry level gate -
+> so an operator renaming the ladder in admin changes the profile and **every leaderboard row
+> keeps saying "Novice Trader"**. Nothing throws and nothing logs. Recorded as risk **R88**;
+> pass 2 costs a code change before it costs an admin edit.
+>
+> The leaderboard route is the clearest instance and the most instructive: it already calls
+> `getUsersWithTitles`, which returns the `UserLevel` documents **carrying the stored
+> `currentTitle`**, and then discards that field and recomputes the title from the constant.
+> **The correct value was in hand and was thrown away** - so the fix is to read the stored
+> field, not to make five call sites `await` a second database read. Related and worth
+> stating because `check:mirrors` cannot: `lib/constants/levels.ts` and
+> `apps/admin/lib/constants/levels.ts` are two copies of that array, **byte-identical
+> today**, and the guard compares models, so it has never had an opinion about them.
+
 **One player-side item is deliberately *not* in this chapter.** The getting-started card
 (`components/dashboard/GettingStartedCard.tsx`) has a step "place your first trade". That
 is a **logic** change - which steps exist and when they count as complete - not a string
@@ -138,6 +231,13 @@ merely relabels it leaves a new player on a games platform with a trading task.
 The level ladder is the highest-value single change. Twenty titles, all trading-themed,
 shown on every profile and leaderboard row - and it is a **database edit**, not a code
 change.
+
+> **CORRECTED 15 September 2026: the last clause is false.** It is a database edit **plus** a
+> code change, because five read sites bypass `XPConfig` for the hard-coded `TITLE_LEVELS`
+> array - including the leaderboard, which is half of what makes the row high-value in the
+> first place. Risk **R88**, and the full mechanism is in the amendment under section 3.2. The
+> sentence is left standing rather than rewritten because it was believed, and a document
+> that claims this is free is how somebody schedules it as an admin task.
 
 ---
 
@@ -186,6 +286,27 @@ provider renames a game, not when a contract moves to a new provider. See `02`.
   rejected
 - The existing husky pre-commit hook already runs `eslint --max-warnings=0`, so a rule
   added here is enforced automatically
+
+> **AMENDED 15 September 2026. What was built is a vitest guard, not an ESLint rule, and the
+> substitution is deliberate.** `components/contest/` and `components/leaderboard/` do not
+> exist (see the section 3.2 amendment), so the rule as specified would police two empty
+> paths. More to the point, the property that needs enforcing is **not** "no trading word
+> appears here" - it is **"no renameable noun appears as a literal, no token is case-folded
+> or pluralised, and every route id and status value stays literal"**, and the last two
+> cannot be expressed as a word list at all. A lint rule that flags a word is also green
+> against the one mutation that matters most: a screen that imports the pack and then
+> hand-writes the noun beside it.
+>
+> The guards are `__tests__/admin/wizard-terminology.test.ts` and
+> `__tests__/admin/contest-screens-terminology.test.ts`, sharing one scanner in
+> `__tests__/helpers/terminology-scan.ts`. **The scanner is shared rather than copied**
+> because two copies of one vocabulary rule is the "one rule, two copies" shape behind
+> `referenceId`, `failedReason`, `challengeId` and the Game Master `||`, none of which
+> `check:mirrors` can see - and here the drift reads as a screen that passed review while
+> serving an operator a noun they renamed. It **strips comments before matching**, because
+> these files explain the anti-patterns in prose, so a guard that reads prose flags a correct
+> file for discussing the mistake and passes a broken one whose only mention of the token is
+> in a comment.
 
 ---
 

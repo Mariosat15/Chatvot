@@ -106,7 +106,7 @@ Do this in passes, each independently shippable and reviewable:
 | Pass | Scope | Approx. strings |
 |---|---|---|
 | 1 | Navigation: sidebar section header, mobile nav, user name fallback "Trader" | ~10 |
-| 2 | Level titles via `XPConfig` DB (see `06`) - **data change, no code** | 20 |
+| 2 | Level titles via `XPConfig` DB (see `06`) - **NOT a data change alone; see the amendment below** | 20 |
 | 3 | Contest shell components moved to `components/contest/` (cards, lobby, countdown, entry, status) | ~50 |
 | 4 | Leaderboard shared columns and headings | ~25 |
 | 5 | Dashboard game-agnostic header and section titles | ~30 |
@@ -117,7 +117,22 @@ Do this in passes, each independently shippable and reviewable:
 | 10 | Help centre core sections | ~40 |
 | 11 | Legal pages - **legal review required** | separate track |
 
-Passes 2, 7, 8 and 9 are **data entry in the admin panel** and need no deploy. That is roughly half the perceived work, and it can be done by someone who is not a developer.
+Passes 7, 8 and 9 are **data entry in the admin panel** and need no deploy. They can be done by
+someone who is not a developer.
+
+> **AMENDED 15 September 2026 - pass 2 is not one of them, and the table row above used to say it
+> was.** Checked while scoping the admin wording pass (`External game plans/14` section 3, whose
+> table restated this row). The title really is stored - `UserLevel.currentTitle` is written from
+> the **async** `getTitleByXP` in `lib/services/xp-config.service.ts`, which reads `XPConfig` and
+> honours an operator's rename - but **five read sites recompute the title from the hard-coded
+> `TITLE_LEVELS` array** via the *synchronous* `getTitleByXP` in `lib/constants/levels.ts`, and one
+> of them is the leaderboard. So renaming the ladder in the admin panel changes a player's profile
+> and leaves every leaderboard row still reading "Novice Trader". Nothing throws, nothing logs, and
+> the two screens disagree rather than being uniformly wrong, which is worse to explain to a player.
+> Recorded as risk **R88** in `External game plans/17-risk-register.md`. **The pass is still worth
+> doing and is still cheap; it is simply a code change plus a data change, and it must not be handed
+> to a non-developer as a settings edit.** The other three passes were verified and are correct as
+> written.
 
 ---
 
@@ -128,7 +143,7 @@ Passes 2, 7, 8 and 9 are **data entry in the admin panel** and need no deploy. T
 | `components/UserSidebar.tsx` section header | "Trading" | "Compete" |
 | `UserSidebar.tsx` / `UserDropdown.tsx` name fallback | "Trader" | "Player" |
 | `/api/user/level` default title | "Trader" | "Player" |
-| `lib/constants/levels.ts` 20 titles | "Novice Trader".."Trading God" | neutral ladder (`06` section 3) |
+| `lib/constants/levels.ts` 20 titles | "Novice Trader".."Trading God" | neutral ladder (`06` section 3). **Five read sites take the title from this array rather than from the stored `currentTitle` - risk R88, see the amendment in section 4** |
 | `app/layout.tsx` metadata | "Live Market competition Trading Platform" | platform-level description |
 | `LiveStatsBar` | "Active Traders" | "Active Players" |
 | Landing feature card | "Trading Competitions" | "Skill Competitions" (with trading as one) |
