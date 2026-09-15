@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -484,5 +484,328 @@ describe("R89 - the level ladder routes are authorized", () => {
   */
   it.each(XP_ROUTES)("%s asks for the badges section, not admin-at-all", (relative) => {
     expect(readCode(relative)).toMatch(/guardSection\(\s*["']badges["']\s*\)/);
+  });
+});
+
+/* ------------------------------------------------------------------------------------ *
+   R90 - a rung's NAME may only come from the ladder.
+
+   R88 is "which ladder does this site read". R90 is one question earlier: several screens
+   held their OWN list of rung names and never consulted a ladder at all. The register
+   recorded two files. There were six.
+
+   THE FRAMING THAT MATTERS, because it was wrong for a day: these were not stale copies of
+   `TITLE_LEVELS`. They were the DIFFICULTY-BAND vocabulary - Novice / Apprentice / Skilled
+   / Expert / Elite / Master / Grand Master / Champion / Legend - mislabelled as levels. That
+   is why every one of them was wrong BY POSITION rather than merely out of date: rung 3 is
+   "Trainee" and they said "Skilled", which is rung 6.
+
+   IT FOLLOWS THAT A VOCABULARY GUARD IS IMPOSSIBLE HERE, and that is the reason this guard
+   has the shape it does. `TradingLobbySidebar.tsx` held the offending `LEVEL_NAMES` array
+   and, thirty lines below it, `DIFFICULTY_STYLES` keyed by those same words - legitimately,
+   because they really are the difficulty bands. Banning the words fires on correct code in
+   the same file as the defect, and "Grand Master" is in both lists, so even restricting the
+   ban to multi-word names does not separate them. A guard that fails on correct code is the
+   one the next reader deletes.
+
+   So the guard is by REACH, not by vocabulary: a screen that renders a level gate must be
+   able to reach the ladder. It is directory-scanned rather than a list, because R90's fix
+   shipped with no test at all - which is precisely how sites three to six outlived a fix, a
+   commit and a register entry.
+ * ------------------------------------------------------------------------------------ */
+
+/** Every way a file can legitimately obtain a rung name. */
+/*
+  Does this file have any route to the operator's ladder at all?
+
+  // Reason: the helper names are matched AS CALLS and TITLE_LEVELS only inside an import.
+  // Written as bare identifiers this regex was satisfied by a `useState` local in
+  // BadgeXPManagementSection.tsx literally named TITLE_LEVELS, which held a hard-coded
+  // ten-rung ladder (R91). A NAME IS NOT AN IMPORT - the sibling of "an import is not a
+  // use", and the more dangerous direction, because the guard reported the file as safe.
+*/
+const LADDER_REACH =
+  /levelLadder|resolveLevelName\(|resolveLevelTitle\(|getTitleLevels\(|import[^;]*\bTITLE_LEVELS\b/;
+
+/*
+  Files that mention a level gate and render no rung name. Each carries its reason, and the
+  canary below asserts each is still in the state its reason describes - a stale exemption
+  reads as a known problem long after it is solved while silently re-permitting the defect.
+*/
+const NAMES_NO_RUNG: { file: string; reason: string; number: RegExp }[] = [
+  {
+    file: "apps/admin/components/admin/GamificationWizardSection.tsx",
+    reason: "renders `Lv.{n}` - the rung NUMBER, never its name",
+    number: /Lv\.\{/,
+  },
+  {
+    file: "components/profile/BadgeDetailCard.tsx",
+    reason: "a badge's rarity-default required level, as a number",
+    number: /requiredLevel/,
+  },
+  {
+    file: "components/profile/BadgesDisplay.tsx",
+    reason: "same as BadgeDetailCard - a number, not a name",
+    number: /requiredLevel/,
+  },
+];
+
+/*
+  A fourth legitimate route to the operator's ladder: a client screen that FETCHES it.
+
+  This is not a loophole for "it probably loads it somewhere". Each entry asserts the
+  endpoint is still called, so a file that loses the fetch and falls back to its own list
+  turns this red. The ladder editor is the one screen that must be able to WRITE the
+  ladder, so it cannot go through the read-only server helpers.
+*/
+const LADDER_BY_FETCH: { file: string; endpoint: RegExp }[] = [
+  {
+    file: "apps/admin/components/admin/BadgeXPManagementSection.tsx",
+    endpoint: /fetch\("\/api\/badges-xp\/manage"\)/,
+  },
+];
+
+/*
+  THE RECORDED OFFENDER. `app/(root)/gamemaster/create-competition/page.tsx` names rungs
+  inline as JSX options and is wrong by position in the ladder's own vocabulary, so a Game
+  Master choosing "Level 3: Skilled Trader" creates a contest that actually admits rung 3,
+  "Trainee". Its maxLevel dropdown names no rung but caps at 10 of 20, so no Game Master can
+  gate above halfway.
+
+  It is exempt rather than fixed because the fix is not a wording change: the page is a
+  2,798-line client component with no access to the operator's ladder, so closing it means
+  threading a server-side read in and lifting the cap. That is its own slice, and putting it
+  in the wording pass would have meant a large change to a page nobody asked me to touch.
+
+  The canary is the important half. It asserts the file IS still an offender, so the day
+  somebody fixes it this test goes red and the exemption is deleted with it.
+*/
+const GAMEMASTER_OFFENDER = "app/(root)/gamemaster/create-competition/page.tsx";
+
+function gateScreens(): string[] {
+  const out: string[] = [];
+  const walk = (dir: string) => {
+    for (const entry of readdirSync(join(root, dir), { withFileTypes: true })) {
+      const rel = `${dir}/${entry.name}`;
+      if (entry.isDirectory()) {
+        if (entry.name === "node_modules" || entry.name === ".next") continue;
+        walk(rel);
+      } else if (entry.name.endsWith(".tsx") && /minLevel|maxLevel/.test(read(rel))) {
+        out.push(rel);
+      }
+    }
+  };
+  for (const dir of ["components", "app", "apps/admin/components"]) walk(dir);
+  return out;
+}
+
+function r90Exempt(): Set<string> {
+  return new Set([
+    ...NAMES_NO_RUNG.map((e) => e.file),
+    ...LADDER_BY_FETCH.map((e) => e.file),
+    GAMEMASTER_OFFENDER,
+  ]);
+}
+
+describe("R90 - no screen holds its own list of rung names", () => {
+  const screens = gateScreens();
+
+  /*
+    // Reason: a directory walk that finds nothing passes every assertion asked of it. This
+    // is the same length check that caught a slice taken against a moved marker.
+  */
+  it("finds the level-gate screens", () => {
+    expect(screens.length).toBeGreaterThanOrEqual(8);
+    expect(screens).toContain("components/trading/CompetitionEntryButton.tsx");
+    expect(screens).toContain(GAMEMASTER_OFFENDER);
+  });
+
+  it.each(
+    // Computed at collection time, so a NEW screen is covered on the day it appears.
+    gateScreens().filter((f) => !r90Exempt().has(f)),
+  )("%s can reach the ladder", (relative) => {
+    expect(readCode(relative)).toMatch(LADDER_REACH);
+  });
+
+  it.each(LADDER_BY_FETCH)("$file still fetches the ladder", ({ file, endpoint }) => {
+    expect(readCode(file)).toMatch(endpoint);
+  });
+
+  it.each(NAMES_NO_RUNG)("$file renders a number, not a name ($reason)", ({ file, number }) => {
+    // Both halves: the file still has no ladder reach, AND it still renders the number the
+    // reason describes. Asserting only the first passes a file that grew a hard-coded name.
+    expect(readCode(file)).not.toMatch(LADDER_REACH);
+    expect(readCode(file)).toMatch(number);
+  });
+
+  it("the Game Master page is still an offender", () => {
+    const code = readCode(GAMEMASTER_OFFENDER);
+    // Wrong by position, and capped at ten. Both are asserted, because fixing either one
+    // alone leaves a Game Master misled - and this test is how the exemption gets deleted.
+    expect(code).toMatch(/Level 3: Skilled Trader/);
+    expect(code).not.toMatch(LADDER_REACH);
+  });
+
+  it("the four fixed screens resolve through the shared helper, not a local map", () => {
+    for (const relative of [
+      "components/trading/CompetitionEntryButton.tsx",
+      "components/trading/CompetitionCard.tsx",
+      "components/trading/lobby/TradingLobbySidebar.tsx",
+      "app/(root)/competitions/page-content.tsx",
+    ]) {
+      const code = readCode(relative);
+      // Named WITH its argument, never as a bare identifier - an import line alone
+      // satisfies a whole-file match, which is how three assertions were defeated in
+      // `12` s4.2a.
+      expect(code).toMatch(/resolveLevelName\s*\(/);
+      expect(code).not.toMatch(/LEVEL_NAMES|LEVEL_LABELS|LEVEL_TITLES/);
+    }
+  });
+
+  /*
+    // Reason: the two admin forms are a THIRD shape - they render the whole ladder as
+    // choices, so they never call the resolver at all and could not be folded into
+    // READ_SITES without weakening its assertions to the point of catching nothing. What
+    // they must not do is import the constant, which is what they did until X6.5.
+  */
+  it.each([
+    "apps/admin/components/admin/CompetitionCreatorForm.tsx",
+    "apps/admin/components/admin/CompetitionEditorForm.tsx",
+  ])("%s offers the operator's ladder, not the constant", (relative) => {
+    const code = readCode(relative);
+    expect(code).toMatch(/levelLadder\.map\s*\(/);
+    // A value import of the constant is the defect; the TYPE import is required.
+    expect(code).not.toMatch(/import\s*\{\s*TITLE_LEVELS/);
+  });
+
+  it.each([
+    "apps/admin/app/competitions/create/page.tsx",
+    "apps/admin/app/competitions/edit/[id]/page.tsx",
+  ])("%s reads the ladder once and hands it down", (relative) => {
+    const code = readCode(relative);
+    expect((code.match(/getTitleLevels\s*\(/g) ?? []).length).toBe(1);
+    expect(code).toMatch(/levelLadder=\{levelLadder\}/);
+  });
+});
+
+/*
+  R91 - the ladder EDITOR could destroy the ladder.
+
+  `BadgeXPManagementSection.tsx` seeded state with a hard-coded ten-rung ladder carrying the
+  old trading names, and `saveLevels` POSTs whatever state holds to a route whose handler is
+  `findOneAndUpdate({ configType: "level_progression" }, { data: { levels } })` - a whole
+  document REPLACEMENT with no merge and no length check. So one failed GET, which the code
+  already anticipates with a toast, followed by one save, replaced a twenty-rung renamed
+  ladder with ten stale rungs. Every player above rung ten then had no rung at all.
+
+  That makes it the only write in the R88/R90/R91 family. The rest were reads showing a wrong
+  name; this one changed the stored configuration and there is no attribution to say whether
+  it ever happened.
+
+  The fix is a REFUSAL, not a better default: seeding the canonical twenty would still
+  overwrite the operator's renames with ours, and a stored value and an absent one are
+  different facts.
+*/
+const LADDER_EDITOR = "apps/admin/components/admin/BadgeXPManagementSection.tsx";
+
+describe("R91 - the ladder editor cannot overwrite what it failed to load", () => {
+  it("holds no hard-coded ladder of its own", () => {
+    const code = readCode(LADDER_EDITOR);
+    /*
+      The old literal's own names. Matched as strings because the rungs are renameable, so
+      there is no generic shape to look for - only the specific stale set that was there.
+    */
+    for (const stale of [
+      "Novice Trader",
+      "Apprentice Trader",
+      "Trading God",
+      "Market Legend",
+    ]) {
+      expect(code).not.toContain(stale);
+    }
+    // And the shadowing name that hid it from LADDER_REACH is gone for good.
+    expect(code).not.toContain("TITLE_LEVELS");
+  });
+
+  it("states no rung count of its own", () => {
+    const code = readCode(LADDER_EDITOR);
+    /*
+      A second instance, found only because the string test above went red on prose rather
+      than on the literal: the help copy asserted "Level 10 ... is the maximum level". Wrong
+      twice over - the canonical ladder has twenty rungs, and the number is the operator's to
+      change. The top rung is derived, and an absent ladder states nothing.
+
+      // Reason: a claim about the data is as renameable as a label, and it is the one a diff
+      // scrolls past because it reads like documentation.
+    */
+    expect(code).not.toMatch(/maximum level/);
+    expect(code).toMatch(/topRung\s*\?/);
+  });
+
+  it("the save refuses before the ladder has loaded", () => {
+    const code = readCode(LADDER_EDITOR);
+    const start = code.indexOf("const saveLevels");
+    expect(start).toBeGreaterThan(-1);
+    const post = code.indexOf('method: "POST"', start);
+    expect(post).toBeGreaterThan(start);
+
+    /*
+      // Reason: POSITION, not presence. The guard has to sit between the function opening
+      // and the request, or it is a check that runs after the write it exists to prevent.
+      // Asserting the file merely mentions ladderLoaded is green on that arrangement.
+    */
+    const beforeRequest = code.slice(start, post);
+    expect(beforeRequest).toMatch(/if\s*\(!ladderLoaded/);
+    /*
+      Both clauses, and the `return`. The flag alone is not enough: a response of `[]` is a
+      shape a half-run migration or a failed seed leaves behind, and without the length test
+      the save POSTs an empty ladder over the stored one - the same destruction the flag
+      exists to prevent, arriving one step along.
+
+      // Reason: the `return` is asserted separately because a guard that toasts and then
+      // falls through is the shape this file already had for the XP tab, and it reads as
+      // correct - the operator is even told something is wrong while the write proceeds.
+    */
+    expect(beforeRequest).toMatch(/levels\.length === 0/);
+    expect(beforeRequest).toMatch(/return;/);
+  });
+
+  it("the flag is set only by a non-empty loaded ladder", () => {
+    const code = readCode(LADDER_EDITOR);
+    const sets = code.match(/setLadderLoaded\(/g) ?? [];
+    /*
+      Exactly one writer. A second `setLadderLoaded(true)` anywhere - in a catch, or beside
+      the save - re-arms the defect while every other assertion here stays green.
+    */
+    expect(sets.length).toBe(1);
+
+    const at = code.indexOf("setLadderLoaded(true)");
+    expect(at).toBeGreaterThan(-1);
+    // The length test must guard it. `if (xpData.levels)` admits [] and an empty ladder
+    // sets the flag, which is the whole defect one step along.
+    const guarded = code.slice(Math.max(0, at - 400), at);
+    expect(guarded).toMatch(/xpData\.levels\.length\s*>\s*0/);
+  });
+
+  it("the editor control is withheld with its reason, not disabled", () => {
+    const code = readCode(LADDER_EDITOR);
+    expect(code).toMatch(/!ladderLoaded \?/);
+    // A refusal that names the missing thing. `disabled={!ladderLoaded}` teaches nothing,
+    // so assert the operator is told what failed and what to do.
+    expect(code).toMatch(/has not loaded/);
+    expect(code).toMatch(/Reload the page/);
+  });
+
+  it("every read of a rung survives an empty ladder", () => {
+    const code = readCode(LADDER_EDITOR);
+    /*
+      storedLevels is empty until the fetch lands, so `storedLevels[0]` is no longer a
+      guaranteed fallback. Both consumers of levelData must be optional or the users table
+      throws on exactly the failed-load path this defect is about.
+    */
+    expect(code).toMatch(/levelData\?\.icon/);
+    expect(code).toMatch(/levelData\?\.color/);
+    expect(code).not.toMatch(/levelData\.icon/);
+    expect(code).not.toMatch(/levelData\.color/);
   });
 });

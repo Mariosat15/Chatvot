@@ -20,14 +20,22 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { TITLE_LEVELS } from "@/lib/constants/levels";
+import type { TitleLevel } from "@/lib/constants/levels";
 
 interface CompetitionEditorFormProps {
   competitionId: string;
+  /**
+   * The operator's configured level ladder, read server-side from XPConfig.
+   *
+   * Reason: R88. Required rather than defaulted to TITLE_LEVELS - see the note on
+   * CompetitionCreatorForm's identical prop.
+   */
+  levelLadder: TitleLevel[];
 }
 
 export default function CompetitionEditorForm({
   competitionId,
+  levelLadder,
 }: CompetitionEditorFormProps) {
   const router = useRouter();
   const { settings } = useAppSettings();
@@ -321,7 +329,12 @@ export default function CompetitionEditorForm({
     return prizeDistribution.reduce((sum, prize) => sum + prize.percentage, 0);
   };
 
-  // Using TITLE_LEVELS from constants for 20 levels
+  // The level dropdowns render `levelLadder`, the operator's configured ladder, handed
+  // down by the page. This comment used to read "Using TITLE_LEVELS from constants for
+  // 20 levels", which was true and was the R88 defect: the code ladder's rung names
+  // would be offered even after an operator renamed them, so a contest was gated against
+  // a vocabulary no other screen agreed with. Corrected rather than deleted, because the
+  // old sentence was believed and is the reason nobody looked.
 
   return (
     <form
@@ -736,7 +749,7 @@ export default function CompetitionEditorForm({
                   }
                   className="mt-2 w-full bg-gray-700 border-gray-600 text-gray-100 rounded-lg px-3 py-2"
                 >
-                  {TITLE_LEVELS.map((level) => (
+                  {levelLadder.map((level) => (
                     <option key={level.level} value={level.level}>
                       Level {level.level}: {level.title} ({level.minXP}+ XP)
                     </option>
@@ -761,7 +774,7 @@ export default function CompetitionEditorForm({
                   className="mt-2 w-full bg-gray-700 border-gray-600 text-gray-100 rounded-lg px-3 py-2"
                 >
                   <option value="">No Maximum</option>
-                  {TITLE_LEVELS.filter((level) => level.level >= levelRequirement.minLevel).map((level) => (
+                  {levelLadder.filter((level) => level.level >= levelRequirement.minLevel).map((level) => (
                     <option key={level.level} value={level.level}>
                       Level {level.level}: {level.title}
                     </option>

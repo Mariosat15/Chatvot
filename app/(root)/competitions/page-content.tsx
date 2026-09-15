@@ -35,6 +35,8 @@ import {
   getAllDifficultyLevels,
 } from "@/lib/utils/competition-difficulty";
 import type { TitleLevel } from "@/lib/constants/levels";
+import { resolveLevelName } from "@/lib/utils/level-title";
+import { levelEmoji } from "@/components/trading/level-emoji";
 
 // Adaptive poll intervals (ms) — speeds up when a competition is about to start
 const POLL_FAST = 5_000; // Within 2 min of a start time
@@ -605,18 +607,35 @@ export default function CompetitionsPageContent({
     "Trading God": { label: "Trading God", emoji: "👑", color: "text-red-500" },
   };
 
-  const LEVEL_LABELS: Record<number, string> = {
-    0: "🌐 Open to All",
-    1: "🌱 Novice+",
-    2: "📚 Apprentice+",
-    3: "⚔️ Skilled+",
-    4: "🎯 Expert+",
-    5: "💎 Elite+",
-    6: "👑 Master+",
-    7: "🔥 Grand Master+",
-    8: "⚡ Champion+",
-    9: "🌟 Legend+",
-    10: "👑 Trading God",
+  /*
+    R90, fourth site. This was a ten-entry `Record<number, string>` whose names disagreed with
+    the twenty-rung ladder in the same way the other three did - by naming a real rung from the
+    wrong position. The option reading "Skilled+" filtered for rung 3, which the ladder calls
+    "Trainee"; and there was no entry at all for rungs 11-20, so those options read "Lvl 12+"
+    while the contests behind them required "Market Legend". The two render sites had drifted
+    apart far enough to carry different fallbacks ("Lvl {n}+" and "Level {n}+").
+
+    `levelLadder` was already a prop on this component and already passed down to the cards
+    below; only this map ignored it. `resolveLevelName` carries the whole fallback chain, so
+    neither render site needs one of its own.
+
+    A FUNCTION RATHER THAN A MAP, because the key is a number off a stored contest document
+    and object indexing walks the prototype chain - `LEVEL_LABELS["constructor"]` returned
+    something truthy that survived the `||` fallback.
+
+    The rung-10 carve-out that suppressed the "+" is deliberately NOT preserved: it existed
+    only because 10 was the top of the ten-entry ladder, and it is rung 20 that is the top of
+    the real one. Separately and left alone: the filter matches `minLevel` EXACTLY (see the
+    `levelFilter.includes` below), so the "+" overstates what selecting an option does. That is
+    a wording defect of its own and fixing it here would put a second change in a commit whose
+    whole claim is that only the names moved.
+  */
+  const levelFilterLabel = (level: number): string => {
+    // Rung 0 is not a rung: it is the "no level requirement" option on the filter.
+    if (level === 0) return "🌐 Open to All";
+
+    const emoji = levelEmoji(level);
+    return `${emoji ? `${emoji} ` : ""}${resolveLevelName(level, levelLadder)}+`;
   };
 
   const activeFiltersCount =
@@ -868,7 +887,7 @@ export default function CompetitionsPageContent({
                         : "bg-gray-700 text-gray-300"
                     }`}
                   >
-                    {LEVEL_LABELS[level] || `Lvl ${level}+`}
+                    {levelFilterLabel(level)}
                   </button>
                 ))}
               </div>
@@ -1173,7 +1192,7 @@ export default function CompetitionsPageContent({
                     }}
                     className="text-gray-300"
                   >
-                    {LEVEL_LABELS[level] || `Level ${level}+`}
+                    {levelFilterLabel(level)}
                   </DropdownMenuCheckboxItem>
                 ))}
               </DropdownMenuContent>

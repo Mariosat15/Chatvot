@@ -2,6 +2,7 @@ import { ArrowLeft, Trophy } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import CompetitionEditorForm from "@/components/admin/CompetitionEditorForm";
+import { getTitleLevels } from "@/lib/services/xp-config.service";
 
 interface EditCompetitionPageProps {
   params: Promise<{ id: string }>;
@@ -36,6 +37,10 @@ export default async function EditCompetitionPage({
 }: EditCompetitionPageProps) {
   const { id } = await params;
 
+  // Reason: R88. Same as the create page - the form is a client component and the
+  // operator's configured ladder lives in XPConfig, so it is read here and handed down.
+  const levelLadder = await getTitleLevels();
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-900 to-gray-800 p-4 md:p-8 lg:p-12">
       {/* Header */}
@@ -68,7 +73,7 @@ export default async function EditCompetitionPage({
       </div>
 
       {/* Form */}
-      <CompetitionEditorForm competitionId={id} />
+      <CompetitionEditorForm competitionId={id} levelLadder={levelLadder} />
     </div>
   );
 }

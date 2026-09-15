@@ -37,7 +37,7 @@ import CompetitionRulesSection from "@/components/admin/CompetitionRulesSection"
 import { useAppSettings } from "@/contexts/AppSettingsContext";
 import AIGeneratorDialog from "@/components/admin/AIGeneratorDialog";
 import { calculateCompetitionDifficulty } from "@/lib/utils/competition-difficulty";
-import { TITLE_LEVELS } from "@/lib/constants/levels";
+import type { TitleLevel } from "@/lib/constants/levels";
 import { formatVolts } from "@/lib/utils/format-volts";
 import {
   WizardShell,
@@ -48,7 +48,20 @@ import {
   type WizardStep,
 } from "@/components/admin/wizard/WizardShell";
 
-export default function CompetitionCreatorForm() {
+interface CompetitionCreatorFormProps {
+  /**
+   * The operator's configured level ladder, read server-side from XPConfig.
+   *
+   * Reason: R88. Required rather than defaulted to TITLE_LEVELS - a default would let a
+   * future call site omit it and silently offer the code ladder's rung names, which is
+   * the defect this prop exists to close, and it would review as harmless.
+   */
+  levelLadder: TitleLevel[];
+}
+
+export default function CompetitionCreatorForm({
+  levelLadder,
+}: CompetitionCreatorFormProps) {
   const router = useRouter();
   const { settings } = useAppSettings();
   const [loading, setLoading] = useState(false);
@@ -2373,7 +2386,7 @@ export default function CompetitionCreatorForm() {
                             }
                             className="w-full mt-2 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-red-500"
                           >
-                            {TITLE_LEVELS.map((level) => (
+                            {levelLadder.map((level) => (
                               <option key={level.level} value={level.level}>
                                 Level {level.level}: {level.title} ({level.minXP}+ XP)
                               </option>
@@ -2398,7 +2411,7 @@ export default function CompetitionCreatorForm() {
                             className="w-full mt-2 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-red-500"
                           >
                             <option value="">No Maximum</option>
-                            {TITLE_LEVELS.filter((level) => level.level >= levelRequirement.minLevel).map((level) => (
+                            {levelLadder.filter((level) => level.level >= levelRequirement.minLevel).map((level) => (
                               <option key={level.level} value={level.level}>
                                 Level {level.level}: {level.title}
                               </option>

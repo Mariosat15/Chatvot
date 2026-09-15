@@ -7,6 +7,7 @@ import CompetitionEntryButton from "@/components/trading/CompetitionEntryButton"
 import LiveCountdown from "@/components/trading/LiveCountdown";
 import { buildTradingLobbySections } from "@/components/trading/lobby/trading-lobby-accordions";
 import PrizeTable from "@/components/competitions/PrizeTable";
+import { resolveLevelName } from "@/lib/utils/level-title";
 
 /**
  * The trading lobby's right-hand column.
@@ -35,30 +36,6 @@ interface RiskSettings {
   marginCall: number;
   marginWarning: number;
   marginSafe: number;
-}
-
-/* The level names, moved here with the card that renders them and nothing else. */
-const LEVEL_NAMES = [
-  "",
-  "Novice",
-  "Apprentice",
-  "Skilled",
-  "Expert",
-  "Elite",
-  "Master",
-  "Grand Master",
-  "Champion",
-  "Legend",
-  "Trading God",
-];
-
-function levelName(value: number): string {
-  /*
-    `at()` rather than `[]`, because the value comes from a competition document. Array indexing
-    with an unchecked number is the same class of sink as object indexing with an unchecked key,
-    and the original code needed an eslint suppression on each of the two reads to say so.
-  */
-  return LEVEL_NAMES.at(value) || `Level ${value}`;
 }
 
 /**
@@ -231,9 +208,17 @@ export default function TradingLobbySidebar({
               const max = competition.levelRequirement.maxLevel
                 ? Number(competition.levelRequirement.maxLevel)
                 : null;
+              /*
+                R90: the third site to carry its own ten-entry name map. It named rung 3
+                "Skilled" where the ladder says "Trainee", and had no name at all for rungs
+                11-20, so a contest gated at level 12 read "Level 12" while the gate itself
+                admitted "Market Legend". `resolveLevelName` answers from the operator's
+                ladder - the same one the entry button beside this card already reads, which
+                is the point: two panels on one page must not disagree about one rung.
+              */
               return max
-                ? `${levelName(min)} to ${levelName(max)}`
-                : `${levelName(min)} or higher`;
+                ? `${resolveLevelName(min, levelLadder)} to ${resolveLevelName(max, levelLadder)}`
+                : `${resolveLevelName(min, levelLadder)} or higher`;
             })()}
           </p>
         </NeonPanel>

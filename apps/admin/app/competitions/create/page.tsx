@@ -2,8 +2,16 @@ import { Trophy, ArrowLeft, Sparkles } from "lucide-react";
 import CompetitionCreatorForm from "@/components/admin/CompetitionCreatorForm";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { getTitleLevels } from "@/lib/services/xp-config.service";
 
-const CreateCompetitionPage = () => {
+const CreateCompetitionPage = async () => {
+  // Reason: R88. The level ladder an operator has configured lives in XPConfig, not in
+  // the hard-coded TITLE_LEVELS array. The form is a client component, so the ladder has
+  // to be read here and handed down - reading the constant inside the form would offer
+  // the operator rung names they had renamed, and the contest would then be created
+  // against a vocabulary no screen agrees with.
+  const levelLadder = await getTitleLevels();
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-900 to-gray-800">
       {/* Enhanced Header */}
@@ -46,7 +54,7 @@ const CreateCompetitionPage = () => {
 
       {/* Form Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <CompetitionCreatorForm />
+        <CompetitionCreatorForm levelLadder={levelLadder} />
       </div>
     </div>
   );

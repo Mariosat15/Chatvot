@@ -1,17 +1,14 @@
-# Probe harness for R88 (a renamed level ladder must reach every screen) and R89 (the
-# routes that read and write it must be authorized).
+# Probe harness for the level ladder - R88 (reads), R90 (local rung maps) and R91 (the editor
+# that could destroy the ladder).
 #
-# Same rules as tools/probe-terminology-delivery.ps1 and not repeated here: one defect per
-# probe, one NAMED expected test, `-LiteralPath`-equivalent byte reads, UTF-8 without a BOM
-# on the read and the write, a relaxed newline in every pattern, and a refusal to believe an
-# outcome when the replacement changed nothing.
+# PROBE 9 IS THE ONE TO READ FIRST. It is the reason R91 exists at all: it restores the local
+# `TITLE_LEVELS` state variable that shadowed the canonical constant, which meant the R90
+# reach regex was satisfied by a hard-coded ten-rung ladder living inside the component. The
+# guard reported the file clean while it held the very thing the guard forbids.
 #
-# A green probe is a question with four known answers - weak test, wrong claim, unreachable
-# guard, or a mutation with no observable - so read the reason before loosening an assertion.
-#
-# THREE PROBES ARE DELIBERATELY ABSENT, each recorded where it would have gone rather than
-# only in a list at the end - one because the guard changes no observable, two because the
-# property already has a witness or the mutation is refused by the compiler.
+# Same rules as every harness here: one defect per probe, one named expected test, and a green
+# probe is a question with four known answers - weak test, wrong claim, unreachable guard, or
+# a mutation with no observable.
 
 $ErrorActionPreference = 'Continue'
 $root = Split-Path -Parent $PSScriptRoot
@@ -31,19 +28,25 @@ function Invoke-Probe {
     [string]$File,
     [string]$From,
     [string]$To,
-    [string]$ExpectRed
+    [string]$ExpectRed,
+    [int]$AllowRed = 1
   )
 
+  # Reason: -LiteralPath on the READ as well as the write. One of these paths contains
+  # `[id]`, which PowerShell parses as a wildcard character class, so Get-Content matches
+  # nothing and returns $null while the write happily empties the file. A probe that
+  # destroys the file it is probing reports every test red for entirely the wrong reason.
   $path = Join-Path $root $File
-  $pattern = Relaxed $From
-
   $original = [IO.File]::ReadAllText($path)
   if ([string]::IsNullOrEmpty($original)) {
     Write-Host "HARNESS BROKEN  $Name - read returned nothing for $File" -ForegroundColor Magenta
     $script:fail++
     return
   }
+
+  $pattern = Relaxed $From
   if (-not [regex]::IsMatch($original, $pattern)) {
+    # Reason: DID NOT APPLY means the target MOVED, never that the run was quiet.
     Write-Host "DID NOT APPLY   $Name - pattern not found in $File" -ForegroundColor Magenta
     $script:fail++
     return
@@ -58,12 +61,15 @@ function Invoke-Probe {
     }
     [IO.File]::WriteAllText($path, $mutated, (New-Object Text.UTF8Encoding $false))
 
+    # Reason: run the expected test ALONE with -t and read the summary counts. Searching the
+    # whole suite's output for the test's NAME reports RED beside "failed 0", because vitest
+    # prints a passing test's name as readily as a failing one.
     $out = & cmd.exe /c "npx vitest run $Suite -t `"$ExpectRed`" --reporter=basic 2>&1" | Out-String
     $flat = ($out -replace '\s+', ' ')
 
     if ($flat -match 'Tests\s+(\d+)\s+failed') {
       $count = [int]$Matches[1]
-      if ($count -le 2) {
+      if ($count -le $AllowRed) {
         Write-Host "RED             $Name" -ForegroundColor Green
       } else {
         Write-Host "RED (x$count)      $Name - more than the expected test broke" -ForegroundColor Yellow
@@ -75,6 +81,9 @@ function Invoke-Probe {
       $flat -match 'Tests\s+0\s+passed' -or
       $flat -notmatch 'Tests\s+\d+\s+passed'
     ) {
+      # Reason: vitest's -t is a REGULAR EXPRESSION, so a bracket or an apostrophe in the
+      # test's name matches nothing and a passing run over zero tests reads exactly like a
+      # missing guard. Every name below is regex-safe for that reason.
       Write-Host "NO TEST RAN     $Name - '$ExpectRed' matched nothing" -ForegroundColor Magenta
       $script:fail++
     } else {
@@ -86,263 +95,225 @@ function Invoke-Probe {
   }
 }
 
-$RESOLVER = 'lib/utils/level-title.ts'
-$LEVELS = 'lib/constants/levels.ts'
-$BOARD = 'app/api/leaderboard/route.ts'
-$PAGE = 'app/(root)/competitions/[id]/page.tsx'
+$ENTRY  = 'components/trading/CompetitionEntryButton.tsx'
+$SIDEBAR = 'components/trading/lobby/TradingLobbySidebar.tsx'
+$LOBBY  = 'app/(root)/competitions/page-content.tsx'
+$FORM   = 'apps/admin/components/admin/CompetitionCreatorForm.tsx'
+$CREATE = 'apps/admin/app/competitions/create/page.tsx'
+$EDITOR = 'apps/admin/components/admin/BadgeXPManagementSection.tsx'
+$TITLE  = 'lib/utils/level-title.ts'
 
-Write-Host "`n=== the operator's ladder wins over the cache ===" -ForegroundColor Cyan
+Write-Host "`n=== R90 - no screen holds its own list of rung names ===" -ForegroundColor Cyan
 
-# 1. THE DEFECT ITSELF, restored in one line. The cached title first is exactly what the five
-#    read sites were doing by another road, and it reads as the obvious implementation.
-Invoke-Probe -Name '1  the cached title preferred over the ladder' -File $RESOLVER `
-  -From '  const title =
-    trimmed(entry.title) ||
-    trimmed(stored?.currentTitle) ||
-    resolveLevelName(level, ladder);' `
-  -To '  const title =
-    trimmed(stored?.currentTitle) ||
-    trimmed(entry.title) ||
-    resolveLevelName(level, ladder);' `
+# 1. THE ORIGINAL DEFECT, VERBATIM. A ten-entry map in a component that gates on a
+#    twenty-rung ladder, so rungs 11-20 rendered as nothing at all and rungs 1-10 carried
+#    whatever the author had typed rather than what the operator had configured.
+Invoke-Probe -Name '1  the local rung map restored' -File $ENTRY `
+  -From 'resolveLevelName(' `
+  -To 'LEVEL_NAMES_LOCAL(' `
+  -ExpectRed 'the four fixed screens resolve through the shared helper, not a local map'
+
+# 2. THE SHAPE A LATER EDIT ACTUALLY PRODUCES. The resolver kept, and a local map added
+#    beside it for one extra caption - so every positive assertion passes while one of the
+#    two answers on the screen is the author's and not the operator's.
+Invoke-Probe -Name '2  a local map beside the correct resolver' -File $SIDEBAR `
+  -From 'import { resolveLevelName }' `
+  -To 'const LEVEL_NAMES: Record<number, string> = { 1: "Novice" };
+import { resolveLevelName }' `
+  -ExpectRed 'the four fixed screens resolve through the shared helper, not a local map'
+
+# 3. THE DIRECTORY WALK NARROWED. The vacuity probe, and the one that matters most for a
+#    scan-based suite: with the walk returning nothing, every `it.each` below it produces
+#    zero cases and the whole R90 block passes having examined no file at all.
+Invoke-Probe -Name '3  the gate-screen walk finds nothing' -File $Suite `
+  -From 'for (const dir of ["components", "app", "apps/admin/components"]) walk(dir);' `
+  -To 'for (const dir of ["lib/constants"]) walk(dir);' `
+  -ExpectRed 'finds the level-gate screens'
+
+# 4. THE EXEMPTION LIST WIDENED. The quietest way to lose this guard: a screen that grows a
+#    hard-coded map is added to NAMES_NO_RUNG with a plausible reason, and the second half of
+#    that block - that the file still renders the NUMBER its reason describes - is what
+#    refuses it. Asserting only the absence of ladder reach would admit the exemption.
+Invoke-Probe -Name '4  a real offender excused as rendering a number' -File $Suite `
+  -From 'const NAMES_NO_RUNG' `
+  -To 'const NAMES_NO_RUNG: { file: string; reason: string; number: RegExp }[] = [
+  { file: "components/trading/CompetitionEntryButton.tsx", reason: "excused", number: /nothing-like-this/ },
+]; const UNUSED_NO_RUNG' `
+  -ExpectRed 'renders a number, not a name' `
+  -AllowRed 2
+
+# 5. THE RECORDED OFFENDER SILENTLY FIXED. The canary in its own direction - if the Game
+#    Master page stops being an offender, the exemption that hides it must be deleted in the
+#    same edit, or a real screen is excused for ever on the strength of a note about a defect
+#    somebody has since closed.
+Invoke-Probe -Name '5  the Game Master page stops being an offender' -File 'app/(root)/gamemaster/create-competition/page.tsx' `
+  -From 'Level 3: Skilled Trader' `
+  -To 'Level 3' `
+  -ExpectRed 'the Game Master page is still an offender'
+
+Write-Host "`n=== R88 - the operator's ladder is the authority ===" -ForegroundColor Cyan
+
+# 6. THE STALE CACHE READ. This is the fix prescription the risk register originally
+#    carried, and it is wrong: `currentTitle` is stamped at award time, so a rung renamed
+#    afterwards never reaches a player who has not levelled up since. It reads as the
+#    obvious fix, which is exactly why it needs a probe.
+Invoke-Probe -Name '6  the title taken from the award-time cache' -File $TITLE `
+  -From '    trimmed(entry.title) ||
+    trimmed(stored?.currentTitle) ||' `
+  -To '    trimmed(stored?.currentTitle) ||
+    trimmed(entry.title) ||' `
   -ExpectRed 'prefers the ladder'
 
-# 2. THE LEVEL NUMBER taken from the same cache. An operator who moves a threshold leaves
-#    every stored level wrong until the next award, and the paid-entry gate compares on it.
-#    Written as a `??` fallback it reads as tolerating a ladder that cannot place the player.
-Invoke-Probe -Name '2  the level read from the stored number first' -File $RESOLVER `
-  -From '  const level = entry.level;' `
-  -To '  const level = numeric(stored?.currentLevel) ?? entry.level;' `
-  -ExpectRed 'derives the level from XP against the ladder'
-
-# 3. THE CACHE DROPPED ENTIRELY. This is the over-correction: a rung an operator saved with a
-#    blank title has no name, so a real historical title is replaced with "Level 2" on every
-#    screen the player appears on. Note the FIXTURE had to be an empty TITLE, not an empty
-#    ladder - against an empty ladder the scan falls back to the code ladder, every rung is
-#    named, and this probe came back green.
-Invoke-Probe -Name '3  the cache fallback removed' -File $RESOLVER `
-  -From '    trimmed(stored?.currentTitle) ||
-' -To '' `
-  -ExpectRed 'falls back to the cached title'
-
-# 4. NO DOCUMENT, NO ROW. Every leaderboard has to render a player who has never earned XP.
-Invoke-Probe -Name '4  an absent XP document not defaulted to rung one' -File $RESOLVER `
-  -From '  const entry = levelEntryForXP(numeric(stored?.currentXP) ?? 0, ladder);' `
-  -To '  const entry = stored ? levelEntryForXP(numeric(stored.currentXP) ?? 0, ladder) : undefined;' `
-  -ExpectRed 'renders a player who has never earned XP'
-
-# 5. ARTWORK TAKEN FROM THE DATABASE. `GameIconName` is a union of committed SVG assets and
-#    the colour is a Tailwind class that must exist in the compiled stylesheet, so an
-#    operator-typed value for either draws NOTHING while reviewing as perfectly correct.
-Invoke-Probe -Name '5  icon and colour taken from the operator entry' -File $RESOLVER `
+# 7. ARTWORK TAKEN FROM THE OPERATOR'S TEXT. The subtle half of R88: the NAME is the
+#    operator's, the icon and colour are not - an operator-typed icon name has no committed
+#    SVG behind it and an operator-typed colour is not a compiled Tailwind class, so both
+#    must be matched out of the code ladder by level NUMBER. Taking them from the stored
+#    entry renders a missing glyph and an unstyled label, and neither throws.
+Invoke-Probe -Name '7  icon and colour read from the stored entry' -File $TITLE `
   -From '  const art = TITLE_LEVELS.find((e) => e.level === level) ?? TITLE_LEVELS[0];' `
-  -To '  const art = entry ?? TITLE_LEVELS[0];' `
+  -To '  const art = { icon: entry.icon, color: entry.color };' `
   -ExpectRed 'takes the icon and colour from the code ladder'
 
-# NO PROBE FOR THE XP COERCION, and this is the third of the four green-probe answers: the
-# guard changes no observable. `numeric()` looked like the obvious sixth probe and came back
-# green on all five rows, because JavaScript coerces both sides of `xp >= entry.minXP`
-# anyway and an unparseable total makes every comparison false, falling through the scan to
-# rung one - which is the same answer `?? 0` produces. The comment in the test says so
-# rather than claiming a fix, and the guard stays because the accident holds only for this
-# scan: a reader comparing with `<`, or averaging, would be silently wrong on a `NaN`.
+# 8. THE ADMIN FORM BACK ON THE CONSTANT. The two forms are a third shape - they offer the
+#    whole ladder as choices - so they never call the resolver and can only be guarded on
+#    what they must NOT import. A value import here is a dropdown of our names over the
+#    operator's, on the one screen where the choice is made.
+Invoke-Probe -Name '8  the admin form imports the constant again' -File $FORM `
+  -From 'levelLadder.map(' `
+  -To 'TITLE_LEVELS_LOCAL.map(' `
+  -ExpectRed 'offers the operator''s ladder, not the constant'
 
-Write-Host "`n=== naming a level with no player to scan ===" -ForegroundColor Cyan
+Write-Host "`n=== R91 - the editor cannot overwrite what it failed to load ===" -ForegroundColor Cyan
 
-# 7. THE POSITION FORM. `ladder[level - 1]` throws on a ladder an operator has shortened and
-#    names the WRONG rung on one they have reordered - and this string is quoted to a player
-#    being refused paid entry.
-Invoke-Probe -Name '7  resolveLevelName matched by array position' -File $RESOLVER `
-  -From '  const configured = trimmed(ladder.find((e) => e.level === level)?.title);' `
-  -To '  const configured = trimmed(ladder[level - 1]?.title);' `
-  -ExpectRed 'matches on the level number, not on array position'
+# 9. THE SHADOWING STATE VARIABLE. READ THIS ONE. The defect was not that the editor held a
+#    hard-coded ladder - it was that the variable holding it was named `TITLE_LEVELS`, so the
+#    R90 reach regex matched a bare identifier and pronounced the file clean. The regex is
+#    now anchored to an IMPORT of the constant or a CALL to a helper for this reason.
+Invoke-Probe -Name '9  the shadowing TITLE_LEVELS state restored' -File $EDITOR `
+  -From 'const [storedLevels, setStoredLevels] = useState<any[]>([]);' `
+  -To 'const [TITLE_LEVELS, setStoredLevels] = useState<any[]>([{ level: 1, title: "Novice Trader" }]);
+  const storedLevels = TITLE_LEVELS;' `
+  -ExpectRed 'holds no hard-coded ladder of its own'
 
-# 8. The last resort removed, so a level no ladder can name renders an empty string - a
-#    refusal message with a hole in it.
-Invoke-Probe -Name '8  the plain level-number fallback removed' -File $RESOLVER `
-  -From '  return `Level ${level}`;' -To '  return "";' `
-  -ExpectRed 'falls back to the code ladder, then to a plain level number'
+# 10. THE SAVE GUARD DELETED. The whole of R91 in one line: the POST replaces the stored
+#     document outright, so a save made before the ladder arrived wrote whatever state held.
+Invoke-Probe -Name '10 the save no longer refuses an unloaded ladder' -File $EDITOR `
+  -From 'if (!ladderLoaded || levels.length === 0) {' `
+  -To 'if (false) {' `
+  -ExpectRed 'the save refuses before the ladder has loaded'
 
-Write-Host "`n=== one definition of the XP to level rule ===" -ForegroundColor Cyan
-
-# 9. AN EMPTY LADDER TAKEN LITERALLY. An operator saving an empty level list would take down
-#    every leaderboard AND the paid-entry gate with an undefined read - which is what the
-#    database copy of this scan did before it was consolidated here.
-Invoke-Probe -Name '9  the empty-ladder fallback removed' -File $LEVELS `
-  -From '  const entries = ladder.length > 0 ? ladder : TITLE_LEVELS;' `
-  -To '  const entries = ladder;' `
-  -ExpectRed "falls back to the code ladder when the operator's is empty"
-
-# 10. Below the first threshold answering nothing. A brand-new player has 0 XP, so this is
-#     the common case rather than an edge one.
+# 11. THE GUARD THAT TOASTS AND FALLS THROUGH. The condition present, correct and complete,
+#     and no `return` - so the operator is told the ladder did not load and the save proceeds
+#     anyway. It is the shape this same file already had on its XP tab, which is why it is the
+#     likely edit, and every positive assertion about the condition passes on it.
 #
-#     RE-AIMED 15 Sep 2026. The pattern read `return entries[0];` and the line is now
-#     `const [lowest] = entries;` - destructured to satisfy the object-injection rule - so
-#     this probe had been reporting DID NOT APPLY and the guard beneath it sat unexercised.
-#     A probe naming something that no longer exists fails in the quiet direction.
-Invoke-Probe -Name '10 the below-first-threshold answer removed' -File $LEVELS `
-  -From '  const [lowest] = entries;
-  return lowest;' -To '  return undefined as unknown as TitleLevel;' `
-  -ExpectRed 'places an XP total below the first threshold on the first rung'
+#     THIS PROBE CAME BACK GREEN ONCE, against `if (!ladderLoaded && false)`, and the honest
+#     answer was a weak test rather than a wrong claim: the assertion matched the opening of
+#     the condition and could not see it neutered. The test now pins both clauses AND the
+#     return. The `&& false` mutation is not probed - see the footer.
+Invoke-Probe -Name '11 the guard toasts and falls through' -File $EDITOR `
+  -From '      return;
+    }' `
+  -To '    }' `
+  -ExpectRed 'the save refuses before the ladder has loaded'
 
-Write-Host "`n=== every read site goes through the resolver ===" -ForegroundColor Cyan
+# 11b. THE LENGTH CLAUSE DROPPED FROM THE SAVE. Distinct from probe 12, which drops it from
+#      the FLAG: this one leaves the flag correct and lets an empty `levels` array through the
+#      save, which POSTs nothing over the stored ladder. Two clauses, two ways to lose it.
+Invoke-Probe -Name '11b the save stops checking the ladder is non-empty' -File $EDITOR `
+  -From 'if (!ladderLoaded || levels.length === 0) {' `
+  -To 'if (!ladderLoaded) {' `
+  -ExpectRed 'the save refuses before the ladder has loaded'
 
-# 11. A SITE BACK ON THE CONSTANT. The synchronous `getTitleByXP` is still exported and still
-#     correct against the hard-coded array, so this compiles, runs and is the defect.
-Invoke-Probe -Name '11 a read site recomputing from the constant' -File $BOARD `
-  -From 'resolveLevelTitle(' -To 'getTitleByXP_LEGACY(' `
-  -ExpectRed 'app/api/leaderboard/route.ts calls resolveLevelTitle'
+# 12. THE LENGTH TEST DROPPED FROM THE FLAG. `if (xpData.levels)` admits `[]`, so an empty
+#     response sets the flag, the guard passes, and the save POSTs an empty ladder over the
+#     stored one. The defect one step along from the one that was fixed, and it reads as a
+#     harmless simplification.
+Invoke-Probe -Name '12 the flag set by an empty response' -File $EDITOR `
+  -From 'Array.isArray(xpData.levels) && xpData.levels.length > 0' `
+  -To 'Array.isArray(xpData.levels)' `
+  -ExpectRed 'the flag is set only by a non-empty loaded ladder'
 
-# 12. THE LADDER NEVER READ, so the resolver's default parameter applies and the site is back
-#     on the constant while CALLING the fix - the defect wearing the fix's name, which probe
-#     11's assertion is green against.
-Invoke-Probe -Name '12 the ladder argument dropped' -File $BOARD `
-  -From 'const ladder = await getTitleLevels();' -To 'const ladder = undefined;' `
-  -ExpectRed 'app/api/leaderboard/route.ts reads the ladder it resolves against'
+# 13. A SECOND WRITER OF THE FLAG. The shape that survives every other assertion here: the
+#     original setter untouched, and a second one in the failure path so the editor arms
+#     itself precisely when the read failed. Caught only by the count.
+Invoke-Probe -Name '13 a second setLadderLoaded in the failure path' -File $EDITOR `
+  -From 'setLadderLoaded(true);' `
+  -To 'setLadderLoaded(true);
+        setLadderLoaded(true);' `
+  -ExpectRed 'the flag is set only by a non-empty loaded ladder'
 
-# 13. RESOLVED PER ROW. A database read per participant is the shape that made
-#     `getComprehensiveDashboardData` unpollable, and it produces identical output.
-Invoke-Probe -Name '13 the ladder read inside the row map' -File $BOARD `
-  -From 'const display = resolveLevelTitle(userLevels.get(entry.userId), ladder);' `
-  -To 'const display = resolveLevelTitle(userLevels.get(entry.userId), await getTitleLevels());' `
-  -ExpectRed 'app/api/leaderboard/route.ts reads the ladder once, not per row'
+# 14. THE REFUSAL REDUCED TO A DISABLED CONTROL. A greyed-out button teaches nothing - an
+#     operator reads it as the feature being broken and reloads nothing. The refusal has to
+#     name the missing thing and the action, which is the same rule as a provider with no
+#     adapter and a rankingMethod a provider game ignores.
+Invoke-Probe -Name '14 the refusal replaced by silence' -File $EDITOR `
+  -From 'Reload the page' `
+  -To 'Unavailable' `
+  -ExpectRed 'the editor control is withheld with its reason, not disabled'
 
-# 14. THE LITERAL REINTRODUCED as a fallback, which is how it got into six files in the first
-#     place - each one individually reasonable-looking.
-Invoke-Probe -Name '14 a hard-coded rung name reintroduced' -File $BOARD `
-  -From 'userTitle: display.title,' -To 'userTitle: display.title || "Novice Trader",' `
-  -ExpectRed 'app/api/leaderboard/route.ts'
+# 15. AN UNGUARDED RUNG READ. storedLevels is empty until the fetch lands, so `[0]` is no
+#     longer the guaranteed fallback it was when state was seeded with ten rungs. This
+#     throws on exactly the failed-load path the whole defect is about.
+Invoke-Probe -Name '15 a rung read that assumes a loaded ladder' -File $EDITOR `
+  -From 'levelData?.icon' `
+  -To 'levelData.icon' `
+  -ExpectRed 'every read of a rung survives an empty ladder'
 
-Write-Host "`n=== the difficulty-band exemption's canary ===" -ForegroundColor Cyan
+# 16. THE HARD-CODED RUNG COUNT RESTORED. Found by accident rather than by design - the
+#     string test above went red on PROSE, not on the literal it was written for. "Level 10
+#     (Trading God) is the maximum level" was wrong twice: the ladder has twenty rungs, and
+#     the name is the operator's to change. A claim about the data is as renameable as a
+#     label, and it is the one a diff scrolls past because it reads like documentation.
+Invoke-Probe -Name '16 the hard-coded maximum-level claim' -File $EDITOR `
+  -From '{topRung' `
+  -To '{false' `
+  -ExpectRed 'states no rung count of its own'
 
-# 15. THE EXEMPTION MADE STALE BY INJECTING THE FIX. A contest's difficulty band shares the
-#     words and not the concept, so the literal is permitted inside that map alone. Injecting
-#     the day X6.5 tokenises those bands is what turns this red - so the exemption cannot
-#     outlive the reason for it and be worked around by somebody who believes the comment.
-Invoke-Probe -Name '15 the difficulty band tokenised - the canary must fire' -File $PAGE `
-  -From 'beginner: { level: "Novice", label: "Novice Trader", score: 10 },' `
-  -To 'beginner: { level: "Novice", label: `Novice ${terms.player}`, score: 10 },' `
-  -ExpectRed 'the difficulty-band exemption is still an offender'
+Write-Host "`n=== the read sites stay on the shared resolver ===" -ForegroundColor Cyan
 
-Write-Host "`n=== the resolver stays client-importable, and mirrored ===" -ForegroundColor Cyan
+# 17. THE LADDER READ TWICE ON ONE PAGE. Two reads is two answers - the page renders one
+#     ladder and hands the form another - and it is the natural shape when somebody adds a
+#     second consumer rather than threading the prop down. Caught only by the count.
+Invoke-Probe -Name '17 a second ladder read on one page' -File $CREATE `
+  -From 'await getTitleLevels()' `
+  -To 'await getTitleLevels(); await getTitleLevels()' `
+  -ExpectRed 'reads the ladder once and hands it down'
 
-# 16. R58 - a `"use client"` file may not name a driver-reaching module in a value-import
-#     position, and admin screens import this one. The typecheck cannot see the breach: the
-#     import is valid TypeScript and a clean `tsc --noEmit` is consistent with an app that
-#     cannot build at all.
-Invoke-Probe -Name '16 the resolver reaching a model' -File $RESOLVER `
-  -From 'import type { GameIconName } from "@/lib/constants/game-icons";' `
-  -To 'import type { GameIconName } from "@/lib/constants/game-icons";
-import UserLevel from "@/database/models/gamification/user-level.model";' `
-  -ExpectRed 'imports no model and no database service'
-
-# 17. MIRROR DRIFT. `check:mirrors` compares MODELS and has never had an opinion about a
-#     utility module, so two copies could disagree about which ladder wins with every other
-#     guard in this file staying green - and the admin copy is the one an operator reads.
-Invoke-Probe -Name '17 the admin copy drifted' -File 'apps/admin/lib/utils/level-title.ts' `
-  -From '  const level = entry.level;' `
-  -To '  const level = numeric(stored?.currentLevel) ?? entry.level;' `
-  -ExpectRed 'apps/admin/lib/utils/level-title.ts matches the main copy'
-
-Write-Host "`n=== R89 - the ladder's routes are authorized ===" -ForegroundColor Cyan
-
-# 18. THE GUARD REMOVED FROM A WRITER. `badges-xp/manage` rebalances the level ladder and
-#     badge XP values, so this is the unauthenticated write, not a listing.
-Invoke-Probe -Name '18 the manage route unguarded' -File 'apps/admin/app/api/badges-xp/manage/route.ts' `
-  -From '  const guard = await guardSection("badges");
-  if (!guard.ok) return guard.response;
-
-  try {
-    await connectToDatabase();' `
-  -To '  try {
-    await connectToDatabase();' `
-  -ExpectRed 'guards every exported handler'
-
-# 19. ONE HANDLER GUARDED AND ONE NOT - the shape a mention-based assertion passes while
-#     leaving a mutation wide open, and `seed-badges-xp` is exactly it: the GET force-resets
-#     both configurations just as destructively as the POST.
-Invoke-Probe -Name '19 seed-badges-xp guarded on POST only' -File 'apps/admin/app/api/seed-badges-xp/route.ts' `
-  -From 'export async function GET() {
-  const guard = await guardSection("badges");
-  if (!guard.ok) return guard.response;
-' -To 'export async function GET() {
-' `
-  -ExpectRed 'guards every exported handler'
-
-# 20. ADMIN-AT-ALL RATHER THAN THE SECTION. `verifyAdminAuth` asks only whether the caller is
-#     an admin, so an employee granted one unrelated section passes - ninth instance of that
-#     class, and the one a reviewer reads straight past because a helper IS being called.
-Invoke-Probe -Name '20 the section grant weakened to admin-at-all' -File 'apps/admin/app/api/badges-xp/route.ts' `
-  -From 'const guard = await guardSection("badges");' `
-  -To 'const guard = await guardSection("overview");' `
-  -ExpectRed 'asks for the badges section, not admin-at-all'
-
-Write-Host "`n=== R88 on the dashboard - one rung from one place ===" -ForegroundColor Cyan
-
-$DASH = 'lib/actions/comprehensive-dashboard.actions.ts'
-
-# 21. THE DEFECT AS IT ACTUALLY SHIPPED, and the reason this site needed a guard of its own:
-#     `level` and `title` were moved onto the resolver and the two ARTWORK fields beside them
-#     were left on the award-time cache, so the fix reviewed as complete. A renamed rung
-#     reached the heading and the colour and icon stayed at whatever the player last earned.
-Invoke-Probe -Name '21 the artwork left on the award-time cache' -File $DASH `
-  -From '      titleColor: levelDisplay.color,
-      titleIcon: levelDisplay.icon,' `
-  -To '      titleColor: (userLevelData as any).currentColor || "#9ca3af",
-      titleIcon: (userLevelData as any).currentIcon || "*",' `
-  -ExpectRed 'comes from the resolver'
-
-# 22. ONE FIELD OF THE FOUR. The partial form is the one to prove, because a guard asserting
-#     the object "mentions levelDisplay" is green against it - three correct fields cover for
-#     the fourth, which is exactly how this defect survived review the first time.
-Invoke-Probe -Name '22 a single field back on the cache' -File $DASH `
-  -From '      title: levelDisplay.title,' `
-  -To '      title: (userLevelData as any).currentTitle || "Novice Trader",' `
-  -ExpectRed 'does not read currentTitle off the award-time cache'
-
-# 23. PRESENTATION TAKEN FROM THE PROGRESS CALCULATION. `calculateXPProgress` returns a
-#     `currentLevel` carrying a title, icon and colour straight off the operator's row, so
-#     this is the OTHER road to the same defect - it never mentions the cache, it calls no
-#     legacy helper, and it reads as using the value already in hand.
-#
-#     AIMED AT THE READ, NOT THE DESTRUCTURING. The first spelling only added `currentLevel`
-#     to the destructured list and came back GREEN - correctly, and it is the fourth cause of
-#     a green probe rather than a weak test: a value pulled out and never consumed changes no
-#     observable, and the assertion is about what the object is BUILT from. Two tests go red
-#     here, the field's own and this one, which is the honest number for one edit.
-Invoke-Probe -Name '23 the rung taken from the progress calculation' -File $DASH `
-  -From '      titleIcon: levelDisplay.icon,' `
-  -To '      titleIcon: currentLevel.icon,' `
-  -ExpectRed 'does not take presentation from the progress calculation'
-
-# 24. THE DISCARDED SECOND READ RESTORED. Not a correctness defect - the result was thrown
-#     away - but it awaited two database reads per dashboard load for nothing, on the one
-#     action already too heavy to poll (`13` s5.1b). The canary keeps it from drifting back
-#     in as a harmless-looking parallel fetch.
-Invoke-Probe -Name '24 the redundant progress read restored' -File $DASH `
-  -From '    getUserGlobalRank(userId).catch(() => ({ rank: 0, totalUsers: 0, percentile: 0 })),' `
-  -To '    calculateXPProgress(0).catch(() => ({ progressPercent: 0, xpToNext: 100 })),
-    getUserGlobalRank(userId).catch(() => ({ rank: 0, totalUsers: 0, percentile: 0 })),' `
-  -ExpectRed 'computes progress once'
-
-# NO PROBE FOR THE SLICE HELPER ITSELF, and it is worth saying why rather than leaving the
-# gap to be noticed: `dashboardPlayerObject` uses `lastIndexOf` because this file has TWO
-# `player: {` - the return type declaration and the object literal - and the first spelling
-# of it sliced the TYPE and reported `titleIcon: string;` as failing to read the resolver.
-# The mutation that proves the helper is a third `player: {` between the two, which is not a
-# defect any reviewer would write. It carries an inline assertion instead: the slice must not
-# match `level: number;`, so it cannot silently go back to examining a type declaration.
-
-# NO PROBE FOR 'apps/admin/lib/constants/levels.ts matches the main copy', and the reason
-# rather than the omission left to be noticed: probe 10 already mutates the main copy of
-# `levelEntryForXP`, which turns that mirror assertion red as a side effect. A probe aimed at
-# the admin copy would report red for the same reason as its sibling and prove nothing
-# additional - the two files' byte-identity is one property with one witness.
-#
-# NO PROBE FOR 'the resolver exports the shapes a consumer needs'. The only mutation that
-# turns it red is renaming or deleting an export, which stops the test file COMPILING - and a
-# probe whose defect is refused by the compiler is indistinguishable from a harness that did
-# not apply. The property is carried by every other test here importing those names.
+# 18. THE PROP DROPPED. The read kept, correct and complete, and never passed to the form -
+#     so the form falls back to whatever it does without a ladder and the page's own read is
+#     dead code that reviews as the fix being present.
+Invoke-Probe -Name '18 the ladder read but not handed down' -File $CREATE `
+  -From 'levelLadder={levelLadder}' `
+  -To 'className="contents"' `
+  -ExpectRed 'reads the ladder once and hands it down'
 
 Write-Host ""
-Write-Host "red: $($script:pass)   green or broken: $($script:fail)" -ForegroundColor Cyan
-if ($script:fail -gt 0) { exit 1 }
+if ($script:fail -eq 0) {
+  Write-Host "all $($script:pass) probes red on the expected test" -ForegroundColor Green
+} else {
+  Write-Host "$($script:pass) red, $($script:fail) NOT red - read those above" -ForegroundColor Red
+}
+
+# THREE PROBES ARE DELIBERATELY ABSENT, with the reasons here rather than three more lines
+# that report green and teach the next reader the guards are decoration.
+#
+# There is no probe for the save guard's condition being made UNREACHABLE while still reading
+# correctly - `if (!ladderLoaded && false)`. It was written, it came back green, and it is not
+# in the file, because catching it means pinning the condition character for character and
+# that guard would then fail on any legitimate rewording. A guard that fires on correct code
+# is the one the next reader deletes, which costs more than this shape does: nobody writes
+# `&& false` by accident, whereas probes 10, 11, 11b, 12 and 13 are all edits somebody makes
+# on purpose while believing they are simplifying.
+#
+# There is no probe for `LADDER_BY_FETCH`'s endpoint assertion being aimed at the right
+# endpoint. Mutating the fetch URL turns that test red, which probe-able - but the property
+# worth proving is that the URL names the route which actually returns the ladder, and that
+# is a claim about a route handler rather than about this component. It is held instead by
+# the route's own suite.
+#
+# And there is no probe for the R91 refusal being rendered rather than merely reachable. The
+# branch is `{!ladderLoaded ? ... : ...}`, so the only mutation that removes the render
+# without removing the condition is one that swaps the arms - and swapping them makes the
+# editor available exactly when the ladder is absent, which is probe 10's defect arriving by
+# a different road. It would report red on the same test and prove nothing new.

@@ -105,78 +105,19 @@ interface Stats {
 export default function BadgeXPManagementSection() {
   // Fetch badges and XP config from database
   const [badgesFromDB, setBadgesFromDB] = useState<any[]>([]);
-  const [TITLE_LEVELS, setTitleLevels] = useState<any[]>([
-    {
-      level: 1,
-      title: "Novice Trader",
-      minXP: 0,
-      icon: "🌱",
-      color: "text-gray-400",
-    },
-    {
-      level: 2,
-      title: "Apprentice Trader",
-      minXP: 100,
-      icon: "📚",
-      color: "text-green-400",
-    },
-    {
-      level: 3,
-      title: "Skilled Trader",
-      minXP: 300,
-      icon: "⚔️",
-      color: "text-blue-400",
-    },
-    {
-      level: 4,
-      title: "Expert Trader",
-      minXP: 600,
-      icon: "🎯",
-      color: "text-cyan-400",
-    },
-    {
-      level: 5,
-      title: "Elite Trader",
-      minXP: 1000,
-      icon: "💎",
-      color: "text-purple-400",
-    },
-    {
-      level: 6,
-      title: "Master Trader",
-      minXP: 1600,
-      icon: "👑",
-      color: "text-pink-400",
-    },
-    {
-      level: 7,
-      title: "Grand Master",
-      minXP: 2400,
-      icon: "🔥",
-      color: "text-orange-400",
-    },
-    {
-      level: 8,
-      title: "Trading Champion",
-      minXP: 3400,
-      icon: "⚡",
-      color: "text-red-400",
-    },
-    {
-      level: 9,
-      title: "Market Legend",
-      minXP: 4600,
-      icon: "🌟",
-      color: "text-yellow-400",
-    },
-    {
-      level: 10,
-      title: "Trading God",
-      minXP: 6000,
-      icon: "👑",
-      color: "text-yellow-300",
-    },
-  ]);
+  /*
+    R91 - this was a hard-coded ten-entry ladder seeded into state, and it could overwrite
+    the operator's twenty-rung ladder with the trading-flavoured names they had renamed away
+    from. The GET below replaces it on success; on failure the operator saw ten stale rungs,
+    and `saveLevels` POSTs whatever is in state to a route that REPLACES the stored document
+    outright. One failed read plus one save destroyed the configuration.
+
+    It seeds empty instead, and the editor is withheld until the real ladder has arrived.
+    Refusing is the fix rather than seeding the canonical twenty, because the canonical names
+    are not the operator's either - a stored value and an absent one are different facts.
+  */
+  const [storedLevels, setStoredLevels] = useState<any[]>([]);
+  const [ladderLoaded, setLadderLoaded] = useState(false);
   const [BADGE_XP_VALUES, setBadgeXPValues] = useState<any>({
     common: 10,
     rare: 25,
@@ -203,9 +144,12 @@ export default function BadgeXPManagementSection() {
             setBadgeXPValues(xpData.badgeXP);
             setXpValues(xpData.badgeXP);
           }
-          if (xpData.levels) {
-            setTitleLevels(xpData.levels);
+          if (Array.isArray(xpData.levels) && xpData.levels.length > 0) {
+            setStoredLevels(xpData.levels);
             setLevels(xpData.levels);
+            // Reason: this flag is what permits saveLevels to run at all (R91). An empty or
+            // absent ladder must NOT set it - saving then POSTs nothing over the stored one.
+            setLadderLoaded(true);
           }
         }
       } catch (error) {
@@ -242,7 +186,19 @@ export default function BadgeXPManagementSection() {
   const [editingBadgeXP, setEditingBadgeXP] = useState(false);
   const [editingLevel, setEditingLevel] = useState(false);
   const [xpValues, setXpValues] = useState(BADGE_XP_VALUES);
-  const [levels, setLevels] = useState<any[]>(TITLE_LEVELS);
+  const [levels, setLevels] = useState<any[]>(storedLevels);
+  /*
+    The top rung of whatever ladder actually loaded. `reduce` rather than the last element
+    because nothing guarantees the stored array is sorted, and `null` while it is absent so
+    the copy below can state nothing rather than guess.
+  */
+  const topRung: { level: number; title?: string } | null = ladderLoaded
+    ? (storedLevels.reduce(
+        (highest, entry) =>
+          highest === null || entry?.level > highest.level ? entry : highest,
+        null as { level: number; title?: string } | null,
+      ) ?? null)
+    : null;
   const [managingBadges, setManagingBadges] = useState(false);
   const [editingBadge, setEditingBadge] = useState<any>(null);
   const [badgeSearchTerm, setBadgeSearchTerm] = useState("");
@@ -388,8 +344,8 @@ export default function BadgeXPManagementSection() {
   };
 
   const calculateProgress = (currentXP: number, level: number) => {
-    const currentLevelData = TITLE_LEVELS.find((l) => l.level === level);
-    const nextLevelData = TITLE_LEVELS.find((l) => l.level === level + 1);
+    const currentLevelData = storedLevels.find((l) => l.level === level);
+    const nextLevelData = storedLevels.find((l) => l.level === level + 1);
 
     if (!currentLevelData || !nextLevelData) return 100;
 
@@ -437,6 +393,19 @@ export default function BadgeXPManagementSection() {
   };
 
   const saveLevels = async () => {
+    /*
+      R91 - the POST replaces the stored ladder document outright rather than merging, so a
+      save made before the real ladder arrived wrote whatever state happened to hold. The
+      guard is here as well as on the control because a disabled button is a UI fact and
+      this is the function that moves the data.
+    */
+    if (!ladderLoaded || levels.length === 0) {
+      toast.error(
+        "The level ladder has not loaded yet. Reload before saving, or you would overwrite the stored ladder.",
+      );
+      return;
+    }
+
     try {
       const response = await fetch("/api/badges-xp/manage", {
         method: "POST",
@@ -449,13 +418,13 @@ export default function BadgeXPManagementSection() {
       if (data.success) {
         toast.success("Level progression saved to database!");
         setEditingLevel(false);
-        setTitleLevels(levels);
+        setStoredLevels(levels);
 
         const refreshRes = await fetch("/api/badges-xp/manage");
         const refreshData = await refreshRes.json();
         if (refreshData.success && refreshData.levels) {
           setLevels(refreshData.levels);
-          setTitleLevels(refreshData.levels);
+          setStoredLevels(refreshData.levels);
         }
       } else {
         toast.error(data.error || "Failed to update levels");
@@ -658,7 +627,17 @@ export default function BadgeXPManagementSection() {
                   Configure XP thresholds and titles for each level
                 </p>
               </div>
-              {editingLevel ? (
+              {!ladderLoaded ? (
+                /*
+                  R91 - a refusal that names the missing thing, not a greyed-out button. An
+                  operator told only that editing is unavailable reloads nothing and assumes
+                  the feature is broken; one told the ladder did not load knows what to do.
+                */
+                <p className="text-sm text-amber-400 max-w-md text-right">
+                  The stored ladder has not loaded, so editing is withheld - saving now would
+                  replace it. Reload the page to try again.
+                </p>
+              ) : editingLevel ? (
                 <div className="flex gap-2">
                   <Button onClick={saveLevels} size="sm">
                     <Save className="h-4 w-4 mr-2" />
@@ -1003,7 +982,16 @@ export default function BadgeXPManagementSection() {
                   </li>
                   <li className="flex items-start gap-2">
                     <Target className="h-4 w-4 mt-0.5 text-yellow-500" />
-                    Level 10 (Trading God) is the maximum level
+                    {/*
+                      R91 - this read "Level 10 (Trading God) is the maximum level", which was
+                      a hard-coded claim about a ladder the operator owns, and wrong on both
+                      counts: the canonical ladder has twenty rungs, and the name is one the
+                      operator may have renamed away from. Derived from the loaded ladder, and
+                      states nothing at all while it is absent.
+                    */}
+                    {topRung
+                      ? `Level ${topRung.level} (${topRung.title}) is the highest rung on your ladder`
+                      : "The highest rung is whichever one sits at the top of your ladder"}
                   </li>
                 </ul>
               </div>
@@ -1329,9 +1317,13 @@ export default function BadgeXPManagementSection() {
             </TableHeader>
             <TableBody>
               {filteredUsers.map((user, index) => {
-                const levelData =
-                  TITLE_LEVELS.find((l) => l.level === user.currentLevel) ||
-                  TITLE_LEVELS[0];
+                // Reason: storedLevels is empty until the ladder loads (R91), so [0] is no
+                // longer a guaranteed fallback and every read below is optional.
+                const levelData:
+                  | { title?: string; icon?: string; color?: string }
+                  | undefined =
+                  storedLevels.find((l) => l.level === user.currentLevel) ??
+                  storedLevels[0];
                 const progress = calculateProgress(
                   user.currentXP,
                   user.currentLevel,
@@ -1372,9 +1364,12 @@ export default function BadgeXPManagementSection() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-3">
-                        <GameIcon name={levelData.icon as GameIconName} size={36} />
+                        <GameIcon
+                          name={levelData?.icon as GameIconName}
+                          size={36}
+                        />
                         <div>
-                          <p className={`font-bold text-lg ${levelData.color}`}>
+                          <p className={`font-bold text-lg ${levelData?.color ?? ""}`}>
                             Level {user.currentLevel}
                           </p>
                           <p className="text-sm text-muted-foreground">
@@ -1400,7 +1395,7 @@ export default function BadgeXPManagementSection() {
                           </span>
                           <span className="text-xs text-muted-foreground">
                             Next:{" "}
-                            {TITLE_LEVELS[user.currentLevel]?.minXP || "MAX"}
+                            {storedLevels[user.currentLevel]?.minXP || "MAX"}
                           </span>
                         </div>
                         <Progress value={progress} className="h-3" />
@@ -2141,7 +2136,7 @@ export default function BadgeXPManagementSection() {
                         <div className="flex items-center gap-4 mb-2">
                           <span className="text-6xl">
                             {
-                              TITLE_LEVELS.find(
+                              storedLevels.find(
                                 (l) =>
                                   l.level === selectedUser.level.currentLevel,
                               )?.icon
@@ -2202,7 +2197,7 @@ export default function BadgeXPManagementSection() {
                       </span>
                       <span>
                         Next:{" "}
-                        {TITLE_LEVELS[
+                        {storedLevels[
                           selectedUser.level.currentLevel
                         ]?.minXP.toLocaleString() || "MAX"}{" "}
                         XP
