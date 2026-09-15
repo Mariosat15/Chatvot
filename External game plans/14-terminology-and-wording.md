@@ -216,9 +216,17 @@ who has to think in games rather than trades.
 > `0`**. But `rg` over the two field names found **seven** readers where the task named two.
 > The five that remain are named in `17` R92 with a **canary asserting each is still an
 > offender**, and the two worth knowing here are that **the player's own result page** shows
-> the person who *paid* `$0.00` and `0 trades` (X7 by phase), and that **the AI agent is handed
-> a `challenger_pnl`** it will state in a confident sentence - which is **A6, still pending in
-> this very phase**.
+> the person who *paid* `$0.00` and `0 trades` (X7 by phase), and that **the AI agent's
+> challenge report carries P&L and no score at all** - which is **A6, still pending in this
+> very phase**.
+>
+> **That AI-agent sentence first read "it will state a `challenger_pnl` in a confident
+> sentence", and that was wrong. Corrected here rather than reworded**, on the R7 and R31
+> precedent: those lines fall back to **`"—"`, not `0`**, so the agent invents nothing - the
+> defect is that it has **no performance figure for a provider challenge to explain with**,
+> and the phantom zeros in that file are on its **competition** reports. The guard moved with
+> the correction: the canary asserts the **absence of `score`**, because aimed at the presence
+> of `challenger_pnl` it would have stayed green straight through A6.
 >
 > **The ledger's labels are tokenised and its KEYS are not**, which is the one assertion in
 > A4's suite that fails when somebody is helpful. `FinancialDashboard` maps a

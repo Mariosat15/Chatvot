@@ -863,9 +863,22 @@ without reading `17`. **`app/(root)/challenges/[id]/page.tsx` is the player's OW
 where the four figures render unconditionally with `|| 0`, so the person who **paid** reads
 `$0.00` and `0 trades` for a game with neither - worse than the admin half, and **X7 by phase
 rather than deferred by effort**. And **`apps/admin/app/api/ai-agent/chat/route.ts` hands
-`challenger_pnl` to the AI agent**, which is the worst-reading of the five: asked about a puzzle
-challenge it will answer with a confident P&L figure. That one is **A6, still pending in this
-very phase**, so it is a defect waiting for work already on the list rather than a new risk.
+`challenger_pnl` to the AI agent**, which is **A6, still pending in this very phase**, so it is
+a defect waiting for work already on the list rather than a new risk.
+
+**That AI-agent claim was first written here as "the agent will answer with a confident P&L
+figure", and it was WRONG - corrected rather than reworded, because it was believed for a day
+and the next reader needs to know it was.** Those two lines fall back to **`"—"`, not to `0`**,
+which is the dash rule doing exactly what R45 and R50 demand, so the agent never invents a
+number. The real defect is an **absence**: the challenge report carries P&L and nothing else, so
+asked about a provider challenge the agent can give the entry fee, the pot and the winner and
+**has nothing to say about how anybody played** - it answers with a dash and stops. **The
+phantom zeros in that file are on its COMPETITION reports**, which do collapse with `|| 0`, and
+those reach the same agent. The lesson is the one this programme keeps relearning: **an aside
+written while summarising is a claim, not a fact**, and the fix here was to read line 2529
+before building on it. It also changed the guard - the canary is aimed at the **absence of
+`score`**, not the presence of `challenger_pnl`, because aimed at the P&L it would have stayed
+green straight through A6: that line is correct for a trading challenge and is going nowhere.
 
 **The ledger's labels are tokenised and its keys are not**, and that is the one assertion in
 A4's suite that fails when somebody is helpful. `FinancialDashboard` maps a
@@ -1083,8 +1096,13 @@ passing the hook meant an unrelated cleanup in the same commit.
 
 **Next chat should:** ~~return to **X6.5 A3b**, the lowercase sweep, which is where this detour
 started.~~ **- done the same day, with A3c.** ~~Take A4.~~ **- also done the same day; see the
-A4 entry above. Take A5, the admin wiki, and note A6 now has a defect waiting for it: R92's
-`challenger_pnl` reaching the AI agent.**
+A4 entry above.** ~~Take A5, the admin wiki, and note A6 now has a defect waiting for it: R92's
+`challenger_pnl` reaching the AI agent.~~ **- reordered on the owner's call, 15 Sep 2026: A6
+first, because it closes a live wrong-guidance defect and is the smaller of the two, and A5's
+content is the owner's to write (the build leaves a reword plus a skeleton of empty
+game-administration topics). Note the A6 defect is NARROWER than the sentence above claimed -
+the agent answers a dash, not a false profit; the absence of any score is the gap, and the
+phantom zeros are on the competition reports in the same file.**
 
 ---
 

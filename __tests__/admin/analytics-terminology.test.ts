@@ -376,14 +376,48 @@ describe("R92's remaining readers are still trading-shaped", () => {
     },
   );
 
-  it("the AI agent is handed a P&L it will state in a sentence", () => {
+  it("the AI agent reports a challenge with no score field at all", () => {
     /*
-      The worst-READING of the five: asked about a puzzle challenge the agent answers with a
-      confident P&L figure. This is X6.5 A6, still pending in this same phase, which is why
-      it is recorded here rather than left for somebody to rediscover.
+      Reason: this claim was first recorded as "the agent states a confident P&L for a puzzle"
+      and that was WRONG - the two challenge lines fall back to an em-dash, not to zero, which
+      is the correct read-side behaviour (R45/R50's dash rule). Corrected here rather than
+      quietly reworded, because the overstatement was believed and acted on.
+
+      The real defect is an ABSENCE: the challenge report carries only P&L, so asked about a
+      provider challenge the agent can give the entry fee, the pot and the winner and has no
+      performance figure to explain WHY that player won. It answers "—" and stops.
+
+      Aimed at the absence, so it goes red the day A6 adds a score. Aimed at the presence of
+      challenger_pnl it would have stayed green through the fix - the P&L line is correct for
+      a trading challenge and is not going anywhere.
     */
     const source = code(AI_AGENT);
-    expect(source).toMatch(/challenger_pnl\s*:/);
-    expect(source).toMatch(/challenged_pnl\s*:/);
+    /*
+      Sliced to the one function, with BOTH ends proven to exist - a slice whose end marker
+      has moved returns the rest of the file and satisfies everything asked of it. The end
+      marker is the next FUNCTION, never the banner comment above it, because `code()` strips
+      comments before matching.
+    */
+    const start = source.indexOf("async function executeGetChallengeDetails");
+    const end = source.indexOf("async function executeGetInvoices");
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    const report = source.slice(start, end);
+
+    expect(report).toMatch(/challenger_pnl\s*:/);
+    // The em-dash, not a zero. Pinned so a later "tidy-up" to || 0 is caught.
+    expect(report).toMatch(/challengerFinalStats\?\.pnl\?\.toFixed\(2\)\s*\|\|\s*"\u2014"/);
+    expect(report).not.toMatch(/score/i);
+  });
+
+  it("the agent's COMPETITION reports are where the phantom zeros actually are", () => {
+    /*
+      Found while correcting the claim above. These are the same R50 shape and they feed the
+      same agent, so a provider contest's participants are reported as having scored 0 with 0
+      trades - which for a game IS a false figure rather than an absent one.
+    */
+    const source = code(AI_AGENT);
+    const hits = source.match(/pnl\s*:[^,\n]*\|\|\s*(0|"0")/g) ?? [];
+    expect(hits.length).toBeGreaterThanOrEqual(2);
   });
 });
