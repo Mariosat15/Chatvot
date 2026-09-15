@@ -40,6 +40,13 @@ import {
 // Import AI Knowledge service for vectorized search
 import { aiKnowledgeService } from "@/lib/services/ai-knowledge.service";
 
+// The operator's renamed nouns, appended to the prompt (X6.5 A6c)
+import { vocabularyRule } from "@/lib/admin/ai-contest-vocabulary";
+import { getTerms } from "@/lib/services/terminology.service";
+import type { TerminologyPack } from "@/lib/constants/terminology";
+import { hasProviderGameLabel } from "@/lib/admin/contest-game-label";
+import { resolveGameBadge } from "@/lib/admin/contest-analytics-presentation";
+
 // Note: Fraud-related models (PaymentFingerprint, FraudAlert, SuspicionScore)
 // are queried via raw MongoDB to avoid schema registration issues
 
@@ -2112,7 +2119,11 @@ async function executeGetCompetitionLeaderboard(
   if (!competition) {
     competition = await db.collection("competitions").findOne({
       $expr: {
-        $regexMatch: { input: { $toString: "$_id" }, regex: searchId, options: "i" },
+        $regexMatch: {
+          input: { $toString: "$_id" },
+          regex: searchId,
+          options: "i",
+        },
       },
     });
   }
@@ -2127,6 +2138,7 @@ async function executeGetCompetitionLeaderboard(
   }
 
   const fullCompetitionId = competition._id.toString();
+  const isProviderContest = hasProviderGameLabel(competition);
 
   // For completed competitions, check if we have winner data stored in the competition
   if (
@@ -2141,11 +2153,7 @@ async function executeGetCompetitionLeaderboard(
         username: entry.username || "N/A",
         email: entry.email || "N/A",
         userId: entry.userId,
-        capital: entry.finalCapital?.toFixed(2) || "0",
-        pnl: entry.pnl?.toFixed(2) || "0",
-        pnlPercent: `${entry.pnlPercentage?.toFixed(2) || 0}%`,
-        trades: entry.totalTrades || 0,
-        winRate: `${entry.winRate?.toFixed(1) || 0}%`,
+        ...participantMetrics(entry, isProviderContest),
         isWinner: entry.rank === 1 ? "🏆 Winner" : "",
       }));
 
@@ -2157,21 +2165,26 @@ async function executeGetCompetitionLeaderboard(
         { key: "rank", label: "#", type: "number" },
         { key: "username", label: "Username" },
         { key: "email", label: "Email" },
-        { key: "capital", label: "Final Capital", type: "number" },
-        { key: "pnl", label: "P&L", type: "number" },
-        { key: "pnlPercent", label: "P&L %" },
-        { key: "trades", label: "Trades", type: "number" },
-        { key: "winRate", label: "Win Rate" },
+        ...(await participantMetricColumns(isProviderContest, "Final Capital")),
         { key: "isWinner", label: "Result" },
       ],
     };
   }
 
+  // Reason a provider contest orders on `currentRank` instead: ordering on `pnl` is
+  // meaningless for a game, and ordering on `score` is WRONG for half the catalogue, since a
+  // time trial's best score is its lowest and the direction lives on the catalogue title.
+  // `currentRank` is the position the ranking engine already computed with that direction
+  // applied, so reading it back is the only ordering here that cannot invert a board.
+  const participantSort: Record<string, 1 | -1> = isProviderContest
+    ? { currentRank: 1 }
+    : { pnl: -1, currentCapital: -1 };
+
   // Query participants collection - try multiple ID formats
   let participants = await db
     .collection("competitionparticipants")
     .find({ competitionId: fullCompetitionId })
-    .sort({ pnl: -1, currentCapital: -1 })
+    .sort(participantSort)
     .limit(limit)
     .toArray();
 
@@ -2180,7 +2193,7 @@ async function executeGetCompetitionLeaderboard(
     participants = await db
       .collection("competitionparticipants")
       .find({ competitionId: new mongoose.Types.ObjectId(fullCompetitionId) })
-      .sort({ pnl: -1, currentCapital: -1 })
+      .sort(participantSort)
       .limit(limit)
       .toArray();
   }
@@ -2190,7 +2203,7 @@ async function executeGetCompetitionLeaderboard(
     participants = await db
       .collection("competitionparticipants")
       .find({ competitionId: { $regex: new RegExp(searchId, "i") } })
-      .sort({ pnl: -1, currentCapital: -1 })
+      .sort(participantSort)
       .limit(limit)
       .toArray();
   }
@@ -2199,11 +2212,7 @@ async function executeGetCompetitionLeaderboard(
     rank: p.currentRank || index + 1,
     username: p.username,
     email: p.email,
-    capital: p.currentCapital?.toFixed(2) || "0",
-    pnl: p.pnl?.toFixed(2) || "0",
-    pnlPercent: `${p.pnlPercentage?.toFixed(2) || 0}%`,
-    trades: p.totalTrades,
-    winRate: `${p.winRate?.toFixed(1) || 0}%`,
+    ...participantMetrics(p, isProviderContest),
     status: p.status,
   }));
 
@@ -2216,7 +2225,9 @@ async function executeGetCompetitionLeaderboard(
         message: `Competition has ${competition.currentParticipants} participants but detailed data not found in participants collection.`,
         competitionId: fullCompetitionId,
         winnerId: competition.winnerId || "Not set",
-        winnerPnL: competition.winnerPnL || "N/A",
+        ...(isProviderContest
+          ? {}
+          : { winnerPnL: competition.winnerPnL ?? "N/A" }),
         status: competition.status,
         suggestion:
           "Check if finalLeaderboard was populated when competition ended.",
@@ -2233,14 +2244,88 @@ async function executeGetCompetitionLeaderboard(
       { key: "rank", label: "#", type: "number" },
       { key: "username", label: "Username" },
       { key: "email", label: "Email" },
-      { key: "capital", label: "Capital", type: "number" },
-      { key: "pnl", label: "P&L", type: "number" },
-      { key: "pnlPercent", label: "P&L %" },
-      { key: "trades", label: "Trades", type: "number" },
-      { key: "winRate", label: "Win Rate" },
+      ...(await participantMetricColumns(isProviderContest)),
       { key: "status", label: "Status", type: "status" },
     ],
   };
+}
+
+/**
+ * A figure the agent reports, or a dash when there is not one.
+ *
+ * R45 and R50's read-side rule, now in the reporter: a phantom `0` is the one answer an
+ * operator cannot tell from a real one, and this reporter's output is quoted into support
+ * replies and prize disputes. `??`-shaped rather than `||`-shaped because a stored zero is a
+ * real figure, which is the `entryBlockThreshold` rule one field along.
+ */
+function reportedFigure(value: unknown, digits = 2): string {
+  return typeof value === "number" && Number.isFinite(value)
+    ? value.toFixed(digits)
+    : "—";
+}
+
+/**
+ * The performance fields of one row of a contest report.
+ *
+ * ONE PRODUCER FOR FOUR CALL SITES, which is the point: the leaderboard tool has a stored
+ * branch and a live branch and the winner tool has a podium and a fallback, so the
+ * trading-shaped version of this was the same rule written four times - the shape behind
+ * `referenceId`, `failedReason`, `challengeId` and the Game Master `||`. A provider
+ * contest's seat carries `pnl`, `pnlPercentage` and `totalTrades` defaulted to `0` by
+ * `participant-seat.ts` regardless of game (R46), so they render perfectly while the score
+ * sits unreported - which is why the trading fields are WITHHELD here rather than zeroed.
+ */
+function participantMetrics(
+  row: any,
+  isProviderContest: boolean,
+): Record<string, string | number> {
+  if (isProviderContest) {
+    const hasScore =
+      typeof row.score === "number" && Number.isFinite(row.score);
+    return { score: hasScore ? row.score.toLocaleString() : "—" };
+  }
+
+  return {
+    // Reason both capital fields: the stored leaderboard calls it `finalCapital` and a live
+    // participant calls it `currentCapital`, and a reader of this function should not have to
+    // know which branch called it.
+    capital: reportedFigure(row.finalCapital ?? row.currentCapital),
+    pnl: reportedFigure(row.pnl),
+    pnlPercent:
+      typeof row.pnlPercentage === "number"
+        ? `${row.pnlPercentage.toFixed(2)}%`
+        : "—",
+    trades: typeof row.totalTrades === "number" ? row.totalTrades : "—",
+    winRate:
+      typeof row.winRate === "number" ? `${row.winRate.toFixed(1)}%` : "—",
+  };
+}
+
+/**
+ * The columns that go with {@link participantMetrics}, so the two cannot disagree.
+ *
+ * Reason it reads the vocabulary itself rather than being handed it: the tool executors are
+ * dispatched by name with only the model's arguments, so threading a pack through would mean
+ * a new parameter on thirty functions that have no use for it. Only the score column is
+ * renameable - "P&L", "Trades" and "Win Rate" are trading's own words and chapter 14's
+ * never-rename list keeps them.
+ */
+async function participantMetricColumns(
+  isProviderContest: boolean,
+  capitalLabel = "Capital",
+) {
+  if (isProviderContest) {
+    const terms = await getTerms();
+    return [{ key: "score", label: terms.score }];
+  }
+
+  return [
+    { key: "capital", label: capitalLabel, type: "number" },
+    { key: "pnl", label: "P&L", type: "number" },
+    { key: "pnlPercent", label: "P&L %" },
+    { key: "trades", label: "Trades", type: "number" },
+    { key: "winRate", label: "Win Rate" },
+  ];
 }
 
 async function executeGetCompetitionWinner(args: any): Promise<AgentResult> {
@@ -2269,7 +2354,11 @@ async function executeGetCompetitionWinner(args: any): Promise<AgentResult> {
   if (!competition) {
     competition = await db.collection("competitions").findOne({
       $expr: {
-        $regexMatch: { input: { $toString: "$_id" }, regex: searchId, options: "i" },
+        $regexMatch: {
+          input: { $toString: "$_id" },
+          regex: searchId,
+          options: "i",
+        },
       },
     });
   }
@@ -2282,6 +2371,8 @@ async function executeGetCompetitionWinner(args: any): Promise<AgentResult> {
       columns: [],
     };
   }
+
+  const isProviderContest = hasProviderGameLabel(competition);
 
   // Get winner info
   let winnerData: any = {
@@ -2324,7 +2415,12 @@ async function executeGetCompetitionWinner(args: any): Promise<AgentResult> {
       userId: competition.winnerId,
       name: winner?.name || "Unknown",
       email: winner?.email || "Unknown",
-      pnl: competition.winnerPnL || 0,
+      // Reason the figure is withheld rather than zeroed on a provider contest: `winnerPnL`
+      // is a trading field that nothing writes there, so reporting it would put a confident
+      // `0` next to the winner of a game that has no profit and loss at all.
+      ...(isProviderContest
+        ? {}
+        : { pnl: reportedFigure(competition.winnerPnL) }),
     };
   }
 
@@ -2336,27 +2432,37 @@ async function executeGetCompetitionWinner(args: any): Promise<AgentResult> {
       medal: i === 0 ? "🥇" : i === 1 ? "🥈" : "🥉",
       username: entry.username,
       email: entry.email,
-      pnl: entry.pnl?.toFixed(2) || "0",
-      pnlPercent: `${entry.pnlPercentage?.toFixed(2) || 0}%`,
+      ...participantMetrics(entry, isProviderContest),
     }));
   }
 
   // If no winner data found, try participants collection
   if (!winnerData.winner && !winnerData.podium) {
-    const topParticipant = await db
-      .collection("competitionparticipants")
-      .find({ competitionId: competition._id.toString() })
-      .sort({ pnl: -1 })
-      .limit(1)
-      .toArray();
+    // Reason a provider contest is refused rather than sorted: this fallback infers a winner
+    // by ordering on `pnl`, and a game has none. It cannot be repaired by ordering on `score`
+    // either, because the direction lives on the catalogue title - a time trial's winner is
+    // the LOWEST score - so a guess here would name the loser on half the catalogue and
+    // present it with a medal. `resolveScoreDirection` is the only answer and it is
+    // settlement's to apply, not a reporter's.
+    const topParticipant = isProviderContest
+      ? []
+      : await db
+          .collection("competitionparticipants")
+          .find({ competitionId: competition._id.toString() })
+          .sort({ pnl: -1 })
+          .limit(1)
+          .toArray();
 
     if (topParticipant.length > 0) {
       winnerData.winner = {
         username: topParticipant[0].username,
         email: topParticipant[0].email,
-        pnl: topParticipant[0].pnl,
-        pnlPercent: `${topParticipant[0].pnlPercentage?.toFixed(2) || 0}%`,
+        pnl: reportedFigure(topParticipant[0].pnl),
+        pnlPercent: `${reportedFigure(topParticipant[0].pnlPercentage)}%`,
       };
+    } else if (isProviderContest) {
+      winnerData.message =
+        "This contest has no stored final leaderboard, so there is no recorded winner to report. A ranking cannot be inferred here, because which score wins depends on the game.";
     } else {
       winnerData.message =
         "Winner data not found. The finalLeaderboard may not have been populated when competition ended.";
@@ -2459,6 +2565,9 @@ async function executeGetChallenges(args: any): Promise<AgentResult> {
     id: c._id.toString().substring(0, 8),
     challenger: c.challengerName,
     challenged: c.challengedName,
+    // A mixed list with no game column is one an operator cannot read: a trading challenge
+    // and a puzzle challenge are indistinguishable by every other field here.
+    game: resolveGameBadge(c).label,
     status: c.status,
     entryFee: c.entryFee,
     prizePool: c.prizePool,
@@ -2475,6 +2584,7 @@ async function executeGetChallenges(args: any): Promise<AgentResult> {
       { key: "id", label: "ID" },
       { key: "challenger", label: "Challenger" },
       { key: "challenged", label: "Challenged" },
+      { key: "game", label: "Game" },
       { key: "status", label: "Status", type: "status" },
       { key: "entryFee", label: "Entry", type: "number" },
       { key: "prizePool", label: "Pool", type: "number" },
@@ -2504,6 +2614,11 @@ async function executeGetChallengeDetails(args: any): Promise<AgentResult> {
     return { type: "text", title: "Not Found", data: "Challenge not found" };
   }
 
+  // A challenge carries the same `gameType` label a contest does, so the same helper answers
+  // it. Only the reported performance and the trading-only configuration change.
+  const isProviderChallenge = hasProviderGameLabel(challenge);
+  const terms = await getTerms();
+
   return {
     type: "stats",
     title: `Challenge: ${challenge.challengerName} vs ${challenge.challengedName}`,
@@ -2517,7 +2632,12 @@ async function executeGetChallengeDetails(args: any): Promise<AgentResult> {
       winner_prize: `${challenge.winnerPrize} credits`,
       platform_fee: `${challenge.platformFeePercentage}% (${challenge.platformFeeAmount} credits)`,
       duration: `${challenge.duration} minutes`,
-      starting_capital: challenge.startingCapital,
+      // Withheld rather than reported as 0: `startingCapital` is virtual trading money and a
+      // game has none. The seat builder writes it per game, so on a provider challenge it is
+      // absent, and an absent required-looking figure reads as a data fault.
+      ...(isProviderChallenge
+        ? {}
+        : { starting_capital: challenge.startingCapital }),
       created: new Date(challenge.createdAt).toLocaleString(),
       start_time: challenge.startTime
         ? new Date(challenge.startTime).toLocaleString()
@@ -2526,8 +2646,22 @@ async function executeGetChallengeDetails(args: any): Promise<AgentResult> {
         ? new Date(challenge.endTime).toLocaleString()
         : "Not ended",
       winner: challenge.winnerName || "TBD",
-      challenger_pnl: challenge.challengerFinalStats?.pnl?.toFixed(2) || "—",
-      challenged_pnl: challenge.challengedFinalStats?.pnl?.toFixed(2) || "—",
+      // R92's read side in the agent. `score` is written onto both stat blocks by
+      // `challenge-outcome.ts`; reporting `pnl` for a game challenge quoted a figure nothing
+      // writes, and `|| "—"` hid that behind a dash that read as "not settled yet".
+      ...(isProviderChallenge
+        ? {
+            [`challenger_${terms.score.toLowerCase()}`]: reportedFigure(
+              challenge.challengerFinalStats?.score,
+            ),
+            [`challenged_${terms.score.toLowerCase()}`]: reportedFigure(
+              challenge.challengedFinalStats?.score,
+            ),
+          }
+        : {
+            challenger_pnl: reportedFigure(challenge.challengerFinalStats?.pnl),
+            challenged_pnl: reportedFigure(challenge.challengedFinalStats?.pnl),
+          }),
     },
   };
 }
@@ -3115,7 +3249,11 @@ async function executeGetUserBadges(args: any): Promise<AgentResult> {
     .toArray();
 
   // Get badge names
-  const badgeConfigs = await db.collection("badgeconfigs").find({}).limit(500).toArray();
+  const badgeConfigs = await db
+    .collection("badgeconfigs")
+    .find({})
+    .limit(500)
+    .toArray();
   const badgeMap = new Map(badgeConfigs.map((b: any) => [b._id.toString(), b]));
 
   const data = badgeStats.map((b: any) => {
@@ -3246,7 +3384,11 @@ async function executeGetOnlineUsers(args: any): Promise<AgentResult> {
 async function executeGetPaymentProviders(args: any): Promise<AgentResult> {
   const db = mongoose.connection.db!;
 
-  const providers = await db.collection("paymentproviders").find({}).limit(100).toArray();
+  const providers = await db
+    .collection("paymentproviders")
+    .find({})
+    .limit(100)
+    .toArray();
 
   const data = providers.map((p: any) => ({
     name: p.name,
@@ -4339,8 +4481,21 @@ async function getAIConfig() {
   };
 }
 
-// System prompt for the AI agent - combines capabilities with knowledge base
-const SYSTEM_PROMPT = `You are an intelligent AI assistant for the ChartVolt admin panel. You can:
+/**
+ * The agent's instructions, before the operator's vocabulary is appended (X6.5 A6c).
+ *
+ * IT USES THE DEFAULT NOUNS AND IS NOT INTERPOLATED WITH THE OPERATOR'S, for the same reason
+ * the knowledge base is not: the renamed words reach the model through
+ * {@link buildSystemPrompt}'s appended clause, which is ONE mechanism serving every prompt on
+ * the platform. Substituting tokens here as well would be a second mechanism for the same job -
+ * the "one rule, two copies" shape - and this is the copy that would drift, because it is the
+ * one nobody re-reads.
+ *
+ * The paths in the examples below are LIVE navigation and must stay so. The agent copies the
+ * shape of its examples, so a stale one here teaches it to invent plausible paths, which is the
+ * failure mode this whole pass exists to close.
+ */
+const SYSTEM_PROMPT_BASE = `You are an intelligent AI assistant for the ChartVolt admin panel. You can:
 1. **Query live data** using database tools (fraud alerts, users, transactions, competitions, etc.)
 2. **Answer questions** about how the system works using your knowledge base
 
@@ -4363,8 +4518,17 @@ You have 30+ tools to query live data:
 
 ### For "How to" Questions:
 - Use your knowledge base to explain step-by-step
-- Include the location in admin panel (e.g., "Admin Panel → Settings → Company Settings")
+- Include the location in the admin panel, written exactly as the knowledge base writes it
+  (e.g., "Settings → Settings → Company"). Never invent a path or adapt one that looks close -
+  a wrong path is the one mistake an operator cannot work around.
 - Explain the concept if needed, then the steps
+
+### For Questions About a Game:
+- Trading is ONE of the platform's games, not the platform. Before answering with capital,
+  leverage, positions, margin or profit and loss, check that the question is about TRADING.
+- A provider's game reports a SCORE and has none of those fields. If a question asks for a
+  trading figure on a provider contest or challenge, say the field does not exist there rather
+  than reporting a zero.
 
 ### For Data Queries:
 - ALWAYS use the appropriate tool to fetch real data
@@ -4389,19 +4553,24 @@ Always remind admins to verify critical decisions in the system.
 ## EXAMPLES
 
 **Q: "How do I change VAT percentage?"**
-A: Go to Admin Panel → Settings → Company Settings. The VAT rate is in the tax configuration section. Current default is 19% (Cyprus VAT). Simply update the percentage and save.
+A: Go to Settings → Settings → Company. The VAT rate is in the tax configuration section. Current default is 19% (Cyprus VAT). Simply update the percentage and save.
 
 **Q: "Show me pending withdrawals"**
 A: [Call get_pending_withdrawals tool first, then present results]
 
 **Q: "How are competition winners evaluated?"**
-A: Winners are automatically evaluated when competition ends:
+A: It depends on the game.
+On a TRADING competition, when it ends:
 1. System calculates final P&L for each participant
 2. Checks for disqualifications (liquidated users, minimum trade requirements)
-3. Ranks by chosen method (PnL, ROI, etc.) as set when creating competition
+3. Ranks by chosen method (PnL, ROI, etc.) as set when creating the competition
 4. Applies tie breakers in order
 5. Distributes prizes to winners
 6. Awards badges and updates statistics
+On a PROVIDER GAME competition, the provider reports each round's score, the scores are
+combined according to the attempts policy, and players are ranked by score in the direction
+that title scores - so a time trial ranks the lowest number first. There is no P&L, no ROI and
+no liquidation there, and a player who recorded no score at all is not ranked and not paid.
 
 ## IMPORTANT
 1. For data queries: Always call the tool first, explain results after
@@ -4410,6 +4579,18 @@ A: Winners are automatically evaluated when competition ends:
 4. End data responses with verification reminder
 
 ⚠️ DISCLAIMER: Data shown is anonymized. Always verify against actual system data for accuracy.`;
+
+/**
+ * The agent's instructions plus whatever the operator has renamed.
+ *
+ * APPENDED, NEVER INTERPOLATED - the A3c rule, and the clause being LAST is the position a
+ * model resolves a conflict in favour of. `vocabularyRule` returns an empty string when the
+ * operator has renamed nothing, so a default deployment gets byte-for-byte
+ * {@link SYSTEM_PROMPT_BASE} and this function is invisible.
+ */
+function buildSystemPrompt(terms: TerminologyPack): string {
+  return SYSTEM_PROMPT_BASE + vocabularyRule(terms);
+}
 
 export async function POST(request: NextRequest) {
   const requestTimestamp = new Date();
@@ -4496,10 +4677,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Reason: the operator's renamed nouns are resolved per request, because an operator can
+    // rename a noun and ask the agent about it in the same session. A module-level constant
+    // could not see the change until the process restarted.
+    const systemPrompt = buildSystemPrompt(await getTerms());
+
     // Build enhanced system prompt with RAG context
     const enhancedSystemPrompt = ragContext
-      ? `${SYSTEM_PROMPT}${ragContext}\n\nUse the above RELEVANT KNOWLEDGE when answering questions about platform features, policies, or procedures.`
-      : SYSTEM_PROMPT;
+      ? `${systemPrompt}${ragContext}\n\nUse the above RELEVANT KNOWLEDGE when answering questions about platform features, policies, or procedures.`
+      : systemPrompt;
 
     // Build messages with system prompt
     const chatMessages: OpenAI.ChatCompletionMessageParam[] = [
@@ -4541,7 +4727,10 @@ export async function POST(request: NextRequest) {
         const functionArgs = JSON.parse(toolCall.function.arguments);
         const toolStartTime = Date.now();
 
-        console.log(`🤖 AI Agent calling tool: ${functionName}`, JSON.stringify(functionArgs));
+        console.log(
+          `🤖 AI Agent calling tool: ${functionName}`,
+          JSON.stringify(functionArgs),
+        );
 
         toolCalls.push({
           id: toolCall.id,

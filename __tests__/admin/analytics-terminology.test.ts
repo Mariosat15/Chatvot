@@ -320,18 +320,23 @@ describe("the ledger's stored values are not renameable", () => {
 // =======================================================================================
 
 /*
-  These five files read the same snapshot fields A4 made game-aware and are STILL
-  unconditionally trading-shaped. They are listed as named exceptions, each carrying an
-  assertion that it is STILL an offender, for the R60 reason: a stale exception reads as a
-  known problem long after it is solved, and silently re-permits the defect in that file.
-  When one is fixed its line here goes red, which is the point.
+  These files read the same snapshot fields A4 made game-aware. Each was listed as a named
+  exception carrying an assertion that it is STILL an offender, for the R60 reason: a stale
+  exception reads as a known problem long after it is solved, and silently re-permits the
+  defect in that file. When one is fixed its line here goes red, which is the point.
+
+  THAT HAS NOW HAPPENED TWICE. The two AI-agent assertions below were flipped by X6.5 A6 on
+  15 Sep 2026 - the canaries fired on the day the defect closed and were rewritten rather
+  than removed, because the comment explaining why each was reachable is the most valuable
+  part. Four offenders remain: the player's own result page (X7 by phase) and the admin list
+  drawer, plus both copies of the profile action.
 
   The count matters. A4's task named two screens; `rg` over the two field names found seven
   readers. That is the counting rule after four entry paths, ten finalize sites, six raw
   inserts and seven lifecycle routes - so the number in the risk register was measured here
   rather than estimated, and this suite is what keeps it honest.
 */
-describe("R92's remaining readers are still trading-shaped", () => {
+describe("R92's readers, and the two the agent no longer has", () => {
   const PLAYER_PAGE = join(ROOT, "app/(root)/challenges/[id]/page.tsx");
   const ADMIN_LIST = join(ADMIN, "components/admin/ChallengesAdminSection.tsx");
   const PROFILE = join(ROOT, "lib/actions/user/profile.actions.ts");
@@ -376,20 +381,23 @@ describe("R92's remaining readers are still trading-shaped", () => {
     },
   );
 
-  it("the AI agent reports a challenge with no score field at all", () => {
+  it("the AI agent reports a challenge on its score", () => {
     /*
-      Reason: this claim was first recorded as "the agent states a confident P&L for a puzzle"
-      and that was WRONG - the two challenge lines fall back to an em-dash, not to zero, which
-      is the correct read-side behaviour (R45/R50's dash rule). Corrected here rather than
-      quietly reworded, because the overstatement was believed and acted on.
+      FLIPPED BY X6.5 A6 (15 Sep 2026), not deleted - this was a named exception asserting the
+      agent was still an offender, and the canary firing is what said the defect was closed.
+      Both halves of its history are worth keeping:
 
-      The real defect is an ABSENCE: the challenge report carries only P&L, so asked about a
-      provider challenge the agent can give the entry fee, the pot and the winner and has no
-      performance figure to explain WHY that player won. It answers "—" and stops.
+      The claim was FIRST recorded as "the agent states a confident P&L for a puzzle" and that
+      was wrong - the two challenge lines fell back to an em-dash, not to zero, which is the
+      correct read-side behaviour (R45/R50's dash rule). Corrected rather than quietly
+      reworded, because the overstatement was believed and acted on.
 
-      Aimed at the absence, so it goes red the day A6 adds a score. Aimed at the presence of
-      challenger_pnl it would have stayed green through the fix - the P&L line is correct for
-      a trading challenge and is not going anywhere.
+      The real defect was an ABSENCE: the challenge report carried only P&L, so asked about a
+      provider challenge the agent could give the entry fee, the pot and the winner and had no
+      performance figure to explain WHY that player won. It answered "—" and stopped. Aiming
+      the old assertion at the absence rather than at `challenger_pnl` is what made it go red
+      today; aimed at the presence it would have stayed green through the fix, because the P&L
+      line is correct for a trading challenge and is not going anywhere.
     */
     const source = code(AI_AGENT);
     /*
@@ -404,20 +412,26 @@ describe("R92's remaining readers are still trading-shaped", () => {
     expect(end).toBeGreaterThan(start);
     const report = source.slice(start, end);
 
+    // Both sides, because a fix to one leaves the other reading as correct.
+    expect(report).toMatch(/challengerFinalStats\?\.score/);
+    expect(report).toMatch(/challengedFinalStats\?\.score/);
+    // And the trading figure survives for a trading challenge - it was never the problem.
     expect(report).toMatch(/challenger_pnl\s*:/);
-    // The em-dash, not a zero. Pinned so a later "tidy-up" to || 0 is caught.
-    expect(report).toMatch(/challengerFinalStats\?\.pnl\?\.toFixed\(2\)\s*\|\|\s*"\u2014"/);
-    expect(report).not.toMatch(/score/i);
   });
 
-  it("the agent's COMPETITION reports are where the phantom zeros actually are", () => {
+  it("the agent's COMPETITION reports carry no phantom zero", () => {
     /*
-      Found while correcting the claim above. These are the same R50 shape and they feed the
-      same agent, so a provider contest's participants are reported as having scored 0 with 0
-      trades - which for a game IS a false figure rather than an absent one.
+      ALSO FLIPPED BY A6. Found while correcting the claim above, and the more serious of the
+      two: these were the R50 shape feeding the same agent, so a provider contest's
+      participants were reported as having made 0.00 with 0 trades - which for a game is a
+      FALSE figure rather than an absent one, in output an operator quotes into a dispute.
+
+      Asserted as a count of zero rather than as the presence of the fix, because the fix is
+      one shared producer (`participantMetrics`) and a fifth call site spelling the old form
+      out inline is exactly how this returns.
     */
     const source = code(AI_AGENT);
     const hits = source.match(/pnl\s*:[^,\n]*\|\|\s*(0|"0")/g) ?? [];
-    expect(hits.length).toBeGreaterThanOrEqual(2);
+    expect(hits, `phantom zeros survive: ${hits.join(", ")}`).toHaveLength(0);
   });
 });

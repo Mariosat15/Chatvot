@@ -192,7 +192,9 @@ who has to think in games rather than trades.
 > with every other game, and a trading prompt that ignored it would produce the only copy on
 > the platform still using the old word.
 >
-> **Still outstanding:** A5 and A6.
+> **Still outstanding:** A5 and A6. *(A4 and A6 were both built later the same day - see the
+> two notices below. A5 is the only pass left, and by owner decision its content is owner
+> work.)*
 
 > **A4 is BUILT as of 15 September 2026, and the pass found a defect larger than the wording
 > it set out to fix.** The table above sizes A4 at ~30 strings; **61 sites were tokenised**,
@@ -218,7 +220,8 @@ who has to think in games rather than trades.
 > offender**, and the two worth knowing here are that **the player's own result page** shows
 > the person who *paid* `$0.00` and `0 trades` (X7 by phase), and that **the AI agent's
 > challenge report carries P&L and no score at all** - which is **A6, still pending in this
-> very phase**.
+> very phase**. *(A6 landed later the same day and closed it; the sentence is correct as
+> history. Four readers remain, not five.)*
 >
 > **That AI-agent sentence first read "it will state a `challenger_pnl` in a confident
 > sentence", and that was wrong. Corrected here rather than reworded**, on the R7 and R31
@@ -245,6 +248,86 @@ who has to think in games rather than trades.
 > Separately, `wordRuns` was rewritten from a single pattern to a tokenise-then-merge, because
 > the original nested a `+` inside a `{2,}` and backtracked polynomially - `security/detect-unsafe-regex`
 > was right, on a helper that reads every file in the admin app.
+
+> **A6 is BUILT as of 15 September 2026, and the table above sizes it as "Content" when
+> two thirds of it were defects.** The pass set out to reword a knowledge base. What it found
+> is that the agent could not answer a question about a game at all, and that two of R92's
+> readers lived here.
+>
+> **The knowledge base opened "ChartVolt is a trading competition platform", and that one
+> sentence is the whole shape of the defect.** Asked how to publish a contest on a provider's
+> game, the agent answered out of the trading material - fluently, with a starting capital and
+> a leverage setting, naming screens that do not exist - because that was the only material it
+> had. There is no error and nothing in a log, which is the failure mode this programme keeps
+> meeting: **the system reports success while doing the wrong thing.** A document that
+> confidently describes the wrong platform is worse than one that says nothing.
+>
+> **The split is by SUBJECT, not by length.** `games-knowledge-base.ts` holds what is true of
+> a provider game - the catalogue, providers and credentials, the round lifecycle, the play
+> shapes, attempts, scores and their direction, the unresolved-round and unscored-contest
+> policies, the round inspector and manual resolution - and `knowledge-base.ts` keeps the
+> trading half with **its sections relabelled "(TRADING)"** so a reader can tell which is
+> which. Its header now asks the next author the question that matters: *is this fact true of
+> every game, or only of trading?*
+>
+> **It enumerates no game.** A test forbids a game code, a provider key or a title's name
+> anywhere in the games material, so the agent describes the *mechanism* and a new title is
+> covered the day it is synced. A knowledge base naming Circuit Sprint is the same failure as
+> an aggregate that enumerates game types, one layer out - it reads perfectly and is silently
+> incomplete for the next game.
+>
+> **Every navigation path in the file was stale, and that is a second, separate defect.** The
+> nav was restructured in `12` s1 on 2 September and the knowledge base still said "Admin
+> Panel → Settings → Credit Conversion" and eleven more like it. **An instruction to visit a
+> screen that does not exist is worse than no instruction**, because the operator concludes
+> the feature is missing. Every path was re-derived from `menuGroups` and
+> `game-sections.ts` - **read from the code, never from the prose**, which is how R93 surfaced:
+> the credit-conversion screen the file sent operators to is **mounted nowhere**, so the
+> EUR-to-credits rate is genuinely unreachable. The file now says so and names the risk rather
+> than inventing a path.
+>
+> **The level-title claim was corrected on the R88 finding**, not reworded: it told operators
+> the ladder's names are theirs to rename, which was false at six read sites until that
+> morning, and is a fact about a *feature* rather than a label.
+>
+> **The vocabulary clause is A3c's, reused rather than rebuilt.** `SYSTEM_PROMPT_BASE` plus
+> `vocabularyRule(terms)`, appended and therefore last, empty when nothing is configured - so
+> `TRADING_SYSTEM_PROMPT_HISTORICAL` is still asserted character for character. A second
+> implementation of the same diff is the "one rule, two copies" shape, and here the drift
+> reads to an operator as the agent using a word they retired.
+>
+> **The R92 remainder in this file was an ABSENCE, and its canary had to be aimed at the
+> absence.** The agent's challenge report carried P&L and, for a provider challenge, a dash -
+> so it could name the winner and had **no figure to explain why they won**. It now carries
+> the score. The competition reports are the phantom-zero half: their performance figures now
+> come from **one** producer that **withholds** the trading fields on a provider contest
+> rather than zeroing them, and the file's phantom-zero count is asserted to be **nil**.
+>
+> **One thing found here is not a wording defect and must not be summarised as one.** The
+> winner tool ordered participants on `pnl` when no final leaderboard was stored, and
+> **ordering on `score` instead does not fix it** - the direction lives on the catalogue title,
+> so on a time trial the winner holds the *lowest* score and a guess would name the loser and
+> hand them a medal. It now **declines** for a provider contest and says why; the live
+> leaderboard orders on `currentRank`, which already has the direction applied. **A refusal
+> that names the missing thing beats a plausible answer** - the same choice as the provider
+> with no adapter and the withheld Edit control.
+>
+> **14 tests, 14 probes red on exactly the expected test.** Two of A4's canaries fired the day
+> A6 closed and were **flipped, not deleted**: the comments recording that the first claim
+> about this file was wrong, and that the challenge canary had to watch for the absence of
+> `score`, are the most valuable part of them.
+>
+> **Two probing notes worth carrying.** Three probes reported `DID NOT APPLY`, and two of them
+> because the pattern carried an **em dash**: PowerShell 5.1 decodes a BOM-less `.ps1` with
+> the system ANSI codepage, so the character never matches and the probe reads like a moved
+> target rather than an unrepresentable one - **keep every probe pattern ASCII**, and anchor on
+> the line above when the line you want contains a dash. The third was an indentation
+> mismatch. And the admin typecheck is at **226**, not the 223 recorded on 7 September; the
+> lists were diffed rather than the counts, and they are identical - **a stale baseline reads
+> exactly like a regression.**
+>
+> **Still outstanding: A5 only**, and by owner decision its content is owner work - the reword
+> plus a skeleton of empty game-administration topics to fill.
 
 **A5 and A6 are the two that get forgotten, and both are worse than a stale label.** The
 wiki is what an operator reads when they are unsure, and the AI agent actively advises

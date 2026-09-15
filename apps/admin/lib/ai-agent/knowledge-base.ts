@@ -3,30 +3,56 @@
  *
  * Comprehensive documentation for the AI Agent to answer admin questions
  * about how the system works.
+ *
+ * TRADING IS ONE GAME AMONG SEVERAL, AND THIS FILE IS THE TRADING HALF. The
+ * game-administration material lives in `games-knowledge-base.ts` and is composed in below.
+ * Before this split the file opened "ChartVolt is a trading competition platform", which is
+ * what made the agent answer a question about a provider game out of the trading material -
+ * confidently, with no error and nothing in a log. If you add a fact here, ask first whether
+ * it is true of every game or only of trading, and put it in the other file if it is the
+ * former.
  */
 
-export const PLATFORM_KNOWLEDGE_BASE = `
+import { GAMES_KNOWLEDGE_BASE, GAMES_QUICK_ANSWERS } from "./games-knowledge-base";
+
+const TRADING_KNOWLEDGE_BASE = `
 # ChartVolt Platform - Complete Admin Guide
 
 ## OVERVIEW
-ChartVolt is a trading competition platform where users can:
-- Deposit credits using real money (EUR)
-- Enter trading competitions using those credits
-- Trade forex, stocks, crypto, and indices with virtual capital
-- Win prizes based on their trading performance
-- Withdraw their winnings back to real money
+ChartVolt is a multi-game competition platform. Players deposit credits with real money (EUR),
+pay a credit entry fee to enter a competition or a one-against-one challenge on one of the
+platform's games, and the best performers win prizes from the pool.
+
+**Trading is one of those games, not the whole platform.** It is the game this section
+describes, and it is the one the platform runs itself: the platform owns the prices, the
+positions and the profit and loss, so a trading contest has starting capital, leverage and
+instruments. Contests on a provider's game have none of those and work differently - that is
+the GAMES section further down, and it is the one to answer from whenever a question is about
+a game rather than about trading.
+
+What is identical across every game: credits, entry fees, prize pools, the platform fee,
+Game Master commission, wallets, withdrawals, KYC, restrictions and the player's progression.
 
 The platform uses a CREDIT system: 100 credits = €1 EUR by default.
 
 ---
 
-## 1. COMPETITIONS
+## 1. COMPETITIONS (TRADING)
 
 ### What are Competitions?
-Competitions are trading events where multiple users compete against each other using virtual trading capital. Users pay an entry fee (in credits), receive virtual trading capital, and try to make the highest return. Winners receive prizes from the prize pool.
+A competition is an event where several players compete on one of the platform's games. They
+pay a credit entry fee, the fees form a prize pool, and the best performers share it.
+
+**This section describes a TRADING competition specifically.** Players receive virtual trading
+capital and try to make the highest return. Everything below about starting capital, leverage,
+instruments, trade requirements and the six ranking methods is trading-only - a competition on
+a provider's game has none of it. See the GAMES section for those.
 
 ### How to Create a Competition
-**Location**: Admin Panel → Competitions → Create New
+**Location**: Competitions → Competitions → New Competition
+
+That opens a game picker first. Choosing Trading opens the trading wizard described here.
+(Typing /competitions/create still goes straight to the trading wizard.)
 
 **Required Settings**:
 1. **Basic Info**: Name, description, slug (URL-friendly name), image
@@ -87,16 +113,25 @@ Direct head-to-head trading battles between two users. One user challenges anoth
 1. **Creation**: User A creates challenge, sets entry fee and duration
 2. **Invite**: Challenge sent to User B
 3. **Accept/Decline**: User B has time to accept (configurable deadline)
-4. **Active**: Both users trade with virtual capital
-5. **Completed**: Higher P&L wins, takes prize pool minus platform fee
+4. **Active**: Both players play - on trading, both trade with virtual capital
+5. **Completed**: The better result wins and takes the pool minus the platform fee. On trading
+   that is the higher profit and loss; on a provider's game it is the better SCORE, in the
+   direction that title scores.
+
+A challenge can be on a provider's game as well as on trading, and it can be left OPEN to
+anyone rather than addressed to one player. Players can also say which games they are willing
+to be challenged at, in their own profile.
 
 ### Challenge Settings
-**Admin Panel → Settings → Challenge Settings**
+**Location**: Competitions → 1v1 Challenges → Settings
 - Platform fee percentage
 - Minimum/maximum entry fee
 - Minimum/maximum duration
-- Accept deadline (default 24 hours)
-- Margin settings (same as competitions)
+- Accept deadline (default 24 hours), and how long an OPEN challenge stays up
+- Margin settings (trading only)
+
+Per-title challenge defaults live with the title, at Games → Game Providers → [provider] →
+Games.
 
 ---
 
@@ -108,13 +143,20 @@ Direct head-to-head trading battles between two users. One user challenges anoth
 - Users buy credits → Use in competitions → Win more → Withdraw to EUR
 
 ### How to Change Deposit Settings
-**Location**: Admin Panel → Settings → Credit Conversion
+**Location**: Settings → Settings → Fees
 
-**Configurable**:
-- EUR to Credits rate
-- Minimum deposit amount
+**Configurable there**:
 - Platform deposit fee % (what you charge users)
-- Bank fee % (what payment provider charges you)
+- Platform withdrawal fee %
+- Bank deposit and withdrawal fees (what the payment provider charges you)
+
+**The EUR-to-credits RATE is not editable in the admin panel at present.** Settings →
+Settings → Currency shows what one credit is worth, derived from that rate, but read-only. If
+an operator needs the rate itself changed, that is a support request, not a screen - do not
+send them looking for a "Credit Conversion" page, because the navigation does not contain one.
+(Recorded as R93.)
+
+**Minimum deposit** is on the payment configuration, not here.
 
 ### Fee Calculation on Deposit
 When user deposits €100:
@@ -136,7 +178,7 @@ When user deposits €100:
    - **Manual**: Admin reviews and processes
 
 ### Withdrawal Settings
-**Location**: Admin Panel → Settings → Withdrawal Settings
+**Location**: Finance → Withdrawal Settings
 
 **Key Settings**:
 - **Processing Mode**: Automatic or Manual
@@ -154,7 +196,7 @@ When user deposits €100:
 
 **Manual Mode**:
 - All withdrawals require admin approval
-- Admin reviews in Admin Panel → Withdrawals → Pending
+- Admin reviews in Finance → Pending Withdrawals
 - Options: Approve (sends money) or Reject (refunds credits)
 
 ---
@@ -162,7 +204,7 @@ When user deposits €100:
 ## 5. VAT (Value Added Tax)
 
 ### How to Change VAT %
-**Location**: Admin Panel → Settings → Company Settings
+**Location**: Settings → Settings → Company
 
 The VAT rate is set in Company Settings under tax configuration. Current default is 19% (Cyprus).
 
@@ -172,7 +214,7 @@ The VAT rate is set in Company Settings under tax configuration. Current default
 - VAT amount (€19) is tracked separately for tax reporting
 
 ### VAT Reports
-**Location**: Admin Panel → Financials → VAT Payments
+**Location**: Finance → Financial Dashboard → VAT
 
 - View VAT collected by period
 - Track pending VAT payments
@@ -190,11 +232,11 @@ The VAT rate is set in Company Settings under tax configuration. Current default
 4. **Challenge Fees**: % taken from 1v1 challenge prize pools
 
 ### How to Change Fees
-**Location**: Admin Panel → Settings → Credit Conversion (for deposits/withdrawals)
-**Location**: Competition creation form (for competition platform fee %)
+**Location**: Settings → Settings → Fees (for deposit and withdrawal fees)
+**Location**: The competition creation wizard (for that competition's platform fee %)
 
 ### Understanding Platform Earnings
-**Location**: Admin Panel → Financials → Platform Earnings
+**Location**: Finance → Financial Dashboard
 
 Sources of revenue:
 - Deposit fees (platform % charged to users)
@@ -217,7 +259,7 @@ Example Deposit of €100:
 ## 7. KYC (Know Your Customer)
 
 ### How to Enable/Configure KYC
-**Location**: Admin Panel → Settings → KYC Settings
+**Location**: Security → KYC Settings
 
 **Settings**:
 - Enable/disable KYC requirement
@@ -234,7 +276,7 @@ Example Deposit of €100:
 5. Auto-approve on success or manual review on decline
 
 ### Duplicate KYC Detection
-**Location**: Fraud Settings
+**Location**: Security → Fraud Detection → Settings
 
 System detects when same ID document used by multiple accounts:
 - Auto-suspend option
@@ -254,7 +296,7 @@ The platform has comprehensive fraud detection:
 - Suspicious behavior analysis
 
 ### How to Configure Fraud Settings
-**Location**: Admin Panel → Security → Fraud Settings
+**Location**: Security → Fraud Detection
 
 **Key Settings**:
 - **Risk Thresholds**: Alert threshold (40), Block threshold (70), Auto-suspend (90)
@@ -263,7 +305,7 @@ The platform has comprehensive fraud detection:
 - **Rate Limiting**: Max signups per hour, max login attempts
 
 ### Fraud Alerts
-**Location**: Admin Panel → Security → Fraud Alerts
+**Location**: Security → Fraud Detection
 
 When suspicious activity detected:
 1. Alert created with severity (low/medium/high/critical)
@@ -296,7 +338,7 @@ Users earn badges for achievements:
 - **Legendary**: Very rare (500 XP)
 
 ### How to Configure Badges
-**Location**: Admin Panel → Gamification → Badges & XP
+**Location**: User Management → Badges & XP
 
 - Enable/disable individual badges
 - Modify XP rewards per rarity
@@ -321,7 +363,7 @@ Badges are evaluated automatically when:
 ## 10. TRADING RISK SETTINGS
 
 ### Margin System
-**Location**: Admin Panel → Settings → Trading Risk
+**Location**: Games → Trading → Risk & Margin
 
 **Margin Levels**:
 - **Safe (200%+)**: Healthy margin
@@ -347,7 +389,7 @@ Each competition can have its own margin settings or use global defaults. When a
 - **Nuvei**: Card payments, alternative methods, payouts
 
 ### How to Configure Providers
-**Location**: Admin Panel → Settings → Payment Providers
+**Location**: Settings → Settings → Payment Providers
 
 Or via environment variables:
 - STRIPE_SECRET_KEY, STRIPE_PUBLISHABLE_KEY, STRIPE_WEBHOOK_SECRET
@@ -363,7 +405,7 @@ Or via environment variables:
 ## 12. USER MANAGEMENT
 
 ### User Restrictions
-**Location**: Admin Panel → Users → [Select User] → Restrictions
+**Location**: User Management → Users → [Select User] → Restrictions
 
 Types:
 - **Deposit blocked**: Cannot deposit
@@ -391,7 +433,7 @@ System automatically generates invoices for:
 - Purchases
 
 ### Invoice Settings
-**Location**: Admin Panel → Settings → Invoice Settings
+**Location**: Settings → Settings → Invoices
 
 - Invoice number prefix
 - Company details (name, address, VAT number)
@@ -399,7 +441,7 @@ System automatically generates invoices for:
 - Footer text
 
 ### Viewing Invoices
-**Location**: Admin Panel → Financials → Invoices
+**Location**: Finance → Financial Dashboard → Invoices
 
 - Search by user, date, status
 - Download PDF
@@ -410,14 +452,14 @@ System automatically generates invoices for:
 ## 14. SYSTEM SETTINGS
 
 ### Company Settings
-**Location**: Admin Panel → Settings → Company Settings
+**Location**: Settings → Settings → Company
 - Company name, address, registration number
 - VAT number and rate
 - Support email
 - Logo
 
 ### Email Templates
-**Location**: Admin Panel → Settings → Email Templates
+**Location**: Settings → Settings → Email Templates
 - Welcome email
 - Verification email
 - Password reset
@@ -426,7 +468,7 @@ System automatically generates invoices for:
 - Competition notifications
 
 ### White Label / Branding
-**Location**: Admin Panel → Settings → White Label
+**Location**: Settings → Settings → Branding
 - Site name
 - Logo
 - Primary colors
@@ -437,25 +479,25 @@ System automatically generates invoices for:
 ## 15. COMMON ADMIN TASKS
 
 ### How to Manually Credit a User
-Admin Panel → Users → [Find User] → Actions → Adjust Balance
+User Management → Users → [Find User] → Actions → Adjust Balance
 - Enter amount (+ or -)
 - Add reason (logged for audit)
 
 ### How to Process a Pending Withdrawal
-Admin Panel → Withdrawals → Pending → [Select] → Approve or Reject
+Finance → Pending Withdrawals → [Select] → Approve or Reject
 
 ### How to Resolve a Fraud Alert
-Admin Panel → Security → Fraud Alerts → [Select Alert]
+Security → Fraud Detection → [Select Alert]
 - Review evidence
 - Click Dismiss (if false positive) or take action (Suspend/Ban)
 
 ### How to Cancel a Competition
-Admin Panel → Competitions → [Select] → Cancel
+Competitions → Competitions → [Select] → view → Cancel
 - All participants refunded automatically
 - Entry fees returned to user wallets
 
 ### How to View User Trading History
-Admin Panel → Users → [Find User] → Trading History
+User Management → Users → [Find User] → Trading History
 - All positions (open and closed)
 - Competition participation
 - P&L history
@@ -467,7 +509,7 @@ Admin Panel → Users → [Find User] → Trading History
 ### Running Reconciliation
 AI Agent can run: "Run reconciliation for this week"
 
-Or manually: Admin Panel → Financials → Reconciliation
+Or manually: Finance → Financial Dashboard → Reconciliation
 
 **Checks**:
 - Completed transactions match provider records
@@ -487,26 +529,46 @@ Or manually: Admin Panel → Financials → Reconciliation
 - Financial operations
 - Security events
 
-**Location**: Admin Panel → System → Audit Logs
+**Location**: Settings → Settings → Audit Logs
 
 ---
 
 ## QUICK REFERENCE
 
+Every path here was read off the live navigation. The top-level groups are Dashboard, Content,
+Competitions, Games, User Management, Finance, Security, Operations, Help, Messaging, Game
+Master, AI & Automation, Settings, Dev Zone, Admin and My Account. There is no "Financials"
+group, no "Gamification" group and no top-level "Trading" group - trading is a destination
+inside Games.
+
 | Task | Location |
 |------|----------|
-| Change VAT % | Settings → Company Settings |
-| Change deposit fees | Settings → Credit Conversion |
-| Change withdrawal fees | Settings → Withdrawal Settings |
-| Enable/disable KYC | Settings → KYC Settings |
-| Configure fraud rules | Security → Fraud Settings |
-| Create competition | Competitions → Create New |
-| Process withdrawal | Withdrawals → Pending |
-| View user details | Users → Search |
-| View fraud alerts | Security → Fraud Alerts |
-| View financials | Financials → Dashboard |
-| Configure badges | Gamification → Badges & XP |
-| Email templates | Settings → Email Templates |
+| Change VAT % | Settings → Settings → Company |
+| Change deposit or withdrawal fees | Settings → Settings → Fees |
+| Change withdrawal rules and limits | Finance → Withdrawal Settings |
+| See what one credit is worth | Settings → Settings → Currency (read-only) |
+| Rename competitions, players, prizes etc. | Settings → Settings → Wording |
+| Enable/disable KYC | Security → KYC Settings |
+| Configure fraud rules | Security → Fraud Detection |
+| Create a competition | Competitions → Competitions → New Competition |
+| Create or edit a 1v1 challenge setting | Competitions → 1v1 Challenges → Settings |
+| Competition and challenge analytics | Competitions → Analytics |
+| Process withdrawal | Finance → Pending Withdrawals |
+| Process a pending deposit | Finance → Pending Payments |
+| View user details | User Management → Users |
+| View fraud alerts | Security → Fraud Detection |
+| View financials | Finance → Financial Dashboard |
+| Configure badges | User Management → Badges & XP |
+| Email templates | Settings → Settings → Email Templates |
+| Audit logs | Settings → Settings → Audit Logs |
+| Add a game provider | Games → Game Providers |
+| Enable a game title | Games → Game Providers → [provider] → Games |
+| Trading symbols, hours, risk, price feed | Games → Trading |
+| A round that needs a decision | Games → Round Inspector |
+| Is a provider working? | Games → Provider Health |
+| Is a game worth keeping? | Games → Game Performance |
+| Incidents | Operations → Incident Management |
+| Game Masters | Game Master → Manage Game Masters |
 
 ---
 
@@ -529,27 +591,48 @@ Check provider dashboard, run reconciliation, check webhook logs.
 `;
 
 /**
+ * The knowledge base the agent is actually given.
+ *
+ * Trading first, then games. The order matters less than the fact that BOTH are present: before
+ * the split the agent had only the trading half and answered questions about a provider game out
+ * of it - fluently, with nothing in a log.
+ */
+export const PLATFORM_KNOWLEDGE_BASE = `${TRADING_KNOWLEDGE_BASE}
+${GAMES_KNOWLEDGE_BASE}`;
+
+/**
  * Quick answers for common questions
  */
-export const QUICK_ANSWERS: Record<string, string> = {
+const TRADING_QUICK_ANSWERS: Record<string, string> = {
   "how to change vat":
-    "Go to Admin Panel → Settings → Company Settings. The VAT rate is in the tax configuration section. Default is 19%.",
+    "Go to Settings → Settings → Company. The VAT rate is in the tax configuration section. Default is 19%.",
   "how to create competition":
-    "Go to Admin Panel → Competitions → Create New. Fill in name, entry fee, starting capital, timing, and prize distribution.",
+    "Go to Competitions → Competitions → New Competition, then pick the game. Trading asks for starting capital, instruments and a ranking method; a provider game asks for attempts, a round start policy and how unresolved rounds are handled. Both ask for a name, an entry fee, a start and end, and a prize split.",
   "how winner evaluated":
-    "Winners are automatically evaluated when competition ends: P&L calculated → Check disqualifications → Rank by method (PnL/ROI) → Apply tie breakers → Distribute prizes.",
+    "At the end the platform ranks the players and pays the prize split. On trading that means profit and loss is calculated, disqualifications are checked, and players are ranked by the method the competition chose. On a provider's game the player's SCORE is ranked in the direction that title scores - a time trial ranks the lowest number first. In both cases a player with no result at all is not ranked and not paid.",
   "what are challenges":
-    "1v1 Challenges are direct head-to-head trading battles between two users. They stake credits, trade for a set duration, and the higher P&L wins.",
+    "1v1 Challenges are head-to-head contests between exactly two players. They stake credits and the better result wins the pool minus the platform fee - on trading the higher profit and loss, on a provider's game the better score. A challenge can also be left open to anyone rather than addressed to one player.",
   "how withdrawal works":
     "User requests withdrawal → System checks requirements (KYC, balance, limits) → Automatic mode processes immediately or Manual mode waits for admin approval.",
   "how to process withdrawal":
-    "Admin Panel → Withdrawals → Pending → Select the withdrawal → Click Approve (sends money) or Reject (returns credits to user).",
+    "Finance → Pending Withdrawals → Select the withdrawal → Click Approve (sends money) or Reject (returns credits to user).",
   "how badges work":
     "Users earn badges for achievements (wins, milestones, profits). Each badge has a rarity (Common/Rare/Epic/Legendary) that determines XP reward. Badges are evaluated automatically.",
   "how fraud detection works":
     "System tracks device fingerprints, payment methods, VPN usage, and behavior patterns. Users get risk scores. Alerts created for suspicious activity. Admins review and take action.",
   "how to ban user":
-    "Admin Panel → Users → Find User → Restrictions → Add Login Block restriction with permanent duration, or use Fraud Alerts → Ban action.",
+    "User Management → Users → Find User → Restrictions → Add Login Block restriction with permanent duration, or use Fraud Alerts → Ban action.",
   "what is margin call":
-    "When user equity drops to margin call level (default 100%), they get a warning. At liquidation level (default 50%), positions are auto-closed. Configure in Trading Risk Settings.",
+    "A TRADING-only rule. When a trader's equity drops to the margin call level (default 100%) they get a warning; at the liquidation level (default 50%) positions are auto-closed. Configure it at Games → Trading → Risk & Margin. A provider's game has no capital, no leverage and no positions, so none of this applies to it.",
+};
+
+/**
+ * Quick answers for common questions, trading and games together.
+ *
+ * Merged rather than kept apart because the lookup in the agent route iterates one object. A
+ * games answer must never be unreachable merely because it lives in the other file.
+ */
+export const QUICK_ANSWERS: Record<string, string> = {
+  ...TRADING_QUICK_ANSWERS,
+  ...GAMES_QUICK_ANSWERS,
 };
