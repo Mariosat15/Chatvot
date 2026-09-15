@@ -347,9 +347,22 @@ describe("the game wizard wears the trading wizard's chrome", () => {
     */
     const source = code(WIZARD);
 
-    expect(source).toMatch(/label="Game"/);
+    /*
+      RE-POINTED AT THE TOKEN LAYER BY X6.5 A2, claims unchanged. These read `label="Game"`
+      and `label="Prize ranks"` until the wording pass, and the literals are now
+      `label={terms.game}` and a template on `terms.prize` - so the assertion has to name the
+      token rather than the default word, or it fails on correct code the moment the caption
+      stops being a literal. What is being pinned is still WHICH FACT the preview reports,
+      which is the half that matters: the negative assertion below is what forbids the
+      trading fields, and it is untouched.
+
+      "Play time" stays a literal deliberately. It is not a noun an operator renames - there
+      is no `playTime` token and adding one would be a third definition of a duration label
+      beside `terms.round` and `terms.attempt`.
+    */
+    expect(source).toMatch(/label=\{terms\.game\}/);
     expect(source).toMatch(/label="Play time"/);
-    expect(source).toMatch(/label="Prize ranks"/);
+    expect(source).toMatch(/label=\{`\$\{terms\.prize\} ranks`\}/);
 
     for (const field of ["startingCapital", "leverage", "assetClass"]) {
       expect(wizardScreen()).not.toContain(field);

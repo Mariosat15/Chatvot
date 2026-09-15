@@ -7,6 +7,7 @@ import {
   AiContentPanel,
   AiFieldButton,
 } from "@/components/admin/wizard/AiContentPanel";
+import { useTerms } from "@/contexts/TerminologyContext";
 import type { ContestDraft } from "../contest-draft";
 import type { ContestableTitle } from "../contest-types";
 import { FieldShell } from "./fields";
@@ -42,6 +43,7 @@ export function StepBasics({
   patch: (changes: Partial<ContestDraft>) => void;
   title?: ContestableTitle;
 }) {
+  const terms = useTerms();
   const words = countWords(draft.description);
   const overLimit = words > DESCRIPTION_WORD_LIMIT;
 
@@ -61,10 +63,13 @@ export function StepBasics({
       />
 
       <FieldShell
-        label="Competition Name *"
+        label={`${terms.contest} Name *`}
         icon={FileText}
         htmlFor="contest-name"
-        hint="Choose a catchy name that attracts participants"
+        // No token here on purpose: the sentence needs the noun in lower case mid-clause, and
+        // case-folding an operator's own word is how "eSports Cup" becomes "esports cup" and a
+        // German noun loses its capital. The noun is dropped rather than re-cased.
+        hint="Choose a catchy name that stands out"
         action={
           <AiFieldButton
             field="title"
@@ -113,8 +118,8 @@ export function StepBasics({
           }`}
           placeholder={
             title
-              ? `Describe the competition briefly. Example: Join our ${title.displayName} showdown - beat the field and win prizes.`
-              : "Describe the competition briefly."
+              ? `${terms.contest} description. Example: Join our ${title.displayName} showdown - beat the field and win prizes.`
+              : `${terms.contest} description, kept brief.`
           }
         />
         <div className="mt-2 flex justify-end">

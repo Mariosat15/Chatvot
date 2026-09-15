@@ -323,9 +323,19 @@ Invoke-Probe -Name "the review step describes an outcome the operator did not ch
     -Edits @(
     @{
         # RE-AIMED: the review step is its own file since `12` s2.8.
+        #
+        # RE-AIMED AGAIN BY X6.5 A2, and it had reported DID NOT APPLY on the first run after the
+        # wording pass. The two branches were literals and are now templates on `terms.contest`,
+        # `terms.players` and `terms.contests`, so the old pattern matched nothing - which prints
+        # as a probe that did not fire rather than as a guard that failed, and is therefore the
+        # quiet direction. Anchored on `draft.publishOnSave` and the two branch arrows, which the
+        # wording pass cannot reach, so the next rename cannot silence it the same way.
         Target  = $StepReview
-        Find    = "{draft.publishOnSave`n                  ? `"The contest is checked once more against what was actually saved, then made visible. If that second check refuses it, the contest is kept as a draft and the reasons are shown here.`"`n                  : `"The contest is saved as a draft. Players cannot see or join a draft - press Publish on the contest list when you are ready.`"}"
-        Replace = "It will be saved as a <strong className=`"text-white`">draft</strong>."
+        # The branch arrow alone, so the pattern carries no backtick and no `$` - the copy either
+        # side of it is now a JS template literal, and escaping one of those through a
+        # double-quoted PowerShell string is how a pattern silently matches nothing.
+        Find    = "{draft.publishOnSave`n                  ? "
+        Replace = "{false`n                  ? "
     }
 )
 

@@ -8,7 +8,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useTerms } from "@/contexts/TerminologyContext";
 import { playShapeRules } from "@/lib/services/games/play-shape";
+import {
+  UNRESOLVED_ROUND_POLICIES,
+  unresolvedRoundPolicyCopy,
+} from "@/lib/services/games/round-types";
 import { PrizeDistributionEditor } from "../PrizeDistributionEditor";
 import { UnscoredPolicyField } from "../UnscoredPolicyField";
 import type { ContestDraft } from "../contest-draft";
@@ -39,11 +44,13 @@ export function StepPrizes({
   // The `title` prop is gone rather than ignored. Left in place it would be the obvious thing
   // to reach for the next time this step needs a fact about the shape.
   const shape = playShapeRules(draft.playMode ?? "anytime");
+  const terms = useTerms();
+  const policyCopy = unresolvedRoundPolicyCopy(terms);
 
   return (
     <>
       <div className="space-y-2">
-        <Label className="text-gray-200">Prize distribution</Label>
+        <Label className="text-gray-200">{`${terms.prize} distribution`}</Label>
         <PrizeDistributionEditor
           value={draft.prizeDistribution}
           onChange={(v) => patch({ prizeDistribution: v })}
@@ -70,7 +77,7 @@ export function StepPrizes({
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
-            <Label className="text-gray-200">Attempts</Label>
+            <Label className="text-gray-200">{terms.attempts}</Label>
             <Select
               value={draft.attemptsPolicy}
               onValueChange={(v) =>
@@ -81,7 +88,7 @@ export function StepPrizes({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="single">One attempt each</SelectItem>
+                <SelectItem value="single">{`One ${terms.attempt} each`}</SelectItem>
                 <SelectItem value="best_of_n">Best of several</SelectItem>
                 <SelectItem value="sum_of_n">Total of several</SelectItem>
               </SelectContent>
@@ -90,7 +97,7 @@ export function StepPrizes({
 
           {draft.attemptsPolicy !== "single" && (
             <NumberField
-              label="How many attempts"
+              label={`How many ${terms.attempts}`}
               value={draft.attemptsAllowed}
               onChange={(v) => patch({ attemptsAllowed: v })}
               min={2}
@@ -100,8 +107,15 @@ export function StepPrizes({
       )}
 
       <div className="space-y-2">
+        {/*
+          Written as "{terms.player} results that never arrive" rather than "If a
+          {terms.player}'s result...", because an indefinite article in front of a token is a
+          sentence that breaks on the operator's own wording - "a Entrant" - and no amount of
+          case-folding fixes it. The rule for every token in this app is the same: put it at
+          the start of a phrase or drop the noun, never bend it to fit.
+        */}
         <Label className="text-gray-200">
-          If a player&apos;s result never arrives
+          {`${terms.player} results that never arrive`}
         </Label>
         <Select
           value={draft.unresolvedRoundPolicy}
@@ -114,23 +128,24 @@ export function StepPrizes({
           <SelectTrigger className="bg-gray-800 border-gray-600 text-gray-100 h-12">
             <SelectValue />
           </SelectTrigger>
+          {/*
+            The three labels and their ORDER both come from `round-types.ts` now. They were
+            written out here and again in `ProviderContestEditor`, and the two copies had
+            already drifted in wording and in order - so an operator picked a policy reading
+            one sentence and edited it later reading a different one.
+
+            The parenthetical on `exclude` used to read "refund not automatic yet" and was TRUE
+            when it was written. `exclusion-refund.ts` shipped with X5 and R44 gave it the
+            input it needed, so the caution became a false statement about the operator's own
+            platform - which is worse than no caution: it either scares an operator off a
+            policy that works, or has them refund by hand on top of the automatic payment.
+          */}
           <SelectContent>
-            <SelectItem value="score_zero">
-              Score it zero and settle on time
-            </SelectItem>
-            <SelectItem value="hold_and_alert">
-              Hold settlement and alert an admin
-            </SelectItem>
-            {/*
-              The parenthetical used to read "refund not automatic yet" and was TRUE when it
-              was written. `exclusion-refund.ts` shipped with X5 and R44 gave it the input it
-              needed, so the caution became a false statement about the operator's own
-              platform - which is worse than no caution: it either scares an operator off a
-              policy that works, or has them refund by hand on top of the automatic payment.
-            */}
-            <SelectItem value="exclude">
-              Remove the player and refund their entry fee
-            </SelectItem>
+            {UNRESOLVED_ROUND_POLICIES.map((policy) => (
+              <SelectItem key={policy} value={policy}>
+                {policyCopy.get(policy)?.label}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
@@ -139,7 +154,7 @@ export function StepPrizes({
         label="Result grace period (seconds)"
         value={draft.resultGracePeriodSeconds}
         onChange={(v) => patch({ resultGracePeriodSeconds: v })}
-        hint="How long after the contest ends a late result is still accepted."
+        hint={`How long after the ${terms.contest} ends a late result is still accepted.`}
         min={0}
       />
 

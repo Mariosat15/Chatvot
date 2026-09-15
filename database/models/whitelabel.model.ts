@@ -520,6 +520,7 @@ const WhiteLabelSchema = new Schema<WhiteLabelDocument>(
       entryFee: { type: String, trim: true },
       prizePool: { type: String, trim: true },
       prize: { type: String, trim: true },
+      prizes: { type: String, trim: true },
       round: { type: String, trim: true },
       rounds: { type: String, trim: true },
       attempt: { type: String, trim: true },

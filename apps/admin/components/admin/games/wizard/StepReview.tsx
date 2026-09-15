@@ -5,6 +5,7 @@ import type { ContestDraft } from "../contest-draft";
 import type { ContestableTitle } from "../contest-types";
 import { Notice, Problem } from "./fields";
 import { formatVolts } from "@/lib/utils/format-volts";
+import { useTerms } from "@/contexts/TerminologyContext";
 
 /**
  * Step six: what the pre-flight said, a summary of the answers, and the publish decision.
@@ -30,10 +31,15 @@ export function StepReview({
   /** `AppSettings.credits.symbol`. An entry fee is a credit amount. */
   creditSymbol?: string;
 }) {
+  const terms = useTerms();
+
   return (
     <>
       {errors.length > 0 && (
-        <Problem title="This contest cannot be created yet" lines={errors} />
+        <Problem
+          title={`This ${terms.contest} cannot be created yet`}
+          lines={errors}
+        />
       )}
 
       {warnings.length > 0 && (
@@ -43,7 +49,7 @@ export function StepReview({
       {errors.length === 0 && (
         <>
           <div className="rounded-xl border border-gray-700 bg-gray-900/60 divide-y divide-gray-800">
-            <SummaryRow label="Game">
+            <SummaryRow label={terms.game}>
               {title?.displayName ?? "-"}
               {title ? (
                 <span className="text-gray-500"> / {title.providerName}</span>
@@ -57,17 +63,24 @@ export function StepReview({
                   ).toLocaleString()}`
                 : "-"}
             </SummaryRow>
-            <SummaryRow label="Entry fee">
+            <SummaryRow label={terms.entryFee}>
               {formatVolts(draft.entryFee, { symbol: creditSymbol })}
               <span className="text-gray-500">
                 {" "}
                 / {draft.platformFeePercentage}% platform fee
               </span>
             </SummaryRow>
-            <SummaryRow label="Players">
+            <SummaryRow label={terms.players}>
               {draft.minParticipants} to {draft.maxParticipants}
             </SummaryRow>
-            <SummaryRow label="Prizes">
+            {/*
+              Labelled with the SINGULAR token and the count carried by the value beside it
+              ("3 ranks"), because there is no `prizes` token and there is deliberately not
+              going to be one: singular and plural are separate tokens in this catalogue,
+              never derived, so a label needing a plural the catalogue does not declare is a
+              label that has to be rephrased rather than pluralised in code.
+            */}
+            <SummaryRow label={terms.prize}>
               {draft.prizeDistribution.length} rank
               {draft.prizeDistribution.length === 1 ? "" : "s"}
               <span className="text-gray-500">
@@ -78,7 +91,7 @@ export function StepReview({
                   .join(" / ")}
               </span>
             </SummaryRow>
-            <SummaryRow label="Attempts">
+            <SummaryRow label={terms.attempts}>
               {draft.attemptsPolicy === "single"
                 ? "One each"
                 : `${draft.attemptsPolicy === "best_of_n" ? "Best" : "Total"} of ${
@@ -103,12 +116,12 @@ export function StepReview({
             />
             <span className="text-xs text-gray-300">
               <strong className="text-white">
-                Publish immediately, so players can enter it
+                {`Publish immediately, so ${terms.players} can enter it`}
               </strong>
               <span className="mt-1 block text-gray-400">
                 {draft.publishOnSave
-                  ? "The contest is checked once more against what was actually saved, then made visible. If that second check refuses it, the contest is kept as a draft and the reasons are shown here."
-                  : "The contest is saved as a draft. Players cannot see or join a draft - press Publish on the contest list when you are ready."}
+                  ? `The ${terms.contest} is checked once more against what was actually saved, then made visible. If that second check refuses it, the ${terms.contest} is kept as a draft and the reasons are shown here.`
+                  : `The ${terms.contest} is saved as a draft. ${terms.players} cannot see or join a draft - press Publish on the ${terms.contests} list when you are ready.`}
               </span>
             </span>
           </label>

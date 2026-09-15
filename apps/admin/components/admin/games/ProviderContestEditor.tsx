@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTerms } from "@/contexts/TerminologyContext";
 import { toast } from "sonner";
 import { AlertTriangle, ArrowLeft, Loader2, Lock, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,10 @@ import {
 import { isClosedToEdits } from "@/lib/admin/provider-contest-edit-policy";
 import { DEFAULT_CREDIT_SYMBOL } from "@/lib/utils/format-volts";
 import { playShapeRules, type PlayMode } from "@/lib/services/games/play-shape";
+import {
+  UNRESOLVED_ROUND_POLICIES,
+  unresolvedRoundPolicyCopy,
+} from "@/lib/services/games/round-types";
 
 /**
  * Editing a provider-game contest.
@@ -103,6 +108,8 @@ export function ProviderContestEditor({
   creditSymbol?: string;
 }) {
   const router = useRouter();
+  const terms = useTerms();
+  const policyCopy = unresolvedRoundPolicyCopy(terms);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [stored, setStored] = useState<StoredContest | null>(null);
@@ -238,7 +245,15 @@ export function ProviderContestEditor({
   return (
     <div className="max-w-3xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-100">Edit game contest</h1>
+        {/*
+          "game" is dropped rather than kept in front of the token: the line below already
+          names the catalogue title, so it said which game twice, and "Edit game
+          Competition" reads as a mistake. A heading is Title Case anyway, which is the one
+          position a token can sit without any case handling.
+        */}
+        <h1 className="text-2xl font-bold text-gray-100">
+          Edit {terms.contest}
+        </h1>
         <p className="text-sm text-gray-400 mt-1">
           {titleName ?? "Provider game"} &middot;{" "}
           <span className="uppercase">{stored.status}</span>
@@ -250,16 +265,28 @@ export function ProviderContestEditor({
           data-testid="entered-freeze-notice"
           className="p-4 rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-200 text-sm space-y-1"
         >
+          {/*
+            The token leads, so the count does not have to agree with it. Written
+            "{n} player(s) have already entered" the plural was carried by a literal "(s)",
+            which is an operator's word being pluralised by us - and `players` is its own
+            token precisely because a plural is never derived from a singular.
+          */}
           <div className="flex items-center gap-2 font-semibold">
             <Lock className="h-4 w-4" />
-            {stored.currentParticipants} player(s) have already entered
+            {terms.players} already entered: {stored.currentParticipants}
           </div>
           <p className="text-amber-200/80">
-            The entry fee, prize split, timings and game settings are locked -
-            changing them now would mean players in one contest paid different
-            amounts or played different games. You can still fix the name and
-            description, and raise the cap. To change anything else, cancel the
-            contest so entrants are refunded, then create it again.
+            {/*
+              The tokens in the first clause are naming the fields below, so Title Case is
+              right there. In the consequence clause the nouns are dropped instead -
+              "entrants" and "cancel" carry it without needing a word we would have to
+              lower-case.
+            */}
+            The {terms.entryFee}, {terms.prize} split, timings and game settings
+            are locked - changing them now would mean two entrants paid
+            different amounts or played different games. You can still fix the
+            name and description, and raise the cap. To change anything else,
+            cancel so entrants are refunded, then create it again.
           </p>
         </div>
       )}
@@ -268,7 +295,7 @@ export function ProviderContestEditor({
         <div className="p-4 rounded-lg border border-red-500/40 bg-red-500/10 space-y-2">
           <div className="flex items-center gap-2 text-red-300 font-semibold text-sm">
             <AlertTriangle className="h-4 w-4" />
-            This contest cannot be saved yet
+            This {terms.contest} cannot be saved yet
           </div>
           <ul className="list-disc pl-5 text-sm text-red-200/90 space-y-1">
             {errors.map((error) => (
@@ -330,7 +357,7 @@ export function ProviderContestEditor({
 
       <section className="space-y-4">
         <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">
-          Game settings
+          {terms.game} settings
         </h2>
         <RoundClockNote
           variant="settings"
@@ -357,7 +384,7 @@ export function ProviderContestEditor({
 
       <section className="space-y-4">
         <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">
-          Entry and prizes
+          Entry and {terms.prizes}
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <NumberField
@@ -480,7 +507,7 @@ export function ProviderContestEditor({
 
       <section className="space-y-4">
         <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">
-          Rounds
+          {terms.rounds}
         </h2>
         {/*
           WITHHELD WITH ITS REASON on a simultaneous contest, matching the wizard, and this is
@@ -507,7 +534,7 @@ export function ProviderContestEditor({
           {!shape.requiresSingleAttempt && (
             <>
               <div>
-                <Label className="text-gray-200">Attempts</Label>
+                <Label className="text-gray-200">{terms.attempts}</Label>
                 <Select
                   value={draft.attemptsPolicy}
                   disabled={entered}
@@ -521,7 +548,7 @@ export function ProviderContestEditor({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="single">One attempt</SelectItem>
+                    <SelectItem value="single">One {terms.attempt}</SelectItem>
                     <SelectItem value="best_of_n">Best of several</SelectItem>
                     <SelectItem value="sum_of_n">Sum of several</SelectItem>
                   </SelectContent>
@@ -530,7 +557,7 @@ export function ProviderContestEditor({
               {draft.attemptsPolicy !== "single" && (
                 <NumberField
                   id="attemptsAllowed"
-                  label="Attempts allowed"
+                  label={`${terms.attempts} allowed`}
                   value={draft.attemptsAllowed ?? 3}
                   min={1}
                   disabled={entered}
@@ -556,14 +583,18 @@ export function ProviderContestEditor({
               <SelectTrigger className="mt-2 bg-gray-700 border-gray-600 text-gray-100">
                 <SelectValue />
               </SelectTrigger>
+              {/*
+                Shared with the wizard's `StepPrizes` since X6.5 A2. These were three
+                hand-written labels in each screen and they had drifted - terser here, in a
+                different order, and untokenised - so the same setting described itself
+                differently depending on whether the operator was creating or editing.
+              */}
               <SelectContent>
-                <SelectItem value="score_zero">Score it zero</SelectItem>
-                <SelectItem value="exclude">
-                  Remove the player and refund
-                </SelectItem>
-                <SelectItem value="hold_and_alert">
-                  Hold settlement and alert
-                </SelectItem>
+                {UNRESOLVED_ROUND_POLICIES.map((policy) => (
+                  <SelectItem key={policy} value={policy}>
+                    {policyCopy.get(policy)?.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

@@ -162,6 +162,38 @@ Invoke-Probe -Name '9  AppSettingsProvider mounted - the canary must fire' -File
         </AppSettingsProvider>' `
   -ExpectRed 'apps/admin still mounts no AppSettingsProvider'
 
+Write-Host "`n=== the vitest alias tripwire ===" -ForegroundColor Cyan
+
+# 10. THE ALIAS ORDERED BELOW THE CATCH-ALL. Vite tries aliases in order, so an entry under
+#     `"@"` is silently dead - and dead in the way that reads as working, because the file
+#     still contains a perfectly correct mapping. This is the config's own recorded rule
+#     ("more specific entries must stay ABOVE `@`") and nothing but this held it.
+Invoke-Probe -Name '10 the alias moved below the catch-all' -File 'vitest.config.ts' `
+  -From '      "@/contexts/TerminologyContext": path.resolve(
+        __dirname,
+        "apps/admin/contexts/TerminologyContext.tsx",
+      ),
+      "@": path.resolve(__dirname, "."),' `
+  -To '      "@": path.resolve(__dirname, "."),
+      "@/contexts/TerminologyContext": path.resolve(
+        __dirname,
+        "apps/admin/contexts/TerminologyContext.tsx",
+      ),' `
+  -ExpectRed 'the alias entry sits above the catch-all, or it never fires'
+
+# NO PROBE FOR 'has no main-app contexts/TerminologyContext competing for the alias', and the
+# reason is recorded rather than the omission left to be noticed.
+#
+# The only mutation that turns it red is CREATING `contexts/TerminologyContext.tsx` at the
+# repository root - a new file, which this harness cannot make and then reliably remove: every
+# probe here restores exactly one file's original bytes in a `finally`, and a harness that
+# creates a module instead would leave it behind on an interrupted run. That residue is worse
+# than the missing probe, because a stray main-app context is precisely the condition the
+# tripwire exists to report, so the next run would fire for a reason nobody caused.
+#
+# It is also the one assertion in this file that cannot silently stop working: it names two
+# absolute paths and asserts `false`, with no slice, no regex and no identifier to drift.
+
 # NO PROBE FOR 'exports the shapes a consumer needs', and the reason rather than the omission:
 # the only mutation that turns it red is renaming or deleting an export, which stops the test
 # file COMPILING. A probe whose defect is refused by the compiler is indistinguishable from a

@@ -10,6 +10,7 @@ import {
   Users,
 } from "lucide-react";
 import { PLAY_MODE_COPY } from "@/lib/services/games/play-shape";
+import { useTerms } from "@/contexts/TerminologyContext";
 import type { ContestableTitle } from "../contest-types";
 import { Problem } from "./fields";
 
@@ -35,12 +36,14 @@ export function StepChooseGame({
   selected?: ContestableTitle;
   onSelect: (title: ContestableTitle) => void;
 }) {
+  const terms = useTerms();
+
   if (titles.length === 0) {
     return (
       <Problem
-        title="No games are available yet"
+        title={`No ${terms.games} are available yet`}
         lines={[
-          "A game appears here once its provider is enabled, its catalogue is synced, and the title is switched on in the provider's game list.",
+          `${terms.games} appear here once their provider is enabled, their catalogue is synced, and the title is switched on in the provider's game list.`,
         ]}
       />
     );
@@ -49,8 +52,7 @@ export function StepChooseGame({
   return (
     <div className="space-y-3">
       <p className="text-sm text-gray-400">
-        The rest of the form is built from the game you choose - its settings, its
-        round length and how its scores are ranked all come from the catalogue.
+        {`The rest of the form is built from the ${terms.game} you choose - its settings, its round length and how its scores are ranked all come from the catalogue.`}
       </p>
 
       {titles.map((title) => {
@@ -120,13 +122,15 @@ export function StepChooseGame({
                     ) : (
                       <TrendingUp className="h-3 w-3 text-green-400" />
                     )}
-                    {lowerWins ? "Lower score wins" : "Higher score wins"}
+                    {lowerWins
+                      ? `Lower ${terms.score} wins`
+                      : `Higher ${terms.score} wins`}
                   </span>
 
                   {title.maxDurationSeconds ? (
                     <span className="inline-flex items-center gap-1 rounded-md bg-gray-900/70 px-2 py-1 text-gray-300">
                       <Clock className="h-3 w-3 text-purple-400" />
-                      Up to {title.maxDurationSeconds}s an attempt
+                      {`Up to ${title.maxDurationSeconds}s per ${terms.attempt}`}
                     </span>
                   ) : null}
 
@@ -160,7 +164,7 @@ export function StepChooseGame({
 
                   {!title.supportsCompetition && (
                     <span className="rounded-md bg-red-500/15 px-2 py-1 text-red-300">
-                      Does not support competitions
+                      {`Does not support ${terms.contests}`}
                     </span>
                   )}
 
@@ -172,7 +176,7 @@ export function StepChooseGame({
                   */}
                   {!title.supportsContentSeed && (
                     <span className="rounded-md bg-red-500/15 px-2 py-1 text-red-300">
-                      No identical content for every player
+                      {`No identical content for every ${terms.player}`}
                     </span>
                   )}
                 </div>

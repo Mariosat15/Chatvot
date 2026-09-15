@@ -53,6 +53,29 @@ export default defineConfig({
         __dirname,
         "apps/admin/lib/admin/section-route-guard.ts",
       ),
+      /**
+       * The admin terminology context, reached by every game contest screen X6.5 tokenised.
+       *
+       * Reason it is needed at all: the structural suites read these components as TEXT and so
+       * never resolve the import, but `provider-contest-schedule-and-prizes.test.ts` imports
+       * `PrizeDistributionEditor` for real. The moment a noun on it became a token, that suite
+       * stopped LOADING - `Cannot find module`, zero tests, which reads as the suite being
+       * broken rather than as one import being unresolvable. Note the shape of the failure:
+       * `next build` resolves this specifier correctly against the admin tsconfig, so the
+       * typecheck, the lint and the app were all fine and only the harness could see it. That
+       * is R58 from the opposite direction, and it is why the alias is the fix rather than
+       * rewriting fourteen imports to relative paths - the aliased form is what the app uses.
+       *
+       * THE TRAP THIS CARRIES INTO X7, pinned by a test rather than left as a comment: there is
+       * no main-app `contexts/TerminologyContext` today, which is the only reason this entry is
+       * unambiguous. X7 delivers tokens to the PLAYER screens and is the obvious moment one
+       * appears - at which point every main-app file importing it would resolve here, to the
+       * admin copy, in tests only. See `__tests__/admin/terminology-delivery.test.ts`.
+       */
+      "@/contexts/TerminologyContext": path.resolve(
+        __dirname,
+        "apps/admin/contexts/TerminologyContext.tsx",
+      ),
       "@": path.resolve(__dirname, "."),
     },
     /**

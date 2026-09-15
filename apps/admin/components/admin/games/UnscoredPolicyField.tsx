@@ -9,6 +9,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AlertCircle } from "lucide-react";
+import { useTerms } from "@/contexts/TerminologyContext";
 import {
   UNSCORED_CONTEST_POLICIES,
   UNSCORED_CONTEST_POLICY_COPY,
@@ -49,12 +50,25 @@ export function UnscoredPolicyField({
   disabled?: boolean;
   onChange: (value: UnscoredContestPolicy) => void;
 }) {
+  const terms = useTerms();
   const copy = UNSCORED_CONTEST_POLICY_COPY.get(value);
 
   return (
     <div className="md:col-span-2">
+      {/*
+        "the" became "this" so the token can be inserted verbatim. A determiner is the one
+        mid-phrase position that works: "this" is invariant, where "a" or "an" would have to
+        agree with a first letter the operator chooses. Leading with the token instead
+        ("Competition finishes and nobody scored") would have turned the condition this label
+        states into a heading.
+
+        `copy.consequence`, the option labels and the amber paragraph stay untokenised: they
+        live in `round-types.ts`, which is mirrored and read by settlement, so the screen
+        cannot promise an outcome the server does not deliver. Rewording them here would put
+        player-facing and server-shared copy inside an admin wording commit.
+      */}
       <Label className="text-gray-200">
-        If the contest finishes and nobody scored
+        If this {terms.contest} finishes and nobody scored
       </Label>
       <Select
         value={value}
@@ -81,6 +95,18 @@ export function UnscoredPolicyField({
         player who broke a rule has a result; a player the provider never reported for does
         not. Only the second is refundable, and an operator who assumes otherwise will file a
         bug against settlement the first time a liquidated trader is not paid back.
+
+        UNTOKENISED ON PURPOSE, and it is the one paragraph here where that needs saying,
+        because unlike the option copy this text does live in this file and so could have
+        been. Every noun in it is mid-sentence behind an article or a possessive - "a
+        contest cancelled", "their entry fees" - which is the position a Title Case token
+        cannot occupy and a lower-cased one destroys the operator's own capitalisation in.
+        The one phrase that was changed is the comparison: it read "the same as a trading
+        competition", which is the generic noun spelled out for trading and nothing else,
+        and reads as though the platform keeps one vocabulary for trading and another for
+        games. The noun is dropped rather than tokenised - "trading" carries it alone.
+        "trader" below is deliberately literal: it names who is liquidated, and only a
+        trading account can be.
       */}
       <div className="mt-3 flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-3">
         <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
@@ -88,7 +114,7 @@ export function UnscoredPolicyField({
           This applies only when <strong>no player recorded a score at all</strong>
           {" "}&mdash; the usual cause is the game provider failing to report. It does not
           apply to players who were disqualified: their entry fees stay with the contest and
-          go to the unclaimed pool, the same as a trading competition. It also does not apply
+          go to the unclaimed pool, the same as trading does. It also does not apply
           to a contest cancelled for too few players, which always refunds every entry fee in
           full with no platform fee.
         </p>

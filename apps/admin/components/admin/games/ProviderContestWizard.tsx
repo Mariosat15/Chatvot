@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -19,6 +19,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAppSettings } from "@/contexts/AppSettingsContext";
+import { useTerms } from "@/contexts/TerminologyContext";
+import type { TerminologyPack } from "@/lib/constants/terminology";
 import {
   WizardPreview,
   WizardPreviewRow,
@@ -75,48 +77,57 @@ interface ProviderContestWizardProps {
 }
 
 /**
- * Defined here, in a client component, and it must stay that way: `icon` is a React
- * component, and handing a function across a server/client boundary is what took the trading
- * lobby down on 6 September (R39). Nothing server-rendered may build this list.
+ * Built here, in a client component, and it must stay that way: `icon` is a React component,
+ * and handing a function across a server/client boundary is what took the trading lobby down
+ * on 6 September (R39). Nothing server-rendered may build this list.
+ *
+ * IT TAKES THE VOCABULARY AS AN ARGUMENT RATHER THAN READING IT, so it stays a pure function
+ * a test can call with a renamed pack. It used to be a module-level constant, which is why
+ * every noun on the rail was a literal: a constant cannot read a hook, so the only way to
+ * honour an operator's rename was to move the list inside the component. The identifier the
+ * component binds it to is still `STEPS`, because the rail and the step lookup are pinned to
+ * that name by `__tests__/admin/game-contest-wizard.test.ts`.
  */
-const STEPS: readonly WizardStep[] = [
-  {
-    title: "Game",
-    description: "Choose the title",
-    icon: Gamepad2,
-    accent: "purple",
-  },
-  {
-    title: "Basic Info",
-    description: "Name and description",
-    icon: FileText,
-    accent: "blue",
-  },
-  {
-    title: "Game Settings",
-    description: "The game's own options",
-    icon: SlidersHorizontal,
-    accent: "orange",
-  },
-  {
-    title: "Schedule & Entry",
-    description: "Clock, fee and players",
-    icon: Calendar,
-    accent: "green",
-  },
-  {
-    title: "Prizes & Rules",
-    description: "Distribution and edge cases",
-    icon: Trophy,
-    accent: "yellow",
-  },
-  {
-    title: "Launch",
-    description: "Review and create",
-    icon: Zap,
-    accent: "green",
-  },
-];
+function buildSteps(terms: TerminologyPack): readonly WizardStep[] {
+  return [
+    {
+      title: terms.game,
+      description: "Choose the title",
+      icon: Gamepad2,
+      accent: "purple",
+    },
+    {
+      title: "Basic Info",
+      description: "Name and description",
+      icon: FileText,
+      accent: "blue",
+    },
+    {
+      title: `${terms.game} Settings`,
+      description: `${terms.game} options`,
+      icon: SlidersHorizontal,
+      accent: "orange",
+    },
+    {
+      title: "Schedule & Entry",
+      description: `${terms.players}, clock and fee`,
+      icon: Calendar,
+      accent: "green",
+    },
+    {
+      title: `${terms.prizes} & Rules`,
+      description: "Distribution and edge cases",
+      icon: Trophy,
+      accent: "yellow",
+    },
+    {
+      title: "Launch",
+      description: "Review and create",
+      icon: Zap,
+      accent: "green",
+    },
+  ];
+}
 
 const STEP_GAME = 0;
 const STEP_BASICS = 1;
@@ -128,6 +139,11 @@ const STEP_REVIEW = 5;
 export function ProviderContestWizard({ titles }: ProviderContestWizardProps) {
   const router = useRouter();
   const { settings } = useAppSettings();
+  const terms = useTerms();
+  // The rail is rebuilt when the vocabulary changes and at no other time. `buildSteps` is
+  // pure, so this is a cache rather than a behaviour: without it every keystroke in the form
+  // hands `WizardStepRail` a new array and a new `currentStep` object.
+  const STEPS = useMemo(() => buildSteps(terms), [terms]);
   const [step, setStep] = useState<number>(STEP_GAME);
   const [draft, setDraft] = useState<ContestDraft>(emptyDraft);
   const [submitting, setSubmitting] = useState(false);
@@ -283,22 +299,24 @@ export function ProviderContestWizard({ titles }: ProviderContestWizardProps) {
         setErrors(
           refusals.length > 0
             ? refusals
-            : [data.error ?? "The contest could not be published."],
+            : [data.error ?? `The ${terms.contest} could not be published.`],
         );
         toast.warning(
-          "Contest created, but it could not be published yet. It is saved as a draft - publish it from the competitions list once the problems below are fixed.",
+          `${terms.contest} created, but it could not be published yet. It is saved as a draft - publish it from the ${terms.contests} list once the problems below are fixed.`,
         );
         return false;
       }
 
-      toast.success("Contest created and published. Players can enter it now.");
+      toast.success(
+        `${terms.contest} created and published. ${terms.players} can enter it now.`,
+      );
       for (const warning of (data.warnings ?? []) as string[]) {
         toast.warning(warning);
       }
       return true;
     } catch {
       toast.warning(
-        "Contest created, but publishing failed. It is saved as a draft - publish it from the competitions list.",
+        `${terms.contest} created, but publishing failed. It is saved as a draft - publish it from the ${terms.contests} list.`,
       );
       return false;
     }
@@ -319,7 +337,7 @@ export function ProviderContestWizard({ titles }: ProviderContestWizardProps) {
 
       if (!response.ok || !data.success) {
         setErrors(data.errors ?? []);
-        toast.error(data.error ?? "The contest could not be created.");
+        toast.error(data.error ?? `The ${terms.contest} could not be created.`);
         return;
       }
 
@@ -327,7 +345,9 @@ export function ProviderContestWizard({ titles }: ProviderContestWizardProps) {
         const published = await publishCreated(String(data.competitionId));
         if (!published) return;
       } else {
-        toast.success("Draft contest created. Players cannot see it yet.");
+        toast.success(
+          `Draft ${terms.contest} created. ${terms.players} cannot see it yet.`,
+        );
       }
 
       router.push("/?activeTab=competitions");
@@ -340,14 +360,17 @@ export function ProviderContestWizard({ titles }: ProviderContestWizardProps) {
 
   /** Why the operator cannot move on yet, or null when they can. */
   function blockedReason(): string | null {
-    if (step === STEP_GAME && !selected) return "Choose a game first.";
+    // "Choose the X", never "Choose a X". An indefinite article in front of a token is a
+    // sentence that breaks the moment an operator renames the noun to one starting with a
+    // vowel - "a Event" - and nothing in the code can notice.
+    if (step === STEP_GAME && !selected) return `Choose the ${terms.game} first.`;
     if (step === STEP_BASICS) {
-      if (!draft.name.trim()) return "The contest needs a name.";
+      if (!draft.name.trim()) return `The ${terms.contest} needs a name.`;
       if (countWords(draft.description) > DESCRIPTION_WORD_LIMIT)
         return `The description is over ${DESCRIPTION_WORD_LIMIT} words.`;
     }
     if (step === STEP_SETTINGS && selected && !selected.schema.ok)
-      return "This game's settings cannot be read.";
+      return `This ${terms.game}'s settings cannot be read.`;
 
     /*
       A CONTEST NOBODY COULD START AN ATTEMPT IN IS REFUSED HERE, not only by the pre-flight.
@@ -373,9 +396,9 @@ export function ProviderContestWizard({ titles }: ProviderContestWizardProps) {
       if (fit?.windowTooShort && fit.reservesFullRound) {
         return `Play is set to ${describeDurationSeconds(
           fit.reservedSeconds,
-        )} but the contest only runs for ${describeDurationSeconds(
+        )} but the ${terms.contest} only runs for ${describeDurationSeconds(
           fit.windowSeconds,
-        )}, so nobody could start an attempt.`;
+        )}, so nobody could start one.`;
       }
     }
 
@@ -457,24 +480,24 @@ export function ProviderContestWizard({ titles }: ProviderContestWizardProps) {
             <WizardPreviewRow
               icon={Gamepad2}
               iconClassName="text-purple-400"
-              label="Game"
+              label={terms.game}
               value={selected?.displayName ?? "Not chosen"}
             />
             <WizardPreviewRow
               icon={Users}
-              label="Participants"
+              label={terms.players}
               value={`${draft.minParticipants} - ${draft.maxParticipants}`}
             />
             <WizardPreviewRow
               icon={Coins}
               iconClassName="text-green-400"
-              label="Entry Fee"
+              label={terms.entryFee}
               value={formatVolts(draft.entryFee, { symbol: creditSymbol })}
             />
             <WizardPreviewRow
               icon={Trophy}
               iconClassName="text-yellow-400"
-              label="Prize ranks"
+              label={`${terms.prize} ranks`}
               value={draft.prizeDistribution.length}
             />
             {/*
@@ -499,7 +522,7 @@ export function ProviderContestWizard({ titles }: ProviderContestWizardProps) {
                 <strong className="text-gray-200">
                   {selected.providerName}
                 </strong>
-                &apos;s catalogue, so this form changes with the game.
+                {`'s catalogue, so this form changes with the ${terms.game}.`}
               </p>
             </div>
           )}

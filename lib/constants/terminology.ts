@@ -95,7 +95,12 @@ export const TERMS = {
   // belong to `format-volts.ts` - see boundary 2 above.
   entryFee: "Entry Fee",
   prizePool: "Prize Pool",
+  // `prize` was the only noun here with no plural, which is the one shape that forces a
+  // consumer to derive one - and a derived plural is what rule 2 above forbids, because
+  // `replace(/$/, "s")` on an operator's own word is us editing their vocabulary. A
+  // section heading covering several ranks legitimately needs the plural.
   prize: "Prize",
+  prizes: "Prizes",
 
   // ---- Play structure -----------------------------------------------------
   // A round is one go at a game; an attempt is a round a player is entitled to. They are

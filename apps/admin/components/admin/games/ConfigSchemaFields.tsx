@@ -275,7 +275,15 @@ function DurationControl({
           id={id}
           className="bg-gray-900 border-gray-700 text-white"
         >
-          <SelectValue placeholder="Choose how long players get" />
+          {/*
+            The noun is dropped rather than tokenised. "Choose how long players get" puts
+            the word mid-sentence, where inserting a token verbatim reads wrong and
+            lower-casing it would destroy an operator's own capitalisation. "Playing time"
+            is what the custom box's own `aria-label` below already calls this, and what the
+            wizard's preview row calls it, so dropping the noun makes three labels agree
+            instead of introducing a fourth.
+          */}
+          <SelectValue placeholder="Choose the playing time" />
         </SelectTrigger>
         <SelectContent>
           {presets.map((minutes) => (

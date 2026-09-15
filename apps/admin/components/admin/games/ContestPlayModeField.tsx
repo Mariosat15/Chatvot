@@ -9,6 +9,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AlertCircle } from "lucide-react";
+import { useTerms } from "@/contexts/TerminologyContext";
 import { PLAY_MODE_COPY, type PlayMode } from "@/lib/services/games/play-shape";
 
 /**
@@ -54,11 +55,23 @@ export function ContestPlayModeField({
   options: PlayMode[];
   onChange: (value: PlayMode) => void;
 }) {
+  const terms = useTerms();
   const copy = PLAY_MODE_COPY.get(value);
 
   return (
     <div className="md:col-span-2">
-      <Label className="text-gray-200">How this contest is played</Label>
+      {/*
+        The token follows a DETERMINER, which is the other position it can sit verbatim
+        besides the start of a phrase: "this" is invariant, where "a" would have to agree
+        with a first letter the operator chooses. The capital mid-label is correct and
+        matches every other caption on this step.
+
+        `copy.detail` and the amber consequence text below are deliberately NOT tokenised -
+        they come from `PLAY_MODE_COPY` in `play-shape.ts`, which is mirrored and read by the
+        player app too, so editing them here would change player-facing wording inside a
+        commit whose claim is that only admin screens moved. That is X8's pass.
+      */}
+      <Label className="text-gray-200">How this {terms.contest} is played</Label>
       <Select value={value} onValueChange={(next) => onChange(next as PlayMode)}>
         <SelectTrigger className="mt-2 bg-gray-700 border-gray-600 text-gray-100">
           <SelectValue />

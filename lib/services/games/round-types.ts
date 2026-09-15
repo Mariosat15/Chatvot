@@ -1,4 +1,5 @@
 import type { Types } from "mongoose";
+import type { TerminologyPack } from "../../constants/terminology";
 
 /**
  * Types shared by the round and ingestion services (X3).
@@ -24,6 +25,51 @@ export const UNRESOLVED_ROUND_POLICIES: UnresolvedRoundPolicy[] = [
   "exclude",
   "hold_and_alert",
 ];
+
+/**
+ * What each choice is CALLED on an operator screen.
+ *
+ * This is the third policy in this file and the only one that had no copy here, which is
+ * exactly why it was the only one two screens hand-wrote. `UNSCORED_CONTEST_POLICY_COPY` and
+ * `ROUND_START_POLICY_COPY` below both live beside their type and are read by one field
+ * component each. This one did not, so the wizard's `StepPrizes` and the editor wrote their
+ * own three labels - and they had already DRIFTED, in three separate ways: different wording
+ * ("Score it zero" against "Score it zero and settle on time"), a different option order, and
+ * only one of the two tokenised. An operator therefore chose this policy reading one
+ * description and edited it later reading another.
+ *
+ * A FUNCTION OF THE PACK, NOT A CONSTANT, and that is the whole reason this shape is new
+ * rather than copied from its siblings. Two of these labels name renameable nouns, so as
+ * literals they would be operator vocabulary this module had frozen - and `round-types.ts` is
+ * not React and can never call `useTerms()`. Taking the pack as an argument is what lets the
+ * words move out of the components WITHOUT de-tokenising them, which a plain `ReadonlyMap`
+ * would have done silently while looking like the tidier change.
+ *
+ * The type import is type-only and `lib/constants/terminology.ts` imports no models, so
+ * nothing about settlement's use of this file changes: `unresolved-rounds.ts` reads the type
+ * and the array and simply never calls this.
+ *
+ * NO `consequence` FIELD, unlike both siblings. Neither screen renders one today, so adding
+ * it here would declare a field nothing reads - the shape this codebase has now found seven
+ * times, from `requiresSyncPlay` to `family`. The object wrapper is kept so that adding one
+ * later is a change at this definition rather than at both screens.
+ *
+ * A `Map` for the reason every other stored-key lookup here is one: the key arrives from a
+ * saved document, so an object lookup walks the prototype chain and `"constructor"` returns
+ * something TRUTHY that survives a `!copy` test and only reads as blank several lines later.
+ */
+export function unresolvedRoundPolicyCopy(
+  terms: TerminologyPack,
+): ReadonlyMap<UnresolvedRoundPolicy, { label: string }> {
+  return new Map([
+    ["score_zero", { label: "Score it zero and settle on time" }],
+    [
+      "exclude",
+      { label: `Remove the ${terms.player} and refund their ${terms.entryFee}` },
+    ],
+    ["hold_and_alert", { label: "Hold settlement and alert an admin" }],
+  ]);
+}
 
 /**
  * Where the pot goes when a contest finishes and NOBODY recorded a score.

@@ -807,7 +807,33 @@ describe("the wizard's closing note", () => {
     expect(code).not.toMatch(
       /It will be saved as a <strong className="text-white">draft<\/strong>/,
     );
-    expect(code).toMatch(/draft\.publishOnSave\s*\n?\s*\?/);
+
+    /*
+      RE-POINTED BY X6.5 A2 - the claim is unchanged and the assertion was weak. It read
+      `toMatch(/draft\.publishOnSave\s*\n?\s*\?/)` over the WHOLE concatenated surface, and
+      `ProviderContestWizard.tsx` carries `{draft.publishOnSave ? "Create and publish" :
+      "Create draft"}` on its submit button - so the button satisfied it on its own and the
+      explanatory copy could state one unconditional outcome with the guard still green. A
+      probe replacing the explanation's branch with `{false` proved it.
+
+      Two occurrences of one identifier defeating a structural test is a class here, after
+      `!expectedOrigin`, the fixed-character Edit guard, `canTransitionRound` and
+      `MIN_REASON_LENGTH`: assert position within the construct, never a bare identifier. So
+      this slices the review step's own explanation span and requires BOTH arms inside it -
+      the button's label is a different fact and is pinned by `toMatch(/Publish/)` above.
+    */
+    const review = readCode(`${WIZARD_STEPS}/StepReview.tsx`);
+    const explanation = review.indexOf('className="mt-1 block text-gray-400"');
+    // A slice taken from -1 passes everything asked of it, so both ends are proven first.
+    expect(explanation).toBeGreaterThan(-1);
+    const explanationEnd = review.indexOf("</span>", explanation);
+    expect(explanationEnd).toBeGreaterThan(explanation);
+
+    const copy = review.slice(explanation, explanationEnd);
+    expect(copy).toMatch(/\{draft\.publishOnSave\s*\r?\n?\s*\?/);
+    // The else arm too: a ternary whose second branch repeats the first is the same defect
+    // wearing a conditional, and it reviews as correct.
+    expect(copy).toMatch(/:\s*`[^`]*draft/);
   });
 });
 
@@ -952,22 +978,43 @@ describe("the round-start policy - the gate became the contest's choice", () => 
       That is the "assert the slice found something" rule with a sharper edge than the usual one:
       a marker that has moved does not produce an empty slice here, it produces a slice so wide
       that every assertion is trivially true. Both ends are now asserted to exist.
-    */
-    const timingStart = note.indexOf("Players can join from the moment");
-    expect(timingStart).toBeGreaterThan(-1);
-    const timing = note.slice(timingStart);
-    expect(timing.length).toBeGreaterThan(400);
 
-    const conditionEnd = timing.indexOf("Play lasts");
-    expect(conditionEnd).toBeGreaterThan(-1);
-    const condition = timing.slice(0, conditionEnd);
+      RE-POINTED BY X6.5 A2 ONTO CODE ANCHORS, claims unchanged. Both markers were prose -
+      "Players can join from the moment" and "Play lasts" - and the first of them is now
+      `{terms.players} can join from the moment`, so `indexOf` returned -1 and the guard broke
+      for the third time on the same cause. The lesson the comment above records was right and
+      incomplete: asserting a marker exists catches the break, but a marker that CAN move will
+      keep moving. A wording pass is free to rewrite any sentence in this component and must
+      not be able to reach these anchors, so they are now the variant branch and the icon that
+      opens each card - code and JSX, not copy.
+
+      THE AMBER BLOCK IS EXCLUDED DELIBERATELY, and this is the half the old end marker only
+      got right by accident. It carries a THIRD `fit.reservesFullRound` of its own, so a slice
+      running to the end of the file is satisfied by the warning's copy however the timing
+      paragraph's condition is mutilated - which is the same failure the 11 September re-aim
+      was written to close, one construct further down.
+    */
+    const settingsStart = note.indexOf('if (variant === "settings")');
+    const settingsIcon = note.indexOf("<Clock", settingsStart);
+    const timingIcon = note.indexOf("<Clock", settingsIcon + 1);
+    const amberStart = note.indexOf("fit?.windowTooShort");
+
+    // Every anchor exists, and in this order - so neither slice can be empty, and neither can
+    // run past the construct it is meant to examine.
+    expect(settingsStart).toBeGreaterThan(-1);
+    expect(settingsIcon).toBeGreaterThan(settingsStart);
+    expect(timingIcon).toBeGreaterThan(settingsIcon);
+    expect(amberStart).toBeGreaterThan(timingIcon);
+
+    const condition = note.slice(timingIcon, amberStart);
     expect(condition.length).toBeGreaterThan(100);
     expect(condition).toMatch(/fit\.reservesFullRound/);
     expect(condition).toMatch(/fit\.lastAttemptStart/);
 
     // The settings variant branches too, so the policy is not merely consulted once and then
     // ignored by the paragraph an operator reads while choosing the game's own round length.
-    const settings = note.slice(0, note.indexOf("Players can join from the moment"));
+    const settings = note.slice(settingsStart, timingIcon);
+    expect(settings.length).toBeGreaterThan(100);
     expect(settings).toMatch(/fit\.reservesFullRound/);
 
     // Both screens pass the policy in. A note that always read the default would describe the

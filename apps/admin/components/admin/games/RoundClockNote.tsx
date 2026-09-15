@@ -1,6 +1,7 @@
 "use client";
 
 import { Clock, TriangleAlert } from "lucide-react";
+import { useTerms } from "@/contexts/TerminologyContext";
 import type { ConfigField } from "@/lib/services/games/config-schema";
 import type { RoundStartPolicy } from "@/lib/services/games/round-types";
 import { describeDurationSeconds, describeRoundFit } from "./contest-draft";
@@ -73,6 +74,7 @@ export function RoundClockNote({
    */
   variant: "settings" | "timing";
 }) {
+  const terms = useTerms();
   const fit = describeRoundFit({
     startTime,
     endTime,
@@ -127,8 +129,17 @@ export function RoundClockNote({
         <div className="flex items-start gap-2">
           <Clock className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
           <div className="space-y-1 text-xs text-gray-400">
+            {/*
+              THE ONLY TOKEN IN THIS COMPONENT, and the reason is position rather than
+              preference. A token is a Title Case label, so it can be inserted verbatim only
+              where a phrase begins. Every other noun here sits mid-sentence ("applies to one
+              attempt, not to the contest"), where a token would have to be lower-cased - which
+              edits an operator's own word, turning "eSports Event" into "esports event" - or
+              would put an article in front of a word whose first letter we do not know.
+              Chapter 14 scopes this pass to labels and help text, not to argued prose.
+            */}
             <p>
-              Players can join from the moment you save until the{" "}
+              {terms.players} can join from the moment you save until the{" "}
               <strong className="text-gray-200">start</strong> time, and play between start and{" "}
               <strong className="text-gray-200">end</strong>. To give a five-minute sign-up
               window, set the start five minutes from now.
@@ -181,7 +192,7 @@ export function RoundClockNote({
             <p className="text-xs text-amber-200/90">
               Play is set to {reserved} but this contest only runs for {contestLength}, so
               every attempt will be cut short at the end time and scored on what the player
-              managed. Players are told how long they have before they start.
+              managed. {terms.players} are told how long they have before they start.
             </p>
           )}
         </div>

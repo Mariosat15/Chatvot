@@ -5,6 +5,7 @@ import {
   playShapeRules,
   type PlayMode,
 } from "@/lib/services/games/play-shape";
+import { useTerms } from "@/contexts/TerminologyContext";
 import { ContestPlayModeField } from "../ContestPlayModeField";
 import { RoundClockNote } from "../RoundClockNote";
 import { RoundStartPolicyField } from "../RoundStartPolicyField";
@@ -85,6 +86,7 @@ export function StepSchedule({
   // gives, so the step reads identically until it needs not to.
   const shape = playShapeRules(draft.playMode ?? "anytime");
   const modeOptions = title?.supportedPlayModes ?? [];
+  const terms = useTerms();
 
   return (
     <>
@@ -157,7 +159,7 @@ export function StepSchedule({
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <NumberField
-            label={`Entry fee (${creditSymbol?.trim() || DEFAULT_CREDIT_SYMBOL})`}
+          label={`${terms.entryFee} (${creditSymbol?.trim() || DEFAULT_CREDIT_SYMBOL})`}
           value={draft.entryFee}
           onChange={(v) => patch({ entryFee: v })}
           icon={Coins}
@@ -165,7 +167,7 @@ export function StepSchedule({
           min={0}
         />
         <NumberField
-          label="Min players"
+          label={`Min ${terms.players}`}
           value={draft.minParticipants}
           onChange={(v) => patch({ minParticipants: v })}
           icon={Users}
@@ -173,7 +175,7 @@ export function StepSchedule({
           min={2}
         />
         <NumberField
-          label="Max players"
+          label={`Max ${terms.players}`}
           value={draft.maxParticipants}
           onChange={(v) => patch({ maxParticipants: v })}
           icon={Users}
@@ -198,8 +200,7 @@ export function StepSchedule({
       </div>
 
       <p className="text-xs text-gray-500">
-        Below the minimum the contest auto-cancels and every entry fee is refunded in
-        full, with no platform fee taken.
+        {`Below the minimum the ${terms.contest} auto-cancels and every ${terms.entryFee} is refunded in full, with no platform fee taken.`}
       </p>
     </>
   );

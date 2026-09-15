@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTerms } from "@/contexts/TerminologyContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -106,6 +107,7 @@ export default function AIGeneratorDialog({
   gameKey,
   subjectLabel,
 }: AIGeneratorDialogProps) {
+  const terms = useTerms();
   const [open, setOpen] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
@@ -224,9 +226,16 @@ export default function AIGeneratorDialog({
             </span>
           </DialogTitle>
           <DialogDescription className="text-gray-400">
+            {/*
+              The noun leads the phrase so the token can be inserted verbatim. Written
+              mid-sentence ("describe your competition theme") it would need lower-casing,
+              which destroys an operator's own capitalisation - "eSports Cup" becomes
+              "esports cup" - and would put an article in front of a word whose first letter
+              we do not know.
+            */}
             {subjectLabel
-              ? `Describe your competition theme and let AI write it for ${subjectLabel}.`
-              : "Describe your competition theme and let AI create engaging content for you."}
+              ? `${terms.contest} theme: describe it and let AI write the copy for ${subjectLabel}.`
+              : `${terms.contest} theme: describe it and let AI create engaging content.`}
           </DialogDescription>
         </DialogHeader>
 

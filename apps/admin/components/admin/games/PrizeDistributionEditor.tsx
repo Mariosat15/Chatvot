@@ -4,6 +4,7 @@ import { Minus, Plus, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useTerms } from "@/contexts/TerminologyContext";
 
 /**
  * Who gets paid, and how much, on a contest played through a game provider.
@@ -67,6 +68,12 @@ export function PrizeDistributionEditor({
   platformFeePercentage,
   disabled,
 }: PrizeDistributionEditorProps) {
+  /*
+    The hook sits in the component and NOT beside `prizeTotal` / `prizeTotalIsValid` above,
+    which are exported pure helpers the create service's own tests import. A hook call at
+    module scope would make importing either of them require a React tree.
+  */
+  const terms = useTerms();
   const total = prizeTotal(value);
   const balanced = prizeTotalIsValid(value);
 
@@ -113,7 +120,7 @@ export function PrizeDistributionEditor({
           className="border-yellow-500 text-yellow-500 hover:bg-yellow-500 hover:text-gray-900"
         >
           <Plus className="mr-2 h-4 w-4" />
-          Add rank
+          Add {terms.rank}
         </Button>
       </div>
 
@@ -130,7 +137,7 @@ export function PrizeDistributionEditor({
               <div className="grid flex-1 grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
                   <Label className="mb-2 block text-xs text-gray-400">
-                    Rank position
+                    {terms.rank} position
                   </Label>
                   <Input
                     type="number"
@@ -145,7 +152,7 @@ export function PrizeDistributionEditor({
                 </div>
                 <div>
                   <Label className="mb-2 block text-xs text-gray-400">
-                    Prize percentage
+                    {terms.prize} percentage
                   </Label>
                   <div className="relative">
                     <Input
@@ -173,7 +180,7 @@ export function PrizeDistributionEditor({
                   size="icon"
                   onClick={() => removeRank(index)}
                   className="flex-shrink-0 text-red-400 hover:bg-red-500/10 hover:text-red-300"
-                  title={`Remove rank (minimum ${MIN_PRIZE_RANKS})`}
+                  title={`Remove ${terms.rank} (minimum ${MIN_PRIZE_RANKS})`}
                 >
                   <Minus className="h-5 w-5" />
                 </Button>

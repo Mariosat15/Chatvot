@@ -9,6 +9,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AlertCircle } from "lucide-react";
+import { useTerms } from "@/contexts/TerminologyContext";
 import {
   ROUND_START_POLICIES,
   ROUND_START_POLICY_COPY,
@@ -58,11 +59,24 @@ export function RoundStartPolicyField({
   disabled?: boolean;
   onChange: (value: RoundStartPolicy) => void;
 }) {
+  const terms = useTerms();
   const copy = ROUND_START_POLICY_COPY.get(value);
 
   return (
     <div className="md:col-span-2">
-      <Label className="text-gray-200">When players may start a round</Label>
+      {/*
+        Both nouns are tokenised and the sentence needed no restructuring: "When" is a
+        question word, so the token follows it in the same position a phrase-initial one
+        would sit, and `round` is preceded by "a" only in the original - dropped, because an
+        article cannot agree with a word the operator chooses ("a Attempt").
+
+        `copy.consequence`, the option labels and the amber caution stay untokenised: they
+        come from `round-types.ts`, which the gate in `round.service.ts` reads, so this
+        screen cannot describe a rule the server does not enforce.
+      */}
+      <Label className="text-gray-200">
+        When {terms.players} may start one {terms.round}
+      </Label>
       <Select
         value={value}
         disabled={disabled}

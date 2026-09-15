@@ -62,7 +62,7 @@ const GROUPS: { heading: string; blurb: string; tokens: TerminologyToken[] }[] =
     heading: "Money labels",
     blurb:
       "The words beside a figure. The figure, its unit and its symbol are set under Currency.",
-    tokens: ["entryFee", "prizePool", "prize"],
+    tokens: ["entryFee", "prizePool", "prize", "prizes"],
   },
   {
     heading: "Play structure",
