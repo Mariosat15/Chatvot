@@ -60,6 +60,7 @@ chapter covers risks to the programme and to the application.
 | **R84** | **A chargeback clawback booked the full amount and clamped the wallet at zero.** The ledger row said `-100` while the balance moved by 20, which is the *normal* case for a chargeback - and the mismatch is unrepairable, because **R81**'s Fix button refuses to reduce a player's balance. The canonical rule, `evaluateClawback`, has always said refuse; it had **no caller**, and the Atlas route carried a second inline copy that agreed with it by luck - **one rule, three readings** | Medium | **Latent for the ledger** (no mismatched pair found, **nothing backfilled**), **live as a behaviour** - any clawback exceeding the balance produced one | **CLOSED 14 Sep 2026** - both writers decide through `evaluateClawback`, **before any write**; a refusal throws `ClawbackRefusedError`, leaves the case **open**, and is recorded on the timeline and in the audit log, because otherwise the whole event is an error toast. Letting the balance go negative was rejected: it has no meaning anywhere else on the platform |
 | **R85** | **An idempotency guard that only ever made a double payment quiet.** The Game Master fee stage checked `gamemasterearnings` for an existing row *inside* the per-referred-player loop and `continue`d only the row insert - while the subscription increment, the wallet credit and the ledger row all sit **after** that loop. A retried transaction therefore skipped the rows and **paid the Game Master a second time**, leaving `gamemasterearnings` with exactly one row per referral: the guard kept clean the one artefact an operator would check. **The question to ask of an idempotency check is not whether it exists but which writes are on its far side** | High | **Latent** - no duplicated pair found, **nothing backfilled**. Reachable rather than theoretical: both apps run the finalize cron every minute inside a retried transaction, and `UnknownTransactionCommitResult` is exactly the case where the first attempt may already have committed | **CLOSED 14 Sep 2026** - the check is hoisted to the **per-Game-Master** level and reads `{ session }`, so one surviving row skips the whole payment block. The `cleanup-duplicates` route that existed to mop this up was **deleted, not fixed**: it debited wallets and **deleted** the duplicate ledger rows instead of writing a compensating adjustment, left `totalGmEarnings` untouched, had no guard on either handler and no caller - and could not have detected R85's duplicates anyway |
 | **R86** | **The reset that manufactured the mismatches it then reported.** `user-data-reset` empties the ledger collections and zeroes the wallets - naming **nine** of the fourteen numeric paths `CreditWallet` declares. The five it missed were all added to the model after it was written, and **two of them are equality-checked by reconciliation**, so every reset account came back reporting an `incident_compensation_mismatch` and a `gm_earnings_mismatch` for activity that no longer existed. The reset reported success and the screen reported defects; neither was wrong | Medium | **LIVE on every "Reset All Data" ever run.** No money moved - a teardown of test data that left phantom findings behind, which is how an operator learns to distrust the instrument | **CLOSED 14 Sep 2026** - all fourteen zeroed, and the guard **reads the numeric paths off `CreditWallet.schema`** rather than listing them, so the fifteenth field is caught the day it is declared. It also pins **which branch** it examines, because "Reset All Users" deletes the wallets outright and legitimately needs no counter list. **Fix-forward** - the remedy for an already-reset wallet is to run it again |
+| **R87** | **The reset that reported success for collections it never touched.** R86 one layer out: not fields it had stopped naming but **twenty-two collections of per-user activity it had never named** - `chargebacks` (the owner's report), `termsacceptances`, the whole messaging feature, X3's game rounds and provider events, stored payment instruments, security and price alerts, the dev-zone run histories. Two things made the list look complete: messaging declares its **own** `user_presence`, a *different* collection from the `userpresences` already covered by a model, and **a name in the list is not evidence the collection exists** - `deleteMany` against a missing name returns 0 and the reset still reports success, which is how `"alerts"` sat there for months while `pricehealthalerts` was never touched | Medium | **LIVE on every reset ever run.** No money moved; a teardown that leaves a player's disputes, messages, consents and game history behind while reporting that it cleared everything | **CLOSED 15 Sep 2026** - every collection either app's models declare is now classified into exactly one of four lists (deleted / **zeroed** / preserved / legacy raw name), and `user-data-reset-coverage.test.ts` **parses both model trees and the service** so a model added later cannot end up in none of them. `ZEROED_COLLECTIONS` is a third category on purpose - calling a wallet "preserved" hides R86. **Fix-forward** - run the reset again |
 | R8 | Bulk find-and-replace on wording | High | Medium | X8 |
 | R9 | Fraud throttle blind to provider entries | High | High | X5 |
 | R11 | Legal wording changed without review | High | Medium | X8 |
@@ -2995,6 +2996,57 @@ satisfied by the delete branch and says nothing about the one that resets.
 
 **Fix-forward, nothing backfilled** - a reset is an operator action on test data, and the
 remedy for an already-reset wallet is to run it again.
+
+---
+
+### R87 - The reset that reported success for collections it never touched - **CLOSED 15 September 2026**
+
+**What it was.** The same reset, one layer out. R86 was about *fields* it had stopped naming;
+this is about *collections* it had never named. The owner reported that chargebacks survived a
+reset, and they did - along with **twenty-one other collections of per-user activity**.
+
+**The list was written once and the platform kept growing.** `chargebacks` is the clearest case,
+being a per-user case file with evidence, notes and a clawback history, and it also references
+`wallettransactions` rows the reset deletes - so a surviving case points at a ledger that no
+longer exists. The rest are the same shape: `termsacceptances` (what the player signed),
+`securityalerts`, `pricehealthalerts`, the whole messaging feature (`conversations`, `messages`,
+`friendships`, `friend_requests`, `blocked_users`), the game activity X3 introduced (`game_round`,
+`provider_event`, `user_game_preference`), `nuveiuserpaymentoptions` (stored payment instruments),
+`securitylogs`, the dev-zone run histories, and `tutorialuploadsessions`.
+
+**One of them is the finding worth carrying, because the list looked complete.** The messaging
+feature declares its **own** `user_presence` collection, which is a *different* collection from
+the `userpresences` the `UserPresence` model backs - and `userpresences` was already in the list
+through the model. So a reader auditing the list saw presence covered, and the near-identical
+name is precisely what made it invisible. **A collection covered by name is not evidence that a
+collection with a similar name is covered.**
+
+**And a name in the list is not evidence a collection exists.** `deleteMany` against a collection
+that is not there returns 0 and the reset still reports success, so a typo and an empty collection
+are indistinguishable in the response. `"alerts"` had sat in the list for months deleting nothing
+while `pricehealthalerts` was never touched.
+
+**What it is now.** Every collection either app's models declare is classified into exactly one of
+four lists, and `__tests__/admin/user-data-reset-coverage.test.ts` **parses both model trees and
+the service itself** and fails if any collection is in none of them - so a model added later cannot
+end up nowhere. The four are `ACTIVITY_MODELS` / `ACTIVITY_RAW_COLLECTIONS` (deleted),
+`ZEROED_COLLECTIONS` (document kept, counters zeroed), `PRESERVED_CONFIG_COLLECTIONS`
+(configuration and identity), and `LEGACY_RAW_COLLECTIONS` (raw names deliberately matching no
+model, so a legacy name is distinguishable from a typo).
+
+**`ZEROED_COLLECTIONS` is a third category rather than a shade of "preserved", and that is
+deliberate.** Calling a wallet preserved hides the thing R86 was about: the counters on it are
+money figures reconciliation compares against a ledger the reset empties. `landingpages` and
+`marketplaceitems` are the same shape one field along.
+
+**The guard parses statically rather than importing.** An import-based version could not be made
+to run at all - `tsx` on Windows will not resolve an absolute `c:\...` path as an ESM specifier,
+and the model files use `@/` aliases the test runner maps to a different root. Static parsing also
+means the test reads what the *service* says rather than what a second list says, which is the
+only way it can catch a disagreement.
+
+**Live on every reset ever run, and nothing was backfilled** - a reset is an operator action on
+test data, and the remedy for a database that has already been reset is to run it again.
 
 ---
 

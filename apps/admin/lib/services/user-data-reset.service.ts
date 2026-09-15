@@ -126,57 +126,185 @@ const ACTIVITY_MODELS: Array<[string, AnyModel]> = [
 ];
 
 /**
- * Activity collections WITHOUT a dedicated Mongoose model — cleared by raw name.
- * (Names verified against the existing reset routes.)
+ * Activity collections cleared by RAW NAME rather than through a model.
+ *
+ * Most of these have no Mongoose model at all (Better Auth's own collections,
+ * the messaging feature's), and the rest are declared only in the MAIN app —
+ * `apps/admin` has no copy to import, which is the whole reason a raw name is
+ * used. Note it is also the dangerous direction: `deleteMany` against a name
+ * that does not exist returns 0 and the reset still reports success, so a typo
+ * or a renamed collection is indistinguishable from an empty one. Every name
+ * here is checked against the collections the two apps' models actually declare
+ * by `__tests__/admin/user-data-reset-coverage.test.ts`.
  */
 const ACTIVITY_RAW_COLLECTIONS: string[] = [
   // Auth session state (NOT "account" — that holds login credentials)
   "session",
   "accountlockouts",
   "verifications",
+  // Consent and agreement records the player signed
+  "termsacceptances",
   // Stored payment instruments (user side)
   "nuveiuserpaymentoptions",
-  // Presence / profile activity
+  // Payment disputes raised against a player's deposits.
+  //
+  // Reason: R87. These are per-user case files with evidence, notes and a
+  // clawback history, and they outlived every reset — which is what the owner
+  // reported. They also reference `wallettransactions` rows the reset deletes,
+  // so keeping them leaves a case pointing at a ledger that no longer exists.
+  "chargebacks",
+  // Presence / profile activity.
+  //
+  // `userpresences` is cleared through the UserPresence model above. The
+  // messaging feature declares its OWN `user_presence` collection, which is a
+  // different collection with a near-identical name — so it survived every
+  // reset while the list looked complete.
+  "user_presence",
   "useronlinestatuses",
-  "userprofiles",
   // Price/system alerts fired to users
-  "alerts",
+  "pricehealthalerts",
+  "securityalerts",
   // Messaging activity
   "conversations",
   "messages",
   "friend_requests",
   "friendships",
+  "blocked_users",
+  // Game activity (rounds a player played, and the provider deliveries that
+  // resolved them — a kept event points at a round that no longer exists)
+  "game_round",
+  "provider_event",
+  "user_game_preference",
   // Game-master / referral activity
   "gamemastersubscriptions",
   "userreferrals",
   "gamemasterearnings",
-  // Automation activity
-  "botexecutions",
   // Admin operational activity / logs (admin actions are deleted too)
   "customer_assignments",
   "customer_audit_trail",
   "employee_notifications",
   "incidents",
-  "adminoperations",
   "aiagentaudits",
   "securitylogs",
+  // Dev-zone run history. The CONFIGS these ran from (`simulatorconfigs`,
+  // `attack_suite_configs`, `testschedules`) are preserved — only the record of
+  // what was run is activity.
+  "simulatorruns",
+  "attackruns",
+  "testruns",
+  "tutorialuploadsessions",
+  // LEGACY NAMES — matched by no model in either app today.
+  //
+  // Kept deliberately rather than tidied away: an older deployment may still
+  // hold rows under these names, and a `deleteMany` against a collection that
+  // does not exist costs one no-op round trip. They are listed separately so
+  // the list does not read as though every name in it is live — which is
+  // exactly how `"alerts"` sat here for months deleting nothing while the real
+  // collection (`pricehealthalerts`) was never touched.
+  "userprofiles",
+  "botexecutions",
+  "adminoperations",
 ];
 
 /**
- * Documentation-only: configuration/identity that is intentionally PRESERVED.
- * Kept here so the preserve contract is explicit and reviewable in one place.
+ * Names in ACTIVITY_RAW_COLLECTIONS that intentionally match no declared model.
+ * Exported so the coverage guard can tell a legacy name from a typo.
+ */
+export const LEGACY_RAW_COLLECTIONS: string[] = [
+  "userprofiles",
+  "botexecutions",
+  "adminoperations",
+  // Better Auth owns these; they have no Mongoose model by design.
+  "session",
+  "verifications",
+  "useronlinestatuses",
+];
+
+/**
+ * Collections the reset neither deletes nor leaves alone: the DOCUMENT survives
+ * and counters on it are zeroed.
+ *
+ * A third category rather than a shade of "preserved", because calling a wallet
+ * preserved would hide the thing R86 was about — the counters on it are money
+ * figures reconciliation compares against a ledger the reset empties, so a
+ * counter left behind invents a mismatch for activity that no longer exists.
+ */
+export const ZEROED_COLLECTIONS: string[] = [
+  "creditwallets", // balance + all 14 lifetime counters (deleted outright when accounts are)
+  "landingpages", // visit counters
+  "marketplaceitems", // purchase counter
+];
+
+/**
+ * Configuration and identity that is intentionally PRESERVED, by collection
+ * name. Every collection either app's models declare must appear either in the
+ * delete lists above or here — enforced by
+ * `__tests__/admin/user-data-reset-coverage.test.ts`, so a model added later
+ * cannot quietly end up in neither.
  */
 export const PRESERVED_CONFIG_COLLECTIONS: string[] = [
-  "*settings (app / fee / kyc / challenge / white-label / assignment_settings / …)",
-  "adminemployees (employee + admin accounts)",
-  "roletemplates",
-  "marketplaceitems (item definitions/keys — purchase counter zeroed)",
-  "vendorsubscriptions + vendorpayments (vendors)",
+  // Settings — one document each, the whole point of preserving them
+  "appsettings",
+  "assignment_settings",
+  "challengesettings",
+  "companysettings",
+  "competitionrules",
+  "cookieconsents", // the consent BANNER's settings, not per-user consent
+  "creditconversionsettings",
+  "fraudsettings",
+  "herosettings",
+  "invoicesettings",
+  "kycsettings",
+  "market_data_settings",
+  "marketsettings",
+  "mdbclustersettings",
+  "messaging_settings",
+  "tradingrisksettings",
+  "whitelabels",
+  "withdrawalsettings",
+  // Employee / admin identity and permissions
+  "admins",
+  "adminemployees",
+  "adminroletemplates",
+  "adminbankaccounts",
+  // Content and templates
+  "announcementtemplates",
+  "emailtemplates",
+  "employeeemailtemplates",
+  "landingpagetemplates",
   "notificationtemplates",
-  "journeymilestones + journeymapconfigs",
-  "badgeconfigs + xpconfigs",
-  "landingpages (visit counters zeroed) + blockedvisitors",
-  "price/market data + worker jobs (system infrastructure)",
+  "sitepages",
+  "systemannouncements",
+  "branding_asset",
+  "tutorialvideos",
+  "aiknowledgechunks",
+  "aiknowledgesettings",
+  "aiknowledgesources",
+  // Gamification and journey DESIGN (earned progress is deleted above)
+  "badgeconfigs",
+  "xpconfigs",
+  "journeymapconfigs",
+  "journeymilestones",
+  // Catalogue and commercial config
+  "game_provider",
+  "provider_game",
+  "paymentproviders",
+  "tradingsymbols",
+  "vendorsubscriptions",
+  "vendorpayments",
+  // Visitor rules (the visits themselves are deleted above)
+  "blockedvisitors",
+  // Dev-zone configuration (the runs are deleted above)
+  "simulatorconfigs",
+  "attack_suite_configs",
+  "testschedules",
+  // Price / market data and system infrastructure
+  "candles_1m",
+  "pricecaches",
+  "pricelogs",
+  "pricesnapshots",
+  "historical_fetch_status",
+  "servers",
 ];
 
 export interface WipeUserDataOptions {
