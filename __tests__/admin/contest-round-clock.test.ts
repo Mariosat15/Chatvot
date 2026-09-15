@@ -328,7 +328,11 @@ describe("the clock explanation is one definition, on both screens", () => {
     // The whole confusion in one sentence: a length in the game's settings is one attempt, and
     // when people may start one is set elsewhere.
     const code = readCode(NOTE);
-    expect(code).toMatch(/one attempt/i);
+    // RE-POINTED BY X6.5 A3b, CLAIM UNCHANGED. The noun is now the operator's, so the literal
+    // "one attempt" is gone and asserting it would fail on correct code - which is the kind of
+    // guard the next reader deletes. What still has to be on screen is that a length in the
+    // game's settings covers exactly one of them.
+    expect(code).toMatch(/one\s*\{terms\.attempt\}/);
 
     /*
       INVERTED, NOT UPDATED. This asserted that the note said "longest possible round", which

@@ -140,9 +140,59 @@ who has to think in games rather than trades.
 > token followed by a word. Without both, the guard fires on correct code, and a guard that
 > fires on correct code is the one the next reader deletes.
 >
-> **Still outstanding:** A3b, the ~139 lines of lowercase renameable nouns in running prose
-> across 32 files, plus extending the guard to ban lowercase literals; A3c, appending a
-> vocabulary clause to the AI prompt; and A4-A6.
+> **A3b and A3c are BUILT as of 15 September 2026, later the same day.**
+>
+> **A3b closed the lowercase prose - 139 lines across 32 files, now nil.** The reason the
+> Title Case sweep had not already reached them is worth carrying: `literalNounHits` is
+> deliberately scoped to Title Case, because the lowercase forms are *also* route ids
+> (`activeTab=competitions`), stored status values (`"contest"`) and local variable names,
+> all on section 6's never-rename list. So every explanatory paragraph on the games screens
+> kept its hard-coded nouns while the headings above them were tokenised, and **an operator
+> who renamed Competitions to "Events" got a screen whose headings said Events and whose
+> sentences underneath still explained how a competition works.** The new
+> `lowercaseNounHits` scanner therefore requires a **display signal** - a quoted span
+> containing a space, or a run of three or more plain words - rather than matching the word
+> anywhere, or it fires on every route id in the codebase. Its guard
+> (`__tests__/admin/games-prose-terminology.test.ts`) **reads the directory rather than a
+> list of files**, so a screen added to `components/admin/games/` next month is policed the
+> day it arrives; and it asserts **first** that the scan found files with content, because
+> both of its real claims are "no match was found" and a reader that silently returns
+> nothing satisfies both.
+>
+> **A3c put the operator's nouns inside the two AI content assistants, and that gap was the
+> largest single inconsistency the pass would have shipped.** Every other consumer of the
+> dictionary reads a word and prints it; these two *write sentences*, and their prompts were
+> fixed strings - so a deployment that had renamed Competition to "Tournament" had a wizard
+> whose every label said Tournament sitting directly above a generated description that said
+> Competition, in the same box, with nothing thrown and nothing logged.
+>
+> **The clause is a DIFF against the defaults, appended and therefore last.** An
+> unconfigured platform gets the empty string, which is the only reason
+> `TRADING_SYSTEM_PROMPT_HISTORICAL` survives being asserted character for character - the
+> same reasoning that kept the Game Master `||` verbatim while settlement was extracted.
+> Splicing it into trading's rule list would have destroyed that guarantee in the very edit
+> that adds the feature. Being last is a second, independent benefit: it is the position a
+> model resolves a conflict in favour of.
+>
+> **`terms` has no default value on any of the three vocabulary functions, and that is the
+> load-bearing decision.** An optional parameter falling back to the defaults produces
+> fluent, correct-looking English in the operator's *old* vocabulary from any call site that
+> forgets it - the same shape as `AppSettingsProvider` being mounted nowhere. Required means
+> a forgotten call site is a compile error rather than a wrong paragraph.
+>
+> **The clause enumerates no token**: it is a diff over `TERMINOLOGY_TOKENS`, so a token
+> added to the dictionary is covered the day it lands, and a test asserts no token name
+> appears as a literal inside it. A hand-picked list of "the tokens that matter to contest
+> copy" is a second place to forget one, and the one forgotten is the one somebody has just
+> renamed.
+>
+> **Trading's prompt gets the clause too**, which reads like a contradiction of section 5's
+> promise and is not: no trading word is a token, so nothing here can rename "trade",
+> "position" or "P&L". What a rename reaches is the platform-neutral nouns trading shares
+> with every other game, and a trading prompt that ignored it would produce the only copy on
+> the platform still using the old word.
+>
+> **Still outstanding:** A4, A5 and A6.
 
 **A5 and A6 are the two that get forgotten, and both are worse than a stale label.** The
 wiki is what an operator reads when they are unsure, and the AI agent actively advises

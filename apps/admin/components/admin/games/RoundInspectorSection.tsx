@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { ResolveRoundDialog } from "./ResolveRoundDialog";
 import { RoundDetailPanel, type RoundDetail } from "./RoundDetailPanel";
+import { useTerms } from "@/contexts/TerminologyContext";
 
 /**
  * The round inspector (X6, chapter 12 section 4).
@@ -64,6 +65,7 @@ function statusColour(status: string) {
 }
 
 export default function RoundInspectorSection() {
+  const terms = useTerms();
   const [rounds, setRounds] = useState<StuckRound[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<string | null>(null);
@@ -123,10 +125,11 @@ export default function RoundInspectorSection() {
         <div>
           <h2 className="flex items-center gap-2 text-xl font-semibold text-white">
             <Search className="h-5 w-5 text-violet-400" />
-            Round Inspector
+            {terms.round} Inspector
           </h2>
           <p className="mt-1 text-sm text-slate-400">
-            Rounds waiting on a result, and the ones the automatic recovery could not finish.
+            {terms.rounds} waiting on a result, and the ones the automatic recovery could not
+            finish.
           </p>
         </div>
         <Button size="sm" variant="outline" onClick={loadRounds} disabled={loading}>
@@ -146,10 +149,12 @@ export default function RoundInspectorSection() {
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4">
           <p className="flex items-center gap-2 text-sm font-semibold text-red-300">
             <PauseCircle className="h-4 w-4" />
-            {heldCount} round{heldCount === 1 ? "" : "s"} are holding a contest from settling
+            {heldCount} {heldCount === 1 ? terms.round : terms.rounds} are holding a{" "}
+            {terms.contest} from settling
           </p>
           <p className="mt-1 text-xs text-red-300/80">
-            These contests are set to wait for a person rather than settle without the missing
+            These {terms.contests} are set to wait for a person rather than settle without the
+            missing
             result. Nobody is paid until each is resolved.
           </p>
         </div>
@@ -158,13 +163,13 @@ export default function RoundInspectorSection() {
       {loading ? (
         <div className="flex items-center gap-2 text-sm text-slate-400">
           <Loader2 className="h-4 w-4 animate-spin" />
-          Loading rounds…
+          Loading {terms.rounds}…
         </div>
       ) : rounds.length === 0 ? (
         <div className="rounded-lg border border-slate-700 bg-slate-900/50 p-8 text-center">
-          <p className="text-sm text-slate-300">No rounds need attention.</p>
+          <p className="text-sm text-slate-300">No {terms.rounds} need attention.</p>
           <p className="mt-1 text-xs text-slate-500">
-            Every round has either finished or is still inside its play window.
+            Every {terms.round} has either finished or is still inside its play window.
           </p>
         </div>
       ) : (
@@ -202,8 +207,11 @@ export default function RoundInspectorSection() {
                       )}
                     </div>
                     <p className="mt-1 truncate text-sm text-slate-200">
-                      {round.contestName ?? `${round.contestType} round`}
-                      <span className="text-slate-500"> · attempt {round.attemptNumber}</span>
+                      {round.contestName ?? `${round.contestType} ${terms.round}`}
+                      <span className="text-slate-500">
+                        {" "}
+                        · {terms.attempt} {round.attemptNumber}
+                      </span>
                     </p>
                     <p className="truncate font-mono text-xs text-slate-500">
                       {round.roundId}

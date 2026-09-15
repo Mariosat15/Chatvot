@@ -22,6 +22,12 @@
  */
 
 import { resolveGameCategory } from "@/lib/services/games/game-categories";
+import {
+  TERMS,
+  TERMINOLOGY_TOKENS,
+  resolveTerms,
+  type TerminologyPack,
+} from "@/lib/constants/terminology";
 
 export type ScoreDirection = "higher_is_better" | "lower_is_better";
 export type ScoreType = "integer" | "decimal" | "duration_ms";
@@ -108,12 +114,96 @@ IMPORTANT RULES:
 export const TRADING_SYSTEM_PROMPT =
   TRADING_SYSTEM_PROMPT_HISTORICAL + NO_FIAT_RULE;
 
-export const TRADING_VOCABULARY: ContestVocabulary = {
-  subject: "trading",
-  audience: "traders",
-  winningRule: "the best trading performance wins",
-  systemPrompt: TRADING_SYSTEM_PROMPT,
-};
+/**
+ * The operator's renamed nouns, as an instruction to the model (X6.5 A3c, chapter 14 s2).
+ *
+ * WHY THE ASSISTANT NEEDS TELLING AT ALL. Every other consumer of the token dictionary reads
+ * a word and prints it. This one writes sentences, so a deployment that renamed "Competition"
+ * to "Tournament" had a wizard whose every label said Tournament sitting directly above a
+ * generated description that said Competition - in the same box, on the same screen, and with
+ * nothing failing. An operator either edits every suggestion by hand or the platform speaks
+ * two vocabularies to its own players.
+ *
+ * IT IS A DIFF AGAINST THE DEFAULTS, WHICH IS WHAT MAKES IT EMPTY BY DEFAULT. Nothing here
+ * enumerates which tokens matter to contest copy: a hand-picked list is a second place to
+ * forget a token, and the token that gets forgotten is the one somebody has just renamed.
+ * With no overrides stored the list is empty and this returns the empty string, so every
+ * prompt is byte-for-byte what it was before A3c - which is the property
+ * `TRADING_VOCABULARY.systemPrompt === TRADING_SYSTEM_PROMPT` now pins.
+ *
+ * IT IS APPENDED, NEVER INTERPOLATED, and that is not a style preference:
+ * {@link TRADING_SYSTEM_PROMPT_HISTORICAL} is asserted character for character as the only
+ * evidence the trading wizard still writes what it wrote, so a clause spliced into its rule
+ * list would destroy the guarantee in the same edit that adds the feature. Appending also
+ * puts the clause LAST, which is the position a model resolves a conflict in favour of.
+ *
+ * THE LEFT-HAND SIDE IS OUR DEFAULT, LOWER-CASED; THE RIGHT-HAND SIDE IS THE OPERATOR'S WORD,
+ * VERBATIM. Lower-casing is safe here and nowhere else in this programme, because it is
+ * applied to a literal in `TERMS` rather than to something a person typed - the distinction
+ * that made `replace(/s$/, "")` wrong on the configured credit symbol. The operator's word
+ * keeps its capitalisation because chapter 14's tokens are Title Case labels used even
+ * mid-sentence, which is what A2 shipped.
+ *
+ * KNOWN GAP, RECORDED RATHER THAN SILENTLY PATCHED: nothing stops an operator renaming a
+ * token TO a trading word - `score` to "P&L", say - at which point this clause and the
+ * provider prompt's `TRADING_WORDS` ban contradict each other, and this clause wins because
+ * it is last. Filtering the word out here would be the "appears to save and does nothing"
+ * shape one layer further from the operator; the refusal belongs in
+ * `validateTerminologyOverrides`, where somebody is present to read it.
+ */
+export function vocabularyRule(terms: TerminologyPack): string {
+  const renamed = TERMINOLOGY_TOKENS.filter(
+    // Reason: both indexes are a declared token from `TERMINOLOGY_TOKENS`, never a
+    // caller-supplied key. Rule-scoped so the next write here has to justify itself too.
+    // eslint-disable-next-line security/detect-object-injection
+    (token) => terms[token] !== TERMS[token],
+  ).map(
+    // eslint-disable-next-line security/detect-object-injection
+    (token) => `- ${TERMS[token].toLowerCase()} -> "${terms[token]}"`,
+  );
+
+  if (renamed.length === 0) return "";
+
+  return `
+
+THE OPERATOR'S OWN NOUNS. This platform calls some things by its own names. Wherever the copy needs one of the everyday nouns on the left, write the word on the right instead, spelled and capitalised exactly as shown, in the title as well as in running text. These are the operator's choice, so a synonym that reads better is still wrong:
+${renamed.join("\n")}`;
+}
+
+/**
+ * Trading's vocabulary, with the operator's renamed nouns appended.
+ *
+ * A FUNCTION RATHER THAN A CONSTANT because the words are a database read now. The constant
+ * below survives as the defaults-resolved answer, which is what keeps the composition
+ * assertions in `volts-currency.test.ts` meaningful: they now say "with nothing renamed, the
+ * prompt is exactly the historical string plus the fiat rule".
+ *
+ * TRADING GETS THE CLAUSE TOO, on purpose. Chapter 14 section 5 promises a trader cannot tell
+ * this programme happened, and the tokens are written to keep that promise structurally - no
+ * trading word is a token, so nothing here can rename "trade", "position" or "P&L". What it
+ * can rename is the platform-neutral nouns a trading contest shares with every other game,
+ * and renaming those is a platform-wide decision an operator took deliberately. A trading
+ * prompt that ignored it would produce the only copy on the platform still using the old word.
+ */
+export function tradingVocabulary(terms: TerminologyPack): ContestVocabulary {
+  return {
+    subject: "trading",
+    audience: "traders",
+    winningRule: "the best trading performance wins",
+    systemPrompt: TRADING_SYSTEM_PROMPT + vocabularyRule(terms),
+  };
+}
+
+/**
+ * Trading's vocabulary with nothing renamed.
+ *
+ * Derived from {@link tradingVocabulary} rather than written out beside it - a second literal
+ * would be the "one rule, two copies" shape, and the copy that drifted would be this one,
+ * since it is the one no route calls.
+ */
+export const TRADING_VOCABULARY: ContestVocabulary = tradingVocabulary(
+  resolveTerms(null),
+);
 
 /**
  * Words that describe trading and describe nothing about a game.
@@ -250,8 +340,19 @@ ${rules.map((text) => `"""${text}"""`).join("\n")}`
 ${lines.join("\n")}${context}`;
 }
 
+/**
+ * `terms` is REQUIRED and has no default, deliberately.
+ *
+ * An optional parameter falling back to the defaults is the failure this programme keeps
+ * finding: a caller that forgets it gets correct-looking English in the operator's old
+ * vocabulary, with nothing thrown and nothing logged. The same reasoning as `apps/admin`
+ * mounting no `AppSettingsProvider` - nineteen components read a context that was never
+ * seeded and every one of them rendered a plausible default. A test pins the absence of a
+ * default value on both vocabulary functions.
+ */
 export function providerVocabulary(
   title: CatalogueVocabularySource,
+  terms: TerminologyPack,
 ): ContestVocabulary {
   const subject = describeSubject(title);
   const winningRule = describeWinningRule(
@@ -273,7 +374,7 @@ IMPORTANT RULES:
 - Include relevant emojis in the title if it fits the theme
 - Write about playing ${title.displayName}, never about trading, investing or financial markets
 - Never use these words: ${TRADING_WORDS.join(", ")}
-- Do not claim a prize amount, a player count or a start time - the operator sets those${NO_FIAT_RULE}`;
+- Do not claim a prize amount, a player count or a start time - the operator sets those${NO_FIAT_RULE}${vocabularyRule(terms)}`;
 
   return {
     subject,

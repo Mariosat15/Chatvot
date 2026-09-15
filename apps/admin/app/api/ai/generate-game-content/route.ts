@@ -16,6 +16,7 @@ import { connectToDatabase } from "@/database/mongoose";
 import { WhiteLabel } from "@/database/models/whitelabel.model";
 import ProviderGame from "@/database/models/games/provider-game.model";
 import { guardSection } from "@/lib/admin/section-route-guard";
+import { getTerms } from "@/lib/services/terminology.service";
 import { gameContentVocabulary } from "@/lib/admin/ai-game-content-vocabulary";
 import {
   parseGameContentSuggestion,
@@ -116,7 +117,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const vocabulary = gameContentVocabulary(title);
+    // The operator's own nouns reach this assistant too: a game page written for a platform
+    // that calls a competition a Tournament must say Tournament. Empty when nothing is
+    // renamed, so an unconfigured platform gets the prompt it got before.
+    const vocabulary = gameContentVocabulary(title, await getTerms());
     const openai = new OpenAI({ apiKey: config.apiKey });
 
     const userPrompt =

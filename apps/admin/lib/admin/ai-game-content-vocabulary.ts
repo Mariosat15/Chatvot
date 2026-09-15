@@ -31,9 +31,11 @@ import {
   describeSubject,
   describeWinningRule,
   describeGameFacts,
+  vocabularyRule,
   type CatalogueVocabularySource,
 } from "./ai-contest-vocabulary";
 import { CONTENT_LIMITS } from "./game-content-fields";
+import type { TerminologyPack } from "@/lib/constants/terminology";
 
 export interface GameContentVocabulary {
   /** For the panel's own wording, so what the operator is told and what the model is told agree. */
@@ -68,9 +70,16 @@ export const NO_RULES_CLAIMS_RULE = `
  * THE LENGTHS ARE IMPORTED, NEVER TYPED IN. A prompt asking for 200 characters into a field
  * the form caps at 120 produces a suggestion that is silently cut - the same reasoning that
  * keeps the dialog's counters reading from `CONTENT_LIMITS` rather than from a literal.
+ *
+ * THE OPERATOR'S RENAMED NOUNS ARE APPENDED, from the same `vocabularyRule` the contest
+ * assistant uses (X6.5 A3c) - not restated here. A game's page copy outlives every contest
+ * run on it, which makes it the WORST place for the old word to survive: a description
+ * written once and read for months. `terms` is required and has no default for the reason
+ * given on `providerVocabulary`.
  */
 export function gameContentVocabulary(
   title: CatalogueVocabularySource,
+  terms: TerminologyPack,
 ): GameContentVocabulary {
   const subject = describeSubject(title);
   const winningRule = describeWinningRule(title.scoreDirection, title.scoreType);
@@ -93,7 +102,7 @@ WHAT TO RETURN. JSON only, with exactly these four keys:
   "description": "what the game is and why it is fun, about 60 words",
   "highlights": [{ "title": "max ${CONTENT_LIMITS.highlightTitle} characters", "detail": "max ${CONTENT_LIMITS.highlightDetail} characters" }]
 }
-Return 3 highlights. Return nothing outside the JSON.`;
+Return 3 highlights. Return nothing outside the JSON.${vocabularyRule(terms)}`;
 
   return { subject, winningRule, systemPrompt };
 }

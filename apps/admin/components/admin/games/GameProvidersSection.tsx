@@ -18,6 +18,7 @@ import { Switch } from "@/components/ui/switch";
 import ProviderRegisterDialog from "./ProviderRegisterDialog";
 import ProviderCredentialsDialog from "./ProviderCredentialsDialog";
 import ProviderCatalogueDialog from "./ProviderCatalogueDialog";
+import { useTerms } from "@/contexts/TerminologyContext";
 import type { GameProviderRow } from "./provider-types";
 
 /**
@@ -34,6 +35,7 @@ import type { GameProviderRow } from "./provider-types";
  */
 
 export default function GameProvidersSection() {
+  const terms = useTerms();
   const [providers, setProviders] = useState<GameProviderRow[]>([]);
   const [masterEnabled, setMasterEnabled] = useState(false);
   const [registeredAdapters, setRegisteredAdapters] = useState<string[]>([]);
@@ -51,7 +53,7 @@ export default function GameProvidersSection() {
       const data = await response.json();
 
       if (!response.ok) {
-        toast.error(data.error ?? "Failed to load game providers.");
+        toast.error(data.error ?? `Failed to load ${terms.game} providers.`);
         return;
       }
 
@@ -59,11 +61,11 @@ export default function GameProvidersSection() {
       setMasterEnabled(Boolean(data.externalGamesEnabled));
       setRegisteredAdapters(data.registeredAdapters ?? []);
     } catch {
-      toast.error("Failed to load game providers.");
+      toast.error(`Failed to load ${terms.game} providers.`);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [terms]);
 
   useEffect(() => {
     void load();
@@ -100,8 +102,8 @@ export default function GameProvidersSection() {
       setMasterEnabled(enabled);
       toast.success(
         enabled
-          ? "External games are switched on at platform level."
-          : "External games are switched off platform-wide. Contests already running will still finish.",
+          ? `External ${terms.games} are switched on platform-wide.`
+          : `External ${terms.games} are switched off platform-wide. ${terms.contests} already running will still finish.`,
       );
     } catch {
       toast.error("Something went wrong. Please contact support.");
@@ -133,7 +135,7 @@ export default function GameProvidersSection() {
       toast.success(
         enabled
           ? `${provider.displayName} is enabled.`
-          : `${provider.displayName} will not accept new contests. Any already running will still finish.`,
+          : `${provider.displayName} will not accept new ${terms.contests}. Any already running will still finish.`,
       );
       await load();
     } catch {
@@ -146,7 +148,7 @@ export default function GameProvidersSection() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24 text-white/50">
-        <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading game providers…
+        <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading {terms.game} providers…
       </div>
     );
   }
@@ -157,12 +159,12 @@ export default function GameProvidersSection() {
         <div>
           <h2 className="flex items-center gap-2 text-2xl font-semibold text-white">
             <Plug className="h-6 w-6 text-violet-400" />
-            Game Providers
+            {terms.game} Providers
           </h2>
           <p className="mt-1 max-w-2xl text-sm text-white/60">
-            Companies that supply games to run competitions on. A game reaches players only
-            when the platform switch, the provider switch and that game&apos;s own switch are
-            all on.
+            Companies that supply {terms.games} to run {terms.contests} on. A {terms.game}{" "}
+            reaches {terms.players} only when the platform switch, the provider switch and
+            that {terms.game}&apos;s own switch are all on.
           </p>
         </div>
         <Button onClick={() => setRegisterOpen(true)}>
@@ -181,11 +183,11 @@ export default function GameProvidersSection() {
             />
             <div>
               <div className="font-medium text-white/90">
-                External games, platform-wide
+                External {terms.games}, platform-wide
               </div>
               <p className="text-sm text-white/60">
-                The master switch. With this off, no external game runs no matter how any
-                provider or game is configured.
+                The master switch. With this off, no external {terms.game} runs no matter how
+                any provider or {terms.game} is configured.
               </p>
             </div>
           </div>
@@ -207,8 +209,8 @@ export default function GameProvidersSection() {
           <Plug className="mx-auto mb-3 h-8 w-8 text-white/25" />
           <div className="font-medium text-white/80">No providers registered yet</div>
           <p className="mx-auto mt-1 max-w-md text-sm text-white/50">
-            Register a provider to store its API details, pull its game catalogue and choose
-            which of its games go live here.
+            Register a provider to store its API details, pull its {terms.game} catalogue and
+            choose which of its {terms.games} go live here.
           </p>
         </Card>
       ) : (
@@ -265,6 +267,7 @@ function ProviderCard({
   onCredentials: () => void;
   onCatalogue: () => void;
 }) {
+  const terms = useTerms();
   const hasCallbackSecret = Boolean(provider.credentials?.hasCallbackSecret);
 
   // Reason for computing this rather than only disabling the switch: an operator needs to
@@ -315,7 +318,7 @@ function ProviderCard({
           {provider.enabled ? "Enabled" : "Disabled"}
         </Badge>
         <Badge variant="outline" className="border-white/20 bg-white/5 text-white/60">
-          {provider.enabledTitleCount} of {provider.titleCount} games live
+          {provider.enabledTitleCount} of {provider.titleCount} {terms.games} live
         </Badge>
         {provider.enabled && !masterEnabled && (
           <Badge className="border-amber-500/40 bg-amber-500/10 text-amber-300">
@@ -338,7 +341,7 @@ function ProviderCard({
         </Button>
         <Button size="sm" variant="outline" onClick={onCatalogue}>
           <Gamepad2 className="mr-2 h-3.5 w-3.5" />
-          Games
+          {terms.games}
         </Button>
       </div>
     </Card>

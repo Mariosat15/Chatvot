@@ -349,10 +349,13 @@ export const ALL_GAMES = "all";
  * list, unreachable by any selection, which reads as data loss. Building from the contests
  * guarantees every row is reachable.
  */
-export function resolveGameFilterOptions(rows: AnalyticsContestRow[]): GameFilterOption[] {
+export function resolveGameFilterOptions(
+  rows: AnalyticsContestRow[],
+  terms: TerminologyPack,
+): GameFilterOption[] {
   const summary = summariseByGame(rows);
   return [
-    { key: ALL_GAMES, label: "All games", contests: rows.length },
+    { key: ALL_GAMES, label: `All ${terms.games}`, contests: rows.length },
     ...summary.map((group) => ({
       key: group.key,
       label: group.provider ? `${group.label} (${group.provider})` : group.label,
@@ -385,9 +388,13 @@ export function filterByGame<T extends AnalyticsGameLabel>(
  * defect verbatim while settlement was being extracted. Labelling it is the honest half that
  * costs nothing.
  */
-export function resolveScopeNote(contestCount: number, limit: number): string {
+export function resolveScopeNote(
+  contestCount: number,
+  limit: number,
+  terms: TerminologyPack,
+): string {
   if (contestCount < limit) {
-    return `Every figure below covers all ${contestCount} finished competitions.`;
+    return `Every figure below covers all ${contestCount} finished ${terms.contests}.`;
   }
-  return `Every figure below covers the ${limit} most recently finished competitions, not all time. Older competitions are excluded from the totals as well as from the list.`;
+  return `Every figure below covers the ${limit} most recently finished ${terms.contests}, not all time. Older ${terms.contests} are excluded from the totals as well as from the list.`;
 }

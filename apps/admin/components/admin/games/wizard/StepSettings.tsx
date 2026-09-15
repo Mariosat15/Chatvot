@@ -5,6 +5,7 @@ import { RoundClockNote } from "../RoundClockNote";
 import type { ContestDraft } from "../contest-draft";
 import type { ContestableTitle } from "../contest-types";
 import { Problem } from "./fields";
+import { useTerms } from "@/contexts/TerminologyContext";
 
 /**
  * Step three: the game's own options, generated from its `configSchema`.
@@ -26,6 +27,8 @@ export function StepSettings({
   patch: (changes: Partial<ContestDraft>) => void;
   title: ContestableTitle;
 }) {
+  const terms = useTerms();
+
   return (
     <>
       <RoundClockNote
@@ -48,7 +51,7 @@ export function StepSettings({
         />
       ) : (
         <Problem
-          title="This game's settings cannot be read"
+          title={`This ${terms.game}'s settings cannot be read`}
           lines={[title.schema.error]}
         />
       )}

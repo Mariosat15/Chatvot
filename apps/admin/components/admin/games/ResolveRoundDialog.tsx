@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { AlertTriangle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useTerms } from "@/contexts/TerminologyContext";
 import {
   MIN_REASON_LENGTH,
   RESOLUTION_ACTIONS,
@@ -50,6 +51,7 @@ export function ResolveRoundDialog({
   onResolved,
   onCancel,
 }: ResolveRoundDialogProps) {
+  const terms = useTerms();
   const [action, setAction] = useState<string>("void");
   const [reason, setReason] = useState("");
   const [pending, setPending] = useState(false);
@@ -72,12 +74,14 @@ export function ResolveRoundDialog({
         return;
       }
 
-      toast.success(`Round marked "${data.status}".`);
+      toast.success(`${terms.round} marked "${data.status}".`);
       // Reported by the server rather than guessed here: a contest can be held by several
       // rounds, and telling an operator settlement is unblocked when three others still hold it
       // would stop them looking.
       if (data.unblockedSettlement) {
-        toast.success("No rounds are holding this contest now - settlement can proceed.");
+        toast.success(
+          `No ${terms.rounds} are holding this ${terms.contest} now - settlement can proceed.`,
+        );
       }
       await onResolved();
     } catch {
@@ -90,10 +94,11 @@ export function ResolveRoundDialog({
   return (
     <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4 space-y-4">
       <div>
-        <p className="text-sm font-semibold text-amber-300">End this round</p>
+        <p className="text-sm font-semibold text-amber-300">End this {terms.round}</p>
         <p className="mt-1 text-xs text-slate-400">
-          A score cannot be entered here. Results only ever arrive from the provider, through
-          one route, so that every score in the system has the same audit trail.
+          A {terms.score} cannot be entered here. Results only ever arrive from the provider,
+          through one route, so that every {terms.score} in the system has the same audit
+          trail.
         </p>
       </div>
 
@@ -118,9 +123,9 @@ export function ResolveRoundDialog({
         </p>
         {stillUnresolved > 1 && (
           <p className="mt-2 text-xs text-slate-400">
-            {stillUnresolved - 1} other unresolved round
-            {stillUnresolved - 1 === 1 ? "" : "s"} in this contest will still be waiting
-            afterwards.
+            {stillUnresolved - 1} other unresolved{" "}
+            {stillUnresolved - 1 === 1 ? terms.round : terms.rounds} in this {terms.contest}{" "}
+            will still be waiting afterwards.
           </p>
         )}
       </div>

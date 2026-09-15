@@ -676,8 +676,11 @@ describe("nothing enumerates games", () => {
   });
 
   it("the component carries task 23's empty state", () => {
+    // RE-POINTED BY X6.5 A3b, CLAIM UNCHANGED. The final noun is the operator's word, so the
+    // sentence no longer ends in the literal "game" - the empty state itself is what task 23
+    // asks for and that is still what is asserted.
     expect(read(COMPONENT)).toContain(
-      "Detailed performance metrics are not available for this game.",
+      "Detailed performance metrics are not available for this {terms.game}.",
     );
   });
 });

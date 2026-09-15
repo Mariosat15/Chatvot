@@ -19,6 +19,7 @@ import {
   resolveSupportedPlayModes,
   type PlayMode,
 } from "@/lib/services/games/play-shape";
+import { useTerms } from "@/contexts/TerminologyContext";
 import type { ProviderTitleRow } from "./provider-types";
 
 /**
@@ -63,6 +64,7 @@ export default function GamePlayStyleControl({
   title,
   onChanged,
 }: Props) {
+  const terms = useTerms();
   const [saving, setSaving] = useState(false);
 
   const effective = resolvePlayMode(title);
@@ -86,8 +88,8 @@ export default function GamePlayStyleControl({
         <div className="flex items-start gap-1 text-xs text-white/40">
           <Lock className="mt-0.5 h-3 w-3 shrink-0" />
           <span>
-            This game needs an opponent, so both players are always up against each other
-            live. There is nothing to choose.
+            This {terms.game} needs an {terms.opponent}, so both {terms.players} are always up
+            against each other live. There is nothing to choose.
           </span>
         </div>
       </div>
@@ -197,6 +199,7 @@ function SupportedModes({
   effective: PlayMode;
   onChanged: (next: { supportedPlayModes?: string[] }) => void;
 }) {
+  const terms = useTerms();
   const [saving, setSaving] = useState(false);
 
   // RESOLVED, never the raw stored array. Two reasons, and both have bitten this programme:
@@ -238,7 +241,7 @@ function SupportedModes({
       // contest can actually be created as.
       onChanged({ supportedPlayModes: data.supported as string[] });
       toast.success(
-        `Contests on ${title.displayName} can be created as: ${(data.supported as PlayMode[])
+        `${terms.contests} on ${title.displayName} can be created as: ${(data.supported as PlayMode[])
           .map((mode) => PLAY_MODE_COPY.get(mode)?.label ?? mode)
           .join(", ")}.`,
       );
@@ -252,7 +255,7 @@ function SupportedModes({
   return (
     <div className="mt-2 space-y-1 border-t border-white/10 pt-2">
       <p className="text-[11px] font-medium uppercase tracking-wide text-white/35">
-        A contest may be created as
+        A {terms.contest} may be created as
       </p>
       {PLAY_MODES.map((mode) => {
         const locked = mode === effective;
@@ -276,8 +279,8 @@ function SupportedModes({
         );
       })}
       <p className="max-w-[260px] text-xs text-white/40">
-        Tick a second style to let an operator choose per contest. This game&apos;s own style
-        cannot be unticked — change it in the box above instead.
+        Tick a second style to let an operator choose per {terms.contest}. This {terms.game}
+        &apos;s own style cannot be unticked — change it in the box above instead.
       </p>
     </div>
   );

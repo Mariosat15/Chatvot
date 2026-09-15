@@ -518,7 +518,7 @@ export function ProviderContestWizard({ titles }: ProviderContestWizardProps) {
           {selected && (
             <div className="rounded-xl border border-gray-700 bg-gray-800/50 p-4">
               <p className="text-xs text-gray-400">
-                Settings, scoring and round length all come from{" "}
+                {`Settings, scoring and ${terms.round} length all come from `}
                 <strong className="text-gray-200">
                   {selected.providerName}
                 </strong>

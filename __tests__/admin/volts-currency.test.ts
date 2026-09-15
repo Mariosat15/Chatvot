@@ -44,6 +44,7 @@ import {
   TRADING_VOCABULARY,
   providerVocabulary,
 } from "@/apps/admin/lib/admin/ai-contest-vocabulary";
+import { resolveTerms } from "@/lib/constants/terminology";
 
 const ROOT = join(__dirname, "..", "..");
 
@@ -535,12 +536,15 @@ describe("no contest string composed on the server names a currency", () => {
 describe("generated contest copy may not name a currency", () => {
   it("the rule reaches both prompts", () => {
     expect(TRADING_SYSTEM_PROMPT).toContain(NO_FIAT_RULE);
-    const provider = providerVocabulary({
-      displayName: "Circuit Sprint",
-      category: "puzzle",
-      scoreDirection: "higher_is_better",
-      scoreType: "points",
-    } as never);
+    const provider = providerVocabulary(
+      {
+        displayName: "Circuit Sprint",
+        category: "puzzle",
+        scoreDirection: "higher_is_better",
+        scoreType: "points",
+      } as never,
+      resolveTerms(null),
+    );
     expect(provider.systemPrompt).toContain(NO_FIAT_RULE);
   });
 
@@ -570,6 +574,12 @@ describe("generated contest copy may not name a currency", () => {
     expect(TRADING_SYSTEM_PROMPT_HISTORICAL).toContain(
       "Focus on the competitive/gaming aspect",
     );
+    /*
+      AND STILL EXACT AFTER X6.5 A3c, which is the point of that clause being APPENDED and a
+      diff against the defaults rather than a rewrite: with nothing renamed it is the empty
+      string, so an unconfigured platform's trading prompt is byte-for-byte the composition
+      above. This assertion is what makes "appended, never interpolated" checkable.
+    */
     expect(TRADING_VOCABULARY.systemPrompt).toBe(TRADING_SYSTEM_PROMPT);
   });
 });

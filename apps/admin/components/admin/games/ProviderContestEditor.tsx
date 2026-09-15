@@ -263,7 +263,7 @@ export function ProviderContestEditor({
           Edit {terms.contest}
         </h1>
         <p className="text-sm text-gray-400 mt-1">
-          {titleName ?? "Provider game"} &middot;{" "}
+          {titleName ?? `Provider ${terms.game}`} &middot;{" "}
           <span className="uppercase">{stored.status}</span>
         </p>
       </div>
@@ -290,9 +290,9 @@ export function ProviderContestEditor({
               "entrants" and "cancel" carry it without needing a word we would have to
               lower-case.
             */}
-            The {terms.entryFee}, {terms.prize} split, timings and game settings
+            The {terms.entryFee}, {terms.prize} split, timings and {terms.game} settings
             are locked - changing them now would mean two entrants paid
-            different amounts or played different games. You can still fix the
+            different amounts or played different {terms.games}. You can still fix the
             name and description, and raise the cap. To change anything else,
             cancel so entrants are refunded, then create it again.
           </p>
@@ -408,7 +408,7 @@ export function ProviderContestEditor({
           />
           <NumberField
             id="minParticipants"
-            label="Minimum players"
+            label={`Minimum ${terms.players}`}
             value={draft.minParticipants}
             min={2}
             disabled={entered}
@@ -576,7 +576,7 @@ export function ProviderContestEditor({
           )}
           <div>
             <Label className="text-gray-200">
-              If a round never reports a result
+              If a {terms.round} never reports a result
             </Label>
             <Select
               value={draft.unresolvedRoundPolicy}

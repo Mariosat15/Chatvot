@@ -30,6 +30,17 @@ import {
   describeWinningRule,
   providerVocabulary,
 } from "../../apps/admin/lib/admin/ai-contest-vocabulary";
+import { resolveTerms } from "../../lib/constants/terminology";
+
+/**
+ * Nothing renamed, which is what every assertion in this file was written against.
+ *
+ * X6.5 A3c made `terms` a REQUIRED parameter of both vocabulary functions rather than one
+ * defaulting to this, so a forgotten call site is a compile error instead of correct-looking
+ * English in the operator's old words. The cost is this constant; the claims below are
+ * unchanged, because with no overrides stored the appended clause is the empty string.
+ */
+const NO_OVERRIDES = resolveTerms(null);
 
 const ROOT = join(__dirname, "..", "..");
 const ADMIN = join(ROOT, "apps", "admin");
@@ -84,7 +95,7 @@ const PUZZLE = {
 
 describe("providerVocabulary - the prompt describes the game the operator picked", () => {
   it("names the title and how it decides a winner", () => {
-    const vocabulary = providerVocabulary(PUZZLE);
+    const vocabulary = providerVocabulary(PUZZLE, NO_OVERRIDES);
 
     expect(vocabulary.systemPrompt).toContain("Circuit Sprint");
     expect(vocabulary.systemPrompt).toContain("the highest score wins");
@@ -99,7 +110,7 @@ describe("providerVocabulary - the prompt describes the game the operator picked
       puzzle got copy written for "a trading competition platform" and an audience of
       "traders" - correct English, entirely wrong subject, and nothing anywhere reported it.
     */
-    const vocabulary = providerVocabulary(PUZZLE);
+    const vocabulary = providerVocabulary(PUZZLE, NO_OVERRIDES);
 
     expect(vocabulary.systemPrompt).not.toBe(TRADING_SYSTEM_PROMPT);
     expect(vocabulary.systemPrompt).not.toContain(
@@ -116,7 +127,7 @@ describe("providerVocabulary - the prompt describes the game the operator picked
       checked here are the ones that would read as a platform-wide claim rather than as a
       stylistic slip.
     */
-    const prompt = providerVocabulary(PUZZLE).systemPrompt;
+    const prompt = providerVocabulary(PUZZLE, NO_OVERRIDES).systemPrompt;
     const banned = prompt.slice(prompt.indexOf("Never use these words:"));
 
     expect(banned.length).toBeGreaterThan(30);
@@ -128,7 +139,7 @@ describe("providerVocabulary - the prompt describes the game the operator picked
   it("tells the model not to invent the prize, the field size or the start", () => {
     // Those three are the operator's settings, and copy naming a figure nobody configured is
     // a promise to a paying player that the contest will not keep.
-    expect(providerVocabulary(PUZZLE).systemPrompt).toMatch(
+    expect(providerVocabulary(PUZZLE, NO_OVERRIDES).systemPrompt).toMatch(
       /Do not claim a prize amount, a player count or a start time/,
     );
   });
@@ -137,11 +148,14 @@ describe("providerVocabulary - the prompt describes the game the operator picked
     // A catalogue row with only the required fields is the normal case for a title an
     // operator has just synced, and the prompt must still describe a game rather than
     // trailing off into an empty bullet.
-    const bare = providerVocabulary({
-      displayName: "Tile Rush",
-      scoreDirection: "lower_is_better",
-      scoreType: "integer",
-    });
+    const bare = providerVocabulary(
+      {
+        displayName: "Tile Rush",
+        scoreDirection: "lower_is_better",
+        scoreType: "integer",
+      },
+      NO_OVERRIDES,
+    );
 
     expect(bare.systemPrompt).toContain("A skill game called Tile Rush");
     expect(bare.systemPrompt).toContain("the lowest score wins");
@@ -245,7 +259,9 @@ describe("the AI route derives the words server-side", () => {
 
   it("builds the vocabulary from the row the key found", () => {
     const source = code(AI_ROUTE);
-    expect(source).toMatch(/providerVocabulary\(title\)/);
+    // `title` is the row, `terms` is the operator's vocabulary (A3c). Both asserted, because
+    // the interesting half is that the game facts come from the LOOKUP and not the body.
+    expect(source).toMatch(/providerVocabulary\(title, terms\)/);
     expect(source).toMatch(/ProviderGame\.findOne\(\{ gameKey: gameKey\.trim\(\) \}\)/);
   });
 
@@ -253,8 +269,14 @@ describe("the AI route derives the words server-side", () => {
     /*
       THE LOAD-BEARING HALF, and the tempting shortcut is the defect: falling back to trading
       when the lookup misses produces fluent, confident, wrong copy with nothing to notice.
-      Asserted by position - `TRADING_VOCABULARY` must be reachable only from the
+      Asserted by position - the trading vocabulary must be reachable only from the
       no-key-at-all branch, so it appears exactly once in the resolver.
+
+      RE-POINTED by X6.5 A3c, claim unchanged: the resolver used to name the constant
+      `TRADING_VOCABULARY` and now calls `tradingVocabulary(terms)`, because the prompt is
+      composed per request once an operator can rename the nouns in it. Only the identifier
+      moved, so the test was re-aimed rather than relaxed - re-pinning it to the new spelling
+      is exactly the step at which a structural guard silently stops reaching anything.
     */
     const source = code(AI_ROUTE);
     const resolver = source.slice(
@@ -263,11 +285,11 @@ describe("the AI route derives the words server-side", () => {
     );
 
     expect(resolver.length).toBeGreaterThan(300);
-    expect(resolver.match(/TRADING_VOCABULARY/g) ?? []).toHaveLength(1);
+    expect(resolver.match(/tradingVocabulary\(/g) ?? []).toHaveLength(1);
 
     const afterLookup = resolver.slice(resolver.indexOf("if (!title)"));
     expect(afterLookup.length).toBeGreaterThan(50);
-    expect(afterLookup).not.toContain("TRADING_VOCABULARY");
+    expect(afterLookup).not.toContain("tradingVocabulary");
     expect(afterLookup).toMatch(/ok: false/);
   });
 

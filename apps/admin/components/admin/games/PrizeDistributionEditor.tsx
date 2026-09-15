@@ -199,13 +199,13 @@ export function PrizeDistributionEditor({
         view has, one screen along.
       */}
       <p className="text-xs text-gray-500">
-        Shares are taken from the prize pool
+        Shares are taken from the {terms.prizePool}
         {typeof platformFeePercentage === "number" && platformFeePercentage > 0
           ? ` after the ${platformFeePercentage}% platform fee`
           : ""}
-        . A rank nobody finishes in is not kept by the platform - its share is
-        split equally among the players who did place, so the amounts actually
-        paid can be higher than the percentages here.
+        . A {terms.rank} nobody finishes in is not kept by the platform - its share is split
+        equally among the {terms.players} who did place, so the amounts actually paid can be
+        higher than the percentages here.
       </p>
     </div>
   );

@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DIALOG_WIDTH_STANDARD } from "@/lib/admin/dialog-widths";
+import { useTerms } from "@/contexts/TerminologyContext";
 
 /**
  * Registering a provider.
@@ -40,6 +41,7 @@ export default function ProviderRegisterDialog({
   onRegistered,
   registeredAdapters,
 }: Props) {
+  const terms = useTerms();
   const [providerKey, setProviderKey] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
@@ -91,10 +93,11 @@ export default function ProviderRegisterDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className={DIALOG_WIDTH_STANDARD}>
         <DialogHeader>
-          <DialogTitle>Register a game provider</DialogTitle>
+          <DialogTitle>Register a {terms.game} provider</DialogTitle>
           <DialogDescription>
-            A newly registered provider is switched off. Nothing reaches players until you
-            add credentials, enable the provider and enable individual games.
+            A newly registered provider is switched off. Nothing reaches {terms.players}{" "}
+            until you add credentials, enable the provider and enable individual{" "}
+            {terms.games}.
           </DialogDescription>
         </DialogHeader>
 
@@ -108,7 +111,8 @@ export default function ProviderRegisterDialog({
               placeholder="acme-games"
             />
             <p className="text-xs text-amber-300/80">
-              Permanent. This key is built into every game and every score recorded for this
+              Permanent. This key is built into every {terms.game} and every {terms.score}{" "}
+              recorded for this
               provider, so it can never be renamed afterwards. Lowercase letters, numbers and
               hyphens.
             </p>
@@ -116,11 +120,19 @@ export default function ProviderRegisterDialog({
 
           <div className="space-y-1.5">
             <Label htmlFor="displayName">Display name</Label>
+            {/*
+              The placeholder is an example SUPPLIER name, so it must not contain a
+              renameable noun. It read "ACME Games" and the A3b guard was right to flag it:
+              an operator who renamed Games to "Puzzles" would have seen a placeholder
+              naming a concept they had retired, in a field that holds a company's name
+              rather than a game's. Reworded rather than exempted - a provider supplies
+              games and is not one.
+            */}
             <Input
               id="displayName"
               value={displayName}
               onChange={(event) => setDisplayName(event.target.value)}
-              placeholder="ACME Games"
+              placeholder="ACME Studios"
             />
           </div>
 

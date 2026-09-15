@@ -15,6 +15,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useTerms } from "@/contexts/TerminologyContext";
 
 /**
  * Game Performance - `12` s5's "New: Game Performance" screen.
@@ -111,6 +112,7 @@ function duration(seconds: number | null): string {
 }
 
 export default function GamePerformanceSection() {
+  const terms = useTerms();
   const [rows, setRows] = useState<PerformanceRow[]>([]);
   const [windowDays, setWindowDays] = useState(30);
   const [windows, setWindows] = useState<number[]>([7, 30, 90]);
@@ -149,13 +151,14 @@ export default function GamePerformanceSection() {
         <div>
           <h2 className="flex items-center gap-2 text-xl font-semibold text-white">
             <BarChart3 className="h-5 w-5 text-cyan-400" />
-            Game Performance
+            {terms.game} Performance
           </h2>
           <p className="mt-1 max-w-3xl text-sm text-white/60">
-            How each game is going for the players, measured from the rounds themselves over the
-            last {windowDays} days. Ranked contests only - practice rounds are excluded, since
-            nothing is at stake in them. There is no money on this screen; entry-fee volume and
-            fee revenue by game are on Competition Analytics.
+            How each {terms.game} is going for the {terms.players}, measured from the{" "}
+            {terms.rounds} themselves over the last {windowDays} days. Ranked {terms.contests}{" "}
+            only - {terms.practice} {terms.rounds} are excluded, since nothing is at stake in
+            them. There is no money on this screen; {terms.entryFee} volume and fee revenue by{" "}
+            {terms.game} are on {terms.contest} Analytics.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -197,11 +200,11 @@ export default function GamePerformanceSection() {
         <div className="rounded-lg border border-slate-700 bg-slate-900/50 p-10 text-center">
           <BarChart3 className="mx-auto mb-3 h-8 w-8 text-white/30" />
           <p className="text-sm text-white/70">
-            No ranked rounds were played in the last {windowDays} days.
+            No ranked {terms.rounds} were played in the last {windowDays} days.
           </p>
           <p className="mt-1 text-xs text-white/40">
-            This screen is measured from rounds, so a game with no play has nothing to show
-            rather than a row of zeroes.
+            This screen is measured from {terms.rounds}, so a {terms.game} with no play has
+            nothing to show rather than a row of zeroes.
           </p>
         </div>
       ) : (
@@ -216,6 +219,7 @@ export default function GamePerformanceSection() {
 }
 
 function PerformanceCard({ row }: { row: PerformanceRow }) {
+  const terms = useTerms();
   const verdict = VERDICTS[row.verdict];
   const Icon = verdict.icon;
 
@@ -253,7 +257,10 @@ function PerformanceCard({ row }: { row: PerformanceRow }) {
         </div>
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
-          <Stat label="Rounds started" value={row.rounds.started.toLocaleString()} />
+          <Stat
+            label={`${terms.rounds} started`}
+            value={row.rounds.started.toLocaleString()}
+          />
           {/*
             Reason this reads `scoreProducing` and not a status count: a round the contest
             closed over, or one the player walked out of, still scores what they achieved and
@@ -273,7 +280,7 @@ function PerformanceCard({ row }: { row: PerformanceRow }) {
                 ? "-"
                 : `${Math.round(row.abandonmentRate * 100)}%`
             }
-            sub={`${row.rounds.leftEarly} rounds`}
+            sub={`${row.rounds.leftEarly} ${terms.rounds}`}
             tone={
               row.abandonmentRate !== null && row.abandonmentRate > 0.35
                 ? "warn"
@@ -289,7 +296,7 @@ function PerformanceCard({ row }: { row: PerformanceRow }) {
             value={
               row.cutOffRate === null ? "-" : `${Math.round(row.cutOffRate * 100)}%`
             }
-            sub="contest closed first"
+            sub={`${terms.contest} closed first`}
             tone={row.cutOffRate !== null && row.cutOffRate > 0.5 ? "warn" : "plain"}
           />
           <Stat
@@ -308,8 +315,8 @@ function PerformanceCard({ row }: { row: PerformanceRow }) {
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-slate-800 pt-3 text-xs text-white/50">
           <span className="inline-flex items-center gap-1.5">
             <Users className="h-3.5 w-3.5" />
-            {row.players} players across {row.contests}{" "}
-            {row.contests === 1 ? "competition" : "competitions"}
+            {row.players} {terms.players} across {row.contests}{" "}
+            {row.contests === 1 ? terms.contest : terms.contests}
           </span>
           {row.rounds.live > 0 && (
             <span className="inline-flex items-center gap-1.5">
@@ -325,7 +332,7 @@ function PerformanceCard({ row }: { row: PerformanceRow }) {
           */}
           {row.entrantsWhoNeverPlayed !== null && row.entrantsWhoNeverPlayed > 0 && (
             <span className="text-amber-300/80">
-              {row.entrantsWhoNeverPlayed} entrants never started a round
+              {row.entrantsWhoNeverPlayed} entrants never started a {terms.round}
             </span>
           )}
           {/*

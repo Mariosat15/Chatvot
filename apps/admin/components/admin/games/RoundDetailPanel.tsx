@@ -1,6 +1,7 @@
 "use client";
 
 import { CheckCircle2, Inbox, XCircle } from "lucide-react";
+import { useTerms } from "@/contexts/TerminologyContext";
 
 /**
  * Everything needed to judge one stuck round.
@@ -67,13 +68,14 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 export function RoundDetailPanel({ detail }: { detail: RoundDetail }) {
+  const terms = useTerms();
   const { round, events = [], contest, participant } = detail;
 
   return (
     <div className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Field
-          label="Score on the round"
+          label={`${terms.score} on the ${terms.round}`}
           value={
             typeof round?.rawScore === "number" ? (
               round.rawScore
@@ -83,7 +85,7 @@ export function RoundDetailPanel({ detail }: { detail: RoundDetail }) {
           }
         />
         <Field
-          label="Score on the contest entry"
+          label={`${terms.score} on the ${terms.contest} entry`}
           value={
             typeof participant?.score === "number" ? (
               participant.score
@@ -96,13 +98,13 @@ export function RoundDetailPanel({ detail }: { detail: RoundDetail }) {
           label="Result arrived by"
           value={round?.resultSource ?? <span className="text-slate-500">not yet</span>}
         />
-        <Field label="Poll attempts" value={round?.pollAttempts ?? 0} />
+        <Field label={`Poll ${terms.attempts}`} value={round?.pollAttempts ?? 0} />
       </div>
 
       {contest && (
         <div className="grid gap-4 rounded border border-slate-700 bg-slate-900/40 p-3 sm:grid-cols-3">
-          <Field label="Contest" value={contest.name ?? "—"} />
-          <Field label="Contest status" value={contest.status ?? "—"} />
+          <Field label={terms.contest} value={contest.name ?? "—"} />
+          <Field label={`${terms.contest} status`} value={contest.status ?? "—"} />
           {/* The setting that decides whether this round can stop a payout. Shown because it is
               the difference between "resolve when convenient" and "players are waiting". */}
           <Field
@@ -125,7 +127,7 @@ export function RoundDetailPanel({ detail }: { detail: RoundDetail }) {
 
       <div>
         <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-          Provider deliveries for this round
+          Provider deliveries for this {terms.round}
         </p>
 
         {events.length === 0 ? (
@@ -133,7 +135,7 @@ export function RoundDetailPanel({ detail }: { detail: RoundDetail }) {
             <Inbox className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
             <div>
               <p className="text-sm text-slate-300">
-                The provider has never sent a result for this round.
+                The provider has never sent a result for this {terms.round}.
               </p>
               <p className="mt-1 text-xs text-slate-500">
                 Nothing was rejected — nothing arrived. This is a question for the provider

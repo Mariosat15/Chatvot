@@ -33,12 +33,16 @@ import {
   NO_RULES_CLAIMS_RULE,
 } from "@/apps/admin/lib/admin/ai-game-content-vocabulary";
 import { TRADING_WORDS } from "@/apps/admin/lib/admin/ai-contest-vocabulary";
+import { resolveTerms } from "@/lib/constants/terminology";
 import {
   stripComments,
   findRouteFiles,
   handlerPattern,
   guardedSections,
 } from "../helpers/route-guard-audit";
+
+/** Nothing renamed, which is the state every assertion here was written against (X6.5 A3c). */
+const NO_OVERRIDES = resolveTerms(null);
 
 const ROOT = join(__dirname, "..", "..");
 const read = (relative: string) => readFileSync(join(ROOT, relative), "utf8");
@@ -132,7 +136,7 @@ describe("what the assistant is allowed to write", () => {
 
 describe("what the model is told", () => {
   it("forbids stating how the game is played", () => {
-    const { systemPrompt } = gameContentVocabulary(TITLE);
+    const { systemPrompt } = gameContentVocabulary(TITLE, NO_OVERRIDES);
     expect(systemPrompt).toContain(NO_RULES_CLAIMS_RULE.trim().split("\n")[0]);
     expect(systemPrompt).toMatch(/Never state how the game is played/);
   });
@@ -143,7 +147,7 @@ describe("what the model is told", () => {
     contest prompt has learned to refuse, and nothing compares them.
   */
   it("bans trading vocabulary from the shared list rather than its own", () => {
-    const { systemPrompt } = gameContentVocabulary(TITLE);
+    const { systemPrompt } = gameContentVocabulary(TITLE, NO_OVERRIDES);
     for (const word of TRADING_WORDS) {
       expect(systemPrompt, `${word} is not banned in the game prompt`).toContain(word);
     }
@@ -160,7 +164,7 @@ describe("what the model is told", () => {
     `CONTENT_LIMITS`: two numbers for one rule is one number that is wrong.
   */
   it("takes its lengths from the content limits rather than typing them in", () => {
-    const { systemPrompt } = gameContentVocabulary(TITLE);
+    const { systemPrompt } = gameContentVocabulary(TITLE, NO_OVERRIDES);
     for (const limit of [
       CONTENT_LIMITS.displayName,
       CONTENT_LIMITS.tagline,
@@ -199,11 +203,14 @@ describe("what the model is told", () => {
   });
 
   it("degrades rather than inventing when the catalogue row says little", () => {
-    const { systemPrompt } = gameContentVocabulary({
-      displayName: "Untitled",
-      scoreDirection: "lower_is_better",
-      scoreType: "duration_ms",
-    });
+    const { systemPrompt } = gameContentVocabulary(
+      {
+        displayName: "Untitled",
+        scoreDirection: "lower_is_better",
+        scoreType: "duration_ms",
+      },
+      NO_OVERRIDES,
+    );
     expect(systemPrompt).toContain("A skill game called Untitled.");
     expect(systemPrompt).toContain("the fastest time wins");
     // An absent duration states nothing rather than guessing one, matching `RoundPreflight`.

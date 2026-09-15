@@ -23,6 +23,7 @@ import {
   describeScoreEligibility,
   SCORE_UNIT_MAX_LENGTH,
 } from "@/lib/admin/score-eligibility-copy";
+import { useTerms } from "@/contexts/TerminologyContext";
 import type { ProviderTitleRow } from "./provider-types";
 import { DIALOG_WIDTH_MEDIUM } from "@/lib/admin/dialog-widths";
 
@@ -90,6 +91,7 @@ export default function GameScoringDialog({
   onOpenChange,
   onSaved,
 }: Props) {
+  const terms = useTerms();
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -121,7 +123,9 @@ export default function GameScoringDialog({
     // `NaN` - which it does guard, because a `NaN` bar makes every comparison in
     // `providerHasResult` false and routes the whole pot to the unclaimed pool.
     if (barIsBroken) {
-      toast.error("A minimum score must be a number, or empty for no minimum.");
+      toast.error(
+        `A minimum ${terms.score} must be a number, or empty for no minimum.`,
+      );
       return;
     }
 
@@ -157,7 +161,7 @@ export default function GameScoringDialog({
         minimumEligibleScore: data.minimumEligibleScore ?? undefined,
         scoreUnit: data.scoreUnit ?? undefined,
       });
-      toast.success(`Prize eligibility saved for ${title.displayName}.`);
+      toast.success(`${terms.prize} eligibility saved for ${title.displayName}.`);
       onOpenChange(false);
     } catch {
       toast.error("Something went wrong. Please contact support.");
@@ -172,11 +176,12 @@ export default function GameScoringDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Trophy className="h-5 w-5 text-amber-400" />
-            Prize eligibility — {title.displayName}
+            {terms.prize} eligibility — {title.displayName}
           </DialogTitle>
           <DialogDescription>
-            Which scores are worth a prize on this game. A player refused here still appears
-            on the leaderboard; their share is spread across the players who did score.
+            Which {terms.score} values are worth a {terms.prize} on this {terms.game}. A{" "}
+            {terms.player} refused here still appears on the {terms.leaderboard}; their share
+            is spread across the {terms.players} who did record one.
           </DialogDescription>
         </DialogHeader>
 
@@ -202,12 +207,12 @@ export default function GameScoringDialog({
           <div className="flex items-start justify-between gap-4 rounded-lg border border-white/10 bg-white/5 p-3">
             <div>
               <Label htmlFor="zero-valid" className="text-sm">
-                A score of zero counts as a result
+                A {terms.score} of zero counts as a result
               </Label>
               <p className="mt-1 text-xs text-white/50">
-                Off for every game we run today: a zero means the player did not manage
-                anything, so it wins nothing. Turn it on only for a game where zero is a real
-                achievement — no mistakes, no penalties.
+                Off for every {terms.game} we run today: a zero means the {terms.player} did
+                not manage anything, so it wins nothing. Turn it on only for a {terms.game}{" "}
+                where zero is a real achievement — no mistakes, no penalties.
               </p>
             </div>
             <Switch
@@ -225,7 +230,7 @@ export default function GameScoringDialog({
           <div className="grid gap-4 sm:grid-cols-[2fr_1fr]">
             <div className="space-y-1.5">
               <Label htmlFor="min-score" className="text-sm">
-                Minimum score to be paid
+                Minimum {terms.score} to be paid
               </Label>
               <Input
                 id="min-score"
@@ -243,8 +248,8 @@ export default function GameScoringDialog({
               />
               <p className="text-xs text-white/50">
                 {direction === "lower_is_better"
-                  ? "Lower is better here, so this is the worst score still worth a prize."
-                  : "The lowest score still worth a prize."}
+                  ? `Lower is better here, so this is the worst ${terms.score} still worth a ${terms.prize}.`
+                  : `The lowest ${terms.score} still worth a ${terms.prize}.`}
               </p>
             </div>
 

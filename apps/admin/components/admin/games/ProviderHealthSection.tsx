@@ -14,6 +14,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useTerms } from "@/contexts/TerminologyContext";
 
 /**
  * Provider health - the fifth and last of chapter 12 section 4's admin destinations.
@@ -113,6 +114,7 @@ function when(value?: string | null): string {
 }
 
 export default function ProviderHealthSection() {
+  const terms = useTerms();
   const [rows, setRows] = useState<HealthRow[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -148,7 +150,7 @@ export default function ProviderHealthSection() {
             Provider Health
           </h2>
           <p className="mt-1 text-sm text-white/60">
-            Measured from the rounds and result deliveries of the last 24 hours.
+            Measured from the {terms.rounds} and result deliveries of the last 24 hours.
             Nothing here is a stored status, so it cannot go stale.
           </p>
         </div>
@@ -174,9 +176,9 @@ export default function ProviderHealthSection() {
       ) : rows.length === 0 ? (
         <div className="rounded-lg border border-slate-700 bg-slate-900/50 p-10 text-center">
           <Activity className="mx-auto mb-3 h-8 w-8 text-white/30" />
-          <p className="text-sm text-white/70">No game providers registered.</p>
+          <p className="text-sm text-white/70">No {terms.game} providers registered.</p>
           <p className="mt-1 text-xs text-white/40">
-            Register one under Game Providers first.
+            Register one under {terms.game} Providers first.
           </p>
         </div>
       ) : (
@@ -191,6 +193,7 @@ export default function ProviderHealthSection() {
 }
 
 function HealthCard({ row }: { row: HealthRow }) {
+  const terms = useTerms();
   const verdict = VERDICTS[row.verdict];
   const Icon = verdict.icon;
 
@@ -257,7 +260,7 @@ function HealthCard({ row }: { row: HealthRow }) {
 
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           <Stat
-            label={`Rounds (${row.windowHours}h)`}
+            label={`${terms.rounds} (${row.windowHours}h)`}
             value={row.rounds.total}
           />
           <Stat label="Scored" value={row.rounds.completed} />
@@ -271,7 +274,7 @@ function HealthCard({ row }: { row: HealthRow }) {
 
         <div className="grid gap-x-6 gap-y-1 text-xs text-white/50 sm:grid-cols-2">
           <Fact
-            label="Last round that scored"
+            label={`Last ${terms.round} that scored`}
             value={when(row.lastSuccessfulRoundAt)}
           />
           <Fact

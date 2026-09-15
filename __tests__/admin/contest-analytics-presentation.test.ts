@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Competition analytics, per game - `12` s5's reporting slice.
  *
  * BEHAVIOURAL where it can be, because the grouping arithmetic and every "absent is not zero"
@@ -300,9 +300,10 @@ describe("the filter is built from the contests present, not from the catalogue"
    * loss rather than as a missing option.
    */
   it("offers an option for a game that is no longer in the catalogue", () => {
-    const options = resolveGameFilterOptions([
-      providerContest({ gameDisplayName: null, providerDisplayName: null }),
-    ]);
+    const options = resolveGameFilterOptions(
+      [providerContest({ gameDisplayName: null, providerDisplayName: null })],
+      terms,
+    );
     expect(options[0].key).toBe(ALL_GAMES);
     expect(options.map((o) => o.key)).toContain(
       "provider:chartvolt-games:circuit-sprint",
@@ -342,10 +343,33 @@ describe("the screen says what its figures actually cover", () => {
    * labelling fix destroys the only evidence the labelling fix was safe.
    */
   it("names the window when the list is capped and the true count when it is not", () => {
-    expect(resolveScopeNote(50, 50)).toMatch(/50 most recently finished/);
-    expect(resolveScopeNote(50, 50)).toMatch(/not all time/i);
-    expect(resolveScopeNote(12, 50)).toMatch(/all 12 finished/);
-    expect(resolveScopeNote(12, 50)).not.toMatch(/not all time/i);
+    // X6.5 A3b made the noun the operator's. The CLAIMS here are unchanged - the window, the
+    // true count, and the absence of the caveat when nothing is capped - so these are
+    // re-pointed call sites and not a relaxed guard. The sentence is asserted against a
+    // RENAMED pack below, which is the half that can catch a hard-coded noun.
+    expect(resolveScopeNote(50, 50, terms)).toMatch(
+      /50 most recently finished/,
+    );
+    expect(resolveScopeNote(50, 50, terms)).toMatch(/not all time/i);
+    expect(resolveScopeNote(12, 50, terms)).toMatch(/all 12 finished/);
+    expect(resolveScopeNote(12, 50, terms)).not.toMatch(/not all time/i);
+  });
+
+  it("writes the operator's noun for a contest, in both branches", () => {
+    /*
+      The load-bearing half of the pair above. Asserting the default wording is satisfied by a
+      hard-coded sentence, which is exactly what was there - so the only assertion that can
+      fail on the defect is one made against a pack whose nouns differ from `TERMS`. Both
+      branches, because a caption corrected in one of two arms is the shape behind the pause
+      list covering for the emergency list.
+    */
+    const renamed = resolveTerms({ contests: "Tournaments" });
+    expect(renamed.contests).toBe("Tournaments");
+
+    expect(resolveScopeNote(50, 50, renamed)).toContain("Tournaments");
+    expect(resolveScopeNote(50, 50, renamed)).not.toMatch(/competitions/i);
+    expect(resolveScopeNote(12, 50, renamed)).toContain("Tournaments");
+    expect(resolveScopeNote(12, 50, renamed)).not.toMatch(/competitions/i);
   });
 });
 

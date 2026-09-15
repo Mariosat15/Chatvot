@@ -96,12 +96,15 @@ export function UnscoredPolicyField({
         not. Only the second is refundable, and an operator who assumes otherwise will file a
         bug against settlement the first time a liquidated trader is not paid back.
 
-        UNTOKENISED ON PURPOSE, and it is the one paragraph here where that needs saying,
-        because unlike the option copy this text does live in this file and so could have
-        been. Every noun in it is mid-sentence behind an article or a possessive - "a
-        contest cancelled", "their entry fees" - which is the position a Title Case token
-        cannot occupy and a lower-cased one destroys the operator's own capitalisation in.
-        The one phrase that was changed is the comparison: it read "the same as a trading
+        TOKENISED SINCE 15 SEPTEMBER 2026, and the sentence this replaces is worth keeping
+        visible because it was believed: it said the paragraph was "untokenised on purpose",
+        every noun in it being mid-sentence behind an article or a possessive, "which is the
+        position a Title Case token cannot occupy". The owner settled that question the other
+        way - the token goes in mid-sentence and Title Case is accepted - so the reason has
+        gone and only the caution's wording survives. It is still never case-folded: a
+        `.toLowerCase()` here would destroy the operator's own capitalisation.
+
+        The one phrase that was changed earlier is the comparison: it read "the same as a trading
         competition", which is the generic noun spelled out for trading and nothing else,
         and reads as though the platform keeps one vocabulary for trading and another for
         games. The noun is dropped rather than tokenised - "trading" carries it alone.
@@ -111,12 +114,15 @@ export function UnscoredPolicyField({
       <div className="mt-3 flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-3">
         <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
         <p className="text-xs text-amber-200/90">
-          This applies only when <strong>no player recorded a score at all</strong>
-          {" "}&mdash; the usual cause is the game provider failing to report. It does not
-          apply to players who were disqualified: their entry fees stay with the contest and
-          go to the unclaimed pool, the same as trading does. It also does not apply
-          to a contest cancelled for too few players, which always refunds every entry fee in
-          full with no platform fee.
+          This applies only when{" "}
+          <strong>
+            no {terms.player} recorded a {terms.score} at all
+          </strong>
+          {" "}&mdash; the usual cause is the {terms.game} provider failing to report. It does
+          not apply to {terms.players} who were disqualified: their {terms.entryFee} stays
+          with the {terms.contest} and goes to the unclaimed pool, the same as trading does.
+          It also does not apply to a {terms.contest} cancelled for too few {terms.players},
+          which always refunds every {terms.entryFee} in full with no platform fee.
         </p>
       </div>
     </div>

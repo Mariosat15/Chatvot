@@ -27,6 +27,8 @@ import type {
   CatalogueSyncSummary,
 } from "./provider-types";
 import { resolveGameCategory } from "@/lib/services/games/game-categories";
+import { useTerms } from "@/contexts/TerminologyContext";
+import type { TerminologyPack } from "@/lib/constants/terminology";
 import { DIALOG_WIDTH_WIDE } from "@/lib/admin/dialog-widths";
 import GameContentDialog from "./GameContentDialog";
 import GamePlayStyleControl from "./GamePlayStyleControl";
@@ -68,6 +70,7 @@ export default function ProviderCatalogueDialog({
   onOpenChange,
   onChanged,
 }: Props) {
+  const terms = useTerms();
   const [titles, setTitles] = useState<ProviderTitleRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -86,16 +89,16 @@ export default function ProviderCatalogueDialog({
       const response = await fetch(`/api/games/providers/${providerKey}/games`);
       const data = await response.json();
       if (!response.ok) {
-        toast.error(data.error ?? "Failed to load the game catalogue.");
+        toast.error(data.error ?? `Failed to load the ${terms.game} catalogue.`);
         return;
       }
       setTitles(data.games ?? []);
     } catch {
-      toast.error("Failed to load the game catalogue.");
+      toast.error(`Failed to load the ${terms.game} catalogue.`);
     } finally {
       setLoading(false);
     }
-  }, [providerKey]);
+  }, [providerKey, terms]);
 
   useEffect(() => {
     if (open) void load();
@@ -154,7 +157,7 @@ export default function ProviderCatalogueDialog({
       toast.success(
         enabled
           ? `${title.displayName} is now available on ChartVolt.`
-          : `${title.displayName} will not accept new contests. Any already running will still finish.`,
+          : `${title.displayName} will not accept new ${terms.contests}. Any already running will still finish.`,
       );
       onChanged();
     } catch {
@@ -172,11 +175,11 @@ export default function ProviderCatalogueDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Gamepad2 className="h-5 w-5 text-violet-400" />
-            Games — {provider.displayName}
+            {terms.games} — {provider.displayName}
           </DialogTitle>
           <DialogDescription>
-            The provider decides what it offers. You decide what goes live here. A game needs
-            both.
+            The provider decides what it offers. You decide what goes live here. A{" "}
+            {terms.game} needs both.
           </DialogDescription>
         </DialogHeader>
 
@@ -203,7 +206,8 @@ export default function ProviderCatalogueDialog({
               <span>
                 {lastSync.missingFromProvider.length} title(s) in our list were not returned
                 by the provider this time. They have been kept, not deleted — a title with
-                past rounds cannot be removed without orphaning those results, and an absent
+                past {terms.rounds} cannot be removed without orphaning those results, and an
+                absent
                 item is as likely to be a partial failure upstream as a real withdrawal.
               </span>
             </div>
@@ -212,11 +216,11 @@ export default function ProviderCatalogueDialog({
 
         {loading ? (
           <div className="flex items-center justify-center py-12 text-white/50">
-            <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading games…
+            <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading {terms.games}…
           </div>
         ) : titles.length === 0 ? (
           <div className="py-12 text-center text-sm text-white/50">
-            No games cached yet. Press <strong>Sync catalogue</strong> to pull the list from
+            No {terms.games} cached yet. Press <strong>Sync catalogue</strong> to pull the list from
             this provider.
           </div>
         ) : (
@@ -228,14 +232,14 @@ export default function ProviderCatalogueDialog({
             <table className="w-full min-w-[76rem] text-sm">
               <thead className="bg-white/5 text-left text-xs uppercase tracking-wide text-white/50">
                 <tr>
-                  <th className="whitespace-nowrap px-3 py-2">Game</th>
+                  <th className="whitespace-nowrap px-3 py-2">{terms.game}</th>
                   <th className="whitespace-nowrap px-3 py-2">Formats</th>
                   <th className="whitespace-nowrap px-3 py-2">Play style</th>
-                  <th className="whitespace-nowrap px-3 py-2">Prize eligibility</th>
-                  <th className="whitespace-nowrap px-3 py-2">Challenge defaults</th>
+                  <th className="whitespace-nowrap px-3 py-2">{terms.prize} eligibility</th>
+                  <th className="whitespace-nowrap px-3 py-2">{terms.challenge} defaults</th>
                   <th className="whitespace-nowrap px-3 py-2">Provider says</th>
                   <th className="whitespace-nowrap px-3 py-2">Live on ChartVolt</th>
-                  <th className="whitespace-nowrap px-3 py-2">Player-facing content</th>
+                  <th className="whitespace-nowrap px-3 py-2">{terms.player}-facing content</th>
                 </tr>
               </thead>
               <tbody>
@@ -254,17 +258,17 @@ export default function ProviderCatalogueDialog({
                       <div className="flex flex-wrap gap-1">
                         {title.supportsCompetition && (
                           <Badge variant="outline" className="text-xs">
-                            Competition
+                            {terms.contest}
                           </Badge>
                         )}
                         {title.supportsOneVsOne && (
                           <Badge variant="outline" className="text-xs">
-                            Challenge
+                            {terms.challenge}
                           </Badge>
                         )}
                         {title.supportsPractice && (
                           <Badge variant="outline" className="text-xs">
-                            Practice
+                            {terms.practice}
                           </Badge>
                         )}
                       </div>
@@ -320,7 +324,7 @@ export default function ProviderCatalogueDialog({
                           onClick={() => setChallenging(title)}
                         >
                           <Swords className="mr-1.5 h-3.5 w-3.5" />
-                          {describeChallengeDefaults(title)}
+                          {describeChallengeDefaults(title, terms)}
                         </Button>
                       ) : (
                         <span className="text-xs text-white/40">
@@ -526,13 +530,17 @@ function describeScoringSummary(title: ProviderTitleRow): string {
  * NO GAME NAME AND NO SETTING NAME. A title's own settings are the provider's, so summarising
  * them would mean knowing what they are called.
  */
-function describeChallengeDefaults(title: ProviderTitleRow): string {
+function describeChallengeDefaults(
+  title: ProviderTitleRow,
+  terms: TerminologyPack,
+): string {
   const defaults = title.challengeDefaults;
   if (!defaults) return "Set defaults";
 
   const parts: string[] = [];
   if (defaults.durationMinutes !== undefined) parts.push(`${defaults.durationMinutes} min`);
-  if (defaults.roundStartPolicy === "reserve_full_round") parts.push("full round");
+  if (defaults.roundStartPolicy === "reserve_full_round")
+    parts.push(`full ${terms.round}`);
   const settingsCount = Object.keys(defaults.settings ?? {}).length;
   if (settingsCount > 0) parts.push(`${settingsCount} setting${settingsCount === 1 ? "" : "s"}`);
 

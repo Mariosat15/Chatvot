@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { useTerms } from "@/contexts/TerminologyContext";
 // Reason: BOTH model-free modules, and this is R58 rather than a preference. A `"use client"`
 // file may not name a driver-reaching module in a value-import position, and the admin app went
 // down for exactly that once. `config-schema.ts` has no imports at all; `challenge-defaults.ts`
@@ -85,6 +86,8 @@ export default function GameChallengeDefaultsDialog({
   const [bounds, setBounds] = useState<Bounds | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
+
+  const terms = useTerms();
 
   const parsed = title ? parseConfigSchema(title.configSchema) : undefined;
   const fields: ConfigField[] = parsed?.ok ? parsed.fields : [];
@@ -184,8 +187,8 @@ export default function GameChallengeDefaultsDialog({
       onSaved({ challengeDefaults: data.stored ?? undefined });
       toast.success(
         clearing
-          ? `Challenge defaults cleared for ${title.displayName}.`
-          : `Challenge defaults saved for ${title.displayName}.`,
+          ? `${terms.challenge} defaults cleared for ${title.displayName}.`
+          : `${terms.challenge} defaults saved for ${title.displayName}.`,
       );
       onOpenChange(false);
     } catch {
@@ -201,11 +204,11 @@ export default function GameChallengeDefaultsDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Swords className="h-5 w-5 text-fuchsia-400" />
-            Challenge defaults — {title.displayName}
+            {terms.challenge} defaults — {title.displayName}
           </DialogTitle>
           <DialogDescription>
-            What a player&apos;s challenge form opens pre-filled with. They can still change any
-            of it; this is the answer they get if they change nothing.
+            What a {terms.player}&apos;s {terms.challenge} form opens pre-filled with. They can
+            still change any of it; this is the answer they get if they change nothing.
           </DialogDescription>
         </DialogHeader>
 
@@ -218,7 +221,8 @@ export default function GameChallengeDefaultsDialog({
             <div className="flex items-start gap-2">
               <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
               <span>
-                This game&apos;s settings are not supported, so nothing can be pre-filled for it:{" "}
+                This {terms.game}&apos;s settings are not supported, so nothing can be pre-filled
+                for it:{" "}
                 {parsed.error}
               </span>
             </div>
@@ -231,7 +235,7 @@ export default function GameChallengeDefaultsDialog({
           <div className="space-y-5">
             <div className="space-y-1.5">
               <Label htmlFor="challenge-minutes" className="text-sm">
-                How long the challenge runs
+                How long the {terms.challenge} runs
               </Label>
               <Input
                 id="challenge-minutes"
@@ -245,21 +249,22 @@ export default function GameChallengeDefaultsDialog({
                 }
               />
               <p className="text-xs text-white/50">
-                Minutes, between {bounds.minMinutes} and {bounds.maxMinutes}. Both players have
-                this long from the moment the challenge is accepted.
+                Minutes, between {bounds.minMinutes} and {bounds.maxMinutes}. Both{" "}
+                {terms.players} have this long from the moment the {terms.challenge} is
+                accepted.
               </p>
             </div>
 
             <div className="flex items-start justify-between gap-4 rounded-lg border border-white/10 bg-white/5 p-3">
               <div>
                 <Label htmlFor="reserve-round" className="text-sm">
-                  Reserve a whole round before the end
+                  Reserve a whole {terms.round} before the end
                 </Label>
                 <p className="mt-1 text-xs text-white/50">
-                  Off for every game we run today. Off, a player who starts late gets a shorter
-                  round and is told how much time they have. On, they are refused once a full
-                  round no longer fits — turn it on only for a game where a cut-short run is
-                  worth nothing.
+                  Off for every {terms.game} we run today. Off, a {terms.player} who starts late
+                  gets a shorter {terms.round} and is told how much time they have. On, they are
+                  refused once a full {terms.round} no longer fits — turn it on only for a{" "}
+                  {terms.game} where a cut-short run is worth nothing.
                 </p>
               </div>
               <Switch
@@ -276,10 +281,10 @@ export default function GameChallengeDefaultsDialog({
 
             <div className="space-y-3 rounded-lg border border-white/10 bg-white/5 p-3">
               <div>
-                <Label className="text-sm">This game&apos;s own settings</Label>
+                <Label className="text-sm">This {terms.game}&apos;s own settings</Label>
                 <p className="mt-1 text-xs text-white/50">
-                  Declared by the provider. A player sees these same questions, opened with
-                  whatever is chosen here.
+                  Declared by the provider. A {terms.player} sees these same questions, opened
+                  with whatever is chosen here.
                 </p>
               </div>
               <ConfigSchemaFields

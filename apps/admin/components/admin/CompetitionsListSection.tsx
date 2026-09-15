@@ -171,7 +171,7 @@ export default function CompetitionsListSection() {
       const data = await response.json();
       setCompetitions(data.competitions || []);
     } catch (error) {
-      toast.error("Failed to load competitions");
+      toast.error(`Failed to load ${terms.contests}`);
       console.error(error);
     } finally {
       setLoading(false);
@@ -447,7 +447,7 @@ export default function CompetitionsListSection() {
                   {hasProviderGameLabel(competition) && (
                     <div className="px-3 py-1 rounded-full border text-xs font-semibold flex items-center gap-1 bg-indigo-500/20 text-indigo-300 border-indigo-500/30">
                       <Gamepad2 className="h-3 w-3" />
-                      {competition.gameKey ?? "Provider game"}
+                      {competition.gameKey ?? `Provider ${terms.game}`}
                     </div>
                   )}
 
@@ -539,7 +539,7 @@ export default function CompetitionsListSection() {
                 {/* Edit routes by game, and the two destinations are genuinely different
                     forms rather than one form with a flag.
                     `/competitions/edit/[id]` is the trading editor: fourteen fields
-                    including starting capital and leverage, which a provider game does not
+                    including starting capital and leverage, which a provider {terms.game} does not
                     have. `/competitions/edit-game/[id]` is the provider editor, whose
                     settings step is generated from the title's `configSchema`.
                     Sending a provider contest to the trading form used to be a corruption

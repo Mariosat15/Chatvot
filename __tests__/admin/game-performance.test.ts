@@ -587,8 +587,16 @@ describe("the screen carries no money, and that is an RBAC rule", () => {
 
   it("renders no currency and reads no money field", () => {
     const code = stripComments(component);
+    /*
+      X6.5 A3b: the signpost sentence now writes the operator's word for an entry fee, so the
+      identifier `terms.entryFee` appears in the file. The ban is on reading a money FIELD, and
+      a terminology token is a caption - so the token reference is discounted before matching
+      rather than the ban being dropped. Written as a bare `not.toContain("entryFee")` the
+      guard fails on correct code, which is how a guard gets deleted.
+    */
+    const withoutTokens = code.replace(/terms\.[A-Za-z]+/g, "TERM");
     for (const forbidden of ["creditSymbol", "entryFee", "prizePool", "platformFee"]) {
-      expect(code).not.toContain(forbidden);
+      expect(withoutTokens).not.toContain(forbidden);
     }
     // A currency SYMBOL, not a bare `$` - the file is full of `${...}` template literals and a
     // literal match on `$` flags every one of them, which is a guard that fails on correct
@@ -612,7 +620,10 @@ describe("the screen carries no money, and that is an RBAC rule", () => {
    * at all. Naming the other screen is what makes the omission a boundary rather than a gap.
    */
   it("says where the money figures are instead", () => {
-    expect(component).toMatch(/Competition Analytics/);
+    // RE-POINTED BY X6.5 A3b, CLAIM UNCHANGED. The screen's name now carries the operator's
+    // noun, so the literal "Competition Analytics" is gone. What must still be on screen is
+    // the signpost naming the other screen.
+    expect(component).toMatch(/\{terms\.contest\}\s*Analytics/);
   });
 
   /**

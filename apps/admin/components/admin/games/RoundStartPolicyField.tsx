@@ -70,9 +70,10 @@ export function RoundStartPolicyField({
         would sit, and `round` is preceded by "a" only in the original - dropped, because an
         article cannot agree with a word the operator chooses ("a Attempt").
 
-        `copy.consequence`, the option labels and the amber caution stay untokenised: they
-        come from `round-types.ts`, which the gate in `round.service.ts` reads, so this
-        screen cannot describe a rule the server does not enforce.
+        `copy.consequence` and the option labels stay untokenised: they come from
+        `round-types.ts`, which the gate in `round.service.ts` reads, so this screen cannot
+        describe a rule the server does not enforce. The amber caution below IS tokenised -
+        it is written here, not there.
       */}
       <Label className="text-gray-200">
         When {terms.players} may start one {terms.round}
@@ -112,10 +113,10 @@ export function RoundStartPolicyField({
         <div className="mt-3 flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-3">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
           <p className="text-xs text-amber-200/90">
-            Entry to play closes <strong>one full playing time</strong> before the contest
-            ends, so a player arriving after that cannot take part even though the contest
-            is still running. The contest must be longer than one playing time or nobody can
-            start at all.
+            Entry to play closes <strong>one full playing time</strong> before the{" "}
+            {terms.contest} ends, so a {terms.player} arriving after that cannot take part
+            even though the {terms.contest} is still running. The {terms.contest} must be
+            longer than one playing time or nobody can start at all.
           </p>
         </div>
       )}

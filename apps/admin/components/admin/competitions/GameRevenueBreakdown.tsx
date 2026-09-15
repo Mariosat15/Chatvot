@@ -28,6 +28,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Gamepad2, Server, AlertTriangle } from "lucide-react";
+import { useTerms } from "@/contexts/TerminologyContext";
 import {
   summariseByGame,
   summariseByProvider,
@@ -41,6 +42,7 @@ interface Props {
 }
 
 export default function GameRevenueBreakdown({ contests, creditSymbol }: Props) {
+  const terms = useTerms();
   const byGame = summariseByGame(contests);
   const byProvider = summariseByProvider(contests);
 
@@ -54,11 +56,11 @@ export default function GameRevenueBreakdown({ contests, creditSymbol }: Props) 
   return (
     <div className="space-y-6">
       <SummaryTable
-        title="By game"
-        description="Which game each competition belonged to, and what it took and paid. Grouped on the contest's immutable game key, so a renamed or retired title keeps its history in one row."
+        title={`By ${terms.game}`}
+        description={`Which ${terms.game} each ${terms.contest} belonged to, and what it took and paid. Grouped on the ${terms.contest}'s immutable ${terms.game} key, so a renamed or retired title keeps its history in one row.`}
         icon={<Gamepad2 className="h-5 w-5 text-cyan-400" />}
         rows={byGame}
-        firstColumn="Game"
+        firstColumn={terms.game}
         showProvider
         creditSymbol={creditSymbol}
       />
@@ -66,7 +68,7 @@ export default function GameRevenueBreakdown({ contests, creditSymbol }: Props) 
       {showProviderTable && (
         <SummaryTable
           title="By provider"
-          description="The same figures grouped by supplier, because a provider's cost is charged across their whole catalogue rather than per title. Trading is shown alongside as our own."
+          description={`The same figures grouped by supplier, because a provider's cost is charged across their whole catalogue rather than per title. Trading is shown alongside as our own.`}
           icon={<Server className="h-5 w-5 text-purple-400" />}
           rows={byProvider}
           firstColumn="Provider"
@@ -95,6 +97,7 @@ function SummaryTable({
   showProvider: boolean;
   creditSymbol: string;
 }) {
+  const terms = useTerms();
   const estimatedTotal = rows.reduce((sum, row) => sum + row.estimatedFeeContests, 0);
 
   return (
@@ -113,10 +116,10 @@ function SummaryTable({
           <TableHeader>
             <TableRow className="border-gray-700">
               <TableHead className="text-gray-400">{firstColumn}</TableHead>
-              <TableHead className="text-gray-400 text-right">Contests</TableHead>
+              <TableHead className="text-gray-400 text-right">{terms.contests}</TableHead>
               <TableHead className="text-gray-400 text-right">Entrants</TableHead>
               <TableHead className="text-gray-400 text-right">Collected</TableHead>
-              <TableHead className="text-gray-400 text-right">Prizes paid</TableHead>
+              <TableHead className="text-gray-400 text-right">{terms.prizes} paid</TableHead>
               <TableHead className="text-gray-400 text-right">Platform fee</TableHead>
               <TableHead className="text-gray-400 text-right">Payout ratio</TableHead>
               <TableHead className="text-gray-400 text-right">Average pot</TableHead>
@@ -174,8 +177,8 @@ function SummaryTable({
             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <span>
               {estimatedTotal === 1
-                ? "One competition has no recorded platform-fee ledger row, so its fee is inferred from the configured percentage and marked"
-                : `${estimatedTotal} competitions have no recorded platform-fee ledger row, so their fees are inferred from the configured percentage and marked`}{" "}
+                ? `One ${terms.contest} has no recorded platform-fee ledger row, so its fee is inferred from the configured percentage and marked`
+                : `${estimatedTotal} ${terms.contests} have no recorded platform-fee ledger row, so their fees are inferred from the configured percentage and marked`}{" "}
               <span className="font-semibold">est.</span> Those figures will not reconcile
               against the platform ledger.
             </span>

@@ -207,6 +207,144 @@ export function literalNounHits(surface: string[]): Line[] {
 }
 
 /**
+ * The same renameable nouns in their LOWERCASE form, in running prose.
+ *
+ * WHY THIS IS A SECOND FUNCTION RATHER THAN A CASE FLAG ON THE ONE ABOVE. Title Case and
+ * lowercase are two different problems. A Title Case noun in this codebase is almost always a
+ * caption, so `literalNounHits` can be strict and cheap. The lowercase forms are the same word
+ * used as a route segment (`activeTab=competitions`), a stored status value (`"contest"`), a
+ * property (`round.pollAttempts`), a local (`const rounds =`) and a type-ish identifier - all
+ * of which are on chapter 14 section 6's never-rename list, and all of which sit on the same
+ * lines as the prose. One function trying to be both is a function that is wrong in one
+ * direction or the other, and the direction it fails in is the quiet one.
+ *
+ * So this works OCCURRENCE BY OCCURRENCE rather than line by line: a line is reported only if
+ * at least one occurrence of the word is in a position no identifier, path or bare string
+ * literal can occupy. `toast.error("Failed to load competitions")` is reported on the same
+ * line as `/api/competitions/${id}` would be, which is the whole reason for counting
+ * positions rather than testing the line.
+ *
+ * `console.*` is excluded outright. A developer log is not operator-facing, and tokenising one
+ * makes the log depend on a stored value - so a support engineer reading "Failed to load
+ * Tournaments" cannot grep for the line that wrote it.
+ */
+/** True when `[start, end)` falls inside a quoted span that contains a space. */
+function quotedSpanWithSpace(text: string, start: number, end: number): boolean {
+  for (const quote of ['"', "'", "`"]) {
+    let from = text.indexOf(quote);
+    while (from !== -1) {
+      const to = text.indexOf(quote, from + 1);
+      if (to === -1) break;
+      const inner = text.slice(from + 1, to);
+      if (start > from && end <= to && /\s/.test(inner)) return true;
+      from = text.indexOf(quote, to + 1);
+    }
+  }
+  return false;
+}
+
+/** Runs of three or more plain words - the shape of a sentence rather than a signature. */
+function wordRuns(text: string): { start: number; end: number }[] {
+  const out: { start: number; end: number }[] = [];
+  const run = /[A-Za-z]{2,}(?:[ ]+[A-Za-z]{2,}){2,}/g;
+  let match: RegExpExecArray | null;
+  while ((match = run.exec(text)) !== null) {
+    out.push({ start: match.index, end: match.index + match[0].length });
+  }
+  return out;
+}
+
+export function lowercaseNounHits(surface: string[]): Line[] {
+  const hits: Line[] = [];
+  for (const line of lines(surface)) {
+    // Not displayed: a log line, an import specifier, a directive.
+    if (/\bconsole\.(?:log|warn|error|info|debug)\s*\(/.test(line.text)) continue;
+    if (/^\s*(?:import|export)\b.*\bfrom\b/.test(line.text)) continue;
+
+    for (const { word } of BANNED_NOUNS) {
+      const lower = word.toLowerCase();
+      // Reason: built from `TERMS`, a hard-coded catalogue in this repository - never from a
+      // request or a stored value. Scoped to the one rule rather than a blanket disable.
+      // eslint-disable-next-line security/detect-non-literal-regexp
+      const occurrence = new RegExp(`(?<![A-Za-z])${lower}(?![A-Za-z])`, "g");
+      let match: RegExpExecArray | null;
+      let prose = false;
+      while ((match = occurrence.exec(line.text)) !== null) {
+        const start = match.index;
+        const end = start + lower.length;
+        const before = start === 0 ? "" : line.text.slice(start - 1, start);
+        const after = line.text.slice(end);
+
+        /*
+          WHAT MAY SIT TO THE LEFT OF A DISPLAYED WORD. Whitespace, the `>` that closes the tag
+          before it, the `}` that closes an interpolation before it, or the quote that opens
+          its string. Everything else is code welded to the noun, and enumerating what is
+          ALLOWED rather than what is banned is what keeps this short: `/api/games/`,
+          `edit-game`, `?activeTab=competitions`, `!competition`, `(competition)`,
+          `{competitions.map` and `[rounds, setRounds]` are all excluded by one rule.
+        */
+        if (!(start === 0 || /[\s>}"'`]/.test(before))) continue;
+
+        /*
+          AND WHAT MAY SIT TO THE RIGHT. Whitespace, the `<` of the next tag, a closing quote,
+          an HTML entity, sentence punctuation that is genuinely followed by a break, or a
+          possessive. The punctuation clause is written with the break requirement rather than
+          as a bare class because `round.pollAttempts`, `game.rounds` and `competition._id` end
+          in a dot too, and a rule that let those through would report every property access in
+          the file.
+        */
+        const rightOk =
+          after.length === 0 ||
+          /^[\s<]/.test(after) ||
+          /^["'`]/.test(after) ||
+          /^&[a-z]+;/.test(after) ||
+          /^[.,;:!?](?:\s|$|["'`<])/.test(after) ||
+          /^['\u2019]s(?![A-Za-z])/.test(after);
+        if (!rightOk) continue;
+
+        /*
+          A BARE STRING LITERAL, which is a stored value or a route id rather than a word an
+          operator reads: `"competition"`, `'contests'`, `` `round` ``. Distinguished from
+          prose that merely STARTS a string - `"competition analytics failed"` - by what
+          follows: a quote closing immediately means the string is the word and nothing else.
+        */
+        if (/["'`]/.test(before) && /^["'`]/.test(after)) continue;
+
+        /*
+          FINALLY, EVIDENCE THAT THE LINE DISPLAYS ANYTHING. The two tests above locate a word
+          in a prose POSITION, which a destructure (`const { round, contest } = detail`) and a
+          signature (`function X({ contests, creditSymbol })`) both satisfy - a comma and a
+          space read exactly like the end of a clause. So one of three things must also be
+          true: the word sits inside a quoted string with a space in it, or inside a run of
+          three or more plain words, or the line carries JSX furniture.
+
+          The three-word run must CONTAIN the occurrence, not merely appear on the line.
+          Anchored to the line, `export default function GameRevenueBreakdown({ contests,` has
+          a perfectly good three-word run in it and nothing displayed at all.
+        */
+        const quoted = quotedSpanWithSpace(line.text, start, end);
+        const inRun = wordRuns(line.text).some(
+          (run) => start >= run.start && end <= run.end,
+        );
+        const jsxFurniture = /<\/|\/>|<[A-Z]|&[a-z]+;|\{" "\}/.test(line.text);
+        if (!quoted && !inRun && !jsxFurniture) continue;
+
+        prose = true;
+        break;
+      }
+      if (!prose) continue;
+
+      // "Game Master" is a role, not a game - same reasoning as the Title Case scan above.
+      if (/^games?$/.test(lower) && /\bgames?\s+master/i.test(line.text)) continue;
+
+      hits.push(line);
+      break;
+    }
+  }
+  return hits;
+}
+
+/**
  * Trading vocabulary in a caption.
  *
  * Separate from the noun check because these are not renameable - there is no token for them

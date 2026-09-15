@@ -10,8 +10,10 @@ import { connectToDatabase } from "@/database/mongoose";
 import { WhiteLabel } from "@/database/models/whitelabel.model";
 import ProviderGame from "@/database/models/games/provider-game.model";
 import { guardSection } from "@/lib/admin/section-route-guard";
+import { getTerms } from "@/lib/services/terminology.service";
+import type { TerminologyPack } from "@/lib/constants/terminology";
 import {
-  TRADING_VOCABULARY,
+  tradingVocabulary,
   providerVocabulary,
   VOCABULARY_SELECT,
   type CatalogueVocabularySource,
@@ -58,14 +60,21 @@ async function getAIConfig(): Promise<AIConfig> {
  * A key that finds NOTHING is refused rather than falling back to trading: silently writing
  * trading copy for a game contest is the exact defect this resolves, and it would be invisible
  * - the operator gets fluent, confident, wrong text.
+ *
+ * `terms` is the operator's own vocabulary and reaches BOTH branches, trading included,
+ * because a platform that calls a competition a Tournament calls it that on the trading
+ * screens too. It arrives as an APPENDED clause which is empty when nothing is renamed, so
+ * an unconfigured platform gets byte-for-byte the prompt it got before this parameter
+ * existed - which is what keeps the historical trading prompt assertion meaningful.
  */
 async function resolveVocabulary(
   gameKey: unknown,
+  terms: TerminologyPack,
 ): Promise<
   { ok: true; vocabulary: ContestVocabulary } | { ok: false; error: string }
 > {
   if (typeof gameKey !== "string" || gameKey.trim() === "") {
-    return { ok: true, vocabulary: TRADING_VOCABULARY };
+    return { ok: true, vocabulary: tradingVocabulary(terms) };
   }
 
   await connectToDatabase();
@@ -84,7 +93,7 @@ async function resolveVocabulary(
     };
   }
 
-  return { ok: true, vocabulary: providerVocabulary(title) };
+  return { ok: true, vocabulary: providerVocabulary(title, terms) };
 }
 
 export async function POST(request: NextRequest) {
@@ -141,7 +150,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const resolved = await resolveVocabulary(gameKey);
+    const resolved = await resolveVocabulary(gameKey, await getTerms());
     if (!resolved.ok) {
       return NextResponse.json({ error: resolved.error }, { status: 400 });
     }

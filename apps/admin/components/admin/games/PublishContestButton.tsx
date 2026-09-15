@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { AlertTriangle, Loader2, Megaphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useTerms } from "@/contexts/TerminologyContext";
 
 /**
  * The control that makes a draft provider contest visible to players.
@@ -36,6 +37,7 @@ export function PublishContestButton({
   competitionName,
   onPublished,
 }: PublishContestButtonProps) {
+  const terms = useTerms();
   const [pending, setPending] = useState(false);
   const [refusals, setRefusals] = useState<string[]>([]);
 
@@ -69,7 +71,7 @@ export function PublishContestButton({
         : [];
 
       toast.success(
-        `"${competitionName}" is now visible to players and can be entered.`,
+        `"${competitionName}" is now visible to ${terms.players} and can be entered.`,
       );
 
       // Warnings are advisory by design - a platform switch that is still off, a stale

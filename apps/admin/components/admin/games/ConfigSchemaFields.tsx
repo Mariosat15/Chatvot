@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { useTerms } from "@/contexts/TerminologyContext";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -42,10 +43,11 @@ export function ConfigSchemaFields({
   onChange,
   disabled,
 }: ConfigSchemaFieldsProps) {
+  const terms = useTerms();
   if (fields.length === 0) {
     return (
       <p className="text-sm text-gray-400">
-        This game has no configurable settings. Nothing to choose here.
+        This {terms.game} has no configurable settings. Nothing to choose here.
       </p>
     );
   }
@@ -222,6 +224,7 @@ function DurationControl({
   onChange: (value: unknown) => void;
   disabled?: boolean;
 }) {
+  const terms = useTerms();
   const min = field.minimum ?? 1;
   const max = field.maximum;
 
@@ -322,8 +325,8 @@ function DurationControl({
       )}
 
       <p className="text-xs text-gray-500">
-        Every player gets this long once they start, and the contest stops accepting new
-        attempts this far before it ends.
+        Every {terms.player} gets this long once they start, and the {terms.contest} stops
+        accepting new {terms.attempts} this far before it ends.
       </p>
     </div>
   );

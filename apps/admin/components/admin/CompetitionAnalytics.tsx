@@ -322,9 +322,9 @@ export default function CompetitionAnalytics() {
     );
   }
 
-  const gameOptions = resolveGameFilterOptions(competitions);
+  const gameOptions = resolveGameFilterOptions(competitions, terms);
   const visibleCompetitions = filterByGame(competitions, selectedGame);
-  const scopeNote = resolveScopeNote(competitions.length, contestLimit);
+  const scopeNote = resolveScopeNote(competitions.length, contestLimit, terms);
 
   return (
     <div className="space-y-6">

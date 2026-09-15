@@ -31,6 +31,10 @@ import {
   type CatalogueVocabularySource,
 } from "../../apps/admin/lib/admin/ai-contest-vocabulary";
 import { gameContentVocabulary } from "../../apps/admin/lib/admin/ai-game-content-vocabulary";
+import { resolveTerms } from "../../lib/constants/terminology";
+
+/** Nothing renamed, which is the state every assertion here was written against (X6.5 A3c). */
+const NO_OVERRIDES = resolveTerms(null);
 
 const ADMIN = join(__dirname, "..", "..", "apps", "admin");
 
@@ -88,8 +92,8 @@ describe("describeGameFacts - the facts block is composed once", () => {
     const facts = describeGameFacts(TETRIS);
 
     expect(facts.length).toBeGreaterThan(80);
-    expect(providerVocabulary(TETRIS).systemPrompt).toContain(facts);
-    expect(gameContentVocabulary(TETRIS).systemPrompt).toContain(facts);
+    expect(providerVocabulary(TETRIS, NO_OVERRIDES).systemPrompt).toContain(facts);
+    expect(gameContentVocabulary(TETRIS, NO_OVERRIDES).systemPrompt).toContain(facts);
   });
 
   it("is defined in one place and composed in no consumer", () => {
@@ -159,8 +163,8 @@ describe("describeGameFacts - the rules reach the model", () => {
     // rules while keeping the rules TEXT is the worst of both: the model has the authoritative
     // wording and no instruction against repeating it.
     for (const prompt of [
-      providerVocabulary(TETRIS).systemPrompt,
-      gameContentVocabulary(TETRIS).systemPrompt,
+      providerVocabulary(TETRIS, NO_OVERRIDES).systemPrompt,
+      gameContentVocabulary(TETRIS, NO_OVERRIDES).systemPrompt,
     ]) {
       expect(prompt).toContain("Rotate and place falling pieces");
       expect(prompt).toMatch(/Do not reproduce it, paraphrase it/);

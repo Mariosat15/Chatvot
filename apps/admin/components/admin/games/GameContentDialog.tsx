@@ -36,6 +36,7 @@ import {
   normaliseCategorySlug,
   resolveGameCategory,
 } from "@/lib/services/games/game-categories";
+import { useTerms } from "@/contexts/TerminologyContext";
 import type { ProviderTitleRow } from "./provider-types";
 import GameArtworkField from "./GameArtworkField";
 import GameContentAiPanel from "./GameContentAiPanel";
@@ -105,6 +106,7 @@ export default function GameContentDialog({
   onOpenChange,
   onSaved,
 }: Props) {
+  const terms = useTerms();
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -209,12 +211,12 @@ export default function GameContentDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-violet-400" />
-            Game page content — {title.displayName}
+            {terms.game} page content — {title.displayName}
           </DialogTitle>
           <DialogDescription>
-            What players see on this game&apos;s contest screens. The provider supplies how
-            the game <em>works</em>; everything here is ours and a catalogue sync will never
-            overwrite it.
+            What {terms.players} see on this {terms.game}&apos;s {terms.contest} screens. The
+            provider supplies how the {terms.game} <em>works</em>; everything here is ours and a
+            catalogue sync will never overwrite it.
           </DialogDescription>
         </DialogHeader>
 
@@ -235,7 +237,7 @@ export default function GameContentDialog({
 
           <Field
             label="Title"
-            hint="The name players see. It replaces whatever the provider called it."
+            hint={`The name ${terms.players} see. It replaces whatever the provider called it.`}
             length={draft.displayName.length}
             limit={CONTENT_LIMITS.displayName}
           >
@@ -267,7 +269,7 @@ export default function GameContentDialog({
 
           <Field
             label="Description"
-            hint="What the game is and why it is fun. Shown on the contest screen and, later, the game's own page."
+            hint={`What the ${terms.game} is and why it is fun. Shown on the ${terms.contest} screen and, later, the ${terms.game}'s own page.`}
             length={draft.description.length}
             limit={CONTENT_LIMITS.description}
           >
@@ -289,7 +291,7 @@ export default function GameContentDialog({
           */}
           <Field
             label="Rules summary"
-            hint="How the score is produced and how ties break. Support quotes this back when a player disputes a prize, so it must match what the game actually does."
+            hint={`How the ${terms.score} is produced and how ties break. Support quotes this back when a ${terms.player} disputes a ${terms.prize}, so it must match what the ${terms.game} actually does.`}
             length={draft.rulesSummary.length}
             limit={CONTENT_LIMITS.rulesSummary}
           >
@@ -304,14 +306,14 @@ export default function GameContentDialog({
           <Field
             label="How to play"
             /*
-              THE HINT NAMES THE FORMAT BECAUSE THE FORMAT IS THE ONLY INPUT TO IT. The contest
+              THE HINT NAMES THE FORMAT BECAUSE THE FORMAT IS THE ONLY INPUT TO IT. The arena
               screen numbers each LINE as a step and shows the first three; written as one
               paragraph it renders as one line, which is correct and is not what the reference
               shows. Nothing else can tell an operator that - the field accepts both and both
               save - so the alternative to this sentence is a screen that looks wrong for a
               reason nobody can find, which is how this panel came to be rebuilt.
             */
-            hint={`The controls and constraints in plain language. One line per step: the contest screen numbers them and shows the first ${ARENA_STEP_LIMIT}. A player asking how to play and a player asking why they lost are asking two different questions.`}
+            hint={`The controls and constraints in plain language. One line per step: the ${terms.contest} screen numbers them and shows the first ${ARENA_STEP_LIMIT}. A ${terms.player} asking how to play and a ${terms.player} asking why they lost are asking two different questions.`}
             length={draft.howToPlay.length}
             limit={CONTENT_LIMITS.howToPlay}
           >
@@ -329,7 +331,7 @@ export default function GameContentDialog({
               gameCode={title.gameCode}
               slot="logo"
               label="Logo"
-              hint="Square. Shown beside the title and, later, on the dashboard tile players click."
+              hint={`Square. Shown beside the title and, later, on the dashboard tile ${terms.players} click.`}
               value={draft.thumbnailUrl}
               onChange={(url) => set("thumbnailUrl", url)}
             />
@@ -338,7 +340,7 @@ export default function GameContentDialog({
               gameCode={title.gameCode}
               slot="banner"
               label="Banner"
-              hint="Wide. The strip behind the contest heading. Unset falls back to a generic banner."
+              hint={`Wide. The strip behind the ${terms.contest} heading. Unset falls back to a generic banner.`}
               value={draft.bannerUrl}
               onChange={(url) => set("bannerUrl", url)}
             />
@@ -378,7 +380,7 @@ export default function GameContentDialog({
                   beside the tips, because the labels said "rules" and "highlights" while the
                   screen says "How it works" and "Game tips".
                 */
-                hint="Small square, beside the numbered steps. A diagram of the game, not a logo."
+                hint={`Small square, beside the numbered steps. A diagram of the ${terms.game}, not a logo.`}
                 value={draft.howToPlayImageUrl}
                 onChange={(url) => set("howToPlayImageUrl", url)}
               />
@@ -386,7 +388,7 @@ export default function GameContentDialog({
                 providerKey={providerKey}
                 gameCode={title.gameCode}
                 slot="highlight"
-                label="Game tips picture"
+                label={`${terms.game} tips picture`}
                 hint="Small landscape, beside the ticked tips. A badge or a slogan graphic."
                 value={draft.highlightsImageUrl}
                 onChange={(url) => set("highlightsImageUrl", url)}
@@ -409,10 +411,11 @@ export default function GameContentDialog({
               <div>
                 <Label>Banner features</Label>
                 <p className="text-xs text-white/50">
-                  The {HERO_FEATURE_LIMIT} icon-and-label items across the middle of the
-                  game&apos;s hero banner. Leave this empty and the banner works them out from
-                  the title&apos;s own settings - the round length, the contest&apos;s player
-                  range and how it is scored. Add even one and yours replace all of them.
+                  The {HERO_FEATURE_LIMIT} icon-and-label items across the middle of the{" "}
+                  {terms.game}&apos;s hero banner. Leave this empty and the banner works them
+                  out from the title&apos;s own settings - the {terms.round} length, the{" "}
+                  {terms.contest}&apos;s {terms.player} range and how it is scored. Add even one
+                  and yours replace all of them.
                 </p>
               </div>
               <Button
@@ -469,7 +472,7 @@ export default function GameContentDialog({
                     <Input
                       value={row.label}
                       maxLength={CONTENT_LIMITS.heroFeatureLabel}
-                      placeholder="Fast rounds"
+                      placeholder={`Fast ${terms.rounds}`}
                       onChange={(event) => setFeature(at, "label", event.target.value)}
                     />
                   </div>
@@ -507,7 +510,7 @@ export default function GameContentDialog({
                   labelled "detail" that an operator would otherwise write the substance into.
                 */}
                 <p className="text-xs text-white/50">
-                  Ticked lines on the contest screen. The first{" "}
+                  Ticked lines on the {terms.contest} screen. The first{" "}
                   {ARENA_HIGHLIGHT_LIMIT} titles are shown, so write each title so it
                   reads on its own; the detail appears on hover. Up to{" "}
                   {CONTENT_LIMITS.highlights} can be stored; none is fine.
@@ -529,7 +532,7 @@ export default function GameContentDialog({
 
             {draft.highlights.length === 0 ? (
               <p className="rounded-lg border border-dashed border-white/10 px-3 py-4 text-center text-xs text-white/40">
-                No highlights. The row is left out of the player&apos;s screen entirely.
+                No highlights. The row is left out of the {terms.player}&apos;s screen entirely.
               </p>
             ) : (
               draft.highlights.map((row, at) => (
@@ -547,7 +550,7 @@ export default function GameContentDialog({
                     <Input
                       value={row.detail}
                       maxLength={CONTENT_LIMITS.highlightDetail}
-                      placeholder="Short rounds. Big thrills."
+                      placeholder={`Short ${terms.rounds}. Big thrills.`}
                       onChange={(event) => setHighlight(at, "detail", event.target.value)}
                     />
                   </div>
@@ -638,6 +641,7 @@ function CategoryField({
   value: string;
   onChange: (slug: string) => void;
 }) {
+  const terms = useTerms();
   const resolved = resolveGameCategory(value);
   const isCustom = resolved !== undefined && !resolved.isKnown;
 
@@ -702,7 +706,7 @@ function CategoryField({
             "Type a genre. It is stored in lower case with hyphens so it can be grouped on."
           )
         ) : (
-          "A badge beside the title on the player's screen. Leave it at No genre and no badge is shown."
+          `A badge beside the title on the ${terms.player}'s screen. Leave it at No genre and no badge is shown.`
         )}
       </p>
     </div>

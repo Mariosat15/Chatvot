@@ -43,7 +43,7 @@ export function StepChooseGame({
       <Problem
         title={`No ${terms.games} are available yet`}
         lines={[
-          `${terms.games} appear here once their provider is enabled, their catalogue is synced, and the title is switched on in the provider's game list.`,
+          `${terms.games} appear here once their provider is enabled, their catalogue is synced, and the title is switched on in the provider's ${terms.game} list.`,
         ]}
       />
     );
@@ -52,7 +52,7 @@ export function StepChooseGame({
   return (
     <div className="space-y-3">
       <p className="text-sm text-gray-400">
-        {`The rest of the form is built from the ${terms.game} you choose - its settings, its round length and how its scores are ranked all come from the catalogue.`}
+        {`The rest of the form is built from the ${terms.game} you choose - its settings, its ${terms.round} length and how its ${terms.score} is ranked all come from the catalogue.`}
       </p>
 
       {titles.map((title) => {

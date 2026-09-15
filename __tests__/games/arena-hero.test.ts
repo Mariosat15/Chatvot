@@ -573,7 +573,10 @@ describe("the admin door onto the banner's strip", () => {
       row replaces all four; neither is guessable from a list of inputs, and both are decisions
       an operator has to make. So the dialog says both, and a probe deleting either goes red.
     */
-    const code = readCode(DIALOG);
+    // Whitespace is collapsed first. Prose inside JSX wraps wherever the line runs out, and
+    // X6.5 A3b's tokens moved the wrap - so a guard matching the raw text fails while the
+    // sentence is intact, which is the kind of guard the next reader deletes.
+    const code = readCode(DIALOG).replace(/\s+/g, " ");
 
     expect(code).toMatch(/works them out/);
     expect(code).toMatch(/replace all of them/);

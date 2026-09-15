@@ -94,27 +94,29 @@ export function RoundClockNote({
           <Clock className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
           <div className="space-y-1 text-xs text-gray-400">
             <p>
-              These are the <strong className="text-gray-200">game&apos;s own settings</strong>,
-              passed straight to the game. Anything here describing a length or a timer applies
-              to <strong className="text-gray-200">one attempt</strong>, not to the contest.
+              These are the <strong className="text-gray-200">{terms.game}&apos;s own settings</strong>,
+              passed straight to the {terms.game}. Anything here describing a length or a timer
+              applies to <strong className="text-gray-200">one {terms.attempt}</strong>, not to
+              the {terms.contest}.
             </p>
             <p>
-              When players may start an attempt is set separately, by the contest&apos;s start
-              and end times on the next step.
+              When {terms.players} may start an {terms.attempt} is set separately, by the{" "}
+              {terms.contest}&apos;s start and end times on the next step.
             </p>
             {fit &&
               (fit.reservesFullRound ? (
                 <p>
-                  Every player gets the full{" "}
-                  <strong className="text-gray-200">{reserved}</strong> of play, so the contest
-                  stops accepting new attempts {reserved} before it ends.
+                  Every {terms.player} gets the full{" "}
+                  <strong className="text-gray-200">{reserved}</strong> of play, so the{" "}
+                  {terms.contest} stops accepting new {terms.attempts} {reserved} before it
+                  ends.
                 </p>
               ) : (
                 <p>
-                  This contest lets players start an attempt at any time, so the{" "}
-                  <strong className="text-gray-200">{reserved}</strong> set here is the most an
-                  attempt can run - one started near the end is closed when the contest closes
-                  and scored on what the player managed.
+                  This {terms.contest} lets {terms.players} start an {terms.attempt} at any
+                  time, so the <strong className="text-gray-200">{reserved}</strong> set here is
+                  the most an {terms.attempt} can run - one started near the end is closed when
+                  the {terms.contest} closes and scored on what the {terms.player} managed.
                 </p>
               ))}
           </div>
@@ -130,13 +132,19 @@ export function RoundClockNote({
           <Clock className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
           <div className="space-y-1 text-xs text-gray-400">
             {/*
-              THE ONLY TOKEN IN THIS COMPONENT, and the reason is position rather than
-              preference. A token is a Title Case label, so it can be inserted verbatim only
-              where a phrase begins. Every other noun here sits mid-sentence ("applies to one
-              attempt, not to the contest"), where a token would have to be lower-cased - which
-              edits an operator's own word, turning "eSports Event" into "esports event" - or
-              would put an article in front of a word whose first letter we do not know.
-              Chapter 14 scopes this pass to labels and help text, not to argued prose.
+              THIS COMMENT USED TO SAY THIS WAS THE ONLY TOKEN IN THE COMPONENT, on the grounds
+              that every other noun sits mid-sentence where a Title Case token would read
+              wrongly, and that chapter 14 scoped the pass to labels rather than to argued
+              prose. THE OWNER DECIDED OTHERWISE on 15 September 2026, and the correction is
+              left visible rather than deleted because the argument was believed for long
+              enough to be written down: a token is used mid-sentence and the capital is
+              accepted, because the alternative is worse in both available directions.
+              Lower-casing edits a word the operator typed, turning "eSports Event" into
+              "esports event"; leaving the noun hard-coded means a renamed platform still says
+              "contest" in the sentence under a heading that says "Tournament", which reads as
+              the setting being broken. The only position still avoided is an article agreeing
+              with a first letter we do not know - so "a {"{"}terms.contest{"}"}" is written
+              "this" or "the" where the grammar allows it.
             */}
             <p>
               {terms.players} can join from the moment you save until the{" "}
@@ -147,7 +155,7 @@ export function RoundClockNote({
             {fit && fit.reservesFullRound && fit.lastAttemptStart ? (
               <p>
                 Play lasts <strong className="text-gray-200">{reserved}</strong>, and everyone
-                gets all of it, so the last attempt can start at{" "}
+                gets all of it, so the last {terms.attempt} can start at{" "}
                 <strong className="text-gray-200">
                   {fit.lastAttemptStart.toLocaleString()}
                 </strong>
@@ -155,8 +163,8 @@ export function RoundClockNote({
               </p>
             ) : (
               <p>
-                Everything still running is closed at the end time, so play never outlives the
-                contest.
+                Everything still running is closed at the end time, so play never outlives the{" "}
+                {terms.contest}.
               </p>
             )}
           </div>
@@ -183,16 +191,17 @@ export function RoundClockNote({
           <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
           {fit.reservesFullRound ? (
             <p className="text-xs text-amber-200/90">
-              Play is set to {reserved} but this contest only runs for {contestLength}, and
-              every player is promised the full {reserved} - so{" "}
-              <strong>nobody could start an attempt at all</strong>. Shorten the playing time,
-              lengthen the contest, or let players start at any time.
+              Play is set to {reserved} but this {terms.contest} only runs for {contestLength},
+              and every {terms.player} is promised the full {reserved} - so{" "}
+              <strong>nobody could start an {terms.attempt} at all</strong>. Shorten the playing
+              time, lengthen the {terms.contest}, or let {terms.players} start at any time.
             </p>
           ) : (
             <p className="text-xs text-amber-200/90">
-              Play is set to {reserved} but this contest only runs for {contestLength}, so
-              every attempt will be cut short at the end time and scored on what the player
-              managed. {terms.players} are told how long they have before they start.
+              Play is set to {reserved} but this {terms.contest} only runs for {contestLength},
+              so every {terms.attempt} will be cut short at the end time and scored on what the{" "}
+              {terms.player} managed. {terms.players} are told how long they have before they
+              start.
             </p>
           )}
         </div>

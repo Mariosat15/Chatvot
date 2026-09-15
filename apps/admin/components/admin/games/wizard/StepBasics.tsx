@@ -118,7 +118,7 @@ export function StepBasics({
           }`}
           placeholder={
             title
-              ? `${terms.contest} description. Example: Join our ${title.displayName} showdown - beat the field and win prizes.`
+              ? `${terms.contest} description. Example: Join our ${title.displayName} showdown - beat the field and win ${terms.prizes}.`
               : `${terms.contest} description, kept brief.`
           }
         />

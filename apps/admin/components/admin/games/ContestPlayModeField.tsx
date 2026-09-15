@@ -100,10 +100,10 @@ export function ContestPlayModeField({
         <div className="mt-3 flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-3">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
           <p className="text-xs text-amber-200/90">
-            Everybody plays at once, so entry closes when the contest{" "}
-            <strong>starts</strong> and every player gets <strong>one attempt</strong>. Those
-            two settings are withheld rather than editable, and this choice cannot be changed
-            once the contest exists.
+            Everybody plays at once, so entry closes when the {terms.contest}{" "}
+            <strong>starts</strong> and every {terms.player} gets{" "}
+            <strong>one {terms.attempt}</strong>. Those two settings are withheld rather than
+            editable, and this choice cannot be changed once the {terms.contest} exists.
           </p>
         </div>
       )}

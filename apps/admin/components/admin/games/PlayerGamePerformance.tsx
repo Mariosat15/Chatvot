@@ -2,6 +2,7 @@
 
 import { Archive, Gamepad2, Trophy } from "lucide-react";
 import { humanizeMetric } from "@/lib/utils/humanize-metric";
+import { useTerms } from "@/contexts/TerminologyContext";
 
 /**
  * One player's game performance, beside their trading performance - tasks 21-24.
@@ -65,6 +66,8 @@ export default function PlayerGamePerformance({
 }: {
   games: PlayerGamePerformanceRowView[];
 }) {
+  const terms = useTerms();
+
   if (games.length === 0) return null;
 
   return (
@@ -72,11 +75,12 @@ export default function PlayerGamePerformance({
       <div>
         <h3 className="flex items-center gap-2 text-lg font-semibold text-white">
           <Gamepad2 className="h-5 w-5 text-emerald-400" />
-          Game Performance
+          {terms.game} Performance
         </h3>
         <p className="mt-1 text-xs text-gray-500">
-          Every game this client has played a ranked round in. Each game is measured on what it
-          actually reports, so two games here will not show the same rows.
+          Every {terms.game} this client has played a ranked {terms.round} in. Each{" "}
+          {terms.game} is measured on what it actually reports, so two {terms.games} here will
+          not show the same rows.
         </p>
       </div>
 
@@ -135,19 +139,27 @@ export default function PlayerGamePerformance({
           </div>
 
           <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Tile label="Rounds played" value={game.rounds.started.toLocaleString()} />
+            <Tile
+              label={`${terms.rounds} played`}
+              value={game.rounds.started.toLocaleString()}
+            />
             <Tile
               label="Scored"
               value={game.rounds.scored.toLocaleString()}
               hint="incl. partial runs"
             />
-            <Tile label="Average round" value={duration(game.averagePlaySeconds)} />
             <Tile
-              label="Contests"
+              label={`Average ${terms.round}`}
+              value={duration(game.averagePlaySeconds)}
+            />
+            <Tile
+              label={terms.contests}
               value={`${game.competitions}`}
               hint={
                 game.challenges > 0
-                  ? `+ ${game.challenges} challenge${game.challenges === 1 ? "" : "s"}`
+                  ? `+ ${game.challenges} ${
+                      game.challenges === 1 ? terms.challenge : terms.challenges
+                    }`
                   : undefined
               }
             />
@@ -155,13 +167,14 @@ export default function PlayerGamePerformance({
 
           {game.rounds.live > 0 && (
             <p className="mt-3 text-xs text-amber-300/80">
-              {game.rounds.live} round{game.rounds.live === 1 ? "" : "s"} in play now
+              {game.rounds.live} {game.rounds.live === 1 ? terms.round : terms.rounds} in play
+              now
             </p>
           )}
 
           <div className="mt-4 border-t border-gray-700 pt-3">
             <p className="mb-2 text-[10px] uppercase tracking-wide text-gray-500">
-              Their best round in detail
+              Their best {terms.round} in detail
             </p>
             {game.bestRoundBreakdown ? (
               <dl className="grid grid-cols-1 gap-1 sm:grid-cols-2">
@@ -177,7 +190,7 @@ export default function PlayerGamePerformance({
               </dl>
             ) : (
               <p className="text-xs text-gray-500">
-                Detailed performance metrics are not available for this game.
+                Detailed performance metrics are not available for this {terms.game}.
               </p>
             )}
           </div>
