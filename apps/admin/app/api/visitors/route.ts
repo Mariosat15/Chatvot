@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import SiteVisit from "@/database/models/site-visit.model";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 /**
  * GET /api/visitors — Comprehensive visitor analytics (Google Analytics-level)
@@ -8,6 +9,10 @@ import SiteVisit from "@/database/models/site-visit.model";
  */
 export async function GET(req: NextRequest) {
   try {
+    // Reason: VisitorAnalyticsSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("visitors");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     const { searchParams } = new URL(req.url);

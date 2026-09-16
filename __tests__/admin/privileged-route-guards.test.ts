@@ -99,6 +99,12 @@ const CLOSED_FOLDERS: { folder: string[]; section: string }[] = [
   { folder: ["messaging", "assigned-customers"], section: "messaging" },
   { folder: ["messaging", "employees"], section: "messaging" },
   { folder: ["messaging", "conversations"], section: "messaging" },
+  /*
+    R101e. VisitorAnalyticsSection → visitors. Four files, six handlers: the list/live reads
+    and the block / clear writers. The writers are why the folder went first among the
+    remaining no-check debt - block and clear destroy or create records anonymously.
+  */
+  { folder: ["visitors"], section: "visitors" },
 ];
 
 describe("R101a - every handler in the closed folders is guarded, per handler", () => {
@@ -477,6 +483,48 @@ describe("R101c - no weaker helper and no hand-rolled JWT under trading-history/
     expect(settingsFiles).toEqual(["messaging/settings/route.ts"]);
     expect(inboxFiles.length).toBeGreaterThanOrEqual(11);
     expect(inboxFiles).not.toContain("messaging/settings/route.ts");
+  });
+});
+
+describe("R101e - visitors/ is section-granted and nothing weaker", () => {
+  /*
+    Four files, six handlers. block POST/DELETE and clear DELETE were the writers that put
+    this folder first among the remaining no-check debt. VisitorAnalyticsSection owns every
+    fetch, so the grant is `visitors` rather than a neighbouring content section.
+  */
+  const WEAKER =
+    /(getAdminSession|requireAdminAuth|verifyAdminAuth|verifyAdminToken|verifyAnyAuth|jwtVerify|getAdminJwtSecret)\s*\(/;
+
+  const dir = join(API, "visitors");
+  const files = findRouteFiles(dir);
+
+  it("the walk finds the four visitor routes", () => {
+    expect(files.length).toBe(4);
+  });
+
+  it("every visitors file names guardSection(visitors) and no weaker helper", () => {
+    const weaker: string[] = [];
+    const wrongSection: string[] = [];
+    let handlers = 0;
+    let guards = 0;
+
+    for (const file of files) {
+      const code = stripComments(readFileSync(file, "utf8"));
+      const name = file.slice(API.length + 1).replace(/\\/g, "/");
+      const sections = [...code.matchAll(/guardSection\(\s*["']([^"']+)["']\s*\)/g)].map(
+        (m) => m[1],
+      );
+
+      if (WEAKER.test(code)) weaker.push(name);
+      if (sections.some((s) => s !== "visitors")) wrongSection.push(name);
+      handlers += (code.match(handlerPattern()) ?? []).length;
+      guards += (code.match(guardCallPattern()) ?? []).length;
+    }
+
+    expect(weaker).toEqual([]);
+    expect(wrongSection).toEqual([]);
+    expect(handlers).toBe(6);
+    expect(guards).toBeGreaterThanOrEqual(handlers);
   });
 });
 

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import SiteVisit from "@/database/models/site-visit.model";
 import BlockedVisitor from "@/database/models/blocked-visitor.model";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 /**
  * DELETE /api/visitors/clear — Clear all site visit data and optionally block rules
@@ -10,6 +11,10 @@ import BlockedVisitor from "@/database/models/blocked-visitor.model";
  */
 export async function DELETE(req: Request) {
   try {
+    // Reason: VisitorAnalyticsSection owns this destructive clear; section grant is the auth answer.
+    const guard = await guardSection("visitors");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
     const { searchParams } = new URL(req.url);
     const includeBlocks = searchParams.get("includeBlocks") === "true";

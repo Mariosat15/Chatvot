@@ -353,6 +353,41 @@ Invoke-Probe -Name 'messaging closed folder loses grant' -File $MSG_EMP `
   -Replace2 '' `
   -ExpectTest 'but none of them are in the folders R101a closed'
 
+$VIS_BLOCK = 'apps/admin/app/api/visitors/block/route.ts'
+$VIS_CLEAR = 'apps/admin/app/api/visitors/clear/route.ts'
+
+Write-Host "`n=== R101e probes ===`n"
+
+# 27. visitors/block POST was world-writable. Restoring that on one handler.
+Invoke-Probe -Name 'visitors block unguarded' -File $VIS_BLOCK -First `
+  -Find '    const guard = await guardSection("visitors");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'visitors/block/route.ts: one guard and one refusal'
+
+# 28. Wrong grant - landing-pages would compile and silently widen who can block IPs.
+Invoke-Probe -Name 'visitors block wrong section' -File $VIS_BLOCK -First `
+  -Find 'guardSection("visitors")' `
+  -Replace 'guardSection("landing-pages")' `
+  -ExpectTest 'visitors/block/route.ts: guards every handler with the section'
+
+# 29. Clear loses its grant - the destructive half of the folder.
+Invoke-Probe -Name 'visitors clear unguarded' -File $VIS_CLEAR `
+  -Find '    const guard = await guardSection("visitors");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'every visitors file names guardSection'
+
+# 30. Folder-level canary: a closed visitors route loses its grant entirely.
+Invoke-Probe -Name 'visitors closed folder loses grant' -File $VIS_CLEAR `
+  -Find '    const guard = await guardSection("visitors");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'but none of them are in the folders R101a closed'
+
 Write-Host ''
 Write-Host 'UNPROBED, with the reason: "still finds routes with no authorization call at all".' -ForegroundColor DarkGray
 Write-Host 'Turning that canary red means guarding the remaining no-check debt, which is later' -ForegroundColor DarkGray

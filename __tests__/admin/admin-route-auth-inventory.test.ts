@@ -114,10 +114,6 @@ const NO_CHECK_OF_ANY_KIND = [
   "tests/schedule/route.ts",
   "tests/suites/route.ts",
   "update-competition-status/route.ts",
-  "visitors/block/route.ts",
-  "visitors/clear/route.ts",
-  "visitors/live/route.ts",
-  "visitors/route.ts",
 ] as const;
 
 /**
@@ -325,7 +321,7 @@ const HELPER_BUT_NO_GRANT = [
   "withdrawals/route.ts",
 ] as const;
 
-/** Folders closed by R101a and R101b. Nothing under these may appear in any list above. */
+/** Folders closed by R101a–R101e. Nothing under these may appear in any debt list above. */
 const CLOSED_FOLDERS = [
   "users",
   "ai",
@@ -334,6 +330,7 @@ const CLOSED_FOLDERS = [
   "journey",
   "trading-history",
   "messaging",
+  "visitors",
 ];
 
 const findings = inventoryAdminRoutes();
