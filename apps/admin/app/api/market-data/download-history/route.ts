@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import mongoose from "mongoose";
 import { getSafeForexTicker } from "@/lib/utils/url-validator";
@@ -245,6 +246,10 @@ async function fetchFromMassive(
  */
 export async function GET() {
   try {
+    // Reason: MarketDataSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("market-data");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     const hasApiKey = !!MASSIVE_API_KEY;
@@ -298,6 +303,10 @@ export async function GET() {
  */
 export async function POST(request: NextRequest) {
   try {
+    // Reason: MarketDataSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("market-data");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     if (!MASSIVE_API_KEY) {
@@ -603,6 +612,10 @@ export async function POST(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
+    // Reason: MarketDataSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("market-data");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     const { searchParams } = new URL(request.url);

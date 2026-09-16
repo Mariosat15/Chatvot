@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import mongoose from "mongoose";
 import { getSafeForexTicker } from "@/lib/utils/url-validator";
@@ -96,6 +97,10 @@ const HistoricalCandle1m = getHistoricalModel("candles_historical_1m");
  */
 export async function GET(request: NextRequest) {
   try {
+    // Reason: MarketDataSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("market-data");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     const symbol = request.nextUrl.searchParams.get("symbol");
@@ -468,6 +473,10 @@ async function fetchFromMassive(
  */
 export async function POST(request: NextRequest) {
   try {
+    // Reason: MarketDataSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("market-data");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     const body = await request.json();

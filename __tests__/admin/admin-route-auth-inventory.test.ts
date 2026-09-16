@@ -59,9 +59,9 @@ import { classifyRouteAuth, stripComments } from "../helpers/route-guard-audit";
  * swept in one commit.
  */
 /**
- * 44 routes calling no authentication of any kind. Frozen rather than swept:
+ * 38 routes calling no authentication of any kind. Frozen rather than swept:
  * each needs a decision about which grant owns the screen that calls it.
- * (Was 51 after R101e; R101f moved the seven landing-pages routes into section-granted.)
+ * (Was 44 after R101f; R101g moved the six market-data routes into section-granted.)
  */
 const NO_CHECK_OF_ANY_KIND = [
   "action-terms/[slug]/route.ts",
@@ -74,12 +74,6 @@ const NO_CHECK_OF_ANY_KIND = [
   "check-database/route.ts",
   "diagnose-user/route.ts",
   "fraud/restrictions/route.ts",
-  "market-data/cleanup/route.ts",
-  "market-data/download-history/route.ts",
-  "market-data/gap-fill/route.ts",
-  "market-data/seed-history/route.ts",
-  "market-data/settings/route.ts",
-  "market-data/stats/route.ts",
   "market-settings/automatic-holidays/route.ts",
   "market-settings/template-holidays/route.ts",
   "market-status/route.ts",
@@ -315,7 +309,7 @@ const HELPER_BUT_NO_GRANT = [
   "withdrawals/route.ts",
 ] as const;
 
-/** Folders closed by R101a–R101f. Nothing under these may appear in any debt list above. */
+/** Folders closed by R101a–R101g. Nothing under these may appear in any debt list above. */
 const CLOSED_FOLDERS = [
   "users",
   "ai",
@@ -326,6 +320,7 @@ const CLOSED_FOLDERS = [
   "messaging",
   "visitors",
   "landing-pages",
+  "market-data",
 ];
 
 const findings = inventoryAdminRoutes();

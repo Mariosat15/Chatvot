@@ -423,6 +423,41 @@ Invoke-Probe -Name 'landing-pages closed folder loses grant' -File $LP_CLEAR `
   -Replace2 '' `
   -ExpectTest 'but none of them are in the folders R101a closed'
 
+$MD_CLEAN = 'apps/admin/app/api/market-data/cleanup/route.ts'
+$MD_SETTINGS = 'apps/admin/app/api/market-data/settings/route.ts'
+
+Write-Host "`n=== R101g probes ===`n"
+
+# 35. cleanup was world-writable - the destructive half of the folder.
+Invoke-Probe -Name 'market-data cleanup unguarded' -File $MD_CLEAN `
+  -Find '    const guard = await guardSection("market-data");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'every market-data file names guardSection'
+
+# 36. Wrong grant - symbols would compile and silently widen who can wipe candles.
+Invoke-Probe -Name 'market-data wrong section' -File $MD_CLEAN `
+  -Find 'guardSection("market-data")' `
+  -Replace 'guardSection("symbols")' `
+  -ExpectTest 'market-data/cleanup/route.ts: guards every handler with the section'
+
+# 37. One handler of settings loses its grant.
+Invoke-Probe -Name 'market-data settings unguarded' -File $MD_SETTINGS -First `
+  -Find '    const guard = await guardSection("market-data");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'market-data/settings/route.ts: one guard and one refusal'
+
+# 38. Folder-level canary: a closed market-data route loses its grant entirely.
+Invoke-Probe -Name 'market-data closed folder loses grant' -File $MD_CLEAN `
+  -Find '    const guard = await guardSection("market-data");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'but none of them are in the folders R101a closed'
+
 Write-Host ''
 Write-Host 'UNPROBED, with the reason: "still finds routes with no authorization call at all".' -ForegroundColor DarkGray
 Write-Host 'Turning that canary red means guarding the remaining no-check debt, which is later' -ForegroundColor DarkGray

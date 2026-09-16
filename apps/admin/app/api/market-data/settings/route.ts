@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import mongoose from "mongoose";
 
@@ -181,6 +182,10 @@ const MarketDataSettings =
  */
 export async function GET() {
   try {
+    // Reason: MarketDataSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("market-data");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     let settings = await MarketDataSettings.findOne({
@@ -272,6 +277,10 @@ export async function GET() {
  */
 export async function POST(request: NextRequest) {
   try {
+    // Reason: MarketDataSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("market-data");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     const body = await request.json();

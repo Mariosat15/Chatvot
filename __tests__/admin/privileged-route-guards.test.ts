@@ -111,6 +111,12 @@ const CLOSED_FOLDERS: { folder: string[]; section: string }[] = [
     and zeroes counters, which is why the folder went next among the remaining writers.
   */
   { folder: ["landing-pages"], section: "landing-pages" },
+  /*
+    R101g. MarketDataSection → market-data. Six files, eleven handlers: settings, stats,
+    cleanup, seed, gap-fill and download-history. Cleanup / seed / gap-fill / download are
+    the writers that put the folder next - they delete or rewrite candle collections.
+  */
+  { folder: ["market-data"], section: "market-data" },
 ];
 
 describe("R101a - every handler in the closed folders is guarded, per handler", () => {
@@ -573,6 +579,48 @@ describe("R101f - landing-pages/ is section-granted and nothing weaker", () => {
     expect(weaker).toEqual([]);
     expect(wrongSection).toEqual([]);
     expect(handlers).toBe(10);
+    expect(guards).toBeGreaterThanOrEqual(handlers);
+  });
+});
+
+describe("R101g - market-data/ is section-granted and nothing weaker", () => {
+  /*
+    Six files, eleven handlers. MarketDataSection owns every fetch, so the grant is
+    `market-data`. cleanup / seed / gap-fill / download rewrite candle collections; they
+    put the folder next among the remaining writers.
+  */
+  const WEAKER =
+    /(getAdminSession|requireAdminAuth|verifyAdminAuth|verifyAdminToken|verifyAnyAuth|jwtVerify|getAdminJwtSecret)\s*\(/;
+
+  const dir = join(API, "market-data");
+  const files = findRouteFiles(dir);
+
+  it("the walk finds the six market-data routes", () => {
+    expect(files.length).toBe(6);
+  });
+
+  it("every market-data file names guardSection(market-data) and no weaker helper", () => {
+    const weaker: string[] = [];
+    const wrongSection: string[] = [];
+    let handlers = 0;
+    let guards = 0;
+
+    for (const file of files) {
+      const code = stripComments(readFileSync(file, "utf8"));
+      const name = file.slice(API.length + 1).replace(/\\/g, "/");
+      const sections = [...code.matchAll(/guardSection\(\s*["']([^"']+)["']\s*\)/g)].map(
+        (m) => m[1],
+      );
+
+      if (WEAKER.test(code)) weaker.push(name);
+      if (sections.some((s) => s !== "market-data")) wrongSection.push(name);
+      handlers += (code.match(handlerPattern()) ?? []).length;
+      guards += (code.match(guardCallPattern()) ?? []).length;
+    }
+
+    expect(weaker).toEqual([]);
+    expect(wrongSection).toEqual([]);
+    expect(handlers).toBe(11);
     expect(guards).toBeGreaterThanOrEqual(handlers);
   });
 });

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import mongoose from "mongoose";
 
@@ -7,6 +8,10 @@ import mongoose from "mongoose";
  */
 export async function GET() {
   try {
+    // Reason: MarketDataSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("market-data");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     const db = mongoose.connection.db;
