@@ -59,26 +59,10 @@ import { classifyRouteAuth, stripComments } from "../helpers/route-guard-audit";
  * swept in one commit.
  */
 /**
- * 14 routes calling no authentication of any kind. Frozen rather than swept:
- * each needs a decision about which grant owns the screen that calls it.
- * (Was 23 after R101k; R101l moved the nine test-runner routes into section-granted.)
+ * 0 routes calling no authentication of any kind. Closed by R101m on 16 Sep 2026.
+ * (Was 14 after R101l; the last fourteen singles and small clusters are now section-granted.)
  */
-const NO_CHECK_OF_ANY_KIND = [
-  "action-terms/[slug]/route.ts",
-  "admin/database/indexes/route.ts",
-  "challenges/[id]/gm-info/route.ts",
-  "check-database/route.ts",
-  "diagnose-user/route.ts",
-  "fraud/restrictions/route.ts",
-  "market-status/route.ts",
-  "pexels/route.ts",
-  "recover-stats/route.ts",
-  "server-fleet/route.ts",
-  "server-monitor/route.ts",
-  "sync-missing-users/route.ts",
-  "test-badge-models/route.ts",
-  "update-competition-status/route.ts",
-] as const;
+const NO_CHECK_OF_ANY_KIND = [] as const;
 
 /**
  * 3 routes that verify a JWT by hand and then ask nothing about grants.
@@ -277,7 +261,7 @@ const HELPER_BUT_NO_GRANT = [
   "withdrawals/route.ts",
 ] as const;
 
-/** Folders closed by R101a–R101l. Nothing under these may appear in any debt list above. */
+/** Folders closed by R101a–R101m. Nothing under these may appear in any debt list above. */
 const CLOSED_FOLDERS = [
   "users",
   "ai",
@@ -298,6 +282,23 @@ const CLOSED_FOLDERS = [
   "tests",
   "admin/end-logic-tests",
   "admin/trading-tests",
+  // R101m. Singles and small clusters. fraud/restrictions only - the rest of fraud/ is
+  // helper-but-no-grant and belongs with that pass. admin/database for the same reason as
+  // the admin/*-tests entries above. challenges/ covers the already-granted list route too.
+  "check-database",
+  "recover-stats",
+  "test-badge-models",
+  "admin/database",
+  "fraud/restrictions",
+  "challenges",
+  "market-status",
+  "pexels",
+  "action-terms",
+  "server-monitor",
+  "server-fleet",
+  "diagnose-user",
+  "sync-missing-users",
+  "update-competition-status",
 ];
 
 const findings = inventoryAdminRoutes();
@@ -459,7 +460,7 @@ describe("R101d - the folders already closed stay closed", () => {
 
     expect(read("users/edit/route.ts")).toBe("section-granted");
     expect(read("badges/route.ts")).toBe("section-granted");
-    expect(read("check-database/route.ts")).toBe("no-check");
+    expect(read("check-database/route.ts")).toBe("section-granted");
     expect(read("messaging/settings/route.ts")).toBe("section-granted");
     expect(read("trading-history/export/route.ts")).toBe("section-granted");
     expect(read("trading-risk-settings/route.ts")).toBe("hand-verified-no-grant");

@@ -104,6 +104,14 @@ export const ADMIN_SECTIONS = [
   // Dev Zone (main + subsections)
   "dev-zone-menu",
   "server-monitor",
+  /*
+    Server Fleet is a real screen (`ServerFleetSection`, menu id `server-fleet`) and was
+    never an ADMIN_SECTIONS value, so only a super admin could open the tab and no grant
+    could be issued. Added here so `guardSection("server-fleet")` can name the calling
+    screen - the same reason journey-map and gamification-wizard were added. Add-only;
+    nobody's access widens: a super admin passed before and passes now.
+  */
+  "server-fleet",
   "server-options",
   "redis",
   "dev-settings",

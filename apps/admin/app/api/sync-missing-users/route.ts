@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import { syncMissingUserLevels } from "@/lib/services/xp-level.service";
 
@@ -9,6 +10,10 @@ import { syncMissingUserLevels } from "@/lib/services/xp-level.service";
  */
 export async function POST(request: NextRequest) {
   try {
+    // Reason: Orphan writer that creates UserLevel rows and awards badges; closest grant is users.
+    const guard = await guardSection("users");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     console.log("🔄 Starting sync of missing users...");
@@ -41,6 +46,10 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
+    // Reason: Orphan dry-run for the same sync; same grant as POST.
+    const guard = await guardSection("users");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     const mongoose = await import("mongoose");

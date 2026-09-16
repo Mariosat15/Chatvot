@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import mongoose from "mongoose";
 
@@ -8,6 +9,10 @@ import mongoose from "mongoose";
  */
 export async function GET(request: NextRequest) {
   try {
+    // Reason: Orphan diagnostic that dumps user PII; closest screen grant is users.
+    const guard = await guardSection("users");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     const { searchParams } = new URL(request.url);

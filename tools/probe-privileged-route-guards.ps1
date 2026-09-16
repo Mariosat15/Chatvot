@@ -219,7 +219,7 @@ Invoke-Probe -Name 'a new route arrives unguarded' -File $SEQUENCE `
   -Replace '    const unused = 1; void unused;' `
   -Find2 '    if (!guard.ok) return guard.response;' `
   -Replace2 '' `
-  -ExpectTest 'but none of them are in the folders R101a closed'
+  -ExpectTest 'and none of the closed folders leak an unguarded file'
 
 $CREDIT = 'apps/admin/app/api/users/credit/route.ts'
 $DELETE = 'apps/admin/app/api/users/delete/route.ts'
@@ -351,7 +351,7 @@ Invoke-Probe -Name 'messaging closed folder loses grant' -File $MSG_EMP `
   -Replace '    const g = 1; void g;' `
   -Find2 '    if (!guard.ok) return guard.response;' `
   -Replace2 '' `
-  -ExpectTest 'but none of them are in the folders R101a closed'
+  -ExpectTest 'and none of the closed folders leak an unguarded file'
 
 $VIS_BLOCK = 'apps/admin/app/api/visitors/block/route.ts'
 $VIS_CLEAR = 'apps/admin/app/api/visitors/clear/route.ts'
@@ -386,7 +386,7 @@ Invoke-Probe -Name 'visitors closed folder loses grant' -File $VIS_CLEAR `
   -Replace '    const g = 1; void g;' `
   -Find2 '    if (!guard.ok) return guard.response;' `
   -Replace2 '' `
-  -ExpectTest 'but none of them are in the folders R101a closed'
+  -ExpectTest 'and none of the closed folders leak an unguarded file'
 
 $LP_CLEAR = 'apps/admin/app/api/landing-pages/analytics/clear/route.ts'
 $LP_ROUTE = 'apps/admin/app/api/landing-pages/route.ts'
@@ -421,7 +421,7 @@ Invoke-Probe -Name 'landing-pages closed folder loses grant' -File $LP_CLEAR `
   -Replace '    const g = 1; void g;' `
   -Find2 '    if (!guard.ok) return guard.response;' `
   -Replace2 '' `
-  -ExpectTest 'but none of them are in the folders R101a closed'
+  -ExpectTest 'and none of the closed folders leak an unguarded file'
 
 $MD_CLEAN = 'apps/admin/app/api/market-data/cleanup/route.ts'
 $MD_SETTINGS = 'apps/admin/app/api/market-data/settings/route.ts'
@@ -456,7 +456,7 @@ Invoke-Probe -Name 'market-data closed folder loses grant' -File $MD_CLEAN `
   -Replace '    const g = 1; void g;' `
   -Find2 '    if (!guard.ok) return guard.response;' `
   -Replace2 '' `
-  -ExpectTest 'but none of them are in the folders R101a closed'
+  -ExpectTest 'and none of the closed folders leak an unguarded file'
 
 $SYM_SYNC = 'apps/admin/app/api/symbols/sync/route.ts'
 $SYM_ROUTE = 'apps/admin/app/api/symbols/route.ts'
@@ -491,7 +491,7 @@ Invoke-Probe -Name 'symbols closed folder loses grant' -File $SYM_SYNC `
   -Replace '    const g = 1; void g;' `
   -Find2 '    if (!guard.ok) return guard.response;' `
   -Replace2 '' `
-  -ExpectTest 'but none of them are in the folders R101a closed'
+  -ExpectTest 'and none of the closed folders leak an unguarded file'
 
 $MS_TEMPLATE = 'apps/admin/app/api/market-settings/template-holidays/route.ts'
 $MS_AUTO = 'apps/admin/app/api/market-settings/automatic-holidays/route.ts'
@@ -527,7 +527,7 @@ Invoke-Probe -Name 'market-settings closed folder loses grant' -File $MS_AUTO `
   -Replace '    const g = 1; void g;' `
   -Find2 '    if (!guard.ok) return guard.response;' `
   -Replace2 '' `
-  -ExpectTest 'but none of them are in the folders R101a closed'
+  -ExpectTest 'and none of the closed folders leak an unguarded file'
 
 $PAGES_ROUTE = 'apps/admin/app/api/pages/route.ts'
 $PAGES_SAVE = 'apps/admin/app/api/pages/save-defaults/route.ts'
@@ -563,7 +563,7 @@ Invoke-Probe -Name 'pages closed folder loses grant' -File $PAGES_SAVE `
   -Replace '    const g = 1; void g;' `
   -Find2 '    if (!guard.ok) return guard.response;' `
   -Replace2 '' `
-  -ExpectTest 'but none of them are in the folders R101a closed'
+  -ExpectTest 'and none of the closed folders leak an unguarded file'
 
 $SIM_RUN = 'apps/admin/app/api/simulator/run/route.ts'
 $SIM_CLEAN = 'apps/admin/app/api/simulator/cleanup/route.ts'
@@ -605,7 +605,7 @@ Invoke-Probe -Name 'simulator closed folder loses grant' -File $SIM_AI `
   -Replace '    const g = 1; void g;' `
   -Find2 '    if (!guard.ok) return guard.response;' `
   -Replace2 '' `
-  -ExpectTest 'but none of them are in the folders R101a closed'
+  -ExpectTest 'and none of the closed folders leak an unguarded file'
 
 Write-Host "`n=== R101l probes ===`n"
 
@@ -639,11 +639,60 @@ Invoke-Probe -Name 'tests closed folder loses grant' -File $TESTS_SUITES `
   -Replace '    const g = 1; void g;' `
   -Find2 '    if (!guard.ok) return guard.response;' `
   -Replace2 '' `
-  -ExpectTest 'but none of them are in the folders R101a closed'
+  -ExpectTest 'and none of the closed folders leak an unguarded file'
+
+$CHECK_DB = 'apps/admin/app/api/check-database/route.ts'
+$RECOVER = 'apps/admin/app/api/recover-stats/route.ts'
+$INDEXES = 'apps/admin/app/api/admin/database/indexes/route.ts'
+$FLEET = 'apps/admin/app/api/server-fleet/route.ts'
+$RESTRICTIONS = 'apps/admin/app/api/fraud/restrictions/route.ts'
+
+Write-Host "`n=== R101m probes ===`n"
+
+# 59. check-database POST was world-writable - dumps competition and trade data anonymously.
+Invoke-Probe -Name 'check-database unguarded' -File $CHECK_DB `
+  -Find '    const guard = await guardSection("database");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'every R101m file names its section grant'
+
+# 60. recover-stats POST was world-writable - rewrites participant stats anonymously.
+Invoke-Probe -Name 'recover-stats unguarded' -File $RECOVER `
+  -Find '    const guard = await guardSection("database");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'recover-stats/route.ts: one guard and one refusal'
+
+# 61. Wrong grant on indexes - DatabaseIndexesTab mounts on the simulator screen, not database.
+# Reason: -First keeps blast to one of two identical guard lines.
+Invoke-Probe -Name 'indexes wrong section' -File $INDEXES -First `
+  -Find 'guardSection("performance-simulator")' `
+  -Replace 'guardSection("database")' `
+  -ExpectTest 'every R101m file names its section grant'
+
+# 62. server-fleet DELETE was world-writable - deletes fleet rows anonymously.
+# Reason: -First on GET would leave DELETE guarded; aim at DELETE by matching after GET is harder,
+# so unguard both with a full replace and expect the R101m aggregate (one file wrong is enough).
+Invoke-Probe -Name 'server-fleet unguarded' -File $FLEET `
+  -Find '    const guard = await guardSection("server-fleet");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'every R101m file names its section grant'
+
+# 63. Folder-level canary on a single-handler R101m file.
+Invoke-Probe -Name 'restrictions closed folder loses grant' -File $RESTRICTIONS `
+  -Find '    const guard = await guardSection("fraud");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'and none of the closed folders leak an unguarded file'
 
 Write-Host ''
-Write-Host 'UNPROBED, with the reason: "still finds routes with no authorization call at all".' -ForegroundColor DarkGray
-Write-Host 'Turning that canary red means guarding the remaining no-check debt, which is later' -ForegroundColor DarkGray
-Write-Host 'R101 work rather than a mutation. It is the one assertion here designed to fail when' -ForegroundColor DarkGray
-Write-Host 'the TREE is finished, so a probe proving it can fail would be proving the wrong thing.' -ForegroundColor DarkGray
+Write-Host 'UNPROBED, with the reason: "finds no route in the no-check-of-any-kind class".' -ForegroundColor DarkGray
+Write-Host 'That assertion is already green (no-check is empty after R101m). Turning it red means' -ForegroundColor DarkGray
+Write-Host 'adding a new unguarded route, which the inventory ratchet also catches. The closed-folder' -ForegroundColor DarkGray
+Write-Host 'leak check above is the probeable regression guard for folders already finished.' -ForegroundColor DarkGray
 Write-Host ''

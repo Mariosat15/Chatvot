@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import BadgeConfig from "@/database/models/badge-config.model";
 import XPConfig from "@/database/models/xp-config.model";
@@ -10,6 +11,10 @@ import mongoose from "mongoose";
  */
 export async function GET() {
   try {
+    // Reason: DatabaseSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("database");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     // Get list of collections

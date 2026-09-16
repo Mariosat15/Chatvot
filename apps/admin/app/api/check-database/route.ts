@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import Competition from "@/database/models/trading/competition.model";
 import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
@@ -11,6 +12,10 @@ import TradeHistory from "@/database/models/trading/trade-history.model";
  */
 export async function POST(request: Request) {
   try {
+    // Reason: DatabaseSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("database");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     const { competitionId } = await request.json().catch(() => ({}));

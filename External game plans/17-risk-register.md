@@ -4558,7 +4558,7 @@ same limit would refuse.
 
 ---
 
-### R101 - Ninety-nine admin routes with no authorization, and fifty-eight of them write - **R101a–R101l CLOSED 16 Sep 2026; tree still open**
+### R101 - Ninety-nine admin routes with no authorization, and fifty-eight of them write - **R101a–R101m CLOSED 16 Sep 2026; hand-verified + helper still open**
 
 **What it is.** `apps/admin` is a separate Next.js process with **no `middleware.ts` of its
 own**. The root `middleware.ts` belongs to the main app and never runs for these routes, so
@@ -4932,7 +4932,18 @@ the same pass. 4 new probes each red on exactly one failure. Inventory after:
 4 new probes each red on exactly one failure. Inventory after:
 **14 no-check / 3 hand-verified / 180 helper / 140 section-granted**.
 
-**R101 remains open** on the remaining 14 no-check routes.
+**R101m CLOSED 16 September 2026.** The last **14 no-check** route files
+(**17 handlers**) - grants from calling screens: `database` (check-database,
+recover-stats, test-badge-models), `performance-simulator` (admin/database/indexes -
+DatabaseIndexesTab mounts there), `fraud` (restrictions), `challenges` (gm-info),
+`competitions` (market-status, update-competition-status), `landing-pages` (pexels),
+`users` (action-terms, diagnose-user, sync-missing-users), `server-monitor`,
+`server-fleet` (ADMIN_SECTIONS entry added so the grant is issuable). 5 new probes
+each red on exactly one failure. Inventory after:
+**0 no-check / 3 hand-verified / 180 helper / 154 section-granted**.
+The no-check canary was **flipped**, not deleted.
+
+**R101 remains open** on the **3 hand-verified** and **180 helper-but-no-grant** routes.
 
 ---
 

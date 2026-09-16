@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import SitePage from "@/database/models/site-page.model";
 
@@ -13,6 +14,10 @@ export async function GET(
   { params }: { params: Promise<{ slug: string }> },
 ) {
   try {
+    // Reason: UserFullDetailPanel owns this call; section grant is users.
+    const guard = await guardSection("users");
+    if (!guard.ok) return guard.response;
+
     const { slug } = await params;
     await connectToDatabase();
 

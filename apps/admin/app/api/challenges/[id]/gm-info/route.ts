@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 
 /**
@@ -9,6 +10,10 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    // Reason: ChallengesAdminSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("challenges");
+    if (!guard.ok) return guard.response;
+
     const { id: challengeId } = await params;
     const { searchParams } = new URL(request.url);
     const challengerId = searchParams.get("challengerId");

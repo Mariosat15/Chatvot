@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import UserRestriction from "@/database/models/user-restriction.model";
 import { getUsersByIds } from "@/lib/utils/user-lookup";
@@ -9,6 +10,10 @@ import { getUsersByIds } from "@/lib/utils/user-lookup";
  */
 export async function GET(_request: NextRequest) {
   try {
+    // Reason: RestrictedUsersSection mounts inside FraudMonitoringSection.
+    const guard = await guardSection("fraud");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     console.log("🔍 API: Fetching all user restrictions...");

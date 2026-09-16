@@ -1,6 +1,7 @@
 "use server";
 
 import { NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import mongoose from "mongoose";
 import { REQUIRED_INDEXES, type RequiredIndex } from "./required-indexes";
@@ -29,6 +30,10 @@ interface IndexStatus {
 // GET - Check index status
 export async function GET() {
   try {
+    // Reason: DatabaseIndexesTab mounts inside PerformanceSimulatorSection.
+    const guard = await guardSection("performance-simulator");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
     const db = mongoose.connection.db;
     if (!db) throw new Error("Database not connected");
@@ -137,6 +142,10 @@ export async function GET() {
 // POST - Create missing indexes
 export async function POST(request: Request) {
   try {
+    // Reason: DatabaseIndexesTab mounts inside PerformanceSimulatorSection.
+    const guard = await guardSection("performance-simulator");
+    if (!guard.ok) return guard.response;
+
     const body = await request.json();
     const { collections: targetCollections, createAll } = body;
 

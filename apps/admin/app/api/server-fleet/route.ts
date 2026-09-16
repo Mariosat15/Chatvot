@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import { Server } from "@/database/models/server.model";
 
@@ -6,6 +7,10 @@ const OFFLINE_THRESHOLD = 90000; // 90 seconds without heartbeat = offline
 
 export async function GET() {
   try {
+    // Reason: ServerFleetSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("server-fleet");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     const servers = await Server.find().sort({ role: 1, hostname: 1 }).lean();
@@ -90,6 +95,10 @@ export async function GET() {
  */
 export async function DELETE(request: Request) {
   try {
+    // Reason: ServerFleetSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("server-fleet");
+    if (!guard.ok) return guard.response;
+
     const { searchParams } = new URL(request.url);
     const serverId = searchParams.get("serverId");
 

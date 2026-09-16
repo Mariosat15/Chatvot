@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import Competition from "@/database/models/trading/competition.model";
 
@@ -6,6 +7,10 @@ import Competition from "@/database/models/trading/competition.model";
 // Call this with: GET /api/admin/update-competition-status
 export async function GET() {
   try {
+    // Reason: Orphan writer that flips competition status; closest screen grant is competitions.
+    const guard = await guardSection("competitions");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     const now = new Date();

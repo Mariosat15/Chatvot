@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import os from "os";
 import v8 from "v8";
 import { exec } from "child_process";
@@ -276,6 +277,10 @@ async function getDatabaseStats(): Promise<{
 
 export async function GET() {
   try {
+    // Reason: ServerMonitorSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("server-monitor");
+    if (!guard.ok) return guard.response;
+
     // Get PM2 process stats
     const pm2Processes = await getPM2Processes();
 

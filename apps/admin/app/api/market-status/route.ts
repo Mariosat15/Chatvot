@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 const MASSIVE_API_KEY = process.env.MASSIVE_API_KEY;
 const MASSIVE_API_BASE_URL = "https://api.massive.com/v1";
@@ -180,6 +181,10 @@ function checkHolidayOverlap(
  */
 export async function GET(request: Request) {
   try {
+    // Reason: CompetitionCreatorForm is the calling screen; grant from competitions.
+    const guard = await guardSection("competitions");
+    if (!guard.ok) return guard.response;
+
     const { searchParams } = new URL(request.url);
     const startDateStr = searchParams.get("startDate");
     const endDateStr = searchParams.get("endDate");

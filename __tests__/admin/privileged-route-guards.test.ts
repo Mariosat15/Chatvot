@@ -39,6 +39,10 @@ import { readFileSync } from "fs";
 import { join } from "path";
 import { ADMIN_SECTIONS } from "../../apps/admin/database/models/admin-employee.model";
 import {
+  inventoryAdminRoutes,
+  routesOfClass,
+} from "../../tools/admin-routes/auth-inventory";
+import {
   findRouteFiles,
   guardCallPattern,
   guardedSections,
@@ -151,6 +155,27 @@ const CLOSED_FOLDERS: { folder: string[]; section: string }[] = [
   { folder: ["tests"], section: "performance-simulator" },
   { folder: ["admin", "end-logic-tests"], section: "performance-simulator" },
   { folder: ["admin", "trading-tests"], section: "performance-simulator" },
+  /*
+    R101m. The last fourteen no-check routes, each granted from its calling screen (or the
+    closest screen when the route is an orphan diagnostic). admin/database/indexes mounts
+    inside PerformanceSimulatorSection, not DatabaseSection - calling-screen rule, not
+    folder-name rule. server-fleet needed an ADMIN_SECTIONS entry before its guard could
+    name the screen. challenges/ covers both the already-granted list route and gm-info.
+  */
+  { folder: ["check-database"], section: "database" },
+  { folder: ["recover-stats"], section: "database" },
+  { folder: ["test-badge-models"], section: "database" },
+  { folder: ["admin", "database"], section: "performance-simulator" },
+  { folder: ["fraud", "restrictions"], section: "fraud" },
+  { folder: ["challenges"], section: "challenges" },
+  { folder: ["market-status"], section: "competitions" },
+  { folder: ["pexels"], section: "landing-pages" },
+  { folder: ["action-terms"], section: "users" },
+  { folder: ["server-monitor"], section: "server-monitor" },
+  { folder: ["server-fleet"], section: "server-fleet" },
+  { folder: ["diagnose-user"], section: "users" },
+  { folder: ["sync-missing-users"], section: "users" },
+  { folder: ["update-competition-status"], section: "competitions" },
 ];
 
 describe("R101a - every handler in the closed folders is guarded, per handler", () => {
@@ -870,6 +895,76 @@ describe("R101l - test runners under performance-simulator are section-granted",
   });
 });
 
+describe("R101m - the last fourteen no-check routes are section-granted", () => {
+  /*
+    Fourteen files, seventeen handlers. Grants from calling screens (or the closest screen
+    for orphan diagnostics). admin/database/indexes is performance-simulator because
+    DatabaseIndexesTab mounts there, not under DatabaseSection. server-fleet is its own
+    ADMIN_SECTIONS id, added in the same slice so the guard can name the screen.
+  */
+  const WEAKER =
+    /(getAdminSession|requireAdminAuth|verifyAdminAuth|verifyAdminToken|verifyAnyAuth|jwtVerify|getAdminJwtSecret)\s*\(/;
+
+  const entries: { path: string[]; section: string; handlers: number }[] = [
+    { path: ["check-database"], section: "database", handlers: 1 },
+    { path: ["recover-stats"], section: "database", handlers: 1 },
+    { path: ["test-badge-models"], section: "database", handlers: 1 },
+    { path: ["admin", "database"], section: "performance-simulator", handlers: 2 },
+    { path: ["fraud", "restrictions"], section: "fraud", handlers: 1 },
+    { path: ["challenges", "[id]", "gm-info"], section: "challenges", handlers: 1 },
+    { path: ["market-status"], section: "competitions", handlers: 1 },
+    { path: ["pexels"], section: "landing-pages", handlers: 1 },
+    { path: ["action-terms"], section: "users", handlers: 1 },
+    { path: ["server-monitor"], section: "server-monitor", handlers: 1 },
+    { path: ["server-fleet"], section: "server-fleet", handlers: 2 },
+    { path: ["diagnose-user"], section: "users", handlers: 1 },
+    { path: ["sync-missing-users"], section: "users", handlers: 2 },
+    { path: ["update-competition-status"], section: "competitions", handlers: 1 },
+  ];
+
+  it("covers fourteen route trees", () => {
+    expect(entries.length).toBe(14);
+  });
+
+  it("every R101m file names its section grant and no weaker helper", () => {
+    const weaker: string[] = [];
+    const wrongSection: string[] = [];
+    let handlers = 0;
+    let guards = 0;
+
+    for (const { path, section, handlers: expected } of entries) {
+      const files = findRouteFiles(join(API, ...path));
+      expect(files.length).toBeGreaterThan(0);
+
+      for (const file of files) {
+        const code = stripComments(readFileSync(file, "utf8"));
+        const name = file.slice(API.length + 1).replace(/\\/g, "/");
+        const sections = [
+          ...code.matchAll(/guardSection\(\s*["']([^"']+)["']\s*\)/g),
+        ].map((m) => m[1]);
+
+        if (WEAKER.test(code)) weaker.push(name);
+        if (sections.some((s) => s !== section)) wrongSection.push(name);
+        const fileHandlers = (code.match(handlerPattern()) ?? []).length;
+        handlers += fileHandlers;
+        guards += (code.match(guardCallPattern()) ?? []).length;
+        expect(fileHandlers).toBe(expected);
+      }
+    }
+
+    expect(weaker).toEqual([]);
+    expect(wrongSection).toEqual([]);
+    expect(handlers).toBe(17);
+    expect(guards).toBeGreaterThanOrEqual(handlers);
+  });
+
+  it("ADMIN_SECTIONS includes server-fleet so the fleet grant is issuable", () => {
+    // Reason: the screen existed; the enum did not. Without this the guard could not name
+    // the calling screen and employees could never be granted the tab.
+    expect(ADMIN_SECTIONS).toContain("server-fleet");
+  });
+});
+
 describe("R101a - the badge routes, which are the data R96 widens", () => {
   it("guards the badge CRUD on every handler", () => {
     const code = read("badges", "route.ts");
@@ -896,34 +991,29 @@ describe("R101a - the badge routes, which are the data R96 widens", () => {
   });
 });
 
-describe("R101 - the rest of the tree is still an offender", () => {
+describe("R101 - the no-check debt is closed; helper and hand-verified remain", () => {
   /*
-    A TRIPWIRE POINTING THE RIGHT WAY, and the reason it is written as a canary rather than as
-    a passing summary is the R60 rule: a test that states a known gap and passes is
-    indistinguishable from the gap having been closed, and it silently re-permits the defect in
-    every file it excuses. When somebody finishes R101b and R101c this goes red, and the reader
-    is sent here to delete it and tighten the walk below into the real guard.
-
-    IT DELIBERATELY ASSERTS NO EXACT COUNT. The number moved three times in one afternoon -
-    A check that states a known gap and passes anyway is indistinguishable from the gap having
-    been closed, and it quietly excuses every file it lists. It goes red when the remaining
-    no-check debt reaches zero - which R101c did not do, and is not supposed to: this canary
-    asserts the TREE is still an offender, not that messaging and trading-history still are.
+    FLIPPED 16 Sep 2026 (R101m). This used to assert the tree still had routes with no
+    authorization call at all - a canary that went red when the no-check pile reached zero.
+    R101m closed the last fourteen. Public-by-design and hand-verified routes still call no
+    AUTH_CALL helper (they are a different class), so the lasting assertions use the inventory
+    classifier for the no-check pile and the closed-folder leak check for regressions.
   */
   const AUTH_CALL =
     /(guardSection|requireSectionAccess|getAdminSession|verifyAdminAuth|verifyAdminToken|requireAdminAuth|verifyAnyAuth|verifyGameMasterAuth|getServerSession|auth\.api\.getSession)\s*\(/;
 
-  const unguarded = findRouteFiles(API).filter((file) => {
+  const unguardedByHelper = findRouteFiles(API).filter((file) => {
     const code = stripComments(readFileSync(file, "utf8"));
     if ((code.match(handlerPattern()) ?? []).length === 0) return false;
     return !AUTH_CALL.test(code);
   });
 
-  it("still finds routes with no authorization call at all", () => {
-    expect(unguarded.length).toBeGreaterThan(0);
+  it("finds no route in the no-check-of-any-kind class", () => {
+    // Reason: inventoryAdminRoutes is the same classifier the audit tool and the ratchet use.
+    expect(routesOfClass(inventoryAdminRoutes(), "no-check")).toEqual([]);
   });
 
-  it("but none of them are in the folders R101a closed", () => {
+  it("and none of the closed folders leak an unguarded file", () => {
     /*
       This is the assertion that lasts, and it is the one the canary above exists to protect.
       A `route.ts` added under any closed folder with no guard lands in this list and turns
@@ -931,7 +1021,7 @@ describe("R101 - the rest of the tree is still an offender", () => {
       per-file allow-list would let through on the day it appeared.
     */
     const closed = CLOSED_FOLDERS.map(({ folder }) => join(API, ...folder));
-    const leaked = unguarded.filter((file) =>
+    const leaked = unguardedByHelper.filter((file) =>
       closed.some((dir) => file.startsWith(dir)),
     );
 

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import { WhiteLabel } from "@/database/models/whitelabel.model";
 
@@ -8,6 +9,10 @@ import { WhiteLabel } from "@/database/models/whitelabel.model";
  */
 export async function GET(req: NextRequest) {
   try {
+    // Reason: PexelsImageBrowser lives under landing-pages; section grant is the auth answer.
+    const guard = await guardSection("landing-pages");
+    if (!guard.ok) return guard.response;
+
     const { searchParams } = new URL(req.url);
     const query = searchParams.get("query") || "trading finance";
     const page = parseInt(searchParams.get("page") || "1", 10);
