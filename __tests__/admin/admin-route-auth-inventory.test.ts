@@ -72,8 +72,8 @@ const NO_CHECK_OF_ANY_KIND = [] as const;
 const HAND_VERIFIED_NO_GRANT = [] as const;
 
 /**
- * 169 routes that authenticate with a helper and never ask which sections the caller
- * holds. (Was 180 after R101n; R101o moved eleven money-writer routes into
+ * 159 routes that authenticate with a helper and never ask which sections the caller
+ * holds. (Was 169 after R101o; R101p moved ten clean money-helper routes into
  * section-granted.)
  */
 const HELPER_BUT_NO_GRANT = [
@@ -114,13 +114,9 @@ const HELPER_BUT_NO_GRANT = [
   "chargebacks/[id]/route.ts",
   "chargebacks/[id]/withdrawn/route.ts",
   "chargebacks/[id]/won/route.ts",
-  "chargebacks/lookup/route.ts",
-  "chargebacks/route.ts",
   "company-settings/route.ts",
-  "complete-pending-payment/route.ts",
   "cookie-consent/route.ts",
   "credentials/route.ts",
-  "credit-conversion/route.ts",
   "customer-assignments/[customerId]/route.ts",
   "customer-assignments/route.ts",
   "customer-assignments/settings/route.ts",
@@ -131,8 +127,6 @@ const HELPER_BUT_NO_GRANT = [
   "database/backups/[id]/route.ts",
   "database/backups/route.ts",
   "debug-fraud/route.ts",
-  "deposits/[id]/manual-complete/route.ts",
-  "deposits/failed/route.ts",
   "dev-scripts/execute/route.ts",
   "dev-scripts/route.ts",
   "dev-zone/dependency-check/route.ts",
@@ -145,10 +139,7 @@ const HELPER_BUT_NO_GRANT = [
   "employees/route.ts",
   "employees/upgrade-super-admin/route.ts",
   "environment/route.ts",
-  "fee-settings/route.ts",
   "finalize-challenges/route.ts",
-  "financial-analytics/route.ts",
-  "financial-dashboard/route.ts",
   "fraud/ai-report/route.ts",
   "fraud/alerts/[id]/route.ts",
   "fraud/alerts/route.ts",
@@ -245,7 +236,6 @@ const HELPER_BUT_NO_GRANT = [
   "vendors/[id]/mark-paid/route.ts",
   "vendors/route.ts",
   "verify-password/route.ts",
-  "withdrawal-settings/route.ts",
 ] as const;
 
 /** Folders closed by R101aâ€“R101m. Nothing under these may appear in any debt list above. */
@@ -293,6 +283,15 @@ const CLOSED_FOLDERS = [
   "vendor-payments",
   "atlas",
   "withdrawals",
+  // R101p. Clean money helpers. chargebacks/[id]/* deferred (dual callers).
+  "financial-dashboard",
+  "financial-analytics",
+  "deposits",
+  "fee-settings",
+  "complete-pending-payment",
+  "withdrawal-settings",
+  "credit-conversion",
+  "chargebacks/lookup",
 ];
 
 const findings = inventoryAdminRoutes();
@@ -463,5 +462,10 @@ describe("R101d - the folders already closed stay closed", () => {
     expect(read("withdrawals/route.ts")).toBe("section-granted");
     expect(read("admin-funds/route.ts")).toBe("section-granted");
     expect(read("atlas/refund/clawback/route.ts")).toBe("section-granted");
+    expect(read("financial-dashboard/route.ts")).toBe("section-granted");
+    expect(read("fee-settings/route.ts")).toBe("section-granted");
+    expect(read("deposits/failed/route.ts")).toBe("section-granted");
+    expect(read("chargebacks/route.ts")).toBe("section-granted");
+    expect(read("chargebacks/lookup/route.ts")).toBe("section-granted");
   });
 });

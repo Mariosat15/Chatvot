@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminSession } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 // Reason: service lives at repo root to stay shared with the main app.
 import { lookupDepositForChargeback } from "../../../../../../lib/services/security/chargeback-lookup.service";
 
@@ -12,10 +12,10 @@ import { lookupDepositForChargeback } from "../../../../../../lib/services/secur
  */
 export async function GET(req: NextRequest) {
   try {
-    const session = await getAdminSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // Reason: ChargebackCreateDialog on Users; section grant is the auth answer.
+    const guard = await guardSection("users");
+    if (!guard.ok) return guard.response;
+
 
     const sp = req.nextUrl.searchParams;
     const providerTransactionId = (

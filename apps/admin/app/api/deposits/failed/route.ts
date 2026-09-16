@@ -6,17 +6,16 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { verifyAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import mongoose from "mongoose";
 
 export async function GET(request: NextRequest) {
   try {
-    const admin = await verifyAdminAuth();
-    if (!admin.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // Reason: FailedDepositsSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("failed-deposits");
+    if (!guard.ok) return guard.response;
 
     await connectToDatabase();
 

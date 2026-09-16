@@ -1,34 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { jwtVerify } from "jose";
 import { connectToDatabase } from "@/database/mongoose";
 import CreditConversionSettings from "@/database/models/credit-conversion-settings.model";
-
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.ADMIN_JWT_SECRET || "admin-secret-key-change-in-production",
-);
-
-async function verifyAdminToken(request: NextRequest) {
-  const token = request.cookies.get("admin_token")?.value;
-
-  if (!token) {
-    return null;
-  }
-
-  try {
-    const { payload } = await jwtVerify(token, JWT_SECRET);
-    return payload;
-  } catch {
-    return null;
-  }
-}
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 // GET: Fetch credit conversion settings
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
-    const admin = await verifyAdminToken(request);
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // Reason: CreditConversionSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("currency");
+    if (!guard.ok) return guard.response;
 
     await connectToDatabase();
     const settings = await CreditConversionSettings.getSingleton();
@@ -46,10 +26,9 @@ export async function GET(request: NextRequest) {
 // POST: Update credit conversion settings
 export async function POST(request: NextRequest) {
   try {
-    const admin = await verifyAdminToken(request);
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // Reason: CreditConversionSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("currency");
+    if (!guard.ok) return guard.response;
 
     const data = await request.json();
 
@@ -63,7 +42,7 @@ export async function POST(request: NextRequest) {
         minimumWithdrawal: data.minimumWithdrawal,
         withdrawalFeePercentage: data.withdrawalFeePercentage,
         lastUpdated: new Date(),
-        updatedBy: (admin.email as string) || "admin",
+        updatedBy: guard.admin.email || "admin",
       },
       { new: true, upsert: true },
     );

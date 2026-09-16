@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { verifyAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import CreditWallet from "@/database/models/trading/credit-wallet.model";
@@ -23,10 +23,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
   session.startTransaction();
 
   try {
-    const admin = await verifyAdminAuth();
-    if (!admin.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // Reason: FailedDepositsSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("failed-deposits");
+    if (!guard.ok) return guard.response;
+    const admin = guard.admin;
 
     const { id: transactionId } = await context.params;
     const body = await request.json();
@@ -202,7 +202,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     // Reason: auditLogService.log expects { admin: { id, email }, ... } — not flat fields.
     await auditLogService.log({
       admin: {
-        id: admin.adminId || "unknown",
+        id: admin.id || "unknown",
         email: admin.email || "unknown",
         name: admin.name,
         role: admin.role,
@@ -275,10 +275,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
  */
 export async function GET(request: NextRequest, context: RouteContext) {
   try {
-    const admin = await verifyAdminAuth();
-    if (!admin.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // Reason: FailedDepositsSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("failed-deposits");
+    if (!guard.ok) return guard.response;
 
     const { id: transactionId } = await context.params;
 

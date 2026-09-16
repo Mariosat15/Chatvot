@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import mongoose from "mongoose";
-import { getAdminSession } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { listChargebackQueue } from "../../../../../lib/services/security/chargeback-case.service";
 
 const ALLOWED_STATUSES = [
@@ -15,10 +15,10 @@ const ALLOWED_STATUSES = [
 /** GET — cross-user chargeback queue for the Financial Dashboard. */
 export async function GET(req: NextRequest) {
   try {
-    const session = await getAdminSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // Reason: ChargebacksFinancialTab on FinancialDashboard; section grant is the auth answer.
+    const guard = await guardSection("financial");
+    if (!guard.ok) return guard.response;
+
     const sp = req.nextUrl.searchParams;
     const statusParam = sp.get("status") || undefined;
     const status =

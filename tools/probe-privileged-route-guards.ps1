@@ -789,10 +789,63 @@ Invoke-Probe -Name 'withdrawals closed folder loses grant' -File $WITHDRAWALS `
   -Replace2 '' `
   -ExpectTest 'and none of the closed folders leak an unguarded file'
 
+Write-Host "`n=== R101p probes ===`n"
+
+$FIN_DASH = 'apps/admin/app/api/financial-dashboard/route.ts'
+$FEE = 'apps/admin/app/api/fee-settings/route.ts'
+$DEPOSITS_FAILED = 'apps/admin/app/api/deposits/failed/route.ts'
+$CB_LIST = 'apps/admin/app/api/chargebacks/route.ts'
+$CB_LOOKUP = 'apps/admin/app/api/chargebacks/lookup/route.ts'
+$WD_SETTINGS = 'apps/admin/app/api/withdrawal-settings/route.ts'
+
+# 75. financial-dashboard was hand-rolled jwtVerify - FinancialDashboard owns it.
+Invoke-Probe -Name 'financial-dashboard unguarded' -File $FIN_DASH -First `
+  -Find '    const guard = await guardSection("financial");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'every R101p file names its section grant and no weaker helper'
+
+# 76. fee-settings wrong section - fees, not financial.
+Invoke-Probe -Name 'fee-settings wrong section' -File $FEE -First `
+  -Find 'guardSection("fees")' `
+  -Replace 'guardSection("financial")' `
+  -ExpectTest 'every R101p file names its section grant and no weaker helper'
+
+# 77. deposits/failed was admin-at-all - FailedDepositsSection owns it.
+Invoke-Probe -Name 'deposits failed unguarded' -File $DEPOSITS_FAILED `
+  -Find '    const guard = await guardSection("failed-deposits");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'every R101p file names its section grant and no weaker helper'
+
+# 78. chargebacks list grant swapped with lookup - two screens, two grants.
+Invoke-Probe -Name 'chargebacks list as users' -File $CB_LIST -First `
+  -Find 'guardSection("financial")' `
+  -Replace 'guardSection("users")' `
+  -ExpectTest 'chargebacks list is financial while lookup is users'
+
+# 79. chargebacks lookup grant swapped with list.
+Invoke-Probe -Name 'chargebacks lookup as financial' -File $CB_LOOKUP -First `
+  -Find 'guardSection("users")' `
+  -Replace 'guardSection("financial")' `
+  -ExpectTest 'chargebacks list is financial while lookup is users'
+
+# 80. Closed-folder canary on a single-handler R101p file (multi-handler -First leaves
+# siblings guarded, so AUTH_CALL still matches and the leak check stays green).
+Invoke-Probe -Name 'financial-analytics closed folder loses grant' -File 'apps/admin/app/api/financial-analytics/route.ts' `
+  -Find '    const guard = await guardSection("financial");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'and none of the closed folders leak an unguarded file'
+
 Write-Host ''
 Write-Host 'UNPROBED, with the reason: "finds no route in the no-check-of-any-kind class" and' -ForegroundColor DarkGray
 Write-Host '"finds no route in the hand-verified-no-grant class". Both are already green (empty' -ForegroundColor DarkGray
 Write-Host 'after R101m/R101n). Turning either red means adding a route in that class, which the' -ForegroundColor DarkGray
 Write-Host 'inventory ratchet also catches. The closed-folder leak check is the probeable guard.' -ForegroundColor DarkGray
-Write-Host 'Helper debt after R101o: 169.' -ForegroundColor DarkGray
+Write-Host 'Helper debt after R101p: 159. chargebacks/[id]/*, admin-bank-accounts, cancel-pending,' -ForegroundColor DarkGray
+Write-Host 'vendors deferred (dual callers / missing section).' -ForegroundColor DarkGray
 Write-Host ''

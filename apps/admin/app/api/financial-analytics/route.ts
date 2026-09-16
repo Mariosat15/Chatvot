@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import { PlatformTransaction } from "@/database/models/platform-financials.model";
@@ -13,7 +13,10 @@ import CreditConversionSettings from "@/database/models/credit-conversion-settin
  */
 export async function GET(request: NextRequest) {
   try {
-    await requireAdminAuth();
+    // Reason: FinancialDashboard owns this screen; section grant is the auth answer.
+    const guard = await guardSection("financial");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     const { searchParams } = new URL(request.url);

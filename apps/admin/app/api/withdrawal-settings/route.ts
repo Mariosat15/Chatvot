@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import WithdrawalSettings from "@/database/models/withdrawal-settings.model";
-import { verifyAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 /**
  * GET /api/withdrawal-settings
@@ -9,10 +9,9 @@ import { verifyAdminAuth } from "@/lib/admin/auth";
  */
 export async function GET() {
   try {
-    const admin = await verifyAdminAuth();
-    if (!admin.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // Reason: WithdrawalSettingsSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("withdrawals");
+    if (!guard.ok) return guard.response;
 
     await connectToDatabase();
     const settings = await WithdrawalSettings.getSingleton();
@@ -36,10 +35,9 @@ export async function GET() {
  */
 export async function PUT(request: NextRequest) {
   try {
-    const admin = await verifyAdminAuth();
-    if (!admin.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // Reason: WithdrawalSettingsSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("withdrawals");
+    if (!guard.ok) return guard.response;
 
     const updates = await request.json();
 
@@ -51,7 +49,7 @@ export async function PUT(request: NextRequest) {
     await connectToDatabase();
     const settings = await WithdrawalSettings.updateSingleton(
       updates,
-      admin.email || "admin",
+      guard.admin.email || "admin",
     );
 
     return NextResponse.json({
@@ -74,10 +72,9 @@ export async function PUT(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const admin = await verifyAdminAuth();
-    if (!admin.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // Reason: WithdrawalSettingsSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("withdrawals");
+    if (!guard.ok) return guard.response;
 
     const { action } = await request.json();
 

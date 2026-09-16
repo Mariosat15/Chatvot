@@ -1,34 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { jwtVerify } from "jose";
 import { connectToDatabase } from "@/database/mongoose";
 import CreditConversionSettings from "@/database/models/credit-conversion-settings.model";
 import { auditLogService } from "@/lib/services/audit-log.service";
-import { getAdminJwtSecret } from "@/lib/admin/jwt-secret";
-
-const JWT_SECRET = new TextEncoder().encode(getAdminJwtSecret());
-
-async function verifyAdminToken(request: NextRequest) {
-  const token = request.cookies.get("admin_token")?.value;
-
-  if (!token) {
-    return null;
-  }
-
-  try {
-    const { payload } = await jwtVerify(token, JWT_SECRET);
-    return payload;
-  } catch {
-    return null;
-  }
-}
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 // GET - Fetch current fee settings
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
-    const admin = await verifyAdminToken(request);
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // Reason: FeeSettingsSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("fees");
+    if (!guard.ok) return guard.response;
 
     await connectToDatabase();
 
@@ -65,10 +46,9 @@ export async function GET(request: NextRequest) {
 // PUT - Update fee settings
 export async function PUT(request: NextRequest) {
   try {
-    const admin = await verifyAdminToken(request);
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // Reason: FeeSettingsSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("fees");
+    if (!guard.ok) return guard.response;
 
     await connectToDatabase();
 
@@ -86,7 +66,8 @@ export async function PUT(request: NextRequest) {
     const bankDepositFeeFixed = Number.parseFloat(body.bankDepositFeeFixed) || 0;
     const bankWithdrawalFeePercentage =
       Number.parseFloat(body.bankWithdrawalFeePercentage) || 0;
-    const bankWithdrawalFeeFixed = Number.parseFloat(body.bankWithdrawalFeeFixed) || 0;
+    const bankWithdrawalFeeFixed =
+      Number.parseFloat(body.bankWithdrawalFeeFixed) || 0;
 
     // Validate percentages are within bounds
     if (platformDepositFeePercentage < 0 || platformDepositFeePercentage > 50) {
@@ -123,7 +104,7 @@ export async function PUT(request: NextRequest) {
           // Keep legacy field in sync
           withdrawalFeePercentage: platformWithdrawalFeePercentage,
           lastUpdated: new Date(),
-          updatedBy: (admin.email as string) || "admin",
+          updatedBy: guard.admin.email || "admin",
         },
       },
       { new: true },
@@ -137,7 +118,10 @@ export async function PUT(request: NextRequest) {
     }
 
     // Sanitize email for logging to prevent format string injection
-    const safeEmail = String(admin.email || "unknown").replaceAll(/[%\n\r]/g, "");
+    const safeEmail = String(guard.admin.email || "unknown").replaceAll(
+      /[%\n\r]/g,
+      "",
+    );
     console.log(`💰 Fee settings updated by ${safeEmail}:`, {
       platformDepositFeePercentage: settings.platformDepositFeePercentage,
       platformWithdrawalFeePercentage: settings.platformWithdrawalFeePercentage,
@@ -149,9 +133,9 @@ export async function PUT(request: NextRequest) {
     try {
       await auditLogService.logSettingsUpdated(
         {
-          id: (admin.adminId as string) || "admin",
-          email: (admin.email as string) || "admin",
-          name: ((admin.email as string) || "admin").split("@")[0],
+          id: guard.admin.id || "admin",
+          email: guard.admin.email || "admin",
+          name: (guard.admin.email || "admin").split("@")[0],
           role: "admin",
         },
         "Fee Settings",

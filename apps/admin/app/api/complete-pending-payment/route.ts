@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import CreditWallet from "@/database/models/trading/credit-wallet.model";
-import { requireAdminAuth, getAdminSession } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { getStripeClient } from "@/lib/stripe/config";
 import { PaymentFraudService } from "@/lib/services/fraud/payment-fraud.service";
 import { auditLogService } from "@/lib/services/audit-log.service";
@@ -13,7 +13,10 @@ import { auditLogService } from "@/lib/services/audit-log.service";
  */
 export async function POST(request: Request) {
   try {
-    await requireAdminAuth();
+    // Reason: PendingPaymentsSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("payments");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     const { transactionId } = await request.json();
@@ -260,29 +263,26 @@ export async function POST(request: Request) {
 
     // Log audit action
     try {
-      const admin = await getAdminSession();
-      if (admin) {
-        await auditLogService.log({
-          admin: {
-            id: admin.id,
-            email: admin.email,
-            name: admin.email.split("@")[0],
-            role: "admin",
-          },
-          action: "payment_completed",
-          category: "financial",
-          description: `Manually completed payment: ${creditsToAdd} credits for user ${transaction.userId}`,
-          targetType: "transaction",
-          targetId: transaction._id.toString(),
-          metadata: {
-            userId: transaction.userId,
-            creditsAdded: creditsToAdd,
-            eurAmount,
-            platformFee: platformFeeAmount,
-            bankFee: bankFeeTotal,
-          },
-        });
-      }
+      await auditLogService.log({
+        admin: {
+          id: guard.admin.id,
+          email: guard.admin.email,
+          name: guard.admin.email.split("@")[0],
+          role: "admin",
+        },
+        action: "payment_completed",
+        category: "financial",
+        description: `Manually completed payment: ${creditsToAdd} credits for user ${transaction.userId}`,
+        targetType: "transaction",
+        targetId: transaction._id.toString(),
+        metadata: {
+          userId: transaction.userId,
+          creditsAdded: creditsToAdd,
+          eurAmount,
+          platformFee: platformFeeAmount,
+          bankFee: bankFeeTotal,
+        },
+      });
     } catch (auditError) {
       console.error("Failed to log audit action:", auditError);
     }

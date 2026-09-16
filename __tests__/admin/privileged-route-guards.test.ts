@@ -196,6 +196,20 @@ const CLOSED_FOLDERS: { folder: string[]; section: string }[] = [
   { folder: ["vendor-payments"], section: "financial" },
   { folder: ["atlas"], section: "financial" },
   { folder: ["withdrawals"], section: "pending-withdrawals" },
+  /*
+    R101p. Clean single-caller money helpers. chargebacks/[id]/* deferred (FinancialDashboard
+    + Users dual callers — needs guardAnySection). admin-bank-accounts / cancel-pending /
+    vendors still deferred.
+  */
+  { folder: ["financial-dashboard"], section: "financial" },
+  { folder: ["financial-analytics"], section: "financial" },
+  { folder: ["deposits"], section: "failed-deposits" },
+  { folder: ["fee-settings"], section: "fees" },
+  { folder: ["complete-pending-payment"], section: "payments" },
+  { folder: ["withdrawal-settings"], section: "withdrawals" },
+  { folder: ["credit-conversion"], section: "currency" },
+  // Reason: only the list + lookup; chargebacks/[id]/* stays helper until accept-either.
+  { folder: ["chargebacks", "lookup"], section: "users" },
 ];
 
 describe("R101a - every handler in the closed folders is guarded, per handler", () => {
@@ -1129,6 +1143,81 @@ describe("R101o - money writers are section-granted", () => {
     expect(wrongSection).toEqual([]);
     expect(handlers).toBe(15);
     expect(guards).toBeGreaterThanOrEqual(handlers);
+  });
+});
+
+describe("R101p - clean money helpers are section-granted", () => {
+  /*
+    Ten files, fifteen handlers. Single-caller money reads/writes. Three of them
+    (financial-dashboard, fee-settings, credit-conversion) were hand-rolled jwtVerify —
+    they sat in the helper frozen list by mistake; the classifier would have called them
+    hand-verified. chargebacks/route is financial; chargebacks/lookup is users (create
+    dialog). chargebacks/[id]/* deferred for dual callers.
+  */
+  const WEAKER =
+    /(getAdminSession|requireAdminAuth|verifyAdminAuth|verifyAdminToken|verifyAnyAuth|jwtVerify|getAdminJwtSecret)\s*\(|\bverify\s*\(/;
+
+  const entries: { rel: string; section: string; handlers: number }[] = [
+    { rel: "financial-dashboard/route.ts", section: "financial", handlers: 1 },
+    { rel: "financial-analytics/route.ts", section: "financial", handlers: 1 },
+    { rel: "chargebacks/route.ts", section: "financial", handlers: 1 },
+    { rel: "chargebacks/lookup/route.ts", section: "users", handlers: 1 },
+    { rel: "deposits/failed/route.ts", section: "failed-deposits", handlers: 1 },
+    {
+      rel: "deposits/[id]/manual-complete/route.ts",
+      section: "failed-deposits",
+      handlers: 2,
+    },
+    { rel: "fee-settings/route.ts", section: "fees", handlers: 2 },
+    { rel: "complete-pending-payment/route.ts", section: "payments", handlers: 1 },
+    { rel: "withdrawal-settings/route.ts", section: "withdrawals", handlers: 3 },
+    { rel: "credit-conversion/route.ts", section: "currency", handlers: 2 },
+  ];
+
+  it("covers ten clean money-helper route files", () => {
+    expect(entries.length).toBe(10);
+  });
+
+  it("every R101p file names its section grant and no weaker helper", () => {
+    const weaker: string[] = [];
+    const wrongSection: string[] = [];
+    let handlers = 0;
+    let guards = 0;
+
+    for (const { rel, section, handlers: expected } of entries) {
+      const file = join(API, ...rel.split("/"));
+      const code = stripComments(readFileSync(file, "utf8"));
+      const sections = [
+        ...code.matchAll(/guardSection\(\s*["']([^"']+)["']\s*\)/g),
+      ].map((m) => m[1]);
+
+      if (WEAKER.test(code)) weaker.push(rel);
+      if (sections.some((s) => s !== section)) wrongSection.push(rel);
+      const fileHandlers = (code.match(handlerPattern()) ?? []).length;
+      handlers += fileHandlers;
+      guards += (code.match(guardCallPattern()) ?? []).length;
+      expect(fileHandlers).toBe(expected);
+    }
+
+    expect(weaker).toEqual([]);
+    expect(wrongSection).toEqual([]);
+    expect(handlers).toBe(15);
+    expect(guards).toBeGreaterThanOrEqual(handlers);
+  });
+
+  it("chargebacks list is financial while lookup is users", () => {
+    // Reason: two screens, two grants — conflating them is how Users loses the create dialog
+    // or Financial loses the queue.
+    const list = stripComments(
+      readFileSync(join(API, "chargebacks", "route.ts"), "utf8"),
+    );
+    const lookup = stripComments(
+      readFileSync(join(API, "chargebacks", "lookup", "route.ts"), "utf8"),
+    );
+    expect(list).toMatch(/guardSection\(\s*["']financial["']\s*\)/);
+    expect(lookup).toMatch(/guardSection\(\s*["']users["']\s*\)/);
+    expect(list).not.toMatch(/guardSection\(\s*["']users["']\s*\)/);
+    expect(lookup).not.toMatch(/guardSection\(\s*["']financial["']\s*\)/);
   });
 });
 

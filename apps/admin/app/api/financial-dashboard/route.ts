@@ -1,6 +1,5 @@
  
 import { NextRequest, NextResponse } from "next/server";
-import { jwtVerify } from "jose";
 import { connectToDatabase } from "@/database/mongoose";
 import CreditWallet from "@/database/models/trading/credit-wallet.model";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
@@ -14,32 +13,14 @@ import Competition from "@/database/models/trading/competition.model";
 import Challenge from "@/database/models/trading/challenge.model";
 import { getUsersByIds } from "@/lib/utils/user-lookup";
 import mongoose from "mongoose";
-
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.ADMIN_JWT_SECRET || "admin-secret-key-change-in-production",
-);
-
-async function verifyAdminToken(request: NextRequest) {
-  const token = request.cookies.get("admin_token")?.value;
-
-  if (!token) {
-    return null;
-  }
-
-  try {
-    const { payload } = await jwtVerify(token, JWT_SECRET);
-    return payload;
-  } catch {
-    return null;
-  }
-}
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 export async function GET(request: NextRequest) {
   try {
-    const admin = await verifyAdminToken(request);
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // Reason: FinancialDashboard owns this screen; section grant is the auth answer.
+    // Hand-rolled jwtVerify only proved a token existed — never which grant.
+    const guard = await guardSection("financial");
+    if (!guard.ok) return guard.response;
 
     await connectToDatabase();
 
