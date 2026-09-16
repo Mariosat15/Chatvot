@@ -3173,6 +3173,16 @@ player now actually reaches.
 **Run the new and old leaderboards in parallel and diff the top 100 before switching.**
 Players notice rank changes immediately and read them as unfair - risk **R14**.
 
+> **BUILT 16 September 2026 — X7 step 2 (parallel period, default still legacy).**
+> Live code: `lib/services/games/game-leaderboard.service.ts`,
+> `app/api/leaderboard/route.ts` (`source=legacy` default, `source=stats&gameKey=`),
+> `components/leaderboard/LeaderboardClient.tsx` (Trading current + Overall/per-game tabs),
+> `GameLeaderboardTable.tsx`, `tools/games/diff-leaderboard-top100.ts`.
+> Tabs come from `UserGameStats.distinct("gameKey")`, never `getEnabledGameTypes()` (R29).
+> Rating is omitted on Overall and shown per game. Caption from question 14 is on every
+> stats page. **Seasonal tab is not built.** Default is still the trading rebuild until
+> `diffTop100WithLegacy` / an owner switch says otherwise.
+
 ### 7.2 The profile page
 
 **Added 2 September 2026.** Until now the profile appeared in this plan only as
