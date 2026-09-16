@@ -376,6 +376,18 @@ the nine-term rebuild `13` s7.1 measures at about seven seconds.
   cross-game aggregates start at zero. Trading's history stays in `TradeHistory` and in the
   trading card, which is where it is correctly scoped. `18`'s migration writes no rows here.
 
+> **BUILT 16 September 2026 — X7 step 1 (collection + ONE writer only).**
+> Live code: `database/models/games/user-game-stats.model.ts` (mirrored),
+> `lib/services/games/normalized-points.ts` (mirrored),
+> `lib/services/games/user-game-stats.service.ts` (`recordContestFinish`, mirrored),
+> called from `awardContestRewards` in both apps after money has committed. All six
+> finalize paths pass `fieldSize` and `entryFee`. 10 + 10 + 33 tests;
+> `tools/probe-user-game-stats.ps1` (6 probes, each red on exactly one failure).
+> **What this is not:** no leaderboard, no profile, no XP rebalance, no backfill.
+> Steps 2–5 of X7 are still outstanding. **Nothing was backfilled** — aggregates start at
+> zero (question 14). A document implying X7 is done, or that historical trading entered
+> the rollup, is wrong.
+
 ---
 
 ## 4. What must NOT change

@@ -58,6 +58,11 @@ export interface ContestRewardParticipant {
    * non-scorer is paid a first place.
    */
   rank?: number;
+  /**
+   * Raw score in the game's units. Optional — used only for `UserGameStats.bestScore`.
+   * Absent when the player has none (R50) or the caller has not yet threaded it.
+   */
+  rawScore?: number;
 }
 
 export interface ContestRewardsInput {
@@ -70,6 +75,16 @@ export interface ContestRewardsInput {
    */
   gameKey?: string;
   participants: ContestRewardParticipant[];
+  /**
+   * Field size for normalised points / Elo. Defaults to the distinct-player count when
+   * omitted so existing callers stay correct while call sites are widened.
+   */
+  fieldSize?: number;
+  /**
+   * Entry fee in credits. `0` is a real free contest. Defaults to 0 when omitted — a
+   * missing fee must never be guessed from the prize pool.
+   */
+  entryFee?: number;
 }
 
 export interface ContestRewardsResult {
@@ -98,22 +113,44 @@ export async function awardContestRewards(
   // the competition path can legitimately hand over a leaderboard and a participant list
   // that overlap. Keeping the BEST rank, because a Map keyed on userId would otherwise let
   // an unranked duplicate erase a podium place depending purely on iteration order.
-  const bestByUser = new Map<string, number | undefined>();
+  const bestByUser = new Map<
+    string,
+    { rank?: number; rawScore?: number }
+  >();
   for (const p of participants) {
     if (!p?.userId) continue;
     const existing = bestByUser.get(p.userId);
-    if (!bestByUser.has(p.userId)) {
-      bestByUser.set(p.userId, p.rank);
+    if (!existing) {
+      bestByUser.set(p.userId, { rank: p.rank, rawScore: p.rawScore });
       continue;
     }
-    if (typeof p.rank === "number" && (existing === undefined || p.rank < existing)) {
-      bestByUser.set(p.userId, p.rank);
+    if (
+      typeof p.rank === "number" &&
+      (existing.rank === undefined || p.rank < existing.rank)
+    ) {
+      bestByUser.set(p.userId, {
+        rank: p.rank,
+        rawScore: p.rawScore ?? existing.rawScore,
+      });
     }
   }
 
   if (bestByUser.size === 0) {
     return { playersRewarded: 0, podiumAwards: 0 };
   }
+
+  const fieldSize =
+    typeof input.fieldSize === "number" &&
+    Number.isFinite(input.fieldSize) &&
+    input.fieldSize >= 1
+      ? input.fieldSize
+      : bestByUser.size;
+  const entryFee =
+    typeof input.entryFee === "number" &&
+    Number.isFinite(input.entryFee) &&
+    input.entryFee >= 0
+      ? input.entryFee
+      : 0;
 
   let podiumAwards = 0;
 
@@ -122,8 +159,11 @@ export async function awardContestRewards(
     const { evaluateUserBadges } = await import(
       "@/lib/services/badge-evaluation.service"
     );
+    const { recordContestFinish } = await import(
+      "@/lib/services/games/user-game-stats.service"
+    );
 
-    for (const [userId, rank] of bestByUser) {
+    for (const [userId, { rank, rawScore }] of bestByUser) {
       // Completion XP: everybody who took part, placed or not.
       const completionEvent =
         kind === "challenge" ? "challenge_completed" : "competition_completed";
@@ -143,6 +183,17 @@ export async function awardContestRewards(
           podiumAwards += 1;
         }
       }
+
+      // X7 step 1: materialise UserGameStats. Awaited (unlike XP/badges) so a slow write
+      // still finishes before the process moves on; never throws into the caller.
+      await recordContestFinish({
+        userId,
+        gameKey,
+        rank,
+        fieldSize,
+        entryFee,
+        rawScore,
+      });
 
       // Evaluate every badge category, not a game-specific subset: a badge's conditions are
       // the badge's business, and filtering by game here would be this layer deciding what a

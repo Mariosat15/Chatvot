@@ -392,6 +392,8 @@ async function attemptProviderChallengeFinalize(
         kind: "challenge",
         contestId: challengeId,
         gameKey: challenge.gameKey,
+        fieldSize: 2,
+        entryFee: challenge.entryFee || 0,
         participants: [challenger, challenged].map((p) => ({
           userId: p.userId.toString(),
           rank: !isTie && p.userId.toString() === winnerId ? 1 : undefined,

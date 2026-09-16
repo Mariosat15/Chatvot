@@ -901,6 +901,8 @@ export async function finalizeCompetition(competitionId: string) {
       kind: "competition",
       contestId: competition._id.toString(),
       gameKey: competition.gameKey,
+      fieldSize: participants.length,
+      entryFee: competition.entryFee || 0,
       participants: participants.map((p) => ({
         userId: p.userId.toString(),
         rank: leaderboard.find((l) => l.userId === p.userId.toString())?.rank,

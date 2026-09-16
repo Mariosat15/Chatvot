@@ -58,6 +58,27 @@ vi.mock("@/lib/services/badge-evaluation.service", () => ({
   }),
 }));
 
+const statsCalls: {
+  userId: string;
+  gameKey: string;
+  rank?: number;
+  fieldSize: number;
+  entryFee: number;
+}[] = [];
+
+vi.mock("@/lib/services/games/user-game-stats.service", () => ({
+  recordContestFinish: vi.fn(async (record: {
+    userId: string;
+    gameKey: string;
+    rank?: number;
+    fieldSize: number;
+    entryFee: number;
+  }) => {
+    statsCalls.push(record);
+    return { points: 0, ratingDelta: 0 };
+  }),
+}));
+
 const { awardContestRewards } = await import(
   "@/lib/services/settlement/contest-rewards"
 );
@@ -74,6 +95,7 @@ async function settle() {
 beforeEach(() => {
   xpCalls.length = 0;
   badgeCalls.length = 0;
+  statsCalls.length = 0;
 });
 
 describe("awardContestRewards - what a finish is worth", () => {
@@ -279,6 +301,7 @@ describe("awardContestRewards - the properties the old copies broke", () => {
     expect(result).toEqual({ playersRewarded: 0, podiumAwards: 0 });
     expect(xpCalls).toHaveLength(0);
     expect(badgeCalls).toHaveLength(0);
+    expect(statsCalls).toHaveLength(0);
   });
 
   it("skips a row with no userId rather than awarding a blank player", async () => {
@@ -290,6 +313,48 @@ describe("awardContestRewards - the properties the old copies broke", () => {
     await settle();
 
     expect(badgeCalls).toEqual(["u1"]);
+  });
+
+  it("records UserGameStats for every distinct player with field size and fee", async () => {
+    // X7 step 1: the shared stage is the ONE writer. A finish that awards XP but
+    // skips the stats upsert is how the leaderboard stays empty while badges light up.
+    await awardContestRewards({
+      kind: "competition",
+      contestId: "c1",
+      gameKey: "provider:x:y",
+      fieldSize: 12,
+      entryFee: 75,
+      participants: [
+        { userId: "u1", rank: 1 },
+        { userId: "u2", rank: 2 },
+        { userId: "u3" },
+      ],
+    });
+    await settle();
+
+    expect(statsCalls).toHaveLength(3);
+    expect(statsCalls.map((c) => c.userId).sort()).toEqual(["u1", "u2", "u3"]);
+    for (const call of statsCalls) {
+      expect(call.gameKey).toBe("provider:x:y");
+      expect(call.fieldSize).toBe(12);
+      expect(call.entryFee).toBe(75);
+    }
+  });
+
+  it("defaults fieldSize to the player count and entryFee to 0 when omitted", async () => {
+    await awardContestRewards({
+      kind: "competition",
+      contestId: "c1",
+      participants: [
+        { userId: "u1", rank: 1 },
+        { userId: "u2", rank: 2 },
+      ],
+    });
+    await settle();
+
+    expect(statsCalls).toHaveLength(2);
+    expect(statsCalls[0].fieldSize).toBe(2);
+    expect(statsCalls[0].entryFee).toBe(0);
   });
 
   it("NEVER throws into its caller - the prizes are already paid", () => {
@@ -359,6 +424,18 @@ describe("the six finalize paths all call it", () => {
       const call = code.slice(code.indexOf("awardContestRewards({"));
       expect(call.length).toBeGreaterThan(50);
       expect(call).toMatch(/gameKey:\s*(competition|challenge|stored)/);
+    }
+  });
+
+  it("passes fieldSize and entryFee so points are not computed from defaults forever", () => {
+    // Reason: omitting both silently awards every finish as a free 2-player contest
+    // (or however many seats were handed over). Presence of the keys is the property;
+    // the values come from the contest document.
+    for (const relative of CALL_SITES) {
+      const code = readCode(relative);
+      const call = code.slice(code.indexOf("awardContestRewards({"));
+      expect(call).toMatch(/fieldSize:/);
+      expect(call).toMatch(/entryFee:/);
     }
   });
 });

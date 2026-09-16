@@ -252,9 +252,10 @@ async function attemptProviderFinalize(
           .select("userId")
           .lean<{ userId: string }[]>(),
         Competition.findById(competitionId)
-          .select("gameKey finalLeaderboard")
+          .select("gameKey finalLeaderboard entryFee")
           .lean<{
             gameKey?: string;
+            entryFee?: number;
             finalLeaderboard?: { userId?: string; rank?: number }[];
           }>(),
       ]);
@@ -271,6 +272,8 @@ async function attemptProviderFinalize(
         kind: "competition",
         contestId: competitionId.toString(),
         gameKey: stored?.gameKey,
+        fieldSize: seats.length,
+        entryFee: stored?.entryFee || 0,
         participants: seats.map((s) => ({
           userId: s.userId.toString(),
           rank: rankByUser.get(s.userId.toString()),
