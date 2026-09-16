@@ -283,13 +283,13 @@ export default function ProfileHeader({
           >
             <QuickStatCard
               icon={<GameIcon name="profit" size={16} />}
-              label="Total Trades"
+              label="Trading trades"
               value={combinedStats.totalTrades.toString()}
               color="text-blue-400"
             />
             <QuickStatCard
               icon={<GameIcon name="trophy" size={16} />}
-              label="Win Rate"
+              label="Trading win %"
               value={`${combinedStats.winRate.toFixed(1)}%`}
               color="text-green-400"
             />

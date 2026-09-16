@@ -3199,6 +3199,18 @@ did.
 | Hide games the player has never played | An external-only platform may carry twenty titles. Twenty empty cards is not a profile |
 | Badges and journey progress stay | Generalised per `05` section 10; a trading-only journey is gated on `tradingEnabled` |
 
+> **BUILT 16 September 2026 — X7 step 3 (private profile only).**
+> Live code: `lib/services/games/player-game-stats.service.ts` (`getPlayerGameProfile`),
+> `components/profile/CrossGameStanding.tsx`, `TradingPerformanceCard.tsx`, wired from
+> `app/(root)/profile/page.tsx` → `ModernProfilePage.tsx`. Header quick stats relabelled
+> "Trading trades" / "Trading win %". **Reads `UserGameStats` only** — no own aggregates,
+> no `getEnabledGameTypes()`. Headline is normalised points (Q13) plus total winnings
+> (wallet credits). Q14 caption is on the standing card. Trading Total Profit lives on
+> `TradingPerformanceCard`, never as a platform-wide label. Per-game cards only for games
+> with a stored row; trading listed first. **Public profile unchanged** — deliberately
+> does not import `UserGameStats`. Badges/journey not yet per-`gameKey` (step 4).
+> 10 tests, `tools/probe-player-game-stats.ps1` (7 probes RED×1). Never verified by eye.
+
 **The naming problem is on this page more than anywhere else.** A profile header that reads
 "Total Profit" is a trading metric presented as a life-time total. It has to become either
 an explicitly trading-scoped figure inside the trading card, or a genuinely cross-game one

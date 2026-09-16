@@ -16,12 +16,16 @@ import {
   getBadgeXPValues,
   getTitleLevels,
 } from "@/lib/services/xp-config.service";
+import { getPlayerGameProfile } from "@/lib/services/games/player-game-stats.service";
+import connectToDatabase from "@/database/mongoose";
 import ModernProfilePage from "./ModernProfilePage";
 import { Badge } from "@/lib/constants/badges";
 
 export default async function ProfilePage() {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) redirect("/sign-in");
+
+  await connectToDatabase();
 
   const [
     competitionStats,
@@ -33,6 +37,7 @@ export default async function ProfilePage() {
     badgeXPValues,
     titleLevels,
     combinedStats,
+    gameProfile,
   ] = await Promise.all([
     getUserCompetitionStats(),
     getUserChallengeStats(),
@@ -43,6 +48,7 @@ export default async function ProfilePage() {
     getBadgeXPValues(),
     getTitleLevels(),
     getCombinedTradingStats(),
+    getPlayerGameProfile(session.user.id),
   ]);
 
   return (
@@ -57,6 +63,7 @@ export default async function ProfilePage() {
       badgeXPValues={badgeXPValues}
       titleLevels={titleLevels}
       combinedStats={combinedStats}
+      gameProfile={gameProfile}
     />
   );
 }
