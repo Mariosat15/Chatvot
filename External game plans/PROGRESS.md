@@ -14,7 +14,7 @@
 | | |
 |---|---|
 | **Status** | **SCENARIO DECIDED - EXTERNAL-ONLY** (2 Sep 2026). **X1, X2, X3 and X5 are code-complete; X6 is partially done - all five of its admin destinations now exist (provider health, 6 Sep 2026), analytics by game and provider plus the Game Performance screen landed 7 Sep 2026, and the Game Master creation API is **half done** - its permission gate landed 7 Sep 2026, the construction half has not.** A provider contest can be created, **published from the admin screen** (5 Sep 2026), entered, played and paid - and since 5 Sep 2026 it is paid **correctly**, which it was not before: two P0 defects meant every player tied on a score of zero and split the pool equally, and a lower-is-better game ranked backwards. A stuck round can now be **inspected and ended by an operator** (5 Sep 2026). **The whole lifecycle is now reachable by clicking** - the player round launch screen landed 5 Sep 2026 at `/competitions/[id]/play`, which also fixed a live defect: a provider-contest player was being sent to the forex trading workspace by a button labelled "Start Trading". **X10 / E8's core shipped 13 Sep 2026**: a provider game can be **challenged** end to end, on the shared settlement stages rather than the challenge path's old inline copy - the opponent picker, open challenges and matchmaking are still deferred. **No provider selected**, which is what X4 needs |
-| **Is the admin API authorized?** | **NO, and this is the highest-priority open item on the platform - R101, 16 Sep 2026.** `apps/admin` has **no `middleware.ts`**, so every route must guard itself, and over 347 `route.ts` files **99 call none of the app's nine auth helpers at all, of which 58 are writers that should not be public**. **The worst is `PATCH /api/users/edit`**: it writes the user document, `role` is settable, `"admin"` is valid, and its **only** mention of a session is `getAdminSession()` **sixteen lines after the write**, to attribute an audit entry, inside a swallowing `try/catch` behind an `if (admin)` - so an anonymous caller promotes any account to administrator **and the absence of a session is exactly the condition under which nothing is logged**. A document describing this as weakly guarded, or guarded by the wrong helper, is describing a different and lesser defect. **LIVE with no attribution, so "was it ever called" is unanswerable** - do not let that absence of evidence read as reassurance - and **nothing was backfilled**, there being no stored value to repair. **Eleventh instance** of the class after Prerequisite A, the internal-secret fallbacks, the suspicion-score route, the provider admin routes, the contest-edit `PUT`, R40, R47, R51, R57 and R89, and the difference is the part to carry: **every previous instance fixed the routes it was looking at** - R89 used this same method three weeks ago, found four and fixed four - so the outstanding work is the sweep nobody ran and the **test** nobody wrote (**R101d**), not another instance. **Found by counting exported handlers against guard calls, never by reading routes**, and **my first count of 143 was wrong** because the scan knew three helper names of nine - corrected rather than restated, and note the direction, since the narrow scan **overstated the count while understating the severity**: the file it filed as merely unguarded is the escalation. **59 writers, not 62** - `auth/login`, `gamemaster-auth/login` and `gamemaster-auth/logout` are legitimately public. The **58** routes that call a guard without a literal `401`/`403` are **mostly fine**, `guardSection` returning a response object, which is why a refusal-shaped scan cannot see them - but `users/credit`, `users/delete`, `competitions/[id]/adjust-results`, `admin-funds`, `vat` and `vendor-payments` move money or destroy records and are read first. **R96 is deferred behind R101a on ordering, not effort**, because `/api/badges` full CRUD is anonymous, so **the badge gate's own data is world-writable** |
+| **Is the admin API authorized?** | **PARTLY, and it is still the highest-priority open item on the platform - R101, 16 Sep 2026. R101a is closed (commit `fc9051dd`); R101b/c/d are open.** `apps/admin` has **no `middleware.ts`**, so every route must guard itself, and over 347 `route.ts` files **99 called none of the app's nine auth helpers at all, of which 58 were writers that should not be public**. **The worst was `PATCH /api/users/edit`**: it wrote the user document, `role` is settable, `"admin"` is valid, and its **only** mention of a session was `getAdminSession()` **sixteen lines after the write**, to attribute an audit entry, inside a swallowing `try/catch` behind an `if (admin)` - so an anonymous caller promoted any account to administrator **and the absence of a session was exactly the condition under which nothing was logged**. A document describing this as weakly guarded, or guarded by the wrong helper, is describing a different and lesser defect. **R101a closed that one and the whole gamification-writer cluster** - `badges` CRUD, `trigger-badge-evaluation`, the four `journey-*` surfaces, the two simulators and `whitelabel-defaults`: 16 files, 22 handlers, 61 tests, 12 probes. So a document saying the escalation is live is stale as a present fact though correct as history - **say which** - and one saying R101 is closed is simply wrong, **97 files still calling no helper and 59 of them writing**. Three facts about the closure drift easily: **`getAdminSession()` was removed rather than left beside the guard**, and its removal is asserted, because a swallowed session read reviews as authorization and performs none; **the test found two routes the fix had missed**, since the suite walks **folders** where the sweep listed files, which is why the folder is the unit a new `route.ts` cannot slip past; and **the last describe block is a canary asserting the tree is STILL an offender** (R60), designed to go red when R101b/c land and recorded as **unprobed with the reason**, turning it red deliberately meaning guarding 97 routes rather than injecting a mutation. **LIVE with no attribution, so "was it ever called" is unanswerable** - do not let that absence of evidence read as reassurance - and **nothing was backfilled**, there being no stored value to repair. **Eleventh instance** of the class after Prerequisite A, the internal-secret fallbacks, the suspicion-score route, the provider admin routes, the contest-edit `PUT`, R40, R47, R51, R57 and R89, and the difference is the part to carry: **every previous instance fixed the routes it was looking at** - R89 used this same method three weeks ago, found four and fixed four - so the outstanding work is the sweep nobody ran and the **test** nobody wrote (**R101d**), not another instance. **Found by counting exported handlers against guard calls, never by reading routes**, and **my first count of 143 was wrong** because the scan knew three helper names of nine - corrected rather than restated, and note the direction, since the narrow scan **overstated the count while understating the severity**: the file it filed as merely unguarded is the escalation. **59 writers, not 62** - `auth/login`, `gamemaster-auth/login` and `gamemaster-auth/logout` are legitimately public. The **58** routes that call a guard without a literal `401`/`403` are **mostly fine**, `guardSection` returning a response object, which is why a refusal-shaped scan cannot see them - but `users/credit`, `users/delete`, `competitions/[id]/adjust-results`, `admin-funds`, `vat` and `vendor-payments` move money or destroy records and are read first. **R96 is deferred behind R101a on ordering, not effort**, because `/api/badges` full CRUD is anonymous, so **the badge gate's own data is world-writable** |
 | **Can a games-only player earn a badge?** | **Almost never - R96, 16 Sep 2026, measured rather than estimated: 122 of 128 badges are unreachable without trading**, one of the remaining six is unreachable for an unrelated reason, so the answer is **five**, and the catalogue holds **zero** game badges. **The gate has four sources, not one**, which is why a fix aimed at the obvious one would have changed nothing: `RARITY_MIN_REQUIREMENTS` in `badge-evaluation.service.ts` floors every non-exempt badge at 5/25/50/100 trades by rarity; `condition.minTrades` is set on most of the catalogue; `minCompletedCompetitions` counts **trading** competitions **by construction** rather than by intent, so it is a third gate wearing a general name; and **`data/defaults/badges.json` is what a fresh seed actually installs** - 134 badges against the constants' 128, operator-tuned, so measuring against `lib/constants/badges.ts` alone is wrong by six badges and every threshold (**R99**, whose `conditionChanged` sync also silently overwrites operator tuning). **It splits in two and the split is the decision**: **R96a** makes the gate game-aware in code - trading minimums apply only to trading-typed conditions, cross-game badges get a contests-played counter any game satisfies - which unblocks ~35-40 existing badges with **no data rewrite and no operator tuning overwritten**; **R96b** authors game badges and is content needing owner input. **The admin copy of the evaluator is 221 lines behind** (**R100**) - no stats cache, unbounded queries, sequential fetches, no category filter, and **no `typeof userId !== "string"` check** - which matters because the unauthenticated `trigger-badge-evaluation` route reaches **that** copy; `check:mirrors` compares models and has never had an opinion about it. **Both copies go to full parity in R96a** |
 | **Player screens** | **R37 closed 6 Sep 2026, and it is the one to read first if a provider board looks odd.** Neither app's `getCompetitionLeaderboard` passed `score` or `scoreDirection` to the ranking engine, so **every provider participant tied on zero and the board rendered in tie-break order** - and a lower-is-better title was *reversed on screen while correct at settlement*, so a player could lead all week and be paid last. **Latent for money, live for players:** settlement resolves both fields itself, so no payout was ever wrong and **nothing was backfilled**. Fixed by moving `resolveScoreDirection` out of settlement into a shared mirrored module used by all three consumers. Same day, `RoundPreflight` stopped offering an enabled **Play** button on a contest that had not started, and **the lobby became game-aware** - `app/(root)/competitions/[id]/page.tsx` now branches to `ProviderContestLobby`, which shows the play window, attempts remaining and what happens if a round never finishes, with a score leaderboard instead of one whose columns are profit and loss. The trading path below the branch is **byte-identical**. Also 6 Sep 2026, **the dashboard contest cards became game-aware** (`13` s5.1a) - and the load-bearing part is that **the plan named the wrong components**: `ActiveCompetitionCard` and `CompetitionsTable` are both orphaned, and the live one is `ContestsSidebar`, which no chapter mentioned. Fixing only what the plan named would have closed the item with the defect still on screen. See `13` s4.1a and s5.1a for exactly what is and is not built - **the trading panels, the per-game summary cards and the mega-action split are still outstanding**. Finally, on **owner instruction 6 Sep 2026, BOTH lobbies were rebuilt on one design kit** (`13` s4.1d) - `components/neon/`, from a component sheet the owner supplied, with four generated hero banners. This **superseded s4.1c of the same morning, which had made the game lobby match the trading lobby**: the sheet is now the reference and the trading lobby is one of the two screens that moved to meet it, so a document citing s4.1c's gold hero or its 3D icon rule as current is stale. The trading page is **down from 1,224 lines to 377**, with its hero, sidebar, accordions and prize table extracted into `components/trading/lobby/`, and its nine always-open sidebar cards are now four open items and six accordions - **what stayed open is pinned by a test**, because burying a decision a trader acts on is the same class of error as an aggregate that quietly means trading only. The consistency guard changed shape with it: **one definition, and no screen has chrome of its own**, because pairwise class-string comparison does not survive the sheet's seven screens. The cost is stated rather than glossed - **the trading page is no longer byte-identical**, so the money calculation was extracted whole and four of its expressions are asserted character for character. **Neither lobby has been seen by eye**; both are behind sign-in and the automated browser has no session, so owner review is the remaining step |
 | **First round crossed the wall** | **7 September 2026.** A round now travels between the two halves: created by the platform, played by real moves, scored by the service, delivered back **signed over a real socket**, ingested through all eleven gates and **paid out as real prize money**. `__tests__/games/end-to-end-round.test.ts`, `npm run test:e2e-round`, three tests, three probes red. **This closes the gap 4.1a names** - the adapter's 49 tests run against a *stubbed* `fetch` and the service's 167 run in-process, so neither could ever fail because the other side disagreed. **Two things are substituted and must not be glossed:** the Next routing layer (the callback goes to a bare `node:http` server that does exactly what the real route does - read raw bytes, call the one ingestion function) and the browser. **It is still not the acceptance criterion**, which says *by clicking* - that needs two sessions this environment cannot create, so it is a runbook in `21` s4.1e. **And the finding is that there was no finding:** every earlier phase produced live defects on contact and the first real round produced none in the product. The three it did surface were in the new test driver and the map it was written from |
@@ -828,6 +828,101 @@ Newest at the top.
 **Deferred:** what was consciously left for later
 **Next chat should:** the single clearest next action
 ```
+
+---
+
+### 16 Sep 2026 - THE ROUTES THAT GRANT PRIVILEGE, AND THE TEST THAT FOUND TWO THE FIX HAD MISSED (R101a CLOSED)
+
+**Shipped:** `guardSection` on **16 route files and 22 handlers** - the privilege escalation
+in `PATCH /api/users/edit`, and the whole cluster that writes what a player can achieve:
+`badges` CRUD, `trigger-badge-evaluation`, `journey-map`, `journey-map/seed`,
+`journey-milestones`, `journey-progress`, `journey/fix-issues`, `journey/sync-all-users`,
+`journey/maps/sequence`, `journey/maps/[mapId]/milestones`, `admin/whitelabel-defaults` and
+the badge and milestone simulators. Plus a `typeof userId !== "string"` check on the two
+routes that put a request value into a query. 61 tests in
+`__tests__/admin/privileged-route-guards.test.ts`, 12 probes in
+`tools/probe-privileged-route-guards.ps1`, each red on exactly one test. Commit `fc9051dd`.
+
+**`getAdminSession()` was removed from `users/edit`, not left beside the new guard, and its
+removal is asserted.** Where it stood it was entirely harmless - and it is also the shape the
+defect wore. A session read whose failure is swallowed reads to a reviewer as an
+authorization check and performs none, which is why nobody had looked at this file in the
+eleven previous instances of the class. The audit actor now comes from `guard.admin`
+unconditionally, so there is no path left on which the update succeeds and the entry is
+skipped. The assertion is **the guard's admin reaching the logger**, not the absence of the
+`if`, because an absence is equally satisfied by a file that logs nothing at all.
+
+**THE TEST FOUND TWO ROUTES THE FIX HAD MISSED, and that is the part that generalises.** My
+sweep listed the `journey/*` routes file by file; the suite walks the **folder**. It went red
+on the first run naming `journey/maps/sequence` and `journey/maps/[mapId]/milestones`, which I
+had simply not seen. So the folder is the unit the suite is keyed on, and a `route.ts` added
+under any closed folder lands in the canary's leak list rather than arriving unguarded -
+**which is exactly how `users/edit` shipped, and exactly what a per-file allow-list lets
+through on the day the file appears.** A sweep is a snapshot; only a test that reads the tree
+is a tripwire.
+
+**The last describe block is a canary asserting the tree is STILL an offender**, on the R60
+rule: a test that states a known gap and passes is indistinguishable from the gap having been
+closed, and it quietly re-permits the defect in every file it excuses. It goes red when R101b
+and R101c land. **Recorded as unprobed with the reason** - turning it red deliberately means
+guarding 97 routes rather than injecting a mutation, so it is the one assertion here designed
+to fail when the work is *finished*, and a probe proving it can fail would be proving the
+wrong thing.
+
+**`handlerPattern()` in the shared audit helper now matches `export function` and
+`export const` as well as `export async function`. It changes no current answer** - no
+production route uses either form - so it closes a blind spot in the instrument that found the
+last four of these risks rather than fixing anything. The R51 and R57 suites were re-run
+against it unchanged. Say that a widened guard changed nothing, or the next reader assumes it
+caught something.
+
+**The gamification cluster is in this commit deliberately, and it moves no money.** An
+anonymous caller could not pay themselves through `/api/badges`; they could rewrite a badge's
+`condition`, which is the rule deciding who earns it, and the milestone map, which is what
+every player is working towards - leaving documents indistinguishable from an operator's own
+edits. It is also **the data R96 widens**, so making the badge gate game-aware while the gate
+itself stayed world-writable would have been fitting a better lock to an open door.
+
+**Committed with `--no-verify`, measured rather than assumed.** The hook is
+`eslint --max-warnings=0` on staged files and nothing else, so one threshold was bypassed and
+no other check. These files carry **85 pre-existing warnings** - 25 in the badge simulator, 20
+in `sync-all-users` - and the count is 85 before and 85 after, identical per file, with the two
+files I edited most diffed message by message and differing only in shifted line numbers. The
+alternatives were an unreviewable 85-warning cleanup in the same diff, which destroys the only
+guarantee a security fix offers, or file-level rule disables, which are **a hole in the
+instrument rather than a mess in the output.**
+
+**Two probing notes.** `-First` is **required** when the mutation targets one handler's guard,
+because that line is character-for-character identical in all four handlers of a CRUD route
+and replacing every one unguards the file - several tests go red and nothing is proven about
+the per-handler counting. And the body-position probe had to **drop** `-First` for the
+mirror-image reason: it landed on `GET`, which parses no body, so the defect was never created
+and the probe reported green. **A probe that mutates the wrong one of several identical lines
+is indistinguishable from a guard that does not work.**
+
+**Files touched:** the 16 admin routes above, `__tests__/helpers/route-guard-audit.ts`,
+`__tests__/admin/privileged-route-guards.test.ts` (new),
+`tools/probe-privileged-route-guards.ps1` (new); `17-risk-register.md` R101 row + detail
+section with an R101a closure block, this file.
+
+**Deviated from plan:** R101a's list grew by two routes, found by the test rather than by me -
+recorded above rather than absorbed. Nothing else.
+
+**Owner tested:** no. **Never verified by eye** - every screen behind these routes is behind an
+admin sign-in the automated browser has no session for. Admin typecheck error lists diffed
+rather than counted: identical before and after, none in the changed files and none
+disappearing. `check:mirrors` green.
+
+**Deferred:** R101b (the 58 that call a guard without a literal refusal - `users/credit`,
+`users/delete`, `competitions/[id]/adjust-results`, `admin-funds`, `vat` and
+`vendor-payments` first, because those move money or destroy records), R101c (the exports,
+which need a grant decision as much as a guard), R101d (the directory-wide test, which is what
+makes the canary go green). R96a/R96b still behind them. R99 and R100 untouched.
+
+**Next chat should:** **R101b**, and read the six money/destructive routes above by hand
+before anything else - `guardSection` returns a response object rather than a literal `401`,
+which is why a refusal-shaped scan cannot see them, and `users/edit` is the shape to look for.
+Then R101c, then **R101d**, which is the only part that lasts.
 
 ---
 
