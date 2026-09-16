@@ -6,7 +6,7 @@ import UserBankAccount from "@/database/models/user-bank-account.model";
 import CreditWallet from "@/database/models/trading/credit-wallet.model";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import { PlatformTransaction } from "@/database/models/platform-financials.model";
-import { verifyAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { auditLogService } from "@/lib/services/audit-log.service";
 
 /**
@@ -18,10 +18,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const admin = await verifyAdminAuth();
-    if (!admin.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // Reason: PendingWithdrawalsSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("pending-withdrawals");
+    if (!guard.ok) return guard.response;
 
     const { id } = await params;
     await connectToDatabase();
@@ -78,15 +77,18 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  // Reason: refuse before opening a session — a 401 must not leave a transaction hanging.
+  const guard = await guardSection("pending-withdrawals");
+  if (!guard.ok) return guard.response;
+  const admin = {
+    adminId: guard.admin.id,
+    email: guard.admin.email,
+  };
+
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
-    const admin = await verifyAdminAuth();
-    if (!admin.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { id } = await params;
     const body = await request.json();
     const { action, reason, bankTransferRef, adminNote, companyBankUsed } =

@@ -735,9 +735,64 @@ Invoke-Probe -Name 'margin-check closed folder loses grant' -File $MARGIN `
   -Replace2 '' `
   -ExpectTest 'and none of the closed folders leak an unguarded file'
 
+$ADMIN_FUNDS = 'apps/admin/app/api/admin-funds/route.ts'
+$VAT = 'apps/admin/app/api/vat/route.ts'
+$CLAWBACK = 'apps/admin/app/api/atlas/refund/clawback/route.ts'
+$WITHDRAWALS = 'apps/admin/app/api/withdrawals/route.ts'
+$WD_PUT = 'apps/admin/app/api/withdrawals/[id]/route.ts'
+
+Write-Host "`n=== R101o probes ===`n"
+
+# 69. admin-funds POST was admin-at-all - FinancialDashboard owns the screen.
+# Reason: -First keeps blast to one of two identical guard lines.
+Invoke-Probe -Name 'admin-funds unguarded' -File $ADMIN_FUNDS -First `
+  -Find '    const guard = await guardSection("financial");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'every R101o file names its section grant and no weaker helper'
+
+# 70. Wrong grant on vat - financial, not pending-withdrawals.
+Invoke-Probe -Name 'vat wrong section' -File $VAT -First `
+  -Find 'guardSection("financial")' `
+  -Replace 'guardSection("pending-withdrawals")' `
+  -ExpectTest 'every R101o file names its section grant and no weaker helper'
+
+# 71. clawback POST moves wallet credits - FinancialDashboard owns Atlas refunds.
+Invoke-Probe -Name 'clawback unguarded' -File $CLAWBACK `
+  -Find '    const guard = await guardSection("financial");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'every R101o file names its section grant and no weaker helper'
+
+# 72. withdrawals list was admin-at-all - PendingWithdrawalsSection owns the screen.
+Invoke-Probe -Name 'withdrawals unguarded' -File $WITHDRAWALS `
+  -Find '    const guard = await guardSection("pending-withdrawals");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'every R101o file names its section grant and no weaker helper'
+
+# 73. Wrong grant on withdrawals PUT - pending-withdrawals, not financial.
+# Reason: -LiteralPath required - [id] is a PowerShell wildcard character class.
+Invoke-Probe -Name 'withdrawals wrong section' -File $WD_PUT -First `
+  -Find 'guardSection("pending-withdrawals")' `
+  -Replace 'guardSection("financial")' `
+  -ExpectTest 'every R101o file names its section grant and no weaker helper'
+
+# 74. Folder-level canary on a single-handler R101o file.
+Invoke-Probe -Name 'withdrawals closed folder loses grant' -File $WITHDRAWALS `
+  -Find '    const guard = await guardSection("pending-withdrawals");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'and none of the closed folders leak an unguarded file'
+
 Write-Host ''
 Write-Host 'UNPROBED, with the reason: "finds no route in the no-check-of-any-kind class" and' -ForegroundColor DarkGray
 Write-Host '"finds no route in the hand-verified-no-grant class". Both are already green (empty' -ForegroundColor DarkGray
 Write-Host 'after R101m/R101n). Turning either red means adding a route in that class, which the' -ForegroundColor DarkGray
 Write-Host 'inventory ratchet also catches. The closed-folder leak check is the probeable guard.' -ForegroundColor DarkGray
+Write-Host 'Helper debt after R101o: 169.' -ForegroundColor DarkGray
 Write-Host ''

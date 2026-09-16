@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import { rejectWithdrawal } from "@/lib/services/withdrawal.service";
-import { verifyAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 /**
  * POST /api/withdrawals/[id]/reject
@@ -12,10 +12,9 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const admin = await verifyAdminAuth();
-    if (!admin.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // Reason: PendingWithdrawalsSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("pending-withdrawals");
+    if (!guard.ok) return guard.response;
 
     const { id } = await params;
 
@@ -36,8 +35,8 @@ export async function POST(
 
     const result = await rejectWithdrawal(
       id,
-      admin.adminId!,
-      admin.email!,
+      guard.admin.id,
+      guard.admin.email,
       reason.trim(),
     );
 
@@ -51,7 +50,7 @@ export async function POST(
     return NextResponse.json({
       success: true,
       message: "Withdrawal rejected - Credits refunded to user",
-      status: result.status,
+      withdrawal: result.withdrawal,
     });
   } catch (error) {
     console.error("Error rejecting withdrawal:", error);

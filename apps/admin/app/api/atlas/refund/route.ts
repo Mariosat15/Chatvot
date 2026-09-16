@@ -11,14 +11,17 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
-import { requireAdminAuth, getAdminSession } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { auditLogService } from "@/lib/services/audit-log.service";
 import { atlasService } from "@/lib/services/atlas.service";
 import { isValidObjectId } from "@/lib/utils/url-validator";
 
 export async function POST(request: Request) {
   try {
-    await requireAdminAuth();
+    // Reason: FinancialDashboard owns Atlas refunds; section grant is the auth answer.
+    const guard = await guardSection("financial");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     const body = await request.json().catch(() => ({}));
@@ -138,28 +141,25 @@ export async function POST(request: Request) {
     await transaction.save();
 
     try {
-      const admin = await getAdminSession();
-      if (admin) {
-        await auditLogService.log({
-          admin: {
-            id: admin.id,
-            email: admin.email,
-            name: admin.name || admin.email.split("@")[0],
-            role: admin.role || "admin",
-          },
-          action: "payment_refunded",
-          category: "financial",
-          description: `Initiated Atlas refund of ${amount} for deposit ${transaction._id} (user ${transaction.userId})`,
-          targetType: "transaction",
-          targetId: transaction._id.toString(),
-          metadata: {
-            refundId: result.refundId,
-            paymentId,
-            amount,
-            userId: transaction.userId,
-          },
-        });
-      }
+      await auditLogService.log({
+        admin: {
+          id: guard.admin.id,
+          email: guard.admin.email,
+          name: guard.admin.name || guard.admin.email.split("@")[0],
+          role: guard.admin.role || "admin",
+        },
+        action: "payment_refunded",
+        category: "financial",
+        description: `Initiated Atlas refund of ${amount} for deposit ${transaction._id} (user ${transaction.userId})`,
+        targetType: "transaction",
+        targetId: transaction._id.toString(),
+        metadata: {
+          refundId: result.refundId,
+          paymentId,
+          amount,
+          userId: transaction.userId,
+        },
+      });
     } catch (auditError) {
       console.error("Failed to log Atlas refund audit action:", auditError);
     }

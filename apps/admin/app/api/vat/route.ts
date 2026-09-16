@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import VATPayment from "@/database/models/vat-payment.model";
@@ -11,7 +11,10 @@ import { auditLogService } from "@/lib/services/audit-log.service";
  */
 export async function GET(request: NextRequest) {
   try {
-    await requireAdminAuth();
+    // Reason: FinancialDashboard owns this screen; section grant is the auth answer.
+    const guard = await guardSection("financial");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     const { searchParams } = new URL(request.url);
@@ -138,7 +141,14 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const admin = await requireAdminAuth();
+    // Reason: FinancialDashboard owns this screen; section grant is the auth answer.
+    const guard = await guardSection("financial");
+    if (!guard.ok) return guard.response;
+    const admin = {
+      adminId: guard.admin.id,
+      email: guard.admin.email,
+    };
+
     await connectToDatabase();
 
     const body = await request.json();

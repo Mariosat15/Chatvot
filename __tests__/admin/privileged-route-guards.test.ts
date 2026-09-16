@@ -185,6 +185,17 @@ const CLOSED_FOLDERS: { folder: string[]; section: string }[] = [
   { folder: ["employees", "availability"], section: "messaging" },
   { folder: ["trading-risk-settings"], section: "trading-risk" },
   { folder: ["trigger-margin-check"], section: "trading-risk" },
+  /*
+    R101o. Money writers first among helper-but-no-grant. FinancialDashboard → financial
+    (admin-funds, vat, vendor-payments, atlas/*); PendingWithdrawalsSection →
+    pending-withdrawals (withdrawals/). admin-bank-accounts deferred - dual callers on
+    company-settings and pending-withdrawals, grant decision needed.
+  */
+  { folder: ["admin-funds"], section: "financial" },
+  { folder: ["vat"], section: "financial" },
+  { folder: ["vendor-payments"], section: "financial" },
+  { folder: ["atlas"], section: "financial" },
+  { folder: ["withdrawals"], section: "pending-withdrawals" },
 ];
 
 describe("R101a - every handler in the closed folders is guarded, per handler", () => {
@@ -1049,6 +1060,74 @@ describe("R101n - the three hand-verified routes are section-granted", () => {
     expect(weaker).toEqual([]);
     expect(wrongSection).toEqual([]);
     expect(handlers).toBe(5);
+    expect(guards).toBeGreaterThanOrEqual(handlers);
+  });
+});
+
+describe("R101o - money writers are section-granted", () => {
+  /*
+    Eleven files, fifteen handlers. Helper-but-no-grant → section-granted. Grants from
+    calling screens: FinancialDashboard → financial; PendingWithdrawalsSection →
+    pending-withdrawals. Atlas refund/clawback also open from TransactionDetailDialog,
+    which mounts on the same financial surface.
+  */
+  const WEAKER =
+    /(getAdminSession|requireAdminAuth|verifyAdminAuth|verifyAdminToken|verifyAnyAuth|jwtVerify|getAdminJwtSecret)\s*\(|\bverify\s*\(/;
+
+  const entries: { rel: string; section: string; handlers: number }[] = [
+    { rel: "admin-funds/route.ts", section: "financial", handlers: 2 },
+    { rel: "vat/route.ts", section: "financial", handlers: 2 },
+    { rel: "vendor-payments/route.ts", section: "financial", handlers: 2 },
+    { rel: "atlas/refund/route.ts", section: "financial", handlers: 1 },
+    { rel: "atlas/refund/clawback/route.ts", section: "financial", handlers: 1 },
+    { rel: "atlas/refunds/pending/route.ts", section: "financial", handlers: 1 },
+    { rel: "withdrawals/route.ts", section: "pending-withdrawals", handlers: 1 },
+    { rel: "withdrawals/[id]/route.ts", section: "pending-withdrawals", handlers: 2 },
+    {
+      rel: "withdrawals/[id]/approve/route.ts",
+      section: "pending-withdrawals",
+      handlers: 1,
+    },
+    {
+      rel: "withdrawals/[id]/reject/route.ts",
+      section: "pending-withdrawals",
+      handlers: 1,
+    },
+    {
+      rel: "withdrawals/[id]/complete/route.ts",
+      section: "pending-withdrawals",
+      handlers: 1,
+    },
+  ];
+
+  it("covers eleven money-writer route files", () => {
+    expect(entries.length).toBe(11);
+  });
+
+  it("every R101o file names its section grant and no weaker helper", () => {
+    const weaker: string[] = [];
+    const wrongSection: string[] = [];
+    let handlers = 0;
+    let guards = 0;
+
+    for (const { rel, section, handlers: expected } of entries) {
+      const file = join(API, ...rel.split("/"));
+      const code = stripComments(readFileSync(file, "utf8"));
+      const sections = [
+        ...code.matchAll(/guardSection\(\s*["']([^"']+)["']\s*\)/g),
+      ].map((m) => m[1]);
+
+      if (WEAKER.test(code)) weaker.push(rel);
+      if (sections.some((s) => s !== section)) wrongSection.push(rel);
+      const fileHandlers = (code.match(handlerPattern()) ?? []).length;
+      handlers += fileHandlers;
+      guards += (code.match(guardCallPattern()) ?? []).length;
+      expect(fileHandlers).toBe(expected);
+    }
+
+    expect(weaker).toEqual([]);
+    expect(wrongSection).toEqual([]);
+    expect(handlers).toBe(15);
     expect(guards).toBeGreaterThanOrEqual(handlers);
   });
 });

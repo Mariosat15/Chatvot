@@ -72,14 +72,13 @@ const NO_CHECK_OF_ANY_KIND = [] as const;
 const HAND_VERIFIED_NO_GRANT = [] as const;
 
 /**
- * 180 routes that authenticate with a helper and never ask which sections the caller
- * holds. (Was 187 after R101j; R101k moved the seven simulator/ helper routes into
+ * 169 routes that authenticate with a helper and never ask which sections the caller
+ * holds. (Was 180 after R101n; R101o moved eleven money-writer routes into
  * section-granted.)
  */
 const HELPER_BUT_NO_GRANT = [
   "admin-bank-accounts/[id]/route.ts",
   "admin-bank-accounts/route.ts",
-  "admin-funds/route.ts",
   "admin/backfill-ranks/route.ts",
   "admin/cleanup/run/route.ts",
   "admin/events/poll/route.ts",
@@ -100,9 +99,6 @@ const HELPER_BUT_NO_GRANT = [
   "announcements/route.ts",
   "announcements/templates/[id]/route.ts",
   "announcements/templates/route.ts",
-  "atlas/refund/clawback/route.ts",
-  "atlas/refund/route.ts",
-  "atlas/refunds/pending/route.ts",
   "audit-logs/route.ts",
   "auth/logout/route.ts",
   "cancel-pending-payment/route.ts",
@@ -246,20 +242,13 @@ const HELPER_BUT_NO_GRANT = [
   "tutorials/upload/[sessionId]/route.ts",
   "tutorials/upload/init/route.ts",
   "tutorials/youtube/route.ts",
-  "vat/route.ts",
-  "vendor-payments/route.ts",
   "vendors/[id]/mark-paid/route.ts",
   "vendors/route.ts",
   "verify-password/route.ts",
   "withdrawal-settings/route.ts",
-  "withdrawals/[id]/approve/route.ts",
-  "withdrawals/[id]/complete/route.ts",
-  "withdrawals/[id]/reject/route.ts",
-  "withdrawals/[id]/route.ts",
-  "withdrawals/route.ts",
 ] as const;
 
-/** Folders closed by R101a–R101m. Nothing under these may appear in any debt list above. */
+/** Folders closed by R101aâ€“R101m. Nothing under these may appear in any debt list above. */
 const CLOSED_FOLDERS = [
   "users",
   "ai",
@@ -297,6 +286,13 @@ const CLOSED_FOLDERS = [
   "diagnose-user",
   "sync-missing-users",
   "update-competition-status",
+  // R101o. Money writers: FinancialDashboard → financial; PendingWithdrawalsSection →
+  // pending-withdrawals. admin-bank-accounts deferred (dual company/pending-withdrawals callers).
+  "admin-funds",
+  "vat",
+  "vendor-payments",
+  "atlas",
+  "withdrawals",
 ];
 
 const findings = inventoryAdminRoutes();
@@ -464,6 +460,8 @@ describe("R101d - the folders already closed stay closed", () => {
     expect(read("trading-risk-settings/route.ts")).toBe("section-granted");
     expect(read("employees/availability/route.ts")).toBe("section-granted");
     expect(read("trigger-margin-check/route.ts")).toBe("section-granted");
-    expect(read("withdrawals/route.ts")).toBe("helper-no-grant");
+    expect(read("withdrawals/route.ts")).toBe("section-granted");
+    expect(read("admin-funds/route.ts")).toBe("section-granted");
+    expect(read("atlas/refund/clawback/route.ts")).toBe("section-granted");
   });
 });

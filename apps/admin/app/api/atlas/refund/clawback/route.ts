@@ -17,7 +17,7 @@ import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import CreditWallet from "@/database/models/trading/credit-wallet.model";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
-import { requireAdminAuth, getAdminSession } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { auditLogService } from "@/lib/services/audit-log.service";
 import { isValidObjectId } from "@/lib/utils/url-validator";
 // Reason: relative, not "@/" — the alias resolves to the admin app root, and
@@ -26,7 +26,10 @@ import { evaluateClawback } from "../../../../../../../lib/services/reconciliati
 
 export async function POST(request: Request) {
   try {
-    await requireAdminAuth();
+    // Reason: FinancialDashboard owns Atlas clawbacks; section grant is the auth answer.
+    const guard = await guardSection("financial");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     const body = await request.json().catch(() => ({}));
@@ -149,29 +152,26 @@ export async function POST(request: Request) {
     await deposit.save();
 
     try {
-      const admin = await getAdminSession();
-      if (admin) {
-        await auditLogService.log({
-          admin: {
-            id: admin.id,
-            email: admin.email,
-            name: admin.name || admin.email.split("@")[0],
-            role: admin.role || "admin",
-          },
-          action: "refund_clawback",
-          category: "financial",
-          description: `Clawed back ${amount} credits from user ${deposit.userId} for refunded Atlas deposit ${deposit._id}`,
-          targetType: "transaction",
-          targetId: deposit._id.toString(),
-          metadata: {
-            clawbackTxId: clawbackTx._id.toString(),
-            amount,
-            previousBalance,
-            newBalance: wallet.creditBalance,
-            atlasRefundId: deposit.metadata?.atlasRefundId,
-          },
-        });
-      }
+      await auditLogService.log({
+        admin: {
+          id: guard.admin.id,
+          email: guard.admin.email,
+          name: guard.admin.name || guard.admin.email.split("@")[0],
+          role: guard.admin.role || "admin",
+        },
+        action: "refund_clawback",
+        category: "financial",
+        description: `Clawed back ${amount} credits from user ${deposit.userId} for refunded Atlas deposit ${deposit._id}`,
+        targetType: "transaction",
+        targetId: deposit._id.toString(),
+        metadata: {
+          clawbackTxId: clawbackTx._id.toString(),
+          amount,
+          previousBalance,
+          newBalance: wallet.creditBalance,
+          atlasRefundId: deposit.metadata?.atlasRefundId,
+        },
+      });
     } catch (auditError) {
       console.error("Failed to log clawback audit action:", auditError);
     }

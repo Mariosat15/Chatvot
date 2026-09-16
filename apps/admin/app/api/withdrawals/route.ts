@@ -4,7 +4,7 @@ import WithdrawalRequest from "@/database/models/withdrawal-request.model";
 import UserBankAccount from "@/database/models/user-bank-account.model";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import AppSettings from "@/database/models/app-settings.model";
-import { verifyAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 /**
  * GET /api/withdrawals
@@ -18,10 +18,9 @@ import { verifyAdminAuth } from "@/lib/admin/auth";
  */
 export async function GET(request: NextRequest) {
   try {
-    const admin = await verifyAdminAuth();
-    if (!admin.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // Reason: PendingWithdrawalsSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("pending-withdrawals");
+    if (!guard.ok) return guard.response;
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");

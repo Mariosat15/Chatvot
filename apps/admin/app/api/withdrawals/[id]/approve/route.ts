@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import { approveWithdrawal } from "@/lib/services/withdrawal.service";
-import { verifyAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 /**
  * POST /api/withdrawals/[id]/approve
@@ -17,16 +17,19 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const admin = await verifyAdminAuth();
-    if (!admin.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // Reason: PendingWithdrawalsSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("pending-withdrawals");
+    if (!guard.ok) return guard.response;
 
     const { id } = await params;
 
     await connectToDatabase();
 
-    const result = await approveWithdrawal(id, admin.adminId!, admin.email!);
+    const result = await approveWithdrawal(
+      id,
+      guard.admin.id,
+      guard.admin.email,
+    );
 
     if (!result.success) {
       return NextResponse.json(

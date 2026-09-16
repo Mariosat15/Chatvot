@@ -16,14 +16,17 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import { getUsersByIds } from "@/lib/utils/user-lookup";
 
 export async function GET(request: NextRequest) {
   try {
-    await requireAdminAuth();
+    // Reason: FinancialDashboard owns the refund queue; section grant is the auth answer.
+    const guard = await guardSection("financial");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     const { searchParams } = new URL(request.url);
