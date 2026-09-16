@@ -41,6 +41,8 @@
     "probe:e2e-round": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/probe-e2e-round.ps1",
     "test:watch": "vitest --watch",
     "audit:security": "npm audit --audit-level=high",
+    "audit:admin-routes": "tsx tools/admin-routes/auth-inventory.ts",
+    "audit:admin-routes:list": "tsx tools/admin-routes/auth-inventory.ts --list",
     "prepare": "husky"
   },
   "lint-staged": {

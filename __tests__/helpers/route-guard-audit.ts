@@ -105,3 +105,64 @@ export function handlerSlices(code: string): { method: string; body: string }[] 
 export function guardedSections(code: string): string[] {
   return [...code.matchAll(guardCallPattern())].map((match) => match[1]);
 }
+
+/**
+ * Any authentication helper at all, including the ones that answer the wrong question.
+ *
+ * `getAdminSession` is the reason this list exists rather than a shorter one. It refuses a
+ * caller with no session and never asks which grants they hold, so a route using it is
+ * neither unguarded nor guarded-by-the-wrong-helper - it is a third answer the earlier
+ * taxonomy had no name for, and eight files sat in that gap while the method that found five
+ * previous rounds of this class walked straight past them.
+ */
+export function anyAuthHelperPattern(): RegExp {
+  return /(guardSection|requireSectionAccess|getAdminSession|verifyAdminAuth|verifyAdminToken|requireAdminAuth|verifyAnyAuth|verifyGameMasterAuth|getServerSession|auth\.api\.getSession)\s*\(/;
+}
+
+/**
+ * A hand-rolled JWT check, which is authentication written out longhand.
+ *
+ * It must be looked for SEPARATELY from the helpers above, because a route doing this calls no
+ * helper and so reads as completely unguarded - while it may well verify the signature
+ * correctly against the real secret and refuse a forgery. That makes it more convincing than
+ * no check at all and no better at the question that matters, which is what the holder is
+ * allowed to reach. `users/[userId]/conversations` was exactly this shape.
+ */
+export function handVerifiedTokenPattern(): RegExp {
+  return /\b(verify|jwtVerify|decode)\s*\(\s*token/;
+}
+
+/**
+ * A call that changes stored data.
+ *
+ * Reason: used with `handlerSlices` to answer whether a handler authenticates BEFORE it
+ * writes. That axis is not a refinement of "is there a guard" - it is the difference between
+ * a weak check and no check at all, because a helper called after the write has already let
+ * the write happen. Measured 16 September 2026 across the whole admin tree: zero handlers,
+ * and the same instrument run against `87d13897` reports three - `users/edit#PATCH`,
+ * `users/credit#POST` and `users/delete#DELETE` - so it is proven able to fire rather than
+ * merely green.
+ */
+export function mutatingDbCallPattern(): RegExp {
+  return /\.(updateOne|updateMany|findOneAndUpdate|findByIdAndUpdate|deleteOne|deleteMany|findOneAndDelete|findByIdAndDelete|insertOne|insertMany|bulkWrite|save)\s*\(/;
+}
+
+/** What a route file does about authorization, in the only four shapes that exist today. */
+export type RouteAuthClass =
+  | "section-granted"
+  | "helper-no-grant"
+  | "hand-verified-no-grant"
+  | "no-check";
+
+/**
+ * Classify one route's source. Order matters: a section grant wins over everything, and a
+ * hand-verified token is only interesting in a file that calls no helper at all.
+ */
+export function classifyRouteAuth(code: string): RouteAuthClass {
+  if (guardCallPattern().test(code) || /requireSectionAccess\s*\(/.test(code)) {
+    return "section-granted";
+  }
+  if (anyAuthHelperPattern().test(code)) return "helper-no-grant";
+  if (handVerifiedTokenPattern().test(code)) return "hand-verified-no-grant";
+  return "no-check";
+}
