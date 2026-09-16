@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import LandingPageVisit from "@/database/models/landing-page-visit.model";
 import LandingPage from "@/database/models/landing-page.model";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 /**
  * DELETE /api/landing-pages/analytics/clear — Clear all LP visit analytics
@@ -9,6 +10,10 @@ import LandingPage from "@/database/models/landing-page.model";
  */
 export async function DELETE() {
   try {
+    // Reason: LandingPagesSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("landing-pages");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     // Reset counters on all landing pages

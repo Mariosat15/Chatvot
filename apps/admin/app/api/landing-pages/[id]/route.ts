@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import LandingPage from "@/database/models/landing-page.model";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 /**
  * GET /api/landing-pages/[id] — Get a single landing page by ID
@@ -10,6 +11,10 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    // Reason: LandingPagesSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("landing-pages");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
     const { id } = await params;
 
@@ -39,6 +44,10 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    // Reason: LandingPagesSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("landing-pages");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
     const { id } = await params;
     const body = await req.json();
@@ -100,6 +109,10 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    // Reason: LandingPagesSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("landing-pages");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
     const { id } = await params;
     const isPermanent = req.nextUrl.searchParams.get("permanent") === "true";

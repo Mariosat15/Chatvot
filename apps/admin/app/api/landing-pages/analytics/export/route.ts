@@ -3,12 +3,17 @@ import { connectToDatabase } from "@/database/mongoose";
 import LandingPageVisit from "@/database/models/landing-page-visit.model";
 import LandingPage from "@/database/models/landing-page.model";
 import mongoose from "mongoose";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 /**
  * GET /api/landing-pages/analytics/export — Export analytics data as CSV
  */
 export async function GET(req: NextRequest) {
   try {
+    // Reason: LandingPagesSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("landing-pages");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     const { searchParams } = new URL(req.url);

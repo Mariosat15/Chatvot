@@ -16,6 +16,7 @@ import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { connectToDatabase } from "@/database/mongoose";
 import { WhiteLabel } from "@/database/models/whitelabel.model";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -850,6 +851,10 @@ NO markdown. NO explanation. NO commentary. ONLY the JSON.`;
 
 export async function POST(request: NextRequest) {
   try {
+    // Reason: LandingPagesSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("landing-pages");
+    if (!guard.ok) return guard.response;
+
     const body = await request.json();
     const { mode, instructions, sections, imageQuery, userImages } = body as {
       mode: "enhance" | "generate";

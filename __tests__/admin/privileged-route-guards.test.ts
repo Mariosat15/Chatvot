@@ -105,6 +105,12 @@ const CLOSED_FOLDERS: { folder: string[]; section: string }[] = [
     remaining no-check debt - block and clear destroy or create records anonymously.
   */
   { folder: ["visitors"], section: "visitors" },
+  /*
+    R101f. LandingPagesSection → landing-pages. Seven files, ten handlers: CRUD, templates,
+    AI generation, analytics, export and the clear writer. Clear deletes every visit record
+    and zeroes counters, which is why the folder went next among the remaining writers.
+  */
+  { folder: ["landing-pages"], section: "landing-pages" },
 ];
 
 describe("R101a - every handler in the closed folders is guarded, per handler", () => {
@@ -524,6 +530,49 @@ describe("R101e - visitors/ is section-granted and nothing weaker", () => {
     expect(weaker).toEqual([]);
     expect(wrongSection).toEqual([]);
     expect(handlers).toBe(6);
+    expect(guards).toBeGreaterThanOrEqual(handlers);
+  });
+});
+
+describe("R101f - landing-pages/ is section-granted and nothing weaker", () => {
+  /*
+    Seven files, ten handlers. LandingPagesSection owns every fetch (list, editor, templates,
+    AI, analytics, export, clear), so the grant is `landing-pages` rather than a neighbouring
+    content or AI section. analytics/clear is the writer that put the folder next after
+    visitors - it zeroes every counter and deletes every visit record anonymously.
+  */
+  const WEAKER =
+    /(getAdminSession|requireAdminAuth|verifyAdminAuth|verifyAdminToken|verifyAnyAuth|jwtVerify|getAdminJwtSecret)\s*\(/;
+
+  const dir = join(API, "landing-pages");
+  const files = findRouteFiles(dir);
+
+  it("the walk finds the seven landing-pages routes", () => {
+    expect(files.length).toBe(7);
+  });
+
+  it("every landing-pages file names guardSection(landing-pages) and no weaker helper", () => {
+    const weaker: string[] = [];
+    const wrongSection: string[] = [];
+    let handlers = 0;
+    let guards = 0;
+
+    for (const file of files) {
+      const code = stripComments(readFileSync(file, "utf8"));
+      const name = file.slice(API.length + 1).replace(/\\/g, "/");
+      const sections = [...code.matchAll(/guardSection\(\s*["']([^"']+)["']\s*\)/g)].map(
+        (m) => m[1],
+      );
+
+      if (WEAKER.test(code)) weaker.push(name);
+      if (sections.some((s) => s !== "landing-pages")) wrongSection.push(name);
+      handlers += (code.match(handlerPattern()) ?? []).length;
+      guards += (code.match(guardCallPattern()) ?? []).length;
+    }
+
+    expect(weaker).toEqual([]);
+    expect(wrongSection).toEqual([]);
+    expect(handlers).toBe(10);
     expect(guards).toBeGreaterThanOrEqual(handlers);
   });
 });

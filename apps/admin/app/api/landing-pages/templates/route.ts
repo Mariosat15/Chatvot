@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import LandingPageTemplate from "@/database/models/landing-page-template.model";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 /**
  * GET /api/landing-pages/templates — List all landing page templates
  */
 export async function GET(req: NextRequest) {
   try {
+    // Reason: LandingPagesSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("landing-pages");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     const { searchParams } = new URL(req.url);

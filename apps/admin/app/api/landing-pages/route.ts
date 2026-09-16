@@ -3,6 +3,7 @@ import { connectToDatabase } from "@/database/mongoose";
 import LandingPage from "@/database/models/landing-page.model";
 import LandingPageTemplate from "@/database/models/landing-page-template.model";
 import { randomBytes } from "crypto";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 /**
  * Generate a unique tracking ID (8 chars, URL-safe).
@@ -17,6 +18,10 @@ function generateTrackingId(): string {
  */
 export async function GET(req: NextRequest) {
   try {
+    // Reason: LandingPagesSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("landing-pages");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     const { searchParams } = new URL(req.url);
@@ -82,6 +87,10 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
+    // Reason: LandingPagesSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("landing-pages");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     const body = await req.json();

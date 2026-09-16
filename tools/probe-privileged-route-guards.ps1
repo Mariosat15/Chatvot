@@ -388,6 +388,41 @@ Invoke-Probe -Name 'visitors closed folder loses grant' -File $VIS_CLEAR `
   -Replace2 '' `
   -ExpectTest 'but none of them are in the folders R101a closed'
 
+$LP_CLEAR = 'apps/admin/app/api/landing-pages/analytics/clear/route.ts'
+$LP_ROUTE = 'apps/admin/app/api/landing-pages/route.ts'
+
+Write-Host "`n=== R101f probes ===`n"
+
+# 31. analytics/clear was world-writable. Restoring that on the destructive half.
+Invoke-Probe -Name 'landing-pages clear unguarded' -File $LP_CLEAR `
+  -Find '    const guard = await guardSection("landing-pages");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'every landing-pages file names guardSection'
+
+# 32. Wrong grant - visitors would compile and silently widen who can edit landing pages.
+Invoke-Probe -Name 'landing-pages wrong section' -File $LP_ROUTE -First `
+  -Find 'guardSection("landing-pages")' `
+  -Replace 'guardSection("visitors")' `
+  -ExpectTest 'landing-pages/route.ts: guards every handler with the section'
+
+# 33. One handler of the list/create route loses its grant.
+Invoke-Probe -Name 'landing-pages list unguarded' -File $LP_ROUTE -First `
+  -Find '    const guard = await guardSection("landing-pages");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'landing-pages/route.ts: one guard and one refusal'
+
+# 34. Folder-level canary: a closed landing-pages route loses its grant entirely.
+Invoke-Probe -Name 'landing-pages closed folder loses grant' -File $LP_CLEAR `
+  -Find '    const guard = await guardSection("landing-pages");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'but none of them are in the folders R101a closed'
+
 Write-Host ''
 Write-Host 'UNPROBED, with the reason: "still finds routes with no authorization call at all".' -ForegroundColor DarkGray
 Write-Host 'Turning that canary red means guarding the remaining no-check debt, which is later' -ForegroundColor DarkGray
