@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
+
 import {
   finalizeEndedChallenges,
   expirePendingChallenges,
@@ -8,7 +9,8 @@ import {
 // POST - Manually trigger challenge finalization (for testing/debugging)
 export async function POST(_request: NextRequest) {
   try {
-    await requireAdminAuth();
+    const guard = await guardSection("challenges");
+    if (!guard.ok) return guard.response;
 
     console.log("🔧 Manually triggering challenge finalization...");
 

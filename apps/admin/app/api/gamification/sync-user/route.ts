@@ -12,16 +12,15 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
-import { getAdminSession } from "@/lib/admin/auth";
+
 import CreditWallet from "@/database/models/trading/credit-wallet.model";
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getAdminSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("users");
+    if (!guard.ok) return guard.response;
 
     await connectToDatabase();
 
@@ -158,10 +157,8 @@ async function syncAllUsers() {
  */
 export async function GET(req: NextRequest) {
   try {
-    const session = await getAdminSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("users");
+    if (!guard.ok) return guard.response;
 
     const { searchParams } = new URL(req.url);
     const userId = searchParams.get("userId");

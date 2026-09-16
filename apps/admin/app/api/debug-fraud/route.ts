@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import DeviceFingerprint from "@/database/models/fraud/device-fingerprint.model";
 import FraudAlert from "@/database/models/fraud/fraud-alert.model";
 import FraudSettings from "@/database/models/fraud/fraud-settings.model";
-import { requireAdminAuth } from "@/lib/admin/auth";
+
 
 /**
  * GET /api/admin/debug-fraud
@@ -11,7 +12,8 @@ import { requireAdminAuth } from "@/lib/admin/auth";
  */
 export async function GET() {
   try {
-    await requireAdminAuth();
+    const guard = await guardSection("fraud");
+    if (!guard.ok) return guard.response;
     await connectToDatabase();
 
     // Get fraud settings

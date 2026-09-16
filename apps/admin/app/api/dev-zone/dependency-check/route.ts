@@ -6,7 +6,8 @@
  */
 
 import { NextResponse } from "next/server";
-import { verifyAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
+
 import { exec } from "child_process";
 import { promisify } from "util";
 import OpenAI from "openai";
@@ -219,10 +220,8 @@ Return ONLY the JSON, no additional text.`;
  */
 export async function GET() {
   try {
-    const admin = await verifyAdminAuth();
-    if (!admin.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("dependency-updates");
+    if (!guard.ok) return guard.response;
 
     // Check cache
     if (cachedResult && Date.now() - cacheTime < CACHE_DURATION) {
@@ -262,10 +261,8 @@ export async function GET() {
  */
 export async function POST(request: Request) {
   try {
-    const admin = await verifyAdminAuth();
-    if (!admin.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("dependency-updates");
+    if (!guard.ok) return guard.response;
 
     const body = await request.json();
     const { packageName, analyzeAll } = body;
@@ -362,10 +359,8 @@ export async function POST(request: Request) {
  */
 export async function DELETE() {
   try {
-    const admin = await verifyAdminAuth();
-    if (!admin.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("dependency-updates");
+    if (!guard.ok) return guard.response;
 
     cachedResult = null;
     cacheTime = 0;

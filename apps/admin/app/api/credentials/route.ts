@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { revalidatePath } from "next/cache";
 import { connectToDatabase } from "@/database/mongoose";
 import { Admin } from "@/database/models/admin.model";
 import { WhiteLabel } from "@/database/models/whitelabel.model";
-import { requireAdminAuth } from "@/lib/admin/auth";
+
 import { auditLogService } from "@/lib/services/audit-log.service";
 
 export async function PUT(request: NextRequest) {
   try {
-    const auth = await requireAdminAuth();
+    const guard = await guardSection("credentials");
+    if (!guard.ok) return guard.response;
     await connectToDatabase();
 
     const { email, currentPassword, newPassword, name } = await request.json();

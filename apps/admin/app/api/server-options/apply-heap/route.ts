@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { exec } from "child_process";
 import { promisify } from "util";
-import { verifyAdminAuth } from "@/lib/admin/auth";
+
 
 const execAsync = promisify(exec);
 
@@ -15,10 +16,8 @@ const PM2_APP_NAME = process.env.PM2_ADMIN_APP_NAME || "chartvolt-admin";
  */
 export async function POST() {
   try {
-    const auth = await verifyAdminAuth();
-    if (!auth.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("server-options");
+    if (!guard.ok) return guard.response;
     const canAccess =
       auth.isSuperAdmin ||
       (auth.allowedSections && auth.allowedSections.includes("server-options"));

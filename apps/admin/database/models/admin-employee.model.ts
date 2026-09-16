@@ -142,6 +142,15 @@ export const ADMIN_SECTIONS = [
   "performance-simulator",
   "image-optimizer",
   "dependency-updates",
+  /*
+    Data Cleanup and Data Maintenance are real screens (DataCleanupSection /
+    DataMaintenanceSection, menu ids data-cleanup / data-maintenance) and were never
+    ADMIN_SECTIONS values, so only a super admin could open the tab and no grant could
+    be issued. Added so guardSection can name the calling screen — same reason as
+    system-announcements. Add-only; nobody's access widens.
+  */
+  "data-cleanup",
+  "data-maintenance",
   // Admin (Super Admin only)
   "employees",
   // My Account

@@ -12,10 +12,11 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import OpenAI from "openai";
 import { connectToDatabase } from "@/database/mongoose";
 import { WhiteLabel } from "@/database/models/whitelabel.model";
-import { verifyAdminAuth } from "@/lib/admin/auth";
+
 import mongoose from "mongoose";
 
 // Import models (non-fraud models that are well-registered)
@@ -4597,10 +4598,8 @@ export async function POST(request: NextRequest) {
   let auditData: any = null;
 
   try {
-    const admin = await verifyAdminAuth();
-    if (!admin.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("ai-agent");
+    if (!guard.ok) return guard.response;
 
     const { messages } = await request.json();
 

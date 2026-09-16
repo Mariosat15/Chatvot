@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
-import { requireAdminAuth, getAdminSession } from "@/lib/admin/auth";
+
 import AuditLog from "@/database/models/audit-log.model";
 import { auditLogService } from "@/lib/services/audit-log.service";
 
@@ -10,7 +11,8 @@ import { auditLogService } from "@/lib/services/audit-log.service";
  */
 export async function GET(request: NextRequest) {
   try {
-    await requireAdminAuth();
+    const guard = await guardSection("audit-logs");
+    if (!guard.ok) return guard.response;
     await connectToDatabase();
 
     const { searchParams } = new URL(request.url);
@@ -166,10 +168,8 @@ export async function GET(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
-    const admin = await getAdminSession();
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("audit-logs");
+    if (!guard.ok) return guard.response;
 
     await connectToDatabase();
 

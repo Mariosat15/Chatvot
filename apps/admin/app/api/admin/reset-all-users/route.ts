@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
+
 import { wipeUserData } from "@/lib/services/user-data-reset.service";
 
 /**
@@ -16,7 +17,8 @@ import { wipeUserData } from "@/lib/services/user-data-reset.service";
  */
 export async function POST(request: NextRequest) {
   try {
-    await requireAdminAuth();
+    const guard = await guardSection("database");
+    if (!guard.ok) return guard.response;
 
     const body = await request.json();
     const { confirmation } = body;

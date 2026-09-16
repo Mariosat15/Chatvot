@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import { WhiteLabel } from "@/database/models/whitelabel.model";
-import { requireAdminAuth, getAdminSession } from "@/lib/admin/auth";
+
 import { auditLogService } from "@/lib/services/audit-log.service";
 import { promises as fs } from "fs";
 import path from "path";
@@ -60,7 +61,8 @@ const DB_FIELDS = new Set([
 // ──────────────────────────────────────────────────────────────
 export async function GET() {
   try {
-    await requireAdminAuth();
+    const guard = await guardSection("environment");
+    if (!guard.ok) return guard.response;
     await connectToDatabase();
 
     // Get or create WhiteLabel settings
@@ -176,7 +178,8 @@ export async function GET() {
 // ──────────────────────────────────────────────────────────────
 export async function PUT(request: NextRequest) {
   try {
-    await requireAdminAuth();
+    const guard = await guardSection("environment");
+    if (!guard.ok) return guard.response;
     await connectToDatabase();
 
     const body = await request.json();
@@ -238,21 +241,21 @@ export async function PUT(request: NextRequest) {
     }
 
     // ── Step 3: Audit log ──
+    // Reason: attribute from the grant already taken at the top of the handler —
+    // a second getAdminSession() here was the R101b shape (looks like auth, is only
+    // attribution) and is unreachable without a session once the guard has passed.
     try {
-      const admin = await getAdminSession();
-      if (admin) {
-        await auditLogService.logSettingsUpdated(
-          {
-            id: admin.id,
-            email: admin.email,
-            name: admin.email.split("@")[0],
-            role: "admin",
-          },
-          "Environment Settings",
-          undefined,
-          { updatedFields: Object.keys(body) },
-        );
-      }
+      await auditLogService.logSettingsUpdated(
+        {
+          id: guard.admin.id,
+          email: guard.admin.email,
+          name: guard.admin.email.split("@")[0],
+          role: "admin",
+        },
+        "Environment Settings",
+        undefined,
+        { updatedFields: Object.keys(body) },
+      );
     } catch (auditError) {
       console.error("Failed to log audit action:", auditError);
     }

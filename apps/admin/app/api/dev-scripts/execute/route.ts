@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
+
 import { exec } from "child_process";
 import { promisify } from "util";
 import path from "path";
@@ -9,10 +10,8 @@ const execAsync = promisify(exec);
 // POST - Execute a dev command
 export async function POST(request: NextRequest) {
   try {
-    const auth = await verifyAdminAuth();
-    if (!auth.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("dev-settings");
+    if (!guard.ok) return guard.response;
 
     const body = await request.json();
     const { action, scriptName } = body;

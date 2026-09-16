@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import v8 from "v8";
-import { verifyAdminAuth } from "@/lib/admin/auth";
+
 
 /**
  * GET /api/server-options/heap-info
@@ -9,10 +10,8 @@ import { verifyAdminAuth } from "@/lib/admin/auth";
  */
 export async function GET() {
   try {
-    const auth = await verifyAdminAuth();
-    if (!auth.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("server-options");
+    if (!guard.ok) return guard.response;
     const canAccess =
       auth.isSuperAdmin ||
       (auth.allowedSections && auth.allowedSections.includes("server-options"));

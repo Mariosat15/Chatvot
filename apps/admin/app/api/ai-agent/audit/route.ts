@@ -5,16 +5,15 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import AIAgentAudit from "@/database/models/ai-agent-audit.model";
-import { verifyAdminAuth } from "@/lib/admin/auth";
+
 
 export async function GET(request: NextRequest) {
   try {
-    const admin = await verifyAdminAuth();
-    if (!admin.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("ai-agent");
+    if (!guard.ok) return guard.response;
 
     await connectToDatabase();
 
@@ -114,10 +113,8 @@ export async function GET(request: NextRequest) {
 // Delete old audit logs (for data retention compliance)
 export async function DELETE(request: NextRequest) {
   try {
-    const admin = await verifyAdminAuth();
-    if (!admin.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("ai-agent");
+    if (!guard.ok) return guard.response;
 
     await connectToDatabase();
 

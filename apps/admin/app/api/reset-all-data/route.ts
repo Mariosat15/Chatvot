@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getAdminSession, requireAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
+
 import { auditLogService } from "@/lib/services/audit-log.service";
 import { wipeUserData } from "@/lib/services/user-data-reset.service";
 
@@ -27,7 +28,8 @@ import { wipeUserData } from "@/lib/services/user-data-reset.service";
  */
 export async function POST(request: Request) {
   try {
-    await requireAdminAuth();
+    const guard = await guardSection("database");
+    if (!guard.ok) return guard.response;
 
     const { confirmationCode } = await request.json();
 
@@ -48,20 +50,18 @@ export async function POST(request: Request) {
 
     console.log("🎉 ACTIVITY RESET COMPLETE", result.deleted);
 
-    // Log this action to audit log (recreated after the wipe as the first entry)
+    // Log this action to audit log (recreated after the wipe as the first entry).
+    // Reason: attribute from the grant already taken — do not reintroduce getAdminSession.
     try {
-      const admin = await getAdminSession();
-      if (admin) {
-        await auditLogService.logDatabaseReset(
-          {
-            id: admin.id,
-            email: admin.email,
-            name: admin.email.split("@")[0],
-            role: "admin",
-          },
-          result.deleted,
-        );
-      }
+      await auditLogService.logDatabaseReset(
+        {
+          id: guard.admin.id,
+          email: guard.admin.email,
+          name: guard.admin.email.split("@")[0],
+          role: "admin",
+        },
+        result.deleted,
+      );
     } catch (auditError) {
       console.error("Failed to log audit action:", auditError);
     }

@@ -72,40 +72,20 @@ const NO_CHECK_OF_ANY_KIND = [] as const;
 const HAND_VERIFIED_NO_GRANT = [] as const;
 
 /**
- * 30 routes that authenticate with a helper and never ask which sections the caller
- * holds. (Was 41 after R101aa; R101ab moved eleven money/ops/employee-self routes into
- * section-granted. Gamemaster/ stays deferred — verifyGameMasterAuth by design.)
+ * 9 routes that authenticate with a helper and never ask which sections the caller
+ * holds. (Was 30 after R101ab; R101ac moved twenty-one clear helpers into
+ * section-granted. Remaining: auth/logout + verify-password + admin/events/poll as
+ * admin-at-all by design, plus gamemaster/ deferred — verifyGameMasterAuth.)
  */
 const HELPER_BUT_NO_GRANT = [
-"admin/backfill-ranks/route.ts",
-"admin/cleanup/run/route.ts",
 "admin/events/poll/route.ts",
-"admin/reset-all-users/route.ts",
-"ai-agent/audit/route.ts",
-"ai-agent/chat/route.ts",
-"ai-agent/config/route.ts",
-"audit-logs/route.ts",
 "auth/logout/route.ts",
-"cookie-consent/route.ts",
-"credentials/route.ts",
-"debug-fraud/route.ts",
-"dev-scripts/execute/route.ts",
-"dev-scripts/route.ts",
-"dev-zone/dependency-check/route.ts",
-"environment/route.ts",
-"finalize-challenges/route.ts",
 "gamemaster/competitions/route.ts",
 "gamemaster/dashboard/route.ts",
 "gamemaster/earnings/route.ts",
 "gamemaster/fix-purchases/route.ts",
 "gamemaster/link/route.ts",
 "gamemaster/referrals/route.ts",
-"gamification/sync-user/route.ts",
-"images/route.ts",
-"images/upload/route.ts",
-"reset-all-data/route.ts",
-"server-options/apply-heap/route.ts",
-"server-options/heap-info/route.ts",
 "verify-password/route.ts",
 ];
 
@@ -223,6 +203,27 @@ const CLOSED_FOLDERS = [
   "notifications",
   "employee",
   "security",
+  // R101ac. Clear helpers: ai-agent, settings leftovers, branding images (upload is
+  // dual branding|landing-pages), server-options, data-cleanup/maintenance (ADMIN_SECTIONS
+  // add-only), database resets, fraud debugger, users sync, challenges finalize, and
+  // the two remaining Dev Zone helpers. Nested admin/backfill-ranks + admin/cleanup +
+  // admin/reset-all-users listed explicitly so a bare "admin" entry is not required.
+  "ai-agent",
+  "audit-logs",
+  "credentials",
+  "environment",
+  "cookie-consent",
+  "images",
+  "server-options",
+  "admin/backfill-ranks",
+  "admin/cleanup",
+  "admin/reset-all-users",
+  "reset-all-data",
+  "debug-fraud",
+  "gamification",
+  "finalize-challenges",
+  "dev-scripts",
+  "dev-zone/dependency-check",
 ];
 
 const findings = inventoryAdminRoutes();

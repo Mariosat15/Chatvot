@@ -1,29 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
+import { guardSection } from "@/lib/admin/section-route-guard";
+
 import { connectToDatabase } from "@/database/mongoose";
 import { CookieConsent } from "@/database/models/cookie-consent.model";
-import { getAdminJwtSecret } from "@/lib/admin/jwt-secret";
 
-const JWT_SECRET = getAdminJwtSecret();
 
-async function verifyAdminToken(request: NextRequest) {
-  try {
-    const token = request.cookies.get("admin_token")?.value;
-    if (!token) return null;
-    const payload = jwt.verify(token, JWT_SECRET) as { email: string };
-    return payload;
-  } catch {
-    return null;
-  }
-}
+
+
+
 
 // GET — Fetch cookie consent settings (admin)
 export async function GET(request: NextRequest) {
   try {
-    const admin = await verifyAdminToken(request);
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("cookie-consent");
+    if (!guard.ok) return guard.response;
 
     await connectToDatabase();
 
@@ -47,10 +37,8 @@ export async function GET(request: NextRequest) {
 // POST — Update cookie consent settings (admin)
 export async function POST(request: NextRequest) {
   try {
-    const admin = await verifyAdminToken(request);
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("cookie-consent");
+    if (!guard.ok) return guard.response;
 
     await connectToDatabase();
     const body = (await request.json()) as Record<string, unknown>;

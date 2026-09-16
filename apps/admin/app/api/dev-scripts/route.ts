@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
+
 import fs from "fs";
 import path from "path";
 
 // GET - List all test scripts in the test-scripts directory
 export async function GET(request: NextRequest) {
   try {
-    const auth = await verifyAdminAuth();
-    if (!auth.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("dev-settings");
+    if (!guard.ok) return guard.response;
 
     // Get the project root directory dynamically
     // When running in the admin app, process.cwd() returns apps/admin

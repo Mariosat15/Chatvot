@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import { WhiteLabel } from "@/database/models/whitelabel.model";
-import { requireAdminAuth } from "@/lib/admin/auth";
+
 
 export async function GET() {
   try {
-    await requireAdminAuth();
+    const guard = await guardSection("branding");
+    if (!guard.ok) return guard.response;
     await connectToDatabase();
 
     let settings = await WhiteLabel.findOne();
@@ -41,7 +43,8 @@ export async function GET() {
 
 export async function PUT(request: NextRequest) {
   try {
-    await requireAdminAuth();
+    const guard = await guardSection("branding");
+    if (!guard.ok) return guard.response;
     await connectToDatabase();
 
     const body = await request.json();

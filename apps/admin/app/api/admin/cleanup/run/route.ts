@@ -4,18 +4,21 @@ import Competition from "@/database/models/trading/competition.model";
 import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
 import Challenge from "@/database/models/trading/challenge.model";
 import ChallengeParticipant from "@/database/models/trading/challenge-participant.model";
-import { verifyAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 /**
  * POST /api/admin/cleanup/run
  * Delete oldest completed/cancelled competitions and challenges older than X days.
  * Body: { olderThanDays: number, deleteOldestCompetitions: number, deleteOldestChallenges: number }
- * Super admin only.
+ * Super admin only (section grant + role).
  */
 export async function POST(request: NextRequest) {
   try {
-    const auth = await verifyAdminAuth();
-    if (!auth.isAuthenticated || !auth.isSuperAdmin) {
+    const guard = await guardSection("data-cleanup");
+    if (!guard.ok) return guard.response;
+    // Reason: the previous check demanded isSuperAdmin; keep that after the section grant
+    // so a custom employee granted data-cleanup cannot wipe contests.
+    if (guard.admin.role !== "super_admin") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

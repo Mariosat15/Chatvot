@@ -309,6 +309,27 @@ const CLOSED_FOLDERS: { folder: string[]; section: string }[] = [
   { folder: ["notifications"], section: "notifications" },
   { folder: ["employee"], section: "profile" },
   { folder: ["security"], section: "overview" },
+  /*
+    R101ac. Clear helpers. images/upload is dual branding|landing-pages; CLOSED_FOLDERS
+    pins branding and the describe asserts both. data-cleanup / data-maintenance were
+    added to ADMIN_SECTIONS (add-only). Nested admin/* paths listed explicitly.
+  */
+  { folder: ["ai-agent"], section: "ai-agent" },
+  { folder: ["audit-logs"], section: "audit-logs" },
+  { folder: ["credentials"], section: "credentials" },
+  { folder: ["environment"], section: "environment" },
+  { folder: ["cookie-consent"], section: "cookie-consent" },
+  { folder: ["images"], section: "branding" },
+  { folder: ["server-options"], section: "server-options" },
+  { folder: ["admin", "backfill-ranks"], section: "data-maintenance" },
+  { folder: ["admin", "cleanup"], section: "data-cleanup" },
+  { folder: ["admin", "reset-all-users"], section: "database" },
+  { folder: ["reset-all-data"], section: "database" },
+  { folder: ["debug-fraud"], section: "fraud" },
+  { folder: ["gamification"], section: "users" },
+  { folder: ["finalize-challenges"], section: "challenges" },
+  { folder: ["dev-scripts"], section: "dev-settings" },
+  { folder: ["dev-zone", "dependency-check"], section: "dependency-updates" },
 ];
 
 describe("R101a - every handler in the closed folders is guarded, per handler", () => {
@@ -2247,6 +2268,103 @@ describe("R101ab - money leftovers / ops health / employee self are section-gran
     expect(weaker).toEqual([]);
     expect(missing).toEqual([]);
     expect(handlers).toBe(2);
+    expect(guards).toBeGreaterThanOrEqual(handlers);
+  });
+});
+
+describe("R101ac - clear helpers (ai/settings/dev/destructive) are section-granted", () => {
+  /*
+    Twenty-one files, twenty-nine handlers. images/upload is dual-caller
+    branding|landing-pages (ImagesSection + LPEditor/LPAIAgent). data-cleanup and
+    data-maintenance were added to ADMIN_SECTIONS (add-only). Remaining helpers are
+    auth/logout, verify-password, admin/events/poll (admin-at-all) and gamemaster/.
+  */
+  const WEAKER =
+    /(getAdminSession|requireAdminAuth|verifyAdminAuth|verifyAdminToken|verifyAnyAuth|jwtVerify|getAdminJwtSecret)\s*\(/;
+
+  const singleCaller: { rel: string; section: string; handlers: number }[] = [
+    { rel: "ai-agent/config/route.ts", section: "ai-agent", handlers: 1 },
+    { rel: "ai-agent/chat/route.ts", section: "ai-agent", handlers: 1 },
+    { rel: "ai-agent/audit/route.ts", section: "ai-agent", handlers: 2 },
+    { rel: "audit-logs/route.ts", section: "audit-logs", handlers: 2 },
+    { rel: "credentials/route.ts", section: "credentials", handlers: 1 },
+    { rel: "environment/route.ts", section: "environment", handlers: 2 },
+    { rel: "cookie-consent/route.ts", section: "cookie-consent", handlers: 2 },
+    { rel: "images/route.ts", section: "branding", handlers: 2 },
+    { rel: "server-options/heap-info/route.ts", section: "server-options", handlers: 1 },
+    { rel: "server-options/apply-heap/route.ts", section: "server-options", handlers: 1 },
+    { rel: "admin/backfill-ranks/route.ts", section: "data-maintenance", handlers: 1 },
+    { rel: "admin/cleanup/run/route.ts", section: "data-cleanup", handlers: 1 },
+    { rel: "admin/reset-all-users/route.ts", section: "database", handlers: 1 },
+    { rel: "reset-all-data/route.ts", section: "database", handlers: 1 },
+    { rel: "debug-fraud/route.ts", section: "fraud", handlers: 1 },
+    { rel: "gamification/sync-user/route.ts", section: "users", handlers: 2 },
+    { rel: "finalize-challenges/route.ts", section: "challenges", handlers: 1 },
+    { rel: "dev-scripts/route.ts", section: "dev-settings", handlers: 1 },
+    { rel: "dev-scripts/execute/route.ts", section: "dev-settings", handlers: 1 },
+    { rel: "dev-zone/dependency-check/route.ts", section: "dependency-updates", handlers: 3 },
+  ];
+
+  const dualCaller: { rel: string; sections: string[]; handlers: number }[] = [
+    {
+      rel: "images/upload/route.ts",
+      sections: ["branding", "landing-pages"],
+      handlers: 1,
+    },
+  ];
+
+  it("covers twenty-one clear helper route files", () => {
+    expect(singleCaller.length + dualCaller.length).toBe(21);
+  });
+
+  it("every single-caller file names its calling-screen grant and no weaker helper", () => {
+    const weaker: string[] = [];
+    const missing: string[] = [];
+    let handlers = 0;
+    let guards = 0;
+
+    for (const { rel, section, handlers: expected } of singleCaller) {
+      const file = join(API, ...rel.split("/"));
+      const code = stripComments(readFileSync(file, "utf8"));
+      if (WEAKER.test(code)) weaker.push(rel);
+      if (!guardedSections(code).includes(section)) missing.push(rel);
+      const fileHandlers = (code.match(handlerPattern()) ?? []).length;
+      handlers += fileHandlers;
+      guards += (code.match(guardCallPattern()) ?? []).length;
+      expect(fileHandlers).toBe(expected);
+    }
+
+    expect(weaker).toEqual([]);
+    expect(missing).toEqual([]);
+    expect(handlers).toBe(28);
+    expect(guards).toBeGreaterThanOrEqual(handlers);
+  });
+
+  it("images/upload uses guardAnySection with branding and landing-pages", () => {
+    const weaker: string[] = [];
+    const missing: string[] = [];
+    let handlers = 0;
+    let guards = 0;
+
+    for (const { rel, sections, handlers: expected } of dualCaller) {
+      const file = join(API, ...rel.split("/"));
+      const code = stripComments(readFileSync(file, "utf8"));
+      if (WEAKER.test(code)) weaker.push(rel);
+      for (const { method, body } of handlerSlices(code)) {
+        const named = guardedSections(body);
+        if (!sections.every((s) => named.includes(s))) {
+          missing.push(`${rel}:${method}`);
+        }
+      }
+      const fileHandlers = (code.match(handlerPattern()) ?? []).length;
+      handlers += fileHandlers;
+      guards += (code.match(guardCallPattern()) ?? []).length;
+      expect(fileHandlers).toBe(expected);
+    }
+
+    expect(weaker).toEqual([]);
+    expect(missing).toEqual([]);
+    expect(handlers).toBe(1);
     expect(guards).toBeGreaterThanOrEqual(handlers);
   });
 });

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdminAuth } from "@/lib/admin/auth";
+import { guardAnySection } from "@/lib/admin/section-route-guard";
+
 import { writeFile, mkdir, access, stat } from "fs/promises";
 import { constants } from "fs";
 import path from "path";
@@ -8,7 +9,8 @@ import { putBrandingAsset } from "@/lib/services/branding-assets.service";
 
 export async function POST(request: NextRequest) {
   try {
-    await requireAdminAuth();
+    const guard = await guardAnySection(["branding", "landing-pages"]);
+    if (!guard.ok) return guard.response;
 
     const formData = await request.formData();
     const file = formData.get("file") as File;
