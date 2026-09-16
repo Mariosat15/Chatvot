@@ -36,7 +36,7 @@ import UserNotificationPreferences from "@/database/models/user-notification-pre
 import UserPresence from "@/database/models/user-presence.model";
 import AuditLog from "@/database/models/audit-log.model";
 import { ObjectId } from "mongodb";
-import { getAdminSession } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { auditLogService } from "@/lib/services/audit-log.service";
 
 /**
@@ -67,9 +67,19 @@ export const maxDuration = 60;
 
 export async function DELETE(request: Request) {
   try {
+    // Reason: R101b. This route erased a user across more than twenty collections before
+    // reading any session - the session was fetched only by the audit block at the end,
+    // long after the deletions, and logged nothing when it came back null. So an
+    // unauthenticated caller could destroy any account and leave no record of who did it.
+    const guard = await guardSection("users");
+    if (!guard.ok) return guard.response;
+
     const { userId } = await request.json();
 
-    if (!userId) {
+    // Reason: userId is used directly as a query value - db.collection("user")
+    // .deleteOne({ id: userId }) - so an object such as { $ne: null } would delete an
+    // arbitrary user. A truthiness check admits it; the shape has to be asserted.
+    if (!userId || typeof userId !== "string") {
       return NextResponse.json(
         { success: false, message: "User ID is required" },
         { status: 400 },
@@ -117,7 +127,14 @@ export async function DELETE(request: Request) {
 
     // If still not found, try by '_id' as string
     if (userDeleteResult.deletedCount === 0) {
-      userDeleteResult = await db.collection("user").deleteOne({ _id: userId });
+      // Reason: R101b. The `typeof userId === "string"` guard added above narrowed this
+      // from `any`, which surfaced a pre-existing mismatch: the typed driver declares
+      // `_id` as ObjectId while this deliberate third fallback looks for a string `_id`.
+      // Cast rather than drop the fallback - removing it is a behaviour change, and a
+      // behaviour change inside a security fix destroys the evidence that nothing moved.
+      userDeleteResult = await db
+        .collection("user")
+        .deleteOne({ _id: userId as unknown as ObjectId });
     }
 
     deletionResults.user = userDeleteResult.deletedCount;
@@ -653,21 +670,21 @@ export async function DELETE(request: Request) {
     console.log("📊 Summary:", deletionResults);
 
     // Log audit action
+    // Reason: the actor comes from the guard rather than a second session read, which
+    // both fixes the attribution and removes the `if (admin)` skip - the one caller that
+    // could delete an account without a session was also the one that wrote no audit row.
     try {
-      const admin = await getAdminSession();
-      if (admin) {
-        await auditLogService.logUserDeleted(
-          {
-            id: admin.id,
-            email: admin.email,
-            name: admin.email.split("@")[0],
-            role: "admin",
-          },
-          userId,
-          "Deleted User",
-          userId,
-        );
-      }
+      await auditLogService.logUserDeleted(
+        {
+          id: guard.admin.id,
+          email: guard.admin.email,
+          name: guard.admin.name ?? guard.admin.email.split("@")[0],
+          role: guard.admin.role ?? "admin",
+        },
+        userId,
+        "Deleted User",
+        userId,
+      );
     } catch (auditError) {
       console.error("Failed to log audit action:", auditError);
     }

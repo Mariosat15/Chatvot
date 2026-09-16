@@ -221,9 +221,92 @@ Invoke-Probe -Name 'a new route arrives unguarded' -File $SEQUENCE `
   -Replace2 '' `
   -ExpectTest 'but none of them are in the folders R101a closed'
 
+$CREDIT = 'apps/admin/app/api/users/credit/route.ts'
+$DELETE = 'apps/admin/app/api/users/delete/route.ts'
+$LIST = 'apps/admin/app/api/users/route.ts'
+$HISTORY = 'apps/admin/app/api/users/[userId]/history/route.ts'
+$CONVOS = 'apps/admin/app/api/users/[userId]/conversations/route.ts'
+$PRESENCE = 'apps/admin/app/api/users/presence/route.ts'
+
+Write-Host "`n=== R101b probes ===`n"
+
+# 13. The money bypass, restored. The wallet is CREATED here if it is missing, so an
+#     unauthenticated caller does not merely adjust an existing balance - it brings one into
+#     existence and writes a ledger row attributed to nobody.
+Invoke-Probe -Name 'credit unguarded' -File $CREDIT `
+  -Find '    const guard = await guardSection("users");' `
+  -Replace '    const guard = { ok: true, admin: { id: "x", email: "x@x", name: "x", role: "admin" } } as any;' `
+  -ExpectTest 'credit refuses before it touches a wallet'
+
+# 14. The truthiness reading of the amount. `NaN` is falsy, so `!amount` happens to catch it -
+#     which is why this probe restores `=== 0` ALONE rather than deleting the check: `Infinity`
+#     is truthy, is not zero, and reaches a balance write. A probe that also deleted the zero
+#     check would turn the same test red for the boring reason and prove nothing about the
+#     finite one.
+Invoke-Probe -Name 'credit takes a non-finite amount' -File $CREDIT `
+  -Find 'if (typeof amount !== "number" || !Number.isFinite(amount) || amount === 0) {' `
+  -Replace 'if (typeof amount !== "number" || amount === 0) {' `
+  -ExpectTest 'credit refuses a non-finite amount'
+
+# 15. The guard moved below the first deletion. It still refuses - but the Better Auth `user`
+#     document is already gone by then, so the refusal is a 403 handed back after the account
+#     it was protecting has been erased. Position, not presence.
+Invoke-Probe -Name 'delete guards after the first deletion' -File $DELETE `
+  -Find '    const guard = await guardSection("users");' `
+  -Replace '    const gd = 1; void gd;' `
+  -Find2 '      .deleteOne({ id: userId });' `
+  -Replace2 '      .deleteOne({ id: userId }); const guard = await guardSection("users"); if (!guard.ok) return guard.response;' `
+  -ExpectTest 'delete refuses before the first deletion'
+
+# 16. `{ $ne: null }` as a userId. `!userId` is false for any object, so the presence check
+#     admits it, and `deleteMany({ userId })` then matches every row in ~20 collections. The
+#     same probe on the same test as 15 deliberately: one assertion, two independent claims,
+#     and either failing alone is the evidence that they are not covering for each other.
+Invoke-Probe -Name 'delete takes any userId' -File $DELETE `
+  -Find 'if (!userId || typeof userId !== "string") {' `
+  -Replace 'if (!userId) {' `
+  -ExpectTest 'delete refuses before the first deletion'
+
+# 17. The PII list, unguarded. This route had no authorization call of any kind, and it returns
+#     every player's email and name.
+Invoke-Probe -Name 'user list unguarded' -File $LIST `
+  -Find '    const guard = await guardSection("users");' `
+  -Replace '    const gl = 1; void gl;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'the user list and the history read both guard before connecting'
+
+# 18. The same claim on the history route, because one file satisfying "guards before it
+#     connects" is not evidence the pair does.
+Invoke-Probe -Name 'history unguarded' -File $HISTORY `
+  -Find '    const guard = await guardSection("users");' `
+  -Replace '    const gh = 1; void gh;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'the user list and the history read both guard before connecting'
+
+# 19. The hand-rolled JWT check, restored. It is the subtlest of the five, because it LOOKS
+#     like authorization and is the only one a reviewer would defend: it verifies a real token
+#     with the real secret. What it never asks is whether the holder was granted `users`.
+Invoke-Probe -Name 'conversations verifies by hand' -File $CONVOS `
+  -Find '    const guard = await guardSection("users");' `
+  -Replace '    const token = request.headers.get("cookie"); verify(token as string, getAdminJwtSecret()); const guard = { ok: true } as any;' `
+  -ExpectTest 'conversations no longer verifies a token by hand'
+
+# 20. A weaker helper reintroduced on a file that KEEPS its guard - which is the only mutation
+#     that isolates the directory-wide negative. Unguarding the file instead would turn the
+#     per-handler suite red as well and the probe would be measuring the wrong assertion.
+#     No import is added, exactly as the reviewer who would write this line would not think to:
+#     the suite reads text, and the point is that a `getAdminSession()` call sitting beside a
+#     real guard reads as belt-and-braces and is in fact a second answer to one question.
+Invoke-Probe -Name 'a weaker helper returns beside the guard' -File $PRESENCE `
+  -Find '    if (!guard.ok) return guard.response;' `
+  -Replace '    if (!guard.ok) return guard.response; const s = await getAdminSession(); void s;' `
+  -ExpectTest 'every file names guardSection and no weaker helper'
+
 Write-Host ''
 Write-Host 'UNPROBED, with the reason: "still finds routes with no authorization call at all".' -ForegroundColor DarkGray
-Write-Host 'Turning that canary red means guarding all 95 remaining routes, which is R101b and'  -ForegroundColor DarkGray
-Write-Host 'R101c rather than a mutation. It is the one assertion here designed to fail when the' -ForegroundColor DarkGray
+Write-Host 'Turning that canary red means guarding the 78 remaining routes, which is R101c and'  -ForegroundColor DarkGray
+Write-Host 'R101d rather than a mutation. It is the one assertion here designed to fail when the' -ForegroundColor DarkGray
 Write-Host 'work is FINISHED, so a probe proving it can fail would be proving the wrong thing.'   -ForegroundColor DarkGray
 Write-Host ''

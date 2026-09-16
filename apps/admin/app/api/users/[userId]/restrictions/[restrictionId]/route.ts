@@ -4,7 +4,7 @@ import UserRestriction from "@/database/models/user-restriction.model";
 import FraudAlert from "@/database/models/fraud/fraud-alert.model";
 import AuditLog from "@/database/models/audit-log.model";
 import UserNote from "@/database/models/user-notes.model";
-import { getAdminSession } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { invalidateLeaderboardCache } from "../../../../../../../../lib/services/leaderboard-cache.invalidator";
 
 export async function DELETE(
@@ -12,10 +12,11 @@ export async function DELETE(
   { params }: { params: Promise<{ userId: string; restrictionId: string }> },
 ) {
   try {
-    const session = await getAdminSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // Reason: R101b - a session check is authentication, not the `users` section grant.
+    // This lifts a restriction, so it is the reverse of the POST next door.
+    const guard = await guardSection("users");
+    if (!guard.ok) return guard.response;
+    const session = guard.admin;
 
     const { userId, restrictionId } = await params;
     await connectToDatabase();

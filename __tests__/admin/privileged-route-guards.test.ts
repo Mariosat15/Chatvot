@@ -68,7 +68,14 @@ function read(...segments: string[]): string {
  * assertable, which a whole-tree walk cannot do.
  */
 const CLOSED_FOLDERS: { folder: string[]; section: string }[] = [
-  { folder: ["users", "edit"], section: "users" },
+  /*
+    R101b widened this from `users/edit` to the whole `users` tree, and the widening rather
+    than the addition is the point: every one of the nineteen `route.ts` files under it is
+    fetched from `UsersSection` or `UserFullDetailPanel`, so `users` is the section that owns
+    the calling screen for all of them, and a folder entry covers a twentieth on the day it
+    appears. Listing `users/edit` separately would now be the weaker statement.
+  */
+  { folder: ["users"], section: "users" },
   { folder: ["badges"], section: "badges" },
   { folder: ["trigger-badge-evaluation"], section: "badges" },
   { folder: ["journey-map"], section: "journey-map" },
@@ -221,6 +228,167 @@ describe("R101a - the privilege-escalation route", () => {
       allow-list.
     */
     expect(code).toMatch(/typeof\s+userId\s*!==\s*["'`]string["'`]/);
+  });
+});
+
+describe("R101b - the five live bypasses under users/", () => {
+  /*
+    WHAT WAS WRONG. Four of these had no authorization of any kind and the fifth had a
+    hand-rolled one. `POST /api/users/credit` created a wallet if absent, moved its balance by
+    any amount and wrote the matching `WalletTransaction` - so an anonymous caller could credit
+    or debit any player, with a full ledger trail and no real actor on it. `DELETE
+    /api/users/delete` erased an account across some twenty collections and then POSTed to the
+    player app's leaderboard cache invalidation with `INTERNAL_API_SECRET || "simulator-cleanup"`,
+    so the erasure reached across the process boundary too. `GET /api/users` returned the whole
+    player base with wallet balances, transaction aggregates, marketplace purchases and
+    restrictions attached, and `GET /api/users/[userId]/history` assembled one player's entire
+    life on the platform from an id in the URL - the two widest anonymous reads in the app.
+
+    `GET /api/users/[userId]/conversations` is the one worth stating separately, because it did
+    not look like a gap: it verified the `admin_token` signature with a bare `jsonwebtoken`
+    `verify()`. That authenticates the token and nothing else - no employee lookup, so a token
+    belonging to a deactivated employee passed until it expired, and no section grant was
+    consulted at all. A FIFTH auth pattern, and the one that would survive any audit that
+    greps for the four known helper names.
+
+    HOW THEY WERE FOUND: counting exported handlers against guards, folder by folder, which is
+    also how R40, R47, R51, R57 and R101a surfaced. Reading the routes would not have done it -
+    the folder's other fourteen files all authenticate somehow, and that is precisely what
+    carries a reader past the ones that do not.
+
+    NO ATTRIBUTION EXISTS for any of them, so whether they were ever called is unanswerable.
+    Nothing was backfilled: for the reads there is nothing to backfill, and for the two writers
+    the resulting documents are indistinguishable from an operator's own.
+  */
+
+  it("credit refuses before it touches a wallet", () => {
+    /*
+      Position against the writes, not presence of a guard. The handler reaches for the wallet
+      three ways - find, create, save - and the transaction after that, so each is asserted
+      rather than the first one found.
+    */
+    const code = read("users", "credit", "route.ts");
+    const guardAt = code.search(guardCallPattern());
+    expect(guardAt).toBeGreaterThan(-1);
+
+    for (const write of ["CreditWallet", "WalletTransaction"]) {
+      const at = code.indexOf(write, guardAt);
+      expect(at, `${write} not found after the guard`).toBeGreaterThan(-1);
+    }
+    // The guard must precede the FIRST mention of either, not merely some mention.
+    for (const write of ["CreditWallet.findOne", "new WalletTransaction"]) {
+      const at = code.indexOf(write);
+      if (at === -1) continue;
+      expect(guardAt, `credit writes ${write} before guarding`).toBeLessThan(at);
+    }
+  });
+
+  it("credit refuses a non-finite amount, not merely a zero one", () => {
+    /*
+      `!amount || amount === 0` was the whole check, so a string "50" reached the arithmetic
+      and `NaN` or `Infinity` reached a required Number path - and a wallet balance that has
+      become NaN fails every comparison downstream while nothing checks. R31's rule one field
+      along: when replacing a truthy guard, enumerate everything it was catching.
+    */
+    const code = read("users", "credit", "route.ts");
+    expect(code).toMatch(/typeof\s+amount\s*!==\s*["'`]number["'`]/);
+    expect(code).toMatch(/Number\.isFinite\s*\(\s*amount\s*\)/);
+  });
+
+  it("delete refuses before the first deletion, and refuses a non-string userId", () => {
+    /*
+      `deleteOne({ id: userId })` with an OBJECT value is a query operator rather than a value,
+      so `{"$ne":null}` deletes the first user in the collection - and this route's original
+      `!userId` presence check is true for no object. Fifth instance of a request-supplied
+      value reaching a query unchecked.
+    */
+    const code = read("users", "delete", "route.ts");
+    const guardAt = code.search(guardCallPattern());
+    expect(guardAt).toBeGreaterThan(-1);
+
+    const firstDelete = code.search(/\.delete(One|Many)\s*\(/);
+    expect(firstDelete).toBeGreaterThan(-1);
+    expect(guardAt).toBeLessThan(firstDelete);
+
+    expect(code).toMatch(/typeof\s+userId\s*!==\s*["'`]string["'`]/);
+  });
+
+  it("the user list and the history read both guard before connecting", () => {
+    for (const segments of [
+      ["users", "route.ts"],
+      ["users", "[userId]", "history", "route.ts"],
+    ]) {
+      const code = read(...segments);
+      const label = segments.join("/");
+      const guardAt = code.search(guardCallPattern());
+      expect(guardAt, `${label} has no guard`).toBeGreaterThan(-1);
+
+      const connectAt = code.search(/await\s+connectToDatabase\s*\(/);
+      expect(connectAt, `${label} never connects`).toBeGreaterThan(-1);
+      expect(guardAt, `${label} connects before guarding`).toBeLessThan(connectAt);
+    }
+  });
+
+  it("conversations no longer verifies a token by hand", () => {
+    /*
+      THE ABSENCE IS THE LOAD-BEARING HALF. Left in place beside the new guard, the bare
+      `verify()` would be harmless and would also be the shape the defect wore - an
+      authorization-looking call that authorizes nothing - and the next reader would take it
+      for the check. Same reasoning as removing `getAdminSession` from `users/edit` outright.
+    */
+    const code = read("users", "[userId]", "conversations", "route.ts");
+    expect(code).not.toMatch(/jsonwebtoken/);
+    expect(code).not.toMatch(/\bverify\s*\(\s*token/);
+    expect(code).not.toMatch(/getAdminJwtSecret/);
+    expect(guardedSections(code)).toContain("users");
+  });
+});
+
+describe("R101b - no weaker helper survives anywhere under users/", () => {
+  /*
+    A DIRECTORY-WIDE NEGATIVE, counted rather than sampled. The folder previously held five
+    different answers to "is this caller allowed" - nothing at all, a hand-rolled `verify`,
+    `getAdminSession` as authentication, `requireAdminAuth` as admin-at-all, and
+    `verifyAdminAuth` likewise - and one rule with five spellings is the shape behind
+    `referenceId`, `failedReason`, `challengeId` and the Game Master `||`, none of which
+    `check:mirrors` can see. The value of asserting the absence over the whole tree rather
+    than per file is that it covers the file somebody adds next, which is the only kind that
+    reintroduces this.
+
+    `guardSection` calls `requireSectionAccess` and `getAdminSession` internally, in
+    `apps/admin/lib/admin/section-route-guard.ts`. That is the ONE place either may appear,
+    which is exactly why this walk is scoped to the routes and not to the app.
+  */
+  const WEAKER =
+    /(getAdminSession|requireAdminAuth|verifyAdminAuth|verifyAdminToken|verifyAnyAuth)\s*\(/;
+
+  const files = findRouteFiles(join(API, "users"));
+
+  it("the walk finds the whole folder", () => {
+    // Nineteen today. A floor, so adding one does not fail here instead of in the per-handler
+    // suite above, which is where a new unguarded handler should surface.
+    expect(files.length).toBeGreaterThanOrEqual(19);
+  });
+
+  it("every file names guardSection and no weaker helper", () => {
+    const offenders: string[] = [];
+    let handlers = 0;
+    let guards = 0;
+
+    for (const file of files) {
+      const code = stripComments(readFileSync(file, "utf8"));
+      const name = file.slice(API.length + 1).replace(/\\/g, "/");
+
+      if (WEAKER.test(code)) offenders.push(name);
+      handlers += (code.match(handlerPattern()) ?? []).length;
+      guards += (code.match(guardCallPattern()) ?? []).length;
+    }
+
+    expect(offenders).toEqual([]);
+    // Twenty-seven handlers today. Compared against each other rather than against a literal,
+    // so the claim survives the folder growing and still fails if a handler arrives unguarded.
+    expect(handlers).toBeGreaterThanOrEqual(19);
+    expect(guards).toBeGreaterThanOrEqual(handlers);
   });
 });
 

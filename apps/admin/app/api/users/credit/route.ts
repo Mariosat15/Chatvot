@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import CreditWallet from "@/database/models/trading/credit-wallet.model";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
-import { getAdminSession } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { auditLogService } from "@/lib/services/audit-log.service";
 
 /**
@@ -11,23 +11,34 @@ import { auditLogService } from "@/lib/services/audit-log.service";
  */
 export async function POST(request: Request) {
   try {
+    // Reason: R101b. This route adjusted a wallet balance and wrote a WalletTransaction
+    // before reading any session at all - the session was fetched only inside the audit
+    // block below, which ran after the money had already moved and did nothing when it
+    // came back null. So an unauthenticated caller could credit or debit any wallet and
+    // the ledger row recorded no operator. The guard must precede every read and write.
+    const guard = await guardSection("users");
+    if (!guard.ok) return guard.response;
+
     const body = await request.json();
-    console.log("📥 Received credit request:", body);
 
     const { userId, amount, reason } = body;
 
     // Validation
-    if (!userId) {
-      console.error("❌ User ID is missing from request body:", body);
+    // Reason: userId reaches CreditWallet.findOne({ userId }) directly, so an object such
+    // as { $ne: null } would match somebody else's wallet. A truthiness check admits it.
+    if (!userId || typeof userId !== "string") {
       return NextResponse.json(
-        { success: false, message: "User ID is required", receivedBody: body },
+        { success: false, message: "User ID is required" },
         { status: 400 },
       );
     }
 
-    if (!amount || amount === 0) {
+    // Reason: amount is added to the stored balance. `!amount` rejects 0 and NaN but
+    // admits Infinity, which would write a non-finite balance that every later figure
+    // derives from. Test for a finite number rather than for truthiness (the R31 rule).
+    if (typeof amount !== "number" || !Number.isFinite(amount) || amount === 0) {
       return NextResponse.json(
-        { success: false, message: "Amount cannot be zero" },
+        { success: false, message: "Amount must be a non-zero number" },
         { status: 400 },
       );
     }
@@ -108,23 +119,24 @@ export async function POST(request: Request) {
     );
 
     // Log audit action
+    // Reason: the actor comes from the guard rather than a second session read. The old
+    // code re-fetched the session and skipped logging entirely when it was null, so the
+    // one path that moved money without an operator was also the one that recorded no
+    // audit row - the absence of evidence was caused by the defect it would have proved.
     try {
-      const admin = await getAdminSession();
-      if (admin) {
-        await auditLogService.logCreditsAdjusted(
-          {
-            id: admin.id,
-            email: admin.email,
-            name: admin.email.split("@")[0],
-            role: "admin",
-          },
-          userId,
-          userId,
-          previousBalance,
-          newBalance,
-          reason || `Admin ${actionText} ${Math.abs(amount)} credits`,
-        );
-      }
+      await auditLogService.logCreditsAdjusted(
+        {
+          id: guard.admin.id,
+          email: guard.admin.email,
+          name: guard.admin.name ?? guard.admin.email.split("@")[0],
+          role: guard.admin.role ?? "admin",
+        },
+        userId,
+        userId,
+        previousBalance,
+        newBalance,
+        reason || `Admin ${actionText} ${Math.abs(amount)} credits`,
+      );
     } catch (auditError) {
       console.error("Failed to log audit action:", auditError);
     }

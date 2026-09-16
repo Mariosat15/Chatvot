@@ -1,17 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import UserNote from "@/database/models/user-notes.model";
-import { getAdminSession } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ userId: string }> },
 ) {
   try {
-    const session = await getAdminSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // Reason: R101b. This asked only whether a session existed, so any admin employee
+    // passed regardless of their grants. `session` keeps its name and its meaning - the
+    // guard supplies the same actor the audit rows in POST read.
+    const guard = await guardSection("users");
+    if (!guard.ok) return guard.response;
 
     const { userId } = await params;
     await connectToDatabase();
@@ -58,10 +59,12 @@ export async function POST(
   { params }: { params: Promise<{ userId: string }> },
 ) {
   try {
-    const session = await getAdminSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // Reason: R101b. This asked only whether a session existed, so any admin employee
+    // passed regardless of their grants. `session` keeps its name and its meaning - the
+    // guard supplies the same actor the audit rows below read.
+    const guard = await guardSection("users");
+    if (!guard.ok) return guard.response;
+    const session = guard.admin;
 
     const { userId } = await params;
     const body = await req.json();

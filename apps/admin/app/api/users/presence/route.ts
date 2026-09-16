@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import mongoose from "mongoose";
 import { connectToDatabase } from "@/database/mongoose";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 /**
  * GET /api/users/presence
@@ -8,6 +9,11 @@ import { connectToDatabase } from "@/database/mongoose";
  */
 export async function GET(request: Request) {
   try {
+    // Reason: R101b. Had no authentication of any kind. Called only from UsersSection,
+    // so `users` is the section that owns the calling screen.
+    const guard = await guardSection("users");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     const db = mongoose.connection.db;

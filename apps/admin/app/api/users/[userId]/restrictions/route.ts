@@ -3,17 +3,17 @@ import { connectToDatabase } from "@/database/mongoose";
 import UserRestriction from "@/database/models/user-restriction.model";
 import AuditLog from "@/database/models/audit-log.model";
 import UserNote from "@/database/models/user-notes.model";
-import { getAdminSession } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ userId: string }> },
 ) {
   try {
-    const session = await getAdminSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // Reason: R101b - a session check is authentication, not the `users` section grant.
+    // The POST writes a UserRestriction, which is what blocks a player from paid entry.
+    const guard = await guardSection("users");
+    if (!guard.ok) return guard.response;
 
     const { userId } = await params;
     await connectToDatabase();
@@ -37,10 +37,11 @@ export async function POST(
   { params }: { params: Promise<{ userId: string }> },
 ) {
   try {
-    const session = await getAdminSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // Reason: R101b - a session check is authentication, not the `users` section grant.
+    // The POST writes a UserRestriction, which is what blocks a player from paid entry.
+    const guard = await guardSection("users");
+    if (!guard.ok) return guard.response;
+    const session = guard.admin;
 
     const { userId } = await params;
     const body = await req.json();

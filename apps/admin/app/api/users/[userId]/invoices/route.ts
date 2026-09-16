@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
-import { requireAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import Invoice from "@/database/models/invoice.model";
 
 /**
@@ -12,7 +12,10 @@ export async function GET(
   { params }: { params: Promise<{ userId: string }> },
 ) {
   try {
-    await requireAdminAuth();
+    // Reason: R101b - `requireAdminAuth` asks whether the caller is an admin at all, not
+    // whether they hold the `users` grant. Sixth instance of that class.
+    const guard = await guardSection("users");
+    if (!guard.ok) return guard.response;
     await connectToDatabase();
 
     const { userId } = await params;

@@ -1,6 +1,7 @@
 /* eslint-disable */
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import CreditWallet from "@/database/models/trading/credit-wallet.model";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
@@ -26,6 +27,12 @@ import "@/database/models/marketplace/marketplace-item.model";
  */
 export async function GET(request: NextRequest) {
   try {
+    // Reason: R101b. This route had no authentication of any kind and returns the whole
+    // player base with wallet balances, transaction aggregates, marketplace purchases and
+    // restrictions attached. It is the widest read in the admin app and it was anonymous.
+    const guard = await guardSection("users");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     // Get query params

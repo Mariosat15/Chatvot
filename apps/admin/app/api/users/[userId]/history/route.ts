@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { ObjectId } from "mongodb";
 
 interface HistoryItem {
@@ -23,9 +24,16 @@ export async function GET(
   { params }: { params: Promise<{ userId: string }> },
 ) {
   try {
+    // Reason: R101b. This route had no authentication of any kind and assembles one
+    // player's whole life on the platform - wallet ledger, deposits, withdrawals,
+    // trades, competition entries, purchases, KYC and support history - from a userId
+    // in the URL. It was the single widest anonymous read in the admin app.
+    const guard = await guardSection("users");
+    if (!guard.ok) return guard.response;
+
     const { userId } = await params;
 
-    if (!userId) {
+    if (!userId || typeof userId !== "string") {
       return NextResponse.json(
         { error: "User ID is required" },
         { status: 400 },

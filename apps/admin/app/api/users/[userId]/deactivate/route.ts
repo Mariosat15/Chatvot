@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
-import { getAdminSession } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import AuditLog from "@/database/models/audit-log.model";
 import UserNote from "@/database/models/user-notes.model";
 
@@ -15,10 +15,12 @@ export async function POST(
   { params }: { params: Promise<{ userId: string }> },
 ) {
   try {
-    const session = await getAdminSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // Reason: R101b - a session check is authentication, not the `users` section grant.
+    // This handler deactivates an account and deletes every session for it, so any admin
+    // employee could lock a player out whatever their grants said.
+    const guard = await guardSection("users");
+    if (!guard.ok) return guard.response;
+    const session = guard.admin;
 
     const { userId } = await params;
     const body = await req.json();
@@ -141,10 +143,12 @@ export async function DELETE(
   { params }: { params: Promise<{ userId: string }> },
 ) {
   try {
-    const session = await getAdminSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // Reason: R101b - a session check is authentication, not the `users` section grant.
+    // This handler deactivates an account and deletes every session for it, so any admin
+    // employee could lock a player out whatever their grants said.
+    const guard = await guardSection("users");
+    if (!guard.ok) return guard.response;
+    const session = guard.admin;
 
     const { userId } = await params;
     const mongoose = await connectToDatabase();

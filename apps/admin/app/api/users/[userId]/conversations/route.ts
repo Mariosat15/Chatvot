@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { verify } from "jsonwebtoken";
-import mongoose, { Types } from "mongoose";
+import mongoose from "mongoose";
 import { connectToDatabase } from "@/database/mongoose";
-import { getAdminJwtSecret } from "@/lib/admin/jwt-secret";
-
-const JWT_SECRET = getAdminJwtSecret();
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 /**
  * GET /api/users/[userId]/conversations
@@ -16,14 +12,11 @@ export async function GET(
   { params }: { params: Promise<{ userId: string }> },
 ) {
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get("admin_token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    verify(token, JWT_SECRET);
+    // Reason: R101b. This was a fifth, hand-rolled auth pattern - a bare `verify()` of the
+    // admin_token signature with no employee lookup, so a token belonging to a deactivated
+    // employee still passed until it expired, and no section grant was consulted at all.
+    const guard = await guardSection("users");
+    if (!guard.ok) return guard.response;
 
     const { userId } = await params;
     const { searchParams } = new URL(request.url);

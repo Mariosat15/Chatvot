@@ -1,17 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import UserNote from "@/database/models/user-notes.model";
-import { getAdminSession } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ userId: string; noteId: string }> },
 ) {
   try {
-    const session = await getAdminSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // Reason: R101b - a session check is authentication, not the `users` section grant.
+    const guard = await guardSection("users");
+    if (!guard.ok) return guard.response;
 
     const { noteId } = await params;
     const body = await req.json();
@@ -50,10 +49,9 @@ export async function DELETE(
   { params }: { params: Promise<{ userId: string; noteId: string }> },
 ) {
   try {
-    const session = await getAdminSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // Reason: R101b - a session check is authentication, not the `users` section grant.
+    const guard = await guardSection("users");
+    if (!guard.ok) return guard.response;
 
     const { noteId } = await params;
     await connectToDatabase();
