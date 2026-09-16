@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { verify } from "jsonwebtoken";
 import mongoose, { Types } from "mongoose";
 import { connectToDatabase } from "@/database/mongoose";
-import { getAdminJwtSecret } from "@/lib/admin/jwt-secret";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 /**
  * POST /api/messaging/conversations/[conversationId]/messages
@@ -14,28 +12,16 @@ export async function POST(
   { params }: { params: Promise<{ conversationId: string }> },
 ) {
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get("admin_token")?.value;
-
-    if (!token) {
-      console.log("❌ [SendMsg] No admin token");
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const jwtSecret = getAdminJwtSecret();
-    const decoded = verify(token, jwtSecret) as {
-      adminId: string;
-      email: string;
-      name?: string;
-      role: string;
-    };
+    // Reason: Messaging conversation view owns send; section grant is the auth answer.
+    const guard = await guardSection("messaging");
+    if (!guard.ok) return guard.response;
 
     const { conversationId } = await params;
     const body = await request.json();
     const { content, messageType, attachments, replyTo } = body;
 
     console.log(
-      `📤 [SendMsg] From: ${decoded.email} (${decoded.adminId}) to conv: ${conversationId}`,
+      `📤 [SendMsg] From: ${guard.admin.email} (${guard.admin.id}) to conv: ${conversationId}`,
     );
     console.log(`📤 [SendMsg] Content: "${content?.substring(0, 50)}..."`);
 
@@ -87,9 +73,9 @@ export async function POST(
     // Create message
     const messageDoc = {
       conversationId: convObjectId,
-      senderId: decoded.adminId,
+      senderId: guard.admin.id,
       senderType: "employee",
-      senderName: decoded.name || decoded.email,
+      senderName: guard.admin.name || guard.admin.email,
       messageType: messageType || "text",
       content: content || "",
       attachments: attachments || [],
@@ -114,7 +100,7 @@ export async function POST(
     // Build unread counts update - use object notation for MongoDB
     const unreadCountsUpdate: Record<string, number> = {};
     for (const participant of conversation.participants || []) {
-      if (participant.id !== decoded.adminId && participant.isActive) {
+      if (participant.id !== guard.admin.id && participant.isActive) {
         const currentCount = conversation.unreadCounts?.[participant.id] || 0;
         unreadCountsUpdate[`unreadCounts.${participant.id}`] = currentCount + 1;
         console.log(
@@ -129,8 +115,8 @@ export async function POST(
         lastMessage: {
           messageId: msgResult.insertedId,
           content: content?.substring(0, 100) || "[Attachment]",
-          senderId: decoded.adminId,
-          senderName: decoded.name || decoded.email,
+          senderId: guard.admin.id,
+          senderName: guard.admin.name || guard.admin.email,
           senderType: "employee",
           timestamp: new Date(),
         },
@@ -144,19 +130,19 @@ export async function POST(
     if (conversation.isAIHandled && conversation.type === "user-to-support") {
       updateDoc.$set.isAIHandled = false;
       updateDoc.$set.aiHandledUntil = new Date();
-      updateDoc.$set.assignedEmployeeId = new Types.ObjectId(decoded.adminId);
-      updateDoc.$set.assignedEmployeeName = decoded.name || decoded.email;
+      updateDoc.$set.assignedEmployeeId = new Types.ObjectId(guard.admin.id);
+      updateDoc.$set.assignedEmployeeName = guard.admin.name || guard.admin.email;
 
       // Add employee to participants if not present
       const existingParticipant = conversation.participants?.find(
-        (p: any) => p.id === decoded.adminId,
+        (p: any) => p.id === guard.admin.id,
       );
       if (!existingParticipant) {
         updateDoc.$push = {
           participants: {
-            id: decoded.adminId,
+            id: guard.admin.id,
             type: "employee",
-            name: decoded.name || decoded.email,
+            name: guard.admin.name || guard.admin.email,
             joinedAt: new Date(),
             isActive: true,
           },
@@ -172,9 +158,9 @@ export async function POST(
     // Build message object for response
     const messageResponse = {
       id: msgResult.insertedId.toString(),
-      senderId: decoded.adminId,
+      senderId: guard.admin.id,
       senderType: "employee",
-      senderName: decoded.name || decoded.email,
+      senderName: guard.admin.name || guard.admin.email,
       content: content || "",
       messageType: messageType || "text",
       attachments: attachments || [],

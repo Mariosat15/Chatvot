@@ -85,6 +85,20 @@ const CLOSED_FOLDERS: { folder: string[]; section: string }[] = [
   { folder: ["admin", "whitelabel-defaults"], section: "settings" },
   { folder: ["admin", "badge-simulator"], section: "badges" },
   { folder: ["admin", "milestone-simulator"], section: "journey-map" },
+  /*
+    R101c. Grants come from the calling screen, never from a guess about the data:
+    TradingHistorySection → trading-history; MessagingSection → messaging;
+    MessagingSettingsSection → messaging-settings. Settings is listed as its own folder
+    entry because a walk of `messaging/` would otherwise demand the inbox grant on the
+    settings route and fail on correct code. Conversations / employees / assigned-customers
+    are the three subtrees the inbox owns; listing them separately is the same unit as
+    the folder - a new route.ts under any of them is covered.
+  */
+  { folder: ["trading-history"], section: "trading-history" },
+  { folder: ["messaging", "settings"], section: "messaging-settings" },
+  { folder: ["messaging", "assigned-customers"], section: "messaging" },
+  { folder: ["messaging", "employees"], section: "messaging" },
+  { folder: ["messaging", "conversations"], section: "messaging" },
 ];
 
 describe("R101a - every handler in the closed folders is guarded, per handler", () => {
@@ -392,6 +406,80 @@ describe("R101b - no weaker helper survives anywhere under users/", () => {
   });
 });
 
+describe("R101c - no weaker helper and no hand-rolled JWT under trading-history/ or messaging/", () => {
+  /*
+    Messaging was the hand-verified class: every route called `verify` against the real
+    secret and then asked nothing about grants. Trading-history called nothing at all.
+    Both now use guardSection; both must refuse a return of either defect.
+  */
+  const WEAKER =
+    /(getAdminSession|requireAdminAuth|verifyAdminAuth|verifyAdminToken|verifyAnyAuth|jwtVerify|getAdminJwtSecret)\s*\(/;
+  // Reason: bare `verify(` is too wide (mongoose etc.); the import of jsonwebtoken's verify
+  // is the tell that the hand-rolled path is back.
+  const HAND_ROLLED_JWT = /from\s+["']jsonwebtoken["']/;
+
+  const folders = [
+    join(API, "trading-history"),
+    join(API, "messaging"),
+  ];
+  const files = folders.flatMap((dir) => findRouteFiles(dir));
+
+  it("the walk finds both folders", () => {
+    expect(files.length).toBeGreaterThanOrEqual(15);
+  });
+
+  it("every file names guardSection, no weaker helper, and no jsonwebtoken import", () => {
+    const weaker: string[] = [];
+    const handRolled: string[] = [];
+    let handlers = 0;
+    let guards = 0;
+
+    for (const file of files) {
+      const raw = readFileSync(file, "utf8");
+      const code = stripComments(raw);
+      const name = file.slice(API.length + 1).replace(/\\/g, "/");
+
+      if (WEAKER.test(code)) weaker.push(name);
+      if (HAND_ROLLED_JWT.test(code)) handRolled.push(name);
+      handlers += (code.match(handlerPattern()) ?? []).length;
+      guards += (code.match(guardCallPattern()) ?? []).length;
+    }
+
+    expect(weaker).toEqual([]);
+    expect(handRolled).toEqual([]);
+    expect(handlers).toBeGreaterThanOrEqual(18);
+    expect(guards).toBeGreaterThanOrEqual(handlers);
+  });
+
+  it("messaging/settings is the only file under messaging/ that names messaging-settings", () => {
+    /*
+      The two grants must not collapse: an employee granted only the inbox must not reach
+      settings, and one granted only settings must not reach the inbox. Asserted by counting
+      which files name which section, so a copy-paste that puts messaging-settings on a
+      conversation route (or messaging on settings) turns this red.
+    */
+    const settingsFiles: string[] = [];
+    const inboxFiles: string[] = [];
+
+    for (const file of files.filter((f) =>
+      f.replace(/\\/g, "/").includes("/messaging/"),
+    )) {
+      const code = stripComments(readFileSync(file, "utf8"));
+      const name = file.slice(API.length + 1).replace(/\\/g, "/");
+      const sections = [...code.matchAll(/guardSection\(\s*["']([^"']+)["']\s*\)/g)].map(
+        (m) => m[1],
+      );
+
+      if (sections.includes("messaging-settings")) settingsFiles.push(name);
+      if (sections.includes("messaging")) inboxFiles.push(name);
+    }
+
+    expect(settingsFiles).toEqual(["messaging/settings/route.ts"]);
+    expect(inboxFiles.length).toBeGreaterThanOrEqual(11);
+    expect(inboxFiles).not.toContain("messaging/settings/route.ts");
+  });
+});
+
 describe("R101a - the badge routes, which are the data R96 widens", () => {
   it("guards the badge CRUD on every handler", () => {
     const code = read("badges", "route.ts");
@@ -427,12 +515,10 @@ describe("R101 - the rest of the tree is still an offender", () => {
     is sent here to delete it and tighten the walk below into the real guard.
 
     IT DELIBERATELY ASSERTS NO EXACT COUNT. The number moved three times in one afternoon -
-    100, then 99, then 97 - and not one of those moves was a code change: each was the
-    CLASSIFIER changing, as the scan learned to strip comments, to recognise `export const`
-    handlers, and to count `getSession` and `auth.api.getSession` as authorization. So the
-    honest thing to pin is the shape rather than the figure, because a hard number here would
-    fail on the day somebody improves the scan and teach the next reader that the suite is
-    noise. The figure belongs in the risk register beside the method that produced it.
+    A check that states a known gap and passes anyway is indistinguishable from the gap having
+    been closed, and it quietly excuses every file it lists. It goes red when the remaining
+    no-check debt reaches zero - which R101c did not do, and is not supposed to: this canary
+    asserts the TREE is still an offender, not that messaging and trading-history still are.
   */
   const AUTH_CALL =
     /(guardSection|requireSectionAccess|getAdminSession|verifyAdminAuth|verifyAdminToken|requireAdminAuth|verifyAnyAuth|verifyGameMasterAuth|getServerSession|auth\.api\.getSession)\s*\(/;

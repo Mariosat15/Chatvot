@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { verify } from "jsonwebtoken";
 import mongoose, { Types } from "mongoose";
 import { connectToDatabase } from "@/database/mongoose";
-import { getAdminJwtSecret } from "@/lib/admin/jwt-secret";
-
-const JWT_SECRET = getAdminJwtSecret();
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 /**
  * POST /api/messaging/conversations/[conversationId]/resolve
@@ -16,18 +12,9 @@ export async function POST(
   { params }: { params: Promise<{ conversationId: string }> },
 ) {
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get("admin_token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const decoded = verify(token, JWT_SECRET) as {
-      adminId: string;
-      email: string;
-      name?: string;
-    };
+    // Reason: Messaging conversation view owns resolve; section grant is the auth answer.
+    const guard = await guardSection("messaging");
+    if (!guard.ok) return guard.response;
 
     const { conversationId } = await params;
 
@@ -71,7 +58,7 @@ export async function POST(
     }
 
     console.log(
-      `✅ [Resolve] Archiving conversation/ticket ${conversationId} by ${decoded.email}`,
+      `✅ [Resolve] Archiving conversation/ticket ${conversationId} by ${guard.admin.email}`,
     );
 
     // Update conversation to ARCHIVED state - this conversation is now closed
@@ -88,8 +75,8 @@ export async function POST(
           status: "archived", // Change status from 'active' to 'archived'
           resolvedAt: new Date(),
           archivedAt: new Date(),
-          resolvedBy: decoded.adminId,
-          resolvedByName: decoded.name || decoded.email,
+          resolvedBy: guard.admin.id,
+          resolvedByName: guard.admin.name || guard.admin.email,
           // This conversation is done - new messages will create a new ticket
           isAIHandled: false,
           updatedAt: new Date(),
@@ -104,7 +91,7 @@ export async function POST(
       senderType: "system",
       senderName: "System",
       messageType: "system",
-      content: `✅ Ticket #${ticketNumber} resolved and archived by ${decoded.name || decoded.email}. For new inquiries, please start a new conversation.`,
+      content: `✅ Ticket #${ticketNumber} resolved and archived by ${guard.admin.name || guard.admin.email}. For new inquiries, please start a new conversation.`,
       status: "sent",
       readBy: [],
       deliveredTo: [],
@@ -142,9 +129,9 @@ export async function POST(
         action: "ticket_resolved",
         category: "messaging",
         performedBy: {
-          id: decoded.adminId,
-          email: decoded.email,
-          name: decoded.name || decoded.email,
+          id: guard.admin.id,
+          email: guard.admin.email,
+          name: guard.admin.name || guard.admin.email,
           type: "employee",
         },
         details: {
@@ -195,18 +182,8 @@ export async function DELETE(
   { params }: { params: Promise<{ conversationId: string }> },
 ) {
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get("admin_token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const decoded = verify(token, JWT_SECRET) as {
-      adminId: string;
-      email: string;
-      name?: string;
-    };
+    const guard = await guardSection("messaging");
+    if (!guard.ok) return guard.response;
 
     const { conversationId } = await params;
 
@@ -244,7 +221,7 @@ export async function DELETE(
     const ticketNumber = conversation.ticketNumber || 1;
 
     console.log(
-      `🔄 [Reopen] Reopening ticket #${ticketNumber} (${conversationId}) by ${decoded.email}`,
+      `🔄 [Reopen] Reopening ticket #${ticketNumber} (${conversationId}) by ${guard.admin.email}`,
     );
 
     await db.collection("conversations").updateOne(
@@ -255,11 +232,11 @@ export async function DELETE(
           isArchived: false,
           status: "active",
           isAIHandled: false,
-          assignedEmployeeId: new Types.ObjectId(decoded.adminId),
-          assignedEmployeeName: decoded.name || decoded.email,
+          assignedEmployeeId: new Types.ObjectId(guard.admin.id),
+          assignedEmployeeName: guard.admin.name || guard.admin.email,
           reopenedAt: new Date(),
-          reopenedBy: decoded.adminId,
-          reopenedByName: decoded.name || decoded.email,
+          reopenedBy: guard.admin.id,
+          reopenedByName: guard.admin.name || guard.admin.email,
           updatedAt: new Date(),
         },
         $unset: {
@@ -278,7 +255,7 @@ export async function DELETE(
       senderType: "system",
       senderName: "System",
       messageType: "system",
-      content: `🔄 Ticket #${ticketNumber} reopened by ${decoded.name || decoded.email}`,
+      content: `🔄 Ticket #${ticketNumber} reopened by ${guard.admin.name || guard.admin.email}`,
       status: "sent",
       readBy: [],
       deliveredTo: [],
@@ -297,9 +274,9 @@ export async function DELETE(
         action: "ticket_reopened",
         category: "messaging",
         performedBy: {
-          id: decoded.adminId,
-          email: decoded.email,
-          name: decoded.name || decoded.email,
+          id: guard.admin.id,
+          email: guard.admin.email,
+          name: guard.admin.name || guard.admin.email,
           type: "employee",
         },
         details: {

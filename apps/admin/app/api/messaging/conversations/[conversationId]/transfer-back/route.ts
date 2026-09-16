@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { verify } from "jsonwebtoken";
 import mongoose, { Types, ClientSession } from "mongoose";
 import { connectToDatabase } from "@/database/mongoose";
-import { getAdminJwtSecret } from "@/lib/admin/jwt-secret";
-
-const JWT_SECRET = getAdminJwtSecret();
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 /**
  * POST /api/messaging/conversations/[conversationId]/transfer-back
@@ -21,20 +17,9 @@ export async function POST(
   let session: ClientSession | null = null;
 
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get("admin_token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const decoded = verify(token, JWT_SECRET) as {
-      adminId: string;
-      email: string;
-      name?: string;
-      role: string;
-      isSuperAdmin?: boolean;
-    };
+    // Reason: Messaging conversation view owns transfer-back; section grant is the auth answer.
+    const guard = await guardSection("messaging");
+    if (!guard.ok) return guard.response;
 
     const { conversationId } = await params;
     const body = await request.json().catch(() => ({}));
@@ -81,8 +66,8 @@ export async function POST(
 
     // Verify current user is the one who received the transfer (or super admin)
     if (
-      !decoded.isSuperAdmin &&
-      conversation.chatTransferredTo !== decoded.adminId
+      guard.admin.role !== "super_admin" &&
+      conversation.chatTransferredTo !== guard.admin.id
     ) {
       return NextResponse.json(
         {
@@ -104,7 +89,7 @@ export async function POST(
     }
 
     console.log(`🔙 [TransferBack] Starting transfer back: ${conversationId}`);
-    console.log(`   From: ${decoded.email} (${decoded.adminId})`);
+    console.log(`   From: ${guard.admin.email} (${guard.admin.id})`);
     console.log(`   Back to: ${originalEmployeeName} (${originalEmployeeId})`);
 
     // Start transaction
@@ -132,8 +117,8 @@ export async function POST(
           $push: {
             "metadata.transferHistory": {
               type: "transfer_back",
-              fromEmployeeId: decoded.adminId,
-              fromEmployeeName: decoded.name || decoded.email,
+              fromEmployeeId: guard.admin.id,
+              fromEmployeeName: guard.admin.name || guard.admin.email,
               toEmployeeId: originalEmployeeId,
               toEmployeeName: originalEmployeeName,
               notes,
@@ -152,7 +137,7 @@ export async function POST(
       await db.collection("conversations").updateOne(
         {
           _id: convObjectId,
-          "participants.id": decoded.adminId,
+          "participants.id": guard.admin.id,
         },
         {
           $set: {
@@ -206,15 +191,15 @@ export async function POST(
             action: "chat_transferred_back",
             category: "messaging",
             performedBy: {
-              id: decoded.adminId,
-              email: decoded.email,
-              name: decoded.name || decoded.email,
+              id: guard.admin.id,
+              email: guard.admin.email,
+              name: guard.admin.name || guard.admin.email,
               type: "employee",
             },
             details: {
               conversationId,
-              fromEmployeeId: decoded.adminId,
-              fromEmployeeName: decoded.name || decoded.email,
+              fromEmployeeId: guard.admin.id,
+              fromEmployeeName: guard.admin.name || guard.admin.email,
               toEmployeeId: originalEmployeeId,
               toEmployeeName: originalEmployeeName,
               notes,
@@ -232,11 +217,11 @@ export async function POST(
           employeeId: originalEmployeeId,
           type: "chat_transfer_returned",
           title: "Chat Returned",
-          message: `${decoded.name || decoded.email} returned a chat to you${notes ? `: ${notes}` : ""}`,
+          message: `${guard.admin.name || guard.admin.email} returned a chat to you${notes ? `: ${notes}` : ""}`,
           data: {
             conversationId,
-            fromEmployeeId: decoded.adminId,
-            fromEmployeeName: decoded.name || decoded.email,
+            fromEmployeeId: guard.admin.id,
+            fromEmployeeName: guard.admin.name || guard.admin.email,
             customerName: userParticipant?.name || "Customer",
           },
           isRead: false,

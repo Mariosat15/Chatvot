@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { verify } from "jsonwebtoken";
 import mongoose from "mongoose";
 import { connectToDatabase } from "@/database/mongoose";
-import { getAdminJwtSecret } from "@/lib/admin/jwt-secret";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 /**
  * GET /api/messaging/employees
@@ -11,23 +9,12 @@ import { getAdminJwtSecret } from "@/lib/admin/jwt-secret";
  */
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get("admin_token")?.value;
-
-    if (!token) {
-      console.log("❌ [Employees] No admin token found");
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const jwtSecret = getAdminJwtSecret();
-    const decoded = verify(token, jwtSecret) as {
-      adminId: string;
-      email: string;
-      role: string;
-    };
+    // Reason: Messaging screen owns the employee picker; section grant is the auth answer.
+    const guard = await guardSection("messaging");
+    if (!guard.ok) return guard.response;
 
     console.log(
-      `📧 [Employees] Request from: ${decoded.email}, adminId: ${decoded.adminId}`,
+      `📧 [Employees] Request from: ${guard.admin.email}, adminId: ${guard.admin.id}`,
     );
 
     await connectToDatabase();
@@ -44,9 +31,9 @@ export async function GET(request: NextRequest) {
     // Get all active employees except current user
     let currentUserId: mongoose.Types.ObjectId;
     try {
-      currentUserId = new mongoose.Types.ObjectId(decoded.adminId);
+      currentUserId = new mongoose.Types.ObjectId(guard.admin.id);
     } catch {
-      console.log(`❌ [Employees] Invalid adminId: ${decoded.adminId}`);
+      console.log(`❌ [Employees] Invalid adminId: ${guard.admin.id}`);
       return NextResponse.json({ error: "Invalid admin ID" }, { status: 400 });
     }
 
@@ -84,7 +71,7 @@ export async function GET(request: NextRequest) {
     });
 
     console.log(
-      `📧 [Employees] Fetched ${employees.length} employees for internal chat (excluding ${decoded.email})`,
+      `📧 [Employees] Fetched ${employees.length} employees for internal chat (excluding ${guard.admin.email})`,
     );
 
     // Get online status from presence collection

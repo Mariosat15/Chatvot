@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { verify } from "jsonwebtoken";
 import mongoose, { Types } from "mongoose";
 import { connectToDatabase } from "@/database/mongoose";
-import { getAdminJwtSecret } from "@/lib/admin/jwt-secret";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 /**
  * GET /api/messaging/conversations/[conversationId]
@@ -14,20 +12,9 @@ export async function GET(
   { params }: { params: Promise<{ conversationId: string }> },
 ) {
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get("admin_token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const jwtSecret = getAdminJwtSecret();
-    const decoded = verify(token, jwtSecret) as {
-      adminId: string;
-      email: string;
-      name?: string;
-      role: string;
-    };
+    // Reason: Messaging conversation view owns this route; section grant is the auth answer.
+    const guard = await guardSection("messaging");
+    if (!guard.ok) return guard.response;
 
     const { conversationId } = await params;
     const { searchParams } = new URL(request.url);
@@ -76,14 +63,14 @@ export async function GET(
     await Message.updateMany(
       {
         conversationId: new Types.ObjectId(conversationId),
-        senderId: { $ne: decoded.adminId },
-        "readBy.participantId": { $ne: decoded.adminId },
+        senderId: { $ne: guard.admin.id },
+        "readBy.participantId": { $ne: guard.admin.id },
       },
       {
         $push: {
           readBy: {
-            participantId: decoded.adminId,
-            participantName: decoded.name || decoded.email,
+            participantId: guard.admin.id,
+            participantName: guard.admin.name || guard.admin.email,
             readAt: new Date(),
           },
         },
@@ -98,7 +85,7 @@ export async function GET(
         .collection("conversations")
         .updateOne(
           { _id: new Types.ObjectId(conversationId) },
-          { $set: { [`unreadCounts.${decoded.adminId}`]: 0 } },
+          { $set: { [`unreadCounts.${guard.admin.id}`]: 0 } },
         );
     }
 

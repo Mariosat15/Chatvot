@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { verify } from "jsonwebtoken";
 import mongoose, { Types } from "mongoose";
 import { connectToDatabase } from "@/database/mongoose";
-import { getAdminJwtSecret } from "@/lib/admin/jwt-secret";
-
-const JWT_SECRET = getAdminJwtSecret();
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 /**
  * POST /api/messaging/conversations/create-with-customer
@@ -13,25 +9,15 @@ const JWT_SECRET = getAdminJwtSecret();
  */
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get("admin_token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const decoded = verify(token, JWT_SECRET) as {
-      adminId: string;
-      email: string;
-      role: string;
-      isSuperAdmin?: boolean;
-    };
+    // Reason: Messaging inbox owns customer chat creation; section grant is the auth answer.
+    const guard = await guardSection("messaging");
+    if (!guard.ok) return guard.response;
 
     const body = await request.json();
     const { customerId, customerName, customerAvatar } = body;
 
     console.log(
-      `💬 [CreateWithCustomer] Employee: ${decoded.email} (${decoded.adminId})`,
+      `💬 [CreateWithCustomer] Employee: ${guard.admin.email} (${guard.admin.id})`,
     );
     console.log(
       `💬 [CreateWithCustomer] Customer: ${customerName || "Unknown"} (${customerId})`,
@@ -56,7 +42,7 @@ export async function POST(request: NextRequest) {
 
     // Get employee details
     const employee = await db.collection("admins").findOne({
-      _id: new Types.ObjectId(decoded.adminId),
+      _id: new Types.ObjectId(guard.admin.id),
     });
 
     if (!employee) {
@@ -96,7 +82,7 @@ export async function POST(request: NextRequest) {
     if (existingConversation) {
       // Add employee as participant if not already
       const hasEmployee = existingConversation.participants?.some(
-        (p: any) => p.id === decoded.adminId && p.type === "employee",
+        (p: any) => p.id === guard.admin.id && p.type === "employee",
       );
 
       if (!hasEmployee) {
@@ -105,7 +91,7 @@ export async function POST(request: NextRequest) {
           {
             $push: {
               participants: {
-                id: decoded.adminId,
+                id: guard.admin.id,
                 type: "employee",
                 name: employee.name || employee.email.split("@")[0],
                 avatar: employee.profileImage,
@@ -114,7 +100,7 @@ export async function POST(request: NextRequest) {
               },
             },
             $set: {
-              assignedEmployeeId: decoded.adminId,
+              assignedEmployeeId: guard.admin.id,
               assignedEmployeeName:
                 employee.name || employee.email.split("@")[0],
               isAIHandled: false,
@@ -148,7 +134,7 @@ export async function POST(request: NextRequest) {
           isActive: true,
         },
         {
-          id: decoded.adminId,
+          id: guard.admin.id,
           type: "employee",
           name: employee.name || employee.email.split("@")[0],
           avatar: employee.profileImage,
@@ -156,7 +142,7 @@ export async function POST(request: NextRequest) {
           isActive: true,
         },
       ],
-      assignedEmployeeId: decoded.adminId,
+      assignedEmployeeId: guard.admin.id,
       assignedEmployeeName: employee.name || employee.email.split("@")[0],
       isAIHandled: false,
       unreadCounts: {},
@@ -173,14 +159,14 @@ export async function POST(request: NextRequest) {
     // Send welcome message from employee
     const welcomeMessage = {
       conversationId: result.insertedId,
-      senderId: decoded.adminId,
+      senderId: guard.admin.id,
       senderType: "employee",
       senderName: employee.name || employee.email.split("@")[0],
       senderAvatar: employee.profileImage,
       content: `Hello ${finalCustomerName}! I'm reaching out to assist you. How can I help you today?`,
       messageType: "text",
       status: "sent",
-      readBy: [{ participantId: decoded.adminId, readAt: new Date() }],
+      readBy: [{ participantId: guard.admin.id, readAt: new Date() }],
       createdAt: new Date(),
     };
 
@@ -193,7 +179,7 @@ export async function POST(request: NextRequest) {
         $set: {
           lastMessage: {
             content: welcomeMessage.content,
-            senderId: decoded.adminId,
+            senderId: guard.admin.id,
             senderName: welcomeMessage.senderName,
             timestamp: new Date(),
           },

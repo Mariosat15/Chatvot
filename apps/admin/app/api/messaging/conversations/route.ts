@@ -1,43 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { verify } from "jsonwebtoken";
 import mongoose, { Types } from "mongoose";
 import { connectToDatabase } from "@/database/mongoose";
-import { getAdminJwtSecret } from "@/lib/admin/jwt-secret";
-
-const JWT_SECRET = getAdminJwtSecret();
-
-interface DecodedToken {
-  adminId: string;
-  email: string;
-  name?: string;
-  role: string;
-  isSuperAdmin?: boolean;
-}
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 /**
  * GET /api/messaging/conversations
  * Get conversations for admin/employees with proper access control:
  *
- * - Super Admin / Admin: Can see ALL conversations
+ * - Super Admin: Can see ALL conversations
  * - Employees: Can ONLY see:
  *   - Support conversations with their assigned customers
  *   - Internal conversations they're part of
  */
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get("admin_token")?.value;
+    // Reason: Messaging inbox owns this list; section grant is the auth answer.
+    const guard = await guardSection("messaging");
+    if (!guard.ok) return guard.response;
 
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const decoded = verify(token, JWT_SECRET) as DecodedToken;
-    const { adminId, email, role, isSuperAdmin } = decoded;
+    const { id: adminId, email } = guard.admin;
+    // Reason: GuardedAdmin.role is only "super_admin" | "admin". Treating "admin" as
+    // full-visibility would let every messaging employee see all conversations.
+    const isFullAdmin = guard.admin.role === "super_admin";
 
     console.log(
-      `📥 [GetConv] Request from: ${email} (${role}), isSuperAdmin: ${isSuperAdmin}`,
+      `📥 [GetConv] Request from: ${email} (${guard.admin.role}), isFullAdmin: ${isFullAdmin}`,
     );
 
     await connectToDatabase();
@@ -56,13 +43,6 @@ export async function GET(request: NextRequest) {
     const includeArchived = searchParams.get("includeArchived") !== "false"; // Default: include archived
     const limit = parseInt(searchParams.get("limit") || "50");
     const offset = parseInt(searchParams.get("offset") || "0");
-
-    // Check if user is super admin or admin (can see everything)
-    const isFullAdmin =
-      isSuperAdmin ||
-      role === "admin" ||
-      role === "Admin" ||
-      role === "Full Admin";
 
     // Get assigned customer IDs for non-admin employees
     let assignedCustomerIds: string[] = [];
@@ -232,15 +212,10 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get("admin_token")?.value;
+    const guard = await guardSection("messaging");
+    if (!guard.ok) return guard.response;
 
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const decoded = verify(token, JWT_SECRET) as DecodedToken;
-    const { adminId, email, name } = decoded;
+    const { id: adminId, email, name } = guard.admin;
 
     console.log(`💬 [CreateConv] Request from: ${email}, adminId: ${adminId}`);
 

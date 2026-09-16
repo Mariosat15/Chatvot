@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { verify } from "jsonwebtoken";
 import mongoose, { Types } from "mongoose";
 import { connectToDatabase } from "@/database/mongoose";
-import { getAdminJwtSecret } from "@/lib/admin/jwt-secret";
-
-const JWT_SECRET = getAdminJwtSecret();
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 /**
  * POST /api/messaging/conversations/[conversationId]/clear
@@ -16,18 +12,9 @@ export async function POST(
   { params }: { params: Promise<{ conversationId: string }> },
 ) {
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get("admin_token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const decoded = verify(token, JWT_SECRET) as {
-      adminId: string;
-      email: string;
-      name?: string;
-    };
+    // Reason: Messaging conversation view owns clear; section grant is the auth answer.
+    const guard = await guardSection("messaging");
+    if (!guard.ok) return guard.response;
 
     const { conversationId } = await params;
 
@@ -63,7 +50,7 @@ export async function POST(
     }
 
     console.log(
-      `🗑️ [Clear] Clearing conversation ${conversationId} by ${decoded.email}`,
+      `🗑️ [Clear] Clearing conversation ${conversationId} by ${guard.admin.email}`,
     );
 
     // Soft delete all messages in this conversation
@@ -73,7 +60,7 @@ export async function POST(
         $set: {
           isDeleted: true,
           deletedAt: new Date(),
-          deletedBy: decoded.adminId,
+          deletedBy: guard.admin.id,
         },
       },
     );
@@ -85,7 +72,7 @@ export async function POST(
       senderType: "system",
       senderName: "System",
       messageType: "system",
-      content: `🗑️ Chat history cleared by ${decoded.name || decoded.email}`,
+      content: `🗑️ Chat history cleared by ${guard.admin.name || guard.admin.email}`,
       status: "sent",
       readBy: [],
       deliveredTo: [],
@@ -126,9 +113,9 @@ export async function POST(
           action: "chat_cleared",
           category: "messaging",
           performedBy: {
-            id: decoded.adminId,
-            email: decoded.email,
-            name: decoded.name || decoded.email,
+            id: guard.admin.id,
+            email: guard.admin.email,
+            name: guard.admin.name || guard.admin.email,
             type: "employee",
           },
           details: {

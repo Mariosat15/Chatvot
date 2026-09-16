@@ -6,6 +6,7 @@ import CompetitionParticipant from "@/database/models/trading/competition-partic
 import ChallengeParticipant from "@/database/models/trading/challenge-participant.model";
 import Competition from "@/database/models/trading/competition.model";
 import Challenge from "@/database/models/trading/challenge.model";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 /**
  * GET /api/trading-history/users/[userId]
@@ -18,6 +19,10 @@ export async function GET(
   { params }: { params: Promise<{ userId: string }> },
 ) {
   try {
+    // Reason: Trading History detail view owns this route; section grant is the auth answer.
+    const guard = await guardSection("trading-history");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     const { userId } = await params;

@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { verify } from "jsonwebtoken";
 import mongoose from "mongoose";
 import { connectToDatabase } from "@/database/mongoose";
-import { getAdminJwtSecret } from "@/lib/admin/jwt-secret";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 // Messaging Settings Schema
 const MessagingSettingsSchema = new mongoose.Schema(
@@ -104,15 +102,9 @@ const MessagingSettingsSchema = new mongoose.Schema(
  */
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get("admin_token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const jwtSecret = getAdminJwtSecret();
-    verify(token, jwtSecret);
+    // Reason: Messaging Settings screen owns this read; messaging-settings grant is the auth answer.
+    const guard = await guardSection("messaging-settings");
+    if (!guard.ok) return guard.response;
 
     await connectToDatabase();
 
@@ -141,27 +133,10 @@ export async function GET(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get("admin_token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const jwtSecret = getAdminJwtSecret();
-    const decoded = verify(token, jwtSecret) as {
-      id: string;
-      email: string;
-      isSuperAdmin?: boolean;
-    };
-
-    // Only super admin can change settings
-    if (!decoded.isSuperAdmin) {
-      return NextResponse.json(
-        { error: "Only super admin can modify messaging settings" },
-        { status: 403 },
-      );
-    }
+    // Reason: Messaging Settings screen owns this write; the section grant replaces the old
+    // super-admin-only check — anyone who can open the screen may save.
+    const guard = await guardSection("messaging-settings");
+    if (!guard.ok) return guard.response;
 
     const body = await request.json();
 
@@ -181,7 +156,7 @@ export async function PUT(request: NextRequest) {
       settings = await MessagingSettings.create(body);
     }
 
-    console.log(`✅ [Messaging Settings] Updated by ${decoded.email}`);
+    console.log(`✅ [Messaging Settings] Updated by ${guard.admin.email}`);
 
     // Handle AI enable/disable toggle - update all active support conversations
     const newAIEnabled = body.enableAISupport;

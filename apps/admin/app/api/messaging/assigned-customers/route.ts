@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { verify } from "jsonwebtoken";
 import mongoose from "mongoose";
 import { connectToDatabase } from "@/database/mongoose";
-import { getAdminJwtSecret } from "@/lib/admin/jwt-secret";
-
-const JWT_SECRET = getAdminJwtSecret();
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 /**
  * GET /api/messaging/assigned-customers
@@ -13,18 +9,9 @@ const JWT_SECRET = getAdminJwtSecret();
  */
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get("admin_token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const decoded = verify(token, JWT_SECRET) as {
-      adminId: string;
-      email: string;
-      isSuperAdmin?: boolean;
-    };
+    // Reason: Messaging inbox owns this list; section grant is the auth answer.
+    const guard = await guardSection("messaging");
+    if (!guard.ok) return guard.response;
 
     await connectToDatabase();
 
@@ -34,16 +21,16 @@ export async function GET(request: NextRequest) {
     }
 
     console.log(
-      `🔍 [Messaging] Fetching assigned customers for employee: ${decoded.email} (ID: ${decoded.adminId})`,
+      `🔍 [Messaging] Fetching assigned customers for employee: ${guard.admin.email} (ID: ${guard.admin.id})`,
     );
 
     // Convert adminId to ObjectId for comparison
     let employeeObjectId;
     try {
-      employeeObjectId = new mongoose.Types.ObjectId(decoded.adminId);
+      employeeObjectId = new mongoose.Types.ObjectId(guard.admin.id);
     } catch {
       console.log(
-        `⚠️ [Messaging] Could not convert adminId to ObjectId: ${decoded.adminId}`,
+        `⚠️ [Messaging] Could not convert adminId to ObjectId: ${guard.admin.id}`,
       );
     }
 
@@ -51,8 +38,8 @@ export async function GET(request: NextRequest) {
     const query = {
       isActive: true,
       $or: [
-        { employeeId: decoded.adminId },
-        { employeeId: decoded.adminId?.toString() },
+        { employeeId: guard.admin.id },
+        { employeeId: guard.admin.id?.toString() },
         ...(employeeObjectId ? [{ employeeId: employeeObjectId }] : []),
       ],
     };

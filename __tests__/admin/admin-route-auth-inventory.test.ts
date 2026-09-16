@@ -58,6 +58,10 @@ import { classifyRouteAuth, stripComments } from "../helpers/route-guard-audit";
  * owner question as much as a code one, and that is why they are frozen here rather than
  * swept in one commit.
  */
+/**
+ * 55 routes calling no authentication of any kind. Frozen rather than swept:
+ * each needs a decision about which grant owns the screen that calls it.
+ */
 const NO_CHECK_OF_ANY_KIND = [
   "action-terms/[slug]/route.ts",
   "admin/database/indexes/route.ts",
@@ -109,9 +113,6 @@ const NO_CHECK_OF_ANY_KIND = [
   "tests/runs/route.ts",
   "tests/schedule/route.ts",
   "tests/suites/route.ts",
-  "trading-history/export/route.ts",
-  "trading-history/users/[userId]/route.ts",
-  "trading-history/users/route.ts",
   "update-competition-status/route.ts",
   "visitors/block/route.ts",
   "visitors/clear/route.ts",
@@ -120,33 +121,17 @@ const NO_CHECK_OF_ANY_KIND = [
 ] as const;
 
 /**
- * 15 routes that verify a JWT by hand and then ask nothing about grants. Cheaper to
- * close than the list above - the caller is already known - and the reason this class exists
- * at all is that a grep for helper names walks straight past them.
+ * 3 routes that verify a JWT by hand and then ask nothing about grants.
  */
 const HAND_VERIFIED_NO_GRANT = [
   "employees/availability/route.ts",
-  "messaging/assigned-customers/route.ts",
-  "messaging/conversations/[conversationId]/clear/route.ts",
-  "messaging/conversations/[conversationId]/messages/route.ts",
-  "messaging/conversations/[conversationId]/reassign-back/route.ts",
-  "messaging/conversations/[conversationId]/resolve/route.ts",
-  "messaging/conversations/[conversationId]/route.ts",
-  "messaging/conversations/[conversationId]/transfer-back/route.ts",
-  "messaging/conversations/[conversationId]/transfer/route.ts",
-  "messaging/conversations/create-with-customer/route.ts",
-  "messaging/conversations/route.ts",
-  "messaging/employees/route.ts",
-  "messaging/settings/route.ts",
   "trading-risk-settings/route.ts",
   "trigger-margin-check/route.ts",
 ] as const;
 
 /**
  * 189 routes that authenticate with a helper and never ask which sections the caller
- * holds. The largest list and the least alarming: an employee granted one unrelated section
- * passes every one of them. The remedy is mechanical, so the cost is review volume rather
- * than judgement.
+ * holds.
  */
 const HELPER_BUT_NO_GRANT = [
   "admin-bank-accounts/[id]/route.ts",
@@ -341,7 +326,15 @@ const HELPER_BUT_NO_GRANT = [
 ] as const;
 
 /** Folders closed by R101a and R101b. Nothing under these may appear in any list above. */
-const CLOSED_FOLDERS = ["users", "ai", "badges", "journey-map", "journey"];
+const CLOSED_FOLDERS = [
+  "users",
+  "ai",
+  "badges",
+  "journey-map",
+  "journey",
+  "trading-history",
+  "messaging",
+];
 
 const findings = inventoryAdminRoutes();
 
@@ -503,7 +496,9 @@ describe("R101d - the folders already closed stay closed", () => {
     expect(read("users/edit/route.ts")).toBe("section-granted");
     expect(read("badges/route.ts")).toBe("section-granted");
     expect(read("check-database/route.ts")).toBe("no-check");
-    expect(read("messaging/settings/route.ts")).toBe("hand-verified-no-grant");
+    expect(read("messaging/settings/route.ts")).toBe("section-granted");
+    expect(read("trading-history/export/route.ts")).toBe("section-granted");
+    expect(read("trading-risk-settings/route.ts")).toBe("hand-verified-no-grant");
     expect(read("withdrawals/route.ts")).toBe("helper-no-grant");
   });
 });

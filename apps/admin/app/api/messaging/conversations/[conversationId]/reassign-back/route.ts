@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { verify } from "jsonwebtoken";
 import mongoose from "mongoose";
 import { connectToDatabase } from "@/database/mongoose";
-import { getAdminJwtSecret } from "@/lib/admin/jwt-secret";
-
-const JWT_SECRET = getAdminJwtSecret();
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 /**
  * POST /api/messaging/conversations/[conversationId]/reassign-back
@@ -16,17 +12,9 @@ export async function POST(
   { params }: { params: Promise<{ conversationId: string }> },
 ) {
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get("admin_token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const decoded = verify(token, JWT_SECRET) as {
-      adminId: string;
-      email: string;
-    };
+    // Reason: Messaging conversation view owns reassign; section grant is the auth answer.
+    const guard = await guardSection("messaging");
+    if (!guard.ok) return guard.response;
 
     const { conversationId } = await params;
 
@@ -115,7 +103,7 @@ export async function POST(
     });
 
     console.log(
-      `📋 [Reassign] Conversation ${conversationId} reassigned back to ${originalEmployee.email}`,
+      `📋 [Reassign] Conversation ${conversationId} reassigned back to ${originalEmployee.email} (by ${guard.admin.email})`,
     );
 
     return NextResponse.json({

@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 import TradeHistory from "@/database/models/trading/trade-history.model";
 import Competition from "@/database/models/trading/competition.model";
 import Challenge from "@/database/models/trading/challenge.model";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 /**
  * GET /api/trading-history/export
@@ -12,6 +13,10 @@ import Challenge from "@/database/models/trading/challenge.model";
  */
 export async function GET(request: NextRequest) {
   try {
+    // Reason: Trading History screen owns this export; section grant is the auth answer.
+    const guard = await guardSection("trading-history");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     const searchParams = request.nextUrl.searchParams;

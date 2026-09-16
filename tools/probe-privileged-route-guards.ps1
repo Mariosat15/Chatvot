@@ -304,9 +304,58 @@ Invoke-Probe -Name 'a weaker helper returns beside the guard' -File $PRESENCE `
   -Replace '    if (!guard.ok) return guard.response; const s = await getAdminSession(); void s;' `
   -ExpectTest 'every file names guardSection and no weaker helper'
 
+$TH_EXPORT = 'apps/admin/app/api/trading-history/export/route.ts'
+$MSG_CONV = 'apps/admin/app/api/messaging/conversations/route.ts'
+$MSG_SETTINGS = 'apps/admin/app/api/messaging/settings/route.ts'
+$MSG_EMP = 'apps/admin/app/api/messaging/employees/route.ts'
+
+Write-Host "`n=== R101c probes ===`n"
+
+# 21. Trading-history export was world-readable. Restoring that state.
+Invoke-Probe -Name 'trading-history export unguarded' -File $TH_EXPORT `
+  -Find '    const guard = await guardSection("trading-history");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'trading-history/export/route.ts: one guard and one refusal'
+
+# 22. Wrong grant on the export - financial would compile and silently widen who can download
+#     every player's trades.
+Invoke-Probe -Name 'trading-history export wrong section' -File $TH_EXPORT `
+  -Find 'guardSection("trading-history")' `
+  -Replace 'guardSection("financial")' `
+  -ExpectTest 'trading-history/export/route.ts: guards every handler with the section'
+
+# 23. Hand-rolled JWT restored beside the guard on a messaging route - the shape that hid the
+#     whole folder from the handler-vs-guard count.
+Invoke-Probe -Name 'messaging hand-rolled jwt returns' -File $MSG_EMP `
+  -Find 'import { guardSection } from "@/lib/admin/section-route-guard";' `
+  -Replace 'import { guardSection } from "@/lib/admin/section-route-guard"; import { verify } from "jsonwebtoken";' `
+  -ExpectTest 'every file names guardSection, no weaker helper, and no jsonwebtoken import'
+
+# 24. Settings and inbox grants collapse - settings gets the inbox section.
+Invoke-Probe -Name 'settings uses inbox grant' -File $MSG_SETTINGS `
+  -Find 'guardSection("messaging-settings")' `
+  -Replace 'guardSection("messaging")' `
+  -ExpectTest 'messaging/settings is the only file under messaging/'
+
+# 25. Inbox route takes the settings grant - the other direction of the same collapse.
+Invoke-Probe -Name 'inbox uses settings grant' -File $MSG_CONV `
+  -Find 'guardSection("messaging")' `
+  -Replace 'guardSection("messaging-settings")' `
+  -ExpectTest 'messaging/settings is the only file under messaging/'
+
+# 26. A closed-folder route loses its grant entirely.
+Invoke-Probe -Name 'messaging closed folder loses grant' -File $MSG_EMP `
+  -Find '    const guard = await guardSection("messaging");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'but none of them are in the folders R101a closed'
+
 Write-Host ''
 Write-Host 'UNPROBED, with the reason: "still finds routes with no authorization call at all".' -ForegroundColor DarkGray
-Write-Host 'Turning that canary red means guarding the 78 remaining routes, which is R101c and'  -ForegroundColor DarkGray
-Write-Host 'R101d rather than a mutation. It is the one assertion here designed to fail when the' -ForegroundColor DarkGray
-Write-Host 'work is FINISHED, so a probe proving it can fail would be proving the wrong thing.'   -ForegroundColor DarkGray
+Write-Host 'Turning that canary red means guarding the remaining no-check debt, which is later' -ForegroundColor DarkGray
+Write-Host 'R101 work rather than a mutation. It is the one assertion here designed to fail when' -ForegroundColor DarkGray
+Write-Host 'the TREE is finished, so a probe proving it can fail would be proving the wrong thing.' -ForegroundColor DarkGray
 Write-Host ''

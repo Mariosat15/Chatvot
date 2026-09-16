@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBulkUserStats } from "@/lib/services/user-stats.service";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 /**
  * GET /api/trading-history/users
@@ -9,6 +10,10 @@ import { getBulkUserStats } from "@/lib/services/user-stats.service";
  */
 export async function GET(request: NextRequest) {
   try {
+    // Reason: Trading History screen owns this list; section grant is the auth answer.
+    const guard = await guardSection("trading-history");
+    if (!guard.ok) return guard.response;
+
     const searchParams = request.nextUrl.searchParams;
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "20");

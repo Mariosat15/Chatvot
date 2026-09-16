@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { verify } from "jsonwebtoken";
 import mongoose, { Types, ClientSession } from "mongoose";
 import { connectToDatabase } from "@/database/mongoose";
-import { getAdminJwtSecret } from "@/lib/admin/jwt-secret";
-
-const JWT_SECRET = getAdminJwtSecret();
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 interface TransferResult {
   success: boolean;
@@ -32,20 +28,9 @@ export async function POST(
   let previousState: any = null;
 
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get("admin_token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const decoded = verify(token, JWT_SECRET) as {
-      adminId: string;
-      email: string;
-      name?: string;
-      role: string;
-      isSuperAdmin?: boolean;
-    };
+    // Reason: Messaging conversation view owns transfer; section grant is the auth answer.
+    const guard = await guardSection("messaging");
+    if (!guard.ok) return guard.response;
 
     const { conversationId } = await params;
     const body = await request.json();
@@ -66,7 +51,7 @@ export async function POST(
     }
 
     // Cannot transfer to self
-    if (toEmployeeId === decoded.adminId) {
+    if (toEmployeeId === guard.admin.id) {
       return NextResponse.json(
         { error: "Cannot transfer to yourself" },
         { status: 400 },
@@ -84,7 +69,7 @@ export async function POST(
     }
 
     // Check if chat transfers are enabled (unless super admin)
-    if (!decoded.isSuperAdmin) {
+    if (guard.admin.role !== "super_admin") {
       const settings = await db.collection("messaging_settings").findOne({});
       if (settings?.allowChatTransfer === false) {
         return NextResponse.json(
@@ -150,7 +135,7 @@ export async function POST(
     console.log(
       `🔄 [Transfer] Starting ${transferAllConversations ? "ALL conversations" : "chat"} transfer: ${conversationId}`,
     );
-    console.log(`   From: ${decoded.email} (${decoded.adminId})`);
+    console.log(`   From: ${guard.admin.email} (${guard.admin.id})`);
     console.log(`   To: ${toEmployeeName} (${toEmployeeId})`);
     console.log(`   Transfer All: ${transferAllConversations}`);
 
@@ -187,12 +172,12 @@ export async function POST(
       const originalEmployeeId =
         conversation.chatTransferredFrom ||
         conversation.assignedEmployeeId?.toString() ||
-        decoded.adminId;
+        guard.admin.id;
       const originalEmployeeName =
         conversation.chatTransferredFromName ||
         conversation.assignedEmployeeName ||
-        decoded.name ||
-        decoded.email;
+        guard.admin.name ||
+        guard.admin.email;
 
       // Transfer each conversation
       const transferredConversations: Types.ObjectId[] = [];
@@ -230,8 +215,8 @@ export async function POST(
             $push: {
               "metadata.transferHistory": {
                 type: transferAllConversations ? "bulk_transfer" : transferType,
-                fromEmployeeId: decoded.adminId,
-                fromEmployeeName: decoded.name || decoded.email,
+                fromEmployeeId: guard.admin.id,
+                fromEmployeeName: guard.admin.name || guard.admin.email,
                 toEmployeeId,
                 toEmployeeName,
                 reason:
@@ -257,7 +242,7 @@ export async function POST(
         await db.collection("conversations").updateOne(
           {
             _id: convId,
-            "participants.id": decoded.adminId,
+            "participants.id": guard.admin.id,
             "participants.type": "employee",
           },
           {
@@ -314,7 +299,7 @@ export async function POST(
           senderName: "System",
           content: transferAllConversations
             ? `📋 Ticket #${ticketNumber} transferred to ${toEmployeeName} (bulk transfer)${reason ? ` - ${reason}` : ""}`
-            : `💬 Ticket #${ticketNumber} transferred from ${decoded.name || decoded.email} to ${toEmployeeName}${reason ? ` - ${reason}` : ""}`,
+            : `💬 Ticket #${ticketNumber} transferred from ${guard.admin.name || guard.admin.email} to ${toEmployeeName}${reason ? ` - ${reason}` : ""}`,
           messageType: "system",
           status: "sent",
           readBy: [],
@@ -343,9 +328,9 @@ export async function POST(
               : "chat_transferred",
             category: "messaging",
             performedBy: {
-              id: decoded.adminId,
-              email: decoded.email,
-              name: decoded.name || decoded.email,
+              id: guard.admin.id,
+              email: guard.admin.email,
+              name: guard.admin.name || guard.admin.email,
               type: "employee",
             },
             details: {
@@ -355,8 +340,8 @@ export async function POST(
               conversationIds: transferredConversations.map((id) =>
                 id.toString(),
               ),
-              fromEmployeeId: decoded.adminId,
-              fromEmployeeName: decoded.name || decoded.email,
+              fromEmployeeId: guard.admin.id,
+              fromEmployeeName: guard.admin.name || guard.admin.email,
               toEmployeeId,
               toEmployeeName,
               reason,
@@ -381,13 +366,13 @@ export async function POST(
             ? "Customer Chats Transferred"
             : "New Chat Transferred",
           message: transferAllConversations
-            ? `${decoded.name || decoded.email} transferred all ${transferredConversations.length} conversation(s) with ${customerName} to you${reason ? `: ${reason}` : ""}`
-            : `${decoded.name || decoded.email} transferred a chat to you${reason ? `: ${reason}` : ""}`,
+            ? `${guard.admin.name || guard.admin.email} transferred all ${transferredConversations.length} conversation(s) with ${customerName} to you${reason ? `: ${reason}` : ""}`
+            : `${guard.admin.name || guard.admin.email} transferred a chat to you${reason ? `: ${reason}` : ""}`,
           data: {
             conversationId,
             conversationsTransferred: transferredConversations.length,
-            fromEmployeeId: decoded.adminId,
-            fromEmployeeName: decoded.name || decoded.email,
+            fromEmployeeId: guard.admin.id,
+            fromEmployeeName: guard.admin.name || guard.admin.email,
             customerName,
           },
           isRead: false,
