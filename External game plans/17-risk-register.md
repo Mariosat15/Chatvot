@@ -4558,7 +4558,7 @@ same limit would refuse.
 
 ---
 
-### R101 - Ninety-nine admin routes with no authorization, and fifty-eight of them write - **R101a–R101h CLOSED 16 Sep 2026; tree still open**
+### R101 - Ninety-nine admin routes with no authorization, and fifty-eight of them write - **R101a–R101i CLOSED 16 Sep 2026; tree still open**
 
 **What it is.** `apps/admin` is a separate Next.js process with **no `middleware.ts` of its
 own**. The root `middleware.ts` belongs to the main app and never runs for these routes, so
@@ -4910,7 +4910,13 @@ the folder cannot grow a fourth unguarded file. Privileged suite grew; 4 new pro
 `=== R101h probes ===` each red on exactly one failure. Inventory after:
 **35 no-check / 3 hand-verified / 189 helper / 110 section-granted**.
 
-**R101 remains open** on the remaining 35 no-check routes.
+**R101i CLOSED 16 September 2026.** The whole of `market-settings/` - **4 route files, 9 handlers** -
+grant `market` from `MarketSettingsSection`. Template/automatic holiday writers were
+world-writable; the two `getAdminSession` routes in the same folder were upgraded so the
+folder cannot grow an under-granted file. 4 new probes each red on exactly one failure. Inventory after:
+**33 no-check / 3 hand-verified / 187 helper / 114 section-granted**.
+
+**R101 remains open** on the remaining 33 no-check routes.
 
 ---
 

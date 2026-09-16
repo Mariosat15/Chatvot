@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAdminSession } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import MarketSettings from "@/database/models/market-settings.model";
 import AuditLog from "@/database/models/audit-log.model";
@@ -7,10 +7,9 @@ import AuditLog from "@/database/models/audit-log.model";
 // GET - Fetch market settings
 export async function GET() {
   try {
-    const session = await getAdminSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // Reason: MarketSettingsSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("market");
+    if (!guard.ok) return guard.response;
 
     await connectToDatabase();
 
@@ -33,10 +32,10 @@ export async function GET() {
 // PUT - Update ALL market settings at once (mode, schedules, holidays, blocking rules)
 export async function PUT(request: Request) {
   try {
-    const session = await getAdminSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // Reason: MarketSettingsSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("market");
+    if (!guard.ok) return guard.response;
+    const session = guard.admin;
 
     await connectToDatabase();
 

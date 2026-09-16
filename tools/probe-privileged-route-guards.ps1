@@ -493,6 +493,42 @@ Invoke-Probe -Name 'symbols closed folder loses grant' -File $SYM_SYNC `
   -Replace2 '' `
   -ExpectTest 'but none of them are in the folders R101a closed'
 
+$MS_TEMPLATE = 'apps/admin/app/api/market-settings/template-holidays/route.ts'
+$MS_AUTO = 'apps/admin/app/api/market-settings/automatic-holidays/route.ts'
+
+Write-Host "`n=== R101i probes ===`n"
+
+# 43. template-holidays POST was world-writable - rewrites the holiday calendar.
+# Reason: -First keeps blast to one handler; all three guard lines are identical.
+Invoke-Probe -Name 'template-holidays POST unguarded' -File $MS_TEMPLATE -First `
+  -Find '    const guard = await guardSection("market");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'every market-settings file names guardSection'
+
+# 44. Wrong grant - visitors would compile and silently widen who can edit market settings.
+Invoke-Probe -Name 'market-settings wrong section' -File $MS_TEMPLATE -First `
+  -Find 'guardSection("market")' `
+  -Replace 'guardSection("visitors")' `
+  -ExpectTest 'market-settings/template-holidays/route.ts: guards every handler with the section'
+
+# 45. automatic-holidays GET was world-readable with no auth.
+Invoke-Probe -Name 'automatic-holidays GET unguarded' -File $MS_AUTO `
+  -Find '    const guard = await guardSection("market");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'market-settings/automatic-holidays/route.ts: one guard and one refusal'
+
+# 46. Folder-level canary.
+Invoke-Probe -Name 'market-settings closed folder loses grant' -File $MS_AUTO `
+  -Find '    const guard = await guardSection("market");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'but none of them are in the folders R101a closed'
+
 Write-Host ''
 Write-Host 'UNPROBED, with the reason: "still finds routes with no authorization call at all".' -ForegroundColor DarkGray
 Write-Host 'Turning that canary red means guarding the remaining no-check debt, which is later' -ForegroundColor DarkGray

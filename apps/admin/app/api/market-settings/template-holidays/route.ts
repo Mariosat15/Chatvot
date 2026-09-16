@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import MarketSettings from "@/database/models/market-settings.model";
 
@@ -218,6 +219,10 @@ function generateTemplateHolidays(): TemplateHoliday[] {
  */
 export async function GET() {
   try {
+    // Reason: MarketSettingsSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("market");
+    if (!guard.ok) return guard.response;
+
     const templateHolidays = generateTemplateHolidays();
 
     return NextResponse.json({
@@ -241,6 +246,10 @@ export async function GET() {
  */
 export async function POST() {
   try {
+    // Reason: MarketSettingsSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("market");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     let settings = await MarketSettings.findOne();
@@ -283,6 +292,10 @@ export async function POST() {
  */
 export async function DELETE() {
   try {
+    // Reason: MarketSettingsSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("market");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     const settings = await MarketSettings.findOne();

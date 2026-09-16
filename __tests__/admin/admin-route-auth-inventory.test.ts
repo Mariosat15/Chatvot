@@ -59,9 +59,9 @@ import { classifyRouteAuth, stripComments } from "../helpers/route-guard-audit";
  * swept in one commit.
  */
 /**
- * 35 routes calling no authentication of any kind. Frozen rather than swept:
+ * 33 routes calling no authentication of any kind. Frozen rather than swept:
  * each needs a decision about which grant owns the screen that calls it.
- * (Was 38 after R101g; R101h moved the three symbols routes into section-granted.)
+ * (Was 35 after R101h; R101i moved the two market-settings no-check routes into section-granted.)
  */
 const NO_CHECK_OF_ANY_KIND = [
   "action-terms/[slug]/route.ts",
@@ -74,8 +74,6 @@ const NO_CHECK_OF_ANY_KIND = [
   "check-database/route.ts",
   "diagnose-user/route.ts",
   "fraud/restrictions/route.ts",
-  "market-settings/automatic-holidays/route.ts",
-  "market-settings/template-holidays/route.ts",
   "market-status/route.ts",
   "pages/[slug]/route.ts",
   "pages/generate-risk-disclaimer/route.ts",
@@ -111,8 +109,9 @@ const HAND_VERIFIED_NO_GRANT = [
 ] as const;
 
 /**
- * 189 routes that authenticate with a helper and never ask which sections the caller
- * holds.
+ * 187 routes that authenticate with a helper and never ask which sections the caller
+ * holds. (Was 189 after R101h; R101i moved market-settings/holidays and market-settings
+ * into section-granted.)
  */
 const HELPER_BUT_NO_GRANT = [
   "admin-bank-accounts/[id]/route.ts",
@@ -246,8 +245,6 @@ const HELPER_BUT_NO_GRANT = [
   "lockouts/[email]/unlock/route.ts",
   "lockouts/clear-all/route.ts",
   "lockouts/route.ts",
-  "market-settings/holidays/route.ts",
-  "market-settings/route.ts",
   "marketplace/generate-content/route.ts",
   "marketplace/generate-cosmetic/route.ts",
   "marketplace/route.ts",
@@ -306,7 +303,7 @@ const HELPER_BUT_NO_GRANT = [
   "withdrawals/route.ts",
 ] as const;
 
-/** Folders closed by R101a–R101h. Nothing under these may appear in any debt list above. */
+/** Folders closed by R101a–R101i. Nothing under these may appear in any debt list above. */
 const CLOSED_FOLDERS = [
   "users",
   "ai",
@@ -319,6 +316,7 @@ const CLOSED_FOLDERS = [
   "landing-pages",
   "market-data",
   "symbols",
+  "market-settings",
 ];
 
 const findings = inventoryAdminRoutes();

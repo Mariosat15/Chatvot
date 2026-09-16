@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 interface Holiday {
   id: string;
@@ -194,6 +195,10 @@ function getEasterDate(year: number, offset: number = 0): Date {
  */
 export async function GET() {
   try {
+    // Reason: MarketSettingsSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("market");
+    if (!guard.ok) return guard.response;
+
     const holidays = getStandardMarketHolidays();
 
     return NextResponse.json({

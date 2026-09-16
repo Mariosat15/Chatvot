@@ -123,6 +123,12 @@ const CLOSED_FOLDERS: { folder: string[]; section: string }[] = [
     catalogue anonymously.
   */
   { folder: ["symbols"], section: "symbols" },
+  /*
+    R101i. MarketSettingsSection → market. Four files, nine handlers: settings GET/PUT,
+    holidays GET/POST/DELETE, template-holidays GET/POST/DELETE, and automatic-holidays GET.
+    The writers rewrite holiday calendars and trading-hours settings anonymously.
+  */
+  { folder: ["market-settings"], section: "market" },
 ];
 
 describe("R101a - every handler in the closed folders is guarded, per handler", () => {
@@ -668,6 +674,47 @@ describe("R101h - symbols/ is section-granted and nothing weaker", () => {
     expect(weaker).toEqual([]);
     expect(wrongSection).toEqual([]);
     expect(handlers).toBe(7);
+    expect(guards).toBeGreaterThanOrEqual(handlers);
+  });
+});
+
+describe("R101i - market-settings/ is section-granted and nothing weaker", () => {
+  /*
+    Four files, nine handlers. MarketSettingsSection owns every fetch, so the grant is
+    `market`. Writers rewrite holiday calendars and trading-hours settings anonymously.
+  */
+  const WEAKER =
+    /(getAdminSession|requireAdminAuth|verifyAdminAuth|verifyAdminToken|verifyAnyAuth|jwtVerify|getAdminJwtSecret)\s*\(/;
+
+  const dir = join(API, "market-settings");
+  const files = findRouteFiles(dir);
+
+  it("the walk finds the four market-settings routes", () => {
+    expect(files.length).toBe(4);
+  });
+
+  it("every market-settings file names guardSection(market) and no weaker helper", () => {
+    const weaker: string[] = [];
+    const wrongSection: string[] = [];
+    let handlers = 0;
+    let guards = 0;
+
+    for (const file of files) {
+      const code = stripComments(readFileSync(file, "utf8"));
+      const name = file.slice(API.length + 1).replace(/\\/g, "/");
+      const sections = [...code.matchAll(/guardSection\(\s*["']([^"']+)["']\s*\)/g)].map(
+        (m) => m[1],
+      );
+
+      if (WEAKER.test(code)) weaker.push(name);
+      if (sections.some((s) => s !== "market")) wrongSection.push(name);
+      handlers += (code.match(handlerPattern()) ?? []).length;
+      guards += (code.match(guardCallPattern()) ?? []).length;
+    }
+
+    expect(weaker).toEqual([]);
+    expect(wrongSection).toEqual([]);
+    expect(handlers).toBe(9);
     expect(guards).toBeGreaterThanOrEqual(handlers);
   });
 });
