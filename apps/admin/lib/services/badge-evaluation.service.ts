@@ -800,30 +800,59 @@ export async function checkBadgeCondition(
     "first_trade", // Onboarding badge for first trade
   ]);
 
+  // Reason (R96a): trading floors apply by condition TYPE, never badge id.
+  // Cross-game types use completedCompetitions (any game) instead of
+  // completedCompetitionsWithTrades, and ignore rarity/stored trade floors so
+  // operator tuning need not be rewritten. Unknown types fail closed to trading.
+  const CROSS_GAME_CONDITION_TYPES = new Set([
+    "competitions_completed",
+    "first_place_finishes",
+    "podium_finishes",
+    "second_place_finishes",
+    "third_place_finishes",
+    "top_10_finishes",
+    "top_50_percent_finishes",
+    "perfect_competition_win_rate",
+    "beat_top_trader",
+    "level_reached",
+    "xp_threshold",
+    "xp_earned_today",
+    "xp_earned_this_week",
+    "total_badges",
+    "messages_sent",
+  ]);
+
   const isTradeExempt = TRADE_EXEMPT_TYPES.has(type);
+  const isCrossGame = CROSS_GAME_CONDITION_TYPES.has(type);
 
   const tierReqs = RARITY_MIN_REQUIREMENTS[badge.rarity] || { trades: 0, competitions: 0 };
-  
-  // Apply the STRICTER of: badge-specific minTrades OR rarity tier minimum
-  // BUT skip rarity tier for trade-exempt badges (only use badge-specific if set)
-  const effectiveMinTrades = isTradeExempt
-    ? (minTrades || 0) // Trade-exempt: only use badge-specific minTrades if explicitly set
-    : Math.max(minTrades || 0, tierReqs.trades);
-  const effectiveMinComps = isTradeExempt
-    ? (minCompletedCompetitions || 0)
-    : Math.max(minCompletedCompetitions || 0, tierReqs.competitions);
 
-  // CRITICAL: First check minimum requirements before evaluating the condition
-  // This prevents "zero-baseline" badges from being awarded to new users
-  // Trade-exempt badges skip this check (they validate their own conditions)
-  
-  // Check minimum trades requirement (uses stricter of badge-specific or tier)
+  let effectiveMinTrades: number;
+  let effectiveMinComps: number;
+  let compsStat: number;
+
+  if (isTradeExempt) {
+    // Trade-exempt: only use badge-specific mins if explicitly set
+    effectiveMinTrades = minTrades || 0;
+    effectiveMinComps = minCompletedCompetitions || 0;
+    compsStat = stats.completedCompetitionsWithTrades;
+  } else if (isCrossGame) {
+    // Reason: ignore stored minTrades — no catalogue rewrite; contests any game satisfy
+    effectiveMinTrades = 0;
+    effectiveMinComps = Math.max(minCompletedCompetitions || 0, tierReqs.competitions);
+    compsStat = stats.completedCompetitions;
+  } else {
+    // Trading-typed: stricter of badge-specific or rarity tier; trades-gated comps
+    effectiveMinTrades = Math.max(minTrades || 0, tierReqs.trades);
+    effectiveMinComps = Math.max(minCompletedCompetitions || 0, tierReqs.competitions);
+    compsStat = stats.completedCompetitionsWithTrades;
+  }
+
   if (effectiveMinTrades > 0 && stats.totalTrades < effectiveMinTrades) {
     return false;
   }
 
-  // Check minimum completed competitions requirement (uses stricter of badge-specific or tier)
-  if (effectiveMinComps > 0 && stats.completedCompetitionsWithTrades < effectiveMinComps) {
+  if (effectiveMinComps > 0 && compsStat < effectiveMinComps) {
     return false;
   }
 
