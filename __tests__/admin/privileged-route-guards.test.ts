@@ -136,6 +136,13 @@ const CLOSED_FOLDERS: { folder: string[]; section: string }[] = [
     into site-pages data, so the grant stays site-pages rather than hero-page.
   */
   { folder: ["pages"], section: "site-pages" },
+  /*
+    R101k. PerformanceSimulatorSection → performance-simulator. Twelve files, twenty-one
+    handlers across the whole simulator/ tree: run control, cleanup, config, AI, attack
+    suite, and the data-integrity tools (AttackSuitePanel and DataIntegrityTab mount on
+    the same screen, so they share the grant).
+  */
+  { folder: ["simulator"], section: "performance-simulator" },
 ];
 
 describe("R101a - every handler in the closed folders is guarded, per handler", () => {
@@ -763,6 +770,48 @@ describe("R101j - pages/ is section-granted and nothing weaker", () => {
     expect(weaker).toEqual([]);
     expect(wrongSection).toEqual([]);
     expect(handlers).toBe(8);
+    expect(guards).toBeGreaterThanOrEqual(handlers);
+  });
+});
+
+describe("R101k - simulator/ is section-granted and nothing weaker", () => {
+  /*
+    Twelve files, twenty-one handlers. PerformanceSimulatorSection owns the screen;
+    AttackSuitePanel and DataIntegrityTab mount on it, so attack-tests and integrity
+    routes share `performance-simulator`.
+  */
+  const WEAKER =
+    /(getAdminSession|requireAdminAuth|verifyAdminAuth|verifyAdminToken|verifyAnyAuth|jwtVerify|getAdminJwtSecret)\s*\(/;
+
+  const dir = join(API, "simulator");
+  const files = findRouteFiles(dir);
+
+  it("the walk finds the twelve simulator routes", () => {
+    expect(files.length).toBe(12);
+  });
+
+  it("every simulator file names guardSection(performance-simulator) and no weaker helper", () => {
+    const weaker: string[] = [];
+    const wrongSection: string[] = [];
+    let handlers = 0;
+    let guards = 0;
+
+    for (const file of files) {
+      const code = stripComments(readFileSync(file, "utf8"));
+      const name = file.slice(API.length + 1).replace(/\\/g, "/");
+      const sections = [...code.matchAll(/guardSection\(\s*["']([^"']+)["']\s*\)/g)].map(
+        (m) => m[1],
+      );
+
+      if (WEAKER.test(code)) weaker.push(name);
+      if (sections.some((s) => s !== "performance-simulator")) wrongSection.push(name);
+      handlers += (code.match(handlerPattern()) ?? []).length;
+      guards += (code.match(guardCallPattern()) ?? []).length;
+    }
+
+    expect(weaker).toEqual([]);
+    expect(wrongSection).toEqual([]);
+    expect(handlers).toBe(21);
     expect(guards).toBeGreaterThanOrEqual(handlers);
   });
 });

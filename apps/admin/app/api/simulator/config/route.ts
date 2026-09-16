@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 // Reason: Simulator models are registered on ROOT's mongoose (imported via
 // relative paths from database/models/simulator/). We MUST use root's
 // connectToDatabase to connect root's mongoose, not admin's.
@@ -11,6 +12,10 @@ import SimulatorConfig from "../../../../../../database/models/simulator/simulat
  */
 export async function GET() {
   try {
+    // Reason: PerformanceSimulatorSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("performance-simulator");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     let config = await SimulatorConfig.findOne({ isActive: true });
@@ -73,6 +78,10 @@ export async function GET() {
  */
 export async function POST(request: NextRequest) {
   try {
+    // Reason: PerformanceSimulatorSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("performance-simulator");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     const body = await request.json();

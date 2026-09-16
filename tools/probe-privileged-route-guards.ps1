@@ -565,6 +565,42 @@ Invoke-Probe -Name 'pages closed folder loses grant' -File $PAGES_SAVE `
   -Replace2 '' `
   -ExpectTest 'but none of them are in the folders R101a closed'
 
+$SIM_RUN = 'apps/admin/app/api/simulator/run/route.ts'
+$SIM_CLEAN = 'apps/admin/app/api/simulator/cleanup/route.ts'
+
+Write-Host "`n=== R101k probes ===`n"
+
+# 51. simulator/run POST was world-writable - starts/stops simulations anonymously.
+# Reason: -First keeps blast to one handler; GET and POST share identical guard lines.
+Invoke-Probe -Name 'simulator/run POST unguarded' -File $SIM_RUN -First `
+  -Find '    const guard = await guardSection("performance-simulator");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'every simulator file names guardSection'
+
+# 52. Wrong grant - dev-zone-menu would compile and silently widen who can run the simulator.
+Invoke-Probe -Name 'simulator wrong section' -File $SIM_RUN -First `
+  -Find 'guardSection("performance-simulator")' `
+  -Replace 'guardSection("dev-zone-menu")' `
+  -ExpectTest 'simulator/run/route.ts: guards every handler with the section'
+
+# 53. cleanup POST was world-writable - deletes all simulation data anonymously.
+Invoke-Probe -Name 'simulator/cleanup unguarded' -File $SIM_CLEAN -First `
+  -Find '    const guard = await guardSection("performance-simulator");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'simulator/cleanup/route.ts: one guard and one refusal'
+
+# 54. Folder-level canary.
+Invoke-Probe -Name 'simulator closed folder loses grant' -File $SIM_CLEAN -First `
+  -Find '    const guard = await guardSection("performance-simulator");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'but none of them are in the folders R101a closed'
+
 Write-Host ''
 Write-Host 'UNPROBED, with the reason: "still finds routes with no authorization call at all".' -ForegroundColor DarkGray
 Write-Host 'Turning that canary red means guarding the remaining no-check debt, which is later' -ForegroundColor DarkGray

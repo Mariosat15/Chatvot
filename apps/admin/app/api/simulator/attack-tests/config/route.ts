@@ -10,17 +10,14 @@
  * curl. Subsequent GETs only return a masked preview.
  *
  * Security:
- *   - `requireAdminAuth()` enforces admin JWT
+ *   - `guardSection("performance-simulator")` enforces the section grant
  *   - every mutation is audit-logged under category "security"
  *   - rotating the secret while a run is in flight is blocked to avoid
  *     invalidating the in-process secret mid-run
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import {
-  requireAdminAuth,
-  getAdminSession,
-} from "../../../../../../../lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { auditLogService } from "../../../../../../../lib/services/audit-log.service";
 import {
   clearAttackSuiteSecret,
@@ -47,36 +44,19 @@ async function assertNoRunInFlight(): Promise<string | null> {
 }
 
 export async function GET() {
-  try {
-    await requireAdminAuth();
-  } catch {
-    return NextResponse.json(
-      { success: false, error: "Unauthorized" },
-      { status: 401 },
-    );
-  }
+  // Reason: PerformanceSimulatorSection owns this screen; section grant is the auth answer.
+  const guard = await guardSection("performance-simulator");
+  if (!guard.ok) return guard.response;
 
   const config = await getPublicAttackSuiteConfig();
   return NextResponse.json({ success: true, config });
 }
 
 export async function POST(req: NextRequest) {
-  try {
-    await requireAdminAuth();
-  } catch {
-    return NextResponse.json(
-      { success: false, error: "Unauthorized" },
-      { status: 401 },
-    );
-  }
-
-  const admin = await getAdminSession();
-  if (!admin) {
-    return NextResponse.json(
-      { success: false, error: "Admin session missing" },
-      { status: 401 },
-    );
-  }
+  // Reason: PerformanceSimulatorSection owns this screen; section grant is the auth answer.
+  const guard = await guardSection("performance-simulator");
+  if (!guard.ok) return guard.response;
+  const admin = guard.admin;
 
   let body: Record<string, unknown> = {};
   try {

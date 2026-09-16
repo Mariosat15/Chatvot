@@ -59,9 +59,9 @@ import { classifyRouteAuth, stripComments } from "../helpers/route-guard-audit";
  * swept in one commit.
  */
 /**
- * 28 routes calling no authentication of any kind. Frozen rather than swept:
+ * 23 routes calling no authentication of any kind. Frozen rather than swept:
  * each needs a decision about which grant owns the screen that calls it.
- * (Was 33 after R101i; R101j moved the five pages/ no-check routes into section-granted.)
+ * (Was 28 after R101j; R101k moved the five simulator/ no-check routes into section-granted.)
  */
 const NO_CHECK_OF_ANY_KIND = [
   "action-terms/[slug]/route.ts",
@@ -79,11 +79,6 @@ const NO_CHECK_OF_ANY_KIND = [
   "recover-stats/route.ts",
   "server-fleet/route.ts",
   "server-monitor/route.ts",
-  "simulator/ai/route.ts",
-  "simulator/cleanup/route.ts",
-  "simulator/config/route.ts",
-  "simulator/run/[runId]/route.ts",
-  "simulator/run/route.ts",
   "sync-missing-users/route.ts",
   "test-badge-models/route.ts",
   "tests/run/route.ts",
@@ -104,9 +99,9 @@ const HAND_VERIFIED_NO_GRANT = [
 ] as const;
 
 /**
- * 187 routes that authenticate with a helper and never ask which sections the caller
- * holds. (Was 189 after R101h; R101i moved market-settings/holidays and market-settings
- * into section-granted.)
+ * 180 routes that authenticate with a helper and never ask which sections the caller
+ * holds. (Was 187 after R101j; R101k moved the seven simulator/ helper routes into
+ * section-granted.)
  */
 const HELPER_BUT_NO_GRANT = [
   "admin-bank-accounts/[id]/route.ts",
@@ -269,13 +264,6 @@ const HELPER_BUT_NO_GRANT = [
   "server-options/heap-info/route.ts",
   "settings/route.ts",
   "settings/trading-risk/route.ts",
-  "simulator/attack-tests/config/route.ts",
-  "simulator/attack-tests/route.ts",
-  "simulator/close-orphaned-positions/route.ts",
-  "simulator/inspect-account/route.ts",
-  "simulator/recompute-finished-stats/route.ts",
-  "simulator/scan-duplicate-deposits/route.ts",
-  "simulator/verify-win-loss/route.ts",
   "transactions/export/route.ts",
   "transactions/route.ts",
   "tutorials/[id]/route.ts",
@@ -298,7 +286,7 @@ const HELPER_BUT_NO_GRANT = [
   "withdrawals/route.ts",
 ] as const;
 
-/** Folders closed by R101a–R101j. Nothing under these may appear in any debt list above. */
+/** Folders closed by R101a–R101k. Nothing under these may appear in any debt list above. */
 const CLOSED_FOLDERS = [
   "users",
   "ai",
@@ -313,6 +301,7 @@ const CLOSED_FOLDERS = [
   "symbols",
   "market-settings",
   "pages",
+  "simulator",
 ];
 
 const findings = inventoryAdminRoutes();

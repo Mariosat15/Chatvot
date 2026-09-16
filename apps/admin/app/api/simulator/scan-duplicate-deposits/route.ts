@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import mongoose from "mongoose";
-import { verifyAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 /**
  * GET /api/simulator/scan-duplicate-deposits
@@ -37,10 +37,9 @@ interface FieldResult {
 
 export async function GET() {
   try {
-    const admin = await verifyAdminAuth();
-    if (!admin.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // Reason: PerformanceSimulatorSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("performance-simulator");
+    if (!guard.ok) return guard.response;
 
     await connectToDatabase();
     const db = mongoose.connection.db;

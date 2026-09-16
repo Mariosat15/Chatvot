@@ -7,15 +7,13 @@
  * GET  /api/simulator/attack-tests                          → list recent runs
  *
  * Layers 6 + 7 of the 7-layer defense live here:
- *   - `requireAdminAuth()` ensures only admins can trigger a run
+ *   - `guardSection("performance-simulator")` ensures only admins with the
+ *     Performance Simulator grant can trigger a run
  *   - every start is written to the audit log with the admin identity
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import {
-  requireAdminAuth,
-  getAdminSession,
-} from "../../../../../../lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { auditLogService } from "../../../../../../lib/services/audit-log.service";
 import {
   createAttackRun,
@@ -44,14 +42,10 @@ function resolveMainAppUrl(): string {
 }
 
 export async function POST(req: NextRequest) {
-  try {
-    await requireAdminAuth();
-  } catch {
-    return NextResponse.json(
-      { success: false, error: "Unauthorized" },
-      { status: 401 },
-    );
-  }
+  // Reason: PerformanceSimulatorSection owns this screen; section grant is the auth answer.
+  const guard = await guardSection("performance-simulator");
+  if (!guard.ok) return guard.response;
+  const admin = guard.admin;
 
   const enabled = await isAttackSuiteEnabled();
   if (!enabled) {
@@ -84,14 +78,6 @@ export async function POST(req: NextRequest) {
     body = {};
   }
   const action = typeof body.action === "string" ? body.action : "start";
-
-  const admin = await getAdminSession();
-  if (!admin) {
-    return NextResponse.json(
-      { success: false, error: "Admin session missing" },
-      { status: 401 },
-    );
-  }
 
   const baseUrl = resolveMainAppUrl();
 
@@ -199,14 +185,9 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-  try {
-    await requireAdminAuth();
-  } catch {
-    return NextResponse.json(
-      { success: false, error: "Unauthorized" },
-      { status: 401 },
-    );
-  }
+  // Reason: PerformanceSimulatorSection owns this screen; section grant is the auth answer.
+  const guard = await guardSection("performance-simulator");
+  if (!guard.ok) return guard.response;
 
   await connectToDatabase();
   const { searchParams } = new URL(req.url);

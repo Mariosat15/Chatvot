@@ -4558,7 +4558,7 @@ same limit would refuse.
 
 ---
 
-### R101 - Ninety-nine admin routes with no authorization, and fifty-eight of them write - **R101a–R101j CLOSED 16 Sep 2026; tree still open**
+### R101 - Ninety-nine admin routes with no authorization, and fifty-eight of them write - **R101a–R101k CLOSED 16 Sep 2026; tree still open**
 
 **What it is.** `apps/admin` is a separate Next.js process with **no `middleware.ts` of its
 own**. The root `middleware.ts` belongs to the main app and never runs for these routes, so
@@ -4921,7 +4921,13 @@ grant `site-pages` from `SitePagesSection`. CMS writers and AI generators rewrit
 site content anonymously. 4 new probes each red on exactly one failure. Inventory after:
 **28 no-check / 3 hand-verified / 187 helper / 119 section-granted**.
 
-**R101 remains open** on the remaining 28 no-check routes.
+**R101k CLOSED 16 September 2026.** The whole of `simulator/` - **12 route files, 21 handlers** -
+grant `performance-simulator` from `PerformanceSimulatorSection`. Run/cleanup/config/ai were
+world-writable; attack-suite and integrity tools that only asked admin-at-all were upgraded in
+the same pass. 4 new probes each red on exactly one failure. Inventory after:
+**23 no-check / 3 hand-verified / 180 helper / 131 section-granted**.
+
+**R101 remains open** on the remaining 23 no-check routes.
 
 ---
 

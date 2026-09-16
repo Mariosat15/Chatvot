@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import mongoose from "mongoose";
-import { verifyAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 /**
  * GET  /api/simulator/close-orphaned-positions  → scan (read-only, dry-run)
@@ -165,10 +165,9 @@ async function findOrphans(
 
 export async function GET() {
   try {
-    const admin = await verifyAdminAuth();
-    if (!admin.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // Reason: PerformanceSimulatorSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("performance-simulator");
+    if (!guard.ok) return guard.response;
 
     await connectToDatabase();
     const db = mongoose.connection.db;
@@ -200,10 +199,10 @@ export async function GET() {
 
 export async function POST() {
   try {
-    const admin = await verifyAdminAuth();
-    if (!admin.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // Reason: PerformanceSimulatorSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("performance-simulator");
+    if (!guard.ok) return guard.response;
+    const admin = guard.admin;
 
     await connectToDatabase();
     const db = mongoose.connection.db;
@@ -254,7 +253,7 @@ export async function POST() {
     const closed = result.modifiedCount ?? 0;
 
     console.log(
-      `🧹 [ORPHAN-CLEANUP] Admin ${admin.adminId ?? "?"} closed ${closed} orphaned open position(s).`,
+      `🧹 [ORPHAN-CLEANUP] Admin ${admin.id} closed ${closed} orphaned open position(s).`,
     );
 
     return NextResponse.json({
