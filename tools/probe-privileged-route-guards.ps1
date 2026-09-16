@@ -1065,3 +1065,61 @@ Write-Host ''
 Write-Host 'Helper debt after R101t: 108. Remaining are helper-but-no-grant folders (settings,' -ForegroundColor DarkGray
 Write-Host 'marketplace, gamemaster, tutorials, ai-knowledge, ...).' -ForegroundColor DarkGray
 Write-Host ''
+
+Write-Host "`n=== R101u probes ===`n"
+
+$MKT_ROUTE = 'apps/admin/app/api/marketplace/route.ts'
+$MKT_UPLOAD = 'apps/admin/app/api/marketplace/upload/route.ts'
+$MKT_GEN = 'apps/admin/app/api/marketplace/generate-content/route.ts'
+$MKT_COSMETIC = 'apps/admin/app/api/marketplace/generate-cosmetic/route.ts'
+
+# 105. Drop marketplace grant from upload (single handler).
+Invoke-Probe -Name 'marketplace upload unguarded' -File $MKT_UPLOAD `
+  -Find '    const guard = await guardSection("marketplace");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'every marketplace handler names the marketplace grant and no weaker helper'
+
+# 106. Wrong section on upload.
+Invoke-Probe -Name 'marketplace upload wrong section' -File $MKT_UPLOAD `
+  -Find 'guardSection("marketplace")' `
+  -Replace 'guardSection("financial")' `
+  -ExpectTest 'every marketplace handler names the marketplace grant and no weaker helper'
+
+# 107. Weaker helper returns beside the guard on generate-content.
+Invoke-Probe -Name 'marketplace generate-content weaker helper' -File $MKT_GEN `
+  -Find 'import { guardSection } from "@/lib/admin/section-route-guard";' `
+  -Replace "import { guardSection } from `"@/lib/admin/section-route-guard`";`nimport { requireAdminAuth } from `"@/lib/admin/auth`";" `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 "    if (!guard.ok) return guard.response;`n    await requireAdminAuth();" `
+  -ExpectTest 'every marketplace handler names the marketplace grant and no weaker helper'
+
+# 108. CRUD route loses one audit attribution back to getAdminSession.
+Invoke-Probe -Name 'marketplace CRUD audit uses session again' -File $MKT_ROUTE `
+  -Find '        id: guard.admin.id,' `
+  -Replace '        id: (await (await import("@/lib/admin/auth")).getAdminSession())?.id ?? guard.admin.id,' `
+  -First `
+  -ExpectTest 'CRUD audits attribute from the guard, not a follow-up session'
+
+# 109. Closed-folder canary — empty AUTH_CALL on single-handler upload.
+Invoke-Probe -Name 'marketplace upload closed folder loses grant' -File $MKT_UPLOAD `
+  -Find '    const guard = await guardSection("marketplace");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'and none of the closed folders leak an unguarded file'
+
+# 110. Inventory canary — same mutation, inventory suite.
+Invoke-Probe -Name 'marketplace upload inventory stays section-granted' -File $MKT_UPLOAD `
+  -Find '    const guard = await guardSection("marketplace");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -SuiteFile '__tests__/admin/admin-route-auth-inventory.test.ts' `
+  -ExpectTest 'no route under a closed folder is anything but section-granted'
+
+Write-Host ''
+Write-Host 'Helper debt after R101u: 103. Remaining are helper-but-no-grant folders (settings,' -ForegroundColor DarkGray
+Write-Host 'gamemaster, tutorials, ai-knowledge, ...).' -ForegroundColor DarkGray
+Write-Host ''

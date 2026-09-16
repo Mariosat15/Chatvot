@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { writeFile, mkdir, access, stat } from "fs/promises";
 import { constants } from "fs";
 import path from "path";
@@ -18,7 +18,8 @@ const IMAGE_SETTINGS = {
 // POST - Upload marketplace cosmetic images
 export async function POST(request: NextRequest) {
   try {
-    await requireAdminAuth();
+    const guard = await guardSection("marketplace");
+    if (!guard.ok) return guard.response;
 
     const formData = await request.formData();
     const file = formData.get("file") as File;

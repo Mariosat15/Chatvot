@@ -72,9 +72,8 @@ const NO_CHECK_OF_ANY_KIND = [] as const;
 const HAND_VERIFIED_NO_GRANT = [] as const;
 
 /**
- * 108 routes that authenticate with a helper and never ask which sections the caller
- * holds. (Was 117 after R101s; R101t moved nine invoices/ + invoice-settings routes
- * into section-granted.)
+ * 103 routes that authenticate with a helper and never ask which sections the caller
+ * holds. (Was 108 after R101t; R101u moved five marketplace/ routes into section-granted.)
  */
 const HELPER_BUT_NO_GRANT = [
   "admin/backfill-ranks/route.ts",
@@ -146,11 +145,6 @@ const HELPER_BUT_NO_GRANT = [
   "lockouts/[email]/unlock/route.ts",
   "lockouts/clear-all/route.ts",
   "lockouts/route.ts",
-  "marketplace/generate-content/route.ts",
-  "marketplace/generate-cosmetic/route.ts",
-  "marketplace/route.ts",
-  "marketplace/save-defaults/route.ts",
-  "marketplace/upload/route.ts",
   "mdb-cluster-settings/route.ts",
   "notifications/route.ts",
   "payment-history/route.ts",
@@ -258,6 +252,9 @@ const CLOSED_FOLDERS = [
   // + FinancialDashboard VAT preview).
   "invoices",
   "invoice-settings",
+  // R101u. MarketplaceSection owns the whole marketplace/ tree (generate-cosmetic has no
+  // UI caller today but shares the grant).
+  "marketplace",
 ];
 
 const findings = inventoryAdminRoutes();

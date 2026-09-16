@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
-import { verifyAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { readFile, access } from "fs/promises";
 import { constants } from "fs";
 import path from "path";
@@ -41,11 +41,9 @@ function sanitizeFilename(filename: string): string | null {
  */
 export async function POST(request: NextRequest) {
   try {
-    // Verify admin authentication
-    const auth = await verifyAdminAuth();
-    if (!auth.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // Reason: orphan AI route under marketplace/; no UI caller today but same grant as siblings.
+    const guard = await guardSection("marketplace");
+    if (!guard.ok) return guard.response;
 
     const { imageUrl, cosmeticType } = await request.json();
 

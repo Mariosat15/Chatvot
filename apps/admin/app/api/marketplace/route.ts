@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import { MarketplaceItem } from "@/database/models/marketplace/marketplace-item.model";
 import { UserPurchase } from "@/database/models/marketplace/user-purchase.model";
-import { requireAdminAuth, getAdminSession } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { auditLogService } from "@/lib/services/audit-log.service";
 import {
   seedMarketplaceItems,
@@ -15,7 +15,10 @@ import {
  */
 export async function GET(request: NextRequest) {
   try {
-    await requireAdminAuth();
+    // Reason: MarketplaceSection is the only caller; requireAdminAuth was admin-at-all.
+    const guard = await guardSection("marketplace");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     const { searchParams } = new URL(request.url);
@@ -23,8 +26,7 @@ export async function GET(request: NextRequest) {
 
     // Seed default items
     if (action === "seed") {
-      const admin = await getAdminSession();
-      const result = await seedMarketplaceItems(admin?.email || "admin");
+      const result = await seedMarketplaceItems(guard.admin.email || "admin");
       return NextResponse.json({ success: true, ...result });
     }
 
@@ -60,12 +62,6 @@ export async function GET(request: NextRequest) {
       stats,
     });
   } catch (error) {
-    if (error instanceof Error && error.message === "Unauthorized") {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 },
-      );
-    }
     console.error("Error fetching marketplace items:", error);
     return NextResponse.json(
       {
@@ -83,10 +79,11 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    await requireAdminAuth();
+    const guard = await guardSection("marketplace");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
-    const admin = await getAdminSession();
     const data = await request.json();
 
     // Generate slug from name if not provided
@@ -111,7 +108,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Set defaults
-    data.createdBy = admin?.email || "admin";
+    data.createdBy = guard.admin.email || "admin";
     data.isFree = data.price === 0;
 
     // Parse code template if it's a string
@@ -121,37 +118,28 @@ export async function POST(request: NextRequest) {
 
     const item = await MarketplaceItem.create(data);
 
-    // Log audit
-    const adminSession = await getAdminSession();
-    if (adminSession) {
-      await auditLogService.logSettingsUpdated(
-        {
-          id: adminSession.id,
-          email: adminSession.email,
-          name: adminSession.name,
-        },
-        "marketplace_item_created",
-        null,
-        {
-          itemId: (item._id as any).toString(),
-          name: item.name,
-          category: item.category,
-          price: item.price,
-        },
-      );
-    }
+    // Reason: attribute from the guard — a follow-up getAdminSession is the R101b shape.
+    await auditLogService.logSettingsUpdated(
+      {
+        id: guard.admin.id,
+        email: guard.admin.email,
+        name: guard.admin.name,
+      },
+      "marketplace_item_created",
+      null,
+      {
+        itemId: (item._id as any).toString(),
+        name: item.name,
+        category: item.category,
+        price: item.price,
+      },
+    );
 
     return NextResponse.json({
       success: true,
       item,
     });
   } catch (error) {
-    if (error instanceof Error && error.message === "Unauthorized") {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 },
-      );
-    }
     console.error("Error creating marketplace item:", error);
     return NextResponse.json(
       {
@@ -169,7 +157,9 @@ export async function POST(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
-    await requireAdminAuth();
+    const guard = await guardSection("marketplace");
+    if (!guard.ok) return guard.response;
+
     const mongoose = await connectToDatabase();
     const db = mongoose.connection.db;
 
@@ -277,25 +267,21 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    // Log audit
-    const adminSession2 = await getAdminSession();
-    if (adminSession2) {
-      await auditLogService.logSettingsUpdated(
-        {
-          id: adminSession2.id,
-          email: adminSession2.email,
-          name: adminSession2.name,
-        },
-        "marketplace_item_updated",
-        null,
-        {
-          itemId: (item._id as any).toString(),
-          name: item.name,
-          updates: Object.keys(updates),
-          subscriptionsUpdated,
-        },
-      );
-    }
+    await auditLogService.logSettingsUpdated(
+      {
+        id: guard.admin.id,
+        email: guard.admin.email,
+        name: guard.admin.name,
+      },
+      "marketplace_item_updated",
+      null,
+      {
+        itemId: (item._id as any).toString(),
+        name: item.name,
+        updates: Object.keys(updates),
+        subscriptionsUpdated,
+      },
+    );
 
     return NextResponse.json({
       success: true,
@@ -303,12 +289,6 @@ export async function PUT(request: NextRequest) {
       subscriptionsUpdated,
     });
   } catch (error) {
-    if (error instanceof Error && error.message === "Unauthorized") {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 },
-      );
-    }
     console.error("Error updating marketplace item:", error);
     return NextResponse.json(
       {
@@ -326,7 +306,9 @@ export async function PUT(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
-    await requireAdminAuth();
+    const guard = await guardSection("marketplace");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     const { searchParams } = new URL(request.url);
@@ -360,32 +342,22 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Log audit
-    const adminSession3 = await getAdminSession();
-    if (adminSession3) {
-      await auditLogService.logSettingsUpdated(
-        {
-          id: adminSession3.id,
-          email: adminSession3.email,
-          name: adminSession3.name,
-        },
-        "marketplace_item_deleted",
-        null,
-        { itemId: (item._id as any).toString(), name: item.name },
-      );
-    }
+    await auditLogService.logSettingsUpdated(
+      {
+        id: guard.admin.id,
+        email: guard.admin.email,
+        name: guard.admin.name,
+      },
+      "marketplace_item_deleted",
+      null,
+      { itemId: (item._id as any).toString(), name: item.name },
+    );
 
     return NextResponse.json({
       success: true,
       message: "Item deleted",
     });
   } catch (error) {
-    if (error instanceof Error && error.message === "Unauthorized") {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 },
-      );
-    }
     console.error("Error deleting marketplace item:", error);
     return NextResponse.json(
       {

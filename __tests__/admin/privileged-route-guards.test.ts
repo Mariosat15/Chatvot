@@ -204,6 +204,11 @@ const CLOSED_FOLDERS: { folder: string[]; section: string }[] = [
   { folder: ["invoices"], section: "financial" },
   { folder: ["invoice-settings"], section: "invoices" },
   /*
+    R101u. MarketplaceSection → marketplace for the whole tree. generate-cosmetic has no
+    UI caller today; still section-granted so an unguarded sibling cannot reappear.
+  */
+  { folder: ["marketplace"], section: "marketplace" },
+  /*
     R101o. Money writers first among helper-but-no-grant. FinancialDashboard → financial
     (admin-funds, vat, vendor-payments, atlas/*); PendingWithdrawalsSection →
     pending-withdrawals (withdrawals/). admin-bank-accounts deferred - dual callers on
@@ -1602,6 +1607,55 @@ describe("R101t - invoices helpers are section-granted", () => {
       expect(code).toMatch(/guard\.admin/);
       expect(code).not.toMatch(/getAdminSession\s*\(/);
     }
+  });
+});
+
+describe("R101u - marketplace helpers are section-granted", () => {
+  /*
+    Five files, eight handlers. MarketplaceSection is the only caller for four of them;
+    generate-cosmetic has no UI caller today and shares the marketplace grant so the
+    folder stays uniformly section-granted. CRUD audits use guard.admin.
+  */
+  const WEAKER =
+    /(getAdminSession|requireAdminAuth|verifyAdminAuth|verifyAdminToken|verifyAnyAuth|jwtVerify|getAdminJwtSecret)\s*\(|\bverify\s*\(/;
+
+  const marketplaceFiles = findRouteFiles(join(API, "marketplace"));
+
+  it("covers the whole marketplace/ tree", () => {
+    expect(marketplaceFiles.length).toBe(5);
+  });
+
+  it("every marketplace handler names the marketplace grant and no weaker helper", () => {
+    const weaker: string[] = [];
+    const missing: string[] = [];
+    let handlers = 0;
+    let guards = 0;
+
+    for (const file of marketplaceFiles) {
+      const code = stripComments(readFileSync(file, "utf8"));
+      const name = file.slice(API.length + 1).replace(/\\/g, "/");
+      const named = guardedSections(code);
+      if (WEAKER.test(code)) weaker.push(name);
+      if (!named.includes("marketplace")) missing.push(name);
+      handlers += (code.match(handlerPattern()) ?? []).length;
+      guards += (code.match(guardCallPattern()) ?? []).length;
+    }
+
+    expect(weaker).toEqual([]);
+    expect(missing).toEqual([]);
+    expect(handlers).toBe(8);
+    expect(guards).toBeGreaterThanOrEqual(handlers);
+  });
+
+  it("CRUD audits attribute from the guard, not a follow-up session", () => {
+    const code = stripComments(
+      readFileSync(join(API, "marketplace", "route.ts"), "utf8"),
+    );
+    expect(code).toMatch(/guard\.admin/);
+    expect(code).not.toMatch(/getAdminSession\s*\(/);
+    // Reason: three writers (create / update / delete) each take guard.admin — count so
+    // dropping one still fails rather than being covered by the other two.
+    expect((code.match(/guard\.admin/g) ?? []).length).toBeGreaterThanOrEqual(3);
   });
 });
 

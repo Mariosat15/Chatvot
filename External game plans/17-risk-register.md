@@ -4558,7 +4558,7 @@ same limit would refuse.
 
 ---
 
-### R101 - Ninety-nine admin routes with no authorization, and fifty-eight of them write - **R101a–R101t CLOSED 16 Sep 2026; helper-but-no-grant still open**
+### R101 - Ninety-nine admin routes with no authorization, and fifty-eight of them write - **R101a–R101u CLOSED 16 Sep 2026; helper-but-no-grant still open**
 
 **What it is.** `apps/admin` is a separate Next.js process with **no `middleware.ts` of its
 own**. The root `middleware.ts` belongs to the main app and never runs for these routes, so
@@ -5017,7 +5017,14 @@ on exactly one failure — closed-folder / inventory canaries use the single-han
 `by-transaction` file so emptying `AUTH_CALL` is possible. Inventory after:
 **0 no-check / 0 hand-verified / 108 helper / 229 section-granted**.
 
-**R101 remains open** on the **108 helper-but-no-grant** routes.
+**R101u CLOSED 16 September 2026.** Marketplace helpers: **5 files, 8 handlers**.
+`MarketplaceSection` → `guardSection("marketplace")` on the whole tree. `generate-cosmetic`
+has no UI caller today and shares the grant so the folder stays uniform. CRUD audits
+attribute from `guard.admin`. 6 new probes each red on exactly one failure — closed-folder /
+inventory canaries aimed at single-handler `upload`. Inventory after:
+**0 no-check / 0 hand-verified / 103 helper / 234 section-granted**.
+
+**R101 remains open** on the **103 helper-but-no-grant** routes.
 
 ---
 

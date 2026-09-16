@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import { MarketplaceItem } from "@/database/models/marketplace/marketplace-item.model";
-import { requireAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { readFile, writeFile, mkdir, access, copyFile, readdir, stat } from "fs/promises";
 import { constants } from "fs";
 import path from "path";
@@ -18,7 +18,9 @@ import path from "path";
  */
 export async function POST(request: NextRequest) {
   try {
-    await requireAdminAuth();
+    const guard = await guardSection("marketplace");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     const items = await MarketplaceItem.find().lean();
