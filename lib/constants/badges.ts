@@ -29,6 +29,8 @@ export interface Badge {
   };
   // Level-gated: badge visible but locked until user reaches this level (0 = no requirement)
   minLevel?: number;
+  /** Empty = platform; ["trading"] = trading-shaped; provider keys = per-game (X7 step 4). */
+  gameTypes?: string[];
 }
 
 export const BADGES: Badge[] = [

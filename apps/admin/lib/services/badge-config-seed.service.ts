@@ -34,6 +34,11 @@ export async function seedBadgeConfigs() {
             rarity: badge.rarity,
             condition: badge.condition,
             minLevel: badge.minLevel || 0,
+            // Reason: X7 step 4 — scope travels with the badge; omit and schema
+            // defaults to ["trading"] while getBadgesFromDB would invent platform.
+            gameTypes: Array.isArray(badge.gameTypes)
+              ? badge.gameTypes
+              : ["trading"],
             isActive: true,
           })),
         );
@@ -61,6 +66,9 @@ export async function seedBadgeConfigs() {
             rarity: badge.rarity,
             condition: badge.condition,
             minLevel: badge.minLevel || 0,
+            gameTypes: Array.isArray(badge.gameTypes)
+              ? badge.gameTypes
+              : ["trading"],
             isActive: true,
           });
           added++;
@@ -186,6 +194,8 @@ export async function getBadgesFromDB() {
       rarity: badge.rarity,
       condition: badge.condition,
       minLevel: badge.minLevel ?? 0,
+      // Reason: X7 step 4 — consumers need the stored scope to filter and stamp XP.
+      gameTypes: Array.isArray(badge.gameTypes) ? badge.gameTypes : ["trading"],
       isActive: badge.isActive,
     }));
   } catch (error) {

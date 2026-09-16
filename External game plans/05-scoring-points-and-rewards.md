@@ -330,6 +330,18 @@ Per `gameKey`, lifetime, adjusted by results against the field. Displayed as
 All existing machinery. What changes is that awards must be **attributable to a
 game** so a player is never shown goals they cannot reach.
 
+> **BUILT 16 September 2026 — X7 step 4 (scope + attribution; not content).**
+> Live code: `lib/services/games/badge-game-scope.ts`, `played-games.service.ts`
+> (both mirrored), wired into both `badge-evaluation.service.ts` copies;
+> `awardXPForBadge` / `sumXpByGameKey` / `getUserLevel.xpByGameKey` in both
+> `xp-level.service.ts` copies; `getBadgesFromDB` returns `gameTypes`.
+> **What shipped:** never show or evaluate an *unearned* badge for a game the
+> player has not played (`05` s5.2 rule 1); stamp badge XP with `gameKey` when
+> the scope is a single game; expose per-game XP totals from the ledger.
+> **What did not:** R96b (authoring per-game badges — needs owner input);
+> renaming existing badge `gameTypes` in the catalogue; a profile chrome for
+> `xpByGameKey`; journeys/milestones. Levels remain one platform ladder.
+
 ### 5.1 Three badge scopes
 
 | Scope | Example | Applies to |

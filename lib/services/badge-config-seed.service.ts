@@ -34,6 +34,10 @@ export async function seedBadgeConfigs() {
             rarity: badge.rarity,
             condition: badge.condition,
             minLevel: badge.minLevel || 0,
+            // Reason: X7 step 4 — scope travels with the badge.
+            gameTypes: Array.isArray(badge.gameTypes)
+              ? badge.gameTypes
+              : ["trading"],
             isActive: true,
           })),
         );
@@ -61,6 +65,9 @@ export async function seedBadgeConfigs() {
             rarity: badge.rarity,
             condition: badge.condition,
             minLevel: badge.minLevel || 0,
+            gameTypes: Array.isArray(badge.gameTypes)
+              ? badge.gameTypes
+              : ["trading"],
             isActive: true,
           });
           added++;
@@ -185,6 +192,9 @@ export async function getBadgesFromDB() {
       condition: badge.condition,
       minLevel: badge.minLevel || 0,
       isActive: badge.isActive,
+      // Reason (X7 step 4): scope must reach evaluate/display; omitting it makes
+      // every badge look platform-wide while the DB still defaults to trading.
+      gameTypes: Array.isArray(badge.gameTypes) ? badge.gameTypes : ["trading"],
     }));
   } catch (error) {
     console.error("Error fetching badges from DB, using constants:", error);

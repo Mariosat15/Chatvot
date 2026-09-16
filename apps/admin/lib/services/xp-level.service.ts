@@ -5,6 +5,7 @@ import UserLevel from "@/database/models/user-level.model";
 import UserBadge from "@/database/models/user-badge.model";
 import BadgeConfig from "@/database/models/badge-config.model";
 import { getTitleByXP, getXPForBadge } from "@/lib/services/xp-config.service";
+import { gameKeyForBadgeXp } from "@/lib/services/games/badge-game-scope";
 
 /**
  * Award XP to user for earning a badge
@@ -81,11 +82,16 @@ export async function awardXPForBadge(
   userLevel.lastXPGain = new Date();
 
   // Add to XP history
+  // Reason (X7 step 4): stamp gameKey so XP can be attributed without recomputing.
+  const badgeGameKey = gameKeyForBadgeXp(
+    (badge as { gameTypes?: string[] }).gameTypes,
+  );
   userLevel.xpHistory.push({
     amount: xpGained,
     source: "badge",
     badgeId,
     timestamp: new Date(),
+    ...(badgeGameKey ? { gameKey: badgeGameKey } : {}),
   });
   console.log(
     `📜 [XP AWARD] XP history updated (${userLevel.xpHistory.length} entries)`,
@@ -332,6 +338,27 @@ export async function awardActivityXP(
 }
 
 /**
+ * Sum xpHistory amounts by gameKey (X7 step 4). Entries without a gameKey are
+ * bucketed under `"_unscoped"` — platform awards, never reassigned to trading.
+ */
+export function sumXpByGameKey(
+  xpHistory: Array<{ amount?: number; gameKey?: string }> | null | undefined,
+): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (!Array.isArray(xpHistory)) return out;
+  for (const row of xpHistory) {
+    const key =
+      typeof row.gameKey === "string" && row.gameKey.trim()
+        ? row.gameKey.trim()
+        : "_unscoped";
+    const amount = Number(row.amount);
+    if (!Number.isFinite(amount) || amount === 0) continue;
+    out[key] = (out[key] || 0) + amount;
+  }
+  return out;
+}
+
+/**
  * Get user's current level and XP
  * Always fetches title, icon, and description from database configuration
  */
@@ -359,6 +386,8 @@ export async function getUserLevel(userId: string) {
       currentColor: titleLevel.color,
       totalBadgesEarned: 0,
       lastXPGain: new Date(),
+      // Reason (X7 step 4): empty history → empty attribution map, never invent trading.
+      xpByGameKey: {},
     };
   }
 
@@ -372,6 +401,7 @@ export async function getUserLevel(userId: string) {
     currentDescription: titleLevel.description, // ✅ From database
     currentColor: titleLevel.color, // ✅ From database
     currentLevel: titleLevel.level, // ✅ From database
+    xpByGameKey: sumXpByGameKey(userLevel.xpHistory),
   };
 }
 

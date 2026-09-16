@@ -12,6 +12,8 @@ import { Badge } from "@/lib/constants/badges";
 import { awardXPForBadge } from "@/lib/services/xp-level.service";
 import { getBadgesFromDB } from "@/lib/services/badge-config-seed.service";
 import { getUserGlobalRank } from "@/lib/actions/leaderboard/global-leaderboard.actions";
+import { badgeAppliesToPlayer } from "@/lib/services/games/badge-game-scope";
+import { getPlayedGamesSnapshot } from "@/lib/services/games/played-games.service";
 
 // Exported for testing/simulation purposes
 export interface UserStats {
@@ -148,6 +150,7 @@ export async function evaluateUserBadges(userId: string, categories?: string[]):
 
     // 1. Gather user statistics
     const stats = await gatherUserStats(userId);
+    const played = await getPlayedGamesSnapshot(userId);
 
     // 2. Get currently earned badges
     const existingBadges = await UserBadge.find({ userId }).lean();
@@ -175,6 +178,19 @@ export async function evaluateUserBadges(userId: string, categories?: string[]):
     for (const badge of badges) {
       // Skip if already earned
       if (existingBadgeIds.has(badge.id)) continue;
+
+      // Reason (X7 step 4): never evaluate a per-game / trading-only badge the
+      // player cannot reach — same rule as display, so award and list agree.
+      if (
+        !badgeAppliesToPlayer({
+          gameTypes: (badge as Badge).gameTypes,
+          conditionType: badge.condition?.type,
+          playedGameKeys: played.gameKeys,
+          hasTradingActivity: played.hasTradingActivity,
+        })
+      ) {
+        continue;
+      }
 
       // Level-gated check: badge requires minimum level to earn
       const badgeMinLevel = (badge as any).minLevel || RARITY_DEFAULT_MIN_LEVEL[badge.rarity] || 0;
@@ -1294,12 +1310,24 @@ export async function getUserBadges(userId: string) {
   const badges = await getBadgesFromDB();
   const earnedBadges = await UserBadge.find({ userId }).lean();
   const earnedBadgeIds = new Set(earnedBadges.map((b) => b.badgeId));
+  const played = await getPlayedGamesSnapshot(userId);
 
-  // Add earned status to badges
-  return badges.map((badge) => ({
-    ...badge,
-    earned: earnedBadgeIds.has(badge.id),
-    earnedAt:
-      earnedBadges.find((b) => b.badgeId === badge.id)?.earnedAt ?? undefined,
-  }));
+  // Reason (X7 step 4 / 05 s5.2): never show unearned badges for games the
+  // player does not play. Earned ones always remain — hiding them deletes progress.
+  return badges
+    .filter((badge) => {
+      if (earnedBadgeIds.has(badge.id)) return true;
+      return badgeAppliesToPlayer({
+        gameTypes: (badge as Badge).gameTypes,
+        conditionType: badge.condition?.type,
+        playedGameKeys: played.gameKeys,
+        hasTradingActivity: played.hasTradingActivity,
+      });
+    })
+    .map((badge) => ({
+      ...badge,
+      earned: earnedBadgeIds.has(badge.id),
+      earnedAt:
+        earnedBadges.find((b) => b.badgeId === badge.id)?.earnedAt ?? undefined,
+    }));
 }
