@@ -630,7 +630,10 @@ export const closePosition = async (
       try {
         const { evaluateUserBadges } =
           await import("@/lib/services/badge-evaluation.service");
-        evaluateUserBadges(session.user.id)
+        // Reason: same category filter as the main app's trade-close path — incremental
+        // evaluation after a trade. Without it the optional filter on the now-shared
+        // evaluator is never used from admin and every close scans the whole catalogue.
+        evaluateUserBadges(session.user.id, ["Trading", "Profit", "Risk", "Speed", "Consistency", "Strategy"])
           .then((result) => {
             if (result.newBadges.length > 0) {
               console.log(

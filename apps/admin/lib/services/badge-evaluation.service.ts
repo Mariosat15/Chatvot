@@ -13,6 +13,7 @@ import { awardXPForBadge } from "@/lib/services/xp-level.service";
 import { getBadgesFromDB } from "@/lib/services/badge-config-seed.service";
 import { getUserGlobalRank } from "@/lib/actions/leaderboard/global-leaderboard.actions";
 
+// Exported for testing/simulation purposes
 export interface UserStats {
   userId: string;
   // Competition stats
@@ -91,7 +92,7 @@ export interface UserStats {
   uniqueStrategiesUsed: number;
   consecutiveProfitableDays: number;
 
-  // SL/TP trigger counts
+  // SL/TP trigger counts (for "always_uses_sl"/"always_uses_tp" badge validation)
   slTriggeredCount: number;
   tpTriggeredCount: number;
 
@@ -117,44 +118,40 @@ export interface UserStats {
 }
 
 /**
- * Evaluate all badges for a user and award new ones
+ * Evaluate badges for a user and award new ones
+ * @param userId - User to evaluate
+ * @param categories - Optional category filter (only evaluate badges in these categories)
+ *   If not provided, evaluates ALL badges (used for hourly cron)
+ *   Use for incremental evaluation: trade close → ["Trading","Profit","Risk","Speed","Consistency"]
+ *                                    competition end → ["Competition"]
+ *                                    deposit → ["Social"]
  */
-export async function evaluateUserBadges(userId: string): Promise<{
+export async function evaluateUserBadges(userId: string, categories?: string[]): Promise<{
   newBadges: Badge[];
   totalBadges: number;
 }> {
   await connectToDatabase();
 
-  try {
-    console.log(`🔍 [BADGE EVAL] Starting badge evaluation for user ${userId}`);
+  // CRITICAL: Invalidate stats cache for this user so we get fresh data.
+  // Badge evaluation is triggered after an action (trade, deposit, etc.),
+  // so we MUST re-fetch stats to include the new action.
+  _statsCache.delete(userId);
 
+  try {
     // 0. Fetch badges from database
-    const badges = await getBadgesFromDB();
-    console.log(
-      `📋 [BADGE EVAL] Loaded ${badges.length} badge definitions from database`,
-    );
+    const allBadges = await getBadgesFromDB();
+
+    // PERF: Filter by category if specified (incremental evaluation)
+    const badges = categories
+      ? allBadges.filter((b) => categories.includes(b.category))
+      : allBadges;
 
     // 1. Gather user statistics
     const stats = await gatherUserStats(userId);
-    console.log(`📊 [BADGE EVAL] User stats:`, {
-      trades: stats.totalTrades,
-      competitions: stats.competitionsEntered,
-      completedCompetitions: stats.completedCompetitions,
-      completedCompetitionsWithTrades: stats.completedCompetitionsWithTrades,
-      wins: stats.totalWins,
-      deposits: stats.totalDeposited,
-      winRate: stats.winRate,
-      totalPnl: stats.totalPnl,
-      liquidations: stats.liquidationCount,
-      tradesAtLateNight: stats.tradesAtLateNight,
-    });
 
     // 2. Get currently earned badges
     const existingBadges = await UserBadge.find({ userId }).lean();
     const existingBadgeIds = new Set(existingBadges.map((b) => b.badgeId));
-    console.log(
-      `🏅 [BADGE EVAL] User already has ${existingBadges.length} badges`,
-    );
 
     // 2b. Fetch user level for level-gated badge checks
     let userCurrentLevel = 1;
@@ -166,49 +163,40 @@ export async function evaluateUserBadges(userId: string): Promise<{
 
     // Default minLevel per rarity for badges that don't specify one
     const RARITY_DEFAULT_MIN_LEVEL: Record<string, number> = {
-      common: 0,
-      rare: 0,
-      epic: 5,
-      legendary: 8,
+      common: 0,   // Always accessible
+      rare: 0,     // Always accessible, but harder conditions
+      epic: 5,     // Visible but locked until level 5
+      legendary: 8, // Visible but locked until level 8
     };
 
-    // 3. Evaluate each badge
+    // 3. Evaluate each badge (filtered by category if specified)
     const newlyEarnedBadges: Badge[] = [];
 
     for (const badge of badges) {
       // Skip if already earned
       if (existingBadgeIds.has(badge.id)) continue;
 
-      // Level-gated check
+      // Level-gated check: badge requires minimum level to earn
       const badgeMinLevel = (badge as any).minLevel || RARITY_DEFAULT_MIN_LEVEL[badge.rarity] || 0;
       if (badgeMinLevel > 0 && userCurrentLevel < badgeMinLevel) {
-        continue;
+        continue; // User hasn't reached the required level yet
       }
 
       // Check if badge condition is met
       const earned = await checkBadgeCondition(badge as Badge, stats);
 
       if (earned) {
-        console.log(
-          `✅ [BADGE EVAL] User earned badge: ${badge.name} (${badge.id})`,
-        );
-
         // Award the badge
-        const userBadge = await UserBadge.create({
+        await UserBadge.create({
           userId,
           badgeId: badge.id,
           earnedAt: new Date(),
           progress: 100,
         });
-        console.log(`💾 [BADGE EVAL] Badge saved to database:`, userBadge._id);
 
         // Award XP for the badge
         try {
-          console.log(`⭐ [BADGE EVAL] Awarding XP for badge ${badge.id}...`);
-          const xpResult = await awardXPForBadge(userId, badge.id);
-          console.log(
-            `✅ [BADGE EVAL] XP awarded: ${xpResult.xpGained} XP (total: ${xpResult.newXP})`,
-          );
+          await awardXPForBadge(userId, badge.id);
         } catch (error) {
           console.error(
             `❌ [BADGE EVAL] Error awarding XP for badge ${badge.id}:`,
@@ -225,9 +213,6 @@ export async function evaluateUserBadges(userId: string): Promise<{
             badge.name,
             badge.description || `You've earned the ${badge.name} badge!`,
           );
-          console.log(
-            `🔔 [BADGE EVAL] Badge notification sent for ${badge.name}`,
-          );
         } catch (error) {
           console.error(
             `❌ [BADGE EVAL] Error sending badge notification:`,
@@ -238,10 +223,6 @@ export async function evaluateUserBadges(userId: string): Promise<{
         newlyEarnedBadges.push(badge as Badge);
       }
     }
-
-    console.log(
-      `🎉 [BADGE EVAL] Evaluation complete: ${newlyEarnedBadges.length} new badges earned`,
-    );
 
     // IMPORTANT: Ensure UserLevel exists so user appears in leaderboard
     // Even if no badges earned, we create the record for tracking
@@ -258,11 +239,7 @@ export async function evaluateUserBadges(userId: string): Promise<{
       const { checkAndCompleteMilestones } =
         await import("@/lib/services/journey-progress.service");
       const journeyResult = await checkAndCompleteMilestones(userId);
-      if (journeyResult.completed.length > 0) {
-        console.log(
-          `🗺️ [BADGE EVAL] Journey milestones completed: ${journeyResult.completed.join(", ")}`
-        );
-      }
+      // Journey milestones checked silently
     } catch (journeyError) {
       console.error("❌ [BADGE EVAL] Error checking journey milestones:", journeyError);
     }
@@ -278,12 +255,45 @@ export async function evaluateUserBadges(userId: string): Promise<{
 }
 
 /**
+ * In-memory cache for gatherUserStats to avoid redundant DB queries within a 5-minute window.
+ * Key: userId, Value: { stats, expiresAt }
+ */
+const _statsCache = new Map<string, { stats: UserStats; expiresAt: number }>();
+const STATS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+/**
  * Gather comprehensive user statistics for badge evaluation
  * Exported for use by journey progress service
+ * PERF: Results cached for 5 minutes per user
  */
 export async function gatherUserStats(userId: string): Promise<UserStats> {
+  // Reason: Runtime typeof guard prevents NoSQL injection via objects like { $ne: null }
+  if (typeof userId !== "string" || !userId.trim()) {
+    throw new Error("Invalid userId");
+  }
+  // Check cache first
+  const cached = _statsCache.get(userId);
+  if (cached && Date.now() < cached.expiresAt) {
+    return cached.stats;
+  }
+
+  // PERF: Fetch independent data in parallel, with reduced limits and countDocuments for totals
+  const [participations, allPositions, closedTrades, totalPositionCount, totalTradeCount, wallet, withdrawalCount, depositCount, slTriggeredCount, tpTriggeredCount] = await Promise.all([
+    CompetitionParticipant.find({ userId }).select("currentRank status totalTrades pnlPercentage createdAt realizedPnl losingTrades winRate totalParticipants totalPnl").lean(),
+    TradingPosition.find({ userId }).select("stopLoss takeProfit symbol createdAt").sort({ createdAt: -1 }).limit(2000).lean(),
+    TradeHistory.find({ userId }).select("realizedPnl closedAt symbol openedAt volume closeReason").sort({ closedAt: -1 }).limit(2000).lean(),
+    TradingPosition.countDocuments({ userId }),
+    TradeHistory.countDocuments({ userId }),
+    CreditWallet.findOne({ userId }).lean() as Promise<Record<string, unknown> | null>,
+    WithdrawalRequest.countDocuments({ userId, status: { $in: ["completed", "paid"] } }),
+    // Count completed deposits
+    WalletTransaction.countDocuments({ userId, transactionType: "deposit", status: "completed" }),
+    // SL/TP trigger counts for badge evaluation
+    TradeHistory.countDocuments({ userId, closeReason: "stop_loss" }),
+    TradeHistory.countDocuments({ userId, closeReason: "take_profit" }),
+  ]);
+
   // Get competition stats
-  const participations = await CompetitionParticipant.find({ userId }).lean();
   const firstPlaceFinishes = participations.filter(
     (p) => p.currentRank === 1,
   ).length;
@@ -291,32 +301,27 @@ export async function gatherUserStats(userId: string): Promise<UserStats> {
     (p) => p.currentRank && p.currentRank <= 3,
   ).length;
 
-  // NEW: Count completed competitions (status = "completed")
+  // Count completed competitions (status = "completed")
   const completedCompetitions = participations.filter(
     (p) => p.status === "completed",
   ).length;
 
-  // NEW: Count completed competitions with 5+ trades (for realistic survival badges)
+  // Count completed competitions with 5+ trades (for realistic survival badges)
   const completedCompetitionsWithTrades = participations.filter(
     (p) => p.status === "completed" && (p.totalTrades || 0) >= 5,
   ).length;
 
-  // Get trading stats
-  const allPositions = await TradingPosition.find({ userId }).lean();
-  const closedTrades = await TradeHistory.find({ userId }).lean();
-
-  // SL/TP trigger counts
-  const slTriggeredCount = closedTrades.filter((t: any) => t.closeReason === "stop_loss").length;
-  const tpTriggeredCount = closedTrades.filter((t: any) => t.closeReason === "take_profit").length;
-
-  const totalTrades = closedTrades.length;
+  // PERF: Use accurate counts from countDocuments (not capped by limit)
+  const totalTrades = totalTradeCount;
   const winningTrades = closedTrades.filter(
     (t) => (t.realizedPnl || 0) > 0,
   ).length;
   const losingTrades = closedTrades.filter(
     (t) => (t.realizedPnl || 0) < 0,
   ).length;
-  const winRate = totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0;
+  // Win rate based on sampled trades (accurate for most users, only very active users are sampled)
+  const sampleTotal = closedTrades.length;
+  const winRate = sampleTotal > 0 ? (winningTrades / sampleTotal) * 100 : 0;
 
   const totalPnl = closedTrades.reduce(
     (sum, t) => sum + (t.realizedPnl || 0),
@@ -394,12 +399,7 @@ export async function gatherUserStats(userId: string): Promise<UserStats> {
   const alwaysUsesTP =
     allPositions.length > 0 && tradesWithTP === allPositions.length;
 
-  // Wallet stats
-  const [wallet, withdrawalCount, depositCount] = await Promise.all([
-    CreditWallet.findOne({ userId }).lean() as Promise<Record<string, unknown> | null>,
-    WithdrawalRequest.countDocuments({ userId, status: { $in: ["completed", "paid"] } }),
-    WalletTransaction.countDocuments({ userId, transactionType: "deposit", status: "completed" }),
-  ]);
+  // Wallet stats (fetched in parallel above)
   const totalDeposited = (wallet?.totalDeposited as number) || 0;
   const totalWithdrawn = (wallet?.totalWithdrawn as number) || 0;
   const kycVerified = !!(wallet?.kycVerified || wallet?.kycStatus === "approved");
@@ -615,15 +615,6 @@ export async function gatherUserStats(userId: string): Promise<UserStats> {
     );
   }
 
-  // Global rank from leaderboard (lower = better; 1 = first). Uses cached leaderboard when available.
-  let globalRank = 999999;
-  try {
-    const rankResult = await getUserGlobalRank(userId);
-    if (rankResult.rank > 0) globalRank = rankResult.rank;
-  } catch (err) {
-    console.warn("[gatherUserStats] getUserGlobalRank failed, using fallback rank:", err);
-  }
-
   // Calculate additional placement finishes from participations
   const secondPlaceFinishes = participations.filter(
     (p) => p.currentRank === 2,
@@ -641,35 +632,25 @@ export async function gatherUserStats(userId: string): Promise<UserStats> {
     (sum, p) => sum + (p.totalPnl || 0), 0
   );
 
-  // Fetch user level data for XP-based conditions
-  let currentLevel = 1;
-  let currentXP = 0;
-  let totalBadgesEarned = 0;
-  try {
-    const UserLevel = (await import("@/database/models/user-level.model")).default;
-    const userLevel = await UserLevel.findOne({ userId }).lean();
-    if (userLevel) {
-      currentLevel = (userLevel as any).currentLevel || 1;
-      currentXP = (userLevel as any).currentXP || 0;
-      totalBadgesEarned = (userLevel as any).totalBadgesEarned || 0;
-    }
-  } catch (error) {
-    // UserLevel may not exist yet
-  }
+  // Parallel fetch: global rank, user level, referral stats
+  const UserLevel = (await import("@/database/models/user-level.model")).default;
+  const UserReferral = (await import("@/database/models/user-referral.model")).default;
+  const [rankResult, userLevelDoc, referralsMadeCount, referralsActiveCount] = await Promise.all([
+    getUserGlobalRank(userId).catch((err: unknown) => {
+      console.warn("[gatherUserStats] getUserGlobalRank failed, using fallback rank:", err);
+      return { rank: 0 };
+    }),
+    UserLevel.findOne({ userId }).lean().catch(() => null),
+    UserReferral.countDocuments({ gameMasterId: userId }).catch(() => 0),
+    UserReferral.countDocuments({ gameMasterId: userId, isActive: true }).catch(() => 0),
+  ]);
 
-  // Fetch referral stats
-  let referralsMade = 0;
-  let referralsActive = 0;
-  try {
-    const UserReferral = (await import("@/database/models/user-referral.model")).default;
-    referralsMade = await UserReferral.countDocuments({ gameMasterId: userId });
-    referralsActive = await UserReferral.countDocuments({ 
-      gameMasterId: userId, 
-      isActive: true 
-    });
-  } catch (error) {
-    // Referral model may not exist
-  }
+  const globalRank = rankResult.rank > 0 ? rankResult.rank : 999999;
+  const currentLevel = (userLevelDoc as any)?.currentLevel || 1;
+  const currentXP = (userLevelDoc as any)?.currentXP || 0;
+  const totalBadgesEarned = (userLevelDoc as any)?.totalBadgesEarned || 0;
+  const referralsMade = referralsMadeCount;
+  const referralsActive = referralsActiveCount;
 
   // Max drawdown: largest peak-to-trough decline in cumulative PnL, as % of peak (for badge thresholds like <= 10%)
   let maxDrawdown = 0;
@@ -691,7 +672,7 @@ export async function gatherUserStats(userId: string): Promise<UserStats> {
     }
   }
 
-  return {
+  const stats: UserStats = {
     userId,
     competitionsEntered: participations.length,
     completedCompetitions,
@@ -767,11 +748,25 @@ export async function gatherUserStats(userId: string): Promise<UserStats> {
     messagesSent: 0, // Not implemented yet
     loginStreak: consecutiveDays, // Use consecutive trading days as proxy
   };
+
+  // Cache result for 5 minutes
+  _statsCache.set(userId, { stats, expiresAt: Date.now() + STATS_CACHE_TTL_MS });
+
+  // Evict old entries if cache grows too large (prevent memory leak)
+  if (_statsCache.size > 500) {
+    const now = Date.now();
+    for (const [key, val] of _statsCache) {
+      if (now >= val.expiresAt) _statsCache.delete(key);
+    }
+  }
+
+  return stats;
 }
 
 /**
  * Check if a badge condition is met
  * NEW: Now properly validates minTrades and minCompletedCompetitions requirements
+ * EXPORTED: For testing/simulation in admin panel
  */
 export async function checkBadgeCondition(
   badge: Badge,
@@ -812,7 +807,7 @@ export async function checkBadgeCondition(
   // Apply the STRICTER of: badge-specific minTrades OR rarity tier minimum
   // BUT skip rarity tier for trade-exempt badges (only use badge-specific if set)
   const effectiveMinTrades = isTradeExempt
-    ? (minTrades || 0)
+    ? (minTrades || 0) // Trade-exempt: only use badge-specific minTrades if explicitly set
     : Math.max(minTrades || 0, tierReqs.trades);
   const effectiveMinComps = isTradeExempt
     ? (minCompletedCompetitions || 0)
@@ -1207,8 +1202,10 @@ export async function checkBadgeCondition(
     
     // Risk Management - Additional
     case "stop_loss_used":
+      // User has used SL on at least 1 trade (or compareValue for "at least N")
       return compareValue(stats.tradesWithSL, value, comparison);
     case "take_profit_used":
+      // User has used TP on at least 1 trade
       return compareValue(stats.tradesWithTP, value, comparison);
     case "max_drawdown_under":
       return stats.totalTrades >= (minTrades || 10) && stats.maxDrawdown <= (value || 50);
