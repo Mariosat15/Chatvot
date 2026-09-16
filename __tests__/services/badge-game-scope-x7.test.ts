@@ -10,7 +10,7 @@ import {
   gameKeyForBadgeXp,
   normalizeBadgeGameTypes,
 } from "@/lib/services/games/badge-game-scope";
-import { sumXpByGameKey } from "@/lib/services/xp-level.service";
+import { sumXpByGameKey } from "@/lib/services/xp-level-shared";
 
 const ROOT = process.cwd();
 
@@ -110,6 +110,20 @@ describe("X7 step 4 - badge game scope", () => {
       _unscoped: 5,
       "provider:chartvolt:circuit-sprint": 3,
     });
+  });
+
+  it("xp-level-shared is byte-identical and outside use-server", () => {
+    // Reason: const/sync exports cannot live in xp-level.service.ts ("use server").
+    expect(read("apps/admin/lib/services/xp-level-shared.ts")).toBe(
+      read("lib/services/xp-level-shared.ts"),
+    );
+    const shared = stripComments(read("lib/services/xp-level-shared.ts"));
+    expect(shared).not.toMatch(/"use server"/);
+    expect(shared).toMatch(/export const TRADE_ACTIVITY_SOURCE_PREFIX/);
+    expect(shared).toMatch(/export function sumXpByGameKey/);
+    const service = stripComments(read("lib/services/xp-level.service.ts"));
+    expect(service).not.toMatch(/export const TRADE_ACTIVITY_SOURCE_PREFIX/);
+    expect(service).not.toMatch(/export function sumXpByGameKey/);
   });
 
   it("evaluate and getUserBadges both call badgeAppliesToPlayer", () => {

@@ -6,6 +6,10 @@ import UserBadge from "@/database/models/user-badge.model";
 import BadgeConfig from "@/database/models/badge-config.model";
 import { getTitleByXP, getXPForBadge } from "@/lib/services/xp-config.service";
 import { gameKeyForBadgeXp } from "@/lib/services/games/badge-game-scope";
+import {
+  TRADE_ACTIVITY_SOURCE_PREFIX,
+  sumXpByGameKey,
+} from "@/lib/services/xp-level-shared";
 
 /**
  * Award XP to user for earning a badge
@@ -134,16 +138,6 @@ export async function awardXPForBadge(
     oldTitle: leveledUp ? oldTitle : undefined,
   };
 }
-
-/**
- * The sourceId prefix every trade-activity award is written under, and the prefix the daily
- * cap matches on to find today's trade XP.
- *
- * Reason: one definition, because the writer and the reader must agree for the cap to apply
- * at all, and when they disagreed the cap did not fail - it silently admitted everything
- * (risk R95). A second literal would reinstate that, and the symptom is no symptom.
- */
-export const TRADE_ACTIVITY_SOURCE_PREFIX = "trade_activity:";
 
 /**
  * The fields the daily cap reads off one stored `xpHistory` row.
@@ -335,27 +329,6 @@ export async function awardActivityXP(
   }
 
   return { xpAwarded: xpAmount, dailyXPUsed: 0, dailyCapped: false };
-}
-
-/**
- * Sum xpHistory amounts by gameKey (X7 step 4). Entries without a gameKey are
- * bucketed under `"_unscoped"` — platform awards, never reassigned to trading.
- */
-export function sumXpByGameKey(
-  xpHistory: Array<{ amount?: number; gameKey?: string }> | null | undefined,
-): Record<string, number> {
-  const out: Record<string, number> = {};
-  if (!Array.isArray(xpHistory)) return out;
-  for (const row of xpHistory) {
-    const key =
-      typeof row.gameKey === "string" && row.gameKey.trim()
-        ? row.gameKey.trim()
-        : "_unscoped";
-    const amount = Number(row.amount);
-    if (!Number.isFinite(amount) || amount === 0) continue;
-    out[key] = (out[key] || 0) + amount;
-  }
-  return out;
 }
 
 /**

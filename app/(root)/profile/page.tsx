@@ -17,7 +17,7 @@ import {
   getTitleLevels,
 } from "@/lib/services/xp-config.service";
 import { getPlayerGameProfile } from "@/lib/services/games/player-game-stats.service";
-import connectToDatabase from "@/database/mongoose";
+import { connectToDatabase } from "@/database/mongoose";
 import ModernProfilePage from "./ModernProfilePage";
 import { Badge } from "@/lib/constants/badges";
 
