@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
-import { requireAdminAuth } from "@/lib/admin/auth";
 import { getStripeClient } from "@/lib/stripe/config";
 
 /**
@@ -11,7 +11,8 @@ import { getStripeClient } from "@/lib/stripe/config";
  */
 export async function GET() {
   try {
-    await requireAdminAuth();
+    const guard = await guardSection("payments");
+    if (!guard.ok) return guard.response;
     await connectToDatabase();
 
     const pendingPayments = await WalletTransaction.find({

@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import KYCSession from "@/database/models/kyc-session.model";
-import { getAdminSession } from "@/lib/admin/auth";
 
 export async function GET(req: NextRequest) {
   try {
-    const session = await getAdminSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("kyc-history");
+    if (!guard.ok) return guard.response;
 
     await connectToDatabase();
 

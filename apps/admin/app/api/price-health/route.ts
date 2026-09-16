@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 /**
  * GET /api/price-health
@@ -9,10 +9,8 @@ import { verifyAdminAuth } from "@/lib/admin/auth";
  */
 export async function GET(request: NextRequest) {
   try {
-    const auth = await verifyAdminAuth();
-    if (!auth.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("price-health");
+    if (!guard.ok) return guard.response;
 
     // Try to fetch from main app's API
     const mainAppUrl =
@@ -76,10 +74,8 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const auth = await verifyAdminAuth();
-    if (!auth.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("price-health");
+    if (!guard.ok) return guard.response;
 
     const body = await request.json();
     const mainAppUrl =

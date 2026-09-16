@@ -1,15 +1,13 @@
 import { NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import mongoose from "mongoose";
 import { connectToDatabase } from "@/database/mongoose";
-import { verifyAdminAuth } from "@/lib/admin/auth";
 
 /** GET /api/health-overview — compact admin health snapshot (DB, users, process). */
 export async function GET() {
   try {
-    const auth = await verifyAdminAuth();
-    if (!auth.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("overview");
+    if (!guard.ok) return guard.response;
 
     await connectToDatabase();
     const readyState = mongoose.connection.readyState;

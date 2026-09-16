@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import mongoose from "mongoose";
 import { ObjectId } from "mongodb";
 import { connectToDatabase } from "@/database/mongoose";
-import { requireAdminAuth } from "@/lib/admin/auth";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import UserPresence from "@/database/models/user-presence.model";
 import WithdrawalRequest from "@/database/models/withdrawal-request.model";
@@ -96,7 +96,8 @@ async function loadUserLookup(userIds: string[]): Promise<UserLookupMap> {
 
 export async function GET() {
   try {
-    await requireAdminAuth();
+    const guard = await guardSection("overview");
+    if (!guard.ok) return guard.response;
     await connectToDatabase();
 
     const now = Date.now();

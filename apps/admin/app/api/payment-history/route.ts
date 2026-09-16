@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
-import { requireAdminAuth } from "@/lib/admin/auth";
 
 // Escape special regex characters to prevent ReDoS attacks
 function escapeRegex(str: string): string {
@@ -14,7 +14,8 @@ function escapeRegex(str: string): string {
  */
 export async function GET(request: NextRequest) {
   try {
-    await requireAdminAuth();
+    const guard = await guardSection("payments");
+    if (!guard.ok) return guard.response;
     await connectToDatabase();
 
     const { searchParams } = new URL(request.url);

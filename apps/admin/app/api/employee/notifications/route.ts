@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { employeeNotificationService } from "@/lib/services/employee-notification.service";
 
 /**
@@ -8,10 +8,9 @@ import { employeeNotificationService } from "@/lib/services/employee-notificatio
  */
 export async function GET(request: NextRequest) {
   try {
-    const auth = await verifyAdminAuth();
-    if (!auth.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("profile");
+    if (!guard.ok) return guard.response;
+    const auth = { adminId: guard.admin.id, isAuthenticated: true as const };
 
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get("limit") || "50", 10);
@@ -42,10 +41,9 @@ export async function GET(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
-    const auth = await verifyAdminAuth();
-    if (!auth.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("profile");
+    if (!guard.ok) return guard.response;
+    const auth = { adminId: guard.admin.id, isAuthenticated: true as const };
 
     const body = await request.json();
     const { notificationId, markAllRead } = body;

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyAdminAuth } from "@/lib/admin/auth";
+import { guardAnySection } from "@/lib/admin/section-route-guard";
 // Reason: the admin app's "@/" alias points at apps/admin/, so shared services
 // in the repo-root lib/ must be imported via a relative path.
 import {
@@ -16,13 +16,9 @@ export const dynamic = "force-dynamic";
  * Lists recent SecurityAlert documents for admin review.
  */
 export async function GET(request: NextRequest) {
-  const adminUser = await verifyAdminAuth();
-  if (!adminUser.isAuthenticated) {
-    return NextResponse.json(
-      { success: false, error: "Unauthorized" },
-      { status: 401 },
-    );
-  }
+  const guard = await guardAnySection(["overview", "fraud"]);
+  if (!guard.ok) return guard.response;
+  const adminUser = { adminId: guard.admin.id, email: guard.admin.email, isAuthenticated: true as const };
 
   const { searchParams } = new URL(request.url);
   const limitParam = searchParams.get("limit");
@@ -73,13 +69,9 @@ export async function GET(request: NextRequest) {
  * Marks a SecurityAlert as acknowledged by the current admin.
  */
 export async function POST(request: NextRequest) {
-  const adminUser = await verifyAdminAuth();
-  if (!adminUser.isAuthenticated) {
-    return NextResponse.json(
-      { success: false, error: "Unauthorized" },
-      { status: 401 },
-    );
-  }
+  const guard = await guardAnySection(["overview", "fraud"]);
+  if (!guard.ok) return guard.response;
+  const adminUser = { adminId: guard.admin.id, email: guard.admin.email, isAuthenticated: true as const };
 
   let body: { alertId?: unknown; note?: unknown };
   try {

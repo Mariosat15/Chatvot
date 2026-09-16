@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import { Admin } from "@/database/models/admin.model";
 import bcrypt from "bcryptjs";
@@ -12,10 +12,9 @@ import { syncEmployeeProfile } from "@/lib/services/profile-sync.service";
  */
 export async function GET(request: NextRequest) {
   try {
-    const auth = await verifyAdminAuth();
-    if (!auth.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("profile");
+    if (!guard.ok) return guard.response;
+    const auth = { adminId: guard.admin.id, isAuthenticated: true as const };
 
     await connectToDatabase();
 
@@ -67,10 +66,9 @@ export async function GET(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
-    const auth = await verifyAdminAuth();
-    if (!auth.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("profile");
+    if (!guard.ok) return guard.response;
+    const auth = { adminId: guard.admin.id, isAuthenticated: true as const };
 
     const body = await request.json();
     const { name, phone, timezone, language, bio, department, title, avatar } =

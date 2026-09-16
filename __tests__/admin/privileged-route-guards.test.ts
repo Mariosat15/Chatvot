@@ -294,6 +294,21 @@ const CLOSED_FOLDERS: { folder: string[]; section: string }[] = [
   { folder: ["admin-bank-accounts"], section: "company" },
   { folder: ["cancel-pending-payment"], section: "failed-deposits" },
   { folder: ["vendors"], section: "vendors" },
+  /*
+    R101ab. Money leftovers + ops health + employee self. security/alerts is dual-caller
+    overview|fraud (LiveOpsPanel + FraudMonitoringSection); CLOSED_FOLDERS pins overview
+    and the describe asserts both. health-overview has no UI caller today — granted as
+    overview with live-ops.
+  */
+  { folder: ["pending-payments"], section: "payments" },
+  { folder: ["payment-history"], section: "payments" },
+  { folder: ["live-ops"], section: "overview" },
+  { folder: ["health-overview"], section: "overview" },
+  { folder: ["price-health"], section: "price-health" },
+  { folder: ["kyc-history"], section: "kyc-history" },
+  { folder: ["notifications"], section: "notifications" },
+  { folder: ["employee"], section: "profile" },
+  { folder: ["security"], section: "overview" },
 ];
 
 describe("R101a - every handler in the closed folders is guarded, per handler", () => {
@@ -2143,6 +2158,96 @@ describe("R101aa - ops / money / customer helpers are section-granted", () => {
     );
     expect(code).not.toMatch(/jwtVerify|jose|ADMIN_JWT_SECRET|admin-secret-key/);
     expect(guardedSections(code)).toContain("financial");
+  });
+});
+
+describe("R101ab - money leftovers / ops health / employee self are section-granted", () => {
+  /*
+    Eleven files, eighteen handlers. PendingPaymentsSection → payments; LiveOpsPanel →
+    overview; PriceHealthWidget → price-health; KYCHistorySection → kyc-history;
+    NotificationSystemSection → notifications; EmployeeProfileSection → profile.
+    security/alerts is dual-caller (overview + fraud). health-overview has no UI caller
+    and is granted overview with live-ops.
+  */
+  // Reason: do not match bare `\bverify\s*(` — it fires on unrelated words and is not
+  // how any weaker helper in this tree is spelled. R101b's list is the canonical one.
+  const WEAKER =
+    /(getAdminSession|requireAdminAuth|verifyAdminAuth|verifyAdminToken|verifyAnyAuth|jwtVerify|getAdminJwtSecret)\s*\(/;
+
+  const singleCaller: { rel: string; section: string; handlers: number }[] = [
+    { rel: "pending-payments/route.ts", section: "payments", handlers: 1 },
+    { rel: "payment-history/route.ts", section: "payments", handlers: 1 },
+    { rel: "live-ops/route.ts", section: "overview", handlers: 1 },
+    { rel: "health-overview/route.ts", section: "overview", handlers: 1 },
+    { rel: "price-health/route.ts", section: "price-health", handlers: 2 },
+    { rel: "kyc-history/route.ts", section: "kyc-history", handlers: 1 },
+    { rel: "notifications/route.ts", section: "notifications", handlers: 4 },
+    { rel: "employee/profile/route.ts", section: "profile", handlers: 2 },
+    { rel: "employee/profile/password/route.ts", section: "profile", handlers: 1 },
+    { rel: "employee/notifications/route.ts", section: "profile", handlers: 2 },
+  ];
+
+  const dualCaller: { rel: string; sections: string[]; handlers: number }[] = [
+    {
+      rel: "security/alerts/route.ts",
+      sections: ["overview", "fraud"],
+      handlers: 2,
+    },
+  ];
+
+  it("covers eleven money/ops/employee route files", () => {
+    expect(singleCaller.length + dualCaller.length).toBe(11);
+  });
+
+  it("every single-caller file names its calling-screen grant and no weaker helper", () => {
+    const weaker: string[] = [];
+    const missing: string[] = [];
+    let handlers = 0;
+    let guards = 0;
+
+    for (const { rel, section, handlers: expected } of singleCaller) {
+      const file = join(API, ...rel.split("/"));
+      const code = stripComments(readFileSync(file, "utf8"));
+      if (WEAKER.test(code)) weaker.push(rel);
+      if (!guardedSections(code).includes(section)) missing.push(rel);
+      const fileHandlers = (code.match(handlerPattern()) ?? []).length;
+      handlers += fileHandlers;
+      guards += (code.match(guardCallPattern()) ?? []).length;
+      expect(fileHandlers).toBe(expected);
+    }
+
+    expect(weaker).toEqual([]);
+    expect(missing).toEqual([]);
+    expect(handlers).toBe(16);
+    expect(guards).toBeGreaterThanOrEqual(handlers);
+  });
+
+  it("security/alerts uses guardAnySection with overview and fraud", () => {
+    const weaker: string[] = [];
+    const missing: string[] = [];
+    let handlers = 0;
+    let guards = 0;
+
+    for (const { rel, sections, handlers: expected } of dualCaller) {
+      const file = join(API, ...rel.split("/"));
+      const code = stripComments(readFileSync(file, "utf8"));
+      if (WEAKER.test(code)) weaker.push(rel);
+      for (const { method, body } of handlerSlices(code)) {
+        const named = guardedSections(body);
+        if (!sections.every((s) => named.includes(s))) {
+          missing.push(`${rel}:${method}`);
+        }
+      }
+      const fileHandlers = (code.match(handlerPattern()) ?? []).length;
+      handlers += fileHandlers;
+      guards += (code.match(guardCallPattern()) ?? []).length;
+      expect(fileHandlers).toBe(expected);
+    }
+
+    expect(weaker).toEqual([]);
+    expect(missing).toEqual([]);
+    expect(handlers).toBe(2);
+    expect(guards).toBeGreaterThanOrEqual(handlers);
   });
 });
 

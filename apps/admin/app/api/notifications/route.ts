@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
-import { requireAdminAuth, getAdminSession } from "@/lib/admin/auth";
 import { notificationService } from "@/lib/services/notification.service";
 import { auditLogService } from "@/lib/services/audit-log.service";
 import { checkAndSeedTemplates } from "@/lib/services/notification-seed.service";
@@ -10,7 +10,8 @@ import Notification from "@/database/models/notification.model";
 // GET - Get notification templates and stats
 export async function GET(request: NextRequest) {
   try {
-    await requireAdminAuth();
+    const guard = await guardSection("notifications");
+    if (!guard.ok) return guard.response;
     await connectToDatabase();
 
     // Auto-seed templates if none exist
@@ -85,12 +86,13 @@ export async function GET(request: NextRequest) {
 // POST - Send notification or create template
 export async function POST(request: NextRequest) {
   try {
-    await requireAdminAuth();
+    const guard = await guardSection("notifications");
+    if (!guard.ok) return guard.response;
     await connectToDatabase();
 
     const body = await request.json();
     const { action } = body;
-    const admin = await getAdminSession();
+    const admin = guard.admin;
 
     if (action === "send_instant") {
       // Send instant notification to users
@@ -354,7 +356,8 @@ export async function POST(request: NextRequest) {
 // PUT - Update template
 export async function PUT(request: NextRequest) {
   try {
-    await requireAdminAuth();
+    const guard = await guardSection("notifications");
+    if (!guard.ok) return guard.response;
     await connectToDatabase();
 
     const body = await request.json();
@@ -367,7 +370,7 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const admin = await getAdminSession();
+    const admin = guard.admin;
 
     if (updateAction === "toggle") {
       // Toggle single template
@@ -453,7 +456,8 @@ export async function PUT(request: NextRequest) {
 // DELETE - Delete custom template
 export async function DELETE(request: NextRequest) {
   try {
-    await requireAdminAuth();
+    const guard = await guardSection("notifications");
+    if (!guard.ok) return guard.response;
     await connectToDatabase();
 
     const { searchParams } = new URL(request.url);
@@ -478,7 +482,7 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const admin = await getAdminSession();
+    const admin = guard.admin;
     if (admin) {
       await auditLogService.logSettingsUpdated(
         { id: admin.id, email: admin.email || "admin", name: admin.name },

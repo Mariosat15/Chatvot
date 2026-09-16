@@ -72,8 +72,8 @@ const NO_CHECK_OF_ANY_KIND = [] as const;
 const HAND_VERIFIED_NO_GRANT = [] as const;
 
 /**
- * 41 routes that authenticate with a helper and never ask which sections the caller
- * holds. (Was 67 after R101y; R101aa moved twenty-six ops/money/customer routes into
+ * 30 routes that authenticate with a helper and never ask which sections the caller
+ * holds. (Was 41 after R101aa; R101ab moved eleven money/ops/employee-self routes into
  * section-granted. Gamemaster/ stays deferred — verifyGameMasterAuth by design.)
  */
 const HELPER_BUT_NO_GRANT = [
@@ -92,9 +92,6 @@ const HELPER_BUT_NO_GRANT = [
 "dev-scripts/execute/route.ts",
 "dev-scripts/route.ts",
 "dev-zone/dependency-check/route.ts",
-"employee/notifications/route.ts",
-"employee/profile/password/route.ts",
-"employee/profile/route.ts",
 "environment/route.ts",
 "finalize-challenges/route.ts",
 "gamemaster/competitions/route.ts",
@@ -104,17 +101,9 @@ const HELPER_BUT_NO_GRANT = [
 "gamemaster/link/route.ts",
 "gamemaster/referrals/route.ts",
 "gamification/sync-user/route.ts",
-"health-overview/route.ts",
 "images/route.ts",
 "images/upload/route.ts",
-"kyc-history/route.ts",
-"live-ops/route.ts",
-"notifications/route.ts",
-"payment-history/route.ts",
-"pending-payments/route.ts",
-"price-health/route.ts",
 "reset-all-data/route.ts",
-"security/alerts/route.ts",
 "server-options/apply-heap/route.ts",
 "server-options/heap-info/route.ts",
 "verify-password/route.ts",
@@ -223,6 +212,17 @@ const CLOSED_FOLDERS = [
   "platform-financials",
   "reconciliation",
   "transactions",
+  // R101ab. Money leftovers + ops health + employee self. security/alerts is
+  // dual-caller overview|fraud; employee/* is profile (self-service screen).
+  "pending-payments",
+  "payment-history",
+  "live-ops",
+  "health-overview",
+  "price-health",
+  "kyc-history",
+  "notifications",
+  "employee",
+  "security",
 ];
 
 const findings = inventoryAdminRoutes();
