@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
+import { guardAnySection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import Invoice from "@/database/models/invoice.model";
-import { requireAdminAuth } from "@/lib/admin/auth";
 
 /**
  * GET /api/admin/invoices
@@ -9,7 +9,9 @@ import { requireAdminAuth } from "@/lib/admin/auth";
  */
 export async function GET(request: Request) {
   try {
-    await requireAdminAuth();
+    const guard = await guardAnySection(["financial", "users"]);
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     const { searchParams } = new URL(request.url);

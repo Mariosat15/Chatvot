@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardAnySection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
-import { requireAdminAuth, getAdminSession } from "@/lib/admin/auth";
 import Invoice from "@/database/models/invoice.model";
 import { generateInvoicePDF } from "@/lib/services/pdf-generator.service";
 import InvoiceSettings from "@/database/models/invoice-settings.model";
@@ -18,7 +18,9 @@ import { auditLogService } from "@/lib/services/audit-log.service";
  */
 export async function GET(request: NextRequest) {
   try {
-    await requireAdminAuth();
+    const guard = await guardAnySection(["financial", "users"]);
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     const { searchParams } = new URL(request.url);
@@ -103,22 +105,20 @@ export async function GET(request: NextRequest) {
       const dateRange =
         startDateStr && endDateStr ? `${startDateStr}_to_${endDateStr}` : "all";
 
-      // Log audit action for CSV export
+      // Reason: guard.admin is the attribution — a second getAdminSession here was the
+      // shape that let users/edit log an audit after an unauthenticated write (R101b).
       try {
-        const admin = await getAdminSession();
-        if (admin) {
-          await auditLogService.logInvoicesExported(
-            {
-              id: admin.id,
-              email: admin.email,
-              name: admin.email.split("@")[0],
-              role: "admin",
-            },
-            invoices.length,
-            { start: startDateStr || "all", end: endDateStr || "all" },
-            "csv",
-          );
-        }
+        await auditLogService.logInvoicesExported(
+          {
+            id: guard.admin.id,
+            email: guard.admin.email,
+            name: (guard.admin.name || guard.admin.email).split("@")[0],
+            role: guard.admin.role || "admin",
+          },
+          invoices.length,
+          { start: startDateStr || "all", end: endDateStr || "all" },
+          "csv",
+        );
       } catch (auditError) {
         console.error("Failed to log audit action:", auditError);
       }
@@ -248,22 +248,18 @@ export async function GET(request: NextRequest) {
       `✅ Export complete: ${successCount} PDFs in ${(zipBuffer.length / 1024).toFixed(2)} KB`,
     );
 
-    // Log audit action
     try {
-      const admin = await getAdminSession();
-      if (admin) {
-        await auditLogService.logInvoicesExported(
-          {
-            id: admin.id,
-            email: admin.email,
-            name: admin.email.split("@")[0],
-            role: "admin",
-          },
-          invoices.length,
-          { start: startDateStr || "all", end: endDateStr || "all" },
-          "zip",
-        );
-      }
+      await auditLogService.logInvoicesExported(
+        {
+          id: guard.admin.id,
+          email: guard.admin.email,
+          name: (guard.admin.name || guard.admin.email).split("@")[0],
+          role: guard.admin.role || "admin",
+        },
+        invoices.length,
+        { start: startDateStr || "all", end: endDateStr || "all" },
+        "zip",
+      );
     } catch (auditError) {
       console.error("Failed to log audit action:", auditError);
     }
@@ -297,7 +293,9 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    await requireAdminAuth();
+    const guard = await guardAnySection(["financial", "users"]);
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     const { startDate, endDate } = await request.json();

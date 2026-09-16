@@ -72,9 +72,9 @@ const NO_CHECK_OF_ANY_KIND = [] as const;
 const HAND_VERIFIED_NO_GRANT = [] as const;
 
 /**
- * 117 routes that authenticate with a helper and never ask which sections the caller
- * holds. (Was 122 after R101r; R101s moved five employees/ + reset-all-employees routes
- * into section-granted. employees/availability was already messaging under R101n.)
+ * 108 routes that authenticate with a helper and never ask which sections the caller
+ * holds. (Was 117 after R101s; R101t moved nine invoices/ + invoice-settings routes
+ * into section-granted.)
  */
 const HELPER_BUT_NO_GRANT = [
   "admin/backfill-ranks/route.ts",
@@ -137,15 +137,6 @@ const HELPER_BUT_NO_GRANT = [
   "incidents/[id]/resolve/route.ts",
   "incidents/[id]/route.ts",
   "incidents/route.ts",
-  "invoice-settings/route.ts",
-  "invoices/[id]/html/route.ts",
-  "invoices/[id]/pdf/route.ts",
-  "invoices/[id]/resend/route.ts",
-  "invoices/[id]/route.ts",
-  "invoices/[id]/view/route.ts",
-  "invoices/by-transaction/route.ts",
-  "invoices/export/route.ts",
-  "invoices/route.ts",
   "kyc-history/route.ts",
   "kyc-settings/provider/route.ts",
   "kyc-settings/route.ts",
@@ -262,6 +253,11 @@ const CLOSED_FOLDERS = [
   // GET /employees is dual-caller employees|users). reset-all is DatabaseSection.
   "employees",
   "admin/reset-all-employees",
+  // R101t. invoices/ is financial|users (FinancialDashboard + UserFullDetailPanel /
+  // TransactionDetailDialog). invoice-settings is invoices|financial (template section
+  // + FinancialDashboard VAT preview).
+  "invoices",
+  "invoice-settings",
 ];
 
 const findings = inventoryAdminRoutes();

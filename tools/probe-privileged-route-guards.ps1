@@ -55,6 +55,7 @@ function Invoke-Probe {
     [string]$Find2,
     [string]$Replace2,
     [string]$ExpectTest,
+    [string]$SuiteFile = $Suite,
     [switch]$First
   )
 
@@ -81,7 +82,7 @@ function Invoke-Probe {
 
   Write-Source $File $mutated
   try {
-    $out = (& npx vitest run $Suite -t $ExpectTest 2>&1 | Out-String) -replace '\s+', ' '
+    $out = (& npx vitest run $SuiteFile -t $ExpectTest 2>&1 | Out-String) -replace '\s+', ' '
     # Checked BEFORE the failure count, and deliberately: a run that matched no test prints no
     # "failed" line at all, so a bare fall-through to GREEN would report a moved or mis-spelled
     # -t pattern as an unprotected guard.
@@ -1010,4 +1011,57 @@ Invoke-Probe -Name 'reset-all inventory stays section-granted' -File $EMP_RESET 
 Write-Host ''
 Write-Host 'Helper debt after R101s: 117. Remaining are helper-but-no-grant folders (settings,' -ForegroundColor DarkGray
 Write-Host 'marketplace, invoices, gamemaster, tutorials, ai-knowledge, ...).' -ForegroundColor DarkGray
+Write-Host ''
+
+Write-Host "`n=== R101t probes ===`n"
+
+$INV_EXPORT = 'apps/admin/app/api/invoices/export/route.ts'
+$INV_RESEND = 'apps/admin/app/api/invoices/[id]/resend/route.ts'
+$INV_SETTINGS = 'apps/admin/app/api/invoice-settings/route.ts'
+$INV_BY_TX = 'apps/admin/app/api/invoices/by-transaction/route.ts'
+
+# 99. Drop users half of invoices dual-caller - locks UserFullDetailPanel out.
+Invoke-Probe -Name 'invoices export users half dropped' -File $INV_EXPORT `
+  -Find 'guardAnySection(["financial", "users"])' `
+  -Replace 'guardSection("financial")' `
+  -ExpectTest 'every invoices/ handler names financial and users, with no weaker helper'
+
+# 100. Wrong single grant on resend (users-only looking) - must still name financial.
+Invoke-Probe -Name 'invoices resend financial half dropped' -File $INV_RESEND `
+  -Find 'guardAnySection(["financial", "users"])' `
+  -Replace 'guardSection("users")' `
+  -ExpectTest 'every invoices/ handler names financial and users, with no weaker helper'
+
+# 101. invoice-settings loses invoices half - locks InvoiceTemplateSection.
+Invoke-Probe -Name 'invoice-settings invoices half dropped' -File $INV_SETTINGS `
+  -Find 'guardAnySection(["invoices", "financial"])' `
+  -Replace 'guardSection("financial")' `
+  -ExpectTest 'invoice-settings accepts either invoices or financial'
+
+# 102. Audit falls back to getAdminSession after the guard.
+Invoke-Probe -Name 'invoice export audit uses session again' -File $INV_EXPORT `
+  -Find 'id: guard.admin.id,' `
+  -Replace 'id: (await getAdminSession())!.id,' `
+  -ExpectTest 'export and settings audits attribute from the guard, not a follow-up session'
+
+# 103. Closed-folder canary — single-handler file so emptying AUTH_CALL is possible.
+Invoke-Probe -Name 'invoices by-transaction closed folder loses grant' -File $INV_BY_TX `
+  -Find '    const guard = await guardAnySection(["financial", "users"]);' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'and none of the closed folders leak an unguarded file'
+
+# 104. Inventory canary — same mutation, inventory suite.
+Invoke-Probe -Name 'invoices by-transaction inventory stays section-granted' -File $INV_BY_TX `
+  -Find '    const guard = await guardAnySection(["financial", "users"]);' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -SuiteFile '__tests__/admin/admin-route-auth-inventory.test.ts' `
+  -ExpectTest 'no route under a closed folder is anything but section-granted'
+
+Write-Host ''
+Write-Host 'Helper debt after R101t: 108. Remaining are helper-but-no-grant folders (settings,' -ForegroundColor DarkGray
+Write-Host 'marketplace, gamemaster, tutorials, ai-knowledge, ...).' -ForegroundColor DarkGray
 Write-Host ''

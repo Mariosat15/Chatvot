@@ -196,6 +196,14 @@ const CLOSED_FOLDERS: { folder: string[]; section: string }[] = [
   { folder: ["employees", "upgrade-super-admin"], section: "employees" },
   { folder: ["admin", "reset-all-employees"], section: "database" },
   /*
+    R101t. Invoice data is dual-caller financial|users (FinancialDashboard +
+    UserFullDetailPanel / TransactionDetailDialog). CLOSED_FOLDERS demands one section
+    per walk — financial is the shared half; users is asserted in the R101t describe.
+    invoice-settings is invoices|financial (InvoiceTemplateSection + FinancialDashboard).
+  */
+  { folder: ["invoices"], section: "financial" },
+  { folder: ["invoice-settings"], section: "invoices" },
+  /*
     R101o. Money writers first among helper-but-no-grant. FinancialDashboard → financial
     (admin-funds, vat, vendor-payments, atlas/*); PendingWithdrawalsSection →
     pending-withdrawals (withdrawals/). admin-bank-accounts deferred - dual callers on
@@ -1526,6 +1534,74 @@ describe("R101s - employees helpers and reset-all are section-granted", () => {
     expect(guardedSections(code)).toEqual(["database"]);
     expect((code.match(handlerPattern()) ?? []).length).toBe(1);
     expect((code.match(guardCallPattern()) ?? []).length).toBe(1);
+  });
+});
+
+describe("R101t - invoices helpers are section-granted", () => {
+  /*
+    Nine files, twelve handlers. Invoice data (8 files under invoices/) is dual-caller
+    financial|users — FinancialDashboard and UserFullDetailPanel (via TransactionDetailDialog).
+    invoice-settings is invoices|financial — InvoiceTemplateSection plus the financial
+    dashboard VAT preview. Export/settings audits use guard.admin, never a follow-up session.
+  */
+  const WEAKER =
+    /(getAdminSession|requireAdminAuth|verifyAdminAuth|verifyAdminToken|verifyAnyAuth|jwtVerify|getAdminJwtSecret)\s*\(|\bverify\s*\(/;
+
+  const invoiceFiles = findRouteFiles(join(API, "invoices"));
+  const settingsFile = join(API, "invoice-settings", "route.ts");
+
+  it("covers the whole invoices/ tree and invoice-settings", () => {
+    expect(invoiceFiles.length).toBe(8);
+    expect(existsSync(settingsFile)).toBe(true);
+  });
+
+  it("every invoices/ handler names financial and users, with no weaker helper", () => {
+    const weaker: string[] = [];
+    const missing: string[] = [];
+    let handlers = 0;
+    let guards = 0;
+
+    for (const file of invoiceFiles) {
+      const code = stripComments(readFileSync(file, "utf8"));
+      const name = file.slice(API.length + 1).replace(/\\/g, "/");
+      const named = guardedSections(code);
+      if (WEAKER.test(code)) weaker.push(name);
+      if (!named.includes("financial") || !named.includes("users")) {
+        missing.push(name);
+      }
+      handlers += (code.match(handlerPattern()) ?? []).length;
+      guards += (code.match(guardCallPattern()) ?? []).length;
+    }
+
+    expect(weaker).toEqual([]);
+    expect(missing).toEqual([]);
+    expect(handlers).toBe(10);
+    expect(guards).toBeGreaterThanOrEqual(handlers);
+  });
+
+  it("invoice-settings accepts either invoices or financial", () => {
+    const code = stripComments(readFileSync(settingsFile, "utf8"));
+    expect(WEAKER.test(code)).toBe(false);
+    expect(code).toMatch(
+      /guardAnySection\s*\(\s*\[\s*["']invoices["']\s*,\s*["']financial["']/,
+    );
+    const named = guardedSections(code);
+    expect(named).toEqual(expect.arrayContaining(["invoices", "financial"]));
+    expect((code.match(handlerPattern()) ?? []).length).toBe(2);
+    expect((code.match(guardCallPattern()) ?? []).length).toBe(2);
+  });
+
+  it("export and settings audits attribute from the guard, not a follow-up session", () => {
+    // Reason: getAdminSession after a successful guard is the R101b shape — it reads as
+    // attribution while performing none when the guard is later removed.
+    for (const file of [
+      join(API, "invoices", "export", "route.ts"),
+      settingsFile,
+    ]) {
+      const code = stripComments(readFileSync(file, "utf8"));
+      expect(code).toMatch(/guard\.admin/);
+      expect(code).not.toMatch(/getAdminSession\s*\(/);
+    }
   });
 });
 

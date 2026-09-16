@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
+import { guardAnySection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import InvoiceSettings from "@/database/models/invoice-settings.model";
 import CompanySettings, {
   isEUCountry,
 } from "@/database/models/company-settings.model";
-import { requireAdminAuth, getAdminSession } from "@/lib/admin/auth";
 import { auditLogService } from "@/lib/services/audit-log.service";
 
 /**
@@ -13,7 +13,9 @@ import { auditLogService } from "@/lib/services/audit-log.service";
  */
 export async function GET() {
   try {
-    await requireAdminAuth();
+    const guard = await guardAnySection(["invoices", "financial"]);
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     const [invoiceSettings, companySettings] = await Promise.all([
@@ -50,7 +52,9 @@ export async function GET() {
  */
 export async function PUT(request: Request) {
   try {
-    await requireAdminAuth();
+    const guard = await guardAnySection(["invoices", "financial"]);
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     const body = await request.json();
@@ -107,17 +111,15 @@ export async function PUT(request: Request) {
       sendInvoiceOnPurchase: settings.sendInvoiceOnPurchase,
     });
 
-    // Log audit action
+    // Reason: attribution comes from the guard that already refused; a follow-up
+    // getAdminSession is the R101b shape (audit after an unauthenticated write).
     try {
-      const admin = await getAdminSession();
-      if (admin) {
-        await auditLogService.logInvoiceSettingsUpdated({
-          id: admin.id,
-          email: admin.email,
-          name: admin.email.split("@")[0],
-          role: "admin",
-        });
-      }
+      await auditLogService.logInvoiceSettingsUpdated({
+        id: guard.admin.id,
+        email: guard.admin.email,
+        name: (guard.admin.name || guard.admin.email).split("@")[0],
+        role: guard.admin.role || "admin",
+      });
     } catch (auditError) {
       console.error("Failed to log audit action:", auditError);
     }

@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
+import { guardAnySection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import Invoice from "@/database/models/invoice.model";
 import { InvoiceService } from "@/lib/services/invoice.service";
-import { requireAdminAuth } from "@/lib/admin/auth";
 
 /**
  * GET /api/admin/invoices/[id]
@@ -13,7 +13,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    await requireAdminAuth();
+    const guard = await guardAnySection(["financial", "users"]);
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     const { id } = await params;
@@ -54,7 +56,9 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    await requireAdminAuth();
+    const guard = await guardAnySection(["financial", "users"]);
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     const { id } = await params;
