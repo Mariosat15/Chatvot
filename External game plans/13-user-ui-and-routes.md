@@ -3166,7 +3166,7 @@ player now actually reaches.
 
 | Change | Note |
 |---|---|
-| Back it with `UserGameStats` | Per-game rows plus an `"_overall"` rollup - `04` |
+| Back it with `UserGameStats` | Per-game rows plus an `"_overall"` rollup - **`04` s3.6**, which did not exist until 16 Sep 2026; see 7.3 |
 | Tabs: Overall, per game, seasonal | Per `05` |
 | Per-game rating column | Provider games support a per-game skill rating - `05` |
 
@@ -3196,6 +3196,25 @@ such as total winnings. Which of the two is open question 13; what is *not* open
 cannot stay ambiguous, because the number will be wrong for every player who plays anything
 else - and it will be wrong silently, since the calculation keeps working.
 
+> **BOTH OF THE TWO THINGS BELOW WERE ANSWERED BY THE OWNER ON 16 SEPTEMBER 2026**, before
+> X7 began, and the answers are in `PROGRESS.md`'s decision log and `05` s10.4. They are
+> kept here as written because they state *what* had to be decided, and a question with its
+> alternatives removed reads as an assumption nobody made.
+>
+> - **Question 14 - the cross-game aggregates start at zero.** Trading's history is neither
+>   discarded nor migrated: it stays inside the trading card of the per-game breakdown with
+>   its full figures, and only the cross-game rollup begins empty. **This page therefore owes
+>   the player a sentence**, not just a number. The failure mode is precise: a trader with ten
+>   years of history sees `0` beside a summary captioned as lifetime and reports data loss -
+>   the figure is correct, the caption is the defect. So the cross-game summary is labelled as
+>   counting from the day cross-game scoring began, and the trading card is what carries
+>   "before that".
+> - **Question 13 - one headline number.** The summary leads with a single cross-game figure
+>   from `05` section 3's normalised points, with per-game ranks on tabs beside it. That makes
+>   the `"_overall"` row of `UserGameStats` a record the page actually reads, and it settles
+>   the naming problem below: the header figure is **total winnings plus a normalised standing**,
+>   and "Total Profit" moves inside the trading card where it is correctly scoped.
+
 **Two things to check before building it**, both of which decide the layout rather than
 following from it:
 
@@ -3213,7 +3232,14 @@ following from it:
 ### 7.3 Where the stats come from
 
 `UserGameStats` is the single source for both surfaces - per-game rows plus an `"_overall"`
-rollup (`04`). Two rules follow, and both exist because the alternative fails quietly:
+rollup, **specified in `04` section 3.6 from 16 September 2026 and not before then**. The
+citation in this section and in 7.1 pointed at `04` for a year while `04` carried no such
+row; the design was in `New games plan/04`, which belongs to the programme that is not being
+delivered. **Read `04` s3.6, not this sentence, for the field list** - and note it keys on
+**`gameKey`**, not the `gameType` the other chapter uses, because `gameKey` is the immutable
+join key every other historical statistic already uses.
+
+Two rules follow, and both exist because the alternative fails quietly:
 
 - **The profile must not compute aggregates of its own.** If the profile derives a total
   its own way, it will disagree with the leaderboard, and the disagreement will be reported

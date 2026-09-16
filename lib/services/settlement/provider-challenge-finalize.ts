@@ -380,6 +380,30 @@ async function attemptProviderChallengeFinalize(
       // Best effort
     }
 
+    // Award activity XP + evaluate badges for both players (fire and forget).
+    //
+    // Reason: risk R94. Until this existed a provider challenge awarded NOTHING, for ever -
+    // so the whole of a games-only player's XP and badge progress was silently zero. Latent
+    // only because no provider challenge has settled in production. A tie leaves both
+    // players unranked, so neither takes the winner bonus.
+    try {
+      const { awardContestRewards } = await import("./contest-rewards");
+      await awardContestRewards({
+        kind: "challenge",
+        contestId: challengeId,
+        gameKey: challenge.gameKey,
+        participants: [challenger, challenged].map((p) => ({
+          userId: p.userId.toString(),
+          rank: !isTie && p.userId.toString() === winnerId ? 1 : undefined,
+        })),
+      });
+    } catch (rewardError) {
+      console.error(
+        `❌ [PROVIDER] Challenge ${challengeId}: rewards stage failed:`,
+        rewardError,
+      );
+    }
+
     console.log(
       `✅ [PROVIDER] Challenge ${challengeId} finalized: Winner: ${winnerName || "TIE"}`,
     );

@@ -518,7 +518,16 @@ Remember the mirror: every model touched here exists twice.
 - [ ] Live leaderboard during play
 - [x] **Result screen with the generic `scoreBreakdown` renderer** (5 Sep 2026, `13` s1.1a)
 - [ ] Practice mode, if supported
-- [ ] Points, ratings, badges and milestones wired to `gameKey`
+- [ ] Points, ratings, badges and milestones wired to `gameKey` - **and before any of it, risk
+  R94**, registered 16 Sep 2026 while scoping X7. The four finalization paths **already disagree
+  about awarding XP and evaluating badges for TRADING**: the admin copy of competition finalize
+  awards no XP, the admin copy of challenge finalize awards neither, and both provider settlement
+  services award neither. Both apps run `checkAndFinalizeCompetitions` on the same every-minute
+  cron, so for trading it is **live and a race** - whether a player's level moves depends on which
+  process claimed the contest, with no flag, no error and no log line. So this bullet is not a
+  greenfield wiring job: it is **one shared reward stage for all four paths**, closed in its own
+  commit against the existing services and the existing green tests, *before* `UserGameStats` is
+  introduced. Doing both at once destroys the only guarantee either change offers
 - [ ] Notifications and journey entries
 
 **Done when:** a player can browse, join, practise, play, see their position and

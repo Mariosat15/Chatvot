@@ -887,35 +887,25 @@ export async function finalizeCompetition(competitionId: string) {
       `   Platform Earned: ${(prizePool - totalDistributed).toFixed(2)} credits`,
     );
 
-    // Evaluate badges for ALL participants after competition ends (fire and forget - non-blocking)
-    try {
-      const { evaluateUserBadges } =
-        await import("@/lib/services/badge-evaluation.service");
-      const uniqueUserIds = [
-        ...new Set(participants.map((p) => p.userId.toString())),
-      ];
-
-      console.log(
-        `🏅 Evaluating badges for ${uniqueUserIds.length} participants...`,
-      );
-
-      // Evaluate badges for each participant (don't wait for all to complete)
-      uniqueUserIds.forEach((userId) => {
-        evaluateUserBadges(userId)
-          .then((result) => {
-            if (result.newBadges.length > 0) {
-              console.log(
-                `🏅 User ${userId} earned ${result.newBadges.length} new badges after competition ended`,
-              );
-            }
-          })
-          .catch((err) =>
-            console.error(`Error evaluating badges for user ${userId}:`, err),
-          );
-      });
-    } catch (error) {
-      console.error("Error importing badge service:", error);
-    }
+    // Award activity XP + evaluate badges for ALL participants (fire and forget).
+    //
+    // Reason: risk R94. This block used to evaluate badges and award NO XP, while the main
+    // app's identical finalizer awarded both - and both apps register the finalize cron on
+    // an every-minute schedule, so which one claimed a contest decided whether its players
+    // were paid XP for finishing. No flag, no error and no log line on either branch. The
+    // shared stage is the one answer for all six finalize paths.
+    const { awardContestRewards } = await import(
+      "@/lib/services/settlement/contest-rewards"
+    );
+    await awardContestRewards({
+      kind: "competition",
+      contestId: competition._id.toString(),
+      gameKey: competition.gameKey,
+      participants: participants.map((p) => ({
+        userId: p.userId.toString(),
+        rank: leaderboard.find((l) => l.userId === p.userId.toString())?.rank,
+      })),
+    });
 
     // Send notifications to all participants about competition end (fire and forget - non-blocking)
     try {

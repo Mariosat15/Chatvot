@@ -326,6 +326,56 @@ like a new event and score twice.
 Small time series recording reachability, latency and error rates per provider.
 Feeds the admin health panel and the decision to auto-disable a failing provider.
 
+### 3.6 `user_game_stats` - the cross-game standing
+
+**Added 16 September 2026, at the start of X7, and the reason it is being added rather than
+cross-referenced is a documentation defect worth stating.** `13` sections 7.1 and 7.3 both
+name `UserGameStats` as the **single** source for the leaderboard and the profile, and both
+cite **this chapter** for it. This chapter never carried it. The specification lives in
+`New games plan/04-scoring-points-leaderboards.md`, which belongs to the programme that is
+**not** being delivered - so X7's foundation collection was cited to a chapter that had no
+row for it, in the chapter that carries the mirror rule. **The paired-document rule fired in
+the direction it usually does: the restatement was right about the design and wrong about
+where it lived.** Verified by grep before writing this, not assumed.
+
+One document per user per game, **materialised at settlement and never computed on read.**
+
+| Field | Type | Note |
+|---|---|---|
+| `userId` | `String` | ObjectId-shaped, as everywhere else |
+| `gameKey` | `String` | The game this row is about, or the literal `"_overall"` for the cross-game rollup. **`gameKey`, not `gameType`** - `New games plan/04` says `gameType`, and this chapter's own invariant is that `gameKey` is the immutable join key for every historical statistic, so the rollup must key on the same thing every other row does |
+| `contestsEntered` | `Number` | |
+| `contestsCompleted` | `Number` | |
+| `wins` | `Number` | |
+| `podiums` | `Number` | |
+| `totalPoints` | `Number` | Lifetime sum of the normalised points of `05` section 3 |
+| `seasonPoints` | `Number` | Resets per season |
+| `rating` | `Number` | Per-game skill rating, 1200 start. **Never aggregated across games** - `05` section 4 |
+| `bestRank` | `Number` | |
+| `bestScore` | `Number` | Raw, in that game's own units, never negated - `05` s2 |
+| `currentStreak` | `Number` | |
+| `lastPlayedAt` | `Date` | |
+| `extra` | `Mixed` | Per-game additions, e.g. trading's profit factor. Keeps a game's own metrics out of the shared shape |
+
+Unique index on `{ userId, gameKey }`. Secondary indexes on `{ gameKey, totalPoints: -1 }`
+and `{ gameKey, rating: -1 }`, so a leaderboard page is served from an index rather than by
+the nine-term rebuild `13` s7.1 measures at about seven seconds.
+
+**Four rules, each of which exists because the alternative fails without erroring:**
+
+- **Totals accumulate on settlement; nothing recomputes them on read.** This is invariant 8
+  of `11` and risk **R29**. Summing over *currently enabled* games is the natural
+  implementation, reads correctly, passes review, and retroactively subtracts everything a
+  player earned in a game an operator later switched off.
+- **`"_overall"` is a stored row, not a query.** Same reason. It is also why question 13's
+  answer matters to this table: with one headline figure, that row is read on every
+  leaderboard and profile request.
+- **No row is created for a game the player has not played.** `13` s7.2 hides never-played
+  games, and an external-only catalogue may carry twenty titles.
+- **Nothing is backfilled into it.** Owner decision on question 14, 16 September 2026: the
+  cross-game aggregates start at zero. Trading's history stays in `TradeHistory` and in the
+  trading card, which is where it is correctly scoped. `18`'s migration writes no rows here.
+
 ---
 
 ## 4. What must NOT change

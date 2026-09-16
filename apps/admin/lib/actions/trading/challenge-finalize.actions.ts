@@ -695,6 +695,25 @@ async function _finalizeChallengeAttempt(challengeId: string) {
       console.error("Error sending challenge notifications:", notifError);
     }
 
+    // Award activity XP + evaluate badges for both participants (fire and forget).
+    //
+    // Reason: risk R94. This finalizer awarded NEITHER, while the main app's identical copy
+    // awarded both - and both apps register the finalize cron every minute, so a player's XP
+    // for finishing a challenge depended on which app got there first, with nothing logged
+    // on either branch. A tie leaves both players unranked, so neither takes the bonus.
+    const { awardContestRewards } = await import(
+      "@/lib/services/settlement/contest-rewards"
+    );
+    await awardContestRewards({
+      kind: "challenge",
+      contestId: challengeId,
+      gameKey: challenge.gameKey,
+      participants: [challenger, challenged].map((p) => ({
+        userId: p.userId,
+        rank: !isTie && p.userId === winnerId ? 1 : undefined,
+      })),
+    });
+
     console.log(
       `✅ Challenge ${challengeId} finalized: Winner: ${winnerName || "TIE"}`,
     );

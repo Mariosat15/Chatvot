@@ -14,7 +14,7 @@ Five backfills, all idempotent, all safe to re-run.
 | 1 | Set the game label to `"trading"` on every existing contest and participant | `Competition`, `Challenge`, `CompetitionParticipant`, `ChallengeParticipant` | **BUILT 4 Sep 2026** |
 | 2 | Populate `score` on participants from their contest's ranking method | participants | **DEFERRED to seam 2** - see below |
 | 3 | Default `BadgeConfig.gameTypes` to `["trading"]` | `BadgeConfig` | **BUILT 4 Sep 2026** |
-| 4 | Build `UserGameStats` rows, including the `"_overall"` rollup | new | X7 |
+| 4 | ~~Build `UserGameStats` rows, including the `"_overall"` rollup~~ **No historical rows are written** - owner decision on question 14, 16 Sep 2026, the aggregates start at zero. Rows are created at settlement from X7 onwards | new | X7 |
 | 5 | Seed **inferred** `UserGamePreference` rows from `UserGameStats` play counts | new | X11.5 |
 
 **Skip the `score` backfill for completed contests.** Their `finalLeaderboard` is already
@@ -66,6 +66,28 @@ The schema default of `0` means nothing crashes in the meantime. It belongs with
 `04`'s participant model is where the field is already declared.
 
 ### Backfill 4 has an unanswered product question in front of it
+
+> **ANSWERED BY THE OWNER, 16 September 2026, before X7 began: START AT ZERO.** Backfill 4
+> therefore **writes no historical rows at all** - neither the per-game trading row nor the
+> `"_overall"` rollup - so what remains of it is not a migration but the creation of rows at
+> settlement from the day X7 ships. **The third option below was NOT taken**, and saying so
+> matters because it is the one that reads as the careful compromise: backfilling the trading
+> row alone would have put a lifetime P&L-derived points total in the per-game breakdown while
+> every other game's row began at zero, which is a comparison no player can interpret.
+>
+> **The cost column's "Start at zero" row is real and is paid by a caption, not by data.**
+> Trading's history is not lost - it stays in `TradeHistory` and renders in full inside the
+> trading card of `13` s7.2 - and the cross-game summary is labelled as counting from the day
+> cross-game scoring began. **Without that sentence the figure is correct and is reported as
+> data loss**, which is the support load this table predicted; with it, there is nothing to
+> report. The owner's decision is recorded in `PROGRESS.md`, `05` s10.4, `13` s7.2 and
+> `04` s3.6.
+>
+> **Rollout step 8's parallel leaderboard diff is not weakened by this and must not be
+> skipped.** Starting at zero does not mean the new leaderboard is trivially safe: it means
+> the top 100 *will* differ, deliberately, so the diff's job changes from "prove nothing
+> moved" to "prove everything that moved, moved for the stated reason". **R14 is about how
+> players read a rank change, not about whether the change was intended.**
 
 **Open question 14, and it must be answered before the backfill is written**, because it
 is written once and it is visible to every existing player.
@@ -279,7 +301,7 @@ to the external scenario and is the cheapest insurance in the plan.
 | 5 | Admin screens. Internal-only provider contest, **free entry** | No |
 | 6 | Internal provider contests with **real small entry fees** | No |
 | 7 | Public launch: one game, low or free entry, capped concurrency | **Yes** |
-| 8 | `UserGameStats` and backfill 4. Parallel leaderboard diff on the top 100 | No |
+| 8 | `UserGameStats`. **Backfill 4 writes nothing** (question 14 - the aggregates start at zero), so the parallel diff on the top 100 exists to prove every movement is explained by that decision, not to prove nothing moved | No |
 | 9 | Switch the leaderboard; announce the model | **Yes** |
 | 10 | Terminology and UI de-trading | **Yes** |
 | 11 | Games catalogue and `/games` routes | **Yes** |

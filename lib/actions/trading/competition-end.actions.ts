@@ -909,47 +909,25 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
       `   Platform Net Earned: ${(prizePool - totalDistributed - actualGmEarnings).toFixed(2)} credits`,
     );
 
-    // Award activity XP + evaluate badges for ALL participants (fire and forget)
-    try {
-      const { evaluateUserBadges } =
-        await import("@/lib/services/badge-evaluation.service");
-      const { awardActivityXP } =
-        await import("@/lib/services/xp-level.service");
-      const uniqueUserIds = [
-        ...new Set(participants.map((p) => p.userId.toString())),
-      ];
-
-      console.log(
-        `🏅 Evaluating badges + awarding XP for ${uniqueUserIds.length} participants...`,
-      );
-
-      // Award competition XP and evaluate badges for each participant
-      uniqueUserIds.forEach((userId) => {
-        // Award competition completion XP
-        awardActivityXP(userId, "competition_completed").catch(() => {});
-
-        // Award podium XP if applicable
-        const userEntry = leaderboard.find((l) => l.userId === userId);
-        if (userEntry?.rank === 1) awardActivityXP(userId, "competition_podium_1").catch(() => {});
-        else if (userEntry?.rank === 2) awardActivityXP(userId, "competition_podium_2").catch(() => {});
-        else if (userEntry?.rank === 3) awardActivityXP(userId, "competition_podium_3").catch(() => {});
-
-        // Evaluate ALL badge categories (competitions involve trading, profit, risk, etc.)
-        evaluateUserBadges(userId)
-          .then((result) => {
-            if (result.newBadges.length > 0) {
-              console.log(
-                `🏅 User ${userId} earned ${result.newBadges.length} new badges after competition ended`,
-              );
-            }
-          })
-          .catch((err) =>
-            console.error(`Error evaluating badges for user ${userId}:`, err),
-          );
-      });
-    } catch (error) {
-      console.error("Error importing badge/XP service:", error);
-    }
+    // Award activity XP + evaluate badges for ALL participants (fire and forget).
+    //
+    // Reason: risk R94. This used to be an inline copy that the admin app's identical
+    // finalizer did not have, so whether a player earned XP for finishing depended on which
+    // app's every-minute cron claimed the contest first. The shared stage is the one answer
+    // for all six finalize paths, and it is game-agnostic - it reads a finishing position
+    // and a game label, never a P&L or a trade count.
+    const { awardContestRewards } = await import(
+      "@/lib/services/settlement/contest-rewards"
+    );
+    await awardContestRewards({
+      kind: "competition",
+      contestId: competition._id.toString(),
+      gameKey: competition.gameKey,
+      participants: participants.map((p) => ({
+        userId: p.userId.toString(),
+        rank: leaderboard.find((l) => l.userId === p.userId.toString())?.rank,
+      })),
+    });
 
     // Send notifications to all participants about competition end (fire and forget - non-blocking)
     try {

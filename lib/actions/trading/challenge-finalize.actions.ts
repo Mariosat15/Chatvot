@@ -732,24 +732,24 @@ async function _finalizeChallengeAttempt(challengeId: string) {
       console.error("Error sending challenge notifications:", notifError);
     }
 
-    // Award activity XP + evaluate badges for both participants (fire and forget)
-    try {
-      const { awardActivityXP } = await import("@/lib/services/xp-level.service");
-      const { evaluateUserBadges } = await import("@/lib/services/badge-evaluation.service");
-
-      for (const p of [challenger, challenged]) {
-        // Challenge completion XP
-        awardActivityXP(p.userId, "challenge_completed").catch(() => {});
-        // Winner bonus XP
-        if (p.userId === winnerId) {
-          awardActivityXP(p.userId, "challenge_won").catch(() => {});
-        }
-        // Evaluate ALL badge categories (challenges involve trading, profit, risk, etc.)
-        evaluateUserBadges(p.userId).catch(() => {});
-      }
-    } catch (xpError) {
-      console.error("Error awarding challenge XP:", xpError);
-    }
+    // Award activity XP + evaluate badges for both participants (fire and forget).
+    //
+    // Reason: risk R94. The shared stage is the one answer for all six finalize paths - the
+    // admin app's copy of this function awarded badges and no XP, and the two provider
+    // finalizers awarded neither. A tie leaves both players unranked, so neither takes the
+    // winner bonus, which is the behaviour the old `p.userId === winnerId` test had.
+    const { awardContestRewards } = await import(
+      "@/lib/services/settlement/contest-rewards"
+    );
+    await awardContestRewards({
+      kind: "challenge",
+      contestId: challengeId,
+      gameKey: challenge.gameKey,
+      participants: [challenger, challenged].map((p) => ({
+        userId: p.userId,
+        rank: !isTie && p.userId === winnerId ? 1 : undefined,
+      })),
+    });
 
     // Reason: Leaderboard includes challengesWon — invalidate after finalize.
     try {

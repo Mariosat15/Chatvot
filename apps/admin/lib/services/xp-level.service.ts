@@ -130,6 +130,32 @@ export async function awardXPForBadge(
 }
 
 /**
+ * The sourceId prefix every trade-activity award is written under, and the prefix the daily
+ * cap matches on to find today's trade XP.
+ *
+ * Reason: one definition, because the writer and the reader must agree for the cap to apply
+ * at all, and when they disagreed the cap did not fail - it silently admitted everything
+ * (risk R95). A second literal would reinstate that, and the symptom is no symptom.
+ */
+export const TRADE_ACTIVITY_SOURCE_PREFIX = "trade_activity:";
+
+/**
+ * The fields the daily cap reads off one stored `xpHistory` row.
+ *
+ * Reason: deliberately the fields this file READS and not a restatement of the schema. A
+ * hand-written interface the compiler checks instead of the schema is exactly where a field
+ * that does not exist looks real, which is where the missing `participant.score` read hid
+ * for a day (R32/R33) - so `source` and `sourceId` are optional here, because `sourceId` was
+ * undeclared until R97 and every row written before that genuinely has none.
+ */
+interface XPHistoryEntry {
+  timestamp: Date | string;
+  amount?: number;
+  source?: string;
+  sourceId?: string;
+}
+
+/**
  * Award XP to user from any source (milestone, action, etc.)
  * This is a generic XP award function, separate from badge XP
  */
@@ -137,7 +163,8 @@ export async function awardXP(
   userId: string,
   amount: number,
   source: "milestone" | "action" | "competition" | "referral" | "bonus" | "other",
-  sourceId?: string
+  sourceId?: string,
+  gameKey?: string
 ): Promise<{
   xpGained: number;
   newXP: number;
@@ -187,6 +214,7 @@ export async function awardXP(
     amount,
     source,
     sourceId,
+    gameKey,
     timestamp: new Date(),
   });
 
@@ -216,6 +244,7 @@ export async function awardXP(
 export async function awardActivityXP(
   userId: string,
   activity: "trade_completed" | "winning_trade" | "competition_completed" | "competition_podium_1" | "competition_podium_2" | "competition_podium_3" | "challenge_completed" | "challenge_won",
+  gameKey?: string,
 ): Promise<{ xpAwarded: number; dailyXPUsed: number; dailyCapped: boolean }> {
   await connectToDatabase();
 
@@ -232,6 +261,11 @@ export async function awardActivityXP(
 
   const DAILY_TRADE_XP_CAP = 100;
 
+  // Reason: `activity` is a closed union, not caller-supplied text, so the lookup is total
+  // and the rule is a false positive here. Silenced in place rather than by rewriting the
+  // table, because the pre-commit hook lints staged files at --max-warnings=0 and this file
+  // has to be staged for the R95/R97 fix above.
+  // eslint-disable-next-line security/detect-object-injection
   const xpAmount = XP_AMOUNTS[activity] || 0;
   if (xpAmount <= 0) return { xpAwarded: 0, dailyXPUsed: 0, dailyCapped: false };
 
@@ -247,12 +281,22 @@ export async function awardActivityXP(
       { upsert: true, new: true }
     );
 
+    // Reason: risk R95. This filter used to test `h.source === "trade_activity"`, a value
+    // nothing has ever written - the award below calls `awardXP` with source `"action"` and
+    // puts `trade_activity:` in the sourceId - so the total was always 0 and the daily cap
+    // never applied to anybody. Matching on the sourceId instead would ALSO have failed
+    // until now, because the schema did not declare that field and strict mode discarded
+    // it (R97). The two defects are one item and are fixed together.
     const todayTradeXP = (userLevel.xpHistory || [])
-      .filter((h: any) => {
+      .filter((h: XPHistoryEntry) => {
         const ts = new Date(h.timestamp);
-        return ts >= today && (h.source === "trade_activity");
+        return (
+          ts >= today &&
+          h.source === "action" &&
+          String(h.sourceId ?? "").startsWith(TRADE_ACTIVITY_SOURCE_PREFIX)
+        );
       })
-      .reduce((sum: number, h: any) => sum + (h.amount || 0), 0);
+      .reduce((sum: number, h: XPHistoryEntry) => sum + (h.amount || 0), 0);
 
     if (todayTradeXP >= DAILY_TRADE_XP_CAP) {
       return { xpAwarded: 0, dailyXPUsed: todayTradeXP, dailyCapped: true };
@@ -263,7 +307,13 @@ export async function awardActivityXP(
 
     if (actualXP > 0) {
       try {
-        await awardXP(userId, actualXP, "action", `trade_activity:${activity}`);
+        await awardXP(
+          userId,
+          actualXP,
+          "action",
+          `${TRADE_ACTIVITY_SOURCE_PREFIX}${activity}`,
+          gameKey,
+        );
       } catch (err) {
         console.error(`[Activity XP] Error awarding trade XP:`, err);
       }
@@ -273,7 +323,7 @@ export async function awardActivityXP(
   }
 
   try {
-    await awardXP(userId, xpAmount, "competition", activity);
+    await awardXP(userId, xpAmount, "competition", activity, gameKey);
   } catch (err) {
     console.error(`[Activity XP] Error awarding ${activity} XP: ${err}`);
   }
@@ -288,6 +338,12 @@ export async function awardActivityXP(
 export async function getUserLevel(userId: string) {
   await connectToDatabase();
 
+  // Reason: left as `any` rather than given a hand-written generic. An explicitly-typed
+  // `.lean<{...}>()` makes the compiler check the invented shape instead of the schema, which
+  // is where the missing `participant.score` read survived a clean typecheck (R32/R33). A
+  // narrowing pass here belongs with X7's stats work, not with a reward-stage extraction
+  // whose whole claim is that nothing moved.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const userLevel = (await UserLevel.findOne({ userId }).lean()) as any;
 
   if (!userLevel) {

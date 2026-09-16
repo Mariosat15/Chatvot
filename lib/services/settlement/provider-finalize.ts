@@ -1,5 +1,6 @@
 import { connectToDatabase } from "@/database/mongoose";
 import Competition from "@/database/models/trading/competition.model";
+import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
 import {
   settleProviderCompetition,
   type ProviderSettlementResult,
@@ -230,6 +231,58 @@ async function attemptProviderFinalize(
       }
     } catch {
       // Best effort
+    }
+
+    // Award activity XP + evaluate badges for every seat (fire and forget).
+    //
+    // Reason: risk R94. Until this existed a provider competition awarded NOTHING - no XP,
+    // no badge evaluation - for ever, so a player who only plays games could never level up
+    // or earn anything however many contests they finished. Latent only because no provider
+    // contest has settled in production.
+    //
+    // The seats are re-read rather than taken from `result.data.leaderboard`, which is
+    // sliced to the top ten for the caller's log line: awarding from it would silently give
+    // completion XP to ten players and nothing to the eleventh. The ranks come from the
+    // PERSISTED `finalLeaderboard`, which is the full list, and a player absent from it
+    // (excluded by the eligibility gate, or refunded for never scoring) correctly has no
+    // rank while still earning completion XP - they entered and the contest ran.
+    try {
+      const [seats, stored] = await Promise.all([
+        CompetitionParticipant.find({ competitionId: competitionId.toString() })
+          .select("userId")
+          .lean<{ userId: string }[]>(),
+        Competition.findById(competitionId)
+          .select("gameKey finalLeaderboard")
+          .lean<{
+            gameKey?: string;
+            finalLeaderboard?: { userId?: string; rank?: number }[];
+          }>(),
+      ]);
+
+      const rankByUser = new Map<string, number>();
+      for (const entry of stored?.finalLeaderboard || []) {
+        if (entry?.userId && typeof entry.rank === "number") {
+          rankByUser.set(entry.userId.toString(), entry.rank);
+        }
+      }
+
+      const { awardContestRewards } = await import("./contest-rewards");
+      await awardContestRewards({
+        kind: "competition",
+        contestId: competitionId.toString(),
+        gameKey: stored?.gameKey,
+        participants: seats.map((s) => ({
+          userId: s.userId.toString(),
+          rank: rankByUser.get(s.userId.toString()),
+        })),
+      });
+    } catch (rewardError) {
+      // The money has committed. A reward failure must be visible in the log and invisible
+      // in the result, or an operator reads a paid contest as a failed one.
+      console.error(
+        `❌ [PROVIDER FINALIZE] ${competitionId.toString()}: rewards stage failed:`,
+        rewardError,
+      );
     }
 
     return result;

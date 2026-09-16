@@ -694,7 +694,25 @@ leaving it ambiguous is not an option.
 
 ### 10.4 Two open questions this exposes
 
-Neither blocks X1, and both are recorded in `PROGRESS.md` rather than decided here:
+> **ANSWERED BY THE OWNER, 16 September 2026, before X7 began.** Both are recorded in
+> `PROGRESS.md`'s decision log. The questions below are kept as the statement of what was
+> being decided, because a decision with its alternatives deleted reads as an assumption.
+>
+> - **Question 13 - one number.** The leaderboard leads with **one** cross-game figure,
+>   computed from the normalised points of section 3, with per-game ranks available on
+>   tabs beside it. So the `"_overall"` row of `UserGameStats` is a load-bearing record
+>   rather than a rollup nothing reads, and **section 3's normalisation is now on the
+>   critical path** rather than being one of two possible designs.
+> - **Question 14 - start at zero, and say so.** The cross-game aggregates begin empty for
+>   every player. Trading's own history is **not** discarded and **not** migrated: it stays
+>   where it is correctly scoped, inside the trading card of the per-game breakdown
+>   (`13` s7.2), with its full `TradeHistory`-derived figures. What starts at zero is the
+>   cross-game rollup alone. **The profile must state this in words**, because the failure
+>   mode is not a wrong number - a long-standing trader sees a zero beside a decade of
+>   trades and reports a data-loss bug, which is support load caused by an absent sentence.
+>   `18`'s backfill therefore writes **no** historical rows into `UserGameStats`.
+
+Neither blocked X1, and both were recorded in `PROGRESS.md` rather than decided here:
 
 - **Is a player's cross-game rank one number or several?** (question 13) A single
   "overall" rank requires normalised points to carry real comparability; several per-game

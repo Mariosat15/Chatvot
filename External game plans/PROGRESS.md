@@ -514,6 +514,8 @@ X12 pilot. All three are in `17` section 7.
 
 | Date | Decision | Reasoning |
 |---|---|---|
+| **16 Sep 2026** | **A player's cross-game standing is ONE headline number**, computed from `05` section 3's normalised points, with per-game ranks on tabs beside it - closing **open question 13** | Owner decision, taken before X7 began because it decides what is stored rather than only what is drawn. **Two consequences are design, not preference.** The `"_overall"` row of `UserGameStats` becomes a record every leaderboard and profile request reads, so it must be **accumulated at settlement and never summed over enabled games** - that is invariant 8 and risk **R29**, and the natural implementation is the one that retroactively demotes a player when an operator disables a game. And **`05` section 3's normalisation moves onto the critical path**: points must come from finishing position, field size and stake, never from raw score, because trading P&L and a puzzle score are not comparable numbers and a single headline is exactly where somebody would sum them. It also settles `13` s7.2's naming problem - the header carries total winnings and a normalised standing, and "Total Profit" moves inside the trading card |
+| **16 Sep 2026** | **The cross-game aggregates START AT ZERO for every player, and the profile must SAY SO in words** - closing **open question 14**, so `18`'s backfill writes no historical rows into `UserGameStats` | Owner decision. Backfilling from `TradeHistory` would make long-standing traders dominate every rollup on a games platform for months. **What makes starting at zero safe is the second half of the decision, and dropping it turns a correct figure into a reported bug:** trading's history is neither discarded nor migrated - it stays where it is correctly scoped, inside the trading card of the per-game breakdown with its full figures - and only the cross-game rollup is empty. A trader with years of history who sees `0` beside a summary captioned as lifetime reports data loss; the number is right and the **caption** is the defect. So the cross-game summary is labelled as counting from the day cross-game scoring began. Recorded in `05` s10.4, `13` s7.2 and `04` s3.6 |
 | 18 Aug 2026 | **The provider never handles money** | Removes wallet integration, third-party balance access, and most of the financial risk |
 | 18 Aug 2026 | **One game module for all provider games**, with the specific game held as data | A new title from an existing provider needs no code change or release |
 | 18 Aug 2026 | **`gameKey` is the statistics key and is immutable** | Historical leaderboards, ratings and badges must never move |
@@ -586,8 +588,8 @@ X12 pilot. All three are in `17` section 7.
 
 | # | Question | Owner | Needed by | Chapter |
 |---|---|---|---|---|
-| 13 | **Is a player's cross-game rank one number or several?** A single "overall" ranking needs normalised points to be comparable across games with wildly different score shapes; several per-game ranks are honest but give no headline figure. `05` section 3 designs the normalisation; the product decision about what the leaderboard *leads with* is separate and not made | Product | Before X7 | `05`, `13` |
-| 14 | **Does historical trading performance enter the new cross-game aggregates, or do they start at zero?** Backfilling makes trading players instantly dominant on a games platform; starting at zero discards real history and will be read as a bug by existing players. Neither is obviously right, and the migration is written once | Product | Before X7 - `18` needs it to write the backfill | `18` |
+| 13 | ~~**Is a player's cross-game rank one number or several?**~~ **ANSWERED 16 Sep 2026: ONE headline number** from `05` section 3's normalised points, with per-game ranks on tabs beside it. See the decision log - two consequences are load-bearing, that the `"_overall"` row is read on every request and must therefore accumulate at settlement rather than be summed over enabled games (**R29**), and that the normalisation is now on the critical path rather than one of two possible designs | Product | ~~Before X7~~ **CLOSED** | `05` s10.4, `13` s7.1/s7.2, `04` s3.6 |
+| 14 | ~~**Does historical trading performance enter the new cross-game aggregates, or do they start at zero?**~~ **ANSWERED 16 Sep 2026: START AT ZERO, and the profile must say so in words.** `18`'s backfill writes **no** rows into `UserGameStats`. **The second half is what makes the first half safe** - trading's history is neither discarded nor migrated, it stays inside the trading card of the per-game breakdown, and the cross-game summary is captioned as counting from the day cross-game scoring began; without the caption, a correct zero is reported as data loss | Product | ~~Before X7~~ **CLOSED** | `18`, `05` s10.4, `13` s7.2 |
 | 15 | **Who may be challenged?** Anyone on the platform, only mutuals/friends, or anyone who has opted in per game? The owner asked for "challenge any user", which needs a decline path, a block list and a rate limit or it becomes a harassment vector | **Owner** | Before X10 | `20` s2 |
 | 16 | **Is declaring game interests part of registration or a later prompt?** Adding steps to registration measurably costs completions, and `20` is designed so the feature works without it | Product | Before X11.5 | `20` s1 |
 | 18 | **Does a contest need a "shape" per game family - and does the wizard change with it?** Raised by the owner, 8 Sep 2026. Everything built so far assumes **independent play with staggered starts**: a player joins whenever, starts an attempt whenever the policy allows, and is ranked on their own score. That is right for a puzzle and **wrong for a race**, where every player must start and finish together - which is not a wizard field but a different contract, touching entry (closes *before* the start, not at the last playable moment - the rule `12` s2.10 just deliberately moved), the round lifecycle (one synchronised launch rather than a per-player one), and the reconciliation net (a player who does not appear at the gun is a no-show, not an unresolved round). **DESIGNED 8 Sep 2026 in `22-contest-shape-and-synchronisation.md`, which carries three owner decisions and a recommendation. Still open, because the decisions are the answer.** Three findings from that pass change the question. **`provider_game.family` (`independent` / `head_to_head`) already exists, is required, is validated on ingest and is read by nothing** - and it is the *wrong axis*, because it describes whether a game needs an **opponent**, so **a race is `independent`**; what a race needs is a shared *moment*, which no field describes. (This paragraph used to guess `category` was the mechanism - it is not, and the field that looked like it is about something else.) Second, **five of the seven things a simultaneous contest changes are already expressible** with `attemptsPolicy: "single"`, the derived window, the existing `playWindowStart` refusal and R45/R50's no-score handling - what is genuinely missing is a synchronised launch and anything stopping an operator configuring a race as a staggered contest. Third, **whether entry closes before the start is a separate question from synchronisation** (s2.1) - they coincide for a race, which is why merging them is convenient and wrong. **What must not happen is a `switch` on game code** - that is the one failure mode of the no-developer-needed claim. **Same question again for challenges** (X10 / E8), which have an extra problem a competition does not: nobody chooses the gun, because a challenge is accepted at an unknown later moment (`22` s5). **ANSWERED 8 Sep 2026, all three parts** - see the decision log. **THEN BUILT THE SAME DAY, for competitions only**, when the owner chose to build rather than defer: `playMode: "anytime" \| "scheduled"` is declared per title, resolved once by `lib/services/games/play-shape.ts` (mirrored), and forces the entry deadline, the attempts policy and the round-start policy **at write time**, with the wizard's wording and withheld controls coming from the same rules object. **`22` section 8 is the authoritative account.** Three parts of the answer survived the build unchanged: the entry-close reasoning stays **separate** from synchronisation (a scheduled contest closes entry at the gun because you cannot join a race that has begun, *not* because the leaderboard is worth seeing); **no `switch` on game code**, pinned by a test; and **challenges are untouched**, which is still X10 / E8. **The spec bump IS now paid** - `ChartVolt-Game-API-Requirements.html` is **version 1.4**, and the field is optional with a default so nothing built against 1.3 is invalidated. **Two things are deliberately not built and must not be summarised as done:** the contest end is not auto-defaulted to start plus one attempt plus grace (`22` s4.2), and there is **no live leaderboard during play**, which is X7. And **no title declares `scheduled` yet**, so the whole path is exercised only by tests until X4. **One thing the build left out and 9 Sep 2026 closed:** the shape could only be declared by the provider, which is right for a third party and useless for our own game company, where the value is a source-code literal. An operator override now exists (`22` s9, `12` s4.2c) - a Play style control per title, writing a **second** field so the catalogue sync cannot revert it, with `head_to_head` still beating the operator. **No rule changed**, and **no provider-facing change was needed**, so the requirements document stays at 1.4 | **Product / Owner** | ~~Before X4~~ **Answered and built for competitions, 8 Sep 2026; the operator control followed 9 Sep 2026.** Challenges land with X10 | **`22` s8 and s9**, `05` s2.1, `07`, `12` s2.11 and s4.2c, `13` |
@@ -824,6 +826,91 @@ Newest at the top.
 **Deferred:** what was consciously left for later
 **Next chat should:** the single clearest next action
 ```
+
+---
+
+### 16 Sep 2026 - X7 SCOPED: TWO DECISIONS TAKEN, A COLLECTION THAT WAS CITED AND NEVER SPECIFIED, AND A LIVE XP DEFECT (R94 OPEN)
+
+**Shipped:** documentation and a risk entry only. **No code.** X7's first step is deliberately
+not started, for the reason in the last paragraph.
+
+**Two owner decisions, both taken before any X7 code because each decides what is STORED
+rather than only what is drawn:**
+
+- **Question 13 - one headline number.** The cross-game standing leads with a single figure
+  from `05` section 3's normalised points, per-game ranks on tabs beside it. Two consequences
+  are design rather than preference. The `"_overall"` row of `UserGameStats` becomes a record
+  read on every leaderboard and profile request, so it must **accumulate at settlement and
+  never be summed over currently-enabled games** - invariant 8 and **R29**, where the natural
+  implementation silently demotes a player the day an operator switches a game off. And
+  **section 3's normalisation moves onto the critical path**: points from finishing position,
+  field size and stake, never raw score, because a trading P&L and a puzzle score are not
+  comparable numbers and one headline figure is exactly where somebody would add them.
+- **Question 14 - start at zero, and say so in words.** `18`'s backfill 4 writes **no**
+  historical rows. **The second half is what makes the first half safe, and a summary will
+  drop it:** trading's history is neither discarded nor migrated - it stays inside the trading
+  card of `13` s7.2 with its full `TradeHistory`-derived figures - and only the rollup is
+  empty. A trader with years of history who reads `0` beside a summary captioned as lifetime
+  reports data loss; **the number is right and the caption is the defect.** The third option
+  `18` had put forward - backfill the trading row but not the rollup - was **not** taken,
+  which is worth recording because it is the one that reads as the careful compromise: it
+  would put a lifetime-derived points total in one card while every other game's began at
+  zero, a comparison no player can interpret.
+
+**A documentation defect found while scoping, and it is the paired-document rule firing in its
+usual direction.** `13` sections 7.1 and 7.3 both name `UserGameStats` as the **single** source
+for the leaderboard and the profile, and both cite **`04`**. `04` never carried it - the
+specification is in `New games plan/04-scoring-points-leaderboards.md`, which belongs to the
+programme that is **not** being delivered. So X7's foundation collection was cited, twice, to a
+chapter with no row for it. Verified by grep before writing, not assumed. Now `04` **s3.6**,
+keyed on **`gameKey` rather than the `gameType` the other chapter uses**, because `gameKey` is
+the immutable join key every other historical statistic already uses.
+
+**A live defect found the same way, registered as R94 rather than fixed here.** Four
+finalization paths should award activity XP and evaluate badges, and they disagree:
+
+| Finalizer | `awardActivityXP` | `evaluateUserBadges` |
+|---|---|---|
+| main competition-end | yes | yes |
+| **admin** competition-end | **no** | yes |
+| main challenge-finalize | yes | yes |
+| **admin** challenge-finalize | **no** | **no** |
+| provider finalize / provider challenge finalize | **no** | **no** |
+
+**This is R26's shape one system along.** Both apps register `checkAndFinalizeCompetitions` on
+an every-minute cron, so whether a player's level moves depends on **which process claimed the
+contest first** - no flag, no error, no log line. The trading rows are **live**; the provider
+rows are **latent** and are `09` E6's own unfinished bullet. **No money moved and nothing is
+backfilled** - XP and badges are not money - but progression was lost, and a level is the one
+figure a player reads about their own standing, which is what X7 is about to build a ladder, a
+leaderboard and a badge set on top of. **There is no way to know how often it happened**,
+because an absent call leaves no record.
+
+**Files touched:** `PROGRESS.md` (decision log, questions 13/14 closed, this entry),
+`05-scoring-points-and-rewards.md` s10.4, `13-user-ui-and-routes.md` s7.1/s7.2/s7.3,
+`04-data-model.md` **new s3.6**, `18-migration-testing-rollout.md` (backfill table, backfill 4,
+rollout step 8), `17-risk-register.md` **new R94**.
+
+**Deviated from plan:** `18` rollout step 8's parallel leaderboard diff is **kept and its job
+restated**. Starting at zero does not make the new leaderboard trivially safe - the top 100
+*will* differ, deliberately - so the diff proves every movement is explained by the decision
+rather than proving nothing moved. **R14 is about how players read a rank change, not about
+whether it was intended.**
+
+**Owner tested:** nothing to test - no code shipped.
+
+**Deferred:** X6.5 **A5** (admin wiki reword plus an empty game-administration topic skeleton
+for the owner to fill) stays at the end of the queue, by owner instruction. **R93** - the
+`eurToCreditsRate` editor is mounted nowhere - and **R75** - `apps/admin` mounts no
+`AppSettingsProvider` - are both still open.
+
+**Next chat should:** close **R94** first, and **not** in the same commit as X7 step 1. The fix
+is to give all four paths one shared stage, the way settlement was unified; doing that *while*
+introducing `UserGameStats` destroys the only guarantee either change offers, since an
+extraction's whole claim is that nothing moved. **Count the callers before unifying** - that
+rule has been right every time here (four entry paths where a plan said two, ten finalize sites
+where a plan said five, six raw inserts where a risk named one, seven writers of the referral
+rate where a document named one).
 
 ---
 
