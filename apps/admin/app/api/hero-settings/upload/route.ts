@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardAnySection } from "@/lib/admin/section-route-guard";
 import { writeFile, mkdir } from "fs/promises";
 import { existsSync } from "fs";
 import path from "path";
-import { verifyAdminAuth } from "@/lib/admin/auth";
 import { auditLogService } from "@/lib/services/audit-log.service";
 import { connectToDatabase } from "@/database/mongoose";
 import {
@@ -12,13 +12,11 @@ import {
 
 // POST - Upload hero images
 export async function POST(request: NextRequest) {
+  const guard = await guardAnySection(["hero-page", "branding"]);
+  if (!guard.ok) return guard.response;
+
   try {
     // Verify admin authentication
-    const auth = await verifyAdminAuth();
-    if (!auth.isAuthenticated || !auth.adminId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const formData = await request.formData();
     const file = formData.get("file") as File;
     const type = formData.get("type") as string; // 'hero', 'logo', 'favicon', 'screenshot', 'testimonial'
@@ -111,9 +109,9 @@ export async function POST(request: NextRequest) {
     // Create audit log
     await auditLogService.log({
       admin: {
-        id: auth.adminId,
-        email: auth.email || "unknown",
-        name: auth.name,
+        id: guard.admin.id,
+        email: guard.admin.email || "unknown",
+        name: guard.admin.name,
       },
       action: "UPLOAD_HERO_IMAGE",
       category: "content",
@@ -139,13 +137,11 @@ export async function POST(request: NextRequest) {
 
 // DELETE - Delete hero image
 export async function DELETE(request: NextRequest) {
+  const guard = await guardAnySection(["hero-page", "branding"]);
+  if (!guard.ok) return guard.response;
+
   try {
     // Verify admin authentication
-    const auth = await verifyAdminAuth();
-    if (!auth.isAuthenticated || !auth.adminId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { filename } = await request.json();
 
     if (!filename) {
@@ -188,9 +184,9 @@ export async function DELETE(request: NextRequest) {
     // Create audit log
     await auditLogService.log({
       admin: {
-        id: auth.adminId,
-        email: auth.email || "unknown",
-        name: auth.name,
+        id: guard.admin.id,
+        email: guard.admin.email || "unknown",
+        name: guard.admin.name,
       },
       action: "DELETE_HERO_IMAGE",
       category: "content",

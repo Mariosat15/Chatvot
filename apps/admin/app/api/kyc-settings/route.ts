@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import KYCSettings from "@/database/models/kyc-settings.model";
-import { getAdminSession } from "@/lib/admin/auth";
 
 export async function GET() {
-  try {
-    const session = await getAdminSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  const guard = await guardSection("kyc-settings");
+  if (!guard.ok) return guard.response;
 
+  try {
+    
     await connectToDatabase();
 
     let settings = await KYCSettings.findOne();
@@ -35,12 +34,11 @@ export async function GET() {
 }
 
 export async function PUT(req: NextRequest) {
-  try {
-    const session = await getAdminSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  const guard = await guardSection("kyc-settings");
+  if (!guard.ok) return guard.response;
 
+  try {
+    
     const body = await req.json();
     await connectToDatabase();
 

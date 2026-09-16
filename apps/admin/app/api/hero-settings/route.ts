@@ -1,20 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardAnySection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import HeroSettings, {
   defaultThemePresets,
 } from "@/database/models/hero-settings.model";
-import { verifyAdminAuth } from "@/lib/admin/auth";
 import { auditLogService } from "@/lib/services/audit-log.service";
 
 // GET - Fetch hero settings
 export async function GET() {
+  const guard = await guardAnySection(["hero-page", "branding"]);
+  if (!guard.ok) return guard.response;
+
   try {
     // Verify admin authentication
-    const auth = await verifyAdminAuth();
-    if (!auth.isAuthenticated || !auth.adminId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     await connectToDatabase();
 
     // Get or create settings (singleton pattern)
@@ -58,13 +56,11 @@ export async function GET() {
 
 // PUT - Update hero settings
 export async function PUT(request: NextRequest) {
+  const guard = await guardAnySection(["hero-page", "branding"]);
+  if (!guard.ok) return guard.response;
+
   try {
     // Verify admin authentication
-    const auth = await verifyAdminAuth();
-    if (!auth.isAuthenticated || !auth.adminId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     await connectToDatabase();
     const body = await request.json();
 
@@ -93,7 +89,7 @@ export async function PUT(request: NextRequest) {
     // Update settings
     Object.assign(settings, updateFields);
     settings.lastUpdated = new Date();
-    settings.updatedBy = auth.adminId;
+    settings.updatedBy = guard.admin.id;
 
     await settings.save();
 
@@ -101,9 +97,9 @@ export async function PUT(request: NextRequest) {
     if (changes.length > 0) {
       await auditLogService.log({
         admin: {
-          id: auth.adminId,
-          email: auth.email || "unknown",
-          name: auth.name,
+          id: guard.admin.id,
+          email: guard.admin.email || "unknown",
+          name: guard.admin.name,
         },
         action: "UPDATE_HERO_SETTINGS",
         category: "settings",
@@ -128,13 +124,11 @@ export async function PUT(request: NextRequest) {
 
 // POST - Apply theme preset
 export async function POST(request: NextRequest) {
+  const guard = await guardAnySection(["hero-page", "branding"]);
+  if (!guard.ok) return guard.response;
+
   try {
     // Verify admin authentication
-    const auth = await verifyAdminAuth();
-    if (!auth.isAuthenticated || !auth.adminId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     await connectToDatabase();
     const { action, themeId, data } = await request.json();
 
@@ -175,9 +169,9 @@ export async function POST(request: NextRequest) {
 
         await auditLogService.log({
           admin: {
-            id: auth.adminId,
-            email: auth.email || "unknown",
-            name: auth.name,
+            id: guard.admin.id,
+            email: guard.admin.email || "unknown",
+            name: guard.admin.name,
           },
           action: "APPLY_HERO_THEME",
           category: "settings",

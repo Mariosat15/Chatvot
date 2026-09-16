@@ -231,6 +231,21 @@ const CLOSED_FOLDERS: { folder: string[]; section: string }[] = [
   */
   { folder: ["announcements"], section: "system-announcements" },
   /*
+    R101y. Settings cluster. CurrencySettingsSection → currency for /api/settings only
+    (AppSettingsProvider is unmounted). CompetitionCreatorForm → competitions for
+    settings/trading-risk, so the bare settings/ tree is NOT walked here — same shape as
+    tutorials/ where asset streamers break a single-section walk. Dual-caller company and
+    hero routes use guardAnySection; the folder walk pins one named grant and the R101y
+    describe pins both. Root settings/route.ts is asserted in the R101y describe.
+  */
+  { folder: ["settings", "trading-risk"], section: "competitions" },
+  { folder: ["challenge-settings"], section: "challenges" },
+  { folder: ["company-settings"], section: "company" },
+  { folder: ["hero-settings"], section: "hero-page" },
+  { folder: ["kyc-settings"], section: "kyc-settings" },
+  { folder: ["redis-settings"], section: "redis" },
+  { folder: ["mdb-cluster-settings"], section: "mdb-cluster" },
+  /*
     R101o. Money writers first among helper-but-no-grant. FinancialDashboard → financial
     (admin-funds, vat, vendor-payments, atlas/*); PendingWithdrawalsSection →
     pending-withdrawals (withdrawals/). admin-bank-accounts deferred - dual callers on
@@ -1839,6 +1854,148 @@ describe("R101x - announcements helpers are section-granted", () => {
     expect(code).toMatch(/createdBy:\s*guard\.admin\.id/);
     expect(code).toMatch(/createdByEmail:\s*guard\.admin\.email/);
     expect(code).not.toMatch(/getAdminSession\s*\(/);
+  });
+});
+
+describe("R101y - settings cluster helpers are section-granted", () => {
+  /*
+    Seventeen files, twenty-seven handlers across seven top-level folders. Currency is the
+    only caller of /api/settings (AppSettingsProvider is unmounted). trading-risk is owned
+    by competitions. Company and hero are dual-caller (guardAnySection); the folder walk
+    pins one named grant and this describe pins both. mdb-cluster was missing from
+    ADMIN_SECTIONS; added add-only so the grant is issuable.
+  */
+  const WEAKER =
+    /(getAdminSession|requireAdminAuth|verifyAdminAuth|verifyAdminToken|verifyAnyAuth|jwtVerify|getAdminJwtSecret)\s*\(|\bverify\s*\(/;
+
+  const singleCaller: { rel: string; section: string; handlers: number }[] = [
+    { rel: "settings/route.ts", section: "currency", handlers: 2 },
+    { rel: "settings/trading-risk/route.ts", section: "competitions", handlers: 1 },
+    { rel: "challenge-settings/route.ts", section: "challenges", handlers: 2 },
+    { rel: "kyc-settings/route.ts", section: "kyc-settings", handlers: 2 },
+    { rel: "kyc-settings/provider/route.ts", section: "kyc-settings", handlers: 1 },
+    { rel: "kyc-settings/test/route.ts", section: "kyc-settings", handlers: 1 },
+    {
+      rel: "kyc-settings/scan-duplicates/route.ts",
+      section: "kyc-settings",
+      handlers: 1,
+    },
+    { rel: "redis-settings/route.ts", section: "redis", handlers: 2 },
+    { rel: "redis-settings/clear-cache/route.ts", section: "redis", handlers: 1 },
+    { rel: "redis-settings/stats/route.ts", section: "redis", handlers: 1 },
+    { rel: "redis-settings/test/route.ts", section: "redis", handlers: 1 },
+    {
+      rel: "redis-settings/websocket-status/route.ts",
+      section: "redis",
+      handlers: 1,
+    },
+    {
+      rel: "redis-settings/websocket-reset/route.ts",
+      section: "redis",
+      handlers: 1,
+    },
+    { rel: "mdb-cluster-settings/route.ts", section: "mdb-cluster", handlers: 3 },
+  ];
+
+  const dualCaller: { rel: string; sections: string[]; handlers: number }[] = [
+    {
+      rel: "company-settings/route.ts",
+      sections: ["company", "hero-page"],
+      handlers: 2,
+    },
+    {
+      rel: "hero-settings/route.ts",
+      sections: ["hero-page", "branding"],
+      handlers: 3,
+    },
+    {
+      rel: "hero-settings/upload/route.ts",
+      sections: ["hero-page", "branding"],
+      handlers: 2,
+    },
+  ];
+
+  it("covers seventeen settings-cluster route files", () => {
+    expect(singleCaller.length + dualCaller.length).toBe(17);
+  });
+
+  it("every single-caller settings file names its calling-screen grant and no weaker helper", () => {
+    const weaker: string[] = [];
+    const missing: string[] = [];
+    let handlers = 0;
+    let guards = 0;
+
+    for (const { rel, section, handlers: expected } of singleCaller) {
+      const file = join(API, ...rel.split("/"));
+      const code = stripComments(readFileSync(file, "utf8"));
+      if (WEAKER.test(code)) weaker.push(rel);
+      if (!guardedSections(code).includes(section)) missing.push(rel);
+      const fileHandlers = (code.match(handlerPattern()) ?? []).length;
+      handlers += fileHandlers;
+      guards += (code.match(guardCallPattern()) ?? []).length;
+      expect(fileHandlers).toBe(expected);
+    }
+
+    expect(weaker).toEqual([]);
+    expect(missing).toEqual([]);
+    expect(handlers).toBe(20);
+    expect(guards).toBeGreaterThanOrEqual(handlers);
+  });
+
+  it("every dual-caller settings file uses guardAnySection with both calling-screen grants", () => {
+    const weaker: string[] = [];
+    const missing: string[] = [];
+    let handlers = 0;
+    let guards = 0;
+
+    for (const { rel, sections, handlers: expected } of dualCaller) {
+      const file = join(API, ...rel.split("/"));
+      const code = stripComments(readFileSync(file, "utf8"));
+      if (WEAKER.test(code)) weaker.push(rel);
+      for (const { method, body } of handlerSlices(code)) {
+        const named = guardedSections(body);
+        if (!sections.every((s) => named.includes(s))) {
+          missing.push(`${rel}:${method}`);
+        }
+        if (!/guardAnySection\s*\(/.test(body)) {
+          missing.push(`${rel}:${method}:not-any`);
+        }
+      }
+      const fileHandlers = (code.match(handlerPattern()) ?? []).length;
+      handlers += fileHandlers;
+      guards += (code.match(guardCallPattern()) ?? []).length;
+      expect(fileHandlers).toBe(expected);
+    }
+
+    expect(weaker).toEqual([]);
+    expect(missing).toEqual([]);
+    expect(handlers).toBe(7);
+    expect(guards).toBeGreaterThanOrEqual(handlers);
+  });
+
+  it("mdb-cluster is an ADMIN_SECTIONS value so the grant can be issued", () => {
+    expect(ADMIN_SECTIONS).toContain("mdb-cluster");
+  });
+
+  it("/api/settings is currency, never the generic settings section", () => {
+    /*
+      AppSettingsProvider is unmounted; CurrencySettingsSection is the only caller.
+      Naming "settings" would silently widen every currency grant to the whole settings
+      surface, which is the privilege-widening shape a menu parent must not become.
+      Root settings/route.ts is not in CLOSED_FOLDERS (trading-risk breaks a single-section
+      walk), so this assertion is also the leak check for that file.
+    */
+    const code = stripComments(
+      readFileSync(join(API, "settings", "route.ts"), "utf8"),
+    );
+    const named = guardedSections(code);
+    expect(named.every((s) => s === "currency")).toBe(true);
+    expect(named.length).toBeGreaterThan(0);
+    expect(code).not.toMatch(/guardSection\s*\(\s*["']settings["']/);
+    const handlers = (code.match(handlerPattern()) ?? []).length;
+    expect((code.match(guardCallPattern()) ?? []).length).toBeGreaterThanOrEqual(
+      handlers,
+    );
   });
 });
 

@@ -131,6 +131,13 @@ export const ADMIN_SECTIONS = [
   "server-fleet",
   "server-options",
   "redis",
+  /*
+    MDB Cluster is a real screen (MdbClusterSection, menu id mdb-cluster) and was never
+    an ADMIN_SECTIONS value, so only a super admin could open the tab and no grant could
+    be issued. Added so guardSection("mdb-cluster") can name the calling screen — same
+    reason as system-announcements / server-fleet. Add-only; nobody's access widens.
+  */
+  "mdb-cluster",
   "dev-settings",
   "performance-simulator",
   "image-optimizer",

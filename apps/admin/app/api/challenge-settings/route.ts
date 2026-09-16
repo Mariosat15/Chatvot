@@ -1,22 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import ChallengeSettings from "@/database/models/trading/challenge-settings.model";
-import { requireAdminAuth, getAdminSession } from "@/lib/admin/auth";
 
 // GET - Get challenge settings
 export async function GET(_request: NextRequest) {
-  try {
-    await requireAdminAuth();
+  const guard = await guardSection("challenges");
+  if (!guard.ok) return guard.response;
 
+  try {
     await connectToDatabase();
 
     const settings = await ChallengeSettings.getSingleton();
 
     return NextResponse.json({ settings });
   } catch (error) {
-    if (error instanceof Error && error.message === "Unauthorized") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
     console.error("Error fetching challenge settings:", error);
     return NextResponse.json(
       { error: "Failed to fetch challenge settings" },
@@ -27,8 +25,10 @@ export async function GET(_request: NextRequest) {
 
 // PUT - Update challenge settings
 export async function PUT(request: NextRequest) {
+  const guard = await guardSection("challenges");
+  if (!guard.ok) return guard.response;
+
   try {
-    await requireAdminAuth();
     await connectToDatabase();
 
     let body;
@@ -109,19 +109,16 @@ export async function PUT(request: NextRequest) {
     try {
       const { auditLogService } =
         await import("@/lib/services/audit-log.service");
-      const adminSession = await getAdminSession();
-      if (adminSession) {
-        await auditLogService.logSettingsUpdated(
-          {
-            id: adminSession.id,
-            email: adminSession.email,
-            name: adminSession.name,
-          },
-          "challenge_settings",
-          null,
-          body,
-        );
-      }
+      await auditLogService.logSettingsUpdated(
+        {
+          id: guard.admin.id,
+          email: guard.admin.email,
+          name: guard.admin.name,
+        },
+        "challenge_settings",
+        null,
+        body,
+      );
     } catch (auditError) {
       console.error("Error logging audit:", auditError);
     }
@@ -132,10 +129,6 @@ export async function PUT(request: NextRequest) {
       settings,
     });
   } catch (error) {
-    if (error instanceof Error && error.message === "Unauthorized") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     console.error("Error updating challenge settings:", error);
 
     // Handle Mongoose validation errors

@@ -1,16 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import KYCSettings from "@/database/models/kyc-settings.model";
 import AuditLog from "@/database/models/audit-log.model";
-import { getAdminSession } from "@/lib/admin/auth";
 
 export async function POST(req: NextRequest) {
-  try {
-    const session = await getAdminSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  const guard = await guardSection("kyc-settings");
+  if (!guard.ok) return guard.response;
 
+  try {
+    
     const body = await req.json();
     const { provider, apiKey, apiSecret, baseUrl } = body;
 

@@ -1,32 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import AppSettings from "@/database/models/app-settings.model";
 import CreditConversionSettings from "@/database/models/credit-conversion-settings.model";
-import { getAdminJwtSecret } from "@/lib/admin/jwt-secret";
 import { creditValueInBaseCurrency } from "@/lib/utils/credit-value";
-
-const JWT_SECRET = getAdminJwtSecret();
-
-async function verifyAdminToken(request: NextRequest) {
-  try {
-    const token = request.cookies.get("admin_token")?.value;
-    if (!token) return null;
-
-    const payload = jwt.verify(token, JWT_SECRET) as { email: string };
-    return payload;
-  } catch {
-    return null;
-  }
-}
 
 // GET - Fetch app settings (admin)
 export async function GET(request: NextRequest) {
   try {
-    const admin = await verifyAdminToken(request);
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("currency");
+    if (!guard.ok) return guard.response;
 
     await connectToDatabase();
 
@@ -93,10 +76,8 @@ export async function GET(request: NextRequest) {
 // PUT - Update app settings
 export async function PUT(request: NextRequest) {
   try {
-    const admin = await verifyAdminToken(request);
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("currency");
+    if (!guard.ok) return guard.response;
 
     await connectToDatabase();
 
@@ -138,7 +119,10 @@ export async function PUT(request: NextRequest) {
 
     await settings.save();
 
-    console.log("✅ App settings updated by admin:", admin.email);
+    console.log(
+      "✅ App settings updated by admin:",
+      guard.admin.email,
+    );
 
     return NextResponse.json({
       success: true,

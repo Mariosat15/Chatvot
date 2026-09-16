@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
+import { guardAnySection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import CompanySettings from "@/database/models/company-settings.model";
-import { requireAdminAuth, getAdminSession } from "@/lib/admin/auth";
 import { auditLogService } from "@/lib/services/audit-log.service";
 
 /**
@@ -9,8 +9,10 @@ import { auditLogService } from "@/lib/services/audit-log.service";
  * Fetch company settings
  */
 export async function GET() {
+  const guard = await guardAnySection(["company", "hero-page"]);
+  if (!guard.ok) return guard.response;
+
   try {
-    await requireAdminAuth();
     await connectToDatabase();
 
     const settings = await CompanySettings.getSingleton();
@@ -18,10 +20,6 @@ export async function GET() {
     return NextResponse.json(settings);
   } catch (error) {
     console.error("Error fetching company settings:", error);
-
-    if (error instanceof Error && error.message === "Unauthorized") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
 
     return NextResponse.json(
       { error: "Failed to fetch company settings" },
@@ -35,8 +33,10 @@ export async function GET() {
  * Update company settings
  */
 export async function PUT(request: Request) {
+  const guard = await guardAnySection(["company", "hero-page"]);
+  if (!guard.ok) return guard.response;
+
   try {
-    await requireAdminAuth();
     await connectToDatabase();
 
     const body = await request.json();
@@ -85,7 +85,7 @@ export async function PUT(request: Request) {
 
     // Log audit action
     try {
-      const admin = await getAdminSession();
+      const admin = guard.admin;
       if (admin) {
         await auditLogService.logCompanySettingsUpdated({
           id: admin.id,
@@ -104,10 +104,6 @@ export async function PUT(request: Request) {
     });
   } catch (error) {
     console.error("Error updating company settings:", error);
-
-    if (error instanceof Error && error.message === "Unauthorized") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
 
     return NextResponse.json(
       { error: "Failed to update company settings" },

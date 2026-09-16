@@ -1,15 +1,14 @@
 import { NextResponse } from "next/server";
-import { verifyAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import mongoose from "mongoose";
 
 export async function GET() {
-  try {
-    const auth = await verifyAdminAuth();
-    if (!auth.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  const guard = await guardSection("redis");
+  if (!guard.ok) return guard.response;
 
+  try {
+    
     // ⚠️ IMPORTANT: Admin cannot access WEB app's WebSocket state directly
     // (they're separate Node.js processes with separate memory)
     // Instead, we check the MongoDB price cache to infer WebSocket status

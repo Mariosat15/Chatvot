@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminSession } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import crypto from "crypto";
 import { getSafeKycBaseUrl } from "@/lib/utils/url-validator";
 
@@ -7,12 +7,11 @@ import { getSafeKycBaseUrl } from "@/lib/utils/url-validator";
 const DEFAULT_VERIFF_URL = "https://stationapi.veriff.com";
 
 export async function POST(req: NextRequest) {
-  try {
-    const session = await getAdminSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  const guard = await guardSection("kyc-settings");
+  if (!guard.ok) return guard.response;
 
+  try {
+    
     const body = await req.json();
     const { apiKey, apiSecret, baseUrl } = body;
 

@@ -1,14 +1,13 @@
 import { NextResponse } from "next/server";
-import { verifyAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { getCacheStats } from "@/lib/services/redis.service";
 
 export async function GET() {
-  try {
-    const auth = await verifyAdminAuth();
-    if (!auth.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  const guard = await guardSection("redis");
+  if (!guard.ok) return guard.response;
 
+  try {
+    
     const stats = await getCacheStats();
 
     if (!stats) {

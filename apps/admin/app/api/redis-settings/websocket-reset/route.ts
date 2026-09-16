@@ -1,17 +1,16 @@
 import { NextResponse } from "next/server";
-import { verifyAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import {
   resetWebSocket,
   getConnectionStatus,
 } from "@/lib/services/websocket-price-streamer";
 
 export async function POST() {
-  try {
-    const auth = await verifyAdminAuth();
-    if (!auth.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  const guard = await guardSection("redis");
+  if (!guard.ok) return guard.response;
 
+  try {
+    
     // Reset the WebSocket connection
     resetWebSocket();
 

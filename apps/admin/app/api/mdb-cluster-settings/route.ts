@@ -1,19 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import MdbClusterSettings from "@/database/models/mdb-cluster-settings.model";
-import { verifyAdminAuth } from "@/lib/admin/auth";
 
 /**
  * GET /api/mdb-cluster-settings
  * Get current MongoDB cluster settings
  */
 export async function GET() {
-  try {
-    const admin = await verifyAdminAuth();
-    if (!admin.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  const guard = await guardSection("mdb-cluster");
+  if (!guard.ok) return guard.response;
 
+  try {
     await connectToDatabase();
     const settings = await MdbClusterSettings.getSingleton();
 
@@ -35,12 +33,10 @@ export async function GET() {
  * Update MongoDB cluster settings
  */
 export async function PUT(request: NextRequest) {
-  try {
-    const admin = await verifyAdminAuth();
-    if (!admin.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  const guard = await guardSection("mdb-cluster");
+  if (!guard.ok) return guard.response;
 
+  try {
     const updates = await request.json();
 
     // Remove fields that shouldn't be directly updated
@@ -51,7 +47,7 @@ export async function PUT(request: NextRequest) {
     await connectToDatabase();
     const settings = await MdbClusterSettings.updateSingleton(
       updates,
-      admin.email || "admin",
+      guard.admin.email || "admin",
     );
 
     return NextResponse.json({
@@ -74,12 +70,10 @@ export async function PUT(request: NextRequest) {
  * Reset to defaults
  */
 export async function POST(request: NextRequest) {
-  try {
-    const admin = await verifyAdminAuth();
-    if (!admin.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  const guard = await guardSection("mdb-cluster");
+  if (!guard.ok) return guard.response;
 
+  try {
     const { action } = await request.json();
 
     if (action !== "reset") {

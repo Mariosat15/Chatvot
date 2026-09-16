@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAdminSession } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import KYCSession from "@/database/models/kyc-session.model";
 import FraudAlert from "@/database/models/fraud/fraud-alert.model";
@@ -84,12 +84,11 @@ function alreadyGrouped(
 const NORMALISE = (value: string) => value.toUpperCase().replace(/\s/g, "");
 
 export async function POST() {
-  try {
-    const session = await getAdminSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  const guard = await guardSection("kyc-settings");
+  if (!guard.ok) return guard.response;
 
+  try {
+    
     await connectToDatabase();
 
     // Get fraud settings
