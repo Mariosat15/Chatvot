@@ -67,7 +67,14 @@ chapter covers risks to the programme and to the application.
 | **R91** | **The ladder editor could destroy the ladder it failed to load.** `BadgeXPManagementSection.tsx` seeded state with a hard-coded **ten-rung** ladder carrying the old trading names, and `saveLevels` POSTs whatever state holds to a handler that does `findOneAndUpdate(..., { data: { levels } })` - **a whole-document replacement with no merge and no length check**. So one failed GET, which the code already anticipated with a toast, followed by one save, **replaced a renamed twenty-rung ladder with ten stale rungs**, and every player above rung ten then had no rung at all | Medium | **The only WRITE in the R88/R90/R91 family** - the rest were reads showing a wrong name. Reachable in production and **no attribution says whether it ever happened**. Nothing backfilled, because the result is a configuration document indistinguishable from an operator's own | **CLOSED 15 Sep 2026** - the editor holds no ladder of its own, and the save **refuses** when the fetch has not landed or returned nothing. **The fix is a refusal, not a better default:** seeding the canonical twenty would still overwrite an operator's renames with ours, and a stored value and an absent one are different facts. Two probes, because the guard has two clauses and two ways to lose it - and the toast-and-fall-through shape is probed explicitly, being the one this same file already had on its XP tab |
 | **R92** | **Challenge analytics were unconditionally trading-shaped, and BOTH halves of the seam were missing.** Every challenge on the analytics screen and the challenge detail page reported **P&L, ROI, a trade count and a win rate** - four figures a puzzle or a race does not have - because `challengerFinalStats` / `challengedFinalStats` declared only trading's numbers and **nothing ever wrote a score into them.** So the read side had nothing to read and the write side had nowhere to put it. It is the **competition** score seam (R32/R33) one contest type along, found by opening the screens to tokenise their wording | Medium | **LATENT for money and LIVE for reporting**, and the distinction matters: the challenge payout has ranked on `score` since 13 Sep 2026 and reads it from the participant row, not from these snapshot fields, so **nobody was ever paid the wrong amount**. What was wrong is what an operator investigating a dispute was shown - `0.00` P&L and `0` trades for a game with neither, which reads as a challenge that never happened. **Nothing was backfilled**: the value never reached the database, so there is nothing to repair, and no provider challenge has settled in production | **PARTLY CLOSED 15 Sep 2026** as part of X6.5 A4 - **the write side is closed and the read side is not, so do not summarise this as done.** `score` is declared on **both** `challenge.model.ts` copies with **no default** (R50's rule - a stored zero is a phantom result), written from **both** `challenge-outcome.ts` copies, and rendered behind the **shared** subline rule by `ChallengeStatRows` and `ChallengePlayerCard`, so the analytics card and the admin detail page cannot answer the game question differently. An absent score renders **`-`, never `0`**. **FIVE MORE READERS OF THOSE SNAPSHOT FIELDS ARE STILL TRADING-SHAPED, COUNTED WITH `rg` RATHER THAN ASSUMED** - the counting rule again, after four entry paths, ten finalize sites, six raw inserts and seven lifecycle routes: the task named two screens and there are seven. **`app/(root)/challenges/[id]/page.tsx` is the one that matters**, being the **player's own** result page, where Final Capital, P&L, P&L %, Trades and Win Rate render unconditionally with `|| 0`, so the player who **paid** reads `$0.00` and `0 trades` for a game with neither - worse than the admin half, and it is **X7** by phase rather than deferred by effort. **`apps/admin/components/admin/ChallengesAdminSection.tsx`** renders the same four twice, once per side, in its detail drawer. **Both** copies of `lib/actions/user/profile.actions.ts` collapse them with `|| 0` **at the action**, so no component downstream can tell absent from zero - the R50 shape one layer up. And **`apps/admin/app/api/ai-agent/chat/route.ts` feeds `challenger_pnl` / `challenged_pnl` into the AI agent's context**, which is **X6.5 A6**, still pending in this very phase - **and the claim first recorded here, that the agent would state a confident false profit, was WRONG and is corrected rather than reworded, because it was believed for a day.** Those two lines fall back to **`"—"`, not to `0`**, which is the dash rule behaving exactly as R45 and R50 demand, so the agent never invents a figure. The defect is an **absence**: the challenge report carries P&L and nothing else, so asked about a provider challenge the agent can give the entry fee, the pot and the winner and **has no performance figure to explain why that player won** - it answers with a dash and stops. **The phantom zeros in that file are on its COMPETITION reports**, which do collapse with `|| 0`, and those are the same R50 shape reaching the same agent. Both are now pinned, and the challenge canary is **aimed at the absence of `score` rather than the presence of `challenger_pnl`** - aimed at the P&L it would have stayed green straight through the fix, the P&L line being correct for a trading challenge and going nowhere. Pinned by a **canary** asserting all five are STILL offenders (the R60 rule), so this entry cannot read as closed and goes red the day somebody fixes them. **AMENDED 15 September 2026 by X6.5 A6, and two of the sentences above are now history only - say which.** The AI-agent half is **closed**: the challenge report carries `challengerFinalStats?.score` and `challengedFinalStats?.score` behind `hasProviderGameLabel`, the competition reports route their performance figures through **one** producer (`participantMetrics`) which **withholds** the trading fields on a provider contest rather than zeroing them, and the phantom-zero count in that file is now **asserted to be zero** rather than at least two. So "which is X6.5 A6, still pending in this very phase" and "the phantom zeros in that file are on its COMPETITION reports" are correct as history and stale as present facts. **Its two canaries fired on the day the defect closed and were FLIPPED, not deleted** - the comments recording that the first claim was wrong, and that the challenge canary had to be aimed at the *absence* of `score`, are the most valuable part of them. **FOUR READERS REMAIN OPEN, not five**: the player's own result page (**X7** by phase), the admin list drawer, and **both** copies of the profile action. One further thing was found closing this half and is worth stating because it is not a wording defect: the winner tool's fallback ordered `competitionparticipants` on `pnl` when no final leaderboard was stored, and **it cannot be repaired by ordering on `score` instead** - the direction lives on the catalogue title, so a time trial's winner holds the *lowest* score and a reporter guessing would name the loser and present it with a medal. It now **declines** for a provider contest and says why, and the live leaderboard orders on **`currentRank`**, which already has the direction applied. **AMENDED AGAIN 16 September 2026, and this is the last amendment this entry should need: THREE of the four remaining readers are closed and ONE is open**, so "FOUR READERS REMAIN OPEN" above is correct as history and stale as a present fact - **say which**. Closed: the **admin list drawer** (`ChallengesAdminSection.tsx`) now renders both sides through the shared `ChallengeStatRows`, and **both** copies of `lib/actions/user/profile.actions.ts` report by game and let an absent figure stay absent. **The remaining one is `app/(root)/challenges/[id]/page.tsx`, the player's own challenge result page, which is X7 by phase rather than deferred by effort**, and its canary is the one surviving R92 offender assertion. **Three things about that pass are worth carrying.** First, **closing the two actions FORCED a player-UI change nobody had scoped**: `ProfileOverview.tsx` and `ProfileContent.tsx` each called `pnl.toFixed(2)` inline, so the moment an action returned `null` instead of `0` the two screens would have thrown - the fix is `lib/utils/profile-result-metric.ts`, one rule both screens ask, because two copies of "how did this player do here" sitting one click apart is the shape behind `referenceId`, `failedReason`, `challengeId` and the Game Master `||`. **Removing a phantom zero is not a display-only change** - something downstream was relying on the zero to be printable. Second, that rule **decides by GAME and never by which figures are present**, because `buildParticipantSeat` writes `pnl: 0` / `totalTrades: 0` onto every seat whatever the game (the R46 mechanism), so a presence test answers trading for every row ever written. Third, **`apps/admin/lib/actions/user/profile.actions.ts` is dead code - imported by nothing - and was fixed anyway rather than deleted**, deliberately unlike the `shouldBlockEntry` precedent: the admin app has no profile screen today and will, and a live defect left in the copy a future screen reaches for is worse than one more mirrored file. **Recorded as unreached so a summary cannot claim it runs.** An absent ROI is **withheld outright rather than dashed**, because a tile captioned "ROI" holding a dash asks the player what their return was and declines to answer, and a provider score is not a return on anything |
 | **R93** | **The exchange rate no operator can reach.** `CreditConversionSettings.eurToCreditsRate` is what deposits, withdrawals, every admin financial screen and R74's derived "one credit is worth" figure all price against, and the **only** component in either app that can edit it - `apps/admin/components/admin/CreditConversionSection.tsx` - **is imported by nothing**, so the rate is settable only by hand-editing the database or calling `PUT /api/credit-conversion` directly. The mounted sibling an operator would reach for, `FeeSettingsSection`, writes to the same collection and carries the fees but **not** the rate | Low | **LIVE, and it is a REACHABILITY defect rather than a wrong number** - every reader honours the stored value and the default is the one R74 settled on, so nothing is miscomputed and **nothing is backfilled.** What it costs is that repricing credits cannot be done through the admin panel at all | **OPEN, owner scope call.** Found by X6.5 A6's stale-navigation-path audit, which is the transferable part: **a path naming no screen is either wrong or a screen nobody can open, and the two are indistinguishable until you grep for the component.** Second unmounted-component finding after **R75**, and not the same defect - that is an unmounted *provider* (values never arrive), this is an unmounted *editor* (values arrive and cannot be changed). Not fixed here because mounting it needs a **section id, which is a Mongoose enum value and therefore add-only**, making it a grant decision about who may reprice the platform |
-| **R94** | **Whether a player gets XP depends on which cron won the race.** Four finalization paths should award activity XP and evaluate badges, and they disagree. The main app's competition and challenge finalizers call both; **`apps/admin`'s competition finalizer calls no `awardActivityXP`**, and its **challenge finalizer calls neither** - `rg` returns no line for the name in that file at all. Both apps register `checkAndFinalizeCompetitions` on an every-minute cron, so a trading competition settled by the admin process awards no XP while still evaluating badges. **Both provider settlement services call neither**, which is `09` E6's unfinished "points, ratings, badges and milestones wired to `gameKey`" | Medium | **The trading rows are LIVE; the provider rows are LATENT.** No money moved and no prize was mispaid - XP and badges are not money - and **nothing is backfilled**; what was lost is progression, silently, with no flag, no error and no log line on either branch. **There is no way to know how often it happened**, because an absent call leaves no record | **OPEN, found while scoping X7 on 16 Sep 2026.** **This is R26's shape one system along** - same file pair, same cron - and R26's closure is no evidence about it, since extracting the money stages is precisely what stopped a size comparison from showing the remaining divergence. **Fix it BEFORE the X7 data model and not beside it**: unifying the four callers against the existing services and the existing green tests is the only way to prove nothing moved, and a behaviour change in that diff destroys the guarantee. **Count the callers first** - that rule has been right every time here |
+| **R94** | **Whether a player gets XP depends on which cron won the race.** Four finalization paths should award activity XP and evaluate badges, and they disagree. The main app's competition and challenge finalizers call both; **`apps/admin`'s competition finalizer calls no `awardActivityXP`**, and its **challenge finalizer calls neither** - `rg` returns no line for the name in that file at all. Both apps register `checkAndFinalizeCompetitions` on an every-minute cron, so a trading competition settled by the admin process awards no XP while still evaluating badges. **Both provider settlement services call neither**, which is `09` E6's unfinished "points, ratings, badges and milestones wired to `gameKey`" | Medium | **The trading rows are LIVE; the provider rows are LATENT.** No money moved and no prize was mispaid - XP and badges are not money - and **nothing is backfilled**; what was lost is progression, silently, with no flag, no error and no log line on either branch. **There is no way to know how often it happened**, because an absent call leaves no record | **OPEN, found while scoping X7 on 16 Sep 2026.** **This is R26's shape one system along** - same file pair, same cron - and R26's closure is no evidence about it, since extracting the money stages is precisely what stopped a size comparison from showing the remaining divergence. **Fix it BEFORE the X7 data model and not beside it**: unifying the four callers against the existing services and the existing green tests is the only way to prove nothing moved, and a behaviour change in that diff destroys the guarantee. **Count the callers first** - that rule has been right every time here. **CLOSED 16 September 2026** (`385c86a2`) - so the OPEN above is correct as history and stale as a present fact, and **say which**. `lib/services/settlement/contest-rewards.ts` (mirrored) is one game-agnostic, **non-throwing** stage that all six paths call, and **the counting rule was right again: the plan said four finalizers and there are six**, the two provider services being the pair nobody had listed. **`UserGameStats` was deliberately kept OUT of the same commit** - an extraction's whole claim is that nothing moved, and a new collection in the same diff destroys the only guarantee it offers. **Three further defects surfaced underneath it and are R95, R97 and R98**, which is the usual pattern here: generalising code finds more than looking for bugs does. **Nothing was backfilled** - the absent calls left no record, so the affected set cannot be queried for |
+| **R95** | **The daily trade XP cap had never applied to anybody.** `awardActivityXP` summed the day's trade XP by filtering `xpHistory` on `h.source === "trade_activity"`, and `awardXP` writes `source: "action"` with the activity name in the `sourceId`. **No entry has ever matched**, so the running total was always zero and the cap always had headroom. It did not fail - it silently admitted everything, which is why an anti-farming control looked like it was working for as long as nobody tested it against a farmer | Medium | **LIVE since the cap was written, and it is an ABSENT LIMIT rather than a wrong number** - every XP award was correct, there was simply no ceiling on how many a day could be earned by trading. No money anywhere near it, and **nothing backfilled**: awarded XP is a player's earned progression and clawing it back on the strength of a cap nobody was subject to is a worse defect than the one being fixed | **CLOSED 16 September 2026** (`385c86a2`), found underneath R94. **R95 and R97 are one item, and that is the interesting part**: matching on the `sourceId` instead would have failed too, because that field was undeclared on the subdocument and strict mode discarded it on every write - so the obvious repair was unreachable until the schema was fixed. The filter now tests `source === "action"` **and** `sourceId.startsWith(TRADE_ACTIVITY_SOURCE_PREFIX)`, with the prefix a **shared constant** rather than a literal at each end, because two copies of a string that must agree is the shape behind `referenceId`, `failedReason` and `challengeId` |
+| **R97** | **`sourceId` was declared on nothing and written by everything.** `awardXP` passes a `sourceId` into every `xpHistory` entry and the subdocument schema did not declare the path, so Mongoose strict mode **discarded it on every write while reporting success**. Same failure mode as mirror drift from a different direction - one writer disagreeing with its own schema rather than two copies disagreeing with each other - so **`check:mirrors` cannot catch it and never could**, because both copies were identically wrong | Medium | **LIVE on every XP award ever made**, and it is a **lost audit trail, not a wrong balance** - every XP total is correct, but no history row can say *which* activity earned it. **Nothing backfilled and nothing can be**: the value never reached the database, so there is no stored field to repair; historical rows stay unattributable exactly as R28's entry-fee rows do | **CLOSED 16 September 2026** (`385c86a2`) - `sourceId?: string` declared on the `xpHistory` path in **both** `user-level.model.ts` copies. **This is the fourth "the field was never stored" finding** after `referenceId`, `challengeId` and `suspensionEndsAt`, so carry the class rather than the cases: **a green `check:mirrors` is not evidence that a field is stored**, only that the two apps agree about it. It is one item with **R95**, which could not be fixed without it |
+| **R98** | **The admin's copy of the level model capped the ladder at ten.** `apps/admin/database/models/user-level.model.ts` declared `max: 10` on `currentLevel` while the canonical ladder has **twenty** rungs, so any admin-side award crossing rung eleven threw a Mongoose validation error. The admin copy was also **missing the indexes** its main-app counterpart declares | Medium | **LIVE but narrow, and stating the scope is the point**: it throws rather than storing a wrong value, so no player was ever recorded at the wrong level - the award simply failed. Reachable only from the admin app's award paths, which R94 has just given more of, so **the blast radius grew the moment R94 was fixed**. **Nothing backfilled** - a rejected write stored nothing | **CLOSED 16 September 2026** (`385c86a2`) - `max` raised to 20 and the missing `UserLevelSchema.index` calls added. **`check:mirrors` compares field paths and enum values and has no opinion about a `max` validator**, which is why two copies of one model disagreed about the legal range of a field they both declare - the same blind spot as the `required` predicate bodies already recorded in the model-mirror row |
+| **R96** | **A player who only plays games can earn five badges out of 128.** `RARITY_MIN_REQUIREMENTS` in `badge-evaluation.service.ts` refuses any badge below a **trades** floor and a **completed-competitions** floor (5/0 common, 25/1 rare, 50/3 epic, 100/5 legendary), and `TRADE_EXEMPT_TYPES` lets only a handful past. `completedCompetitionsWithTrades` counts **trading** competitions by construction. So the gate is not merely trading-flavoured, it is arithmetically closed: **122 of 128 badges are unreachable without trading**, and the catalogue contains **zero** game badges to begin with | Medium | **LATENT in effect and LIVE in mechanism** - no games-only player has completed enough to test it, so nobody has yet been refused, but every branch is in production today and refuses correctly. **Nothing to backfill**: no badge was wrongly awarded or withheld, and the remedy is a gate change plus new content, not a data repair | **OPEN, split into R96a and R96b (owner decision, 16 Sep 2026).** **The gate comes from FOUR sources and a fix aimed at one of them changes nothing** - `RARITY_MIN_REQUIREMENTS` in code, `condition.minTrades` in `lib/constants/badges.ts`, `condition.minCompletedCompetitions` (trading-only by construction), and **`data/defaults/badges.json`, which is the live source on a fresh seed and is operator-tuned** (see **R99**). **R96a** makes the gate game-aware in code only - trading minimums apply to trading-typed conditions, cross-game badges get a contests-played counter any game satisfies - which unblocks ~35-40 existing badges with **no data rewrite and no operator tuning overwritten**. **R96b** is a separate content pass authoring game badges, which needs owner input on naming and thresholds. **R101 comes first**: `/api/badges` full CRUD is anonymously callable, so the gate's own data is world-writable, and tuning a gate whose storage is unguarded is the wrong order of work |
+| **R99** | **The badge catalogue in the repository is not the one that gets installed.** `lib/constants/badges.ts` holds 128 badges; **`data/defaults/badges.json` holds 134**, is written by the admin app, is read by `whitelabel-defaults-reader.ts`, and is **preferred over the constants on a fresh seed** - so the file a developer reads is not the file an installation gets, and the two disagree by six badges and by their tuning (115 of the 134 declare `minTrades > 0`). Worse, `badge-config-seed.service.ts`'s sync updates `condition` on existing rows when the source differs, so **a seed run silently overwrites values an operator tuned in the database** | Medium | **LIVE as a divergence; the overwrite is REACHABLE rather than observed.** Nothing is miscomputed - both files are internally valid - and **nothing backfilled**. What it costs is that any reasoning about badge behaviour done by reading `lib/constants/badges.ts` is reasoning about the wrong catalogue, which is how R96 was nearly mis-measured | **OPEN.** Two questions, and they want different answers: **which file is canonical** is an owner decision, while **a sync that overwrites operator tuning** is a defect whichever file wins. The rule this breaks is already carried in the backfill row - **never let a second copy of a constant exist where one of them is authoritative** - and the guard is a test asserting the two catalogues agree, or an explicit allow-list of deliberate differences with reasons, exactly as `tools/model-mirror/allowlist.ts` does for models. **Found while measuring R96**, which is the transferable part: the measurement was against the constants and would have been wrong by six badges and every threshold |
+| **R100** | **The admin's badge evaluator is a materially older revision, and no guard can see it.** `apps/admin/lib/services/badge-evaluation.service.ts` diverges from the main app's copy by 221 lines. It lacks the **stats cache**, runs **unbounded** queries where the main app limits them, fetches **sequentially** rather than in parallel, logs verbosely, has **no category filter**, computes win rate off a different sample, and - the one that matters - **omits the `typeof userId !== "string"` check the main app added to stop a request-supplied object reaching a database query** | Medium | **LIVE.** Both copies award badges and they can disagree about whether a player qualifies, so which badges a player holds depends on which app evaluated them - and the admin copy is the one reached by `POST /api/trigger-badge-evaluation`, which **R101 shows is unauthenticated**, so the missing type check is reachable by an anonymous caller. **Nothing backfilled**: a badge awarded by either copy is indistinguishable from one awarded by the other | **OPEN, to be closed as a behaviour-preserving port BEFORE R96a** (owner decision, 16 Sep 2026: full parity). **Full parity and a gate change in one commit would destroy the only evidence the port is safe**, so they are two commits - the same rule as the settlement extraction. **`check:mirrors` compares MODELS**, so it has never had an opinion about this file or any other service; this is the same blind spot as `competition-ranking.service.ts` (R45's 77-line divergence) and the two `challenge-finalize.actions.ts` copies. **Third finding in a services file pair that no guard covers**, so the lesson is not about this file: **a mirrored directory is not a guarded one**, and the guarantee for a shared non-model file has to be a byte-for-byte test |
+| **R101** | **Ninety-nine admin API route files have no authorization check of any kind, and fifty-eight of them write.** Counted over all 347 route files in `apps/admin/app/api` with comments stripped: **189** call a guard and can refuse, **58** call one whose result may not be used, **1** authenticates by secret header, **99** call none of the app's nine auth helpers and have no secret header or signature either. `apps/admin` has **no `middleware.ts`**, so there is no app-wide check to fall back on - the root `middleware.ts` belongs to the main app and never runs here. **The worst is `PATCH /api/users/edit`**, which writes the user document at line 121 and only then calls `getAdminSession()` at line 137, **purely to attribute an audit entry**, inside a `try/catch` that swallows failure and behind an `if (admin)` that skips the log when there is no session: `role` is a settable field and `"admin"` is a valid value, so it is **unauthenticated privilege escalation that also leaves no audit row**. Also anonymously callable: full CRUD on `/api/badges`, `/api/journey-map`, `/api/journey-milestones`, `/api/journey-progress`; `POST /api/trigger-badge-evaluation`, which awards badges and recalculates XP for one user or all of them; the whole `messaging/conversations/*` surface; and two data exports, `trading-history/export` and `landing-pages/analytics/export` | **Critical** | **LIVE, and the exposure runs in both directions.** No money moved and no prize was paid - none of these are settlement paths - but a role write is a total compromise of the admin app, the exports hand out personal data, and the badge and journey writers change player-facing progression. **There is no way to know whether any of it was ever called, because a route with no guard writes no attribution**, and **nothing was backfilled**: an edit through any of them leaves a document indistinguishable from an operator's own. Do not let the absence of evidence read as reassurance | **OPEN, and it is the next piece of work - ahead of R96 and ahead of X7.** **ELEVENTH instance of this class**, after Prerequisite A, the internal-secret fallbacks, the suspicion-score route, the provider admin routes, the contest-edit PUT, R40, R47, R51, R57 and **R89** - and the difference is the one worth carrying: **every previous instance fixed the routes it happened to be looking at, and nobody ever swept the directory.** R89 found four by this exact method three weeks ago. Found again by **counting exported handlers against guard calls**, which is the only method that works, because every neighbour having a guard is precisely what walks a reader past the file that has none. **My first count of 143 was WRONG and is corrected rather than quietly restated**: the sweep searched three helper names and this app exports nine, so reading one file by hand is what found `getAdminSession` - **a scan is a hypothesis until one of its answers is checked by hand.** Three routes in the write list are **legitimately public** (`auth/login`, `gamemaster-auth/login`, `gamemaster-auth/logout`), which is why the honest figure is 58 and not 61: **classify, never merely count.** **Then the corrected count was wrong too, by one, and it is corrected here as well** - this row first said 100 and 59, and an independently rewritten scan returned 99 and 61, because one route authenticates by secret header (a real mechanism, so its own bucket) and the writer arithmetic had subtracted the three public logins from the wrong subtotal. **Record the count as a table with every bucket and every exclusion visible**, since a headline number has nowhere to show which of those two mistakes it is making. The fix has four parts - the escalation and user-data writers first, then the 58 read individually, then the exports, then **the guard as a TEST**: extend `__tests__/helpers/route-guard-audit.ts` (built for R57) to read the whole directory against an explicit allow-list, because a sweep I ran today is a snapshot and only a test stops route 348 arriving unguarded |
 | R8 | Bulk find-and-replace on wording | High | Medium | X8 |
 | R9 | Fraud throttle blind to provider entries | High | High | X5 |
 | R11 | Legal wording changed without review | High | Medium | X8 |
@@ -3232,7 +3239,7 @@ Recorded rather than quietly scoped, and deliberately not "fixed" by folding the
 
 ---
 
-### R94 - Whether a player gets XP depends on which cron won the race - **OPEN, found while scoping X7**
+### R94 - Whether a player gets XP depends on which cron won the race - **CLOSED 16 Sep 2026, commit `385c86a2`**
 
 **What it is.** Four finalization paths should award activity XP and evaluate badges. They
 disagree about it, and one pair of them runs on the **same every-minute cron in two
@@ -3289,6 +3296,38 @@ callers disagreeing. **Count them before unifying**, because that rule has been 
 time here: four competition entry paths where a plan said two, ten finalize sites where a plan
 said five, six raw inserts where a risk named one, seven writers of the referral rate where a
 document named one.
+
+> **CLOSED 16 September 2026, commit `385c86a2`.** Everything above stands as the diagnosis
+> and the paragraphs written in the future tense are left in the future tense deliberately -
+> the reasoning about *why* the fix was kept out of the `UserGameStats` commit is the part a
+> future reader needs, and retensing it into a report of what happened deletes the argument.
+> `lib/services/rewards/contest-rewards.ts` (mirrored) is now the one stage all of them call.
+>
+> **The counting rule was right again, and by more than usual: the table above says four
+> paths and there are twelve.** Eight finalization sites, not four - the six in the table plus
+> the two provider challenge paths - and **four position-close sites** nobody had counted at
+> all, of which `apps/admin/.../position.actions.ts` evaluated badges without awarding XP and
+> `closePositionAutomatic` in the main app did **neither**. That is now the seventh instance
+> of the rule, and note the shape: the table was not wrong about the rows it listed, it was a
+> **hypothesis about how many rows there are**, and a table with a plausible number of rows is
+> the least likely thing in a document to be re-counted.
+>
+> **Three further defects surfaced underneath it, none of them by looking for bugs - which is
+> the usual pattern here, and generalising code keeps finding more than searching does.**
+> Each has its own row: **R95**, the daily trade XP cap that had never applied to anybody;
+> **R97**, the `sourceId` that every write passed and the schema discarded; and **R98**, the
+> admin level model's `max: 10`. **R95 and R97 are one item and must not be summarised as
+> two independent fixes** - the cap filtered on `source === "trade_activity"` while `awardXP`
+> writes `source: "action"` with the prefix in the `sourceId`, so the obvious repair is to
+> match on the `sourceId` instead, **and that would have failed too**, because that field was
+> undeclared and strict mode dropped it on every write. A fix to either alone is a cap that
+> still admits everything, silently, exactly as before.
+>
+> **The failure direction is the thing to carry from R95.** A cap whose running total is
+> always zero does not refuse anything and does not throw - **it admits everything while
+> reading as a working cap**, which is this codebase's recurring shape, and it is why an
+> anti-farming limit needs a test that proves the limit *bites* rather than one that proves a
+> legitimate award is allowed through.
 
 ---
 
@@ -4517,6 +4556,189 @@ any other field on that document is one growth spurt away from the same refusal,
 will name whatever field happened to grow. Nothing is lost by running it: it copies,
 reads back, and only then clears, one `$unset` at a time - never by saving the document, which the
 same limit would refuse.
+
+---
+
+### R101 - Ninety-nine admin routes with no authorization, and fifty-eight of them write - **OPEN, the next piece of work**
+
+**What it is.** `apps/admin` is a separate Next.js process with **no `middleware.ts` of its
+own**. The root `middleware.ts` belongs to the main app and never runs for these routes, so
+there is no app-wide authorization to fall back on and **every route must guard itself**.
+Counted over all 347 `route.ts` files under `apps/admin/app/api`, with comments stripped
+first:
+
+| | Files |
+|---|---|
+| Call a guard and can refuse | 189 |
+| Call a guard whose result may not be used | 58 |
+| Authenticate by secret header instead of a session | 1 |
+| Call **none** of the app's nine auth helpers, and carry no secret header or signature | **99** |
+| ...of those 99, perform `POST` / `PUT` / `PATCH` / `DELETE` | **61** |
+| ...of those 61, legitimately public (`auth/login`, `gamemaster-auth/login`, `gamemaster-auth/logout`) | 3 |
+| **Unauthenticated writers that should not be** | **58** |
+
+The nine helpers are `guardSection`, `requireSectionAccess`, `verifyAdminAuth`,
+`requireAdminAuth`, `verifyAdminToken`, `getAdminSession`, `verifyAnyAuth`,
+`verifyGameMasterAuth` and `requireGameMasterAuth`. Only the first two are *authorization*;
+the rest answer narrower questions, and `getAdminSession` answers none at all - it returns a
+session or null and it is up to the caller to care.
+
+**The worst one, and it is worth reading in order.** `PATCH /api/users/edit`:
+
+1. Line ~121: `db.collection("user").updateOne(query, { $set: updateData })` - **the write**.
+2. Line ~137: `const admin = await getAdminSession()` - **the first and only mention of a
+   session**, and it is there to attribute an audit-log entry.
+3. That call sits inside a `try/catch` that logs and swallows, behind an `if (admin)` that
+   **skips the audit entry entirely when there is no session**.
+
+`role` is one of the settable fields and `"admin"` is in `VALID_ROLES`. So an anonymous
+`PATCH` promotes any account to administrator, **and the absence of a session is exactly the
+condition under which no audit row is written.** The one artefact an operator would check for
+evidence is the one the defect suppresses - the same shape as **R85**, where an idempotency
+guard kept clean precisely the collection somebody would inspect.
+
+**Also anonymously callable**, and grouped by what it costs:
+
+- **Permissions and player progression:** full CRUD on `/api/badges`, `/api/journey-map`,
+  `/api/journey-milestones`, `/api/journey-progress`; `POST /api/trigger-badge-evaluation`,
+  which awards badges and recalculates XP for one user **or all of them**.
+- **User records:** `/api/users/[userId]/deactivate`, `/api/sync-missing-users`,
+  `/api/recover-stats`.
+- **Money-adjacent configuration:** `/api/admin-bank-accounts/[id]`,
+  `/api/trading-risk-settings`.
+- **Personal data out:** `/api/trading-history/export`,
+  `/api/landing-pages/analytics/export`, and the whole `messaging/conversations/*` surface
+  including message reads and writes.
+- **Destructive dev-zone operations:** the simulator, test-run and market-data routes, which
+  seed, clean up and delete.
+
+**Three of the write routes are legitimately public** - `auth/login`,
+`gamemaster-auth/login` and `gamemaster-auth/logout` - which is why the honest figure is
+**58 and not 61**. `classify, never merely count`, and a security finding that inflates
+itself is the one nobody believes the second time.
+
+**How it was found, which is the part that generalises.** By **counting exported handlers
+against guard calls**, never by reading routes. Reading is structurally the wrong instrument
+here: every neighbour having a guard is precisely what carries a reader past the file that
+has none, which is how `dev-zone/optimize-images` survived beside a properly guarded
+`dependency-check` until **R57**.
+
+**And the count itself was wrong first, which is worth recording rather than restating
+quietly.** The initial sweep searched three helper names, reported 143, and was believed for
+several minutes. This app exports **nine**. What found the gap was reading one file by hand -
+`users/edit` - and discovering it called a helper the scan had never heard of. **A scan is a
+hypothesis until one of its answers is checked by hand**, and the direction of the error is
+the instructive bit: the narrow scan **overstated** the count while **understating** the
+severity, because the file it misclassified as merely unguarded is in fact the privilege
+escalation.
+
+**Then the corrected count was wrong too, by one, and the rule earned itself twice in a
+day.** This entry first recorded 100 unguarded and 59 unauthenticated writers. An
+independently rewritten scan returned **99** and **61**: one route authenticates by secret
+header - a real mechanism, so it belongs in its own row rather than in the unguarded pile -
+and the writer arithmetic had subtracted the three public login routes from the wrong
+subtotal. Both figures were corrected rather than quietly restated. **Write the count as a
+table with every bucket and every exclusion visible**, because a single headline number has
+nowhere to show the reader which of these two mistakes it is making.
+
+**Why this is the eleventh instance and still new.** After Prerequisite A, the
+internal-secret fallbacks, the suspicion-score route, the provider admin routes, the
+contest-edit `PUT`, R40, R47, R51, R57 and **R89**, the class is thoroughly established. The
+difference is that **every one of those fixed the routes it happened to be looking at.**
+R89 used this exact method three weeks ago, found four routes, and fixed four routes. Nobody
+ever pointed the method at the directory. The lesson is not about authorization at all:
+**when a defect recurs eleven times, the outstanding work is not another instance - it is
+the sweep nobody has run and the test nobody has written.**
+
+**The fix is four parts, in this order.**
+
+1. **R101a - the escalation and the user-data writers.** Hours, not days: `guardSection`
+   exists, and the change is one import and three lines per handler. `users/edit` first.
+2. **R101b - the 58 read individually.** Most are fine: `guardSection` returns a response
+   object rather than a literal `status: 401`, which is why a refusal-shaped scan cannot see
+   them. The ones to find are the `users/edit` shape, and **`users/credit`,
+   `users/delete`, `competitions/[id]/adjust-results`, `admin-funds`, `vat` and
+   `vendor-payments` are where to look first**, because those move money or destroy records.
+3. **R101c - the exports**, which need a grant decision as much as a guard: whoever may read
+   a trading-history export may read every player's positions.
+4. **R101d - the guard as a TEST, which is the only part that lasts.** Extend
+   `__tests__/helpers/route-guard-audit.ts`, built for R57, to **read the whole
+   `apps/admin/app/api` directory** against an explicit allow-list of deliberately public
+   routes with a reason each. **A sweep run today is a snapshot; a test that reads the
+   directory is a tripwire**, and it is the difference between fixing 100 routes and fixing
+   the reason there were 100. It must **strip comments first** - these files will name
+   `guardSection` in prose the moment they are documented - and it must **count handlers
+   against guards**, because a file whose `GET` is guarded and whose `PATCH` is not passes
+   any mention-based check while leaving the mutation open.
+
+**State the harm in both directions.** No money moved, no prize was paid and no settlement
+path is involved. But a role write is a total compromise of the admin app; the exports hand
+out personal data; and the badge, journey and XP writers change what players see and what
+contests they may enter. **There is no way to know whether any of it was ever called**,
+because a route with no guard writes no attribution, and **nothing was backfilled** - an edit
+through any of these leaves a document indistinguishable from an operator's own. The absence
+of evidence is not reassurance, and saying so is part of the finding.
+
+---
+
+### R96 - A games-only player can earn five badges out of 128 - **OPEN, split in two**
+
+**What it is.** `badge-evaluation.service.ts` refuses a badge unless the player clears a
+**trades** floor and a **completed-competitions** floor, by rarity:
+
+| Rarity | Trades | Competitions |
+|---|---|---|
+| common | 5 | 0 |
+| rare | 25 | 1 |
+| epic | 50 | 3 |
+| legendary | 100 | 5 |
+
+`TRADE_EXEMPT_TYPES` lets a small set of condition types past. Everything else is refused,
+and `completedCompetitionsWithTrades` - the counter behind the second column - **counts
+trading competitions by construction**, so a player who has played fifty provider contests
+reads as zero. Measured rather than estimated: **122 of 128 badges are unreachable without
+trading**, and of the six that remain one is unreachable for an unrelated reason, so the
+honest figure is **five**.
+
+**The catalogue contains zero game badges**, which is the second half and the reason a gate
+fix alone is not a feature. Of the 128, roughly 95 are trading-specific by *condition* - they
+ask about P&L, win rate, positions, streaks - and only ~35-40 are cross-game capable at all
+(contests entered, contests won, account age, referrals, profile completion).
+
+**The gate comes from FOUR sources, and a fix aimed at one of them changes nothing.** This is
+the counting rule again, and it is why the first estimate of this work was wrong:
+
+1. `RARITY_MIN_REQUIREMENTS` - **code**, in both copies of the service.
+2. `condition.minTrades` - **data**, in `lib/constants/badges.ts`.
+3. `condition.minCompletedCompetitions` - data, and **trading-only by construction** even
+   when the number is small.
+4. **`data/defaults/badges.json`** - which is the live source on a fresh seed, holds 134
+   badges rather than 128, and is operator-tuned with 115 of them declaring
+   `minTrades > 0`. See **R99**; measuring this defect against the constants alone would
+   have been wrong by six badges and every threshold.
+
+**The split, and why it is a split** (owner decision, 16 September 2026):
+
+- **R96a - the gate, code only.** Classify by condition type: a trading minimum applies to a
+  **trading-typed** condition, and a cross-game badge gets a contests-played counter that
+  **any** game satisfies. This unblocks the ~35-40 already-cross-game badges with **no data
+  rewrite and no operator tuning overwritten**, which is the whole reason to shape it this
+  way rather than lowering the thresholds.
+- **R96b - the content.** Authoring game badges is a separate pass needing owner input on
+  naming and thresholds, and it is where "redo the badge naming to include games" actually
+  lands.
+
+**Two things must happen first, and both are ordering rather than effort.** **R100** - the
+admin copy of the evaluator is 221 lines behind and must be brought to parity as a
+**behaviour-preserving port in its own commit**, because parity and a gate change in one diff
+destroy the only evidence the port is safe. And **R101** - `/api/badges` full CRUD is
+anonymously callable, so **the gate's own data is world-writable**, and carefully tuning a
+gate whose storage is unguarded is the wrong order of work.
+
+**Harm, precisely.** **Latent in effect, live in mechanism**: every branch is in production
+and refuses correctly, but no games-only player has yet completed enough to be refused, so
+nobody has been harmed. **Nothing to backfill** - no badge was wrongly awarded or wrongly
+withheld, and the remedy is a gate change plus new content, not a data repair.
 
 ---
 

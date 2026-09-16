@@ -14,6 +14,8 @@
 | | |
 |---|---|
 | **Status** | **SCENARIO DECIDED - EXTERNAL-ONLY** (2 Sep 2026). **X1, X2, X3 and X5 are code-complete; X6 is partially done - all five of its admin destinations now exist (provider health, 6 Sep 2026), analytics by game and provider plus the Game Performance screen landed 7 Sep 2026, and the Game Master creation API is **half done** - its permission gate landed 7 Sep 2026, the construction half has not.** A provider contest can be created, **published from the admin screen** (5 Sep 2026), entered, played and paid - and since 5 Sep 2026 it is paid **correctly**, which it was not before: two P0 defects meant every player tied on a score of zero and split the pool equally, and a lower-is-better game ranked backwards. A stuck round can now be **inspected and ended by an operator** (5 Sep 2026). **The whole lifecycle is now reachable by clicking** - the player round launch screen landed 5 Sep 2026 at `/competitions/[id]/play`, which also fixed a live defect: a provider-contest player was being sent to the forex trading workspace by a button labelled "Start Trading". **X10 / E8's core shipped 13 Sep 2026**: a provider game can be **challenged** end to end, on the shared settlement stages rather than the challenge path's old inline copy - the opponent picker, open challenges and matchmaking are still deferred. **No provider selected**, which is what X4 needs |
+| **Is the admin API authorized?** | **NO, and this is the highest-priority open item on the platform - R101, 16 Sep 2026.** `apps/admin` has **no `middleware.ts`**, so every route must guard itself, and over 347 `route.ts` files **99 call none of the app's nine auth helpers at all, of which 58 are writers that should not be public**. **The worst is `PATCH /api/users/edit`**: it writes the user document, `role` is settable, `"admin"` is valid, and its **only** mention of a session is `getAdminSession()` **sixteen lines after the write**, to attribute an audit entry, inside a swallowing `try/catch` behind an `if (admin)` - so an anonymous caller promotes any account to administrator **and the absence of a session is exactly the condition under which nothing is logged**. A document describing this as weakly guarded, or guarded by the wrong helper, is describing a different and lesser defect. **LIVE with no attribution, so "was it ever called" is unanswerable** - do not let that absence of evidence read as reassurance - and **nothing was backfilled**, there being no stored value to repair. **Eleventh instance** of the class after Prerequisite A, the internal-secret fallbacks, the suspicion-score route, the provider admin routes, the contest-edit `PUT`, R40, R47, R51, R57 and R89, and the difference is the part to carry: **every previous instance fixed the routes it was looking at** - R89 used this same method three weeks ago, found four and fixed four - so the outstanding work is the sweep nobody ran and the **test** nobody wrote (**R101d**), not another instance. **Found by counting exported handlers against guard calls, never by reading routes**, and **my first count of 143 was wrong** because the scan knew three helper names of nine - corrected rather than restated, and note the direction, since the narrow scan **overstated the count while understating the severity**: the file it filed as merely unguarded is the escalation. **59 writers, not 62** - `auth/login`, `gamemaster-auth/login` and `gamemaster-auth/logout` are legitimately public. The **58** routes that call a guard without a literal `401`/`403` are **mostly fine**, `guardSection` returning a response object, which is why a refusal-shaped scan cannot see them - but `users/credit`, `users/delete`, `competitions/[id]/adjust-results`, `admin-funds`, `vat` and `vendor-payments` move money or destroy records and are read first. **R96 is deferred behind R101a on ordering, not effort**, because `/api/badges` full CRUD is anonymous, so **the badge gate's own data is world-writable** |
+| **Can a games-only player earn a badge?** | **Almost never - R96, 16 Sep 2026, measured rather than estimated: 122 of 128 badges are unreachable without trading**, one of the remaining six is unreachable for an unrelated reason, so the answer is **five**, and the catalogue holds **zero** game badges. **The gate has four sources, not one**, which is why a fix aimed at the obvious one would have changed nothing: `RARITY_MIN_REQUIREMENTS` in `badge-evaluation.service.ts` floors every non-exempt badge at 5/25/50/100 trades by rarity; `condition.minTrades` is set on most of the catalogue; `minCompletedCompetitions` counts **trading** competitions **by construction** rather than by intent, so it is a third gate wearing a general name; and **`data/defaults/badges.json` is what a fresh seed actually installs** - 134 badges against the constants' 128, operator-tuned, so measuring against `lib/constants/badges.ts` alone is wrong by six badges and every threshold (**R99**, whose `conditionChanged` sync also silently overwrites operator tuning). **It splits in two and the split is the decision**: **R96a** makes the gate game-aware in code - trading minimums apply only to trading-typed conditions, cross-game badges get a contests-played counter any game satisfies - which unblocks ~35-40 existing badges with **no data rewrite and no operator tuning overwritten**; **R96b** authors game badges and is content needing owner input. **The admin copy of the evaluator is 221 lines behind** (**R100**) - no stats cache, unbounded queries, sequential fetches, no category filter, and **no `typeof userId !== "string"` check** - which matters because the unauthenticated `trigger-badge-evaluation` route reaches **that** copy; `check:mirrors` compares models and has never had an opinion about it. **Both copies go to full parity in R96a** |
 | **Player screens** | **R37 closed 6 Sep 2026, and it is the one to read first if a provider board looks odd.** Neither app's `getCompetitionLeaderboard` passed `score` or `scoreDirection` to the ranking engine, so **every provider participant tied on zero and the board rendered in tie-break order** - and a lower-is-better title was *reversed on screen while correct at settlement*, so a player could lead all week and be paid last. **Latent for money, live for players:** settlement resolves both fields itself, so no payout was ever wrong and **nothing was backfilled**. Fixed by moving `resolveScoreDirection` out of settlement into a shared mirrored module used by all three consumers. Same day, `RoundPreflight` stopped offering an enabled **Play** button on a contest that had not started, and **the lobby became game-aware** - `app/(root)/competitions/[id]/page.tsx` now branches to `ProviderContestLobby`, which shows the play window, attempts remaining and what happens if a round never finishes, with a score leaderboard instead of one whose columns are profit and loss. The trading path below the branch is **byte-identical**. Also 6 Sep 2026, **the dashboard contest cards became game-aware** (`13` s5.1a) - and the load-bearing part is that **the plan named the wrong components**: `ActiveCompetitionCard` and `CompetitionsTable` are both orphaned, and the live one is `ContestsSidebar`, which no chapter mentioned. Fixing only what the plan named would have closed the item with the defect still on screen. See `13` s4.1a and s5.1a for exactly what is and is not built - **the trading panels, the per-game summary cards and the mega-action split are still outstanding**. Finally, on **owner instruction 6 Sep 2026, BOTH lobbies were rebuilt on one design kit** (`13` s4.1d) - `components/neon/`, from a component sheet the owner supplied, with four generated hero banners. This **superseded s4.1c of the same morning, which had made the game lobby match the trading lobby**: the sheet is now the reference and the trading lobby is one of the two screens that moved to meet it, so a document citing s4.1c's gold hero or its 3D icon rule as current is stale. The trading page is **down from 1,224 lines to 377**, with its hero, sidebar, accordions and prize table extracted into `components/trading/lobby/`, and its nine always-open sidebar cards are now four open items and six accordions - **what stayed open is pinned by a test**, because burying a decision a trader acts on is the same class of error as an aggregate that quietly means trading only. The consistency guard changed shape with it: **one definition, and no screen has chrome of its own**, because pairwise class-string comparison does not survive the sheet's seven screens. The cost is stated rather than glossed - **the trading page is no longer byte-identical**, so the money calculation was extracted whole and four of its expressions are asserted character for character. **Neither lobby has been seen by eye**; both are behind sign-in and the automated browser has no session, so owner review is the remaining step |
 | **First round crossed the wall** | **7 September 2026.** A round now travels between the two halves: created by the platform, played by real moves, scored by the service, delivered back **signed over a real socket**, ingested through all eleven gates and **paid out as real prize money**. `__tests__/games/end-to-end-round.test.ts`, `npm run test:e2e-round`, three tests, three probes red. **This closes the gap 4.1a names** - the adapter's 49 tests run against a *stubbed* `fetch` and the service's 167 run in-process, so neither could ever fail because the other side disagreed. **Two things are substituted and must not be glossed:** the Next routing layer (the callback goes to a bare `node:http` server that does exactly what the real route does - read raw bytes, call the one ingestion function) and the browser. **It is still not the acceptance criterion**, which says *by clicking* - that needs two sessions this environment cannot create, so it is a runbook in `21` s4.1e. **And the finding is that there was no finding:** every earlier phase produced live defects on contact and the first real round produced none in the product. The three it did surface were in the new test driver and the map it was written from |
 | **The play surface itself** | **Rebuilt 7 Sep 2026** (`21` s4.1f) on the owner's report that the board was small and ugly, had no instructions, and had a bad result screen. All three were true and **none was findable by any test here**, because all three lived in `app.js`, which touches `document` at module scope and therefore cannot be imported. **The board was stuck at its minimum cell size by a feedback loop**: the frame reported its own `scrollHeight`, the stylesheet sizes the page to `100dvh` - inside an iframe, the iframe's own height - so the game measured the frame and the platform sized the frame to the measurement, agreeing on the host's 320-pixel floor. Cells went **34 -> 75** once the height became a request derived from the grid. **The result screen's heading was a lookup on the status**, and `completed` covers both a clock expiring and a Perfect player finishing every board, so **the player who had done everything the game asked was congratulated for running out of time**. And **the rules had two homes** - markup and each title's `howToPlay` - which had already drifted; they now live in `src/games/instructions.ts` and reach the frame in the round state, along with `title` and the previously-absent `scoring`, without which a player in a paid contest could not tell from inside the game whether a fast board beat a finished one. The numbers and wording moved into `public/play/presentation.js` so they could be asserted at all: **196 tests, 19 probes**, and **verified by eye on both titles** at desktop and phone sizes - which the platform's own lobbies could not be, being behind sign-in |
@@ -826,6 +828,110 @@ Newest at the top.
 **Deferred:** what was consciously left for later
 **Next chat should:** the single clearest next action
 ```
+
+---
+
+### 16 Sep 2026 - NINETY-NINE ADMIN ROUTES WITH NO AUTHORIZATION, AND THE SEVEN RISKS NOBODY HAD NUMBERED (R101 OPEN, R95/R97/R98 CLOSED)
+
+**Shipped:** documentation only in this entry. **No code.** What it records is a sweep, seven
+register entries that did not exist, and a re-ordering of the next three pieces of work.
+
+**Why there are seven new numbers at once, which is itself the finding.** R94 closed this
+morning and **three defects surfaced underneath it**; R96, R99 and R100 came out of scoping
+the badge gate this afternoon; R101 came out of one line of R96's groundwork. **None of the
+seven had a register entry, and R94's own row still said OPEN** although the commit that
+closed it (`385c86a2`) had already landed. The register max was R94 and I had been calling
+things R95 through R100 in conversation for hours, which means **every one of those numbers
+was unallocated and any of them could have been handed to a different defect by the next
+chat.** The rule already in the register - check the next free number before adding a risk -
+covers the case where you are *adding* one; this was the case where six had accumulated
+without being written down at all. **A number used in conversation is not a registered
+risk**, and the gap between the two is exactly where two defects end up sharing an id.
+
+**R101, and it is the reason R96 stopped.** `apps/admin` has **no `middleware.ts`** of its
+own - the root one belongs to the main app and never runs for these routes - so every route
+must guard itself. Over all 347 `route.ts` files, comments stripped: **189** call a guard and
+can refuse, **58** call one whose result may not be used, **1** authenticates by secret
+header, and **99 call none of the app's nine auth helpers at all**, of which **61 write** -
+three of those being legitimately public login routes, so **58** unauthenticated writers
+that should not be.
+
+**The worst is `PATCH /api/users/edit`, and the order of its lines is the whole defect.** It
+writes the user document at line 121 and calls `getAdminSession()` at line 137 - the first
+and only mention of a session - **to attribute an audit entry**, inside a `try/catch` that
+swallows and behind an `if (admin)` that skips the log when there is no session. `role` is
+settable and `"admin"` is valid. So an anonymous `PATCH` promotes any account to
+administrator, **and the absence of a session is precisely the condition under which nothing
+is logged**: the one artefact an operator would check is the one the defect suppresses. Same
+shape as **R85**, whose idempotency guard kept clean exactly the collection somebody would
+inspect.
+
+**Three things about how it was found, and the second one is the transferable one.**
+
+- Found by **counting exported handlers against guard calls**, never by reading routes.
+  Reading is the wrong instrument: every neighbour having a guard is what carries a reader
+  past the file that has none.
+- **My first count of 143 was wrong and is corrected rather than quietly restated.** The
+  sweep searched three helper names; the app exports **nine**. What exposed it was reading
+  one file by hand and finding it called a helper the scan had never heard of. **A scan is a
+  hypothesis until one of its answers is checked by hand** - and note the direction: the
+  narrow scan **overstated the count** while **understating the severity**, because the file
+  it filed as merely unguarded is the privilege escalation.
+- **Three of the write routes are legitimately public** (`auth/login`,
+  `gamemaster-auth/login`, `gamemaster-auth/logout`), so the honest figure is **59, not 62**.
+  `classify, never merely count`, and a security finding that inflates itself is the one
+  nobody believes the second time.
+
+**This is the ELEVENTH instance of the class**, after Prerequisite A, the internal-secret
+fallbacks, the suspicion-score route, the provider admin routes, the contest-edit `PUT`, R40,
+R47, R51, R57 and **R89**. The difference is the part worth carrying: **every previous
+instance fixed the routes it happened to be looking at.** R89 used this exact method three
+weeks ago, found four, fixed four. Nobody pointed it at the directory. **When a defect
+recurs eleven times the outstanding work is not another instance - it is the sweep nobody ran
+and the test nobody wrote**, which is why R101d is the part that lasts.
+
+**R96 is deferred behind it, on ordering rather than effort.** `/api/badges` full CRUD is
+anonymously callable, so **the badge gate's own data is world-writable**, and carefully
+tuning a gate whose storage is unguarded is the wrong order of work. Two further findings
+came out of measuring that gate. **It has four sources, not one** - `RARITY_MIN_REQUIREMENTS`
+in code, `condition.minTrades` in `lib/constants/badges.ts`, `minCompletedCompetitions`
+(trading-only by construction), and **`data/defaults/badges.json`, which holds 134 badges
+against the constants' 128, is operator-tuned, and is what a fresh seed actually installs**
+(**R99**). Measuring against the constants alone would have been wrong by six badges and
+every threshold. And **the admin copy of the evaluator is 221 lines behind** the main app's
+(**R100**), missing the stats cache, the query limits, the category filter and the
+`typeof userId !== "string"` check - which matters because the unauthenticated
+`trigger-badge-evaluation` route reaches **that** copy.
+
+**Measured, not estimated:** **122 of 128 badges are unreachable without trading**, and one
+of the remaining six is unreachable for an unrelated reason, so a games-only player can earn
+**five**. The catalogue contains **zero** game badges.
+
+**Files touched:** `17-risk-register.md` - R94 row and detail closed, **new rows R95, R96,
+R97, R98, R99, R100, R101**, new detail sections for **R101** and **R96**;
+`PROGRESS.md` (this entry, the status block, the task table); the internal HTML.
+
+**Deviated from plan:** the plan for today was R96a. It stopped at the groundwork because one
+grep for an authorization guard on `trigger-badge-evaluation` returned nothing and the sweep
+that followed found a hundred more. **Recorded rather than absorbed**, because "I went to
+open the badge gate and found the admin API unauthenticated" is the fact a new chat needs.
+
+**Owner tested:** nothing - documentation only.
+
+**Deferred:** R96a and R96b both, behind R101a and R100. R99's canonical-catalogue question
+needs an owner call.
+
+**Next chat should:** **R101a** - the escalation and user-data writers, `users/edit` first.
+Hours rather than days: `guardSection` exists and the change is one import and three lines
+per handler. Then **R101b**, the 58 read individually - most are fine, since `guardSection`
+returns a response object rather than a literal `status: 401`, which is why a refusal-shaped
+scan cannot see them; look at `users/credit`, `users/delete`,
+`competitions/[id]/adjust-results`, `admin-funds`, `vat` and `vendor-payments` first, because
+those move money or destroy records. Then **R101c**, the exports. Then **R101d, which is the
+only part that outlives the fix**: extend `__tests__/helpers/route-guard-audit.ts` to read
+the whole `apps/admin/app/api` directory against an explicit allow-list with a reason per
+entry. **A sweep run today is a snapshot; a test that reads the directory is a tripwire**,
+and it is the difference between fixing 100 routes and fixing the reason there were 100.
 
 ---
 
