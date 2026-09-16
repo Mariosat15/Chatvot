@@ -4558,7 +4558,7 @@ same limit would refuse.
 
 ---
 
-### R101 - Ninety-nine admin routes with no authorization, and fifty-eight of them write - **R101a–R101q CLOSED 16 Sep 2026; helper-but-no-grant still open**
+### R101 - Ninety-nine admin routes with no authorization, and fifty-eight of them write - **R101a–R101r CLOSED 16 Sep 2026; helper-but-no-grant still open**
 
 **What it is.** `apps/admin` is a separate Next.js process with **no `middleware.ts` of its
 own**. The root `middleware.ts` belongs to the main app and never runs for these routes, so
@@ -4988,7 +4988,18 @@ assertion was file-wide and that route has two handlers (fourth cause); flipped 
 per-handler slices. Inventory after: **0 no-check / 0 hand-verified / 143 helper / 194
 section-granted**.
 
-**R101 remains open** on the **143 helper-but-no-grant** routes.
+**R101r CLOSED 16 September 2026.** Fraud helper folder: **21 newly guarded files**
+(22 under `fraud/` including `restrictions`, which was already section-granted in R101m;
+**28 handlers**). Calling screen is `FraudMonitoringSection` → `guardSection("fraud")`
+everywhere except `user-status`, which is also fetched from `UserFullDetailPanel` →
+`guardAnySection(["fraud", "users"])`. `CLOSED_FOLDERS` widened from
+`fraud/restrictions` to `fraud`. 6 new probes each red on exactly one failure — the
+suspicion-score wrong-section probe first came back green because `-First` left three of
+four handlers naming `fraud` and the file-wide `named.includes("fraud")` stayed satisfied
+(fourth cause); flipped to replace-all. Inventory after: **0 no-check / 0 hand-verified /
+122 helper / 215 section-granted**.
+
+**R101 remains open** on the **122 helper-but-no-grant** routes.
 
 ---
 

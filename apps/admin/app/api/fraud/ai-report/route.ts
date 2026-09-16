@@ -12,10 +12,10 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import OpenAI from "openai";
 import { connectToDatabase } from "@/database/mongoose";
 import { WhiteLabel } from "@/database/models/whitelabel.model";
-import { verifyAdminAuth } from "@/lib/admin/auth";
 import mongoose from "mongoose";
 
 // ─── OpenAI Config ──────────────────────────────────────────
@@ -279,10 +279,8 @@ Any caveats, edge cases, or things to watch for.`;
 // ─── Route Handler ──────────────────────────────────────────
 export async function POST(request: NextRequest) {
   try {
-    const admin = await verifyAdminAuth();
-    if (!admin.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("fraud");
+    if (!guard.ok) return guard.response;
 
     const body = await request.json();
     const { alert } = body;

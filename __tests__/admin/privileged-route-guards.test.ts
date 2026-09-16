@@ -166,7 +166,7 @@ const CLOSED_FOLDERS: { folder: string[]; section: string }[] = [
   { folder: ["recover-stats"], section: "database" },
   { folder: ["test-badge-models"], section: "database" },
   { folder: ["admin", "database"], section: "performance-simulator" },
-  { folder: ["fraud", "restrictions"], section: "fraud" },
+  { folder: ["fraud"], section: "fraud" },
   { folder: ["challenges"], section: "challenges" },
   { folder: ["market-status"], section: "competitions" },
   { folder: ["pexels"], section: "landing-pages" },
@@ -1393,6 +1393,60 @@ describe("R101q - dual-caller money helpers and vendors are section-granted", ()
     expect(slice.indexOf("sections.length === 0")).toBeLessThan(
       slice.indexOf("verifyAdminAuth"),
     );
+  });
+});
+
+
+describe("R101r - fraud/ is section-granted and nothing weaker", () => {
+  /*
+    Twenty-two files, twenty-eight handlers. FraudMonitoringSection (id fraud) owns
+    alerts, devices, investigation, settings, history and restrictions. user-status is
+    also fetched from UserFullDetailPanel (users), so it uses guardAnySection.
+    fraud/restrictions was already granted in R101m; the rest were admin-at-all.
+  */
+  const WEAKER =
+    /(getAdminSession|requireAdminAuth|verifyAdminAuth|verifyAdminToken|verifyAnyAuth|jwtVerify|getAdminJwtSecret)\s*\(|\bverify\s*\(/;
+
+  const dir = join(API, "fraud");
+  const files = findRouteFiles(dir);
+
+  it("covers twenty-two fraud route files", () => {
+    expect(files.length).toBe(22);
+  });
+
+  it("every fraud file names the fraud section grant and no weaker helper", () => {
+    const weaker: string[] = [];
+    const missingFraud: string[] = [];
+    let handlers = 0;
+    let guards = 0;
+
+    for (const file of files) {
+      const code = stripComments(readFileSync(file, "utf8"));
+      const name = file.slice(API.length + 1).replace(/\\/g, "/");
+      const named = guardedSections(code);
+
+      if (WEAKER.test(code)) weaker.push(name);
+      if (!named.includes("fraud")) missingFraud.push(name);
+      handlers += (code.match(handlerPattern()) ?? []).length;
+      guards += (code.match(guardCallPattern()) ?? []).length;
+    }
+
+    expect(weaker).toEqual([]);
+    expect(missingFraud).toEqual([]);
+    expect(handlers).toBe(28);
+    expect(guards).toBeGreaterThanOrEqual(handlers);
+  });
+
+  it("user-status accepts either the fraud or the users grant", () => {
+    // Reason: UserFullDetailPanel is granted by users; the fraud folder's CLOSED_FOLDERS
+    // walk still requires the fraud id to be named so a users-only grant does not hide
+    // behind a dual-caller path that forgot one half.
+    const code = stripComments(
+      readFileSync(join(API, "fraud", "user-status", "route.ts"), "utf8"),
+    );
+    expect(code).toMatch(/guardAnySection\s*\(\s*\[/);
+    const named = guardedSections(code);
+    expect(named).toEqual(expect.arrayContaining(["fraud", "users"]));
   });
 });
 

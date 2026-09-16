@@ -898,11 +898,64 @@ Invoke-Probe -Name 'vendors mark-paid closed folder loses grant' -File 'apps/adm
   -Replace2 '' `
   -ExpectTest 'and none of the closed folders leak an unguarded file'
 
+Write-Host "`n=== R101r probes ===`n"
+
+$FRAUD_ALERTS = 'apps/admin/app/api/fraud/alerts/route.ts'
+$FRAUD_USER = 'apps/admin/app/api/fraud/user-status/route.ts'
+$FRAUD_SCORE = 'apps/admin/app/api/fraud/suspicion-score/route.ts'
+$FRAUD_BAN = 'apps/admin/app/api/fraud/investigation/ban/route.ts'
+
+# 87. alerts unguarded - FraudMonitoringSection's list.
+Invoke-Probe -Name 'fraud alerts unguarded' -File $FRAUD_ALERTS -First `
+  -Find '    const guard = await guardSection("fraud");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'every fraud file names the fraud section grant and no weaker helper'
+
+# 88. user-status drops to users-only - locks FraudMonitoringSection out of its own folder.
+Invoke-Probe -Name 'fraud user-status users only' -File $FRAUD_USER `
+  -Find 'guardAnySection(["fraud", "users"])' `
+  -Replace 'guardSection("users")' `
+  -ExpectTest 'user-status accepts either the fraud or the users grant'
+
+# 89. suspicion-score wrong section - a neighbouring grant that compiles.
+# Reason: four handlers each name fraud; -First leaves three and the file-wide
+# `named.includes("fraud")` stays green (fourth cause). Replace every call.
+Invoke-Probe -Name 'fraud suspicion-score wrong section' -File $FRAUD_SCORE `
+  -Find 'guardSection("fraud")' `
+  -Replace 'guardSection("users")' `
+  -ExpectTest 'every fraud file names the fraud section grant and no weaker helper'
+
+# 90. investigation/ban unguarded - money-adjacent identity write.
+Invoke-Probe -Name 'fraud investigation ban unguarded' -File $FRAUD_BAN -First `
+  -Find '    const guard = await guardSection("fraud");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'every fraud file names the fraud section grant and no weaker helper'
+
+# 91. Closed-folder canary on the whole fraud/ tree.
+Invoke-Probe -Name 'fraud closed folder loses grant' -File $FRAUD_ALERTS -First `
+  -Find '    const guard = await guardSection("fraud");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'and none of the closed folders leak an unguarded file'
+
+# 92. Inventory canary - fraud leaves the helper frozen list.
+Invoke-Probe -Name 'fraud inventory stays section-granted' -File $FRAUD_ALERTS -First `
+  -Find '    const guard = await guardSection("fraud");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'no route under a closed folder is anything but section-granted'
+
 Write-Host ''
 Write-Host 'UNPROBED, with the reason: "finds no route in the no-check-of-any-kind class" and' -ForegroundColor DarkGray
 Write-Host '"finds no route in the hand-verified-no-grant class". Both are already green (empty' -ForegroundColor DarkGray
 Write-Host 'after R101m/R101n). Turning either red means adding a route in that class, which the' -ForegroundColor DarkGray
 Write-Host 'inventory ratchet also catches. The closed-folder leak check is the probeable guard.' -ForegroundColor DarkGray
-Write-Host 'Helper debt after R101q: 143. Remaining are helper-but-no-grant folders (fraud,' -ForegroundColor DarkGray
-Write-Host 'settings, marketplace, invoices, ...).' -ForegroundColor DarkGray
+Write-Host 'Helper debt after R101r: 122. Remaining are helper-but-no-grant folders (employees,' -ForegroundColor DarkGray
+Write-Host 'settings, marketplace, invoices, gamemaster, ...).' -ForegroundColor DarkGray
 Write-Host ''

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { SuspicionScoringService } from "@/lib/services/fraud/suspicion-scoring.service";
-import { verifyAdminAuth } from "@/lib/admin/auth";
 
 /**
  * GET /api/fraud/suspicion-score
@@ -13,14 +13,8 @@ import { verifyAdminAuth } from "@/lib/admin/auth";
 export async function GET(request: Request) {
   try {
     // Check admin auth
-    const admin = await verifyAdminAuth();
-
-    if (!admin.isAuthenticated) {
-      return NextResponse.json(
-        { success: false, message: "Unauthorized" },
-        { status: 401 },
-      );
-    }
+    const guard = await guardSection("fraud");
+    if (!guard.ok) return guard.response;
 
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get("userId");
@@ -114,14 +108,8 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     // Check admin auth
-    const admin = await verifyAdminAuth();
-
-    if (!admin.isAuthenticated) {
-      return NextResponse.json(
-        { success: false, message: "Unauthorized" },
-        { status: 401 },
-      );
-    }
+    const guard = await guardSection("fraud");
+    if (!guard.ok) return guard.response;
 
     const body = await request.json();
     const { userId, method, points, evidence } = body;
@@ -163,13 +151,8 @@ export async function POST(request: Request) {
  */
 export async function PUT(request: Request) {
   try {
-    const admin = await verifyAdminAuth();
-    if (!admin.isAuthenticated) {
-      return NextResponse.json(
-        { success: false, message: "Unauthorized" },
-        { status: 401 },
-      );
-    }
+    const guard = await guardSection("fraud");
+    if (!guard.ok) return guard.response;
 
     const body = await request.json();
     const { userId, alertId } = body;
@@ -216,14 +199,8 @@ export async function PUT(request: Request) {
 export async function DELETE(request: Request) {
   try {
     // Check admin auth
-    const admin = await verifyAdminAuth();
-
-    if (!admin.isAuthenticated) {
-      return NextResponse.json(
-        { success: false, message: "Unauthorized" },
-        { status: 401 },
-      );
-    }
+    const guard = await guardSection("fraud");
+    if (!guard.ok) return guard.response;
 
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get("userId");

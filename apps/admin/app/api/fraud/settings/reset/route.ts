@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import mongoose from "mongoose";
 import FraudSettings, {
   DEFAULT_FRAUD_SETTINGS,
 } from "@/database/models/fraud/fraud-settings.model";
-import { requireAdminAuth } from "@/lib/admin/auth";
 
 /**
  * POST /api/fraud/settings/reset
@@ -14,7 +14,8 @@ import { requireAdminAuth } from "@/lib/admin/auth";
  */
 export async function POST(request: Request) {
   try {
-    await requireAdminAuth();
+    const guard = await guardSection("fraud");
+    if (!guard.ok) return guard.response;
     await connectToDatabase();
 
     const body = await request.json().catch(() => ({}));

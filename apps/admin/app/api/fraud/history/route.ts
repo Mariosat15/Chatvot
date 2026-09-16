@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import mongoose from "mongoose";
 import { connectToDatabase } from "@/database/mongoose";
 import {
@@ -6,12 +7,12 @@ import {
   FraudActionType,
   ActionSeverity,
 } from "@/database/models/fraud/fraud-history.model";
-import { requireAdminAuth } from "@/lib/admin/auth";
 
 // GET - Fetch fraud history with filters
 export async function GET(request: NextRequest) {
   try {
-    await requireAdminAuth();
+    const guard = await guardSection("fraud");
+    if (!guard.ok) return guard.response;
     await connectToDatabase();
 
     const { searchParams } = new URL(request.url);
@@ -159,7 +160,9 @@ export async function GET(request: NextRequest) {
 // POST - Add manual entry to fraud history
 export async function POST(request: NextRequest) {
   try {
-    const auth = await requireAdminAuth();
+    const guard = await guardSection("fraud");
+    if (!guard.ok) return guard.response;
+    const auth = { isAuthenticated: true as const, adminId: guard.admin.id, email: guard.admin.email };
     await connectToDatabase();
 
     const body = await request.json();

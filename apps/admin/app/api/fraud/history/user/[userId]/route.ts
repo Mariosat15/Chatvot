@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import { FraudHistory } from "@/database/models/fraud/fraud-history.model";
-import { requireAdminAuth } from "@/lib/admin/auth";
 import mongoose from "mongoose";
 
 // GET - Fetch complete fraud history for a specific user
@@ -10,7 +10,8 @@ export async function GET(
   { params }: { params: Promise<{ userId: string }> },
 ) {
   try {
-    await requireAdminAuth();
+    const guard = await guardSection("fraud");
+    if (!guard.ok) return guard.response;
     await connectToDatabase();
 
     const { userId } = await params;

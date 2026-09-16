@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import mongoose from "mongoose";
 import { connectToDatabase } from "@/database/mongoose";
-import { requireAdminAuth } from "@/lib/admin/auth";
 import FraudAlert from "@/database/models/fraud/fraud-alert.model";
 import DeviceFingerprint from "@/database/models/fraud/device-fingerprint.model";
 import PaymentFingerprint from "@/database/models/fraud/payment-fingerprint.model";
@@ -32,7 +32,8 @@ const MAX_ITEMS = 100;
 
 export async function POST(request: Request) {
   try {
-    await requireAdminAuth();
+    const guard = await guardSection("fraud");
+    if (!guard.ok) return guard.response;
     await connectToDatabase();
 
     const body = await request.json().catch(() => ({}));

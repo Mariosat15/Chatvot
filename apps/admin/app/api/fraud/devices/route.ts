@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import DeviceFingerprint from "@/database/models/fraud/device-fingerprint.model";
-import { requireAdminAuth } from "@/lib/admin/auth";
 
 /**
  * GET /api/admin/fraud/devices
@@ -9,7 +9,8 @@ import { requireAdminAuth } from "@/lib/admin/auth";
  */
 export async function GET(request: Request) {
   try {
-    await requireAdminAuth();
+    const guard = await guardSection("fraud");
+    if (!guard.ok) return guard.response;
     await connectToDatabase();
 
     const { searchParams } = new URL(request.url);

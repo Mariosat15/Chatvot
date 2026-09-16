@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import { Admin } from "@/database/models/admin.model";
 import FraudAlert from "@/database/models/fraud/fraud-alert.model";
@@ -29,14 +29,9 @@ import bcrypt from "bcryptjs";
 export async function POST(request: NextRequest) {
   try {
     // Verify admin authentication
-    const adminAuth = await verifyAdminAuth();
-
-    if (!adminAuth.isAuthenticated) {
-      return NextResponse.json(
-        { success: false, message: "Unauthorized" },
-        { status: 401 },
-      );
-    }
+    const guard = await guardSection("fraud");
+    if (!guard.ok) return guard.response;
+    const adminAuth = { isAuthenticated: true as const, adminId: guard.admin.id, email: guard.admin.email };
 
     const { password } = await request.json();
 

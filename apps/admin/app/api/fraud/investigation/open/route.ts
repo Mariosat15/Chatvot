@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
-import { verifyAdminAuth } from "@/lib/admin/auth";
 import FraudAlert from "@/database/models/fraud/fraud-alert.model";
 import UserRestriction from "@/database/models/user-restriction.model";
 import { getUsersByIds } from "@/lib/utils/user-lookup";
@@ -38,13 +38,9 @@ import { normalizeReviewPacket } from "@/lib/services/fraud/review-packet";
  */
 export async function POST(request: NextRequest) {
   try {
-    const adminUser = await verifyAdminAuth();
-    if (!adminUser.isAuthenticated) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 },
-      );
-    }
+    const guard = await guardSection("fraud");
+    if (!guard.ok) return guard.response;
+    const adminUser = { isAuthenticated: true as const, adminId: guard.admin.id, email: guard.admin.email };
 
     const {
       alertId,

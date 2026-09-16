@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import mongoose from "mongoose";
-import { requireAdminAuth } from "@/lib/admin/auth";
 
 /**
  * POST /api/fraud/resolve-users
@@ -10,7 +10,8 @@ import { requireAdminAuth } from "@/lib/admin/auth";
  */
 export async function POST(request: Request) {
   try {
-    await requireAdminAuth();
+    const guard = await guardSection("fraud");
+    if (!guard.ok) return guard.response;
     await connectToDatabase();
 
     const body = await request.json();

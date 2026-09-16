@@ -72,9 +72,9 @@ const NO_CHECK_OF_ANY_KIND = [] as const;
 const HAND_VERIFIED_NO_GRANT = [] as const;
 
 /**
- * 143 routes that authenticate with a helper and never ask which sections the caller
- * holds. (Was 159 after R101p; R101q moved sixteen dual-caller / vendors routes into
- * section-granted.)
+ * 122 routes that authenticate with a helper and never ask which sections the caller
+ * holds. (Was 143 after R101q; R101r moved twenty-one fraud/ routes into section-granted.
+ * fraud/restrictions was already granted under R101m and was not in this frozen list.)
  */
 const HELPER_BUT_NO_GRANT = [
   "admin/backfill-ranks/route.ts",
@@ -126,27 +126,6 @@ const HELPER_BUT_NO_GRANT = [
   "employees/upgrade-super-admin/route.ts",
   "environment/route.ts",
   "finalize-challenges/route.ts",
-  "fraud/ai-report/route.ts",
-  "fraud/alerts/[id]/route.ts",
-  "fraud/alerts/route.ts",
-  "fraud/devices/actions/route.ts",
-  "fraud/devices/route.ts",
-  "fraud/history/route.ts",
-  "fraud/history/user/[userId]/route.ts",
-  "fraud/investigation/ban/route.ts",
-  "fraud/investigation/dismiss/route.ts",
-  "fraud/investigation/lift/route.ts",
-  "fraud/investigation/open/route.ts",
-  "fraud/investigation/suspend/route.ts",
-  "fraud/manual-check/route.ts",
-  "fraud/reset-alerts/route.ts",
-  "fraud/resolve-users/route.ts",
-  "fraud/settings/reset/route.ts",
-  "fraud/settings/route.ts",
-  "fraud/suspicion-score/route.ts",
-  "fraud/unrestrict/route.ts",
-  "fraud/update-restriction/route.ts",
-  "fraud/user-status/route.ts",
   "gamemaster/competitions/route.ts",
   "gamemaster/dashboard/route.ts",
   "gamemaster/earnings/route.ts",
@@ -220,9 +199,9 @@ const HELPER_BUT_NO_GRANT = [
   "tutorials/upload/init/route.ts",
   "tutorials/youtube/route.ts",
   "verify-password/route.ts",
-] as const;
+];
 
-/** Folders closed by R101aâ€“R101m. Nothing under these may appear in any debt list above. */
+/** Folders closed by R101a–R101r. Nothing under these may appear in any debt list above. */
 const CLOSED_FOLDERS = [
   "users",
   "ai",
@@ -243,14 +222,16 @@ const CLOSED_FOLDERS = [
   "tests",
   "admin/end-logic-tests",
   "admin/trading-tests",
-  // R101m. Singles and small clusters. fraud/restrictions only - the rest of fraud/ is
-  // helper-but-no-grant and belongs with that pass. admin/database for the same reason as
-  // the admin/*-tests entries above. challenges/ covers the already-granted list route too.
+  // R101m. Singles and small clusters. admin/database for the same reason as the
+  // admin/*-tests entries above. challenges/ covers the already-granted list route too.
+  // (fraud/restrictions was listed here alone until R101r closed the whole fraud/ folder.)
   "check-database",
   "recover-stats",
   "test-badge-models",
   "admin/database",
-  "fraud/restrictions",
+  // R101r. Whole fraud/ folder - FraudMonitoringSection. user-status is dual-caller
+  // (fraud|users) but still names fraud, so the folder walk holds.
+  "fraud",
   "challenges",
   "market-status",
   "pexels",
@@ -457,5 +438,8 @@ describe("R101d - the folders already closed stay closed", () => {
     expect(read("deposits/failed/route.ts")).toBe("section-granted");
     expect(read("chargebacks/route.ts")).toBe("section-granted");
     expect(read("chargebacks/lookup/route.ts")).toBe("section-granted");
+    expect(read("fraud/alerts/route.ts")).toBe("section-granted");
+    expect(read("fraud/user-status/route.ts")).toBe("section-granted");
+    expect(read("fraud/suspicion-score/route.ts")).toBe("section-granted");
   });
 });

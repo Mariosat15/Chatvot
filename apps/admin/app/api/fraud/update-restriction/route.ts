@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import UserRestriction from "@/database/models/user-restriction.model";
 import { Admin } from "@/database/models/admin.model";
@@ -11,7 +11,9 @@ import bcrypt from "bcryptjs";
  */
 export async function PUT(request: NextRequest) {
   try {
-    const auth = await requireAdminAuth();
+    const guard = await guardSection("fraud");
+    if (!guard.ok) return guard.response;
+    const auth = { isAuthenticated: true as const, adminId: guard.admin.id, email: guard.admin.email };
 
     const {
       restrictionId,

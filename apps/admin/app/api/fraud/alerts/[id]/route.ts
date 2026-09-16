@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import FraudAlert from "@/database/models/fraud/fraud-alert.model";
-import { requireAdminAuth } from "@/lib/admin/auth";
 import { FraudHistoryService } from "@/lib/services/fraud/fraud-history.service";
 import { getUsersByIds } from "@/lib/utils/user-lookup";
 
@@ -14,7 +14,9 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const auth = await requireAdminAuth();
+    const guard = await guardSection("fraud");
+    if (!guard.ok) return guard.response;
+    const auth = { isAuthenticated: true as const, adminId: guard.admin.id, email: guard.admin.email };
     await connectToDatabase();
 
     const { id } = await params;
@@ -133,7 +135,8 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    await requireAdminAuth();
+    const guard = await guardSection("fraud");
+    if (!guard.ok) return guard.response;
     await connectToDatabase();
 
     const { id } = await params;

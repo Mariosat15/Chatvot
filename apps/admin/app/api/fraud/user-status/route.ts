@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdminAuth } from "@/lib/admin/auth";
+import { guardAnySection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import FraudAlert from "@/database/models/fraud/fraud-alert.model";
 import { SuspicionScoringService } from "@/lib/services/fraud/suspicion-scoring.service";
@@ -11,7 +11,8 @@ import { SuspicionScoringService } from "@/lib/services/fraud/suspicion-scoring.
  */
 export async function GET(request: NextRequest) {
   try {
-    await requireAdminAuth();
+    const guard = await guardAnySection(["fraud", "users"]);
+    if (!guard.ok) return guard.response;
     await connectToDatabase();
 
     const userId = request.nextUrl.searchParams.get("userId");
