@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { aiKnowledgeService } from "@/lib/services/ai-knowledge.service";
 import { PLATFORM_KNOWLEDGE_BASE } from "@/lib/ai-agent/knowledge-base";
 import {
@@ -11,7 +11,9 @@ import { AIKnowledgeSource } from "@/database/models/ai-knowledge.model";
 // POST - Index the built-in help/wiki content
 export async function POST(request: NextRequest) {
   try {
-    const admin = await requireAdminAuth();
+    const guard = await guardSection("ai-knowledge");
+    if (!guard.ok) return guard.response;
+    const admin = guard.admin;
 
     const body = await request.json().catch(() => ({}));
     const { force = false, type = "all" } = body; // type: 'admin', 'customer', 'all'
@@ -45,7 +47,7 @@ export async function POST(request: NextRequest) {
             category: "Admin",
             tags: ["admin", "internal", "guide", "documentation"],
           },
-          createdBy: admin.adminId || "system",
+          createdBy: admin.id || "system",
         });
         results.admin = { alreadyIndexed: false, source: adminSource };
       }
@@ -92,7 +94,7 @@ export async function POST(request: NextRequest) {
             category: "Customer Support",
             tags: ["faq", "customer", "support", "help", "dynamic"],
           },
-          createdBy: admin.adminId || "system",
+          createdBy: admin.id || "system",
         });
         results.customer = {
           alreadyIndexed: false,
@@ -127,7 +129,8 @@ export async function POST(request: NextRequest) {
 // GET - Check if help is indexed
 export async function GET() {
   try {
-    await requireAdminAuth();
+    const guard = await guardSection("ai-knowledge");
+    if (!guard.ok) return guard.response;
 
     const [adminSource, customerSource] = await Promise.all([
       AIKnowledgeSource.findOne({

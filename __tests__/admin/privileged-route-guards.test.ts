@@ -218,6 +218,12 @@ const CLOSED_FOLDERS: { folder: string[]; section: string }[] = [
   { folder: ["tutorials", "youtube"], section: "tutorials" },
   { folder: ["tutorials", "[id]"], section: "tutorials" },
   /*
+    R101w. AIKnowledgeSection → ai-knowledge. Seven files, twelve handlers across the
+    whole tree: list/create, per-id GET/PUT/DELETE, index-help, scrape, search, settings,
+    upload. AIKnowledgeSection is the only caller.
+  */
+  { folder: ["ai-knowledge"], section: "ai-knowledge" },
+  /*
     R101o. Money writers first among helper-but-no-grant. FinancialDashboard → financial
     (admin-funds, vat, vendor-payments, atlas/*); PendingWithdrawalsSection →
     pending-withdrawals (withdrawals/). admin-bank-accounts deferred - dual callers on
@@ -1728,6 +1734,54 @@ describe("R101v - tutorials helpers are section-granted", () => {
     expect(guardedSections(code)).toEqual(["tutorials", "tutorials"]);
     expect((code.match(handlerPattern()) ?? []).length).toBe(2);
     expect((code.match(guardCallPattern()) ?? []).length).toBe(2);
+  });
+});
+
+describe("R101w - ai-knowledge helpers are section-granted", () => {
+  /*
+    Seven files, twelve handlers. AIKnowledgeSection is the only caller. Writers create,
+    update and delete knowledge sources that feed the admin and customer AI agents.
+  */
+  const WEAKER =
+    /(getAdminSession|requireAdminAuth|verifyAdminAuth|verifyAdminToken|verifyAnyAuth|jwtVerify|getAdminJwtSecret)\s*\(|\bverify\s*\(/;
+
+  const knowledgeFiles = findRouteFiles(join(API, "ai-knowledge"));
+
+  it("covers the whole ai-knowledge/ tree", () => {
+    expect(knowledgeFiles.length).toBe(7);
+  });
+
+  it("every ai-knowledge handler names the ai-knowledge grant and no weaker helper", () => {
+    const weaker: string[] = [];
+    const missing: string[] = [];
+    let handlers = 0;
+    let guards = 0;
+
+    for (const file of knowledgeFiles) {
+      const code = stripComments(readFileSync(file, "utf8"));
+      const name = file.slice(API.length + 1).replace(/\\/g, "/");
+      const named = guardedSections(code);
+      if (WEAKER.test(code)) weaker.push(name);
+      if (!named.includes("ai-knowledge")) missing.push(name);
+      handlers += (code.match(handlerPattern()) ?? []).length;
+      guards += (code.match(guardCallPattern()) ?? []).length;
+    }
+
+    expect(weaker).toEqual([]);
+    expect(missing).toEqual([]);
+    expect(handlers).toBe(12);
+    expect(guards).toBeGreaterThanOrEqual(handlers);
+  });
+
+  it("index-help attributes createdBy from the guard, not a follow-up session", () => {
+    // Reason: getAdminSession after a successful guard is the R101b shape — it reads as
+    // attribution while performing none when the guard is later removed.
+    const code = stripComments(
+      readFileSync(join(API, "ai-knowledge", "index-help", "route.ts"), "utf8"),
+    );
+    expect(code).toMatch(/guard\.admin/);
+    expect(code).toMatch(/createdBy:\s*admin\.id/);
+    expect(code).not.toMatch(/getAdminSession\s*\(/);
   });
 });
 

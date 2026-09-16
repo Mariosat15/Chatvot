@@ -4558,7 +4558,7 @@ same limit would refuse.
 
 ---
 
-### R101 - Ninety-nine admin routes with no authorization, and fifty-eight of them write - **R101a–R101v CLOSED 16 Sep 2026; helper-but-no-grant still open**
+### R101 - Ninety-nine admin routes with no authorization, and fifty-eight of them write - **R101a–R101w CLOSED 16 Sep 2026; helper-but-no-grant still open**
 
 **What it is.** `apps/admin` is a separate Next.js process with **no `middleware.ts` of its
 own**. The root `middleware.ts` belongs to the main app and never runs for these routes, so
@@ -5031,7 +5031,15 @@ streamers stay **public-by-design**; closed-folder leak checks now exclude
 exactly one failure. Inventory after:
 **0 no-check / 0 hand-verified / 96 helper / 241 section-granted**.
 
-**R101 remains open** on the **96 helper-but-no-grant** routes.
+**R101w CLOSED 16 September 2026.** AI knowledge helpers: **7 files, 12 handlers**.
+`AIKnowledgeSection` → `guardSection("ai-knowledge")` on the whole tree (list/create,
+`[id]` GET/PUT/DELETE, index-help, scrape, search, settings, upload). Writers attribute
+`createdBy` from `guard.admin.id` (not the old `adminId` field `requireAdminAuth` exposed).
+6 new probes each red on exactly one failure — closed-folder / inventory canaries aimed at
+single-handler `search`. Inventory after:
+**0 no-check / 0 hand-verified / 89 helper / 248 section-granted**.
+
+**R101 remains open** on the **89 helper-but-no-grant** routes.
 
 ---
 

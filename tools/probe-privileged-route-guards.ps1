@@ -1175,3 +1175,55 @@ Write-Host ''
 Write-Host 'Helper debt after R101v: 96. Remaining are helper-but-no-grant folders (settings,' -ForegroundColor DarkGray
 Write-Host 'gamemaster, ai-knowledge, ...).' -ForegroundColor DarkGray
 Write-Host ''
+
+Write-Host "`n=== R101w probes ===`n"
+
+$AK_ROOT = 'apps/admin/app/api/ai-knowledge/route.ts'
+$AK_SEARCH = 'apps/admin/app/api/ai-knowledge/search/route.ts'
+$AK_INDEX = 'apps/admin/app/api/ai-knowledge/index-help/route.ts'
+
+Invoke-Probe -Name 'ai-knowledge search unguarded' -File $AK_SEARCH `
+  -Find '    const guard = await guardSection("ai-knowledge");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'every ai-knowledge handler names the ai-knowledge grant and no weaker helper'
+
+Invoke-Probe -Name 'ai-knowledge search wrong section' -File $AK_SEARCH `
+  -Find 'guardSection("ai-knowledge")' `
+  -Replace 'guardSection("marketplace")' `
+  -ExpectTest 'every ai-knowledge handler names the ai-knowledge grant and no weaker helper'
+
+Invoke-Probe -Name 'ai-knowledge index weaker helper' -File $AK_INDEX `
+  -Find 'import { guardSection } from "@/lib/admin/section-route-guard";' `
+  -Replace "import { guardSection } from `"@/lib/admin/section-route-guard`";`nimport { requireAdminAuth } from `"@/lib/admin/auth`";" `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 "    if (!guard.ok) return guard.response;`n    await requireAdminAuth();" `
+  -ExpectTest 'every ai-knowledge handler names the ai-knowledge grant and no weaker helper'
+
+Invoke-Probe -Name 'ai-knowledge root one handler unguarded' -File $AK_ROOT -First `
+  -Find '    const guard = await guardSection("ai-knowledge");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'every ai-knowledge handler names the ai-knowledge grant and no weaker helper'
+
+Invoke-Probe -Name 'ai-knowledge search closed folder loses grant' -File $AK_SEARCH `
+  -Find '    const guard = await guardSection("ai-knowledge");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'and none of the closed folders leak an unguarded file'
+
+Invoke-Probe -Name 'ai-knowledge search inventory stays section-granted' -File $AK_SEARCH `
+  -Find '    const guard = await guardSection("ai-knowledge");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -SuiteFile '__tests__/admin/admin-route-auth-inventory.test.ts' `
+  -ExpectTest 'no route under a closed folder is anything but section-granted'
+
+Write-Host ''
+Write-Host 'Helper debt after R101w: 89. Remaining are helper-but-no-grant folders (settings,' -ForegroundColor DarkGray
+Write-Host 'gamemaster, announcements, ...).' -ForegroundColor DarkGray
+Write-Host ''

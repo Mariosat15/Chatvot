@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { aiKnowledgeService } from "@/lib/services/ai-knowledge.service";
 
 // GET - Fetch knowledge sources and stats
 export async function GET(request: NextRequest) {
   try {
-    const admin = await requireAdminAuth();
+    const guard = await guardSection("ai-knowledge");
+    if (!guard.ok) return guard.response;
+    const admin = guard.admin;
 
     const searchParams = request.nextUrl.searchParams;
     const type = searchParams.get("type") as any;
@@ -42,7 +44,9 @@ export async function GET(request: NextRequest) {
 // POST - Create new knowledge source (manual text or URL)
 export async function POST(request: NextRequest) {
   try {
-    const admin = await requireAdminAuth();
+    const guard = await guardSection("ai-knowledge");
+    if (!guard.ok) return guard.response;
+    const admin = guard.admin;
 
     const body = await request.json();
     const { name, type, content, websiteUrl, metadata, audience } = body;
@@ -81,7 +85,7 @@ export async function POST(request: NextRequest) {
       content: type === "manual" ? content : undefined,
       websiteUrl: type === "url" ? websiteUrl : undefined,
       metadata,
-      createdBy: admin.adminId || "system",
+      createdBy: admin.id || "system",
     });
 
     return NextResponse.json({

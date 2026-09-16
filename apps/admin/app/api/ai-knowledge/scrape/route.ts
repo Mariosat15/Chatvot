@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import dns from "dns/promises";
-import { requireAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { aiKnowledgeService } from "@/lib/services/ai-knowledge.service";
 import { isValidSsrfUrl } from "@/lib/utils/url-validator";
 import DOMPurify from "isomorphic-dompurify";
@@ -36,7 +36,9 @@ function isBlockedHost(hostname: string): boolean {
 // POST - Scrape a URL and add to knowledge base
 export async function POST(request: NextRequest) {
   try {
-    const admin = await requireAdminAuth();
+    const guard = await guardSection("ai-knowledge");
+    if (!guard.ok) return guard.response;
+    const admin = guard.admin;
 
     const body = await request.json();
     const {
@@ -149,7 +151,7 @@ export async function POST(request: NextRequest) {
         description: description || extractDescriptionFromHtml(html),
         category: category || "General",
       },
-      createdBy: admin.adminId || "system",
+      createdBy: admin.id || "system",
     });
 
     return NextResponse.json({

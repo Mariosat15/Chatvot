@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { aiKnowledgeService } from "@/lib/services/ai-knowledge.service";
 
 // POST - Search knowledge base
 export async function POST(request: NextRequest) {
   try {
-    await requireAdminAuth();
+    const guard = await guardSection("ai-knowledge");
+    if (!guard.ok) return guard.response;
 
     const body = await request.json();
     const { query, maxResults, threshold, category, sourceTypes } = body;

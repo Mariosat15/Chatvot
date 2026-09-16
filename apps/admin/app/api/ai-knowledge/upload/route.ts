@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { aiKnowledgeService } from "@/lib/services/ai-knowledge.service";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
@@ -18,7 +18,9 @@ const SUPPORTED_TYPES = {
 // POST - Upload document for processing
 export async function POST(request: NextRequest) {
   try {
-    const admin = await requireAdminAuth();
+    const guard = await guardSection("ai-knowledge");
+    if (!guard.ok) return guard.response;
+    const admin = guard.admin;
 
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
@@ -108,7 +110,7 @@ export async function POST(request: NextRequest) {
         category,
         tags: tags ? tags.split(",").map((t) => t.trim()) : [],
       },
-      createdBy: admin.adminId || "system",
+      createdBy: admin.id || "system",
     });
 
     return NextResponse.json({

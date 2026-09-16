@@ -72,9 +72,8 @@ const NO_CHECK_OF_ANY_KIND = [] as const;
 const HAND_VERIFIED_NO_GRANT = [] as const;
 
 /**
- * 96 routes that authenticate with a helper and never ask which sections the caller
- * holds. (Was 103 after R101u; R101v moved seven tutorials/ helpers into section-granted.
- * The two tutorials/videos/* asset routes stay public-by-design.)
+ * 89 routes that authenticate with a helper and never ask which sections the caller
+ * holds. (Was 96 after R101v; R101w moved seven ai-knowledge/ helpers into section-granted.)
  */
 const HELPER_BUT_NO_GRANT = [
   "admin/backfill-ranks/route.ts",
@@ -84,13 +83,6 @@ const HELPER_BUT_NO_GRANT = [
   "ai-agent/audit/route.ts",
   "ai-agent/chat/route.ts",
   "ai-agent/config/route.ts",
-  "ai-knowledge/[id]/route.ts",
-  "ai-knowledge/index-help/route.ts",
-  "ai-knowledge/route.ts",
-  "ai-knowledge/scrape/route.ts",
-  "ai-knowledge/search/route.ts",
-  "ai-knowledge/settings/route.ts",
-  "ai-knowledge/upload/route.ts",
   "announcements/[id]/route.ts",
   "announcements/ai-generate/route.ts",
   "announcements/route.ts",
@@ -175,7 +167,7 @@ const HELPER_BUT_NO_GRANT = [
   "verify-password/route.ts",
 ];
 
-/** Folders closed by R101a–R101v. Nothing under these may appear in any debt list above. */
+/** Folders closed by R101a–R101w. Nothing under these may appear in any debt list above. */
 const CLOSED_FOLDERS = [
   "users",
   "ai",
@@ -252,6 +244,8 @@ const CLOSED_FOLDERS = [
   // R101v. TutorialsSection owns the helpers; tutorials/videos/* stay public-by-design
   // (asset streamers) and are excluded from the closed-folder leak check below.
   "tutorials",
+  // R101w. AIKnowledgeSection owns the whole ai-knowledge/ tree.
+  "ai-knowledge",
 ];
 
 const findings = inventoryAdminRoutes();

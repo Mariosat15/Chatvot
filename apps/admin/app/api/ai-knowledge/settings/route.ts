@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { aiKnowledgeService } from "@/lib/services/ai-knowledge.service";
 
 // GET - Get settings
 export async function GET() {
   try {
-    await requireAdminAuth();
+    const guard = await guardSection("ai-knowledge");
+    if (!guard.ok) return guard.response;
 
     const settings = await aiKnowledgeService.getSettings();
 
@@ -28,7 +29,8 @@ export async function GET() {
 // PUT - Update settings
 export async function PUT(request: NextRequest) {
   try {
-    await requireAdminAuth();
+    const guard = await guardSection("ai-knowledge");
+    if (!guard.ok) return guard.response;
 
     const body = await request.json();
     const {
