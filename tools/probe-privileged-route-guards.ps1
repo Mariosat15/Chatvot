@@ -690,9 +690,54 @@ Invoke-Probe -Name 'restrictions closed folder loses grant' -File $RESTRICTIONS 
   -Replace2 '' `
   -ExpectTest 'and none of the closed folders leak an unguarded file'
 
+$AVAIL = 'apps/admin/app/api/employees/availability/route.ts'
+$RISK = 'apps/admin/app/api/trading-risk-settings/route.ts'
+$MARGIN = 'apps/admin/app/api/trigger-margin-check/route.ts'
+
+Write-Host "`n=== R101n probes ===`n"
+
+# 64. availability PUT was hand-verified only - MessagingSection owns the toggle.
+# Reason: -First keeps blast to one of two identical guard lines.
+Invoke-Probe -Name 'availability unguarded' -File $AVAIL -First `
+  -Find '    const guard = await guardSection("messaging");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'every R101n file names its section grant'
+
+# 65. Wrong grant on availability - messaging, not employees/users.
+Invoke-Probe -Name 'availability wrong section' -File $AVAIL -First `
+  -Find 'guardSection("messaging")' `
+  -Replace 'guardSection("users")' `
+  -ExpectTest 'every R101n file names its section grant'
+
+# 66. trading-risk-settings POST was hand-verified only - rewrites live margin thresholds.
+Invoke-Probe -Name 'risk-settings unguarded' -File $RISK -First `
+  -Find '    const guard = await guardSection("trading-risk");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'every R101n file names its section grant'
+
+# 67. trigger-margin-check liquidates positions - orphan, shares trading-risk by domain.
+Invoke-Probe -Name 'margin-check unguarded' -File $MARGIN `
+  -Find '    const guard = await guardSection("trading-risk");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'every R101n file names its section grant'
+
+# 68. Folder-level canary on a single-handler R101n file.
+Invoke-Probe -Name 'margin-check closed folder loses grant' -File $MARGIN `
+  -Find '    const guard = await guardSection("trading-risk");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'and none of the closed folders leak an unguarded file'
+
 Write-Host ''
-Write-Host 'UNPROBED, with the reason: "finds no route in the no-check-of-any-kind class".' -ForegroundColor DarkGray
-Write-Host 'That assertion is already green (no-check is empty after R101m). Turning it red means' -ForegroundColor DarkGray
-Write-Host 'adding a new unguarded route, which the inventory ratchet also catches. The closed-folder' -ForegroundColor DarkGray
-Write-Host 'leak check above is the probeable regression guard for folders already finished.' -ForegroundColor DarkGray
+Write-Host 'UNPROBED, with the reason: "finds no route in the no-check-of-any-kind class" and' -ForegroundColor DarkGray
+Write-Host '"finds no route in the hand-verified-no-grant class". Both are already green (empty' -ForegroundColor DarkGray
+Write-Host 'after R101m/R101n). Turning either red means adding a route in that class, which the' -ForegroundColor DarkGray
+Write-Host 'inventory ratchet also catches. The closed-folder leak check is the probeable guard.' -ForegroundColor DarkGray
 Write-Host ''

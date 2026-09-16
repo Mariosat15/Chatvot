@@ -10,36 +10,20 @@
  */
 
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { jwtVerify } from "jose";
 import { revalidatePath } from "next/cache";
 import { connectToDatabase } from "@/database/mongoose";
 import TradingRiskSettings from "@/database/models/trading-risk-settings.model";
-import { getAdminJwtSecret } from "@/lib/admin/jwt-secret";
-
-const SECRET_KEY = new TextEncoder().encode(getAdminJwtSecret());
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 // GET - Load current risk settings
 export async function GET() {
   try {
-    // Verify admin authentication
-    const cookieStore = await cookies();
-    const token = cookieStore.get("admin_token"); // Use underscore to match auth system
+    // Reason: TradingRiskSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("trading-risk");
+    if (!guard.ok) return guard.response;
 
-    if (!token) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-    }
-
-    try {
-      await jwtVerify(token.value, SECRET_KEY);
-    } catch {
-      return NextResponse.json({ message: "Invalid token" }, { status: 401 });
-    }
-
-    // Connect to database
     await connectToDatabase();
 
-    // Get singleton settings
     const settings = await TradingRiskSettings.getSingleton();
 
     return NextResponse.json({
@@ -76,23 +60,10 @@ export async function GET() {
 // POST - Save risk settings
 export async function POST(req: Request) {
   try {
-    // Verify admin authentication
-    const cookieStore = await cookies();
-    const token = cookieStore.get("admin_token"); // Use underscore to match auth system
+    // Reason: TradingRiskSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("trading-risk");
+    if (!guard.ok) return guard.response;
 
-    if (!token) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-    }
-
-    let adminEmail: string;
-    try {
-      const { payload } = await jwtVerify(token.value, SECRET_KEY);
-      adminEmail = payload.email as string;
-    } catch {
-      return NextResponse.json({ message: "Invalid token" }, { status: 401 });
-    }
-
-    // Parse request body
     const body = await req.json();
 
     // Validate required fields
@@ -156,24 +127,17 @@ export async function POST(req: Request) {
       );
     }
 
-    // Connect to database
-    console.log("🔌 Connecting to database...");
     await connectToDatabase();
-    console.log("✅ Database connected");
 
-    // Update singleton settings
-    console.log("💾 Updating settings with data:", body);
     const settings = await TradingRiskSettings.updateSingleton({
       ...body,
-      updatedBy: adminEmail,
+      updatedBy: guard.admin.email,
     });
 
-    console.log("✅ Trading risk settings updated by:", adminEmail);
-    console.log("📊 Updated settings:", settings);
+    console.log("✅ Trading risk settings updated by:", guard.admin.email);
 
     // Revalidate all trading pages to apply new settings immediately
     revalidatePath("/competitions/[id]/trade", "page");
-    console.log("♻️ Revalidated cache - new settings will apply immediately");
 
     return NextResponse.json({
       success: true,

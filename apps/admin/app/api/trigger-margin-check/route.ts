@@ -2,39 +2,23 @@
  * Admin API to manually trigger margin checks and liquidate positions
  * below the configured stopout level
  *
- * GET /api/admin/trigger-margin-check
+ * GET /api/trigger-margin-check
  */
 
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { jwtVerify } from "jose";
 import { connectToDatabase } from "@/database/mongoose";
 import { checkMarginCalls } from "@/lib/actions/trading/position.actions";
 import Competition from "@/database/models/trading/competition.model";
-import { getAdminJwtSecret } from "@/lib/admin/jwt-secret";
-
-const SECRET_KEY = new TextEncoder().encode(getAdminJwtSecret());
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 export async function GET() {
   try {
-    // Verify admin authentication
-    const cookieStore = await cookies();
-    const token = cookieStore.get("admin_token"); // Use underscore to match auth system
+    // Reason: no UI caller; margin liquidation belongs with TradingRiskSection's grant.
+    const guard = await guardSection("trading-risk");
+    if (!guard.ok) return guard.response;
 
-    if (!token) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-    }
-
-    try {
-      await jwtVerify(token.value, SECRET_KEY);
-    } catch {
-      return NextResponse.json({ message: "Invalid token" }, { status: 401 });
-    }
-
-    // Connect to database
     await connectToDatabase();
 
-    // Get all active competitions
     const activeCompetitions = await Competition.find({
       status: "active",
     })
@@ -52,8 +36,8 @@ export async function GET() {
     const results = [];
 
     for (const competition of activeCompetitions) {
-      const competitionId = String((competition as any)._id);
-      const competitionName = (competition as any).name;
+      const competitionId = String((competition as { _id: unknown })._id);
+      const competitionName = (competition as { name?: string }).name;
 
       try {
         await checkMarginCalls(competitionId);

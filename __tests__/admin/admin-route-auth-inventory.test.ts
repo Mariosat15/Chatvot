@@ -67,11 +67,9 @@ const NO_CHECK_OF_ANY_KIND = [] as const;
 /**
  * 3 routes that verify a JWT by hand and then ask nothing about grants.
  */
-const HAND_VERIFIED_NO_GRANT = [
-  "employees/availability/route.ts",
-  "trading-risk-settings/route.ts",
-  "trigger-margin-check/route.ts",
-] as const;
+// Reason: flipped empty 16 Sep 2026 (R101n). The three hand-verified routes are
+// section-granted; keeping a non-empty list here would silently re-permit the class.
+const HAND_VERIFIED_NO_GRANT = [] as const;
 
 /**
  * 180 routes that authenticate with a helper and never ask which sections the caller
@@ -463,7 +461,9 @@ describe("R101d - the folders already closed stay closed", () => {
     expect(read("check-database/route.ts")).toBe("section-granted");
     expect(read("messaging/settings/route.ts")).toBe("section-granted");
     expect(read("trading-history/export/route.ts")).toBe("section-granted");
-    expect(read("trading-risk-settings/route.ts")).toBe("hand-verified-no-grant");
+    expect(read("trading-risk-settings/route.ts")).toBe("section-granted");
+    expect(read("employees/availability/route.ts")).toBe("section-granted");
+    expect(read("trigger-margin-check/route.ts")).toBe("section-granted");
     expect(read("withdrawals/route.ts")).toBe("helper-no-grant");
   });
 });

@@ -1,29 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { verify } from "jsonwebtoken";
 import mongoose from "mongoose";
 import { connectToDatabase } from "@/database/mongoose";
-import { getAdminJwtSecret } from "@/lib/admin/jwt-secret";
-
-const JWT_SECRET = getAdminJwtSecret();
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 /**
  * GET /api/employees/availability
  * Get current employee's availability status
  */
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get("admin_token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const decoded = verify(token, JWT_SECRET) as {
-      adminId: string;
-      email: string;
-    };
+    // Reason: MessagingSection owns the availability toggle; section grant is the auth answer.
+    const guard = await guardSection("messaging");
+    if (!guard.ok) return guard.response;
 
     await connectToDatabase();
 
@@ -36,7 +24,7 @@ export async function GET(request: NextRequest) {
     }
 
     const employee = await db.collection("admins").findOne({
-      _id: new mongoose.Types.ObjectId(decoded.adminId),
+      _id: new mongoose.Types.ObjectId(guard.admin.id),
     });
 
     if (!employee) {
@@ -67,17 +55,9 @@ export async function GET(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get("admin_token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const decoded = verify(token, JWT_SECRET) as {
-      adminId: string;
-      email: string;
-    };
+    // Reason: MessagingSection owns the availability toggle; section grant is the auth answer.
+    const guard = await guardSection("messaging");
+    if (!guard.ok) return guard.response;
 
     const body = await request.json();
     const { isAvailable, reason, untilTime } = body;
@@ -92,7 +72,7 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const updateData: any = {
+    const updateData: Record<string, unknown> = {
       isAvailableForChat: isAvailable,
     };
 
@@ -111,17 +91,17 @@ export async function PUT(request: NextRequest) {
     await db
       .collection("admins")
       .updateOne(
-        { _id: new mongoose.Types.ObjectId(decoded.adminId) },
+        { _id: new mongoose.Types.ObjectId(guard.admin.id) },
         { $set: updateData },
       );
 
     // If becoming unavailable, redirect active conversations to another employee
     if (!isAvailable) {
-      await redirectActiveConversations(decoded.adminId, decoded.email);
+      await redirectActiveConversations(guard.admin.id, guard.admin.email);
     }
 
     console.log(
-      `📋 [Availability] ${decoded.email} is now ${isAvailable ? "AVAILABLE" : "UNAVAILABLE"}${reason ? `: ${reason}` : ""}`,
+      `📋 [Availability] ${guard.admin.email} is now ${isAvailable ? "AVAILABLE" : "UNAVAILABLE"}${reason ? `: ${reason}` : ""}`,
     );
 
     return NextResponse.json({

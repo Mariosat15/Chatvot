@@ -176,6 +176,15 @@ const CLOSED_FOLDERS: { folder: string[]; section: string }[] = [
   { folder: ["diagnose-user"], section: "users" },
   { folder: ["sync-missing-users"], section: "users" },
   { folder: ["update-competition-status"], section: "competitions" },
+  /*
+    R101n. The three hand-verified-token routes. Availability is under MessagingSection
+    (messaging grant) - scoped to employees/availability so the rest of employees/ stays
+    in helper-but-no-grant until that folder is closed. Risk settings and the orphan
+    margin-check trigger share TradingRiskSection's trading-risk grant.
+  */
+  { folder: ["employees", "availability"], section: "messaging" },
+  { folder: ["trading-risk-settings"], section: "trading-risk" },
+  { folder: ["trigger-margin-check"], section: "trading-risk" },
 ];
 
 describe("R101a - every handler in the closed folders is guarded, per handler", () => {
@@ -991,13 +1000,65 @@ describe("R101a - the badge routes, which are the data R96 widens", () => {
   });
 });
 
-describe("R101 - the no-check debt is closed; helper and hand-verified remain", () => {
+describe("R101n - the three hand-verified routes are section-granted", () => {
   /*
-    FLIPPED 16 Sep 2026 (R101m). This used to assert the tree still had routes with no
-    authorization call at all - a canary that went red when the no-check pile reached zero.
-    R101m closed the last fourteen. Public-by-design and hand-verified routes still call no
-    AUTH_CALL helper (they are a different class), so the lasting assertions use the inventory
-    classifier for the no-check pile and the closed-folder leak check for regressions.
+    Three files, five handlers. Hand-verified JWT refused a forgery correctly and never
+    asked which grant the holder held - the subtlest of the four auth classes. Grants from
+    calling screens: MessagingSection → messaging; TradingRiskSection → trading-risk;
+    trigger-margin-check has no UI caller and shares trading-risk by domain.
+  */
+  const WEAKER =
+    /(getAdminSession|requireAdminAuth|verifyAdminAuth|verifyAdminToken|verifyAnyAuth|jwtVerify|getAdminJwtSecret)\s*\(|\bverify\s*\(/;
+
+  const entries: { path: string[]; section: string; handlers: number }[] = [
+    { path: ["employees", "availability"], section: "messaging", handlers: 2 },
+    { path: ["trading-risk-settings"], section: "trading-risk", handlers: 2 },
+    { path: ["trigger-margin-check"], section: "trading-risk", handlers: 1 },
+  ];
+
+  it("covers three route trees", () => {
+    expect(entries.length).toBe(3);
+  });
+
+  it("every R101n file names its section grant and no weaker helper", () => {
+    const weaker: string[] = [];
+    const wrongSection: string[] = [];
+    let handlers = 0;
+    let guards = 0;
+
+    for (const { path, section, handlers: expected } of entries) {
+      const files = findRouteFiles(join(API, ...path));
+      expect(files.length).toBeGreaterThan(0);
+
+      for (const file of files) {
+        const code = stripComments(readFileSync(file, "utf8"));
+        const name = file.slice(API.length + 1).replace(/\\/g, "/");
+        const sections = [
+          ...code.matchAll(/guardSection\(\s*["']([^"']+)["']\s*\)/g),
+        ].map((m) => m[1]);
+
+        if (WEAKER.test(code)) weaker.push(name);
+        if (sections.some((s) => s !== section)) wrongSection.push(name);
+        const fileHandlers = (code.match(handlerPattern()) ?? []).length;
+        handlers += fileHandlers;
+        guards += (code.match(guardCallPattern()) ?? []).length;
+        expect(fileHandlers).toBe(expected);
+      }
+    }
+
+    expect(weaker).toEqual([]);
+    expect(wrongSection).toEqual([]);
+    expect(handlers).toBe(5);
+    expect(guards).toBeGreaterThanOrEqual(handlers);
+  });
+});
+
+describe("R101 - the no-check and hand-verified debt is closed; helper remains", () => {
+  /*
+    FLIPPED 16 Sep 2026 (R101m) for no-check; hand-verified closed the same day (R101n).
+    Public-by-design routes still call no AUTH_CALL helper (they are a different class), so
+    the lasting assertions use the inventory classifier for the empty piles and the
+    closed-folder leak check for regressions.
   */
   const AUTH_CALL =
     /(guardSection|requireSectionAccess|getAdminSession|verifyAdminAuth|verifyAdminToken|requireAdminAuth|verifyAnyAuth|verifyGameMasterAuth|getServerSession|auth\.api\.getSession)\s*\(/;
@@ -1011,6 +1072,12 @@ describe("R101 - the no-check debt is closed; helper and hand-verified remain", 
   it("finds no route in the no-check-of-any-kind class", () => {
     // Reason: inventoryAdminRoutes is the same classifier the audit tool and the ratchet use.
     expect(routesOfClass(inventoryAdminRoutes(), "no-check")).toEqual([]);
+  });
+
+  it("finds no route in the hand-verified-no-grant class", () => {
+    // Reason: R101n emptied this class. A new hand-rolled jwtVerify without a section grant
+    // lands here and turns this red.
+    expect(routesOfClass(inventoryAdminRoutes(), "hand-verified-no-grant")).toEqual([]);
   });
 
   it("and none of the closed folders leak an unguarded file", () => {
