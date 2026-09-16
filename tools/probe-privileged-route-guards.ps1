@@ -567,6 +567,7 @@ Invoke-Probe -Name 'pages closed folder loses grant' -File $PAGES_SAVE `
 
 $SIM_RUN = 'apps/admin/app/api/simulator/run/route.ts'
 $SIM_CLEAN = 'apps/admin/app/api/simulator/cleanup/route.ts'
+$SIM_AI = 'apps/admin/app/api/simulator/ai/route.ts'
 
 Write-Host "`n=== R101k probes ===`n"
 
@@ -593,8 +594,10 @@ Invoke-Probe -Name 'simulator/cleanup unguarded' -File $SIM_CLEAN -First `
   -Replace2 '' `
   -ExpectTest 'simulator/cleanup/route.ts: one guard and one refusal'
 
-# 54. Folder-level canary.
-Invoke-Probe -Name 'simulator closed folder loses grant' -File $SIM_CLEAN -First `
+# 54. Folder-level canary. Aimed at ai/ (one handler) rather than cleanup with -First:
+# Reason: the canary filters files with NO auth call at all; ungating one of two handlers
+# leaves guardSection in the file and the probe stays green (fourth cause).
+Invoke-Probe -Name 'simulator closed folder loses grant' -File $SIM_AI `
   -Find '    const guard = await guardSection("performance-simulator");' `
   -Replace '    const g = 1; void g;' `
   -Find2 '    if (!guard.ok) return guard.response;' `
