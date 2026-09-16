@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import TestRun from "@/database/models/test-run.model";
 
@@ -9,6 +10,10 @@ import TestRun from "@/database/models/test-run.model";
  */
 export async function GET(request: NextRequest) {
   try {
+    // Reason: PerformanceSimulatorSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("performance-simulator");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     const { searchParams } = new URL(request.url);

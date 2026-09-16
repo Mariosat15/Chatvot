@@ -13,6 +13,7 @@
 // security rules that matter here.
 
 import { NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import mongoose from "mongoose";
 import crypto from "crypto";
@@ -1456,6 +1457,10 @@ const TRADING_TEST_SCENARIOS: TradingTestScenario[] = [
 
 export async function POST(request: Request) {
   try {
+    // Reason: PerformanceSimulatorSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("performance-simulator");
+    if (!guard.ok) return guard.response;
+
     const { testId } = await request.json();
 
     if (!testId) {
@@ -2861,6 +2866,10 @@ export async function POST(request: Request) {
 
 // Return list of available tests
 export async function GET() {
+  // Reason: PerformanceSimulatorSection owns this screen; section grant is the auth answer.
+  const guard = await guardSection("performance-simulator");
+  if (!guard.ok) return guard.response;
+
   return NextResponse.json({
     success: true,
     tests: TRADING_TEST_SCENARIOS.map((s) => ({

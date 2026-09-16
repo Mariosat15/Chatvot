@@ -4558,7 +4558,7 @@ same limit would refuse.
 
 ---
 
-### R101 - Ninety-nine admin routes with no authorization, and fifty-eight of them write - **R101a–R101k CLOSED 16 Sep 2026; tree still open**
+### R101 - Ninety-nine admin routes with no authorization, and fifty-eight of them write - **R101a–R101l CLOSED 16 Sep 2026; tree still open**
 
 **What it is.** `apps/admin` is a separate Next.js process with **no `middleware.ts` of its
 own**. The root `middleware.ts` belongs to the main app and never runs for these routes, so
@@ -4927,7 +4927,12 @@ world-writable; attack-suite and integrity tools that only asked admin-at-all we
 the same pass. 4 new probes each red on exactly one failure. Inventory after:
 **23 no-check / 3 hand-verified / 180 helper / 131 section-granted**.
 
-**R101 remains open** on the remaining 23 no-check routes.
+**R101l CLOSED 16 September 2026.** `tests/` + `admin/end-logic-tests/` +
+`admin/trading-tests/` - **9 route files, 12 handlers** - grant `performance-simulator`.
+4 new probes each red on exactly one failure. Inventory after:
+**14 no-check / 3 hand-verified / 180 helper / 140 section-granted**.
+
+**R101 remains open** on the remaining 14 no-check routes.
 
 ---
 

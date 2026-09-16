@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import TestSchedule from "@/database/models/test-schedule.model";
 
@@ -8,6 +9,10 @@ import TestSchedule from "@/database/models/test-schedule.model";
  */
 export async function GET() {
   try {
+    // Reason: PerformanceSimulatorSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("performance-simulator");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     let schedule = await TestSchedule.findOne().lean();
@@ -37,6 +42,10 @@ export async function GET() {
  */
 export async function POST(request: NextRequest) {
   try {
+    // Reason: PerformanceSimulatorSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("performance-simulator");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     const body = await request.json();

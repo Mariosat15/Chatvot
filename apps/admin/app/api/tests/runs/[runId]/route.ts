@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import TestRun from "@/database/models/test-run.model";
 
@@ -11,6 +12,10 @@ export async function GET(
   { params }: { params: Promise<{ runId: string }> },
 ) {
   try {
+    // Reason: PerformanceSimulatorSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("performance-simulator");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
     const { runId } = await params;
 
@@ -41,6 +46,10 @@ export async function DELETE(
   { params }: { params: Promise<{ runId: string }> },
 ) {
   try {
+    // Reason: PerformanceSimulatorSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("performance-simulator");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
     const { runId } = await params;
 

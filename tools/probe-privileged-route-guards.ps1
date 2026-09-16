@@ -568,6 +568,9 @@ Invoke-Probe -Name 'pages closed folder loses grant' -File $PAGES_SAVE `
 $SIM_RUN = 'apps/admin/app/api/simulator/run/route.ts'
 $SIM_CLEAN = 'apps/admin/app/api/simulator/cleanup/route.ts'
 $SIM_AI = 'apps/admin/app/api/simulator/ai/route.ts'
+$TESTS_RUN = 'apps/admin/app/api/tests/run/route.ts'
+$TESTS_SUITES = 'apps/admin/app/api/tests/suites/route.ts'
+$TRADING_CLEAN = 'apps/admin/app/api/admin/trading-tests/cleanup/route.ts'
 
 Write-Host "`n=== R101k probes ===`n"
 
@@ -598,6 +601,40 @@ Invoke-Probe -Name 'simulator/cleanup unguarded' -File $SIM_CLEAN -First `
 # Reason: the canary filters files with NO auth call at all; ungating one of two handlers
 # leaves guardSection in the file and the probe stays green (fourth cause).
 Invoke-Probe -Name 'simulator closed folder loses grant' -File $SIM_AI `
+  -Find '    const guard = await guardSection("performance-simulator");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'but none of them are in the folders R101a closed'
+
+Write-Host "`n=== R101l probes ===`n"
+
+# 55. tests/run POST was world-writable - spawns vitest and writes TestRun rows anonymously.
+Invoke-Probe -Name 'tests/run POST unguarded' -File $TESTS_RUN `
+  -Find '    const guard = await guardSection("performance-simulator");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'every test-runner file names guardSection'
+
+# 56. Wrong grant - same silent widening as R101k probe 52, aimed at the unit-test runner.
+Invoke-Probe -Name 'tests wrong section' -File $TESTS_RUN `
+  -Find 'guardSection("performance-simulator")' `
+  -Replace 'guardSection("dev-zone-menu")' `
+  -ExpectTest 'tests/run/route.ts: guards every handler with the section'
+
+# 57. trading-tests/cleanup POST was world-writable - deletes test trade rows anonymously.
+Invoke-Probe -Name 'trading-tests/cleanup unguarded' -File $TRADING_CLEAN `
+  -Find '    const guard = await guardSection("performance-simulator");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'admin/trading-tests/cleanup/route.ts: one guard and one refusal'
+
+# 58. Folder-level canary on a single-handler file (suites GET only).
+# Reason: R101k lesson - canary filters files with NO auth call at all; a multi-handler
+# file with -First leaves guardSection in the file and the probe stays green.
+Invoke-Probe -Name 'tests closed folder loses grant' -File $TESTS_SUITES `
   -Find '    const guard = await guardSection("performance-simulator");' `
   -Replace '    const g = 1; void g;' `
   -Find2 '    if (!guard.ok) return guard.response;' `

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import mongoose from "mongoose";
 
@@ -9,6 +10,10 @@ import mongoose from "mongoose";
 
 export async function POST(request: NextRequest) {
   try {
+    // Reason: PerformanceSimulatorSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("performance-simulator");
+    if (!guard.ok) return guard.response;
+
     const { testDataIds } = await request.json();
 
     await connectToDatabase();

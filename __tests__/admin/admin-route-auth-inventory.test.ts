@@ -59,17 +59,13 @@ import { classifyRouteAuth, stripComments } from "../helpers/route-guard-audit";
  * swept in one commit.
  */
 /**
- * 23 routes calling no authentication of any kind. Frozen rather than swept:
+ * 14 routes calling no authentication of any kind. Frozen rather than swept:
  * each needs a decision about which grant owns the screen that calls it.
- * (Was 28 after R101j; R101k moved the five simulator/ no-check routes into section-granted.)
+ * (Was 23 after R101k; R101l moved the nine test-runner routes into section-granted.)
  */
 const NO_CHECK_OF_ANY_KIND = [
   "action-terms/[slug]/route.ts",
   "admin/database/indexes/route.ts",
-  "admin/end-logic-tests/cleanup/route.ts",
-  "admin/end-logic-tests/run/route.ts",
-  "admin/trading-tests/cleanup/route.ts",
-  "admin/trading-tests/run/route.ts",
   "challenges/[id]/gm-info/route.ts",
   "check-database/route.ts",
   "diagnose-user/route.ts",
@@ -81,11 +77,6 @@ const NO_CHECK_OF_ANY_KIND = [
   "server-monitor/route.ts",
   "sync-missing-users/route.ts",
   "test-badge-models/route.ts",
-  "tests/run/route.ts",
-  "tests/runs/[runId]/route.ts",
-  "tests/runs/route.ts",
-  "tests/schedule/route.ts",
-  "tests/suites/route.ts",
   "update-competition-status/route.ts",
 ] as const;
 
@@ -286,7 +277,7 @@ const HELPER_BUT_NO_GRANT = [
   "withdrawals/route.ts",
 ] as const;
 
-/** Folders closed by R101a–R101k. Nothing under these may appear in any debt list above. */
+/** Folders closed by R101a–R101l. Nothing under these may appear in any debt list above. */
 const CLOSED_FOLDERS = [
   "users",
   "ai",
@@ -302,6 +293,11 @@ const CLOSED_FOLDERS = [
   "market-settings",
   "pages",
   "simulator",
+  // Reason: nested under admin/; a bare "admin" entry would also demand grants on
+  // badge-simulator / database / etc. which closed under different sections.
+  "tests",
+  "admin/end-logic-tests",
+  "admin/trading-tests",
 ];
 
 const findings = inventoryAdminRoutes();
