@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import TradingSymbol from "@/database/models/trading/symbol-settings.model";
 
@@ -11,6 +12,10 @@ export async function GET(
   { params }: { params: Promise<{ symbol: string }> },
 ) {
   try {
+    // Reason: SymbolsSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("symbols");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     const { symbol: symbolParam } = await params;
@@ -41,6 +46,10 @@ export async function PUT(
   { params }: { params: Promise<{ symbol: string }> },
 ) {
   try {
+    // Reason: SymbolsSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("symbols");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     const { symbol: symbolParam } = await params;
@@ -96,6 +105,10 @@ export async function DELETE(
   { params }: { params: Promise<{ symbol: string }> },
 ) {
   try {
+    // Reason: SymbolsSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("symbols");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     const { symbol: symbolParam } = await params;

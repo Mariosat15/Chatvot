@@ -117,6 +117,12 @@ const CLOSED_FOLDERS: { folder: string[]; section: string }[] = [
     the writers that put the folder next - they delete or rewrite candle collections.
   */
   { folder: ["market-data"], section: "market-data" },
+  /*
+    R101h. SymbolsSection → symbols. Three files, seven handlers: list/create/bulk-update,
+    sync, and per-symbol GET/PUT/DELETE. Sync and the writers rewrite the live symbol
+    catalogue anonymously.
+  */
+  { folder: ["symbols"], section: "symbols" },
 ];
 
 describe("R101a - every handler in the closed folders is guarded, per handler", () => {
@@ -621,6 +627,47 @@ describe("R101g - market-data/ is section-granted and nothing weaker", () => {
     expect(weaker).toEqual([]);
     expect(wrongSection).toEqual([]);
     expect(handlers).toBe(11);
+    expect(guards).toBeGreaterThanOrEqual(handlers);
+  });
+});
+
+describe("R101h - symbols/ is section-granted and nothing weaker", () => {
+  /*
+    Three files, seven handlers. SymbolsSection owns every fetch, so the grant is `symbols`.
+    Sync and the writers rewrite the live symbol catalogue anonymously.
+  */
+  const WEAKER =
+    /(getAdminSession|requireAdminAuth|verifyAdminAuth|verifyAdminToken|verifyAnyAuth|jwtVerify|getAdminJwtSecret)\s*\(/;
+
+  const dir = join(API, "symbols");
+  const files = findRouteFiles(dir);
+
+  it("the walk finds the three symbols routes", () => {
+    expect(files.length).toBe(3);
+  });
+
+  it("every symbols file names guardSection(symbols) and no weaker helper", () => {
+    const weaker: string[] = [];
+    const wrongSection: string[] = [];
+    let handlers = 0;
+    let guards = 0;
+
+    for (const file of files) {
+      const code = stripComments(readFileSync(file, "utf8"));
+      const name = file.slice(API.length + 1).replace(/\\/g, "/");
+      const sections = [...code.matchAll(/guardSection\(\s*["']([^"']+)["']\s*\)/g)].map(
+        (m) => m[1],
+      );
+
+      if (WEAKER.test(code)) weaker.push(name);
+      if (sections.some((s) => s !== "symbols")) wrongSection.push(name);
+      handlers += (code.match(handlerPattern()) ?? []).length;
+      guards += (code.match(guardCallPattern()) ?? []).length;
+    }
+
+    expect(weaker).toEqual([]);
+    expect(wrongSection).toEqual([]);
+    expect(handlers).toBe(7);
     expect(guards).toBeGreaterThanOrEqual(handlers);
   });
 });

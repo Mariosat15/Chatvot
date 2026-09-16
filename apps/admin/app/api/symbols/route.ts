@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import TradingSymbol, {
   DEFAULT_FOREX_PAIRS,
@@ -11,6 +12,10 @@ import TradingSymbol, {
  */
 export async function GET(request: NextRequest) {
   try {
+    // Reason: SymbolsSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("symbols");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     const searchParams = request.nextUrl.searchParams;
@@ -66,6 +71,10 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    // Reason: SymbolsSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("symbols");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     const body = await request.json();
@@ -135,6 +144,10 @@ export async function POST(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
+    // Reason: SymbolsSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("symbols");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     const body = await request.json();

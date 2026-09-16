@@ -458,6 +458,41 @@ Invoke-Probe -Name 'market-data closed folder loses grant' -File $MD_CLEAN `
   -Replace2 '' `
   -ExpectTest 'but none of them are in the folders R101a closed'
 
+$SYM_SYNC = 'apps/admin/app/api/symbols/sync/route.ts'
+$SYM_ROUTE = 'apps/admin/app/api/symbols/route.ts'
+
+Write-Host "`n=== R101h probes ===`n"
+
+# 39. sync was world-writable - rewrites the live symbol catalogue.
+Invoke-Probe -Name 'symbols sync unguarded' -File $SYM_SYNC `
+  -Find '    const guard = await guardSection("symbols");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'every symbols file names guardSection'
+
+# 40. Wrong grant - market-data would compile and silently widen who can sync symbols.
+Invoke-Probe -Name 'symbols wrong section' -File $SYM_SYNC `
+  -Find 'guardSection("symbols")' `
+  -Replace 'guardSection("market-data")' `
+  -ExpectTest 'symbols/sync/route.ts: guards every handler with the section'
+
+# 41. One handler of the list/create route loses its grant.
+Invoke-Probe -Name 'symbols list unguarded' -File $SYM_ROUTE -First `
+  -Find '    const guard = await guardSection("symbols");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'symbols/route.ts: one guard and one refusal'
+
+# 42. Folder-level canary.
+Invoke-Probe -Name 'symbols closed folder loses grant' -File $SYM_SYNC `
+  -Find '    const guard = await guardSection("symbols");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'but none of them are in the folders R101a closed'
+
 Write-Host ''
 Write-Host 'UNPROBED, with the reason: "still finds routes with no authorization call at all".' -ForegroundColor DarkGray
 Write-Host 'Turning that canary red means guarding the remaining no-check debt, which is later' -ForegroundColor DarkGray
