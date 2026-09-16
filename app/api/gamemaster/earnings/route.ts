@@ -5,6 +5,11 @@ import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import GameMasterSubscription from "@/database/models/gamemaster/gamemaster-subscription.model";
 import GameMasterEarning from "@/database/models/gamemaster/gamemaster-earning.model";
+import {
+  resolveEarningGameKey,
+  summariseEarningsByGame,
+} from "@/lib/services/gamemaster/earnings-by-game";
+import { labelForGameKey } from "@/lib/services/games/game-leaderboard.service";
 
 /**
  * GET /api/gamemaster/earnings
@@ -104,11 +109,27 @@ export async function GET(request: NextRequest) {
       },
     );
 
+    // Reason (X7 step 5): by-game rollup from stamped gameKey. Labels resolved
+    // from the catalogue so renaming a title does not split history (group by key).
+    const byGameRaw = summariseEarningsByGame(allFilteredEarnings);
+    const byGame = await Promise.all(
+      byGameRaw.map(async (row) => ({
+        ...row,
+        label: await labelForGameKey(row.gameKey),
+      })),
+    );
+
     return NextResponse.json({
       success: true,
       data: {
-        earnings,
+        earnings: earnings.map((e) => ({
+          ...e,
+          gameKey: resolveEarningGameKey(
+            (e as { gameKey?: string }).gameKey,
+          ),
+        })),
         totals,
+        byGame,
         pagination: {
           page,
           limit,

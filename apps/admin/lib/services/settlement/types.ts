@@ -67,6 +67,11 @@ export interface SettlementContest {
   gameMasterId?: string | null;
   platformFeePercentage: number;
   /**
+   * Immutable game label for GM earning attribution (X7 step 5).
+   * Absent resolves to trading at the distribute stamp (invariant 5).
+   */
+  gameKey?: string;
+  /**
    * Which money vocabulary this contest writes on the ledger.
    *
    * Absent (or "competition") means every existing caller's behaviour is unchanged -

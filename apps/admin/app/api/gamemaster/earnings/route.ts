@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import { verifyGameMasterAuth } from "@/lib/admin/auth";
 import mongoose from "mongoose";
+import {
+  earningsByGameGroupStages,
+  resolveEarningGameKey,
+} from "@/lib/services/gamemaster/earnings-by-game";
 
 /**
  * GET /api/gamemaster/earnings
@@ -127,12 +131,22 @@ export async function GET(request: NextRequest) {
       ])
       .toArray();
 
+    // Reason (X7 step 5): per-game rollup on stamped gameKey (absent → trading).
+    const byGame = await db
+      .collection("gamemasterearnings")
+      .aggregate([
+        { $match: { gameMasterId: auth.userId } },
+        ...earningsByGameGroupStages(),
+      ])
+      .toArray();
+
     return NextResponse.json({
       earnings: earnings.map((e) => ({
         id: e._id.toString(),
         sourceType: e.sourceType,
         sourceId: e.sourceId,
         sourceName: e.sourceName,
+        gameKey: resolveEarningGameKey(e.gameKey as string | undefined),
         referredUserId: e.referredUserId,
         referredUserEmail: e.referredUserEmail,
         referredUserName: e.referredUserName,
@@ -159,6 +173,7 @@ export async function GET(request: NextRequest) {
         challengeEarnings: 0,
         transactionCount: 0,
       },
+      byGame,
       monthlyBreakdown: monthlyBreakdown.map((m) => ({
         year: m._id.year,
         month: m._id.month,

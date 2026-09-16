@@ -36,6 +36,14 @@ export interface EarningItem {
   createdAt: string;
 }
 
+/** Per-game earnings rollup from the dashboard API (X7 step 5). */
+export interface EarningsByGameRow {
+  gameKey: string;
+  label: string;
+  netEarning: number;
+  count: number;
+}
+
 export interface ReferralItem {
   _id: string;
   name: string;

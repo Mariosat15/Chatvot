@@ -198,6 +198,9 @@ export async function applyChallengeOutcome({
     // naturally evaluates false in the fee stage below.
     gameMasterId: null,
     platformFeePercentage: challenge.platformFeePercentage,
+    // Reason (X7 step 5): challenges carry gameKey; stamp it onto GM earnings so
+    // a provider 1v1 is not filed under trading by the distribute fallback.
+    gameKey: challenge.gameKey,
     contestKind: "challenge",
   };
 

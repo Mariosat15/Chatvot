@@ -7,10 +7,10 @@ import {
 } from "recharts";
 import Link from "next/link";
 import { Shield } from "lucide-react";
-import type { DashboardStats, CompetitionItem, EarningItem, ReferralItem, SubscriptionData } from "./gamemaster-dashboard-types";
+import type { DashboardStats, CompetitionItem, EarningItem, ReferralItem, SubscriptionData, EarningsByGameRow } from "./gamemaster-dashboard-types";
 
 // Re-export types so existing imports still work
-export type { DashboardStats, CompetitionItem, EarningItem, ReferralItem, SubscriptionData };
+export type { DashboardStats, CompetitionItem, EarningItem, ReferralItem, SubscriptionData, EarningsByGameRow };
 
 // ─── Constants ────────────────────────────────────────────────────────
 const PIE_COLORS = ["#22c55e", "#eab308", "#6366f1", "#ef4444", "#64748b"];
@@ -53,12 +53,13 @@ function MiniStat({ label, value, color }: { label: string; value: string; color
 }
 
 // ─── Overview Tab ─────────────────────────────────────────────────────
-export function OverviewTab({ stats, subscription, earningsChartData, compStatusPieData, compStats }: {
+export function OverviewTab({ stats, subscription, earningsChartData, compStatusPieData, compStats, earningsByGame }: {
   stats: DashboardStats;
   subscription: SubscriptionData;
   earningsChartData: Array<{ month: string; earnings: number }>;
   compStatusPieData: Array<{ name: string; value: number }>;
   compStats: { active: number; completed: number; upcoming: number; cancelled: number; totalParticipants: number; totalPrizePool: number } | null;
+  earningsByGame?: EarningsByGameRow[];
 }) {
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -157,6 +158,24 @@ export function OverviewTab({ stats, subscription, earningsChartData, compStatus
         <MiniStat label="Pending" value={`⚡ ${(stats.pendingEarnings ?? 0).toFixed(2)}`} color="yellow" />
         <MiniStat label="Transactions" value={String(stats.totalTransactions ?? 0)} color="blue" />
       </div>
+
+      {/* Per-game earnings (X7 step 5) */}
+      {earningsByGame && earningsByGame.length > 0 && (
+        <div className="bg-gray-800/50 rounded-2xl p-4 sm:p-6 border border-gray-700/50">
+          <h3 className="text-base sm:text-lg font-semibold text-white mb-3 flex items-center gap-2">
+            <DollarSign className="h-5 w-5 text-emerald-400" /> Earnings by game
+          </h3>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-3">
+            {earningsByGame.map((row) => (
+              <div key={row.gameKey} className="rounded-xl p-3 border border-gray-700/50 bg-gray-900/40">
+                <p className="text-gray-400 text-[11px] sm:text-xs truncate" title={row.label}>{row.label}</p>
+                <p className="text-base sm:text-lg font-bold text-emerald-400">⚡ {row.netEarning.toFixed(2)}</p>
+                <p className="text-[10px] text-gray-500">{row.count} payout{row.count === 1 ? "" : "s"}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -17,6 +17,12 @@ export interface IGameMasterEarning extends Document {
   sourceType: EarningSource;
   sourceId: string; // Competition or Challenge ID
   sourceName: string; // Cached name for display
+  /**
+   * Immutable game label stamped at settlement (X7 step 5).
+   * Join key for per-game GM analytics. Absent on pre-X7 rows until backfill;
+   * readers treat missing as "trading" (invariant 5).
+   */
+  gameKey?: string;
 
   // Referred user who generated this earning
   referredUserId: string;
@@ -73,6 +79,13 @@ const GameMasterEarningSchema = new Schema<IGameMasterEarning>(
     sourceName: {
       type: String,
       required: true,
+    },
+    // Reason (X7 step 5): stamped at distribute write time. No default — a schema
+    // default would mask pre-X7 rows as deliberately trading; backfill + reader
+    // fallback handle history. Index supports by-game dashboard $group.
+    gameKey: {
+      type: String,
+      index: true,
     },
     referredUserId: {
       type: String,
@@ -149,6 +162,7 @@ GameMasterEarningSchema.index({ gameMasterId: 1, createdAt: -1 }); // GM's earni
 GameMasterEarningSchema.index({ gameMasterId: 1, status: 1 }); // GM's pending earnings
 GameMasterEarningSchema.index({ sourceType: 1, sourceId: 1 }); // Find earnings by event
 GameMasterEarningSchema.index({ referredUserId: 1, gameMasterId: 1 }); // Find GM for user
+GameMasterEarningSchema.index({ gameMasterId: 1, gameKey: 1 }); // Per-game earnings (X7 step 5)
 
 const GameMasterEarning =
   models?.GameMasterEarning ||

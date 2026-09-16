@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 import { OverviewTab, CompetitionsTab, ReferralsTab, EarningsTab } from "./gamemaster-dashboard-tabs";
 import { WarningBanner, RefField, KPI, SubscriptionPanel, CancelModal } from "./gamemaster-dashboard-helpers";
 import { useGmSubscription } from "./use-gm-subscription";
-import type { DashboardStats, CompetitionItem, EarningItem, ReferralItem, SubscriptionData } from "./gamemaster-dashboard-types";
+import type { DashboardStats, CompetitionItem, EarningItem, ReferralItem, SubscriptionData, EarningsByGameRow } from "./gamemaster-dashboard-types";
 
 // ─── Types ────────────────────────────────────────────────────────────
 interface GameMasterData {
@@ -20,6 +20,7 @@ interface GameMasterData {
   referredUsers: ReferralItem[];
   recentEarnings: EarningItem[];
   recentCompetitions: CompetitionItem[];
+  earningsByGame?: EarningsByGameRow[];
   stats: DashboardStats;
 }
 
@@ -239,7 +240,16 @@ export default function GameMasterDashboardContent() {
           ))}
         </div>
 
-        {activeTab === "Overview" && stats && <OverviewTab stats={stats} subscription={sub} earningsChartData={earningsChartData} compStatusPieData={compStatusPieData} compStats={compStats} />}
+        {activeTab === "Overview" && stats && (
+          <OverviewTab
+            stats={stats}
+            subscription={sub}
+            earningsChartData={earningsChartData}
+            compStatusPieData={compStatusPieData}
+            compStats={compStats}
+            earningsByGame={data?.earningsByGame}
+          />
+        )}
         {activeTab === "Competitions" && <CompetitionsTab competitions={filteredComps} filter={compFilter} onFilterChange={setCompFilter} subscription={sub} isExpired={isExpired} />}
         {activeTab === "Referrals" && <ReferralsTab referrals={filteredReferrals} search={referralSearch} onSearchChange={setReferralSearch} total={stats?.totalReferredUsers ?? 0} />}
         {activeTab === "Earnings" && stats && <EarningsTab earnings={filteredEarnings} filter={earningsFilter} onFilterChange={setEarningsFilter} stats={stats} />}

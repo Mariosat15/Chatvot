@@ -25,6 +25,7 @@ interface Earning {
   sourceType: "competition" | "challenge";
   sourceId: string;
   sourceName: string;
+  gameKey?: string;
   referredUserId: string;
   referredUserEmail: string;
   referredUserName: string;
@@ -48,6 +49,12 @@ interface EarningsData {
     fromCompetitions: number;
     fromChallenges: number;
   };
+  byGame?: Array<{
+    gameKey: string;
+    label: string;
+    netEarning: number;
+    count: number;
+  }>;
   pagination: {
     page: number;
     limit: number;
@@ -225,6 +232,31 @@ export default function GMEarningsPage() {
               <div className="text-base sm:text-xl font-bold text-white">
                 ⚡ {(data.totals?.fromChallenges ?? 0).toLocaleString()}
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Per-game breakdown (X7 step 5) — only when more than trading exists */}
+        {data?.byGame && data.byGame.length > 0 && (
+          <div className="mb-4 sm:mb-8">
+            <h2 className="text-sm font-medium text-gray-400 mb-2">By game</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-3">
+              {data.byGame.map((row) => (
+                <div
+                  key={row.gameKey}
+                  className="bg-gray-800/50 rounded-2xl p-3 sm:p-4 border border-gray-700/50"
+                >
+                  <div className="text-xs text-gray-400 mb-1 truncate" title={row.label}>
+                    {row.label}
+                  </div>
+                  <div className="text-base sm:text-lg font-bold text-emerald-400">
+                    ⚡ {row.netEarning.toLocaleString()}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-0.5">
+                    {row.count} payout{row.count === 1 ? "" : "s"}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}

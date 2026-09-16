@@ -7,6 +7,8 @@ import Competition from "@/database/models/trading/competition.model";
 import { MarketplaceItem } from "@/database/models/marketplace/marketplace-item.model";
 import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
+import { earningsByGameGroupStages } from "@/lib/services/gamemaster/earnings-by-game";
+import { labelForGameKey } from "@/lib/services/games/game-leaderboard.service";
 
 /**
  * GET /api/gamemaster/dashboard
@@ -209,6 +211,23 @@ export async function GET() {
       totalTransactions: 0,
     };
 
+    // Reason (X7 step 5): per-game earnings for the GM dashboard. Groups on
+    // stamped gameKey only — never re-joins contests or filters by enabled games.
+    const byGameAgg = await GameMasterEarning.aggregate([
+      { $match: { gameMasterId: userId } },
+      ...earningsByGameGroupStages(),
+    ]);
+    const earningsByGame = await Promise.all(
+      byGameAgg.map(
+        async (row: { gameKey: string; netEarning: number; count: number }) => ({
+          gameKey: row.gameKey,
+          netEarning: row.netEarning,
+          count: row.count,
+          label: await labelForGameKey(row.gameKey),
+        }),
+      ),
+    );
+
     // ── Competition Counts ──────────────────────────────────────────
     const totalCompetitions = competitions.length;
     const activeCompetitions = competitions.filter(
@@ -230,6 +249,7 @@ export async function GET() {
         referredUsers,
         recentEarnings,
         recentCompetitions: competitions,
+        earningsByGame,
         stats: {
           totalReferredUsers: referredUsers.length,
           activeReferredUsers: referredUsers.filter((r) => r.isActive).length,

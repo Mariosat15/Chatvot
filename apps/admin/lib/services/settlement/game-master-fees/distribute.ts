@@ -28,6 +28,8 @@ export interface DistributeGmFeesInput {
     startTime?: Date;
     endTime?: Date;
     contestKind?: ContestKind;
+    /** Immutable game label; absent stamps as trading (invariant 5). */
+    gameKey?: string;
   };
   participantCount: number;
   /**
@@ -105,6 +107,12 @@ export async function distributeGameMasterFees({
           sourceType: vocabulary.gmSourceType,
           sourceId: contest._id.toString(),
           sourceName: contest.name,
+          // Reason (X7 step 5): stamp the immutable game label at write time so
+          // dashboards can group without $lookup. Absent → trading (invariant 5).
+          gameKey:
+            typeof contest.gameKey === "string" && contest.gameKey.trim()
+              ? contest.gameKey.trim()
+              : "trading",
           referredUserId: user.userId,
           referredUserEmail: user.userEmail,
           referredUserName: user.userName,

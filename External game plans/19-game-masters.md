@@ -341,7 +341,7 @@ only the ability to create a potentially loss-making contest is held back.
 | Minimum entry fee for Game Master provider contests | Same | 0.5 day |
 | **Game Master creation API accepts a game and `gameConfig`** | X6 | 2 days - **partly built 7 Sep 2026, see below** |
 | Game Master creation UI: game picker plus dynamic settings | X6 | 3 days - **not built, and blocked** |
-| Per-game analytics, Game Master and admin | X7 | 2 days |
+| ~~Per-game analytics, Game Master and admin~~ **BUILT 16 Sep 2026 (X7 step 5)** | X7 | 2 days |
 | ~~Implement or remove `toggleCompetitionCreation`~~ **BUILT 7 Sep 2026** | X6 | 0.5 day |
 | Tier wording | X8 | Database content, non-developer |
 | **Total** | | **~2.5 weeks** |
