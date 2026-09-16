@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import { Admin } from "@/database/models/admin.model";
 import {
@@ -17,7 +17,16 @@ import mongoose from "mongoose";
  */
 export async function POST(request: NextRequest) {
   try {
-    const auth = await requireAdminAuth();
+    const guard = await guardSection("database");
+
+    if (!guard.ok) return guard.response;
+
+    const auth = {
+      adminId: guard.admin.id,
+      email: guard.admin.email,
+      name: guard.admin.name,
+      isSuperAdmin: guard.admin.role === "super_admin",
+    };
 
     const body = await request.json();
     const { confirmation } = body;

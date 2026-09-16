@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardAnySection, guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import { Admin } from "@/database/models/admin.model";
 import {
@@ -9,7 +10,6 @@ import {
   EmployeeEmailTemplate,
   DEFAULT_EMPLOYEE_EMAIL_TEMPLATES,
 } from "@/database/models/employee-email-template.model";
-import { verifyAdminAuth } from "@/lib/admin/auth";
 import {
   ADMIN_SECTIONS,
   type AdminSection,
@@ -83,10 +83,16 @@ function replaceTemplateVariables(
 // GET - List all employees
 export async function GET(request: NextRequest) {
   try {
-    const auth = await verifyAdminAuth();
-    if (!auth.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardAnySection(["employees", "users"]);
+
+    if (!guard.ok) return guard.response;
+
+    const auth = {
+      adminId: guard.admin.id,
+      email: guard.admin.email,
+      name: guard.admin.name,
+      isSuperAdmin: guard.admin.role === "super_admin",
+    };
 
     await connectToDatabase();
 
@@ -169,10 +175,16 @@ export async function GET(request: NextRequest) {
 // POST - Create new employee or perform actions
 export async function POST(request: NextRequest) {
   try {
-    const auth = await verifyAdminAuth();
-    if (!auth.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("employees");
+
+    if (!guard.ok) return guard.response;
+
+    const auth = {
+      adminId: guard.admin.id,
+      email: guard.admin.email,
+      name: guard.admin.name,
+      isSuperAdmin: guard.admin.role === "super_admin",
+    };
 
     await connectToDatabase();
 

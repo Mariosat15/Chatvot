@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import { Admin } from "@/database/models/admin.model";
 import { AdminRoleTemplate } from "@/database/models/admin-role-template.model";
-import { verifyAdminAuth } from "@/lib/admin/auth";
 import {
   ADMIN_SECTIONS,
   type AdminSection,
@@ -33,10 +33,16 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const auth = await verifyAdminAuth();
-    if (!auth.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("employees");
+
+    if (!guard.ok) return guard.response;
+
+    const auth = {
+      adminId: guard.admin.id,
+      email: guard.admin.email,
+      name: guard.admin.name,
+      isSuperAdmin: guard.admin.role === "super_admin",
+    };
 
     await connectToDatabase();
 
@@ -72,10 +78,16 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const auth = await verifyAdminAuth();
-    if (!auth.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("employees");
+
+    if (!guard.ok) return guard.response;
+
+    const auth = {
+      adminId: guard.admin.id,
+      email: guard.admin.email,
+      name: guard.admin.name,
+      isSuperAdmin: guard.admin.role === "super_admin",
+    };
 
     await connectToDatabase();
 
@@ -217,10 +229,16 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const auth = await verifyAdminAuth();
-    if (!auth.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("employees");
+
+    if (!guard.ok) return guard.response;
+
+    const auth = {
+      adminId: guard.admin.id,
+      email: guard.admin.email,
+      name: guard.admin.name,
+      isSuperAdmin: guard.admin.role === "super_admin",
+    };
 
     await connectToDatabase();
 
@@ -347,10 +365,16 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const auth = await verifyAdminAuth();
-    if (!auth.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("employees");
+
+    if (!guard.ok) return guard.response;
+
+    const auth = {
+      adminId: guard.admin.id,
+      email: guard.admin.email,
+      name: guard.admin.name,
+      isSuperAdmin: guard.admin.role === "super_admin",
+    };
 
     await connectToDatabase();
 

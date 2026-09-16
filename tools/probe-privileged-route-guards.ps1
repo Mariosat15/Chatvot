@@ -959,3 +959,55 @@ Write-Host 'inventory ratchet also catches. The closed-folder leak check is the 
 Write-Host 'Helper debt after R101r: 122. Remaining are helper-but-no-grant folders (employees,' -ForegroundColor DarkGray
 Write-Host 'settings, marketplace, invoices, gamemaster, ...).' -ForegroundColor DarkGray
 Write-Host ''
+
+Write-Host "`n=== R101s probes ===`n"
+
+$EMP_ID = 'apps/admin/app/api/employees/[id]/route.ts'
+$EMP_ROUTE = 'apps/admin/app/api/employees/route.ts'
+$EMP_TEMPLATES = 'apps/admin/app/api/employees/role-templates/route.ts'
+$EMP_RESET = 'apps/admin/app/api/admin/reset-all-employees/route.ts'
+
+# 93. [id] wrong section - four handlers; replace-all (fourth cause on -First).
+Invoke-Probe -Name 'employees id wrong section' -File $EMP_ID `
+  -Find 'guardSection("employees")' `
+  -Replace 'guardSection("users")' `
+  -ExpectTest 'every employees-only file names the employees grant and no weaker helper'
+
+# 94. GET list drops to employees-only - locks UsersSection out of the picker.
+Invoke-Probe -Name 'employees list users half dropped' -File $EMP_ROUTE `
+  -Find 'guardAnySection(["employees", "users"])' `
+  -Replace 'guardSection("employees")' `
+  -ExpectTest 'GET /employees accepts either employees or users; POST demands employees'
+
+# 95. role-templates wrong section - four handlers; replace-all.
+Invoke-Probe -Name 'employees role-templates wrong section' -File $EMP_TEMPLATES `
+  -Find 'guardSection("employees")' `
+  -Replace 'guardSection("users")' `
+  -ExpectTest 'every employees-only file names the employees grant and no weaker helper'
+
+# 96. reset-all wrong section - DatabaseSection's control must stay database.
+Invoke-Probe -Name 'reset-all-employees wrong section' -File $EMP_RESET `
+  -Find 'guardSection("database")' `
+  -Replace 'guardSection("employees")' `
+  -ExpectTest 'reset-all-employees names the database grant and no weaker helper'
+
+# 97. Closed-folder canary - single-handler file so emptying AUTH_CALL is possible.
+Invoke-Probe -Name 'reset-all closed folder loses grant' -File $EMP_RESET `
+  -Find '    const guard = await guardSection("database");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'and none of the closed folders leak an unguarded file'
+
+# 98. Inventory canary.
+Invoke-Probe -Name 'reset-all inventory stays section-granted' -File $EMP_RESET `
+  -Find '    const guard = await guardSection("database");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'no route under a closed folder is anything but section-granted'
+
+Write-Host ''
+Write-Host 'Helper debt after R101s: 117. Remaining are helper-but-no-grant folders (settings,' -ForegroundColor DarkGray
+Write-Host 'marketplace, invoices, gamemaster, tutorials, ai-knowledge, ...).' -ForegroundColor DarkGray
+Write-Host ''

@@ -72,15 +72,14 @@ const NO_CHECK_OF_ANY_KIND = [] as const;
 const HAND_VERIFIED_NO_GRANT = [] as const;
 
 /**
- * 122 routes that authenticate with a helper and never ask which sections the caller
- * holds. (Was 143 after R101q; R101r moved twenty-one fraud/ routes into section-granted.
- * fraud/restrictions was already granted under R101m and was not in this frozen list.)
+ * 117 routes that authenticate with a helper and never ask which sections the caller
+ * holds. (Was 122 after R101r; R101s moved five employees/ + reset-all-employees routes
+ * into section-granted. employees/availability was already messaging under R101n.)
  */
 const HELPER_BUT_NO_GRANT = [
   "admin/backfill-ranks/route.ts",
   "admin/cleanup/run/route.ts",
   "admin/events/poll/route.ts",
-  "admin/reset-all-employees/route.ts",
   "admin/reset-all-users/route.ts",
   "ai-agent/audit/route.ts",
   "ai-agent/chat/route.ts",
@@ -120,10 +119,6 @@ const HELPER_BUT_NO_GRANT = [
   "employee/notifications/route.ts",
   "employee/profile/password/route.ts",
   "employee/profile/route.ts",
-  "employees/[id]/route.ts",
-  "employees/role-templates/route.ts",
-  "employees/route.ts",
-  "employees/upgrade-super-admin/route.ts",
   "environment/route.ts",
   "finalize-challenges/route.ts",
   "gamemaster/competitions/route.ts",
@@ -201,7 +196,7 @@ const HELPER_BUT_NO_GRANT = [
   "verify-password/route.ts",
 ];
 
-/** Folders closed by R101a–R101r. Nothing under these may appear in any debt list above. */
+/** Folders closed by R101a–R101s. Nothing under these may appear in any debt list above. */
 const CLOSED_FOLDERS = [
   "users",
   "ai",
@@ -263,6 +258,10 @@ const CLOSED_FOLDERS = [
   "cancel-pending-payment",
   "vendors",
   "chargebacks",
+  // R101s. Whole employees/ tree is section-granted (availability was already messaging;
+  // GET /employees is dual-caller employees|users). reset-all is DatabaseSection.
+  "employees",
+  "admin/reset-all-employees",
 ];
 
 const findings = inventoryAdminRoutes();

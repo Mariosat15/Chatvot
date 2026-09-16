@@ -1,18 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import { Admin } from "@/database/models/admin.model";
-import { verifyAdminAuth } from "@/lib/admin/auth";
-
 // The original/default admin is ALWAYS considered the super admin
 // They are identified by being the first admin created or matching ADMIN_EMAIL env var
 
 // GET - Check super admin status
 export async function GET(request: NextRequest) {
   try {
-    const auth = await verifyAdminAuth();
-    if (!auth.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("employees");
+
+    if (!guard.ok) return guard.response;
+
+    const auth = {
+      adminId: guard.admin.id,
+      email: guard.admin.email,
+      name: guard.admin.name,
+      isSuperAdmin: guard.admin.role === "super_admin",
+    };
 
     await connectToDatabase();
 
@@ -61,10 +66,16 @@ export async function GET(request: NextRequest) {
 // POST - Not needed for original admin, but keep for compatibility
 export async function POST(request: NextRequest) {
   try {
-    const auth = await verifyAdminAuth();
-    if (!auth.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("employees");
+
+    if (!guard.ok) return guard.response;
+
+    const auth = {
+      adminId: guard.admin.id,
+      email: guard.admin.email,
+      name: guard.admin.name,
+      isSuperAdmin: guard.admin.role === "super_admin",
+    };
 
     await connectToDatabase();
 

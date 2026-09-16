@@ -35,7 +35,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "fs";
+import { readFileSync, existsSync } from "fs";
 import { join } from "path";
 import { ADMIN_SECTIONS } from "../../apps/admin/database/models/admin-employee.model";
 import {
@@ -178,13 +178,23 @@ const CLOSED_FOLDERS: { folder: string[]; section: string }[] = [
   { folder: ["update-competition-status"], section: "competitions" },
   /*
     R101n. The three hand-verified-token routes. Availability is under MessagingSection
-    (messaging grant) - scoped to employees/availability so the rest of employees/ stays
-    in helper-but-no-grant until that folder is closed. Risk settings and the orphan
-    margin-check trigger share TradingRiskSection's trading-risk grant.
+    (messaging grant) - scoped to employees/availability so the rest of employees/ could
+    close separately. Risk settings and the orphan margin-check trigger share
+    TradingRiskSection's trading-risk grant.
   */
   { folder: ["employees", "availability"], section: "messaging" },
   { folder: ["trading-risk-settings"], section: "trading-risk" },
   { folder: ["trigger-margin-check"], section: "trading-risk" },
+  /*
+    R101s. EmployeesSection → employees for [id], role-templates, upgrade-super-admin.
+    employees/route.ts is dual-caller (GET also from UsersSection / TransferCustomerDialog)
+    so it is asserted in the R101s describe rather than here. DatabaseSection → database
+    for the destructive reset-all-employees control.
+  */
+  { folder: ["employees", "[id]"], section: "employees" },
+  { folder: ["employees", "role-templates"], section: "employees" },
+  { folder: ["employees", "upgrade-super-admin"], section: "employees" },
+  { folder: ["admin", "reset-all-employees"], section: "database" },
   /*
     R101o. Money writers first among helper-but-no-grant. FinancialDashboard → financial
     (admin-funds, vat, vendor-payments, atlas/*); PendingWithdrawalsSection →
@@ -1447,6 +1457,75 @@ describe("R101r - fraud/ is section-granted and nothing weaker", () => {
     expect(code).toMatch(/guardAnySection\s*\(\s*\[/);
     const named = guardedSections(code);
     expect(named).toEqual(expect.arrayContaining(["fraud", "users"]));
+  });
+});
+
+
+describe("R101s - employees helpers and reset-all are section-granted", () => {
+  /*
+    Five files, thirteen handlers. EmployeesSection owns [id], role-templates,
+    upgrade-super-admin and POST /employees. GET /employees is also fetched from
+    UsersSection and TransferCustomerDialog (users). reset-all-employees is the
+    DatabaseSection danger control. availability stays messaging (R101n).
+  */
+  const WEAKER =
+    /(getAdminSession|requireAdminAuth|verifyAdminAuth|verifyAdminToken|verifyAnyAuth|jwtVerify|getAdminJwtSecret)\s*\(|\bverify\s*\(/;
+
+  const employeeOwned = [
+    join(API, "employees", "[id]", "route.ts"),
+    join(API, "employees", "role-templates", "route.ts"),
+    join(API, "employees", "upgrade-super-admin", "route.ts"),
+  ];
+
+  it("covers the three employees-only subtrees", () => {
+    for (const file of employeeOwned) {
+      expect(existsSync(file)).toBe(true);
+    }
+  });
+
+  it("every employees-only file names the employees grant and no weaker helper", () => {
+    const weaker: string[] = [];
+    const missing: string[] = [];
+    let handlers = 0;
+    let guards = 0;
+
+    for (const file of employeeOwned) {
+      const code = stripComments(readFileSync(file, "utf8"));
+      const name = file.slice(API.length + 1).replace(/\\/g, "/");
+      const named = guardedSections(code);
+      if (WEAKER.test(code)) weaker.push(name);
+      if (!named.includes("employees")) missing.push(name);
+      handlers += (code.match(handlerPattern()) ?? []).length;
+      guards += (code.match(guardCallPattern()) ?? []).length;
+    }
+
+    expect(weaker).toEqual([]);
+    expect(missing).toEqual([]);
+    expect(handlers).toBe(10);
+    expect(guards).toBeGreaterThanOrEqual(handlers);
+  });
+
+  it("GET /employees accepts either employees or users; POST demands employees", () => {
+    const code = stripComments(
+      readFileSync(join(API, "employees", "route.ts"), "utf8"),
+    );
+    expect(WEAKER.test(code)).toBe(false);
+    expect(code).toMatch(/guardAnySection\s*\(\s*\[\s*["']employees["']\s*,\s*["']users["']/);
+    expect(code).toMatch(/guardSection\s*\(\s*["']employees["']\s*\)/);
+    // Reason: count both calls so a GET that dropped users still fails here rather than
+    // only on the include check that a POST-only employees name would also satisfy.
+    expect((code.match(guardCallPattern()) ?? []).length).toBe(2);
+    expect((code.match(handlerPattern()) ?? []).length).toBe(2);
+  });
+
+  it("reset-all-employees names the database grant and no weaker helper", () => {
+    const code = stripComments(
+      readFileSync(join(API, "admin", "reset-all-employees", "route.ts"), "utf8"),
+    );
+    expect(WEAKER.test(code)).toBe(false);
+    expect(guardedSections(code)).toEqual(["database"]);
+    expect((code.match(handlerPattern()) ?? []).length).toBe(1);
+    expect((code.match(guardCallPattern()) ?? []).length).toBe(1);
   });
 });
 

@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import { Admin } from "@/database/models/admin.model";
 import {
   AdminRoleTemplate,
   DEFAULT_ROLE_TEMPLATES,
 } from "@/database/models/admin-role-template.model";
-import { verifyAdminAuth } from "@/lib/admin/auth";
 import {
   ADMIN_SECTIONS,
   type AdminSection,
@@ -30,10 +30,16 @@ async function isOriginalAdmin(admin: any): Promise<boolean> {
 // GET - List all role templates
 export async function GET(request: NextRequest) {
   try {
-    const auth = await verifyAdminAuth();
-    if (!auth.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("employees");
+
+    if (!guard.ok) return guard.response;
+
+    const auth = {
+      adminId: guard.admin.id,
+      email: guard.admin.email,
+      name: guard.admin.name,
+      isSuperAdmin: guard.admin.role === "super_admin",
+    };
 
     await connectToDatabase();
 
@@ -67,10 +73,16 @@ export async function GET(request: NextRequest) {
 // POST - Create new role template
 export async function POST(request: NextRequest) {
   try {
-    const auth = await verifyAdminAuth();
-    if (!auth.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("employees");
+
+    if (!guard.ok) return guard.response;
+
+    const auth = {
+      adminId: guard.admin.id,
+      email: guard.admin.email,
+      name: guard.admin.name,
+      isSuperAdmin: guard.admin.role === "super_admin",
+    };
 
     await connectToDatabase();
 
@@ -137,10 +149,16 @@ export async function POST(request: NextRequest) {
 // PUT - Update role template
 export async function PUT(request: NextRequest) {
   try {
-    const auth = await verifyAdminAuth();
-    if (!auth.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("employees");
+
+    if (!guard.ok) return guard.response;
+
+    const auth = {
+      adminId: guard.admin.id,
+      email: guard.admin.email,
+      name: guard.admin.name,
+      isSuperAdmin: guard.admin.role === "super_admin",
+    };
 
     await connectToDatabase();
 
@@ -217,10 +235,16 @@ export async function PUT(request: NextRequest) {
 // DELETE - Delete role template
 export async function DELETE(request: NextRequest) {
   try {
-    const auth = await verifyAdminAuth();
-    if (!auth.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("employees");
+
+    if (!guard.ok) return guard.response;
+
+    const auth = {
+      adminId: guard.admin.id,
+      email: guard.admin.email,
+      name: guard.admin.name,
+      isSuperAdmin: guard.admin.role === "super_admin",
+    };
 
     await connectToDatabase();
 

@@ -4558,7 +4558,7 @@ same limit would refuse.
 
 ---
 
-### R101 - Ninety-nine admin routes with no authorization, and fifty-eight of them write - **R101a–R101r CLOSED 16 Sep 2026; helper-but-no-grant still open**
+### R101 - Ninety-nine admin routes with no authorization, and fifty-eight of them write - **R101a–R101s CLOSED 16 Sep 2026; helper-but-no-grant still open**
 
 **What it is.** `apps/admin` is a separate Next.js process with **no `middleware.ts` of its
 own**. The root `middleware.ts` belongs to the main app and never runs for these routes, so
@@ -4999,7 +4999,15 @@ four handlers naming `fraud` and the file-wide `named.includes("fraud")` stayed 
 (fourth cause); flipped to replace-all. Inventory after: **0 no-check / 0 hand-verified /
 122 helper / 215 section-granted**.
 
-**R101 remains open** on the **122 helper-but-no-grant** routes.
+**R101s CLOSED 16 September 2026.** Employees helpers + reset: **5 files, 13 handlers**.
+`EmployeesSection` → `employees` on `[id]`, `role-templates`, `upgrade-super-admin` and
+`POST /employees`; `GET /employees` is dual-caller with `UsersSection` /
+`TransferCustomerDialog` → `guardAnySection(["employees", "users"])`.
+`DatabaseSection` → `database` on `admin/reset-all-employees`. `availability` stays
+`messaging` (R101n). 6 new probes each red on exactly one failure. Inventory after:
+**0 no-check / 0 hand-verified / 117 helper / 220 section-granted**.
+
+**R101 remains open** on the **117 helper-but-no-grant** routes.
 
 ---
 
