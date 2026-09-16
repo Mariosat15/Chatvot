@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardAnySection } from "@/lib/admin/section-route-guard";
 import { randomUUID } from "crypto";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
-import { getAdminSession } from "@/lib/admin/auth";
 import Chargeback from "../../../../../../../database/models/chargeback.model";
 import AuditLog from "../../../../../../../database/models/audit-log.model";
 import { connectToDatabase } from "../../../../../../../database/mongoose";
@@ -65,10 +65,9 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const session = await getAdminSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardAnySection(["financial", "users"]);
+    if (!guard.ok) return guard.response;
+    const session = guard.admin;
     const { id } = await params;
     await connectToDatabase();
     const c = await Chargeback.findById(id);
@@ -178,10 +177,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const session = await getAdminSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardAnySection(["financial", "users"]);
+    if (!guard.ok) return guard.response;
+    const session = guard.admin;
     const { id } = await params;
     await connectToDatabase();
     const c = await Chargeback.findById(id).lean<{

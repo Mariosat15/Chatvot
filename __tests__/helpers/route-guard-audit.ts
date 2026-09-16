@@ -77,8 +77,39 @@ export function handlerPattern(): RegExp {
  * elsewhere in these suites (`canTransitionRound`, `MIN_REASON_LENGTH`, and the round
  * inspector's own `resolveRoundManually`).
  */
+/**
+ * Counts section-grant calls of either shape (`guardSection` or `guardAnySection`).
+ *
+ * Reason: a dual-caller route uses `guardAnySection([...])`, and a count that only
+ * matches the single-argument form reports those handlers as unguarded while every
+ * refusal and every import still look correct.
+ */
 export function guardCallPattern(): RegExp {
-  return /guardSection\(\s*["'`]([a-z0-9-]+)["'`]\s*\)/g;
+  return /guard(?:Any)?Section\s*\(/g;
+}
+
+/** Either shape of section grant — single or any-of. Alias kept for classifyRouteAuth. */
+export function anyGuardCallPattern(): RegExp {
+  return /guard(?:Any)?Section\s*\(/;
+}
+
+/**
+ * Section ids named by either grant shape.
+ *
+ * `guardSection("users")` yields `["users"]`; `guardAnySection(["financial", "users"])`
+ * yields both. Used by the closed-folder suite so a dual-caller route can still prove
+ * it names the screen that owns it without inventing a second folder entry.
+ */
+export function guardedSections(code: string): string[] {
+  const single = [
+    ...code.matchAll(/guardSection\(\s*["'`]([a-z0-9-]+)["'`]\s*\)/g),
+  ].map((match) => match[1]);
+  const anyOf = [
+    ...code.matchAll(/guardAnySection\(\s*\[([^\]]+)\]\s*\)/g),
+  ].flatMap((match) =>
+    [...match[1].matchAll(/["'`]([a-z0-9-]+)["'`]/g)].map((inner) => inner[1]),
+  );
+  return [...single, ...anyOf];
 }
 
 /**
@@ -101,11 +132,6 @@ export function handlerSlices(code: string): { method: string; body: string }[] 
   }));
 }
 
-/** The section ids a folder's routes name, in source order. */
-export function guardedSections(code: string): string[] {
-  return [...code.matchAll(guardCallPattern())].map((match) => match[1]);
-}
-
 /**
  * Any authentication helper at all, including the ones that answer the wrong question.
  *
@@ -116,7 +142,7 @@ export function guardedSections(code: string): string[] {
  * previous rounds of this class walked straight past them.
  */
 export function anyAuthHelperPattern(): RegExp {
-  return /(guardSection|requireSectionAccess|getAdminSession|verifyAdminAuth|verifyAdminToken|requireAdminAuth|verifyAnyAuth|verifyGameMasterAuth|getServerSession|auth\.api\.getSession)\s*\(/;
+  return /(guardSection|guardAnySection|requireSectionAccess|requireAnySectionAccess|getAdminSession|verifyAdminAuth|verifyAdminToken|requireAdminAuth|verifyAnyAuth|verifyGameMasterAuth|getServerSession|auth\.api\.getSession)\s*\(/;
 }
 
 /**
@@ -159,7 +185,12 @@ export type RouteAuthClass =
  * hand-verified token is only interesting in a file that calls no helper at all.
  */
 export function classifyRouteAuth(code: string): RouteAuthClass {
-  if (guardCallPattern().test(code) || /requireSectionAccess\s*\(/.test(code)) {
+  // Reason: guardAnySection is a section grant over more than one id — classifying it as
+  // helper-no-grant would leave every dual-caller route permanently in the debt pile.
+  if (
+    anyGuardCallPattern().test(code) ||
+    /require(?:Any)?SectionAccess\s*\(/.test(code)
+  ) {
     return "section-granted";
   }
   if (anyAuthHelperPattern().test(code)) return "helper-no-grant";

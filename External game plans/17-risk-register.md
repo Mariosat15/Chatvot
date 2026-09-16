@@ -4558,7 +4558,7 @@ same limit would refuse.
 
 ---
 
-### R101 - Ninety-nine admin routes with no authorization, and fifty-eight of them write - **R101a–R101p CLOSED 16 Sep 2026; helper-but-no-grant still open**
+### R101 - Ninety-nine admin routes with no authorization, and fifty-eight of them write - **R101a–R101q CLOSED 16 Sep 2026; helper-but-no-grant still open**
 
 **What it is.** `apps/admin` is a separate Next.js process with **no `middleware.ts` of its
 own**. The root `middleware.ts` belongs to the main app and never runs for these routes, so
@@ -4970,13 +4970,25 @@ Grants from calling screens: `financial` (`financial-dashboard`, `financial-anal
 (`fee-settings`), `payments` (`complete-pending-payment`), `withdrawals`
 (`withdrawal-settings`), `currency` (`credit-conversion`). Three of the ten
 (`financial-dashboard`, `fee-settings`, `credit-conversion`) were hand-rolled
-`jwtVerify` and had sat in the helper frozen list by classifier mistake. **Deferred:**
-`chargebacks/[id]/*` (FinancialDashboard + Users dual callers — needs
-`guardAnySection`), `admin-bank-accounts`, `cancel-pending-payment`, `vendors` (no
-`ADMIN_SECTIONS` id). 6 new probes each red on exactly one failure. Inventory after:
-**0 no-check / 0 hand-verified / 159 helper / 178 section-granted**.
+`jwtVerify` and had sat in the helper frozen list by classifier mistake. **Deferred at
+the time:** `chargebacks/[id]/*`, `admin-bank-accounts`, `cancel-pending-payment`,
+`vendors` — closed the same day as R101q. 6 new probes each red on exactly one failure.
+Inventory after: **0 no-check / 0 hand-verified / 159 helper / 178 section-granted**.
 
-**R101 remains open** on the **159 helper-but-no-grant** routes.
+**R101q CLOSED 16 September 2026.** Dual-caller money + vendors: **16 files, 23 handlers**.
+Introduced `guardAnySection` / `requireAnySectionAccess` (succeed on any named grant;
+empty list refuses **before** `verifyAdminAuth`). Grants: `financial|users` on
+`chargebacks/[id]/*` (11 files); `company|pending-withdrawals` on `admin-bank-accounts`
+(2); `failed-deposits|payments` on `cancel-pending-payment` (1); `vendors` on
+`vendors/*` (2) after adding `"vendors"` to `ADMIN_SECTIONS` (menu id existed; enum did
+not — same class as journey-map / server-fleet). Classifier and `guardCallPattern` /
+`guardedSections` recognise both grant shapes. 6 new probes each red on exactly one
+failure — the bank-accounts probe first came back green because the dual-caller
+assertion was file-wide and that route has two handlers (fourth cause); flipped to
+per-handler slices. Inventory after: **0 no-check / 0 hand-verified / 143 helper / 194
+section-granted**.
+
+**R101 remains open** on the **143 helper-but-no-grant** routes.
 
 ---
 

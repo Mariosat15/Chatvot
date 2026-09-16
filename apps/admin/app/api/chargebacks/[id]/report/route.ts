@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminSession } from "@/lib/admin/auth";
+import { guardAnySection } from "@/lib/admin/section-route-guard";
 import { getChargebackById } from "../../../../../../../lib/services/security/chargeback-case.service";
 import { buildDefensePacket } from "../../../../../../../lib/services/security/chargeback-evidence.service";
 import {
@@ -29,10 +29,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const session = await getAdminSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardAnySection(["financial", "users"]);
+    if (!guard.ok) return guard.response;
+    const session = guard.admin;
     const { id } = await params;
     const formatParam =
       (req.nextUrl.searchParams.get("format") || "docx").toLowerCase();

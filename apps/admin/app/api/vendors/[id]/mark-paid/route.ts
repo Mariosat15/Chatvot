@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
-import { verifyAdminAuth } from "@/lib/admin/auth";
 import VendorSubscription from "@/database/models/vendor-subscription.model";
 
 /**
@@ -12,10 +12,8 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const admin = await verifyAdminAuth();
-    if (!admin.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("vendors");
+    if (!guard.ok) return guard.response;
 
     await connectToDatabase();
 

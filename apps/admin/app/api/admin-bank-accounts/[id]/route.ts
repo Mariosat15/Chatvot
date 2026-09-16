@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardAnySection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import AdminBankAccount from "@/database/models/admin-bank-account.model";
-import { getAdminSession } from "@/lib/admin/auth";
 
 /**
  * GET /api/admin-bank-accounts/[id]
@@ -12,10 +12,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const session = await getAdminSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardAnySection(["company", "pending-withdrawals"]);
+    if (!guard.ok) return guard.response;
+    const session = guard.admin;
 
     const { id } = await params;
     await connectToDatabase();
@@ -51,10 +50,9 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const session = await getAdminSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardAnySection(["company", "pending-withdrawals"]);
+    if (!guard.ok) return guard.response;
+    const session = guard.admin;
 
     const { id } = await params;
     await connectToDatabase();
@@ -132,10 +130,9 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const session = await getAdminSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardAnySection(["company", "pending-withdrawals"]);
+    if (!guard.ok) return guard.response;
+    const session = guard.admin;
 
     const { id } = await params;
     await connectToDatabase();

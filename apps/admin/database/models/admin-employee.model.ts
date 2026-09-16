@@ -86,6 +86,14 @@ export const ADMIN_SECTIONS = [
   "settings",
   "credentials",
   "environment",
+  /*
+    Vendor Subscriptions is a real screen (`VendorSubscriptionsSection`, menu id `vendors`)
+    and was never an ADMIN_SECTIONS value, so only a super admin could open the tab and no
+    grant could be issued. Added so `guardSection("vendors")` can name the calling screen —
+    same reason as journey-map, gamification-wizard and server-fleet. Add-only; nobody's
+    access widens: a super admin passed before and passes now.
+  */
+  "vendors",
   "branding",
   // Reason: the display-word overrides (X6.5). Its own grant rather than a slice of
   // "branding", because renaming "Competition" to "Tournament" changes every operator and

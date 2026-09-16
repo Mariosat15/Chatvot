@@ -187,6 +187,36 @@ export async function requireSectionAccess(
 }
 
 /**
+ * Require access to ANY of the named sections.
+ *
+ * Reason: a route called from two screens cannot pick one grant without locking the
+ * other out. Refusing when the caller holds neither is still fail-closed; succeeding
+ * on either is the dual-caller answer. An empty list is a programming error and
+ * refuses rather than opening the door.
+ */
+export async function requireAnySectionAccess(
+  sections: readonly AdminSection[],
+): Promise<AdminAuthResult> {
+  // Reason: empty accept-either is a programming error — refuse before any session work
+  // so a miswired caller cannot open the door by also lacking a cookie.
+  if (sections.length === 0) {
+    throw new Error("Access denied to section: (none)");
+  }
+
+  const auth = await verifyAdminAuth();
+
+  if (!auth.isAuthenticated) {
+    throw new Error("Unauthorized");
+  }
+
+  if (sections.some((section) => hasAccessToSection(auth, section))) {
+    return auth;
+  }
+
+  throw new Error(`Access denied to section: ${sections.join("|")}`);
+}
+
+/**
  * Get current admin session info (returns null if not authenticated)
  */
 export async function getAdminSession(): Promise<{

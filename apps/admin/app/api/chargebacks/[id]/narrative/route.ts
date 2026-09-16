@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminSession } from "@/lib/admin/auth";
+import { guardAnySection } from "@/lib/admin/section-route-guard";
 import { updateNarrative } from "../../../../../../../lib/services/security/chargeback-case.service";
 import { logChargebackAction } from "../../_audit";
 
@@ -8,10 +8,9 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const session = await getAdminSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardAnySection(["financial", "users"]);
+    if (!guard.ok) return guard.response;
+    const session = guard.admin;
     const { id } = await params;
     const body = await req.json().catch(() => ({}));
     if (typeof body?.narrative !== "string") {

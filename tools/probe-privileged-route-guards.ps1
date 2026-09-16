@@ -841,11 +841,68 @@ Invoke-Probe -Name 'financial-analytics closed folder loses grant' -File 'apps/a
   -Replace2 '' `
   -ExpectTest 'and none of the closed folders leak an unguarded file'
 
+Write-Host "`n=== R101q probes ===`n"
+
+$CB_ID = 'apps/admin/app/api/chargebacks/[id]/route.ts'
+$BANK = 'apps/admin/app/api/admin-bank-accounts/route.ts'
+$CANCEL = 'apps/admin/app/api/cancel-pending-payment/route.ts'
+$VENDORS = 'apps/admin/app/api/vendors/route.ts'
+$AUTH_TS = 'apps/admin/lib/admin/auth.ts'
+
+# 81. chargebacks/[id] drops to a single grant - locks one of two calling screens out.
+Invoke-Probe -Name 'chargebacks id financial only' -File $CB_ID -First `
+  -Find 'guardAnySection(["financial", "users"])' `
+  -Replace 'guardSection("financial")' `
+  -ExpectTest 'every dual-caller file uses guardAnySection with both calling-screen grants'
+
+# 82. admin-bank-accounts loses pending-withdrawals half.
+Invoke-Probe -Name 'bank accounts company only' -File $BANK -First `
+  -Find 'guardAnySection(["company", "pending-withdrawals"])' `
+  -Replace 'guardSection("company")' `
+  -ExpectTest 'every dual-caller file uses guardAnySection with both calling-screen grants'
+
+# 83. cancel-pending drops payments half.
+Invoke-Probe -Name 'cancel pending failed-deposits only' -File $CANCEL `
+  -Find 'guardAnySection(["failed-deposits", "payments"])' `
+  -Replace 'guardSection("failed-deposits")' `
+  -ExpectTest 'every dual-caller file uses guardAnySection with both calling-screen grants'
+
+# 84. vendors unguarded - VendorSubscriptionsSection owns it.
+Invoke-Probe -Name 'vendors unguarded' -File $VENDORS -First `
+  -Find '    const guard = await guardSection("vendors");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'vendors routes name the vendors section and no weaker helper'
+
+# 85. empty accept-either checked after auth - would open on a miswired caller without a cookie.
+Invoke-Probe -Name 'empty any-section after auth' -File $AUTH_TS `
+  -Find '  if (sections.length === 0) {
+    throw new Error("Access denied to section: (none)");
+  }
+
+  const auth = await verifyAdminAuth();' `
+  -Replace '  const auth = await verifyAdminAuth();
+
+  if (sections.length === 0) {
+    throw new Error("Access denied to section: (none)");
+  }' `
+  -ExpectTest 'guardAnySection refuses an empty section list before authenticating'
+
+# 86. Closed-folder canary on vendors (single section, multi-handler - use -First carefully:
+# mark-paid is single-handler).
+Invoke-Probe -Name 'vendors mark-paid closed folder loses grant' -File 'apps/admin/app/api/vendors/[id]/mark-paid/route.ts' `
+  -Find '    const guard = await guardSection("vendors");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'and none of the closed folders leak an unguarded file'
+
 Write-Host ''
 Write-Host 'UNPROBED, with the reason: "finds no route in the no-check-of-any-kind class" and' -ForegroundColor DarkGray
 Write-Host '"finds no route in the hand-verified-no-grant class". Both are already green (empty' -ForegroundColor DarkGray
 Write-Host 'after R101m/R101n). Turning either red means adding a route in that class, which the' -ForegroundColor DarkGray
 Write-Host 'inventory ratchet also catches. The closed-folder leak check is the probeable guard.' -ForegroundColor DarkGray
-Write-Host 'Helper debt after R101p: 159. chargebacks/[id]/*, admin-bank-accounts, cancel-pending,' -ForegroundColor DarkGray
-Write-Host 'vendors deferred (dual callers / missing section).' -ForegroundColor DarkGray
+Write-Host 'Helper debt after R101q: 143. Remaining are helper-but-no-grant folders (fraud,' -ForegroundColor DarkGray
+Write-Host 'settings, marketplace, invoices, ...).' -ForegroundColor DarkGray
 Write-Host ''

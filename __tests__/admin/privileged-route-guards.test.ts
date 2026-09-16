@@ -197,9 +197,9 @@ const CLOSED_FOLDERS: { folder: string[]; section: string }[] = [
   { folder: ["atlas"], section: "financial" },
   { folder: ["withdrawals"], section: "pending-withdrawals" },
   /*
-    R101p. Clean single-caller money helpers. chargebacks/[id]/* deferred (FinancialDashboard
-    + Users dual callers — needs guardAnySection). admin-bank-accounts / cancel-pending /
-    vendors still deferred.
+    R101p. Clean single-caller money helpers. chargebacks/[id]/* closed in R101q
+    (guardAnySection) — not listed here because the folder mixes users-only lookup
+    with dual-caller case routes and CLOSED_FOLDERS demands one section per walk.
   */
   { folder: ["financial-dashboard"], section: "financial" },
   { folder: ["financial-analytics"], section: "financial" },
@@ -208,8 +208,16 @@ const CLOSED_FOLDERS: { folder: string[]; section: string }[] = [
   { folder: ["complete-pending-payment"], section: "payments" },
   { folder: ["withdrawal-settings"], section: "withdrawals" },
   { folder: ["credit-conversion"], section: "currency" },
-  // Reason: only the list + lookup; chargebacks/[id]/* stays helper until accept-either.
   { folder: ["chargebacks", "lookup"], section: "users" },
+  /*
+    R101q. Dual-caller money + vendors section. Bank accounts: CompanyDetailsSection
+    (company) OR PendingWithdrawalsSection (pending-withdrawals). Cancel: FailedDeposits
+    OR PendingPayments. Vendors needed an ADMIN_SECTIONS entry before it could be named.
+    chargebacks/[id] is asserted in the R101q describe (both grants required).
+  */
+  { folder: ["admin-bank-accounts"], section: "company" },
+  { folder: ["cancel-pending-payment"], section: "failed-deposits" },
+  { folder: ["vendors"], section: "vendors" },
 ];
 
 describe("R101a - every handler in the closed folders is guarded, per handler", () => {
@@ -1221,6 +1229,173 @@ describe("R101p - clean money helpers are section-granted", () => {
   });
 });
 
+describe("R101q - dual-caller money helpers and vendors are section-granted", () => {
+  /*
+    Sixteen files. guardAnySection for routes called from two screens; guardSection("vendors")
+    after adding the menu id to ADMIN_SECTIONS. chargebacks/[id] is not a CLOSED_FOLDERS walk
+    because the parent folder also holds the users-only lookup.
+  */
+  const WEAKER =
+    /(getAdminSession|requireAdminAuth|verifyAdminAuth|verifyAdminToken|verifyAnyAuth|jwtVerify|getAdminJwtSecret)\s*\(|\bverify\s*\(/;
+
+  const dualCaller: { rel: string; sections: string[]; handlers: number }[] = [
+    { rel: "chargebacks/[id]/route.ts", sections: ["financial", "users"], handlers: 1 },
+    {
+      rel: "chargebacks/[id]/ai-narrative/route.ts",
+      sections: ["financial", "users"],
+      handlers: 1,
+    },
+    {
+      rel: "chargebacks/[id]/attachments/route.ts",
+      sections: ["financial", "users"],
+      handlers: 2,
+    },
+    {
+      rel: "chargebacks/[id]/attachments/[attachmentId]/route.ts",
+      sections: ["financial", "users"],
+      handlers: 1,
+    },
+    {
+      rel: "chargebacks/[id]/complete/route.ts",
+      sections: ["financial", "users"],
+      handlers: 1,
+    },
+    {
+      rel: "chargebacks/[id]/initiate/route.ts",
+      sections: ["financial", "users"],
+      handlers: 1,
+    },
+    {
+      rel: "chargebacks/[id]/narrative/route.ts",
+      sections: ["financial", "users"],
+      handlers: 1,
+    },
+    {
+      rel: "chargebacks/[id]/report/route.ts",
+      sections: ["financial", "users"],
+      handlers: 1,
+    },
+    {
+      rel: "chargebacks/[id]/represented/route.ts",
+      sections: ["financial", "users"],
+      handlers: 1,
+    },
+    {
+      rel: "chargebacks/[id]/withdrawn/route.ts",
+      sections: ["financial", "users"],
+      handlers: 1,
+    },
+    {
+      rel: "chargebacks/[id]/won/route.ts",
+      sections: ["financial", "users"],
+      handlers: 1,
+    },
+    {
+      rel: "admin-bank-accounts/route.ts",
+      sections: ["company", "pending-withdrawals"],
+      handlers: 2,
+    },
+    {
+      rel: "admin-bank-accounts/[id]/route.ts",
+      sections: ["company", "pending-withdrawals"],
+      handlers: 3,
+    },
+    {
+      rel: "cancel-pending-payment/route.ts",
+      sections: ["failed-deposits", "payments"],
+      handlers: 1,
+    },
+  ];
+
+  const singleCaller: { rel: string; section: string; handlers: number }[] = [
+    { rel: "vendors/route.ts", section: "vendors", handlers: 4 },
+    { rel: "vendors/[id]/mark-paid/route.ts", section: "vendors", handlers: 1 },
+  ];
+
+  it("covers sixteen dual-caller and vendors route files", () => {
+    expect(dualCaller.length + singleCaller.length).toBe(16);
+  });
+
+  it("every dual-caller file uses guardAnySection with both calling-screen grants", () => {
+    /*
+      Per handler slice, not file-wide. A probe that narrows only the first handler of
+      admin-bank-accounts (two handlers) stayed green against a file-level check because the
+      sibling still named both grants - fourth cause of a green probe (mutation changes no
+      observable). Both calling-screen grants must appear on EVERY exported handler.
+    */
+    const weaker: string[] = [];
+    const missing: string[] = [];
+    let handlers = 0;
+    let guards = 0;
+
+    for (const { rel, sections, handlers: expected } of dualCaller) {
+      const file = join(API, ...rel.split("/"));
+      const code = stripComments(readFileSync(file, "utf8"));
+
+      if (WEAKER.test(code)) weaker.push(rel);
+      for (const { method, body } of handlerSlices(code)) {
+        const named = guardedSections(body);
+        if (!sections.every((s) => named.includes(s))) {
+          missing.push(`${rel}:${method}`);
+        }
+        if (!/guardAnySection\s*\(/.test(body)) {
+          missing.push(`${rel}:${method}:not-any`);
+        }
+      }
+      const fileHandlers = (code.match(handlerPattern()) ?? []).length;
+      handlers += fileHandlers;
+      guards += (code.match(guardCallPattern()) ?? []).length;
+      expect(fileHandlers).toBe(expected);
+    }
+
+    expect(weaker).toEqual([]);
+    expect(missing).toEqual([]);
+    expect(handlers).toBe(18);
+    expect(guards).toBeGreaterThanOrEqual(handlers);
+  });
+
+  it("vendors routes name the vendors section and no weaker helper", () => {
+    for (const { rel, section, handlers: expected } of singleCaller) {
+      const file = join(API, ...rel.split("/"));
+      const code = stripComments(readFileSync(file, "utf8"));
+      expect(WEAKER.test(code)).toBe(false);
+      expect(guardedSections(code)).toContain(section);
+      expect((code.match(handlerPattern()) ?? []).length).toBe(expected);
+      expect((code.match(guardCallPattern()) ?? []).length).toBeGreaterThanOrEqual(
+        expected,
+      );
+    }
+  });
+
+  it("vendors is an ADMIN_SECTIONS value so the grant can be issued", () => {
+    // Reason: the menu id existed; the enum did not. Without this, guardSection("vendors")
+    // would not typecheck and no employee document could store the grant.
+    const model = readFileSync(
+      join(
+        process.cwd(),
+        "apps/admin/database/models/admin-employee.model.ts",
+      ),
+      "utf8",
+    );
+    expect(model).toMatch(/"vendors"/);
+  });
+
+  it("guardAnySection refuses an empty section list before authenticating", () => {
+    // Reason: empty accept-either is a programming error that must fail closed. Asserted
+    // in source so the suite does not need a live session to prove the order.
+    const authSrc = readFileSync(
+      join(process.cwd(), "apps/admin/lib/admin/auth.ts"),
+      "utf8",
+    );
+    const start = authSrc.indexOf("export async function requireAnySectionAccess");
+    expect(start).toBeGreaterThan(-1);
+    const slice = authSrc.slice(start, start + 600);
+    expect(slice.indexOf("sections.length === 0")).toBeLessThan(
+      slice.indexOf("verifyAdminAuth"),
+    );
+  });
+});
+
 describe("R101 - the no-check and hand-verified debt is closed; helper remains", () => {
   /*
     FLIPPED 16 Sep 2026 (R101m) for no-check; hand-verified closed the same day (R101n).
@@ -1229,7 +1404,7 @@ describe("R101 - the no-check and hand-verified debt is closed; helper remains",
     closed-folder leak check for regressions.
   */
   const AUTH_CALL =
-    /(guardSection|requireSectionAccess|getAdminSession|verifyAdminAuth|verifyAdminToken|requireAdminAuth|verifyAnyAuth|verifyGameMasterAuth|getServerSession|auth\.api\.getSession)\s*\(/;
+    /(guardSection|guardAnySection|requireSectionAccess|requireAnySectionAccess|getAdminSession|verifyAdminAuth|verifyAdminToken|requireAdminAuth|verifyAnyAuth|verifyGameMasterAuth|getServerSession|auth\.api\.getSession)\s*\(/;
 
   const unguardedByHelper = findRouteFiles(API).filter((file) => {
     const code = stripComments(readFileSync(file, "utf8"));

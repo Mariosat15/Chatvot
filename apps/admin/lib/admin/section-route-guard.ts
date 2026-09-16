@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import type { AdminSection } from "@/database/models/admin-employee.model";
-import { requireSectionAccess, getAdminSession } from "@/lib/admin/auth";
+import {
+  requireSectionAccess,
+  requireAnySectionAccess,
+  getAdminSession,
+} from "@/lib/admin/auth";
 
 /**
  * Shared guard for admin API routes that belong to one RBAC section.
@@ -23,11 +27,12 @@ export type GuardOutcome =
   | { ok: true; admin: GuardedAdmin }
   | { ok: false; response: NextResponse };
 
-export async function guardSection(
-  section: AdminSection,
+async function toOutcome(
+  label: string,
+  resolve: () => Promise<{ isSuperAdmin?: boolean }>,
 ): Promise<GuardOutcome> {
   try {
-    const auth = await requireSectionAccess(section);
+    const auth = await resolve();
     const session = await getAdminSession();
 
     return {
@@ -58,7 +63,7 @@ export async function guardSection(
       };
     }
 
-    console.error(`❌ Section guard failed for "${section}":`, error);
+    console.error(`❌ Section guard failed for "${label}":`, error);
     return {
       ok: false,
       response: NextResponse.json(
@@ -67,4 +72,24 @@ export async function guardSection(
       ),
     };
   }
+}
+
+export async function guardSection(
+  section: AdminSection,
+): Promise<GuardOutcome> {
+  return toOutcome(section, () => requireSectionAccess(section));
+}
+
+/**
+ * Succeed when the caller holds ANY of the named section grants.
+ *
+ * Reason: dual-caller routes (chargebacks case panel from Financial + Users, bank
+ * accounts from Company + Pending Withdrawals, cancel-pending from Payments + Failed
+ * Deposits). Picking one grant locks the other screen out; requiring both is a silent
+ * privilege narrowing. An empty array refuses — same fail-closed as requireAnySectionAccess.
+ */
+export async function guardAnySection(
+  sections: readonly AdminSection[],
+): Promise<GuardOutcome> {
+  return toOutcome(sections.join("|"), () => requireAnySectionAccess(sections));
 }

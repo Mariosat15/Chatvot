@@ -72,13 +72,11 @@ const NO_CHECK_OF_ANY_KIND = [] as const;
 const HAND_VERIFIED_NO_GRANT = [] as const;
 
 /**
- * 159 routes that authenticate with a helper and never ask which sections the caller
- * holds. (Was 169 after R101o; R101p moved ten clean money-helper routes into
+ * 143 routes that authenticate with a helper and never ask which sections the caller
+ * holds. (Was 159 after R101p; R101q moved sixteen dual-caller / vendors routes into
  * section-granted.)
  */
 const HELPER_BUT_NO_GRANT = [
-  "admin-bank-accounts/[id]/route.ts",
-  "admin-bank-accounts/route.ts",
   "admin/backfill-ranks/route.ts",
   "admin/cleanup/run/route.ts",
   "admin/events/poll/route.ts",
@@ -101,19 +99,7 @@ const HELPER_BUT_NO_GRANT = [
   "announcements/templates/route.ts",
   "audit-logs/route.ts",
   "auth/logout/route.ts",
-  "cancel-pending-payment/route.ts",
   "challenge-settings/route.ts",
-  "chargebacks/[id]/ai-narrative/route.ts",
-  "chargebacks/[id]/attachments/[attachmentId]/route.ts",
-  "chargebacks/[id]/attachments/route.ts",
-  "chargebacks/[id]/complete/route.ts",
-  "chargebacks/[id]/initiate/route.ts",
-  "chargebacks/[id]/narrative/route.ts",
-  "chargebacks/[id]/report/route.ts",
-  "chargebacks/[id]/represented/route.ts",
-  "chargebacks/[id]/route.ts",
-  "chargebacks/[id]/withdrawn/route.ts",
-  "chargebacks/[id]/won/route.ts",
   "company-settings/route.ts",
   "cookie-consent/route.ts",
   "credentials/route.ts",
@@ -233,8 +219,6 @@ const HELPER_BUT_NO_GRANT = [
   "tutorials/upload/[sessionId]/route.ts",
   "tutorials/upload/init/route.ts",
   "tutorials/youtube/route.ts",
-  "vendors/[id]/mark-paid/route.ts",
-  "vendors/route.ts",
   "verify-password/route.ts",
 ] as const;
 
@@ -283,7 +267,7 @@ const CLOSED_FOLDERS = [
   "vendor-payments",
   "atlas",
   "withdrawals",
-  // R101p. Clean money helpers. chargebacks/[id]/* deferred (dual callers).
+  // R101p. Clean money helpers. chargebacks/[id]/* closed in R101q (dual callers).
   "financial-dashboard",
   "financial-analytics",
   "deposits",
@@ -292,6 +276,12 @@ const CLOSED_FOLDERS = [
   "withdrawal-settings",
   "credit-conversion",
   "chargebacks/lookup",
+  // R101q. Dual-caller money + vendors. chargebacks/[id] covered by chargebacks/ prefix
+  // after lookup; whole chargebacks/ tree is now section-granted.
+  "admin-bank-accounts",
+  "cancel-pending-payment",
+  "vendors",
+  "chargebacks",
 ];
 
 const findings = inventoryAdminRoutes();

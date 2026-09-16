@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
-import { verifyAdminAuth } from "@/lib/admin/auth";
 import VendorSubscription from "@/database/models/vendor-subscription.model";
 
 // Protect against prototype pollution
@@ -15,10 +15,8 @@ function isSafeKey(key: string): boolean {
  */
 export async function GET(request: NextRequest) {
   try {
-    const admin = await verifyAdminAuth();
-    if (!admin.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("vendors");
+    if (!guard.ok) return guard.response;
 
     await connectToDatabase();
 
@@ -150,10 +148,8 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const admin = await verifyAdminAuth();
-    if (!admin.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("vendors");
+    if (!guard.ok) return guard.response;
 
     await connectToDatabase();
 
@@ -198,10 +194,8 @@ export async function POST(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
-    const admin = await verifyAdminAuth();
-    if (!admin.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("vendors");
+    if (!guard.ok) return guard.response;
 
     await connectToDatabase();
 
@@ -256,10 +250,8 @@ export async function PUT(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
-    const admin = await verifyAdminAuth();
-    if (!admin.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("vendors");
+    if (!guard.ok) return guard.response;
 
     await connectToDatabase();
 

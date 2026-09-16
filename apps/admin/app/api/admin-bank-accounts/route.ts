@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardAnySection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import AdminBankAccount from "@/database/models/admin-bank-account.model";
-import { getAdminSession } from "@/lib/admin/auth";
 
 /**
  * GET /api/admin-bank-accounts
@@ -9,10 +9,9 @@ import { getAdminSession } from "@/lib/admin/auth";
  */
 export async function GET() {
   try {
-    const session = await getAdminSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardAnySection(["company", "pending-withdrawals"]);
+    if (!guard.ok) return guard.response;
+    const session = guard.admin;
 
     await connectToDatabase();
 
@@ -39,10 +38,9 @@ export async function GET() {
  */
 export async function POST(request: NextRequest) {
   try {
-    const session = await getAdminSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardAnySection(["company", "pending-withdrawals"]);
+    if (!guard.ok) return guard.response;
+    const session = guard.admin;
 
     await connectToDatabase();
 

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
-import { requireAdminAuth, getAdminSession } from "@/lib/admin/auth";
+import { guardAnySection } from "@/lib/admin/section-route-guard";
 import { auditLogService } from "@/lib/services/audit-log.service";
 
 /**
@@ -12,7 +12,10 @@ import { auditLogService } from "@/lib/services/audit-log.service";
  */
 export async function POST(request: Request) {
   try {
-    await requireAdminAuth();
+    // Reason: FailedDepositsSection + PendingPaymentsSection; either grant admits.
+    const guard = await guardAnySection(["failed-deposits", "payments"]);
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     const { transactionId, reason } = await request.json();
@@ -85,14 +88,12 @@ export async function POST(request: Request) {
 
     // Log audit action
     try {
-      const admin = await getAdminSession();
-      if (admin) {
-        await auditLogService.log({
+      await auditLogService.log({
           admin: {
-            id: admin.id,
-            email: admin.email,
-            name: admin.email.split("@")[0],
-            role: "admin",
+            id: guard.admin.id,
+            email: guard.admin.email,
+            name: guard.admin.name || guard.admin.email.split("@")[0],
+            role: guard.admin.role || "admin",
           },
           action: "payment_cancelled",
           category: "financial",
@@ -105,7 +106,6 @@ export async function POST(request: Request) {
             reason: reason || "Admin cancelled",
           },
         });
-      }
     } catch (auditError) {
       console.error("Failed to log audit action:", auditError);
       // Don't fail if audit logging fails
@@ -122,9 +122,6 @@ export async function POST(request: Request) {
       },
     });
   } catch (error) {
-    if (error instanceof Error && error.message === "Unauthorized") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
     console.error("❌ Error cancelling payment:", error);
     return NextResponse.json(
       { error: "Failed to cancel payment" },

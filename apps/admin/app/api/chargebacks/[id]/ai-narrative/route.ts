@@ -1,4 +1,5 @@
 /**
+import { guardAnySection } from "@/lib/admin/section-route-guard";
  * POST /api/chargebacks/[id]/ai-narrative
  *
  * Generates (or regenerates) the AI-backed defense narrative for a case.
@@ -11,7 +12,6 @@
  * this path.
  */
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminSession } from "@/lib/admin/auth";
 import {
   getChargebackById,
   updateNarrative,
@@ -28,10 +28,9 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const session = await getAdminSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardAnySection(["financial", "users"]);
+    if (!guard.ok) return guard.response;
+    const session = guard.admin;
     const { id } = await params;
 
     const c = await getChargebackById(id);
