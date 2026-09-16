@@ -12,6 +12,15 @@ export const ADMIN_SECTIONS = [
   "cookie-consent",
   "visitors",
   "marketplace",
+  /*
+    System Announcements is a real screen (SystemAnnouncementsSection, menu id
+    system-announcements) and was never an ADMIN_SECTIONS value, so only a super admin
+    could open the tab and no grant could be issued. Added so
+    guardSection("system-announcements") can name the calling screen — same reason as
+    journey-map, gamification-wizard, vendors and server-fleet. Add-only; nobody's access
+    widens.
+  */
+  "system-announcements",
   // Trading
   "competitions",
   "challenges",

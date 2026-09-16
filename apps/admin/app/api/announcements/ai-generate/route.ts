@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { connectToDatabase } from "@/database/mongoose";
 import { WhiteLabel } from "@/database/models/whitelabel.model";
-import { requireAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 export const maxDuration = 30;
 
@@ -52,7 +52,8 @@ Return ONLY valid JSON with "title" and "message" fields. No markdown, no code f
 
 export async function POST(req: NextRequest) {
   try {
-    await requireAdminAuth();
+    const guard = await guardSection("system-announcements");
+    if (!guard.ok) return guard.response;
 
     const { action, prompt, currentTitle, currentMessage, type = "info" } =
       await req.json();

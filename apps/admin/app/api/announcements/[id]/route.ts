@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import SystemAnnouncement from "@/database/models/system-announcement.model";
-import { requireAdminAuth, getAdminSession } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    await requireAdminAuth();
-    const session = await getAdminSession();
+    const guard = await guardSection("system-announcements");
+    if (!guard.ok) return guard.response;
     await connectToDatabase();
 
     const { id } = await params;
@@ -62,7 +62,7 @@ export async function PATCH(
     }
 
     console.log(
-      `📢 Announcement ${id} updated by ${session?.email}: status=${announcement.status}`,
+      `📢 Announcement ${id} updated by ${guard.admin.email}: status=${announcement.status}`,
     );
 
     return NextResponse.json({ success: true, announcement });
@@ -83,7 +83,8 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    await requireAdminAuth();
+    const guard = await guardSection("system-announcements");
+    if (!guard.ok) return guard.response;
     await connectToDatabase();
 
     const { id } = await params;

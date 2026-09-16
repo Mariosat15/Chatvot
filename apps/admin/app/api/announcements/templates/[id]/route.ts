@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import AnnouncementTemplate from "@/database/models/announcement-template.model";
-import { requireAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    await requireAdminAuth();
+    const guard = await guardSection("system-announcements");
+    if (!guard.ok) return guard.response;
     await connectToDatabase();
 
     const { id } = await params;

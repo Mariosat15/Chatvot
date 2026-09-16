@@ -72,8 +72,8 @@ const NO_CHECK_OF_ANY_KIND = [] as const;
 const HAND_VERIFIED_NO_GRANT = [] as const;
 
 /**
- * 89 routes that authenticate with a helper and never ask which sections the caller
- * holds. (Was 96 after R101v; R101w moved seven ai-knowledge/ helpers into section-granted.)
+ * 84 routes that authenticate with a helper and never ask which sections the caller
+ * holds. (Was 89 after R101w; R101x moved five announcements/ helpers into section-granted.)
  */
 const HELPER_BUT_NO_GRANT = [
   "admin/backfill-ranks/route.ts",
@@ -83,11 +83,6 @@ const HELPER_BUT_NO_GRANT = [
   "ai-agent/audit/route.ts",
   "ai-agent/chat/route.ts",
   "ai-agent/config/route.ts",
-  "announcements/[id]/route.ts",
-  "announcements/ai-generate/route.ts",
-  "announcements/route.ts",
-  "announcements/templates/[id]/route.ts",
-  "announcements/templates/route.ts",
   "audit-logs/route.ts",
   "auth/logout/route.ts",
   "challenge-settings/route.ts",
@@ -167,7 +162,7 @@ const HELPER_BUT_NO_GRANT = [
   "verify-password/route.ts",
 ];
 
-/** Folders closed by R101a–R101w. Nothing under these may appear in any debt list above. */
+/** Folders closed by R101a–R101x. Nothing under these may appear in any debt list above. */
 const CLOSED_FOLDERS = [
   "users",
   "ai",
@@ -246,6 +241,8 @@ const CLOSED_FOLDERS = [
   "tutorials",
   // R101w. AIKnowledgeSection owns the whole ai-knowledge/ tree.
   "ai-knowledge",
+  // R101x. SystemAnnouncementsSection → system-announcements (ADMIN_SECTIONS add-only).
+  "announcements",
 ];
 
 const findings = inventoryAdminRoutes();

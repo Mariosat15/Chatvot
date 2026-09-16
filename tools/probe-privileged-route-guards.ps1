@@ -1227,3 +1227,55 @@ Write-Host ''
 Write-Host 'Helper debt after R101w: 89. Remaining are helper-but-no-grant folders (settings,' -ForegroundColor DarkGray
 Write-Host 'gamemaster, announcements, ...).' -ForegroundColor DarkGray
 Write-Host ''
+
+Write-Host "`n=== R101x probes ===`n"
+
+$ANN_AI = 'apps/admin/app/api/announcements/ai-generate/route.ts'
+$ANN_TPL_ID = 'apps/admin/app/api/announcements/templates/[id]/route.ts'
+$ANN_ROOT = 'apps/admin/app/api/announcements/route.ts'
+
+Invoke-Probe -Name 'announcements ai-generate unguarded' -File $ANN_AI `
+  -Find '    const guard = await guardSection("system-announcements");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'every announcements handler names the system-announcements grant and no weaker helper'
+
+Invoke-Probe -Name 'announcements ai-generate wrong section' -File $ANN_AI `
+  -Find 'guardSection("system-announcements")' `
+  -Replace 'guardSection("marketplace")' `
+  -ExpectTest 'every announcements handler names the system-announcements grant and no weaker helper'
+
+Invoke-Probe -Name 'announcements template weaker helper' -File $ANN_TPL_ID `
+  -Find 'import { guardSection } from "@/lib/admin/section-route-guard";' `
+  -Replace "import { guardSection } from `"@/lib/admin/section-route-guard`";`nimport { requireAdminAuth } from `"@/lib/admin/auth`";" `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 "    if (!guard.ok) return guard.response;`n    await requireAdminAuth();" `
+  -ExpectTest 'every announcements handler names the system-announcements grant and no weaker helper'
+
+Invoke-Probe -Name 'announcements root one handler unguarded' -File $ANN_ROOT -First `
+  -Find '    const guard = await guardSection("system-announcements");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'every announcements handler names the system-announcements grant and no weaker helper'
+
+Invoke-Probe -Name 'announcements ai-generate closed folder loses grant' -File $ANN_AI `
+  -Find '    const guard = await guardSection("system-announcements");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'and none of the closed folders leak an unguarded file'
+
+Invoke-Probe -Name 'announcements ai-generate inventory stays section-granted' -File $ANN_AI `
+  -Find '    const guard = await guardSection("system-announcements");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -SuiteFile '__tests__/admin/admin-route-auth-inventory.test.ts' `
+  -ExpectTest 'no route under a closed folder is anything but section-granted'
+
+Write-Host ''
+Write-Host 'Helper debt after R101x: 84. Remaining are helper-but-no-grant folders (settings,' -ForegroundColor DarkGray
+Write-Host 'gamemaster, ...).' -ForegroundColor DarkGray
+Write-Host ''

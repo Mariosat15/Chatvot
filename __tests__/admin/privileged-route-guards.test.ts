@@ -224,6 +224,13 @@ const CLOSED_FOLDERS: { folder: string[]; section: string }[] = [
   */
   { folder: ["ai-knowledge"], section: "ai-knowledge" },
   /*
+    R101x. SystemAnnouncementsSection → system-announcements. Five files, eight handlers.
+    Menu id was never in ADMIN_SECTIONS; added add-only in the same slice so the grant is
+    issuable. getAdminSession after requireAdminAuth was the R101b attribution shape and
+    is gone — writers use guard.admin.
+  */
+  { folder: ["announcements"], section: "system-announcements" },
+  /*
     R101o. Money writers first among helper-but-no-grant. FinancialDashboard → financial
     (admin-funds, vat, vendor-payments, atlas/*); PendingWithdrawalsSection →
     pending-withdrawals (withdrawals/). admin-bank-accounts deferred - dual callers on
@@ -1781,6 +1788,56 @@ describe("R101w - ai-knowledge helpers are section-granted", () => {
     );
     expect(code).toMatch(/guard\.admin/);
     expect(code).toMatch(/createdBy:\s*admin\.id/);
+    expect(code).not.toMatch(/getAdminSession\s*\(/);
+  });
+});
+
+describe("R101x - announcements helpers are section-granted", () => {
+  /*
+    Five files, eight handlers. SystemAnnouncementsSection is the only caller. The menu id
+    system-announcements was missing from ADMIN_SECTIONS until this slice; add-only.
+  */
+  const WEAKER =
+    /(getAdminSession|requireAdminAuth|verifyAdminAuth|verifyAdminToken|verifyAnyAuth|jwtVerify|getAdminJwtSecret)\s*\(|\bverify\s*\(/;
+
+  const announcementFiles = findRouteFiles(join(API, "announcements"));
+
+  it("covers the whole announcements/ tree", () => {
+    expect(announcementFiles.length).toBe(5);
+  });
+
+  it("every announcements handler names the system-announcements grant and no weaker helper", () => {
+    const weaker: string[] = [];
+    const missing: string[] = [];
+    let handlers = 0;
+    let guards = 0;
+
+    for (const file of announcementFiles) {
+      const code = stripComments(readFileSync(file, "utf8"));
+      const name = file.slice(API.length + 1).replace(/\\/g, "/");
+      const named = guardedSections(code);
+      if (WEAKER.test(code)) weaker.push(name);
+      if (!named.includes("system-announcements")) missing.push(name);
+      handlers += (code.match(handlerPattern()) ?? []).length;
+      guards += (code.match(guardCallPattern()) ?? []).length;
+    }
+
+    expect(weaker).toEqual([]);
+    expect(missing).toEqual([]);
+    expect(handlers).toBe(8);
+    expect(guards).toBeGreaterThanOrEqual(handlers);
+  });
+
+  it("system-announcements is an ADMIN_SECTIONS value so the grant can be issued", () => {
+    expect(ADMIN_SECTIONS).toContain("system-announcements");
+  });
+
+  it("create attributes from the guard, not a follow-up session", () => {
+    const code = stripComments(
+      readFileSync(join(API, "announcements", "route.ts"), "utf8"),
+    );
+    expect(code).toMatch(/createdBy:\s*guard\.admin\.id/);
+    expect(code).toMatch(/createdByEmail:\s*guard\.admin\.email/);
     expect(code).not.toMatch(/getAdminSession\s*\(/);
   });
 });

@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import AnnouncementTemplate from "@/database/models/announcement-template.model";
-import { requireAdminAuth, getAdminSession } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 export async function GET() {
   try {
-    await requireAdminAuth();
+    const guard = await guardSection("system-announcements");
+    if (!guard.ok) return guard.response;
     await connectToDatabase();
 
     // Seed defaults on first load
@@ -30,8 +31,8 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    await requireAdminAuth();
-    const session = await getAdminSession();
+    const guard = await guardSection("system-announcements");
+    if (!guard.ok) return guard.response;
     await connectToDatabase();
 
     const { name, title, message, type = "info" } = await req.json();
@@ -49,7 +50,7 @@ export async function POST(req: NextRequest) {
       message: message.slice(0, 2000),
       type,
       isDefault: false,
-      createdBy: session?.adminId || "unknown",
+      createdBy: guard.admin.id || "unknown",
     });
 
     return NextResponse.json({ success: true, template });

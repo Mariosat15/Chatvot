@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import SystemAnnouncement from "@/database/models/system-announcement.model";
-import { requireAdminAuth, getAdminSession } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 export async function GET(req: NextRequest) {
   try {
-    await requireAdminAuth();
+    const guard = await guardSection("system-announcements");
+    if (!guard.ok) return guard.response;
     await connectToDatabase();
 
     const { searchParams } = new URL(req.url);
@@ -46,8 +47,8 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    await requireAdminAuth();
-    const session = await getAdminSession();
+    const guard = await guardSection("system-announcements");
+    if (!guard.ok) return guard.response;
     await connectToDatabase();
 
     const body = await req.json();
@@ -89,8 +90,8 @@ export async function POST(req: NextRequest) {
       scheduledEnd: scheduledEnd ? new Date(scheduledEnd) : undefined,
       dismissible,
       showCountdown,
-      createdBy: session?.adminId || "unknown",
-      createdByEmail: session?.email || "unknown",
+      createdBy: guard.admin.id || "unknown",
+      createdByEmail: guard.admin.email || "unknown",
     });
 
     return NextResponse.json({ success: true, announcement });
