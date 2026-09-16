@@ -40,16 +40,18 @@ export async function seedBadgeConfigs() {
         console.log(`✅ Seeded ${BADGES.length} default badges from constants`);
       }
     } else {
-      // Sync: upsert any badges from constants that are missing or outdated in DB
+      // Reason (R99): sync is ADD-ONLY. Existing rows are operator-owned (and may
+      // have been seeded from data/defaults/badges.json, which disagrees with
+      // BADGES on six ids and on most thresholds). Overwriting `condition` when
+      // constants differ silently undoes admin tuning. Intentional reset remains
+      // resetBadgeAndXPConfigs / seed-badges-xp (delete + reseed, JSON preferred).
       const existingBadges = await BadgeConfig.find({}).lean();
       const existingIds = new Set(existingBadges.map((b: any) => b.id));
 
       let added = 0;
-      let updated = 0;
 
       for (const badge of BADGES) {
         if (!existingIds.has(badge.id)) {
-          // New badge not in DB yet - insert it
           await BadgeConfig.create({
             id: badge.id,
             name: badge.name,
@@ -62,32 +64,11 @@ export async function seedBadgeConfigs() {
             isActive: true,
           });
           added++;
-        } else {
-          // Badge exists - update condition and metadata in case constants changed
-          const existing = existingBadges.find((b: any) => b.id === badge.id) as any;
-          const conditionChanged = JSON.stringify(existing?.condition) !== JSON.stringify(badge.condition);
-          if (conditionChanged) {
-            await BadgeConfig.updateOne(
-              { id: badge.id },
-              {
-                $set: {
-                  condition: badge.condition,
-                  name: badge.name,
-                  description: badge.description,
-                  category: badge.category,
-                  icon: badge.icon,
-                  rarity: badge.rarity,
-                  minLevel: badge.minLevel || 0,
-                },
-              },
-            );
-            updated++;
-          }
         }
       }
 
-      if (added > 0 || updated > 0) {
-        console.log(`🔄 Badge sync: ${added} added, ${updated} updated (${existingCount} existed)`);
+      if (added > 0) {
+        console.log(`🔄 Badge sync: ${added} added (${existingCount} existed, existing rows untouched)`);
       } else {
         console.log(`ℹ️ Badges already synced (${existingCount} badges found)`);
       }

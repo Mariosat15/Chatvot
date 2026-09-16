@@ -984,6 +984,25 @@ R96b → X7.
 
 ---
 
+### 16 Sep 2026 - BADGE SYNC NO LONGER OVERWRITES OPERATOR TUNING (R99 OVERWRITE CLOSED)
+
+**Shipped:** `seedBadgeConfigs` in both apps is **add-only** when the DB already has
+rows — missing ids from `BADGES` are still inserted; existing `condition` / metadata are
+never `$set` from constants. Fresh empty seed still prefers `data/defaults/badges.json`
+(134) over constants (128). Intentional wipe+reseed (`resetBadgeAndXPConfigs` /
+`seed-badges-xp`) unchanged. Catalogue divergence documented and pinned (six JSON-only
+ids), not merged. 6 tests in `__tests__/services/badge-catalogue-r99.test.ts`, 5 probes
+each red on exactly one failure (`tools/probe-r99-badge-catalogue.ps1`).
+
+**Documented:** `17-risk-register.md`, this file, `games-plan-docs-sync.mdc`.
+
+**Deferred:** optional catalogue alignment (regenerate `BADGES` from JSON — owner
+decision); **R96a** (game-aware gate) → R96b → X7.
+
+**Next chat should:** close **R96a**, then **R96b** (needs owner input), then X7.
+
+---
+
 ### 16 Sep 2026 - ADMIN BADGE EVALUATOR PARITY (R100 CLOSED)
 
 **Shipped:** `apps/admin/lib/services/badge-evaluation.service.ts` overwritten from the
