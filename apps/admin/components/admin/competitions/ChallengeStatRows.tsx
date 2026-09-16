@@ -1,11 +1,19 @@
 /**
  * A settled challenge player's figures on the challenge detail screen. R92.
  *
- * WHY IT IS SHARED WITH NOTHING ELSE AND STILL A COMPONENT. The detail screen wrote these
- * four rows twice, once per player, and the analytics screen wrote its own two-row version
- * twice more - four copies of "what does this player's result look like", none of which knew
- * about a provider game. This is the detail screen's pair collapsed into one; both files reach
- * the same rule through `resolveResultMetric`, which is the thing that actually has to agree.
+ * WHY IT IS A COMPONENT. There were copies of "what does this player's result look like" in
+ * three screens, none of which knew about a provider game.
+ *
+ * COUNT CORRECTED 16 September 2026, and the correction is the useful part. This comment used
+ * to say "four copies": the detail screen's pair plus the analytics screen's two-row pair. It
+ * missed `ChallengesAdminSection.tsx`, whose drawer wrote the same four rows twice again - so
+ * there were SIX, and the two nobody had counted were the ones still rendering +0.00 / 0 / 0.0%
+ * for a provider challenge a day after R92 was recorded as read-side-fixed on the others. Left
+ * visible rather than quietly renumbered, because "count the writers before unifying anything"
+ * has now cost a missed offender in this very file's own justification.
+ *
+ * All three screens reach the same rule through `resolveResultMetric`, which is the thing that
+ * actually has to agree.
  *
  * The four trading rows are WITHHELD rather than zeroed on a provider game, for the reason
  * that made R92 invisible: `pnl`, `pnlPercentage`, `totalTrades` and `winRate` are all absent

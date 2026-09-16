@@ -221,7 +221,22 @@ who has to think in games rather than trades.
 > the person who *paid* `$0.00` and `0 trades` (X7 by phase), and that **the AI agent's
 > challenge report carries P&L and no score at all** - which is **A6, still pending in this
 > very phase**. *(A6 landed later the same day and closed it; the sentence is correct as
-> history. Four readers remain, not five.)*
+> history. Four readers remain, not five.)* *(AMENDED 16 September 2026: **one** remains.
+> The owner took the three administration readers ahead of A5 because each is a screen X7
+> would otherwise have copied - `ChallengesAdminSection.tsx`'s drawer, which wrote the four
+> trading figures **twice, once per side**, and **both** copies of `profile.actions.ts` - and
+> the remaining reader is the player's own challenge result page, which is X7 by phase rather
+> than deferred by effort. **The transferable finding is that removing a phantom zero is not
+> a display-only change:** `ProfileOverview.tsx` and `ProfileContent.tsx` each called
+> `pnl.toFixed(2)` inline, so the moment the action returned `null` both would have thrown -
+> **something downstream was relying on the zero being printable** - and the answer is
+> `lib/utils/profile-result-metric.ts`, one rule both screens ask, which **decides by GAME and
+> never by which figures are present**, since `buildParticipantSeat` writes `pnl: 0` onto
+> every seat whatever the game, so a presence test answers trading for every row ever
+> written. An absent ROI is **withheld outright rather than dashed**, a tile captioned "ROI"
+> holding a dash being a question it then declines to answer. `apps/admin`'s copy of the
+> action is **dead code and was fixed anyway**, recorded as unreached, on the R42 precedent
+> that two copies agreeing while one runs is the failure nobody sees.)*
 >
 > **That AI-agent sentence first read "it will state a `challenger_pnl` in a confident
 > sentence", and that was wrong. Corrected here rather than reworded**, on the R7 and R31
@@ -442,7 +457,12 @@ change.
 > was **six** read sites and not five, and three further defects came with the fix: four
 > unauthenticated routes over the ladder (**R89**), six screens holding their own list of rung
 > names - the **difficulty-band vocabulary mislabelled as levels**, so wrong by position rather
-> than stale (**R90**) - and the ladder **editor** able to replace a renamed twenty-rung ladder
+> than stale (**R90**) - *(one of those six, the Game Master's create-contest screen, was left
+> standing behind a canary that day and **closed on 16 September 2026**: it needed the ladder
+> threaded in from a server component, and the interesting half was not the stale names but
+> the `maxLevel` cap of **10**, which is not a wording fault at all - a Game Master could not
+> restrict a contest to the upper half of a twenty-rung ladder, so the fix restores a
+> capability rather than a caption)* - and the ladder **editor** able to replace a renamed twenty-rung ladder
 > with ten stale rungs after one failed fetch (**R91**). So the row is now genuinely a database
 > edit; it was three code changes and a refusal away from being one.
 

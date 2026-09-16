@@ -19,6 +19,11 @@ import {
 } from "lucide-react";
 import { useAppSettings } from "@/contexts/AppSettingsContext";
 import { motion, AnimatePresence } from "framer-motion";
+import {
+  profileResultMetric,
+  profileResultSubline,
+  type MetricTone,
+} from "@/lib/utils/profile-result-metric";
 interface ProfileOverviewProps {
   combinedStats: any;
   competitionStats: any;
@@ -560,8 +565,20 @@ function CollapsibleSection({
   );
 }
 
+/**
+ * R92. The tone the shared rule returns, spelled in this screen's own classes. A score is
+ * neither profit nor loss, so `neutral` is a third answer rather than a fallback to green.
+ */
+const METRIC_TONE_CLASS: Record<MetricTone, string> = {
+  profit: "text-green-400",
+  loss: "text-red-400",
+  neutral: "text-gray-100",
+};
+
 // Component: Competition Row
 function CompetitionRow({ comp, settings }: { comp: any; settings: any }) {
+  const metric = profileResultMetric(comp);
+  const subline = profileResultSubline(comp, { includeWinRate: true });
   const statusColors: Record<string, string> = {
     active: "bg-green-500/20 text-green-400 border-green-500/30",
     completed: "bg-blue-500/20 text-blue-400 border-blue-500/30",
@@ -588,9 +605,13 @@ function CompetitionRow({ comp, settings }: { comp: any; settings: any }) {
             {comp.status === "cancelled" && "✕ CANCELLED"}
           </span>
         </div>
-        <p className="text-xs text-gray-400">
-          {comp.totalTrades} trades · {comp.winRate.toFixed(1)}% win rate
-        </p>
+        {/*
+          R92. Withheld rather than reworded on a provider row - see the note in
+          lib/utils/profile-result-metric.ts. This used to read "0 trades · 0.0% win rate"
+          for a puzzle, and `winRate.toFixed(1)` now THROWS on the absent case rather than
+          printing a zero, which is why the whole line moved behind the shared rule.
+        */}
+        {subline && <p className="text-xs text-gray-400">{subline}</p>}
       </div>
       <div className="flex items-center gap-4 text-right text-sm">
         <div>
@@ -600,12 +621,11 @@ function CompetitionRow({ comp, settings }: { comp: any; settings: any }) {
           </p>
         </div>
         <div>
-          <p className="text-xs text-gray-500">P&L</p>
+          <p className="text-xs text-gray-500">{metric.label}</p>
           <p
-            className={`font-semibold tabular-nums ${comp.pnl >= 0 ? "text-green-400" : "text-red-400"}`}
+            className={`font-semibold tabular-nums ${METRIC_TONE_CLASS[metric.tone]}`}
           >
-            {comp.pnl >= 0 ? "+" : ""}
-            {comp.pnl.toFixed(2)}
+            {metric.value}
           </p>
         </div>
         {comp.prizeAmount > 0 && (
@@ -630,6 +650,9 @@ function ChallengeRow({
   challenge: any;
   settings: any;
 }) {
+  const metric = profileResultMetric(challenge);
+  const subline = profileResultSubline(challenge);
+
   return (
     <Link
       href={`/challenges/${challenge.challengeId}`}
@@ -661,7 +684,8 @@ function ChallengeRow({
             </span>
           )}
         </div>
-        <p className="text-xs text-gray-400">{challenge.totalTrades} trades</p>
+        {/* R92. Withheld on a provider challenge rather than reading "0 trades". */}
+        {subline && <p className="text-xs text-gray-400">{subline}</p>}
       </div>
       <div className="flex items-center gap-4 text-right text-sm">
         <div>
@@ -669,12 +693,11 @@ function ChallengeRow({
           <p className="font-semibold text-blue-400">{challenge.entryFee}</p>
         </div>
         <div>
-          <p className="text-xs text-gray-500">P&L</p>
+          <p className="text-xs text-gray-500">{metric.label}</p>
           <p
-            className={`font-semibold tabular-nums ${challenge.pnl >= 0 ? "text-green-400" : "text-red-400"}`}
+            className={`font-semibold tabular-nums ${METRIC_TONE_CLASS[metric.tone]}`}
           >
-            {challenge.pnl >= 0 ? "+" : ""}
-            {challenge.pnl.toFixed(2)}
+            {metric.value}
           </p>
         </div>
       </div>

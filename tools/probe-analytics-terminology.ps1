@@ -124,6 +124,10 @@ $ROUTE      = 'apps/admin/app/api/competition-analytics/route.ts'
 $MODEL      = 'database/models/trading/challenge.model.ts'
 $OUTCOME    = 'lib/services/settlement/challenge-outcome.ts'
 $SCANNER    = '__tests__/helpers/terminology-scan.ts'
+$ADMIN_LIST = 'apps/admin/components/admin/ChallengesAdminSection.tsx'
+$PROFILE    = 'lib/actions/user/profile.actions.ts'
+$METRIC     = 'lib/utils/profile-result-metric.ts'
+$OVERVIEW   = 'components/profile/ProfileOverview.tsx'
 
 Write-Host "`n=== the two exemptions A4 added to the shared scanner ===" -ForegroundColor Cyan
 
@@ -310,6 +314,86 @@ Invoke-Probe -Name '18 the surface list emptied' -File $Suite `
   -To 'const SURFACE: string[] = [];' `
   -ExpectRed 'reads every file, each with content' `
   -AllowRed 4
+
+Write-Host "`n=== R92's three admin readers, closed 16 Sep 2026 ===" -ForegroundColor Cyan
+
+# 19. THE DRAWER'S STAT BLOCK TYPED OUT AGAIN. The defect in the shape it shipped in, and the
+#     reason the flipped assertion COUNTS the shared component rather than looking for it: the
+#     drawer renders one block per side, so a fix to the challenger's half leaves the
+#     challenged player's reading `+0.00 / 0 trades` and every mention-based check green.
+Invoke-Probe -Name '19 one side of the drawer writes its own trading block' -File $ADMIN_LIST `
+  -From @'
+                                <ChallengeStatRows
+                                  stats={stats}
+                                  isProviderGame={hasProviderGameLabel(
+                                    selectedChallenge,
+'@ `
+  -To @'
+                                <div>{(stats.pnlPercentage ?? 0).toFixed(2)}%</div>
+                                <ChallengeStatRows
+                                  stats={stats}
+                                  isProviderGame={hasProviderGameLabel(
+                                    selectedChallenge,
+'@ `
+  -ExpectRed 'the admin challenge LIST drawer reports both sides through the shared rule'
+
+# 20. THE STARTING-CAPITAL ROW UNGATED. Found while fixing the block above rather than by the
+#     canary, which never mentioned it: a provider challenge has no simulated capital, so the
+#     row renders the credit symbol with nothing after it. Ungating it is the tidier-looking
+#     edit, because the row is real and correct on every trading challenge.
+Invoke-Probe -Name '20 the drawer renders starting capital for a provider game' -File $ADMIN_LIST `
+  -From @'
+                      {showsTradingConfiguration(
+                        hasProviderGameLabel(selectedChallenge),
+                      ) && (
+'@ `
+  -To @'
+                      {true && (
+'@ `
+  -ExpectRed 'the admin challenge LIST drawer reports both sides through the shared rule'
+
+# 21. R92 AT THE ACTION, RESTORED. `|| 0` rather than `?? null`, which is the spelling both
+#     copies actually carried - and `||` is the operator that matters, because it also
+#     rewrites a legitimately flat P&L of 0 into the same figure, so a trading row and a
+#     provider row become indistinguishable at the source.
+Invoke-Probe -Name '21 the action collapses an absent figure to zero' -File $PROFILE `
+  -From 'pnl: isProviderGame ? null : (myStats?.pnl ?? null),' `
+  -To 'pnl: myStats?.pnl || 0,' `
+  -ExpectRed 'profile action reports by game and lets an absent figure stay absent'
+
+# 22. THE GAME QUESTION REPLACED BY A PRESENCE TEST. The one mutation here that reads as an
+#     IMPROVEMENT - it needs no label and handles a row that predates the field. It is wrong
+#     on every provider row ever written, because `buildParticipantSeat` stores `pnl: 0`
+#     whatever the game (R46), so "has a P&L" answers yes for all of them.
+Invoke-Probe -Name '22 the rule decides by which figures are present' -File $METRIC `
+  -From '  return row.gameType === "provider";' `
+  -To '  return !Number.isFinite(row.pnl);' `
+  -ExpectRed 'the rule decides by GAME, never by which figures happen to be present'
+
+# 23. AN ABSENT FIGURE PRINTED AS ZERO. R45 and R50's read side in one character. A zero is a
+#     result; an absence is not, and the two are indistinguishable once rendered.
+Invoke-Probe -Name '23 an absent figure printed as zero' -File $METRIC `
+  -From 'export const ABSENT_FIGURE = "-";' `
+  -To 'export const ABSENT_FIGURE = "0";' `
+  -ExpectRed 'the rule decides by GAME, never by which figures happen to be present'
+
+# 24. A SIGN PUT IN FRONT OF A SCORE. The mutation is pure consistency - the P&L branch below
+#     signs its figure, so signing this one looks like finishing the job. Which direction a
+#     game ranks in is resolved once in `calculateRankings`, so a `+` here is this screen
+#     forming its own opinion, and on a time trial the best score would read as negative.
+Invoke-Probe -Name '24 a score printed with a sign' -File $METRIC `
+  -From '        ? (row.score as number).toLocaleString()' `
+  -To '        ? "+" + (row.score as number).toLocaleString()' `
+  -ExpectRed 'the rule decides by GAME, never by which figures happen to be present'
+
+# 25. A SCREEN FORMATTING THE FIGURE ITSELF. The negative half, and the load-bearing one:
+#     importing the module is trivially satisfied by a screen that imports it and then reads
+#     `pnl` five lines later, which is exactly what both of these did before the extraction.
+#     After the action stopped writing zeros, that same line THROWS on the absent case.
+Invoke-Probe -Name '25 a profile screen formatting the P and L itself' -File $OVERVIEW `
+  -From '  const metric = profileResultMetric(comp);' `
+  -To '  const metric = { label: "P&L", value: (comp.pnl as number).toFixed(2), tone: "neutral" as const };' `
+  -ExpectRed 'screen asks the rule and does not format the figure itself'
 
 Write-Host ""
 if ($script:fail -eq 0) {

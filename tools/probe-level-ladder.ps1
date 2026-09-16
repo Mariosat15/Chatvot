@@ -102,6 +102,8 @@ $FORM   = 'apps/admin/components/admin/CompetitionCreatorForm.tsx'
 $CREATE = 'apps/admin/app/competitions/create/page.tsx'
 $EDITOR = 'apps/admin/components/admin/BadgeXPManagementSection.tsx'
 $TITLE  = 'lib/utils/level-title.ts'
+$GM_PAGE = 'app/(root)/gamemaster/create-competition/page.tsx'
+$GM_FORM = 'app/(root)/gamemaster/create-competition/page-content.tsx'
 
 Write-Host "`n=== R90 - no screen holds its own list of rung names ===" -ForegroundColor Cyan
 
@@ -142,14 +144,24 @@ Invoke-Probe -Name '4  a real offender excused as rendering a number' -File $Sui
   -ExpectRed 'renders a number, not a name' `
   -AllowRed 2
 
-# 5. THE RECORDED OFFENDER SILENTLY FIXED. The canary in its own direction - if the Game
-#    Master page stops being an offender, the exemption that hides it must be deleted in the
-#    same edit, or a real screen is excused for ever on the strength of a note about a defect
-#    somebody has since closed.
-Invoke-Probe -Name '5  the Game Master page stops being an offender' -File 'app/(root)/gamemaster/create-competition/page.tsx' `
-  -From 'Level 3: Skilled Trader' `
-  -To 'Level 3' `
-  -ExpectRed 'the Game Master page is still an offender'
+# 5. THE ORIGINAL DEFECT, VERBATIM, ON THE FILE THAT CARRIED IT. Probe 5 used to prove the
+#    opposite - that the Game Master page was STILL an offender - and was re-aimed rather
+#    than deleted when the page was fixed on 16 Sep 2026. Note this restores the *name*
+#    only: rung 3 of the default ladder is "Trainee", so a Game Master reading
+#    "Skilled Trader" gated on a rung whose real name is something else entirely.
+Invoke-Probe -Name '5a the Game Master rung names typed in again' -File $GM_FORM `
+  -From '                                  Level {level.level}: {level.title} (' `
+  -To '                                  Level 3: Skilled Trader (' `
+  -ExpectRed 'the Game Master form names no rung of its own and caps at no number'
+
+# 5b. THE CAP, WHICH IS THE HALF THAT WAS WRONG EVEN AGAINST THE DEFAULT LADDER. The maxLevel
+#     list was a literal `[1..10]` over a twenty-rung ladder, so no Game Master could gate
+#     above halfway - and it named no rung, so probe 5a cannot see it. Two halves, two probes,
+#     because fixing either alone still leaves a Game Master unable to say what they meant.
+Invoke-Probe -Name '5b the maxLevel cap of ten restored' -File $GM_FORM `
+  -From '                                    level.level >= levelRequirement.minLevel,' `
+  -To '                                    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].includes(level.level),' `
+  -ExpectRed 'the Game Master form names no rung of its own and caps at no number'
 
 Write-Host "`n=== R88 - the operator's ladder is the authority ===" -ForegroundColor Cyan
 
@@ -287,6 +299,35 @@ Invoke-Probe -Name '18 the ladder read but not handed down' -File $CREATE `
   -From 'levelLadder={levelLadder}' `
   -To 'className="contents"' `
   -ExpectRed 'reads the ladder once and hands it down'
+
+# 19. THE GAME MASTER FORM BACK ON THE CONSTANT. The same third shape as the two admin forms
+#     - it offers the whole ladder as choices and so never calls the resolver - which is why
+#     it is exempt from LADDER_REACH and has to be guarded on what it must NOT import. Probed
+#     separately from probe 8 because the two files are exempted for the same reason and a
+#     single probe would leave whichever one it did not name unproven.
+Invoke-Probe -Name '19 the Game Master form imports the constant again' -File $GM_FORM `
+  -From 'levelLadder.map(' `
+  -To 'TITLE_LEVELS_LOCAL.map(' `
+  -ExpectRed 'offers the operator''s ladder, not the constant'
+
+# 20. THE PROP DROPPED ON THE GAME MASTER PAGE. The server half reads the ladder, correctly,
+#     and never hands it over - so the client falls back to nothing and the read is dead code
+#     that reviews as the fix being present. Probe 18's defect on the page that needed it most,
+#     this being the one screen where a Game Master chooses which rung may enter.
+Invoke-Probe -Name '20 the Game Master ladder read but not handed down' -File $GM_PAGE `
+  -From 'levelLadder={levelLadder}' `
+  -To 'className="contents"' `
+  -ExpectRed 'reads the ladder once and hands it down'
+
+# 21. THE CONTAINMENT ASSERTION AIMED AT THE SERVER HALF. The vacuity trap the client/server
+#     split introduces, and it reads as the more natural of the two: `page.tsx` is the file
+#     whose name a reader remembers, it holds no `minLevel`, so the walk never returns it and
+#     the assertion fails - which is the honest outcome. The dangerous direction is the one
+#     this probe pins by contrast: name the server half and the CONTROLS go unexamined.
+Invoke-Probe -Name '21 the walk assertion names the server half' -File $Suite `
+  -From 'expect(screens).toContain(GAMEMASTER_FORM);' `
+  -To 'expect(screens).toContain(GAMEMASTER_PAGE);' `
+  -ExpectRed 'finds the level-gate screens'
 
 Write-Host ""
 if ($script:fail -eq 0) {

@@ -178,10 +178,27 @@ export interface UserCompetitionStats {
     competitionId: string;
     competitionName: string;
     rank: number;
-    pnl: number;
-    pnlPercentage: number;
-    totalTrades: number;
-    winRate: number;
+    /**
+     * R92. The game label travels with the row so a consumer can tell which of the two
+     * figures below is the real one. Read through `hasProviderGameLabel`, never compared
+     * here: an absent label resolves to trading (invariant 5), and these rows are read with
+     * `.lean()`, which skips hydration and so does not fill the schema default in.
+     */
+    gameType: string;
+    /** What a provider contest's seat actually scored. Absent means no result - never 0. */
+    score?: number | null;
+    /**
+     * R92 / R46. Optional rather than `number`, and the distinction is the whole fix:
+     * `buildParticipantSeat` defaults these three to 0 on **every** seat whatever the game,
+     * so a provider participant carries `pnl: 0`, `pnlPercentage: 0` and `totalTrades: 0` -
+     * three plausible trading figures no settlement ever stated. Typing them as `number`
+     * meant a consumer could not distinguish a real zero from the default, and the action
+     * then collapsed the absent cases with `|| 0` as well.
+     */
+    pnl?: number | null;
+    pnlPercentage?: number | null;
+    totalTrades?: number | null;
+    winRate?: number | null;
     status: string;
     prizeAmount: number;
     startedAt: Date;
@@ -331,14 +348,28 @@ export async function getUserCompetitionStats(
         if (leaderboardEntry) prizeAmount = leaderboardEntry.prizeAmount || 0;
       }
 
+      const isProviderGame = competition?.gameType === "provider";
+
       return {
         competitionId: p.competitionId,
         competitionName: competition?.name || "Unknown Competition",
         rank: p.currentRank || 0,
-        pnl: p.pnl || 0,
-        pnlPercentage: p.pnlPercentage || 0,
-        totalTrades: p.totalTrades || 0,
-        winRate,
+        // Reason: R92. Taken from the CONTEST, never from the seat's own `gameKey`. That
+        // field defaults to "trading", the Game Master route inserts with the raw driver and
+        // bypasses defaults entirely (R7), and the X1 backfill has never been applied - so
+        // reading the seat files real game entrants under trading while every figure beside
+        // it still looks right. An absent contest label resolves to trading (invariant 5).
+        gameType: competition?.gameType || "trading",
+        // Reason: R92. The two shapes are reported separately and neither is defaulted to
+        // zero. `buildParticipantSeat` writes `pnl: 0`, `pnlPercentage: 0` and
+        // `totalTrades: 0` onto every seat whatever the game (the R46 mechanism), so a
+        // provider row arrives carrying three perfectly renderable trading figures the
+        // settlement never stated - and `|| 0` here made the absent cases identical to them.
+        score: isProviderGame ? (p.score ?? null) : null,
+        pnl: isProviderGame ? null : (p.pnl ?? null),
+        pnlPercentage: isProviderGame ? null : (p.pnlPercentage ?? null),
+        totalTrades: isProviderGame ? null : (p.totalTrades ?? null),
+        winRate: isProviderGame ? null : winRate,
         status: competition?.status || p.status, // Use competition status, fallback to participant status
         prizeAmount,
         startedAt: competition?.startTime || p.createdAt,
@@ -406,10 +437,23 @@ export interface UserChallengeStats {
     opponentName: string;
     entryFee: number;
     winnerPrize: number;
-    pnl: number;
-    pnlPercentage: number;
-    totalTrades: number;
-    winRate: number;
+    /**
+     * R92. The game label, so a consumer can tell which of the figures below is the real one.
+     * Read through `hasProviderGameLabel`, never compared here - an absent label resolves to
+     * trading (invariant 5).
+     */
+    gameType: string;
+    /** What a provider challenge's side actually scored. Absent means no result - never 0. */
+    score?: number | null;
+    /**
+     * R92. Optional rather than `number`. These four are the trading shape, and the snapshot
+     * genuinely carries none of them on a provider challenge - `|| 0` here turned that
+     * absence into +0.00 / +0.00% / 0 / 0.0%, four figures the settlement never stated.
+     */
+    pnl?: number | null;
+    pnlPercentage?: number | null;
+    totalTrades?: number | null;
+    winRate?: number | null;
     status: string;
     isWinner: boolean;
     isTie: boolean;
@@ -518,16 +562,25 @@ export async function getUserChallengeStats(
         ? c.challengerFinalStats
         : c.challengedFinalStats;
       const isWinner = c.winnerId === targetUserId;
+      const isProviderGame = c.gameType === "provider";
 
       return {
         challengeId: c._id.toString(),
         opponentName,
         entryFee: c.entryFee,
         winnerPrize: c.winnerPrize,
-        pnl: myStats?.pnl || 0,
-        pnlPercentage: myStats?.pnlPercentage || 0,
-        totalTrades: myStats?.totalTrades || 0,
-        winRate: myStats?.winRate || 0,
+        // Reason: R92. An absent label resolves to trading (invariant 5), and these rows are
+        // read with `.lean()`, which skips hydration and so does not fill the schema default
+        // in - a stored value and an absent one have to reach the same answer here.
+        gameType: c.gameType || "trading",
+        // Reason: R92. The two shapes are reported separately and neither is defaulted to
+        // zero. A provider challenge's snapshot carries `score` and none of the four below,
+        // so `|| 0` reported a puzzle player as having made no profit over no trades.
+        score: isProviderGame ? (myStats?.score ?? null) : null,
+        pnl: isProviderGame ? null : (myStats?.pnl ?? null),
+        pnlPercentage: isProviderGame ? null : (myStats?.pnlPercentage ?? null),
+        totalTrades: isProviderGame ? null : (myStats?.totalTrades ?? null),
+        winRate: isProviderGame ? null : (myStats?.winRate ?? null),
         status: c.status,
         isWinner,
         isTie: c.isTie || false,

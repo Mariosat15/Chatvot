@@ -47,10 +47,19 @@ export interface UserCompetitionStats {
     competitionId: string;
     competitionName: string;
     rank: number;
-    pnl: number;
-    pnlPercentage: number;
-    totalTrades: number;
-    winRate: number;
+    /** The game label. R92. Absent resolves to trading - invariant 5. */
+    gameType: string;
+    /** A provider seat's score. Absent means no result (R50) - never 0. */
+    score?: number | null;
+    /**
+     * R92. Optional rather than `number`: `buildParticipantSeat` writes 0 into these on
+     * every seat whatever the game (the R46 mechanism), so a provider row arrives carrying
+     * three renderable trading figures no settlement ever stated.
+     */
+    pnl?: number | null;
+    pnlPercentage?: number | null;
+    totalTrades?: number | null;
+    winRate?: number | null;
     status: string;
     prizeAmount: number;
     startedAt: Date;
@@ -183,14 +192,22 @@ export async function getUserCompetitionStats(
         if (leaderboardEntry) prizeAmount = leaderboardEntry.prizeAmount || 0;
       }
 
+      const isProviderGame = competition?.gameType === "provider";
+
       return {
         competitionId: p.competitionId,
         competitionName: competition?.name || "Unknown Competition",
         rank: p.currentRank || 0,
-        pnl: p.pnl || 0,
-        pnlPercentage: p.pnlPercentage || 0,
-        totalTrades: p.totalTrades || 0,
-        winRate,
+        // Reason: R92. From the CONTEST, never the seat's own `gameKey` - that field defaults
+        // to "trading", the Game Master route bypasses defaults with the raw driver (R7), and
+        // the X1 backfill has never been applied.
+        gameType: competition?.gameType || "trading",
+        // Reason: R92. Neither shape is defaulted to zero, so an absent figure stays absent.
+        score: isProviderGame ? (p.score ?? null) : null,
+        pnl: isProviderGame ? null : (p.pnl ?? null),
+        pnlPercentage: isProviderGame ? null : (p.pnlPercentage ?? null),
+        totalTrades: isProviderGame ? null : (p.totalTrades ?? null),
+        winRate: isProviderGame ? null : winRate,
         status: competition?.status || p.status, // Use competition status, fallback to participant status
         prizeAmount,
         startedAt: competition?.startTime || p.createdAt,
@@ -259,10 +276,15 @@ export interface UserChallengeStats {
     opponentName: string;
     entryFee: number;
     winnerPrize: number;
-    pnl: number;
-    pnlPercentage: number;
-    totalTrades: number;
-    winRate: number;
+    /** The game label. R92. Absent resolves to trading - invariant 5. */
+    gameType: string;
+    /** A provider side's score. Absent means no result (R50) - never 0. */
+    score?: number | null;
+    /** R92. Optional: a provider challenge's snapshot carries none of these four. */
+    pnl?: number | null;
+    pnlPercentage?: number | null;
+    totalTrades?: number | null;
+    winRate?: number | null;
     status: string;
     isWinner: boolean;
     prizeAmount: number;
@@ -360,16 +382,22 @@ export async function getUserChallengeStats(
         ? c.challengerFinalStats
         : c.challengedFinalStats;
       const isWinner = c.winnerId === targetUserId;
+      const isProviderGame = c.gameType === "provider";
 
       return {
         challengeId: c._id.toString(),
         opponentName,
         entryFee: c.entryFee,
         winnerPrize: c.winnerPrize,
-        pnl: myStats?.pnl || 0,
-        pnlPercentage: myStats?.pnlPercentage || 0,
-        totalTrades: myStats?.totalTrades || 0,
-        winRate: myStats?.winRate || 0,
+        // Reason: R92. Absent resolves to trading - invariant 5.
+        gameType: c.gameType || "trading",
+        // Reason: R92. `score` is on the snapshot since A4; the four trading figures are
+        // withheld rather than zeroed, because a puzzle has no P&L, ROI, trades or win rate.
+        score: isProviderGame ? (myStats?.score ?? null) : null,
+        pnl: isProviderGame ? null : (myStats?.pnl ?? null),
+        pnlPercentage: isProviderGame ? null : (myStats?.pnlPercentage ?? null),
+        totalTrades: isProviderGame ? null : (myStats?.totalTrades ?? null),
+        winRate: isProviderGame ? null : (myStats?.winRate ?? null),
         status: c.status,
         isWinner,
         prizeAmount: isWinner ? c.winnerPrize : 0,

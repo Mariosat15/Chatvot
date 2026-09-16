@@ -566,21 +566,25 @@ const LADDER_BY_FETCH: { file: string; endpoint: RegExp }[] = [
 ];
 
 /*
-  THE RECORDED OFFENDER. `app/(root)/gamemaster/create-competition/page.tsx` names rungs
-  inline as JSX options and is wrong by position in the ladder's own vocabulary, so a Game
-  Master choosing "Level 3: Skilled Trader" creates a contest that actually admits rung 3,
-  "Trainee". Its maxLevel dropdown names no rung but caps at 10 of 20, so no Game Master can
-  gate above halfway.
+  THE RECORDED OFFENDER, FIXED 16 September 2026 - and the canary below was FLIPPED rather
+  than deleted, because the reason it existed is the reason to keep watching the file.
 
-  It is exempt rather than fixed because the fix is not a wording change: the page is a
-  2,798-line client component with no access to the operator's ladder, so closing it means
-  threading a server-side read in and lifting the cap. That is its own slice, and putting it
-  in the wording pass would have meant a large change to a page nobody asked me to touch.
+  What it was. `app/(root)/gamemaster/create-competition/page.tsx` named rungs inline as JSX
+  options and was wrong by position in the ladder's own vocabulary, so a Game Master choosing
+  "Level 3: Skilled Trader" created a contest that actually admitted rung 3, "Trainee". Its
+  maxLevel dropdown named no rung but capped at 10 of 20, so no Game Master could gate above
+  halfway - a truncation that was wrong even against the DEFAULT ladder, which is the part
+  that makes it more than a rename defect.
 
-  The canary is the important half. It asserts the file IS still an offender, so the day
-  somebody fixes it this test goes red and the exemption is deleted with it.
+  Why it was exempt for a day. The fix is not a wording change: the page was a 2,798-line
+  client component with no access to the operator's ladder, so closing it meant threading a
+  server-side read in. It is now the same split `app/(root)/competitions/page.tsx` uses - a
+  server `page.tsx` reading the ladder, a client `page-content.tsx` receiving it as a
+  REQUIRED prop, so the compiler objects rather than a default quietly covering for it.
 */
-const GAMEMASTER_OFFENDER = "app/(root)/gamemaster/create-competition/page.tsx";
+const GAMEMASTER_PAGE = "app/(root)/gamemaster/create-competition/page.tsx";
+const GAMEMASTER_FORM =
+  "app/(root)/gamemaster/create-competition/page-content.tsx";
 
 function gateScreens(): string[] {
   const out: string[] = [];
@@ -603,7 +607,10 @@ function r90Exempt(): Set<string> {
   return new Set([
     ...NAMES_NO_RUNG.map((e) => e.file),
     ...LADDER_BY_FETCH.map((e) => e.file),
-    GAMEMASTER_OFFENDER,
+    // Reason: the Game Master form is the same THIRD shape as the two admin contest forms -
+    // it renders the whole ladder as choices and never calls the resolver - so it is
+    // asserted by the `offers the operator's ladder` case below rather than by LADDER_REACH.
+    GAMEMASTER_FORM,
   ]);
 }
 
@@ -617,7 +624,10 @@ describe("R90 - no screen holds its own list of rung names", () => {
   it("finds the level-gate screens", () => {
     expect(screens.length).toBeGreaterThanOrEqual(8);
     expect(screens).toContain("components/trading/CompetitionEntryButton.tsx");
-    expect(screens).toContain(GAMEMASTER_OFFENDER);
+    // Reason: the Game Master gate controls live in the CLIENT half since the split. Asserting
+    // the server `page.tsx` here would pass vacuously - it holds no `minLevel` at all, so the
+    // walk never reaches it and the one file with the controls would go unchecked.
+    expect(screens).toContain(GAMEMASTER_FORM);
   });
 
   it.each(
@@ -638,12 +648,18 @@ describe("R90 - no screen holds its own list of rung names", () => {
     expect(readCode(file)).toMatch(number);
   });
 
-  it("the Game Master page is still an offender", () => {
-    const code = readCode(GAMEMASTER_OFFENDER);
-    // Wrong by position, and capped at ten. Both are asserted, because fixing either one
-    // alone leaves a Game Master misled - and this test is how the exemption gets deleted.
-    expect(code).toMatch(/Level 3: Skilled Trader/);
-    expect(code).not.toMatch(LADDER_REACH);
+  /*
+    // Reason: FLIPPED 16 Sep 2026. This asserted the Game Master page was still an offender.
+    // The claim is inverted and the two halves are kept, because fixing one alone still left
+    // a Game Master misled: the names had to stop being typed in AND the cap of ten had to go.
+  */
+  it("the Game Master form names no rung of its own and caps at no number", () => {
+    const code = readCode(GAMEMASTER_FORM);
+    // The exact string the defect rendered. Any hard-coded rung name would do, but this one
+    // is the one that was wrong by position, so it is the one worth naming.
+    expect(code).not.toMatch(/Level 3: Skilled Trader/);
+    // The maxLevel list was a literal `[1..10]`. A ladder is never a literal array of rungs.
+    expect(code).not.toMatch(/\[\s*1\s*,\s*2\s*,\s*3\s*,/);
   });
 
   it("the four fixed screens resolve through the shared helper, not a local map", () => {
@@ -671,6 +687,7 @@ describe("R90 - no screen holds its own list of rung names", () => {
   it.each([
     "apps/admin/components/admin/CompetitionCreatorForm.tsx",
     "apps/admin/components/admin/CompetitionEditorForm.tsx",
+    GAMEMASTER_FORM,
   ])("%s offers the operator's ladder, not the constant", (relative) => {
     const code = readCode(relative);
     expect(code).toMatch(/levelLadder\.map\s*\(/);
@@ -681,6 +698,7 @@ describe("R90 - no screen holds its own list of rung names", () => {
   it.each([
     "apps/admin/app/competitions/create/page.tsx",
     "apps/admin/app/competitions/edit/[id]/page.tsx",
+    GAMEMASTER_PAGE,
   ])("%s reads the ladder once and hands it down", (relative) => {
     const code = readCode(relative);
     expect((code.match(/getTitleLevels\s*\(/g) ?? []).length).toBe(1);

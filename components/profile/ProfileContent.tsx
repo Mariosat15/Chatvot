@@ -16,8 +16,25 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useAppSettings } from "@/contexts/AppSettingsContext";
+import {
+  profileResultMetric,
+  profileResultRoi,
+  profileResultSubline,
+  type MetricTone,
+} from "@/lib/utils/profile-result-metric";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
+
+/**
+ * R92. The tone the shared rule returns, in this screen's own classes. `neutral` is a third
+ * answer rather than a fallback to green: a score is neither profit nor loss.
+ */
+const METRIC_TONE_CLASS: Record<MetricTone, string> = {
+  profit: "text-green-400",
+  loss: "text-red-400",
+  neutral: "text-gray-100",
+};
+
 interface ProfileContentProps {
   session: any;
   competitionStats: any;
@@ -480,7 +497,16 @@ export default function ProfileContent({
           </div>
         ) : (
           <div className="space-y-3">
-            {competitionStats.recentCompetitions.map((comp: any) => (
+            {competitionStats.recentCompetitions.map((comp: any) => {
+              // R92. See lib/utils/profile-result-metric.ts - the same rule this screen's
+              // sibling ProfileOverview.tsx reads, so the two cannot disagree about one row.
+              const metric = profileResultMetric(comp);
+              const roi = profileResultRoi(comp);
+              const subline = profileResultSubline(comp, {
+                includeWinRate: true,
+              });
+
+              return (
               <Link
                 key={comp.competitionId}
                 href={`/competitions/${comp.competitionId}`}
@@ -524,9 +550,9 @@ export default function ProfileContent({
                         comp.status === "upcoming"
                           ? comp.startedAt
                           : comp.endedAt,
-                      ).toLocaleDateString()}{" "}
-                      • {comp.totalTrades} trades • {comp.winRate.toFixed(1)}%
-                      win rate
+                      ).toLocaleDateString()}
+                      {/* R92. Withheld, not reworded, on a provider row. */}
+                      {subline ? ` • ${subline}` : ""}
                     </p>
                   </div>
 
@@ -543,30 +569,27 @@ export default function ProfileContent({
                     </div>
 
                     <div className="text-right">
-                      <p className="text-sm text-dark-400">P&L</p>
+                      <p className="text-sm text-dark-400">{metric.label}</p>
                       <p
-                        className={`text-xl font-bold tabular-nums ${
-                          comp.pnl >= 0 ? "text-green-400" : "text-red-400"
-                        }`}
+                        className={`text-xl font-bold tabular-nums ${METRIC_TONE_CLASS[metric.tone]}`}
                       >
-                        {comp.pnl >= 0 ? "+" : ""}
-                        {comp.pnl.toFixed(2)}
+                        {metric.value}
                       </p>
                     </div>
 
-                    <div className="text-right">
-                      <p className="text-sm text-dark-400">ROI</p>
-                      <p
-                        className={`text-xl font-bold tabular-nums ${
-                          comp.pnlPercentage >= 0
-                            ? "text-green-400"
-                            : "text-red-400"
-                        }`}
-                      >
-                        {comp.pnlPercentage >= 0 ? "+" : ""}
-                        {comp.pnlPercentage.toFixed(2)}%
-                      </p>
-                    </div>
+                    {/* R92. ROI is withheld outright on a provider row - a score is not a
+                        return on anything, and a tile captioned ROI holding a dash asks the
+                        question and declines to answer it. */}
+                    {roi && (
+                      <div className="text-right">
+                        <p className="text-sm text-dark-400">{roi.label}</p>
+                        <p
+                          className={`text-xl font-bold tabular-nums ${METRIC_TONE_CLASS[roi.tone]}`}
+                        >
+                          {roi.value}
+                        </p>
+                      </div>
+                    )}
 
                     {comp.prizeAmount > 0 && (
                       <div className="text-right">
@@ -586,7 +609,8 @@ export default function ProfileContent({
                   </div>
                 </div>
               </Link>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -682,7 +706,12 @@ export default function ProfileContent({
             </h2>
 
             <div className="space-y-3">
-              {challengeStats.recentChallenges.map((challenge: any) => (
+              {challengeStats.recentChallenges.map((challenge: any) => {
+                // R92. Same shared rule as the competition rows above.
+                const metric = profileResultMetric(challenge);
+                const subline = profileResultSubline(challenge);
+
+                return (
                 <Link
                   key={challenge.challengeId}
                   href={`/challenges/${challenge.challengeId}`}
@@ -727,8 +756,9 @@ export default function ProfileContent({
                       </div>
                       <p className="text-sm text-dark-400">
                         {challenge.status === "active" ? "Ends" : "Ended"}:{" "}
-                        {new Date(challenge.endTime).toLocaleDateString()} •{" "}
-                        {challenge.totalTrades} trades
+                        {new Date(challenge.endTime).toLocaleDateString()}
+                        {/* R92. Withheld, not reworded, on a provider challenge. */}
+                        {subline ? ` • ${subline}` : ""}
                       </p>
                     </div>
 
@@ -741,16 +771,11 @@ export default function ProfileContent({
                       </div>
 
                       <div className="text-right">
-                        <p className="text-sm text-dark-400">P&L</p>
+                        <p className="text-sm text-dark-400">{metric.label}</p>
                         <p
-                          className={`text-xl font-bold tabular-nums ${
-                            challenge.pnl >= 0
-                              ? "text-green-400"
-                              : "text-red-400"
-                          }`}
+                          className={`text-xl font-bold tabular-nums ${METRIC_TONE_CLASS[metric.tone]}`}
                         >
-                          {challenge.pnl >= 0 ? "+" : ""}
-                          {challenge.pnl.toFixed(2)}
+                          {metric.value}
                         </p>
                       </div>
 
@@ -772,7 +797,8 @@ export default function ProfileContent({
                     </div>
                   </div>
                 </Link>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}

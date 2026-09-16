@@ -54,6 +54,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import ChallengeSettingsSection from "./ChallengeSettingsSection";
+import ChallengeStatRows from "./competitions/ChallengeStatRows";
+import { hasProviderGameLabel } from "@/lib/admin/contest-game-label";
+import { showsTradingConfiguration } from "@/lib/admin/contest-result-presentation";
+import { useTerms } from "@/contexts/TerminologyContext";
 
 // Live countdown badge component
 function LiveCountdownBadge({
@@ -114,12 +118,22 @@ function LiveCountdownBadge({
   );
 }
 
+/**
+ * R92. Every figure here except the disqualification pair is OPTIONAL, and that is the fix
+ * rather than looseness. `GET /api/challenges` reads with `.lean()` and no projection, so a
+ * provider challenge's snapshot arrives with `score` set and these five absent - the route was
+ * already handing this screen a state its own types denied, which is why nothing failed and
+ * nothing logged. A type that denies a state the screen is being handed does not make the
+ * screen type-safe, it makes it uninformed.
+ */
 interface FinalStats {
-  finalCapital: number;
-  pnl: number;
-  pnlPercentage: number;
-  totalTrades: number;
-  winRate: number;
+  finalCapital?: number | null;
+  pnl?: number | null;
+  pnlPercentage?: number | null;
+  totalTrades?: number | null;
+  winRate?: number | null;
+  /** What a PROVIDER challenge's side actually scored. No zero fallback - see R50. */
+  score?: number | null;
   isDisqualified: boolean;
   disqualificationReason?: string;
 }
@@ -134,7 +148,12 @@ interface Challenge {
   challengedName: string;
   challengedEmail: string;
   entryFee: number;
-  startingCapital: number;
+  /**
+   * R92. Optional because `challenge.model.ts` requires it only when
+   * `(this.gameType ?? "trading") === "trading"`, so a provider challenge genuinely has
+   * none - and rendering the absence produced `Capital: €` with nothing after it.
+   */
+  startingCapital?: number | null;
   prizePool: number;
   platformFeePercentage: number;
   platformFeeAmount: number;
@@ -159,6 +178,13 @@ interface Challenge {
   loserName?: string;
   loserPnL?: number;
   isTie?: boolean;
+  /**
+   * The game label. R92. Read through `hasProviderGameLabel`, never compared here: an absent
+   * label resolves to trading (invariant 5), and `.lean()` skips hydration so the schema
+   * default does not fill it in.
+   */
+  gameType?: string | null;
+  gameKey?: string | null;
   // Final stats from challenge finalization
   challengerFinalStats?: FinalStats;
   challengedFinalStats?: FinalStats;
@@ -188,6 +214,7 @@ type Tab = "active" | "history" | "settings";
 export default function ChallengesAdminSection() {
   const { settings } = useAppSettings();
   const cs = settings?.currency?.symbol || "€";
+  const terms = useTerms();
   const [activeTab, setActiveTab] = useState<Tab>("active");
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
@@ -790,10 +817,21 @@ export default function ChallengesAdminSection() {
                           {formatDuration(challenge.duration)}
                         </div>
 
-                        <div className="flex items-center gap-1 text-xs text-gray-500">
-                          <TrendingUp className="h-3 w-3" />
-                          Capital: {cs}{challenge.startingCapital}
-                        </div>
+                        {/*
+                          R92. Withheld rather than zeroed on a provider challenge: the model
+                          requires `startingCapital` only for trading, so this rendered
+                          "Capital: €" with nothing after it. Nothing replaces it here on
+                          purpose - see the note in the drawer.
+                        */}
+                        {showsTradingConfiguration(
+                          hasProviderGameLabel(challenge),
+                        ) && (
+                          <div className="flex items-center gap-1 text-xs text-gray-500">
+                            <TrendingUp className="h-3 w-3" />
+                            Capital: {cs}
+                            {challenge.startingCapital}
+                          </div>
+                        )}
 
                         <div className="flex items-center gap-1 text-xs text-gray-500">
                           <Calendar className="h-3 w-3" />
@@ -994,38 +1032,20 @@ export default function ChallengesAdminSection() {
                           {selectedChallenge.status === "completed" &&
                             stats && (
                               <div className="space-y-2 pt-3 border-t border-gray-600">
-                                <div className="flex justify-between text-sm">
-                                  <span className="text-gray-400">P&L:</span>
-                                  <span
-                                    className={`font-bold ${stats.pnl >= 0 ? "text-green-400" : "text-red-400"}`}
-                                  >
-                                    {stats.pnl >= 0 ? "+" : ""}
-                                    {stats.pnl?.toFixed(2)}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between text-sm">
-                                  <span className="text-gray-400">ROI:</span>
-                                  <span
-                                    className={`${stats.pnlPercentage >= 0 ? "text-green-400" : "text-red-400"}`}
-                                  >
-                                    {stats.pnlPercentage >= 0 ? "+" : ""}
-                                    {stats.pnlPercentage?.toFixed(2)}%
-                                  </span>
-                                </div>
-                                <div className="flex justify-between text-sm">
-                                  <span className="text-gray-400">Trades:</span>
-                                  <span className="text-white">
-                                    {stats.totalTrades}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between text-sm">
-                                  <span className="text-gray-400">
-                                    Win Rate:
-                                  </span>
-                                  <span className="text-white">
-                                    {stats.winRate?.toFixed(1)}%
-                                  </span>
-                                </div>
+                                {/*
+                                  R92. Was four hand-written trading rows here, rendering
+                                  +0.00 / +0.00% / 0 / 0.0% for a provider challenge - four
+                                  plausible figures the settlement never stated. Routed
+                                  through the shared component so this drawer and the detail
+                                  page cannot disagree about one player's result.
+                                */}
+                                <ChallengeStatRows
+                                  stats={stats}
+                                  isProviderGame={hasProviderGameLabel(
+                                    selectedChallenge,
+                                  )}
+                                  terms={terms}
+                                />
                                 {isWinner && (
                                   <div className="flex justify-between text-sm pt-2 border-t border-gray-600">
                                     <span className="text-gray-400">
@@ -1120,38 +1140,20 @@ export default function ChallengesAdminSection() {
                           {selectedChallenge.status === "completed" &&
                             stats && (
                               <div className="space-y-2 pt-3 border-t border-gray-600">
-                                <div className="flex justify-between text-sm">
-                                  <span className="text-gray-400">P&L:</span>
-                                  <span
-                                    className={`font-bold ${stats.pnl >= 0 ? "text-green-400" : "text-red-400"}`}
-                                  >
-                                    {stats.pnl >= 0 ? "+" : ""}
-                                    {stats.pnl?.toFixed(2)}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between text-sm">
-                                  <span className="text-gray-400">ROI:</span>
-                                  <span
-                                    className={`${stats.pnlPercentage >= 0 ? "text-green-400" : "text-red-400"}`}
-                                  >
-                                    {stats.pnlPercentage >= 0 ? "+" : ""}
-                                    {stats.pnlPercentage?.toFixed(2)}%
-                                  </span>
-                                </div>
-                                <div className="flex justify-between text-sm">
-                                  <span className="text-gray-400">Trades:</span>
-                                  <span className="text-white">
-                                    {stats.totalTrades}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between text-sm">
-                                  <span className="text-gray-400">
-                                    Win Rate:
-                                  </span>
-                                  <span className="text-white">
-                                    {stats.winRate?.toFixed(1)}%
-                                  </span>
-                                </div>
+                                {/*
+                                  R92. Was four hand-written trading rows here, rendering
+                                  +0.00 / +0.00% / 0 / 0.0% for a provider challenge - four
+                                  plausible figures the settlement never stated. Routed
+                                  through the shared component so this drawer and the detail
+                                  page cannot disagree about one player's result.
+                                */}
+                                <ChallengeStatRows
+                                  stats={stats}
+                                  isProviderGame={hasProviderGameLabel(
+                                    selectedChallenge,
+                                  )}
+                                  terms={terms}
+                                />
                                 {isWinner && (
                                   <div className="flex justify-between text-sm pt-2 border-t border-gray-600">
                                     <span className="text-gray-400">
@@ -1215,12 +1217,26 @@ export default function ChallengesAdminSection() {
                       Configuration
                     </h4>
                     <div className="space-y-2 text-sm">
-                      <div className="flex justify-between py-2 border-b border-gray-700">
-                        <span className="text-gray-400">Starting Capital</span>
-                        <span className="text-white font-semibold">
-                          ${selectedChallenge.startingCapital}
-                        </span>
-                      </div>
+                      {/*
+                        R92. Withheld on a provider challenge - the model requires
+                        `startingCapital` for trading only, so this rendered "$" followed by
+                        nothing. The symbol was also a hard-coded dollar while the list row
+                        beside it used the configured one, so one challenge read in two
+                        currencies on two screens.
+                      */}
+                      {showsTradingConfiguration(
+                        hasProviderGameLabel(selectedChallenge),
+                      ) && (
+                        <div className="flex justify-between py-2 border-b border-gray-700">
+                          <span className="text-gray-400">
+                            Starting Capital
+                          </span>
+                          <span className="text-white font-semibold">
+                            {cs}
+                            {selectedChallenge.startingCapital}
+                          </span>
+                        </div>
+                      )}
                       <div className="flex justify-between py-2 border-b border-gray-700">
                         <span className="text-gray-400">Duration</span>
                         <span className="text-white font-semibold">

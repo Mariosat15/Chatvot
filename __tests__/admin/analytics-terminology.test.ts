@@ -325,18 +325,21 @@ describe("the ledger's stored values are not renameable", () => {
   exception reads as a known problem long after it is solved, and silently re-permits the
   defect in that file. When one is fixed its line here goes red, which is the point.
 
-  THAT HAS NOW HAPPENED TWICE. The two AI-agent assertions below were flipped by X6.5 A6 on
-  15 Sep 2026 - the canaries fired on the day the defect closed and were rewritten rather
-  than removed, because the comment explaining why each was reachable is the most valuable
-  part. Four offenders remain: the player's own result page (X7 by phase) and the admin list
-  drawer, plus both copies of the profile action.
+  THAT HAS NOW HAPPENED FOUR TIMES. The two AI-agent assertions were flipped by X6.5 A6 on
+  15 Sep 2026, and the admin list drawer plus both copies of the profile action on 16 Sep -
+  the canaries fired on the day each defect closed and were rewritten rather than removed,
+  because the comment explaining why each was reachable is the most valuable part.
+
+  ONE OFFENDER REMAINS: the player's own result page, `app/(root)/challenges/[id]/page.tsx`,
+  which is X7 by phase. Say that precisely rather than calling R92 closed - it is the worst
+  of the readers, because it is the person who paid.
 
   The count matters. A4's task named two screens; `rg` over the two field names found seven
   readers. That is the counting rule after four entry paths, ten finalize sites, six raw
   inserts and seven lifecycle routes - so the number in the risk register was measured here
   rather than estimated, and this suite is what keeps it honest.
 */
-describe("R92's readers, and the two the agent no longer has", () => {
+describe("R92's one remaining reader, and the four that were closed", () => {
   const PLAYER_PAGE = join(ROOT, "app/(root)/challenges/[id]/page.tsx");
   const ADMIN_LIST = join(ADMIN, "components/admin/ChallengesAdminSection.tsx");
   const PROFILE = join(ROOT, "lib/actions/user/profile.actions.ts");
@@ -356,28 +359,74 @@ describe("R92's readers, and the two the agent no longer has", () => {
     expect(source).not.toMatch(/hasProviderGameLabel|isProviderGame/);
   });
 
-  it("the admin challenge LIST drawer renders them twice, once per side", () => {
+  it("the admin challenge LIST drawer reports both sides through the shared rule", () => {
+    /*
+      FLIPPED 16 September 2026, not deleted. This asserted the drawer rendered the four
+      trading figures TWICE, once per side, and asked no game question anywhere - which is
+      what made it the widest of the readers: an operator answering a support ticket read
+      `+0.00 / +0.00% / 0 / 0.0%` about a puzzle, twice, and had nothing on the screen to
+      suggest the figures did not apply.
+
+      The fix is a shared component rather than two branches, which is the load-bearing part:
+      the two blocks were 30 lines of duplicated markup, so a conditional written into one is
+      exactly the shape that leaves the other confidently wrong. `ChallengeStatRows` is now
+      the sixth caller of one rule.
+    */
     const source = code(ADMIN_LIST);
-    // Counted, not merely found: a fix to one side leaves the other reading as correct.
-    const hits = source.match(/stats\.pnlPercentage/g) ?? [];
-    expect(hits.length).toBeGreaterThanOrEqual(2);
-    expect(source).not.toMatch(/hasProviderGameLabel|isProviderGame/);
+    // Counted, not merely found: one side routed and the other hand-written is the defect.
+    const rendered = source.match(/<ChallengeStatRows\b/g) ?? [];
+    expect(rendered.length).toBeGreaterThanOrEqual(2);
+    // The game question is asked, and the old hand-written figures are gone from the file.
+    expect(source).toMatch(/hasProviderGameLabel/);
+    expect(source).not.toMatch(/stats\.pnlPercentage/);
+    /*
+      AND THE TRADING-ONLY CONFIGURATION IS WITHHELD RATHER THAN ZEROED. Found while fixing
+      the figures and not part of the original claim: the list row's Capital chip and the
+      drawer's Starting Capital both rendered unconditionally, so a provider challenge
+      advertised a starting balance for a game that has no balance. Withheld through the
+      shared predicate, never re-asked inline.
+
+      COUNTED, because a probe proved the bare version green: there are TWO capital sites on
+      this screen and they are hundreds of lines apart, so a check asking whether the file
+      mentions the predicate is satisfied by either one of them while the other renders a
+      credit symbol with nothing after it. Sixth instance of one identifier defeating a
+      structural test, after `!expectedOrigin`, the fixed-character Edit guard,
+      `canTransitionRound`, `MIN_REASON_LENGTH` and the Image Optimizer's refusal count.
+    */
+    const gates = source.match(/showsTradingConfiguration\(/g) ?? [];
+    expect(
+      gates.length,
+      "one capital site is gated and the other is not",
+    ).toBeGreaterThanOrEqual(2);
   });
 
   it.each([
     ["main app", PROFILE],
     ["admin app", PROFILE_ADMIN],
   ])(
-    "%s's profile action collapses an absent score to zero at the action",
+    "%s's profile action reports by game and lets an absent figure stay absent",
     (_label, path) => {
       /*
-        This one is upstream of every component, so no screen downstream CAN tell absent from
-        zero - R50's phantom-zero shape one layer up. Both copies, because a fix to one is the
-        "one rule, two copies" drift this programme keeps finding.
+        FLIPPED 16 September 2026, not deleted. This asserted the action collapsed an absent
+        score to zero with `|| 0`, and it was the most consequential of the three because it
+        is UPSTREAM of every component: no screen downstream COULD tell absent from zero, so
+        a correct component was impossible to write.
+
+        The admin copy is fixed too although nothing imports it - dead code today, and a
+        second copy of a rule is how the live one drifts back. Recorded as unreached rather
+        than deleted, on the R42 reasoning.
+
+        The assertion is on the SHAPE of the branch rather than on a rendered string, because
+        the action renders nothing: what it owes its callers is `null` where a game has no
+        such figure, and `?? null` is the only spelling that keeps a legitimate zero.
       */
       const source = code(path);
-      expect(source).toMatch(/myStats\?\.pnl\s*\|\|\s*0/);
-      expect(source).toMatch(/myStats\?\.totalTrades\s*\|\|\s*0/);
+      expect(source).toMatch(/const isProviderGame\s*=/);
+      expect(source).toMatch(/score:\s*isProviderGame\s*\?/);
+      expect(source).toMatch(/pnl:\s*isProviderGame\s*\?\s*null\s*:/);
+      // The collapse itself, both fields, gone from the mapped row.
+      expect(source).not.toMatch(/myStats\?\.pnl\s*\|\|\s*0/);
+      expect(source).not.toMatch(/myStats\?\.totalTrades\s*\|\|\s*0/);
     },
   );
 
@@ -433,5 +482,85 @@ describe("R92's readers, and the two the agent no longer has", () => {
     const source = code(AI_AGENT);
     const hits = source.match(/pnl\s*:[^,\n]*\|\|\s*(0|"0")/g) ?? [];
     expect(hits, `phantom zeros survive: ${hits.join(", ")}`).toHaveLength(0);
+  });
+});
+
+// =======================================================================================
+// What the profile action's callers had to learn
+// =======================================================================================
+
+/*
+  THIS BLOCK EXISTS BECAUSE FIXING AN ACTION IS NOT FIXING A SCREEN, and the reason is worth
+  stating plainly: the moment the action stopped writing `0` it started writing `null`, and
+  both player screens called `.toFixed(2)` on that value with no guard. The honest fix
+  therefore reached further than the canary described - the action could not be corrected
+  without giving its two readers somewhere to put an absence.
+
+  ONE MODULE, TWO SCREENS. `ProfileOverview.tsx` and `ProfileContent.tsx` sit one click
+  apart and answer the same question, so two inline expressions is the "one rule, two
+  copies" shape behind `referenceId`, `failedReason`, `challengeId` and the Game Master `||`
+  - none of which the mirror guard can see, and here a disagreement is visible to the player
+  and to nobody reviewing the diff.
+
+  THE NEGATIVE ASSERTION IS THE LOAD-BEARING HALF. Importing the module is trivially
+  satisfied by a screen that imports it and then formats the figure itself five lines later,
+  which is precisely what these two files did before the extraction.
+*/
+describe("the player's profile rows describe themselves through one rule", () => {
+  const METRIC = join(ROOT, "lib/utils/profile-result-metric.ts");
+  const OVERVIEW = join(ROOT, "components/profile/ProfileOverview.tsx");
+  const CONTENT = join(ROOT, "components/profile/ProfileContent.tsx");
+
+  it("the rule decides by GAME, never by which figures happen to be present", () => {
+    /*
+      The R46 mechanism is why: `buildParticipantSeat` writes `pnl: 0`, `pnlPercentage: 0`
+      and `totalTrades: 0` onto every seat whatever the game, so a presence test answers
+      "trading" for every row ever written - it reads as the more defensive choice and is
+      wrong on every provider row. The label decides, and it comes from the CONTEST.
+    */
+    const source = code(METRIC);
+    expect(source).toMatch(/gameType\s*===\s*"provider"/);
+    /*
+      An absent figure is a dash, never a zero - the read-side form of R45 and R50, and the
+      same answer the admin contest view, the provider leaderboard and the player results
+      screen already give. Pinned as the exported constant, so a fifth spelling of "-"
+      cannot appear beside it.
+    */
+    expect(source).toMatch(/ABSENT_FIGURE\s*=\s*"-"/);
+    /*
+      A score is printed plain. No `+`, because which direction a game ranks in is resolved
+      once server-side in `calculateRankings`, so a sign here is this screen forming its own
+      opinion - and a time trial's best would read as a negative number.
+
+      Sliced between the two labels with BOTH ends proven, rather than scanned a fixed number
+      of characters: the trading branch immediately below legitimately writes a `+`, so a
+      window that overruns fails on correct code, and one that falls short of the score's own
+      `value:` passes vacuously.
+    */
+    const scoreAt = source.indexOf('label: "Score"');
+    const pnlAt = source.indexOf('label: "P&L"');
+    expect(scoreAt).toBeGreaterThan(-1);
+    expect(pnlAt).toBeGreaterThan(scoreAt);
+    const scoreBranch = source.slice(scoreAt, pnlAt);
+    expect(scoreBranch).toMatch(/value\s*:/);
+    expect(scoreBranch).not.toMatch(/\+/);
+  });
+
+  it.each([
+    ["overview", OVERVIEW],
+    ["detail", CONTENT],
+  ])("the %s screen asks the rule and does not format the figure itself", (
+    _label,
+    path,
+  ) => {
+    const source = code(path);
+    expect(source).toMatch(/profileResultMetric\(/);
+    expect(source).toMatch(/profileResultSubline\(/);
+    /*
+      The defect these two carried, in its own words. `.toFixed` on a P&L is the screen
+      deciding both the shape of the answer and, by implication, that there is one.
+    */
+    expect(source).not.toMatch(/\bpnl[^\n]*\.toFixed/);
+    expect(source).not.toMatch(/totalTrades[^\n]*\}\s*trades/);
   });
 });

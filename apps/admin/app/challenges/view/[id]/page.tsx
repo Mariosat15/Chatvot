@@ -21,6 +21,7 @@ import Challenge from "@/database/models/trading/challenge.model";
 import { formatVolts } from "@/lib/utils/format-volts";
 import { getTerms } from "@/lib/services/terminology.service";
 import { hasProviderGameLabel } from "@/lib/admin/contest-game-label";
+import { showsTradingConfiguration } from "@/lib/admin/contest-result-presentation";
 import ChallengeStatRows from "@/components/admin/competitions/ChallengeStatRows";
 
 interface AdminChallengeViewPageProps {
@@ -312,14 +313,24 @@ const AdminChallengeViewPage = async ({
                 </h2>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
-                    <p className="text-xs text-gray-500 mb-1">
-                      Starting Capital
-                    </p>
-                    <p className="text-lg font-semibold text-gray-100">
-                      ${challenge.startingCapital?.toLocaleString()}
-                    </p>
-                  </div>
+                  {/*
+                    R92, missed by A4 on this very screen. A4 made the ranking method and the
+                    player figures game-aware here and left this tile rendering "$" with
+                    nothing after it, because `startingCapital` is required for trading only.
+                    The symbol stays a dollar deliberately: this is simulated TRADING money in
+                    the contest's quote currency, not credits, so `formatVolts` beside it
+                    would relabel a trader's capital as the platform's own unit.
+                  */}
+                  {showsTradingConfiguration(isProviderGame) && (
+                    <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
+                      <p className="text-xs text-gray-500 mb-1">
+                        Starting Capital
+                      </p>
+                      <p className="text-lg font-semibold text-gray-100">
+                        ${challenge.startingCapital?.toLocaleString()}
+                      </p>
+                    </div>
+                  )}
 
                   <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
                     <p className="text-xs text-gray-500 mb-1">Duration</p>
