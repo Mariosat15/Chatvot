@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
-import { requireAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import {
   TutorialVideo,
@@ -33,7 +33,8 @@ function toSlug(input: string): string {
  */
 export async function POST(req: NextRequest) {
   try {
-    const auth = await requireAdminAuth();
+    const guard = await guardSection("tutorials");
+    if (!guard.ok) return guard.response;
     await connectToDatabase();
 
     const body = await req.json().catch(() => ({}));
@@ -90,8 +91,8 @@ export async function POST(req: NextRequest) {
       youtubeId,
       order: Number.isFinite(order) ? order : 100,
       isActive,
-      uploadedBy: auth.adminId || "unknown",
-      uploadedByName: auth.name,
+      uploadedBy: guard.admin.id || "unknown",
+      uploadedByName: guard.admin.name,
     });
 
     return NextResponse.json({ success: true, item: created.toObject() });

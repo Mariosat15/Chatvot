@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { writeFile } from "fs/promises";
 import path from "path";
-import { requireAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import TutorialUploadSession from "@/database/models/tutorial-upload-session.model";
 import { getSessionTmpDir } from "@/lib/tutorials/sessions";
@@ -26,7 +26,8 @@ export async function PUT(
   ctx: { params: Promise<{ sessionId: string }> },
 ) {
   try {
-    const auth = await requireAdminAuth();
+    const guard = await guardSection("tutorials");
+    if (!guard.ok) return guard.response;
     await connectToDatabase();
 
     const { sessionId } = await ctx.params;
@@ -62,7 +63,7 @@ export async function PUT(
     }
     // Reason: each session is owned by its uploader to prevent
     // cross-admin tampering with someone else's in-flight upload.
-    if (session.adminId !== (auth.adminId || "")) {
+    if (session.adminId !== (guard.admin.id || "")) {
       return NextResponse.json(
         { success: false, error: "Forbidden" },
         { status: 403 },

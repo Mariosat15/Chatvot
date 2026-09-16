@@ -3,7 +3,7 @@ import { randomUUID } from "crypto";
 import { writeFile } from "fs/promises";
 import path from "path";
 import sharp from "sharp";
-import { requireAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import { TutorialVideo, TUTORIAL_CATEGORIES, type TutorialCategory } from "@/database/models/tutorial-video.model";
 import TutorialUploadSession from "@/database/models/tutorial-upload-session.model";
@@ -83,7 +83,8 @@ function toSlug(input: string): string {
  */
 export async function POST(req: NextRequest) {
   try {
-    const auth = await requireAdminAuth();
+    const guard = await guardSection("tutorials");
+    if (!guard.ok) return guard.response;
     await connectToDatabase();
 
     // Opportunistic cleanup — cheap, runs at most once per upload start.
@@ -193,8 +194,8 @@ export async function POST(req: NextRequest) {
 
     const session = await TutorialUploadSession.create({
       sessionId,
-      adminId: auth.adminId || "unknown",
-      adminName: auth.name,
+      adminId: guard.admin.id || "unknown",
+      adminName: guard.admin.name,
       title,
       description,
       category,

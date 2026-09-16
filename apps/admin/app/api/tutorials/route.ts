@@ -3,7 +3,7 @@ import { writeFile, unlink, stat } from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
 import sharp from "sharp";
-import { requireAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import {
   TutorialVideo,
@@ -61,7 +61,8 @@ function extFromMime(mime: string): string {
 // GET /api/tutorials — list all tutorials (admin view)
 export async function GET() {
   try {
-    await requireAdminAuth();
+    const guard = await guardSection("tutorials");
+    if (!guard.ok) return guard.response;
     await connectToDatabase();
 
     const items = await TutorialVideo.find({})
@@ -87,7 +88,8 @@ export async function GET() {
 // POST /api/tutorials — upload + create
 export async function POST(req: NextRequest) {
   try {
-    const auth = await requireAdminAuth();
+    const guard = await guardSection("tutorials");
+    if (!guard.ok) return guard.response;
     await connectToDatabase();
 
     const form = await req.formData();
@@ -208,8 +210,8 @@ export async function POST(req: NextRequest) {
       thumbnailFilename,
       order: Number.isFinite(order) ? order : 100,
       isActive,
-      uploadedBy: auth.adminId || "unknown",
-      uploadedByName: auth.name,
+      uploadedBy: guard.admin.id || "unknown",
+      uploadedByName: guard.admin.name,
     });
 
     return NextResponse.json({ success: true, item: created.toObject() });

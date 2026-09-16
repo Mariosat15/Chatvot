@@ -40,6 +40,7 @@ import { join } from "path";
 import { ADMIN_SECTIONS } from "../../apps/admin/database/models/admin-employee.model";
 import {
   inventoryAdminRoutes,
+  PUBLIC_BY_DESIGN,
   routesOfClass,
 } from "../../tools/admin-routes/auth-inventory";
 import {
@@ -208,6 +209,14 @@ const CLOSED_FOLDERS: { folder: string[]; section: string }[] = [
     UI caller today; still section-granted so an unguarded sibling cannot reappear.
   */
   { folder: ["marketplace"], section: "marketplace" },
+  /*
+    R101v. TutorialsSection → tutorials. Asset streamers under tutorials/videos/* stay
+    public-by-design, so CLOSED_FOLDERS walks the helper subtrees only — not the whole
+    tutorials/ tree. Root tutorials/route.ts is asserted in the R101v describe.
+  */
+  { folder: ["tutorials", "upload"], section: "tutorials" },
+  { folder: ["tutorials", "youtube"], section: "tutorials" },
+  { folder: ["tutorials", "[id]"], section: "tutorials" },
   /*
     R101o. Money writers first among helper-but-no-grant. FinancialDashboard → financial
     (admin-funds, vat, vendor-payments, atlas/*); PendingWithdrawalsSection →
@@ -1659,6 +1668,69 @@ describe("R101u - marketplace helpers are section-granted", () => {
   });
 });
 
+describe("R101v - tutorials helpers are section-granted", () => {
+  /*
+    Seven helper files, nine handlers. TutorialsSection is the only caller. The two
+    tutorials/videos/* asset routes stay public-by-design (streamers for the admin preview
+    and any signed-in player player-app embed) and are asserted absent from the helper set.
+  */
+  const WEAKER =
+    /(getAdminSession|requireAdminAuth|verifyAdminAuth|verifyAdminToken|verifyAnyAuth|jwtVerify|getAdminJwtSecret)\s*\(|\bverify\s*\(/;
+
+  const helperFiles = findRouteFiles(join(API, "tutorials")).filter((file) => {
+    const rel = file.slice(API.length + 1).replace(/\\/g, "/");
+    return !(rel in PUBLIC_BY_DESIGN);
+  });
+
+  it("covers every tutorials helper and leaves the asset streamers public", () => {
+    expect(helperFiles.length).toBe(7);
+    expect(
+      findRouteFiles(join(API, "tutorials", "videos")).map((f) =>
+        f.slice(API.length + 1).replace(/\\/g, "/"),
+      ),
+    ).toEqual(
+      expect.arrayContaining([
+        "tutorials/videos/[filename]/route.ts",
+        "tutorials/videos/thumbnails/[filename]/route.ts",
+      ]),
+    );
+  });
+
+  it("every tutorials helper names the tutorials grant and no weaker helper", () => {
+    const weaker: string[] = [];
+    const missing: string[] = [];
+    let handlers = 0;
+    let guards = 0;
+
+    for (const file of helperFiles) {
+      const code = stripComments(readFileSync(file, "utf8"));
+      const name = file.slice(API.length + 1).replace(/\\/g, "/");
+      const named = guardedSections(code);
+      if (WEAKER.test(code)) weaker.push(name);
+      if (!named.includes("tutorials")) missing.push(name);
+      handlers += (code.match(handlerPattern()) ?? []).length;
+      guards += (code.match(guardCallPattern()) ?? []).length;
+    }
+
+    expect(weaker).toEqual([]);
+    expect(missing).toEqual([]);
+    expect(handlers).toBe(9);
+    expect(guards).toBeGreaterThanOrEqual(handlers);
+  });
+
+  it("the root tutorials route is section-granted too", () => {
+    // Reason: CLOSED_FOLDERS walks upload / youtube / [id] only, so the list file at
+    // tutorials/route.ts would otherwise be unasserted by the shared walk.
+    const code = stripComments(
+      readFileSync(join(API, "tutorials", "route.ts"), "utf8"),
+    );
+    expect(WEAKER.test(code)).toBe(false);
+    expect(guardedSections(code)).toEqual(["tutorials", "tutorials"]);
+    expect((code.match(handlerPattern()) ?? []).length).toBe(2);
+    expect((code.match(guardCallPattern()) ?? []).length).toBe(2);
+  });
+});
+
 describe("R101 - the no-check and hand-verified debt is closed; helper remains", () => {
   /*
     FLIPPED 16 Sep 2026 (R101m) for no-check; hand-verified closed the same day (R101n).
@@ -1694,9 +1766,12 @@ describe("R101 - the no-check and hand-verified debt is closed; helper remains",
       per-file allow-list would let through on the day it appeared.
     */
     const closed = CLOSED_FOLDERS.map(({ folder }) => join(API, ...folder));
-    const leaked = unguardedByHelper.filter((file) =>
-      closed.some((dir) => file.startsWith(dir)),
-    );
+    const leaked = unguardedByHelper.filter((file) => {
+      const rel = file.slice(API.length + 1).replace(/\\/g, "/");
+      // Reason: tutorials/videos/* are public-by-design asset streamers inside a closed folder.
+      if (rel in PUBLIC_BY_DESIGN) return false;
+      return closed.some((dir) => file.startsWith(dir));
+    });
 
     expect(leaked.map((f) => f.slice(API.length + 1))).toEqual([]);
   });

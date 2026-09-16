@@ -4,7 +4,7 @@ import { stat } from "fs/promises";
 import path from "path";
 import { Readable } from "stream";
 import { pipeline } from "stream/promises";
-import { requireAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import { TutorialVideo } from "@/database/models/tutorial-video.model";
 import TutorialUploadSession from "@/database/models/tutorial-upload-session.model";
@@ -29,7 +29,8 @@ export async function POST(
   ctx: { params: Promise<{ sessionId: string }> },
 ) {
   try {
-    const auth = await requireAdminAuth();
+    const guard = await guardSection("tutorials");
+    if (!guard.ok) return guard.response;
     await connectToDatabase();
 
     const { sessionId } = await ctx.params;
@@ -41,7 +42,7 @@ export async function POST(
         { status: 404 },
       );
     }
-    if (session.adminId !== (auth.adminId || "")) {
+    if (session.adminId !== (guard.admin.id || "")) {
       return NextResponse.json(
         { success: false, error: "Forbidden" },
         { status: 403 },

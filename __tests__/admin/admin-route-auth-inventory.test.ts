@@ -72,8 +72,9 @@ const NO_CHECK_OF_ANY_KIND = [] as const;
 const HAND_VERIFIED_NO_GRANT = [] as const;
 
 /**
- * 103 routes that authenticate with a helper and never ask which sections the caller
- * holds. (Was 108 after R101t; R101u moved five marketplace/ routes into section-granted.)
+ * 96 routes that authenticate with a helper and never ask which sections the caller
+ * holds. (Was 103 after R101u; R101v moved seven tutorials/ helpers into section-granted.
+ * The two tutorials/videos/* asset routes stay public-by-design.)
  */
 const HELPER_BUT_NO_GRANT = [
   "admin/backfill-ranks/route.ts",
@@ -171,17 +172,10 @@ const HELPER_BUT_NO_GRANT = [
   "settings/trading-risk/route.ts",
   "transactions/export/route.ts",
   "transactions/route.ts",
-  "tutorials/[id]/route.ts",
-  "tutorials/route.ts",
-  "tutorials/upload/[sessionId]/chunk/route.ts",
-  "tutorials/upload/[sessionId]/finalize/route.ts",
-  "tutorials/upload/[sessionId]/route.ts",
-  "tutorials/upload/init/route.ts",
-  "tutorials/youtube/route.ts",
   "verify-password/route.ts",
 ];
 
-/** Folders closed by R101a–R101s. Nothing under these may appear in any debt list above. */
+/** Folders closed by R101a–R101v. Nothing under these may appear in any debt list above. */
 const CLOSED_FOLDERS = [
   "users",
   "ai",
@@ -255,6 +249,9 @@ const CLOSED_FOLDERS = [
   // R101u. MarketplaceSection owns the whole marketplace/ tree (generate-cosmetic has no
   // UI caller today but shares the grant).
   "marketplace",
+  // R101v. TutorialsSection owns the helpers; tutorials/videos/* stay public-by-design
+  // (asset streamers) and are excluded from the closed-folder leak check below.
+  "tutorials",
 ];
 
 const findings = inventoryAdminRoutes();
@@ -395,6 +392,9 @@ describe("R101d - the folders already closed stay closed", () => {
       .filter((finding) =>
         CLOSED_FOLDERS.some((folder) => finding.route.startsWith(`${folder}/`)),
       )
+      // Reason: a closed folder may still contain PUBLIC_BY_DESIGN asset routes
+      // (tutorials/videos/*). Those are no-check by design and must not count as leaks.
+      .filter((finding) => !(finding.route in PUBLIC_BY_DESIGN))
       .filter((finding) => finding.klass !== "section-granted")
       .map((finding) => `${finding.route} [${finding.klass}]`);
 

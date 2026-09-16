@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import path from "path";
 import { unlink } from "fs/promises";
-import { requireAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import TutorialUploadSession from "@/database/models/tutorial-upload-session.model";
 import { cleanupSessionTmpDir } from "@/lib/tutorials/sessions";
@@ -21,7 +21,8 @@ export async function DELETE(
   ctx: { params: Promise<{ sessionId: string }> },
 ) {
   try {
-    const auth = await requireAdminAuth();
+    const guard = await guardSection("tutorials");
+    if (!guard.ok) return guard.response;
     await connectToDatabase();
 
     const { sessionId } = await ctx.params;
@@ -31,7 +32,7 @@ export async function DELETE(
       // Idempotent — return success even if it never existed.
       return NextResponse.json({ success: true });
     }
-    if (session.adminId !== (auth.adminId || "")) {
+    if (session.adminId !== (guard.admin.id || "")) {
       return NextResponse.json(
         { success: false, error: "Forbidden" },
         { status: 403 },

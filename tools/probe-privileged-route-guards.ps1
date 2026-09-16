@@ -1123,3 +1123,55 @@ Write-Host ''
 Write-Host 'Helper debt after R101u: 103. Remaining are helper-but-no-grant folders (settings,' -ForegroundColor DarkGray
 Write-Host 'gamemaster, tutorials, ai-knowledge, ...).' -ForegroundColor DarkGray
 Write-Host ''
+
+Write-Host "`n=== R101v probes ===`n"
+
+$TUT_YT = 'apps/admin/app/api/tutorials/youtube/route.ts'
+$TUT_ROOT = 'apps/admin/app/api/tutorials/route.ts'
+$TUT_INIT = 'apps/admin/app/api/tutorials/upload/init/route.ts'
+
+Invoke-Probe -Name 'tutorials youtube unguarded' -File $TUT_YT `
+  -Find '    const guard = await guardSection("tutorials");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'every tutorials helper names the tutorials grant and no weaker helper'
+
+Invoke-Probe -Name 'tutorials youtube wrong section' -File $TUT_YT `
+  -Find 'guardSection("tutorials")' `
+  -Replace 'guardSection("marketplace")' `
+  -ExpectTest 'every tutorials helper names the tutorials grant and no weaker helper'
+
+Invoke-Probe -Name 'tutorials init weaker helper' -File $TUT_INIT `
+  -Find 'import { guardSection } from "@/lib/admin/section-route-guard";' `
+  -Replace "import { guardSection } from `"@/lib/admin/section-route-guard`";`nimport { requireAdminAuth } from `"@/lib/admin/auth`";" `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 "    if (!guard.ok) return guard.response;`n    await requireAdminAuth();" `
+  -ExpectTest 'every tutorials helper names the tutorials grant and no weaker helper'
+
+Invoke-Probe -Name 'tutorials root one handler unguarded' -File $TUT_ROOT -First `
+  -Find '    const guard = await guardSection("tutorials");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'the root tutorials route is section-granted too'
+
+Invoke-Probe -Name 'tutorials youtube closed folder loses grant' -File $TUT_YT `
+  -Find '    const guard = await guardSection("tutorials");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'and none of the closed folders leak an unguarded file'
+
+Invoke-Probe -Name 'tutorials youtube inventory stays section-granted' -File $TUT_YT `
+  -Find '    const guard = await guardSection("tutorials");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -SuiteFile '__tests__/admin/admin-route-auth-inventory.test.ts' `
+  -ExpectTest 'no route under a closed folder is anything but section-granted'
+
+Write-Host ''
+Write-Host 'Helper debt after R101v: 96. Remaining are helper-but-no-grant folders (settings,' -ForegroundColor DarkGray
+Write-Host 'gamemaster, ai-knowledge, ...).' -ForegroundColor DarkGray
+Write-Host ''
