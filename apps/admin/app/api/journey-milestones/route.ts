@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import JourneyMilestone from "@/database/models/journey-milestone.model";
 import JourneyMapConfig from "@/database/models/journey-map-config.model";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 /** Resolve active mapId dynamically instead of hardcoding */
 async function resolveMapId(): Promise<string> {
@@ -18,6 +19,9 @@ async function resolveMapId(): Promise<string> {
  */
 export async function GET(request: NextRequest) {
   try {
+    const guard = await guardSection("journey-map");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     const { searchParams } = new URL(request.url);
@@ -103,6 +107,9 @@ function buildMilestoneDoc(data: any) {
  */
 export async function POST(request: NextRequest) {
   try {
+    const guard = await guardSection("journey-map");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
     const data = await request.json();
 
@@ -217,6 +224,9 @@ export async function POST(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
+    const guard = await guardSection("journey-map");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
     const data = await request.json();
 
@@ -284,6 +294,9 @@ export async function PUT(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
+    const guard = await guardSection("journey-map");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
     const { searchParams } = new URL(request.url);
     const milestoneId = searchParams.get("id");

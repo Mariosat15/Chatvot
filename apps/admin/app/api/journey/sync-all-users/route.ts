@@ -9,6 +9,7 @@ import WalletTransaction from "@/database/models/trading/wallet-transaction.mode
 import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
 import { evaluateMilestoneCondition } from "@root/lib/services/journey-milestone-evaluation.service";
 import UserBadge from "@/database/models/user-badge.model";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 /**
  * POST /api/journey/sync-all-users
@@ -16,6 +17,9 @@ import UserBadge from "@/database/models/user-badge.model";
  */
 export async function POST(request: NextRequest) {
   try {
+    const guard = await guardSection("journey-map");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     // Get all maps and milestones

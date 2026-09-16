@@ -52,9 +52,21 @@ export function findRouteFiles(dir: string): string[] {
   return found;
 }
 
-/** Fresh each time: a `g` regex carries `lastIndex`, so a shared instance skips matches. */
+/**
+ * Fresh each time: a `g` regex carries `lastIndex`, so a shared instance skips matches.
+ *
+ * ALL THREE EXPORT FORMS, and the two beyond `export async function` are latent rather than
+ * decorative. Next.js accepts `export function GET`, `export const GET = async () => {}` and
+ * the async-function form equally, so a route written either of the first two ways was
+ * invisible to every assertion built on this pattern - handlers counted as zero, which the
+ * consumer suites' own `toBeGreaterThan(0)` catches for a whole file, but a file mixing forms
+ * would have reported a lower handler count and passed a guard-per-handler comparison while
+ * leaving the unmatched handler open. Measured 16 September 2026: no admin route uses either
+ * form today, so this closes a gap nothing is currently falling through, which is the only
+ * time it is cheap to close.
+ */
 export function handlerPattern(): RegExp {
-  return /export\s+async\s+function\s+(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\b/g;
+  return /export\s+(?:async\s+function|function|const)\s+(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\b/g;
 }
 
 /**

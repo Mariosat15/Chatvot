@@ -6,6 +6,7 @@ import {
   UserStats 
 } from "@/lib/services/badge-evaluation.service";
 import { Badge } from "@/lib/constants/badges";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -955,6 +956,9 @@ async function handleFixAction(body: any) {
 // ─── POST HANDLER ────────────────────────────────────────────────────────
 export async function POST(request: Request) {
   try {
+    const guard = await guardSection("badges");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
     
     const body = await request.json().catch(() => ({}));
@@ -1233,6 +1237,9 @@ function generateFailingMockStats(badge: Badge): Partial<UserStats> {
 
 export async function GET() {
   try {
+    const guard = await guardSection("badges");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
     
     const badges = await BadgeConfig.find({ isActive: true })

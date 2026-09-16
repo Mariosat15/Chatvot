@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import JourneyMilestone from "@/database/models/journey-milestone.model";
 import JourneyMapConfig from "@/database/models/journey-map-config.model";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 /**
  * POST /api/journey/fix-issues
@@ -9,6 +10,9 @@ import JourneyMapConfig from "@/database/models/journey-map-config.model";
  */
 export async function POST(request: NextRequest) {
   try {
+    const guard = await guardSection("journey-map");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
     
     const fixes: string[] = [];

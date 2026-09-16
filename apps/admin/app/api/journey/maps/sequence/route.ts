@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import JourneyMapConfig from "@/database/models/journey-map-config.model";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 export async function GET(request: NextRequest) {
   try {
+    const guard = await guardSection("journey-map");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     const maps = await JourneyMapConfig.find({ isActive: true })

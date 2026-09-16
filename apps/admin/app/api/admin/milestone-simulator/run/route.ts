@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import JourneyMilestone from "@/database/models/journey-milestone.model";
 import JourneyMapConfig from "@/database/models/journey-map-config.model";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -576,6 +577,9 @@ interface MilestoneTestResult {
 // ─── POST HANDLER ────────────────────────────────────────────────────────
 export async function POST(request: Request) {
   try {
+    const guard = await guardSection("journey-map");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
     const body = await request.json().catch(() => ({}));
     const { milestoneId, mapId, action } = body;
@@ -787,6 +791,9 @@ async function handleFixAction(body: any) {
 // ─── GET HANDLER ─────────────────────────────────────────────────────────
 export async function GET() {
   try {
+    const guard = await guardSection("journey-map");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
     const maps = await JourneyMapConfig.find({ isActive: true }).select("mapId name sequenceOrder").sort({ sequenceOrder: 1 }).lean() as any[];
     const milestones = await JourneyMilestone.find({ isActive: true }).select("id name mapId order completeCondition rewards").sort({ mapId: 1, order: 1 }).lean() as any[];

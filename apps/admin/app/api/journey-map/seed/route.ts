@@ -3,6 +3,7 @@ import { connectToDatabase } from "@/database/mongoose";
 import JourneyMapConfig from "@/database/models/journey-map-config.model";
 import JourneyMilestone from "@/database/models/journey-milestone.model";
 import { DEFAULT_MAP_CONFIG, DEFAULT_MILESTONES } from "@/lib/constants/journey-map-template";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 /**
  * @deprecated — Use the Gamification Wizard to generate milestones instead.
@@ -131,6 +132,9 @@ async function seedJourneyMap() {
  */
 export async function GET(request: NextRequest) {
   try {
+    const guard = await guardSection("journey-map");
+    if (!guard.ok) return guard.response;
+
     const result = await seedJourneyMap();
 
     return NextResponse.json({
@@ -158,6 +162,9 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    const guard = await guardSection("journey-map");
+    if (!guard.ok) return guard.response;
+
     const result = await seedJourneyMap();
 
     return NextResponse.json({
@@ -185,6 +192,9 @@ export async function POST(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
+    const guard = await guardSection("journey-map");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     const mapId = DEFAULT_MAP_CONFIG.mapId;

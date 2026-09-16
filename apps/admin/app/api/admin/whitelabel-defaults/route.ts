@@ -8,6 +8,7 @@ import {
   seedMilestonesFromDefaults,
   getDefaultsSummary,
 } from "@/lib/services/whitelabel-defaults.service";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 /**
  * GET /api/admin/whitelabel-defaults
@@ -15,6 +16,9 @@ import {
  */
 export async function GET() {
   try {
+    const guard = await guardSection("settings");
+    if (!guard.ok) return guard.response;
+
     const summary = getDefaultsSummary();
     return NextResponse.json({ success: true, defaults: summary });
   } catch (error) {
@@ -37,6 +41,9 @@ export async function GET() {
  */
 export async function POST(request: NextRequest) {
   try {
+    const guard = await guardSection("settings");
+    if (!guard.ok) return guard.response;
+
     const body = await request.json();
     const { action, type } = body;
 

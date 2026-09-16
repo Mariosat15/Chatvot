@@ -4,6 +4,7 @@ import CompetitionParticipant from "@/database/models/trading/competition-partic
 import UserLevel from "@/database/models/user-level.model";
 import { evaluateUserBadges } from "@/lib/services/badge-evaluation.service";
 import { recalculateUserLevel } from "@/lib/services/xp-level.service";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 // Allow up to 2 minutes for bulk badge evaluation
 export const maxDuration = 120;
@@ -15,9 +16,23 @@ export const maxDuration = 120;
  */
 export async function POST(request: NextRequest) {
   try {
+    const guard = await guardSection("badges");
+    if (!guard.ok) return guard.response;
+
     const { userId } = await request.json();
 
     await connectToDatabase();
+
+    // Reason: an omitted `userId` means "every user", so this cannot fall through to the bulk
+    // branch on a bad value. It must also be a string rather than merely truthy - the admin
+    // copy of `gatherUserStats` has no type check of its own (R100), so an object here reaches
+    // a query as an operator instead of a value.
+    if (userId !== undefined && typeof userId !== "string") {
+      return NextResponse.json(
+        { success: false, error: "userId must be a string when provided" },
+        { status: 400 },
+      );
+    }
 
     if (userId) {
       // Evaluate badges for a specific user

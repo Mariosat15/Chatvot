@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import BadgeConfig from "@/database/models/badge-config.model";
 import { getBadgesFromDB } from "@/lib/services/badge-config-seed.service";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 /**
  * GET /api/admin/badges
@@ -9,6 +10,9 @@ import { getBadgesFromDB } from "@/lib/services/badge-config-seed.service";
  */
 export async function GET() {
   try {
+    const guard = await guardSection("badges");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
     const badges = await getBadgesFromDB();
 
@@ -32,6 +36,12 @@ export async function GET() {
  */
 export async function POST(request: NextRequest) {
   try {
+    // Reason: a badge's `condition` is the rule deciding who earns it, so an anonymous write
+    // here changes what every player can achieve. Guarded per handler rather than once at the
+    // top of the file - a file-level convention is invisible to a reviewer reading one export.
+    const guard = await guardSection("badges");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
     const badge = await request.json();
 
@@ -85,6 +95,9 @@ export async function POST(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
+    const guard = await guardSection("badges");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
     const badge = await request.json();
 
@@ -145,6 +158,9 @@ export async function PUT(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
+    const guard = await guardSection("badges");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
     const { searchParams } = new URL(request.url);
     const badgeId = searchParams.get("badgeId");

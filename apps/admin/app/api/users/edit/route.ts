@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
-import { getAdminSession } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { auditLogService } from "@/lib/services/audit-log.service";
 import { ObjectId } from "mongodb";
 
@@ -19,6 +19,11 @@ type UserRole = (typeof VALID_ROLES)[number];
 /**
  * Build a query that matches user by various ID formats
  * Better-auth uses 'id' field, but MongoDB also has '_id'
+ *
+ * Callers MUST have established that `userId` is a string. `{ id: userId }` with an object
+ * value is a query operator rather than a value, so `{ "$ne": null }` would match the first
+ * user in the collection - and `!userId` is true for no object, so the presence check above
+ * cannot stand in for the type check.
  */
 function buildUserQuery(userId: string) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -41,6 +46,14 @@ function buildUserQuery(userId: string) {
  */
 export async function PATCH(request: Request) {
   try {
+    // Reason: `role` is a settable field here and "admin" is a valid value, so this route
+    // grants administrator. It must refuse BEFORE the write, and the refusal must be the
+    // guard's - the audit-log lookup that used to be the file's only mention of a session
+    // ran after the update and was skipped entirely when there was no session, so the one
+    // artefact an operator would check for evidence was suppressed by the same condition.
+    const guard = await guardSection("users");
+    if (!guard.ok) return guard.response;
+
     const {
       userId,
       name,
@@ -53,7 +66,7 @@ export async function PATCH(request: Request) {
       phone,
     } = await request.json();
 
-    if (!userId) {
+    if (typeof userId !== "string" || !userId) {
       return NextResponse.json(
         { success: false, message: "User ID is required" },
         { status: 400 },
@@ -132,22 +145,21 @@ export async function PATCH(request: Request) {
 
     console.log("✅ Updated user", userId, ":", updateData);
 
-    // Log audit action
+    // Log audit action. The actor comes from the guard above, so there is no longer a path
+    // on which the update succeeds and the audit entry is silently skipped for want of a
+    // session - the guard has already refused that request.
     try {
-      const admin = await getAdminSession();
-      if (admin) {
-        await auditLogService.logUserUpdated(
-          {
-            id: admin.id,
-            email: admin.email,
-            name: admin.email.split("@")[0],
-            role: "admin",
-          },
-          userId,
-          name || email || userId,
-          updateData,
-        );
-      }
+      await auditLogService.logUserUpdated(
+        {
+          id: guard.admin.id,
+          email: guard.admin.email,
+          name: guard.admin.name ?? guard.admin.email.split("@")[0],
+          role: guard.admin.role ?? "admin",
+        },
+        userId,
+        name || email || userId,
+        updateData,
+      );
     } catch (auditError) {
       console.error("Failed to log audit action:", auditError);
     }
