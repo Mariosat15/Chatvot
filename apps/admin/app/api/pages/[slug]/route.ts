@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import SitePage from "@/database/models/site-page.model";
 
@@ -10,6 +11,10 @@ export async function GET(
   { params }: { params: Promise<{ slug: string }> },
 ) {
   try {
+    // Reason: SitePagesSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("site-pages");
+    if (!guard.ok) return guard.response;
+
     const { slug } = await params;
     await connectToDatabase();
 
@@ -39,6 +44,10 @@ export async function PUT(
   { params }: { params: Promise<{ slug: string }> },
 ) {
   try {
+    // Reason: SitePagesSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("site-pages");
+    if (!guard.ok) return guard.response;
+
     const { slug } = await params;
     const body = await req.json();
 
@@ -89,6 +98,10 @@ export async function DELETE(
   { params }: { params: Promise<{ slug: string }> },
 ) {
   try {
+    // Reason: SitePagesSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("site-pages");
+    if (!guard.ok) return guard.response;
+
     const { slug } = await params;
     await connectToDatabase();
 

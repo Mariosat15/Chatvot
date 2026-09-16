@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import SitePage from "@/database/models/site-page.model";
 import { RESERVED_SLUGS } from "@root/lib/constants/default-pages";
@@ -8,6 +9,10 @@ import { RESERVED_SLUGS } from "@root/lib/constants/default-pages";
  */
 export async function GET() {
   try {
+    // Reason: SitePagesSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("site-pages");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
     const pages = await SitePage.find({}).sort({ createdAt: -1 }).lean();
     return NextResponse.json({ success: true, pages });
@@ -25,6 +30,10 @@ export async function GET() {
  */
 export async function POST(req: NextRequest) {
   try {
+    // Reason: SitePagesSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("site-pages");
+    if (!guard.ok) return guard.response;
+
     const body = await req.json();
     const { slug, title, subtitle, sections, seoTitle, seoDescription } = body;
 

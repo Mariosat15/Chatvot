@@ -529,6 +529,42 @@ Invoke-Probe -Name 'market-settings closed folder loses grant' -File $MS_AUTO `
   -Replace2 '' `
   -ExpectTest 'but none of them are in the folders R101a closed'
 
+$PAGES_ROUTE = 'apps/admin/app/api/pages/route.ts'
+$PAGES_SAVE = 'apps/admin/app/api/pages/save-defaults/route.ts'
+
+Write-Host "`n=== R101j probes ===`n"
+
+# 47. pages/route.ts POST was world-writable - creates site pages anonymously.
+# Reason: -First keeps blast to one handler; GET and POST share identical guard lines.
+Invoke-Probe -Name 'pages/route.ts POST unguarded' -File $PAGES_ROUTE -First `
+  -Find '    const guard = await guardSection("site-pages");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'every pages file names guardSection'
+
+# 48. Wrong grant - landing-pages would compile and silently widen who can edit site pages.
+Invoke-Probe -Name 'pages wrong section' -File $PAGES_ROUTE -First `
+  -Find 'guardSection("site-pages")' `
+  -Replace 'guardSection("landing-pages")' `
+  -ExpectTest 'pages/route.ts: guards every handler with the section'
+
+# 49. save-defaults POST was world-writable - persists page defaults to disk.
+Invoke-Probe -Name 'save-defaults POST unguarded' -File $PAGES_SAVE `
+  -Find '    const guard = await guardSection("site-pages");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'pages/save-defaults/route.ts: one guard and one refusal'
+
+# 50. Folder-level canary.
+Invoke-Probe -Name 'pages closed folder loses grant' -File $PAGES_SAVE `
+  -Find '    const guard = await guardSection("site-pages");' `
+  -Replace '    const g = 1; void g;' `
+  -Find2 '    if (!guard.ok) return guard.response;' `
+  -Replace2 '' `
+  -ExpectTest 'but none of them are in the folders R101a closed'
+
 Write-Host ''
 Write-Host 'UNPROBED, with the reason: "still finds routes with no authorization call at all".' -ForegroundColor DarkGray
 Write-Host 'Turning that canary red means guarding the remaining no-check debt, which is later' -ForegroundColor DarkGray

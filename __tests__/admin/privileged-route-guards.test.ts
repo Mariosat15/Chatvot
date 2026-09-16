@@ -129,6 +129,13 @@ const CLOSED_FOLDERS: { folder: string[]; section: string }[] = [
     The writers rewrite holiday calendars and trading-hours settings anonymously.
   */
   { folder: ["market-settings"], section: "market" },
+  /*
+    R101j. SitePagesSection → site-pages. Five files, eight handlers: list/create,
+    per-slug GET/PUT/DELETE, generate, generate-risk-disclaimer, and save-defaults.
+    LandingPageBuilder and FooterSectionEditor also call these routes; that is reaching
+    into site-pages data, so the grant stays site-pages rather than hero-page.
+  */
+  { folder: ["pages"], section: "site-pages" },
 ];
 
 describe("R101a - every handler in the closed folders is guarded, per handler", () => {
@@ -715,6 +722,47 @@ describe("R101i - market-settings/ is section-granted and nothing weaker", () =>
     expect(weaker).toEqual([]);
     expect(wrongSection).toEqual([]);
     expect(handlers).toBe(9);
+    expect(guards).toBeGreaterThanOrEqual(handlers);
+  });
+});
+
+describe("R101j - pages/ is section-granted and nothing weaker", () => {
+  /*
+    Five files, eight handlers. SitePagesSection owns the screen; LandingPageBuilder and
+    FooterSectionEditor reach into the same data, so the grant is still `site-pages`.
+  */
+  const WEAKER =
+    /(getAdminSession|requireAdminAuth|verifyAdminAuth|verifyAdminToken|verifyAnyAuth|jwtVerify|getAdminJwtSecret)\s*\(/;
+
+  const dir = join(API, "pages");
+  const files = findRouteFiles(dir);
+
+  it("the walk finds the five pages routes", () => {
+    expect(files.length).toBe(5);
+  });
+
+  it("every pages file names guardSection(site-pages) and no weaker helper", () => {
+    const weaker: string[] = [];
+    const wrongSection: string[] = [];
+    let handlers = 0;
+    let guards = 0;
+
+    for (const file of files) {
+      const code = stripComments(readFileSync(file, "utf8"));
+      const name = file.slice(API.length + 1).replace(/\\/g, "/");
+      const sections = [...code.matchAll(/guardSection\(\s*["']([^"']+)["']\s*\)/g)].map(
+        (m) => m[1],
+      );
+
+      if (WEAKER.test(code)) weaker.push(name);
+      if (sections.some((s) => s !== "site-pages")) wrongSection.push(name);
+      handlers += (code.match(handlerPattern()) ?? []).length;
+      guards += (code.match(guardCallPattern()) ?? []).length;
+    }
+
+    expect(weaker).toEqual([]);
+    expect(wrongSection).toEqual([]);
+    expect(handlers).toBe(8);
     expect(guards).toBeGreaterThanOrEqual(handlers);
   });
 });

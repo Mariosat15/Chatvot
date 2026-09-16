@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import CompanySettingsModel from "@/database/models/company-settings.model";
 
@@ -42,6 +43,10 @@ interface GeneratedSection {
  */
 export async function POST(req: NextRequest) {
   try {
+    // Reason: SitePagesSection owns this screen; section grant is the auth answer.
+    const guard = await guardSection("site-pages");
+    if (!guard.ok) return guard.response;
+
     const body = await req.json();
     const { pageType, pageTitle } = body;
 

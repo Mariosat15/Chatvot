@@ -59,9 +59,9 @@ import { classifyRouteAuth, stripComments } from "../helpers/route-guard-audit";
  * swept in one commit.
  */
 /**
- * 33 routes calling no authentication of any kind. Frozen rather than swept:
+ * 28 routes calling no authentication of any kind. Frozen rather than swept:
  * each needs a decision about which grant owns the screen that calls it.
- * (Was 35 after R101h; R101i moved the two market-settings no-check routes into section-granted.)
+ * (Was 33 after R101i; R101j moved the five pages/ no-check routes into section-granted.)
  */
 const NO_CHECK_OF_ANY_KIND = [
   "action-terms/[slug]/route.ts",
@@ -75,11 +75,6 @@ const NO_CHECK_OF_ANY_KIND = [
   "diagnose-user/route.ts",
   "fraud/restrictions/route.ts",
   "market-status/route.ts",
-  "pages/[slug]/route.ts",
-  "pages/generate-risk-disclaimer/route.ts",
-  "pages/generate/route.ts",
-  "pages/route.ts",
-  "pages/save-defaults/route.ts",
   "pexels/route.ts",
   "recover-stats/route.ts",
   "server-fleet/route.ts",
@@ -303,7 +298,7 @@ const HELPER_BUT_NO_GRANT = [
   "withdrawals/route.ts",
 ] as const;
 
-/** Folders closed by R101a–R101i. Nothing under these may appear in any debt list above. */
+/** Folders closed by R101a–R101j. Nothing under these may appear in any debt list above. */
 const CLOSED_FOLDERS = [
   "users",
   "ai",
@@ -317,6 +312,7 @@ const CLOSED_FOLDERS = [
   "market-data",
   "symbols",
   "market-settings",
+  "pages",
 ];
 
 const findings = inventoryAdminRoutes();
