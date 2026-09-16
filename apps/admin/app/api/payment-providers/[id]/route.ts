@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import PaymentProvider from "@/database/models/payment-provider.model";
-import { requireAdminAuth } from "@/lib/admin/auth";
-
+import { guardSection } from "@/lib/admin/section-route-guard";
 /**
  * PUT /api/admin/payment-providers/[id]
  * Update a payment provider
@@ -12,7 +11,8 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    await requireAdminAuth();
+    const guard = await guardSection("payment-providers");
+    if (!guard.ok) return guard.response;
     await connectToDatabase();
 
     const { id } = await params;
@@ -69,7 +69,8 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    await requireAdminAuth();
+    const guard = await guardSection("payment-providers");
+    if (!guard.ok) return guard.response;
     await connectToDatabase();
 
     const { id } = await params;

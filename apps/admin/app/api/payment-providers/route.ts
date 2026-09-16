@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import PaymentProvider from "@/database/models/payment-provider.model";
-import { requireAdminAuth, getAdminSession } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { auditLogService } from "@/lib/services/audit-log.service";
 
 /**
@@ -10,7 +10,8 @@ import { auditLogService } from "@/lib/services/audit-log.service";
  */
 export async function GET() {
   try {
-    await requireAdminAuth();
+    const guard = await guardSection("payment-providers");
+    if (!guard.ok) return guard.response;
     await connectToDatabase();
 
     const providers = await PaymentProvider.find().sort({
@@ -40,7 +41,8 @@ export async function GET() {
  */
 export async function POST(request: Request) {
   try {
-    await requireAdminAuth();
+    const guard = await guardSection("payment-providers");
+    if (!guard.ok) return guard.response;
     await connectToDatabase();
 
     const body = await request.json();
@@ -94,7 +96,7 @@ export async function POST(request: Request) {
 
     // Log audit action
     try {
-      const admin = await getAdminSession();
+      const admin = guard.admin;
       if (admin) {
         await auditLogService.logPaymentProviderCreated(
           {

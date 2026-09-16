@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import { getAdminSession, requireAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import { Admin } from "@/database/models/admin.model";
 import { auditLogService } from "@/lib/services/audit-log.service";
@@ -22,7 +22,8 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const auth = await requireAdminAuth();
+    const guard = await guardSection("database");
+    if (!guard.ok) return guard.response;
     const { id } = await params;
 
     const { password, confirmationCode } = await request.json();
@@ -46,7 +47,7 @@ export async function POST(
 
     // Verify the current admin's password against the stored hash.
     await connectToDatabase();
-    const adminDoc = await Admin.findById(auth.adminId).select("password");
+    const adminDoc = await Admin.findById(guard.admin.id).select("password");
     if (!adminDoc || !(await bcrypt.compare(password, adminDoc.password))) {
       return NextResponse.json(
         { success: false, message: "Invalid password" },
@@ -54,7 +55,7 @@ export async function POST(
       );
     }
 
-    const admin = await getAdminSession();
+    const admin = guard.admin;
     await restoreBackup(id, admin?.email);
 
     if (admin) {

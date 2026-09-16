@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminSession, requireAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { auditLogService } from "@/lib/services/audit-log.service";
 import { createBackup, getBackupState } from "@/lib/services/backup/backup.service";
 
@@ -12,7 +12,8 @@ export const dynamic = "force-dynamic";
  */
 export async function GET() {
   try {
-    await requireAdminAuth();
+    const guard = await guardSection("database");
+    if (!guard.ok) return guard.response;
     const state = await getBackupState();
     return NextResponse.json({ success: true, ...state });
   } catch (error) {
@@ -36,9 +37,9 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    await requireAdminAuth();
-    const admin = await getAdminSession();
-
+    const guard = await guardSection("database");
+    if (!guard.ok) return guard.response;
+    const admin = guard.admin;
     let label: string | undefined;
     try {
       const body = await request.json();

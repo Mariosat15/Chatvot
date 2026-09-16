@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdminAuth, getAdminSession } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import { PlatformFinancialsService } from "@/lib/services/platform-financials.service";
 import CreditConversionSettings from "@/database/models/credit-conversion-settings.model";
@@ -10,7 +10,8 @@ import CreditConversionSettings from "@/database/models/credit-conversion-settin
  */
 export async function GET(request: NextRequest) {
   try {
-    await requireAdminAuth();
+    const guard = await guardSection("financial");
+    if (!guard.ok) return guard.response;
     await connectToDatabase();
 
     const stats = await PlatformFinancialsService.getFinancialStats();
@@ -49,10 +50,9 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const admin = await getAdminSession();
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("financial");
+    if (!guard.ok) return guard.response;
+    const admin = guard.admin;
 
     await connectToDatabase();
 

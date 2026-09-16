@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { customerAuditService } from "@/lib/services/customer-audit.service";
 import { connectToDatabase } from "@/database/mongoose";
 
@@ -9,10 +9,8 @@ import { connectToDatabase } from "@/database/mongoose";
  */
 export async function GET(request: NextRequest) {
   try {
-    const auth = await verifyAdminAuth();
-    if (!auth.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("users");
+    if (!guard.ok) return guard.response;
 
     const { searchParams } = new URL(request.url);
     const customerId = searchParams.get("customerId");

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminSession } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import AccountLockout from "@/database/models/account-lockout.model";
 
@@ -9,10 +9,9 @@ import AccountLockout from "@/database/models/account-lockout.model";
  */
 export async function POST(req: NextRequest) {
   try {
-    const session = await getAdminSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("fraud");
+    if (!guard.ok) return guard.response;
+    const session = guard.admin;
 
     await connectToDatabase();
 

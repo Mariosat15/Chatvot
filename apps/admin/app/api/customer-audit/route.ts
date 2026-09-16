@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { customerAuditService } from "@/lib/services/customer-audit.service";
 import {
   AuditActionCategory,
@@ -13,10 +13,15 @@ import { connectToDatabase } from "@/database/mongoose";
  */
 export async function GET(request: NextRequest) {
   try {
-    const auth = await verifyAdminAuth();
-    if (!auth.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("users");
+    if (!guard.ok) return guard.response;
+    const auth = {
+      adminId: guard.admin.id,
+      email: guard.admin.email,
+      name: guard.admin.name,
+      role: guard.admin.role,
+      isSuperAdmin: guard.admin.role === "super_admin",
+    };
 
     const { searchParams } = new URL(request.url);
     const customerId = searchParams.get("customerId");
@@ -76,10 +81,15 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const auth = await verifyAdminAuth();
-    if (!auth.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("users");
+    if (!guard.ok) return guard.response;
+    const auth = {
+      adminId: guard.admin.id,
+      email: guard.admin.email,
+      name: guard.admin.name,
+      role: guard.admin.role,
+      isSuperAdmin: guard.admin.role === "super_admin",
+    };
 
     const body = await request.json();
     const { customerId, customerEmail, customerName, note } = body;

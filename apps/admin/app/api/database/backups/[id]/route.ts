@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAdminSession, requireAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { auditLogService } from "@/lib/services/audit-log.service";
 import { deleteBackup } from "@/lib/services/backup/backup.service";
 
@@ -14,12 +14,13 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    await requireAdminAuth();
+    const guard = await guardSection("database");
+    if (!guard.ok) return guard.response;
     const { id } = await params;
 
     await deleteBackup(id);
 
-    const admin = await getAdminSession();
+    const admin = guard.admin;
     if (admin) {
       await auditLogService.log({
         admin: {

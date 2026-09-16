@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import Incident from "@/database/models/incident.model";
 import { auditLogService } from "@/lib/services/audit-log.service";
@@ -13,10 +13,15 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const auth = await verifyAdminAuth();
-    if (!auth.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("incidents");
+    if (!guard.ok) return guard.response;
+    const auth = {
+      adminId: guard.admin.id,
+      email: guard.admin.email,
+      name: guard.admin.name,
+      role: guard.admin.role,
+      isSuperAdmin: guard.admin.role === "super_admin",
+    };
 
     const { id } = await params;
     await connectToDatabase();
@@ -51,10 +56,15 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const auth = await verifyAdminAuth();
-    if (!auth.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("incidents");
+    if (!guard.ok) return guard.response;
+    const auth = {
+      adminId: guard.admin.id,
+      email: guard.admin.email,
+      name: guard.admin.name,
+      role: guard.admin.role,
+      isSuperAdmin: guard.admin.role === "super_admin",
+    };
 
     const { id } = await params;
     const body = await request.json();
@@ -183,10 +193,15 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const auth = await verifyAdminAuth();
-    if (!auth.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("incidents");
+    if (!guard.ok) return guard.response;
+    const auth = {
+      adminId: guard.admin.id,
+      email: guard.admin.email,
+      name: guard.admin.name,
+      role: guard.admin.role,
+      isSuperAdmin: guard.admin.role === "super_admin",
+    };
 
     const { id } = await params;
     await connectToDatabase();

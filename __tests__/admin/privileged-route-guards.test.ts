@@ -246,6 +246,22 @@ const CLOSED_FOLDERS: { folder: string[]; section: string }[] = [
   { folder: ["redis-settings"], section: "redis" },
   { folder: ["mdb-cluster-settings"], section: "mdb-cluster" },
   /*
+    R101aa. Ops / money / customer cluster. Dual-caller folders pin the shared grant here;
+    the R101aa describe asserts both halves. customer-audit is users-only (UserFullDetailPanel).
+    lockouts is fraud (FraudMonitoringSection). platform-financials/backfill was a hand-rolled
+    JWT with a secret fallback — closed as financial in the same slice.
+  */
+  { folder: ["customer-assignments"], section: "customer-assignment" },
+  { folder: ["customer-audit"], section: "users" },
+  { folder: ["database"], section: "database" },
+  { folder: ["email-templates"], section: "email-templates" },
+  { folder: ["incidents"], section: "incidents" },
+  { folder: ["lockouts"], section: "fraud" },
+  { folder: ["payment-providers"], section: "payment-providers" },
+  { folder: ["platform-financials"], section: "financial" },
+  { folder: ["reconciliation"], section: "financial" },
+  { folder: ["transactions"], section: "financial" },
+  /*
     R101o. Money writers first among helper-but-no-grant. FinancialDashboard → financial
     (admin-funds, vat, vendor-payments, atlas/*); PendingWithdrawalsSection →
     pending-withdrawals (withdrawals/). admin-bank-accounts deferred - dual callers on
@@ -1996,6 +2012,137 @@ describe("R101y - settings cluster helpers are section-granted", () => {
     expect((code.match(guardCallPattern()) ?? []).length).toBeGreaterThanOrEqual(
       handlers,
     );
+  });
+});
+
+describe("R101aa - ops / money / customer helpers are section-granted", () => {
+  /*
+    Twenty-six files, forty-five handlers. Dual-caller routes use guardAnySection so an
+    employee granted only one of the calling screens still reaches them; single-caller
+    routes use guardSection. platform-financials/backfill lost a hand-rolled JWT that fell
+    back to a hard-coded secret — the same shape as R101n's three hand-verified routes.
+  */
+  const WEAKER =
+    /(getAdminSession|requireAdminAuth|verifyAdminAuth|verifyAdminToken|verifyAnyAuth|jwtVerify|getAdminJwtSecret)\s*\(|\bverify\s*\(/;
+
+  const singleCaller: { rel: string; section: string; handlers: number }[] = [
+    { rel: "customer-assignments/settings/route.ts", section: "customer-assignment", handlers: 2 },
+    { rel: "customer-audit/route.ts", section: "users", handlers: 2 },
+    { rel: "customer-audit/stats/route.ts", section: "users", handlers: 1 },
+    { rel: "database/backups/route.ts", section: "database", handlers: 2 },
+    { rel: "database/backups/[id]/route.ts", section: "database", handlers: 1 },
+    { rel: "database/backups/[id]/restore/route.ts", section: "database", handlers: 1 },
+    { rel: "email-templates/route.ts", section: "email-templates", handlers: 3 },
+    { rel: "incidents/route.ts", section: "incidents", handlers: 2 },
+    { rel: "incidents/[id]/route.ts", section: "incidents", handlers: 3 },
+    { rel: "incidents/[id]/compensate/route.ts", section: "incidents", handlers: 2 },
+    { rel: "incidents/[id]/resolve/route.ts", section: "incidents", handlers: 2 },
+    { rel: "lockouts/route.ts", section: "fraud", handlers: 2 },
+    { rel: "lockouts/clear-all/route.ts", section: "fraud", handlers: 1 },
+    { rel: "lockouts/[email]/unlock/route.ts", section: "fraud", handlers: 1 },
+    { rel: "payment-providers/route.ts", section: "payment-providers", handlers: 2 },
+    { rel: "payment-providers/[id]/route.ts", section: "payment-providers", handlers: 2 },
+    { rel: "payment-providers/regenerate-env/route.ts", section: "payment-providers", handlers: 1 },
+    { rel: "payment-providers/auto-configure-webhook/route.ts", section: "payment-providers", handlers: 1 },
+    { rel: "platform-financials/route.ts", section: "financial", handlers: 2 },
+    { rel: "platform-financials/backfill/route.ts", section: "financial", handlers: 2 },
+  ];
+
+  const dualCaller: { rel: string; sections: string[]; handlers: number }[] = [
+    {
+      rel: "customer-assignments/route.ts",
+      sections: ["customer-assignment", "users"],
+      handlers: 2,
+    },
+    {
+      rel: "customer-assignments/[customerId]/route.ts",
+      sections: ["customer-assignment", "users"],
+      handlers: 2,
+    },
+    {
+      rel: "customer-assignments/transfer/route.ts",
+      sections: ["customer-assignment", "users"],
+      handlers: 1,
+    },
+    {
+      rel: "reconciliation/route.ts",
+      sections: ["financial", "overview"],
+      handlers: 2,
+    },
+    {
+      rel: "transactions/route.ts",
+      sections: ["financial", "users"],
+      handlers: 2,
+    },
+    {
+      rel: "transactions/export/route.ts",
+      sections: ["financial", "users"],
+      handlers: 1,
+    },
+  ];
+
+  it("covers twenty-six ops/money/customer route files", () => {
+    expect(singleCaller.length + dualCaller.length).toBe(26);
+  });
+
+  it("every single-caller file names its calling-screen grant and no weaker helper", () => {
+    const weaker: string[] = [];
+    const missing: string[] = [];
+    let handlers = 0;
+    let guards = 0;
+
+    for (const { rel, section, handlers: expected } of singleCaller) {
+      const file = join(API, ...rel.split("/"));
+      const code = stripComments(readFileSync(file, "utf8"));
+      if (WEAKER.test(code)) weaker.push(rel);
+      if (!guardedSections(code).includes(section)) missing.push(rel);
+      const fileHandlers = (code.match(handlerPattern()) ?? []).length;
+      handlers += fileHandlers;
+      guards += (code.match(guardCallPattern()) ?? []).length;
+      expect(fileHandlers).toBe(expected);
+    }
+
+    expect(weaker).toEqual([]);
+    expect(missing).toEqual([]);
+    expect(handlers).toBe(35);
+    expect(guards).toBeGreaterThanOrEqual(handlers);
+  });
+
+  it("every dual-caller file uses guardAnySection with both calling-screen grants", () => {
+    const weaker: string[] = [];
+    const missing: string[] = [];
+    let handlers = 0;
+    let guards = 0;
+
+    for (const { rel, sections, handlers: expected } of dualCaller) {
+      const file = join(API, ...rel.split("/"));
+      const code = stripComments(readFileSync(file, "utf8"));
+      if (WEAKER.test(code)) weaker.push(rel);
+      for (const { method, body } of handlerSlices(code)) {
+        const named = guardedSections(body);
+        if (!sections.every((s) => named.includes(s))) {
+          missing.push(`${rel}:${method}`);
+        }
+      }
+      const fileHandlers = (code.match(handlerPattern()) ?? []).length;
+      handlers += fileHandlers;
+      guards += (code.match(guardCallPattern()) ?? []).length;
+      expect(fileHandlers).toBe(expected);
+    }
+
+    expect(weaker).toEqual([]);
+    expect(missing).toEqual([]);
+    expect(handlers).toBe(10);
+    expect(guards).toBeGreaterThanOrEqual(handlers);
+  });
+
+  it("platform-financials/backfill no longer hand-verifies a JWT", () => {
+    // Reason: it used jose + ADMIN_JWT_SECRET || hard-coded fallback — R101n's class.
+    const code = stripComments(
+      readFileSync(join(API, "platform-financials", "backfill", "route.ts"), "utf8"),
+    );
+    expect(code).not.toMatch(/jwtVerify|jose|ADMIN_JWT_SECRET|admin-secret-key/);
+    expect(guardedSections(code)).toContain("financial");
   });
 });
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { customerAssignmentService } from "@/lib/services/customer-assignment.service";
 import { connectToDatabase } from "@/database/mongoose";
 import { AdminRoleTemplate } from "@/database/models/admin-role-template.model";
@@ -10,10 +10,15 @@ import { AdminRoleTemplate } from "@/database/models/admin-role-template.model";
  */
 export async function GET(request: NextRequest) {
   try {
-    const auth = await verifyAdminAuth();
-    if (!auth.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("customer-assignment");
+    if (!guard.ok) return guard.response;
+    const auth = {
+      adminId: guard.admin.id,
+      email: guard.admin.email,
+      name: guard.admin.name,
+      role: guard.admin.role,
+      isSuperAdmin: guard.admin.role === "super_admin",
+    };
 
     await connectToDatabase();
     const settings = await customerAssignmentService.getSettings();
@@ -50,10 +55,15 @@ export async function GET(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
-    const auth = await verifyAdminAuth();
-    if (!auth.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("customer-assignment");
+    if (!guard.ok) return guard.response;
+    const auth = {
+      adminId: guard.admin.id,
+      email: guard.admin.email,
+      name: guard.admin.name,
+      role: guard.admin.role,
+      isSuperAdmin: guard.admin.role === "super_admin",
+    };
 
     // Only super admin can update settings
     if (!auth.isSuperAdmin) {

@@ -1,32 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { jwtVerify } from "jose";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import { PlatformTransaction } from "@/database/models/platform-financials.model";
 import CreditConversionSettings from "@/database/models/credit-conversion-settings.model";
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.ADMIN_JWT_SECRET || "admin-secret-key-change-in-production",
-);
-
-async function verifyAdminToken(request: NextRequest) {
-  const token = request.cookies.get("admin_token")?.value;
-  if (!token) return null;
-  try {
-    const { payload } = await jwtVerify(token, JWT_SECRET);
-    return payload;
-  } catch {
-    return null;
-  }
-}
-
 // POST - Backfill deposit/withdrawal fees for existing transactions
 export async function POST(request: NextRequest) {
   try {
-    const admin = await verifyAdminToken(request);
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("financial");
+    if (!guard.ok) return guard.response;
 
     await connectToDatabase();
 
@@ -189,10 +172,8 @@ export async function POST(request: NextRequest) {
 // DELETE - Clear all platform financial transactions (for database reset)
 export async function DELETE(request: NextRequest) {
   try {
-    const admin = await verifyAdminToken(request);
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("financial");
+    if (!guard.ok) return guard.response;
 
     await connectToDatabase();
 

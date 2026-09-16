@@ -72,9 +72,9 @@ const NO_CHECK_OF_ANY_KIND = [] as const;
 const HAND_VERIFIED_NO_GRANT = [] as const;
 
 /**
- * 67 routes that authenticate with a helper and never ask which sections the caller
- * holds. (Was 84 after R101x; R101y moved seventeen settings-cluster routes into
- * section-granted.)
+ * 41 routes that authenticate with a helper and never ask which sections the caller
+ * holds. (Was 67 after R101y; R101aa moved twenty-six ops/money/customer routes into
+ * section-granted. Gamemaster/ stays deferred — verifyGameMasterAuth by design.)
  */
 const HELPER_BUT_NO_GRANT = [
 "admin/backfill-ranks/route.ts",
@@ -88,20 +88,10 @@ const HELPER_BUT_NO_GRANT = [
 "auth/logout/route.ts",
 "cookie-consent/route.ts",
 "credentials/route.ts",
-"customer-assignments/[customerId]/route.ts",
-"customer-assignments/route.ts",
-"customer-assignments/settings/route.ts",
-"customer-assignments/transfer/route.ts",
-"customer-audit/route.ts",
-"customer-audit/stats/route.ts",
-"database/backups/[id]/restore/route.ts",
-"database/backups/[id]/route.ts",
-"database/backups/route.ts",
 "debug-fraud/route.ts",
 "dev-scripts/execute/route.ts",
 "dev-scripts/route.ts",
 "dev-zone/dependency-check/route.ts",
-"email-templates/route.ts",
 "employee/notifications/route.ts",
 "employee/profile/password/route.ts",
 "employee/profile/route.ts",
@@ -117,36 +107,20 @@ const HELPER_BUT_NO_GRANT = [
 "health-overview/route.ts",
 "images/route.ts",
 "images/upload/route.ts",
-"incidents/[id]/compensate/route.ts",
-"incidents/[id]/resolve/route.ts",
-"incidents/[id]/route.ts",
-"incidents/route.ts",
 "kyc-history/route.ts",
 "live-ops/route.ts",
-"lockouts/[email]/unlock/route.ts",
-"lockouts/clear-all/route.ts",
-"lockouts/route.ts",
 "notifications/route.ts",
 "payment-history/route.ts",
-"payment-providers/[id]/route.ts",
-"payment-providers/auto-configure-webhook/route.ts",
-"payment-providers/regenerate-env/route.ts",
-"payment-providers/route.ts",
 "pending-payments/route.ts",
-"platform-financials/backfill/route.ts",
-"platform-financials/route.ts",
 "price-health/route.ts",
-"reconciliation/route.ts",
 "reset-all-data/route.ts",
 "security/alerts/route.ts",
 "server-options/apply-heap/route.ts",
 "server-options/heap-info/route.ts",
-"transactions/export/route.ts",
-"transactions/route.ts",
 "verify-password/route.ts",
 ];
 
-/** Folders closed by R101a–R101y. Nothing under these may appear in any debt list above. */
+/** Folders closed by R101a–R101aa. Nothing under these may appear in any debt list above. */
 const CLOSED_FOLDERS = [
   "users",
   "ai",
@@ -235,6 +209,20 @@ const CLOSED_FOLDERS = [
   "kyc-settings",
   "redis-settings",
   "mdb-cluster-settings",
+  // R101aa. Ops / money / customer cluster. Dual-caller routes (assignments list,
+  // reconciliation, transactions) use guardAnySection; the folder walk pins the shared
+  // grant and the R101aa describe pins both. lockouts sits under fraud (FraudMonitoring
+  // owns unlock/clear-all; GET/POST have no other caller).
+  "customer-assignments",
+  "customer-audit",
+  "database",
+  "email-templates",
+  "incidents",
+  "lockouts",
+  "payment-providers",
+  "platform-financials",
+  "reconciliation",
+  "transactions",
 ];
 
 const findings = inventoryAdminRoutes();
@@ -424,5 +412,14 @@ describe("R101d - the folders already closed stay closed", () => {
     expect(read("kyc-settings/route.ts")).toBe("section-granted");
     expect(read("redis-settings/route.ts")).toBe("section-granted");
     expect(read("mdb-cluster-settings/route.ts")).toBe("section-granted");
+    expect(read("customer-assignments/route.ts")).toBe("section-granted");
+    expect(read("customer-assignments/settings/route.ts")).toBe("section-granted");
+    expect(read("database/backups/route.ts")).toBe("section-granted");
+    expect(read("incidents/route.ts")).toBe("section-granted");
+    expect(read("lockouts/route.ts")).toBe("section-granted");
+    expect(read("payment-providers/route.ts")).toBe("section-granted");
+    expect(read("platform-financials/backfill/route.ts")).toBe("section-granted");
+    expect(read("reconciliation/route.ts")).toBe("section-granted");
+    expect(read("transactions/export/route.ts")).toBe("section-granted");
   });
 });

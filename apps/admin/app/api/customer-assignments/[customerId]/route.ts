@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyAdminAuth } from "@/lib/admin/auth";
+import { guardAnySection } from "@/lib/admin/section-route-guard";
 import { customerAssignmentService } from "@/lib/services/customer-assignment.service";
 import { connectToDatabase } from "@/database/mongoose";
 
@@ -13,10 +13,15 @@ interface RouteParams {
  */
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
-    const auth = await verifyAdminAuth();
-    if (!auth.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardAnySection(["customer-assignment", "users"]);
+    if (!guard.ok) return guard.response;
+    const auth = {
+      adminId: guard.admin.id,
+      email: guard.admin.email,
+      name: guard.admin.name,
+      role: guard.admin.role,
+      isSuperAdmin: guard.admin.role === "super_admin",
+    };
 
     const { customerId } = await params;
 
@@ -52,10 +57,15 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
  */
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
-    const auth = await verifyAdminAuth();
-    if (!auth.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardAnySection(["customer-assignment", "users"]);
+    if (!guard.ok) return guard.response;
+    const auth = {
+      adminId: guard.admin.id,
+      email: guard.admin.email,
+      name: guard.admin.name,
+      role: guard.admin.role,
+      isSuperAdmin: guard.admin.role === "super_admin",
+    };
 
     // Only super admin can unassign
     if (!auth.isSuperAdmin) {

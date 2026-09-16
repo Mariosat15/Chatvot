@@ -3,7 +3,7 @@
 // casting every .lean() result would add noise without improving safety.
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
-import { verifyAdminAuth } from "@/lib/admin/auth";
+import { guardAnySection } from "@/lib/admin/section-route-guard";
 import { auditLogService } from "@/lib/services/audit-log.service";
 import CreditWallet from "@/database/models/trading/credit-wallet.model";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
@@ -108,10 +108,12 @@ interface UserReconciliationDetail {
  */
 export async function GET(request: NextRequest) {
   try {
-    const admin = await verifyAdminAuth();
-    if (!admin.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardAnySection(["financial", "overview"]);
+    if (!guard.ok) return guard.response;
+    const admin = {
+      adminId: guard.admin.id,
+      email: guard.admin.email,
+    };
 
     await connectToDatabase();
 
@@ -332,15 +334,17 @@ export async function GET(request: NextRequest) {
  * Fix a specific reconciliation issue
  */
 export async function POST(request: NextRequest) {
+  const guard = await guardAnySection(["financial", "overview"]);
+  if (!guard.ok) return guard.response;
+  const admin = {
+    adminId: guard.admin.id,
+    email: guard.admin.email,
+  };
+
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
-    const admin = await verifyAdminAuth();
-    if (!admin.isAuthenticated) {
-      await session.abortTransaction();
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
 
     // Safely parse JSON body
     let body: { issueType?: string; userId?: string } = {};

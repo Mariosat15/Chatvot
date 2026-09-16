@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import PaymentProvider from "@/database/models/payment-provider.model";
-import { requireAdminAuth } from "@/lib/admin/auth";
-
+import { guardSection } from "@/lib/admin/section-route-guard";
 /**
  * POST /api/admin/payment-providers/regenerate-env
  * Verify payment provider credentials are stored in MongoDB.
@@ -11,7 +10,8 @@ import { requireAdminAuth } from "@/lib/admin/auth";
  */
 export async function POST() {
   try {
-    await requireAdminAuth();
+    const guard = await guardSection("payment-providers");
+    if (!guard.ok) return guard.response;
     await connectToDatabase();
 
     // Verify all providers have their credentials stored in MongoDB

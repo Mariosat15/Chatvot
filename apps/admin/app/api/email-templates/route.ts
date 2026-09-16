@@ -3,13 +3,14 @@ import { connectToDatabase } from "@/database/mongoose";
 import EmailTemplate, {
   IEmailTemplate,
 } from "@/database/models/email-template.model";
-import { requireAdminAuth, getAdminSession } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { auditLogService } from "@/lib/services/audit-log.service";
 
 // GET - Get all email templates or specific template
 export async function GET(request: NextRequest) {
   try {
-    await requireAdminAuth();
+    const guard = await guardSection("email-templates");
+    if (!guard.ok) return guard.response;
     await connectToDatabase();
 
     const { searchParams } = new URL(request.url);
@@ -83,7 +84,8 @@ export async function GET(request: NextRequest) {
 // PUT - Update email template
 export async function PUT(request: NextRequest) {
   try {
-    await requireAdminAuth();
+    const guard = await guardSection("email-templates");
+    if (!guard.ok) return guard.response;
     await connectToDatabase();
 
     const body = await request.json();
@@ -106,7 +108,7 @@ export async function PUT(request: NextRequest) {
     );
 
     // Log the update
-    const admin = await getAdminSession();
+    const admin = guard.admin;
     if (admin) {
       await auditLogService.logSettingsUpdated(
         { id: admin.id, email: admin.email || "admin", name: admin.name },
@@ -136,7 +138,8 @@ export async function PUT(request: NextRequest) {
 // POST - Send test email
 export async function POST(request: NextRequest) {
   try {
-    await requireAdminAuth();
+    const guard = await guardSection("email-templates");
+    if (!guard.ok) return guard.response;
     await connectToDatabase();
 
     const body = await request.json();
@@ -198,7 +201,7 @@ export async function POST(request: NextRequest) {
 
     if (emailSent) {
       // Log the test email
-      const admin = await getAdminSession();
+      const admin = guard.admin;
       if (admin) {
         await auditLogService.logSettingsUpdated(
           { id: admin.id, email: admin.email || "admin", name: admin.name },

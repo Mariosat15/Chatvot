@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import PaymentProvider from "@/database/models/payment-provider.model";
-import { verifyAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import Stripe from "stripe";
 
 /**
@@ -32,11 +32,8 @@ const REQUIRED_STRIPE_EVENTS: Stripe.WebhookEndpointCreateParams.EnabledEvent[] 
 
 export async function POST(request: NextRequest) {
   try {
-    // Verify admin authentication
-    const admin = await verifyAdminAuth();
-    if (!admin.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("payment-providers");
+    if (!guard.ok) return guard.response;
 
     const { provider, webhookUrl } = await request.json();
 
