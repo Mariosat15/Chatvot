@@ -2,17 +2,11 @@
  * Deterministic journey blueprint — a fixed sequence of thematic maps whose
  * milestones are dual-path: trading OR gaming.
  *
- * Reason: the previous version built **one map per catalogue scope**, so with
- * trading + one provider game the generator produced exactly two maps while
- * operators still expected the historic ~10-map sequence. Nothing failed; the
- * toast just said "2 maps". The schema also caps `sequenceOrder` at 10, which
- * is the hard ceiling this module honours.
- *
- * Dual-path is load-bearing for a mixed audience: a games-only player must be
- * able to finish every required node without placing a trade, and a trader
- * without entering a game contest. Each activity milestone therefore carries a
- * primary `completeCondition` (trading) and `orCompleteConditions` (gaming).
- * Evaluation is OR — see `checkMilestoneAnyCondition` in journey-progress.
+ * Reason: R106 emitted ten themed *names* but flat XP, flat milestone counts,
+ * shared Foundations/Ascent/Summit zones, account_created on every start node,
+ * and no backgroundImage — so every map looked and played like Pirate Cove.
+ * This module restores progressive budgets/counts, theme zones, map-gated
+ * starts, Map-1 onboarding, and stamps art URLs from the shells.
  */
 
 import {
@@ -23,15 +17,23 @@ import {
 import {
   DEFAULT_MAP_COUNT,
   JOURNEY_MAP_SHELLS,
+  MAP_MILESTONE_COUNTS,
+  MAP_XP_BUDGETS,
   MAX_JOURNEY_MAPS,
+  THEME_ZONES,
   type MapTheme,
+  type ThemeZoneTemplate,
 } from "./journey-map-shells";
 
 export type { MapTheme } from "./journey-map-shells";
 export {
   DEFAULT_MAP_COUNT,
   JOURNEY_MAP_SHELLS,
+  MAP_MILESTONE_COUNTS,
+  MAP_XP_BUDGETS,
   MAX_JOURNEY_MAPS,
+  backgroundImageForMapId,
+  resolveMapBackgroundImage,
 } from "./journey-map-shells";
 
 export interface BlueprintZone {
@@ -47,8 +49,8 @@ export interface BlueprintZone {
 
 export interface BlueprintCondition {
   type: string;
-  value?: number;
-  comparison: "gte" | "lte";
+  value?: number | string;
+  comparison: "gte" | "lte" | "eq";
 }
 
 export interface BlueprintMilestone {
@@ -64,10 +66,6 @@ export interface BlueprintMilestone {
   color: string;
   size: "small" | "medium" | "large";
   completeCondition: BlueprintCondition;
-  /**
-   * Alternate ways to finish the same node. Evaluation is OR against
-   * `completeCondition`. Absent / empty means trading-only (or platform-only).
-   */
   orCompleteConditions?: BlueprintCondition[];
   rewards: { xp: number };
   connectedTo: string[];
@@ -88,6 +86,7 @@ export interface BlueprintMap {
   zones: BlueprintZone[];
   defaultStartNode: string;
   backgroundColor: string;
+  backgroundImage: string;
   isActive: boolean;
   sequenceOrder: number;
   previousMapId: string | null;
@@ -98,7 +97,6 @@ export interface BlueprintMap {
   requiredLevelToStart: number;
   completionRequirement: number;
   totalMilestones: number;
-  /** Cross-audience journey — never scoped to a single game. */
   gameKey: string | null;
 }
 
@@ -110,7 +108,7 @@ export interface JourneyBlueprint {
 
 const MILESTONE_XP_MULTIPLIER = 2;
 
-const TIER_XP: readonly number[] = [
+const TIER_WEIGHTS: readonly number[] = [
   DEFAULT_BADGE_XP.common * MILESTONE_XP_MULTIPLIER,
   DEFAULT_BADGE_XP.common * MILESTONE_XP_MULTIPLIER,
   DEFAULT_BADGE_XP.rare * MILESTONE_XP_MULTIPLIER,
@@ -120,37 +118,8 @@ const TIER_XP: readonly number[] = [
   DEFAULT_BADGE_XP.legendary * MILESTONE_XP_MULTIPLIER,
 ];
 
-const ZONE_TEMPLATES: readonly {
-  suffix: string;
-  name: string;
-  description: string;
-  color: string;
-  icon: string;
-}[] = [
-  {
-    suffix: "foundations",
-    name: "Foundations",
-    description: "First steps — nothing here needs experience.",
-    color: "#22C55E",
-    icon: "flag",
-  },
-  {
-    suffix: "ascent",
-    name: "Ascent",
-    description: "Consistency and volume start to matter.",
-    color: "#3B82F6",
-    icon: "mountain",
-  },
-  {
-    suffix: "summit",
-    name: "Summit",
-    description: "The long targets, for players who stay.",
-    color: "#A855F7",
-    icon: "crown",
-  },
-];
-
-export const DEFAULT_MILESTONES_PER_MAP = 12;
+/** Default only when a caller forces one flat count; generation uses MAP_MILESTONE_COUNTS. */
+export const DEFAULT_MILESTONES_PER_MAP = MAP_MILESTONE_COUNTS[0];
 
 const MAP_LAYOUT_WIDTH = 1200;
 const MAP_LAYOUT_HEIGHT = 800;
@@ -165,24 +134,46 @@ const NODE_ICONS: readonly string[] = [
   "crown",
 ];
 
-/**
- * Trading ↔ gaming equivalents. Thresholds scale by map index so later maps
- * are harder without hard-coding ten ladders.
- *
- * Reason: values are deliberately lower on the gaming side for early maps —
- * a contest is a heavier commitment than a single trade — then catch up.
- */
 type DualStep = {
   key: string;
   label: string;
   tradingType: string;
   gamingType: string | null;
-  /** Base value at map index 0; multiplied by growth^mapIndex. */
   base: number;
   growth: number;
   gamingBase?: number;
   gamingGrowth?: number;
 };
+
+/** Map 1 only — platform onboarding before dual-path activity scales. */
+const ONBOARDING_STEPS: readonly DualStep[] = [
+  {
+    key: "kyc",
+    label: "Verify Identity",
+    tradingType: "kyc_verified",
+    gamingType: null,
+    base: 1,
+    growth: 1,
+  },
+  {
+    key: "deposit",
+    label: "First Deposit",
+    tradingType: "first_deposit",
+    gamingType: null,
+    base: 1,
+    growth: 1,
+  },
+  {
+    key: "first_action",
+    label: "First Action",
+    tradingType: "first_trade",
+    gamingType: "game_contests_entered",
+    base: 1,
+    growth: 1,
+    gamingBase: 1,
+    gamingGrowth: 1,
+  },
+];
 
 const DUAL_STEPS: readonly DualStep[] = [
   { key: "activity", label: "Activity", tradingType: "total_trades", gamingType: "game_contests_completed", base: 3, growth: 1.55, gamingBase: 1, gamingGrowth: 1.45 },
@@ -220,8 +211,14 @@ function positionFor(index: number, perRow = 5): { x: number; y: number } {
   };
 }
 
-function zonesFor(mapId: string): BlueprintZone[] {
-  return ZONE_TEMPLATES.map((z, i) => ({
+function zoneTemplatesFor(theme: MapTheme): readonly ThemeZoneTemplate[] {
+  // Reason: theme is a closed MapTheme union from the shell, not request input.
+  // eslint-disable-next-line security/detect-object-injection
+  return THEME_ZONES[theme] ?? THEME_ZONES.pirate;
+}
+
+function zonesFor(mapId: string, theme: MapTheme): BlueprintZone[] {
+  return zoneTemplatesFor(theme).map((z, i) => ({
     id: `${mapId}_${z.suffix}`,
     name: z.name,
     description: z.description,
@@ -250,6 +247,29 @@ function sizeFor(
   return "small";
 }
 
+/** Spread a map budget across `count` nodes using tier weights; last node absorbs rounding. */
+function allocateXp(count: number, budget: number): number[] {
+  const safeCount = Math.max(2, count);
+  const safeBudget = Math.max(safeCount * 5, budget);
+  const weights = Array.from({ length: safeCount }, (_, i) => {
+    const tier = Math.min(
+      TIER_WEIGHTS.length - 1,
+      Math.floor((i / Math.max(1, safeCount - 1)) * (TIER_WEIGHTS.length - 1)),
+    );
+    // eslint-disable-next-line security/detect-object-injection -- tier is clamped to TIER_WEIGHTS
+    return TIER_WEIGHTS[tier] ?? TIER_WEIGHTS[0]!;
+  });
+  const weightSum = weights.reduce((a, b) => a + b, 0);
+  const raw = weights.map((w) =>
+    Math.max(5, Math.round((w / weightSum) * safeBudget)),
+  );
+  const sum = raw.reduce((a, b) => a + b, 0);
+  const last = raw.length - 1;
+  // eslint-disable-next-line security/detect-object-injection -- last is raw.length - 1
+  raw[last] = Math.max(5, (raw[last] ?? 5) + (safeBudget - sum));
+  return raw;
+}
+
 function describeDual(
   label: string,
   trading: BlueprintCondition,
@@ -271,36 +291,58 @@ function describeDual(
   };
 }
 
+function booleanCondition(type: string): BlueprintCondition {
+  return { type, value: 1, comparison: "gte" };
+}
+
 function buildMilestonesForMap(
   mapId: string,
   mapIndex: number,
+  theme: MapTheme,
   perMap: number,
+  xpBudget: number,
+  previousMapId: string | null,
 ): BlueprintMilestone[] {
   const out: BlueprintMilestone[] = [];
   const total = Math.max(2, perMap);
+  const xpByOrder = allocateXp(total, xpBudget);
+  const zones = zoneTemplatesFor(theme);
+  const zoneAt = (index: number) =>
+    zones[
+      Math.min(Math.floor((index / total) * zones.length), zones.length - 1)
+    ]!;
 
-  // Start node — always true for anyone who can open the map (gated by level).
+  // Start — map 1 opens on account; later maps require the previous map done.
   {
-    const zone = ZONE_TEMPLATES[0];
+    const zone = zones[0]!;
+    const isFirst = mapIndex === 0 || !previousMapId;
     out.push({
       id: `${mapId}_start`,
       mapId,
-      name: "Begin",
-      description: "Enter this chapter of the journey.",
-      shortDescription: "Start",
+      name: isFirst ? "Begin" : "Enter",
+      description: isFirst
+        ? "Create your account and enter this chapter."
+        : `Complete ${previousMapId!.replace(/_/g, " ")} to enter this chapter.`,
+      shortDescription: isFirst ? "Start" : "Previous map",
       zoneId: `${mapId}_${zone.suffix}`,
       position: positionFor(0),
       nodeType: "start",
       icon: "flag",
       color: zone.color,
       size: "large",
-      completeCondition: { type: "account_created", comparison: "gte" },
+      completeCondition: isFirst
+        ? booleanCondition("account_created")
+        : {
+            type: "map_completed",
+            value: previousMapId!,
+            comparison: "eq",
+          },
       orCompleteConditions: [],
-      rewards: { xp: TIER_XP[0] },
+      rewards: { xp: xpByOrder[0] ?? 5 },
       connectedTo: [],
       connectedFrom: [],
       isRequired: true,
-      isAutoComplete: true,
+      isAutoComplete: isFirst,
       order: 0,
       isActive: true,
       isSeasonal: false,
@@ -309,13 +351,36 @@ function buildMilestonesForMap(
   }
 
   const stepsNeeded = total - 1;
+  const stepSource: DualStep[] =
+    mapIndex === 0
+      ? [
+          ...ONBOARDING_STEPS,
+          ...Array.from({ length: Math.max(0, stepsNeeded - ONBOARDING_STEPS.length) }, (_, i) =>
+            DUAL_STEPS[i % DUAL_STEPS.length]!,
+          ),
+        ]
+      : Array.from({ length: stepsNeeded }, (_, i) => DUAL_STEPS[i % DUAL_STEPS.length]!);
+
   for (let i = 0; i < stepsNeeded; i += 1) {
-    const step = DUAL_STEPS[i % DUAL_STEPS.length];
+    // eslint-disable-next-line security/detect-object-injection -- i bounded by stepsNeeded
+    const step = stepSource[i]!;
     const tier = Math.min(
-      TIER_XP.length - 1,
-      Math.floor((i / Math.max(1, stepsNeeded - 1)) * (TIER_XP.length - 1)),
+      TIER_WEIGHTS.length - 1,
+      Math.floor((i / Math.max(1, stepsNeeded - 1)) * (TIER_WEIGHTS.length - 1)),
     );
-    const tradingValue = scale(step.base, step.growth, mapIndex + Math.floor(i / DUAL_STEPS.length));
+    const isBoolean =
+      step.tradingType === "kyc_verified" ||
+      step.tradingType === "first_deposit" ||
+      step.tradingType === "first_trade" ||
+      step.tradingType === "account_created";
+
+    const tradingValue = isBoolean
+      ? 1
+      : scale(
+          step.base,
+          step.growth,
+          mapIndex + Math.floor(i / DUAL_STEPS.length),
+        );
     const gamingValue = step.gamingType
       ? scale(
           step.gamingBase ?? Math.max(1, Math.ceil(step.base / 3)),
@@ -337,12 +402,22 @@ function buildMilestonesForMap(
         }
       : null;
 
-    const copy = describeDual(step.label, trading, gaming);
+    const copy = isBoolean
+      ? {
+          name: step.label,
+          description:
+            step.tradingType === "kyc_verified"
+              ? "Complete identity verification."
+              : step.tradingType === "first_deposit"
+                ? "Make your first deposit."
+                : "Place a trade or enter a game contest.",
+          shortDescription: step.label,
+        }
+      : describeDual(step.label, trading, gaming);
+
     const index = out.length;
     const nodeType = nodeTypeFor(index, total);
-    const zone = ZONE_TEMPLATES[
-      Math.min(Math.floor((index / total) * ZONE_TEMPLATES.length), ZONE_TEMPLATES.length - 1)
-    ];
+    const zone = zoneAt(index);
 
     out.push({
       id: `${mapId}_${step.key}_${tradingValue}`,
@@ -358,9 +433,8 @@ function buildMilestonesForMap(
       size: sizeFor(nodeType),
       completeCondition: trading,
       orCompleteConditions: gaming ? [gaming] : [],
-      // Reason: tier is a closed 0..n index into our own TIER_XP table.
-      // eslint-disable-next-line security/detect-object-injection
-      rewards: { xp: TIER_XP[tier] ?? TIER_XP[0] },
+      // eslint-disable-next-line security/detect-object-injection -- index is out.length
+      rewards: { xp: xpByOrder[index] ?? 5 },
       connectedTo: [],
       connectedFrom: [],
       isRequired: nodeType !== "checkpoint",
@@ -385,23 +459,16 @@ function buildMilestonesForMap(
 }
 
 export interface JourneyBlueprintOptions {
+  /** Override all maps to the same count (tests). Production uses MAP_MILESTONE_COUNTS. */
   perMap?: number;
-  /** How many thematic maps to emit (1–10). Default 10. */
   mapCount?: number;
   earnableBadgeXp?: number;
 }
 
-/**
- * Build the multi-map dual-path journey.
- *
- * `plan` is accepted so call sites stay stable; map count no longer comes from
- * catalogue scope count. A platform with one game still gets the full sequence.
- */
 export function buildJourneyBlueprint(
   _plan: BadgeQuotaPlan,
   options: JourneyBlueprintOptions = {},
 ): JourneyBlueprint {
-  const perMap = Math.max(2, options.perMap ?? DEFAULT_MILESTONES_PER_MAP);
   const mapCount = Math.min(
     MAX_JOURNEY_MAPS,
     Math.max(1, options.mapCount ?? DEFAULT_MAP_COUNT),
@@ -411,12 +478,27 @@ export function buildJourneyBlueprint(
   const milestones: BlueprintMilestone[] = [];
 
   shells.forEach((shell, i) => {
-    const scopeMilestones = buildMilestonesForMap(shell.mapId, i, perMap);
+    const perMap =
+      options.perMap ??
+      MAP_MILESTONE_COUNTS[Math.min(i, MAP_MILESTONE_COUNTS.length - 1)] ??
+      DEFAULT_MILESTONES_PER_MAP;
+    const xpBudget =
+      MAP_XP_BUDGETS[Math.min(i, MAP_XP_BUDGETS.length - 1)] ?? 150;
+    const previousMapId = i === 0 ? null : (shells[i - 1]?.mapId ?? null);
+    const scopeMilestones = buildMilestonesForMap(
+      shell.mapId,
+      i,
+      shell.theme,
+      perMap,
+      xpBudget,
+      previousMapId,
+    );
     if (scopeMilestones.length === 0) return;
 
     const estimatedXP = scopeMilestones.reduce((sum, m) => sum + m.rewards.xp, 0);
     const bands = deriveLadderBands(
-      (options.earnableBadgeXp ?? 0) + estimatedXP * shells.length,
+      (options.earnableBadgeXp ?? 0) +
+        MAP_XP_BUDGETS.slice(0, shells.length).reduce((a, b) => a + b, 0),
     );
     const gateIndex = Math.min(i * 2, bands.length - 1);
     const requiredLevelToStart =
@@ -426,9 +508,10 @@ export function buildJourneyBlueprint(
       mapId: shell.mapId,
       name: shell.name,
       description: shell.description,
-      zones: zonesFor(shell.mapId),
+      zones: zonesFor(shell.mapId, shell.theme),
       defaultStartNode: scopeMilestones[0]?.id ?? `${shell.mapId}_start`,
       backgroundColor: shell.backgroundColor,
+      backgroundImage: shell.backgroundImage,
       isActive: true,
       sequenceOrder: i + 1,
       previousMapId: null,

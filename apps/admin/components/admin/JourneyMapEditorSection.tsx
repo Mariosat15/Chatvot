@@ -77,6 +77,7 @@ import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { resolveBadgeDisplayName } from "@/lib/utils/badge-display-name";
+import { resolveMapBackgroundImage } from "@/lib/services/games/journey-map-shells";
 import Image from "next/image";
 
 // Types
@@ -2314,9 +2315,12 @@ export default function JourneyMapEditorSection() {
             transformOrigin: "top left",
           }}
         >
-          {/* Map Background */}
+          {/* Map Background — derive from mapId when stored URL is missing */}
           <Image
-            src={mapConfig?.backgroundImage || "/assets/maps/pirate-cove.png"}
+            src={resolveMapBackgroundImage(
+              mapConfig?.mapId,
+              mapConfig?.backgroundImage,
+            )}
             alt={mapConfig?.name || "Journey Map"}
             width={MAP_WIDTH}
             height={MAP_HEIGHT}
@@ -2325,8 +2329,9 @@ export default function JourneyMapEditorSection() {
             priority
             draggable={false}
             onError={(e) => {
-              // Fallback to default map if image not found
-              (e.target as HTMLImageElement).src = "/assets/maps/pirate-cove.png";
+              // Reason: do not silently swap every theme to Pirate Cove art.
+              const target = e.target as HTMLImageElement;
+              target.src = resolveMapBackgroundImage(mapConfig?.mapId);
             }}
           />
 

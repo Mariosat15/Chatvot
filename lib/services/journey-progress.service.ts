@@ -352,6 +352,55 @@ export async function checkConditionMet(
     case "account_created":
       return { met: true, currentValue: 1 };
 
+    // Reason: Map 2+ start nodes gate on the previous mapId (string value).
+    // Prefer the progress row for that map; fall back to required-milestone completion.
+    case "map_completed": {
+      const requiredMapId =
+        typeof condition.value === "string"
+          ? condition.value
+          : condition.milestoneId;
+      if (!requiredMapId || typeof requiredMapId !== "string") {
+        return { met: false, currentValue: 0 };
+      }
+      const mapProgress = await UserJourneyProgress.findOne({
+        userId,
+        mapId: requiredMapId,
+      }).lean();
+      if (
+        mapProgress?.isMapComplete ||
+        mapProgress?.completedMaps?.includes(requiredMapId)
+      ) {
+        return { met: true, currentValue: 1 };
+      }
+      const listed = await UserJourneyProgress.findOne({
+        userId,
+        completedMaps: requiredMapId,
+      })
+        .select("_id")
+        .lean();
+      if (listed) {
+        return { met: true, currentValue: 1 };
+      }
+      const JourneyMilestoneModel = (
+        await import("@/database/models/journey-milestone.model")
+      ).default;
+      const required = await JourneyMilestoneModel.find({
+        mapId: requiredMapId,
+        isActive: true,
+        isRequired: true,
+      })
+        .select("id")
+        .lean();
+      if (required.length === 0) {
+        return { met: false, currentValue: 0 };
+      }
+      const done = new Set(
+        (mapProgress?.completedMilestones || []).map((m) => m.milestoneId),
+      );
+      const allDone = required.every((m) => done.has(m.id));
+      return { met: allDone, currentValue: allDone ? 1 : 0 };
+    }
+
     case "first_deposit":
     case "has_deposit":
       // totalDeposited is the amount, > 0 means at least one deposit

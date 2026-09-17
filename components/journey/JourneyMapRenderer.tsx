@@ -14,6 +14,7 @@ import { ZoomIn, ZoomOut, RotateCcw, Compass, Ship, ChevronLeft, ChevronRight, L
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
+import { resolveMapBackgroundImage } from "@/lib/services/games/journey-map-shells";
 
 // Types
 export interface Milestone {
@@ -668,9 +669,12 @@ export default function JourneyMapRenderer({
             transformOrigin: "top left",
           }}
         >
-          {/* Dynamic Map Background */}
+          {/* Dynamic Map Background — derive from mapId when stored URL is missing */}
           <Image
-            src={mapConfig?.backgroundImage || "/assets/maps/pirate-cove.png"}
+            src={resolveMapBackgroundImage(
+              mapConfig?.mapId,
+              mapConfig?.backgroundImage,
+            )}
             alt={mapConfig?.name || "Journey Map"}
             width={MAP_WIDTH}
             height={MAP_HEIGHT}
@@ -679,9 +683,12 @@ export default function JourneyMapRenderer({
             priority
             draggable={false}
             onError={(e) => {
-              // Fallback to default treasure map if image fails to load
+              // Reason: do not silently swap every theme to Pirate Cove art.
               const target = e.target as HTMLImageElement;
-              target.src = "/assets/maps/pirate-cove.png";
+              const derived = resolveMapBackgroundImage(mapConfig?.mapId);
+              if (target.src && !target.src.endsWith(derived)) {
+                target.src = derived;
+              }
             }}
           />
 
