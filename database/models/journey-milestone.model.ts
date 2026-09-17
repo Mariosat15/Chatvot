@@ -70,6 +70,10 @@ export interface IJourneyMilestone extends Document {
   seasonTag?: string; // e.g. "winter_2026", "ramadan_2026"
   // Badge-gated: milestone requires specific badges before it can be unlocked
   requiredBadgeIds: string[]; // Array of badge IDs that must be earned
+  // Which game(s) this milestone belongs to. Absent means platform-wide.
+  // Reason: read by analyseMilestoneCoverage — without it a single game-scoped
+  // milestone credits every catalogue game and coverage reads as complete.
+  gameTypes?: string[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -210,6 +214,12 @@ const JourneyMilestoneSchema = new Schema<IJourneyMilestone>(
     requiredBadgeIds: {
       type: [String],
       default: [],
+    },
+    // Reason: no default on purpose — an absent list is "platform-wide", which
+    // is a different fact from an empty one, and a default would make every
+    // pre-existing milestone indistinguishable from a deliberately empty edit.
+    gameTypes: {
+      type: [String],
     },
   },
   {

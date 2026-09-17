@@ -27,6 +27,10 @@ import {
   GAMIFICATION_RESET_SCOPE_COPY,
   type GamificationResetScope,
 } from "@/lib/admin/gamification-reset-copy";
+// Reason: `gamification-economy.ts` is model-free and client-reachable by
+// requirement (R58), so a `"use client"` component may import the default from
+// it rather than carrying a second copy of the number.
+import { DEFAULT_TARGET_BADGE_TOTAL } from "@/lib/services/games/gamification-economy";
 
 // ─── Types ──────────────────────────────────────────────────────────────────────
 
@@ -156,6 +160,21 @@ export default function GamificationWizardSection() {
   // Badge Agent state
   const [badgeResult, setBadgeResult] = useState<BadgeAgentResult | null>(null);
   const [badgeGenCount, setBadgeGenCount] = useState(5);
+
+  /**
+   * How many badges the full setup should aim for in total.
+   *
+   * Reason: this used to share `badgeGenCount` with the AI Badge Agent card,
+   * and that is why a full run produced five badges. The two numbers answer
+   * different questions and cannot share a control: the agent's count is how
+   * many extra badges to ask a language model for in one call, so it is small
+   * by necessity (token budget) and capped at 20, while this is the size of the
+   * whole catalogue, built deterministically at no per-badge cost. Sharing them
+   * silently caps the catalogue at the agent's limit.
+   */
+  const [setupBadgeTarget, setSetupBadgeTarget] = useState(
+    DEFAULT_TARGET_BADGE_TOTAL,
+  );
 
   // Milestone Agent state
   const [milestoneResult, setMilestoneResult] = useState<MilestoneAgentResult | null>(null);
@@ -357,7 +376,7 @@ export default function GamificationWizardSection() {
     try {
       const data = await callWizardAPI({
         action: "run_full",
-        generateCount: badgeGenCount > 0 ? badgeGenCount : undefined,
+        generateCount: setupBadgeTarget > 0 ? setupBadgeTarget : undefined,
         mode: setupMode,
         ...(rebuilding
           ? {
@@ -737,6 +756,26 @@ export default function GamificationWizardSection() {
                     system in the same run. There is no undo.
                   </p>
                 </button>
+              </div>
+
+              <div className="rounded-lg border border-gray-700 bg-gray-900/40 p-3">
+                <Label htmlFor="setup-badge-target" className="text-gray-300">
+                  How many badges in total
+                </Label>
+                <Input
+                  id="setup-badge-target"
+                  type="number"
+                  min={20}
+                  max={1000}
+                  value={setupBadgeTarget}
+                  onChange={(e) => setSetupBadgeTarget(Number(e.target.value))}
+                  className="bg-gray-900 border-gray-600 text-white mt-1 max-w-[10rem]"
+                />
+                <p className="text-xs text-gray-400 mt-2">
+                  {setupMode === "rebuild"
+                    ? "The size of the catalogue to build. It is shared out across trading, every game in your catalogue, and the badges everybody can earn, so raising it adds badges to all of them rather than only to trading."
+                    : "The size the catalogue should reach. Only the shortfall is written, so a number at or below what you already have adds nothing."}
+                </p>
               </div>
 
               {setupMode === "rebuild" && (

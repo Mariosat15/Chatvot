@@ -76,6 +76,7 @@ chapter covers risks to the programme and to the application.
 | **R100** | **The admin's badge evaluator is a materially older revision, and no guard can see it.** `apps/admin/lib/services/badge-evaluation.service.ts` diverged from the main app's copy by 221 lines. It lacked the **stats cache**, ran **unbounded** queries where the main app limits them, fetched **sequentially** rather than in parallel, logged verbosely, had **no category filter**, computed win rate off a different sample, and - the one that matters - **omitted the `typeof userId !== "string"` check the main app added to stop a request-supplied object reaching a database query** *(**CLOSED 16 Sep 2026.** Admin copy is now byte-identical to main; admin trade-close passes the same category list. Pinned by `__tests__/services/badge-evaluator-parity.test.ts`, 6 probes. `check:mirrors` still has no opinion about services — the byte test is the guard. A document treating the evaluator as still diverged is stale.)* | Medium | **Was LIVE; closed.** Nothing backfilled: a badge awarded by either copy remains indistinguishable from one awarded by the other | **CLOSED 16 Sep 2026.** Behaviour-preserving port only — the gate change is **R96a**, kept in a separate commit so the port's green suite remains evidence nothing moved |
 | **R101** | **Ninety-nine admin API route files have no authorization check of any kind, and fifty-eight of them write.** *(**R101a–R101ac CLOSED 16 Sep 2026.** Inventory after R101ac: **0 no-check / 0 hand-verified / 9 helper / 328 section-granted**. R101ac closed clear helpers (21 files / 29 handlers). A document treating R101 as closed is wrong; one treating the escalation, wallet credit, erasure, exports, messaging, visitors, landing-pages, market-data, settings, ops/money/customer, money leftovers or clear helpers as live is stale; and one quoting **30 helper** or **41 helper** or **78 / 58 / 55 / 51 / 44** still-unguarded is quoting a figure the next closure moved - **say which**.)* Counted over all 347 route files in `apps/admin/app/api` with comments stripped: see the detail section for the full a–ac closure history | **Critical** | **LIVE on the remaining helper-but-no-grant surface (9 routes: 3 admin-at-all leftovers + gamemaster deferred).** Earlier writers are closed; absence of evidence of past calls is not reassurance | **R101a–R101ac CLOSED; R101 remains open on the 9 helper-but-no-grant routes and still ahead of R96 and X7.** Inventory after R101ac: **0 / 0 / 9 / 328**. **ELEVENTH instance of this class** — every previous instance fixed the routes it happened to be looking at; the directory inventory (R101d) is what makes the rest countable |
 | **R102** | **The gamification wizard's level ladder was written where nothing reads it.** `dbTools.writeXPConfig` wrote `xpconfigs` keyed on **`type`** while `xp-config.model.ts` declares the discriminator as **`configType`** and `POST /api/badges-xp/manage` reads through the model, so every ladder and badge-XP table the wizard saved landed in a document nothing else could find. `readXPConfig` also read `levels?.data` where the document nests the array as `data.levels`, so the wizard's own audit reported an **unconfigured ladder on every run, including straight after writing one** - which is what made a lost write look like an unfinished feature | Medium | **LIVE since the wizard's ladder step existed, and it is a LOST WRITE rather than a wrong value.** Nothing read the orphaned document, so no XP, level or badge was ever computed from it and **nothing was backfilled**; what it cost is an operator's configuration silently not taking effect while the screen said it was still unset | **CLOSED 17 Sep 2026** alongside the R96b rebuild option. Uses `configType` and wraps the ladder as `{ levels: data }`; the read follows. **Orphaned documents are left in place rather than migrated** - keyed on a field nothing queries, so they are inert, and rewriting discriminators in a config collection is an unreviewed writer for no gain. **The rule: a collection reached by both the raw driver and a model has two spellings of its own key and only one is enforced** - the driver accepts `type` cheerfully for ever. Third instance of the raw-driver boundary after the R42 fixture and the analytics participation funnel, and the first where the disagreement was a **key** rather than a value's type |
+| **R103** | **The gamification wizard asked one AI call to populate the whole catalogue, and it returned five trading badges.** `run_full`'s badge step was a single generative request told to cover every game inside a token budget; it produced **5 badges, all trading**, and reported success. Four faults travelled with it, each independently enough to make the screen read as broken: the journey step defaulted `maxMaps` to **3** (one AI call per map) so every game past the second silently got no journey at all, and after a wipe the milestone agent iterated maps that no longer existed and produced **nothing**; the ladder was derived **before** the badges existed, so its top rung asked **426,400 XP** against a catalogue paying a few thousand; **eight of the twenty level rungs named icons that are not in the registry** (`medal1`, `diamond1`, `flame1`), and the admin `GameIcon` renders an unknown name as **raw text**; and the Badge Library header was the literal string **"120 Total"**, so five stored badges displayed under a heading claiming 120 | **High** | **LIVE, and it is a GENERATION defect rather than a wrong payment.** No XP, level, badge or prize was ever computed wrongly - the system simply produced almost none of the content it reported producing, and **nothing was backfilled**, because the rows were never written. The cost is an operator wiping the platform and being left with five badges, no journeys and an unreachable ladder, with no error and no log line anywhere | **CLOSED 17 Sep 2026.** Generation is **arithmetic now, not a model call** - `gamification-economy.ts` plans the quota, `badge-blueprint.ts` and `journey-blueprint.ts` emit the rows, `proposeNeutralLadder` derives the curve from what the catalogue can actually pay. The model is a **rewording pass over what the blueprint produced**, never the producer. See the detail section |
 | R8 | Bulk find-and-replace on wording | High | Medium | X8 |
 | R9 | Fraud throttle blind to provider entries | High | High | X5 |
 | R11 | Legal wording changed without review | High | Medium | X8 |
@@ -5224,6 +5225,106 @@ the screen. That is why the rebuild path sets suppression flags
 (`gamification-defaults-state`) rather than relying on the deletes, and why restoring
 defaults deliberately clears them. **The general form: a store that repopulates itself
 cannot be emptied by deleting from it.**
+
+---
+
+### R103 - The wizard asked a model to do arithmetic - **CLOSED 17 Sep 2026**
+
+**What it is.** `run_full`'s badge step was **one generative call** told to cover the whole
+catalogue inside a reply budget. It returned **five badges, every one of them trading**,
+and the route reported success. That is not a prompt that needed improving: a language
+model is not a quota planner, and asking it to enumerate two hundred balanced rows across
+an arbitrary number of games is asking it to do arithmetic in prose.
+
+**Four faults travelled with it, and each alone would have made the screen read as
+broken.**
+
+- **The journey step capped itself at three maps.** `maxMaps` defaulted to `3` because
+ each map cost an AI call, so every game past the second silently got no journey. Worse,
+ after a wipe the milestone agent **iterates maps that already exist** - there were none,
+ so it produced nothing and said it had succeeded.
+- **The ladder was derived before the badges existed.** `proposeNeutralLadder` ran on a
+ hand-picked 1.35x curve ending at **426,400 XP**, against a catalogue that could pay a
+ few thousand. Legend was unreachable by roughly a hundredfold, and nothing compared the
+ two halves. This is the "no balance" the operator saw.
+- **Eight of the twenty rungs named icons that do not exist.** `medal1`, `diamond1` and
+ `flame1` are not in `lib/constants/game-icons.ts`, and the admin `GameIcon` renders an
+ unknown name as **raw text** rather than falling back - so the level list displayed the
+ literal word `diamond1`. Nothing threw and nothing logged; the only witness was a
+ screenshot.
+- **The Badge Library header was the literal string "120 Total".** Five stored badges
+ rendered under a heading claiming 120, which is how a near-empty catalogue read as a
+ rendering fault rather than an empty one.
+
+**A fifth fault was on the player's side and is the read half of R96a.**
+`getBadgeRequirement` appended the rarity trade floor to **every** badge regardless of
+scope, so a Games badge on `game_wins` advertised *"25+ total trades (rare tier)"* - a
+requirement the evaluator does not apply to a game-scoped condition and a games-only
+player can never meet. The card was telling the player to do the one thing the gate had
+just been fixed to stop demanding.
+
+**Harm, precisely.** **Live, and it is a GENERATION defect rather than a wrong payment.**
+No XP, level, badge or prize was ever computed wrongly. The system produced almost none of
+the content it reported producing, and **nothing was backfilled** - the rows were never
+written, so there is nothing to repair. What it cost is an operator wiping the platform
+and being left with five badges, no journeys and an unreachable ladder.
+
+**The fix: the model stops being the producer.** `lib/services/games/gamification-economy.ts`
+(mirrored) plans the quota - how many badges each scope gets, the rarity pyramid, the XP
+the catalogue can pay, and the level bands that follow from it.
+`badge-blueprint.ts` and `journey-blueprint.ts` (both mirrored) emit the rows from that
+plan. `proposeNeutralLadder` takes `earnableXp` and derives the curve through
+`deriveLadderBands`. **The AI is a rewording pass over what the blueprint produced**, never
+the producer, and `run_full` calls **no agent at all** - pinned by a test asserting the
+agents are not invoked.
+
+**Seven rules worth carrying.**
+
+- **`check:mirrors` compares models, so it says nothing about the three generators.** Their
+ only guarantee is a byte-for-byte comparison in
+ `__tests__/admin/r96b-gamification-orchestration.test.ts`, and the direction matters: the
+ **admin** copy is the one that runs when an operator presses the button, while the player
+ app reads the main copy's quotas and thresholds. A drift is two apps disagreeing about how
+ much XP the catalogue can pay, with nothing failing on either side.
+
+- **A generative call that under-delivers reports success, and that is the whole
+ problem.** There is no partial-failure signal to detect: five rows out of two hundred is
+ a well-formed reply. The only guard that works is not asking the model the question -
+ the count, the pyramid and the thresholds are now arithmetic, and a test asserts the
+ planned total matches the target.
+- **Derive the ladder AFTER the content it prices, or it prices nothing.** The ordering
+ inside `run_full` is load-bearing and is asserted by position: XP table, then badges,
+ then journeys, then levels. A ladder written first is a function of zero earnable XP,
+ which is exactly the mismatch an operator reads as "no balance".
+- **An icon registry that renders an unknown name as text has no failure mode.** A
+ fallback would have hidden this for ever; raw text made it visible and unexplainable at
+ the same time. The list is now **twenty distinct names with a test asserting both that
+ every one resolves and that none repeats** - the first repair paired them up, which left
+ rungs 12, 13 and 20 all wearing `crown`, so the top of the ladder was indistinguishable
+ from its middle.
+- **A count in a heading must come from the thing it counts.** `"120 Total"` was correct
+ on the day it was typed and wrong from the first wizard run, the first reset and the
+ first hand edit. The reset toast had the same literal as its fallback, so a route
+ reporting no count told the operator 120 badges had been restored whatever happened.
+- **A cap chosen for cost outlives the cost.** `maxMaps = 3` was right when a map cost an
+ AI call and became a silent data loss the moment maps were free. `0` now means every map
+ the blueprint produces.
+- **A requirement string is a promise, and the display copy of a gate drifts from the
+ gate.** `badge-descriptions.ts` is client-reachable (**R58**) and so cannot import the
+ evaluator; `RARITY_ACTIVITY_FLOORS` duplicates `RARITY_MIN_REQUIREMENTS` deliberately,
+ and `__tests__/utils/badge-requirement-scope.test.ts` **parses the evaluator's own table
+ and asserts the two agree**, because a floor shown here that the evaluator does not apply
+ - and the reverse - is invisible from either side alone. Note the mixed case is kept
+ **on purpose**: a badge listing trading *and* a provider key really does carry the floor,
+ so hiding it there would understate a requirement that is genuinely enforced, which is
+ the mirror image of the defect being fixed.
+
+**What this does NOT close.** The blueprint writes **add-only** through
+`writeBadgesBatch`, so it fills gaps and never overwrites an operator's tuning - which
+also means **a catalogue an operator has already half-authored will not be rebalanced by
+running the wizard again**; that is a deliberate scope line, not an omission. And
+**`run_full` has still never been run against a real database** - every guarantee here is
+from tests and probes (36 orchestration tests, 27 probes red on exactly one failure).
 
 ---
 

@@ -40,6 +40,36 @@ function readCode(relative: string): string {
     .replace(/(^|[^:])\/\/.*$/gm, "$1");
 }
 
+/**
+ * The body of every `.map(` call, extracted by balanced parentheses.
+ *
+ * Reason: a row mapping is where an N+1 read hides, so it is the construct to
+ * look inside rather than a fixed number of characters after the `.map(` - a
+ * fixed window either stops short of the read or swallows the code after the
+ * call. A slice that found nothing passes everything asked of it, so callers
+ * check the count.
+ */
+function mapBodies(code: string): string[] {
+  const bodies: string[] = [];
+  const opener = /\.map\s*\(/g;
+  let match: RegExpExecArray | null;
+
+  while ((match = opener.exec(code)) !== null) {
+    let depth = 1;
+    let i = match.index + match[0].length;
+    const start = i;
+    while (i < code.length && depth > 0) {
+      const ch = code.charAt(i);
+      if (ch === "(") depth += 1;
+      else if (ch === ")") depth -= 1;
+      i += 1;
+    }
+    if (depth === 0) bodies.push(code.slice(start, i - 1));
+  }
+
+  return bodies;
+}
+
 /*
   A three-rung ladder an operator has renamed and re-thresholded.
 
@@ -274,9 +304,22 @@ describe("every read site resolves through the shared helper", () => {
   */
   it.each(READ_SITES)("%s reads the ladder once, not per row", (relative) => {
     const code = readCode(relative);
-    const reads = code.match(/getTitleLevels\s*\(/g) ?? [];
+    expect(code).toMatch(/getTitleLevels\s*\(/);
 
-    expect(reads.length).toBe(1);
+    /*
+      // Reason: this counted the reads and required exactly one, which went stale the
+      // moment the leaderboard route grew a Global and a Games board beside Trading -
+      // three reads, one per board, each outside its own row map, so the assertion
+      // failed on correct code. Counting to three instead would fail again on the
+      // fourth board. The property is that no read sits INSIDE the row mapping, so
+      // that is what is asserted: a `.map(` body is extracted by balanced parens and
+      // must contain no read.
+    */
+    const bodies = mapBodies(code);
+    if (/\.map\s*\(/.test(code)) expect(bodies.length).toBeGreaterThan(0);
+    for (const body of bodies) {
+      expect(body).not.toMatch(/getTitleLevels\s*\(/);
+    }
   });
 });
 
@@ -368,6 +411,10 @@ describe("R88 - the dashboard's rung is one fact from one place", () => {
     (field) => {
       const player = dashboardPlayerObject(readCode(DASHBOARD_SITE));
       expect(player).toMatch(
+        // Reason: the pattern is built from this suite's own `it.each` field list,
+        // never from input. Scoped rather than blanket-disabled, and silenced only
+        // because the pre-commit hook lints staged files at --max-warnings=0.
+        // eslint-disable-next-line security/detect-non-literal-regexp
         new RegExp(`${field}:\\s*(levelDisplay\\.|levelDisplay\\b)`),
       );
     },
@@ -377,6 +424,7 @@ describe("R88 - the dashboard's rung is one fact from one place", () => {
     "does not read %s off the award-time cache",
     (cached) => {
       const player = dashboardPlayerObject(readCode(DASHBOARD_SITE));
+      // eslint-disable-next-line security/detect-non-literal-regexp -- see above: the field list is this suite's own.
       expect(player).not.toMatch(new RegExp(`\\.${cached}\\b`));
     },
   );

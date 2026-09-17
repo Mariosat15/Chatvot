@@ -45,6 +45,13 @@ import {
   ALL_GAMIFICATION_RESET_SCOPES,
   resetGamification,
 } from "@/lib/services/gamification-reset.service";
+import {
+  DEFAULT_TARGET_BADGE_TOTAL,
+  earnableXpFromBadges,
+  planBadgeQuota,
+} from "@/lib/services/games/gamification-economy";
+import { buildBadgeBlueprint } from "@/lib/services/games/badge-blueprint";
+import { buildJourneyBlueprint } from "@/lib/services/games/journey-blueprint";
 
 // Allow up to 2 minutes for AI agents
 export const maxDuration = 120;
@@ -340,8 +347,39 @@ const dbTools = {
     }
     return results;
   },
-  async writeMilestonesBatch(milestones: unknown[]) {
-    const results = { created: 0, updated: 0, errors: 0 };
+  // Reason: the milestone agent iterates the maps that already exist, so after a
+  // "start from scratch" there were none and it silently produced nothing — an
+  // operator saw a wizard report success and a journey screen with no maps at
+  // all. Add-only: a map an operator has renamed or re-themed is never rewritten.
+  async writeMapsBatch(maps: unknown[]) {
+    const results = { created: 0, skipped: 0, errors: 0 };
+    for (const row of maps) {
+      const map = row as { mapId?: string };
+      try {
+        if (!map.mapId || typeof map.mapId !== "string") {
+          results.errors++;
+          continue;
+        }
+        const existing = await JourneyMapConfig.findOne({ mapId: map.mapId });
+        if (existing) {
+          results.skipped++;
+          continue;
+        }
+        await JourneyMapConfig.create(map);
+        results.created++;
+      } catch (err) {
+        console.error(`[Wizard] Map write error for ${map?.mapId}: ${err}`);
+        results.errors++;
+      }
+    }
+    return results;
+  },
+  async writeMilestonesBatch(
+    milestones: unknown[],
+    options: { mode?: "add-only" | "replace" } = {},
+  ) {
+    const mode = options.mode ?? "replace";
+    const results = { created: 0, updated: 0, skipped: 0, errors: 0 };
     for (const row of milestones) {
       const ms = row as MilestoneDraft;
       try {
@@ -356,6 +394,10 @@ const dbTools = {
         } = ms;
         const existing = await JourneyMilestone.findOne({ id: clean.id, mapId: clean.mapId });
         if (existing) {
+          if (mode === "add-only") {
+            results.skipped++;
+            continue;
+          }
           await JourneyMilestone.findOneAndUpdate({ id: clean.id, mapId: clean.mapId }, clean);
           results.updated++;
         } else {
@@ -1239,57 +1281,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, action: "apply_changes", results });
     }
 
-    // ─── AI actions require OpenAI ──────────────────────────────────────────
-    const config = await getAIConfig();
-    if (!config.enabled || !config.apiKey) {
-      return NextResponse.json({ success: false, error: "AI is not enabled. Configure OpenAI in admin settings." }, { status: 400 });
-    }
-    const openai = new OpenAI({ apiKey: config.apiKey });
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // agent_badges — OPTIMIZED: compact format, return ONLY changed badges
-    // ═══════════════════════════════════════════════════════════════════════════
-    if (action === "agent_badges") {
-      const { autoApply = false, mode = "add-only" } = body;
-      const cap =
-        typeof body.generateCount === "number" && body.generateCount > 0
-          ? body.generateCount
-          : Number.POSITIVE_INFINITY;
-      const result = await runBadgeAgent(openai, config, { autoApply, mode, cap });
-      if (!result.ok) {
-        return NextResponse.json(
-          { success: false, error: result.error, raw: result.raw },
-          { status: 500 },
-        );
-      }
-      const { ok: _ok, ...payload } = result;
-      return NextResponse.json({ success: true, ...payload });
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // reset_gamification — wipe the authored content so the wizard can rebuild.
-    //
-    // Exposed on its own as well as inside `run_full` because an operator may
-    // legitimately want the platform empty and hand-author from there. It
-    // refuses without the confirmation phrase, and it leaves player-earned rows
-    // alone unless asked, reporting how many it orphaned.
-    // ═══════════════════════════════════════════════════════════════════════════
-    if (action === "reset_gamification") {
-      const result = await resetGamification({
-        scopes:
-          Array.isArray(body.scopes) && body.scopes.length > 0
-            ? body.scopes
-            : ALL_GAMIFICATION_RESET_SCOPES,
-        confirmation: body.confirmation,
-        includePlayerProgress: body.includePlayerProgress === true,
-        actor: guard.admin.email,
-      });
-      return NextResponse.json(
-        { action: "reset_gamification", ...result },
-        { status: result.success ? 200 : 400 },
-      );
-    }
-
     // ═══════════════════════════════════════════════════════════════════════════
     // run_full — one pass over the whole gamification system.
     //
@@ -1303,7 +1294,10 @@ export async function POST(request: NextRequest) {
     if (action === "run_full") {
       const {
         includeMilestones = true,
-        maxMaps = 3,
+        // Reason: 0 means every map the blueprint produces. It used to default
+        // to 3 because each map cost an AI call; the blueprint costs none, and a
+        // cap of 3 silently drops the journey of every game past the second.
+        maxMaps = 0,
         proposeLadder = true,
         mode = "add",
         confirmation,
@@ -1340,16 +1334,104 @@ export async function POST(request: NextRequest) {
         steps.reset = "skipped (add-only)";
       }
 
-      // ── 1. Levels and badge XP ────────────────────────────────────────────
-      // Reason: a ladder an operator has tuned is never overwritten — a
-      // proposal is only written when there is no ladder at all, the same
-      // add-only rule the badge writer follows.
+      // ── 1. Badge XP table ─────────────────────────────────────────────────
+      // Reason: the XP each rarity pays has to be settled BEFORE the ladder is
+      // derived, because the ladder is a function of what the catalogue can
+      // actually pay. The ladder itself is step 4.
       const xpConfig = await dbTools.readXPConfig();
+      if (!xpConfig?.badgeXP) {
+        await dbTools.writeXPConfig("badge_xp", DEFAULT_BADGE_XP);
+        steps.badgeXp = { action: "created", badgeXP: DEFAULT_BADGE_XP };
+      } else {
+        steps.badgeXp = { action: "kept", badgeXP: xpConfig.badgeXP };
+      }
+      const badgeXp = await resolveBadgeXp();
+
+      // ── 2. Badges — deterministic blueprint, add-only ─────────────────────
+      // Reason (R103): this used to be a single AI call asked to cover the whole
+      // catalogue inside a 6,000-token reply. It returned a handful of trading
+      // badges, reported success, and an operator who had just wiped the system
+      // was left with five. The quota, the rarity pyramid and the thresholds are
+      // arithmetic now; the model is a rewording pass over what this produced.
+      const catalogue = await loadCatalogueGameRefs();
+      const knownKeys = knownGameKeys(catalogue);
+      const targetTotal =
+        typeof body.generateCount === "number" && body.generateCount > 0
+          ? Math.floor(body.generateCount)
+          : DEFAULT_TARGET_BADGE_TOTAL;
+      const quotaPlan = planBadgeQuota(
+        catalogue.map((c) => ({ gameKey: c.gameKey, name: c.displayName })),
+        targetTotal,
+      );
+      const blueprint = buildBadgeBlueprint(quotaPlan);
+      const badgeWrite = await dbTools.writeBadgesBatch(blueprint.badges, {
+        mode: "add-only",
+        knownKeys,
+      });
+      steps.badges = {
+        action: "blueprint",
+        target: quotaPlan.target,
+        planned: quotaPlan.planned,
+        generated: blueprint.badges.length,
+        shortfalls: blueprint.shortfalls,
+        scopes: quotaPlan.scopes.map((s) => ({
+          scope: s.scope,
+          label: s.label,
+          total: s.total,
+        })),
+        writeResults: badgeWrite,
+      };
+
+      // ── 3. Journey maps and milestones — deterministic, add-only ──────────
+      // Reason: the milestone agent iterates maps that already exist, so after a
+      // wipe there were none and it produced nothing at all — a wizard reporting
+      // success beside an empty journey screen. The maps are built here from the
+      // same quota plan the badges are, which is what guarantees a game cannot
+      // have badges and no journey.
+      if (includeMilestones) {
+        const journey = buildJourneyBlueprint(quotaPlan, {
+          earnableBadgeXp: earnableXpFromBadges(blueprint.badges, badgeXp),
+        });
+        const mapsToWrite = journey.maps.slice(
+          0,
+          Math.max(0, maxMaps === 0 ? journey.maps.length : maxMaps),
+        );
+        const writtenMapIds = new Set(mapsToWrite.map((m) => m.mapId));
+        const mapWrite = await dbTools.writeMapsBatch(mapsToWrite);
+        const milestoneWrite = await dbTools.writeMilestonesBatch(
+          journey.milestones.filter((m) => writtenMapIds.has(m.mapId)),
+          { mode: "add-only" },
+        );
+        steps.milestones = {
+          action: "blueprint",
+          maps: mapWrite,
+          milestones: milestoneWrite,
+          mapIds: mapsToWrite.map((m) => m.mapId),
+        };
+      } else {
+        steps.milestones = "skipped";
+      }
+
+      // ── 4. Levels — derived from what the catalogue can now pay ───────────
+      // Reason: a ladder an operator has tuned is never overwritten, and a
+      // ladder written BEFORE the badges exists is derived from zero earnable
+      // XP — which is exactly the "level 20 needs 426,000 XP while a badge pays
+      // 25" mismatch an operator sees as no balance at all.
       const existingLevels = Array.isArray(xpConfig?.levels) ? xpConfig.levels : [];
       if (proposeLadder && existingLevels.length === 0) {
-        const proposed = proposeNeutralLadder();
+        const allBadges = await dbTools.readAllBadges();
+        const earnable = earnableXpFromBadges(
+          allBadges as Array<{ rarity?: string | null }>,
+          badgeXp,
+        );
+        const proposed = proposeNeutralLadder(undefined, earnable);
         await dbTools.writeXPConfig("level_progression", proposed);
-        steps.levels = { action: "created", levelCount: proposed.length };
+        steps.levels = {
+          action: "created",
+          levelCount: proposed.length,
+          earnableXp: earnable,
+          topLevelMinXP: proposed.at(-1)?.minXP,
+        };
       } else {
         steps.levels = {
           action: "kept",
@@ -1357,59 +1439,8 @@ export async function POST(request: NextRequest) {
           audit: auditLadder(existingLevels as never[]),
         };
       }
-      if (!xpConfig?.badgeXP) {
-        await dbTools.writeXPConfig("badge_xp", DEFAULT_BADGE_XP);
-        steps.badgeXp = { action: "created", badgeXP: DEFAULT_BADGE_XP };
-      } else {
-        steps.badgeXp = { action: "kept", badgeXP: xpConfig.badgeXP };
-      }
 
-      // ── 2. Badges — gap-fill per game, add-only ───────────────────────────
-      const cap =
-        typeof body.generateCount === "number" && body.generateCount > 0
-          ? body.generateCount
-          : Number.POSITIVE_INFINITY;
-      const badgeResult = await runBadgeAgent(openai, config, {
-        autoApply: true,
-        mode: "add-only",
-        cap,
-      });
-      steps.badges = badgeResult.ok
-        ? {
-            summary: badgeResult.summary,
-            newCount: badgeResult.newCount,
-            fixedCount: badgeResult.fixedCount,
-            writeResults: badgeResult.writeResults,
-            coverage: badgeResult.coverage,
-          }
-        : { error: badgeResult.error };
-
-      // ── 3. Milestones — one pass per journey map that has gaps ────────────
-      if (includeMilestones) {
-        const maps = (await dbTools.readAllMaps()) as Array<{ mapId: string }>;
-        const milestoneRuns: unknown[] = [];
-        for (const map of maps.slice(0, Math.max(0, maxMaps))) {
-          const msResult = await runMilestoneAgent(openai, config, {
-            mapId: map.mapId,
-            autoApply: true,
-          });
-          milestoneRuns.push(
-            msResult.ok
-              ? {
-                  mapId: map.mapId,
-                  summary: msResult.summary,
-                  fixedCount: msResult.fixedCount,
-                  writeResults: msResult.writeResults,
-                }
-              : { mapId: map.mapId, error: msResult.error },
-          );
-        }
-        steps.milestones = milestoneRuns;
-      } else {
-        steps.milestones = "skipped";
-      }
-
-      // ── 4. Deterministic fixes, then score the result ─────────────────────
+      // ── 5. Deterministic fixes, then score the result ─────────────────────
       steps.autoFix = await applyAutoFixes();
       const evaluation = await runEvaluation();
       steps.evaluation = evaluation;
@@ -1427,19 +1458,27 @@ export async function POST(request: NextRequest) {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // agent_milestones — OPTIMIZED: compact format, per-map processing
+    // reset_gamification — wipe the authored content so the wizard can rebuild.
+    //
+    // Exposed on its own as well as inside `run_full` because an operator may
+    // legitimately want the platform empty and hand-author from there. It
+    // refuses without the confirmation phrase, and it leaves player-earned rows
+    // alone unless asked, reporting how many it orphaned.
     // ═══════════════════════════════════════════════════════════════════════════
-    if (action === "agent_milestones") {
-      const { mapId, autoApply = false } = body;
-      const result = await runMilestoneAgent(openai, config, { mapId, autoApply });
-      if (!result.ok) {
-        return NextResponse.json(
-          { success: false, error: result.error, raw: result.raw },
-          { status: 500 },
-        );
-      }
-      const { ok: _ok, ...payload } = result;
-      return NextResponse.json({ success: true, ...payload });
+    if (action === "reset_gamification") {
+      const result = await resetGamification({
+        scopes:
+          Array.isArray(body.scopes) && body.scopes.length > 0
+            ? body.scopes
+            : ALL_GAMIFICATION_RESET_SCOPES,
+        confirmation: body.confirmation,
+        includePlayerProgress: body.includePlayerProgress === true,
+        actor: guard.admin.email,
+      });
+      return NextResponse.json(
+        { action: "reset_gamification", ...result },
+        { status: result.success ? 200 : 400 },
+      );
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -1460,6 +1499,49 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, ...payload });
     }
 
+    // ─── AI actions require OpenAI ──────────────────────────────────────────
+    const config = await getAIConfig();
+    if (!config.enabled || !config.apiKey) {
+      return NextResponse.json({ success: false, error: "AI is not enabled. Configure OpenAI in admin settings." }, { status: 400 });
+    }
+    const openai = new OpenAI({ apiKey: config.apiKey });
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // agent_badges — OPTIMIZED: compact format, return ONLY changed badges
+    // ═══════════════════════════════════════════════════════════════════════════
+    if (action === "agent_badges") {
+      const { autoApply = false, mode = "add-only" } = body;
+      const cap =
+        typeof body.generateCount === "number" && body.generateCount > 0
+          ? body.generateCount
+          : Number.POSITIVE_INFINITY;
+      const result = await runBadgeAgent(openai, config, { autoApply, mode, cap });
+      if (!result.ok) {
+        return NextResponse.json(
+          { success: false, error: result.error, raw: result.raw },
+          { status: 500 },
+        );
+      }
+      const { ok: _ok, ...payload } = result;
+      return NextResponse.json({ success: true, ...payload });
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // agent_milestones — OPTIMIZED: compact format, per-map processing
+    // ═══════════════════════════════════════════════════════════════════════════
+    if (action === "agent_milestones") {
+      const { mapId, autoApply = false } = body;
+      const result = await runMilestoneAgent(openai, config, { mapId, autoApply });
+      if (!result.ok) {
+        return NextResponse.json(
+          { success: false, error: result.error, raw: result.raw },
+          { status: 500 },
+        );
+      }
+      const { ok: _ok, ...payload } = result;
+      return NextResponse.json({ success: true, ...payload });
+    }
+
     return NextResponse.json(
       {
         success: false,
@@ -1471,8 +1553,14 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("[Gamification Wizard] Error:", error);
     return NextResponse.json(
-      { success: false, error: "Gamification Wizard failed: " + (error instanceof Error ? error.message : "Unknown error") },
+      {
+        success: false,
+        error:
+          "Gamification Wizard failed: " +
+          (error instanceof Error ? error.message : "Unknown error"),
+      },
       { status: 500 },
     );
   }
 }
+

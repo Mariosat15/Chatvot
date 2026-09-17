@@ -1263,7 +1263,11 @@ export default function BadgeXPManagementSection() {
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h4 className="text-lg font-semibold">
-                  Badge Library (120 Total)
+                  {/* Reason: this read "120 Total" as a literal, so the header kept
+                      reporting the shipped default count after a wizard run, a
+                      reset or any hand edit — which is how five stored badges
+                      came to be displayed under a heading claiming 120. */}
+                  Badge Library ({badgesFromDB.length} Total)
                 </h4>
                 <p className="text-sm text-muted-foreground">
                   Manage all badges: add, edit, delete, and change icons
@@ -1278,7 +1282,14 @@ export default function BadgeXPManagementSection() {
                       const data = await response.json();
                       toast.dismiss();
                       if (data.success) {
-                        toast.success(`Badges reset! ${data.counts?.badges || 120} badges restored from defaults.`);
+                        // Reason: the fallback was a literal 120, so a route that
+                        // reported no count told the operator 120 badges had been
+                        // restored whatever actually happened.
+                        toast.success(
+                          typeof data.counts?.badges === "number"
+                            ? `Badges reset! ${data.counts.badges} badges restored from defaults.`
+                            : "Badges reset from defaults.",
+                        );
                         await fetchData();
                       } else {
                         toast.error(data.error || "Failed to reseed badges");

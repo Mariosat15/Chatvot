@@ -6,6 +6,7 @@ import JourneyMapRenderer, {
   type Milestone,
   type MapSequenceInfo,
   type MilestoneProgress,
+  type Zone,
 } from "@/components/journey/JourneyMapRenderer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,9 +32,27 @@ interface MapData {
   sequenceOrder: number;
   difficulty: number;
   estimatedXP: number;
-  zones: any[];
+  // Reason: `Zone` is the renderer's own exported shape, and `zones` is passed
+  // straight through to it — a local re-declaration would be a second copy of a
+  // type that only has to agree with one consumer.
+  zones: Zone[];
   backgroundColor: string;
   backgroundImage?: string;
+}
+
+/**
+ * One entry of the progress route's milestone lists.
+ *
+ * Reason: the route has returned bare id strings and `{ milestoneId }` objects
+ * at different times, so the union is the honest type. Narrowing it to the
+ * object form would compile and read correctly while dropping every id on a
+ * deployment still serving strings.
+ */
+type ProgressEntry = string | { milestoneId?: string | null };
+
+function milestoneIdOf(entry: ProgressEntry): string {
+  if (typeof entry === "string") return entry;
+  return entry?.milestoneId ?? "";
 }
 
 interface JourneyClientProps {
@@ -41,7 +60,14 @@ interface JourneyClientProps {
 }
 
 export default function JourneyClient({ userId }: JourneyClientProps) {
-  const [loading, setLoading] = useState(true);
+  // Reason: the skeleton used to be gated on a `loading` flag that started true and was cleared
+  // only by the map-data effect, which returned early when there were no maps - so an empty
+  // sequence (what a gamification reset leaves behind, since it deletes every JourneyMapConfig
+  // and reseeds none) spun the page for ever with no error and nothing in a log. This flag is
+  // set by the sequence request itself, in a `finally`, so it separates "still asking" from
+  // "asked, and none exist". The old `loading` flag is deliberately gone rather than left
+  // write-only: a flag nothing reads is an invitation to re-gate the skeleton on it.
+  const [mapsResolved, setMapsResolved] = useState(false);
   const [currentMapIndex, setCurrentMapIndex] = useState(1);
   const [maps, setMaps] = useState<MapData[]>([]);
   const [currentMapConfig, setCurrentMapConfig] = useState<MapConfig | null>(null);
@@ -67,6 +93,8 @@ export default function JourneyClient({ userId }: JourneyClientProps) {
         }
       } catch (error) {
         console.error("Error fetching maps:", error);
+      } finally {
+        setMapsResolved(true);
       }
     };
     fetchMaps();
@@ -76,8 +104,7 @@ export default function JourneyClient({ userId }: JourneyClientProps) {
   useEffect(() => {
     const fetchMapData = async () => {
       if (maps.length === 0) return;
-      
-      setLoading(true);
+
       try {
         const currentMap = maps.find(m => m.sequenceOrder === currentMapIndex);
         if (!currentMap) return;
@@ -104,8 +131,6 @@ export default function JourneyClient({ userId }: JourneyClientProps) {
       } catch (error) {
         console.error("Error fetching map data:", error);
         toast.error("Failed to load map");
-      } finally {
-        setLoading(false);
       }
     };
 
@@ -123,12 +148,19 @@ export default function JourneyClient({ userId }: JourneyClientProps) {
 
         if (data.success) {
           // Extract milestone ID strings from objects (API returns { milestoneId, completedAt, rewards })
-          const completedIds = (data.completedMilestones || []).map((item: any) =>
-            typeof item === "string" ? item : item?.milestoneId
-          ).filter(Boolean);
-          const unlockedIds = (data.unlockedMilestones || []).map((item: any) =>
-            typeof item === "string" ? item : item?.milestoneId
-          ).filter(Boolean);
+          //
+          // Reason: the route has returned both shapes over time, so both are
+          // accepted rather than assuming the newer one — a bare `.milestoneId`
+          // read against the string form yields `undefined`, which `filter`
+          // silently drops, and the player's journey renders as untouched.
+          const completedIds = (
+            (data.completedMilestones || []) as ProgressEntry[]
+          )
+            .map(milestoneIdOf)
+            .filter(Boolean);
+          const unlockedIds = ((data.unlockedMilestones || []) as ProgressEntry[])
+            .map(milestoneIdOf)
+            .filter(Boolean);
           setUserProgress({
             completedMilestones: completedIds,
             unlockedMilestones: unlockedIds,
@@ -202,11 +234,34 @@ export default function JourneyClient({ userId }: JourneyClientProps) {
     );
   };
 
-  if (loading && maps.length === 0) {
+  if (!mapsResolved && maps.length === 0) {
     return (
       <div className="container mx-auto py-8 space-y-6">
         <Skeleton className="h-12 w-64" />
         <Skeleton className="h-[600px] w-full" />
+      </div>
+    );
+  }
+
+  if (mapsResolved && maps.length === 0) {
+    return (
+      <div className="container mx-auto py-8">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-3">
+              <Map className="h-6 w-6 text-amber-400" />
+              Your Trading Journey
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-muted-foreground">
+              No journey maps found. Please ask an admin to generate the journey.
+            </p>
+            <Button variant="outline" onClick={() => window.location.reload()}>
+              Try again
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }

@@ -58,6 +58,10 @@ export interface IJourneyMapConfig extends Document {
   requiredLevelToStart: number; // Minimum level suggestion
   completionRequirement: number; // Percentage of milestones needed (default 100)
   totalMilestones: number; // Cached count of milestones
+  // The game this map belongs to. Absent/null means platform-wide.
+  // Reason: without it a per-game journey cannot be attributed to its game, so
+  // coverage reads as complete for every title the moment one map exists.
+  gameKey?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -171,6 +175,13 @@ const JourneyMapConfigSchema = new Schema<IJourneyMapConfig>(
     totalMilestones: {
       type: Number,
       default: 0,
+    },
+    // Reason: no default on purpose — an absent value is "platform-wide", which
+    // is a different fact from a deliberately cleared one, and a default would
+    // make every pre-existing map indistinguishable from an authored choice.
+    gameKey: {
+      type: String,
+      index: true,
     },
   },
   {

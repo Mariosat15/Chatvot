@@ -29,9 +29,12 @@ function Invoke-Probe {
   if ([string]::IsNullOrEmpty($orig)) { throw "PROBE DID NOT APPLY (empty read): $File" }
 
   $idx = $orig.IndexOf($Find)
-  if ($idx -lt 0) { throw "PROBE DID NOT APPLY (Find miss): $Name" }
+  # Reason: report and carry on rather than throwing. A thrown DID-NOT-APPLY
+  # aborts the whole harness, so one moved anchor silently skips every probe
+  # after it — the run then looks quiet when eight real guards went unchecked.
+  if ($idx -lt 0) { Write-Host "DID NOT APPLY (Find miss): $Name"; return }
   $mut = $orig.Remove($idx, $Find.Length).Insert($idx, $Replace)
-  if ($mut -eq $orig) { throw "PROBE DID NOT APPLY (no change): $Name" }
+  if ($mut -eq $orig) { Write-Host "DID NOT APPLY (no change): $Name"; return }
   Write-Utf8 $full $mut
 
   try {
@@ -51,6 +54,7 @@ function Invoke-Probe {
 
 $COVERAGE = 'apps/admin/lib/services/games/gamification-coverage.ts'
 $LADDER   = 'apps/admin/lib/admin/neutral-level-ladder.ts'
+$ECONOMY  = 'apps/admin/lib/services/games/gamification-economy.ts'
 $ENGINE   = 'apps/admin/lib/gamification-engine.ts'
 $ROUTE    = 'apps/admin/app/api/ai/gamification-wizard/route.ts'
 $UI       = 'apps/admin/components/admin/GamificationWizardSection.tsx'
@@ -101,9 +105,14 @@ Invoke-Probe -Name 'parity-scored-without-catalogue' -File $ENGINE `
 # ── Neutral ladder ───────────────────────────────────────────────────────────
 
 # 6 — overlapping bands
-Invoke-Probe -Name 'ladder-bands-overlap' -File $LADDER `
-  -Find 'const maxXP = isLast ? Number.MAX_SAFE_INTEGER : minXP + rounded - 1;' `
-  -Replace 'const maxXP = isLast ? Number.MAX_SAFE_INTEGER : minXP + rounded;' `
+#
+#     Re-aimed 17 Sep 2026: the band arithmetic moved out of the admin-only
+#     ladder module into the mirrored economy engine, so the ladder now reads
+#     the bands rather than computing them. The claim is unchanged; only the
+#     file and the surrounding expression moved.
+Invoke-Probe -Name 'ladder-bands-overlap' -File $ECONOMY `
+  -Find 'maxXP: isLast ? Number.MAX_SAFE_INTEGER : cursor + rounded - 1,' `
+  -Replace 'maxXP: isLast ? Number.MAX_SAFE_INTEGER : cursor + rounded,' `
   -ExpectTest 'proposes a monotonic ladder'
 
 # 7 — stop flagging a game noun in a title
@@ -136,7 +145,7 @@ Invoke-Probe -Name 'run-full-replaces-badges' -File $ROUTE `
 Invoke-Probe -Name 'run-full-skips-autofix' -File $ROUTE `
   -Find 'steps.autoFix = await applyAutoFixes();' `
   -Replace 'steps.autoFix = null; const _deadFixer = applyAutoFixes;' `
-  -ExpectTest 'chains all four stages in one action'
+  -ExpectTest 'builds badges and journeys deterministically'
 
 # 12 — stop reporting the post-run gap
 Invoke-Probe -Name 'run-full-hides-gap' -File $ROUTE `
@@ -237,5 +246,21 @@ Invoke-Probe -Name 'panel-stays-armed' -File $UI `
   -Find 'setSetupMode("add");' `
   -Replace '' `
   -ExpectTest 'disarms the panel after a rebuild'
+
+# 25-27 — drift each deterministic generator's admin copy away from the main one.
+# Reason: check:mirrors compares models, so a text comparison is the only guard,
+# and the admin copy is the one that runs when an operator presses the button.
+foreach ($m in @(
+  @{ Name = 'economy-mirror-drifts';  File = $ECONOMY; Test = 'gamification-economy.ts is byte-identical' },
+  @{ Name = 'badge-blueprint-mirror-drifts';   File = 'apps/admin/lib/services/games/badge-blueprint.ts';   Test = 'badge-blueprint.ts is byte-identical' },
+  @{ Name = 'journey-blueprint-mirror-drifts'; File = 'apps/admin/lib/services/games/journey-blueprint.ts'; Test = 'journey-blueprint.ts is byte-identical' }
+)) {
+  # A single added character is enough: the guard is equality, not a pattern.
+  Invoke-Probe -Name $m.Name -File $m.File `
+    -Find 'import' `
+    -Replace '// drifted
+import' `
+    -ExpectTest $m.Test
+}
 
 Write-Host 'R96b orchestration probes done.'

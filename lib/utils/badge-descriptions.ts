@@ -5,6 +5,13 @@
  */
 
 import type { Badge } from "@/lib/constants/badges";
+import { TRADING_GAME_TYPE } from "@/lib/games/types";
+import { getConditionDef } from "@/lib/services/games/badge-condition-registry";
+import {
+  normalizeBadgeGameTypes,
+  providerKeysFromGameTypes,
+} from "@/lib/services/games/badge-game-scope";
+import { DEFAULT_BADGE_XP } from "@/lib/services/games/gamification-economy";
 
 interface BadgeRequirement {
   /** Short description of what the user needs to do */
@@ -19,40 +26,158 @@ interface BadgeRequirement {
   tip?: string;
 }
 
+interface ActivityFloors {
+  /** Total trades the evaluator will require before the condition is even read */
+  trades: number;
+  /** Completed competitions the evaluator will require */
+  competitions: number;
+}
+
+/**
+ * Rarity activity floors, for DISPLAY only.
+ *
+ * Reason: this duplicates `RARITY_MIN_REQUIREMENTS` in
+ * `lib/services/badge-evaluation.service.ts`, which stays authoritative — the
+ * evaluator is a server module and this file is reachable from a client
+ * component (R58), so it cannot import it. `__tests__/utils/badge-requirement-scope.test.ts`
+ * parses the evaluator's table and asserts the two agree, because a floor shown
+ * here that the evaluator does not apply (and the reverse) is invisible.
+ */
+export const RARITY_ACTIVITY_FLOORS: ReadonlyMap<string, ActivityFloors> =
+  new Map([
+    ["common", { trades: 5, competitions: 0 }],
+    ["rare", { trades: 25, competitions: 1 }],
+    ["epic", { trades: 50, competitions: 3 }],
+    ["legendary", { trades: 100, competitions: 5 }],
+  ]);
+
+const NO_FLOORS: ActivityFloors = { trades: 0, competitions: 0 };
+
+/** Shown on every game-scoped badge so the absence of a trade floor is explicit. */
+const GAME_SCOPE_TIP =
+  "Progress is tracked for this game only — no trading activity required";
+
+/**
+ * Which activity floors this badge actually carries, mirroring
+ * `checkBadgeCondition`'s branch on the registry scope of the condition type.
+ *
+ * Reason (R96b, the live defect): the rarity trade/competition floor used to be
+ * appended for every badge regardless of scope, so a Games badge on `game_wins`
+ * advertised "25+ total trades (rare tier)" — a requirement the evaluator never
+ * applies to a game-scoped condition and a games-only player can never meet.
+ */
+function resolveDisplayedFloors(badge: Badge): ActivityFloors {
+  const { type, minTrades, minCompletedCompetitions } = badge.condition;
+  const storedTrades = minTrades || 0;
+  const storedComps = minCompletedCompetitions || 0;
+  const tier = RARITY_ACTIVITY_FLOORS.get(badge.rarity) ?? NO_FLOORS;
+  const def = getConditionDef(type);
+
+  // Reason: an unregistered condition type FAILS CLOSED here by claiming no
+  // tier floor. The evaluator's `conditionScope()` defaults such a type to
+  // trading, so the card is less informative than it could be — but stating a
+  // trade requirement that may not exist is the defect being fixed, and the
+  // repair for an affected badge is to register its type, not to guess here.
+  if (!def) return { trades: storedTrades, competitions: storedComps };
+
+  switch (def.scope) {
+    case "game":
+      // Reason: game_* reads UserGameStats; trade floors would re-block a
+      // games-only player, so the evaluator zeroes them and honours only an
+      // explicitly authored competition minimum.
+      return { trades: 0, competitions: storedComps };
+    case "platform":
+      // Account / wallet / social: only what the badge itself asks for.
+      return { trades: storedTrades, competitions: storedComps };
+    case "both":
+      // Reason (R96a): contests in ANY game satisfy a cross-game condition, so
+      // the evaluator ignores a stored `minTrades` entirely. Showing it would
+      // overstate the requirement for a games-only player.
+      return {
+        trades: 0,
+        competitions: Math.max(storedComps, tier.competitions),
+      };
+    default: {
+      // Trading-scoped.
+      //
+      // Reason: a badge scoped to provider games ALONE cannot be earned through
+      // forex activity, so no trade floor is advertised. `conditionAllowedOnBadge`
+      // refuses that combination at every writer, so this is a guard against bad
+      // data rather than a path the catalogue can reach.
+      //
+      // A MIXED list (trading plus a provider key) deliberately keeps the floor:
+      // the writers permit a trading condition there, the evaluator applies the
+      // floor, and hiding it would understate a requirement that really is
+      // enforced — the mirror image of the defect being fixed.
+      const gameTypes = normalizeBadgeGameTypes(badge.gameTypes);
+      const providerOnly =
+        providerKeysFromGameTypes(gameTypes).length > 0 &&
+        !gameTypes.includes(TRADING_GAME_TYPE);
+      if (providerOnly) {
+        return { trades: 0, competitions: storedComps };
+      }
+      return {
+        trades: Math.max(storedTrades, tier.trades),
+        competitions: Math.max(storedComps, tier.competitions),
+      };
+    }
+  }
+}
+
 /**
  * Get human-readable requirement description for a badge condition
  */
 export function getBadgeRequirement(badge: Badge): BadgeRequirement {
   const { condition } = badge;
-  const { type, value, comparison, minTrades, minCompletedCompetitions } = condition;
+  const { type, value, comparison } = condition;
 
+  const floors = resolveDisplayedFloors(badge);
   const extras: string[] = [];
-  if (minTrades) extras.push(`${minTrades}+ total trades required`);
-  if (minCompletedCompetitions) extras.push(`${minCompletedCompetitions}+ competitions completed`);
-
-  // Rarity tier requirements
-  const tierReqs: Record<string, { trades: number; competitions: number }> = {
-    common: { trades: 5, competitions: 0 },
-    rare: { trades: 25, competitions: 1 },
-    epic: { trades: 50, competitions: 3 },
-    legendary: { trades: 100, competitions: 5 },
-  };
-  const tier = tierReqs[badge.rarity];
-  if (tier) {
-    const effectiveMinTrades = Math.max(minTrades || 0, tier.trades);
-    const effectiveMinComps = Math.max(minCompletedCompetitions || 0, tier.competitions);
-    if (effectiveMinTrades > (minTrades || 0)) {
-      extras.push(`${effectiveMinTrades}+ total trades (${badge.rarity} tier)`);
-    }
-    if (effectiveMinComps > (minCompletedCompetitions || 0)) {
-      extras.push(`${effectiveMinComps}+ competitions completed (${badge.rarity} tier)`);
-    }
+  // Reason: one line per floor, suffixed only when the rarity tier — rather
+  // than the badge itself — is what set it. The old code pushed both the
+  // stored and the tier figure, so a badge with a stored 25 and an epic tier
+  // of 50 listed two different trade requirements.
+  if (floors.trades > 0) {
+    const fromTier = floors.trades > (condition.minTrades || 0);
+    extras.push(
+      `${floors.trades}+ total trades required${fromTier ? ` (${badge.rarity} tier)` : ""}`,
+    );
+  }
+  if (floors.competitions > 0) {
+    const fromTier =
+      floors.competitions > (condition.minCompletedCompetitions || 0);
+    extras.push(
+      `${floors.competitions}+ competitions completed${fromTier ? ` (${badge.rarity} tier)` : ""}`,
+    );
   }
 
   const compLabel = (n: number) => `${n} competition${n > 1 ? "s" : ""}`;
   const tradeLabel = (n: number) => `${n} trade${n > 1 ? "s" : ""}`;
+  const contestLabel = (n: number) => `${n} contest${n > 1 ? "s" : ""}`;
 
   switch (type) {
+    // Game (UserGameStats — scoped to the badge's own game, never to trading)
+    case "game_contests_entered":
+      return { requirement: `Enter ${contestLabel(value || 1)} in this game`, statLabel: "Game Contests Entered", targetValue: value || 1, extras, tip: GAME_SCOPE_TIP };
+    case "game_contests_completed":
+      return { requirement: `Complete ${contestLabel(value || 1)} in this game`, statLabel: "Game Contests Completed", targetValue: value || 1, extras, tip: GAME_SCOPE_TIP };
+    case "game_wins":
+      return { requirement: `Win ${contestLabel(value || 1)} in this game`, statLabel: "Game Wins", targetValue: value || 1, extras, tip: GAME_SCOPE_TIP };
+    case "game_podiums":
+      return { requirement: `Finish top 3 in ${contestLabel(value || 1)} in this game`, statLabel: "Game Podiums", targetValue: value || 1, extras, tip: GAME_SCOPE_TIP };
+    case "game_total_points":
+      return { requirement: `Earn ${(value || 1).toLocaleString()} total points in this game`, statLabel: "Game Total Points", targetValue: (value || 1).toLocaleString(), extras, tip: GAME_SCOPE_TIP };
+    case "game_rating":
+      return { requirement: `Reach a ${value || 1} rating in this game`, statLabel: "Game Rating", targetValue: value || 1, extras, tip: GAME_SCOPE_TIP };
+    case "game_best_rank":
+      // Reason: bestRank is lower-is-better — the evaluator compares with
+      // `lte` unless the badge overrides it — so "reach 3" would read as the
+      // opposite of the requirement.
+      if (comparison === "eq") return { requirement: `Finish exactly rank #${value || 1} in this game`, statLabel: "Game Best Rank", targetValue: `#${value || 1}`, extras, tip: GAME_SCOPE_TIP };
+      return { requirement: `Finish rank #${value || 1} or better in this game`, statLabel: "Game Best Rank", targetValue: `#${value || 1} or better`, extras, tip: GAME_SCOPE_TIP };
+    case "game_current_streak":
+      return { requirement: `Win ${contestLabel(value || 1)} in a row in this game`, statLabel: "Game Current Streak", targetValue: value || 1, extras, tip: GAME_SCOPE_TIP };
+
     // Competition
     case "competitions_entered":
       return { requirement: `Join ${value} competition${(value || 1) > 1 ? "s" : ""}`, statLabel: "Competitions Entered", targetValue: value || 1, extras };
@@ -258,27 +383,37 @@ export function getBadgeRequirement(badge: Badge): BadgeRequirement {
 }
 
 /**
- * Get the XP reward for a badge based on its rarity
+ * Reason: the XP-per-rarity numbers used to be a second hard-coded table here.
+ * `gamification-economy.ts` is model-free and client-reachable, so the platform
+ * default can be read directly and there is one definition rather than two.
+ * A `Map` rather than an index expression keeps the object-injection lint rule
+ * satisfied without a cast.
+ */
+const DEFAULT_XP_BY_RARITY = new Map<string, number>(
+  Object.entries(DEFAULT_BADGE_XP),
+);
+
+/**
+ * Get the platform-default XP reward for a badge based on its rarity.
+ * A stored `badge_xp` config overrides this server-side when XP is awarded.
  */
 export function getBadgeXP(rarity: string): number {
-  const XP_VALUES: Record<string, number> = {
-    common: 10,
-    rare: 25,
-    epic: 50,
-    legendary: 100,
-  };
-  return XP_VALUES[rarity] || 10;
+  return DEFAULT_XP_BY_RARITY.get(rarity) ?? DEFAULT_BADGE_XP.common;
 }
+
+// Reason: the wording is unchanged, including "traders" — a terminology pass is
+// its own phase (X8) with a token dictionary, and rewording player-facing copy
+// inside a defect fix would destroy the evidence that only the floors moved.
+const RARITY_DESCRIPTIONS = new Map<string, string>([
+  ["common", "Achievable by active traders"],
+  ["rare", "Requires dedication and skill"],
+  ["epic", "Only the most skilled traders earn this"],
+  ["legendary", "The ultimate achievement - extremely rare"],
+]);
 
 /**
  * Get rarity description for display
  */
 export function getRarityDescription(rarity: string): string {
-  const descriptions: Record<string, string> = {
-    common: "Achievable by active traders",
-    rare: "Requires dedication and skill",
-    epic: "Only the most skilled traders earn this",
-    legendary: "The ultimate achievement - extremely rare",
-  };
-  return descriptions[rarity] || "";
+  return RARITY_DESCRIPTIONS.get(rarity) ?? "";
 }

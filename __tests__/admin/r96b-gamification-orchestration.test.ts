@@ -278,19 +278,66 @@ describe("run_full pipeline (structural)", () => {
   const route = readCode("apps/admin/app/api/ai/gamification-wizard/route.ts");
   const ui = readCode("apps/admin/components/admin/GamificationWizardSection.tsx");
 
-  it("chains all four stages in one action", () => {
-    const block = route.slice(route.indexOf('action === "run_full"'));
+  /**
+   * Reason (R103): this test used to assert `runBadgeAgent(` and
+   * `runMilestoneAgent(` appeared inside `run_full`, and it kept passing after
+   * both were replaced by the deterministic blueprints — the slice runs to the
+   * end of the file, so it was finding the `agent_badges` action's own call
+   * sites further down. **Flipped rather than deleted**: the claim is now that
+   * the pipeline does NOT reach for an AI agent, because a single model call
+   * asked to cover the whole catalogue inside a token budget is what produced
+   * five trading badges and reported success.
+   */
+  it("builds badges and journeys deterministically, not through an AI agent", () => {
+    const block = route.slice(
+      route.indexOf('action === "run_full"'),
+      route.indexOf('action === "reset_gamification"'),
+    );
     expect(block.length).toBeGreaterThan(500);
-    const badges = block.indexOf("runBadgeAgent(");
-    const milestones = block.indexOf("runMilestoneAgent(");
+
+    const quota = block.indexOf("planBadgeQuota(");
+    const badges = block.indexOf("buildBadgeBlueprint(");
+    const journey = block.indexOf("buildJourneyBlueprint(");
     const autoFix = block.indexOf("applyAutoFixes(");
     const evaluate = block.indexOf("runEvaluation(");
-    for (const position of [badges, milestones, autoFix, evaluate]) {
+    for (const position of [quota, badges, journey, autoFix, evaluate]) {
       expect(position).toBeGreaterThan(-1);
     }
+
+    // The quota is the input to the blueprint, and the journey is built from
+    // the same plan the badges are — that shared plan is what guarantees a
+    // game cannot receive badges and no journey.
+    expect(quota).toBeLessThan(badges);
+    expect(badges).toBeLessThan(journey);
     // Deterministic fixes must land before the run is scored, or the score
     // describes a system that no longer exists.
     expect(autoFix).toBeLessThan(evaluate);
+
+    expect(block).not.toMatch(/runBadgeAgent\(/);
+    expect(block).not.toMatch(/runMilestoneAgent\(/);
+  });
+
+  /**
+   * Reason (R103): the full setup shared `badgeGenCount` with the AI Badge
+   * Agent card, whose input is capped at 20 and defaults to 5 — which is
+   * literally why an operator who wiped the system was left with five badges.
+   * The two numbers answer different questions and must not share state.
+   */
+  it("sizes the catalogue from its own control, not the AI agent's capped count", () => {
+    const body = ui.slice(
+      ui.indexOf("const runFullSetup"),
+      ui.indexOf("const applyChanges"),
+    );
+    expect(body.length).toBeGreaterThan(200);
+    expect(body).toMatch(/generateCount:\s*setupBadgeTarget/);
+    expect(body).not.toMatch(/generateCount:\s*badgeGenCount/);
+
+    // And the default is the economy engine's, never a second literal.
+    expect(ui).toMatch(
+      /useState\(\s*DEFAULT_TARGET_BADGE_TOTAL\s*,?\s*\)/,
+    );
+    // The field has to reach the screen, or the operator cannot change it.
+    expect(ui).toMatch(/value=\{setupBadgeTarget\}/);
   });
 
   it("writes a ladder only when none exists", () => {
@@ -511,4 +558,28 @@ describe("rebuild-from-scratch (R96b)", () => {
     expect(body).toMatch(/setSetupMode\("add"\)/);
     expect(body).toMatch(/setResetConfirmation\(""\)/);
   });
+});
+
+describe("the deterministic generators are mirrored (R103)", () => {
+  const root = join(__dirname, "..", "..");
+
+  // Reason: `check:mirrors` compares MODELS, so it has no opinion about these
+  // three. A drifted copy would mean the wizard generates one set of badges,
+  // quotas or milestones and the player app assumes another — and the admin
+  // copy is the one that runs when an operator presses the button.
+  for (const file of [
+    "gamification-economy.ts",
+    "badge-blueprint.ts",
+    "journey-blueprint.ts",
+  ]) {
+    it(`${file} is byte-identical in both apps`, () => {
+      const main = readFileSync(join(root, "lib/services/games", file), "utf8");
+      const admin = readFileSync(
+        join(root, "apps/admin/lib/services/games", file),
+        "utf8",
+      );
+      expect(admin.length).toBeGreaterThan(500);
+      expect(admin).toBe(main);
+    });
+  }
 });

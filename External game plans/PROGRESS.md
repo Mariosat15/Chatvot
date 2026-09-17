@@ -15,7 +15,7 @@
 |---|---|
 | **Status** | **SCENARIO DECIDED - EXTERNAL-ONLY** (2 Sep 2026). **X1, X2, X3 and X5 are code-complete; X6 is partially done - all five of its admin destinations now exist (provider health, 6 Sep 2026), analytics by game and provider plus the Game Performance screen landed 7 Sep 2026, and the Game Master creation API is **half done** - its permission gate landed 7 Sep 2026, the construction half has not.** A provider contest can be created, **published from the admin screen** (5 Sep 2026), entered, played and paid - and since 5 Sep 2026 it is paid **correctly**, which it was not before: two P0 defects meant every player tied on a score of zero and split the pool equally, and a lower-is-better game ranked backwards. A stuck round can now be **inspected and ended by an operator** (5 Sep 2026). **The whole lifecycle is now reachable by clicking** - the player round launch screen landed 5 Sep 2026 at `/competitions/[id]/play`, which also fixed a live defect: a provider-contest player was being sent to the forex trading workspace by a button labelled "Start Trading". **X10 / E8's core shipped 13 Sep 2026**: a provider game can be **challenged** end to end, on the shared settlement stages rather than the challenge path's old inline copy - the opponent picker, open challenges and matchmaking are still deferred. **No provider selected**, which is what X4 needs |
 | **Is the admin API authorized?** | **PARTLY, and it is still the highest-priority open item on the platform - R101, 16 Sep 2026. R101a–R101ac are closed; the no-check and hand-verified piles are empty.** `apps/admin` has **no `middleware.ts`**, so every route must guard itself. **R101ac closed the clear-helpers cluster (21 files / 29 handlers)** on 16 Sep 2026 - ai-agent, audit-logs, credentials, environment, cookie-consent, images (+ dual upload), server-options, data-cleanup/maintenance (ADMIN_SECTIONS add-only), database resets, debug-fraud, gamification/sync-user, finalize-challenges, dev-scripts, dependency-check - inventory **0 no-check / 0 hand-verified / 9 helper / 328 section-granted**. A document quoting **30 helper** or **41 helper** or **67 helper** or **84 helper** or **89 helper** or **96 helper** or **103 helper** or **108 helper** or **117 helper** or **122 helper** or **143 helper** or **159 helper** or **169 helper** or **180 helper** or **3 hand-verified** or **14 / 23 / 58 / 78** remaining no-check is stale as a present fact though correct as history - **say which**. **Next: classify or close the remaining 9 helpers (auth/logout, verify-password, admin/events/poll as admin-at-all by design; gamemaster/ deferred — verifyGameMasterAuth), then R100 → R99 → R96a → R96b → X7.** **R96 is deferred behind R101 on ordering, not effort** |
-| **Can a games-only player earn a badge?** | **Partly - R96a CLOSED 16 Sep 2026; R96b AUTHORING CLOSED 17 Sep 2026 (content still owner).** Before the gate fix, **122 of 128 badges were unreachable without trading**. **R96a** classifies by condition TYPE: cross-game types ignore trade floors and count any completed contest; trading types keep the floors; unknown fail closed (**R100** byte-identical evaluators). **R96b authoring is built**: one registry (`badge-condition-registry.ts`) tags scopes platform\|trading\|both\|game; `game_*` conditions read `UserGameStats`; Games category on both badge models; admin form scopes by `gameTypes`; AI generate/wizard/balance refuse mismatches and skip trade floors on non-trading scopes; wizard apply is **add-only** by default; ladder add/remove with neutral titles. **Catalogue still holds zero game-specific badge rows** until an operator (or AI with owner brief) authors them — that content pass is what remains, not the plumbing. A document treating R96b as unbuilt is stale as a present fact though correct as history; **say which**. **Since later on 17 Sep 2026 the wizard also offers "start from scratch"** — `gamification-reset.service.ts` deletes badges, milestones and/or levels-and-XP behind the exact phrase `RESET GAMIFICATION`, keeps player-earned rows unless asked and reports what it orphaned, and `run_full` takes `mode: "add"` (default) or `"rebuild"`. **A plain delete could not have worked**: `getBadgesFromDB()` and `getXPConfigFromDB()` reseed the shipped defaults whenever their collection reads empty, so the wipe was undone by the next read — hence the `gamification-defaults-state` suppression flags, set **after** the deletes, and the defaults do **not** return on their own afterwards. Closed **R102** on the way: `writeXPConfig` keyed `xpconfigs` on `type` where the model declares `configType`, so **every ladder the wizard ever saved was written where nothing reads** and its own audit reported an unconfigured ladder immediately after writing one |
+| **Can a games-only player earn a badge?** | **Partly - R96a CLOSED 16 Sep 2026; R96b AUTHORING CLOSED 17 Sep 2026 (content still owner).** Before the gate fix, **122 of 128 badges were unreachable without trading**. **R96a** classifies by condition TYPE: cross-game types ignore trade floors and count any completed contest; trading types keep the floors; unknown fail closed (**R100** byte-identical evaluators). **R96b authoring is built**: one registry (`badge-condition-registry.ts`) tags scopes platform\|trading\|both\|game; `game_*` conditions read `UserGameStats`; Games category on both badge models; admin form scopes by `gameTypes`; AI generate/wizard/balance refuse mismatches and skip trade floors on non-trading scopes; wizard apply is **add-only** by default; ladder add/remove with neutral titles. **Catalogue still holds zero game-specific badge rows** until an operator (or AI with owner brief) authors them — that content pass is what remains, not the plumbing. A document treating R96b as unbuilt is stale as a present fact though correct as history; **say which**. **Since later on 17 Sep 2026 the wizard also offers "start from scratch"** — `gamification-reset.service.ts` deletes badges, milestones and/or levels-and-XP behind the exact phrase `RESET GAMIFICATION`, keeps player-earned rows unless asked and reports what it orphaned, and `run_full` takes `mode: "add"` (default) or `"rebuild"`. **A plain delete could not have worked**: `getBadgesFromDB()` and `getXPConfigFromDB()` reseed the shipped defaults whenever their collection reads empty, so the wipe was undone by the next read — hence the `gamification-defaults-state` suppression flags, set **after** the deletes, and the defaults do **not** return on their own afterwards. Closed **R102** on the way: `writeXPConfig` keyed `xpconfigs` on `type` where the model declares `configType`, so **every ladder the wizard ever saved was written where nothing reads** and its own audit reported an unconfigured ladder immediately after writing one. **Later still on 17 Sep 2026 the generation itself stopped being a model call (R103)** — `run_full`'s badge step was one generative request told to cover the whole catalogue and it returned **five badges, all trading**, reporting success, because five rows out of two hundred is a well-formed reply; the quota, the rarity pyramid, the thresholds and the XP curve are **arithmetic** now (`gamification-economy.ts`, `badge-blueprint.ts`, `journey-blueprint.ts`, all mirrored) and **`run_full` calls no agent at all**, so a document describing the wizard as AI-generated is correct as history and stale as a present fact — **say which**. Four faults travelled with it: the journey cap of **3 maps** (so every game past the second silently got none, and after a wipe the milestone agent iterated maps that no longer existed and produced nothing), a ladder derived **before** the badges and therefore from zero earnable XP (top rung 426,400 against a catalogue paying thousands), **eight of twenty rungs naming icons absent from the registry** — which the admin `GameIcon` renders as **raw text** — and a Badge Library header that was the literal `"120 Total"`. The fifth was the read half of R96a: `getBadgeRequirement` appended the rarity **trade** floor to every badge regardless of scope, so a Games badge advertised "25+ total trades" |
 | **Is there one leaderboard or three?** | **THREE BOARDS, ONE LAYOUT, amended later on 17 Sep 2026.** Dropdown is **Global Leaderboard**, **Trading Leaderboard**, **Games Leaderboard** only — per-game boards (Circuit Sprint, etc.) were removed on owner instruction. All three share Trading's chrome (search, filters, rank badges, clickable name → ProfileCard, friend/challenge). The **Global** standing still ranks on seven things by **position within each**, weighted trading 25 / games 25 / competitions 15 / challenges 10 / level 10 / badges 8 / milestones 7, **editable under Badges & XP -> Global Rank**. Absent figures render **`—`, never `0`**. Redistribution for non-players and R29 pins unchanged. A document naming "Trading performance", "Games performance", or a per-game board in the dropdown is correct as history and stale as a present fact; **say which**. **Never verified by eye**; level titles are still trading-shaped |
 | **Player screens** | **R37 closed 6 Sep 2026, and it is the one to read first if a provider board looks odd.** Neither app's `getCompetitionLeaderboard` passed `score` or `scoreDirection` to the ranking engine, so **every provider participant tied on zero and the board rendered in tie-break order** - and a lower-is-better title was *reversed on screen while correct at settlement*, so a player could lead all week and be paid last. **Latent for money, live for players:** settlement resolves both fields itself, so no payout was ever wrong and **nothing was backfilled**. Fixed by moving `resolveScoreDirection` out of settlement into a shared mirrored module used by all three consumers. Same day, `RoundPreflight` stopped offering an enabled **Play** button on a contest that had not started, and **the lobby became game-aware** - `app/(root)/competitions/[id]/page.tsx` now branches to `ProviderContestLobby`, which shows the play window, attempts remaining and what happens if a round never finishes, with a score leaderboard instead of one whose columns are profit and loss. The trading path below the branch is **byte-identical**. Also 6 Sep 2026, **the dashboard contest cards became game-aware** (`13` s5.1a) - and the load-bearing part is that **the plan named the wrong components**: `ActiveCompetitionCard` and `CompetitionsTable` are both orphaned, and the live one is `ContestsSidebar`, which no chapter mentioned. Fixing only what the plan named would have closed the item with the defect still on screen. See `13` s4.1a and s5.1a for exactly what is and is not built - **the trading panels, the per-game summary cards and the mega-action split are still outstanding**. Finally, on **owner instruction 6 Sep 2026, BOTH lobbies were rebuilt on one design kit** (`13` s4.1d) - `components/neon/`, from a component sheet the owner supplied, with four generated hero banners. This **superseded s4.1c of the same morning, which had made the game lobby match the trading lobby**: the sheet is now the reference and the trading lobby is one of the two screens that moved to meet it, so a document citing s4.1c's gold hero or its 3D icon rule as current is stale. The trading page is **down from 1,224 lines to 377**, with its hero, sidebar, accordions and prize table extracted into `components/trading/lobby/`, and its nine always-open sidebar cards are now four open items and six accordions - **what stayed open is pinned by a test**, because burying a decision a trader acts on is the same class of error as an aggregate that quietly means trading only. The consistency guard changed shape with it: **one definition, and no screen has chrome of its own**, because pairwise class-string comparison does not survive the sheet's seven screens. The cost is stated rather than glossed - **the trading page is no longer byte-identical**, so the money calculation was extracted whole and four of its expressions are asserted character for character. **Neither lobby has been seen by eye**; both are behind sign-in and the automated browser has no session, so owner review is the remaining step |
 | **First round crossed the wall** | **7 September 2026.** A round now travels between the two halves: created by the platform, played by real moves, scored by the service, delivered back **signed over a real socket**, ingested through all eleven gates and **paid out as real prize money**. `__tests__/games/end-to-end-round.test.ts`, `npm run test:e2e-round`, three tests, three probes red. **This closes the gap 4.1a names** - the adapter's 49 tests run against a *stubbed* `fetch` and the service's 167 run in-process, so neither could ever fail because the other side disagreed. **Two things are substituted and must not be glossed:** the Next routing layer (the callback goes to a bare `node:http` server that does exactly what the real route does - read raw bytes, call the one ingestion function) and the browser. **It is still not the acceptance criterion**, which says *by clicking* - that needs two sessions this environment cannot create, so it is a runbook in `21` s4.1e. **And the finding is that there was no finding:** every earlier phase produced live defects on contact and the first real round produced none in the product. The three it did surface were in the new test driver and the map it was written from |
@@ -829,6 +829,99 @@ Newest at the top.
 **Deferred:** what was consciously left for later
 **Next chat should:** the single clearest next action
 ```
+
+---
+
+### 17 Sep 2026 - THE WIZARD ASKED A MODEL TO DO ARITHMETIC (R103 CLOSED)
+
+**Why it exists:** owner report, after running "start from scratch" - five badges created
+under a header claiming 120, every one of them trading, no journeys, level rungs showing
+the literal word `diamond1`, a top rung asking 426,400 XP against a catalogue paying a few
+thousand, and a Games badge card telling the player to complete 25 trades.
+
+**The finding:** `run_full`'s badge step was **one generative call** told to cover the
+whole catalogue inside a reply budget. It returned five rows and reported success, because
+**five rows out of two hundred is a well-formed reply** - there is no partial-failure
+signal to detect. A language model is not a quota planner, so the fix is not a better
+prompt: **the count, the rarity pyramid, the thresholds and the XP curve are arithmetic
+now, and the model is a rewording pass over what the blueprint produced.** `run_full`
+calls **no agent at all**, pinned by a test asserting the agents are not invoked.
+
+**Shipped:** `lib/services/games/gamification-economy.ts` (mirrored) plans the quota per
+scope and derives the ladder bands from earnable XP; `badge-blueprint.ts` and
+`journey-blueprint.ts` (both mirrored) emit the rows; `proposeNeutralLadder` takes
+`earnableXp`. `run_full`'s step order is **XP table, badges, journeys, levels** and is
+asserted by position - a ladder written first is a function of zero earnable XP, which is
+exactly the mismatch read as "no balance". The wizard gained a **total-badge target**
+field (`setupBadgeTarget`, defaulting to `DEFAULT_TARGET_BADGE_TOTAL`) decoupled from the
+per-agent count, `maxMaps` defaults to **0 meaning every map** rather than 3, and the
+Badge Library header reads `badgesFromDB.length` rather than the literal `"120 Total"`.
+
+**Four faults travelled with the main one and each alone made the screen read as broken:**
+the journey cap at three maps (one AI call each, so every game past the second silently got
+no journey, and after a wipe the milestone agent iterated maps that no longer existed and
+produced nothing); the ladder derived before the badges; **eight of twenty rungs naming
+icons absent from `lib/constants/game-icons.ts`**, which the admin `GameIcon` renders as
+**raw text** rather than falling back; and the hard-coded header count, which also sat in
+the reset toast's fallback. `TIER_ICONS` is now **twenty distinct registry names**, with a
+test asserting both that every one resolves and that none repeats - the first repair
+paired them up and left rungs 12, 13 and 20 all wearing `crown`.
+
+**The fifth fault was the read half of R96a.** `getBadgeRequirement` appended the rarity
+trade floor to **every** badge regardless of scope, so a Games badge on `game_wins`
+advertised "25+ total trades (rare tier)" - the one thing the gate had just been fixed to
+stop demanding. `resolveDisplayedFloors` now branches on the registry scope. Because
+`badge-descriptions.ts` is client-reachable (**R58**) it cannot import the evaluator, so
+`RARITY_ACTIVITY_FLOORS` duplicates `RARITY_MIN_REQUIREMENTS` deliberately and
+`__tests__/utils/badge-requirement-scope.test.ts` **parses the evaluator's own table and
+asserts the two agree**. The **mixed** case keeps its floor on purpose: a badge listing
+trading *and* a provider key really does carry it, so hiding it there would understate a
+requirement that is genuinely enforced - the mirror image of the defect being fixed.
+
+**Harm, precisely:** **live, and a generation defect rather than a wrong payment.** No XP,
+level, badge or prize was ever computed wrongly - the system produced almost none of the
+content it reported producing, and **nothing was backfilled** because the rows were never
+written.
+
+**Files touched:** `lib/services/games/{gamification-economy,badge-blueprint,journey-blueprint}.ts`
+(mirrored), `apps/admin/lib/admin/neutral-level-ladder.ts`,
+`apps/admin/app/api/ai/gamification-wizard/route.ts`,
+`apps/admin/components/admin/{GamificationWizardSection,BadgeXPManagementSection}.tsx`,
+`lib/utils/badge-descriptions.ts`, `database/models/journey-{map-config,milestone}.model.ts`
+(both copies, `gameKey` / `gameTypes`), `lib/actions/badges/user-badges.actions.ts`,
+`components/profile/BadgesDisplay.tsx`, `app/(root)/journey/JourneyClient.tsx`.
+
+**Deviated from plan:** the blueprint writes **add-only** through `writeBadgesBatch`, so a
+catalogue an operator has already half-authored **will not be rebalanced** by running the
+wizard again. That is a deliberate scope line rather than an omission - overwriting tuned
+rows is the one outcome an operator pressing a "fill the gaps" button would not expect.
+
+**And a mirror note, because `check:mirrors` compares MODELS and has no opinion about any
+of the three generators.** `gamification-economy.ts`, `badge-blueprint.ts` and
+`journey-blueprint.ts` exist in both apps and their only guarantee is a byte-for-byte
+comparison in `__tests__/admin/r96b-gamification-orchestration.test.ts`, with a probe per
+file. The direction is what makes the drift dangerous rather than untidy: the **admin**
+copy is what runs when an operator presses the button, while the player app reads the main
+copy's quotas and thresholds - so the two would disagree about how much XP the catalogue
+can pay, silently, with a green `check:mirrors` beside them.
+
+**Gates:** 177 tests green across the touched suites, **27/27 orchestration probes and 7/7
+player-side probes red on exactly one failure**, `check:mirrors` OK, and the two
+typechecks measured **against a stashed baseline rather than against a recorded figure** -
+`git stash push --include-untracked`, re-run, restore - because the documented admin
+baseline of **223 is stale**: the real figure is **244 admin / 108 main**, identical with
+and without this change, with nothing in a touched file and, equally important, nothing
+disappearing. **Diff the lists and measure the baseline; never trust a number a document
+remembers** - this is the second time that baseline has drifted (it was corrected to 226 on
+15 September) and a stale one reads as a regression somebody then goes looking for.
+
+**Owner tested:** not yet. **`run_full` has still never been run against a real
+database**, so every guarantee here is from tests and probes, and nothing was verified by
+eye.
+
+**Next chat should:** have the owner run "start from scratch" once and read back the
+reported counts against the screen - the header, the badge total, the journey maps per
+game and the top rung's XP against `earnableXp`.
 
 ---
 

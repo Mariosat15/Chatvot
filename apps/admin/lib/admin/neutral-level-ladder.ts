@@ -14,6 +14,10 @@
  * replaced by a later run of the wizard.
  */
 
+// Reason: relative, never `@/` — vitest aliases `@` to the repository root, so
+// the aliased form resolves under `next build` and fails in the suite (R58).
+import { deriveLadderBands } from "../services/games/gamification-economy";
+
 export interface ProposedLevel {
   level: number;
   title: string;
@@ -73,69 +77,71 @@ const TIER_COLORS: readonly string[] = [
   "text-yellow-300",
 ] as const;
 
+/**
+ * Every name here must exist in `lib/constants/game-icons.ts`, and a test
+ * asserts it does.
+ *
+ * Reason: this list shipped with `medal1`, `diamond1` and `flame1`, none of
+ * which are in the registry — and the admin `GameIcon` renders an unknown name
+ * as raw text rather than falling back, so eight of the twenty rungs displayed
+ * the literal word "diamond1" beside the level. Nothing threw and nothing
+ * logged; the only witness was a screenshot.
+ *
+ * Twenty DISTINCT names, deliberately. The first repair paired them up, which
+ * left rungs 12, 13 and 20 all wearing `crown` — so the top of the ladder was
+ * indistinguishable from its middle, and a ladder whose last rung looks like
+ * its thirteenth gives a player nothing to recognise as an ending. A test
+ * asserts both that every name resolves and that no name repeats.
+ */
 const TIER_ICONS: readonly string[] = [
-  "starBadge",
+  "star1",
+  "star2",
+  "star3",
   "starBadge",
   "shield1",
-  "shield1",
-  "target",
-  "target",
-  "medal1",
-  "medal1",
+  "shield2",
+  "shield3",
+  "shield4",
+  "magicShield3D",
+  "medal7",
+  "goldMedal",
+  "starAward",
+  "trophy1",
+  "trophy2",
+  "trophy3",
   "trophy",
-  "trophy",
-  "crown",
-  "crown",
-  "crown",
-  "diamond1",
-  "diamond1",
-  "diamond1",
-  "flame1",
-  "flame1",
-  "flame1",
+  "trophyStar",
+  "gems",
+  "gemsAlt",
   "crown",
 ] as const;
 
 /**
- * Geometric XP curve. Each level costs ~1.35x the previous band, which keeps
- * early levels reachable from two or three badges while the top of the ladder
- * needs sustained play.
+ * Propose a ladder whose top rung is reachable from the XP the badge catalogue
+ * can actually pay.
+ *
+ * `earnableXp` comes from `earnableXpFromBadges`. Omitted, the curve falls back
+ * to the engine's default rather than the old hand-picked 1.35x growth, which
+ * ended at 426,400 XP against a catalogue paying a few thousand — Legend was
+ * unreachable by roughly a hundredfold and nothing compared the two halves.
  */
 export function proposeNeutralLadder(
   levelCount = NEUTRAL_TITLES.length,
-  firstBandXp = 500,
-  growth = 1.35,
+  earnableXp = 0,
 ): ProposedLevel[] {
   const count = Math.max(1, Math.min(NEUTRAL_TITLES.length, levelCount));
-  const levels: ProposedLevel[] = [];
+  const bands = deriveLadderBands(earnableXp, count);
 
-  let cursor = 0;
-  let band = firstBandXp;
-
-  for (let i = 0; i < count; i++) {
-    const isLast = i === count - 1;
-    const minXP = cursor;
-    // Round to a readable number so an operator editing the row is not fighting
-    // values like 1837.
-    const rounded = Math.max(100, Math.round(band / 100) * 100);
-    const maxXP = isLast ? Number.MAX_SAFE_INTEGER : minXP + rounded - 1;
-
-    levels.push({
-      level: i + 1,
-      // Reason: `.at()` rather than `[i]` so the type admits the out-of-range
-      // case the readonly array signature otherwise hides.
-      title: NEUTRAL_TITLES.at(i) ?? `Level ${i + 1}`,
-      minXP,
-      maxXP,
-      color: TIER_COLORS.at(i) ?? "text-gray-400",
-      icon: TIER_ICONS.at(i) ?? "starBadge",
-    });
-
-    cursor = minXP + rounded;
-    band = band * growth;
-  }
-
-  return levels;
+  return bands.map((band, i) => ({
+    level: band.level,
+    // Reason: `.at()` rather than `[i]` so the type admits the out-of-range
+    // case the readonly array signature otherwise hides.
+    title: NEUTRAL_TITLES.at(i) ?? `Level ${i + 1}`,
+    minXP: band.minXP,
+    maxXP: band.maxXP,
+    color: TIER_COLORS.at(i) ?? "text-gray-400",
+    icon: TIER_ICONS.at(i) ?? "starBadge",
+  }));
 }
 
 /** Titles carrying a game noun — a ladder failing this is trading-shaped. */

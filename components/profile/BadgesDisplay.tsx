@@ -39,6 +39,10 @@ const CATEGORIES: BadgeCategory[] = [
   "Risk",
   "Speed",
   "Consistency",
+  // Reason: "Volume" is a real BadgeCategory (lib/constants/badges.ts) and the
+  // stats payload counts it, so omitting it here made volume badges unreachable
+  // through the category filter.
+  "Volume",
   "Strategy",
   "Social",
   "Legendary",
@@ -60,6 +64,14 @@ export default function BadgesDisplay({ badges, stats, userLevel = 1 }: BadgesDi
     "All",
   );
   const [selectedBadge, setSelectedBadge] = useState<(Badge & { earned: boolean; earnedAt?: Date }) | null>(null);
+
+  // Reason: read through a Map rather than indexing `stats.categoryCount` by a
+  // variable. The key is a `BadgeCategory` so the index is safe, but a Map read
+  // is total without the compiler having to prove it, and a category the server
+  // has not sent yet reads as 0 instead of rendering "undefined earned".
+  const categoryCounts = new Map<string, number>(
+    Object.entries(stats.categoryCount),
+  );
 
   // Filter badges
   const filteredBadges = badges.filter((badge) => {
@@ -96,33 +108,13 @@ export default function BadgesDisplay({ badges, stats, userLevel = 1 }: BadgesDi
     }
   };
 
-  const getCategoryIcon = (
-    category: BadgeCategory,
-    iconSize: number = 32,
-  ) => {
-    switch (category) {
-      case "Competition":
-        return <GameIcon name="trophy" size={iconSize} />;
-      case "Trading":
-        return <GameIcon name="profit" size={iconSize} />;
-      case "Profit":
-        return <GameIcon name="coin" size={iconSize} />;
-      case "Risk":
-        return <GameIcon name="shield1" size={iconSize} />;
-      case "Speed":
-        return <GameIcon name="blueFireSpell" size={iconSize} />;
-      case "Consistency":
-        return <GameIcon name="target" size={iconSize} />;
-      case "Strategy":
-        return <GameIcon name="guideBook" size={iconSize} />;
-      case "Social":
-        return <GameIcon name="animal1" size={iconSize} />;
-      case "Legendary":
-        return <GameIcon name="crown" size={iconSize} />;
-      default:
-        return <GameIcon name="starAward" size={iconSize} />;
-    }
-  };
+  // Reason: `getCategoryIcon` used to live here — defined, never called, and with
+  // no `Games` arm, so a games badge would have fallen through to the generic
+  // star the moment somebody wired it up. Deleted rather than given an arm, on
+  // the `shouldBlockEntry` precedent: a dead helper that is wrong for the newest
+  // case is an invitation to reintroduce the defect in one line that reads like
+  // using an existing API. Category artwork is rendered from `getRarityIcon` and
+  // the badge's own `icon` field.
 
   return (
     <div className="space-y-6">
@@ -207,7 +199,7 @@ export default function BadgesDisplay({ badges, stats, userLevel = 1 }: BadgesDi
                   value={category}
                   className="text-white"
                 >
-                  {category} ({stats.categoryCount[category]} earned)
+                  {category} ({categoryCounts.get(category) ?? 0} earned)
                 </SelectItem>
               ))}
             </SelectContent>
