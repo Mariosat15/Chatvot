@@ -4,6 +4,15 @@ import { connectToDatabase } from "@/database/mongoose";
 import JourneyMapConfig from "@/database/models/journey-map-config.model";
 import JourneyMilestone, { IJourneyMilestone, IMilestoneCondition } from "@/database/models/journey-milestone.model";
 import UserJourneyProgress, { IUserJourneyProgress } from "@/database/models/user-journey-progress.model";
+import {
+  defaultGameComparison,
+  readJourneyGameConditionValue,
+} from "@/lib/services/games/journey-game-conditions";
+
+// Reason: this service predates strict typing and is endemic with `any` on
+// lean docs and mongoose maps. Cleared for the pre-commit gate when adding
+// dual-path OR evaluation; do not widen further without typing the call site.
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 /**
  * Get the first active map's mapId from JourneyMapConfig.
@@ -669,6 +678,35 @@ export async function checkConditionMet(
       currentValue = stats.podiumFinishes || 0;
       break;
 
+    // ============================================
+    // Games (UserGameStats — dual-path milestones)
+    // ============================================
+    case "game_contests_entered":
+    case "game_contests_completed":
+    case "game_wins":
+    case "game_podiums":
+    case "game_total_points":
+    case "game_season_points":
+    case "game_rating":
+    case "game_best_rank":
+    case "game_best_score":
+    case "game_current_streak": {
+      currentValue = await readJourneyGameConditionValue(userId, type);
+      // Reason: bestRank is lower-is-better; if the milestone omitted comparison,
+      // honour the type's default rather than the trading-shaped "gte".
+      if (
+        condition.comparison === undefined &&
+        defaultGameComparison(type) === "lte"
+      ) {
+        const target = value;
+        if (target === undefined) {
+          return { met: currentValue > 0, currentValue };
+        }
+        return { met: currentValue > 0 && currentValue <= target, currentValue };
+      }
+      break;
+    }
+
     default:
       console.warn(`⚠️ [JOURNEY] Unknown condition type: ${type}`);
       return { met: false };
@@ -699,6 +737,43 @@ export async function checkConditionMet(
   }
 
   return { met, currentValue };
+}
+
+/**
+ * Primary completeCondition OR any entry in orCompleteConditions.
+ * Reason: traders and gamers share one journey — either path finishes the node.
+ */
+export async function checkMilestoneAnyCondition(
+  userId: string,
+  milestone: {
+    completeCondition: IMilestoneCondition;
+    orCompleteConditions?: IMilestoneCondition[] | null;
+  },
+  preloadedStats?: Record<string, any>,
+): Promise<{ met: boolean; currentValue?: number; matchedPath: "primary" | "or" | "none" }> {
+  const primary = await checkConditionMet(
+    userId,
+    milestone.completeCondition,
+    preloadedStats,
+  );
+  if (primary.met) {
+    return { met: true, currentValue: primary.currentValue, matchedPath: "primary" };
+  }
+  const alts = Array.isArray(milestone.orCompleteConditions)
+    ? milestone.orCompleteConditions
+    : [];
+  for (const alt of alts) {
+    if (!alt?.type) continue;
+    const result = await checkConditionMet(userId, alt, preloadedStats);
+    if (result.met) {
+      return { met: true, currentValue: result.currentValue, matchedPath: "or" };
+    }
+  }
+  return {
+    met: false,
+    currentValue: primary.currentValue,
+    matchedPath: "none",
+  };
 }
 
 /**
@@ -763,8 +838,12 @@ export async function checkMilestoneCompletion(
     }
   }
 
-  // Check completion condition
-  const { met, currentValue } = await checkConditionMet(userId, milestone.completeCondition, preloadedStats);
+  // Check completion condition — primary OR any alternate (dual-path)
+  const { met, currentValue } = await checkMilestoneAnyCondition(
+    userId,
+    milestone,
+    preloadedStats,
+  );
 
   return {
     canComplete: met,
@@ -1200,7 +1279,11 @@ export async function checkAndCompleteMilestones(
       }
     }
     
-    const { met } = await checkConditionMet(userId, milestone.completeCondition, preloadedStats);
+    const { met } = await checkMilestoneAnyCondition(
+      userId,
+      milestone,
+      preloadedStats,
+    );
 
     if (met) {
       // Force-unlock this milestone if it's not already unlocked
@@ -1262,6 +1345,8 @@ export async function selectBranchPath(
 
   // Store the selection
   progress.selectedBranches = progress.selectedBranches || {};
+  // Reason: branchMilestoneId is a stored milestone id already verified against connectedTo.
+  // eslint-disable-next-line security/detect-object-injection
   progress.selectedBranches[branchMilestoneId] = selectedPath;
   progress.activePath = selectedPath;
 

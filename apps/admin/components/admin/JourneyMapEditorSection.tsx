@@ -118,6 +118,13 @@ interface Milestone {
     comparison?: string;
     badgeId?: string;
   };
+  /** Alternate completion paths (OR). Gamers use these when trading is not their path. */
+  orCompleteConditions?: Array<{
+    type: string;
+    value?: number;
+    comparison?: string;
+    badgeId?: string;
+  }>;
   rewards: {
     xp: number;
     badgeId?: string;
@@ -246,6 +253,18 @@ const CONDITION_TYPES = [
   { value: "legend_rank_1", label: "Legend: 1st Place Finishes", category: "competitions" },
   { value: "legend_hall_of_fame", label: "Legend: Hall of Fame (Podiums)", category: "competitions" },
   { value: "perfect_day", label: "Perfect Day (All Profitable)", category: "performance" },
+
+  // Games (UserGameStats) — dual-path OR alternatives for gamers
+  { value: "game_contests_entered", label: "Game Contests Entered", category: "gaming" },
+  { value: "game_contests_completed", label: "Game Contests Completed", category: "gaming" },
+  { value: "game_wins", label: "Game Wins", category: "gaming" },
+  { value: "game_podiums", label: "Game Podiums", category: "gaming" },
+  { value: "game_total_points", label: "Game Total Points", category: "gaming" },
+  { value: "game_season_points", label: "Game Season Points", category: "gaming" },
+  { value: "game_rating", label: "Game Rating", category: "gaming" },
+  { value: "game_best_rank", label: "Game Best Rank (≤)", category: "gaming" },
+  { value: "game_best_score", label: "Game Best Score", category: "gaming" },
+  { value: "game_current_streak", label: "Game Current Streak", category: "gaming" },
 ];
 
 // Milestone templates for varied generation
@@ -416,6 +435,8 @@ export default function JourneyMapEditorSection() {
   const [syncingAllUsers, setSyncingAllUsers] = useState(false);
   const [savingDefaults, setSavingDefaults] = useState(false);
   const [allBadges, setAllBadges] = useState<BadgeOption[]>([]);
+  const [journeysEnabled, setJourneysEnabled] = useState(true);
+  const [journeysToggleSaving, setJourneysToggleSaving] = useState(false);
   
   // Milestone counts per map (admin can customize)
   const [mapMilestoneCounts, setMapMilestoneCounts] = useState<Record<number, number>>({
@@ -1331,6 +1352,51 @@ export default function JourneyMapEditorSection() {
     };
     fetchBadges();
   }, []);
+
+  useEffect(() => {
+    const loadJourneyToggle = async () => {
+      try {
+        const res = await fetch("/api/journey/settings");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (typeof data.enabled === "boolean") {
+          setJourneysEnabled(data.enabled);
+        }
+      } catch {
+        // Fail open — leave default true
+      }
+    };
+    void loadJourneyToggle();
+  }, []);
+
+  const toggleJourneysEnabled = async (enabled: boolean) => {
+    setJourneysToggleSaving(true);
+    const previous = journeysEnabled;
+    setJourneysEnabled(enabled);
+    try {
+      const res = await fetch("/api/journey/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setJourneysEnabled(previous);
+        toast.error(data.error || "Failed to update journey system");
+        return;
+      }
+      toast.success(
+        enabled
+          ? "Journey maps are visible to players"
+          : "Journey maps are hidden from players",
+      );
+    } catch {
+      setJourneysEnabled(previous);
+      toast.error("Failed to update journey system");
+    } finally {
+      setJourneysToggleSaving(false);
+    }
+  };
 
   // Update milestone position (local state)
   const updateMilestonePosition = (id: string, x: number, y: number) => {
@@ -2591,6 +2657,132 @@ export default function JourneyMapEditorSection() {
                 </div>
               </div>
 
+              {/* OR Gaming / Alternate Paths */}
+              <div className="bg-slate-900/50 rounded-lg p-4 border border-emerald-800/60">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <Target className="h-5 w-5 text-emerald-500" />
+                    OR Alternate Paths
+                  </h3>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      const existing = selectedMilestone.orCompleteConditions || [];
+                      setSelectedMilestone({
+                        ...selectedMilestone,
+                        orCompleteConditions: [
+                          ...existing,
+                          { type: "game_contests_completed", value: 1, comparison: "gte" },
+                        ],
+                      });
+                    }}
+                  >
+                    Add Gaming Path
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Any one of these conditions also completes the milestone (alongside the primary).
+                  Use this so traders OR gamers can proceed.
+                </p>
+                {(selectedMilestone.orCompleteConditions || []).length === 0 ? (
+                  <p className="text-sm text-slate-500">No alternate paths — trading-only for this node.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {(selectedMilestone.orCompleteConditions || []).map((alt, altIdx) => (
+                      <div key={`or-${altIdx}`} className="grid grid-cols-4 gap-3 items-end">
+                        <div className="space-y-1">
+                          <Label>Type</Label>
+                          <Select
+                            value={alt.type}
+                            onValueChange={value => {
+                              const next = [...(selectedMilestone.orCompleteConditions || [])];
+                              next[altIdx] = { ...next[altIdx], type: value };
+                              setSelectedMilestone({
+                                ...selectedMilestone,
+                                orCompleteConditions: next,
+                              });
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {CONDITION_TYPES.filter(ct => ct.category === "gaming" || ct.category === "competitions" || ct.category === "progression").map(ct => (
+                                <SelectItem key={ct.value} value={ct.value}>
+                                  {ct.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Value</Label>
+                          <Input
+                            type="number"
+                            value={alt.value ?? ""}
+                            onChange={e => {
+                              const next = [...(selectedMilestone.orCompleteConditions || [])];
+                              next[altIdx] = {
+                                ...next[altIdx],
+                                value: e.target.value ? parseInt(e.target.value, 10) : undefined,
+                              };
+                              setSelectedMilestone({
+                                ...selectedMilestone,
+                                orCompleteConditions: next,
+                              });
+                            }}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Comparison</Label>
+                          <Select
+                            value={alt.comparison || "gte"}
+                            onValueChange={value => {
+                              const next = [...(selectedMilestone.orCompleteConditions || [])];
+                              next[altIdx] = { ...next[altIdx], comparison: value };
+                              setSelectedMilestone({
+                                ...selectedMilestone,
+                                orCompleteConditions: next,
+                              });
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="gte">≥</SelectItem>
+                              <SelectItem value="gt">&gt;</SelectItem>
+                              <SelectItem value="eq">=</SelectItem>
+                              <SelectItem value="lte">≤</SelectItem>
+                              <SelectItem value="lt">&lt;</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="text-red-400"
+                          onClick={() => {
+                            const next = (selectedMilestone.orCompleteConditions || []).filter(
+                              (_, i) => i !== altIdx,
+                            );
+                            setSelectedMilestone({
+                              ...selectedMilestone,
+                              orCompleteConditions: next,
+                            });
+                          }}
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {/* Rewards */}
               <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700">
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
@@ -3074,10 +3266,20 @@ export default function JourneyMapEditorSection() {
             Journey Map Editor
           </h2>
           <p className="text-muted-foreground">
-            Configure the trader's journey progression map - drag milestones to position them
+            Configure dual-path journey maps — traders and gamers can both progress
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 items-center">
+          <div className="flex items-center gap-2 mr-2 px-3 py-2 rounded-md border border-slate-700 bg-slate-900/60">
+            <Switch
+              checked={journeysEnabled}
+              disabled={journeysToggleSaving}
+              onCheckedChange={(checked) => void toggleJourneysEnabled(checked)}
+            />
+            <Label className="text-sm whitespace-nowrap">
+              {journeysEnabled ? "Journeys ON" : "Journeys OFF"}
+            </Label>
+          </div>
           <Button onClick={() => setGeneratorOpen(true)} className="bg-purple-600 hover:bg-purple-700">
             <Wand2 className="h-4 w-4 mr-2" />
             Generate Map

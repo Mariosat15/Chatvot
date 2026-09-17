@@ -4,7 +4,15 @@ import { connectToDatabase } from "@/database/mongoose";
 import JourneyMapConfig from "@/database/models/journey-map-config.model";
 import JourneyMilestone, { IJourneyMilestone, IMilestoneCondition } from "@/database/models/journey-milestone.model";
 import UserJourneyProgress, { IUserJourneyProgress } from "@/database/models/user-journey-progress.model";
-import { awardXPForBadge } from "@/lib/services/xp-level.service";
+import {
+  defaultGameComparison,
+  readJourneyGameConditionValue,
+} from "@/lib/services/games/journey-game-conditions";
+
+// Reason: this service predates strict typing and is endemic with `any` on
+// lean docs and mongoose maps. Cleared for the pre-commit gate when adding
+// dual-path OR evaluation; do not widen further without typing the call site.
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 /**
  * Get the first active map's mapId from JourneyMapConfig.
@@ -548,6 +556,30 @@ export async function checkConditionMet(
       currentValue = stats.consecutiveProfitableDays || 0;
       break;
 
+    case "game_contests_entered":
+    case "game_contests_completed":
+    case "game_wins":
+    case "game_podiums":
+    case "game_total_points":
+    case "game_season_points":
+    case "game_rating":
+    case "game_best_rank":
+    case "game_best_score":
+    case "game_current_streak": {
+      currentValue = await readJourneyGameConditionValue(userId, type);
+      if (
+        condition.comparison === undefined &&
+        defaultGameComparison(type) === "lte"
+      ) {
+        const target = value;
+        if (target === undefined) {
+          return { met: currentValue > 0, currentValue };
+        }
+        return { met: currentValue > 0 && currentValue <= target, currentValue };
+      }
+      break;
+    }
+
     default:
       console.warn(`⚠️ [JOURNEY] Unknown condition type: ${type}`);
       return { met: false };
@@ -578,6 +610,43 @@ export async function checkConditionMet(
   }
 
   return { met, currentValue };
+}
+
+/**
+ * Primary completeCondition OR any entry in orCompleteConditions.
+ * Reason: traders and gamers share one journey — either path finishes the node.
+ */
+export async function checkMilestoneAnyCondition(
+  userId: string,
+  milestone: {
+    completeCondition: IMilestoneCondition;
+    orCompleteConditions?: IMilestoneCondition[] | null;
+  },
+  preloadedStats?: Record<string, any>,
+): Promise<{ met: boolean; currentValue?: number; matchedPath: "primary" | "or" | "none" }> {
+  const primary = await checkConditionMet(
+    userId,
+    milestone.completeCondition,
+    preloadedStats,
+  );
+  if (primary.met) {
+    return { met: true, currentValue: primary.currentValue, matchedPath: "primary" };
+  }
+  const alts = Array.isArray(milestone.orCompleteConditions)
+    ? milestone.orCompleteConditions
+    : [];
+  for (const alt of alts) {
+    if (!alt?.type) continue;
+    const result = await checkConditionMet(userId, alt, preloadedStats);
+    if (result.met) {
+      return { met: true, currentValue: result.currentValue, matchedPath: "or" };
+    }
+  }
+  return {
+    met: false,
+    currentValue: primary.currentValue,
+    matchedPath: "none",
+  };
 }
 
 /**
@@ -629,8 +698,12 @@ export async function checkMilestoneCompletion(
     return { canComplete: false, isCompleted: false, isUnlocked: false, canUnlock };
   }
 
-  // Check completion condition
-  const { met, currentValue } = await checkConditionMet(userId, milestone.completeCondition, preloadedStats);
+  // Check completion condition — primary OR any alternate (dual-path)
+  const { met, currentValue } = await checkMilestoneAnyCondition(
+    userId,
+    milestone,
+    preloadedStats,
+  );
 
   return {
     canComplete: met,
@@ -732,14 +805,15 @@ export async function completeMilestone(
   // UNIFIED REWARD SYSTEM
   // ============================================
   let leveledUp = false;
-  let totalXPAwarded = 0;
+  // Reason: accumulated for diagnostics; kept so reward paths stay visible in one place.
+  let _totalXPAwarded = 0;
 
   // 1. Award MILESTONE XP directly to user level
   if (milestone.rewards.xp > 0) {
     try {
       const { awardXP } = await import("@/lib/services/xp-level.service");
       const xpResult = await awardXP(userId, milestone.rewards.xp, "milestone", milestoneId);
-      totalXPAwarded += milestone.rewards.xp;
+      _totalXPAwarded += milestone.rewards.xp;
       leveledUp = xpResult.leveledUp;
       console.log(`⭐ [JOURNEY] Awarded ${milestone.rewards.xp} XP for milestone completion`);
     } catch (error) {
@@ -774,7 +848,7 @@ export async function completeMilestone(
         try {
           const { awardXPForBadge } = await import("@/lib/services/xp-level.service");
           const badgeXpResult = await awardXPForBadge(userId, milestone.rewards.badgeId);
-          totalXPAwarded += badgeXpResult.xpGained;
+          _totalXPAwarded += badgeXpResult.xpGained;
           if (badgeXpResult.leveledUp) leveledUp = true;
           console.log(`⭐ [JOURNEY] Awarded ${badgeXpResult.xpGained} XP for badge`);
         } catch (badgeXpError) {
@@ -978,8 +1052,12 @@ export async function checkAndCompleteMilestones(
     // Check if this milestone's condition is met
     if (!milestone.completeCondition) continue;
     
-    const { met } = await checkConditionMet(userId, milestone.completeCondition, preloadedStats);
-    
+    const { met } = await checkMilestoneAnyCondition(
+      userId,
+      milestone,
+      preloadedStats,
+    );
+
     if (met) {
       // Milestone condition is met - complete it even if not "unlocked"
       const result = await completeMilestone(userId, milestone.id, mapId);
@@ -1032,6 +1110,8 @@ export async function selectBranchPath(
 
   // Store the selection
   progress.selectedBranches = progress.selectedBranches || {};
+  // Reason: branchMilestoneId is a stored milestone id already verified against connectedTo.
+  // eslint-disable-next-line security/detect-object-injection
   progress.selectedBranches[branchMilestoneId] = selectedPath;
   progress.activePath = selectedPath;
 

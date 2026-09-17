@@ -68,6 +68,7 @@ export default function JourneyClient({ userId }: JourneyClientProps) {
   // "asked, and none exist". The old `loading` flag is deliberately gone rather than left
   // write-only: a flag nothing reads is an invitation to re-gate the skeleton on it.
   const [mapsResolved, setMapsResolved] = useState(false);
+  const [journeysEnabled, setJourneysEnabled] = useState(true);
   const [currentMapIndex, setCurrentMapIndex] = useState(1);
   const [maps, setMaps] = useState<MapData[]>([]);
   const [currentMapConfig, setCurrentMapConfig] = useState<MapConfig | null>(null);
@@ -90,6 +91,9 @@ export default function JourneyClient({ userId }: JourneyClientProps) {
         const data = await res.json();
         if (data.success && data.maps) {
           setMaps(data.maps);
+        }
+        if (typeof data.journeysEnabled === "boolean") {
+          setJourneysEnabled(data.journeysEnabled);
         }
       } catch (error) {
         console.error("Error fetching maps:", error);
@@ -250,16 +254,20 @@ export default function JourneyClient({ userId }: JourneyClientProps) {
           <CardHeader>
             <CardTitle className="flex items-center gap-3">
               <Map className="h-6 w-6 text-amber-400" />
-              Your Trading Journey
+              Your Journey
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-muted-foreground">
-              No journey maps found. Please ask an admin to generate the journey.
+              {journeysEnabled === false
+                ? "The journey system is currently turned off. Check back later."
+                : "No journey maps found. Please ask an admin to generate the journey."}
             </p>
-            <Button variant="outline" onClick={() => window.location.reload()}>
-              Try again
-            </Button>
+            {journeysEnabled !== false && (
+              <Button variant="outline" onClick={() => window.location.reload()}>
+                Try again
+              </Button>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -273,10 +281,10 @@ export default function JourneyClient({ userId }: JourneyClientProps) {
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-3">
             <Map className="h-8 w-8 text-amber-400" />
-            Your Trading Journey
+            Your Journey
           </h1>
           <p className="text-muted-foreground mt-1">
-            Complete milestones to earn XP and unlock new maps
+            Complete trading or gaming milestones to earn XP and unlock new maps
           </p>
         </div>
         <div className="flex items-center gap-4">

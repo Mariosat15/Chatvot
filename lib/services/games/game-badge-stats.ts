@@ -15,8 +15,10 @@ export interface GameBadgeStatsRow {
   wins: number;
   podiums: number;
   totalPoints: number;
+  seasonPoints: number;
   rating: number;
   bestRank: number;
+  bestScore: number;
   currentStreak: number;
 }
 
@@ -26,8 +28,10 @@ const EMPTY: GameBadgeStatsRow = {
   wins: 0,
   podiums: 0,
   totalPoints: 0,
+  seasonPoints: 0,
   rating: 0,
   bestRank: 0,
+  bestScore: 0,
   currentStreak: 0,
 };
 
@@ -37,8 +41,10 @@ function rowFromDoc(doc: {
   wins?: number;
   podiums?: number;
   totalPoints?: number;
+  seasonPoints?: number;
   rating?: number;
   bestRank?: number;
+  bestScore?: number;
   currentStreak?: number;
 } | null): GameBadgeStatsRow {
   if (!doc) return { ...EMPTY };
@@ -48,8 +54,10 @@ function rowFromDoc(doc: {
     wins: doc.wins || 0,
     podiums: doc.podiums || 0,
     totalPoints: doc.totalPoints || 0,
+    seasonPoints: doc.seasonPoints || 0,
     rating: doc.rating || 0,
     bestRank: doc.bestRank || 0,
+    bestScore: doc.bestScore || 0,
     currentStreak: doc.currentStreak || 0,
   };
 }

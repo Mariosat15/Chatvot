@@ -31,8 +31,10 @@ export interface BadgeConditionDef {
     | "wins"
     | "podiums"
     | "totalPoints"
+    | "seasonPoints"
     | "rating"
     | "bestRank"
+    | "bestScore"
     | "currentStreak";
 }
 
@@ -143,6 +145,13 @@ export const BADGE_CONDITION_DEFS: readonly BadgeConditionDef[] = [
     gameStat: "totalPoints",
   },
   {
+    type: "game_season_points",
+    label: "Game Season Points",
+    group: "Games",
+    scope: "game",
+    gameStat: "seasonPoints",
+  },
+  {
     type: "game_rating",
     label: "Game Rating",
     group: "Games",
@@ -155,6 +164,13 @@ export const BADGE_CONDITION_DEFS: readonly BadgeConditionDef[] = [
     group: "Games",
     scope: "game",
     gameStat: "bestRank",
+  },
+  {
+    type: "game_best_score",
+    label: "Game Best Score",
+    group: "Games",
+    scope: "game",
+    gameStat: "bestScore",
   },
   {
     type: "game_current_streak",

@@ -36,7 +36,7 @@ const journey = buildJourneyBlueprint(plan, { earnableBadgeXp: 12_000 });
 
 describe("journey blueprint produces documents the schemas accept", () => {
   it("generates at least one map and its milestones", () => {
-    expect(journey.maps.length).toBeGreaterThan(0);
+    expect(journey.maps.length).toBe(10);
     expect(journey.milestones.length).toBeGreaterThan(0);
   });
 

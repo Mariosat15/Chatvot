@@ -54,6 +54,13 @@ export interface IJourneyMilestone extends Document {
   size: "small" | "medium" | "large";
   unlockCondition?: IMilestoneCondition;
   completeCondition: IMilestoneCondition;
+  /**
+   * Alternate completion paths evaluated as OR against `completeCondition`.
+   * Reason: traders and gamers share one journey — a node that only asks for
+   * trades locks games-only players out forever with no error. Empty / absent
+   * means the primary condition alone decides.
+   */
+  orCompleteConditions?: IMilestoneCondition[];
   rewards: IMilestoneReward;
   connectedTo: string[];
   connectedFrom: string[];
@@ -160,6 +167,10 @@ const JourneyMilestoneSchema = new Schema<IJourneyMilestone>(
     completeCondition: {
       type: MilestoneConditionSchema,
       required: true,
+    },
+    orCompleteConditions: {
+      type: [MilestoneConditionSchema],
+      default: [],
     },
     rewards: {
       type: MilestoneRewardSchema,

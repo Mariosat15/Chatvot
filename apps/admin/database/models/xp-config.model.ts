@@ -1,7 +1,11 @@
 import mongoose, { Schema, Document, Model } from "mongoose";
 
 export interface IXPConfig extends Document {
-  configType: "badge_xp" | "level_progression" | "leaderboard_weights";
+  configType:
+    | "badge_xp"
+    | "level_progression"
+    | "leaderboard_weights"
+    | "journey_settings";
   data: {
     // For badge_xp type
     common?: number;
@@ -25,6 +29,9 @@ export interface IXPConfig extends Document {
     // 100, so a set that does not add up is corrected rather than refused.
     // See `lib/services/leaderboard/global-score.ts` for the definition.
     weights?: Record<string, number>;
+
+    // For journey_settings — master switch for the player journey system.
+    enabled?: boolean;
   };
   isActive: boolean;
   createdAt: Date;
@@ -38,7 +45,12 @@ const XPConfigSchema = new Schema<IXPConfig>(
       required: true,
       // Reason: a Mongoose enum is ADD-ONLY. Removing a value orphans every
       // document already storing it.
-      enum: ["badge_xp", "level_progression", "leaderboard_weights"],
+      enum: [
+        "badge_xp",
+        "level_progression",
+        "leaderboard_weights",
+        "journey_settings",
+      ],
       unique: true,
     },
     data: {

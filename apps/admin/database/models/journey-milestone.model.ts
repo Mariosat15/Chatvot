@@ -54,6 +54,13 @@ export interface IJourneyMilestone extends Document {
   size: "small" | "medium" | "large";
   unlockCondition?: IMilestoneCondition;
   completeCondition: IMilestoneCondition;
+  /**
+   * Alternate completion paths evaluated as OR against `completeCondition`.
+   * Reason: traders and gamers share one journey — a node that only asks for
+   * trades locks games-only players out forever with no error. Empty / absent
+   * means the primary condition alone decides.
+   */
+  orCompleteConditions?: IMilestoneCondition[];
   rewards: IMilestoneReward;
   connectedTo: string[];
   connectedFrom: string[];
@@ -67,9 +74,9 @@ export interface IJourneyMilestone extends Document {
   isSeasonal: boolean;
   seasonStart?: Date;
   seasonEnd?: Date;
-  seasonTag?: string;
+  seasonTag?: string; // e.g. "winter_2026", "ramadan_2026"
   // Badge-gated: milestone requires specific badges before it can be unlocked
-  requiredBadgeIds: string[];
+  requiredBadgeIds: string[]; // Array of badge IDs that must be earned
   // Which game(s) this milestone belongs to. Absent means platform-wide.
   // Reason: read by analyseMilestoneCoverage — without it a single game-scoped
   // milestone credits every catalogue game and coverage reads as complete.
@@ -107,8 +114,6 @@ const JourneyMilestoneSchema = new Schema<IJourneyMilestone>(
     id: {
       type: String,
       required: true,
-      unique: true,
-      index: true,
     },
     mapId: {
       type: String,
@@ -163,6 +168,10 @@ const JourneyMilestoneSchema = new Schema<IJourneyMilestone>(
       type: MilestoneConditionSchema,
       required: true,
     },
+    orCompleteConditions: {
+      type: [MilestoneConditionSchema],
+      default: [],
+    },
     rewards: {
       type: MilestoneRewardSchema,
       required: true,
@@ -210,7 +219,7 @@ const JourneyMilestoneSchema = new Schema<IJourneyMilestone>(
       type: Date,
     },
     seasonTag: {
-      type: String,
+      type: String, // e.g. "winter_2026", "ramadan_2026"
     },
     // Badge-gated: all listed badges must be earned before this milestone unlocks
     requiredBadgeIds: {
@@ -229,6 +238,8 @@ const JourneyMilestoneSchema = new Schema<IJourneyMilestone>(
   }
 );
 
+// Compound unique: milestone ID is unique PER MAP (not globally)
+JourneyMilestoneSchema.index({ id: 1, mapId: 1 }, { unique: true });
 // Index for efficient queries
 JourneyMilestoneSchema.index({ mapId: 1, zoneId: 1 });
 JourneyMilestoneSchema.index({ mapId: 1, order: 1 });
