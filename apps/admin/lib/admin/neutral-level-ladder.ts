@@ -122,11 +122,13 @@ export function proposeNeutralLadder(
 
     levels.push({
       level: i + 1,
-      title: NEUTRAL_TITLES[i],
+      // Reason: `.at()` rather than `[i]` so the type admits the out-of-range
+      // case the readonly array signature otherwise hides.
+      title: NEUTRAL_TITLES.at(i) ?? `Level ${i + 1}`,
       minXP,
       maxXP,
-      color: TIER_COLORS[i] ?? "text-gray-400",
-      icon: TIER_ICONS[i] ?? "starBadge",
+      color: TIER_COLORS.at(i) ?? "text-gray-400",
+      icon: TIER_ICONS.at(i) ?? "starBadge",
     });
 
     cursor = minXP + rounded;

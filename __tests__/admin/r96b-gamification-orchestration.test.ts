@@ -224,8 +224,10 @@ describe("neutral level ladder (R96b)", () => {
     const levels = proposeNeutralLadder();
     expect(levels.length).toBeGreaterThan(1);
     for (let i = 1; i < levels.length; i++) {
-      expect(levels[i]!.minXP).toBeGreaterThan(levels[i - 1]!.minXP);
-      expect(levels[i]!.minXP).toBe(levels[i - 1]!.maxXP + 1);
+      const previous = levels.at(i - 1)!;
+      const current = levels.at(i)!;
+      expect(current.minXP).toBeGreaterThan(previous.minXP);
+      expect(current.minXP).toBe(previous.maxXP + 1);
     }
     expect(levels[0]!.minXP).toBe(0);
     expect(levels[levels.length - 1]!.maxXP).toBe(Number.MAX_SAFE_INTEGER);
@@ -425,11 +427,17 @@ describe("rebuild-from-scratch (R96b)", () => {
   it("keeps player-earned rows unless asked, and reports how many it orphaned", () => {
     // Deleting the design does not make an earned badge untrue.
     expect(service).toMatch(/includePlayerProgress\s*=\s*false/);
-    for (const collection of ["UserBadge", "UserLevel", "UserJourneyProgress"]) {
-      expect(service).toMatch(
-        new RegExp(`orphanedPlayerProgress\\.\\w+\\s*=\\s*await ${collection}\\.countDocuments`),
-      );
-    }
+    // Literal patterns, one per collection: a constructed RegExp here would let
+    // a typo in the collection name compile into a pattern that matches nothing.
+    expect(service).toMatch(
+      /orphanedPlayerProgress\.\w+\s*=\s*await UserBadge\.countDocuments/,
+    );
+    expect(service).toMatch(
+      /orphanedPlayerProgress\.\w+\s*=\s*await UserLevel\.countDocuments/,
+    );
+    expect(service).toMatch(
+      /orphanedPlayerProgress\.\w+\s*=\s*await UserJourneyProgress\.countDocuments/,
+    );
   });
 
   it("wipes and rebuilds in ONE run, with the wipe before anything is read", () => {

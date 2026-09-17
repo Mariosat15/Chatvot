@@ -58,9 +58,14 @@ $UI       = 'apps/admin/components/admin/GamificationWizardSection.tsx'
 # ── Coverage ─────────────────────────────────────────────────────────────────
 
 # 1 — credit platform badges to every game, so a brand-new title reports covered
+#
+#     Re-aimed 17 Sep 2026: the rarity writes moved behind `addCount` when the
+#     module's object-injection warnings were cleared, so the old anchor
+#     (`platformHave[rarity] += 1;`) reported "DID NOT APPLY" — which reads like
+#     a broken harness rather than a moved target. The claim is unchanged.
 Invoke-Probe -Name 'platform-credited-to-games' -File $COVERAGE `
-  -Find 'platformHave[rarity] += 1;' `
-  -Replace 'platformHave[rarity] += 1; for (const row of perGame.values()) row[rarity] += 1;' `
+  -Find 'addCount(platformHave, rarity);' `
+  -Replace 'addCount(platformHave, rarity); for (const row of perGame.values()) addCount(row, rarity);' `
   -ExpectTest 'does not credit a platform badge to any game'
 
 # 2 — stop inferring per-game scope from a game_* milestone condition

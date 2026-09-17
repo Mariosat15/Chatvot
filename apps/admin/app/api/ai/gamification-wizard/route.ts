@@ -32,7 +32,9 @@ import {
   analyseMilestoneCoverage,
   DEFAULT_BADGE_XP,
   type BadgeXpByRarity,
+  type CoverageBadge,
   type CoverageGameRef,
+  type CoverageMilestone,
 } from "@/lib/services/games/gamification-coverage";
 import {
   auditLadder,
@@ -41,12 +43,73 @@ import {
 import { gameConditionTypesForPrompt } from "@/lib/services/games/badge-condition-registry";
 import {
   ALL_GAMIFICATION_RESET_SCOPES,
-  GAMIFICATION_RESET_CONFIRMATION,
   resetGamification,
 } from "@/lib/services/gamification-reset.service";
 
 // Allow up to 2 minutes for AI agents
 export const maxDuration = 120;
+
+// ─── DRAFT SHAPES ──────────────────────────────────────────────────────────────
+// Reason: everything on this route arrives either from a language model or from
+// a `.lean()` read, so nothing here is a validated document. The drafts below
+// say exactly that: the fields this file reads are optional and everything else
+// is `unknown`, which is what `sanitizeBadgeForWrite` and the validation in
+// `writeBadgesBatch` narrow before anything is written.
+
+interface BadgeConditionDraft {
+  type?: string;
+  value?: unknown;
+  comparison?: string;
+  minTrades?: number;
+  minCompletedCompetitions?: number;
+  [key: string]: unknown;
+}
+
+interface BadgeDraft {
+  id?: string;
+  name?: string;
+  description?: string;
+  category?: string;
+  rarity?: string;
+  icon?: string;
+  minLevel?: number;
+  gameTypes?: string[];
+  condition?: BadgeConditionDraft;
+  /** Written by the badge agent to mark a proposal as new or amended. */
+  _isNew?: boolean;
+  _changes?: string;
+  [key: string]: unknown;
+}
+
+interface MilestoneDraft {
+  id?: string;
+  mapId?: string;
+  name?: string;
+  nodeType?: string;
+  order?: number;
+  completeCondition?: { type?: string; value?: unknown; [key: string]: unknown };
+  requiredBadgeIds?: string[];
+  rewards?: { xp?: number; badgeId?: string; [key: string]: unknown };
+  [key: string]: unknown;
+}
+
+/** XP awarded per badge rarity, as stored under the `badge_xp` XP config. */
+interface BadgeXPTable {
+  common: number;
+  rare: number;
+  epic: number;
+  legendary: number;
+}
+
+interface MapDraft {
+  mapId?: string;
+  name?: string;
+  theme?: string;
+  difficulty?: string | number;
+  sequenceOrder?: number;
+  totalMilestones?: number;
+  [key: string]: unknown;
+}
 
 // ─── AI CONFIG ─────────────────────────────────────────────────────────────────
 interface AIConfig { apiKey: string | null; model: string; enabled: boolean }
@@ -85,7 +148,7 @@ const dbTools = {
     return JourneyMapConfig.find({}).sort({ sequenceOrder: 1 }).lean();
   },
   async writeBadgesBatch(
-    badges: any[],
+    badges: unknown[],
     options: {
       /** Default add-only: never overwrite existing ids. Pass "replace" to upsert. */
       mode?: "add-only" | "replace";
@@ -121,7 +184,8 @@ const dbTools = {
       "Legendary",
     ];
 
-    for (const badge of badges) {
+    for (const row of badges) {
+      const badge = row as BadgeDraft;
       try {
         const sanitized = sanitizeBadgeForWrite(
           badge as Record<string, unknown>,
@@ -135,7 +199,7 @@ const dbTools = {
           continue;
         }
 
-        const clean = sanitized.badge as any;
+        const clean = sanitized.badge as BadgeDraft;
 
         // ── Validation ──
         if (!clean.id || typeof clean.id !== "string") {
@@ -214,7 +278,7 @@ const dbTools = {
             continue;
           }
           // ── Surgical update (replace mode only) ──
-          const updateDoc: any = {
+          const updateDoc: Record<string, unknown> = {
             minLevel,
           };
           if (clean.name) updateDoc.name = clean.name;
@@ -224,8 +288,13 @@ const dbTools = {
           if (clean.rarity) updateDoc.rarity = clean.rarity;
           if (Array.isArray(clean.gameTypes)) updateDoc.gameTypes = clean.gameTypes;
           if (clean.condition) {
+            // Reason: a hydrated subdocument has to be flattened before it can
+            // be spread, or the stored condition's own keys are lost.
+            const stored = existing.condition as
+              | { toObject?: () => Record<string, unknown> }
+              | undefined;
             updateDoc.condition = {
-              ...((existing as any).condition?.toObject?.() || (existing as any).condition || {}),
+              ...(stored?.toObject?.() ?? stored ?? {}),
               ...clean.condition,
             };
           }
@@ -271,11 +340,20 @@ const dbTools = {
     }
     return results;
   },
-  async writeMilestonesBatch(milestones: any[]) {
+  async writeMilestonesBatch(milestones: unknown[]) {
     const results = { created: 0, updated: 0, errors: 0 };
-    for (const ms of milestones) {
+    for (const row of milestones) {
+      const ms = row as MilestoneDraft;
       try {
-        const { _changes, _isNew, _id, __v, createdAt, updatedAt, ...clean } = ms;
+        const {
+          _changes: _c,
+          _isNew: _n,
+          _id: _i,
+          __v: _v,
+          createdAt: _created,
+          updatedAt: _updated,
+          ...clean
+        } = ms;
         const existing = await JourneyMilestone.findOne({ id: clean.id, mapId: clean.mapId });
         if (existing) {
           await JourneyMilestone.findOneAndUpdate({ id: clean.id, mapId: clean.mapId }, clean);
@@ -310,7 +388,7 @@ const dbTools = {
       return { badgeXP: badgeXP?.data, levels: levels?.data?.levels };
     } catch { return null; }
   },
-  async writeXPConfig(configType: string, data: any) {
+  async writeXPConfig(configType: string, data: unknown) {
     try {
       const db = (await connectToDatabase()).connection.db;
       if (!db) return null;
@@ -339,20 +417,20 @@ const dbTools = {
 // ─── COMPACT FORMAT HELPERS ─────────────────────────────────────────────────────
 // Instead of pretty JSON, use compact CSV-like format to cut prompt size by ~70%
 
-function badgesToCompact(badges: any[]): string {
+function badgesToCompact(badges: unknown[]): string {
   // One line per badge: id|name|category|rarity|minLevel|icon|condType|condValue|condComp|minTrades|minComps
   const header = "id|name|cat|rarity|minLvl|icon|condType|condVal|comp|minTrades|minComps";
-  const lines = (badges as any[]).map((b) => {
+  const lines = (badges as BadgeDraft[]).map((b) => {
     const c = b.condition || {};
     return `${b.id}|${b.name}|${b.category}|${b.rarity}|${b.minLevel || 0}|${b.icon || ""}|${c.type || "manual"}|${c.value ?? ""}|${c.comparison || "gte"}|${c.minTrades || 0}|${c.minCompletedCompetitions || 0}`;
   });
   return [header, ...lines].join("\n");
 }
 
-function milestonesToCompact(milestones: any[]): string {
+function milestonesToCompact(milestones: unknown[]): string {
   // One line per milestone: id|mapId|name|nodeType|order|condType|condValue|xpReward|badgeGates
   const header = "id|mapId|name|nodeType|order|condType|condVal|xpReward|requiredBadgeIds";
-  const lines = (milestones as any[]).map((m) => {
+  const lines = (milestones as MilestoneDraft[]).map((m) => {
     const c = m.completeCondition || {};
     const gates = (m.requiredBadgeIds || []).join(",");
     return `${m.id}|${m.mapId}|${m.name}|${m.nodeType || "milestone"}|${m.order || 0}|${c.type || ""}|${c.value ?? ""}|${m.rewards?.xp || 0}|${gates}`;
@@ -382,7 +460,20 @@ Return ONLY valid JSON. No markdown.`;
 // (gamification-engine.ts) — instant, deterministic, no AI, no timeouts.
 
 // ─── JSON PARSER (with repair) ──────────────────────────────────────────────────
-function parseAIJSON(content: string): any {
+/**
+ * Narrow a parsed model reply to a plain object.
+ *
+ * Reason: `parseAIJSON` can return an array, a primitive or `null`, and every
+ * caller then reads named fields off it. Doing the check once here is what lets
+ * the callers stay free of `any`.
+ */
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function parseAIJSON(content: string): unknown {
   const cleaned = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
   try {
     return JSON.parse(cleaned);
@@ -441,9 +532,13 @@ async function computeCoverage() {
   ]);
 
   const games = coverageGames(catalogue);
-  const badgeCoverage = analyseBadgeCoverage(badges as any[], games);
-  const milestoneCoverage = analyseMilestoneCoverage(milestones as any[], games);
-  const parity = analyseGamesOnlyParity(badges as any[], games, badgeXp);
+  const coverageBadges = badges as CoverageBadge[];
+  const badgeCoverage = analyseBadgeCoverage(coverageBadges, games);
+  const milestoneCoverage = analyseMilestoneCoverage(
+    milestones as CoverageMilestone[],
+    games,
+  );
+  const parity = analyseGamesOnlyParity(coverageBadges, games, badgeXp);
 
   const storedLevels = Array.isArray(xpConfig?.levels) ? xpConfig.levels : [];
   const ladder = {
@@ -539,10 +634,10 @@ async function runBadgeAgent(
       };
       const allBadgesRaw = await BadgeConfig.find({ isActive: true }).lean();
       let iconFixCount = 0;
-      for (const b of allBadgesRaw as any[]) {
-        const icon = b.icon;
+      for (const b of allBadgesRaw as (BadgeDraft & { _id: unknown })[]) {
+        const icon = typeof b.icon === "string" ? b.icon : "";
         if (!icon || !isValidGameIconName(icon)) {
-          const fallback = CATEGORY_ICON_MAP[b.category] || "starBadge";
+          const fallback = CATEGORY_ICON_MAP[b.category || ""] || "starBadge";
           await BadgeConfig.updateOne({ _id: b._id }, { $set: { icon: fallback } });
           iconFixCount++;
         }
@@ -565,7 +660,7 @@ Prefer ADDITIVE fixes — return only badges that need changes or are new. Do no
       // Find which badges milestones reference (protect these)
       const milestones = await dbTools.readAllMilestones();
       const referencedIds = new Set<string>();
-      for (const m of milestones as any[]) {
+      for (const m of milestones as MilestoneDraft[]) {
         if (m.requiredBadgeIds) for (const bid of m.requiredBadgeIds) referencedIds.add(bid);
         if (m.rewards?.badgeId) referencedIds.add(m.rewards.badgeId);
       }
@@ -606,8 +701,13 @@ Return JSON:
         max_tokens: 6000,
       });
 
-      const parsed = parseAIJSON(completion.choices[0]?.message?.content || "{}");
-      if (!parsed || !parsed.badges) {
+      const parsed = asRecord(
+        parseAIJSON(completion.choices[0]?.message?.content || "{}"),
+      );
+      const proposed = Array.isArray(parsed?.badges)
+        ? (parsed.badges as BadgeDraft[])
+        : null;
+      if (!proposed) {
         return {
           ok: false as const,
           error: "Badge agent returned invalid response",
@@ -616,23 +716,26 @@ Return JSON:
       }
 
       let writeResults = null;
-      if (autoApply && Array.isArray(parsed.badges) && parsed.badges.length > 0) {
-        writeResults = await dbTools.writeBadgesBatch(parsed.badges, {
+      if (autoApply && proposed.length > 0) {
+        writeResults = await dbTools.writeBadgesBatch(proposed, {
           mode: mode === "replace" ? "replace" : "add-only",
           knownKeys,
         });
       }
 
-      const existingIds = new Set((badges as any[]).map((b) => b.id));
-      const plan = planBadgesByScope(parsed.badges, existingIds);
+      const existingIds = new Set(
+        (badges as BadgeDraft[]).map((b) => b.id).filter(Boolean) as string[],
+      );
+      const plan = planBadgesByScope(proposed, existingIds);
 
       return {
         ok: true as const,
         action: "agent_badges",
-        badges: parsed.badges,
-        summary: parsed.summary || "",
-        fixedCount: parsed.fixedCount || parsed.badges.filter((b: any) => b._changes).length,
-        newCount: parsed.newCount || parsed.badges.filter((b: any) => b._isNew).length,
+        badges: proposed,
+        summary: parsed?.summary || "",
+        fixedCount:
+          parsed?.fixedCount || proposed.filter((b) => b._changes).length,
+        newCount: parsed?.newCount || proposed.filter((b) => b._isNew).length,
         totalBadges: badges.length,
         applied: autoApply,
         writeResults,
@@ -668,8 +771,9 @@ async function runMilestoneAgent(
 
       // If no mapId, process the FIRST map that has milestones (not all at once)
       let targetMapId = mapId;
-      if (!targetMapId && (maps as any[]).length > 0) {
-        targetMapId = (maps as any[])[0].mapId;
+      const mapRows = maps as MapDraft[];
+      if (!targetMapId && mapRows.length > 0) {
+        targetMapId = mapRows[0]?.mapId;
       }
 
       const milestones = targetMapId
@@ -691,12 +795,12 @@ async function runMilestoneAgent(
       }
 
       // Compact badge list for context (IDs, names, and condition types for smarter gating)
-      const badgeContext = (badges as any[]).map((b) =>
+      const badgeContext = (badges as BadgeDraft[]).map((b) =>
         `${b.id}("${b.name}",${b.rarity},Lv${b.minLevel || 0},${b.condition?.type || "manual"})`
       ).join(", ");
 
       const compactMilestones = milestonesToCompact(milestones);
-      const mapInfo = (maps as any[]).find((m) => m.mapId === targetMapId);
+      const mapInfo = mapRows.find((m) => m.mapId === targetMapId);
 
       // Reason (R96b): the milestone prompt named trading metrics only, so every
       // milestone it proposed asked a puzzle player for trades. The catalogue and
@@ -749,8 +853,11 @@ Return JSON:
         max_tokens: 6000,
       });
 
-      const parsed = parseAIJSON(completion.choices[0]?.message?.content || "{}");
-      if (!parsed || !parsed.milestones) {
+      const parsed = asRecord(parseAIJSON(completion.choices[0]?.message?.content || "{}"));
+      const proposed = Array.isArray(parsed?.milestones)
+        ? (parsed.milestones as MilestoneDraft[])
+        : null;
+      if (!proposed) {
         return {
           ok: false as const,
           error: "Milestone agent returned invalid response",
@@ -759,17 +866,17 @@ Return JSON:
       }
 
       let writeResults = null;
-      if (autoApply && Array.isArray(parsed.milestones) && parsed.milestones.length > 0) {
-        writeResults = await dbTools.writeMilestonesBatch(parsed.milestones);
+      if (autoApply && proposed.length > 0) {
+        writeResults = await dbTools.writeMilestonesBatch(proposed);
       }
 
       return {
         ok: true as const,
         action: "agent_milestones",
-        milestones: parsed.milestones,
-        summary: parsed.summary || "",
-        fixedCount: parsed.fixedCount || parsed.milestones.length,
-        badgeGatesAdded: parsed.badgeGatesAdded || 0,
+        milestones: proposed,
+        summary: parsed?.summary || "",
+        fixedCount: parsed?.fixedCount || proposed.length,
+        badgeGatesAdded: parsed?.badgeGatesAdded || 0,
         totalMilestones: milestones.length,
         mapId: targetMapId,
         applied: autoApply,
@@ -833,17 +940,31 @@ async function applyAutoFixes() {
       let badgeWriteResults = null;
 
       if (fixes.badgeFixes.length > 0) {
-        // Group fixes by badge ID
-        const fixesByBadge: Record<string, Record<string, any>> = {};
+        // Group fixes by badge ID.
+        // Reason: the keys are badge ids and field names taken from the engine's
+        // own output, so they are indexed in a Map rather than an object — an
+        // object lookup walks the prototype chain and `"constructor"` returns
+        // something truthy that survives a `!target` test.
+        const fixesByBadge = new Map<string, Map<string, unknown>>();
         for (const fix of fixes.badgeFixes) {
-          if (!fixesByBadge[fix.id]) fixesByBadge[fix.id] = {};
+          let target = fixesByBadge.get(fix.id);
+          if (!target) {
+            target = new Map<string, unknown>();
+            fixesByBadge.set(fix.id, target);
+          }
           // Handle nested fields like "condition.minTrades"
           const parts = fix.field.split(".");
           if (parts.length === 2) {
-            if (!fixesByBadge[fix.id][parts[0]]) fixesByBadge[fix.id][parts[0]] = {};
-            fixesByBadge[fix.id][parts[0]][parts[1]] = fix.newValue;
+            const head = parts[0] as string;
+            const tail = parts[1] as string;
+            let nested = target.get(head);
+            if (!(nested instanceof Map)) {
+              nested = new Map<string, unknown>();
+              target.set(head, nested);
+            }
+            (nested as Map<string, unknown>).set(tail, fix.newValue);
           } else {
-            fixesByBadge[fix.id][fix.field] = fix.newValue;
+            target.set(fix.field, fix.newValue);
           }
         }
 
@@ -851,22 +972,22 @@ async function applyAutoFixes() {
         let applied = 0;
         let errors = 0;
         let notFound = 0;
-        for (const [badgeId, updates] of Object.entries(fixesByBadge)) {
+        for (const [badgeId, updates] of fixesByBadge) {
           try {
             // For condition sub-fields, merge with existing
-            const setDoc: any = {};
-            for (const [key, val] of Object.entries(updates)) {
-              if (key === "condition" && typeof val === "object") {
-                for (const [subKey, subVal] of Object.entries(val as Record<string, any>)) {
-                  setDoc[`condition.${subKey}`] = subVal;
+            const setDoc = new Map<string, unknown>();
+            for (const [key, val] of updates) {
+              if (key === "condition" && val instanceof Map) {
+                for (const [subKey, subVal] of val) {
+                  setDoc.set(`condition.${subKey}`, subVal);
                 }
               } else {
-                setDoc[key] = val;
+                setDoc.set(key, val);
               }
             }
             const result = await BadgeConfig.findOneAndUpdate(
               { id: badgeId },
-              { $set: setDoc },
+              { $set: Object.fromEntries(setDoc) },
               { new: true },
             );
             if (result) {
@@ -874,12 +995,12 @@ async function applyAutoFixes() {
             } else {
               notFound++;
             }
-          } catch (err: any) {
+          } catch (err) {
             console.error(`[Wizard] auto_fix badge error for ${badgeId}: ${err}`);
             errors++;
           }
         }
-        badgeWriteResults = { applied, errors, notFound, total: Object.keys(fixesByBadge).length };
+        badgeWriteResults = { applied, errors, notFound, total: fixesByBadge.size };
       }
 
       // Apply milestone fixes
@@ -900,7 +1021,7 @@ async function applyAutoFixes() {
             } else {
               notFound++;
             }
-          } catch (err: any) {
+          } catch (err) {
             console.error(`[Wizard] auto_fix milestone error for ${fix.id}: ${err}`);
             errors++;
           }
@@ -942,17 +1063,32 @@ export async function POST(request: NextRequest) {
         dbTools.readXPConfig(),
       ]);
 
-      const badgesByCategory: Record<string, Record<string, number>> = {};
-      const badgesByRarity: Record<string, number> = { common: 0, rare: 0, epic: 0, legendary: 0 };
+      // Reason: category and rarity names arrive from stored documents, so the
+      // tallies are held in a Map rather than an object. An object lookup walks
+      // the prototype chain, where `"constructor"` returns something truthy that
+      // survives the `!counts` test below.
+      const emptyRarityCounts = () =>
+        new Map<string, number>([
+          ["common", 0],
+          ["rare", 0],
+          ["epic", 0],
+          ["legendary", 0],
+        ]);
+      const badgesByCategory = new Map<string, Map<string, number>>();
+      const badgesByRarity = emptyRarityCounts();
       const badgesWithMinLevel = { withGate: 0, withoutGate: 0 };
       const badgesZeroBaseline: string[] = [];
 
-      for (const b of badges as any[]) {
+      for (const b of badges as BadgeDraft[]) {
         const cat = b.category || "Unknown";
         const rar = b.rarity || "common";
-        if (!badgesByCategory[cat]) badgesByCategory[cat] = { common: 0, rare: 0, epic: 0, legendary: 0 };
-        badgesByCategory[cat][rar] = (badgesByCategory[cat][rar] || 0) + 1;
-        badgesByRarity[rar] = (badgesByRarity[rar] || 0) + 1;
+        let catCounts = badgesByCategory.get(cat);
+        if (!catCounts) {
+          catCounts = emptyRarityCounts();
+          badgesByCategory.set(cat, catCounts);
+        }
+        catCounts.set(rar, (catCounts.get(rar) ?? 0) + 1);
+        badgesByRarity.set(rar, (badgesByRarity.get(rar) ?? 0) + 1);
         if ((b.minLevel || 0) > 0) badgesWithMinLevel.withGate++;
         else badgesWithMinLevel.withoutGate++;
         const mt = b.condition?.minTrades || 0;
@@ -962,29 +1098,38 @@ export async function POST(request: NextRequest) {
           conditionScope(b.condition?.type || "") === "trading" &&
           (b.category || "") !== "Games";
         if (tradingScoped && mt === 0 && rar !== "common") {
-          badgesZeroBaseline.push(b.id);
+          badgesZeroBaseline.push(b.id ?? "unknown");
         } else if (
           (b.category || "") === "Competition" &&
           mc === 0 &&
           rar !== "common"
         ) {
-          badgesZeroBaseline.push(b.id);
+          badgesZeroBaseline.push(b.id ?? "unknown");
         }
       }
 
-      const milestonesByMap: Record<string, number> = {};
+      const milestonesByMap = new Map<string, number>();
       let milestonesWithBadgeGate = 0;
-      for (const m of milestones as any[]) {
-        milestonesByMap[m.mapId || "unknown"] = (milestonesByMap[m.mapId || "unknown"] || 0) + 1;
-        if (m.requiredBadgeIds?.length > 0) milestonesWithBadgeGate++;
+      for (const m of milestones as MilestoneDraft[]) {
+        const mapId = m.mapId || "unknown";
+        milestonesByMap.set(mapId, (milestonesByMap.get(mapId) ?? 0) + 1);
+        if ((m.requiredBadgeIds?.length ?? 0) > 0) milestonesWithBadgeGate++;
       }
 
       return NextResponse.json({
         success: true,
         status: {
-          badges: { total: badges.length, byCategory: badgesByCategory, byRarity: badgesByRarity, levelGating: badgesWithMinLevel, zeroBaselineRisks: badgesZeroBaseline },
-          milestones: { total: milestones.length, byMap: milestonesByMap, withBadgeGate: milestonesWithBadgeGate },
-          maps: { total: maps.length, list: (maps as any[]).map((m) => ({ mapId: m.mapId, name: m.name, theme: m.theme, difficulty: m.difficulty, sequenceOrder: m.sequenceOrder, totalMilestones: m.totalMilestones })) },
+          badges: {
+            total: badges.length,
+            byCategory: Object.fromEntries(
+              [...badgesByCategory].map(([cat, counts]) => [cat, Object.fromEntries(counts)]),
+            ),
+            byRarity: Object.fromEntries(badgesByRarity),
+            levelGating: badgesWithMinLevel,
+            zeroBaselineRisks: badgesZeroBaseline,
+          },
+          milestones: { total: milestones.length, byMap: Object.fromEntries(milestonesByMap), withBadgeGate: milestonesWithBadgeGate },
+          maps: { total: maps.length, list: (maps as MapDraft[]).map((m) => ({ mapId: m.mapId, name: m.name, theme: m.theme, difficulty: m.difficulty, sequenceOrder: m.sequenceOrder, totalMilestones: m.totalMilestones })) },
           xp: { configured: !!xpConfig?.badgeXP, badgeXP: xpConfig?.badgeXP || { common: 10, rare: 25, epic: 50, legendary: 100 } },
         },
       });
@@ -995,14 +1140,18 @@ export async function POST(request: NextRequest) {
     // ═══════════════════════════════════════════════════════════════════════════
     if (action === "setup_levels") {
       const { preset, badgeXP, levels } = body;
-      const presets: Record<string, { badgeXP: any; description: string }> = {
-        conservative: { badgeXP: { common: 5, rare: 15, epic: 35, legendary: 75 }, description: "Slower progression." },
-        balanced: { badgeXP: { common: 10, rare: 25, epic: 50, legendary: 100 }, description: "Default balanced." },
-        aggressive: { badgeXP: { common: 15, rare: 35, epic: 75, legendary: 150 }, description: "Faster progression." },
-      };
-      if (preset && presets[preset]) {
-        await dbTools.writeXPConfig("badge_xp", presets[preset].badgeXP);
-        return NextResponse.json({ success: true, message: `Applied "${preset}": ${presets[preset].description}`, badgeXP: presets[preset].badgeXP });
+      // Reason: `preset` is caller-supplied, so it is resolved through a Map. An
+      // object lookup walks the prototype chain and `presets["constructor"]`
+      // returns something truthy that would survive the `presets[preset]` test.
+      const presets = new Map<string, { badgeXP: BadgeXPTable; description: string }>([
+        ["conservative", { badgeXP: { common: 5, rare: 15, epic: 35, legendary: 75 }, description: "Slower progression." }],
+        ["balanced", { badgeXP: { common: 10, rare: 25, epic: 50, legendary: 100 }, description: "Default balanced." }],
+        ["aggressive", { badgeXP: { common: 15, rare: 35, epic: 75, legendary: 150 }, description: "Faster progression." }],
+      ]);
+      const chosen = typeof preset === "string" ? presets.get(preset) : undefined;
+      if (chosen) {
+        await dbTools.writeXPConfig("badge_xp", chosen.badgeXP);
+        return NextResponse.json({ success: true, message: `Applied "${preset}": ${chosen.description}`, badgeXP: chosen.badgeXP });
       }
       if (badgeXP) await dbTools.writeXPConfig("badge_xp", badgeXP);
       if (levels) await dbTools.writeXPConfig("level_progression", levels);
@@ -1037,7 +1186,9 @@ export async function POST(request: NextRequest) {
         );
       }
       const existing = await dbTools.readAllBadges();
-      const existingIds = new Set((existing as any[]).map((b) => b.id));
+      const existingIds = new Set(
+        (existing as BadgeDraft[]).map((b) => b.id).filter((id): id is string => !!id),
+      );
       const catalogue = await loadCatalogueGameRefs();
       const knownKeys = knownGameKeys(catalogue);
 
@@ -1076,7 +1227,7 @@ export async function POST(request: NextRequest) {
         milestones: milestonesToApply,
         mode = "add-only",
       } = body;
-      const results: any = {};
+      const results: Record<string, unknown> = {};
       if (Array.isArray(badgesToApply) && badgesToApply.length > 0) {
         results.badges = await dbTools.writeBadgesBatch(badgesToApply, {
           mode: mode === "replace" ? "replace" : "add-only",

@@ -96,5 +96,9 @@ export function gameStatValue(
   gameKey: string,
   field: keyof GameBadgeStatsRow,
 ): number {
+  // Reason: `field` is a keyof union, so the lookup cannot reach the prototype
+  // chain — there is no narrower typing to reach for, and the row is a plain
+  // object built by `rowFromDoc`, never the caller's.
+  // eslint-disable-next-line security/detect-object-injection
   return map.get(gameKey)?.[field] ?? 0;
 }

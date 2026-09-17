@@ -519,14 +519,13 @@ export default function BadgeXPManagementSection() {
       .sort((a, b) => a.level - b.level)
       .map((l, idx) => ({ ...l, level: idx + 1 }));
     // Re-stitch maxXP of each rung to the next minXP so the ladder stays contiguous.
-    for (let i = 0; i < remaining.length - 1; i++) {
-      remaining[i].maxXP = remaining[i + 1].minXP - 1;
-    }
-    if (remaining.length > 0) {
-      const top = remaining[remaining.length - 1];
-      if (typeof top.maxXP !== "number" || top.maxXP < top.minXP) {
-        top.maxXP = top.minXP + 999;
-      }
+    remaining.forEach((rung, idx) => {
+      const next = remaining.at(idx + 1);
+      if (next) rung.maxXP = next.minXP - 1;
+    });
+    const top = remaining.at(-1);
+    if (top && (typeof top.maxXP !== "number" || top.maxXP < top.minXP)) {
+      top.maxXP = top.minXP + 999;
     }
     setLevels(remaining);
   };

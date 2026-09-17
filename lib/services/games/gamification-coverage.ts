@@ -76,16 +76,37 @@ function normaliseRarity(rarity: string | undefined): BadgeRarity {
     : "common";
 }
 
+/*
+ * Every rarity lookup in this module goes through these two helpers.
+ *
+ * Reason: `RarityCounts` is a closed `Record<BadgeRarity, number>` and the key
+ * is always either a member of `BADGE_RARITIES` or the output of
+ * `normaliseRarity`, which cannot return anything else — so the lookup can
+ * never reach the prototype chain and a `Map` would buy nothing but a shape
+ * change across the engine, the wizard and the UI that read these records.
+ * Routing the access through two functions keeps that argument in one place
+ * rather than repeating it at ten call sites.
+ */
+function readCount(counts: RarityCounts, rarity: BadgeRarity): number {
+  // eslint-disable-next-line security/detect-object-injection
+  return counts[rarity];
+}
+
+function addCount(counts: RarityCounts, rarity: BadgeRarity, by = 1): void {
+  // eslint-disable-next-line security/detect-object-injection
+  counts[rarity] += by;
+}
+
 function deficit(have: RarityCounts, want: RarityCounts): RarityCounts {
   const out = emptyCounts();
   for (const r of BADGE_RARITIES) {
-    out[r] = Math.max(0, want[r] - have[r]);
+    addCount(out, r, Math.max(0, readCount(want, r) - readCount(have, r)));
   }
   return out;
 }
 
 function sumCounts(counts: RarityCounts): number {
-  return BADGE_RARITIES.reduce((acc, r) => acc + counts[r], 0);
+  return BADGE_RARITIES.reduce((acc, r) => acc + readCount(counts, r), 0);
 }
 
 // ─── Badge coverage ──────────────────────────────────────────────────────────
@@ -138,21 +159,21 @@ export function analyseBadgeCoverage(
         const row = perGame.get(key);
         // Reason: a badge scoped to a title that has left the catalogue still
         // exists and is still earned — it is simply not part of any gap.
-        if (row) row[rarity] += 1;
+        if (row) addCount(row, rarity);
       }
-      if (types.includes(TRADING_GAME_TYPE)) tradingHave[rarity] += 1;
+      if (types.includes(TRADING_GAME_TYPE)) addCount(tradingHave, rarity);
       continue;
     }
 
     if (types.length === 0) {
-      platformHave[rarity] += 1;
+      addCount(platformHave, rarity);
       continue;
     }
 
     if (types.includes(TRADING_GAME_TYPE)) {
-      tradingHave[rarity] += 1;
+      addCount(tradingHave, rarity);
       const row = perGame.get(TRADING_GAME_TYPE);
-      if (row) row[rarity] += 1;
+      if (row) addCount(row, rarity);
     }
   }
 
@@ -302,7 +323,7 @@ export function analyseGamesOnlyParity(
 
   for (const b of badges) {
     const rarity = normaliseRarity(b.rarity);
-    const xp = badgeXp[rarity] ?? 0;
+    const xp = readCount(badgeXp, rarity) ?? 0;
     const conditionType = b.condition?.type || "";
 
     if (

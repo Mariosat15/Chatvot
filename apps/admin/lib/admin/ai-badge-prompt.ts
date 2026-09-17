@@ -144,7 +144,15 @@ export function sanitizeBadgeForWrite(
   raw: Record<string, unknown>,
   knownKeys: Set<string>,
 ): BadgeWriteSanitizeResult {
-  const { _changes, _isNew, _id, __v, createdAt, updatedAt, ...rest } = raw as Record<
+  const {
+    _changes,
+    _isNew,
+    _id,
+    __v,
+    createdAt: _createdAt,
+    updatedAt: _updatedAt,
+    ...rest
+  } = raw as Record<
     string,
     unknown
   > & { condition?: Record<string, unknown> };
@@ -205,7 +213,10 @@ export function planBadgesByScope(
 } {
   const wouldCreate: Array<{ id: string; name?: string; scope: string }> = [];
   const wouldSkipExisting: string[] = [];
-  const byScope: Record<string, number> = {};
+  // Reason: the key is a joined gameTypes list from model output, so it is
+  // counted in a Map — an object lookup walks the prototype chain and
+  // "constructor" would arrive as a truthy count.
+  const byScope = new Map<string, number>();
 
   for (const b of badges) {
     if (!b.id) continue;
@@ -218,8 +229,12 @@ export function planBadgesByScope(
       continue;
     }
     wouldCreate.push({ id: b.id, name: b.name, scope: scopeLabel });
-    byScope[scopeLabel] = (byScope[scopeLabel] || 0) + 1;
+    byScope.set(scopeLabel, (byScope.get(scopeLabel) ?? 0) + 1);
   }
 
-  return { wouldCreate, wouldSkipExisting, byScope };
+  return {
+    wouldCreate,
+    wouldSkipExisting,
+    byScope: Object.fromEntries(byScope),
+  };
 }

@@ -18,6 +18,74 @@ import JourneyMapConfig from "@/database/models/journey-map-config.model";
 import { evaluateSystem, generateFixes, type BadgeData, type MilestoneData, type MapData } from "@/lib/gamification-engine";
 import { guardSection } from "@/lib/admin/section-route-guard";
 
+/*
+  The fields this route reads off a `.lean()` document.
+
+  Reason: `.lean()` skips hydration and returns the raw document, so a
+  hand-written shape is a claim the compiler checks against *this* interface
+  rather than against the schema (R32/R33). They are kept to fields the badge and
+  milestone schemas actually declare, and the mappers below supply the same
+  defaults the previous `any` casts did — so this is a typing change, never a
+  behaviour one.
+*/
+interface LeanBadgeRow {
+  id: string;
+  name: string;
+  category: string;
+  rarity: string;
+  minLevel?: number;
+  condition?: BadgeData["condition"];
+  gameTypes?: unknown;
+}
+
+interface LeanMilestoneRow {
+  id?: string;
+  _id?: { toString(): string };
+  mapId: string;
+  name: string;
+  nodeType: string;
+  order?: number;
+  completeCondition?: MilestoneData["completeCondition"];
+  rewards?: MilestoneData["rewards"];
+  requiredBadgeIds?: string[];
+}
+
+interface LeanMapRow {
+  mapId: string;
+  name: string;
+  difficulty?: number;
+  sequenceOrder?: number;
+}
+
+function toBadgeData(rows: LeanBadgeRow[]): BadgeData[] {
+  return rows.map((b) => ({
+    id: b.id,
+    name: b.name,
+    category: b.category,
+    rarity: b.rarity,
+    minLevel: b.minLevel || 0,
+    condition: b.condition || ({} as BadgeData["condition"]),
+    // Reason (R96b): engine skips minTrades for non-trading scopes / Games.
+    gameTypes: Array.isArray(b.gameTypes)
+      ? (b.gameTypes as string[])
+      : undefined,
+  }));
+}
+
+function toMilestoneData(rows: LeanMilestoneRow[]): MilestoneData[] {
+  return rows.map((m) => ({
+    id: m.id || m._id?.toString() || "",
+    mapId: m.mapId,
+    name: m.name,
+    nodeType: m.nodeType,
+    order: m.order || 0,
+    completeCondition:
+      m.completeCondition || ({} as MilestoneData["completeCondition"]),
+    rewards: m.rewards || { xp: 0 },
+    requiredBadgeIds: m.requiredBadgeIds || [],
+  }));
+}
+
 export async function POST(request: NextRequest) {
   /*
     Guarded 8 September 2026, with the other four routes under `app/api/ai/`. None of the five
@@ -47,35 +115,24 @@ export async function POST(request: NextRequest) {
         JourneyMapConfig.find({}).lean(),
       ]);
 
-      const badgeData: BadgeData[] = (badges as any[]).map((b) => ({
-        id: b.id,
-        name: b.name,
-        category: b.category,
-        rarity: b.rarity,
-        minLevel: b.minLevel || 0,
-        condition: b.condition || {},
-        // Reason (R96b): engine skips minTrades for non-trading scopes / Games.
-        gameTypes: Array.isArray(b.gameTypes) ? b.gameTypes : undefined,
-      }));
+      const badgeData: BadgeData[] = toBadgeData(
+        badges as unknown as LeanBadgeRow[],
+      );
 
-      const milestoneData: MilestoneData[] = (milestones as any[]).map((m) => ({
-        id: m.id || m._id?.toString(),
-        mapId: m.mapId,
-        name: m.name,
-        nodeType: m.nodeType,
-        order: m.order || 0,
-        completeCondition: m.completeCondition || {},
-        rewards: m.rewards || { xp: 0 },
-        requiredBadgeIds: m.requiredBadgeIds || [],
-      }));
+      const milestoneData: MilestoneData[] = toMilestoneData(
+        milestones as unknown as LeanMilestoneRow[],
+      );
 
-      const mapData: MapData[] = (mapConfigs as any[]).map((m) => ({
-        mapId: m.mapId,
-        name: m.name,
-        difficulty: m.difficulty || 1,
-        sequenceOrder: m.sequenceOrder || 0,
-        totalMilestones: milestoneData.filter(ms => ms.mapId === m.mapId).length,
-      }));
+      const mapData: MapData[] = (mapConfigs as unknown as LeanMapRow[]).map(
+        (m) => ({
+          mapId: m.mapId,
+          name: m.name,
+          difficulty: m.difficulty || 1,
+          sequenceOrder: m.sequenceOrder || 0,
+          totalMilestones: milestoneData.filter((ms) => ms.mapId === m.mapId)
+            .length,
+        }),
+      );
 
       const evaluation = evaluateSystem(badgeData, milestoneData, mapData);
 
@@ -112,27 +169,13 @@ export async function POST(request: NextRequest) {
         ).lean(),
       ]);
 
-      const badgeData: BadgeData[] = (badges as any[]).map((b) => ({
-        id: b.id,
-        name: b.name,
-        category: b.category,
-        rarity: b.rarity,
-        minLevel: b.minLevel || 0,
-        condition: b.condition || {},
-        // Reason (R96b): engine skips minTrades for non-trading scopes / Games.
-        gameTypes: Array.isArray(b.gameTypes) ? b.gameTypes : undefined,
-      }));
+      const badgeData: BadgeData[] = toBadgeData(
+        badges as unknown as LeanBadgeRow[],
+      );
 
-      const milestoneData: MilestoneData[] = (milestones as any[]).map((m) => ({
-        id: m.id || m._id?.toString(),
-        mapId: m.mapId,
-        name: m.name,
-        nodeType: m.nodeType,
-        order: m.order || 0,
-        completeCondition: m.completeCondition || {},
-        rewards: m.rewards || { xp: 0 },
-        requiredBadgeIds: m.requiredBadgeIds || [],
-      }));
+      const milestoneData: MilestoneData[] = toMilestoneData(
+        milestones as unknown as LeanMilestoneRow[],
+      );
 
       const fixes = generateFixes(badgeData, milestoneData);
 
@@ -142,7 +185,7 @@ export async function POST(request: NextRequest) {
       const results = { applied: 0, skipped: 0, errors: 0, notFound: 0 };
 
       // Group badge fixes by badge ID
-      const fixesByBadge: Record<string, Record<string, any>> = {};
+      const fixesByBadge: Record<string, Record<string, unknown>> = {};
       for (const fix of fixes.badgeFixes) {
         if (!fixesByBadge[fix.id]) fixesByBadge[fix.id] = {};
         const parts = fix.field.split(".");
@@ -175,8 +218,10 @@ export async function POST(request: NextRequest) {
       // Verify first badge
       if (Object.keys(fixesByBadge).length > 0) {
         const sampleId = Object.keys(fixesByBadge)[0];
-        const verify = await BadgeConfig.findOne({ id: sampleId }).lean();
-        console.log(`[EVAL-FIX] VERIFY ${sampleId}: minLevel=${(verify as any)?.minLevel} minTrades=${(verify as any)?.condition?.minTrades}`);
+        const verify = (await BadgeConfig.findOne({
+          id: sampleId,
+        }).lean()) as unknown as LeanBadgeRow | null;
+        console.log(`[EVAL-FIX] VERIFY ${sampleId}: minLevel=${verify?.minLevel} minTrades=${verify?.condition?.minTrades}`);
       }
       console.log(`[EVAL-FIX] Badge results: ${results.applied} applied, ${results.notFound} not found, ${results.errors} errors`);
 
