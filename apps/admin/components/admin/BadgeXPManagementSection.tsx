@@ -65,6 +65,7 @@ import {
   Info,
 } from "lucide-react";
 import { toast } from "sonner";
+import LeaderboardWeightsPanel from "./gamification/LeaderboardWeightsPanel";
 
 interface UserLevelData {
   userId: string;
@@ -602,7 +603,7 @@ export default function BadgeXPManagementSection() {
         </h3>
 
         <Tabs defaultValue="levels" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 h-12">
+          <TabsList className="grid w-full grid-cols-4 h-12">
             <TabsTrigger value="levels" className="text-base">
               <Crown className="h-4 w-4 mr-2" />
               Level Progression
@@ -615,7 +616,21 @@ export default function BadgeXPManagementSection() {
               <Trophy className="h-4 w-4 mr-2" />
               Badge Management
             </TabsTrigger>
+            <TabsTrigger value="global-rank" className="text-base">
+              <BarChart3 className="h-4 w-4 mr-2" />
+              Global Rank
+            </TabsTrigger>
           </TabsList>
+
+          {/*
+            The global-rank shares live here rather than on their own screen
+            because the parts they weigh - levels, badges, milestones - are the
+            ones this screen already owns, and `badges` is the grant that
+            reaches it.
+          */}
+          <TabsContent value="global-rank" className="mt-6">
+            <LeaderboardWeightsPanel />
+          </TabsContent>
 
           <TabsContent value="levels" className="space-y-6 mt-6">
             <div className="flex items-center justify-between mb-4">

@@ -19,12 +19,14 @@ import {
   ArrowUpDown,
   Loader2,
 } from "lucide-react";
-import Link from "next/link";
 import { GameIcon, RankIcon } from "@/components/ui/GameIcon";
 import { GAME_ICONS, type GameIconName } from "@/lib/constants/game-icons";
 import LeaderboardChallengeButton from "@/components/leaderboard/LeaderboardChallengeButton";
 import LeaderboardFriendButton from "@/components/leaderboard/LeaderboardFriendButton";
 import MatchmakingCards from "@/components/leaderboard/MatchmakingCards";
+import LeaderboardPageHeader from "@/components/leaderboard/LeaderboardPageHeader";
+import LeaderboardRankCard from "@/components/leaderboard/LeaderboardRankCard";
+import RankingsExplainer from "@/components/leaderboard/RankingsExplainer";
 import ProfileCard from "@/components/profile/ProfileCard";
 import ProfileImage from "@/components/ui/ProfileImage";
 import ChallengeCreateDialog from "@/components/challenges/ChallengeCreateDialog";
@@ -82,6 +84,8 @@ interface LeaderboardContentProps {
   pageSize?: number;
   onPageChange?: (page: number) => void;
   loading?: boolean;
+  /** The board dropdown, rendered in the shared header. */
+  boardPicker?: React.ReactNode;
 }
 
 // Sort columns
@@ -113,6 +117,7 @@ export default function LeaderboardContent({
   pageSize = 50,
   onPageChange,
   loading: paginationLoading = false,
+  boardPicker,
 }: LeaderboardContentProps) {
   const isPaginated = typeof propTotalCount === "number" && typeof onPageChange === "function";
   const totalCount = propTotalCount ?? leaderboard.length;
@@ -280,165 +285,97 @@ export default function LeaderboardContent({
   const SortHeader = ({
     column,
     label,
-    className = "",
+    align = "left",
   }: {
     column: SortColumn;
     label: string;
-    className?: string;
+    align?: "left" | "right";
   }) => {
     const isActive = filters.sortBy === column;
+    // Reason: the sort glyph occupies width even when it is invisible
+    // (`opacity-0`), so on a right-aligned column it pushed the label ~16px
+    // left of the numbers below it. Putting the glyph on the LEFT of the label
+    // for those columns lets the label's right edge line up with the values,
+    // which are flush right. Do not fold this back into a `justify-end` class.
+    const icon = (
+      <div
+        className={cn(
+          "transition-transform",
+          isActive && filters.sortOrder === "asc" && "rotate-180",
+        )}
+      >
+        {isActive ? (
+          <ChevronDown className="h-3 w-3" />
+        ) : (
+          <ArrowUpDown className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+        )}
+      </div>
+    );
     return (
       <button
         onClick={() => handleSort(column)}
         className={cn(
           "flex items-center gap-1 text-xs font-semibold uppercase tracking-wider transition-colors group",
           isActive ? "text-primary-400" : "text-gray-500 hover:text-gray-300",
-          className,
+          align === "right" && "justify-end",
         )}
       >
-        {label}
-        <div
-          className={cn(
-            "transition-transform",
-            isActive && filters.sortOrder === "asc" && "rotate-180",
-          )}
-        >
-          {isActive ? (
-            <ChevronDown className="h-3 w-3" />
-          ) : (
-            <ArrowUpDown className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-          )}
-        </div>
+        {align === "right" ? (
+          <>
+            {icon}
+            {label}
+          </>
+        ) : (
+          <>
+            {label}
+            {icon}
+          </>
+        )}
       </button>
     );
   };
 
   return (
     <div className="flex min-h-screen flex-col gap-6">
-      {/* Header Section */}
-      <div className="relative">
-        {/* Background glow effect */}
-        <div className="absolute -top-20 left-1/2 -translate-x-1/2 w-[600px] h-[200px] bg-primary-500/20 blur-[100px] rounded-full pointer-events-none" />
-
-        <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-2xl blur-lg opacity-60 animate-pulse" />
-              <div className="relative bg-gradient-to-br from-yellow-400 via-amber-500 to-orange-500 p-3 rounded-2xl shadow-2xl">
-                <GameIcon name="trophy" size={32} className="drop-shadow-lg" />
-              </div>
-            </div>
-            <div>
-              <h1 className="text-xl sm:text-2xl md:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-gray-200 to-gray-400">
-                GLOBAL LEADERBOARD
-              </h1>
-              <p className="text-sm text-gray-500 font-medium">
-                Top traders ranked by performance
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            {/* View Toggle */}
-            <div className="flex p-1 bg-gray-900/80 rounded-xl border border-gray-800 backdrop-blur-sm">
-              <button
-                onClick={() => setViewMode("table")}
-                className={cn(
-                  "px-3 sm:px-4 py-2.5 sm:py-2 min-h-[44px] rounded-lg font-semibold text-sm transition-all flex items-center gap-1.5 sm:gap-2",
-                  viewMode === "table"
-                    ? "bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-lg shadow-primary-500/25"
-                    : "text-gray-500 hover:text-white",
-                )}
-              >
-                <LayoutList className="h-4 w-4" />
-                Table
-              </button>
-              <button
-                onClick={() => setViewMode("cards")}
-                className={cn(
-                  "px-3 sm:px-4 py-2.5 sm:py-2 min-h-[44px] rounded-lg font-semibold text-sm transition-all flex items-center gap-1.5 sm:gap-2",
-                  viewMode === "cards"
-                    ? "bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-lg shadow-purple-500/25"
-                    : "text-gray-500 hover:text-white",
-                )}
-              >
-                <Sparkles className="h-4 w-4" />
-                Match Cards
-              </button>
-            </div>
-            <Link
-              href="/profile"
-              className="hidden sm:flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white rounded-xl font-semibold text-sm transition-all shadow-lg shadow-primary-500/25 hover:shadow-primary-500/40"
+      <LeaderboardPageHeader
+        title="TRADING PERFORMANCE"
+        subtitle="Traders ranked by how they have traded"
+        boardPicker={boardPicker}
+        actions={
+          <div className="flex p-1 bg-gray-900/80 rounded-xl border border-gray-800 backdrop-blur-sm">
+            <button
+              onClick={() => setViewMode("table")}
+              className={cn(
+                "px-3 sm:px-4 py-2.5 sm:py-2 min-h-[44px] rounded-lg font-semibold text-sm transition-all flex items-center gap-1.5 sm:gap-2",
+                viewMode === "table"
+                  ? "bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-lg shadow-primary-500/25"
+                  : "text-gray-500 hover:text-white",
+              )}
             >
-              My Profile
-            </Link>
+              <LayoutList className="h-4 w-4" />
+              Table
+            </button>
+            <button
+              onClick={() => setViewMode("cards")}
+              className={cn(
+                "px-3 sm:px-4 py-2.5 sm:py-2 min-h-[44px] rounded-lg font-semibold text-sm transition-all flex items-center gap-1.5 sm:gap-2",
+                viewMode === "cards"
+                  ? "bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-lg shadow-purple-500/25"
+                  : "text-gray-500 hover:text-white",
+              )}
+            >
+              <Sparkles className="h-4 w-4" />
+              Match Cards
+            </button>
           </div>
-        </div>
-      </div>
+        }
+      />
 
-      {/* Your Rank Card */}
-      {myPosition && (myPosition.rank > 0 ? (
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 border border-gray-700/50 shadow-2xl">
-          {/* Animated border gradient */}
-          <div className="absolute inset-0 bg-gradient-to-r from-primary-500/20 via-transparent to-cyan-500/20 opacity-50" />
-          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary-500 to-transparent" />
-
-          <div className="relative p-4 sm:p-6 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 sm:gap-5">
-              <div
-                className={cn(
-                  "relative w-14 h-14 sm:w-20 sm:h-20 rounded-2xl flex items-center justify-center",
-                  myPosition.rank === 1 &&
-                    "bg-gradient-to-br from-yellow-500/30 to-amber-500/30 border-2 border-yellow-500/50",
-                  myPosition.rank === 2 &&
-                    "bg-gradient-to-br from-gray-400/30 to-gray-500/30 border-2 border-gray-400/50",
-                  myPosition.rank === 3 &&
-                    "bg-gradient-to-br from-amber-600/30 to-orange-600/30 border-2 border-amber-600/50",
-                  myPosition.rank > 3 &&
-                    "bg-gradient-to-br from-primary-500/30 to-cyan-500/30 border-2 border-primary-500/50",
-                )}
-              >
-                {myPosition.rank <= 3 ? (
-                  <RankIcon rank={myPosition.rank} size={40} />
-                ) : (
-                  <span className="text-xl sm:text-3xl font-black text-primary-400">
-                    #{myPosition.rank}
-                  </span>
-                )}
-              </div>
-              <div>
-                <p className="text-[11px] sm:text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
-                  Your Rank
-                </p>
-                <p className="text-2xl sm:text-4xl font-black text-white">
-                  #{myPosition.rank}
-                </p>
-                <p className="text-sm text-gray-500">
-                  of {myPosition.totalUsers} traders
-                </p>
-              </div>
-            </div>
-            <div className="text-right">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
-                Percentile
-              </p>
-              <p className="text-2xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-500">
-                {myPosition.percentile.toFixed(1)}%
-              </p>
-              <p className="text-sm text-gray-500">
-                Top {(100 - myPosition.percentile).toFixed(1)}%
-              </p>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="rounded-2xl bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 border border-gray-700/50 p-5 text-center">
-          <p className="text-lg font-bold text-gray-300 mb-1">Unranked</p>
-          <p className="text-sm text-gray-500">
-            Complete a competition to appear on the leaderboard
-          </p>
-        </div>
-      ))}
+      <LeaderboardRankCard
+        position={myPosition}
+        unitLabel="traders"
+        unrankedMessage="Place a trade in a competition to appear on this board"
+      />
 
       {/* Match Cards View */}
       {viewMode === "cards" && (
@@ -604,37 +541,17 @@ export default function LeaderboardContent({
               <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
                 Trader
               </span>
-              <SortHeader column="pnl" label="P&L" className="justify-end" />
-              <SortHeader
-                column="roi"
-                label="Trade ROI"
-                className="justify-end"
-              />
-              <SortHeader
-                column="winrate"
-                label="Win Rate"
-                className="justify-end"
-              />
+              <SortHeader column="pnl" label="P&L" align="right" />
+              <SortHeader column="roi" label="Trade ROI" align="right" />
+              <SortHeader column="winrate" label="Win Rate" align="right" />
               <SortHeader
                 column="profitfactor"
                 label="P.Factor"
-                className="justify-end"
+                align="right"
               />
-              <SortHeader
-                column="competitions"
-                label="Comps"
-                className="justify-end"
-              />
-              <SortHeader
-                column="badges"
-                label="Badges"
-                className="justify-end"
-              />
-              <SortHeader
-                column="score"
-                label="Score"
-                className="justify-end"
-              />
+              <SortHeader column="competitions" label="Comps" align="right" />
+              <SortHeader column="badges" label="Badges" align="right" />
+              <SortHeader column="score" label="Score" align="right" />
               <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
                 Actions
               </span>
@@ -1065,83 +982,24 @@ export default function LeaderboardContent({
             })}
           </div>
 
-          {/* How Rankings Work */}
-          <details className="rounded-2xl bg-gray-900/50 border border-gray-800 overflow-hidden">
-            <summary className="p-5 cursor-pointer hover:bg-gray-800/30 transition-colors flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center">
-                <TrendingUp className="h-5 w-5 text-blue-400" />
-              </div>
-              <span className="font-semibold text-white">
-                How Rankings Work
-              </span>
-            </summary>
-            <div className="px-5 pb-5 border-t border-gray-800 pt-4">
-              <div className="grid sm:grid-cols-2 gap-4 text-sm text-gray-400">
-                <div>
-                  <p className="font-semibold text-gray-300 mb-2">
-                    Score Formula
-                  </p>
-                  <ul className="space-y-1.5">
-                    <li className="flex items-center gap-2">
-                      <span className="w-12 text-primary-400 font-mono">
-                        30%
-                      </span>{" "}
-                      Total P&L
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <span className="w-12 text-primary-400 font-mono">
-                        25%
-                      </span>{" "}
-                      Trade ROI %
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <span className="w-12 text-primary-400 font-mono">
-                        20%
-                      </span>{" "}
-                      Win Rate
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <span className="w-12 text-primary-400 font-mono">
-                        10%
-                      </span>{" "}
-                      Profit Factor
-                    </li>
-                  </ul>
-                </div>
-                <div>
-                  <p className="font-semibold text-gray-300 mb-2">
-                    Bonus Points
-                  </p>
-                  <ul className="space-y-1.5">
-                    <li className="flex items-center gap-2">
-                      <span className="w-12 text-primary-400 font-mono">
-                        5%
-                      </span>{" "}
-                      Competition Wins
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <span className="w-12 text-primary-400 font-mono">
-                        5%
-                      </span>{" "}
-                      Podium Finishes
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <span className="w-12 text-primary-400 font-mono">
-                        3%
-                      </span>{" "}
-                      Badges
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <span className="w-12 text-primary-400 font-mono">
-                        2%
-                      </span>{" "}
-                      Challenges Won
-                    </li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          </details>
+          {/*
+            Reason: this panel used to publish a fixed percentage split — 30%
+            Total P&L, 25% ROI and so on — which the score has never been
+            computed from. The trading score adds up weighted points rather
+            than shares of 100, so the honest thing is to name the ingredients
+            in order of influence and not invent percentages for them.
+          */}
+          <RankingsExplainer
+            weights={[]}
+            intro="Your trading score adds up points from everything below. It is one of the seven things that decide your place on the Global leaderboard."
+            notes={[
+              "Profit is worth the most — both the amount you made and how much you made relative to what you started with.",
+              "How often you win, and how much you win compared with what you lose, come next.",
+              "Winning a competition is worth more than finishing on the podium, and a podium is worth more than a challenge win.",
+              "Badges add a little, and legendary badges add more.",
+              "A very high profit factor is capped, so one lucky run without a single loss cannot take the top spot on its own.",
+            ]}
+          />
         </>
       )}
 
