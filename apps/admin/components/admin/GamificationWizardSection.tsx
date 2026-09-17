@@ -439,14 +439,36 @@ export default function GamificationWizardSection() {
           fixedCount: s.badges?.fixedCount || 0,
           newCount: s.badges?.generated || s.badges?.newCount || 0,
         },
+        // Reason: this row matched only `action === "blueprint"`, and a rebuild
+        // reports `blueprint-replaced` — so a START FROM SCRATCH run fell
+        // through to the literal word "skipped" while the maps and milestones
+        // were in fact written. That is the "no milestones, no zones" report.
+        // It now reads the stored counts, and a zero is a failure.
         {
           name: "Journeys & milestones",
-          success: true,
+          success:
+            typeof s.milestones !== "object" ||
+            s.milestones === null ||
+            (!s.milestones.error && (s.milestones.milestonesStored ?? 0) > 0),
           summary:
-            s.milestones?.action === "blueprint"
-              ? `${(s.milestones.mapIds || []).length} maps, milestones written`
-              : typeof s.milestones === "string"
-                ? s.milestones
+            typeof s.milestones === "string"
+              ? s.milestones
+              : typeof s.milestones === "object" && s.milestones !== null
+                ? [
+                    `${s.milestones.mapsStored ?? 0} maps`,
+                    `${s.milestones.milestonesStored ?? 0}/${s.milestones.plannedMilestones ?? 0} milestones`,
+                    `${s.milestones.zonesStored ?? 0} zones`,
+                  ].join(", ") +
+                  // Reason: an add-only pass over a design that is already
+                  // complete writes nothing and is not a failure. Without this
+                  // the row is indistinguishable from one, and an operator
+                  // reruns the wizard looking for a fault that is not there.
+                  (!s.milestones.error &&
+                  (s.milestones.createdMilestones ?? 0) === 0 &&
+                  (s.milestones.milestonesStored ?? 0) > 0
+                    ? " (already present)"
+                    : "") +
+                  (s.milestones.error ? ` \u2014 ${s.milestones.error}` : "")
                 : "skipped",
         },
         {
@@ -487,6 +509,14 @@ export default function GamificationWizardSection() {
 
       loadStatus();
       setCurrentStep("evaluate");
+
+      // Reason: a run that stored no milestones must not be announced as a
+      // complete setup — that is the exact sentence the operator read before
+      // opening an empty Journey Map editor.
+      const journeyStep = steps.find((x) => x.name === "Journeys & milestones");
+      if (journeyStep && !journeyStep.success) {
+        toast.error(`Journeys were not written \u2014 ${journeyStep.summary}`);
+      }
 
       const missing = data.coverage?.badgeCoverage?.missingTotal ?? 0;
       toast.success(

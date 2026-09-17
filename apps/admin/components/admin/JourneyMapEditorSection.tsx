@@ -5,9 +5,9 @@
  * `any` on AI validation payloads). Clearing it is a separate chore; the
  * pre-commit hook stages the whole file, so these rules are scoped here
  * rather than blocking an unrelated XP/journey fix. */
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars, security/detect-object-injection, react-hooks/exhaustive-deps, react/no-unescaped-entities */
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars, security/detect-object-injection, react/no-unescaped-entities */
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -298,6 +298,29 @@ const MILESTONE_TEMPLATES = [
   { name: "Trading God", desc: "Reach Level 20", condition: { type: "level_reached", value: 20 }, xp: 2000, tier: 7 },
 ];
 
+// The ten themed maps this screen used to be built around. Kept only as the
+// fallback for a database with no journey maps at all.
+const LEGACY_SEQUENCE_CARDS = [
+  { order: 1, name: "Pirate Cove", theme: "pirate", xp: 150, color: "#F59E0B", milestoneCount: null, fromDatabase: false },
+  { order: 2, name: "Space Station", theme: "space", xp: 200, color: "#8B5CF6", milestoneCount: null, fromDatabase: false },
+  { order: 3, name: "Medieval Castle", theme: "medieval", xp: 300, color: "#EF4444", milestoneCount: null, fromDatabase: false },
+  { order: 4, name: "Cyber City", theme: "cyber", xp: 400, color: "#00FFFF", milestoneCount: null, fromDatabase: false },
+  { order: 5, name: "Ancient Temple", theme: "ancient", xp: 500, color: "#D4A373", milestoneCount: null, fromDatabase: false },
+  { order: 6, name: "Volcanic Island", theme: "volcanic", xp: 700, color: "#DC2626", milestoneCount: null, fromDatabase: false },
+  { order: 7, name: "Arctic Fortress", theme: "arctic", xp: 1000, color: "#38BDF8", milestoneCount: null, fromDatabase: false },
+  { order: 8, name: "Dragon Realm", theme: "dragon", xp: 1500, color: "#A855F7", milestoneCount: null, fromDatabase: false },
+  { order: 9, name: "Celestial Kingdom", theme: "celestial", xp: 2500, color: "#FFD700", milestoneCount: null, fromDatabase: false },
+  { order: 10, name: "Hall of Legends", theme: "legendary", xp: 5000, color: "#FF6B6B", milestoneCount: null, fromDatabase: false },
+] as Array<{
+  order: number;
+  name: string;
+  theme: string;
+  xp: number;
+  color: string;
+  milestoneCount: number | null;
+  fromDatabase: boolean;
+}>;
+
 export default function JourneyMapEditorSection() {
   const [mapConfig, setMapConfig] = useState<MapConfig | null>(null);
   const [milestones, setMilestones] = useState<Milestone[]>([]);
@@ -368,6 +391,24 @@ export default function JourneyMapEditorSection() {
     isComplete: boolean;
   }>>([]);
   const [selectedSequenceMap, setSelectedSequenceMap] = useState<number>(1);
+  // The maps that actually exist in the database, in sequence order.
+  // Reason: this screen used to navigate by a hard-coded list of ten legacy
+  // ids, so a map written by the journey blueprint could never be opened.
+  const [availableMaps, setAvailableMaps] = useState<Array<{
+    mapId: string;
+    name: string;
+    theme: string;
+    order: number;
+    estimatedXP: number;
+    gameKey: string | null;
+    milestoneCount: number;
+  }>>([]);
+  // Whether the map list has been answered yet, however it was answered.
+  // Reason: the first data fetch is gated on this, so it cannot be aimed at the
+  // legacy fallback id. It is set even when the list request FAILS — otherwise
+  // a settings outage leaves the editor permanently blank rather than falling
+  // back to the legacy list it was written for.
+  const [mapsLoaded, setMapsLoaded] = useState(false);
   const [sequenceLoading, setSequenceLoading] = useState(false);
   const [sequenceGenerating, setSequenceGenerating] = useState(false);
   const [showSequenceDialog, setShowSequenceDialog] = useState(false);
@@ -454,12 +495,33 @@ export default function JourneyMapEditorSection() {
       const data = await response.json();
 
       if (data.success) {
-        const mapCount = data.mapIds?.length ?? 0;
+        // Reason: `totalMilestones` is now what the database STORED, not what
+        // the blueprint planned — the old message said "Generated 24
+        // milestones" whatever happened to them, which is how a successful
+        // toast sat above an empty editor. The planned figure is shown beside
+        // it so a partial write is visible rather than merely smaller.
+        const mapCount = data.totalMaps ?? data.mapIds?.length ?? 0;
         const msCount = data.totalMilestones ?? 0;
+        const planned = data.plannedMilestones ?? msCount;
+        const zoneCount = data.totalZones ?? 0;
         toast.success(
-          `Generated ${msCount} milestones across ${mapCount} maps (${(data.mapNames || []).join(", ") || "none"})`,
+          `Stored ${msCount}/${planned} milestones and ${zoneCount} zones across ${mapCount} maps (${(data.mapNames || []).join(", ") || "none"})`,
         );
-        await fetchData();
+        if (data.milestones?.errors > 0) {
+          toast.warning(
+            `${data.milestones.errors} milestone(s) were rejected \u2014 ${data.milestones.firstError ?? "see server log"}`,
+          );
+        }
+        // Reason: the editor navigates by position, so the freshly written map
+        // ids must be loaded before fetchData or it reopens a map that the
+        // rebuild has just deleted and the screen looks empty.
+        const maps = await loadAvailableMaps();
+        if (maps.length > 0) {
+          setSelectedSequenceMap(1);
+          await fetchData(maps[0].mapId);
+        } else {
+          await fetchData();
+        }
       } else {
         toast.error(data.error || "Failed to generate journeys");
       }
@@ -1101,18 +1163,86 @@ export default function JourneyMapEditorSection() {
     }
   };
 
-  // Map ID lookup from sequence order
-  const MAP_IDS = [
-    "pirate_cove", "space_station", "medieval_castle", "cyber_city", "ancient_temple",
-    "volcanic_island", "arctic_fortress", "dragon_realm", "celestial_kingdom", "hall_of_legends"
-  ];
+  // Legacy ten-map list, kept only as the fallback for a database that has no
+  // maps at all — the real list comes from `availableMaps`.
+  const MAP_IDS = useMemo(
+    () => [
+      "pirate_cove", "space_station", "medieval_castle", "cyber_city", "ancient_temple",
+      "volcanic_island", "arctic_fortress", "dragon_realm", "celestial_kingdom", "hall_of_legends"
+    ],
+    [],
+  );
 
-  // Get mapId from sequence order
-  const getMapIdFromOrder = (order: number) => MAP_IDS[order - 1] || "traders_journey";
+  // Get mapId from sequence order, preferring maps that actually exist.
+  const getMapIdFromOrder = useCallback(
+    (order: number) =>
+      availableMaps.at(order - 1)?.mapId ??
+      MAP_IDS.at(order - 1) ??
+      "traders_journey",
+    [availableMaps, MAP_IDS],
+  );
+
+  // How many maps the operator can page through. Reason: the journey blueprint
+  // writes one map per game, so the count is data rather than the legacy ten.
+  const mapCount = availableMaps.length || MAP_IDS.length;
+
+  // The cards on the Sequence tab. Reason: they were ten hard-coded themes, so
+  // an operator who had just generated journeys saw Pirate Cove ... Hall of
+  // Legends and none of the maps that exist, which reads as "nothing was
+  // generated". The palette is positional; the rest is data.
+  const sequenceCards = useMemo(() => {
+    const palette = [
+      "#F59E0B", "#8B5CF6", "#EF4444", "#00FFFF", "#D4A373",
+      "#DC2626", "#38BDF8", "#A855F7", "#FFD700", "#FF6B6B",
+    ];
+    if (availableMaps.length === 0) {
+      return LEGACY_SEQUENCE_CARDS;
+    }
+    return availableMaps.map((m, i) => ({
+      order: i + 1,
+      name: m.name,
+      theme: m.theme,
+      xp: m.estimatedXP,
+      color: palette.at(i % palette.length) ?? "#F59E0B",
+      milestoneCount: m.milestoneCount,
+      fromDatabase: true,
+    }));
+  }, [availableMaps]);
+
+  const loadAvailableMaps = useCallback(async () => {
+    try {
+      const res = await fetch("/api/journey-map?list=true");
+      const data = await res.json();
+      if (data.success && Array.isArray(data.maps)) {
+        setAvailableMaps(data.maps);
+        return data.maps as typeof availableMaps;
+      }
+    } catch (error) {
+      console.error("Error listing journey maps:", error);
+    } finally {
+      // Reason: the first fetch must WAIT for this, or it runs against the
+      // legacy fallback id. See the mount effect below.
+      setMapsLoaded(true);
+    }
+    return [];
+  }, []);
+
+  /**
+   * The map this screen last asked for.
+   *
+   * Reason: two fetches are in flight on mount — the legacy fallback id and the
+   * real one, once the list arrives — and they can resolve in either order.
+   * When the legacy one landed second it overwrote the real map with a
+   * placeholder carrying `zones: []` and an empty milestone list, which is the
+   * "24 milestones generated, none on screen" report, intermittently and with
+   * nothing in any log. A stale response is now discarded.
+   */
+  const requestedMapRef = useRef<string | null>(null);
 
   // Fetch data for a specific map
   const fetchData = useCallback(async (mapId?: string) => {
     const targetMapId = mapId || getMapIdFromOrder(selectedSequenceMap);
+    requestedMapRef.current = targetMapId;
     setLoading(true);
     try {
       const [mapRes, milestonesRes] = await Promise.all([
@@ -1123,13 +1253,17 @@ export default function JourneyMapEditorSection() {
       const mapData = await mapRes.json();
       const milestonesData = await milestonesRes.json();
 
+      // A newer request has been issued; this answer is about a map the
+      // operator is no longer looking at.
+      if (requestedMapRef.current !== targetMapId) return;
+
       if (mapData.success && mapData.mapConfig) {
         setMapConfig(mapData.mapConfig);
       } else {
         // If map doesn't exist, create a placeholder config
         setMapConfig({
           mapId: targetMapId,
-          name: MAP_IDS[selectedSequenceMap - 1]?.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase()) || "Journey Map",
+          name: targetMapId.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase()) || "Journey Map",
           description: "Journey map awaiting generation",
           zones: [],
           defaultStartNode: "start",
@@ -1151,7 +1285,7 @@ export default function JourneyMapEditorSection() {
     } finally {
       setLoading(false);
     }
-  }, [selectedSequenceMap]);
+  }, [selectedSequenceMap, getMapIdFromOrder]);
 
   // Load a specific map from the 10-map sequence
   const loadSequenceMap = async (sequenceOrder: number) => {
@@ -1162,8 +1296,18 @@ export default function JourneyMapEditorSection() {
   };
 
   useEffect(() => {
+    loadAvailableMaps();
+  }, [loadAvailableMaps]);
+
+  // Reason: gated on `mapsLoaded` so the opening fetch is never aimed at the
+  // legacy fallback id. Without the gate the screen's first request is for
+  // `pirate_cove`, which no generated design contains — so the editor opens on
+  // a placeholder with no zones and no milestones even when the journey is
+  // complete, and whether it recovers depends on which response lands last.
+  useEffect(() => {
+    if (!mapsLoaded) return;
     fetchData();
-  }, [fetchData]);
+  }, [mapsLoaded, fetchData]);
 
   // Fetch all badges for dropdowns (once on mount)
   useEffect(() => {
@@ -1961,7 +2105,7 @@ export default function JourneyMapEditorSection() {
             {mapConfig?.name || "Journey Map"}
           </h3>
           <p className="text-sm text-slate-400">
-            Map {selectedSequenceMap} of 10 • {milestones.length} milestones
+            Map {selectedSequenceMap} of {mapCount} • {milestones.length} milestones
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -1976,8 +2120,8 @@ export default function JourneyMapEditorSection() {
           <Button
             size="sm"
             variant="outline"
-            onClick={() => loadSequenceMap(Math.min(10, selectedSequenceMap + 1))}
-            disabled={selectedSequenceMap >= 10}
+            onClick={() => loadSequenceMap(Math.min(mapCount, selectedSequenceMap + 1))}
+            disabled={selectedSequenceMap >= mapCount}
           >
             Next Map →
           </Button>
@@ -3126,18 +3270,7 @@ export default function JourneyMapEditorSection() {
 
             {/* Sequence Overview Cards */}
             <div className="grid grid-cols-5 gap-4">
-              {[
-                { order: 1, name: "Pirate Cove", theme: "pirate", xp: 150, color: "#F59E0B" },
-                { order: 2, name: "Space Station", theme: "space", xp: 200, color: "#8B5CF6" },
-                { order: 3, name: "Medieval Castle", theme: "medieval", xp: 300, color: "#EF4444" },
-                { order: 4, name: "Cyber City", theme: "cyber", xp: 400, color: "#00FFFF" },
-                { order: 5, name: "Ancient Temple", theme: "ancient", xp: 500, color: "#D4A373" },
-                { order: 6, name: "Volcanic Island", theme: "volcanic", xp: 700, color: "#DC2626" },
-                { order: 7, name: "Arctic Fortress", theme: "arctic", xp: 1000, color: "#38BDF8" },
-                { order: 8, name: "Dragon Realm", theme: "dragon", xp: 1500, color: "#A855F7" },
-                { order: 9, name: "Celestial Kingdom", theme: "celestial", xp: 2500, color: "#FFD700" },
-                { order: 10, name: "Hall of Legends", theme: "legendary", xp: 5000, color: "#FF6B6B" },
-              ].map((map) => (
+              {sequenceCards.map((map) => (
                 <Card 
                   key={map.order}
                   className={`cursor-pointer transition-all hover:scale-105 ${
@@ -3171,11 +3304,17 @@ export default function JourneyMapEditorSection() {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Difficulty:</span>
-                        <span>{map.order}/10</span>
+                        <span>{map.order}/{mapCount}</span>
                       </div>
-                      {/* Editable Milestone Count */}
+                      {/* Milestones: the stored count once the map exists, an
+                          editable target only for the legacy fallback list. */}
                       <div className="flex justify-between items-center pt-1 border-t border-slate-700">
                         <span className="text-muted-foreground">Milestones:</span>
+                        {map.fromDatabase ? (
+                          <span className={map.milestoneCount ? "text-emerald-400" : "text-amber-400"}>
+                            {map.milestoneCount ?? 0}
+                          </span>
+                        ) : (
                         <Input
                           type="number"
                           min={5}
@@ -3189,6 +3328,7 @@ export default function JourneyMapEditorSection() {
                           onClick={(e) => e.stopPropagation()}
                           className="w-14 h-6 text-xs text-center p-1"
                         />
+                        )}
                       </div>
                     </div>
                   </CardContent>

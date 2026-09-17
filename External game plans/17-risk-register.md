@@ -77,6 +77,7 @@ chapter covers risks to the programme and to the application.
 | **R101** | **Ninety-nine admin API route files have no authorization check of any kind, and fifty-eight of them write.** *(**R101a–R101ac CLOSED 16 Sep 2026.** Inventory after R101ac: **0 no-check / 0 hand-verified / 9 helper / 328 section-granted**. R101ac closed clear helpers (21 files / 29 handlers). A document treating R101 as closed is wrong; one treating the escalation, wallet credit, erasure, exports, messaging, visitors, landing-pages, market-data, settings, ops/money/customer, money leftovers or clear helpers as live is stale; and one quoting **30 helper** or **41 helper** or **78 / 58 / 55 / 51 / 44** still-unguarded is quoting a figure the next closure moved - **say which**.)* Counted over all 347 route files in `apps/admin/app/api` with comments stripped: see the detail section for the full a–ac closure history | **Critical** | **LIVE on the remaining helper-but-no-grant surface (9 routes: 3 admin-at-all leftovers + gamemaster deferred).** Earlier writers are closed; absence of evidence of past calls is not reassurance | **R101a–R101ac CLOSED; R101 remains open on the 9 helper-but-no-grant routes and still ahead of R96 and X7.** Inventory after R101ac: **0 / 0 / 9 / 328**. **ELEVENTH instance of this class** — every previous instance fixed the routes it happened to be looking at; the directory inventory (R101d) is what makes the rest countable |
 | **R102** | **The gamification wizard's level ladder was written where nothing reads it.** `dbTools.writeXPConfig` wrote `xpconfigs` keyed on **`type`** while `xp-config.model.ts` declares the discriminator as **`configType`** and `POST /api/badges-xp/manage` reads through the model, so every ladder and badge-XP table the wizard saved landed in a document nothing else could find. `readXPConfig` also read `levels?.data` where the document nests the array as `data.levels`, so the wizard's own audit reported an **unconfigured ladder on every run, including straight after writing one** - which is what made a lost write look like an unfinished feature | Medium | **LIVE since the wizard's ladder step existed, and it is a LOST WRITE rather than a wrong value.** Nothing read the orphaned document, so no XP, level or badge was ever computed from it and **nothing was backfilled**; what it cost is an operator's configuration silently not taking effect while the screen said it was still unset | **CLOSED 17 Sep 2026** alongside the R96b rebuild option. Uses `configType` and wraps the ladder as `{ levels: data }`; the read follows. **Orphaned documents are left in place rather than migrated** - keyed on a field nothing queries, so they are inert, and rewriting discriminators in a config collection is an unreviewed writer for no gain. **The rule: a collection reached by both the raw driver and a model has two spellings of its own key and only one is enforced** - the driver accepts `type` cheerfully for ever. Third instance of the raw-driver boundary after the R42 fixture and the analytics participation funnel, and the first where the disagreement was a **key** rather than a value's type |
 | **R103** | **The gamification wizard asked one AI call to populate the whole catalogue, and it returned five trading badges.** `run_full`'s badge step was a single generative request told to cover every game inside a token budget; it produced **5 badges, all trading**, and reported success. Four faults travelled with it, each independently enough to make the screen read as broken: the journey step defaulted `maxMaps` to **3** (one AI call per map) so every game past the second silently got no journey at all, and after a wipe the milestone agent iterated maps that no longer existed and produced **nothing**; the ladder was derived **before** the badges existed, so its top rung asked **426,400 XP** against a catalogue paying a few thousand; **eight of the twenty level rungs named icons that are not in the registry** (`medal1`, `diamond1`, `flame1`), and the admin `GameIcon` renders an unknown name as **raw text**; and the Badge Library header was the literal string **"120 Total"**, so five stored badges displayed under a heading claiming 120 | **High** | **LIVE, and it is a GENERATION defect rather than a wrong payment.** No XP, level, badge or prize was ever computed wrongly - the system simply produced almost none of the content it reported producing, and **nothing was backfilled**, because the rows were never written. The cost is an operator wiping the platform and being left with five badges, no journeys and an unreachable ladder, with no error and no log line anywhere | **CLOSED 17 Sep 2026.** Generation is **arithmetic now, not a model call** - `gamification-economy.ts` plans the quota, `badge-blueprint.ts` and `journey-blueprint.ts` emit the rows, `proposeNeutralLadder` derives the curve from what the catalogue can actually pay. The model is a **rewording pass over what the blueprint produced**, never the producer. See the detail section |
+| **R104** | **The journey editor asked for a map that no generated design contains, then let that answer overwrite the real one.** `JourneyMapEditorSection` issued its first data fetch **before** the map list had been answered, so `getMapIdFromOrder` fell back to the legacy `pirate_cove` id. That map does not exist, the route answers `success: false`, and the component's own `else` branch renders a **placeholder carrying `zones: []` and an empty milestone list**. A second fetch for the real map was already in flight, and **neither request cancelled the other**, so which design the operator saw depended purely on which response landed last. The reporting made it unfalsifiable from the other end: the wizard and the editor both quoted the **blueprint's intent**, so a rebuild that stored 24 milestones and a rebuild that stored none printed the same sentence | **High** | **LIVE and REPORTING-ONLY - no milestone, zone, badge or XP value was ever computed or stored wrongly, and nothing was backfilled.** Proven by `__tests__/admin/journey-blueprint-round-trip.test.ts`, which writes a real blueprint to a real MongoDB and reads it back through the editor's own three queries. What it cost is the entire observability of the feature: an operator ran the wizard, was told 24 milestones across 2 maps had been generated, opened the editor, saw nothing, and had no way to tell a rejected write from a screen looking at the wrong map | **CLOSED 17 Sep 2026.** Two halves, and both are needed: the mount fetch is **gated on the map list having been answered** so the legacy id is never requested, and a `requestedMapRef` **discards a stale response** between the parse and the first `setState`. Reporting is now counted out of the collections by `journeyState()` rather than taken from the blueprint, and **storing zero milestones is a refusal** carrying the first write error. See the detail section |
 | R8 | Bulk find-and-replace on wording | High | Medium | X8 |
 | R9 | Fraud throttle blind to provider entries | High | High | X5 |
 | R11 | Legal wording changed without review | High | Medium | X8 |
@@ -5325,6 +5326,91 @@ also means **a catalogue an operator has already half-authored will not be rebal
 running the wizard again**; that is a deliberate scope line, not an omission. And
 **`run_full` has still never been run against a real database** - every guarantee here is
 from tests and probes (36 orchestration tests, 27 probes red on exactly one failure).
+
+---
+
+### R104 - The editor opened on the wrong map, and nothing could say so - **CLOSED 17 Sep 2026**
+
+**What it is.** Two defects that are only dangerous together, which is why each had
+survived a reading of the other.
+
+**The write path was fine.** This is the first thing to get right, because the report -
+*"NO MILESTONE AGAIN PRODUCED ... NO ZONES NOTHING"* - points squarely at generation.
+`__tests__/admin/journey-blueprint-round-trip.test.ts` writes a real blueprint into a real
+MongoDB through `mongodb-memory-server` and reads it back through the editor's **own three
+queries**: every map stored, every milestone stored, every zone stored, the unique index on
+`JourneyMilestone.id` holding, a second identical pass adding nothing and losing nothing,
+and a replace pass leaving exactly the new design behind. **No milestone, zone, badge or XP
+value was ever computed or stored wrongly, and nothing was backfilled.**
+
+**The screen asked for a map that no generated design contains.** `JourneyMapEditorSection`
+ran two effects on mount - one to list the maps, one to fetch data - and the second did not
+wait for the first. With `availableMaps` still empty, `getMapIdFromOrder(1)` fell through to
+the legacy hard-coded list and asked for **`pirate_cove`**. The route correctly answers
+`success: false` for a map that does not exist, and the component's own `else` branch then
+renders a placeholder with **`zones: []`** and an empty milestone array. Once the list
+arrived a second fetch went out for the real map, and **neither request cancelled the
+other** - so whether the operator saw the real design or the placeholder depended on which
+response landed last. Intermittent, and nothing in any log, because nothing failed.
+
+**The reporting made it unfalsifiable from the other end.** Both the wizard's summary row
+and the editor's *Generate Full Sequence* toast quoted `journey.milestones.length` - the
+**blueprint's intent**. So "Generated 24 milestones across 2 maps" is printed identically
+by a run that stored 24 and a run that stored none, and `writeMapsBatch` /
+`writeMilestonesBatch` counted their failures without carrying a single message out. The
+operator had two screens, both confident, and no way to tell a rejected write from a screen
+looking at the wrong map.
+
+**Harm, precisely.** **Live, and reporting-only.** What it cost is the entire observability
+of the feature, which is worse than it sounds: the natural response is to rerun the wizard,
+which is add-only, which writes nothing, which prints the same cheerful sentence again.
+
+**The fix.**
+
+- **The mount fetch is gated on the map list having been answered** (`mapsLoaded`), so the
+ legacy id is never requested. The flag is raised in a `finally`, so a **failed** list
+ request still releases the fetch onto the legacy fallback rather than leaving the editor
+ permanently blank.
+- **`requestedMapRef` discards a stale answer**, and its position is load-bearing: the bail
+ sits between the JSON parse and the first `setState`, or the placeholder still lands on
+ top of the real map.
+- **`journeyState(mapIds)` counts what is in the collections after the write** - maps,
+ milestones and zones - scoped to the maps the run planned. `build_journeys` **refuses**
+ when that count is zero, and both screens print the stored figure against the planned one
+ plus `firstError`.
+
+**Six rules worth carrying.**
+
+- **Two fetches with no cancellation are not a race you can reason about from the happy
+ path.** Both requests were individually correct and both handlers were individually
+ correct. The bug is entirely in the *ordering*, so it reviews as clean, tests green on
+ either interleaving, and reproduces for the operator and not for the developer.
+- **An `else` branch that invents a plausible empty object is how a wrong question gets a
+ confident answer.** The placeholder exists for a real reason - an operator creating a new
+ map needs somewhere to start - and it is indistinguishable on screen from a complete
+ design that failed to load. If a fallback fabricates state, the thing that decides *when*
+ to fabricate it becomes safety-critical.
+- **A default that is only reached before data arrives is reached on every single mount.**
+ `getMapIdFromOrder`'s legacy fallback looked like dead code for a migrated screen. It ran
+ first, every time.
+- **Raise a "loaded" flag on failure as well as success.** The instinct is to set it only
+ when the list arrives, which converts a transient outage into a screen that never
+ renders - trading one intermittent fault for a permanent one. Same direction as the
+ admin trading-surface default failing **open**.
+- **A created/updated counter cannot tell a rejected write from an add-only pass over a
+ complete design.** Both are zero and only one is broken, which is why the stored figure
+ is counted out of the collections and why the assertion requiring the counters was
+ **inverted rather than deleted** - the comment explaining why they were believed is the
+ most valuable part of it.
+- **Scope a stored-state count to what the run planned.** Counted platform-wide, one
+ leftover `getting_started` row makes an empty rebuild read as one stored map, which is
+ exactly the reassurance the refusal exists to deny.
+
+**What this does NOT close.** The round-trip test proves the write path against a real
+database; **the two screens have still never been verified by eye**, because both are behind
+an admin sign-in the automated browser has no session for. The operator-visible confirmation
+is that the toast wording has changed - a run reporting *"Generated 24 milestones"* is the
+**old build**, and the fixed one says *"Stored X/Y milestones and Z zones across N maps"*.
 
 ---
 

@@ -395,6 +395,146 @@ describe("run_full pipeline (structural)", () => {
     expect(dialog).toMatch(/generateFullSequence/);
   });
 
+  /**
+   * Reason: every reported "no milestones, no zones" has been a REPORTING
+   * defect rather than a write that failed. The blueprint planned 24, the
+   * screen said 24, and nobody had asked the database. Two halves:
+   *
+   *  - the server reports what was STORED, and storing none is a refusal;
+   *  - the screen reads those counts, and matches BOTH journey actions —
+   *    `action === "blueprint"` alone fell through to the literal word
+   *    "skipped" on every rebuild, because a rebuild reports
+   *    `blueprint-replaced`.
+   */
+  it("build_journeys reports what was stored, and storing none refuses", () => {
+    const block = route.slice(
+      route.indexOf('action === "build_journeys"'),
+      route.indexOf("Invalid action. Use:"),
+    );
+    expect(block.length).toBeGreaterThan(200);
+    // The planned length must not be what `totalMilestones` reports.
+    expect(block).not.toMatch(
+      /totalMilestones:\s*journey\.milestones\.length/,
+    );
+    // Reason: this used to require the run's own created+updated counters, and
+    // that assertion is now INVERTED rather than deleted. Those counters cannot
+    // tell a rejected write from an add-only pass over a design that is already
+    // complete — both are zero, and only one is broken. The figure is counted
+    // out of the collections instead, which is the question being asked.
+    expect(block).not.toMatch(
+      /storedMilestones\s*=\s*milestoneWrite\.created\s*\+\s*milestoneWrite\.updated/,
+    );
+    expect(block).toMatch(/journeyState\(/);
+    expect(block).toMatch(/storedMilestones\s*=\s*state\.milestones/);
+    expect(block).toMatch(/totalMilestones:\s*storedMilestones/);
+    // Zero stored is a refusal, not a success with a cheerful number.
+    expect(block).toMatch(/storedMilestones === 0/);
+    expect(block).toMatch(/success:\s*false/);
+  });
+
+  /**
+   * Reason: `journeyState` is scoped to the maps the run planned, so an
+   * unrelated legacy map cannot inflate the figure into a success. Scoped to
+   * everything, a leftover `getting_started` row makes an empty rebuild read as
+   * one stored map — which is the exact reassurance the refusal exists to deny.
+   */
+  it("the stored figures are counted from the collections, map-scoped", () => {
+    const helper = route.slice(
+      route.indexOf("async function journeyState("),
+      route.indexOf("const dbTools = {"),
+    );
+    expect(helper.length).toBeGreaterThan(200);
+    expect(helper).toMatch(/JourneyMilestone\.countDocuments\(\s*\{\s*mapId/);
+    expect(helper).toMatch(/JourneyMapConfig\.find\(\s*\{\s*mapId:\s*\{\s*\$in/);
+    expect(helper).not.toMatch(/countDocuments\(\s*\)/);
+    // Zones are counted off the stored documents, never off the blueprint.
+    expect(helper).toMatch(/zones\?\.length/);
+    const full = route.slice(
+      route.indexOf("steps.milestones = {"),
+      route.indexOf('name: "Auto-Fix Engine"') > 0
+        ? route.length
+        : route.length,
+    );
+    expect(full).toMatch(/mapsStored:\s*state\.maps/);
+    expect(full).toMatch(/zonesStored:\s*state\.zones/);
+    // The old zone figure sliced the blueprint by a count, which attributes
+    // zones to whichever maps happened to sort first.
+    expect(full).not.toMatch(/mapsToWrite\s*\n?\s*\.slice\(0, mapWrite\.created\)/);
+  });
+
+  /**
+   * Reason: the editor issued its first data fetch before the map list had been
+   * answered, so it asked for the legacy `pirate_cove` id — which no generated
+   * design contains — and rendered a placeholder with `zones: []` and no
+   * milestones. Two fetches were then in flight and whether the real map
+   * survived depended on which landed last, so a complete journey read as an
+   * empty one intermittently, with nothing in any log. Both halves are needed:
+   * the gate stops the wrong request, the ref stops a stale answer applying.
+   */
+  it("the editor waits for the map list and discards a stale answer", () => {
+    const editor = readCode(
+      "apps/admin/components/admin/JourneyMapEditorSection.tsx",
+    );
+
+    // The mount effect must not fetch unconditionally.
+    const effect = editor.slice(
+      editor.indexOf("if (!mapsLoaded) return;") - 400,
+      editor.indexOf("if (!mapsLoaded) return;") + 120,
+    );
+    expect(effect).toContain("if (!mapsLoaded) return;");
+    expect(effect).toMatch(/fetchData\(\)/);
+
+    // The flag is raised however the list request ended, or a failed list
+    // leaves the screen blank for good instead of using the legacy fallback.
+    const loader = editor.slice(
+      editor.indexOf("const loadAvailableMaps = useCallback"),
+      editor.indexOf("const requestedMapRef"),
+    );
+    expect(loader.length).toBeGreaterThan(100);
+    expect(loader).toMatch(/finally\s*\{[\s\S]*setMapsLoaded\(true\)/);
+
+    // The stale-response guard must sit between the parse and the first
+    // setState, or the placeholder still overwrites the real map.
+    const fetcher = editor.slice(
+      editor.indexOf("const fetchData = useCallback"),
+      editor.indexOf("const loadSequenceMap"),
+    );
+    expect(fetcher.length).toBeGreaterThan(200);
+    expect(fetcher).toMatch(/requestedMapRef\.current = targetMapId/);
+    const bail = fetcher.indexOf("requestedMapRef.current !== targetMapId");
+    expect(bail).toBeGreaterThan(-1);
+    expect(bail).toBeLessThan(fetcher.indexOf("setMapConfig("));
+    expect(bail).toBeLessThan(fetcher.indexOf("setMilestones("));
+  });
+
+  it("the journey row survives a rebuild and reads the stored counts", () => {
+    const row = ui.slice(
+      ui.indexOf('name: "Journeys & milestones"'),
+      ui.indexOf('name: "Auto-Fix Engine"'),
+    );
+    expect(row.length).toBeGreaterThan(100);
+    // A rebuild reports `blueprint-replaced`, so an equality test against the
+    // add-only action alone renders the word "skipped" over a successful run.
+    expect(row).not.toMatch(/s\.milestones\?\.action === "blueprint"\s*$/m);
+    expect(row).toMatch(/milestonesStored/);
+    expect(row).toMatch(/zonesStored/);
+    // The row must be able to fail; `success: true` cannot report a bad write.
+    expect(row).not.toMatch(/success:\s*true/);
+  });
+
+  it("a batch writer carries the first error out, not just a counter", () => {
+    // A rejected write and a deliberate skip both incremented a number nobody
+    // surfaced, so the cause stayed in the server log.
+    expect(route).toMatch(/firstError:\s*null as string \| null/);
+    const journeyStep = route.slice(
+      route.indexOf("steps.milestones = {"),
+      route.indexOf("steps.milestones = \"skipped\""),
+    );
+    expect(journeyStep).toMatch(
+      /error:\s*mapWrite\.firstError\s*\?\?\s*milestoneWrite\.firstError/,
+    );
+  });
+
   it("reports the post-run gap so a second pass is measurable", () => {
     const block = route.slice(route.indexOf('action === "run_full"'));
     const evaluate = block.indexOf("runEvaluation(");

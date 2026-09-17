@@ -25,6 +25,38 @@ export async function GET(request: NextRequest) {
     await connectToDatabase();
 
     const { searchParams } = new URL(request.url);
+
+    // Reason: the editor used to drive itself from a hard-coded list of ten
+    // legacy map ids (pirate_cove ...), so every map the journey blueprint
+    // writes (journey_trading, journey_provider_*) was invisible — generation
+    // reported "24 milestones across 2 maps" and the screen stayed empty.
+    if (searchParams.get("list") === "true") {
+      const maps = await JourneyMapConfig.find({})
+        .sort({ sequenceOrder: 1, createdAt: 1 })
+        .select("mapId name theme sequenceOrder estimatedXP gameKey isActive")
+        .lean();
+
+      const counts = await JourneyMilestone.aggregate<{
+        _id: string;
+        count: number;
+      }>([{ $group: { _id: "$mapId", count: { $sum: 1 } } }]);
+      const countByMap = new Map(counts.map((c) => [c._id, c.count]));
+
+      return NextResponse.json({
+        success: true,
+        maps: maps.map((m, i) => ({
+          mapId: m.mapId,
+          name: m.name,
+          theme: m.theme,
+          order: m.sequenceOrder ?? i + 1,
+          estimatedXP: m.estimatedXP ?? 0,
+          gameKey: m.gameKey ?? null,
+          isActive: m.isActive !== false,
+          milestoneCount: countByMap.get(m.mapId) ?? 0,
+        })),
+      });
+    }
+
     const mapId = searchParams.get("mapId") || await resolveMapId();
 
     const mapConfig = await JourneyMapConfig.findOne({ mapId }).lean();

@@ -142,6 +142,30 @@ async function getAIConfig(): Promise<AIConfig> {
   };
 }
 
+/**
+ * What is actually in the journey collections, counted after a write.
+ *
+ * Reason: every earlier report was derived from the blueprint's intent or from
+ * one run's own created/updated counters, which cannot distinguish a rejected
+ * write from an add-only pass over a design that is already complete. Both read
+ * as zero, and only one of them is broken. Scoped to the maps this run planned,
+ * so an unrelated legacy map cannot inflate the figure.
+ */
+async function journeyState(mapIds: Set<string>) {
+  const ids = [...mapIds];
+  if (ids.length === 0) return { maps: 0, milestones: 0, zones: 0 };
+
+  const maps = await JourneyMapConfig.find({ mapId: { $in: ids } })
+    .select("mapId zones")
+    .lean<{ mapId: string; zones?: unknown[] }[]>();
+
+  return {
+    maps: maps.length,
+    milestones: await JourneyMilestone.countDocuments({ mapId: { $in: ids } }),
+    zones: maps.reduce((sum, m) => sum + (m.zones?.length ?? 0), 0),
+  };
+}
+
 // ─── DB TOOLS ──────────────────────────────────────────────────────────────────
 const dbTools = {
   async readAllBadges() {
@@ -354,12 +378,25 @@ const dbTools = {
   // operator saw a wizard report success and a journey screen with no maps at
   // all. Add-only: a map an operator has renamed or re-themed is never rewritten.
   async writeMapsBatch(maps: unknown[]) {
-    const results = { created: 0, skipped: 0, errors: 0 };
+    // Reason: `firstError` exists because the counter alone made a rejected
+    // write indistinguishable from a skip — an operator read "milestones
+    // written" beside an empty journey screen with the cause only in the server
+    // log. The message is the whole diagnosis, so it travels to the UI.
+    const results = {
+      created: 0,
+      skipped: 0,
+      errors: 0,
+      firstError: null as string | null,
+    };
+    const note = (message: string) => {
+      results.errors++;
+      if (!results.firstError) results.firstError = message;
+    };
     for (const row of maps) {
       const map = row as { mapId?: string };
       try {
         if (!map.mapId || typeof map.mapId !== "string") {
-          results.errors++;
+          note("a generated map had no mapId");
           continue;
         }
         const existing = await JourneyMapConfig.findOne({ mapId: map.mapId });
@@ -370,8 +407,9 @@ const dbTools = {
         await JourneyMapConfig.create(map);
         results.created++;
       } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
         console.error(`[Wizard] Map write error for ${map?.mapId}: ${err}`);
-        results.errors++;
+        note(`${map?.mapId ?? "map"}: ${message}`);
       }
     }
     return results;
@@ -381,7 +419,16 @@ const dbTools = {
     options: { mode?: "add-only" | "replace" } = {},
   ) {
     const mode = options.mode ?? "replace";
-    const results = { created: 0, updated: 0, skipped: 0, errors: 0 };
+    // Reason: same as writeMapsBatch — a validation rejection and a deliberate
+    // skip both incremented a counter nobody surfaced, so the operator saw
+    // success beside an empty editor.
+    const results = {
+      created: 0,
+      updated: 0,
+      skipped: 0,
+      errors: 0,
+      firstError: null as string | null,
+    };
     for (const row of milestones) {
       const ms = row as MilestoneDraft;
       try {
@@ -407,8 +454,12 @@ const dbTools = {
           results.created++;
         }
       } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
         console.error(`[Wizard] Milestone write error for ${ms.id}: ${err}`);
         results.errors++;
+        if (!results.firstError) {
+          results.firstError = `${ms.id ?? "milestone"}: ${message}`;
+        }
       }
     }
     return results;
@@ -1419,10 +1470,26 @@ export async function POST(request: NextRequest) {
           journey.milestones.filter((m) => writtenMapIds.has(m.mapId)),
           { mode: mode === "rebuild" ? "replace" : "add-only" },
         );
+        // Reason: the figures are counted out of the COLLECTIONS after the
+        // writes, never from the blueprint's intent and never from this run's
+        // own created/updated counters. Two different failures read identically
+        // otherwise: a rejected write, and an add-only pass over a design that
+        // is already complete. The first is broken and the second is fine, and
+        // both used to report zero. What an operator is asking is "are there
+        // milestones", so that is the number on the screen.
+        const state = await journeyState(writtenMapIds);
         steps.milestones = {
           action: mode === "rebuild" ? "blueprint-replaced" : "blueprint",
           maps: mapWrite,
           milestones: milestoneWrite,
+          mapsStored: state.maps,
+          milestonesStored: state.milestones,
+          zonesStored: state.zones,
+          createdMilestones: milestoneWrite.created + milestoneWrite.updated,
+          plannedMilestones: journey.milestones.filter((m) =>
+            writtenMapIds.has(m.mapId),
+          ).length,
+          error: mapWrite.firstError ?? milestoneWrite.firstError ?? null,
           mapIds: mapsToWrite.map((m) => m.mapId),
           mapNames: mapsToWrite.map((m) => m.name),
         };
@@ -1625,6 +1692,34 @@ export async function POST(request: NextRequest) {
         { mode: replaceExisting ? "replace" : "add-only" },
       );
 
+      // Reason: `totalMilestones` used to be the BLUEPRINT's length, so the
+      // button reported "Generated 24 milestones" whatever the database did
+      // with them — the operator read success and opened an empty editor. It is
+      // now counted out of the collections, so it answers the question the
+      // operator is actually asking; an empty result is a refusal rather than a
+      // success with a cheerful number on it.
+      const state = await journeyState(
+        new Set(journey.maps.map((m) => m.mapId)),
+      );
+      const storedMilestones = state.milestones;
+      if (storedMilestones === 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            action: "build_journeys",
+            maps: mapWrite,
+            milestones: milestoneWrite,
+            plannedMilestones: journey.milestones.length,
+            error:
+              milestoneWrite.firstError ??
+              (milestoneWrite.skipped > 0
+                ? `All ${milestoneWrite.skipped} milestone(s) already exist — tick "replace existing" to rebuild the sequence.`
+                : "The blueprint produced no milestones to store."),
+          },
+          { status: 500 },
+        );
+      }
+
       return NextResponse.json({
         success: true,
         action: "build_journeys",
@@ -1632,7 +1727,10 @@ export async function POST(request: NextRequest) {
         milestones: milestoneWrite,
         mapIds: journey.maps.map((m) => m.mapId),
         mapNames: journey.maps.map((m) => m.name),
-        totalMilestones: journey.milestones.length,
+        totalMilestones: storedMilestones,
+        totalMaps: state.maps,
+        totalZones: state.zones,
+        plannedMilestones: journey.milestones.length,
         scopes: quotaPlan.scopes
           .filter((s) => s.scope !== "platform" && s.total > 0)
           .map((s) => ({ scope: s.scope, label: s.label, total: s.total })),
