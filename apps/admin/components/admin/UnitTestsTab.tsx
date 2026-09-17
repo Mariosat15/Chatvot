@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Card,
   CardContent,
@@ -25,7 +25,13 @@ import {
   ChevronDown,
   ChevronRight,
   Trash2,
+  Copy,
+  ClipboardCheck,
 } from "lucide-react";
+import {
+  buildUnitTestReport,
+  type UnitTestResultRow,
+} from "@/lib/admin/unit-test-report";
 
 interface TestSuite {
   name: string;
@@ -33,13 +39,7 @@ interface TestSuite {
   relativePath: string;
 }
 
-interface TestResult {
-  name: string;
-  suite: string;
-  status: "passed" | "failed" | "skipped";
-  duration: number;
-  error?: string;
-}
+type TestResult = UnitTestResultRow;
 
 interface TestRun {
   _id: string;
@@ -71,6 +71,8 @@ interface TestSchedule {
   suites?: string[];
 }
 
+type ResultFilter = "all" | "failed" | "passed" | "skipped";
+
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 export default function UnitTestsTab() {
@@ -82,6 +84,8 @@ export default function UnitTestsTab() {
   const [isRunning, setIsRunning] = useState(false);
   const [loading, setLoading] = useState(true);
   const [savingSchedule, setSavingSchedule] = useState(false);
+  const [resultFilter, setResultFilter] = useState<ResultFilter>("all");
+  const [reportCopied, setReportCopied] = useState(false);
 
   const fetchSuites = useCallback(async () => {
     try {
@@ -137,7 +141,15 @@ export default function UnitTestsTab() {
           if (data.run.status !== "running") {
             setIsRunning(false);
             setActiveRun(null);
-            fetchRuns();
+            // Reason: attach full results so Copy Report works without a second expand click.
+            setRuns((prev) => {
+              const others = prev.filter((r) => r._id !== data.run._id);
+              return [data.run, ...others];
+            });
+            setExpandedRun(data.run._id);
+            if (data.run.failed > 0) {
+              setResultFilter("failed");
+            }
             if (data.run.status === "passed") {
               toast.success(`Tests passed! ${data.run.passed}/${data.run.totalTests}`);
             } else if (data.run.status === "failed") {
@@ -152,7 +164,7 @@ export default function UnitTestsTab() {
       }
     }, 3000);
     return () => clearInterval(interval);
-  }, [isRunning, activeRun, fetchRuns]);
+  }, [isRunning, activeRun]);
 
   const startTestRun = async () => {
     try {
@@ -183,6 +195,7 @@ export default function UnitTestsTab() {
       const data = await res.json();
       if (data.success) {
         toast.success("Test run deleted");
+        if (expandedRun === runId) setExpandedRun(null);
         fetchRuns();
       }
     } catch {
@@ -203,6 +216,13 @@ export default function UnitTestsTab() {
           prev.map((r) => (r._id === runId ? { ...r, testResults: data.run.testResults } : r)),
         );
         setExpandedRun(runId);
+        // Reason: when opening a failed run, default the filter to failures so the list is usable.
+        if ((data.run.failed ?? 0) > 0) {
+          setResultFilter("failed");
+        } else {
+          setResultFilter("all");
+        }
+        setReportCopied(false);
       }
     } catch {
       toast.error("Failed to load test details");
@@ -231,6 +251,53 @@ export default function UnitTestsTab() {
     }
   };
 
+  const expandedRunData = useMemo(
+    () => runs.find((r) => r._id === expandedRun) ?? null,
+    [runs, expandedRun],
+  );
+
+  const visibleResults = useMemo(() => {
+    const results = expandedRunData?.testResults ?? [];
+    const filtered =
+      resultFilter === "all"
+        ? results
+        : results.filter((t) => t.status === resultFilter);
+    // Reason: failures first even on "all", so the list is useful without the filter.
+    return [...filtered].sort((a, b) => {
+      const rank = (s: TestResult["status"]) =>
+        s === "failed" ? 0 : s === "skipped" ? 1 : 2;
+      return rank(a.status) - rank(b.status);
+    });
+  }, [expandedRunData, resultFilter]);
+
+  const copyReport = async () => {
+    if (!expandedRunData?.testResults?.length && !expandedRunData?.errorMessage) {
+      toast.error("Expand a finished run first");
+      return;
+    }
+    const report = buildUnitTestReport(expandedRunData);
+    try {
+      await navigator.clipboard.writeText(report);
+      setReportCopied(true);
+      toast.success("Report copied to clipboard");
+      setTimeout(() => setReportCopied(false), 3000);
+    } catch {
+      // Reason: clipboard can fail in some browsers; fall back to a download.
+      try {
+        const blob = new Blob([report], { type: "text/plain;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `unit-test-report-${expandedRunData._id}.txt`;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success("Report downloaded");
+      } catch {
+        toast.error("Failed to copy report");
+      }
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -240,6 +307,10 @@ export default function UnitTestsTab() {
   }
 
   const latestRun = runs[0];
+  const canCopyReport = Boolean(
+    expandedRunData &&
+      (expandedRunData.testResults?.length || expandedRunData.errorMessage),
+  );
 
   return (
     <div className="space-y-6">
@@ -257,6 +328,26 @@ export default function UnitTestsTab() {
               </CardDescription>
             </div>
             <div className="flex items-center gap-3">
+              {canCopyReport && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={copyReport}
+                  className="border-gray-600 text-gray-300 hover:bg-gray-700"
+                >
+                  {reportCopied ? (
+                    <>
+                      <ClipboardCheck className="h-4 w-4 mr-2 text-green-400" />
+                      Copied
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-4 w-4 mr-2" />
+                      Copy Report
+                    </>
+                  )}
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="sm"
@@ -456,16 +547,41 @@ export default function UnitTestsTab() {
       {/* History Section */}
       <Card className="bg-gray-800/50 border-gray-700">
         <CardHeader>
-          <CardTitle className="text-white flex items-center gap-2">
-            <Clock className="h-5 w-5 text-amber-400" />
-            Test History
-          </CardTitle>
-          <CardDescription className="text-gray-400">
-            {runs.length} recent test run{runs.length !== 1 ? "s" : ""}
-          </CardDescription>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <CardTitle className="text-white flex items-center gap-2">
+                <Clock className="h-5 w-5 text-amber-400" />
+                Test History
+              </CardTitle>
+              <CardDescription className="text-gray-400">
+                {runs.length} recent test run{runs.length !== 1 ? "s" : ""}
+              </CardDescription>
+            </div>
+            {canCopyReport && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={copyReport}
+                className="border-gray-600 text-gray-300 hover:bg-gray-700"
+              >
+                {reportCopied ? (
+                  <>
+                    <ClipboardCheck className="h-4 w-4 mr-2 text-green-400" />
+                    Copied
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-4 w-4 mr-2" />
+                    Copy Report
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
-          <ScrollArea className="max-h-[500px]">
+          {/* Reason: fixed height required — Radix ScrollArea ignores max-h alone. */}
+          <ScrollArea className="h-[560px] pr-3">
             <div className="space-y-2">
               {runs.map((run) => (
                 <div key={run._id} className="border border-gray-700 rounded-lg overflow-hidden">
@@ -498,6 +614,11 @@ export default function UnitTestsTab() {
                               {run.passed}/{run.totalTests} passed
                             </span>
                           )}
+                          {run.failed > 0 && (
+                            <span className="text-xs text-red-400">
+                              {run.failed} failed
+                            </span>
+                          )}
                           {run.duration != null && (
                             <span className="text-xs text-gray-500">
                               {(run.duration / 1000).toFixed(1)}s
@@ -522,19 +643,72 @@ export default function UnitTestsTab() {
                   {/* Expanded details */}
                   {expandedRun === run._id && run.testResults && (
                     <div className="border-t border-gray-700 px-4 py-3 bg-gray-900/30">
-                      {run.testResults.length > 0 ? (
-                        <div className="space-y-1.5">
-                          {run.testResults.map((test, i) => (
-                            <div key={i} className="flex items-start gap-2 text-sm">
+                      <div className="flex flex-wrap items-center gap-2 mb-3">
+                        {(
+                          [
+                            ["all", `All (${run.testResults.length})`],
+                            ["failed", `Failed (${run.failed})`],
+                            ["passed", `Passed (${run.passed})`],
+                            ["skipped", `Skipped (${run.skipped})`],
+                          ] as const
+                        ).map(([key, label]) => (
+                          <Button
+                            key={key}
+                            type="button"
+                            size="sm"
+                            variant={resultFilter === key ? "default" : "outline"}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setResultFilter(key);
+                            }}
+                            className={
+                              resultFilter === key
+                                ? "h-7 text-xs"
+                                : "h-7 text-xs border-gray-600 text-gray-300"
+                            }
+                          >
+                            {label}
+                          </Button>
+                        ))}
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            copyReport();
+                          }}
+                          className="h-7 text-xs border-gray-600 text-gray-300 ml-auto"
+                        >
+                          {reportCopied ? (
+                            <>
+                              <ClipboardCheck className="h-3.5 w-3.5 mr-1 text-green-400" />
+                              Copied
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="h-3.5 w-3.5 mr-1" />
+                              Copy Report
+                            </>
+                          )}
+                        </Button>
+                      </div>
+
+                      {visibleResults.length > 0 ? (
+                        // Reason: nested scroll for the result list — the outer history
+                        // scroll alone buried failures under hundreds of passed rows.
+                        <div className="max-h-[360px] overflow-y-auto space-y-1.5 pr-1">
+                          {visibleResults.map((test, i) => (
+                            <div key={`${test.suite}-${test.name}-${i}`} className="flex items-start gap-2 text-sm">
                               <StatusIcon status={test.status} size="sm" />
                               <div className="flex-1 min-w-0">
                                 <span className="text-gray-300">{test.name}</span>
                                 <span className="text-gray-600 text-xs ml-2">
-                                  ({test.duration}ms)
+                                  {test.suite} · {test.duration}ms
                                 </span>
                                 {test.error && (
-                                  <pre className="text-red-400 text-xs mt-1 whitespace-pre-wrap font-mono bg-red-950/20 p-2 rounded">
-                                    {test.error.slice(0, 500)}
+                                  <pre className="text-red-400 text-xs mt-1 whitespace-pre-wrap font-mono bg-red-950/20 p-2 rounded max-h-48 overflow-y-auto">
+                                    {test.error.slice(0, 2000)}
                                   </pre>
                                 )}
                               </div>
@@ -543,7 +717,10 @@ export default function UnitTestsTab() {
                         </div>
                       ) : (
                         <p className="text-gray-500 text-sm">
-                          {run.errorMessage || "No test results available"}
+                          {run.errorMessage ||
+                            (resultFilter === "failed"
+                              ? "No failed tests in this run"
+                              : "No test results available")}
                         </p>
                       )}
                     </div>
