@@ -245,16 +245,31 @@ function describe(
 /**
  * Lay a milestone out on a serpentine path so a map with any number of nodes
  * still reads as a route rather than a grid.
+ *
+ * Reason: the player renderer places nodes at absolute pixels on a 1200×800
+ * canvas (`JourneyMapRenderer` MAP_WIDTH / MAP_HEIGHT). An earlier version of
+ * this helper emitted values in the 10–90 range — which read as percentages —
+ * so every node piled into a ~90×60 box in the top-left corner and the map
+ * looked blank while the header still counted "1 of 12 milestones". Nothing
+ * threw and nothing logged; the only witness was a screenshot.
  */
+const MAP_LAYOUT_WIDTH = 1200;
+const MAP_LAYOUT_HEIGHT = 800;
+
 function positionFor(index: number, perRow = 5): { x: number; y: number } {
   const row = Math.floor(index / perRow);
   const col = index % perRow;
   // Reason: odd rows run right-to-left, which is what makes consecutive nodes
   // adjacent at a row boundary instead of jumping the full width of the map.
   const laidOut = row % 2 === 0 ? col : perRow - 1 - col;
+  const marginX = 100;
+  const marginY = 100;
+  const usableW = MAP_LAYOUT_WIDTH - marginX * 2;
+  const usableH = MAP_LAYOUT_HEIGHT - marginY * 2;
+  const rowPitch = Math.min(160, Math.floor(usableH / 3));
   return {
-    x: 10 + laidOut * (80 / Math.max(1, perRow - 1)),
-    y: 12 + row * 16,
+    x: Math.round(marginX + laidOut * (usableW / Math.max(1, perRow - 1))),
+    y: Math.round(marginY + row * rowPitch),
   };
 }
 
@@ -402,15 +417,17 @@ export function buildJourneyBlueprint(
   const maps: BlueprintMap[] = [];
   const milestones: BlueprintMilestone[] = [];
 
+  // Reason: the platform/"Getting Started" map was a journey with no game and
+  // no trading — social/account conditions that produced a blank-looking route
+  // (and that the owner does not want on the player carousel). Game and trading
+  // scopes already cover every player; a third map for "platform" is friction
+  // with no prize.
   const scopes = plan.scopes.filter(
-    (s) => s.total > 0 || s.scope === "platform",
+    (s) => s.total > 0 && s.scope !== "platform",
   );
 
   scopes.forEach((quota, i) => {
-    const mapId =
-      quota.scope === "platform"
-        ? "platform_journey"
-        : `journey_${slug(quota.scope)}`;
+    const mapId = `journey_${slug(quota.scope)}`;
     const scopeMilestones = buildMilestonesForScope(quota, mapId, perMap);
     if (scopeMilestones.length === 0) return;
 
@@ -430,14 +447,8 @@ export function buildJourneyBlueprint(
 
     maps.push({
       mapId,
-      name:
-        quota.scope === "platform"
-          ? "Getting Started"
-          : `${quota.label} Journey`,
-      description:
-        quota.scope === "platform"
-          ? "Steps every player can take, whichever games they play."
-          : `Your path through ${quota.label}.`,
+      name: `${quota.label} Journey`,
+      description: `Your path through ${quota.label}.`,
       zones: zonesFor(mapId),
       defaultStartNode: scopeMilestones[0]?.id ?? `${mapId}_start`,
       backgroundColor: "#0F172A",
@@ -455,7 +466,7 @@ export function buildJourneyBlueprint(
       requiredLevelToStart,
       completionRequirement: 100,
       totalMilestones: scopeMilestones.length,
-      gameKey: quota.scope === "platform" ? null : quota.scope,
+      gameKey: quota.scope === "trading" ? null : quota.scope,
     });
     milestones.push(...scopeMilestones);
   });

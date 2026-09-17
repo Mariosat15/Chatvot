@@ -49,6 +49,8 @@ import {
   DEFAULT_TARGET_BADGE_TOTAL,
   earnableXpFromBadges,
   planBadgeQuota,
+  proposeBadgeXp,
+  auditEconomy,
 } from "@/lib/services/games/gamification-economy";
 import { buildBadgeBlueprint } from "@/lib/services/games/badge-blueprint";
 import { buildJourneyBlueprint } from "@/lib/services/games/journey-blueprint";
@@ -1338,13 +1340,24 @@ export async function POST(request: NextRequest) {
       // Reason: the XP each rarity pays has to be settled BEFORE the ladder is
       // derived, because the ladder is a function of what the catalogue can
       // actually pay. The ladder itself is step 4.
-      const xpConfig = await dbTools.readXPConfig();
-      if (!xpConfig?.badgeXP) {
-        await dbTools.writeXPConfig("badge_xp", DEFAULT_BADGE_XP);
-        steps.badgeXp = { action: "created", badgeXP: DEFAULT_BADGE_XP };
-      } else {
-        steps.badgeXp = { action: "kept", badgeXP: xpConfig.badgeXP };
-      }
+      //
+      // ALWAYS rewrite on every run_full. Leaving an existing 10/25/50/100 row
+      // (the install default) made the XP Values screen look unchanged after the
+      // wizard "succeeded", which reads as "the wizard does not calculate XP".
+      // An operator who wants a hand-tuned table edits Badges & XP directly; the
+      // wizard's job is to propose the scale that matches the catalogue size.
+      const targetTotal =
+        typeof body.generateCount === "number" && body.generateCount > 0
+          ? Math.floor(body.generateCount)
+          : DEFAULT_TARGET_BADGE_TOTAL;
+      const proposedXp = proposeBadgeXp(targetTotal);
+      const priorXp = await dbTools.readXPConfig();
+      await dbTools.writeXPConfig("badge_xp", proposedXp);
+      steps.badgeXp = {
+        action: priorXp?.badgeXP ? "recalculated" : "created",
+        badgeXP: proposedXp,
+        previous: priorXp?.badgeXP ?? null,
+      };
       const badgeXp = await resolveBadgeXp();
 
       // ── 2. Badges — deterministic blueprint, add-only ─────────────────────
@@ -1355,10 +1368,6 @@ export async function POST(request: NextRequest) {
       // arithmetic now; the model is a rewording pass over what this produced.
       const catalogue = await loadCatalogueGameRefs();
       const knownKeys = knownGameKeys(catalogue);
-      const targetTotal =
-        typeof body.generateCount === "number" && body.generateCount > 0
-          ? Math.floor(body.generateCount)
-          : DEFAULT_TARGET_BADGE_TOTAL;
       const quotaPlan = planBadgeQuota(
         catalogue.map((c) => ({ gameKey: c.gameKey, name: c.displayName })),
         targetTotal,
@@ -1382,12 +1391,16 @@ export async function POST(request: NextRequest) {
         writeResults: badgeWrite,
       };
 
-      // ── 3. Journey maps and milestones — deterministic, add-only ──────────
+      // ── 3. Journey maps and milestones — deterministic ────────────────────
       // Reason: the milestone agent iterates maps that already exist, so after a
       // wipe there were none and it produced nothing at all — a wizard reporting
       // success beside an empty journey screen. The maps are built here from the
       // same quota plan the badges are, which is what guarantees a game cannot
       // have badges and no journey.
+      //
+      // On rebuild we REPLACE: add-only leaves Getting Started / Pirate Cove /
+      // blank percent-layout rows beside the new maps, and the player carousel
+      // then offers a journey with nothing on it.
       if (includeMilestones) {
         const journey = buildJourneyBlueprint(quotaPlan, {
           earnableBadgeXp: earnableXpFromBadges(blueprint.badges, badgeXp),
@@ -1397,46 +1410,73 @@ export async function POST(request: NextRequest) {
           Math.max(0, maxMaps === 0 ? journey.maps.length : maxMaps),
         );
         const writtenMapIds = new Set(mapsToWrite.map((m) => m.mapId));
+        if (mode === "rebuild") {
+          await JourneyMilestone.deleteMany({});
+          await JourneyMapConfig.deleteMany({});
+        }
         const mapWrite = await dbTools.writeMapsBatch(mapsToWrite);
         const milestoneWrite = await dbTools.writeMilestonesBatch(
           journey.milestones.filter((m) => writtenMapIds.has(m.mapId)),
-          { mode: "add-only" },
+          { mode: mode === "rebuild" ? "replace" : "add-only" },
         );
         steps.milestones = {
-          action: "blueprint",
+          action: mode === "rebuild" ? "blueprint-replaced" : "blueprint",
           maps: mapWrite,
           milestones: milestoneWrite,
           mapIds: mapsToWrite.map((m) => m.mapId),
+          mapNames: mapsToWrite.map((m) => m.name),
         };
       } else {
         steps.milestones = "skipped";
       }
 
       // ── 4. Levels — derived from what the catalogue can now pay ───────────
-      // Reason: a ladder an operator has tuned is never overwritten, and a
-      // ladder written BEFORE the badges exists is derived from zero earnable
-      // XP — which is exactly the "level 20 needs 426,000 XP while a badge pays
-      // 25" mismatch an operator sees as no balance at all.
-      const existingLevels = Array.isArray(xpConfig?.levels) ? xpConfig.levels : [];
-      if (proposeLadder && existingLevels.length === 0) {
-        const allBadges = await dbTools.readAllBadges();
-        const earnable = earnableXpFromBadges(
-          allBadges as Array<{ rarity?: string | null }>,
-          badgeXp,
-        );
+      // Reason: a ladder an operator has tuned is never overwritten on add-only,
+      // and a ladder written BEFORE the badges exists is derived from zero
+      // earnable XP — which is exactly the "level 20 needs 426,000 XP while a
+      // badge pays 25" mismatch an operator sees as no balance at all.
+      //
+      // On rebuild we ALWAYS rewrite: an add-only "kept" after a wipe that
+      // somehow left the row (or a wipe that omitted the levels scope) is how
+      // the 426,400 curve survived beside the new catalogue.
+      const freshXpConfig = await dbTools.readXPConfig();
+      const existingLevels = Array.isArray(freshXpConfig?.levels)
+        ? freshXpConfig.levels
+        : [];
+      const allBadges = await dbTools.readAllBadges();
+      const earnable = earnableXpFromBadges(
+        allBadges as Array<{ rarity?: string | null }>,
+        badgeXp,
+      );
+      const economy = auditEconomy(
+        allBadges as Array<{ rarity?: string | null }>,
+        existingLevels as Array<{ minXP?: number | null }>,
+        badgeXp,
+      );
+      const shouldRewriteLadder =
+        proposeLadder &&
+        (mode === "rebuild" ||
+          existingLevels.length === 0 ||
+          !economy.reachable);
+
+      if (shouldRewriteLadder) {
         const proposed = proposeNeutralLadder(undefined, earnable);
         await dbTools.writeXPConfig("level_progression", proposed);
         steps.levels = {
-          action: "created",
+          action: mode === "rebuild" ? "rebuilt" : "created",
           levelCount: proposed.length,
           earnableXp: earnable,
           topLevelMinXP: proposed.at(-1)?.minXP,
+          reason: !economy.reachable && existingLevels.length > 0
+            ? "replaced unreachable ladder"
+            : undefined,
         };
       } else {
         steps.levels = {
           action: "kept",
           levelCount: existingLevels.length,
           audit: auditLadder(existingLevels as never[]),
+          economy,
         };
       }
 
@@ -1542,11 +1582,68 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, ...payload });
     }
 
+    // ═══════════════════════════════════════════════════════════════════════════
+    // build_journeys — deterministic maps + milestones for every game (no AI).
+    //
+    // Reason: Journey Map → "Generate Full Sequence" used to call the trading
+    // AI agent ten times (`generate_single_map`), so every map was Pirate Cove /
+    // total_trades regardless of the catalogue. The blueprint already walks
+    // every scope; this action is the button's public surface onto it.
+    // ═══════════════════════════════════════════════════════════════════════════
+    if (action === "build_journeys") {
+      const replaceExisting = body.replaceExisting === true;
+      const catalogue = await loadCatalogueGameRefs();
+      const badgeXp = await resolveBadgeXp();
+      const existingBadges = await dbTools.readAllBadges();
+      const targetTotal =
+        typeof body.generateCount === "number" && body.generateCount > 0
+          ? Math.floor(body.generateCount)
+          : Math.max(DEFAULT_TARGET_BADGE_TOTAL, existingBadges.length);
+      const quotaPlan = planBadgeQuota(
+        catalogue.map((c) => ({ gameKey: c.gameKey, name: c.displayName })),
+        targetTotal,
+      );
+      const journey = buildJourneyBlueprint(quotaPlan, {
+        earnableBadgeXp: earnableXpFromBadges(
+          existingBadges as Array<{ rarity?: string | null }>,
+          badgeXp,
+        ),
+      });
+
+      if (replaceExisting) {
+        // Reason: add-only cannot retire Getting Started / Pirate Cove rows the
+        // trading generator left behind, so a replace pass deletes the design
+        // first — the same wipe the wizard's milestones scope does — then
+        // writes the blueprint. Player progress is kept.
+        await JourneyMilestone.deleteMany({});
+        await JourneyMapConfig.deleteMany({});
+      }
+
+      const mapWrite = await dbTools.writeMapsBatch(journey.maps);
+      const milestoneWrite = await dbTools.writeMilestonesBatch(
+        journey.milestones,
+        { mode: replaceExisting ? "replace" : "add-only" },
+      );
+
+      return NextResponse.json({
+        success: true,
+        action: "build_journeys",
+        maps: mapWrite,
+        milestones: milestoneWrite,
+        mapIds: journey.maps.map((m) => m.mapId),
+        mapNames: journey.maps.map((m) => m.name),
+        totalMilestones: journey.milestones.length,
+        scopes: quotaPlan.scopes
+          .filter((s) => s.scope !== "platform" && s.total > 0)
+          .map((s) => ({ scope: s.scope, label: s.label, total: s.total })),
+      });
+    }
+
     return NextResponse.json(
       {
         success: false,
         error:
-          "Invalid action. Use: get_status, coverage, setup_levels, plan_badges, run_full, agent_badges, agent_milestones, agent_evaluate, auto_fix, apply_changes",
+          "Invalid action. Use: get_status, coverage, setup_levels, plan_badges, run_full, build_journeys, agent_badges, agent_milestones, agent_evaluate, auto_fix, apply_changes",
       },
       { status: 400 },
     );

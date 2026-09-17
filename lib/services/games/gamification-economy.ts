@@ -37,6 +37,31 @@ export const DEFAULT_BADGE_XP: RarityCount = {
 };
 
 /**
+ * Propose XP-per-rarity for a catalogue of `badgeCount` badges.
+ *
+ * Reason: leaving `DEFAULT_BADGE_XP` forever means the XP Values screen never
+ * moves when the wizard runs, which reads as "the wizard does not calculate
+ * XP" even when the ladder was derived correctly underneath. The ratios stay
+ * the DEFAULT ones; only the scale moves with catalogue size so a 220-badge
+ * system does not pay the same per-badge as a 50-badge one.
+ *
+ * Floor is the default table — never shrink below what a fresh install pays.
+ */
+export function proposeBadgeXp(badgeCount: number): RarityCount {
+  const n = Math.max(1, Math.floor(Number(badgeCount) || 0) || 1);
+  // Reason: one "unit" of the default table per ~50 badges. 220 → scale 4 →
+  // 40 / 100 / 200 / 400, which is a visible change on the XP Values screen
+  // and still keeps the ladder reachable under `LADDER_TOP_FRACTION`.
+  const scale = Math.max(1, Math.round(n / 50));
+  return {
+    common: DEFAULT_BADGE_XP.common * scale,
+    rare: DEFAULT_BADGE_XP.rare * scale,
+    epic: DEFAULT_BADGE_XP.epic * scale,
+    legendary: DEFAULT_BADGE_XP.legendary * scale,
+  };
+}
+
+/**
  * Rarity pyramid. Deliberately not equal shares: a catalogue where a quarter of
  * everything is legendary devalues the word, and one with no legendaries has no
  * top end to chase.

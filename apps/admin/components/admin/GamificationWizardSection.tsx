@@ -396,6 +396,7 @@ export default function GamificationWizardSection() {
 
       const s = data.steps || {};
       const reset = typeof s.reset === "object" && s.reset !== null ? s.reset : null;
+      const xp = s.badgeXp?.badgeXP;
       const steps: FullSetupStep[] = [
         // Reason: the wipe is reported as a step of its own, with counts. A
         // rebuild that silently deleted nothing — a wrong scope, an empty
@@ -413,26 +414,40 @@ export default function GamificationWizardSection() {
             ]
           : []),
         {
+          name: "Badge XP values",
+          success: true,
+          summary:
+            s.badgeXp?.action === "kept"
+              ? `Kept existing (${xp ? `C${xp.common}/R${xp.rare}/E${xp.epic}/L${xp.legendary}` : "unchanged"})`
+              : `Wrote ${s.badgeXp?.action || "xp"}: C${xp?.common ?? "?"}/R${xp?.rare ?? "?"}/E${xp?.epic ?? "?"}/L${xp?.legendary ?? "?"}`,
+        },
+        {
           name: "Level ladder",
           success: true,
           summary:
-            s.levels?.action === "created"
-              ? `Created ${s.levels.levelCount} neutral levels`
+            s.levels?.action === "created" || s.levels?.action === "rebuilt"
+              ? `${s.levels.action === "rebuilt" ? "Rebuilt" : "Created"} ${s.levels.levelCount} levels (top ${s.levels.topLevelMinXP?.toLocaleString?.() ?? s.levels.topLevelMinXP} XP)`
               : `Kept ${s.levels?.levelCount ?? 0} existing levels`,
         },
         {
-          name: "Badge Agent (AI)",
+          name: "Badges (blueprint)",
           success: !s.badges?.error,
-          summary: s.badges?.summary || s.badges?.error || "",
+          summary:
+            s.badges?.action === "blueprint"
+              ? `Generated ${s.badges.generated ?? 0} / target ${s.badges.target ?? "?"} across ${(s.badges.scopes || []).length} scopes`
+              : s.badges?.summary || s.badges?.error || "",
           fixedCount: s.badges?.fixedCount || 0,
-          newCount: s.badges?.newCount || 0,
+          newCount: s.badges?.generated || s.badges?.newCount || 0,
         },
         {
-          name: "Milestone Agent (AI)",
+          name: "Journeys & milestones",
           success: true,
-          summary: Array.isArray(s.milestones)
-            ? `${s.milestones.length} map(s) processed`
-            : "skipped",
+          summary:
+            s.milestones?.action === "blueprint"
+              ? `${(s.milestones.mapIds || []).length} maps, milestones written`
+              : typeof s.milestones === "string"
+                ? s.milestones
+                : "skipped",
         },
         {
           name: "Auto-Fix Engine",

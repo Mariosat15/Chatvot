@@ -923,6 +923,26 @@ eye.
 reported counts against the screen - the header, the badge total, the journey maps per
 game and the top rung's XP against `earnableXp`.
 
+### 17 Sep 2026 - WIZARD XP / JOURNEYS FOLLOW-UP (stale admin mirrors)
+
+**Owner report (screenshots):** after the Gamification Wizard, Badges & XP → XP Values
+still showed **10 / 25 / 50 / 100**; Journey Map → Generate Full Sequence still felt
+trading-only; player Journey offered a blank **Getting Started** map.
+
+**Root cause:** the admin copies of `gamification-economy.ts` and `journey-blueprint.ts`
+had **drifted** — the wizard imports those, so `proposeBadgeXp` and the pixel-layout /
+no-platform journey build never ran in admin. XP Values also stayed on install defaults
+because `run_full` **kept** an existing `badge_xp` row on add-only. Getting Started was
+the old `platform_journey` map with percent coordinates on a 1200×800 canvas.
+
+**Shipped:** mirrors resynced; `run_full` **always** writes `proposeBadgeXp(target)` into
+`badge_xp`; rebuild replaces all journey maps + milestones; `build_journeys` remains the
+Full Sequence path with `replaceExisting: true`; player `GET /api/journey/maps/sequence`
+hides Getting Started / empty maps. **42** orchestration tests green.
+
+**Operator action:** re-run the wizard (Start from scratch preferred) or Journey Map →
+Generate Full Sequence, then refresh Badges & XP and the player Journey page.
+
 ---
 
 ### 17 Sep 2026 - THREE LEADERBOARDS BECAME ONE GLOBAL STANDING (X7 STEP 2 EXTENDED)

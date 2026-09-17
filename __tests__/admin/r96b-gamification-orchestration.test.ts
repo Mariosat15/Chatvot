@@ -28,6 +28,13 @@ import {
   type BadgeData,
   type MilestoneData,
 } from "../../apps/admin/lib/gamification-engine";
+import {
+  proposeBadgeXp,
+  planBadgeQuota,
+  DEFAULT_BADGE_XP,
+  DEFAULT_TARGET_BADGE_TOTAL,
+} from "../../apps/admin/lib/services/games/gamification-economy";
+import { buildJourneyBlueprint } from "../../apps/admin/lib/services/games/journey-blueprint";
 
 const SPRINT = "provider:chartvolt:circuit-sprint";
 const PERFECT = "provider:chartvolt:circuit-perfect";
@@ -353,8 +360,39 @@ describe("run_full pipeline (structural)", () => {
       route.indexOf('action === "run_full"'),
       route.indexOf('action === "agent_milestones"'),
     );
-    expect(block).toMatch(/mode:\s*"add-only"/);
-    expect(block).not.toMatch(/mode:\s*"replace"/);
+    // Badges stay add-only; milestones may replace on rebuild so Getting Started
+    // leftovers do not sit beside the new maps.
+    expect(block).toMatch(/writeBadgesBatch\([\s\S]*?mode:\s*"add-only"/);
+  });
+
+  it("always recalculates badge XP on run_full (never keeps the install defaults)", () => {
+    // Reason: leaving `badge_xp` at 10/25/50/100 when the table already existed
+    // made the XP Values screen look unchanged after a successful wizard run.
+    const block = route.slice(
+      route.indexOf('action === "run_full"'),
+      route.indexOf('action === "reset_gamification"'),
+    );
+    expect(block).toMatch(/proposeBadgeXp\(/);
+    expect(block).toMatch(/writeXPConfig\(\s*"badge_xp"/);
+    // Levels may still be "kept" when reachable; badge XP must not.
+    expect(block).toMatch(/action:\s*priorXp\?\.badgeXP\s*\?\s*"recalculated"/);
+    expect(block).not.toMatch(/steps\.badgeXp\s*=\s*\{\s*action:\s*"kept"/);
+  });
+
+  it("exposes build_journeys for the Journey Map Full Sequence button", () => {
+    expect(route).toMatch(/action === "build_journeys"/);
+    const editor = readCode(
+      "apps/admin/components/admin/JourneyMapEditorSection.tsx",
+    );
+    expect(editor).toMatch(/action:\s*"build_journeys"/);
+    expect(editor).toMatch(/replaceExisting:\s*true/);
+    // Reason: the trading AI path must not be the Full Sequence confirm target.
+    const dialog = editor.slice(
+      editor.indexOf("Generate journeys for every game"),
+      editor.indexOf("Visual Milestone Placement"),
+    );
+    expect(dialog).not.toMatch(/generate_single_map/);
+    expect(dialog).toMatch(/generateFullSequence/);
   });
 
   it("reports the post-run gap so a second pass is measurable", () => {
@@ -582,4 +620,63 @@ describe("the deterministic generators are mirrored (R103)", () => {
       expect(admin).toBe(main);
     });
   }
+});
+
+describe("proposeBadgeXp scales with catalogue size", () => {
+  it("never shrinks below the install defaults", () => {
+    expect(proposeBadgeXp(1)).toEqual(DEFAULT_BADGE_XP);
+    expect(proposeBadgeXp(49)).toEqual(DEFAULT_BADGE_XP);
+  });
+
+  it("scales so a 220-badge catalogue visibly moves the XP Values screen", () => {
+    const xp = proposeBadgeXp(DEFAULT_TARGET_BADGE_TOTAL);
+    expect(xp.common).toBeGreaterThan(DEFAULT_BADGE_XP.common);
+    expect(xp).toEqual({
+      common: 40,
+      rare: 100,
+      epic: 200,
+      legendary: 400,
+    });
+  });
+});
+
+describe("journey blueprint skips the blank Getting Started map", () => {
+  it("does not emit platform_journey or Getting Started", () => {
+    const plan = planBadgeQuota(
+      [
+        { gameKey: "trading", name: "Trading" },
+        { gameKey: SPRINT, name: "Circuit Sprint" },
+      ],
+      80,
+    );
+    const journey = buildJourneyBlueprint(plan, { earnableBadgeXp: 5000 });
+    expect(journey.maps.some((m) => m.mapId === "platform_journey")).toBe(
+      false,
+    );
+    expect(
+      journey.maps.some((m) => /getting started/i.test(m.name)),
+    ).toBe(false);
+    expect(journey.maps.length).toBeGreaterThan(0);
+    expect(journey.milestones.length).toBeGreaterThan(0);
+    // Reason: player canvas is 1200×800 pixels — percent coords (10–90) pile
+    // every node into the top-left corner and look like a blank map.
+    for (const m of journey.milestones) {
+      expect(m.position.x).toBeGreaterThan(50);
+      expect(m.position.y).toBeGreaterThan(50);
+    }
+  });
+});
+
+describe("player sequence API hides empty / Getting Started maps", () => {
+  it("filters platform_journey and zero-milestone maps", () => {
+    const src = readFileSync(
+      join(__dirname, "..", "..", "app/api/journey/maps/sequence/route.ts"),
+      "utf8",
+    ).replace(/\/\*[\s\S]*?\*\//g, "");
+    expect(src).toMatch(/HIDDEN_MAP_IDS/);
+    expect(src).toMatch(/platform_journey/);
+    expect(src).toMatch(/getting_started/);
+    expect(src).toMatch(/JourneyMilestone\.aggregate/);
+    expect(src).toMatch(/countByMap/);
+  });
 });
