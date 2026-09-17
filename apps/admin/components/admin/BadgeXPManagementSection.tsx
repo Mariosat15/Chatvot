@@ -18,7 +18,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
@@ -108,9 +107,145 @@ interface Stats {
   averageLevel: number;
 }
 
+/**
+ * A badge row as these screens handle it — a stored document, an AI fix proposal
+ * carrying `_changes`, or a candidate carrying `_isNew`.
+ *
+ * Reason: the six identity and presentation fields are required because every
+ * producer supplies them and the grid renders all six unconditionally. Only the
+ * gating fields are optional, which is what distinguishes a platform badge from
+ * a level- or game-scoped one.
+ */
+interface AdminBadge {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  rarity: string;
+  icon: string;
+  minLevel?: number;
+  gameTypes?: string[];
+  condition?: {
+    type?: string;
+    value?: number;
+    comparison?: string;
+    minTrades?: number;
+    minCompletedCompetitions?: number;
+  };
+  _changes?: string;
+  _isNew?: boolean;
+}
+
+/** The four rarities the XP table is keyed on. */
+type BadgeRarity = "common" | "rare" | "epic" | "legendary";
+
+/**
+ * The edit form's shape for one badge.
+ *
+ * Reason: the grid populates this from two controls — the card and its pencil —
+ * and the literal was written twice. Two copies of the defaulting rule is how a
+ * badge edited by one control arrives with a condition the other would have
+ * filled in, so there is one producer.
+ */
+function badgeFormFrom(badge: AdminBadge) {
+  return {
+    id: badge.id,
+    name: badge.name,
+    description: badge.description,
+    category: badge.category,
+    rarity: badge.rarity,
+    icon: badge.icon,
+    minLevel: badge.minLevel ?? 0,
+    gameTypes: Array.isArray(badge.gameTypes) ? badge.gameTypes : ["trading"],
+    condition: {
+      type: badge.condition?.type ?? "",
+      value: badge.condition?.value,
+      comparison: (badge.condition?.comparison ?? "gte") as
+        | "gte"
+        | "lte"
+        | "eq"
+        | undefined,
+      minTrades: badge.condition?.minTrades,
+      minCompletedCompetitions: badge.condition?.minCompletedCompetitions,
+    },
+  };
+}
+
+/**
+ * XP for one rarity.
+ *
+ * Reason: a switch rather than `values[rarity]`, because the rarity comes off a
+ * stored document and an object lookup walks the prototype chain — the same rule
+ * as every other request-keyed lookup here. An unrecognised rarity earns nothing
+ * rather than crashing the grid.
+ */
+function xpForRarity(values: BadgeXPValues, rarity: string): number {
+  switch (rarity as BadgeRarity) {
+    case "common":
+      return values.common;
+    case "rare":
+      return values.rare;
+    case "epic":
+      return values.epic;
+    case "legendary":
+      return values.legendary;
+    default:
+      return 0;
+  }
+}
+
+/** One rung of the stored XP ladder. */
+interface LevelRung {
+  level: number;
+  title?: string;
+  minXP: number;
+  maxXP?: number;
+  color?: string;
+  icon?: string;
+  description?: string;
+}
+
+interface BadgeXPValues {
+  common: number;
+  rare: number;
+  epic: number;
+  legendary: number;
+}
+
+/** A player's level standing as `/api/badges-xp/users` reports it. */
+interface UserLevelStanding {
+  currentLevel: number;
+  currentXP: number;
+  currentTitle?: string;
+  xpToNextLevel?: number;
+  progressPercentage?: number;
+}
+
+/** The balance evaluator's reply, as `/api/ai/evaluate-balance` returns it. */
+interface BalanceEvaluationResponse {
+  evaluation: {
+    overallScore: number;
+    summary: string;
+    scores?: Record<string, number>;
+    strengths?: string[];
+    issues?: Array<{
+      severity: string;
+      area: string;
+      description: string;
+      recommendation: string;
+      autoFixable?: boolean;
+    }>;
+  };
+  systemStats?: {
+    totalBadges: number;
+    totalMilestones: number;
+    totalMaps: number;
+  };
+}
+
 export default function BadgeXPManagementSection() {
   // Fetch badges and XP config from database
-  const [badgesFromDB, setBadgesFromDB] = useState<any[]>([]);
+  const [badgesFromDB, setBadgesFromDB] = useState<AdminBadge[]>([]);
   /*
     R91 - this was a hard-coded ten-entry ladder seeded into state, and it could overwrite
     the operator's twenty-rung ladder with the trading-flavoured names they had renamed away
@@ -122,9 +257,9 @@ export default function BadgeXPManagementSection() {
     Refusing is the fix rather than seeding the canonical twenty, because the canonical names
     are not the operator's either - a stored value and an absent one are different facts.
   */
-  const [storedLevels, setStoredLevels] = useState<any[]>([]);
+  const [storedLevels, setStoredLevels] = useState<LevelRung[]>([]);
   const [ladderLoaded, setLadderLoaded] = useState(false);
-  const [BADGE_XP_VALUES, setBadgeXPValues] = useState<any>({
+  const [BADGE_XP_VALUES, setBadgeXPValues] = useState<BadgeXPValues>({
     common: 10,
     rare: 25,
     epic: 50,
@@ -185,14 +320,13 @@ export default function BadgeXPManagementSection() {
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [selectedUser, setSelectedUser] = useState<{
     user: { id: string; name: string; email: string; image: string | null };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    level: any;
+    level: UserLevelStanding;
     badges: UserBadgeData[];
   } | null>(null);
   const [editingBadgeXP, setEditingBadgeXP] = useState(false);
   const [editingLevel, setEditingLevel] = useState(false);
   const [xpValues, setXpValues] = useState(BADGE_XP_VALUES);
-  const [levels, setLevels] = useState<any[]>(storedLevels);
+  const [levels, setLevels] = useState<LevelRung[]>(storedLevels);
   /*
     The top rung of whatever ladder actually loaded. `reduce` rather than the last element
     because nothing guarantees the stored array is sorted, and `null` while it is absent so
@@ -206,7 +340,7 @@ export default function BadgeXPManagementSection() {
       ) ?? null)
     : null;
   const [managingBadges, setManagingBadges] = useState(false);
-  const [editingBadge, setEditingBadge] = useState<any>(null);
+  const [editingBadge, setEditingBadge] = useState<AdminBadge | null>(null);
   const [badgeSearchTerm, setBadgeSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [badgeForm, setBadgeForm] = useState({
@@ -235,8 +369,8 @@ export default function BadgeXPManagementSection() {
   // AI Badge Generation & Evaluation state
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiEvaluating, setAiEvaluating] = useState(false);
-  const [aiGeneratedBadges, setAiGeneratedBadges] = useState<any[]>([]);
-  const [aiEvaluation, setAiEvaluation] = useState<any>(null);
+  const [aiGeneratedBadges, setAiGeneratedBadges] = useState<AdminBadge[]>([]);
+  const [aiEvaluation, setAiEvaluation] = useState<BalanceEvaluationResponse | null>(null);
   const [showAiResults, setShowAiResults] = useState(false);
   const [showAiEvaluation, setShowAiEvaluation] = useState(false);
   const [aiApplying, setAiApplying] = useState(false);
@@ -794,7 +928,7 @@ export default function BadgeXPManagementSection() {
                 >
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
-                      <GameIcon name={level.icon} size={48} />
+                      <GameIcon name={level.icon ?? ""} size={48} />
                       <div>
                         <p className={`text-xl font-bold ${level.color}`}>
                           Level {level.level}
@@ -1149,7 +1283,7 @@ export default function BadgeXPManagementSection() {
                       } else {
                         toast.error(data.error || "Failed to reseed badges");
                       }
-                    } catch (error) {
+                    } catch {
                       toast.dismiss();
                       toast.error("Error reseeding badges");
                     }
@@ -1187,7 +1321,7 @@ export default function BadgeXPManagementSection() {
                         // Combine fixed existing badges + new badges for review
                         const allBadges = [
                           ...(data.fixedBadges || []),
-                          ...(data.newBadges || []).map((b: any) => ({ ...b, _isNew: true })),
+                          ...(data.newBadges || []).map((b: AdminBadge) => ({ ...b, _isNew: true })),
                         ];
                         setAiGeneratedBadges(allBadges);
                         setShowAiResults(true);
@@ -1312,23 +1446,7 @@ export default function BadgeXPManagementSection() {
                   className={`border-2 rounded-xl p-6 hover:scale-105 transition-transform cursor-pointer ${getRarityColor(badge.rarity)}`}
                   onClick={() => {
                     setEditingBadge(badge);
-                    setBadgeForm({
-                      id: badge.id,
-                      name: badge.name,
-                      description: badge.description,
-                      category: badge.category,
-                      rarity: badge.rarity,
-                      icon: badge.icon,
-                      minLevel: badge.minLevel ?? 0,
-                      gameTypes: Array.isArray(badge.gameTypes) ? badge.gameTypes : ["trading"],
-                      condition: badge.condition || {
-                        type: "",
-                        value: undefined,
-                        comparison: "gte",
-                        minTrades: undefined,
-                        minCompletedCompetitions: undefined,
-                      },
-                    });
+                    setBadgeForm(badgeFormFrom(badge));
                   }}
                 >
                   <div className="flex items-start justify-between mb-3">
@@ -1347,23 +1465,7 @@ export default function BadgeXPManagementSection() {
                         onClick={(e) => {
                           e.stopPropagation();
                           setEditingBadge(badge);
-                          setBadgeForm({
-                            id: badge.id,
-                            name: badge.name,
-                            description: badge.description,
-                            category: badge.category,
-                            rarity: badge.rarity,
-                            icon: badge.icon,
-                            minLevel: badge.minLevel ?? 0,
-                            gameTypes: Array.isArray(badge.gameTypes) ? badge.gameTypes : ["trading"],
-                            condition: badge.condition || {
-                              type: "",
-                              value: undefined,
-                              comparison: "gte",
-                              minTrades: undefined,
-                              minCompletedCompetitions: undefined,
-                            },
-                          });
+                          setBadgeForm(badgeFormFrom(badge));
                         }}
                       >
                         <Edit className="h-4 w-4" />
@@ -1380,14 +1482,14 @@ export default function BadgeXPManagementSection() {
                     </span>
                     <Badge variant="secondary" className="font-bold">
                       <Star className="h-3 w-3 mr-1" />+
-                      {BADGE_XP_VALUES[badge.rarity]} XP
+                      {xpForRarity(BADGE_XP_VALUES, badge.rarity)} XP
                     </Badge>
                   </div>
                   <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
                     <code className="bg-muted px-2 py-1 rounded">
                       {badge.id}
                     </code>
-                    {badge.minLevel > 0 && (
+                    {(badge.minLevel ?? 0) > 0 && (
                       <Badge variant="outline" className="text-xs font-semibold text-amber-400 border-amber-500/50">
                         <Shield className="h-3 w-3 mr-1" />
                         Lv.{badge.minLevel}
@@ -1466,6 +1568,9 @@ export default function BadgeXPManagementSection() {
                     <TableCell>
                       <div className="flex items-center gap-3">
                         {user.image ? (
+                          // Reason: avatar URLs are arbitrary third-party or uploaded
+                          // paths; the optimizer adds no value on a 48px thumbnail.
+                          // eslint-disable-next-line @next/next/no-img-element
                           <img
                             src={user.image}
                             alt={user.name}
@@ -2225,6 +2330,8 @@ export default function BadgeXPManagementSection() {
                   <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-6">
                       {selectedUser.user.image ? (
+                        // Reason: same as the table avatar above — arbitrary remote path.
+                        // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={selectedUser.user.image}
                           alt={selectedUser.user.name}
@@ -2311,16 +2418,15 @@ export default function BadgeXPManagementSection() {
 
                 {/* Badge Statistics */}
                 <div className="grid grid-cols-4 gap-6">
-                  {Object.entries(
-                    selectedUser.badges.reduce(
-                      (acc, badge) => {
+                  {[
+                    ...selectedUser.badges
+                      .reduce((acc, badge) => {
                         const rarity = badge.badgeDetails?.rarity || "common";
-                        acc[rarity] = (acc[rarity] || 0) + 1;
+                        acc.set(rarity, (acc.get(rarity) ?? 0) + 1);
                         return acc;
-                      },
-                      {} as Record<string, number>,
-                    ),
-                  ).map(([rarity, count]) => (
+                      }, new Map<string, number>())
+                      .entries(),
+                  ].map(([rarity, count]) => (
                     <div
                       key={rarity}
                       className={`border-2 rounded-xl p-6 ${getRarityColor(rarity)}`}
@@ -2409,9 +2515,9 @@ export default function BadgeXPManagementSection() {
             </DialogTitle>
             <DialogDescription>
               {(() => {
-                const fixed = aiGeneratedBadges.filter((b: any) => b._changes);
-                const newOnes = aiGeneratedBadges.filter((b: any) => b._isNew);
-                const unchanged = aiGeneratedBadges.filter((b: any) => !b._changes && !b._isNew);
+                const fixed = aiGeneratedBadges.filter((b) => b._changes);
+                const newOnes = aiGeneratedBadges.filter((b) => b._isNew);
+                const unchanged = aiGeneratedBadges.filter((b) => !b._changes && !b._isNew);
                 return `${fixed.length} badges fixed | ${newOnes.length} new badges | ${unchanged.length} unchanged`;
               })()}
             </DialogDescription>
@@ -2419,13 +2525,13 @@ export default function BadgeXPManagementSection() {
 
           <div className="space-y-4 mt-4">
             {/* Fixed badges section */}
-            {aiGeneratedBadges.filter((b: any) => b._changes).length > 0 && (
+            {aiGeneratedBadges.filter((b) => b._changes).length > 0 && (
               <div>
                 <h3 className="text-lg font-bold flex items-center gap-2 mb-3 text-amber-400">
                   <AlertTriangle className="h-5 w-5" />
-                  Fixed Badges ({aiGeneratedBadges.filter((b: any) => b._changes).length})
+                  Fixed Badges ({aiGeneratedBadges.filter((b) => b._changes).length})
                 </h3>
-                {aiGeneratedBadges.filter((b: any) => b._changes).map((badge: any, i: number) => (
+                {aiGeneratedBadges.filter((b) => b._changes).map((badge, i) => (
                   <div
                     key={`fix-${badge.id || i}`}
                     className={`border-2 rounded-xl p-4 mb-3 ${getRarityColor(badge.rarity)} border-amber-500/30`}
@@ -2461,13 +2567,13 @@ export default function BadgeXPManagementSection() {
             )}
 
             {/* New badges section */}
-            {aiGeneratedBadges.filter((b: any) => b._isNew).length > 0 && (
+            {aiGeneratedBadges.filter((b) => b._isNew).length > 0 && (
               <div>
                 <h3 className="text-lg font-bold flex items-center gap-2 mb-3 text-emerald-400">
                   <Plus className="h-5 w-5" />
-                  New Badges ({aiGeneratedBadges.filter((b: any) => b._isNew).length})
+                  New Badges ({aiGeneratedBadges.filter((b) => b._isNew).length})
                 </h3>
-                {aiGeneratedBadges.filter((b: any) => b._isNew).map((badge: any, i: number) => (
+                {aiGeneratedBadges.filter((b) => b._isNew).map((badge, i) => (
                   <div
                     key={`new-${badge.id || i}`}
                     className={`border-2 rounded-xl p-4 mb-3 ${getRarityColor(badge.rarity)} border-emerald-500/30`}
@@ -2483,7 +2589,7 @@ export default function BadgeXPManagementSection() {
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="capitalize text-xs">{badge.rarity}</Badge>
                         <Badge variant="secondary" className="text-xs">{badge.category}</Badge>
-                        {badge.minLevel > 0 && (
+                        {(badge.minLevel ?? 0) > 0 && (
                           <Badge variant="outline" className="text-amber-400 border-amber-500/50 text-xs">
                             <Shield className="h-3 w-3 mr-1" />Lv.{badge.minLevel}
                           </Badge>
@@ -2502,10 +2608,10 @@ export default function BadgeXPManagementSection() {
             )}
 
             {/* Unchanged badges count */}
-            {aiGeneratedBadges.filter((b: any) => !b._changes && !b._isNew).length > 0 && (
+            {aiGeneratedBadges.filter((b) => !b._changes && !b._isNew).length > 0 && (
               <div className="p-3 bg-muted/50 rounded-lg text-sm text-muted-foreground text-center">
                 <CheckCircle className="h-4 w-4 inline mr-2 text-emerald-400" />
-                {aiGeneratedBadges.filter((b: any) => !b._changes && !b._isNew).length} badges are already properly balanced (no changes needed)
+                {aiGeneratedBadges.filter((b) => !b._changes && !b._isNew).length} badges are already properly balanced (no changes needed)
               </div>
             )}
           </div>
@@ -2592,7 +2698,7 @@ export default function BadgeXPManagementSection() {
               {/* Score Breakdown */}
               {aiEvaluation.evaluation.scores && (
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                  {Object.entries(aiEvaluation.evaluation.scores).map(([key, value]: [string, any]) => (
+                  {Object.entries(aiEvaluation.evaluation.scores).map(([key, value]) => (
                     <div key={key} className="bg-card border rounded-lg p-3 text-center">
                       <p className={`text-2xl font-bold ${value >= 7 ? "text-emerald-400" : value >= 5 ? "text-yellow-400" : "text-red-400"}`}>
                         {value}
@@ -2606,13 +2712,13 @@ export default function BadgeXPManagementSection() {
               )}
 
               {/* Strengths */}
-              {aiEvaluation.evaluation.strengths?.length > 0 && (
+              {(aiEvaluation.evaluation.strengths?.length ?? 0) > 0 && (
                 <div className="border border-emerald-500/20 rounded-xl p-4">
                   <h3 className="font-bold text-lg flex items-center gap-2 mb-3 text-emerald-400">
                     <CheckCircle className="h-5 w-5" /> Strengths
                   </h3>
                   <ul className="space-y-1">
-                    {aiEvaluation.evaluation.strengths.map((s: string, i: number) => (
+                    {(aiEvaluation.evaluation.strengths ?? []).map((s, i) => (
                       <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
                         <span className="text-emerald-400 mt-0.5">+</span> {s}
                       </li>
@@ -2622,13 +2728,13 @@ export default function BadgeXPManagementSection() {
               )}
 
               {/* Issues */}
-              {aiEvaluation.evaluation.issues?.length > 0 && (
+              {(aiEvaluation.evaluation.issues?.length ?? 0) > 0 && (
                 <div className="border border-yellow-500/20 rounded-xl p-4">
                   <h3 className="font-bold text-lg flex items-center gap-2 mb-3 text-yellow-400">
-                    <AlertTriangle className="h-5 w-5" /> Issues ({aiEvaluation.evaluation.issues.length})
+                    <AlertTriangle className="h-5 w-5" /> Issues ({aiEvaluation.evaluation.issues?.length ?? 0})
                   </h3>
                   <div className="space-y-3">
-                    {aiEvaluation.evaluation.issues.map((issue: any, i: number) => (
+                    {(aiEvaluation.evaluation.issues ?? []).map((issue, i) => (
                       <div key={i} className="bg-card border rounded-lg p-3">
                         <div className="flex items-center gap-2 mb-1">
                           {issue.severity === "critical" && <AlertCircle className="h-4 w-4 text-red-400" />}
@@ -2680,7 +2786,7 @@ export default function BadgeXPManagementSection() {
                 <Button variant="outline" onClick={() => setShowAiEvaluation(false)}>
                   Close
                 </Button>
-                {aiEvaluation.evaluation.issues?.some((i: any) => i.autoFixable) && (
+                {aiEvaluation.evaluation.issues?.some((i) => i.autoFixable) && (
                   <Button
                     disabled={aiApplying}
                     onClick={async () => {
@@ -2724,7 +2830,7 @@ export default function BadgeXPManagementSection() {
                     ) : (
                       <Sparkles className="h-4 w-4 mr-2" />
                     )}
-                    Auto-Fix {aiEvaluation.evaluation.issues.filter((i: any) => i.autoFixable).length} Issues
+                    Auto-Fix {aiEvaluation.evaluation.issues.filter((i) => i.autoFixable).length} Issues
                   </Button>
                 )}
               </DialogFooter>

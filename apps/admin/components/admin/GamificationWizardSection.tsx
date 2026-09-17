@@ -14,9 +14,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import {
   Sparkles, Wand2, Play, CheckCircle, AlertTriangle, AlertCircle,
-  Info, Trophy, Target, Map, BarChart3, Zap, Shield, Crown,
+  Trophy, Target, Map, BarChart3, Zap, Shield,
   ArrowRight, ArrowLeft, RefreshCw, Download, Loader2,
-  ChevronDown, ChevronUp, Eye, Wrench, Settings, Star,
+  Eye, Wrench, Settings, Star,
   Trash2,
 } from "lucide-react";
 import {
@@ -68,6 +68,71 @@ interface EvaluationResult {
   summary: string;
 }
 
+/**
+ * A badge row as the wizard's badge stage reports it.
+ *
+ * Reason: every field is optional because a preview row is whatever the stage
+ * has decided so far — a fix proposal carries `_changes`, a candidate carries
+ * `_isNew`, and neither is guaranteed to be a complete badge document.
+ */
+interface WizardBadge {
+  id?: string;
+  name?: string;
+  category?: string;
+  rarity?: string;
+  minLevel?: number;
+  condition?: {
+    type?: string;
+    value?: number;
+    comparison?: string;
+    minTrades?: number;
+    minCompletedCompetitions?: number;
+  };
+  _changes?: string;
+  _isNew?: boolean;
+}
+
+interface BadgeAgentResult {
+  applied?: boolean;
+  totalBadges?: number;
+  fixedCount?: number;
+  newCount?: number;
+  summary?: string;
+  error?: string;
+  badges?: WizardBadge[];
+}
+
+interface WizardMilestone {
+  id?: string;
+  mapId?: string;
+  name?: string;
+  nodeType?: string;
+  rewards?: { xp?: number };
+  requiredBadgeIds?: string[];
+  completeCondition?: { type?: string; value?: number };
+  _changes?: string;
+}
+
+interface MilestoneAgentResult {
+  applied?: boolean;
+  totalMilestones?: number;
+  fixedCount?: number;
+  badgeGatesAdded?: number;
+  summary?: string;
+  milestones?: WizardMilestone[];
+}
+
+/** One line of the full-setup progress list. */
+interface FullSetupStep {
+  name: string;
+  success: boolean;
+  summary?: string;
+  fixedCount?: number;
+  newCount?: number;
+  overallScore?: number;
+  issueCount?: number;
+}
+
 // ─── Wizard Steps ───────────────────────────────────────────────────────────────
 
 const WIZARD_STEPS = [
@@ -89,18 +154,18 @@ export default function GamificationWizardSection() {
   const [stepLoading, setStepLoading] = useState<string | null>(null);
 
   // Badge Agent state
-  const [badgeResult, setBadgeResult] = useState<any>(null);
+  const [badgeResult, setBadgeResult] = useState<BadgeAgentResult | null>(null);
   const [badgeGenCount, setBadgeGenCount] = useState(5);
 
   // Milestone Agent state
-  const [milestoneResult, setMilestoneResult] = useState<any>(null);
+  const [milestoneResult, setMilestoneResult] = useState<MilestoneAgentResult | null>(null);
   const [selectedMapId, setSelectedMapId] = useState<string>("all");
 
   // Evaluation state
   const [evaluation, setEvaluation] = useState<EvaluationResult | null>(null);
 
   // Full setup progress
-  const [fullSetupProgress, setFullSetupProgress] = useState<{ step: number; label: string; steps: any[] } | null>(null);
+  const [fullSetupProgress, setFullSetupProgress] = useState<{ step: number; label: string; steps: FullSetupStep[] } | null>(null);
 
   // Rebuild-from-scratch controls. Default is "add": the destructive mode must
   // be chosen deliberately, never arrived at by leaving a control alone.
@@ -114,11 +179,10 @@ export default function GamificationWizardSection() {
   // Dialogs
   const [showBadgeDetails, setShowBadgeDetails] = useState(false);
   const [showMilestoneDetails, setShowMilestoneDetails] = useState(false);
-  const [showEvalDetails, setShowEvalDetails] = useState(false);
 
   // ─── API Calls ──────────────────────────────────────────────────────────────
 
-  const callWizardAPI = useCallback(async (payload: any) => {
+  const callWizardAPI = useCallback(async (payload: Record<string, unknown>) => {
     const res = await fetch("/api/ai/gamification-wizard", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -136,7 +200,7 @@ export default function GamificationWizardSection() {
       } else {
         toast.error("Failed to load system status");
       }
-    } catch (err) {
+    } catch {
       toast.error("Failed to connect to wizard API");
     }
     setLoading(false);
@@ -181,7 +245,7 @@ export default function GamificationWizardSection() {
       } else {
         toast.error(data.error || "Badge agent failed");
       }
-    } catch (err) {
+    } catch {
       toast.error("Badge agent error");
     }
     setStepLoading(null);
@@ -206,7 +270,7 @@ export default function GamificationWizardSection() {
       } else {
         toast.error(data.error || "Milestone agent failed");
       }
-    } catch (err) {
+    } catch {
       toast.error("Milestone agent error");
     }
     setStepLoading(null);
@@ -224,7 +288,7 @@ export default function GamificationWizardSection() {
       } else {
         toast.error(data.error || "Evaluation failed");
       }
-    } catch (err: any) {
+    } catch {
       toast.error("Evaluation error");
     }
     setStepLoading(null);
@@ -250,7 +314,7 @@ export default function GamificationWizardSection() {
       } else {
         toast.error(data.error || "Auto-fix failed");
       }
-    } catch (err: any) {
+    } catch {
       toast.error("Auto-fix error");
     }
     setStepLoading(null);
@@ -313,7 +377,7 @@ export default function GamificationWizardSection() {
 
       const s = data.steps || {};
       const reset = typeof s.reset === "object" && s.reset !== null ? s.reset : null;
-      const steps: any[] = [
+      const steps: FullSetupStep[] = [
         // Reason: the wipe is reported as a step of its own, with counts. A
         // rebuild that silently deleted nothing — a wrong scope, an empty
         // collection — is otherwise indistinguishable from one that worked.
@@ -403,7 +467,7 @@ export default function GamificationWizardSection() {
     setStepLoading(null);
   };
 
-  const applyChanges = async (badges?: any[], milestones?: any[]) => {
+  const applyChanges = async (badges?: WizardBadge[], milestones?: WizardMilestone[]) => {
     setStepLoading("apply");
     try {
       const data = await callWizardAPI({
@@ -420,7 +484,7 @@ export default function GamificationWizardSection() {
       } else {
         toast.error(data.error || "Apply failed");
       }
-    } catch (err) {
+    } catch {
       toast.error("Apply error");
     }
     setStepLoading(null);
@@ -436,7 +500,7 @@ export default function GamificationWizardSection() {
       } else {
         toast.error(data.error || "Failed to apply preset");
       }
-    } catch (err) {
+    } catch {
       toast.error("Failed to apply preset");
     }
     setStepLoading(null);
@@ -765,7 +829,7 @@ export default function GamificationWizardSection() {
                 </div>
 
                 {/* Completed steps */}
-                {fullSetupProgress.steps.map((s: any, i: number) => (
+                {fullSetupProgress.steps.map((s, i) => (
                   <div key={i} className="flex items-center gap-2 text-xs">
                     {s.success ? (
                       <CheckCircle className="h-3 w-3 text-green-400" />
@@ -952,7 +1016,7 @@ export default function GamificationWizardSection() {
             <div className="flex items-center justify-between">
               <CardTitle className="text-white text-sm">Badge Agent Results</CardTitle>
               <div className="flex gap-2">
-                {!badgeResult.applied && badgeResult.badges?.length > 0 && (
+                {!badgeResult.applied && (badgeResult.badges?.length ?? 0) > 0 && (
                   <Button
                     size="sm"
                     onClick={() => applyChanges(badgeResult.badges)}
@@ -1012,7 +1076,7 @@ export default function GamificationWizardSection() {
           </DialogHeader>
           <ScrollArea className="h-[60vh]">
             <div className="space-y-2 pr-4">
-              {badgeResult?.badges?.map((b: any, i: number) => (
+              {badgeResult?.badges?.map((b, i) => (
                 <div
                   key={b.id || i}
                   className={`p-3 rounded border ${b._changes ? "border-orange-500/30 bg-orange-900/10" : b._isNew ? "border-green-500/30 bg-green-900/10" : "border-gray-700/30 bg-gray-800/30"}`}
@@ -1026,7 +1090,7 @@ export default function GamificationWizardSection() {
                             b.rarity === "epic" ? "border-purple-500 text-purple-400 text-[10px]" :
                               "border-yellow-500 text-yellow-400 text-[10px]"
                       }>{b.rarity}</Badge>
-                      {b.minLevel > 0 && (
+                      {(b.minLevel ?? 0) > 0 && (
                         <Badge variant="outline" className="border-cyan-500 text-cyan-400 text-[10px]">Lv.{b.minLevel}</Badge>
                       )}
                     </div>
@@ -1124,7 +1188,7 @@ export default function GamificationWizardSection() {
             <div className="flex items-center justify-between">
               <CardTitle className="text-white text-sm">Milestone Agent Results</CardTitle>
               <div className="flex gap-2">
-                {!milestoneResult.applied && milestoneResult.milestones?.length > 0 && (
+                {!milestoneResult.applied && (milestoneResult.milestones?.length ?? 0) > 0 && (
                   <Button
                     size="sm"
                     onClick={() => applyChanges(undefined, milestoneResult.milestones)}
@@ -1181,7 +1245,7 @@ export default function GamificationWizardSection() {
           </DialogHeader>
           <ScrollArea className="h-[60vh]">
             <div className="space-y-2 pr-4">
-              {milestoneResult?.milestones?.map((m: any, i: number) => (
+              {milestoneResult?.milestones?.map((m, i) => (
                 <div
                   key={m.id || i}
                   className={`p-3 rounded border ${m._changes ? "border-orange-500/30 bg-orange-900/10" : "border-gray-700/30 bg-gray-800/30"}`}
@@ -1196,10 +1260,10 @@ export default function GamificationWizardSection() {
                     </div>
                     <span className="text-xs text-purple-400">{m.rewards?.xp || 0} XP</span>
                   </div>
-                  {m.requiredBadgeIds?.length > 0 && (
+                  {(m.requiredBadgeIds?.length ?? 0) > 0 && (
                     <div className="mt-1 flex items-center gap-1">
                       <Shield className="h-3 w-3 text-cyan-400" />
-                      <span className="text-xs text-cyan-400">Requires: {m.requiredBadgeIds.join(", ")}</span>
+                      <span className="text-xs text-cyan-400">Requires: {(m.requiredBadgeIds ?? []).join(", ")}</span>
                     </div>
                   )}
                   {m._changes && (
@@ -1324,16 +1388,16 @@ export default function GamificationWizardSection() {
           )}
 
           {/* Issues (Recommendations) */}
-          {evaluation.issues?.length > 0 && (
+          {(evaluation.issues?.length ?? 0) > 0 && (
             <Card className="bg-gray-800/50 border-gray-700">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
                     <CardTitle className="text-white text-sm flex items-center gap-2">
                       <AlertTriangle className="h-4 w-4 text-yellow-400" /> Issues ({evaluation.issues.length})
-                      {evaluation.issues.filter((i: any) => i.autoFixable).length > 0 && (
+                      {evaluation.issues.filter((i) => i.autoFixable).length > 0 && (
                         <Badge variant="outline" className="border-orange-500 text-orange-400 text-[10px] ml-1">
-                          {evaluation.issues.filter((i: any) => i.autoFixable).length} auto-fixable
+                          {evaluation.issues.filter((i) => i.autoFixable).length} auto-fixable
                         </Badge>
                       )}
                     </CardTitle>
@@ -1341,14 +1405,14 @@ export default function GamificationWizardSection() {
                       Auto-fixable issues are resolved by the &quot;Auto-Fix All Issues&quot; button above.
                     </CardDescription>
                   </div>
-                  {evaluation.issues.filter((i: any) => i.autoFixable).length > 0 && (
+                  {evaluation.issues.filter((i) => i.autoFixable).length > 0 && (
                     <Button
                       size="sm"
                       onClick={() => runAutoFix()}
                       disabled={isStepLoading("autofix")}
                       className="bg-orange-600 hover:bg-orange-500 text-white"
                     >
-                      {isStepLoading("autofix") ? <Loader2 className="h-3 w-3 animate-spin" /> : <><Wrench className="h-3 w-3 mr-1" /> Fix {evaluation.issues.filter((i: any) => i.autoFixable).length} Issues</>}
+                      {isStepLoading("autofix") ? <Loader2 className="h-3 w-3 animate-spin" /> : <><Wrench className="h-3 w-3 mr-1" /> Fix {evaluation.issues.filter((i) => i.autoFixable).length} Issues</>}
                     </Button>
                   )}
                 </div>
@@ -1365,14 +1429,14 @@ export default function GamificationWizardSection() {
                           <Badge variant="outline" className="border-gray-600 text-gray-400 text-[10px]">
                             {issue.area}
                           </Badge>
-                          {(issue as any).targetAgent && (
+                          {issue.targetAgent && (
                             <Badge variant="outline" className="border-cyan-600 text-cyan-400 text-[10px]">
-                              {(issue as any).targetAgent === "badge_agent" ? "Badge Agent"
-                                : (issue as any).targetAgent === "milestone_agent" ? "Milestone Agent"
+                              {issue.targetAgent === "badge_agent" ? "Badge Agent"
+                                : issue.targetAgent === "milestone_agent" ? "Milestone Agent"
                                 : "Manual"}
                             </Badge>
                           )}
-                          {(issue as any).autoFixable && (
+                          {issue.autoFixable && (
                             <Badge variant="outline" className="border-orange-500 text-orange-400 text-[10px]">
                               auto-fixable
                             </Badge>
