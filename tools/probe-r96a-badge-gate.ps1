@@ -18,6 +18,10 @@ function Invoke-Probe {
     [string]$Find,
     [string]$Replace,
     [switch]$First,
+    # Reason: three of the floor assignments now appear twice — once on the R96b
+    # game-scoped arm and once on the cross-game arm — so a first-occurrence probe
+    # silently mutates the wrong branch and reports the guard as absent.
+    [int]$Index = 0,
     [string]$ExpectTest,
     [string]$Suite = '__tests__/services/badge-gate-r96a.test.ts'
   )
@@ -27,8 +31,11 @@ function Invoke-Probe {
   if ([string]::IsNullOrEmpty($orig)) { throw "PROBE DID NOT APPLY (empty read): $File" }
 
   $mut = if ($First) {
-    $idx = $orig.IndexOf($Find)
-    if ($idx -lt 0) { throw "PROBE DID NOT APPLY (Find miss): $Name / $Find" }
+    $idx = -1
+    for ($i = 0; $i -le $Index; $i++) {
+      $idx = $orig.IndexOf($Find, $idx + 1)
+      if ($idx -lt 0) { throw "PROBE DID NOT APPLY (Find miss #$i): $Name / $Find" }
+    }
     $orig.Remove($idx, $Find.Length).Insert($idx, $Replace)
   } else {
     if (-not $orig.Contains($Find)) { throw "PROBE DID NOT APPLY (Find miss): $Name" }
@@ -57,18 +64,18 @@ $ADMIN = 'apps/admin/lib/services/badge-evaluation.service.ts'
 # 1 — empty the set so every real type falls through to trading floors
 # Reason: expect a behavioural test — renaming the Set still satisfies the structural one.
 Invoke-Probe -Name 'drop-cross-game-set' -File $MAIN -First `
-  -Find 'const CROSS_GAME_CONDITION_TYPES = new Set([' `
-  -Replace 'const CROSS_GAME_CONDITION_TYPES = new Set(["__never__"]); const _R96A_DEAD = new Set([' `
+  -Find 'new Set(crossGameConditionTypes());' `
+  -Replace 'new Set(["__never__"]);' `
   -ExpectTest 'games-only player clears a rare cross-game'
 
-# 2 — cross-game arm still applies trade floors
-Invoke-Probe -Name 'cross-game-keeps-trade-floor' -File $MAIN -First `
+# 2 — cross-game arm still applies trade floors (index 1: index 0 is the game-scoped arm)
+Invoke-Probe -Name 'cross-game-keeps-trade-floor' -File $MAIN -First -Index 1 `
   -Find 'effectiveMinTrades = 0;' `
   -Replace 'effectiveMinTrades = Math.max(minTrades || 0, tierReqs.trades);' `
   -ExpectTest 'games-only player clears a rare cross-game'
 
 # 3 — compsStat still WithTrades on cross-game arm
-Invoke-Probe -Name 'cross-game-uses-with-trades' -File $MAIN -First `
+Invoke-Probe -Name 'cross-game-uses-with-trades' -File $MAIN -First -Index 1 `
   -Find 'compsStat = stats.completedCompetitions;' `
   -Replace 'compsStat = stats.completedCompetitionsWithTrades;' `
   -ExpectTest 'cross-game competition floor reads completedCompetitions'
@@ -81,8 +88,8 @@ Invoke-Probe -Name 'drop-trading-math-max' -File $MAIN -First `
 
 # 5 — admin diverges (R100 regression)
 Invoke-Probe -Name 'admin-diverges' -File $ADMIN -First `
-  -Find 'const CROSS_GAME_CONDITION_TYPES = new Set([' `
-  -Replace 'const CROSS_GAME_CONDITION_TYPES_REMOVED = new Set([' `
+  -Find 'const CROSS_GAME_CONDITION_TYPES = new Set(crossGameConditionTypes());' `
+  -Replace 'const CROSS_GAME_CONDITION_TYPES_RENAMED = new Set(crossGameConditionTypes()); const CROSS_GAME_CONDITION_TYPES = CROSS_GAME_CONDITION_TYPES_RENAMED;' `
   -ExpectTest 'both evaluators stay byte-identical'
 
 # 6 — every non-exempt type treated as cross-game (fail open on trading floors)
@@ -92,7 +99,7 @@ Invoke-Probe -Name 'unknown-becomes-cross-game' -File $MAIN `
   -ExpectTest 'trading-typed badge still refuses'
 
 # 7 — stored minTrades honoured on cross-game again (ASCII-only find)
-Invoke-Probe -Name 'honour-stored-minTrades' -File $MAIN -First `
+Invoke-Probe -Name 'honour-stored-minTrades' -File $MAIN -First -Index 1 `
   -Find 'effectiveMinTrades = 0;' `
   -Replace 'effectiveMinTrades = minTrades || 0;' `
   -ExpectTest 'ignores a stored minTrades'

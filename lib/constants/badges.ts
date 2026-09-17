@@ -3,6 +3,7 @@ import type { GameIconName } from "@/lib/constants/game-icons";
 export type BadgeCategory =
   | "Competition"
   | "Trading"
+  | "Games"
   | "Profit"
   | "Risk"
   | "Speed"

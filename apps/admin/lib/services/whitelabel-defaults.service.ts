@@ -16,6 +16,7 @@ import XPConfig from "@/database/models/xp-config.model";
 import JourneyMilestone from "@/database/models/journey-milestone.model";
 import JourneyMapConfig from "@/database/models/journey-map-config.model";
 import SitePage from "@/database/models/site-page.model";
+import { setDefaultsSuppression } from "@/lib/services/gamification-defaults-state.service";
 import path from "path";
 import fs from "fs";
 
@@ -146,6 +147,10 @@ export async function seedBadgesFromDefaults(): Promise<boolean> {
   await connectToDatabase();
   await BadgeConfig.deleteMany({});
   await BadgeConfig.insertMany(defaults);
+  // Reason: restoring defaults is the inverse of a from-scratch reset, so it
+  // lifts that reset's suppression too. Left set, the add-only top-up in
+  // seedBadgeConfigs stays disabled against a catalogue that is no longer empty.
+  await setDefaultsSuppression({ badgeDefaultsSuppressed: false });
   console.log(`[Defaults] Seeded ${defaults.length} badges from saved defaults`);
   return true;
 }
@@ -173,6 +178,9 @@ export async function seedXPFromDefaults(): Promise<boolean> {
       isActive: true,
     });
   }
+
+  // Reason: see seedBadgesFromDefaults — a restore lifts the from-scratch flag.
+  await setDefaultsSuppression({ xpDefaultsSuppressed: false });
 
   console.log("[Defaults] Seeded XP config from saved defaults");
   return true;

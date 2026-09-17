@@ -338,9 +338,14 @@ game** so a player is never shown goals they cannot reach.
 > **What shipped:** never show or evaluate an *unearned* badge for a game the
 > player has not played (`05` s5.2 rule 1); stamp badge XP with `gameKey` when
 > the scope is a single game; expose per-game XP totals from the ledger.
-> **What did not:** R96b (authoring per-game badges — needs owner input);
-> renaming existing badge `gameTypes` in the catalogue; a profile chrome for
-> `xpByGameKey`; journeys/milestones. Levels remain one platform ladder.
+> **What did not (as of step 4):** R96b content; renaming existing badge
+> `gameTypes` in the catalogue; a profile chrome for `xpByGameKey`;
+> journeys/milestones. Levels remain one platform ladder.
+> **AMENDED 17 Sep 2026:** R96b *authoring* is closed (registry, `game_*`
+> conditions, Games category, form/AI/wizard/balance, add-only apply, ladder
+> CRUD) — see `PROGRESS.md` work log. Catalogue still holds **zero**
+> game-specific badge *rows* until an owner brief; a document treating the
+> authoring surface as unbuilt is stale as a present fact — **say which**.
 
 ### 5.1 Three badge scopes
 

@@ -14,10 +14,26 @@ import { getBadgesFromDB } from "@/lib/services/badge-config-seed.service";
 import { getUserGlobalRank } from "@/lib/actions/leaderboard/global-leaderboard.actions";
 import { badgeAppliesToPlayer } from "@/lib/services/games/badge-game-scope";
 import { getPlayedGamesSnapshot } from "@/lib/services/games/played-games.service";
+import {
+  crossGameConditionTypes,
+  getConditionDef,
+  tradeExemptTypes,
+} from "@/lib/services/games/badge-condition-registry";
+import {
+  loadGameBadgeStatsMap,
+  resolveGameStatsKey,
+  type GameBadgeStatsRow,
+} from "@/lib/services/games/game-badge-stats";
 
 // Exported for testing/simulation purposes
 export interface UserStats {
   userId: string;
+  /**
+   * Per-game stats for R96b `game_*` conditions. Keyed by gameKey including
+   * `_overall`. Absent map → game conditions fail closed.
+   */
+  gameStats?: Map<string, GameBadgeStatsRow>;
+
   // Competition stats
   competitionsEntered: number;
   completedCompetitions: number; // NEW: Competitions with status "completed"
@@ -763,6 +779,9 @@ export async function gatherUserStats(userId: string): Promise<UserStats> {
     friendsAdded: 0, // Not implemented yet
     messagesSent: 0, // Not implemented yet
     loginStreak: consecutiveDays, // Use consecutive trading days as proxy
+    // Reason (R96b): load once with the rest of the stats so game_* conditions
+    // do not hit UserGameStats per badge. Never filtered by getEnabledGameTypes (R29).
+    gameStats: await loadGameBadgeStatsMap(userId),
   };
 
   // Cache result for 5 minutes
@@ -801,42 +820,14 @@ export async function checkBadgeCondition(
     legendary: { trades: 100, competitions: 5 },
   };
 
-  // Condition types that do NOT require minimum trading activity
-  // These are social, onboarding, account-based, and referral badges
-  const TRADE_EXEMPT_TYPES = new Set([
-    "first_deposit", "has_deposit", "total_deposited", "total_deposits",
-    "withdrawal_made", "total_withdrawals", "large_withdrawal",
-    "net_profit_lifetime",
-    "platform_age", "early_adopter", "account_age", "account_age_days",
-    "account_created",
-    "kyc_verified", "profile_complete",
-    "referrals_made", "referrals_active",
-    "friends_added", "login_streak",
-    "competitions_entered", // Entry alone shouldn't require trades
-    "first_trade", // Onboarding badge for first trade
-  ]);
-
-  // Reason (R96a): trading floors apply by condition TYPE, never badge id.
-  // Cross-game types use completedCompetitions (any game) instead of
-  // completedCompetitionsWithTrades, and ignore rarity/stored trade floors so
-  // operator tuning need not be rewritten. Unknown types fail closed to trading.
-  const CROSS_GAME_CONDITION_TYPES = new Set([
-    "competitions_completed",
-    "first_place_finishes",
-    "podium_finishes",
-    "second_place_finishes",
-    "third_place_finishes",
-    "top_10_finishes",
-    "top_50_percent_finishes",
-    "perfect_competition_win_rate",
-    "beat_top_trader",
-    "level_reached",
-    "xp_threshold",
-    "xp_earned_today",
-    "xp_earned_this_week",
-    "total_badges",
-    "messages_sent",
-  ]);
+  // Reason (R96a/R96b): floors apply by condition TYPE from the registry.
+  // Unknown types fail closed to trading (registry default). Keep the local
+  // Set names — R96a structural tests pin CROSS_GAME_CONDITION_TYPES.has(type)
+  // and `= new Set` on the declaration.
+  const TRADE_EXEMPT_TYPES = new Set(tradeExemptTypes());
+  const CROSS_GAME_CONDITION_TYPES = new Set(crossGameConditionTypes());
+  const conditionDef = getConditionDef(type);
+  const isGameScoped = conditionDef?.scope === "game";
 
   const isTradeExempt = TRADE_EXEMPT_TYPES.has(type);
   const isCrossGame = CROSS_GAME_CONDITION_TYPES.has(type);
@@ -847,8 +838,15 @@ export async function checkBadgeCondition(
   let effectiveMinComps: number;
   let compsStat: number;
 
-  if (isTradeExempt) {
-    // Trade-exempt: only use badge-specific mins if explicitly set
+  if (isGameScoped) {
+    // Reason (R96b): game_* reads UserGameStats — rarity/stored trade floors
+    // would re-block games-only players. Competition mins still honour an
+    // explicit badge setting.
+    effectiveMinTrades = 0;
+    effectiveMinComps = minCompletedCompetitions || 0;
+    compsStat = stats.completedCompetitions;
+  } else if (isTradeExempt) {
+    // Platform: only use badge-specific mins if explicitly set
     effectiveMinTrades = minTrades || 0;
     effectiveMinComps = minCompletedCompetitions || 0;
     compsStat = stats.completedCompetitionsWithTrades;
@@ -1267,9 +1265,23 @@ export async function checkBadgeCondition(
     case "login_streak":
       return compareValue(stats.loginStreak || stats.consecutiveTradingDays, value, comparison);
 
-    // Default: false for unimplemented conditions
-    default:
+    // Default: game_* via registry, else unimplemented → false
+    default: {
+      // Reason (R96b): one door for UserGameStats conditions — field comes from
+      // the registry, row key from the badge's gameTypes. Unknown stays false.
+      if (conditionDef?.scope === "game" && conditionDef.gameStat) {
+        const key = resolveGameStatsKey(badge.gameTypes);
+        const row = stats.gameStats?.get(key);
+        const actual = row?.[conditionDef.gameStat] ?? 0;
+        // Reason: bestRank defaults to 0 meaning "never ranked", not rank #0.
+        if (conditionDef.gameStat === "bestRank" && actual === 0) return false;
+        const comp =
+          comparison ??
+          (conditionDef.gameStat === "bestRank" ? "lte" : "gte");
+        return compareValue(actual, value, comp);
+      }
       return false;
+    }
   }
 }
 

@@ -3,7 +3,33 @@ import { connectToDatabase } from "@/database/mongoose";
 import BadgeConfig from "@/database/models/badge-config.model";
 import { getBadgesFromDB } from "@/lib/services/badge-config-seed.service";
 import { guardSection } from "@/lib/admin/section-route-guard";
+import {
+  BADGE_CATEGORY_IDS,
+  conditionAllowedOnBadge,
+} from "@/lib/services/games/badge-condition-registry";
 
+function normalizeGameTypes(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return ["trading"];
+  return raw
+    .map((t) => (typeof t === "string" ? t.trim() : ""))
+    .filter(Boolean);
+}
+
+function validateBadgePayload(badge: {
+  category?: string;
+  condition?: { type?: string };
+  gameTypes?: unknown;
+}): string | null {
+  if (badge.category && !BADGE_CATEGORY_IDS.includes(badge.category)) {
+    return `Unknown category: ${badge.category}`;
+  }
+  const gameTypes = normalizeGameTypes(badge.gameTypes);
+  const type = badge.condition?.type;
+  if (type && !conditionAllowedOnBadge(type, gameTypes)) {
+    return `Condition "${type}" is not allowed for gameTypes [${gameTypes.join(", ") || "platform"}]`;
+  }
+  return null;
+}
 /**
  * GET /api/admin/badges
  * Get all badges from database
@@ -62,6 +88,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const gameTypes = normalizeGameTypes(badge.gameTypes);
+    const validationError = validateBadgePayload({ ...badge, gameTypes });
+    if (validationError) {
+      return NextResponse.json(
+        { success: false, error: validationError },
+        { status: 400 },
+      );
+    }
+
     // Create badge in database
     const newBadge = await BadgeConfig.create({
       id: badge.id,
@@ -72,6 +107,7 @@ export async function POST(request: NextRequest) {
       rarity: badge.rarity,
       condition: badge.condition || { type: "manual" },
       minLevel: badge.minLevel ?? 0,
+      gameTypes,
       isActive: true,
     });
 
@@ -117,6 +153,26 @@ export async function PUT(request: NextRequest) {
     }
 
     // Update badge in database
+    // Reason: omit gameTypes from the body must mean "keep", never silently
+    // rewrite a platform badge to trading-only.
+    const existingDoc = await BadgeConfig.findOne({ id: badge.id }).lean();
+    if (!existingDoc) {
+      return NextResponse.json(
+        { success: false, error: "Badge not found" },
+        { status: 404 },
+      );
+    }
+    const gameTypes = Array.isArray(badge.gameTypes)
+      ? normalizeGameTypes(badge.gameTypes)
+      : normalizeGameTypes((existingDoc as { gameTypes?: string[] }).gameTypes);
+    const validationError = validateBadgePayload({ ...badge, gameTypes });
+    if (validationError) {
+      return NextResponse.json(
+        { success: false, error: validationError },
+        { status: 400 },
+      );
+    }
+
     const updatedBadge = await BadgeConfig.findOneAndUpdate(
       { id: badge.id },
       {
@@ -127,6 +183,7 @@ export async function PUT(request: NextRequest) {
         rarity: badge.rarity,
         condition: badge.condition || { type: "manual" },
         minLevel: badge.minLevel ?? 0,
+        gameTypes,
       },
       { new: true },
     );

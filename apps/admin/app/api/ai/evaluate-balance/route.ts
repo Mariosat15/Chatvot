@@ -54,6 +54,8 @@ export async function POST(request: NextRequest) {
         rarity: b.rarity,
         minLevel: b.minLevel || 0,
         condition: b.condition || {},
+        // Reason (R96b): engine skips minTrades for non-trading scopes / Games.
+        gameTypes: Array.isArray(b.gameTypes) ? b.gameTypes : undefined,
       }));
 
       const milestoneData: MilestoneData[] = (milestones as any[]).map((m) => ({
@@ -117,6 +119,8 @@ export async function POST(request: NextRequest) {
         rarity: b.rarity,
         minLevel: b.minLevel || 0,
         condition: b.condition || {},
+        // Reason (R96b): engine skips minTrades for non-trading scopes / Games.
+        gameTypes: Array.isArray(b.gameTypes) ? b.gameTypes : undefined,
       }));
 
       const milestoneData: MilestoneData[] = (milestones as any[]).map((m) => ({

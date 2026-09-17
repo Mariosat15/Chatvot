@@ -3,10 +3,12 @@ import type { GameIconName } from "@/lib/constants/game-icons";
 export type BadgeCategory =
   | "Competition"
   | "Trading"
+  | "Games"
   | "Profit"
   | "Risk"
   | "Speed"
   | "Consistency"
+  | "Volume"
   | "Strategy"
   | "Social"
   | "Legendary";
@@ -22,10 +24,14 @@ export interface Badge {
     type: string;
     value?: number;
     comparison?: "gte" | "lte" | "eq";
-    // NEW: Minimum requirements to prevent zero-baseline badges
+    // Minimum requirements to prevent zero-baseline badges
     minTrades?: number;
     minCompletedCompetitions?: number;
   };
+  // Level-gated: badge visible but locked until user reaches this level (0 = no requirement)
+  minLevel?: number;
+  /** Empty = platform; ["trading"] = trading-shaped; provider keys = per-game (X7 step 4). */
+  gameTypes?: string[];
 }
 
 export const BADGES: Badge[] = [
@@ -40,7 +46,8 @@ export const BADGES: Badge[] = [
     category: "Competition",
     icon: "trophy",
     rarity: "common",
-    condition: { type: "competitions_entered", value: 5, comparison: "gte" },
+    // Must have actually traded in competitions (not just joined)
+    condition: { type: "competitions_entered", value: 5, comparison: "gte", minTrades: 10 },
   },
   {
     id: "comp_10_entries",
@@ -49,7 +56,7 @@ export const BADGES: Badge[] = [
     category: "Competition",
     icon: "trophyStar",
     rarity: "rare",
-    condition: { type: "competitions_entered", value: 10, comparison: "gte" },
+    condition: { type: "competitions_entered", value: 10, comparison: "gte", minTrades: 25 },
   },
   {
     id: "comp_25_entries",
@@ -58,7 +65,7 @@ export const BADGES: Badge[] = [
     category: "Competition",
     icon: "champion",
     rarity: "epic",
-    condition: { type: "competitions_entered", value: 25, comparison: "gte" },
+    condition: { type: "competitions_entered", value: 25, comparison: "gte", minTrades: 75, minCompletedCompetitions: 10 },
   },
   {
     id: "comp_50_entries",
@@ -67,7 +74,7 @@ export const BADGES: Badge[] = [
     category: "Competition",
     icon: "victory",
     rarity: "legendary",
-    condition: { type: "competitions_entered", value: 50, comparison: "gte" },
+    condition: { type: "competitions_entered", value: 50, comparison: "gte", minTrades: 150, minCompletedCompetitions: 25 },
   },
   {
     id: "comp_3_wins",
@@ -76,7 +83,7 @@ export const BADGES: Badge[] = [
     category: "Competition",
     icon: "crown",
     rarity: "rare",
-    condition: { type: "first_place_finishes", value: 3, comparison: "gte" },
+    condition: { type: "first_place_finishes", value: 3, comparison: "gte", minTrades: 25 },
   },
   {
     id: "comp_5_wins",
@@ -85,7 +92,7 @@ export const BADGES: Badge[] = [
     category: "Competition",
     icon: "goldMedal",
     rarity: "epic",
-    condition: { type: "first_place_finishes", value: 5, comparison: "gte" },
+    condition: { type: "first_place_finishes", value: 5, comparison: "gte", minTrades: 50 },
   },
   {
     id: "comp_10_wins",
@@ -94,7 +101,7 @@ export const BADGES: Badge[] = [
     category: "Competition",
     icon: "lightningSpell",
     rarity: "legendary",
-    condition: { type: "first_place_finishes", value: 10, comparison: "gte" },
+    condition: { type: "first_place_finishes", value: 10, comparison: "gte", minTrades: 100 },
   },
   {
     id: "comp_5_podiums",
@@ -103,7 +110,7 @@ export const BADGES: Badge[] = [
     category: "Competition",
     icon: "trophy",
     rarity: "common",
-    condition: { type: "podium_finishes", value: 5, comparison: "gte" },
+    condition: { type: "podium_finishes", value: 5, comparison: "gte", minTrades: 25 },
   },
   {
     id: "comp_10_podiums",
@@ -112,7 +119,7 @@ export const BADGES: Badge[] = [
     category: "Competition",
     icon: "starAward",
     rarity: "rare",
-    condition: { type: "podium_finishes", value: 10, comparison: "gte" },
+    condition: { type: "podium_finishes", value: 10, comparison: "gte", minTrades: 50 },
   },
   {
     id: "comp_25_podiums",
@@ -121,7 +128,7 @@ export const BADGES: Badge[] = [
     category: "Competition",
     icon: "star1",
     rarity: "epic",
-    condition: { type: "podium_finishes", value: 25, comparison: "gte" },
+    condition: { type: "podium_finishes", value: 25, comparison: "gte", minTrades: 100 },
   },
   {
     id: "comp_perfect_run",
@@ -579,8 +586,8 @@ export const BADGES: Badge[] = [
     rarity: "common",
     condition: { 
       type: "no_liquidations", 
-      minCompletedCompetitions: 1, // MUST complete at least 1 competition
-      minTrades: 5 // MUST have placed at least 5 trades
+      minCompletedCompetitions: 3, // Must prove consistency across 3 competitions
+      minTrades: 25 // Must have placed 25+ trades (real activity, not just sitting idle)
     },
   },
   {
@@ -593,7 +600,7 @@ export const BADGES: Badge[] = [
     condition: { 
       type: "zero_liquidations_lifetime",
       minCompletedCompetitions: 10, // MUST complete 10+ competitions
-      minTrades: 50 // MUST have 50+ trades
+      minTrades: 100 // MUST have 100+ trades (prove long-term discipline)
     },
   },
   {
@@ -621,7 +628,7 @@ export const BADGES: Badge[] = [
     category: "Risk",
     icon: "riskWarning",
     rarity: "rare",
-    condition: { type: "always_uses_sl", minTrades: 50 },
+    condition: { type: "always_uses_sl", minTrades: 50, minCompletedCompetitions: 3 },
   },
   {
     id: "risk_tp_master",
@@ -630,7 +637,7 @@ export const BADGES: Badge[] = [
     category: "Risk",
     icon: "target",
     rarity: "rare",
-    condition: { type: "always_uses_tp", minTrades: 50 },
+    condition: { type: "always_uses_tp", minTrades: 50, minCompletedCompetitions: 3 },
   },
   {
     id: "risk_disciplined",
@@ -1074,7 +1081,7 @@ export const BADGES: Badge[] = [
     category: "Social",
     icon: "star1",
     rarity: "rare",
-    condition: { type: "early_adopter", minTrades: 10 },
+    condition: { type: "early_adopter", minTrades: 25, minCompletedCompetitions: 2 },
   },
   {
     id: "social_3_months",

@@ -36,6 +36,11 @@ import { GameIcon } from "@/components/ui/GameIcon";
 import { GameIconPicker } from "@/components/ui/GameIconPicker";
 import { GAME_ICONS, type GameIconName } from "@/lib/constants/game-icons";
 import {
+  BADGE_CATEGORIES,
+  conditionsAllowedForGameTypes,
+  conditionScope,
+} from "@/lib/services/games/badge-condition-registry";
+import {
   Trophy,
   Award,
   Star,
@@ -212,6 +217,8 @@ export default function BadgeXPManagementSection() {
     rarity: "",
     icon: "",
     minLevel: 0 as number,
+    // Reason (R96b): default trading matches schema default; empty = platform.
+    gameTypes: ["trading"] as string[],
     condition: {
       type: "",
       value: undefined as number | undefined,
@@ -220,6 +227,9 @@ export default function BadgeXPManagementSection() {
       minCompletedCompetitions: undefined as number | undefined,
     },
   });
+  const [gameOptions, setGameOptions] = useState<
+    { gameKey: string; displayName: string }[]
+  >([{ gameKey: "trading", displayName: "Trading" }]);
   const [isClosing, setIsClosing] = useState(false);
 
   // AI Badge Generation & Evaluation state
@@ -270,6 +280,25 @@ export default function BadgeXPManagementSection() {
   useEffect(() => {
     fetchData(1, "");
   }, [fetchData]);
+
+  // Reason (R96b): catalogue-fed scope picker — refuse inventing gameKeys.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/badges/game-options");
+        const data = await res.json();
+        if (!cancelled && data.success && Array.isArray(data.options)) {
+          setGameOptions(data.options);
+        }
+      } catch {
+        /* keep Trading-only fallback */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Debounced search: wait 400ms after user stops typing, then fetch page 1
   useEffect(() => {
@@ -434,6 +463,72 @@ export default function BadgeXPManagementSection() {
       console.error("Error saving levels:", error);
       toast.error("Error saving levels");
     }
+  };
+
+  // Reason: R96b — neutral (non-forex) titles for new rungs so the ladder
+  // is not trading-shaped when an operator extends it for games.
+  const NEUTRAL_LEVEL_TITLES = [
+    "Newcomer",
+    "Contender",
+    "Challenger",
+    "Competitor",
+    "Veteran",
+    "Champion",
+    "Elite",
+    "Master",
+    "Grandmaster",
+    "Legend",
+  ] as const;
+
+  const addLevel = () => {
+    if (!editingLevel) return;
+    const sorted = [...levels].sort((a, b) => a.level - b.level);
+    const last = sorted[sorted.length - 1];
+    const nextLevel = (last?.level || 0) + 1;
+    if (nextLevel > 50) {
+      toast.error("Maximum 50 levels.");
+      return;
+    }
+    const prevMax = typeof last?.maxXP === "number" ? last.maxXP : (last?.minXP || 0) + 99;
+    const minXP = prevMax + 1;
+    const title =
+      NEUTRAL_LEVEL_TITLES[(nextLevel - 1) % NEUTRAL_LEVEL_TITLES.length] ||
+      `Level ${nextLevel}`;
+    setLevels([
+      ...sorted,
+      {
+        level: nextLevel,
+        title,
+        minXP,
+        maxXP: minXP + 199,
+        color: "text-primary",
+        icon: "starBadge",
+        description: `Reach level ${nextLevel}`,
+      },
+    ]);
+  };
+
+  const removeLevel = (levelNumber: number) => {
+    if (!editingLevel) return;
+    if (levels.length <= 1) {
+      toast.error("Keep at least one level.");
+      return;
+    }
+    const remaining = levels
+      .filter((l) => l.level !== levelNumber)
+      .sort((a, b) => a.level - b.level)
+      .map((l, idx) => ({ ...l, level: idx + 1 }));
+    // Re-stitch maxXP of each rung to the next minXP so the ladder stays contiguous.
+    for (let i = 0; i < remaining.length - 1; i++) {
+      remaining[i].maxXP = remaining[i + 1].minXP - 1;
+    }
+    if (remaining.length > 0) {
+      const top = remaining[remaining.length - 1];
+      if (typeof top.maxXP !== "number" || top.maxXP < top.minXP) {
+        top.maxXP = top.minXP + 999;
+      }
+    }
+    setLevels(remaining);
   };
 
   return (
@@ -679,6 +774,19 @@ export default function BadgeXPManagementSection() {
               )}
             </div>
 
+            {editingLevel && ladderLoaded && (
+              <div className="flex items-center gap-2 mb-2">
+                <Button onClick={addLevel} size="sm" variant="secondary">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add level
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  New levels use neutral titles (Newcomer, Contender, …). Rename
+                  freely. Save when done.
+                </p>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
               {levels.map((level) => (
                 <div
@@ -698,8 +806,13 @@ export default function BadgeXPManagementSection() {
                       </div>
                     </div>
                     {editingLevel && (
-                      <Button variant="ghost" size="icon">
-                        <Edit className="h-4 w-4" />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        title="Remove level"
+                        onClick={() => removeLevel(level.level)}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     )}
                   </div>
@@ -1208,6 +1321,7 @@ export default function BadgeXPManagementSection() {
                       rarity: badge.rarity,
                       icon: badge.icon,
                       minLevel: badge.minLevel ?? 0,
+                      gameTypes: Array.isArray(badge.gameTypes) ? badge.gameTypes : ["trading"],
                       condition: badge.condition || {
                         type: "",
                         value: undefined,
@@ -1242,6 +1356,7 @@ export default function BadgeXPManagementSection() {
                             rarity: badge.rarity,
                             icon: badge.icon,
                             minLevel: badge.minLevel ?? 0,
+                            gameTypes: Array.isArray(badge.gameTypes) ? badge.gameTypes : ["trading"],
                             condition: badge.condition || {
                               type: "",
                               value: undefined,
@@ -1520,6 +1635,7 @@ export default function BadgeXPManagementSection() {
                 rarity: "",
                 icon: "",
                 minLevel: 0,
+                gameTypes: ["trading"],
                 condition: {
                   type: "",
                   value: undefined,
@@ -1574,6 +1690,7 @@ export default function BadgeXPManagementSection() {
                         rarity: "",
                         icon: "",
                         minLevel: 0,
+                        gameTypes: ["trading"],
                         condition: {
                           type: "",
                           value: undefined,
@@ -1681,15 +1798,11 @@ export default function BadgeXPManagementSection() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Competition">Competition</SelectItem>
-                      <SelectItem value="Trading">Trading</SelectItem>
-                      <SelectItem value="Profit">Profit</SelectItem>
-                      <SelectItem value="Risk">Risk</SelectItem>
-                      <SelectItem value="Speed">Speed</SelectItem>
-                      <SelectItem value="Consistency">Consistency</SelectItem>
-                      <SelectItem value="Strategy">Strategy</SelectItem>
-                      <SelectItem value="Social">Social</SelectItem>
-                      <SelectItem value="Legendary">Legendary</SelectItem>
+                      {BADGE_CATEGORIES.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1755,6 +1868,64 @@ export default function BadgeXPManagementSection() {
                   />
                 </div>
 
+
+                {/* Game scope (R96b) */}
+                <div className="space-y-3 col-span-2">
+                  <Label className="text-xl font-semibold">Game Scope</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Empty = platform (every game). Trading-only keeps forex floors.
+                    Provider keys scope to that game&apos;s UserGameStats.
+                  </p>
+                  <div className="flex flex-wrap gap-3">
+                    <label className="flex items-center gap-2 text-sm border rounded-md px-3 py-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={badgeForm.gameTypes.length === 0}
+                        onChange={(e) => {
+                          setBadgeForm({
+                            ...badgeForm,
+                            gameTypes: e.target.checked ? [] : ["trading"],
+                            condition: {
+                              ...badgeForm.condition,
+                              type: "",
+                            },
+                          });
+                        }}
+                      />
+                      Platform (all games)
+                    </label>
+                    {gameOptions.map((opt) => {
+                      const checked = badgeForm.gameTypes.includes(opt.gameKey);
+                      return (
+                        <label
+                          key={opt.gameKey}
+                          className="flex items-center gap-2 text-sm border rounded-md px-3 py-2 cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            disabled={badgeForm.gameTypes.length === 0}
+                            checked={checked}
+                            onChange={(e) => {
+                              const next = e.target.checked
+                                ? [...badgeForm.gameTypes, opt.gameKey]
+                                : badgeForm.gameTypes.filter((k) => k !== opt.gameKey);
+                              setBadgeForm({
+                                ...badgeForm,
+                                gameTypes: next.length ? next : ["trading"],
+                                condition: {
+                                  ...badgeForm.condition,
+                                  type: "",
+                                },
+                              });
+                            }}
+                          />
+                          {opt.displayName}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 {/* Condition Settings */}
                 <div className="col-span-2 border-t pt-6 mt-4">
                   <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
@@ -1778,97 +1949,11 @@ export default function BadgeXPManagementSection() {
                           <SelectValue placeholder="Select condition type" />
                         </SelectTrigger>
                         <SelectContent className="max-h-80">
-                          {/* Account & Setup */}
-                          <SelectItem value="account_created">Account Created</SelectItem>
-                          <SelectItem value="first_deposit">First Deposit</SelectItem>
-                          <SelectItem value="has_deposit">Has Any Deposit</SelectItem>
-                          <SelectItem value="kyc_verified">KYC Verified</SelectItem>
-                          <SelectItem value="profile_complete">Profile Complete</SelectItem>
-                          <SelectItem value="total_deposits">Total Deposited Amount</SelectItem>
-                          
-                          {/* Trading Activity */}
-                          <SelectItem value="first_trade">First Trade</SelectItem>
-                          <SelectItem value="total_trades">Total Trades</SelectItem>
-                          <SelectItem value="winning_trades">Winning Trades</SelectItem>
-                          <SelectItem value="losing_trades">Losing Trades</SelectItem>
-                          <SelectItem value="trades_today">Trades Today</SelectItem>
-                          <SelectItem value="trades_this_week">Trades This Week</SelectItem>
-                          <SelectItem value="trades_this_month">Trades This Month</SelectItem>
-                          <SelectItem value="consecutive_trading_days">Consecutive Trading Days</SelectItem>
-                          <SelectItem value="unique_pairs_traded">Unique Pairs Traded</SelectItem>
-                          <SelectItem value="different_assets_traded">Different Assets Traded</SelectItem>
-                          
-                          {/* Performance */}
-                          <SelectItem value="win_rate">Win Rate %</SelectItem>
-                          <SelectItem value="win_streak">Current Win Streak</SelectItem>
-                          <SelectItem value="max_win_streak">Max Win Streak</SelectItem>
-                          <SelectItem value="total_pnl">Total P&L</SelectItem>
-                          <SelectItem value="total_pnl_positive">Positive P&L</SelectItem>
-                          <SelectItem value="profit_factor">Profit Factor</SelectItem>
-                          <SelectItem value="single_trade_profit">Single Trade Profit</SelectItem>
-                          <SelectItem value="best_trade_pnl">Best Trade P&L</SelectItem>
-                          <SelectItem value="average_trade_pnl">Average Trade P&L</SelectItem>
-                          <SelectItem value="average_roi">Average ROI %</SelectItem>
-                          <SelectItem value="risk_reward_ratio">Risk Reward Ratio</SelectItem>
-                          
-                          {/* Competitions */}
-                          <SelectItem value="competitions_entered">Competitions Entered</SelectItem>
-                          <SelectItem value="competitions_completed">Competitions Completed</SelectItem>
-                          <SelectItem value="first_place_finishes">First Place Finishes</SelectItem>
-                          <SelectItem value="second_place_finishes">Second Place Finishes</SelectItem>
-                          <SelectItem value="third_place_finishes">Third Place Finishes</SelectItem>
-                          <SelectItem value="podium_finishes">Podium Finishes (Top 3)</SelectItem>
-                          <SelectItem value="top_10_finishes">Top 10 Finishes</SelectItem>
-                          <SelectItem value="top_50_percent_finishes">Top 50% Finishes</SelectItem>
-                          <SelectItem value="competition_pnl">Competition P&L</SelectItem>
-                          
-                          {/* Progression & XP */}
-                          <SelectItem value="level_reached">Level Reached</SelectItem>
-                          <SelectItem value="xp_threshold">XP Threshold</SelectItem>
-                          <SelectItem value="xp_earned_today">XP Earned Today</SelectItem>
-                          <SelectItem value="xp_earned_this_week">XP Earned This Week</SelectItem>
-                          <SelectItem value="total_badges">Total Badges Earned</SelectItem>
-                          
-                          {/* Social & Community */}
-                          <SelectItem value="referrals_made">Referrals Made</SelectItem>
-                          <SelectItem value="referrals_active">Active Referrals</SelectItem>
-                          <SelectItem value="friends_added">Friends Added</SelectItem>
-                          <SelectItem value="messages_sent">Messages Sent</SelectItem>
-                          
-                          {/* Risk Management */}
-                          <SelectItem value="no_liquidations">No Liquidations</SelectItem>
-                          <SelectItem value="zero_liquidations_lifetime">Zero Lifetime Liquidations</SelectItem>
-                          <SelectItem value="always_uses_sl">Always Uses Stop Loss</SelectItem>
-                          <SelectItem value="always_uses_tp">Always Uses Take Profit</SelectItem>
-                          <SelectItem value="stop_loss_used">Stop Loss Used (count)</SelectItem>
-                          <SelectItem value="take_profit_used">Take Profit Used (count)</SelectItem>
-                          <SelectItem value="max_drawdown">Max Drawdown %</SelectItem>
-                          <SelectItem value="max_drawdown_under">Max Drawdown Under %</SelectItem>
-                          <SelectItem value="position_size_under">Position Size Under</SelectItem>
-                          
-                          {/* Time-Based */}
-                          <SelectItem value="platform_age">Platform Age (Days)</SelectItem>
-                          <SelectItem value="account_age">Account Age (Days)</SelectItem>
-                          <SelectItem value="active_days">Active Trading Days</SelectItem>
-                          <SelectItem value="login_streak">Login Streak</SelectItem>
-                          <SelectItem value="consecutive_profitable_days">Consecutive Profitable Days</SelectItem>
-                          
-                          {/* Wallet */}
-                          <SelectItem value="total_deposited">Total Deposited</SelectItem>
-                          <SelectItem value="withdrawal_made">Withdrawal Made</SelectItem>
-                          <SelectItem value="large_withdrawal">Large Withdrawal (500+)</SelectItem>
-                          <SelectItem value="net_profit_lifetime">Net Profit Lifetime</SelectItem>
-                          
-                          {/* Trading Speed */}
-                          <SelectItem value="daily_trade_volume">Daily Trade Volume</SelectItem>
-                          <SelectItem value="weekly_trade_volume">Weekly Trade Volume</SelectItem>
-                          <SelectItem value="monthly_trade_volume">Monthly Trade Volume</SelectItem>
-                          <SelectItem value="fast_order_execution">Fast Order Execution</SelectItem>
-                          <SelectItem value="quick_scalps">Quick Scalps</SelectItem>
-                          
-                          {/* Special */}
-                          <SelectItem value="global_rank">Global Rank</SelectItem>
-                          <SelectItem value="early_adopter">Early Adopter</SelectItem>
+                          {conditionsAllowedForGameTypes(badgeForm.gameTypes).map((d) => (
+                            <SelectItem key={d.type} value={d.type}>
+                              {d.label} [{d.scope}]
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -1917,6 +2002,7 @@ export default function BadgeXPManagementSection() {
                       </p>
                     </div>
 
+                    {conditionScope(badgeForm.condition?.type || "") === "trading" && (
                     <div className="space-y-3">
                       <Label className="text-lg font-semibold">Minimum Trades Required</Label>
                       <Input
@@ -1938,6 +2024,7 @@ export default function BadgeXPManagementSection() {
                         User must have this many trades to earn badge
                       </p>
                     </div>
+                    )}
 
                     <div className="space-y-3 col-span-2">
                       <Label className="text-lg font-semibold">Min Completed Competitions</Label>
@@ -2022,6 +2109,7 @@ export default function BadgeXPManagementSection() {
                       rarity: badgeForm.rarity || "common",
                       icon: badgeForm.icon || "🏆",
                       minLevel: badgeForm.minLevel || 0,
+                      gameTypes: badgeForm.gameTypes,
                       condition: badgeForm.condition || { type: "manual" },
                     };
 
@@ -2058,6 +2146,7 @@ export default function BadgeXPManagementSection() {
                           rarity: "",
                           icon: "",
                           minLevel: 0,
+                          gameTypes: ["trading"],
                           condition: {
                             type: "",
                             value: undefined,

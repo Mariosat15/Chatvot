@@ -1,52 +1,19 @@
 /**
  * Badge visibility / evaluation scope by game (X7 step 4).
  *
- * Model-free so client and services can share the rules. Does not author
- * badges (R96b) — it only decides whether an existing badge applies to a
- * player given which games they have played.
+ * Model-free so client and services can share the rules. Authoring of
+ * game-scoped badges is R96b — this module only decides whether an
+ * existing badge applies to a player given which games they have played.
  */
 
 import { TRADING_GAME_TYPE } from "@/lib/games/types";
+import { noTradeFloorTypes } from "@/lib/services/games/badge-condition-registry";
 
-/** Condition types that are meaningful without trading activity (R96a). */
-export const PLATFORM_OR_CROSS_GAME_CONDITION_TYPES = new Set([
-  "first_deposit",
-  "has_deposit",
-  "total_deposited",
-  "total_deposits",
-  "withdrawal_made",
-  "total_withdrawals",
-  "large_withdrawal",
-  "net_profit_lifetime",
-  "platform_age",
-  "early_adopter",
-  "account_age",
-  "account_age_days",
-  "account_created",
-  "kyc_verified",
-  "profile_complete",
-  "referrals_made",
-  "referrals_active",
-  "friends_added",
-  "login_streak",
-  "competitions_entered",
-  "first_trade",
-  "competitions_completed",
-  "first_place_finishes",
-  "podium_finishes",
-  "second_place_finishes",
-  "third_place_finishes",
-  "top_10_finishes",
-  "top_50_percent_finishes",
-  "perfect_competition_win_rate",
-  "beat_top_trader",
-  "level_reached",
-  "xp_threshold",
-  "xp_earned_today",
-  "xp_earned_this_week",
-  "total_badges",
-  "messages_sent",
-]);
+/**
+ * Condition types meaningful without trading activity (R96a + R96b game scope).
+ * Reason: derived from the registry so a fourth hard-coded list cannot drift.
+ */
+export const PLATFORM_OR_CROSS_GAME_CONDITION_TYPES = noTradeFloorTypes();
 
 /**
  * Empty stored array → platform (every game). A lone `"trading"` keeps today's

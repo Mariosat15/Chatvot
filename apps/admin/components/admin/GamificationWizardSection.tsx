@@ -17,7 +17,16 @@ import {
   Info, Trophy, Target, Map, BarChart3, Zap, Shield, Crown,
   ArrowRight, ArrowLeft, RefreshCw, Download, Loader2,
   ChevronDown, ChevronUp, Eye, Wrench, Settings, Star,
+  Trash2,
 } from "lucide-react";
+import {
+  ALL_GAMIFICATION_RESET_SCOPES,
+  GAMIFICATION_REBUILD_WARNING,
+  GAMIFICATION_RESET_CONFIRMATION,
+  GAMIFICATION_RESET_PROGRESS_WARNING,
+  GAMIFICATION_RESET_SCOPE_COPY,
+  type GamificationResetScope,
+} from "@/lib/admin/gamification-reset-copy";
 
 // ─── Types ──────────────────────────────────────────────────────────────────────
 
@@ -92,6 +101,15 @@ export default function GamificationWizardSection() {
 
   // Full setup progress
   const [fullSetupProgress, setFullSetupProgress] = useState<{ step: number; label: string; steps: any[] } | null>(null);
+
+  // Rebuild-from-scratch controls. Default is "add": the destructive mode must
+  // be chosen deliberately, never arrived at by leaving a control alone.
+  const [setupMode, setSetupMode] = useState<"add" | "rebuild">("add");
+  const [resetScopes, setResetScopes] = useState<GamificationResetScope[]>([
+    ...ALL_GAMIFICATION_RESET_SCOPES,
+  ]);
+  const [resetIncludeProgress, setResetIncludeProgress] = useState(false);
+  const [resetConfirmation, setResetConfirmation] = useState("");
 
   // Dialogs
   const [showBadgeDetails, setShowBadgeDetails] = useState(false);
@@ -238,96 +256,149 @@ export default function GamificationWizardSection() {
     setStepLoading(null);
   };
 
+  /**
+   * Runs the whole pipeline in ONE server call.
+   *
+   * Reason (R96b): the browser used to chain four actions in a fixed order,
+   * which made the client a second owner of the sequence and of the add-only
+   * rule. `run_full` owns both, and it also does the two steps the client
+   * version could not: propose a neutral level ladder when none exists, and
+   * size badge generation from the measured per-game gap rather than from a
+   * number typed into this form.
+   */
   const runFullSetup = async () => {
+    const rebuilding = setupMode === "rebuild";
+
+    // Reason: refuse here as well as on the server. Sending a request the
+    // server will refuse spends an AI call's worth of waiting to be told the
+    // operator mistyped a phrase that is on screen in front of them.
+    if (rebuilding && resetConfirmation !== GAMIFICATION_RESET_CONFIRMATION) {
+      toast.error(`Type "${GAMIFICATION_RESET_CONFIRMATION}" to confirm the rebuild.`);
+      return;
+    }
+    if (rebuilding && resetScopes.length === 0) {
+      toast.error("Choose at least one thing to delete, or switch back to Add.");
+      return;
+    }
+
     setStepLoading("full");
-    const steps: any[] = [];
-    setFullSetupProgress({ step: 1, label: "Running Badge Agent (AI)...", steps: [] });
+    setFullSetupProgress({
+      step: 1,
+      label: rebuilding
+        ? "Deleting the existing system, then rebuilding..."
+        : "Running full setup (levels, badges, milestones, evaluation)...",
+      steps: [],
+    });
 
     try {
-      // Step 1: Badge Agent (AI)
-      const badgesData = await callWizardAPI({
-        action: "agent_badges",
-        generateCount: badgeGenCount,
-        autoApply: true,
+      const data = await callWizardAPI({
+        action: "run_full",
+        generateCount: badgeGenCount > 0 ? badgeGenCount : undefined,
+        mode: setupMode,
+        ...(rebuilding
+          ? {
+              resetScopes,
+              confirmation: resetConfirmation,
+              includePlayerProgress: resetIncludeProgress,
+            }
+          : {}),
       });
-      const badgeStep = {
-        name: "Badge Agent (AI)",
-        success: badgesData.success,
-        summary: badgesData.summary || "",
-        fixedCount: badgesData.fixedCount || 0,
-        newCount: badgesData.newCount || 0,
-      };
-      steps.push(badgeStep);
-      if (badgesData.success) {
-        setBadgeResult(badgesData);
-        toast.success(`Step 1/4: Badges — ${badgesData.fixedCount} fixed, ${badgesData.newCount} new`);
-      } else {
-        toast.error(`Step 1/4: Badge Agent failed — ${badgesData.error || "unknown error"}`);
+
+      if (!data.success) {
+        toast.error(data.error || "Full setup failed");
+        setFullSetupProgress(null);
+        setStepLoading(null);
+        return;
       }
 
-      // Step 2: Milestone Agent (AI)
-      setFullSetupProgress({ step: 2, label: "Running Milestone Agent (AI)...", steps });
-      const msData = await callWizardAPI({
-        action: "agent_milestones",
-        autoApply: true,
-      });
-      const msStep = {
-        name: "Milestone Agent (AI)",
-        success: msData.success,
-        summary: msData.summary || "",
-        fixedCount: msData.fixedCount || 0,
-        badgeGatesAdded: msData.badgeGatesAdded || 0,
-      };
-      steps.push(msStep);
-      if (msData.success) {
-        setMilestoneResult(msData);
-        toast.success(`Step 2/4: Milestones — ${msData.fixedCount} fixed, ${msData.badgeGatesAdded} badge-gates`);
-      } else {
-        toast.error(`Step 2/4: Milestone Agent failed — ${msData.error || "unknown error"}`);
-      }
+      const s = data.steps || {};
+      const reset = typeof s.reset === "object" && s.reset !== null ? s.reset : null;
+      const steps: any[] = [
+        // Reason: the wipe is reported as a step of its own, with counts. A
+        // rebuild that silently deleted nothing — a wrong scope, an empty
+        // collection — is otherwise indistinguishable from one that worked.
+        ...(reset
+          ? [
+              {
+                name: "Rebuild (deleted)",
+                success: true,
+                summary:
+                  Object.entries(reset.deleted || {})
+                    .map(([k, v]) => `${k}: ${v}`)
+                    .join(", ") || "nothing to delete",
+              },
+            ]
+          : []),
+        {
+          name: "Level ladder",
+          success: true,
+          summary:
+            s.levels?.action === "created"
+              ? `Created ${s.levels.levelCount} neutral levels`
+              : `Kept ${s.levels?.levelCount ?? 0} existing levels`,
+        },
+        {
+          name: "Badge Agent (AI)",
+          success: !s.badges?.error,
+          summary: s.badges?.summary || s.badges?.error || "",
+          fixedCount: s.badges?.fixedCount || 0,
+          newCount: s.badges?.newCount || 0,
+        },
+        {
+          name: "Milestone Agent (AI)",
+          success: true,
+          summary: Array.isArray(s.milestones)
+            ? `${s.milestones.length} map(s) processed`
+            : "skipped",
+        },
+        {
+          name: "Auto-Fix Engine",
+          success: true,
+          summary: `${s.autoFix?.fixes?.totalFixes || 0} fixes applied`,
+        },
+        {
+          name: "Evaluation Engine",
+          success: true,
+          overallScore: s.evaluation?.evaluation?.overallScore,
+          issueCount: s.evaluation?.evaluation?.issues?.length || 0,
+        },
+      ];
 
-      // Step 3: Local Evaluation (instant, no AI)
-      setFullSetupProgress({ step: 3, label: "Evaluating system (instant)...", steps });
-      const evalData = await callWizardAPI({ action: "agent_evaluate" });
-      const evalStep = {
-        name: "Evaluation Engine",
-        success: evalData.success,
-        overallScore: evalData.evaluation?.overallScore,
-        issueCount: evalData.evaluation?.issues?.length || 0,
-      };
-      steps.push(evalStep);
-      if (evalData.success && evalData.evaluation) {
-        setEvaluation(evalData.evaluation);
-        toast.success(`Step 3/4: Score ${evalData.evaluation.overallScore}/10 — ${evalData.evaluation.issues?.length || 0} issues`);
-      } else {
-        toast.error(`Step 3/4: Evaluation failed — ${evalData.error || "unknown error"}`);
-      }
-
-      // Step 4: Auto-fix (local engine, no AI)
-      setFullSetupProgress({ step: 4, label: "Auto-fixing issues...", steps });
-      const fixData = await callWizardAPI({ action: "auto_fix" });
-      const fixStep = {
-        name: "Auto-Fix Engine",
-        success: fixData.success,
-        summary: `${fixData.fixes?.totalFixes || 0} fixes applied`,
-      };
-      steps.push(fixStep);
-      if (fixData.success) {
-        toast.success(`Step 4/4: ${fixData.fixes?.totalFixes || 0} fixes applied`);
-      }
-
-      // Final re-evaluation to show updated scores
-      const finalEval = await callWizardAPI({ action: "agent_evaluate" });
-      if (finalEval.success && finalEval.evaluation) {
-        setEvaluation(finalEval.evaluation);
-      }
+      if (s.evaluation?.evaluation) setEvaluation(s.evaluation.evaluation);
+      if (s.badges && !s.badges.error) setBadgeResult(s.badges);
 
       setFullSetupProgress({ step: 5, label: "Complete!", steps });
+
+      if (rebuilding) {
+        // Reason: back to Add and clear the phrase. Leaving the panel armed
+        // means the next press of the same button wipes the system that was
+        // just built, which is the one outcome nobody would expect twice.
+        setSetupMode("add");
+        setResetConfirmation("");
+        setResetIncludeProgress(false);
+        const orphaned = Object.entries(reset?.orphanedPlayerProgress || {})
+          .filter(([, v]) => Number(v) > 0)
+          .map(([k, v]) => `${v} ${k}`)
+          .join(", ");
+        if (orphaned) {
+          toast.warning(
+            `Kept player-earned rows that now point at deleted content: ${orphaned}`,
+          );
+        }
+      }
+
       loadStatus();
       setCurrentStep("evaluate");
-      toast.success("Full setup complete! All 4 steps finished.");
-    } catch (err) {
-      toast.error("Full setup error — check your connection");
+
+      const missing = data.coverage?.badgeCoverage?.missingTotal ?? 0;
+      toast.success(
+        missing > 0
+          ? `Full setup complete \u2014 ${missing} badge gap(s) still open, run again to fill them`
+          : "Full setup complete \u2014 every game is covered",
+      );
+    } catch {
+      toast.error("Full setup error \u2014 check your connection");
+      setFullSetupProgress(null);
     }
     setStepLoading(null);
   };
@@ -542,20 +613,134 @@ export default function GamificationWizardSection() {
                   <Wand2 className="h-5 w-5 text-purple-400" /> One-Click Full Setup
                 </h3>
                 <p className="text-sm text-gray-400 mt-1">
-                  Runs 4 steps: AI Badge Agent → AI Milestone Agent → Evaluate (instant) → Auto-Fix (instant). AI generates/audits, then the local engine evaluates and applies targeted fixes — no timeouts.
+                  Level ladder → AI Badge Agent → AI Milestone Agent → Evaluate → Auto-Fix, in one pass. Choose whether to add to what you already have, or delete it and start again.
                 </p>
               </div>
               <Button
                 onClick={runFullSetup}
                 disabled={isStepLoading("full")}
-                className="bg-purple-600 hover:bg-purple-500 text-white px-6"
+                className={
+                  setupMode === "rebuild"
+                    ? "bg-red-600 hover:bg-red-500 text-white px-6"
+                    : "bg-purple-600 hover:bg-purple-500 text-white px-6"
+                }
               >
                 {isStepLoading("full") ? (
                   <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Running...</>
+                ) : setupMode === "rebuild" ? (
+                  <><Trash2 className="h-4 w-4 mr-2" /> Delete & Rebuild</>
                 ) : (
                   <><Play className="h-4 w-4 mr-2" /> Run All Agents</>
                 )}
               </Button>
+            </div>
+
+            {/* ── Add vs Rebuild ───────────────────────────────────────────── */}
+            <div className="space-y-3 pt-2 border-t border-purple-700/30">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => setSetupMode("add")}
+                  className={`text-left rounded-lg border p-3 transition-colors cursor-pointer ${
+                    setupMode === "add"
+                      ? "border-purple-500 bg-purple-900/30"
+                      : "border-gray-700 bg-gray-900/40 hover:border-gray-600"
+                  }`}
+                >
+                  <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                    <Play className="h-4 w-4 text-purple-400" /> Add to what exists
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Keeps everything you already have and writes only what is
+                    missing for each game. Your edits are never overwritten.
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSetupMode("rebuild")}
+                  className={`text-left rounded-lg border p-3 transition-colors cursor-pointer ${
+                    setupMode === "rebuild"
+                      ? "border-red-500 bg-red-900/30"
+                      : "border-gray-700 bg-gray-900/40 hover:border-gray-600"
+                  }`}
+                >
+                  <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                    <Trash2 className="h-4 w-4 text-red-400" /> Start from scratch
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Deletes the selected content first, then builds a fresh
+                    system in the same run. There is no undo.
+                  </p>
+                </button>
+              </div>
+
+              {setupMode === "rebuild" && (
+                <div className="rounded-lg border border-red-700/60 bg-red-950/30 p-4 space-y-3">
+                  <p className="text-xs text-red-200">{GAMIFICATION_REBUILD_WARNING}</p>
+
+                  <div className="space-y-2">
+                    {GAMIFICATION_RESET_SCOPE_COPY.map((scope) => {
+                      const checked = resetScopes.includes(scope.id);
+                      return (
+                        <label
+                          key={scope.id}
+                          className="flex gap-3 items-start cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            className="mt-1 accent-red-500 cursor-pointer"
+                            checked={checked}
+                            onChange={(e) =>
+                              setResetScopes((prev) =>
+                                e.target.checked
+                                  ? [...prev, scope.id]
+                                  : prev.filter((s) => s !== scope.id),
+                              )
+                            }
+                          />
+                          <span>
+                            <span className="text-sm text-white">{scope.label}</span>
+                            <span className="block text-xs text-gray-400">
+                              {scope.consequence}
+                            </span>
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+
+                  <Separator className="bg-red-800/50" />
+
+                  <label className="flex gap-3 items-start cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="mt-1 accent-red-500 cursor-pointer"
+                      checked={resetIncludeProgress}
+                      onChange={(e) => setResetIncludeProgress(e.target.checked)}
+                    />
+                    <span className="text-xs text-red-200">
+                      {GAMIFICATION_RESET_PROGRESS_WARNING}
+                    </span>
+                  </label>
+
+                  <div className="space-y-1">
+                    <Label className="text-xs text-gray-300">
+                      Type{" "}
+                      <span className="font-mono text-red-300">
+                        {GAMIFICATION_RESET_CONFIRMATION}
+                      </span>{" "}
+                      to confirm
+                    </Label>
+                    <Input
+                      value={resetConfirmation}
+                      onChange={(e) => setResetConfirmation(e.target.value)}
+                      placeholder={GAMIFICATION_RESET_CONFIRMATION}
+                      className="bg-gray-900 border-gray-700 text-white font-mono"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Live Progress */}

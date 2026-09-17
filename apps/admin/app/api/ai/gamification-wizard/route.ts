@@ -17,6 +17,33 @@ import JourneyMapConfig from "@/database/models/journey-map-config.model";
 import { evaluateSystem, generateFixes, type BadgeData, type MilestoneData, type MapData } from "@/lib/gamification-engine";
 import { isValidGameIconName } from "@/lib/constants/game-icons";
 import { guardSection } from "@/lib/admin/section-route-guard";
+import { conditionScope } from "@/lib/services/games/badge-condition-registry";
+import {
+  buildBadgeSystemPrompt,
+  knownGameKeys,
+  loadCatalogueGameRefs,
+  planBadgesByScope,
+  sanitizeBadgeForWrite,
+  type CatalogueGameRef,
+} from "@/lib/admin/ai-badge-prompt";
+import {
+  analyseBadgeCoverage,
+  analyseGamesOnlyParity,
+  analyseMilestoneCoverage,
+  DEFAULT_BADGE_XP,
+  type BadgeXpByRarity,
+  type CoverageGameRef,
+} from "@/lib/services/games/gamification-coverage";
+import {
+  auditLadder,
+  proposeNeutralLadder,
+} from "@/lib/admin/neutral-level-ladder";
+import { gameConditionTypesForPrompt } from "@/lib/services/games/badge-condition-registry";
+import {
+  ALL_GAMIFICATION_RESET_SCOPES,
+  GAMIFICATION_RESET_CONFIRMATION,
+  resetGamification,
+} from "@/lib/services/gamification-reset.service";
 
 // Allow up to 2 minutes for AI agents
 export const maxDuration = 120;
@@ -57,14 +84,58 @@ const dbTools = {
   async readAllMaps() {
     return JourneyMapConfig.find({}).sort({ sequenceOrder: 1 }).lean();
   },
-  async writeBadgesBatch(badges: any[]) {
-    const results = { created: 0, updated: 0, errors: 0, skipped: 0 };
+  async writeBadgesBatch(
+    badges: any[],
+    options: {
+      /** Default add-only: never overwrite existing ids. Pass "replace" to upsert. */
+      mode?: "add-only" | "replace";
+      knownKeys?: Set<string>;
+    } = {},
+  ) {
+    // Reason: R96b — plan-then-apply must INSERT missing badges only. Overwriting
+    // existing ids wiped operator edits and reintroduced trading floors on game badges.
+    const mode = options.mode ?? "add-only";
+    const knownKeys =
+      options.knownKeys ??
+      knownGameKeys(await loadCatalogueGameRefs());
+
+    const results = {
+      created: 0,
+      updated: 0,
+      errors: 0,
+      skipped: 0,
+      refused: 0,
+      refusals: [] as string[],
+    };
     const validRarities = ["common", "rare", "epic", "legendary"];
-    const validCategories = ["Competition", "Trading", "Profit", "Risk", "Speed", "Consistency", "Strategy", "Social", "Legendary"];
+    const validCategories = [
+      "Competition",
+      "Trading",
+      "Games",
+      "Profit",
+      "Risk",
+      "Speed",
+      "Consistency",
+      "Strategy",
+      "Social",
+      "Legendary",
+    ];
 
     for (const badge of badges) {
       try {
-        const { _changes, _isNew, _id, __v, createdAt, updatedAt, ...clean } = badge;
+        const sanitized = sanitizeBadgeForWrite(
+          badge as Record<string, unknown>,
+          knownKeys,
+        );
+        if (!sanitized.ok || !sanitized.badge) {
+          results.refused++;
+          results.refusals.push(
+            `${badge?.id || "?"}: ${sanitized.reason || "refused"}`,
+          );
+          continue;
+        }
+
+        const clean = sanitized.badge as any;
 
         // ── Validation ──
         if (!clean.id || typeof clean.id !== "string") {
@@ -87,6 +158,7 @@ const dbTools = {
           const CATEGORY_ICON_FALLBACK: Record<string, string> = {
             Competition: "trophy",
             Trading: "trade",
+            Games: "joystick1",
             Profit: "profit",
             Risk: "shield1",
             Speed: "lightningSpell",
@@ -121,6 +193,7 @@ const dbTools = {
           const CATEGORY_DEFAULT_TYPE: Record<string, string> = {
             Competition: "competitions_entered",
             Trading: "total_trades",
+            Games: "game_contests_completed",
             Profit: "total_pnl",
             Risk: "no_liquidations",
             Speed: "quick_scalps",
@@ -136,19 +209,21 @@ const dbTools = {
         }
 
         if (existing) {
-          // ── Surgical update: use $set to only update provided fields ──
-          // Preserve fields the AI didn't provide by merging with existing
+          if (mode === "add-only") {
+            results.skipped++;
+            continue;
+          }
+          // ── Surgical update (replace mode only) ──
           const updateDoc: any = {
             minLevel,
           };
-          // Only update fields that are explicitly provided in clean
           if (clean.name) updateDoc.name = clean.name;
           if (clean.description) updateDoc.description = clean.description;
           if (clean.category) updateDoc.category = clean.category;
           if (clean.icon) updateDoc.icon = clean.icon;
           if (clean.rarity) updateDoc.rarity = clean.rarity;
+          if (Array.isArray(clean.gameTypes)) updateDoc.gameTypes = clean.gameTypes;
           if (clean.condition) {
-            // Merge with existing condition to preserve fields AI didn't mention
             updateDoc.condition = {
               ...((existing as any).condition?.toObject?.() || (existing as any).condition || {}),
               ...clean.condition,
@@ -171,6 +246,7 @@ const dbTools = {
           const CATEGORY_ICON_DEFAULT: Record<string, string> = {
             Competition: "trophy",
             Trading: "trade",
+            Games: "joystick1",
             Profit: "profit",
             Risk: "shield1",
             Speed: "lightningSpell",
@@ -215,22 +291,42 @@ const dbTools = {
     }
     return results;
   },
+  // Reason (R102): the discriminator is `configType`, not `type`, and a level
+  // ladder is stored as `data.levels` — that is what `XPConfig`,
+  // `xp-config.service.ts` and `/api/badges-xp/manage` all read. Written the
+  // other way the wizard's ladder and XP values are invisible to the rest of
+  // the platform, the ladder audit always reports "no ladder", and every write
+  // reports success.
   async readXPConfig() {
     try {
       const db = (await connectToDatabase()).connection.db;
       if (!db) return null;
-      const badgeXP = await db.collection("xpconfigs").findOne({ type: "badge_xp" });
-      const levels = await db.collection("xpconfigs").findOne({ type: "level_progression" });
-      return { badgeXP: badgeXP?.data, levels: levels?.data };
+      const badgeXP = await db
+        .collection("xpconfigs")
+        .findOne({ configType: "badge_xp" });
+      const levels = await db
+        .collection("xpconfigs")
+        .findOne({ configType: "level_progression" });
+      return { badgeXP: badgeXP?.data, levels: levels?.data?.levels };
     } catch { return null; }
   },
-  async writeXPConfig(type: string, data: any) {
+  async writeXPConfig(configType: string, data: any) {
     try {
       const db = (await connectToDatabase()).connection.db;
       if (!db) return null;
+      // Reason: callers hand over a bare levels array; the stored shape nests it
+      // under `data.levels`, so wrapping happens here rather than at three call
+      // sites that could each forget.
+      const payload =
+        configType === "level_progression" && Array.isArray(data)
+          ? { levels: data }
+          : data;
       return db.collection("xpconfigs").findOneAndUpdate(
-        { type },
-        { $set: { type, data, updatedAt: new Date() } },
+        { configType },
+        {
+          $set: { configType, data: payload, updatedAt: new Date() },
+          $setOnInsert: { isActive: true, createdAt: new Date() },
+        },
         { upsert: true },
       );
     } catch (err) {
@@ -266,65 +362,19 @@ function milestonesToCompact(milestones: any[]): string {
 
 // ─── SYSTEM PROMPTS (compact) ──────────────────────────────────────────────────
 
-const BADGE_AGENT_PROMPT = `You are a BADGE AGENT for a forex trading competition platform.
-20 levels, XP: common=10, rare=25, epic=50, legendary=100.
-Categories: Competition, Trading, Profit, Risk, Speed, Consistency, Strategy, Social, Legendary.
+// BADGE_AGENT_PROMPT is built per-request via buildBadgeSystemPrompt(catalogue)
+// so condition/category lists stay registry-driven (R96b).
 
-RULES:
-1. No zero-baseline badges. minTrades>0 for trading, minComps>0 for competition badges.
-2. minLevel gates: common=0-1, rare=2-4, epic=5-10, legendary=8-15.
-3. Rarity matches difficulty: common=easy(week), rare=moderate(month), epic=hard(2-3mo), legendary=extreme(6mo+).
-4. Common:5-25trades, Rare:25-100trades, Epic:100-500trades, Legendary:500+trades.
-5. icon MUST be a valid GameIconName from the AVAILABLE ICONS list below. NEVER use emojis.
-
-AVAILABLE ICONS (pick the best match for each badge category and theme):
-Trophies: trophy, trophyStar, trophyGame, trophyFootball, trophyMusic, trophyMovie, trophy1, trophy2, trophy3, trophyCol1-trophyCol15
-Awards: starAward, starBadge, shieldAward, certificateAward, graduationAward, scrollAward, award, giftAward, studyAward, champion, victory, goldMedal
-Stars/Rankings: star1, star2, star3, rank1-rank7, crown, medal7
-Currency: coin, coins, gems, treasure, chest, chest1-chest4, pouch1, pouch2, money, moneyDeposit, capital, pirateCoin
-Finance: profit, profitAlt, loss, trade, investment, portfolio, buy, sell, equity, dividend, valuation, inflation, hedge, gain, fluctuation, dollarFinance1-10, euroFinance1-10, finance1-10, longTermInvestment, goldInvest, dollarPlant
-Risk/Status: warning, warning2-warning10, riskWarning, riskManagement, riskAnalysis, riskControl, riskMonitoring, target, timer, skull, crisisRecovery
-Weapons: sword, sword1-sword6, swordKnight3D, axe1-axe4, hammer1-hammer3, bow3D, bomb1-bomb4, piratePistol, cannon
-Defense: shield1-shield4, magicShield3D, helmet1-helmet4, armor1-armor2, key, banner, flag, crown, compass
-Potions/Spells: healthPotion, energyPotion, lightningPotion, ragePotion, fireSpell, blueFireSpell, iceSpell, lightningSpell, poisonSpell
-Characters: rookie, lord, archer, war, wolf1-wolf20, animal1-animal10, parrot
-Pirate: pirateShip, anchor, pirateFlag, pirateHat, pirateSword, pirateMap, eyePatch, barrel, compass
-Gaming: joystick1-joystick3, headset, keyboard, wasd
-Rewards: reward1-reward5, heart, dream, medKit1, medKit2
-Seasonal: christmas1-20, halloween1-10, blackFriday1-10, cyber1-10
-Technology: tech1-tech10
-Renders: render1-render20
-Prototypes: roundProto-roundProto4, shieldProto-shieldProto4
-
-REQUIRED SCHEMA for each badge (especially NEW badges):
-{
-  "id": "snake_case_id", "name": "Display Name", "description": "...",
-  "category": "Trading", "rarity": "common|rare|epic|legendary",
-  "icon": "<GameIconName from AVAILABLE ICONS above - NEVER use emojis>",
-  "minLevel": 0-18,
-  "condition": {
-    "type": "<MUST be one of: total_trades, winning_trades, win_rate, win_streak, max_win_streak, total_pnl, profit_factor, competitions_entered, competitions_completed, first_place_finishes, podium_finishes, top_10_finishes, consecutive_trading_days, unique_pairs_traded, no_liquidations, always_uses_sl, always_uses_tp, stop_loss_used, take_profit_used, referrals_made, level_reached, xp_threshold, total_badges, platform_age, active_days, quick_scalps, net_profit_lifetime>",
-    "value": <threshold number>,
-    "minTrades": <required for Trading/Profit/Risk/Speed/Consistency/Strategy badges>,
-    "minCompletedCompetitions": <required for Competition badges>
-  }
-}
-
-CRITICAL: Every badge MUST have condition.type set to a valid value from the list above.
-CRITICAL: icon MUST be a valid GameIconName string (e.g. "trophy", "shield1", "sword"). NEVER use emoji characters.
-When fixing existing badges with emoji icons, replace them with the best matching GameIconName.
-
-Return ONLY valid JSON. No markdown, no explanation.`;
-
-const MILESTONE_AGENT_PROMPT = `You are a MILESTONE AGENT for a forex trading platform.
+const MILESTONE_AGENT_PROMPT = `You are a MILESTONE AGENT for a skill-based competition platform (trading + games).
 10 journey maps with progressive difficulty.
-Maps 1-2: beginner (5-50 trades). Maps 3-4: early (50-150). Maps 5-6: mid (150-300). Maps 7-8: advanced (300-600). Maps 9-10: expert (600-1000+).
+Maps 1-2: beginner. Maps 3-4: early. Maps 5-6: mid. Maps 7-8: advanced. Maps 9-10: expert.
 
 RULES:
 1. Values must increase within each map and across maps.
 2. Use requiredBadgeIds at strategic checkpoints (every 3-5 milestones).
 3. XP rewards match difficulty: easy=10-15, medium=20-30, hard=40-60.
-4. Return ONLY badges that need changes, not unchanged ones.
+4. Return ONLY milestones that need changes, not unchanged ones.
+5. Prefer additive changes — do not delete and recreate milestones wholesale.
 
 Return ONLY valid JSON. No markdown.`;
 
@@ -355,102 +405,135 @@ function parseAIJSON(content: string): any {
   }
 }
 
-// ─── MAIN HANDLER ────────────────────────────────────────────────────────────────
-export async function POST(request: NextRequest) {
-  // Guarded 8 September 2026 with the other four under `app/api/ai/`. See the note in
-  // `generate-competition/route.ts`. Like `evaluate-balance` this one writes - it creates and
-  // rebalances badges and milestones - so the folder name is the least reliable guide to what
-  // it does. `gamification-wizard` became a section id in the same commit.
-  const guard = await guardSection("gamification-wizard");
-  if (!guard.ok) return guard.response;
+// ─── COVERAGE / GAP ANALYSIS (no AI) ───────────────────────────────────────────
 
-  try {
-    await connectToDatabase();
-    const body = await request.json();
-    const { action } = body;
+/** Catalogue refs plus trading, which is a game for coverage purposes. */
+function coverageGames(catalogue: CatalogueGameRef[]): CoverageGameRef[] {
+  return [
+    { gameKey: "trading", displayName: "Trading", category: "trading" },
+    ...catalogue.map((c) => ({
+      gameKey: c.gameKey,
+      displayName: c.displayName,
+      category: c.category,
+    })),
+  ];
+}
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // get_status — Load full system state (no AI, fast)
-    // ═══════════════════════════════════════════════════════════════════════════
-    if (action === "get_status") {
-      const [badges, milestones, maps, xpConfig] = await Promise.all([
-        dbTools.readAllBadges(),
-        dbTools.readAllMilestones(),
-        dbTools.readAllMaps(),
-        dbTools.readXPConfig(),
-      ]);
+async function resolveBadgeXp(): Promise<BadgeXpByRarity> {
+  const xp = await dbTools.readXPConfig();
+  const configured = xp?.badgeXP;
+  if (!configured || typeof configured !== "object") return DEFAULT_BADGE_XP;
+  return {
+    common: Number(configured.common) || DEFAULT_BADGE_XP.common,
+    rare: Number(configured.rare) || DEFAULT_BADGE_XP.rare,
+    epic: Number(configured.epic) || DEFAULT_BADGE_XP.epic,
+    legendary: Number(configured.legendary) || DEFAULT_BADGE_XP.legendary,
+  };
+}
 
-      const badgesByCategory: Record<string, Record<string, number>> = {};
-      const badgesByRarity: Record<string, number> = { common: 0, rare: 0, epic: 0, legendary: 0 };
-      const badgesWithMinLevel = { withGate: 0, withoutGate: 0 };
-      const badgesZeroBaseline: string[] = [];
+async function computeCoverage() {
+  const [badges, milestones, catalogue, badgeXp, xpConfig] = await Promise.all([
+    dbTools.readAllBadges(),
+    dbTools.readAllMilestones(),
+    loadCatalogueGameRefs(),
+    resolveBadgeXp(),
+    dbTools.readXPConfig(),
+  ]);
 
-      for (const b of badges as any[]) {
-        const cat = b.category || "Unknown";
-        const rar = b.rarity || "common";
-        if (!badgesByCategory[cat]) badgesByCategory[cat] = { common: 0, rare: 0, epic: 0, legendary: 0 };
-        badgesByCategory[cat][rar] = (badgesByCategory[cat][rar] || 0) + 1;
-        badgesByRarity[rar] = (badgesByRarity[rar] || 0) + 1;
-        if ((b.minLevel || 0) > 0) badgesWithMinLevel.withGate++;
-        else badgesWithMinLevel.withoutGate++;
-        const mt = b.condition?.minTrades || 0;
-        const mc = b.condition?.minCompletedCompetitions || 0;
-        if (mt === 0 && mc === 0 && rar !== "common") badgesZeroBaseline.push(b.id);
-      }
+  const games = coverageGames(catalogue);
+  const badgeCoverage = analyseBadgeCoverage(badges as any[], games);
+  const milestoneCoverage = analyseMilestoneCoverage(milestones as any[], games);
+  const parity = analyseGamesOnlyParity(badges as any[], games, badgeXp);
 
-      const milestonesByMap: Record<string, number> = {};
-      let milestonesWithBadgeGate = 0;
-      for (const m of milestones as any[]) {
-        milestonesByMap[m.mapId || "unknown"] = (milestonesByMap[m.mapId || "unknown"] || 0) + 1;
-        if (m.requiredBadgeIds?.length > 0) milestonesWithBadgeGate++;
-      }
+  const storedLevels = Array.isArray(xpConfig?.levels) ? xpConfig.levels : [];
+  const ladder = {
+    configured: storedLevels.length > 0,
+    ...auditLadder(storedLevels),
+  };
 
-      return NextResponse.json({
-        success: true,
-        status: {
-          badges: { total: badges.length, byCategory: badgesByCategory, byRarity: badgesByRarity, levelGating: badgesWithMinLevel, zeroBaselineRisks: badgesZeroBaseline },
-          milestones: { total: milestones.length, byMap: milestonesByMap, withBadgeGate: milestonesWithBadgeGate },
-          maps: { total: maps.length, list: (maps as any[]).map((m) => ({ mapId: m.mapId, name: m.name, theme: m.theme, difficulty: m.difficulty, sequenceOrder: m.sequenceOrder, totalMilestones: m.totalMilestones })) },
-          xp: { configured: !!xpConfig?.badgeXP, badgeXP: xpConfig?.badgeXP || { common: 10, rare: 25, epic: 50, legendary: 100 } },
-        },
-      });
-    }
+  return {
+    catalogueGames: games,
+    badgeCoverage,
+    milestoneCoverage,
+    parity,
+    ladder,
+    badgeXp,
+    xpConfigured: !!xpConfig?.badgeXP,
+  };
+}
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // setup_levels — Apply level/XP preset (no AI, fast)
-    // ═══════════════════════════════════════════════════════════════════════════
-    if (action === "setup_levels") {
-      const { preset, badgeXP, levels } = body;
-      const presets: Record<string, { badgeXP: any; description: string }> = {
-        conservative: { badgeXP: { common: 5, rare: 15, epic: 35, legendary: 75 }, description: "Slower progression." },
-        balanced: { badgeXP: { common: 10, rare: 25, epic: 50, legendary: 100 }, description: "Default balanced." },
-        aggressive: { badgeXP: { common: 15, rare: 35, epic: 75, legendary: 150 }, description: "Faster progression." },
-      };
-      if (preset && presets[preset]) {
-        await dbTools.writeXPConfig("badge_xp", presets[preset].badgeXP);
-        return NextResponse.json({ success: true, message: `Applied "${preset}": ${presets[preset].description}`, badgeXP: presets[preset].badgeXP });
-      }
-      if (badgeXP) await dbTools.writeXPConfig("badge_xp", badgeXP);
-      if (levels) await dbTools.writeXPConfig("level_progression", levels);
-      return NextResponse.json({ success: true, message: "XP configuration updated" });
-    }
+type CoverageReport = Awaited<ReturnType<typeof computeCoverage>>;
 
-    // ─── AI actions require OpenAI ──────────────────────────────────────────
-    const config = await getAIConfig();
-    if (!config.enabled || !config.apiKey) {
-      return NextResponse.json({ success: false, error: "AI is not enabled. Configure OpenAI in admin settings." }, { status: 400 });
-    }
-    const openai = new OpenAI({ apiKey: config.apiKey });
+/**
+ * Turn the badge gap into an instruction naming games and rarities.
+ *
+ * Reason: "generate 10 badges" is what produced ten more trading badges. Naming
+ * the deficit per gameKey is what makes a later run add only the new game.
+ */
+function buildGapBrief(coverage: CoverageReport): {
+  brief: string;
+  totalMissing: number;
+} {
+  const lines: string[] = [];
+  for (const row of coverage.badgeCoverage.games) {
+    if (row.missingTotal === 0) continue;
+    const parts = Object.entries(row.missing)
+      .filter(([, n]) => n > 0)
+      .map(([rarity, n]) => `${n} ${rarity}`);
+    const scope =
+      row.gameKey === "trading" ? `["trading"]` : `["${row.gameKey}"]`;
+    lines.push(
+      `- ${row.displayName} (gameTypes ${scope}): needs ${parts.join(", ")}`,
+    );
+  }
+  const platformMissing = coverage.badgeCoverage.platform.missing;
+  const platformParts = Object.entries(platformMissing)
+    .filter(([, n]) => n > 0)
+    .map(([rarity, n]) => `${n} ${rarity}`);
+  if (platformParts.length > 0) {
+    lines.push(
+      `- Platform-wide (gameTypes []): needs ${platformParts.join(", ")}`,
+    );
+  }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // agent_badges — OPTIMIZED: compact format, return ONLY changed badges
-    // ═══════════════════════════════════════════════════════════════════════════
-    if (action === "agent_badges") {
-      const { generateCount = 0, autoApply = false } = body;
+  if (lines.length === 0) {
+    return { brief: "", totalMissing: 0 };
+  }
+
+  return {
+    brief: `COVERAGE GAPS — generate exactly these and nothing else:
+${lines.join("\n")}
+
+Parity: ${coverage.parity.verdict} (trader XP ${coverage.parity.traderXp}, games-only ${coverage.parity.gamesOnlyXp}).
+Do NOT propose badges for scopes not listed above — they are already covered.`,
+    totalMissing: coverage.badgeCoverage.missingTotal,
+  };
+}
+
+/**
+ * Runs the badge audit / gap-fill agent.
+ *
+ * Reason (R96b): extracted from the `agent_badges` action so the `run_full`
+ * orchestrator can drive the same code path. A second copy would let the two
+ * entry points disagree about the add-only rule and the measured gap, which is
+ * the "one rule, two copies" shape this programme keeps finding.
+ */
+async function runBadgeAgent(
+  openai: OpenAI,
+  config: AIConfig,
+  opts: { autoApply: boolean; mode: string; cap: number },
+) {
+  {
+      const { autoApply, mode } = opts;
+      // Reason (R96b): the count comes from the measured gap, never from the
+      // caller. `generateCount` is honoured only as a CAP, so an operator can
+      // take a large first run in smaller bites without being able to ask for
+      // badges the catalogue already has.
+      const requestedCap = opts.cap;
 
       // ── Pre-pass: fix all badges with invalid icons (emojis, missing, etc.) ──
       const CATEGORY_ICON_MAP: Record<string, string> = {
-        Competition: "trophy", Trading: "trade", Profit: "profit",
+        Competition: "trophy", Trading: "trade", Games: "joystick1", Profit: "profit",
         Risk: "shield1", Speed: "lightningSpell", Consistency: "target",
         Strategy: "portfolio", Social: "heart", Legendary: "crown",
       };
@@ -469,6 +552,12 @@ export async function POST(request: NextRequest) {
       }
 
       const badges = await dbTools.readAllBadges();
+      const catalogue: CatalogueGameRef[] = await loadCatalogueGameRefs();
+      const knownKeys = knownGameKeys(catalogue);
+      const badgeAgentPrompt = `${buildBadgeSystemPrompt(catalogue)}
+
+ICON RULE: icon MUST be a valid GameIconName string (e.g. "trophy", "shield1", "joystick1"). NEVER use emoji characters.
+Prefer ADDITIVE fixes — return only badges that need changes or are new. Do not delete-and-recreate the badge set.`;
 
       // Compact format: ~70% smaller than pretty JSON
       const compactBadges = badgesToCompact(badges);
@@ -481,7 +570,17 @@ export async function POST(request: NextRequest) {
         if (m.rewards?.badgeId) referencedIds.add(m.rewards.badgeId);
       }
 
-      const prompt = `AUDIT ${badges.length} badges. Return ONLY badges that need fixes (not unchanged ones).${generateCount > 0 ? ` Also generate ${generateCount} new badges.` : ""}
+      const coverage = await computeCoverage();
+      const gap = buildGapBrief(coverage);
+      const generateCount = Math.min(gap.totalMissing, requestedCap);
+
+      const prompt = `AUDIT ${badges.length} badges. Return ONLY badges that need fixes (not unchanged ones).${
+        generateCount > 0
+          ? ` Also generate up to ${generateCount} NEW badges, chosen strictly from the coverage gaps below.
+
+${gap.brief}`
+          : " The catalogue is fully covered — generate NO new badges."
+      }
 
 BADGES (pipe-separated):
 ${compactBadges}
@@ -489,9 +588,10 @@ ${compactBadges}
 Protected IDs (used by milestones): [${[...referencedIds].join(",")}]
 
 For EACH badge with issues, return the FULL fixed badge object.
-For NEW badges, include "_isNew": true.
+For NEW badges, include "_isNew": true and a valid gameTypes array.
 For FIXED badges, include "_changes": "what changed".
 Do NOT include unchanged badges.
+Do NOT delete existing badges — additive changes only.
 
 Return JSON:
 {"badges":[<only changed + new badges>],"summary":"brief","fixedCount":N,"newCount":N}`;
@@ -499,7 +599,7 @@ Return JSON:
       const completion = await openai.chat.completions.create({
         model: config.model,
         messages: [
-          { role: "system", content: BADGE_AGENT_PROMPT },
+          { role: "system", content: badgeAgentPrompt },
           { role: "user", content: prompt },
         ],
         temperature: 0.25,
@@ -508,20 +608,26 @@ Return JSON:
 
       const parsed = parseAIJSON(completion.choices[0]?.message?.content || "{}");
       if (!parsed || !parsed.badges) {
-        return NextResponse.json({
-          success: false,
+        return {
+          ok: false as const,
           error: "Badge agent returned invalid response",
           raw: completion.choices[0]?.message?.content?.substring(0, 500),
-        }, { status: 500 });
+        };
       }
 
       let writeResults = null;
       if (autoApply && Array.isArray(parsed.badges) && parsed.badges.length > 0) {
-        writeResults = await dbTools.writeBadgesBatch(parsed.badges);
+        writeResults = await dbTools.writeBadgesBatch(parsed.badges, {
+          mode: mode === "replace" ? "replace" : "add-only",
+          knownKeys,
+        });
       }
 
-      return NextResponse.json({
-        success: true,
+      const existingIds = new Set((badges as any[]).map((b) => b.id));
+      const plan = planBadgesByScope(parsed.badges, existingIds);
+
+      return {
+        ok: true as const,
         action: "agent_badges",
         badges: parsed.badges,
         summary: parsed.summary || "",
@@ -530,14 +636,30 @@ Return JSON:
         totalBadges: badges.length,
         applied: autoApply,
         writeResults,
-      });
-    }
+        plan,
+        catalogueGames: catalogue,
+        coverage: {
+          badgeCoverage: coverage.badgeCoverage,
+          parity: coverage.parity,
+          generateCount,
+        },
+      };
+  }
+}
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // agent_milestones — OPTIMIZED: compact format, per-map processing
-    // ═══════════════════════════════════════════════════════════════════════════
-    if (action === "agent_milestones") {
-      const { mapId, autoApply = false } = body;
+/**
+ * Runs the milestone audit agent for one journey map.
+ *
+ * Reason (R96b): extracted so `run_full` drives the same code path as the
+ * standalone action, rather than a second copy of the add-only rule.
+ */
+async function runMilestoneAgent(
+  openai: OpenAI,
+  config: AIConfig,
+  opts: { mapId?: string; autoApply: boolean },
+) {
+  {
+      const { mapId, autoApply } = opts;
 
       const [badges, maps] = await Promise.all([
         dbTools.readAllBadges(),
@@ -555,8 +677,8 @@ Return JSON:
         : await dbTools.readAllMilestones();
 
       if (milestones.length === 0) {
-        return NextResponse.json({
-          success: true,
+        return {
+          ok: true as const,
           action: "agent_milestones",
           milestones: [],
           summary: "No milestones found for this map",
@@ -565,7 +687,7 @@ Return JSON:
           totalMilestones: 0,
           applied: false,
           writeResults: null,
-        });
+        };
       }
 
       // Compact badge list for context (IDs, names, and condition types for smarter gating)
@@ -576,8 +698,32 @@ Return JSON:
       const compactMilestones = milestonesToCompact(milestones);
       const mapInfo = (maps as any[]).find((m) => m.mapId === targetMapId);
 
+      // Reason (R96b): the milestone prompt named trading metrics only, so every
+      // milestone it proposed asked a puzzle player for trades. The catalogue and
+      // the game-legal condition list come from the same registry the badge agent
+      // reads, so a new condition type reaches both at once.
+      const msCatalogue = await loadCatalogueGameRefs();
+      const msCoverage = await computeCoverage();
+      const catalogueBlock =
+        msCatalogue.length > 0
+          ? msCatalogue
+              .map((g) => `- ${g.gameKey} — ${g.displayName}`)
+              .join("\n")
+          : "(no provider titles enabled — trading only)";
+      const milestoneGaps = msCoverage.milestoneCoverage.games
+        .filter((g) => g.missing > 0)
+        .map((g) => `- ${g.displayName} (${g.gameKey}): needs ${g.missing} more`)
+        .join("\n");
+
       const prompt = `AUDIT milestones for map "${targetMapId}" (${mapInfo?.name || "unknown"}, difficulty ${mapInfo?.difficulty || "?"}).
 Return ONLY milestones that need fixes (not unchanged ones).
+
+CATALOGUE GAMES (a milestone must never ask a game player for trades):
+${catalogueBlock}
+
+GAME-LEGAL CONDITION TYPES:
+${gameConditionTypesForPrompt()}
+${milestoneGaps ? `\nGAME MILESTONE GAPS:\n${milestoneGaps}` : ""}
 
 AVAILABLE BADGES: ${badgeContext}
 
@@ -605,11 +751,11 @@ Return JSON:
 
       const parsed = parseAIJSON(completion.choices[0]?.message?.content || "{}");
       if (!parsed || !parsed.milestones) {
-        return NextResponse.json({
-          success: false,
+        return {
+          ok: false as const,
           error: "Milestone agent returned invalid response",
           raw: completion.choices[0]?.message?.content?.substring(0, 500),
-        }, { status: 500 });
+        };
       }
 
       let writeResults = null;
@@ -617,8 +763,8 @@ Return JSON:
         writeResults = await dbTools.writeMilestonesBatch(parsed.milestones);
       }
 
-      return NextResponse.json({
-        success: true,
+      return {
+        ok: true as const,
         action: "agent_milestones",
         milestones: parsed.milestones,
         summary: parsed.summary || "",
@@ -628,40 +774,51 @@ Return JSON:
         mapId: targetMapId,
         applied: autoApply,
         writeResults,
-      });
-    }
+      };
+  }
+}
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // agent_evaluate — LOCAL ENGINE: instant, deterministic, NO AI calls.
-    // Scores 10 criteria via rules, generates specific fix recommendations.
-    // ═══════════════════════════════════════════════════════════════════════════
-    if (action === "agent_evaluate") {
-      const [badges, milestones, maps] = await Promise.all([
+/**
+ * Scores the gamification system against the live catalogue (no AI, no writes).
+ */
+async function runEvaluation() {
+  {
+      const [badges, milestones, maps, catalogue, badgeXp] = await Promise.all([
         dbTools.readAllBadges(),
         dbTools.readAllMilestones(),
         dbTools.readAllMaps(),
+        loadCatalogueGameRefs(),
+        resolveBadgeXp(),
       ]);
+
+      // Reason (R96b): without the catalogue the engine scores the badge set
+      // against itself, so a catalogue where every rare is trading-scoped reads
+      // as perfectly balanced while a games-only player is stuck at level 1.
+      const games = coverageGames(catalogue);
 
       const evaluation = evaluateSystem(
         badges as unknown as BadgeData[],
         milestones as unknown as MilestoneData[],
         maps as unknown as MapData[],
+        games,
+        badgeXp,
       );
 
-      return NextResponse.json({
-        success: true,
+      return {
         action: "agent_evaluate",
         evaluation,
+        catalogueGames: games,
         applied: false,
         fixResults: null,
-      });
-    }
+      };
+  }
+}
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // auto_fix — LOCAL ENGINE: applies deterministic fixes based on rules.
-    // Fixes zero-baseline, level gating, invalid badge refs. NO AI.
-    // ═══════════════════════════════════════════════════════════════════════════
-    if (action === "auto_fix") {
+/**
+ * Applies the deterministic engine fixes (no AI).
+ */
+async function applyAutoFixes() {
+  {
       const [badges, milestones] = await Promise.all([
         dbTools.readAllBadges(),
         dbTools.readAllMilestones(),
@@ -751,23 +908,179 @@ Return JSON:
         milestoneWriteResults = { applied, errors, notFound, total: fixes.milestoneFixes.length };
       }
 
-      return NextResponse.json({
-        success: true,
+      return {
         action: "auto_fix",
         fixes,
         badgeWriteResults,
         milestoneWriteResults,
+      };
+  }
+}
+
+// ─── MAIN HANDLER ────────────────────────────────────────────────────────────────
+export async function POST(request: NextRequest) {
+  // Guarded 8 September 2026 with the other four under `app/api/ai/`. See the note in
+  // `generate-competition/route.ts`. Like `evaluate-balance` this one writes - it creates and
+  // rebalances badges and milestones - so the folder name is the least reliable guide to what
+  // it does. `gamification-wizard` became a section id in the same commit.
+  const guard = await guardSection("gamification-wizard");
+  if (!guard.ok) return guard.response;
+
+  try {
+    await connectToDatabase();
+    const body = await request.json();
+    const { action } = body;
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // get_status — Load full system state (no AI, fast)
+    // ═══════════════════════════════════════════════════════════════════════════
+    if (action === "get_status") {
+      const [badges, milestones, maps, xpConfig] = await Promise.all([
+        dbTools.readAllBadges(),
+        dbTools.readAllMilestones(),
+        dbTools.readAllMaps(),
+        dbTools.readXPConfig(),
+      ]);
+
+      const badgesByCategory: Record<string, Record<string, number>> = {};
+      const badgesByRarity: Record<string, number> = { common: 0, rare: 0, epic: 0, legendary: 0 };
+      const badgesWithMinLevel = { withGate: 0, withoutGate: 0 };
+      const badgesZeroBaseline: string[] = [];
+
+      for (const b of badges as any[]) {
+        const cat = b.category || "Unknown";
+        const rar = b.rarity || "common";
+        if (!badgesByCategory[cat]) badgesByCategory[cat] = { common: 0, rare: 0, epic: 0, legendary: 0 };
+        badgesByCategory[cat][rar] = (badgesByCategory[cat][rar] || 0) + 1;
+        badgesByRarity[rar] = (badgesByRarity[rar] || 0) + 1;
+        if ((b.minLevel || 0) > 0) badgesWithMinLevel.withGate++;
+        else badgesWithMinLevel.withoutGate++;
+        const mt = b.condition?.minTrades || 0;
+        const mc = b.condition?.minCompletedCompetitions || 0;
+        // Reason: only trading-scoped conditions need a trade floor for this risk list.
+        const tradingScoped =
+          conditionScope(b.condition?.type || "") === "trading" &&
+          (b.category || "") !== "Games";
+        if (tradingScoped && mt === 0 && rar !== "common") {
+          badgesZeroBaseline.push(b.id);
+        } else if (
+          (b.category || "") === "Competition" &&
+          mc === 0 &&
+          rar !== "common"
+        ) {
+          badgesZeroBaseline.push(b.id);
+        }
+      }
+
+      const milestonesByMap: Record<string, number> = {};
+      let milestonesWithBadgeGate = 0;
+      for (const m of milestones as any[]) {
+        milestonesByMap[m.mapId || "unknown"] = (milestonesByMap[m.mapId || "unknown"] || 0) + 1;
+        if (m.requiredBadgeIds?.length > 0) milestonesWithBadgeGate++;
+      }
+
+      return NextResponse.json({
+        success: true,
+        status: {
+          badges: { total: badges.length, byCategory: badgesByCategory, byRarity: badgesByRarity, levelGating: badgesWithMinLevel, zeroBaselineRisks: badgesZeroBaseline },
+          milestones: { total: milestones.length, byMap: milestonesByMap, withBadgeGate: milestonesWithBadgeGate },
+          maps: { total: maps.length, list: (maps as any[]).map((m) => ({ mapId: m.mapId, name: m.name, theme: m.theme, difficulty: m.difficulty, sequenceOrder: m.sequenceOrder, totalMilestones: m.totalMilestones })) },
+          xp: { configured: !!xpConfig?.badgeXP, badgeXP: xpConfig?.badgeXP || { common: 10, rare: 25, epic: 50, legendary: 100 } },
+        },
       });
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // apply_changes — Manual apply for preview workflow (no AI, fast)
+    // setup_levels — Apply level/XP preset (no AI, fast)
+    // ═══════════════════════════════════════════════════════════════════════════
+    if (action === "setup_levels") {
+      const { preset, badgeXP, levels } = body;
+      const presets: Record<string, { badgeXP: any; description: string }> = {
+        conservative: { badgeXP: { common: 5, rare: 15, epic: 35, legendary: 75 }, description: "Slower progression." },
+        balanced: { badgeXP: { common: 10, rare: 25, epic: 50, legendary: 100 }, description: "Default balanced." },
+        aggressive: { badgeXP: { common: 15, rare: 35, epic: 75, legendary: 150 }, description: "Faster progression." },
+      };
+      if (preset && presets[preset]) {
+        await dbTools.writeXPConfig("badge_xp", presets[preset].badgeXP);
+        return NextResponse.json({ success: true, message: `Applied "${preset}": ${presets[preset].description}`, badgeXP: presets[preset].badgeXP });
+      }
+      if (badgeXP) await dbTools.writeXPConfig("badge_xp", badgeXP);
+      if (levels) await dbTools.writeXPConfig("level_progression", levels);
+      return NextResponse.json({ success: true, message: "XP configuration updated" });
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // coverage — Deterministic gap report per game (no AI, no writes)
+    //
+    // Reason (R96b): generation used to take a caller-supplied count and let the
+    // model choose what to write, so a second run re-proposed badges the catalogue
+    // already had and a newly added game got nothing. The gap is computed here.
+    // ═══════════════════════════════════════════════════════════════════════════
+    if (action === "coverage") {
+      const coverage = await computeCoverage();
+      return NextResponse.json({
+        success: true,
+        action: "coverage",
+        ...coverage,
+      });
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // plan_badges — Report what would be added per gameTypes scope (no writes)
+    // ═══════════════════════════════════════════════════════════════════════════
+    if (action === "plan_badges") {
+      const { badges: proposed } = body;
+      if (!Array.isArray(proposed)) {
+        return NextResponse.json(
+          { success: false, error: "badges array required" },
+          { status: 400 },
+        );
+      }
+      const existing = await dbTools.readAllBadges();
+      const existingIds = new Set((existing as any[]).map((b) => b.id));
+      const catalogue = await loadCatalogueGameRefs();
+      const knownKeys = knownGameKeys(catalogue);
+
+      const refusals: string[] = [];
+      const accepted: typeof proposed = [];
+      for (const b of proposed) {
+        const sanitized = sanitizeBadgeForWrite(
+          b as Record<string, unknown>,
+          knownKeys,
+        );
+        if (!sanitized.ok) {
+          refusals.push(`${b?.id || "?"}: ${sanitized.reason}`);
+          continue;
+        }
+        accepted.push(sanitized.badge);
+      }
+
+      const plan = planBadgesByScope(accepted, existingIds);
+      return NextResponse.json({
+        success: true,
+        action: "plan_badges",
+        plan,
+        refusals,
+        catalogueGames: catalogue,
+        message:
+          "Add-only by default: existing badge ids are skipped. Pass mode:\"replace\" on apply_changes to overwrite.",
+      });
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // apply_changes — Manual apply (no AI). Default add-only for badges.
     // ═══════════════════════════════════════════════════════════════════════════
     if (action === "apply_changes") {
-      const { badges: badgesToApply, milestones: milestonesToApply } = body;
+      const {
+        badges: badgesToApply,
+        milestones: milestonesToApply,
+        mode = "add-only",
+      } = body;
       const results: any = {};
       if (Array.isArray(badgesToApply) && badgesToApply.length > 0) {
-        results.badges = await dbTools.writeBadgesBatch(badgesToApply);
+        results.badges = await dbTools.writeBadgesBatch(badgesToApply, {
+          mode: mode === "replace" ? "replace" : "add-only",
+        });
       }
       if (Array.isArray(milestonesToApply) && milestonesToApply.length > 0) {
         results.milestones = await dbTools.writeMilestonesBatch(milestonesToApply);
@@ -775,8 +1088,233 @@ Return JSON:
       return NextResponse.json({ success: true, action: "apply_changes", results });
     }
 
+    // ─── AI actions require OpenAI ──────────────────────────────────────────
+    const config = await getAIConfig();
+    if (!config.enabled || !config.apiKey) {
+      return NextResponse.json({ success: false, error: "AI is not enabled. Configure OpenAI in admin settings." }, { status: 400 });
+    }
+    const openai = new OpenAI({ apiKey: config.apiKey });
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // agent_badges — OPTIMIZED: compact format, return ONLY changed badges
+    // ═══════════════════════════════════════════════════════════════════════════
+    if (action === "agent_badges") {
+      const { autoApply = false, mode = "add-only" } = body;
+      const cap =
+        typeof body.generateCount === "number" && body.generateCount > 0
+          ? body.generateCount
+          : Number.POSITIVE_INFINITY;
+      const result = await runBadgeAgent(openai, config, { autoApply, mode, cap });
+      if (!result.ok) {
+        return NextResponse.json(
+          { success: false, error: result.error, raw: result.raw },
+          { status: 500 },
+        );
+      }
+      const { ok: _ok, ...payload } = result;
+      return NextResponse.json({ success: true, ...payload });
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // reset_gamification — wipe the authored content so the wizard can rebuild.
+    //
+    // Exposed on its own as well as inside `run_full` because an operator may
+    // legitimately want the platform empty and hand-author from there. It
+    // refuses without the confirmation phrase, and it leaves player-earned rows
+    // alone unless asked, reporting how many it orphaned.
+    // ═══════════════════════════════════════════════════════════════════════════
+    if (action === "reset_gamification") {
+      const result = await resetGamification({
+        scopes:
+          Array.isArray(body.scopes) && body.scopes.length > 0
+            ? body.scopes
+            : ALL_GAMIFICATION_RESET_SCOPES,
+        confirmation: body.confirmation,
+        includePlayerProgress: body.includePlayerProgress === true,
+        actor: guard.admin.email,
+      });
+      return NextResponse.json(
+        { action: "reset_gamification", ...result },
+        { status: result.success ? 200 : 400 },
+      );
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // run_full — one pass over the whole gamification system.
+    //
+    // Reason (R96b): the operator's question is "make the system complete and
+    // balanced for every game we run", which used to need five separate button
+    // presses in the right order. Every step is ADD-ONLY and gap-driven, so the
+    // first run builds the system and a later run — after a new title is
+    // enabled — writes only that title's missing pieces and leaves operator
+    // edits alone.
+    // ═══════════════════════════════════════════════════════════════════════════
+    if (action === "run_full") {
+      const {
+        includeMilestones = true,
+        maxMaps = 3,
+        proposeLadder = true,
+        mode = "add",
+        confirmation,
+        includePlayerProgress = false,
+      } = body;
+      const steps: Record<string, unknown> = {};
+
+      // ── 0. Rebuild from scratch, if asked ─────────────────────────────────
+      // Reason: the wipe runs INSIDE run_full rather than beside it, so the
+      // rebuild and the build that replaces it are one operator action. Run as
+      // two presses, a wipe that is not followed by a build leaves the platform
+      // with no badges and no ladder, and the flags mean the shipped defaults
+      // will not cover for it.
+      if (mode === "rebuild") {
+        const reset = await resetGamification({
+          scopes: Array.isArray(body.resetScopes) && body.resetScopes.length > 0
+            ? body.resetScopes
+            : ALL_GAMIFICATION_RESET_SCOPES,
+          confirmation,
+          includePlayerProgress,
+          actor: guard.admin.email,
+        });
+        if (!reset.success) {
+          // Reason: refuse the WHOLE run. Falling through to the add-only build
+          // after a refused wipe is the one outcome an operator who typed the
+          // phrase wrongly would not expect, and it reads as success.
+          return NextResponse.json(
+            { success: false, action: "run_full", error: reset.error },
+            { status: 400 },
+          );
+        }
+        steps.reset = reset;
+      } else {
+        steps.reset = "skipped (add-only)";
+      }
+
+      // ── 1. Levels and badge XP ────────────────────────────────────────────
+      // Reason: a ladder an operator has tuned is never overwritten — a
+      // proposal is only written when there is no ladder at all, the same
+      // add-only rule the badge writer follows.
+      const xpConfig = await dbTools.readXPConfig();
+      const existingLevels = Array.isArray(xpConfig?.levels) ? xpConfig.levels : [];
+      if (proposeLadder && existingLevels.length === 0) {
+        const proposed = proposeNeutralLadder();
+        await dbTools.writeXPConfig("level_progression", proposed);
+        steps.levels = { action: "created", levelCount: proposed.length };
+      } else {
+        steps.levels = {
+          action: "kept",
+          levelCount: existingLevels.length,
+          audit: auditLadder(existingLevels as never[]),
+        };
+      }
+      if (!xpConfig?.badgeXP) {
+        await dbTools.writeXPConfig("badge_xp", DEFAULT_BADGE_XP);
+        steps.badgeXp = { action: "created", badgeXP: DEFAULT_BADGE_XP };
+      } else {
+        steps.badgeXp = { action: "kept", badgeXP: xpConfig.badgeXP };
+      }
+
+      // ── 2. Badges — gap-fill per game, add-only ───────────────────────────
+      const cap =
+        typeof body.generateCount === "number" && body.generateCount > 0
+          ? body.generateCount
+          : Number.POSITIVE_INFINITY;
+      const badgeResult = await runBadgeAgent(openai, config, {
+        autoApply: true,
+        mode: "add-only",
+        cap,
+      });
+      steps.badges = badgeResult.ok
+        ? {
+            summary: badgeResult.summary,
+            newCount: badgeResult.newCount,
+            fixedCount: badgeResult.fixedCount,
+            writeResults: badgeResult.writeResults,
+            coverage: badgeResult.coverage,
+          }
+        : { error: badgeResult.error };
+
+      // ── 3. Milestones — one pass per journey map that has gaps ────────────
+      if (includeMilestones) {
+        const maps = (await dbTools.readAllMaps()) as Array<{ mapId: string }>;
+        const milestoneRuns: unknown[] = [];
+        for (const map of maps.slice(0, Math.max(0, maxMaps))) {
+          const msResult = await runMilestoneAgent(openai, config, {
+            mapId: map.mapId,
+            autoApply: true,
+          });
+          milestoneRuns.push(
+            msResult.ok
+              ? {
+                  mapId: map.mapId,
+                  summary: msResult.summary,
+                  fixedCount: msResult.fixedCount,
+                  writeResults: msResult.writeResults,
+                }
+              : { mapId: map.mapId, error: msResult.error },
+          );
+        }
+        steps.milestones = milestoneRuns;
+      } else {
+        steps.milestones = "skipped";
+      }
+
+      // ── 4. Deterministic fixes, then score the result ─────────────────────
+      steps.autoFix = await applyAutoFixes();
+      const evaluation = await runEvaluation();
+      steps.evaluation = evaluation;
+
+      // Reason: the report is the post-run gap, so an operator can see at a
+      // glance whether a second pass has anything left to do.
+      const finalCoverage = await computeCoverage();
+
+      return NextResponse.json({
+        success: true,
+        action: "run_full",
+        steps,
+        coverage: finalCoverage,
+      });
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // agent_milestones — OPTIMIZED: compact format, per-map processing
+    // ═══════════════════════════════════════════════════════════════════════════
+    if (action === "agent_milestones") {
+      const { mapId, autoApply = false } = body;
+      const result = await runMilestoneAgent(openai, config, { mapId, autoApply });
+      if (!result.ok) {
+        return NextResponse.json(
+          { success: false, error: result.error, raw: result.raw },
+          { status: 500 },
+        );
+      }
+      const { ok: _ok, ...payload } = result;
+      return NextResponse.json({ success: true, ...payload });
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // agent_evaluate — LOCAL ENGINE: instant, deterministic, NO AI calls.
+    // Scores 10 criteria via rules, generates specific fix recommendations.
+    // ═══════════════════════════════════════════════════════════════════════════
+    if (action === "agent_evaluate") {
+      const payload = await runEvaluation();
+      return NextResponse.json({ success: true, ...payload });
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // auto_fix — LOCAL ENGINE: applies deterministic fixes based on rules.
+    // Fixes zero-baseline, level gating, invalid badge refs. NO AI.
+    // ═══════════════════════════════════════════════════════════════════════════
+    if (action === "auto_fix") {
+      const payload = await applyAutoFixes();
+      return NextResponse.json({ success: true, ...payload });
+    }
+
     return NextResponse.json(
-      { success: false, error: "Invalid action. Use: get_status, setup_levels, agent_badges, agent_milestones, agent_evaluate, auto_fix, apply_changes" },
+      {
+        success: false,
+        error:
+          "Invalid action. Use: get_status, coverage, setup_levels, plan_badges, run_full, agent_badges, agent_milestones, agent_evaluate, auto_fix, apply_changes",
+      },
       { status: 400 },
     );
   } catch (error) {

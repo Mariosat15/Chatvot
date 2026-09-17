@@ -4,7 +4,18 @@
  * 100% local, instant, deterministic — NO AI calls, NO timeouts.
  * SMART: Detects flat distributions, clustered levels, missing progression.
  * CREATIVE: Distributes values across smooth curves, not just minimums.
+ *
+ * R96b: trade-floor distribution and zero-baseline scoring skip non-trading
+ * condition scopes and the Games category so game/platform badges are not
+ * forced to carry minTrades.
  */
+
+import { conditionScope } from "@/lib/services/games/badge-condition-registry";
+import {
+  analyseGamesOnlyParity,
+  type BadgeXpByRarity,
+  type CoverageGameRef,
+} from "@/lib/services/games/gamification-coverage";
 
 // ─── Types ──────────────────────────────────────────────────────────────────────
 
@@ -14,6 +25,8 @@ export interface BadgeData {
   category: string;
   rarity: string;
   minLevel: number;
+  /** Empty / omit = platform; ["trading"] or provider gameKeys = scoped. */
+  gameTypes?: string[];
   condition: {
     type: string;
     value?: number;
@@ -26,6 +39,13 @@ export interface BadgeData {
   description?: string;
   icon?: string;
   isActive?: boolean;
+}
+
+/** True when this badge may receive a rarity trade-floor (minTrades). */
+function takesTradeFloor(b: BadgeData): boolean {
+  // Reason: Games category is never trading-scoped even if a bad row slipped in.
+  if ((b.category || "") === "Games") return false;
+  return conditionScope(b.condition?.type || "") === "trading";
 }
 
 export interface MilestoneData {
@@ -112,7 +132,7 @@ const RARITY_COMPS_RANGES: Record<string, [number, number]> = {
 };
 
 const VALID_CATEGORIES = [
-  "Competition", "Trading", "Profit", "Risk",
+  "Competition", "Trading", "Games", "Profit", "Risk",
   "Speed", "Consistency", "Strategy", "Social", "Legendary",
 ];
 
@@ -160,6 +180,13 @@ export function evaluateSystem(
   badges: BadgeData[],
   milestones: MilestoneData[],
   maps: MapData[],
+  /**
+   * Live catalogue games. Omitted / empty means the parity criterion is not
+   * scored at all — on a trading-only deployment there is no games-only player
+   * to be unfair to, and a zero there would read as a defect (R96b).
+   */
+  games: readonly CoverageGameRef[] = [],
+  badgeXp?: BadgeXpByRarity,
 ): EvalResult {
   const issues: EvalIssue[] = [];
   const strengths: string[] = [];
@@ -188,9 +215,23 @@ export function evaluateSystem(
     funFactor: funScore,
   };
 
-  const overallScore = Math.round(
-    (Object.values(scores).reduce((a, b) => a + b, 0) / 10) * 10
-  ) / 10;
+  if (games.length > 0) {
+    scores.crossGameParity = scoreCrossGameParity(
+      badges,
+      games,
+      issues,
+      strengths,
+      badgeXp,
+    );
+  }
+
+  // Reason: divide by the criteria actually scored — a fixed 10 silently
+  // deflates the overall score the moment an eleventh criterion is added.
+  const scoreValues = Object.values(scores);
+  const overallScore =
+    Math.round(
+      (scoreValues.reduce((a, b) => a + b, 0) / scoreValues.length) * 10,
+    ) / 10;
 
   const severityOrder: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
   issues.sort((a, b) => (severityOrder[a.severity] ?? 3) - (severityOrder[b.severity] ?? 3));
@@ -275,8 +316,10 @@ export function generateFixes(
   // ══════════════════════════════════════════════════════════════════════════
 
   for (const rarity of RARITY_ORDER) {
-    const pool = (byRarity[rarity] || []).filter(b =>
-      TRADE_CATEGORIES.includes(b.category || "")
+    // Reason: skip Games category and any condition whose registry scope is not
+    // trading — otherwise auto-fix stamps minTrades onto game/platform badges.
+    const pool = (byRarity[rarity] || []).filter(
+      (b) => TRADE_CATEGORIES.includes(b.category || "") && takesTradeFloor(b),
     );
     if (pool.length === 0) continue;
 
@@ -570,7 +613,13 @@ function scoreZeroBaseline(badges: BadgeData[], issues: EvalIssue[], strengths: 
     if (b.rarity === "common") continue;
     const cat = b.category || "";
 
-    if (TRADE_CATEGORIES.includes(cat) && (b.condition?.minTrades || 0) === 0) {
+    // Reason: game / platform / cross-game badges must not be flagged for
+    // missing minTrades — only trading-scoped conditions need that floor.
+    if (
+      TRADE_CATEGORIES.includes(cat) &&
+      takesTradeFloor(b) &&
+      (b.condition?.minTrades || 0) === 0
+    ) {
       tradeZeros++;
     }
     if (COMP_CATEGORIES.includes(cat) && (b.condition?.minCompletedCompetitions || 0) === 0) {
@@ -924,6 +973,44 @@ function scoreFunFactor(
   if (badges.length >= 120) strengths.push(`${badges.length} badges create a rich collection to pursue`);
 
   return Math.max(1, Math.min(10, score));
+}
+
+/**
+ * Can a games-only player progress as fast as a trader? (R96b)
+ *
+ * The other ten criteria all measure the badge set against itself, so a
+ * catalogue where every rare and above is trading-scoped scores perfectly while
+ * a games-only player is stuck at level 1 for ever. Nothing errors and nothing
+ * is logged, which is why this needed to become a scored criterion rather than
+ * a note in a report.
+ */
+function scoreCrossGameParity(
+  badges: BadgeData[],
+  games: readonly CoverageGameRef[],
+  issues: EvalIssue[],
+  strengths: string[],
+  badgeXp?: BadgeXpByRarity,
+): number {
+  const parity = analyseGamesOnlyParity(badges, games, badgeXp);
+
+  if (parity.ratio >= 0.8) {
+    strengths.push(
+      `Games-only players can reach ${Math.round(parity.ratio * 100)}% of a trader's badge XP (${parity.gamesOnlyBadgeCount} badges)`,
+    );
+    return parity.score;
+  }
+
+  const gameNames = games.map((g) => g.displayName).join(", ");
+  issues.push({
+    severity: parity.ratio < 0.4 ? "critical" : parity.ratio < 0.6 ? "high" : "medium",
+    area: "crossGameParity",
+    description: `${parity.verdict} Reachable badge XP: trader ${parity.traderXp}, games-only ${parity.gamesOnlyXp}.`,
+    recommendation: `Author badges scoped to the catalogue games (${gameNames}) using game_* or cross-game conditions, or widen platform badges. A game badge must never carry a trading condition.`,
+    targetAgent: "badge_agent",
+    autoFixable: false,
+  });
+
+  return parity.score;
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────────

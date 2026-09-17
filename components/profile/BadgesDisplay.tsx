@@ -34,6 +34,7 @@ interface BadgesDisplayProps {
 const CATEGORIES: BadgeCategory[] = [
   "Competition",
   "Trading",
+  "Games",
   "Profit",
   "Risk",
   "Speed",

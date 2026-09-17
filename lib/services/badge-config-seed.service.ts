@@ -4,6 +4,10 @@ import { BADGES } from "@/lib/constants/badges";
 import { BADGE_XP_VALUES, TITLE_LEVELS } from "@/lib/constants/levels";
 import { connectToDatabase } from "@/database/mongoose";
 import { getDefaultBadges, getDefaultXPConfig } from "@/lib/services/whitelabel-defaults-reader";
+import {
+  clearDefaultsSuppression,
+  getDefaultsSuppression,
+} from "@/lib/services/gamification-defaults-state.service";
 
 /**
  * Seed default badge configurations to database
@@ -11,6 +15,18 @@ import { getDefaultBadges, getDefaultXPConfig } from "@/lib/services/whitelabel-
 export async function seedBadgeConfigs() {
   try {
     await connectToDatabase();
+
+    // Reason: an operator who deliberately wiped the catalogue to start from
+    // scratch must not have it restored by the next read. The gate covers BOTH
+    // branches below — after a wipe the add-only sync is indistinguishable from
+    // a first seed, so guarding only the empty case restores everything anyway.
+    const { badgeDefaultsSuppressed } = await getDefaultsSuppression();
+    if (badgeDefaultsSuppressed) {
+      console.log(
+        "⏭️ Badge defaults are suppressed (catalogue was reset from scratch) — not seeding.",
+      );
+      return;
+    }
 
     // Check if badges already exist
     const existingCount = await BadgeConfig.countDocuments();
@@ -93,6 +109,17 @@ export async function seedXPConfigs() {
   try {
     await connectToDatabase();
 
+    // Reason: same as badges — a deliberately emptied ladder must stay empty
+    // until the operator builds one, or "Novice Trader" reappears on a games
+    // platform on the next page load.
+    const { xpDefaultsSuppressed } = await getDefaultsSuppression();
+    if (xpDefaultsSuppressed) {
+      console.log(
+        "⏭️ XP defaults are suppressed (levels were reset from scratch) — not seeding.",
+      );
+      return;
+    }
+
     // Check if XP configs already exist
     const existingBadgeXP = await XPConfig.findOne({ configType: "badge_xp" });
     const existingLevels = await XPConfig.findOne({
@@ -151,6 +178,12 @@ export async function resetBadgeAndXPConfigs() {
     // Delete all existing configs
     await BadgeConfig.deleteMany({});
     await XPConfig.deleteMany({});
+
+    // Reason: restoring defaults is the inverse of starting from scratch, so it
+    // must lift the suppression in the same operation. Left set, the reseed
+    // below writes nothing and reports success — a restore that restored
+    // nothing.
+    await clearDefaultsSuppression();
 
     // Reseed defaults
     await seedBadgeConfigs();

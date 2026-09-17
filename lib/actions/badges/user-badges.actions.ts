@@ -46,6 +46,7 @@ export async function getMyBadgeStats() {
   const categoryCount: Record<BadgeCategory, number> = {
     Competition: 0,
     Trading: 0,
+    Games: 0,
     Profit: 0,
     Risk: 0,
     Speed: 0,
