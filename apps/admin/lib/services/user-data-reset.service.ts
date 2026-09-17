@@ -175,6 +175,9 @@ const ACTIVITY_RAW_COLLECTIONS: string[] = [
   "game_round",
   "provider_event",
   "user_game_preference",
+  // Per-player cross-game standings written at settlement (X7) — earned data,
+  // not catalogue design, so it clears with the rest of activity
+  "user_game_stats",
   // Game-master / referral activity
   "gamemastersubscriptions",
   "userreferrals",
@@ -285,6 +288,9 @@ export const PRESERVED_CONFIG_COLLECTIONS: string[] = [
   "xpconfigs",
   "journeymapconfigs",
   "journeymilestones",
+  // Whether the shipped defaults are suppressed after a wipe (R102) — operator
+  // config, not player data. Mongoose pluralises GamificationDefaultsState.
+  "gamificationdefaultsstates",
   // Catalogue and commercial config
   "game_provider",
   "provider_game",

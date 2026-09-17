@@ -167,6 +167,10 @@ export function getBadgeRequirement(badge: Badge): BadgeRequirement {
       return { requirement: `Finish top 3 in ${contestLabel(value || 1)} in this game`, statLabel: "Game Podiums", targetValue: value || 1, extras, tip: GAME_SCOPE_TIP };
     case "game_total_points":
       return { requirement: `Earn ${(value || 1).toLocaleString()} total points in this game`, statLabel: "Game Total Points", targetValue: (value || 1).toLocaleString(), extras, tip: GAME_SCOPE_TIP };
+    case "game_season_points":
+      return { requirement: `Earn ${(value || 1).toLocaleString()} season points in this game`, statLabel: "Game Season Points", targetValue: (value || 1).toLocaleString(), extras, tip: GAME_SCOPE_TIP };
+    case "game_best_score":
+      return { requirement: `Reach a best score of ${(value || 1).toLocaleString()} in this game`, statLabel: "Game Best Score", targetValue: (value || 1).toLocaleString(), extras, tip: GAME_SCOPE_TIP };
     case "game_rating":
       return { requirement: `Reach a ${value || 1} rating in this game`, statLabel: "Game Rating", targetValue: value || 1, extras, tip: GAME_SCOPE_TIP };
     case "game_best_rank":

@@ -24,6 +24,7 @@ import { ADMIN_SECTIONS } from "../../apps/admin/database/models/admin-employee.
 import {
   findRouteFiles,
   guardCallPattern,
+  guardedSections,
   handlerPattern,
   stripComments,
 } from "../helpers/route-guard-audit";
@@ -88,15 +89,18 @@ describe("apps/admin/app/api/ai - every handler is behind a section guard", () =
         to one that exists and is wrong in a way a typecheck cannot see, by pinning the
         argument against the enum that actually issues grants.
       */
-      const named = [...code.matchAll(guardCallPattern())];
+      // Reason: `guardCallPattern()` matches the call site but has no capture group, so
+      // `match[1]` is always undefined. `guardedSections` extracts the section id argument —
+      // the thing ADMIN_SECTIONS must contain.
+      const named = guardedSections(code);
 
       // An assertion inside a loop over an empty list is green, and that is not a theoretical
       // worry: the first probe for this test mutated the call into a shape the regex could not
       // match, the loop never ran, and the probe reported the guard useless.
       expect(named.length).toBeGreaterThan(0);
 
-      for (const match of named) {
-        expect(ADMIN_SECTIONS as readonly string[]).toContain(match[1]);
+      for (const section of named) {
+        expect(ADMIN_SECTIONS as readonly string[]).toContain(section);
       }
     });
   }

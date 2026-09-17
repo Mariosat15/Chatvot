@@ -236,7 +236,10 @@ describe("game-leaderboard.service (X7 step 2)", () => {
     expect(stripped).not.toMatch(/getEnabledGameTypes/);
   });
 
-  it("client defaults to legacy during R14 parallel period", () => {
+  it("client defaults to the global board, never an empty or trading-only view", () => {
+    // Reason: R14's `source=legacy|stats` parallel period ended. The live client picks among
+    // global / trading / games and must open on Overall (`GLOBAL_BOARD`), not Trading, or a
+    // games-only player lands on an empty board.
     const src = fs.readFileSync(
       path.join(
         process.cwd(),
@@ -244,16 +247,22 @@ describe("game-leaderboard.service (X7 step 2)", () => {
       ),
       "utf8",
     );
-    expect(src).toMatch(/useState<BoardSource>\("legacy"\)/);
-    expect(src).not.toMatch(/useState<BoardSource>\("stats"\)/);
+    expect(src).toMatch(/GLOBAL_BOARD\s*=\s*"global"/);
+    expect(src).toMatch(/useState<string>\(\s*GLOBAL_BOARD\s*\)/);
+    expect(src).not.toMatch(/useState[^;]*"legacy"/);
+    expect(src).not.toMatch(/useState[^;]*"stats"/);
   });
 
-  it("API defaults source to legacy", () => {
+  it("API defaults board to global when none is requested", () => {
     const src = fs.readFileSync(
       path.join(process.cwd(), "app/api/leaderboard/route.ts"),
       "utf8",
     );
-    expect(src).toMatch(
+    // Reason: resolveBoardId is the one answer; a missing/blank board must become "global",
+    // never "legacy" (gone) and never trading (would hide games-only players on first load).
+    expect(src).toMatch(/function\s+resolveBoardId/);
+    expect(src).toMatch(/return\s+"global"/);
+    expect(src).not.toMatch(
       /searchParams\.get\("source"\)\s*\|\|\s*"legacy"/,
     );
   });

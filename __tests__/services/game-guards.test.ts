@@ -27,6 +27,21 @@ function sourceOf(relativePath: string): string {
   return readFileSync(resolve(process.cwd(), relativePath), "utf8");
 }
 
+/**
+ * Comment-stripped source for call-ban assertions.
+ *
+ * Reason: invariant 9 bans calling getEnabledGameTypes, not mentioning it in a
+ * comment that explains why the call is forbidden. Stripping must NOT be applied to
+ * eslint.config.mjs — its comments contain nested games globs whose star-slash
+ * sequence truncates a naive block-comment strip and mangles every invariant-1
+ * assertion.
+ */
+function sourceWithoutComments(relativePath: string): string {
+  return sourceOf(relativePath)
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\/\/.*$/gm, "");
+}
+
 /** Every writer that inserts a contest with the raw driver, bypassing Mongoose defaults. */
 const RAW_CONTEST_WRITERS = [
   "app/api/gamemaster/competitions/route.ts",
@@ -242,7 +257,8 @@ describe("invariant 9: no stats or progression read consults the enabled-game se
   it.each(STATS_AND_PROGRESSION_READ_PATHS)(
     "%s does not call getEnabledGameTypes",
     (file) => {
-      expect(sourceOf(file)).not.toContain("getEnabledGameTypes");
+      // Reason: ban the CALL, not the name in a comment warning against it (R96a).
+      expect(sourceWithoutComments(file)).not.toContain("getEnabledGameTypes");
     },
   );
 
@@ -252,7 +268,7 @@ describe("invariant 9: no stats or progression read consults the enabled-game se
       // Reason: assertGameEnabled calls getEnabledGameTypes internally, so checking only
       // the direct name would miss the indirect route - which is the one a well-meaning
       // contributor is more likely to take, since it reads as a validity check.
-      expect(sourceOf(file)).not.toContain("assertGameEnabled");
+      expect(sourceWithoutComments(file)).not.toContain("assertGameEnabled");
     },
   );
 
@@ -274,7 +290,9 @@ describe("invariant 9: no stats or progression read consults the enabled-game se
 
   it("the settlement router does not consult it either", () => {
     // A paid entry must never be stranded by a flag flipped while the contest ran.
-    expect(sourceOf("lib/games/settlement.ts")).not.toContain("getEnabledGameTypes");
+    expect(sourceWithoutComments("lib/games/settlement.ts")).not.toContain(
+      "getEnabledGameTypes",
+    );
   });
 });
 

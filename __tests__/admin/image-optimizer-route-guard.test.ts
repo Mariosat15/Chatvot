@@ -65,19 +65,11 @@ describe("apps/admin/app/api/dev-zone - no handler is reachable unauthenticated"
 
     it(`${name}: authenticates every exported handler`, () => {
       /*
-        THIS ASSERTS THE WEAK PROPERTY DELIBERATELY, and the reason is the whole design of this
-        block. The strong property - every handler behind `guardSection` - is false for this
-        folder today: `dependency-check` authenticates all three of its handlers with
-        `verifyAdminAuth`, which is admin-at-all rather than section access. That is the same
-        class of defect corrected eight times elsewhere, but converting it means choosing a
-        section id and deciding which existing employees keep the screen, which is an owner
-        decision rather than a mechanical fix. It is recorded below rather than quietly
-        permitted by an allow-list.
-
-        What the weak form still buys, and it is the thing that matters: a route added to this
-        folder with NO authorization at all turns this red. That is the exact defect
-        `optimize-images` shipped with, and the exact one that a per-file allow-list would let
-        through on the day it appeared.
+        Folder-wide: every handler authenticates *somehow*. Both routes in this folder now
+        use `guardSection` (dependency-check was upgraded under R101ac from `verifyAdminAuth`).
+        The strong per-handler property for optimize-images is asserted in the suite below;
+        this block still fails if a third route arrives with no auth at all — the exact
+        defect optimize-images shipped with, and the one a per-file allow-list would miss.
       */
       const handlers = code.match(handlerPattern()) ?? [];
       const guards = code.match(authCallPattern()) ?? [];
@@ -98,20 +90,22 @@ describe("apps/admin/app/api/dev-zone - no handler is reachable unauthenticated"
     });
   }
 
-  it("records dependency-check as still using the weaker helper", () => {
+  it("records dependency-check as section-granted (R101ac closed the weaker helper)", () => {
     /*
-      A tripwire pointing the right way. If somebody strengthens `dependency-check` to
-      `guardSection`, this goes red and the reader is sent to delete it and tighten the
-      folder-wide assertion above to the strong property - at which point the weak form can go
-      entirely. Left as a passing test that states a known gap, it would be indistinguishable
-      from the gap having been closed.
+      Flipped, not deleted. The tripwire used to assert `verifyAdminAuth` and an empty
+      `guardedSections` list — the known gap. R101ac closed it with `guardSection(
+      "dependency-updates")`. Keeping the history in the comment is the point: a green
+      "still using the weaker helper" test after the upgrade would have been a wrong fact.
     */
     const code = stripComments(
       readFileSync(join(DEV_ZONE, "dependency-check", "route.ts"), "utf8"),
     );
 
-    expect(code).toMatch(/verifyAdminAuth\s*\(/);
-    expect(guardedSections(code)).toEqual([]);
+    expect(code).not.toMatch(/verifyAdminAuth\s*\(/);
+    // Reason: three handlers each call guardSection("dependency-updates"), so the
+    // helper returns the id three times. Uniqueness is the tripwire — a second
+    // section id would mean the upgrade drifted onto a different grant.
+    expect([...new Set(guardedSections(code))]).toEqual(["dependency-updates"]);
   });
 });
 
