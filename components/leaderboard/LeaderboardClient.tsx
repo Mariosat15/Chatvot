@@ -30,13 +30,12 @@ interface MyPosition {
 }
 
 /**
- * One screen, one dropdown, four kinds of board.
+ * Three boards only: Global, Trading, Games — same layout family throughout.
  *
- * Reason: the three tab buttons were three leaderboards standing next to each
- * other with nothing joining them, so a player could not see how trading and
- * games added up to one standing. The board list arrives with every response
- * and is never held here — a per-game board is named by a stored `gameKey`,
- * and a client with its own list stops offering a game the day one is added.
+ * Reason: per-game boards (Circuit Sprint, etc.) duplicated the Games rollup
+ * without adding a decision a player needed. The owner asked for three
+ * leaderboards that share Trading's chrome so switching boards changes the
+ * numbers, not the screen.
  */
 export default function LeaderboardClient({
   currentUserId,
@@ -45,8 +44,9 @@ export default function LeaderboardClient({
 }) {
   const [board, setBoard] = useState<string>(GLOBAL_BOARD);
   const [boards, setBoards] = useState<BoardOption[]>([
-    { id: GLOBAL_BOARD, label: "Global leaderboard" },
-    { id: TRADING_BOARD, label: "Trading performance" },
+    { id: GLOBAL_BOARD, label: "Global Leaderboard" },
+    { id: TRADING_BOARD, label: "Trading Leaderboard" },
+    { id: GAMES_BOARD, label: "Games Leaderboard" },
   ]);
 
   const [globalEntries, setGlobalEntries] = useState<GlobalBoardRow[]>([]);
@@ -102,8 +102,6 @@ export default function LeaderboardClient({
       setStatsEntries(data.source === "stats" ? (data.entries ?? []) : []);
 
       if (data.source === "global") {
-        // The percentages are the ones the server actually used, so an operator
-        // changing them in admin changes the explanation too.
         setGlobalWeights(data.weights ?? []);
       }
     } catch (e) {
@@ -138,11 +136,23 @@ export default function LeaderboardClient({
     [totalCount, fetchPage, board],
   );
 
+  const handleBoardChange = useCallback((next: string) => {
+    // Reason: only the three named boards are offered. An unexpected id from a
+    // stale response must not open a per-game view that no longer exists.
+    if (
+      next === GLOBAL_BOARD ||
+      next === TRADING_BOARD ||
+      next === GAMES_BOARD
+    ) {
+      setBoard(next);
+    }
+  }, []);
+
   const picker = (
     <LeaderboardBoardPicker
       boards={boards}
       value={board}
-      onChange={setBoard}
+      onChange={handleBoardChange}
       disabled={loading}
     />
   );
@@ -175,8 +185,6 @@ export default function LeaderboardClient({
     );
   }
 
-  // The trading board brings its own header, because it also owns the
-  // table/cards toggle; it is handed the picker to render in the same row.
   if (board === TRADING_BOARD) {
     return (
       <LeaderboardContent
@@ -193,71 +201,73 @@ export default function LeaderboardClient({
     );
   }
 
-  if (board === GLOBAL_BOARD) {
+  if (board === GAMES_BOARD) {
     return (
-      <div className="flex flex-col gap-6">
+      <div className="flex min-h-screen flex-col gap-6">
         <LeaderboardPageHeader
-          title="GLOBAL LEADERBOARD"
-          subtitle="Everything you do on ChartVolt, in one standing"
+          title="GAMES LEADERBOARD"
+          subtitle="Players ranked across every game they play"
           boardPicker={picker}
         />
         <LeaderboardRankCard
           position={myPosition}
           unitLabel="players"
-          unrankedMessage="Play a game or trade in a competition to appear on this board"
+          unrankedMessage="Finish a game contest to appear on this board"
         />
-        <GlobalLeaderboardTable
-          entries={globalEntries}
-          viewerUserId={currentUserId}
+        <GameLeaderboardTable
+          entries={statsEntries}
+          myPosition={myPosition}
+          currentUserId={currentUserId}
+          totalCount={totalCount}
+          page={page}
+          pageSize={PAGE_SIZE}
+          onPageChange={handlePageChange}
+          loading={loading}
+          showRating={false}
+          startsFromCaption={startsFromCaption}
         />
         <RankingsExplainer
-          weights={globalWeights}
-          intro="Your global place is built from seven things. For each one you are ranked against everyone else who does it, and those positions are combined using the shares below."
+          weights={[]}
+          intro="Points you earn for finishing a game contest, added up across every game. This is one of the seven things that decide your place on the Global Leaderboard."
           notes={[
-            "You are never penalised for something you do not do. If you only play games, the share that would have gone to trading is spread across the things you do take part in — a games-only player can reach #1.",
-            "A dash means that part has not counted for you yet.",
-            "Trading and Games each have a board of their own. Pick them from the dropdown to see the full figures behind those two shares.",
+            "Points come from where you finish and how big the contest was, so a win against more players is worth more.",
+            "A game being switched off does not remove what you earned in it.",
+            "Click a player’s name to open their card.",
           ]}
         />
       </div>
     );
   }
 
-  const selected = boards.find((b) => b.id === board);
-  const isGamesRollup = board === GAMES_BOARD;
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex min-h-screen flex-col gap-6">
       <LeaderboardPageHeader
-        title={(selected?.label ?? "Games performance").toUpperCase()}
-        subtitle={
-          isGamesRollup
-            ? "Players ranked across every game they play"
-            : "Players ranked in this game"
-        }
+        title="GLOBAL LEADERBOARD"
+        subtitle="Everything you do on ChartVolt, in one standing"
         boardPicker={picker}
       />
-      <GameLeaderboardTable
-        entries={statsEntries}
-        myPosition={myPosition}
-        currentUserId={currentUserId}
+      <LeaderboardRankCard
+        position={myPosition}
+        unitLabel="players"
+        unrankedMessage="Play a game or trade in a competition to appear on this board"
+      />
+      <GlobalLeaderboardTable
+        entries={globalEntries}
+        viewerUserId={currentUserId}
         totalCount={totalCount}
         page={page}
         pageSize={PAGE_SIZE}
         onPageChange={handlePageChange}
         loading={loading}
-        showRating={!isGamesRollup}
-        startsFromCaption={startsFromCaption}
       />
       <RankingsExplainer
-        weights={[]}
-        intro={
-          isGamesRollup
-            ? "Points you earn for finishing a game contest, added up across every game. This is one of the seven things that decide your place on the Global leaderboard."
-            : "Points you have earned in this game alone. Your rating is your skill level against the other players of this game."
-        }
+        weights={globalWeights}
+        intro="Your global place is built from seven things. For each one you are ranked against everyone else who does it, and those positions are combined using the shares below."
         notes={[
-          "Points come from where you finish and how big the contest was, so a win against more players is worth more.",
-          "A game being switched off does not remove what you earned in it.",
+          "You are never penalised for something you do not do. If you only play games, the share that would have gone to trading is spread across the things you do take part in — a games-only player can reach #1.",
+          "A dash means that part has not counted for you yet.",
+          "Trading Leaderboard and Games Leaderboard each show the full figures behind those two shares.",
+          "Click a player’s name to open their card.",
         ]}
       />
     </div>

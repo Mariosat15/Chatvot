@@ -6,16 +6,10 @@ export interface BoardOption {
 }
 
 /**
- * One dropdown, every board — replaces the row of tab buttons.
+ * One dropdown — Global, Trading, Games.
  *
- * Reason: the list comes from the server on every response and is never
- * hard-coded here. A per-game board is named by a stored `gameKey`, so a client
- * holding its own list stops offering a game the moment one is added, silently.
- *
- * `bg-gray-800` is deliberate and must stay opaque: a browser paints a native
- * select's option list itself and takes the background from the element, so a
- * translucent theme colour composites over the browser's light list surface and
- * renders every option white on white (R60).
+ * Reason: the list comes from the server. Opaque `bg-gray-800` stays (R60 —
+ * translucent backgrounds make native option text white-on-white).
  */
 export default function LeaderboardBoardPicker({
   boards,

@@ -338,7 +338,7 @@ export default function LeaderboardContent({
   return (
     <div className="flex min-h-screen flex-col gap-6">
       <LeaderboardPageHeader
-        title="TRADING PERFORMANCE"
+        title="TRADING LEADERBOARD"
         subtitle="Traders ranked by how they have traded"
         boardPicker={boardPicker}
         actions={
@@ -348,7 +348,7 @@ export default function LeaderboardContent({
               className={cn(
                 "px-3 sm:px-4 py-2.5 sm:py-2 min-h-[44px] rounded-lg font-semibold text-sm transition-all flex items-center gap-1.5 sm:gap-2",
                 viewMode === "table"
-                  ? "bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-lg shadow-primary-500/25"
+                  ? "bg-primary-500 text-white shadow-md"
                   : "text-gray-500 hover:text-white",
               )}
             >
@@ -360,7 +360,7 @@ export default function LeaderboardContent({
               className={cn(
                 "px-3 sm:px-4 py-2.5 sm:py-2 min-h-[44px] rounded-lg font-semibold text-sm transition-all flex items-center gap-1.5 sm:gap-2",
                 viewMode === "cards"
-                  ? "bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-lg shadow-purple-500/25"
+                  ? "bg-primary-500 text-white shadow-md"
                   : "text-gray-500 hover:text-white",
               )}
             >
@@ -991,13 +991,14 @@ export default function LeaderboardContent({
           */}
           <RankingsExplainer
             weights={[]}
-            intro="Your trading score adds up points from everything below. It is one of the seven things that decide your place on the Global leaderboard."
+            intro="Your trading score adds up points from everything below. It is one of the seven things that decide your place on the Global Leaderboard."
             notes={[
               "Profit is worth the most — both the amount you made and how much you made relative to what you started with.",
               "How often you win, and how much you win compared with what you lose, come next.",
               "Winning a competition is worth more than finishing on the podium, and a podium is worth more than a challenge win.",
               "Badges add a little, and legendary badges add more.",
               "A very high profit factor is capped, so one lucky run without a single loss cannot take the top spot on its own.",
+              "Click a player’s name to open their card.",
             ]}
           />
         </>
