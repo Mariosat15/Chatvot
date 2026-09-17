@@ -86,6 +86,9 @@ Videos/.tmp-uploads/
 logs/
 *.log
 
+# Dev Zone Performance Simulator vitest output (written then deleted; belt)
+.vitest-admin-run-*.json
+
 # PM2
 .pm2/
 

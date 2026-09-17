@@ -1,5 +1,8 @@
 "use server";
 
+/* eslint-disable @typescript-eslint/no-explicit-any, security/detect-object-injection --
+   Pre-existing patterns in this large evaluator; R108 only adds switch cases. */
+
 import { connectToDatabase } from "@/database/mongoose";
 import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
 import TradingPosition from "@/database/models/trading/trading-position.model";
@@ -270,7 +273,7 @@ export async function evaluateUserBadges(userId: string, categories?: string[]):
     try {
       const { checkAndCompleteMilestones } =
         await import("@/lib/services/journey-progress.service");
-      const journeyResult = await checkAndCompleteMilestones(userId);
+      await checkAndCompleteMilestones(userId);
       // Journey milestones checked silently
     } catch (journeyError) {
       console.error("❌ [BADGE EVAL] Error checking journey milestones:", journeyError);
@@ -310,7 +313,8 @@ export async function gatherUserStats(userId: string): Promise<UserStats> {
   }
 
   // PERF: Fetch independent data in parallel, with reduced limits and countDocuments for totals
-  const [participations, allPositions, closedTrades, totalPositionCount, totalTradeCount, wallet, withdrawalCount, depositCount, slTriggeredCount, tpTriggeredCount] = await Promise.all([
+  // Reason: position count kept for parallel fetch shape; trade count drives badge stats.
+  const [participations, allPositions, closedTrades, _totalPositionCount, totalTradeCount, wallet, withdrawalCount, depositCount, slTriggeredCount, tpTriggeredCount] = await Promise.all([
     CompetitionParticipant.find({ userId }).select("currentRank status totalTrades pnlPercentage createdAt realizedPnl losingTrades winRate totalParticipants totalPnl").lean(),
     TradingPosition.find({ userId }).select("stopLoss takeProfit symbol createdAt").sort({ createdAt: -1 }).limit(2000).lean(),
     TradeHistory.find({ userId }).select("realizedPnl closedAt symbol openedAt volume closeReason").sort({ closedAt: -1 }).limit(2000).lean(),
@@ -1104,6 +1108,10 @@ export async function checkBadgeCondition(
       return compareValue(stats.maxTradesInOneMonth, value, comparison);
 
     // Consistency badges
+    // Reason: registry + blueprint author `consecutive_trading_days`; the
+    // daily_trading_streak alias must stay. Missing the registry name made
+    // every authored streak badge fall through to default → permanently false.
+    case "consecutive_trading_days":
     case "daily_trading_streak":
       return compareValue(stats.consecutiveTradingDays, value, comparison);
     case "weekly_trading_streak":
@@ -1275,10 +1283,19 @@ export async function checkBadgeCondition(
         const actual = row?.[conditionDef.gameStat] ?? 0;
         // Reason: bestRank defaults to 0 meaning "never ranked", not rank #0.
         if (conditionDef.gameStat === "bestRank" && actual === 0) return false;
+        // Reason: boolean-authored game stats (no ladder at write time) stored
+        // `eq` with no value — compareValue(undefined) is always false. Treat a
+        // missing target as "any positive progress" so the badge remains earnable.
+        const target =
+          value === undefined || value === null || Number.isNaN(Number(value))
+            ? 1
+            : Number(value);
         const comp =
           comparison ??
           (conditionDef.gameStat === "bestRank" ? "lte" : "gte");
-        return compareValue(actual, value, comp);
+        const effectiveComp =
+          (value === undefined || value === null) && comp === "eq" ? "gte" : comp;
+        return compareValue(actual, target, effectiveComp);
       }
       return false;
     }

@@ -77,7 +77,9 @@ const THRESHOLD_LADDERS = new Map<string, readonly [number, number]>([
   ["game_wins", [1, 2.6]],
   ["game_podiums", [3, 2.2]],
   ["game_total_points", [500, 2.6]],
+  ["game_season_points", [200, 2.4]],
   ["game_rating", [1100, 1.08]],
+  ["game_best_score", [100, 2.2]],
   ["game_current_streak", [2, 1.8]],
   // Social / account
   ["referrals_made", [1, 2.6]],

@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+/* eslint-disable @typescript-eslint/no-explicit-any, security/detect-object-injection --
+   Simulator route is a typed-loose admin harness; R108 only widened condition recognition. */
 import { connectToDatabase } from "@/database/mongoose";
 import BadgeConfig from "@/database/models/badge-config.model";
 import { 
@@ -7,6 +9,14 @@ import {
 } from "@/lib/services/badge-evaluation.service";
 import { Badge } from "@/lib/constants/badges";
 import { guardSection } from "@/lib/admin/section-route-guard";
+import {
+  BADGE_CONDITION_DEFS,
+  getConditionDef,
+} from "@/lib/services/games/badge-condition-registry";
+import {
+  resolveGameStatsKey,
+  type GameBadgeStatsRow,
+} from "@/lib/services/games/game-badge-stats";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -18,6 +28,7 @@ const INVERSE_CONDITION_TYPES = new Set([
   "max_drawdown",        // lower drawdown = better risk management
   "max_drawdown_under",  // explicitly "under" a threshold
   "position_size_under", // explicitly "under" a threshold
+  "game_best_rank",      // lower rank number = better placing
 ]);
 
 // ─── COUNTER TYPES THAT SHOULD USE GTE ─────────────────────────────────────
@@ -42,6 +53,10 @@ const COUNTER_TYPES_PREFER_GTE = new Set([
   "total_badges", "stop_loss_used", "take_profit_used",
   "max_win_streak", "win_streak", "best_trade_pnl", "best_single_trade",
   "average_trade_pnl", "average_win", "account_age_days", "account_age", "platform_age",
+  // Reason (R96b): game_* counters — same eq-is-wrong rule as trading counts.
+  "game_contests_entered", "game_contests_completed", "game_wins", "game_podiums",
+  "game_total_points", "game_season_points", "game_rating", "game_best_score",
+  "game_current_streak",
 ]);
 
 // ─── BOOLEAN / ALWAYS-TRUE TYPES ────────────────────────────────────────
@@ -115,6 +130,22 @@ const SUPPORTED_CONDITION_TYPES = new Set([
   "risk_reward_ratio", "trades_today", "trades_this_week", "trades_this_month",
 ]);
 
+// Reason (R96b): the hardcoded list above drifted the moment game_* landed in
+// the registry. Recognition must follow BADGE_CONDITION_DEFS so a new type is
+// accepted the day it is registered — a second hand-maintained list is how
+// every Games badge fails this simulator while production already awards them.
+const REGISTRY_CONDITION_TYPES = new Set(
+  BADGE_CONDITION_DEFS.map((d) => d.type),
+);
+
+function isSupportedConditionType(type: string): boolean {
+  if (!type) return false;
+  if (SUPPORTED_CONDITION_TYPES.has(type)) return true;
+  if (REGISTRY_CONDITION_TYPES.has(type)) return true;
+  // Reason: getConditionDef is the same door the evaluator uses.
+  return getConditionDef(type) != null;
+}
+
 // ─── USER-FRIENDLY MESSAGES ──────────────────────────────────────────────
 function getUserFriendlyMessage(result: BadgeTestResult): string {
   const { passed, issues, condition } = result;
@@ -127,7 +158,7 @@ function getUserFriendlyMessage(result: BadgeTestResult): string {
     return "This badge passes but has configuration issues that should be fixed for reliability.";
   }
 
-  if (!passed && !SUPPORTED_CONDITION_TYPES.has(condition.type)) {
+  if (!passed && !isSupportedConditionType(condition.type)) {
     return `The condition type "${condition.type}" is not recognized by the production code. Users can never earn this badge.`;
   }
 
@@ -205,7 +236,7 @@ function validateBadgeInput(badge: any): { issues: string[]; autoFixable: boolea
   }
 
   // Unsupported type
-  if (!SUPPORTED_CONDITION_TYPES.has(cond.type)) {
+  if (!isSupportedConditionType(cond.type)) {
     issues.push(`Unsupported condition type "${cond.type}" - not handled in production code`);
   }
 
@@ -286,7 +317,7 @@ interface BadgeTestResult {
 
 // ─── MOCK STATS GENERATOR ───────────────────────────────────────────────
 function generateMockStatsForBadge(badge: Badge): Partial<UserStats> {
-  const { condition } = badge;
+  const { condition, gameTypes } = badge;
   const { type, value = 1, comparison = "gte", minTrades = 0, minCompletedCompetitions = 0 } = condition;
   const numericValue = typeof value === "number" ? value : parseInt(value as string) || 1;
 
@@ -389,7 +420,13 @@ function generateMockStatsForBadge(badge: Badge): Partial<UserStats> {
 
     // Trading volume conditions
     case "total_trades":
-      baseStats.totalTrades = isEq ? numericValue : numericValue + 10;
+      // Reason: rarity/stored minTrades often exceed the condition value — setting
+      // totalTrades to value+10 then fails the floor gate before the comparison runs.
+      baseStats.totalTrades = Math.max(
+        isEq ? numericValue : numericValue + 10,
+        minTrades || 0,
+        baseStats.totalTrades || 0,
+      );
       break;
     case "unique_pairs_traded":
       baseStats.uniquePairsTraded = isEq ? numericValue : numericValue + 2;
@@ -878,6 +915,61 @@ function generateMockStatsForBadge(badge: Badge): Partial<UserStats> {
       break;
   }
 
+  // Reason (R96b): rarity floors still apply for trading types — guarantee
+  // totalTrades clears the gate even when a case overwrote it downward.
+  const rarityFloor =
+    badge.rarity === "legendary"
+      ? 100
+      : badge.rarity === "epic"
+        ? 50
+        : badge.rarity === "rare"
+          ? 25
+          : 5;
+  const conditionDef = getConditionDef(type);
+  if (conditionDef?.scope !== "game" && conditionDef?.scope !== "platform") {
+    baseStats.totalTrades = Math.max(
+      baseStats.totalTrades || 0,
+      minTrades || 0,
+      rarityFloor,
+    );
+  }
+
+  // Reason (R96b): game_* reads UserGameStats via gameStats map — without it
+  // every Games badge evaluates to 0 / false even when the type is recognized.
+  if (conditionDef?.scope === "game" && conditionDef.gameStat) {
+    const key = resolveGameStatsKey(gameTypes);
+    const target =
+      value === undefined || value === null || Number.isNaN(Number(value))
+        ? 1
+        : Number(value);
+    const row: GameBadgeStatsRow = {
+      contestsEntered: 0,
+      contestsCompleted: 0,
+      wins: 0,
+      podiums: 0,
+      totalPoints: 0,
+      seasonPoints: 0,
+      rating: 0,
+      bestRank: 0,
+      bestScore: 0,
+      currentStreak: 0,
+    };
+    const field = conditionDef.gameStat;
+    if (field === "bestRank") {
+      // Lower is better — set at or under the target (never the unset 0).
+      row.bestRank = Math.max(1, isEq ? target : Math.max(1, target - 1));
+    } else {
+       
+      row[field] = isEq ? target : target + Math.max(1, Math.round(target * 0.1));
+    }
+    baseStats.gameStats = new Map([[key, row]]);
+    // Games badges ignore trade floors; keep completedCompetitions healthy if set.
+    baseStats.completedCompetitions = Math.max(
+      baseStats.completedCompetitions || 0,
+      minCompletedCompetitions || 0,
+    );
+  }
+
   return baseStats;
 }
 
@@ -1009,6 +1101,11 @@ export async function POST(request: Request) {
           minTrades: badgeDoc.condition?.minTrades,
           minCompletedCompetitions: badgeDoc.condition?.minCompletedCompetitions,
         },
+        // Reason (R96b): game_* resolves the UserGameStats row from gameTypes —
+        // omitting it made every provider badge read `_overall` and fail the mock.
+        gameTypes: Array.isArray(badgeDoc.gameTypes)
+          ? (badgeDoc.gameTypes as string[])
+          : undefined,
       };
 
       // Validate badge configuration
@@ -1184,7 +1281,7 @@ export async function POST(request: Request) {
 
 // ─── FAILING MOCK STATS ─────────────────────────────────────────────────
 function generateFailingMockStats(badge: Badge): Partial<UserStats> {
-  const { condition } = badge;
+  const { condition, gameTypes } = badge;
   const { minTrades = 0, minCompletedCompetitions = 0 } = condition;
 
   const failingStats: Partial<UserStats> = {
@@ -1231,6 +1328,30 @@ function generateFailingMockStats(badge: Badge): Partial<UserStats> {
 
   if (minTrades > 0) failingStats.totalTrades = minTrades - 1;
   if (minCompletedCompetitions > 0) failingStats.completedCompetitionsWithTrades = minCompletedCompetitions - 1;
+
+  // Reason: game_* fails closed on a missing / empty map — seed an empty row
+  // under the badge's key so the fail-path still exercises the registry door.
+  const failDef = getConditionDef(condition.type);
+  if (failDef?.scope === "game") {
+    const key = resolveGameStatsKey(gameTypes);
+    failingStats.gameStats = new Map([
+      [
+        key,
+        {
+          contestsEntered: 0,
+          contestsCompleted: 0,
+          wins: 0,
+          podiums: 0,
+          totalPoints: 0,
+          seasonPoints: 0,
+          rating: 0,
+          bestRank: 0,
+          bestScore: 0,
+          currentStreak: 0,
+        },
+      ],
+    ]);
+  }
 
   return failingStats;
 }

@@ -3,6 +3,7 @@ import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import TestRun from "@/database/models/test-run.model";
 import { exec } from "child_process";
+import fs from "fs";
 import path from "path";
 
 /**
@@ -43,14 +44,18 @@ export async function POST(request: NextRequest) {
 
     // Reason: Resolve to the monorepo root where vitest.config.ts lives.
     const rootDir = path.resolve(process.cwd(), "..", "..");
+    // Reason: the full suite's JSON reporter exceeds Node's default 1MB
+    // maxBuffer, so exec fails with "Command failed" and no parseable stdout.
+    // Write JSON to a file instead and raise the buffer as a belt.
+    const outputFile = path.join(rootDir, `.vitest-admin-run-${run._id}.json`);
 
-    let command = "npx vitest run --reporter=json";
+    let command = `npx vitest run --reporter=json --outputFile=${JSON.stringify(outputFile)}`;
     if (suites && suites.length > 0) {
       const suitePaths = suites.map((s) => `__tests__/**/${s}*`).join(" ");
-      command = `npx vitest run --reporter=json ${suitePaths}`;
+      command = `npx vitest run --reporter=json --outputFile=${JSON.stringify(outputFile)} ${suitePaths}`;
     }
 
-    executeTests(run._id.toString(), command, rootDir);
+    executeTests(run._id.toString(), command, rootDir, outputFile);
 
     return NextResponse.json({
       success: true,
@@ -74,73 +79,114 @@ async function executeTests(
   runId: string,
   command: string,
   cwd: string,
+  outputFile: string,
 ): Promise<void> {
   const { connectToDatabase: ensureDb } = await import("@/database/mongoose");
   const TestRunModel = (await import("@/database/models/test-run.model")).default;
 
-  exec(command, { cwd, timeout: 120_000, env: { ...process.env, NODE_ENV: "test" } }, async (error, stdout, stderr) => {
-    try {
-      await ensureDb();
-
-      const completedAt = new Date();
-      const run = await TestRunModel.findById(runId);
-      if (!run) return;
-
-      const startTime = run.startedAt?.getTime() || Date.now();
-      const duration = completedAt.getTime() - startTime;
-
-      let parsed: VitestJsonOutput | null = null;
+  // Reason: command is built server-side from an allow-listed suite list, not user shell input.
+  // eslint-disable-next-line security/detect-child-process -- Dev Zone test runner; argv is not user-controlled shell.
+  exec(
+    command,
+    {
+      cwd,
+      // Reason: full suite regularly exceeds 2 minutes on a cold Windows box.
+      timeout: 300_000,
+      maxBuffer: 20 * 1024 * 1024,
+      env: { ...process.env, NODE_ENV: "test" },
+    },
+    async (error, stdout, stderr) => {
       try {
-        parsed = JSON.parse(stdout);
-      } catch {
-        // vitest may output non-JSON lines before the JSON blob
-        const jsonStart = stdout.indexOf("{");
-        if (jsonStart >= 0) {
+        await ensureDb();
+
+        const completedAt = new Date();
+        const run = await TestRunModel.findById(runId);
+        if (!run) return;
+
+        const startTime = run.startedAt?.getTime() || Date.now();
+        const duration = completedAt.getTime() - startTime;
+
+        let rawJson = "";
+        try {
+          if (fs.existsSync(outputFile)) {
+            rawJson = fs.readFileSync(outputFile, "utf8");
+          }
+        } catch {
+          // Fall through to stdout parse
+        } finally {
           try {
-            parsed = JSON.parse(stdout.slice(jsonStart));
+            if (fs.existsSync(outputFile)) fs.unlinkSync(outputFile);
           } catch {
-            // Could not parse
+            // Best-effort cleanup
           }
         }
+
+        let parsed: VitestJsonOutput | null = null;
+        const candidates = [rawJson, stdout].filter(Boolean);
+        for (const blob of candidates) {
+          try {
+            parsed = JSON.parse(blob);
+            if (parsed?.testResults) break;
+          } catch {
+            const jsonStart = blob.indexOf("{");
+            if (jsonStart >= 0) {
+              try {
+                parsed = JSON.parse(blob.slice(jsonStart));
+                if (parsed?.testResults) break;
+              } catch {
+                // try next candidate
+              }
+            }
+          }
+        }
+
+        if (parsed && parsed.testResults) {
+          const testResults = parsed.testResults.flatMap((file) =>
+            (file.assertionResults || []).map((t) => ({
+              name: t.fullName || t.title || "unknown",
+              suite:
+                file.name?.split(/[/\\]/).pop()?.replace(/\.(test|spec)\.\w+$/, "") ||
+                "unknown",
+              status:
+                t.status === "passed"
+                  ? ("passed" as const)
+                  : t.status === "failed"
+                    ? ("failed" as const)
+                    : ("skipped" as const),
+              duration: t.duration || 0,
+              error: t.failureMessages?.join("\n"),
+            })),
+          );
+
+          const passed = testResults.filter((t) => t.status === "passed").length;
+          const failed = testResults.filter((t) => t.status === "failed").length;
+          const skipped = testResults.filter((t) => t.status === "skipped").length;
+
+          // Reason: vitest exits non-zero when any test fails — that is a
+          // suite result, not a runner crash. Prefer the parsed counts.
+          run.status = failed > 0 ? "failed" : "passed";
+          run.testResults = testResults;
+          run.totalTests = testResults.length;
+          run.passed = passed;
+          run.failed = failed;
+          run.skipped = skipped;
+        } else if (error) {
+          run.status = "error";
+          run.errorMessage = error.message || stderr || "Test execution failed";
+        } else {
+          run.status = "passed";
+          run.totalTests = 0;
+        }
+
+        run.completedAt = completedAt;
+        run.duration = duration;
+        run.rawOutput = (rawJson || stdout || stderr || "").slice(0, 50_000);
+        await run.save();
+      } catch (saveError) {
+        console.error("Error saving test results:", saveError);
       }
-
-      if (parsed && parsed.testResults) {
-        const testResults = parsed.testResults.flatMap((file) =>
-          (file.assertionResults || []).map((t) => ({
-            name: t.fullName || t.title || "unknown",
-            suite: file.name?.split("/").pop()?.replace(/\.(test|spec)\.\w+$/, "") || "unknown",
-            status: t.status === "passed" ? "passed" as const : t.status === "failed" ? "failed" as const : "skipped" as const,
-            duration: t.duration || 0,
-            error: t.failureMessages?.join("\n"),
-          })),
-        );
-
-        const passed = testResults.filter((t) => t.status === "passed").length;
-        const failed = testResults.filter((t) => t.status === "failed").length;
-        const skipped = testResults.filter((t) => t.status === "skipped").length;
-
-        run.status = failed > 0 ? "failed" : "passed";
-        run.testResults = testResults;
-        run.totalTests = testResults.length;
-        run.passed = passed;
-        run.failed = failed;
-        run.skipped = skipped;
-      } else if (error) {
-        run.status = "error";
-        run.errorMessage = error.message || stderr || "Test execution failed";
-      } else {
-        run.status = "passed";
-        run.totalTests = 0;
-      }
-
-      run.completedAt = completedAt;
-      run.duration = duration;
-      run.rawOutput = stdout.slice(0, 50_000);
-      await run.save();
-    } catch (saveError) {
-      console.error("Error saving test results:", saveError);
-    }
-  });
+    },
+  );
 }
 
 interface VitestJsonOutput {

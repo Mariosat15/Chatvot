@@ -81,6 +81,7 @@ chapter covers risks to the programme and to the application.
 | **R105** | **A badge gate stored as one id that names no badge, and a review screen that died rendering it.** `milestonesToCompact` hands the milestone agent its four `[String]` paths **comma-joined inside a pipe table**, so a model echoing `"trade_25,risk_survivor"` back is using the format it was given. The reply was then cast `as MilestoneDraft[]` with `Array.isArray` on the outer list as the only shape check, and two things followed with nothing raised. Mongoose **wraps a bare string into a one-element array and validates it**, so a gate persisted as `["trade_25,risk_survivor"]` names a badge nobody can hold and `requiredBadgeIds.every(id => earned.has(id))` can never be true - **the milestone is locked for ever**. And a string has `.length`, so `(m.requiredBadgeIds?.length ?? 0) > 0` admitted it and the `.join(", ")` beneath threw, taking the **whole Milestone Agent step** down and losing every proposal the agent had just made. The same path exists on badges' `gameTypes`, where the update branch **silently dropped** a non-array | **High** | **LIVE, and it is TWO harms of different kinds.** The crash is visible and cost an operator their review; the stored gate is silent and would have made a badge-gated milestone permanently unreachable. **No XP, badge or prize was ever computed or paid wrongly.** **Nothing was backfilled** - whether any milestone in production carries a comma-joined gate is a question for `tools/games/inspect-journey-state.ts`, and the normaliser repairs one on the next write rather than reaching back | **CLOSED 17 Sep 2026.** `apps/admin/lib/admin/milestone-id-lists.ts` is the one definition of what a list of ids is, **model-free** so the Mongoose-holding route and the `"use client"` screen can both import it (R58). Normalising happens at the **agent's reply** as well as in the writer, so the object an operator reviews is the object that gets stored. `__tests__/admin/milestone-id-lists.test.ts`, `tools/probe-milestone-id-lists.ps1`, 12 probes red on exactly one failure |
 | **R106** | **Journey generation produced two maps and trading-only milestones.** `buildJourneyBlueprint` emitted **one map per catalogue scope**, so trading + one provider game yielded exactly two maps while operators still expected the historic ~10-map sequence. Activity milestones carried only trading `completeCondition`s, so a games-only player could not proceed. There was also no master enable/disable for the journey system | **High** | **LIVE as a GENERATION shape defect until regenerate.** No money moved; stored 2-map designs remain until an operator runs Generate Full Sequence with replace. **Nothing was backfilled** | **CLOSED 17 Sep 2026 (code).** Fixed 10-map dual-path blueprint (`journey-map-shells.ts` + `orCompleteConditions`), OR evaluation in both progress services, gaming condition types, master `journey_settings` toggle. Owner must regenerate to replace live data |
 | **R107** | **Journey editor selection did not load the selected map; Required Badges showed raw badge ids.** Clicking a sequence card only set `selectedSequenceMap`, so the highlight moved while Current Map / Milestones / Zones kept map 1's data. Separately, `MilestoneDetailModal` resolved badge names only through `lib/constants/badges`, so blueprint ids like `trading_beat_top_trader_flag` rendered as snake_case | **Medium** | **LIVE and DISPLAY / EDITOR only** — no money, no wrong unlocks from the naming half; the editor half blocked editing maps 2–10. **Nothing was backfilled** | **CLOSED 17 Sep 2026.** `selectAndLoadMap` + tab-change reload by mapId; `resolveBadgeDisplayName` + milestones API enrichment from `getBadgesFromDB` |
+| **R108** | **Badge Simulator reported every `game_*` condition as unrecognized; `consecutive_trading_days` could never earn.** Simulator allow-list drifted from the registry; mock omitted `gameStats`/`gameTypes`; evaluator switch missed the registry streak name; vitest JSON blew `maxBuffer` | **Medium** | **LIVE for the simulator report and for streak badges in production**; Games badges were already earnable in production (registry door) — the simulator lied. **Nothing was backfilled** | **CLOSED 17 Sep 2026.** `isSupportedConditionType` + gameStats mocks; evaluator `consecutive_trading_days`; blueprint ladders for season/best score; vitest `--outputFile` |
 | R8 | Bulk find-and-replace on wording | High | Medium | X8 |
 | R9 | Fraud throttle blind to provider entries | High | High | X5 |
 | R11 | Legal wording changed without review | High | Medium | X8 |
@@ -5530,6 +5531,30 @@ matches API `order` before index. Badge names: `lib/utils/badge-display-name.ts`
 (mirrored), milestones route enriches via `getBadgesFromDB`, modal uses
 `requiredBadgeNames` then humanise. Tests: `__tests__/utils/badge-display-name.test.ts`,
 `__tests__/admin/journey-editor-map-selection.test.ts`.
+
+---
+
+### R108 - Badge Simulator lied about game_* ; streak badges never earned - **CLOSED 17 Sep 2026**
+
+**What it is.** Dev Zone Badge Simulator failed ~43 Circuit Sprint badges with
+*"condition type game_* is not recognized by the production code"* while production
+`checkBadgeCondition` already awards them through the R96b registry default door. The
+same run failed `consecutive_trading_days` badges for a different reason: that type was
+in the registry and blueprint but **absent from the evaluator switch** (only
+`daily_trading_streak` was handled). Unit Tests showed `Command failed: npx vitest run
+--reporter=json` because the full suite's JSON exceeded `exec`'s 1MB `maxBuffer`.
+
+**Harm.** Simulator half is reporting — operators were told Games badges can never earn
+when they already can. Streak half is **live production**: those badges could never be
+awarded. No money moved. Nothing to backfill (no wrong awards; the missing awards are
+the absence of a case).
+
+**The fix.** `isSupportedConditionType` unions the legacy allow-list with
+`BADGE_CONDITION_DEFS` / `getConditionDef`; mock stats build a `gameStats` Map and pass
+`gameTypes`; `total_trades` mocks honour `minTrades` / rarity floors; evaluator (mirrored)
+adds `consecutive_trading_days` and treats a missing game_* target as gte 1; blueprint
+ladders `game_season_points` / `game_best_score`; tests route writes `--outputFile` with
+a 20MB buffer. Tests: `__tests__/services/badge-game-conditions-r108.test.ts`.
 
 ---
 
