@@ -78,6 +78,7 @@ chapter covers risks to the programme and to the application.
 | **R102** | **The gamification wizard's level ladder was written where nothing reads it.** `dbTools.writeXPConfig` wrote `xpconfigs` keyed on **`type`** while `xp-config.model.ts` declares the discriminator as **`configType`** and `POST /api/badges-xp/manage` reads through the model, so every ladder and badge-XP table the wizard saved landed in a document nothing else could find. `readXPConfig` also read `levels?.data` where the document nests the array as `data.levels`, so the wizard's own audit reported an **unconfigured ladder on every run, including straight after writing one** - which is what made a lost write look like an unfinished feature | Medium | **LIVE since the wizard's ladder step existed, and it is a LOST WRITE rather than a wrong value.** Nothing read the orphaned document, so no XP, level or badge was ever computed from it and **nothing was backfilled**; what it cost is an operator's configuration silently not taking effect while the screen said it was still unset | **CLOSED 17 Sep 2026** alongside the R96b rebuild option. Uses `configType` and wraps the ladder as `{ levels: data }`; the read follows. **Orphaned documents are left in place rather than migrated** - keyed on a field nothing queries, so they are inert, and rewriting discriminators in a config collection is an unreviewed writer for no gain. **The rule: a collection reached by both the raw driver and a model has two spellings of its own key and only one is enforced** - the driver accepts `type` cheerfully for ever. Third instance of the raw-driver boundary after the R42 fixture and the analytics participation funnel, and the first where the disagreement was a **key** rather than a value's type |
 | **R103** | **The gamification wizard asked one AI call to populate the whole catalogue, and it returned five trading badges.** `run_full`'s badge step was a single generative request told to cover every game inside a token budget; it produced **5 badges, all trading**, and reported success. Four faults travelled with it, each independently enough to make the screen read as broken: the journey step defaulted `maxMaps` to **3** (one AI call per map) so every game past the second silently got no journey at all, and after a wipe the milestone agent iterated maps that no longer existed and produced **nothing**; the ladder was derived **before** the badges existed, so its top rung asked **426,400 XP** against a catalogue paying a few thousand; **eight of the twenty level rungs named icons that are not in the registry** (`medal1`, `diamond1`, `flame1`), and the admin `GameIcon` renders an unknown name as **raw text**; and the Badge Library header was the literal string **"120 Total"**, so five stored badges displayed under a heading claiming 120 | **High** | **LIVE, and it is a GENERATION defect rather than a wrong payment.** No XP, level, badge or prize was ever computed wrongly - the system simply produced almost none of the content it reported producing, and **nothing was backfilled**, because the rows were never written. The cost is an operator wiping the platform and being left with five badges, no journeys and an unreachable ladder, with no error and no log line anywhere | **CLOSED 17 Sep 2026.** Generation is **arithmetic now, not a model call** - `gamification-economy.ts` plans the quota, `badge-blueprint.ts` and `journey-blueprint.ts` emit the rows, `proposeNeutralLadder` derives the curve from what the catalogue can actually pay. The model is a **rewording pass over what the blueprint produced**, never the producer. See the detail section |
 | **R104** | **The journey editor asked for a map that no generated design contains, then let that answer overwrite the real one.** `JourneyMapEditorSection` issued its first data fetch **before** the map list had been answered, so `getMapIdFromOrder` fell back to the legacy `pirate_cove` id. That map does not exist, the route answers `success: false`, and the component's own `else` branch renders a **placeholder carrying `zones: []` and an empty milestone list**. A second fetch for the real map was already in flight, and **neither request cancelled the other**, so which design the operator saw depended purely on which response landed last. The reporting made it unfalsifiable from the other end: the wizard and the editor both quoted the **blueprint's intent**, so a rebuild that stored 24 milestones and a rebuild that stored none printed the same sentence | **High** | **LIVE and REPORTING-ONLY - no milestone, zone, badge or XP value was ever computed or stored wrongly, and nothing was backfilled.** Proven by `__tests__/admin/journey-blueprint-round-trip.test.ts`, which writes a real blueprint to a real MongoDB and reads it back through the editor's own three queries. What it cost is the entire observability of the feature: an operator ran the wizard, was told 24 milestones across 2 maps had been generated, opened the editor, saw nothing, and had no way to tell a rejected write from a screen looking at the wrong map | **CLOSED 17 Sep 2026.** Two halves, and both are needed: the mount fetch is **gated on the map list having been answered** so the legacy id is never requested, and a `requestedMapRef` **discards a stale response** between the parse and the first `setState`. Reporting is now counted out of the collections by `journeyState()` rather than taken from the blueprint, and **storing zero milestones is a refusal** carrying the first write error. See the detail section |
+| **R105** | **A badge gate stored as one id that names no badge, and a review screen that died rendering it.** `milestonesToCompact` hands the milestone agent its four `[String]` paths **comma-joined inside a pipe table**, so a model echoing `"trade_25,risk_survivor"` back is using the format it was given. The reply was then cast `as MilestoneDraft[]` with `Array.isArray` on the outer list as the only shape check, and two things followed with nothing raised. Mongoose **wraps a bare string into a one-element array and validates it**, so a gate persisted as `["trade_25,risk_survivor"]` names a badge nobody can hold and `requiredBadgeIds.every(id => earned.has(id))` can never be true - **the milestone is locked for ever**. And a string has `.length`, so `(m.requiredBadgeIds?.length ?? 0) > 0` admitted it and the `.join(", ")` beneath threw, taking the **whole Milestone Agent step** down and losing every proposal the agent had just made. The same path exists on badges' `gameTypes`, where the update branch **silently dropped** a non-array | **High** | **LIVE, and it is TWO harms of different kinds.** The crash is visible and cost an operator their review; the stored gate is silent and would have made a badge-gated milestone permanently unreachable. **No XP, badge or prize was ever computed or paid wrongly.** **Nothing was backfilled** - whether any milestone in production carries a comma-joined gate is a question for `tools/games/inspect-journey-state.ts`, and the normaliser repairs one on the next write rather than reaching back | **CLOSED 17 Sep 2026.** `apps/admin/lib/admin/milestone-id-lists.ts` is the one definition of what a list of ids is, **model-free** so the Mongoose-holding route and the `"use client"` screen can both import it (R58). Normalising happens at the **agent's reply** as well as in the writer, so the object an operator reviews is the object that gets stored. `__tests__/admin/milestone-id-lists.test.ts`, `tools/probe-milestone-id-lists.ps1`, 12 probes red on exactly one failure |
 | R8 | Bulk find-and-replace on wording | High | Medium | X8 |
 | R9 | Fraud throttle blind to provider entries | High | High | X5 |
 | R11 | Legal wording changed without review | High | Medium | X8 |
@@ -5411,6 +5412,85 @@ database; **the two screens have still never been verified by eye**, because bot
 an admin sign-in the automated browser has no session for. The operator-visible confirmation
 is that the toast wording has changed - a run reporting *"Generated 24 milestones"* is the
 **old build**, and the fixed one says *"Stored X/Y milestones and Z zones across N maps"*.
+
+---
+
+### R105 - A gate naming a badge nobody holds, and the screen that died showing it - **CLOSED 17 Sep 2026**
+
+**What it is.** One unchecked cast, two failures of very different character, and the noisy
+one hid the quiet one.
+
+**The visible half.** The Milestone Agent step rendered
+`{(m.requiredBadgeIds ?? []).join(", ")}` and threw
+`(e.requiredBadgeIds ?? []).join is not a function`, replacing the step with *"Something went
+wrong rendering this step"*. The guard above it was `(m.requiredBadgeIds?.length ?? 0) > 0`,
+and **a string has `.length`** - so the check that was supposed to stop this admitted exactly
+the value that breaks it. The operator loses every proposal the agent made, which is the whole
+output of the step.
+
+**Where the string comes from, and why the model is not at fault.** `milestonesToCompact`
+serialises each milestone into a pipe-separated row and joins the id lists with commas,
+because that is a compact format for a prompt. The model replies in the same shape. The reply
+is then read as `parsed.milestones as MilestoneDraft[]` - `Array.isArray` on the outer list and
+nothing at all on the fields - and `MilestoneDraft` declares `requiredBadgeIds?: string[]`. So
+the compiler had nothing to disagree with, the declared type was simply false, and **declaring
+the shape we wanted is what made the crash invisible to every check we had.**
+
+**The silent half, which is the one that matters.** `JourneyMilestone` declares
+`requiredBadgeIds` as `[String]`, and Mongoose **wraps a bare string into a one-element array
+and validates it** rather than rejecting it. Proven by construction, not inferred: a throwaway
+probe built the document and printed `["trade_25,risk_survivor"]` with `validateSync()`
+returning `OK`. Evaluation asks `requiredBadgeIds.every(id => earned.has(id))`, no badge is
+named `trade_25,risk_survivor`, and so **the milestone can never be completed by anybody** -
+with no error, no log line, and a gate that reads perfectly in a document dump.
+
+**Count the paths, not the one that crashed.** Four milestone paths are `[String]`
+(`requiredBadgeIds`, `gameTypes`, `connectedTo`, `connectedFrom`) and `gameTypes` on a badge is
+a fifth, one model along - a badge stored as `["trading,provider:x:y"]` scopes to a game key
+nothing carries, so it is displayed and evaluated for nobody. The badge **update** branch was
+worse than the milestone one: it dropped a non-array silently, so the edit appeared to save.
+
+**The fix.** `apps/admin/lib/admin/milestone-id-lists.ts` holds `toIdList` and
+`normaliseMilestoneIdLists`, and is **model-free by requirement** - the writer is an API route
+holding Mongoose models and the reader is a `"use client"` component, so neither can import the
+other (R58). It is applied in three places: the writer (the route's only `JourneyMilestone`
+writer, five call sites including `apply_changes`, which takes its list from a request body),
+the **agent's reply**, and the badge `gameTypes` path. The screen reads through `toIdList` too,
+and `WizardMilestone.requiredBadgeIds` is typed **`unknown`**.
+
+**Six rules worth carrying.**
+
+- **A value that arrives from a language model over JSON has no type, whatever the interface
+ says.** `as MilestoneDraft[]` is an assertion about data we did not produce. The honest
+ declaration is `unknown`, which is what forces a reader at every use.
+- **Normalise at the boundary the operator sees, not only at the one that writes.** Fixing the
+ writer alone leaves the review screen showing a proposal in a different shape from the thing
+ that will be stored - and the review is the step whose whole purpose is to be trusted.
+- **`.length` is not an array check.** It is the single most common way a string passes a guard
+ written for a list, and the failure surfaces on the line *after* the guard.
+- **Mongoose coerces towards validity, so a wrong shape becomes a wrong value.** A rejection
+ would have been a bug report; the wrap is a permanently locked milestone. Sibling rule to
+ mirror drift and `suspensionEndsAt`: **the schema is not a validator of intent.**
+- **Count the `[String]` paths on the model, then the models with the same shape.** One crash
+ named one field; five were reachable by the same mechanism. Seventh instance of the counting
+ rule, after four entry paths, ten finalize sites, six raw inserts, seven lifecycle routes,
+ seven writers of the referral rate and two native selects.
+- **Choose the direction an unreadable value falls, and say why.** `toIdList` **drops** what it
+ cannot read rather than keeping it, because keeping it preserves a gate nobody can satisfy -
+ the permanent lock this module exists to prevent - while dropping it leaves the milestone
+ reachable and the missing gate visible on the screen that proposed it.
+
+**One deliberate non-normalisation.** Only fields that are **present** are touched. `gameTypes`
+carries no schema default on purpose - an absent list means platform-wide, which is a different
+fact from an empty one - so normalising an absent field into `[]` would destroy that distinction
+on every milestone passing through. A stored value and an absent one are different facts,
+again.
+
+**What this does NOT close.** The wizard screen has **not been verified by eye** - it is behind
+an admin sign-in the automated browser has no session for - and **no production data was
+inspected**, so whether any live milestone already carries a comma-joined gate is unanswered.
+`tools/games/inspect-journey-state.ts` is the way to ask; the normaliser repairs such a row the
+next time it is written and does not reach back.
 
 ---
 

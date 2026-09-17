@@ -31,6 +31,7 @@ import {
 // requirement (R58), so a `"use client"` component may import the default from
 // it rather than carrying a second copy of the number.
 import { DEFAULT_TARGET_BADGE_TOTAL } from "@/lib/services/games/gamification-economy";
+import { toIdList } from "@/lib/admin/milestone-id-lists";
 
 // ─── Types ──────────────────────────────────────────────────────────────────────
 
@@ -112,7 +113,10 @@ interface WizardMilestone {
   name?: string;
   nodeType?: string;
   rewards?: { xp?: number };
-  requiredBadgeIds?: string[];
+  // Reason: typed `unknown` rather than `string[]` because the value arrives
+  // from a language model over JSON. Declaring the shape we want is what made
+  // the crash invisible to the compiler; `toIdList` is the only way to read it.
+  requiredBadgeIds?: unknown;
   completeCondition?: { type?: string; value?: number };
   _changes?: string;
 }
@@ -1344,10 +1348,17 @@ export default function GamificationWizardSection() {
                     </div>
                     <span className="text-xs text-purple-400">{m.rewards?.xp || 0} XP</span>
                   </div>
-                  {(m.requiredBadgeIds?.length ?? 0) > 0 && (
+                  {/* Reason: a string has `.length`, so the old guard admitted a
+                      comma-joined value and the `.join` beneath it threw, taking
+                      the whole review step down and losing every proposal the
+                      agent had made. Read the value rather than trusting its
+                      declared type — see `milestone-id-lists.ts`. */}
+                  {toIdList(m.requiredBadgeIds).length > 0 && (
                     <div className="mt-1 flex items-center gap-1">
                       <Shield className="h-3 w-3 text-cyan-400" />
-                      <span className="text-xs text-cyan-400">Requires: {(m.requiredBadgeIds ?? []).join(", ")}</span>
+                      <span className="text-xs text-cyan-400">
+                        Requires: {toIdList(m.requiredBadgeIds).join(", ")}
+                      </span>
                     </div>
                   )}
                   {m._changes && (

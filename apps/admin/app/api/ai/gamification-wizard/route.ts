@@ -17,6 +17,7 @@ import JourneyMapConfig from "@/database/models/journey-map-config.model";
 import { evaluateSystem, generateFixes, type BadgeData, type MilestoneData, type MapData } from "@/lib/gamification-engine";
 import { isValidGameIconName } from "@/lib/constants/game-icons";
 import { guardSection } from "@/lib/admin/section-route-guard";
+import { normaliseMilestoneIdLists, toIdList } from "@/lib/admin/milestone-id-lists";
 import { conditionScope } from "@/lib/services/games/badge-condition-registry";
 import {
   buildBadgeSystemPrompt,
@@ -234,6 +235,15 @@ const dbTools = {
 
         const clean = sanitized.badge as BadgeDraft;
 
+        // Reason: `gameTypes` is `[String]` here too, and the same defect lands
+        // one model along — a badge stored as `["trading,provider:x:y"]` scopes
+        // to a game key nothing carries, so it is displayed and evaluated for
+        // nobody. The update branch below silently DROPS a non-array, which
+        // hides it further; read it as a list instead.
+        if ("gameTypes" in clean && clean.gameTypes !== undefined) {
+          clean.gameTypes = toIdList(clean.gameTypes);
+        }
+
         // ── Validation ──
         if (!clean.id || typeof clean.id !== "string") {
           console.warn(`[Wizard] Skipping badge with missing/invalid id`);
@@ -439,8 +449,16 @@ const dbTools = {
           __v: _v,
           createdAt: _created,
           updatedAt: _updated,
-          ...clean
+          ...rest
         } = ms;
+        // Reason: this is the only writer of `JourneyMilestone` in the route
+        // (five call sites, including `apply_changes`, which takes its list
+        // straight from a request body), so the four `[String]` paths are read
+        // as lists here rather than at each caller. Mongoose wraps a bare
+        // string into a one-element array and validates it, which turns a
+        // comma-joined gate into a badge nobody holds and locks the milestone
+        // for ever — see `milestone-id-lists.ts`.
+        const clean = normaliseMilestoneIdLists(rest);
         const existing = await JourneyMilestone.findOne({ id: clean.id, mapId: clean.mapId });
         if (existing) {
           if (mode === "add-only") {
@@ -949,8 +967,15 @@ Return JSON:
       });
 
       const parsed = asRecord(parseAIJSON(completion.choices[0]?.message?.content || "{}"));
+      // Reason: `Array.isArray` on the outer list was the only shape check, and
+      // the cast then asserted `string[]` on fields the model returns as
+      // comma-joined strings because that is the format the pipe table gave it.
+      // Normalising here, rather than only in the writer, is what makes the
+      // proposal an operator reviews the same object that later gets stored.
       const proposed = Array.isArray(parsed?.milestones)
-        ? (parsed.milestones as MilestoneDraft[])
+        ? (parsed.milestones as MilestoneDraft[]).map((m) =>
+            normaliseMilestoneIdLists(m as Record<string, unknown>) as MilestoneDraft,
+          )
         : null;
       if (!proposed) {
         return {
