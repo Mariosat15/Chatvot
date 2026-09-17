@@ -76,6 +76,7 @@ import {
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { resolveBadgeDisplayName } from "@/lib/utils/badge-display-name";
 import Image from "next/image";
 
 // Types
@@ -332,6 +333,7 @@ const LEGACY_SEQUENCE_CARDS = [
   { order: 10, name: "Hall of Legends", theme: "legendary", xp: 5000, color: "#FF6B6B", milestoneCount: null, fromDatabase: false },
 ] as Array<{
   order: number;
+  mapId?: string;
   name: string;
   theme: string;
   xp: number;
@@ -1195,8 +1197,12 @@ export default function JourneyMapEditorSection() {
   );
 
   // Get mapId from sequence order, preferring maps that actually exist.
+  // Reason: match the API's `order` field first — index-only lookup drifts if
+  // sequenceOrder is not a contiguous 1..n list, and that is exactly how an
+  // operator selects map 3 and still sees map 1.
   const getMapIdFromOrder = useCallback(
     (order: number) =>
+      availableMaps.find((m) => m.order === order)?.mapId ??
       availableMaps.at(order - 1)?.mapId ??
       MAP_IDS.at(order - 1) ??
       "traders_journey",
@@ -1220,7 +1226,8 @@ export default function JourneyMapEditorSection() {
       return LEGACY_SEQUENCE_CARDS;
     }
     return availableMaps.map((m, i) => ({
-      order: i + 1,
+      order: m.order ?? i + 1,
+      mapId: m.mapId,
       name: m.name,
       theme: m.theme,
       xp: m.estimatedXP,
@@ -1314,6 +1321,30 @@ export default function JourneyMapEditorSection() {
     const mapId = getMapIdFromOrder(sequenceOrder);
     await fetchData(mapId);
     setSelectedTab("map"); // Switch to map view
+  };
+
+  /**
+   * Select a sequence card and load that map's config / milestones / zones.
+   *
+   * Reason: click used to only set `selectedSequenceMap`. The follow-on effect
+   * was supposed to refetch, but operators still landed on map 1 after opening
+   * Current Map / Milestones / Zones — selection highlight moved, data did not.
+   * Passing the mapId explicitly removes the race and the index/order drift.
+   */
+  const selectAndLoadMap = async (sequenceOrder: number, mapId?: string) => {
+    setSelectedSequenceMap(sequenceOrder);
+    const targetId = mapId || getMapIdFromOrder(sequenceOrder);
+    await fetchData(targetId);
+  };
+
+  /** Keep Current Map / Milestones / Zones on the selected map when the tab changes. */
+  const handleEditorTabChange = (tab: string) => {
+    setSelectedTab(tab);
+    if (tab === "sequence") return;
+    const expectedId = getMapIdFromOrder(selectedSequenceMap);
+    if (expectedId && mapConfig?.mapId !== expectedId) {
+      void fetchData(expectedId);
+    }
   };
 
   useEffect(() => {
@@ -2873,7 +2904,7 @@ export default function JourneyMapEditorSection() {
                           className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-800 border-orange-500/30"
                         >
                           <span>{badge?.icon || "🏆"}</span>
-                          <span>{badge?.name || badgeId}</span>
+                          <span>{resolveBadgeDisplayName(badgeId, badge?.name)}</span>
                           <button
                             onClick={() => setSelectedMilestone({
                               ...selectedMilestone,
@@ -3193,7 +3224,7 @@ export default function JourneyMapEditorSection() {
                       const badge = allBadges.find(b => b.id === badgeId);
                       return (
                         <Badge key={badgeId} variant="outline" className="text-xs border-orange-500/30">
-                          {badge?.icon || "🏆"} {badge?.name || badgeId}
+                          {badge?.icon || "🏆"} {resolveBadgeDisplayName(badgeId, badge?.name)}
                         </Badge>
                       );
                     })}
@@ -3400,7 +3431,7 @@ export default function JourneyMapEditorSection() {
       </div>
 
       {/* Tabs */}
-      <Tabs value={selectedTab} onValueChange={setSelectedTab}>
+      <Tabs value={selectedTab} onValueChange={handleEditorTabChange}>
         <TabsList>
           <TabsTrigger value="sequence">
             <Map className="h-4 w-4 mr-2" />
@@ -3474,13 +3505,13 @@ export default function JourneyMapEditorSection() {
             <div className="grid grid-cols-5 gap-4">
               {sequenceCards.map((map) => (
                 <Card 
-                  key={map.order}
+                  key={map.mapId || map.order}
                   className={`cursor-pointer transition-all hover:scale-105 ${
                     selectedSequenceMap === map.order ? "ring-2 ring-primary" : ""
                   }`}
-                  onClick={() => setSelectedSequenceMap(map.order)}
+                  onClick={() => void selectAndLoadMap(map.order, map.mapId)}
                   onDoubleClick={() => loadSequenceMap(map.order)}
-                  title="Click to select, double-click to view"
+                  title="Click to select and load this map"
                 >
                   <CardHeader className="p-3">
                     <div 
@@ -3837,6 +3868,17 @@ export default function JourneyMapEditorSection() {
 
         {/* Milestones Tab */}
         <TabsContent value="milestones" className="mt-4">
+          <div className="mb-3 flex items-center justify-between rounded-lg border border-slate-700 bg-slate-800/60 px-3 py-2 text-sm">
+            <span className="text-slate-300">
+              Editing milestones for{" "}
+              <span className="font-semibold text-white">
+                {mapConfig?.name || `Map ${selectedSequenceMap}`}
+              </span>
+            </span>
+            <span className="text-xs text-slate-500">
+              Map {selectedSequenceMap} of {mapCount} · {milestones.length} milestones
+            </span>
+          </div>
           <div className="flex gap-4 mb-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -3994,6 +4036,17 @@ export default function JourneyMapEditorSection() {
 
         {/* Zones Tab */}
         <TabsContent value="zones" className="mt-4">
+          <div className="mb-3 flex items-center justify-between rounded-lg border border-slate-700 bg-slate-800/60 px-3 py-2 text-sm">
+            <span className="text-slate-300">
+              Editing zones for{" "}
+              <span className="font-semibold text-white">
+                {mapConfig?.name || `Map ${selectedSequenceMap}`}
+              </span>
+            </span>
+            <span className="text-xs text-slate-500">
+              Map {selectedSequenceMap} of {mapCount} · {mapConfig?.zones?.length ?? 0} zones
+            </span>
+          </div>
           <div className="flex justify-end mb-4">
             <Button
               variant="outline"

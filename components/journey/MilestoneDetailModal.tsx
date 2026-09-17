@@ -6,9 +6,18 @@ import { cn } from "@/lib/utils";
 import Image from "next/image";
 import type { Milestone } from "./JourneyMapRenderer";
 import { BADGES } from "@/lib/constants/badges";
+import { resolveBadgeDisplayName } from "@/lib/utils/badge-display-name";
 
-// Build a lookup map from badge ID -> display name
-const BADGE_NAME_MAP = new Map(BADGES.map(b => [b.id, b.name]));
+// Reason: constants cover the shipped catalogue; blueprint / DB badges use
+// different ids, so a miss must humanise rather than show the raw slug.
+const BADGE_NAME_MAP = new Map(BADGES.map((b) => [b.id, b.name]));
+
+function badgeLabel(id: string, index: number, milestone: Milestone): string {
+  // Reason: Array.at avoids the object-injection lint on a numeric index into
+  // a parallel names array that the milestones API may or may not have sent.
+  const fromApi = milestone.requiredBadgeNames?.at(index);
+  return resolveBadgeDisplayName(id, fromApi, BADGE_NAME_MAP);
+}
 
 interface MilestoneDetailModalProps {
   milestone: Milestone;
@@ -118,7 +127,10 @@ const getIconImage = (icon: string): string => {
     riskControl: "7. Risk Control.png",
     lord: "8. Lord.png", rookie: "7. Rookie.png", war: "6. War.png",
   };
-  return `/game-icons/${iconMap[icon] || "Pirate Ship.png"}`;
+  // Reason: a Map has no prototype chain, so a request-shaped icon string cannot
+  // walk Object.prototype the way `iconMap[icon]` can.
+  const file = new Map(Object.entries(iconMap)).get(icon) ?? "Pirate Ship.png";
+  return `/game-icons/${file}`;
 };
 
 const formatCondition = (condition: { type: string; value?: number }) => {
@@ -158,7 +170,8 @@ export default function MilestoneDetailModal({
   targetValue,
   onContinue,
 }: MilestoneDetailModalProps) {
-  const config = STATUS_CONFIG[status] || STATUS_CONFIG.locked;
+  const config =
+    new Map(Object.entries(STATUS_CONFIG)).get(status) ?? STATUS_CONFIG.locked;
 
   const target = targetValue || milestone.completeCondition?.value || 1;
   const progressPercent = Math.min(100, Math.round((currentValue / target) * 100));
@@ -408,7 +421,9 @@ export default function MilestoneDetailModal({
                     <span className="text-[10px] font-bold text-purple-400">Required Badges</span>
                   </div>
                   <p className="text-[10px] text-purple-300 mt-0.5">
-                    {milestone.requiredBadgeIds.map(id => BADGE_NAME_MAP.get(id) || id).join(", ")}
+                    {milestone.requiredBadgeIds
+                      .map((id, i) => badgeLabel(id, i, milestone))
+                      .join(", ")}
                   </p>
                 </div>
               )}

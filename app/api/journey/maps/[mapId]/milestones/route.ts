@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import JourneyMilestone from "@/database/models/journey-milestone.model";
 import JourneyMapConfig from "@/database/models/journey-map-config.model";
+import { getBadgesFromDB } from "@/lib/services/badge-config-seed.service";
+import { resolveBadgeDisplayName } from "@/lib/utils/badge-display-name";
 
 interface RouteParams {
   params: Promise<{ mapId: string }>;
@@ -43,24 +45,46 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       milestoneQuery.whitelabelId = whitelabelId;
     }
 
-    const allMilestones = await JourneyMilestone.find(milestoneQuery)
+    type LeanMilestone = {
+      isSeasonal?: boolean;
+      seasonEnd?: Date | string | null;
+      requiredBadgeIds?: string[] | null;
+      [key: string]: unknown;
+    };
+
+    const allMilestones = (await JourneyMilestone.find(milestoneQuery)
       .sort({ orderInMap: 1 })
-      .lean();
+      .lean()) as LeanMilestone[];
 
     // Filter out expired seasonal milestones, but keep future/active ones
     const now = new Date();
-    const milestones = allMilestones.filter((m: any) => {
+    const milestones = allMilestones.filter((m) => {
       if (!m.isSeasonal) return true; // Non-seasonal always shown
       // Show if season hasn't ended yet (or no end date)
       if (m.seasonEnd && now > new Date(m.seasonEnd)) return false;
       return true;
     });
 
+    // Reason: the player dialog used to map ids through `lib/constants/badges`
+    // only, so blueprint ids like `trading_beat_top_trader_flag` rendered as
+    // raw slugs. Resolve against the live catalogue and humanise any miss.
+    const badges = await getBadgesFromDB();
+    const nameById = new Map(
+      badges.map((b: { id: string; name: string }) => [b.id, b.name]),
+    );
+    const enriched = milestones.map((m) => {
+      const ids: string[] = Array.isArray(m.requiredBadgeIds) ? m.requiredBadgeIds : [];
+      return {
+        ...m,
+        requiredBadgeNames: ids.map((id) => resolveBadgeDisplayName(id, null, nameById)),
+      };
+    });
+
     return NextResponse.json({
       success: true,
       mapConfig,
-      milestones,
-      totalMilestones: milestones.length,
+      milestones: enriched,
+      totalMilestones: enriched.length,
     });
   } catch (error) {
     console.error("Error fetching map milestones:", error);
