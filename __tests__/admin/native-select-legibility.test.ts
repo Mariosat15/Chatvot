@@ -20,14 +20,12 @@
  * inconvenienced - the reasoning that narrowed the `GameIcon` ban in `13` s4.1g. A rule banning
  * the combination fires on nothing that works.
  *
- * // Reason: two instances existed when this was written. The genre picker was moved onto the
- * shared `Select` primitive, which draws its own list in a portal and never asks the browser
- * for one. The second - the "Transfer to" employee picker in `MessagingSection.tsx` - is
- * KNOWN, RECORDED AND NOT FIXED, because that file carries about thirty pre-existing lint
- * warnings and the repository's pre-commit hook lints staged files at zero warnings, so a
- * one-token fix cannot be committed without an unrelated cleanup of a 2,180-line component.
- * It is listed as an allowed exception below rather than being excluded silently, so the
- * exception has to be deleted for the guard to go green again.
+ * // Reason: two instances existed when this was written. The genre picker moved onto the
+ * shared `Select` primitive on 9 Sep 2026. The "Transfer to" employee picker in
+ * `MessagingSection.tsx` stayed as a named exception until **18 Sep 2026 (R60 remainder)**,
+ * blocked by that file's lint debt; the debt was cleared and `bg-white/5` became `bg-gray-800`.
+ * The exception list is kept empty and pinned, so a future offender cannot hide behind a stale
+ * allow-list entry that nobody re-reads.
  */
 
 import { describe, it, expect } from "vitest";
@@ -37,13 +35,13 @@ import { join, relative } from "node:path";
 const ROOT = join(__dirname, "..", "..");
 
 /**
- * The one instance that is known, live and deliberately unfixed.
+ * Allowed exceptions. Empty since R60 closed the MessagingSection Transfer-to picker.
  *
- * Recorded as an exception rather than by narrowing the search, so it appears in the failure
- * message of anybody who widens the rule and cannot be lost. Remove the entry when the file's
- * lint debt is cleared and the background is made opaque.
+ * Kept as a Set (not deleted) so the platform-wide scan still has somewhere to list a
+ * deliberate temporary offender without rewriting the suite — and so a probe can reintroduce
+ * one and watch the unlisted-offender assertion go red.
  */
-const KNOWN_UNFIXED = new Set(["apps/admin/components/admin/MessagingSection.tsx"]);
+const KNOWN_UNFIXED = new Set<string>([]);
 
 /** Directories to walk. The player app's own components are in scope for the same reason. */
 const ROOTS = [
@@ -127,6 +125,8 @@ function nativeSelectOpenings(source: string): string[] {
 /** `bg-white/5`, `bg-black/40`, `bg-transparent` - anything the browser cannot paint with. */
 const TRANSLUCENT = /\bbg-(?:transparent|(?:white|black|slate|gray|zinc|neutral|stone)\/\d+)/;
 
+const MESSAGING_SECTION = "apps/admin/components/admin/MessagingSection.tsx";
+
 describe("a native <select> may not sit on a translucent background", () => {
   const files = ROOTS.flatMap(tsxFilesUnder);
 
@@ -162,17 +162,22 @@ describe("a native <select> may not sit on a translucent background", () => {
     expect(unlisted).toEqual([]);
   });
 
-  it("every listed exception is still an offender, so the list cannot rot", () => {
-    // A stale exception is worse than none: it reads as a known problem long after somebody
-    // fixed it, and it silently permits the defect coming back to that file. Same reasoning
-    // as flipping a defect test to prove its fix rather than deleting it.
-    for (const file of KNOWN_UNFIXED) {
-      const source = stripComments(readFileSync(join(ROOT, file), "utf8"));
-      const offends = nativeSelectOpenings(source).some((opening) =>
-        TRANSLUCENT.test(opening),
-      );
-      expect(offends, `${file} no longer offends - delete it from KNOWN_UNFIXED`).toBe(true);
-    }
+  it("the exception list is empty - MessagingSection Transfer-to closed (R60)", () => {
+    // Flipped from the canary that asserted MessagingSection was still an offender. A stale
+    // exception is worse than none: it reads as a known problem long after it was solved and
+    // silently re-permits the defect in that file. Same reasoning as flipping a defect test
+    // rather than deleting it.
+    expect([...KNOWN_UNFIXED]).toEqual([]);
+  });
+
+  it("MessagingSection Transfer-to no longer sits on a translucent background", () => {
+    const source = stripComments(readFileSync(join(ROOT, MESSAGING_SECTION), "utf8"));
+    const offends = nativeSelectOpenings(source).some((opening) =>
+      TRANSLUCENT.test(opening),
+    );
+    expect(offends).toBe(false);
+    // Opaque control still present — a rewrite that deleted the picker would also pass above.
+    expect(nativeSelectOpenings(source).length).toBeGreaterThan(0);
   });
 
   it("the pattern recognises what it claims to and not more", () => {

@@ -40,10 +40,11 @@ import { join } from "path";
 import { ADMIN_SECTIONS } from "../../apps/admin/database/models/admin-employee.model";
 import {
   inventoryAdminRoutes,
-  PUBLIC_BY_DESIGN,
+  isAuthCarveOut,
   routesOfClass,
 } from "../../tools/admin-routes/auth-inventory";
 import {
+  classifyRouteAuth,
   findRouteFiles,
   guardCallPattern,
   guardedSections,
@@ -231,12 +232,13 @@ const CLOSED_FOLDERS: { folder: string[]; section: string }[] = [
   */
   { folder: ["announcements"], section: "system-announcements" },
   /*
-    R101y. Settings cluster. CurrencySettingsSection → currency for /api/settings only
-    (AppSettingsProvider is unmounted). CompetitionCreatorForm → competitions for
-    settings/trading-risk, so the bare settings/ tree is NOT walked here — same shape as
-    tutorials/ where asset streamers break a single-section walk. Dual-caller company and
-    hero routes use guardAnySection; the folder walk pins one named grant and the R101y
-    describe pins both. Root settings/route.ts is asserted in the R101y describe.
+    R101y. Settings cluster. CurrencySettingsSection → currency for PUT /api/settings
+    (GET is admin-at-all since R110 so AppSettingsProvider can load the credit symbol).
+    CompetitionCreatorForm → competitions for settings/trading-risk, so the bare settings/
+    tree is NOT walked here — same shape as tutorials/ where asset streamers break a
+    single-section walk. Dual-caller company and hero routes use guardAnySection; the
+    folder walk pins one named grant and the R101y describe pins both. Root
+    settings/route.ts is asserted in the R101y describe.
   */
   { folder: ["settings", "trading-risk"], section: "competitions" },
   { folder: ["challenge-settings"], section: "challenges" },
@@ -1759,7 +1761,8 @@ describe("R101v - tutorials helpers are section-granted", () => {
 
   const helperFiles = findRouteFiles(join(API, "tutorials")).filter((file) => {
     const rel = file.slice(API.length + 1).replace(/\\/g, "/");
-    return !(rel in PUBLIC_BY_DESIGN);
+    // Reason: tutorials/videos/* are public-by-design; isAuthCarveOut covers both carve-out maps.
+    return !isAuthCarveOut(rel);
   });
 
   it("covers every tutorials helper and leaves the asset streamers public", () => {
@@ -1911,8 +1914,8 @@ describe("R101x - announcements helpers are section-granted", () => {
 
 describe("R101y - settings cluster helpers are section-granted", () => {
   /*
-    Seventeen files, twenty-seven handlers across seven top-level folders. Currency is the
-    only caller of /api/settings (AppSettingsProvider is unmounted). trading-risk is owned
+    Seventeen files across seven top-level folders. Since R110, GET /api/settings is
+    admin-at-all (AppSettingsProvider) while PUT stays currency. trading-risk is owned
     by competitions. Company and hero are dual-caller (guardAnySection); the folder walk
     pins one named grant and this describe pins both. mdb-cluster was missing from
     ADMIN_SECTIONS; added add-only so the grant is issuable.
@@ -1921,7 +1924,7 @@ describe("R101y - settings cluster helpers are section-granted", () => {
     /(getAdminSession|requireAdminAuth|verifyAdminAuth|verifyAdminToken|verifyAnyAuth|jwtVerify|getAdminJwtSecret)\s*\(|\bverify\s*\(/;
 
   const singleCaller: { rel: string; section: string; handlers: number }[] = [
-    { rel: "settings/route.ts", section: "currency", handlers: 2 },
+    // settings/route.ts is split — see the dedicated assertion below (R110).
     { rel: "settings/trading-risk/route.ts", section: "competitions", handlers: 1 },
     { rel: "challenge-settings/route.ts", section: "challenges", handlers: 2 },
     { rel: "kyc-settings/route.ts", section: "kyc-settings", handlers: 2 },
@@ -1968,7 +1971,8 @@ describe("R101y - settings cluster helpers are section-granted", () => {
   ];
 
   it("covers seventeen settings-cluster route files", () => {
-    expect(singleCaller.length + dualCaller.length).toBe(17);
+    // 13 single-caller + 3 dual-caller + settings/route (asserted separately) = 17
+    expect(singleCaller.length + dualCaller.length + 1).toBe(17);
   });
 
   it("every single-caller settings file names its calling-screen grant and no weaker helper", () => {
@@ -1990,7 +1994,8 @@ describe("R101y - settings cluster helpers are section-granted", () => {
 
     expect(weaker).toEqual([]);
     expect(missing).toEqual([]);
-    expect(handlers).toBe(20);
+    // Was 20 with settings/route's two handlers; R110 moved that file out of this loop.
+    expect(handlers).toBe(18);
     expect(guards).toBeGreaterThanOrEqual(handlers);
   });
 
@@ -2029,25 +2034,32 @@ describe("R101y - settings cluster helpers are section-granted", () => {
     expect(ADMIN_SECTIONS).toContain("mdb-cluster");
   });
 
-  it("/api/settings is currency, never the generic settings section", () => {
+  it("/api/settings GET is admin-at-all; PUT stays currency (R110)", () => {
     /*
-      AppSettingsProvider is unmounted; CurrencySettingsSection is the only caller.
-      Naming "settings" would silently widen every currency grant to the whole settings
-      surface, which is the privilege-widening shape a menu parent must not become.
-      Root settings/route.ts is not in CLOSED_FOLDERS (trading-risk breaks a single-section
-      walk), so this assertion is also the leak check for that file.
+      AppSettingsProvider mounts in the root layout and fetches GET on every signed-in
+      page. The read must not require the currency grant or employees without it still
+      render createContext defaults — the same silence the unmounted provider caused.
+      PUT stays currency. Naming "settings" for either would silently widen every currency
+      grant to the whole settings surface.
     */
     const code = stripComments(
       readFileSync(join(API, "settings", "route.ts"), "utf8"),
     );
-    const named = guardedSections(code);
-    expect(named.every((s) => s === "currency")).toBe(true);
-    expect(named.length).toBeGreaterThan(0);
+    const slices = handlerSlices(code);
+    expect(slices.map((s) => s.method).sort()).toEqual(["GET", "PUT"]);
+
+    const get = slices.find((s) => s.method === "GET")!;
+    const put = slices.find((s) => s.method === "PUT")!;
+
+    expect(get.body).toMatch(/verifyAdminAuth\s*\(/);
+    expect(get.body).not.toMatch(/guard(?:Any)?Section\s*\(/);
+
+    expect(guardedSections(put.body)).toEqual(["currency"]);
+    expect(put.body).toMatch(/guardSection\s*\(\s*["']currency["']/);
+
     expect(code).not.toMatch(/guardSection\s*\(\s*["']settings["']/);
-    const handlers = (code.match(handlerPattern()) ?? []).length;
-    expect((code.match(guardCallPattern()) ?? []).length).toBeGreaterThanOrEqual(
-      handlers,
-    );
+    // File-level class stays section-granted because PUT carries a grant (classify wins).
+    expect(classifyRouteAuth(code)).toBe("section-granted");
   });
 });
 
@@ -2406,11 +2418,45 @@ describe("R101 - the no-check and hand-verified debt is closed; helper remains",
     const closed = CLOSED_FOLDERS.map(({ folder }) => join(API, ...folder));
     const leaked = unguardedByHelper.filter((file) => {
       const rel = file.slice(API.length + 1).replace(/\\/g, "/");
-      // Reason: tutorials/videos/* are public-by-design asset streamers inside a closed folder.
-      if (rel in PUBLIC_BY_DESIGN) return false;
+      // Reason: public-by-design and helper-by-design carve-outs live inside closed folders.
+      if (isAuthCarveOut(rel)) return false;
       return closed.some((dir) => file.startsWith(dir));
     });
 
     expect(leaked.map((f) => f.slice(API.length + 1))).toEqual([]);
+  });
+});
+
+describe("R101ad - fix-purchases is section-granted; helper debt is empty", () => {
+  /*
+    Of the nine routes left after R101ac, only gamemaster/fix-purchases was real debt:
+    an admin repair under a Game Master path, authenticated with verifyAdminAuth alone.
+    The other eight are HELPER_BY_DESIGN (3 admin-at-all + 5 Game Master portal).
+  */
+  const FIX = join(API, "gamemaster", "fix-purchases", "route.ts");
+  const code = () => stripComments(readFileSync(FIX, "utf8"));
+
+  it("fix-purchases names the gamemaster-management grant before any write", () => {
+    const src = code();
+    expect(src).toMatch(/guardSection\s*\(\s*["']gamemaster-management["']\s*\)/);
+    expect(src).not.toMatch(/verifyAdminAuth\s*\(/);
+    expect(src).not.toMatch(/verifyGameMasterAuth\s*\(/);
+
+    const grant = src.search(/guardSection\s*\(\s*["']gamemaster-management["']\s*\)/);
+    const write = src.search(/collection\s*\(/);
+    expect(grant).toBeGreaterThanOrEqual(0);
+    expect(write).toBeGreaterThan(grant);
+  });
+
+  it("keeps the super_admin write gate after the section grant", () => {
+    // Reason: section opens the dry-run; the money-adjacent write still needs super_admin.
+    // A probe that deletes only the role check must turn this red, not the grant test.
+    expect(code()).toMatch(/guard\.admin\.role\s*!==\s*["']super_admin["']/);
+  });
+
+  it("finds no route in the helper-but-no-grant debt class", () => {
+    // Reason: routesOfClass strips HELPER_BY_DESIGN. A new verifyAdminAuth-only route
+    // that is not carved out lands here and turns this red.
+    expect(routesOfClass(inventoryAdminRoutes(), "helper-no-grant")).toEqual([]);
   });
 });

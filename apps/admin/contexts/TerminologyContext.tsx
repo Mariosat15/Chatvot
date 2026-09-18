@@ -8,16 +8,12 @@ import type { TerminologyPack } from "@/lib/constants/terminology";
  * Delivery of the resolved display vocabulary to client components (X6.5, chapter 14).
  *
  * WHY THIS IS NOT PART OF `AppSettingsProvider`, WHICH IS WHAT CHAPTER 14 SPECIFIES.
- * `apps/admin` mounts `AppSettingsProvider` nowhere - `app/layout.tsx` is the app's only
- * layout and wraps `children` in nothing - while nineteen admin components call
- * `useAppSettings()` regardless and silently receive the value handed to `createContext`.
- * They have been reading a hard-coded credit symbol and base currency for as long as they
- * have existed. That is recorded as its own defect and is deliberately not fixed here,
- * because mounting that provider changes what nineteen money-adjacent screens display and
- * has no business riding along in a wording commit. The point for this file is narrower and
- * more important: HAD THE TOKENS BEEN DELIVERED THE WAY THE PLAN SAYS, `useTerms()` would
- * have been correct, tested, probed, and would have returned the defaults on every admin
- * screen for ever.
+ * On 15 September 2026 `apps/admin` mounted `AppSettingsProvider` nowhere while nineteen
+ * components called `useAppSettings()` and silently received createContext defaults — that
+ * was its own live defect (credit symbol never reached admin screens). **R110 CLOSED 18 Sep
+ * 2026** mounts it in `app/layout.tsx`. Terminology still ships through THIS provider rather
+ * than through AppSettings, because the wording pass must not depend on a money-settings
+ * fetch, and a missing TerminologyProvider must THROW rather than answer defaults.
  *
  * THE HOOK THEREFORE THROWS WHEN NO PROVIDER IS MOUNTED, and that is the opposite direction
  * from `getTerms()` on the server, which deliberately falls back to the defaults. The
@@ -29,9 +25,9 @@ import type { TerminologyPack } from "@/lib/constants/terminology";
  *   - `useTerms()` refuses because its failure is STRUCTURAL. A missing provider is a static
  *     fact about the component tree, not about data, so it is all renders or none - it
  *     cannot appear in production having passed development. Falling back to the defaults
- *     here is precisely the silence that hid the `useAppSettings` defect, and the one
- *     outcome that must not happen is an operator renaming a token, seeing nothing change,
- *     and concluding the feature is broken when it is the wiring that is absent.
+ *     here is precisely the silence that hid the pre-R110 `useAppSettings` defect, and the
+ *     one outcome that must not happen is an operator renaming a token, seeing nothing
+ *     change, and concluding the feature is broken when it is the wiring that is absent.
  */
 const TerminologyContext = createContext<TerminologyPack | null>(null);
 

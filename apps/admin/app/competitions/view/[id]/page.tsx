@@ -34,7 +34,11 @@ import {
 } from "@/lib/admin/contest-result-presentation";
 import ContestPrizePanel from "@/components/admin/competitions/ContestPrizePanel";
 import SettledResultPanel from "@/components/admin/competitions/SettledResultPanel";
+import AdjustResultsPanel, {
+  type AdjustableSeat,
+} from "@/components/admin/competitions/AdjustResultsPanel";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
+import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
 import { formatVolts } from "@/lib/utils/format-volts";
 import { getTerms } from "@/lib/services/terminology.service";
 
@@ -132,6 +136,59 @@ const AdminCompetitionViewPage = async ({
     prizeTransactions.forEach((tx) => {
       prizeMap.set(tx.userId, tx.amount);
     });
+
+    /*
+      Adjust-results seats. Built only for a COMPLETED contest - that is the route's only
+      admitted status (R76). participantId is CompetitionParticipant._id, never a
+      finalLeaderboard row (those carry no seat id). Prize prefers the settled snapshot the
+      operator's SettledResultPanel already shows, then the ledger, then zero.
+    */
+    let adjustSeats: AdjustableSeat[] = [];
+    if (isCompleted) {
+      const seats = await CompetitionParticipant.find({ competitionId: id })
+        .select("_id userId username currentRank qualificationStatus")
+        .lean<
+          {
+            _id: { toString(): string };
+            userId: string;
+            username?: string;
+            currentRank?: number | null;
+            qualificationStatus?: string | null;
+          }[]
+        >();
+      const settledByUser = new Map<
+        string,
+        {
+          userId?: string;
+          rank?: number | null;
+          prizeAmount?: number | null;
+          username?: string | null;
+          qualificationStatus?: string | null;
+        }
+      >();
+      for (const row of competition.finalLeaderboard ?? []) {
+        if (row.userId) settledByUser.set(row.userId, row);
+      }
+      adjustSeats = seats.map((seat) => {
+        const settled = settledByUser.get(seat.userId);
+        const snapshotPrize =
+          typeof settled?.prizeAmount === "number" ? settled.prizeAmount : null;
+        return {
+          participantId: seat._id.toString(),
+          userId: seat.userId,
+          username:
+            settled?.username || seat.username || "Anonymous",
+          currentRank:
+            typeof settled?.rank === "number"
+              ? settled.rank
+              : (seat.currentRank ?? null),
+          prizeAmount:
+            snapshotPrize ?? prizeMap.get(seat.userId) ?? 0,
+          qualificationStatus:
+            settled?.qualificationStatus ?? seat.qualificationStatus ?? null,
+        };
+      });
+    }
 
     // Get Game Master earnings for this competition
     const db = (await connectToDatabase()).connection.db;
@@ -697,6 +754,19 @@ const AdminCompetitionViewPage = async ({
                 creditSymbol={creditSymbol}
                 terms={terms}
               />
+
+              {/*
+                THE ADJUST-RESULTS SCREEN. The route has been money-correct since R76 and had
+                no UI caller - X6.5 closes that. Mounted only when completed and seats exist;
+                the panel itself is a client component that POSTs to the existing route.
+              */}
+              {isCompleted && adjustSeats.length > 0 && (
+                <AdjustResultsPanel
+                  competitionId={id}
+                  seats={adjustSeats}
+                  creditSymbol={creditSymbol}
+                />
+              )}
             </div>
 
             {/* Sidebar */}

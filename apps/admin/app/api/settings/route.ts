@@ -1,15 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
+import { verifyAdminAuth } from "@/lib/admin/auth";
 import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import AppSettings from "@/database/models/app-settings.model";
 import CreditConversionSettings from "@/database/models/credit-conversion-settings.model";
 import { creditValueInBaseCurrency } from "@/lib/utils/credit-value";
 
+/*
+  GET is admin-at-all; PUT stays behind `currency`.
+
+  // Reason (R110): AppSettingsProvider mounts in the root layout and fetches this on every
+  // signed-in admin page. Scoping the read to the currency grant meant every employee without
+  // that section still rendered createContext defaults for the credit symbol — the same silent
+  // wrong answer the unmounted provider caused. Reading the display pack is not a privilege;
+  // writing it is. Naming the generic "settings" section for either handler would silently
+  // widen every currency grant to the whole settings surface.
+*/
+
 // GET - Fetch app settings (admin)
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
-    const guard = await guardSection("currency");
-    if (!guard.ok) return guard.response;
+    const auth = await verifyAdminAuth();
+    if (!auth.isAuthenticated) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     await connectToDatabase();
 

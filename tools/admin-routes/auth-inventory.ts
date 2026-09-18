@@ -66,6 +66,41 @@ export const PUBLIC_BY_DESIGN: Record<string, string> = {
   "tutorials/videos/thumbnails/[filename]/route.ts": ASSET_REASON,
 };
 
+/**
+ * Routes that authenticate with a helper and correctly never ask about ADMIN_SECTIONS.
+ *
+ * R101ad. Distinct from PUBLIC_BY_DESIGN: these require a session (admin or Game Master)
+ * and must stay that way. Distinct from the debt pile: a section grant here would either
+ * lock employees out of logout / password confirm / event poll, or force Game Master
+ * portal routes onto employee RBAC they do not hold. Every entry was read before listing.
+ */
+export const HELPER_BY_DESIGN: Record<string, string> = {
+  "auth/logout/route.ts":
+    "Clears the caller's own admin cookies and marks them offline. A section grant would " +
+    "stop an employee without that section from signing out.",
+  "verify-password/route.ts":
+    "Re-checks the signed-in admin's password before a sensitive UI step. Any logged-in " +
+    "admin may need it; scoping it to one section breaks every other screen's confirm flow.",
+  "admin/events/poll/route.ts":
+    "Delivers cross-section admin events to whoever is signed in. There is no single " +
+    "calling screen to grant, and a grant would silence the poll for everyone else.",
+  "gamemaster/competitions/route.ts":
+    "Game Master portal. Authenticated by verifyGameMasterAuth — a different principal " +
+    "from employees, with no ADMIN_SECTIONS grant to ask about.",
+  "gamemaster/dashboard/route.ts":
+    "Game Master portal. Authenticated by verifyGameMasterAuth — a different principal " +
+    "from employees, with no ADMIN_SECTIONS grant to ask about.",
+  "gamemaster/earnings/route.ts":
+    "Game Master portal. Authenticated by verifyGameMasterAuth — a different principal " +
+    "from employees, with no ADMIN_SECTIONS grant to ask about.",
+  "gamemaster/link/route.ts":
+    "Game Master portal. Authenticated by verifyGameMasterAuth — a different principal " +
+    "from employees, with no ADMIN_SECTIONS grant to ask about.",
+  "gamemaster/referrals/route.ts":
+    "Game Master portal. Authenticated by verifyGameMasterAuth — a different principal " +
+    "from employees, with no ADMIN_SECTIONS grant to ask about.",
+};
+
 /** The six above that must stay read-only, because a write method on one would be an upload. */
 export const READ_ONLY_PUBLIC = Object.keys(PUBLIC_BY_DESIGN).filter(
   (name) => name.startsWith("assets/") || name.startsWith("tutorials/videos/"),
@@ -128,20 +163,26 @@ export function handlersAuthenticatingAfterAWrite(root = ADMIN_API_ROOT): string
   return late.sort();
 }
 
-/** The routes of one class, with the public-by-design carve-outs removed. */
+/** True when the route is carved out of the debt lists with a recorded reason. */
+export function isAuthCarveOut(route: string): boolean {
+  return route in PUBLIC_BY_DESIGN || route in HELPER_BY_DESIGN;
+}
+
+/** The routes of one class, with intentional carve-outs removed. */
 export function routesOfClass(
   findings: RouteAuthFinding[],
   klass: RouteAuthClass,
 ): string[] {
   return findings
     .filter((finding) => finding.klass === klass)
-    .filter((finding) => !(finding.route in PUBLIC_BY_DESIGN))
+    .filter((finding) => !isAuthCarveOut(finding.route))
     .map((finding) => finding.route);
 }
 
 function main(): void {
   const findings = inventoryAdminRoutes();
-  const carvedOut = findings.filter((finding) => finding.route in PUBLIC_BY_DESIGN);
+  const publicCarve = findings.filter((finding) => finding.route in PUBLIC_BY_DESIGN);
+  const helperCarve = findings.filter((finding) => finding.route in HELPER_BY_DESIGN);
 
   const groups: [string, string[]][] = [
     ["NO CHECK OF ANY KIND", routesOfClass(findings, "no-check")],
@@ -151,7 +192,8 @@ function main(): void {
   ];
 
   console.log(`\n${findings.length} admin API routes with exported handlers`);
-  console.log(`${carvedOut.length} carved out as public by design\n`);
+  console.log(`${publicCarve.length} carved out as public by design`);
+  console.log(`${helperCarve.length} carved out as helper by design\n`);
 
   for (const [label, list] of groups) {
     console.log(`${label}: ${list.length}`);

@@ -45,9 +45,11 @@ import { describe, expect, it } from "vitest";
 import {
   ADMIN_API_ROOT,
   PUBLIC_BY_DESIGN,
+  HELPER_BY_DESIGN,
   READ_ONLY_PUBLIC,
   handlersAuthenticatingAfterAWrite,
   inventoryAdminRoutes,
+  isAuthCarveOut,
   routesOfClass,
 } from "../../tools/admin-routes/auth-inventory";
 import { classifyRouteAuth, stripComments } from "../helpers/route-guard-audit";
@@ -72,22 +74,12 @@ const NO_CHECK_OF_ANY_KIND = [] as const;
 const HAND_VERIFIED_NO_GRANT = [] as const;
 
 /**
- * 9 routes that authenticate with a helper and never ask which sections the caller
- * holds. (Was 30 after R101ab; R101ac moved twenty-one clear helpers into
- * section-granted. Remaining: auth/logout + verify-password + admin/events/poll as
- * admin-at-all by design, plus gamemaster/ deferred — verifyGameMasterAuth.)
+ * 0 routes that authenticate with a helper and never ask which sections the caller
+ * holds — as debt. (Was 9 after R101ac.) R101ad section-granted gamemaster/fix-purchases
+ * and carved the remaining eight into HELPER_BY_DESIGN (3 admin-at-all + 5 Game Master
+ * portal). Keeping a non-empty list here would silently re-permit real debt.
  */
-const HELPER_BUT_NO_GRANT = [
-"admin/events/poll/route.ts",
-"auth/logout/route.ts",
-"gamemaster/competitions/route.ts",
-"gamemaster/dashboard/route.ts",
-"gamemaster/earnings/route.ts",
-"gamemaster/fix-purchases/route.ts",
-"gamemaster/link/route.ts",
-"gamemaster/referrals/route.ts",
-"verify-password/route.ts",
-];
+const HELPER_BUT_NO_GRANT = [] as const;
 
 /** Folders closed by R101a–R101aa. Nothing under these may appear in any debt list above. */
 const CLOSED_FOLDERS = [
@@ -253,7 +245,8 @@ describe("R101d - the admin API authorization inventory", () => {
       routesOfClass(findings, "hand-verified-no-grant").length +
       routesOfClass(findings, "helper-no-grant").length +
       routesOfClass(findings, "section-granted").length +
-      Object.keys(PUBLIC_BY_DESIGN).length;
+      Object.keys(PUBLIC_BY_DESIGN).length +
+      Object.keys(HELPER_BY_DESIGN).length;
 
     expect(total).toBe(findings.length);
   });
@@ -343,6 +336,56 @@ describe("R101d - the public-by-design carve-outs", () => {
   });
 });
 
+describe("R101ad - the helper-by-design carve-outs", () => {
+  it("every carve-out still exists, and still carries its reason", () => {
+    for (const [route, reason] of Object.entries(HELPER_BY_DESIGN)) {
+      const found = findings.find((finding) => finding.route === route);
+      expect(found, `${route} is carved out but no longer exists`).toBeDefined();
+      expect(reason.length, `${route} has no reason`).toBeGreaterThan(30);
+    }
+  });
+
+  it("refuses to excuse a carve-out that has since been section-granted", () => {
+    // Reason: same ratchet as PUBLIC_BY_DESIGN — an exemption that outlives a grant is a lie.
+    const guarded = Object.keys(HELPER_BY_DESIGN).filter((route) => {
+      const finding = findings.find((entry) => entry.route === route);
+      return finding?.klass === "section-granted";
+    });
+
+    expect(guarded).toEqual([]);
+  });
+
+  it("names exactly eight intentional leftovers and never fix-purchases", () => {
+    // Reason: fix-purchases was the one of the nine that was real debt (admin repair under
+    // a Game Master path). A carve-out that re-includes it undoes R101ad.
+    expect(Object.keys(HELPER_BY_DESIGN).sort()).toEqual([
+      "admin/events/poll/route.ts",
+      "auth/logout/route.ts",
+      "gamemaster/competitions/route.ts",
+      "gamemaster/dashboard/route.ts",
+      "gamemaster/earnings/route.ts",
+      "gamemaster/link/route.ts",
+      "gamemaster/referrals/route.ts",
+      "verify-password/route.ts",
+    ]);
+    expect("gamemaster/fix-purchases/route.ts" in HELPER_BY_DESIGN).toBe(false);
+  });
+
+  it("fix-purchases is section-granted, not carved out", () => {
+    expect(isAuthCarveOut("gamemaster/fix-purchases/route.ts")).toBe(false);
+    expect(
+      classifyRouteAuth(
+        stripComments(
+          readFileSync(
+            join(ADMIN_API_ROOT, "gamemaster/fix-purchases/route.ts"),
+            "utf8",
+          ),
+        ),
+      ),
+    ).toBe("section-granted");
+  });
+});
+
 describe("R101d - the folders already closed stay closed", () => {
   it("no route under a closed folder is anything but section-granted", () => {
     /*
@@ -364,9 +407,8 @@ describe("R101d - the folders already closed stay closed", () => {
       .filter((finding) =>
         CLOSED_FOLDERS.some((folder) => finding.route.startsWith(`${folder}/`)),
       )
-      // Reason: a closed folder may still contain PUBLIC_BY_DESIGN asset routes
-      // (tutorials/videos/*). Those are no-check by design and must not count as leaks.
-      .filter((finding) => !(finding.route in PUBLIC_BY_DESIGN))
+      // Reason: closed folders may still hold PUBLIC_BY_DESIGN or HELPER_BY_DESIGN carve-outs.
+      .filter((finding) => !isAuthCarveOut(finding.route))
       .filter((finding) => finding.klass !== "section-granted")
       .map((finding) => `${finding.route} [${finding.klass}]`);
 
@@ -422,5 +464,8 @@ describe("R101d - the folders already closed stay closed", () => {
     expect(read("platform-financials/backfill/route.ts")).toBe("section-granted");
     expect(read("reconciliation/route.ts")).toBe("section-granted");
     expect(read("transactions/export/route.ts")).toBe("section-granted");
+    expect(read("gamemaster/fix-purchases/route.ts")).toBe("section-granted");
+    expect(read("auth/logout/route.ts")).toBe("helper-no-grant");
+    expect(read("gamemaster/dashboard/route.ts")).toBe("helper-no-grant");
   });
 });

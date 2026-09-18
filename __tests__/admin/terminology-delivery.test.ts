@@ -135,22 +135,16 @@ describe("an unmounted provider REFUSES rather than answering the defaults", () 
   });
 });
 
-describe("the AppSettingsProvider defect is still open", () => {
+describe("the AppSettingsProvider defect is CLOSED (R110)", () => {
   /*
-    A NAMED EXCEPTION THAT ASSERTS IT IS STILL AN OFFENDER.
+    Flipped from the 15 September canary that asserted the provider was still unmounted.
 
-    The owner's decision of 15 September 2026 was to record the unmounted
-    `AppSettingsProvider` and fix it in its own commit, since mounting it changes what
-    nineteen money-adjacent screens display and does not belong in a wording pass.
-
-    // Reason this is a test rather than a note: a recorded defect with nothing watching it
-    // reads as a live problem long after somebody has fixed it, and the next reader either
-    // re-investigates or - worse - trusts the note and works around a defect that is gone.
-    // This goes RED on the day the provider is mounted, which is the day the record should be
-    // closed. Do not delete it to make the suite green; close the record and flip it.
+    // Reason: a recorded defect with nothing watching it reads as a live problem long after
+    // somebody has fixed it. The canary went red on mount; this assertion keeps it mounted.
+    // Do not restore the negative form — that reopens the credit-symbol silence.
   */
-  it("apps/admin still mounts no AppSettingsProvider - flip this test when that is fixed", () => {
-    expect(readCode(LAYOUT)).not.toMatch(/<AppSettingsProvider\b/);
+  it("apps/admin mounts AppSettingsProvider in the root layout", () => {
+    expect(readCode(LAYOUT)).toMatch(/<AppSettingsProvider\b/);
   });
 });
 

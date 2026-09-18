@@ -13,7 +13,6 @@ import {
   CheckCheck,
   Check,
   CheckCircle,
-  Mail,
   MoreVertical,
   RefreshCw,
   Headphones,
@@ -35,7 +34,11 @@ import { formatDistanceToNow, format } from "date-fns";
 import EmojiPicker from "@/components/chat/EmojiPicker";
 
 // Simple WebSocket hook for admin
-function useAdminWebSocket(onMessage: (msg: any) => void) {
+// Reason: payload shape is server-driven and varies by event; narrowing every case is out of scope for R60.
+function useAdminWebSocket(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- WS event payloads are heterogeneous
+  onMessage: (msg: any) => void,
+) {
   const [isConnected, setIsConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -185,7 +188,7 @@ interface Conversation {
   chatTransferredToName?: string;
   chatTransferredFrom?: string;
   chatTransferredFromName?: string;
-  metadata?: any;
+  metadata?: Record<string, unknown>;
   createdAt: string;
   lastActivityAt: string;
 }
@@ -198,10 +201,12 @@ interface Message {
   senderAvatar?: string;
   content: string;
   messageType: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- attachment shape varies by upload type
   attachments?: any[];
   readBy?: Array<{ participantId: string; readAt: string }>;
   isModerated?: boolean;
   moderationReason?: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- AI metadata is free-form
   aiMetadata?: any;
   createdAt: string;
 }
@@ -241,7 +246,6 @@ export default function MessagingSection() {
   const [filter, setFilter] = useState<"all" | "assigned" | "unassigned">(
     "all",
   );
-  const [isLoading, setIsLoading] = useState(false); // Start with false - show UI immediately
   const [isSending, setIsSending] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [isAvailable, setIsAvailable] = useState(true);
@@ -261,7 +265,6 @@ export default function MessagingSection() {
     Map<string, { name: string; timestamp: number }>
   >(new Map());
   const [currentAdminId, setCurrentAdminId] = useState<string>("");
-  const [currentAdminName, setCurrentAdminName] = useState<string>("");
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [showChatMenu, setShowChatMenu] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
@@ -272,7 +275,6 @@ export default function MessagingSection() {
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const selectedConvRef = useRef<string | null>(null);
   const isUserAtBottomRef = useRef(true);
-  const isInitialLoadRef = useRef(true); // Track if this is the first load of messages
   const chatMenuRef = useRef<HTMLDivElement>(null);
   const initialLoadDone = useRef(false); // Track if initial data load completed
   const fetchConversationsRef = useRef<(() => Promise<void>) | undefined>(
@@ -285,13 +287,7 @@ export default function MessagingSection() {
       .split("; ")
       .find((c) => c.startsWith("admin_id="))
       ?.split("=")[1];
-    const adminNameCookie = document.cookie
-      .split("; ")
-      .find((c) => c.startsWith("admin_name="))
-      ?.split("=")[1];
     if (adminIdCookie) setCurrentAdminId(decodeURIComponent(adminIdCookie));
-    if (adminNameCookie)
-      setCurrentAdminName(decodeURIComponent(adminNameCookie));
   }, []);
 
   useEffect(() => {
@@ -317,6 +313,7 @@ export default function MessagingSection() {
 
   // WebSocket message handler - uses refs to avoid circular dependency
   const handleWebSocketMessage = useCallback(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- WS event payloads are heterogeneous
     (message: { type: string; data?: any; [key: string]: any }) => {
       switch (message.type) {
         case "new_message":
@@ -483,7 +480,7 @@ export default function MessagingSection() {
   const startConversationWithCustomer = async (
     customerId: string,
     customerName: string,
-    customerAvatar?: string,
+    _customerAvatar?: string,
   ) => {
     try {
       console.log(
@@ -642,22 +639,6 @@ export default function MessagingSection() {
       console.error("Error toggling availability:", error);
     }
     setIsTogglingAvailability(false);
-  };
-
-  const handleReassignBack = async (conversationId: string) => {
-    try {
-      const response = await fetch(
-        `/api/messaging/conversations/${conversationId}/reassign-back`,
-        { method: "POST" },
-      );
-      if (response.ok) {
-        await fetchConversations();
-        if (selectedConversation?.id === conversationId)
-          fetchMessages(conversationId);
-      }
-    } catch (error) {
-      console.error("Error reassigning conversation:", error);
-    }
   };
 
   const handleResolve = async (conversationId: string) => {
@@ -1001,7 +982,7 @@ export default function MessagingSection() {
       } else {
         alert("Failed to clear conversation");
       }
-    } catch (error) {
+    } catch {
       alert("Error clearing conversation");
     } finally {
       setIsClearing(false);
@@ -1187,7 +1168,9 @@ export default function MessagingSection() {
               <button
                 key={tab.id}
                 onClick={() => {
-                  setActiveTab(tab.id as any);
+                  setActiveTab(
+                    tab.id as "support" | "internal" | "my-customers",
+                  );
                   setSelectedConversation(null);
                 }}
                 className={`flex-1 flex items-center justify-center gap-2 py-4 text-sm font-medium transition-all relative ${
@@ -2112,7 +2095,7 @@ export default function MessagingSection() {
                     onChange={(e) =>
                       setSelectedEmployeeForTransfer(e.target.value)
                     }
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500/50"
+                    className="w-full bg-gray-800 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500/50"
                   >
                     <option value="">Select an employee...</option>
                     {employees.map((emp) => (

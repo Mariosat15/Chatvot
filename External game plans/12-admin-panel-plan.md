@@ -1386,7 +1386,7 @@ assumption until `rg` says so.
 | `POST /api/competitions/[id]/pause` | `verifyAdminAuth` on POST and GET; **`isPaused` enforced nowhere for a provider game** | Guarded, plus the gate below |
 | `POST /api/competitions/[id]/cancel` | `requireAdminAuth` - admin-at-all, not section access | Guarded; live rounds now voided |
 | `POST /api/competitions/[id]/emergency-cancel` | `verifyAdminAuth`; closes positions and left rounds `launched` | Guarded; live rounds voided; reports the count |
-| `POST /api/competitions/[id]/adjust-results` | `verifyAdminAuth` | Guarded. **Still has no UI caller at all** - API-only, and recorded rather than hidden |
+| `POST /api/competitions/[id]/adjust-results` | `guardSection("competitions")` | Guarded and money-correct (R76). **UI caller exists since 17 Sep 2026** (`12` s3.2c) - a document saying API-only is correct as history and stale as a present fact, and **say which** |
 | `POST /api/finalize-old-competitions` | **No authentication of any kind.** Risk **R40** | Guarded **before `connectToDatabase()`**; provider contests skipped explicitly |
 
 **`requireAdminAuth`, `verifyAdminAuth` and `verifyAdminToken` all answer "is this an admin at
@@ -1496,19 +1496,21 @@ its **trading** branch, because an operator running a trading contest still need
 happened to their positions. The honest claim is narrower - no *unconditional* trading wording -
 and it is asserted over the JSX with the branched strings living in the handlers.
 
-**Two things are recorded rather than fixed.** `adjust-results` has **no UI caller** and is
-reachable only by API, so it is guarded but not usable by clicking; and the panel's
+**Two things are recorded rather than fixed.** ~~`adjust-results` has **no UI caller** and is
+reachable only by API~~ - **closed 17 Sep 2026 as `12` s3.2c**, so that half is correct as
+history and stale as a present fact, and **say which**; and the panel's
 `emergency_ended` status is read while `emergencyCancelActiveCompetition` writes `"cancelled"`
 with an `emergencyEndedAt` alongside, so **`emergency_ended` is a state the model declares and
-nothing ever stores.** Both belong with X6.5's admin pass rather than here - the first needs a
-screen, the second is a mirrored status decision - and neither is closed.
+nothing ever stores.** The second belonged with X6.5 and was closed as **R77**.
 
 > **AMENDED 14 September 2026, and both halves are now correct as history rather than as
 > present facts - see s3.2b.** The `emergency_ended` half was examined and closed as **R77**;
 > the `adjust-results` half was examined, found to be four defects rather than an absent
-> screen, and closed as **R76**. **The screen is still not built**, so the "no UI caller"
-> sentence above survives - the route is guarded, correct and API-only. What has changed is
-> that it no longer moves money without recording it.
+> screen, and closed as **R76**. ~~**The screen is still not built**, so the "no UI caller"
+> sentence above survives - the route is guarded, correct and API-only.~~ **- the screen
+> shipped 17 Sep 2026 (`12` s3.2c), so that clause is correct as history and stale as a
+> present fact; say which.** What changed on the 14th is that the route no longer moves money
+> without recording it.
 
 ---
 
@@ -1550,9 +1552,10 @@ was actually written.
 schema rather than only here, because the obvious repair - making the writer store it - is wrong
 in three places at once.
 
-**Two things are still outstanding and must not be summarised as done.** There is **no screen**
-for `adjust-results`, which is X6.5 and unchanged; and the `completed` / `finalizing` gap on
-`closePosition` is recorded, not fixed.
+**Two things were outstanding after R76; one is now closed.** The `adjust-results`
+**screen shipped as X6.5** (see s3.2c below) - so a document saying it has no UI caller is
+correct as history and stale as a present fact, and **say which**. The `completed` /
+`finalizing` gap on `closePosition` is still recorded, not fixed.
 
 **Guarded by `__tests__/admin/adjust-results.test.ts` (21 tests) and
 `tools/probe-adjust-results.ps1` (19 probes, every one red on exactly the expected test).** Two
@@ -1572,6 +1575,41 @@ Vitest keys a mock by resolved id. `vitest.config.ts` now aliases
 wildcard would silently resolve any admin-only module a main-app file reaches for, which is the
 R58 / R75 class of failure only `next build` can see, and the suite would go green on an app that
 cannot be built.
+
+---
+
+### 3.2c What was built - the adjust-results screen (17 September 2026)
+
+**The route was correct and unreachable by clicking.** X6.5 closes that with
+`AdjustResultsPanel` on `/competitions/view/[id]`, mounted only when `status === "completed"`
+and at least one `CompetitionParticipant` seat exists.
+
+**Live code:** `apps/admin/components/admin/competitions/AdjustResultsPanel.tsx`, the mount and
+seat builder in `apps/admin/app/competitions/view/[id]/page.tsx`, and a one-line pointer on the
+completed banner in `CompetitionAdminActions.tsx`. **Nothing here is mirrored.**
+
+**Six facts drift easily.**
+
+1. **No second money writer** - the panel POSTs to the existing
+   `POST /api/competitions/[id]/adjust-results` and imports neither wallet nor settlement
+   modules. A document describing a client-side prize credit is wrong.
+2. **`participantId` is `CompetitionParticipant._id`**, never a `finalLeaderboard` row - those
+   carry no seat id. Seats are loaded from the participant collection and prizes joined from
+   the settled snapshot (then the ledger, then zero).
+3. **Incident id is required** - paste is primary because listing incidents needs the
+   `incidents` grant, which a competitions-only employee may not hold. The optional picker is
+   best-effort and a 403 leaves paste working.
+4. **Partial success is surfaced per row** - the route returns one result per adjustment; a
+   single toast would hide a reclaim refusal beside a successful rank change.
+5. **Completed only** - matching R76's gate. There is no control on cancelled / emergency /
+   active contests.
+6. **Wording goes through `useTerms` / `formatVolts`** - no hard-coded trader or euro nouns.
+
+**Still outstanding and must not be summarised as done:** the `closePosition` completed /
+finalizing gap (R77 follow-up), and X6.5 **A5** (admin wiki content - owner).
+
+**Guarded by `__tests__/admin/adjust-results-ui.test.ts`.** Asserts the mount gate, the seat
+builder, the literal fetch URL (an import is not a use), and the absence of wallet imports.
 
 ---
 

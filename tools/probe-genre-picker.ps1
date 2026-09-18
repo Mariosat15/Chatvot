@@ -88,15 +88,15 @@ $probes = @(
         Replace = 'className="bg-white/5 border border-gray-700 rounded-lg px-3 py-2 text-sm"'
     },
     @{
-        # Proves the offender scan actually REACHES the known instance rather than the
-        # exception list papering over a scan that finds nothing. Same role as the probe that
-        # mutates the dialog primitive in probe-dialog-widths.ps1.
-        Name = "the known exception is delisted, so the scan has to find it unaided"
+        # Was "delist the MessagingSection exception". That exception is gone (R60 closed
+        # 18 Sep 2026). Re-aim: reinstate the translucent background on the Transfer-to
+        # picker itself so the platform-wide scan has to catch a real live offender.
+        Name = "MessagingSection Transfer-to is put back on bg-white/5"
         Suite = $legibility
-        File = $legibilityFile
+        File = (Join-Path $repo "apps\admin\components\admin\MessagingSection.tsx")
         Expected = "no unlisted file combines the two"
-        Find = 'const KNOWN_UNFIXED = new Set(["apps/admin/components/admin/MessagingSection.tsx"]);'
-        Replace = 'const KNOWN_UNFIXED = new Set<string>([]);'
+        Find = 'className="w-full bg-gray-800 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500/50"'
+        Replace = 'className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500/50"'
     },
     @{
         # THE CONTROL. The first version of the scan was `<select\b[^>]*>`, which stops at the

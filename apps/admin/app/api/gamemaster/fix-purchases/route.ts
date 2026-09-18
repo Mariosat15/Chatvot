@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import mongoose from "mongoose";
 import { ObjectId } from "mongodb";
-import { verifyAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import { buildSubscriptionLimits } from "@/lib/services/gamemaster/subscription-limits";
 
@@ -11,21 +11,18 @@ import { buildSubscriptionLimits } from "@/lib/services/gamemaster/subscription-
  * Retroactively creates GameMasterSubscription records for users
  * who purchased Game Master packages before auto-activation was implemented.
  *
- * Admin only endpoint.
+ * Admin endpoint: gamemaster-management grant, plus super_admin for the write.
+ * Reason (R101ad): lived under /api/gamemaster/ with verifyAdminAuth only, so any
+ * admin-at-all token could reach a money-adjacent repair. The path is admin repair,
+ * not the Game Master portal — verifyGameMasterAuth would be the wrong helper.
  */
 export async function POST() {
   try {
-    // Verify admin authentication
-    const authResult = await verifyAdminAuth();
-    if (!authResult.isAuthenticated || !authResult.admin) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 },
-      );
-    }
+    const guard = await guardSection("gamemaster-management");
+    if (!guard.ok) return guard.response;
 
-    // Only super admins can run this
-    if (authResult.admin.role !== "super_admin") {
+    // Reason: section grant opens the dry-run; the write still needs super_admin.
+    if (guard.admin.role !== "super_admin") {
       return NextResponse.json(
         { success: false, error: "Only super admins can run this operation" },
         { status: 403 },
@@ -240,14 +237,8 @@ export async function POST() {
  */
 export async function GET() {
   try {
-    // Verify admin authentication
-    const authResult = await verifyAdminAuth();
-    if (!authResult.isAuthenticated || !authResult.admin) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 },
-      );
-    }
+    const guard = await guardSection("gamemaster-management");
+    if (!guard.ok) return guard.response;
 
     await connectToDatabase();
     const db = mongoose.connection.db;

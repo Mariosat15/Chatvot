@@ -384,7 +384,10 @@ export default function CompetitionAdminActions({
             <Clock className="h-5 w-5 text-green-400" />
             <div>
               <p className="text-sm font-semibold text-green-400">COMPLETED</p>
-              <p className="text-xs text-green-300/70">Competition has ended</p>
+              <p className="text-xs text-green-300/70">
+                Contest has ended. Use Adjust results below the settled snapshot
+                to correct a rank or prize (incident required).
+              </p>
             </div>
           </div>
         </div>
