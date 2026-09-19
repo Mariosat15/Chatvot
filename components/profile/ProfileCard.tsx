@@ -6,17 +6,13 @@ import { Button } from "@/components/ui/button";
 import {
   X,
   Trophy,
-  Target,
-  TrendingUp,
   Swords,
-  Award,
   BarChart3,
   Loader2,
-  Star,
-  Shield,
 } from "lucide-react";
 import { GameIcon } from "@/components/ui/GameIcon";
 import { GAME_ICONS, type GameIconName } from "@/lib/constants/game-icons";
+import { useTerms } from "@/contexts/TerminologyContext";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 
@@ -47,7 +43,8 @@ const RANK_CONFIG = {
     border: "border-gray-600",
     headerBg: "from-gray-500 to-slate-600",
     tagBg: "bg-gray-700 text-gray-400",
-    tagLabel: "Trader",
+    // Reason: X8 pass 6 — resolved to terms.player at render; null means use the pack.
+    tagLabel: null as string | null,
     textColor: "text-gray-300",
   },
 };
@@ -95,12 +92,14 @@ export default function ProfileCard({
   showChallengeButton = false,
   onChallenge,
 }: ProfileCardProps) {
+  const terms = useTerms();
   const [loading, setLoading] = useState(false);
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [bio, setBio] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
 
   const config = getRankTier(stats?.rank);
+  const tagLabel = config.tagLabel ?? terms.player;
 
   useEffect(() => {
     if (show && userId) {
@@ -177,7 +176,7 @@ export default function ProfileCard({
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-1.5">
                     <span className={`text-[11px] font-bold uppercase px-2 py-0.5 rounded ${config.tagBg}`}>
-                      {config.tagLabel}
+                      {tagLabel}
                     </span>
                     {stats?.userTitle && (
                       <span className="text-[11px] text-gray-400 italic flex items-center gap-1">
@@ -194,7 +193,7 @@ export default function ProfileCard({
                   <h2 className={`text-lg font-extrabold ${config.textColor} leading-tight`}>{username}</h2>
                   {stats?.rank && (
                     <div className="flex items-center gap-1">
-                      <span className="text-[11px] font-bold text-gray-400 uppercase">Rank</span>
+                      <span className="text-[11px] font-bold text-gray-400 uppercase">{terms.rank}</span>
                       <span className={`text-lg font-extrabold ${config.textColor}`}>#{stats.rank}</span>
                       <Trophy className={`h-4 w-4 ${stats.rank <= 3 ? "text-yellow-500" : "text-gray-400"}`} />
                     </div>
@@ -283,7 +282,7 @@ export default function ProfileCard({
                       color="text-yellow-400"
                     />
                     <StatCell
-                      label="Challenges"
+                      label={terms.challenges}
                       value={`${stats?.challengesWon || 0}/${stats?.challengesEntered || 0}`}
                       color="text-orange-400"
                     />
@@ -295,13 +294,13 @@ export default function ProfileCard({
               {/* === BOTTOM STATS BAR === */}
               <div className="mx-3 mb-2 flex items-stretch divide-x divide-gray-700 bg-gray-800/50 border border-gray-700 rounded-lg overflow-hidden text-center">
                 <div className="flex-1 py-2 px-1">
-                  <p className="text-[11px] text-gray-400 uppercase font-semibold">Score</p>
+                  <p className="text-[11px] text-gray-400 uppercase font-semibold">{terms.score}</p>
                   <p className={`text-xs font-bold ${config.textColor} mt-0.5`}>
                     {stats?.overallScore?.toFixed(0) || "0"}
                   </p>
                 </div>
                 <div className="flex-1 py-2 px-1">
-                  <p className="text-[11px] text-gray-400 uppercase font-semibold">Rank</p>
+                  <p className="text-[11px] text-gray-400 uppercase font-semibold">{terms.rank}</p>
                   <p className={`text-xs font-bold ${config.textColor} mt-0.5`}>
                     #{stats?.rank || "-"}
                   </p>
@@ -329,14 +328,16 @@ export default function ProfileCard({
                     className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white text-xs h-11 min-h-[44px]"
                   >
                     <Swords className="h-3.5 w-3.5 mr-1.5" />
-                    Challenge
+                    {terms.challenge}
                   </Button>
                 )}
               </div>
 
               {/* Card ID */}
               <div className="px-4 pb-2 flex items-center justify-between">
-                <span className="text-[10px] text-gray-500">Chartvolt Trader Card</span>
+                <span className="text-[10px] text-gray-500">
+                  Chartvolt {terms.player} Card
+                </span>
                 <span className="text-[10px] text-gray-500 font-mono">{userId.slice(-8)}</span>
               </div>
             </div>

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Trophy, Award, Swords, Crown } from "lucide-react";
 import { useAppSettings } from "@/contexts/AppSettingsContext";
+import { useTerms } from "@/contexts/TerminologyContext";
 import { motion } from "framer-motion";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -63,6 +64,7 @@ export default function ProfileOverviewCharts({
   void _combinedStats; // Reason: kept in interface for backward compat; stats now only on dashboard
   void _walletData;
   const { settings } = useAppSettings();
+  const terms = useTerms();
 
   const hasActivity =
     competitionStats?.totalCompetitionsEntered > 0 ||
@@ -84,7 +86,7 @@ export default function ProfileOverviewCharts({
         >
           <div className="flex items-center gap-2 mb-3 sm:mb-4">
             <Trophy className="w-5 h-5 text-yellow-400" />
-            <h3 className="text-base sm:text-lg font-semibold text-white">Competitions</h3>
+            <h3 className="text-base sm:text-lg font-semibold text-white">{terms.contests}</h3>
           </div>
 
           <div className="space-y-3 sm:space-y-4">
@@ -105,7 +107,7 @@ export default function ProfileOverviewCharts({
                   )}{" "}
                   {settings.credits.symbol}
                 </p>
-                <p className="text-[11px] sm:text-xs text-gray-400">Total Prizes</p>
+                <p className="text-[11px] sm:text-xs text-gray-400">Total {terms.prizes}</p>
               </div>
             </div>
 
@@ -148,7 +150,7 @@ export default function ProfileOverviewCharts({
         >
           <div className="flex items-center gap-2 mb-3 sm:mb-4">
             <Swords className="w-5 h-5 text-orange-400" />
-            <h3 className="text-base sm:text-lg font-semibold text-white">1v1 Challenges</h3>
+            <h3 className="text-base sm:text-lg font-semibold text-white">1v1 {terms.challenges}</h3>
           </div>
 
           <div className="space-y-3 sm:space-y-4">
@@ -174,7 +176,7 @@ export default function ProfileOverviewCharts({
             </div>
 
             <HorizontalBar
-              label="Total Challenges"
+              label={`Total ${terms.challenges}`}
               value={challengeStats?.totalChallengesEntered || 0}
               maxValue={Math.max(
                 challengeStats?.totalChallengesEntered || 0,
@@ -213,24 +215,24 @@ export default function ProfileOverviewCharts({
             <Trophy className="w-8 h-8 text-gray-500" />
           </div>
           <h3 className="text-lg sm:text-xl font-bold text-white mb-2">
-            Ready to Start Trading?
+            Ready to play?
           </h3>
           <p className="text-gray-400 mb-4 sm:mb-6 max-w-md mx-auto text-sm sm:text-base">
-            Join competitions or challenge other traders to start building your
-            trading record and climb the leaderboard!
+            Join {terms.contests} or {terms.challenge} other {terms.players} to
+            start building your record and climb the {terms.leaderboard}!
           </p>
           <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4">
             <Link
               href="/competitions"
               className="px-5 sm:px-6 py-3 min-h-[44px] flex items-center justify-center bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-400 hover:to-amber-400 text-gray-900 rounded-xl font-semibold transition-all shadow-lg shadow-yellow-500/20"
             >
-              Browse Competitions
+              Browse {terms.contests}
             </Link>
             <Link
               href="/challenges"
               className="px-5 sm:px-6 py-3 min-h-[44px] flex items-center justify-center bg-gray-700 hover:bg-gray-600 text-white rounded-xl font-semibold transition-all"
             >
-              Find Challengers
+              Find a {terms.opponent}
             </Link>
           </div>
         </motion.div>

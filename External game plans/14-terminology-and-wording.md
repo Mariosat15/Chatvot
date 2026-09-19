@@ -375,7 +375,7 @@ Ordered by visibility, so the highest-impact strings change first.
 | 3 | Contest shell — `components/games/` (+ trading lobby keeps trading language) | ~50 | Developer | **BUILT 19 Sep 2026** — see s3.2b |
 | 4 | Leaderboard columns and headings | ~25 | Developer | **BUILT 19 Sep 2026** — see s3.2c |
 | 5 | Dashboard header and section titles | ~30 | Developer | **BUILT 19 Sep 2026** — see s3.2d |
-| 6 | Profile tabs and headings | ~30 | Developer | Outstanding |
+| 6 | Profile tabs and headings | ~30 | Developer | **BUILT 19 Sep 2026** — see s3.2e |
 | 7 | Notification and email templates (database) | ~25 templates | Admin | Outstanding |
 | 8 | Badge and milestone **content** - never IDs | data | Admin | Outstanding |
 | 9 | Landing and hero content (database) | data | Admin | Outstanding |
@@ -465,6 +465,27 @@ getting-started checklist nouns.
 
 **Not built:** passes 2, 6–11; LiveDashboardWrapper / CompetitionsTable orphaned surfaces;
 AccountStatusCard restriction labels.
+
+#### 3.2e Pass 6 — profile tabs and headings (BUILT 19 Sep 2026)
+
+**What shipped:** high-visibility nouns on the private profile and the shared profile card.
+
+| File | Mechanism | Tokens |
+|---|---|---|
+| `ProfileHeader.tsx` | `useTerms()` | `player` (name fallback), `contests`, `challenges` |
+| `XPProgressBar.tsx` | `useTerms()` | `player`, `level` |
+| `CrossGameStanding.tsx` | `useTerms()` | `contests`, `game`, `level`, `contest` |
+| `ProfileOverviewCharts.tsx` | `useTerms()` | `contests`, `challenges`, `prizes`, `players`, `challenge`, `leaderboard`, `opponent` |
+| `ChallengeAvailabilitySection.tsx` | `useTerms()` | `challenge`, `challenges`, `players`, `games`, `game` |
+| `ProfileCard.tsx` | `useTerms()` | `player`, `challenge`, `challenges`, `rank`, `score` |
+
+**Trading chrome untouched** (`TradingPerformanceCard`, Trading Stats / trades / P&L on the
+card, Arsenal, Journey copy). Tab strip labels (Overview, Journey, Badges…) are not
+catalogue tokens. Badge category filter ids stay as stored enum values (pass 8). **10 tests**
+in `__tests__/player/profile-terminology.test.ts`.
+
+**Not built:** passes 2, 7–11; orphaned `ProfileOverview` / `ProfileContent`; public profile
+API copy.
 
 ---
 

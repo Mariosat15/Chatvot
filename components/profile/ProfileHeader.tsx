@@ -10,6 +10,7 @@ import {
 import { GameIcon } from "@/components/ui/GameIcon";
 import { useUserProfileImage } from "@/hooks/useUserProfileImage";
 import { useAppSettings } from "@/contexts/AppSettingsContext";
+import { useTerms } from "@/contexts/TerminologyContext";
 import AvatarWithFrame from "@/components/ui/AvatarWithFrame";
 
 interface ProfileHeaderProps {
@@ -59,11 +60,13 @@ export default function ProfileHeader({
 }: ProfileHeaderProps) {
   const { profileImage, frameUrl, hasCustomImage } = useUserProfileImage();
   const { settings } = useAppSettings();
+  const terms = useTerms();
   const [showQuickStats, setShowQuickStats] = useState(true);
   const [isGameMaster, setIsGameMaster] = useState(false);
   const [gmPackageName, setGmPackageName] = useState("");
 
-  const displayName = session.user.name || "Trader";
+  // Reason: X8 pass 6 — shell fallback is terms.player, never a hard-coded "Trader".
+  const displayName = session.user.name || terms.player;
   const [memberSince, setMemberSince] = useState<string>("");
 
   useEffect(() => {
@@ -295,13 +298,13 @@ export default function ProfileHeader({
             />
             <QuickStatCard
               icon={<GameIcon name="trophy" size={16} />}
-              label="Competitions"
+              label={terms.contests}
               value={competitionStats.totalCompetitionsEntered.toString()}
               color="text-yellow-400"
             />
             <QuickStatCard
               icon={<GameIcon name="sword" size={16} />}
-              label="Challenges"
+              label={terms.challenges}
               value={challengeStats?.totalChallengesEntered?.toString() || "0"}
               color="text-orange-400"
             />

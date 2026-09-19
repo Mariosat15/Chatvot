@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Loader2, Swords } from "lucide-react";
 import { toast } from "sonner";
+import { useTerms } from "@/contexts/TerminologyContext";
 import { WILLING_TO_BE_CHALLENGED_BY_DEFAULT } from "@/lib/services/games/challenge-willingness";
 
 /**
@@ -33,6 +34,7 @@ interface GameAvailability {
 }
 
 export default function ChallengeAvailabilitySection() {
+  const terms = useTerms();
   const [loading, setLoading] = useState(true);
   const [acceptingChallenges, setAcceptingChallenges] = useState(
     WILLING_TO_BE_CHALLENGED_BY_DEFAULT,
@@ -74,7 +76,9 @@ export default function ChallengeAvailabilitySection() {
       if (!response.ok) throw new Error("Failed to save");
       setAcceptingChallenges(next);
       toast.success(
-        next ? "Challenges enabled" : "You will not receive challenges",
+        next
+          ? `${terms.challenges} enabled`
+          : `You will not receive ${terms.challenges}`,
       );
     } catch {
       toast.error("Something went wrong. Please contact support.");
@@ -109,7 +113,7 @@ export default function ChallengeAvailabilitySection() {
     <div className="bg-dark-700/50 rounded-2xl p-6 shadow-xl border border-dark-600">
       <div className="flex items-center gap-3 mb-6">
         <Swords className="h-6 w-6 text-orange-500" />
-        <h2 className="text-2xl font-bold text-white">Challenge Requests</h2>
+        <h2 className="text-2xl font-bold text-white">{terms.challenge} Requests</h2>
       </div>
 
       {loading ? (
@@ -122,12 +126,12 @@ export default function ChallengeAvailabilitySection() {
           <div className="flex items-center justify-between p-4 bg-dark-800/50 rounded-lg border border-dark-600">
             <div>
               <p className="text-white font-medium">
-                Accept challenges from other players
+                Accept {terms.challenges} from other {terms.players}
               </p>
               <p className="text-sm text-gray-400">
                 {acceptingChallenges
-                  ? "Other players can challenge you one against one"
-                  : "Nobody can challenge you, at any game"}
+                  ? `Other ${terms.players} can send you a ${terms.challenge}`
+                  : `Nobody can send you a ${terms.challenge}, at any ${terms.game}`}
               </p>
             </div>
             <Toggle
@@ -149,8 +153,8 @@ export default function ChallengeAvailabilitySection() {
           >
             <p className="text-sm text-gray-400">
               {acceptingChallenges
-                ? "Choose which games you are happy to be challenged at."
-                : "These apply again once you accept challenges."}
+                ? `Choose which ${terms.games} you are happy to receive ${terms.challenges} at.`
+                : `These apply again once you accept ${terms.challenges}.`}
             </p>
             {games.map((game) => (
               <div
@@ -163,8 +167,8 @@ export default function ChallengeAvailabilitySection() {
                     {game.unavailableReason
                       ? game.unavailableReason
                       : game.willing
-                        ? "Open to challenges"
-                        : "Not accepting challenges at this game"}
+                        ? `Open to ${terms.challenges}`
+                        : `Not accepting ${terms.challenges} at this ${terms.game}`}
                   </p>
                 </div>
                 <Toggle

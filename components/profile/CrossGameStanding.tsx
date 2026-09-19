@@ -7,6 +7,7 @@
 
 import type { ReactNode } from "react";
 import { Trophy, Swords, Medal, Sparkles } from "lucide-react";
+import { useTerms } from "@/contexts/TerminologyContext";
 import type { PlayerGameProfile } from "@/lib/services/games/player-game-stats.service";
 
 interface CrossGameStandingProps {
@@ -29,6 +30,7 @@ export default function CrossGameStanding({
   xp,
   title,
 }: CrossGameStandingProps) {
+  const terms = useTerms();
   const overall = profile.overall ?? {
     contestsEntered: 0,
     contestsCompleted: 0,
@@ -62,7 +64,7 @@ export default function CrossGameStanding({
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <Mini
           icon={<Swords className="w-4 h-4" />}
-          label="Contests entered"
+          label={`${terms.contests} entered`}
           value={String(overall.contestsEntered)}
         />
         <Mini
@@ -82,7 +84,7 @@ export default function CrossGameStanding({
         />
         <Mini
           icon={<Trophy className="w-4 h-4" />}
-          label="Level"
+          label={terms.level}
           value={`${level}`}
         />
         <Mini
@@ -96,7 +98,7 @@ export default function CrossGameStanding({
       {profile.perGame.length > 0 ? (
         <div className="space-y-2 pt-2 border-t border-border/40">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">
-            By game
+            By {terms.game}
           </p>
           <div className="grid gap-2 sm:grid-cols-2">
             {profile.perGame.map((game) => (
@@ -122,8 +124,9 @@ export default function CrossGameStanding({
         </div>
       ) : (
         <p className="text-sm text-muted-foreground border-t border-border/40 pt-3">
-          No per-game rows yet. Finish a contest after cross-game scoring began
-          and it will show here. Your trading history is unchanged below.
+          No {terms.game} rows yet. Finish a {terms.contest} after cross-game
+          scoring began and it will show here. Your trading history is unchanged
+          below.
         </p>
       )}
     </section>

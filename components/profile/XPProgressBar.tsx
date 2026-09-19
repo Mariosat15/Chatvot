@@ -6,6 +6,7 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { GameIcon } from "@/components/ui/GameIcon";
 import { useAppSettings } from "@/contexts/AppSettingsContext";
+import { useTerms } from "@/contexts/TerminologyContext";
 import type { GameIconName } from "@/lib/constants/game-icons";
 
 interface XPProgressBarProps {
@@ -38,6 +39,7 @@ export default function XPProgressBar({
 }: XPProgressBarProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const { settings } = useAppSettings();
+  const terms = useTerms();
 
   // Use the title, icon, description from database (passed as props)
   const levelData = {
@@ -50,9 +52,10 @@ export default function XPProgressBar({
     maxXP: titleLevels[currentLevel - 1]?.maxXP || 0,
   };
 
-  const getNextTitle = (currentLevel: number) => {
-    if (currentLevel >= titleLevels.length) return null;
-    return titleLevels[currentLevel];
+  const getNextTitle = (level: number) => {
+    if (level < 0 || level >= titleLevels.length) return null;
+    // Reason: index already bounds-checked; prefer .at over [] for the injection linter.
+    return titleLevels.at(level) ?? null;
   };
 
   const nextLevel = getNextTitle(currentLevel);
@@ -83,7 +86,7 @@ export default function XPProgressBar({
           </div>
           <div className="text-left">
             <h2 className="text-xl font-bold text-white">
-              Trader Level & Title
+              {terms.player} {terms.level} & Title
             </h2>
             <p className="text-sm text-gray-400">
               Earn XP by collecting badges
