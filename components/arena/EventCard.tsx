@@ -13,7 +13,7 @@ interface EventCardProps {
 }
 
 const EventCard: React.FC<EventCardProps> = ({ event: ev, onSelect }) => {
-  const top3 = ranked(ev.participants).slice(0, 3);
+  const top3 = ranked(ev.participants, ev.gameType).slice(0, 3);
   const isLive = ev.status === 'active' || ev.status === 'live';
   const isUpcoming = ev.status === 'upcoming' || ev.status === 'pending';
   const tl = timeLeft(ev.endDate);

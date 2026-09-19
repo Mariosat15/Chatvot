@@ -1,5 +1,11 @@
 // ─── Arena Helper Functions ───────────────────────────────────────────────────
 import type { Participant, OpenPos } from './types';
+import {
+  isProviderBroadcast,
+  describeBroadcastMetric,
+} from '@/lib/utils/broadcast-metric';
+
+export { isProviderBroadcast, describeBroadcastMetric };
 
 /** Format currency (compact — for totals and summaries) */
 export const fmt = (v: number, d = 2) =>
@@ -20,8 +26,11 @@ export const fmtRoi = (v: number) =>
 export const fmtPnl = (v: number) =>
   `${v >= 0 ? '+$' : '-$'}${Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-/** Risk level from equity vs starting */
-export const riskLevel = (p: Participant, startCap: number) => {
+/** Risk level from equity vs starting — trading only. */
+export const riskLevel = (p: Participant, startCap: number, gameType?: string | null) => {
+  if (isProviderBroadcast(gameType)) {
+    return { label: 'Skill', color: '#22d3ee', icon: 'Trophy' };
+  }
   const dd = ((startCap - p.liveEquity) / startCap) * 100;
   if (dd > 30) return { label: 'Aggressive', color: '#FF495B', icon: 'AlertTriangle' };
   if (dd > 15) return { label: 'Medium', color: '#FF8243', icon: 'AlertCircle' };
@@ -53,12 +62,25 @@ export const calcMaxDrawdown = (p: Participant) => p.maxDrawdownPercentage;
 export const calcSharpe = (roi: number, pf: number) =>
   pf > 0 && isFinite(pf) ? roi / (1 + 1 / pf) : 0;
 
-/** Sort participants by rank (live equity descending) */
-export const ranked = (ps: Participant[]) =>
-  [...ps].sort((a, b) => b.liveEquity - a.liveEquity);
+/** Sort participants for display. Provider boards keep the API rank order. */
+export const ranked = (ps: Participant[], gameType?: string | null) => {
+  if (isProviderBroadcast(gameType)) {
+    // Reason: never re-sort on liveEquity/livePnl — both are capital defaults on a
+    // provider seat and would undo the server's score order (s5.1c).
+    return [...ps].sort((a, b) => {
+      const ar = a.rank ?? Number.MAX_SAFE_INTEGER;
+      const br = b.rank ?? Number.MAX_SAFE_INTEGER;
+      return ar - br;
+    });
+  }
+  return [...ps].sort((a, b) => b.liveEquity - a.liveEquity);
+};
 
-/** Assign arena-style title from trading stats */
-export const getTraderTitle = (p: Participant, startCap: number) => {
+/** Assign arena-style title from trading stats — trading only. */
+export const getTraderTitle = (p: Participant, startCap: number, gameType?: string | null) => {
+  if (isProviderBroadcast(gameType)) {
+    return { title: 'Competitor', icon: 'Trophy' };
+  }
   const roi = calcRoi(p.liveEquity, startCap);
   const wr = p.winRate;
   const dd = p.maxDrawdownPercentage;

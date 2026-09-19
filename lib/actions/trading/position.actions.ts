@@ -1,5 +1,9 @@
 "use server";
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// Reason: pre-existing `any` surface across close/open paths. Close-position
+// terminal-status fix (X6.5 leftover) must not expand into a typing rewrite.
+
 import { revalidatePath, unstable_noStore as noStore } from "next/cache";
 import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
@@ -85,7 +89,7 @@ export const getUserPositions = async (competitionId: string) => {
     const symConfigs = await getMultipleSymbolConfigs(uniqueSymbols);
 
     // Update P&L for each position with current REAL prices (instant - from batch)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const positionsWithCurrentPnL = positions.map((position: any) => {
       const currentPrice = pricesMap.get(position.symbol as ForexSymbol);
       if (currentPrice) {
@@ -309,12 +313,27 @@ export const closePosition = async (
       close positions on a contest that had already been cancelled and every entry fee refunded.
       `order.actions.ts` refuses `cancelled` on the way in; this is the same rule on the way out.
 
-      Deliberately NOT widened to `completed` or `finalizing`. Closing after the leaderboard
-      snapshot is a real hazard and a pre-existing one on the trading path, so it needs its own
-      regression evidence rather than arriving inside this fix. Recorded in `12` section 3.2a.
+      Widened 18 Sep 2026 (X6.5 leftover from `12` s3.2a/s3.2c): `completed` and `finalizing`
+      must refuse too. Closing after the leaderboard snapshot (or while ranking is mid-flight)
+      moves capital that settlement already used, with no error and a success toast. Order
+      placement already refuses non-active contests; exit must match.
     */
-    if (competition?.status === "cancelled") {
-      throw new Error(`Competition was cancelled. Trading is not available.`);
+    if (
+      competition?.status === "cancelled" ||
+      competition?.status === "completed" ||
+      competition?.status === "finalizing"
+    ) {
+      if (competition.status === "cancelled") {
+        throw new Error(`Competition was cancelled. Trading is not available.`);
+      }
+      if (competition.status === "finalizing") {
+        throw new Error(
+          `Competition is being finalized. You can no longer close trades.`,
+        );
+      }
+      throw new Error(
+        `Competition has ended. You can no longer close trades.`,
+      );
     }
 
     // Determine exit price - use locked price from frontend if provided and fresh
@@ -328,7 +347,8 @@ export const closePosition = async (
     };
 
     const MAX_PRICE_AGE_MS = 2000; // Max 2 seconds old for locked price
-    const MAX_SLIPPAGE_PIPS = 5; // Max 5 pips slippage allowed
+    // Reason: reserved for a future locked-price slippage check; keep name discoverable.
+    const _MAX_SLIPPAGE_PIPS = 5;
     const pipSize = position.symbol.includes("JPY") ? 0.01 : 0.0001;
 
     if (

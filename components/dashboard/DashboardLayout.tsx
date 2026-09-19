@@ -23,6 +23,8 @@ import ContestStatsCards from "./ContestStatsCards";
 import AccountStatusCard from "./AccountStatusCard";
 import CreditBreakdownChart from "./CreditBreakdownChart";
 import GettingStartedCard from "./GettingStartedCard";
+import PlayerGamePerformancePanel from "./PlayerGamePerformancePanel";
+import GameSummaryCards from "./GameSummaryCards";
 
 const EquityChart = dynamic(() => import("./EquityChart"), { ssr: false });
 const DailyCreditFlow = dynamic(() => import("./DailyCreditFlow"), {
@@ -39,7 +41,29 @@ interface DashboardLayoutProps {
 }
 
 export default function DashboardLayout({ data }: DashboardLayoutProps) {
-  const { overview, charts, competitions, challenges, recentActivity, streaks, player, journey, accountStatus } = data;
+  const {
+    overview,
+    charts,
+    competitions,
+    challenges,
+    recentActivity,
+    streaks,
+    player,
+    journey,
+    accountStatus,
+    gamePerformance,
+    gameStanding,
+    tradingEnabled,
+  } = data;
+
+  // Reason: a games-only player never places a trade; rounds.started/scored complete
+  // the play step. Either signal is enough (20 s5 / GettingStarted).
+  const hasPlayedGame = gamePerformance.some(
+    (row) => row.rounds.started > 0 || row.rounds.scored > 0,
+  );
+  // Reason (R21): absent, not empty — a games-only player must not see zeroed trading
+  // rings. Former traders keep the chrome when trading is later switched off (R29).
+  const showTradingChrome = tradingEnabled || overview.totalTrades > 0;
 
   // Reason: Persist the selected tab across page refreshes so users return
   // to the section they were last viewing.
@@ -66,9 +90,11 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
     <div className="w-full p-3 sm:p-4 lg:p-6 overflow-x-hidden">
       {/* Onboarding — always visible above tabs */}
       <GettingStartedCard
+        tradingEnabled={tradingEnabled}
         hasFundedWallet={overview.totalDeposited > 0}
         hasJoinedCompetition={competitions.stats.total > 0}
         hasPlacedTrade={overview.totalTrades > 0}
+        hasPlayedGame={hasPlayedGame}
         hasCompletedMilestone={journey?.completedMilestones > 0}
         hasChallengedUser={challenges.stats.total > 0}
       />
@@ -111,6 +137,8 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
             variant="compact"
           />
 
+          <GameSummaryCards standing={gameStanding} />
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="lg:col-span-2">
               <PlayerProfileCard
@@ -130,21 +158,25 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
               />
             </div>
             <div>
-              <RecentTradesFeed
-                trades={recentActivity.trades}
-                positions={recentActivity.positions}
-              />
+              {showTradingChrome ? (
+                <RecentTradesFeed
+                  trades={recentActivity.trades}
+                  positions={recentActivity.positions}
+                />
+              ) : null}
             </div>
           </div>
 
-          <StreaksShowcase
-            currentWinStreak={streaks.currentWinStreak}
-            currentLossStreak={streaks.currentLossStreak}
-            longestWinStreak={streaks.longestWinStreak}
-            longestLossStreak={streaks.longestLossStreak}
-            tradingDaysThisMonth={streaks.tradingDaysThisMonth}
-            consecutiveProfitableDays={streaks.consecutiveProfitableDays}
-          />
+          {showTradingChrome ? (
+            <StreaksShowcase
+              currentWinStreak={streaks.currentWinStreak}
+              currentLossStreak={streaks.currentLossStreak}
+              longestWinStreak={streaks.longestWinStreak}
+              longestLossStreak={streaks.longestLossStreak}
+              tradingDaysThisMonth={streaks.tradingDaysThisMonth}
+              consecutiveProfitableDays={streaks.consecutiveProfitableDays}
+            />
+          ) : null}
         </TabsContent>
 
         {/* ── Tab 2: Wallet & Credits ── */}
@@ -167,34 +199,50 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
           </div>
         </TabsContent>
 
-        {/* ── Tab 3: Trading Performance ── */}
+        {/* ── Tab 3: Performance (trading scoped + games when present) ── */}
         <TabsContent value="performance" className="space-y-4 mt-4">
-          <PerformanceRings
-            winRate={overview.winRate}
-            roi={overview.roi}
-            tradeRoi={overview.totalPnLPercentage}
-            profitFactor={overview.profitFactor}
-            avgWin={overview.averageWin}
-            avgLoss={overview.averageLoss}
-            largestWin={overview.largestWin}
-            largestLoss={overview.largestLoss}
-          />
+          {/*
+            Reason: R64 player twin. Games sit ABOVE trading chrome so a games-only
+            player is not buried under empty trade rings. Trading stays labelled
+            trading — never removed or renamed into a silent aggregate.
+          */}
+          <PlayerGamePerformancePanel games={gamePerformance} />
 
-          <TradingAnalytics
-            winLoss={charts.winLossDistribution}
-            tradesBySymbol={charts.tradesBySymbol}
-            tradesByHour={charts.tradesByHour}
-            totalTrades={overview.totalTrades}
-            winningTrades={overview.winningTrades}
-            losingTrades={overview.losingTrades}
-          />
+          {showTradingChrome ? (
+            <>
+              <div>
+                <h3 className="mb-3 text-sm font-medium uppercase tracking-wide text-gray-400">
+                  Trading performance
+                </h3>
+                <PerformanceRings
+                  winRate={overview.winRate}
+                  roi={overview.roi}
+                  tradeRoi={overview.totalPnLPercentage}
+                  profitFactor={overview.profitFactor}
+                  avgWin={overview.averageWin}
+                  avgLoss={overview.averageLoss}
+                  largestWin={overview.largestWin}
+                  largestLoss={overview.largestLoss}
+                />
+              </div>
+
+              <TradingAnalytics
+                winLoss={charts.winLossDistribution}
+                tradesBySymbol={charts.tradesBySymbol}
+                tradesByHour={charts.tradesByHour}
+                totalTrades={overview.totalTrades}
+                winningTrades={overview.winningTrades}
+                losingTrades={overview.losingTrades}
+              />
+            </>
+          ) : null}
 
           <ContestStatsCards
             competitionStats={competitions.stats}
             challengeStats={challenges.stats}
           />
 
-          <MarketHolidaysCard />
+          {showTradingChrome ? <MarketHolidaysCard /> : null}
         </TabsContent>
 
         {/* ── Tab 4: Contests ── */}

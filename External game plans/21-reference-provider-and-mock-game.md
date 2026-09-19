@@ -483,17 +483,22 @@ screen - were both **complete by API and unreachable by clicking**, found only b
 caller. A passing end-to-end test is evidence about the protocol and says nothing about whether an
 operator and a player can actually get there.
 
-It cannot be closed from here: it needs an authenticated admin session and an authenticated player
-session, and this environment has neither. So it is the owner's run, and the steps are:
+**It cannot be closed from here: it needs an authenticated admin session and an authenticated player
+session, and this environment has neither. So it is the owner's run, and the steps are:**
+
+*(Engineering handoff confirmed 18 September 2026 — no further code blocks this runbook.
+`deploy/README.md` ChartVolt Games section is the operational twin; keep them aligned.)*
 
 1. **Deploy.** `games-service` on the server, `pm2 start ecosystem.config.js --only chartvolt-games`,
    with `npm run setup:env` having written the `.env`. The play surface arrives at
    `https://chartvolt.com/play` through the three rewrites - no DNS, no nginx, no certificate.
+   **After any `.ts` change under `games-service/`:** `npm run build` then `pm2 restart
+   chartvolt-games` — a pull alone leaves `dist` stale (R52 / R66).
 2. **Register the provider** in the admin panel as **ChartVolt Games**, first-party, base URL
-   pointing at the service. Paste the four credentials `setup:env` printed. **Check the display
+   pointing at the service (loopback `http://127.0.0.1:4010` is correct when co-located). Paste the four credentials `setup:env` printed. **Check the display
    name before the first contest settles** - a provider row joined to contest history can never be
    renamed away from it.
-3. **Sync the catalogue**, and confirm the title appears. ~~**Enable `circuit-perfect` first**: it
+3. **Sync the catalogue**, and confirm **Circuit Sprint** appears. ~~**Enable `circuit-perfect` first**: it
    ends when the player finishes rather than when a clock does, so a full round takes under a
    minute rather than the sprint's 60-second floor.~~ **Stale since 8 September 2026** - there is
    only `circuit-sprint` now (s4.1g). **Set the contest's playing time to one minute**, which is

@@ -15,7 +15,10 @@ interface DangerSceneProps {
 const mono = '"SF Mono", Consolas, "Courier New", monospace';
 
 const DangerScene: React.FC<DangerSceneProps> = ({ event, onSelectTrader }) => {
-  const sorted = useMemo(() => ranked(event.participants), [event.participants]);
+  const sorted = useMemo(
+    () => ranked(event.participants, event.gameType),
+    [event.participants, event.gameType],
+  );
 
   // Traders in danger: negative ROI or high drawdown
   const inDanger = sorted.filter(p => {
@@ -151,8 +154,8 @@ const DangerScene: React.FC<DangerSceneProps> = ({ event, onSelectTrader }) => {
         ) : (
           inDanger.map((p, i) => {
             const roi = calcRoi(p.liveEquity, event.startingCapital);
-            const risk = riskLevel(p, event.startingCapital);
-            const title = getTraderTitle(p, event.startingCapital);
+            const risk = riskLevel(p, event.startingCapital, event.gameType);
+            const title = getTraderTitle(p, event.startingCapital, event.gameType);
             const marginPct = p.liveEquity > 0 ? (p.usedMargin / p.liveEquity * 100) : 0;
             const rank = sorted.findIndex(s => s.userId === p.userId) + 1;
 

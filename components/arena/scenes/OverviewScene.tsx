@@ -29,7 +29,7 @@ const OverviewScene: React.FC<OverviewSceneProps> = ({
   event, previousEquities, chartSymbol, chartTf,
   candles, bubbles, availableSymbols, onSymbolChange, onTfChange, onSelectTrader,
 }) => {
-  const sorted = ranked(event.participants);
+  const sorted = ranked(event.participants, event.gameType);
   const leader = sorted[0];
   const positions = getAllPositions(event.participants);
   const tl = timeLeft(event.endDate);

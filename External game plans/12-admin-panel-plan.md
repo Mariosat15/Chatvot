@@ -122,11 +122,13 @@ build.
   `ADMIN_SECTIONS`, because it opens a submenu and renders no screen. A permission that
   maps to no screen is the seed of the privilege widening caution 2 warns about.
 
-**One pre-existing limitation, unchanged and worth knowing.** `handleMenuClick` calls
-`setActiveSection` without writing the URL, so deep links work *inbound* but the address
-bar does not track the current section. The in-page tab bar deliberately behaves the same
-way rather than adding history entries only trading screens would produce. Making
-navigation write the URL is a whole-panel change and belongs with X6.5, not here.
+**One pre-existing limitation, closed 18 September 2026 as an X6.5 leftover.**
+`handleMenuClick` used to call `setActiveSection` without writing the URL, so deep links
+worked *inbound* but the address bar did not track the current section. That is now
+`navigateToSection`, which `router.replace`s `?activeTab=<sectionId>` (replace, not push —
+Back leaves the panel rather than stepping every tab). The sidebar, the trading tab strip
+and the overview's `onNavigate` all go through the same helper. Pinned by
+`__tests__/admin/sidebar-url-sync.test.ts` (3 tests).
 
 **What was added:** `apps/admin/lib/admin/game-sections.ts` as the single list of which
 sections belong to trading — the sidebar and the tab bar both read it, so they cannot
@@ -1552,10 +1554,13 @@ was actually written.
 schema rather than only here, because the obvious repair - making the writer store it - is wrong
 in three places at once.
 
-**Two things were outstanding after R76; one is now closed.** The `adjust-results`
+**Two things were outstanding after R76; both are now closed.** The `adjust-results`
 **screen shipped as X6.5** (see s3.2c below) - so a document saying it has no UI caller is
 correct as history and stale as a present fact, and **say which**. The `completed` /
-`finalizing` gap on `closePosition` is still recorded, not fixed.
+`finalizing` gap on `closePosition` **closed 18 September 2026** (X6.5 leftover): the same
+status check now refuses all three of `cancelled` | `completed` | `finalizing`, pinned by
+`__tests__/services/close-position-terminal-status.test.ts` (4 tests). A document listing
+either as outstanding is correct as history and stale as a present fact — **say which**.
 
 **Guarded by `__tests__/admin/adjust-results.test.ts` (21 tests) and
 `tools/probe-adjust-results.ps1` (19 probes, every one red on exactly the expected test).** Two
@@ -1605,8 +1610,9 @@ completed banner in `CompetitionAdminActions.tsx`. **Nothing here is mirrored.**
    active contests.
 6. **Wording goes through `useTerms` / `formatVolts`** - no hard-coded trader or euro nouns.
 
-**Still outstanding and must not be summarised as done:** the `closePosition` completed /
-finalizing gap (R77 follow-up), and X6.5 **A5** (admin wiki content - owner).
+**Still outstanding and must not be summarised as done:** X6.5 **A5** only (admin wiki
+content - owner). The `closePosition` completed / finalizing gap closed 18 September 2026
+— see the s3.2b amendment above.
 
 **Guarded by `__tests__/admin/adjust-results-ui.test.ts`.** Asserts the mount gate, the seat
 builder, the literal fetch URL (an import is not a use), and the absence of wallet imports.
@@ -2336,7 +2342,11 @@ trap as the R42 fixture, and it is pinned by its own test.
   different set of sources entirely - putting it there means either a second aggregation that
   can disagree with this one, or moving the analytics route's work under a different grant.
   **Two screens disagreeing about one game's revenue is worse than the breakdown being on the
-  neighbouring screen.** A cross-link from the financial dashboard belongs with X6.5.
+  neighbouring screen.** **Cross-link shipped 18 September 2026 (X6.5 leftover):** the
+  Financial dashboard overview carries a card linking to
+  `/dashboard?activeTab=analytics`, pinned by
+  `__tests__/admin/financial-analytics-cross-link.test.ts` (2 tests). A document listing the
+  cross-link as outstanding is correct as history and stale as a present fact — **say which**.
 - **The participation funnel asked for on `CompetitionAnalytics.tsx` is on Game Performance
   instead.** It is a rounds-versus-seats figure, so it needs the round collection the
   performance service already aggregates and the analytics route does not touch. Putting it on

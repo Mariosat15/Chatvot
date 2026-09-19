@@ -150,11 +150,11 @@ Games.
 - Platform withdrawal fee %
 - Bank deposit and withdrawal fees (what the payment provider charges you)
 
-**The EUR-to-credits RATE is not editable in the admin panel at present.** Settings →
-Settings → Currency shows what one credit is worth, derived from that rate, but read-only. If
-an operator needs the rate itself changed, that is a support request, not a screen - do not
-send them looking for a "Credit Conversion" page, because the navigation does not contain one.
-(Recorded as R93.)
+**The EUR-to-credits RATE is editable under Settings → Currency**, on the Credit
+conversion card below the currency symbol settings. The same page shows what one credit
+is worth as a derived read-only figure. Do not send operators to Fees for the rate —
+Fees owns platform/bank fee percentages only. (R93 closed 18 Sep 2026 by mounting
+CreditConversionSection under the existing currency grant.)
 
 **Minimum deposit** is on the payment configuration, not here.
 

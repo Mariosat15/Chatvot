@@ -316,7 +316,7 @@ describe("the ledger's stored values are not renameable", () => {
 });
 
 // =======================================================================================
-// R92's open remainder
+// R92's readers - four closed, player page flipped 18 Sep 2026
 // =======================================================================================
 
 /*
@@ -325,38 +325,56 @@ describe("the ledger's stored values are not renameable", () => {
   exception reads as a known problem long after it is solved, and silently re-permits the
   defect in that file. When one is fixed its line here goes red, which is the point.
 
-  THAT HAS NOW HAPPENED FOUR TIMES. The two AI-agent assertions were flipped by X6.5 A6 on
-  15 Sep 2026, and the admin list drawer plus both copies of the profile action on 16 Sep -
-  the canaries fired on the day each defect closed and were rewritten rather than removed,
-  because the comment explaining why each was reachable is the most valuable part.
+  THAT HAS NOW HAPPENED FIVE TIMES. The two AI-agent assertions were flipped by X6.5 A6 on
+  15 Sep 2026, the admin list drawer plus both copies of the profile action on 16 Sep, and
+  the player's own challenge page on 18 Sep 2026 - the canaries fired on the day each defect
+  closed and were rewritten rather than removed, because the comment explaining why each was
+  reachable is the most valuable part.
 
-  ONE OFFENDER REMAINS: the player's own result page, `app/(root)/challenges/[id]/page.tsx`,
-  which is X7 by phase. Say that precisely rather than calling R92 closed - it is the worst
-  of the readers, because it is the person who paid.
+  THE PLAYER PAGE WAS ALREADY BRANCHED when the canary below was still asserting it was an
+  offender: `hasProviderChallengeGameLabel` returns early into `ProviderChallengeLobby`, so
+  the trading Final Results card never renders for a provider challenge. The canary looked
+  for `hasProviderGameLabel|isProviderGame` and never matched the challenge-specific helper,
+  which is why it stayed green while the page was already correct. Flipped to pin the real
+  branch, not the wrong helper name.
 
   The count matters. A4's task named two screens; `rg` over the two field names found seven
   readers. That is the counting rule after four entry paths, ten finalize sites, six raw
   inserts and seven lifecycle routes - so the number in the risk register was measured here
   rather than estimated, and this suite is what keeps it honest.
 */
-describe("R92's one remaining reader, and the four that were closed", () => {
+describe("R92's five readers, all closed", () => {
   const PLAYER_PAGE = join(ROOT, "app/(root)/challenges/[id]/page.tsx");
   const ADMIN_LIST = join(ADMIN, "components/admin/ChallengesAdminSection.tsx");
   const PROFILE = join(ROOT, "lib/actions/user/profile.actions.ts");
   const PROFILE_ADMIN = join(ADMIN, "lib/actions/user/profile.actions.ts");
   const AI_AGENT = join(ADMIN, "app/api/ai-agent/chat/route.ts");
 
-  it("the PLAYER's own result page renders four trading figures with no game branch", () => {
+  it("the PLAYER's own challenge page branches to the provider lobby before trading stats", () => {
     /*
-      The worst of the five, because this is the person who paid. A provider challenge shows
-      them $0.00 capital and 0 trades for a game that has neither. X7 by phase.
+      FLIPPED 18 September 2026, not deleted. Previously asserted the page rendered four
+      trading figures with no game branch - which was already false: the early return into
+      ProviderChallengeLobby has existed since the challenge play path shipped. The old
+      canary looked for `hasProviderGameLabel|isProviderGame` and never matched
+      `hasProviderChallengeGameLabel`, so it stayed green on correct code (R60 canary that
+      had stopped watching the right thing).
+
+      The load-bearing half is POSITION: the label check must precede every `myStats.pnl`
+      read, or a half-built branch that falls through still satisfies a bare presence check
+      while a puzzle player reads $0.00 capital.
     */
     const source = code(PLAYER_PAGE);
+    expect(source).toMatch(/hasProviderChallengeGameLabel\(/);
+    expect(source).toMatch(/<ProviderChallengeLobby\b/);
+
+    const branchAt = source.indexOf("hasProviderChallengeGameLabel(");
+    const pnlAt = source.indexOf("myStats.pnl");
+    expect(branchAt).toBeGreaterThan(-1);
+    expect(pnlAt).toBeGreaterThan(branchAt);
+
+    // Trading Final Results survive for trading challenges only - below the early return.
     expect(source).toMatch(/myStats\.pnl/);
     expect(source).toMatch(/myStats\.totalTrades/);
-    expect(source).toMatch(/myStats\.winRate/);
-    // The tell: no provider-game question is asked anywhere on the page.
-    expect(source).not.toMatch(/hasProviderGameLabel|isProviderGame/);
   });
 
   it("the admin challenge LIST drawer reports both sides through the shared rule", () => {

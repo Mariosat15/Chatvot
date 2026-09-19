@@ -6,37 +6,44 @@ import {
   Wallet,
   Trophy,
   Swords,
-  TrendingUp,
+  Gamepad2,
   Map,
   CheckCircle2,
   ChevronRight,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-interface GettingStartedStep {
-  id: string;
-  title: string;
-  description: string;
-  href: string;
-  icon: React.ReactNode;
-  completed: boolean;
-}
+import {
+  buildGettingStartedSteps,
+  type GettingStartedFacts,
+} from "@/lib/utils/getting-started-steps";
 
 interface GettingStartedCardProps {
+  tradingEnabled: boolean;
   hasFundedWallet: boolean;
   hasJoinedCompetition: boolean;
   hasPlacedTrade: boolean;
+  hasPlayedGame: boolean;
   hasCompletedMilestone: boolean;
   hasChallengedUser: boolean;
 }
 
 const DISMISS_KEY = "chartvolt_onboarding_dismissed";
 
+const STEP_ICONS: Record<string, React.ReactNode> = {
+  fund: <Wallet className="size-5" />,
+  competition: <Trophy className="size-5" />,
+  play: <Gamepad2 className="size-5" />,
+  milestone: <Map className="size-5" />,
+  challenge: <Swords className="size-5" />,
+};
+
 export default function GettingStartedCard({
+  tradingEnabled,
   hasFundedWallet,
   hasJoinedCompetition,
   hasPlacedTrade,
+  hasPlayedGame,
   hasCompletedMilestone,
   hasChallengedUser,
 }: GettingStartedCardProps) {
@@ -47,48 +54,16 @@ export default function GettingStartedCard({
     setDismissed(stored === "true");
   }, []);
 
-  const steps: GettingStartedStep[] = [
-    {
-      id: "fund",
-      title: "Fund Your Account",
-      description: "Add credits to start trading",
-      href: "/wallet",
-      icon: <Wallet className="size-5" />,
-      completed: hasFundedWallet,
-    },
-    {
-      id: "competition",
-      title: "Join a Competition",
-      description: "Compete with other traders",
-      href: "/competitions",
-      icon: <Trophy className="size-5" />,
-      completed: hasJoinedCompetition,
-    },
-    {
-      id: "trade",
-      title: "Place Your First Trade",
-      description: "Open a position in a competition",
-      href: "/competitions",
-      icon: <TrendingUp className="size-5" />,
-      completed: hasPlacedTrade,
-    },
-    {
-      id: "milestone",
-      title: "Complete a Milestone",
-      description: "Progress on your trader journey",
-      href: "/profile?tab=journey",
-      icon: <Map className="size-5" />,
-      completed: hasCompletedMilestone,
-    },
-    {
-      id: "challenge",
-      title: "Challenge a Trader",
-      description: "Go head-to-head in a 1v1 battle",
-      href: "/challenges",
-      icon: <Swords className="size-5" />,
-      completed: hasChallengedUser,
-    },
-  ];
+  const facts: GettingStartedFacts = {
+    tradingEnabled,
+    hasFundedWallet,
+    hasJoinedCompetition,
+    hasPlacedTrade,
+    hasPlayedGame,
+    hasCompletedMilestone,
+    hasChallengedUser,
+  };
+  const steps = buildGettingStartedSteps(facts);
 
   const completedCount = steps.filter((s) => s.completed).length;
   const allComplete = completedCount === steps.length;
@@ -113,7 +88,7 @@ export default function GettingStartedCard({
               Getting Started
             </h3>
             <p className="text-sm text-gray-400 mt-0.5">
-              Complete these steps to become a pro trader
+              Complete these steps to get competing
             </p>
           </div>
           <button
@@ -163,7 +138,7 @@ export default function GettingStartedCard({
                 {step.completed ? (
                   <CheckCircle2 className="size-5" />
                 ) : (
-                  step.icon
+                  STEP_ICONS[step.id] ?? <Trophy className="size-5" />
                 )}
               </div>
               <div className="flex-1 min-w-0">

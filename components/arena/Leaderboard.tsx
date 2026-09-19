@@ -3,7 +3,16 @@
 import React from 'react';
 import type { Participant, AEvent } from './types';
 import { CV } from './constants';
-import { fmtEquity, fmtRoi, calcRoi, ranked, riskLevel, getTraderTitle } from './helpers';
+import {
+  fmtEquity,
+  fmtRoi,
+  calcRoi,
+  ranked,
+  riskLevel,
+  getTraderTitle,
+  describeBroadcastMetric,
+  isProviderBroadcast,
+} from './helpers';
 import Avatar from './Avatar';
 import ArenaIcon from './ArenaIcon';
 
@@ -17,7 +26,8 @@ const MEDAL_ICONS = ['Medal', 'Medal', 'Medal'] as const;
 const MEDAL_COLORS = [CV.gold, '#C0C0C0', '#CD7F32'] as const;
 
 const Leaderboard: React.FC<LeaderboardProps> = ({ event, onSelectTrader, previousEquities }) => {
-  const sorted = ranked(event.participants);
+  const sorted = ranked(event.participants, event.gameType);
+  const provider = isProviderBroadcast(event.gameType);
 
   return (
     <div style={{
@@ -56,20 +66,32 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ event, onSelectTrader, previo
         padding: '6px 14px', borderBottom: `1px solid ${CV.bd0}`,
       }}>
         <span style={{ width: 24, color: CV.gray, fontSize: 8, fontWeight: 600, textAlign: 'center', letterSpacing: .5 }}>#</span>
-        <span style={{ flex: 1, color: CV.gray, fontSize: 8, fontWeight: 600, letterSpacing: .5 }}>TRADER</span>
-        <span style={{ width: 65, color: CV.gray, fontSize: 8, fontWeight: 600, textAlign: 'right', letterSpacing: .5 }}>EQUITY</span>
-        <span style={{ width: 55, color: CV.gray, fontSize: 8, fontWeight: 600, textAlign: 'right', letterSpacing: .5 }}>ROI</span>
+        <span style={{ flex: 1, color: CV.gray, fontSize: 8, fontWeight: 600, letterSpacing: .5 }}>
+          {provider ? 'PLAYER' : 'TRADER'}
+        </span>
+        <span style={{ width: 65, color: CV.gray, fontSize: 8, fontWeight: 600, textAlign: 'right', letterSpacing: .5 }}>
+          {provider ? 'SCORE' : 'EQUITY'}
+        </span>
+        {!provider && (
+          <span style={{ width: 55, color: CV.gray, fontSize: 8, fontWeight: 600, textAlign: 'right', letterSpacing: .5 }}>ROI</span>
+        )}
       </div>
 
       {/* Rows */}
       <div style={{ flex: 1, overflow: 'auto', padding: '2px 0' }}>
         {sorted.map((p, i) => {
           const roi = calcRoi(p.liveEquity, event.startingCapital);
-          const risk = riskLevel(p, event.startingCapital);
-          const title = getTraderTitle(p, event.startingCapital);
+          const risk = riskLevel(p, event.startingCapital, event.gameType);
+          const title = getTraderTitle(p, event.startingCapital, event.gameType);
+          const metric = describeBroadcastMetric({
+            gameType: event.gameType,
+            score: p.score,
+            livePnl: p.livePnl,
+          });
           const isLeader = i === 0;
           const prevEq = previousEquities?.get(p.userId);
-          const eqDelta = prevEq ? p.liveEquity - prevEq : 0;
+          const eqDelta = !provider && prevEq ? p.liveEquity - prevEq : 0;
+          const displayRank = p.rank ?? i + 1;
 
           return (
             <div
@@ -97,13 +119,17 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ event, onSelectTrader, previo
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
                 {i < 3 ? (
-                  <ArenaIcon name={MEDAL_ICONS[i]} size={16} color={MEDAL_COLORS[i]} />
+                  <ArenaIcon
+                    name={MEDAL_ICONS.at(i) ?? "Medal"}
+                    size={16}
+                    color={MEDAL_COLORS.at(i) ?? CV.gold}
+                  />
                 ) : (
-                  <span style={{ color: CV.gray, fontWeight: 700, fontSize: 12 }}>{i + 1}</span>
+                  <span style={{ color: CV.gray, fontWeight: 700, fontSize: 12 }}>{displayRank}</span>
                 )}
               </div>
 
-              <Avatar src={p.profileImage} name={p.username} size={30} rank={i + 1} />
+              <Avatar src={p.profileImage} name={p.username} size={30} rank={displayRank} />
 
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{
@@ -129,11 +155,11 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ event, onSelectTrader, previo
               {/* Live stats */}
               <div style={{ textAlign: 'right' }}>
                 <div style={{
-                  color: CV.txt, fontSize: 11, fontWeight: 700,
+                  color: provider ? metric.color : CV.txt, fontSize: 11, fontWeight: 700,
                   fontFamily: '"SF Mono", Consolas, monospace',
                   display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 3,
                 }}>
-                  {fmtEquity(p.liveEquity)}
+                  {provider ? metric.value : fmtEquity(p.liveEquity)}
                   {eqDelta !== 0 && (
                     <ArenaIcon
                       name={eqDelta > 0 ? 'ArrowUpRight' : 'ArrowDownRight'}
@@ -142,25 +168,29 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ event, onSelectTrader, previo
                     />
                   )}
                 </div>
-                <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end', marginTop: 2 }}>
-                  <span style={{
-                    color: roi >= 0 ? CV.teal : CV.red,
-                    fontSize: 10, fontWeight: 700,
-                    fontFamily: '"SF Mono", Consolas, monospace',
-                    textShadow: Math.abs(roi) > 5 ? `0 0 6px ${roi >= 0 ? CV.teal : CV.red}30` : 'none',
-                  }}>
-                    {fmtRoi(roi)}
-                  </span>
-                </div>
+                {!provider && (
+                  <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end', marginTop: 2 }}>
+                    <span style={{
+                      color: roi >= 0 ? CV.teal : CV.red,
+                      fontSize: 10, fontWeight: 700,
+                      fontFamily: '"SF Mono", Consolas, monospace',
+                      textShadow: Math.abs(roi) > 5 ? `0 0 6px ${roi >= 0 ? CV.teal : CV.red}30` : 'none',
+                    }}>
+                      {fmtRoi(roi)}
+                    </span>
+                  </div>
+                )}
               </div>
 
-              {/* P&L indicator */}
+              {/* Tone indicator — neutral cyan for score, green/red for PnL */}
               <div style={{
                 width: 4, height: 28, borderRadius: 2, flexShrink: 0,
-                background: roi >= 0
-                  ? `linear-gradient(180deg, ${CV.teal}, ${CV.teal}40)`
-                  : `linear-gradient(180deg, ${CV.red}, ${CV.red}40)`,
-                boxShadow: `0 0 4px ${roi >= 0 ? CV.teal : CV.red}30`,
+                background: provider
+                  ? `linear-gradient(180deg, ${metric.color}, ${metric.color}40)`
+                  : roi >= 0
+                    ? `linear-gradient(180deg, ${CV.teal}, ${CV.teal}40)`
+                    : `linear-gradient(180deg, ${CV.red}, ${CV.red}40)`,
+                boxShadow: `0 0 4px ${provider ? metric.color : roi >= 0 ? CV.teal : CV.red}30`,
               }} />
             </div>
           );
@@ -174,38 +204,63 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ event, onSelectTrader, previo
         background: `${CV.bg3}60`,
         display: 'flex', justifyContent: 'space-between',
       }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-            <ArenaIcon name="BarChart3" size={9} color={CV.gray} />
-            <span style={{ color: CV.gray, fontSize: 9, letterSpacing: .5 }}>TOTAL TRADES</span>
-          </div>
-          <div style={{ color: CV.txt, fontSize: 12, fontWeight: 700, fontFamily: '"SF Mono", Consolas, monospace' }}>
-            {sorted.reduce((acc, p) => acc + p.totalTrades, 0)}
-          </div>
-        </div>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-            <ArenaIcon name="TrendingUp" size={9} color={CV.gray} />
-            <span style={{ color: CV.gray, fontSize: 9, letterSpacing: .5 }}>AVG ROI</span>
-          </div>
-          <div style={{
-            color: CV.teal, fontSize: 12, fontWeight: 700,
-            fontFamily: '"SF Mono", Consolas, monospace',
-          }}>
-            {sorted.length > 0
-              ? fmtRoi(sorted.reduce((acc, p) => acc + calcRoi(p.liveEquity, event.startingCapital), 0) / sorted.length)
-              : '0.00%'}
-          </div>
-        </div>
-        <div style={{ textAlign: 'right' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 3, justifyContent: 'flex-end' }}>
-            <ArenaIcon name="Activity" size={9} color={CV.gray} />
-            <span style={{ color: CV.gray, fontSize: 9, letterSpacing: .5 }}>OPEN POS</span>
-          </div>
-          <div style={{ color: CV.purp, fontSize: 12, fontWeight: 700, fontFamily: '"SF Mono", Consolas, monospace' }}>
-            {sorted.reduce((acc, p) => acc + p.currentOpenPositions, 0)}
-          </div>
-        </div>
+        {provider ? (
+          <>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                <ArenaIcon name="Users" size={9} color={CV.gray} />
+                <span style={{ color: CV.gray, fontSize: 9, letterSpacing: .5 }}>PLAYERS</span>
+              </div>
+              <div style={{ color: CV.txt, fontSize: 12, fontWeight: 700, fontFamily: '"SF Mono", Consolas, monospace' }}>
+                {sorted.length}
+              </div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 3, justifyContent: 'flex-end' }}>
+                <ArenaIcon name="Target" size={9} color={CV.gray} />
+                <span style={{ color: CV.gray, fontSize: 9, letterSpacing: .5 }}>SCORED</span>
+              </div>
+              <div style={{ color: '#22d3ee', fontSize: 12, fontWeight: 700, fontFamily: '"SF Mono", Consolas, monospace' }}>
+                {sorted.filter((p) => typeof p.score === 'number').length}
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                <ArenaIcon name="BarChart3" size={9} color={CV.gray} />
+                <span style={{ color: CV.gray, fontSize: 9, letterSpacing: .5 }}>TOTAL TRADES</span>
+              </div>
+              <div style={{ color: CV.txt, fontSize: 12, fontWeight: 700, fontFamily: '"SF Mono", Consolas, monospace' }}>
+                {sorted.reduce((acc, p) => acc + p.totalTrades, 0)}
+              </div>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                <ArenaIcon name="TrendingUp" size={9} color={CV.gray} />
+                <span style={{ color: CV.gray, fontSize: 9, letterSpacing: .5 }}>AVG ROI</span>
+              </div>
+              <div style={{
+                color: CV.teal, fontSize: 12, fontWeight: 700,
+                fontFamily: '"SF Mono", Consolas, monospace',
+              }}>
+                {sorted.length > 0
+                  ? fmtRoi(sorted.reduce((acc, p) => acc + calcRoi(p.liveEquity, event.startingCapital), 0) / sorted.length)
+                  : '0.00%'}
+              </div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 3, justifyContent: 'flex-end' }}>
+                <ArenaIcon name="Activity" size={9} color={CV.gray} />
+                <span style={{ color: CV.gray, fontSize: 9, letterSpacing: .5 }}>OPEN POS</span>
+              </div>
+              <div style={{ color: CV.purp, fontSize: 12, fontWeight: 700, fontFamily: '"SF Mono", Consolas, monospace' }}>
+                {sorted.reduce((acc, p) => acc + p.currentOpenPositions, 0)}
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

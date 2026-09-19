@@ -23,6 +23,10 @@ import {
   routeToTradingSettlement,
 } from "@/lib/games/settlement";
 import { settleFeesAndGameMasters } from "@/lib/services/settlement/fees.service";
+import {
+  logPrizePoolIntegrityViolation,
+  reconcilePrizePoolAgainstCollectedFees,
+} from "@/lib/services/settlement/prize-pool-integrity";
 
 /**
  * End a competition and distribute prizes
@@ -610,27 +614,30 @@ export async function finalizeCompetition(competitionId: string) {
     // STEP 3: Distribute prizes with tie handling
     console.log(`💰 Distributing prizes...`);
 
-    // Reason: SAFEGUARD against distributing more credits than were actually collected.
-    // The actual collected fees = currentParticipants × entryFee.
-    // If competition.prizePool is somehow inflated (e.g. from a bug where it was
-    // pre-set to an estimated value AND then incremented per entry), cap it.
-    const actualCollectedFees =
-      (competition.currentParticipants || 0) * (competition.entryFee || 0);
-    let prizePool = competition.prizePool || 0;
+    // Reason: R1 — align stored prizePool with fees collected (cap over-count,
+    // raise under-count). Stage 0 only capped the high side; a forgotten $inc
+    // on prizePool underpaid winners with no log until the under branch landed.
+    const participantCount = competition.currentParticipants || 0;
+    const entryFee = competition.entryFee || 0;
+    const storedPrizePool = competition.prizePool || 0;
+    const integrity = reconcilePrizePoolAgainstCollectedFees(
+      storedPrizePool,
+      participantCount,
+      entryFee,
+    );
+    let prizePool = integrity.prizePool;
+    const actualCollectedFees = integrity.collectedFees;
 
-    if (prizePool > actualCollectedFees && actualCollectedFees > 0) {
-      console.error(
-        `🚨 [COMPETITION] PRIZE POOL INTEGRITY VIOLATION for ${competitionId}!`,
-      );
-      console.error(
-        `   Stored prizePool: ${prizePool}, actual collected (${competition.currentParticipants} × ${competition.entryFee}): ${actualCollectedFees}`,
-      );
-      console.error(
-        `   Capping prizePool to actual collected fees to prevent phantom credit distribution.`,
-      );
-      prizePool = actualCollectedFees;
-
-      // Also fix the stored value so the DB is consistent
+    if (integrity.correction) {
+      logPrizePoolIntegrityViolation({
+        label: "COMPETITION",
+        contestId: competitionId,
+        stored: storedPrizePool,
+        collected: actualCollectedFees,
+        participantCount,
+        entryFee,
+        correction: integrity.correction,
+      });
       await Competition.findByIdAndUpdate(competitionId, {
         $set: { prizePool: actualCollectedFees },
       });

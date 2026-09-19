@@ -46,15 +46,43 @@ function DialogOverlay({
   );
 }
 
+/**
+ * Size variants are ALL `sm:`-prefixed on purpose.
+ *
+ * // Reason: an unprefixed `max-w-4xl` in className never displaces a bare
+ * `sm:max-w-lg` on the primitive (R59). The size prop is how every screen asks
+ * for width without reintroducing that trap. Tokens in dialog-widths.ts remain
+ * valid for the games surface — they also carry `sm:` and win the merge.
+ */
+const DIALOG_SIZE_CLASSES = {
+  sm: "sm:max-w-sm",
+  default: "sm:max-w-lg",
+  lg: "sm:max-w-2xl",
+  xl: "sm:max-w-4xl",
+  // Reason: matches DIALOG_WIDTH_WIDE — dense tables / 5xl–6xl authors.
+  full: "sm:max-w-[min(90rem,calc(100vw-3rem))]",
+} as const;
+
+export type DialogSize = keyof typeof DIALOG_SIZE_CLASSES;
+
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
     showCloseButton?: boolean;
     container?: HTMLElement | null;
+    /** How wide the dialog is. Defaults to the historic 32rem cap. */
+    size?: DialogSize;
   }
 >(
   (
-    { className, children, showCloseButton = true, container, ...props },
+    {
+      className,
+      children,
+      showCloseButton = true,
+      container,
+      size = "default",
+      ...props
+    },
     ref,
   ) => {
     return (
@@ -64,7 +92,11 @@ const DialogContent = React.forwardRef<
           ref={ref}
           data-slot="dialog-content"
           className={cn(
-            "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-1rem)] sm:max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-4 sm:p-6 shadow-lg duration-200 max-h-[90vh] overflow-y-auto",
+            // Reason: no sm:max-w-* here — width comes only from size / className tokens.
+            "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-1rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-4 sm:p-6 shadow-lg duration-200 max-h-[90vh] overflow-y-auto",
+            // Reason: size is DialogSize (typed allow-list), not request input.
+            // eslint-disable-next-line security/detect-object-injection
+            DIALOG_SIZE_CLASSES[size],
             className,
           )}
           {...props}
@@ -146,4 +178,5 @@ export {
   DialogPortal,
   DialogTitle,
   DialogTrigger,
+  DIALOG_SIZE_CLASSES,
 };

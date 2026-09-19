@@ -2871,13 +2871,53 @@ Four facts drift easily.
 
 | Change | Note |
 |---|---|
-| Split the mega-action into per-section loaders | Risk **R21**. Do it because trading data must not be fetched for a player who has never traded |
-| Hide the trading section entirely when `tradingEnabled === false` | Not an empty panel - absent |
-| Hide the trading section for a player with no trading history | Their dashboard should be about the games they play |
-| Add per-game summary cards | Contests entered, best finish, current rating per game |
+| Split the mega-action into per-section loaders | Risk **R21**. Do it because trading data must not be fetched for a player who has never traded. **CLOSED 18 Sep 2026** — see **s5.1d** |
+| Hide the trading section entirely when `tradingEnabled === false` | Not an empty panel - absent. **CLOSED 18 Sep 2026** with R21 (`showTradingChrome`) |
+| Hide the trading section for a player with no trading history | Their dashboard should be about the games they play. **CLOSED 18 Sep 2026** with R21 (former traders keep chrome — R29) |
+| Add per-game summary cards | Contests entered, best finish, current rating per game. **CLOSED 18 Sep 2026** — see **s5.1f** |
 
 **A player who only plays provider games must never see an empty trading panel.** In the
 external-only scenario this is the majority of new players, not an edge case.
+
+### 5.1d Dashboard mega-action split and trade-fetch gate - BUILT 18 September 2026
+
+`lib/actions/dashboard/{types,charts,process-competitions,process-challenges}.ts`,
+`lib/actions/comprehensive-dashboard.actions.ts` (composer, ~874 lines),
+`components/dashboard/DashboardLayout.tsx`, `__tests__/dashboard/r21-dashboard-extract.test.ts`
+(9 tests). **Nothing mirrored** — player dashboard only.
+
+**Four facts drift easily.** The extract was **behaviour-free first** (types, charts, contest
+and challenge processors) so the gate could not destroy the only proof nothing moved — a
+document describing a refactor that also changed fetches in one commit is describing work
+that would have no regression proof. **`needsTradeHistory` is `tradingEnabled || exists`**,
+never `tradingEnabled` alone — R29: a former trader on a platform that later turns trading
+off still needs `TradeHistory`. **Trading chrome is withheld, not zeroed** —
+`showTradingChrome` removes rings, streaks, recent trades, analytics and market holidays;
+ContestStatsCards and the game performance panel stay. ~~And **per-game summary cards remain
+outstanding** — R21 closed the fetch/hide half of section 5, not the whole table.~~ **CLOSED
+18 Sep 2026** (`13` **s5.1f**) — say which.
+
+**Never verified by eye** (dashboard behind sign-in).
+
+### 5.1f Per-game summary cards - BUILT 18 September 2026
+
+Section 5's last table row. Profile already read `UserGameStats` (X7 step 3); the dashboard
+did not.
+
+**Live code:** `getPlayerGameProfile` wired from `lib/actions/comprehensive-dashboard.actions.ts`
+(`gameStanding`), `components/dashboard/GameSummaryCards.tsx`, mount in
+`DashboardLayout.tsx` Overview, `__tests__/dashboard/game-summary-cards.test.ts` (6 tests).
+**Nothing mirrored.**
+
+**Four facts drift easily.** It **reads the same service as the profile standing card** — a
+document describing a second aggregate computed on the dashboard is wrong. **Empty `perGame`
+renders null**, never twenty blank cards. **`bestRank <= 0` is a dash**, never `#0` (R45/R50
+read-side). **Trading's rating cell is a dash** — skill for trading stays on Performance /
+the trading card, matching the profile's "trading P&L stays below" rule; provider games show
+the stored rating. Tabs come from **stored rows only**, never `getEnabledGameTypes()` (R29).
+Q14 caption travels with the strip. Client file uses a **local view type** (R58).
+
+**Never verified by eye** (dashboard behind sign-in).
 
 ### 5.1a The contest cards, made game-aware - BUILT 6 September 2026
 
@@ -2926,8 +2966,9 @@ grep for its importer.**
   `pnl` fails to compile. It earned that immediately: the narrow type caught an unguarded
   `currentRank > 0` comparison that `any` had been hiding.
 
-**Still trading-shaped, and deliberately not touched:** the trading panels themselves, the
-per-game summary cards, and the mega-action split (R21). Those are the rest of this section.
+**Still trading-shaped, and deliberately not touched:** the trading panels themselves.
+~~per-game summary cards~~ **CLOSED 18 Sep 2026** (`13` **s5.1f**) — say which.
+~~The mega-action split (R21)~~ **CLOSED 18 Sep 2026** (`13` s5.1d).
 
 ### 5.1b The contest cards, made live - BUILT 11 September 2026
 
@@ -2957,11 +2998,12 @@ stages while a known one-character defect was preserved verbatim.
   That route is the **public, unauthenticated broadcast display** behind `/arena`,
   `TraderChampionshipClient.tsx` and `deploy/competition-dashboard.html`, and it is
   trading-shaped - it selects neither `score` nor `gameType`, so it would rank a provider contest
-  on `pnl` and tie every player at zero **on a screen with no sign-in in front of it**. It is
-  **recorded as a named exception with a test asserting it is STILL an offender**, not fixed: it
-  is its own finding and its own commit, and a stale exception reads as a known problem long after
-  it is solved while silently re-permitting the defect (the R60 rule). When it is fixed the canary
-  goes red, which is the signal to delete the exception.
+  on `pnl` and tie every player at zero **on a screen with no sign-in in front of it**. It was
+  **recorded as a named exception with a test asserting it is STILL an offender**, not fixed in
+  this slice: it is its own finding and its own commit, and a stale exception reads as a known
+  problem long after it is solved while silently re-permitting the defect (the R60 rule).
+  **CLOSED 18 Sep 2026** (`13` **s5.1c**) — correct as history that it was outstanding, stale
+  as a present fact, so **say which**.
 - **The cards could not use the lobbies' answer, and that is a measurement rather than a
   preference.** Both lobbies re-read their own page on a timer (`LiveContestRefresher`, s1.1j)
   because a server action holds the direction, the R45 eligibility gate and the tie handling, so
@@ -3020,6 +3062,51 @@ any edit to the file; they are silenced in place with a reason, the key coming f
 
 **Never verified by eye** - the dashboard is behind sign-in and the automated browser has no
 session.
+
+### 5.1c The public arena broadcast, ranking on score - BUILT 18 September 2026
+
+The named exception from s5.1b. `GET /api/dashboard/competitions` is the unauthenticated feed
+behind `/arena`. Before this slice it ranked every provider contest on `pnl` and tied every
+player at zero with no error and no log line — R37's shape on a public screen.
+
+**Live code:** `sortParticipants` on `lib/services/games/dashboard-contest-rank.service.ts`,
+`app/api/dashboard/competitions/route.ts`, and the flipped canary in
+`__tests__/games/provider-dashboard-cards.test.ts`. **Nothing mirrored** — admin has no arena.
+
+**What shipped**
+- Provider contests (label via `hasProviderGameLabel`) sort through the shared `sortParticipants`
+  — same direction resolution and registry dispatch as the signed-in dashboard.
+- Trading contests keep the in-route live-PnL sort (`aHasTrades` + `rankValue`), so open-position
+  equity still moves the public board.
+- Participant selects include `score`; responses carry `gameType` / `gameKey`.
+- Canary **flipped, not deleted** (R60). Asserts `await sortParticipants(`, one resolver per
+  request, and that `resolveRank` stays absent (the arena needs the ordered list, not one viewer's
+  position).
+
+**Not built and must not be summarised as done:** ~~`TraderChampionshipClient` still paints
+`livePnl` for every row~~ **CLOSED later the same day** (`13` **s5.1e**) — say which. ~~Mega-action
+(R21)~~ **CLOSED 18 Sep 2026** (`13` s5.1d). ~~Challenge result page~~ **CLOSED 18 Sep 2026**.
+~~Per-game summary cards~~ **CLOSED 18 Sep 2026** (`13` **s5.1f**) — say which.
+
+**Never verified by eye** — needs a live provider contest on `/arena`.
+
+### 5.1e Arena / championship Score-vs-PnL chrome - BUILT 18 September 2026
+
+The s5.1c leftover. Server order was correct; every broadcast row still painted trading PnL.
+
+**Live code:** `lib/utils/broadcast-metric.ts`, `components/arena/{helpers,types,Leaderboard,TraderCard}.tsx`,
+arena scenes (Spotlight / Podium / H2H), `app/arena/page.tsx` `mapEvent`,
+`components/championship/TraderChampionshipClient.tsx`,
+`__tests__/games/arena-score-chrome.test.ts`. **Nothing mirrored.**
+
+**What shipped**
+- Shared helper: provider → Score + neutral cyan + dash for absent (R50); trading → P&L green/red.
+- Arena `ranked()` keeps API rank order for provider (never re-sorts on `liveEquity`).
+- `mapEvent` threads `score` / `rank` / `gameType` / `gameKey`.
+- Championship EC / LR / TP / map use the helper; provider seats sort on score.
+
+**Not built:** ~~per-game summary cards~~ **CLOSED later the same day** (`13` **s5.1f**) — say which.
+**Never verified by eye.**
 
 ---
 

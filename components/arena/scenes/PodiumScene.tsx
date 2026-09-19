@@ -3,7 +3,7 @@
 import React, { useMemo } from 'react';
 import type { AEvent, Participant } from '../types';
 import { CV, RANK_COLORS, RANK_GLOW } from '../constants';
-import { ranked, fmtEquity, fmtRoi, fmtPnl, calcRoi, getTraderTitle } from '../helpers';
+import { ranked, fmtEquity, fmtRoi, fmtPnl, calcRoi, getTraderTitle, describeBroadcastMetric, isProviderBroadcast } from '../helpers';
 import Avatar from '../Avatar';
 import ArenaIcon from '../ArenaIcon';
 
@@ -15,7 +15,10 @@ interface PodiumSceneProps {
 const mono = '"SF Mono", Consolas, "Courier New", monospace';
 
 const PodiumScene: React.FC<PodiumSceneProps> = ({ event, onSelectTrader }) => {
-  const sorted = useMemo(() => ranked(event.participants), [event.participants]);
+  const sorted = useMemo(
+    () => ranked(event.participants, event.gameType),
+    [event.participants, event.gameType],
+  );
   const top3 = sorted.slice(0, 3);
   const rest = sorted.slice(3, 10);
 
@@ -89,21 +92,21 @@ const PodiumScene: React.FC<PodiumSceneProps> = ({ event, onSelectTrader }) => {
         {top3[1] && (
           <PodiumBlock
             p={top3[1]} rank={2} startCap={event.startingCapital}
-            height={200} onSelect={onSelectTrader}
+            height={200} onSelect={onSelectTrader} gameType={event.gameType}
           />
         )}
         {/* 1st place */}
         {top3[0] && (
           <PodiumBlock
             p={top3[0]} rank={1} startCap={event.startingCapital}
-            height={270} onSelect={onSelectTrader}
+            height={270} onSelect={onSelectTrader} gameType={event.gameType}
           />
         )}
         {/* 3rd place */}
         {top3[2] && (
           <PodiumBlock
             p={top3[2]} rank={3} startCap={event.startingCapital}
-            height={160} onSelect={onSelectTrader}
+            height={160} onSelect={onSelectTrader} gameType={event.gameType}
           />
         )}
       </div>
@@ -132,7 +135,7 @@ const PodiumScene: React.FC<PodiumSceneProps> = ({ event, onSelectTrader }) => {
           </div>
           {rest.map((p, i) => {
             const roi = calcRoi(p.liveEquity, event.startingCapital);
-            const title = getTraderTitle(p, event.startingCapital);
+            const title = getTraderTitle(p, event.startingCapital, event.gameType);
             return (
               <div
                 key={p.userId}
@@ -185,9 +188,12 @@ const PodiumScene: React.FC<PodiumSceneProps> = ({ event, onSelectTrader }) => {
 const PodiumBlock: React.FC<{
   p: Participant; rank: number; startCap: number; height: number;
   onSelect: (p: Participant) => void;
-}> = ({ p, rank, startCap, height, onSelect }) => {
+  gameType?: string | null;
+}> = ({ p, rank, startCap, height, onSelect, gameType }) => {
   const roi = calcRoi(p.liveEquity, startCap);
-  const title = getTraderTitle(p, startCap);
+  const title = getTraderTitle(p, startCap, gameType);
+  const metric = describeBroadcastMetric({ gameType, score: p.score, livePnl: p.livePnl });
+  const provider = isProviderBroadcast(gameType);
   const color = RANK_COLORS[rank - 1] ?? CV.gray;
   const glow = RANK_GLOW[rank - 1] ?? 'transparent';
   const isFirst = rank === 1;
@@ -243,14 +249,14 @@ const PodiumBlock: React.FC<{
         <ArenaIcon name={title.icon} size={11} color={color} /> {title.title}
       </div>
       <div style={{
-        color: roi >= 0 ? CV.teal : CV.red, fontWeight: 700,
+        color: provider ? metric.color : (roi >= 0 ? CV.teal : CV.red), fontWeight: 700,
         fontSize: isFirst ? 20 : 15, fontFamily: mono,
-        textShadow: `0 0 10px ${roi >= 0 ? CV.teal : CV.red}20`,
+        textShadow: `0 0 10px ${provider ? metric.color : (roi >= 0 ? CV.teal : CV.red)}20`,
       }}>
-        {fmtRoi(roi)}
+        {provider ? metric.value : fmtRoi(roi)}
       </div>
       <div style={{ color: CV.gray, fontSize: 11, fontFamily: mono }}>
-        {fmtPnl(p.livePnl)}
+        {provider ? metric.label : fmtPnl(p.livePnl)}
       </div>
 
       {/* Podium column */}

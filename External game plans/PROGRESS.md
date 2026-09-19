@@ -18,13 +18,13 @@
 | **Do journey maps work for traders AND gamers?** | **CLOSED for code AND live data, 18 Sep 2026.** R106 + R109 code closed 17 Sep; **owner ran Generate Full Sequence (replace) on 18 Sep**, so the flat 750 XP / 12 milestone designs are no longer what the DB holds. Blueprint remains the fixed **10-map** dual-path sequence with trading OR gaming conditions. A document saying "owner must regenerate" or "Existing DB still holds the flat design" is correct as history and stale as a present fact — **say which**. Never verified by eye |
 | **Can a games-only player earn a badge?** | **Partly - R96a CLOSED 16 Sep 2026; R96b AUTHORING CLOSED 17 Sep 2026; R108 CLOSED 17 Sep 2026 (simulator + streak).** Before the gate fix, **122 of 128 badges were unreachable without trading**. **R96a** classifies by condition TYPE: cross-game types ignore trade floors and count any completed contest; trading types keep the floors; unknown fail closed (**R100** byte-identical evaluators). **R96b authoring is built**: one registry (`badge-condition-registry.ts`) tags scopes platform\|trading\|both\|game; `game_*` conditions read `UserGameStats`; Games category on both badge models; admin form scopes by `gameTypes`; AI generate/wizard/balance refuse mismatches and skip trade floors on non-trading scopes; wizard apply is **add-only** by default; ladder add/remove with neutral titles. **R108:** Dev Zone Badge Simulator's hardcoded allow-list had never learned `game_*`, so every Games badge failed as "not recognized" while production already evaluated them; mock stats omitted `gameStats`/`gameTypes`; `consecutive_trading_days` was authored but missing from the evaluator switch; blueprint now ladders `game_season_points` / `game_best_score`; Unit Tests runner writes vitest JSON to a file (full suite blew 1MB maxBuffer). **Catalogue may still need an owner re-run of generate for ladders on season/best-score** if those rows were boolean-authored earlier. A document treating R96b as unbuilt is stale as a present fact though correct as history; **say which**. **Since later on 17 Sep 2026 the wizard also offers "start from scratch"** — `gamification-reset.service.ts` deletes badges, milestones and/or levels-and-XP behind the exact phrase `RESET GAMIFICATION`, keeps player-earned rows unless asked and reports what it orphaned, and `run_full` takes `mode: "add"` (default) or `"rebuild"`. **A plain delete could not have worked**: `getBadgesFromDB()` and `getXPConfigFromDB()` reseed the shipped defaults whenever their collection reads empty, so the wipe was undone by the next read — hence the `gamification-defaults-state` suppression flags, set **after** the deletes, and the defaults do **not** return on their own afterwards. Closed **R102** on the way: `writeXPConfig` keyed `xpconfigs` on `type` where the model declares `configType`, so **every ladder the wizard ever saved was written where nothing reads** and its own audit reported an unconfigured ladder immediately after writing one. **Later still on 17 Sep 2026 the generation itself stopped being a model call (R103)** — `run_full`'s badge step was one generative request told to cover the whole catalogue and it returned **five badges, all trading**, reporting success, because five rows out of two hundred is a well-formed reply; the quota, the rarity pyramid, the thresholds and the XP curve are **arithmetic** now (`gamification-economy.ts`, `badge-blueprint.ts`, `journey-blueprint.ts`, all mirrored) and **`run_full` calls no agent at all**, so a document describing the wizard as AI-generated is correct as history and stale as a present fact — **say which**. Four faults travelled with it: the journey cap of **3 maps** (so every game past the second silently got none, and after a wipe the milestone agent iterated maps that no longer existed and produced nothing), a ladder derived **before** the badges and therefore from zero earnable XP (top rung 426,400 against a catalogue paying thousands), **eight of twenty rungs naming icons absent from the registry** — which the admin `GameIcon` renders as **raw text** — and a Badge Library header that was the literal `"120 Total"`. The fifth was the read half of R96a: `getBadgeRequirement` appended the rarity **trade** floor to every badge regardless of scope, so a Games badge advertised "25+ total trades". **Later still on 17 Sep 2026, R104 closed the reason none of this could be SEEN** — the journey editor fetched before it knew which maps exist, asked for the legacy `pirate_cove` id, and rendered its own `zones: []` placeholder over the real design in a race neither request cancelled; both screens quoted the **blueprint's intent** rather than the stored result, so a rebuild that stored 24 milestones and one that stored none printed the same sentence. **The write path was never at fault** — proven by `__tests__/admin/journey-blueprint-round-trip.test.ts` against a real MongoDB — so a document describing R104 as a generation or storage defect is describing something nobody found; **nothing was backfilled**, `journeyState()` now counts out of the collections, and storing zero milestones is a **refusal** carrying the first write error. **Later still on 17 Sep 2026, R105 closed the crash the owner then hit on the Milestone Agent step** - `milestonesToCompact` hands the agent its four `[String]` paths **comma-joined**, the reply is cast `as MilestoneDraft[]` with no field check, and `(m.requiredBadgeIds?.length ?? 0) > 0` **admits a string** because a string has `.length`, so the `.join` beneath it threw and took every proposal the agent had made down with it. **The crash is the smaller half:** Mongoose **wraps a bare string into a one-element array and validates it**, so a gate stored as `["trade_25,risk_survivor"]` names a badge nobody can hold and the milestone is **locked for ever**, silently - and the same path reaches badges' `gameTypes`, whose update branch dropped a non-array without a word. One model-free module (`apps/admin/lib/admin/milestone-id-lists.ts`, R58) is now the single reading, applied at the writer, at the **agent's reply** and on the badge path. **No XP, badge or prize was ever computed or paid wrongly and nothing was backfilled** - whether a live milestone already carries a comma-joined gate is unanswered, so a document calling R105 fully swept is wrong. Never verified by eye |
 | **Is there one leaderboard or three?** | **THREE BOARDS, ONE LAYOUT, amended later on 17 Sep 2026.** Dropdown is **Global Leaderboard**, **Trading Leaderboard**, **Games Leaderboard** only — per-game boards (Circuit Sprint, etc.) were removed on owner instruction. All three share Trading's chrome (search, filters, rank badges, clickable name → ProfileCard, friend/challenge). The **Global** standing still ranks on seven things by **position within each**, weighted trading 25 / games 25 / competitions 15 / challenges 10 / level 10 / badges 8 / milestones 7, **editable under Badges & XP -> Global Rank**. Absent figures render **`—`, never `0`**. Redistribution for non-players and R29 pins unchanged. A document naming "Trading performance", "Games performance", or a per-game board in the dropdown is correct as history and stale as a present fact; **say which**. **Never verified by eye**; level titles are still trading-shaped |
-| **Player screens** | **R37 closed 6 Sep 2026, and it is the one to read first if a provider board looks odd.** Neither app's `getCompetitionLeaderboard` passed `score` or `scoreDirection` to the ranking engine, so **every provider participant tied on zero and the board rendered in tie-break order** - and a lower-is-better title was *reversed on screen while correct at settlement*, so a player could lead all week and be paid last. **Latent for money, live for players:** settlement resolves both fields itself, so no payout was ever wrong and **nothing was backfilled**. Fixed by moving `resolveScoreDirection` out of settlement into a shared mirrored module used by all three consumers. Same day, `RoundPreflight` stopped offering an enabled **Play** button on a contest that had not started, and **the lobby became game-aware** - `app/(root)/competitions/[id]/page.tsx` now branches to `ProviderContestLobby`, which shows the play window, attempts remaining and what happens if a round never finishes, with a score leaderboard instead of one whose columns are profit and loss. The trading path below the branch is **byte-identical**. Also 6 Sep 2026, **the dashboard contest cards became game-aware** (`13` s5.1a) - and the load-bearing part is that **the plan named the wrong components**: `ActiveCompetitionCard` and `CompetitionsTable` are both orphaned, and the live one is `ContestsSidebar`, which no chapter mentioned. Fixing only what the plan named would have closed the item with the defect still on screen. See `13` s4.1a and s5.1a for exactly what is and is not built - **the trading panels, the per-game summary cards and the mega-action split are still outstanding**. Finally, on **owner instruction 6 Sep 2026, BOTH lobbies were rebuilt on one design kit** (`13` s4.1d) - `components/neon/`, from a component sheet the owner supplied, with four generated hero banners. This **superseded s4.1c of the same morning, which had made the game lobby match the trading lobby**: the sheet is now the reference and the trading lobby is one of the two screens that moved to meet it, so a document citing s4.1c's gold hero or its 3D icon rule as current is stale. The trading page is **down from 1,224 lines to 377**, with its hero, sidebar, accordions and prize table extracted into `components/trading/lobby/`, and its nine always-open sidebar cards are now four open items and six accordions - **what stayed open is pinned by a test**, because burying a decision a trader acts on is the same class of error as an aggregate that quietly means trading only. The consistency guard changed shape with it: **one definition, and no screen has chrome of its own**, because pairwise class-string comparison does not survive the sheet's seven screens. The cost is stated rather than glossed - **the trading page is no longer byte-identical**, so the money calculation was extracted whole and four of its expressions are asserted character for character. **Neither lobby has been seen by eye**; both are behind sign-in and the automated browser has no session, so owner review is the remaining step |
+| **Player screens** | **R37 closed 6 Sep 2026, and it is the one to read first if a provider board looks odd.** Neither app's `getCompetitionLeaderboard` passed `score` or `scoreDirection` to the ranking engine, so **every provider participant tied on zero and the board rendered in tie-break order** - and a lower-is-better title was *reversed on screen while correct at settlement*, so a player could lead all week and be paid last. **Latent for money, live for players:** settlement resolves both fields itself, so no payout was ever wrong and **nothing was backfilled**. Fixed by moving `resolveScoreDirection` out of settlement into a shared mirrored module used by all three consumers. Same day, `RoundPreflight` stopped offering an enabled **Play** button on a contest that had not started, and **the lobby became game-aware** - `app/(root)/competitions/[id]/page.tsx` now branches to `ProviderContestLobby`, which shows the play window, attempts remaining and what happens if a round never finishes, with a score leaderboard instead of one whose columns are profit and loss. The trading path below the branch is **byte-identical**. Also 6 Sep 2026, **the dashboard contest cards became game-aware** (`13` s5.1a) - and the load-bearing part is that **the plan named the wrong components**: `ActiveCompetitionCard` and `CompetitionsTable` are both orphaned, and the live one is `ContestsSidebar`, which no chapter mentioned. Fixing only what the plan named would have closed the item with the defect still on screen. See `13` s4.1a and s5.1a for exactly what is and is not built - **the trading panels** remain; ~~the per-game summary cards and the mega-action split are still outstanding~~ **both CLOSED 18 Sep 2026** (`13` s5.1f / s5.1d) — say which. Finally, on **owner instruction 6 Sep 2026, BOTH lobbies were rebuilt on one design kit** (`13` s4.1d) - `components/neon/`, from a component sheet the owner supplied, with four generated hero banners. This **superseded s4.1c of the same morning, which had made the game lobby match the trading lobby**: the sheet is now the reference and the trading lobby is one of the two screens that moved to meet it, so a document citing s4.1c's gold hero or its 3D icon rule as current is stale. The trading page is **down from 1,224 lines to 377**, with its hero, sidebar, accordions and prize table extracted into `components/trading/lobby/`, and its nine always-open sidebar cards are now four open items and six accordions - **what stayed open is pinned by a test**, because burying a decision a trader acts on is the same class of error as an aggregate that quietly means trading only. The consistency guard changed shape with it: **one definition, and no screen has chrome of its own**, because pairwise class-string comparison does not survive the sheet's seven screens. The cost is stated rather than glossed - **the trading page is no longer byte-identical**, so the money calculation was extracted whole and four of its expressions are asserted character for character. **Neither lobby has been seen by eye**; both are behind sign-in and the automated browser has no session, so owner review is the remaining step |
 | **First round crossed the wall** | **7 September 2026.** A round now travels between the two halves: created by the platform, played by real moves, scored by the service, delivered back **signed over a real socket**, ingested through all eleven gates and **paid out as real prize money**. `__tests__/games/end-to-end-round.test.ts`, `npm run test:e2e-round`, three tests, three probes red. **This closes the gap 4.1a names** - the adapter's 49 tests run against a *stubbed* `fetch` and the service's 167 run in-process, so neither could ever fail because the other side disagreed. **Two things are substituted and must not be glossed:** the Next routing layer (the callback goes to a bare `node:http` server that does exactly what the real route does - read raw bytes, call the one ingestion function) and the browser. **It is still not the acceptance criterion**, which says *by clicking* - that needs two sessions this environment cannot create, so it is a runbook in `21` s4.1e. **And the finding is that there was no finding:** every earlier phase produced live defects on contact and the first real round produced none in the product. The three it did surface were in the new test driver and the map it was written from |
 | **The play surface itself** | **Rebuilt 7 Sep 2026** (`21` s4.1f) on the owner's report that the board was small and ugly, had no instructions, and had a bad result screen. All three were true and **none was findable by any test here**, because all three lived in `app.js`, which touches `document` at module scope and therefore cannot be imported. **The board was stuck at its minimum cell size by a feedback loop**: the frame reported its own `scrollHeight`, the stylesheet sizes the page to `100dvh` - inside an iframe, the iframe's own height - so the game measured the frame and the platform sized the frame to the measurement, agreeing on the host's 320-pixel floor. Cells went **34 -> 75** once the height became a request derived from the grid. **The result screen's heading was a lookup on the status**, and `completed` covers both a clock expiring and a Perfect player finishing every board, so **the player who had done everything the game asked was congratulated for running out of time**. And **the rules had two homes** - markup and each title's `howToPlay` - which had already drifted; they now live in `src/games/instructions.ts` and reach the frame in the round state, along with `title` and the previously-absent `scoring`, without which a player in a paid contest could not tell from inside the game whether a fast board beat a finished one. The numbers and wording moved into `public/play/presentation.js` so they could be asserted at all: **196 tests, 19 probes**, and **verified by eye on both titles** at desktop and phone sizes - which the platform's own lobbies could not be, being behind sign-in |
 | **Can an operator rename the platform's nouns?** | **Yes, from 15 Sep 2026** - X6.5's A1 shipped the token layer and A2/A3 put the contest wizard, the contest list and the contest detail screen through it. An operator edits Settings -> Wording and the admin app reads their noun with no deploy. **The instruction in chapter `14` could not work, and following it would have shipped a wording layer that silently served defaults everywhere**: it says to deliver through `AppSettingsProvider` because "the delivery mechanism exists and is proven", and that provider was **mounted nowhere in `apps/admin`** until **R110 (18 Sep 2026)** - nineteen components called `useAppSettings()` and every one of them received the `createContext` defaults, which is why the configured credit symbol never reached an admin screen. **"The mechanism exists and is proven" was a claim about a file, never about a render tree.** Terminology therefore ships through its own `TerminologyProvider` in the admin root layout (still separate — credit symbol and noun overrides are different packs), and the **canary that asserted `AppSettingsProvider` was unmounted was flipped, not deleted**, when R110 mounted it. A document saying the credit symbol never reaches admin screens is correct as history and stale as a present fact — **say which**. **The guard bans three things beyond a missing token**, and the last two are the ones a word list could not express: a renameable noun surviving as a **literal** in displayed text, any **case-folding or pluralisation** of a token (`terms.prize + "s"` is how an operator's renamed noun becomes a word they never chose), and any tokenising of a **route id or status value** - `activeTab=competitions` and `"completed"` are on the never-rename list, so a pass that renames them is a production defect wearing a copy change. Two owner decisions the same day: a token may sit mid-sentence after a determiner, accepting Title Case; and **"Participant(s)" is a synonym of the `players` token** rather than a token of its own, so an operator has one noun to rename instead of two that can disagree. **A3b and A3c landed later the same day**, so a document listing either as outstanding is correct as history and stale as a present fact - **say which**. A3b closed the lowercase prose, and the reason it had been left is worth keeping: the Title Case scanner is scoped that way deliberately, because the lowercase forms are *also* route ids and stored status values, so **the headings were tokenised while the sentences underneath them still explained how a competition works** - the new scanner demands a display signal (a quoted span with a space, or three-plus plain words) rather than matching the word anywhere, or it fires on every route id in the tree. A3c put the operator's nouns inside **both AI content assistants**, which is where the largest inconsistency would have shipped: those two *write sentences*, so a renamed deployment had a wizard labelled Tournament sitting directly above a generated description that said Competition. The clause is a **diff against the defaults, appended and therefore last**, empty when nothing is renamed - which is the only reason `TRADING_SYSTEM_PROMPT_HISTORICAL` survives being asserted character for character - it **enumerates no token** (a diff over `TERMINOLOGY_TOKENS`, so a new token is covered the day it lands), and **`terms` has no default value on any of the three vocabulary functions**, because an optional parameter gives a forgotten call site fluent English in the operator's *old* vocabulary with nothing thrown. **A4 landed 15 Sep too**, 61 sites rather than the ~30 the chapter sized, and it found **R92** - every challenge on both screens reported a P&L, an ROI, a trade count and a win rate, because the snapshot fields declared only trading's numbers and **nothing had ever written a score**, so both halves of the seam were missing at once. **The write half is closed and the read half is not**: `rg` found **seven** readers where the task named two, and the five that remain carry a **canary asserting each is still an offender** - the two worth knowing being the **player's own** result page, which shows the person who paid `$0.00` and `0 trades` (X7 by phase), and the **AI agent**, handed a `challenger_pnl` it will state in a sentence, which is **A6 in this very phase**. The ledger's **labels** are tokenised and its **keys** are not, since those are stored enum values on documents already written. **A6 landed 15 Sep too, so two clauses above are correct as history and stale as present facts - say which.** The agent claim was **wrong** and is corrected rather than reworded: those lines fell back to **`"—"`, not `0`**, so it invented nothing - the defect was that it had **no performance figure** for a provider challenge to explain a win with, and the phantom zeros in that file were on its **competition** reports. Both are closed, so **four readers remain, not five**. A6 was sized as "Content" in the chapter and **two thirds of it were defects**: the knowledge base opened *"ChartVolt is a trading competition platform"*, so asked about a provider game the agent answered out of the trading material - with a starting capital, a leverage setting and screens that do not exist - and **every navigation path in it was stale** since the 2 Sep nav restructure, which is worse than no instruction because the operator concludes the feature is missing. Paths were re-derived **from `menuGroups`, never from the prose**, which is how **R93** surfaced: the credit-conversion screen the file sent operators to is **mounted nowhere**, so the EUR-to-credits rate is genuinely unreachable. The games material **enumerates no game**, pinned by a test. And one thing found there is not a wording defect: the winner tool ordered participants on `pnl` with no stored leaderboard, and **ordering on `score` instead does not fix it** - the direction lives on the catalogue title, so on a time trial a guess names the **loser** and hands them a medal; it now **declines** and says why. **AMENDED 16 Sep 2026: "four readers remain" is correct as history and stale as a present fact - say which.** The owner took the **three admin readers and R90's remainder** ahead of A5, on the grounds that they are an hour or two and they stop X7 inheriting the pattern, so `ChallengesAdminSection.tsx`'s drawer and **both** copies of `profile.actions.ts` are closed and **one** reader remains: the player's own challenge result page, which is X7. The finding from that pass is that **removing a phantom zero is not a display-only change** - two profile screens called `pnl.toFixed(2)` inline, so the moment the action returned `null` they would have thrown; something downstream was relying on the zero being printable, and the answer is one shared rule (`lib/utils/profile-result-metric.ts`) that **decides by GAME rather than by which figures are present**, since `buildParticipantSeat` writes `pnl: 0` onto every seat whatever the game. **Outstanding:** A5 only, and by owner decision its content is owner work and it is now scheduled **last** in X6.5 |
 | **The level ladder an operator cannot fully rename** | **R88, found and CLOSED 15 Sep 2026, and it brought three more with it - R89, R90, R91.** Chapter `14` calls the twenty level titles the highest-value single wording change and says it is "a **database edit**, not a code change" - and the last clause is false, which is the **third** time a chapter's claim about the code has been wrong after R7's severity and R31's branch. Two functions share the name `getTitleByXP`: an **async** one reading `XPConfig` from the database, and a **synchronous** one reading a hard-coded twenty-entry array in `lib/constants/levels.ts`. The XP award path uses the database one and **stores its answer** on `UserLevel.currentTitle`; **five read sites use the constant** - the public leaderboard route, both apps' `competition.actions.ts`, the admin global leaderboard, and the contest-entry level gate - so renaming the ladder changes the profile while **every leaderboard row keeps saying "Novice Trader"**, and a player refused paid entry is told the name of a level that no longer exists. Nothing throws and nothing logs. **The leaderboard route is the sharpest instance:** it already receives the `UserLevel` documents **carrying the stored title** and discards that field to recompute from the constant, so the correct value was in hand and thrown away - which is what decides the fix. **Latent, a reporting defect, no money anywhere near it, nothing to backfill** - the stored field is right and the readers ignore it. What it actually costs is that pass 2 is costed as a free admin edit and is not one, and **shipping it as one is worse than not doing it**, since the titles become inconsistent across screens rather than uniformly trading-themed. Both copies of `levels.ts` are byte-identical today and `check:mirrors` compares **models**, so it has never had an opinion about either. **AMENDED on closing it, and three of the sentences above are correct as history and stale as present facts - say which.** There were **six** read sites, not five (`app/(root)/competitions/[id]/page.tsx`), plus `comprehensive-dashboard.actions.ts` making the same disagreement face the *other* way, which is why the dashboard and the profile disagreed with each other rather than both being wrong together - **fifth instance of the counting rule.** And **the prescription in the sentence about the leaderboard route is WRONG**: `currentTitle` is a cache written at XP-award time, so reading it leaves a renamed ladder stale on every row until each player next earns XP - **some rows renamed and some not, which is the inconsistency a player reports as a bug** rather than a uniformly old name nobody questions. The fix reads the **ladder**, once per board and passed in, through `lib/utils/level-title.ts` (mirrored, model-free by R58); the stored title answers only for a rung an operator saved blank; and **icon and colour still come from the code ladder**, matched on the level number, because a title is words an operator owns while an icon is a key into `GAME_ICONS` and a colour is a Tailwind class. **The paid-entry gate is the site that was not a display at all** - it compared against the constant's thresholds, so an operator who moved one got refusals computed on numbers nobody had configured. 50 tests, 19 probes |
 | **Three defects the ladder fix walked into** | **All three found while fixing R88 and none of them by planned work.** **R89** - four routes over the ladder, its XP values and every player's identity with **no authorization of any kind**, found by **counting exported handlers against guards** rather than by reading routes (the ninth instance of that class). Two of them write, and `seed-badges-xp` **force-resets the whole configuration on its GET**, so a URL in a browser was enough; `badges-xp` handed out a paginated list of real users. **LIVE, no attribution, nothing backfilled** - no money moved, but a rewritten ladder changes **who may enter a paid contest**. **R90** - six screens that named the rungs themselves, and the finding is that they read **no ladder at all**: each held the **difficulty-band vocabulary mislabelled as levels**, so they were **wrong by position** rather than stale, and every map stopped at 10 of 20. Live and player-facing, **display only** since the gate compares numbers. **A vocabulary guard is impossible here** - one offending file holds `DIFFICULTY_STYLES` keyed on those identical words, legitimately - so the guard is by **reach** and is **directory-scanned**, which is why it now covers a screen written tomorrow. It was found **twice**: the first pass fixed two files and shipped with no test, which is how sites three to six outlived a fix, a commit and a register entry. `app/(root)/gamemaster/create-competition/page.tsx` was the **recorded remainder**, exempt with its reason and a **canary asserting it is still an offender** - **CLOSED 16 Sep 2026, so that clause is correct as history and stale as a present fact; say which.** The canary fired on the day the defect closed and was **flipped, not deleted**. **The cap was the worse of the two defects and was not in the report**: wrong rung names are a display fault, a `maxLevel` dropdown stopping at 10 of 20 is a **missing capability**, so no Game Master could gate a contest above halfway whatever the operator's ladder said. Closing it needed a **server/client split rather than a prop**, the page having been `"use client"` from its first line with nowhere to `await` the ladder. **R91** - the ladder **editor** seeded its state with a hard-coded ten-rung ladder and `saveLevels` POSTs whatever state holds to a whole-document replacement with no merge and no length check, so **one failed GET followed by one save replaced a renamed twenty-rung ladder with ten stale rungs**. The only **write** in the family. **The fix is a refusal, not a better default** - seeding the canonical twenty would overwrite an operator's renames with ours, and a stored value and an absent one are different facts |
-| **Next action** | **Owner ops 1–2 DONE. R101ad CLOSED. R110 CLOSED. R60 CLOSED** (MessagingSection Transfer-to). **R43/R26 compensation: leave-it.** Engineering next from the unfinished safety/demo path: **R59** (dialog sweep — needs owner decision), **R93** (credit EUR rate UI — needs owner scope), or X6.5 leftovers other than A5 (A5 stays last). **X4a** click acceptance and commercial provider search remain parallel owner/commercial tracks — risk **X8** stays OPEN until players can pay/play/be paid for real. **Technically still useful:** drive one provider round end to end by clicking if not already done (`21` s4.1e; one-minute contest length). Provider health shipped; GM construction of provider contests stays blocked on `19` s5 economics |
+| **Next action** | **Per-game summary cards CLOSED** (`13` s5.1f). **Arena Score-vs-PnL chrome CLOSED** (`13` s5.1e). **R21 / R92 / s5.1c / GettingStarted / R64 / R1 CLOSED.** **R59 / R93 / R101 / R110 / X6.5 eng leftovers CLOSED.** **A5 wiki last (owner).** **X4a** click-acceptance + **commercial Track A last** (owner). **R99** catalogue merge is owner-deferred. Risk **X8** OPEN. Next eng: owner items, or remaining player-surface polish. R43/R26 leave-it. GM provider construction blocked on `19` s5 |
 | **Admin lifecycle controls** | **Code-complete 7 Sep 2026** (`12` s3.2a), and it found the worst authorization defect in the programme. `POST /api/finalize-old-competitions` had **no authentication of any kind** - **R40**, unauthenticated and reachable *today*, unlike almost everything else here. Any anonymous caller could force-finalize every `completed` competition: closing positions at live prices, writing trade history, and hitting an external forex API per position. Scoped to already-completed contests, so no prize and no wallet movement - **do not round that up, and do not round it down either.** No backfill, and **no way to know whether it was ever called**, because a route with no guard has no attribution. Five siblings authenticated on **admin-at-all rather than section access**, the sixth instance of that class. Separately, **pausing a provider contest did nothing at all** (**R41**): `isPaused` was never read by the launch service, so an operator got a success toast, a banner and a notification to every participant while play continued - and this is the route `IncidentsSection.tsx` calls when an incident is raised. Latent, since no provider contest has run in production. The rule from it: **a capability the platform already has does not extend to a new game by itself, and the way it fails is silence** |
 | **Admin provider settlement** | **Fixed 7 Sep 2026 (R42)**, found by verifying a mapping subagent's claim rather than by planned work. `apps/admin`'s `finalizeCompetition` had **no provider dispatch** - only `routeToTradingSettlement`, which answers "may *trading* settle this" - so a provider contest reaching the admin cron was refused and left `active`. **Both apps register `checkAndFinalizeCompetitions` on an every-minute cron**, so whether a provider contest settled was decided by which process claimed it first. **R26's shape one layer out and worse**: R26 skipped the Game Master's commission while still paying the players, this paid **nobody and completed nothing**. Latent - no provider contest has settled in production, **nothing backfilled**. Two instruments were silent and both are ones we trust: `provider-finalize.ts` and `provider-settlement.service.ts` were **already mirrored here and imported by nothing**, so `check:mirrors` agreed correctly, and the file-size gap that found R26 has closed to 8 KB so it raises nothing. The rule that now replaces both instances: **the four finalize functions are not four copies of one function, and a capability added to one is not thereby added to the others** |
 | **The universal cut-off** | **R44 closed 7 Sep 2026**, answering the owner's question about one player finishing while another is still going. **Half the answer was already right** - `createRound` clamps a round to `playWindowEnd` and `12` s2.3 makes that the contest clock, so there is one cut-off for everybody. **The missing half was the handover and it cost a player money:** `checkAndFinalizeCompetitions` claims any contest past `endTime` every minute, so settlement ran **before the grace window had even opened**, and a player finishing at 13:59:50 had their result refused as late, was ranked on nothing and **paid nothing for a round they completed.** Settlement now defers until the window closes - **refusing a manual admin finalize too**, because forcing it destroys those scores invisibly - then marks what never reported **`unresolved`, never `voided`**. `voided` would have silently overridden all three configured policies with "score zero, nothing owed". **The sibling finding is larger: nothing in the running system had ever written `unresolved`**, because the reconciliation net that was designed to is **unscheduled** (E7), so `exclude` and `hold_and_alert` were controls that could not fire and a round sat `launched` for ever against a finished contest. **Latent, nothing backfilled.** `07` s2.3b. **The two questions this row used to list as unanswered - what a contest pays when nobody scored, and where an unclaimed rank's share goes - were answered the same day by R45.** One remains genuinely open, and it is narrower than the pair it replaces: whether an all-unscored contest should **refund** its entrants rather than route the pot to the unclaimed pool |
@@ -110,11 +110,12 @@ rediscovered as new findings later.
 | Item | Why it is deferred | Where it is specified |
 |---|---|---|
 | **Sections that were missing from `ADMIN_SECTIONS`** - `journey-map`, `gamification-wizard`, `vendors` and others; **`system-announcements` added 16 Sep 2026 (R101x)**; **`mdb-cluster` added 16 Sep 2026 (R101y)**; **`data-cleanup` and `data-maintenance` added 16 Sep 2026 (R101ac)** | Owner decision 2 Sep 2026: **do later** for the remainder. Add-only. Both were menu ids only until a slice needed to name the grant | `12` section 1, "RBAC - do not forget this" |
-| **Sidebar clicks do not write the URL** | Pre-existing across all ~60 admin sections. Deep links work *inbound*; the address bar just does not track the current section. Belongs with the X6.5 admin pass | `12` s1.1a, "One pre-existing limitation" |
+| **Sidebar clicks write the URL** | **Closed 18 Sep 2026 (X6.5 leftover).** `navigateToSection` `router.replace`s `?activeTab=<sectionId>`; sidebar, trading tabs and overview `onNavigate` share it. Deep links still work inbound. Pinned by `__tests__/admin/sidebar-url-sync.test.ts` | `12` s1.1a |
+| **`closePosition` refuses `completed` / `finalizing`** | **Closed 18 Sep 2026 (X6.5 leftover from R77).** Same status check as `cancelled`; pinned by `__tests__/services/close-position-terminal-status.test.ts` | `12` s3.2b; `17` R77 |
+| **Financial → Analytics game-revenue cross-link** | **Closed 18 Sep 2026 (X6.5 leftover from s5.1a).** Overview card links to `?activeTab=analytics`; figures stay on one screen. Pinned by `__tests__/admin/financial-analytics-cross-link.test.ts` | `12` s5.1a |
 | **The `tradingEnabled` conditional that hides the Trading destination** | Genuinely blocked - the flag does not exist until X1 introduces it. **"Built" does not include it** | `12` s1, target grouping |
 | **A popup when an open challenge is CREATED** | Owner request 14 Sep 2026, taken after the notification seam shipped. Deferred one step because the seam delivers to **one named recipient** and this is a fan-out to strangers, so it needs a who-gets-told decision before a writer - and an unbounded broadcast is the fastest way to make every other challenge notification get muted | `13` s11.1a; the seam is `lib/services/notifications/delivery.ts` |
 | **A screen for `adjust-results`** | **CLOSED 17 Sep 2026** (`12` s3.2c) - `AdjustResultsPanel` on the completed contest view. A document listing this as outstanding is correct as history and stale as a present fact - **say which** | `12` s3.2c |
-| **`closePosition` permits a close on a `completed` or `finalizing` contest** | Pre-existing on the trading path and a real hazard - a close after the leaderboard snapshot - so it needs its own regression evidence rather than arriving inside R77's fix | `12` s3.2b; `17` R77 |
 
 **The first is invisible-by-default, which is why it is worth stating rather than listing.**
 `ADMIN_SECTIONS` is what allows a section to be granted to an employee at all, so those
@@ -311,7 +312,9 @@ project low risk.
 
 ## START HERE NEXT
 
-This plan has two tracks, and the commercial one is currently the blocker.
+This plan has two tracks. **As of 18 September 2026**, engineering on the X4a *code* path
+is handed off: what remains is **owner click-acceptance** (`21` s4.1e) and this commercial
+track. Neither needs more code until a runbook step fails or a provider answers Gate 1.
 
 ### Track A - commercial (blocking, no engineering needed)
 
@@ -448,7 +451,7 @@ numbers in chapters `01`-`09` remain resolvable. **Plan against the X-phases bel
 | **X4** | Real adapter against sandbox | `09` E3 | 1 week | `NOT STARTED` - **blocked on a signed provider**. X4a shrinks it but **does not replace it**: a harness we control cannot rehearse a real partner's auth, error shapes, latency or pricing |
 | **X5** | Contest integration + settlement | `09` E4 | 1 week | **`CODE-COMPLETE`** 4 Sep 2026, **with two P0 payout defects found and fixed 5 Sep 2026** - publish, entry, ranking, round launch, settlement and **all three unresolved-round policies**. **A provider contest can be published, entered, played and paid. Publishing became clickable on 5 Sep 2026 (X6 slice), and the player round launch on the same day (`13` s1.1a) - the lifecycle is no longer API-only anywhere.** Settlement was an **extraction**: the payout, fee/GM and completion stages moved to `lib/services/settlement/` and trading was rewired onto them. Closing `exclude` also closed **`hold_and_alert`**, which nothing had ever consumed. **The two P0s are why "code-complete" must never be read as "correct":** no code path wrote `participant.score`, so every player settled on zero and split the pool equally; and settlement read `scoreDirection` off a field neither participant copy declared, so a lower-is-better game paid the slowest player first |
 | **X6** | Admin: nav restructure incl. **the single Trading section**, RBAC, provider registration, game-aware wizard, analytics, **GM creation API + wizard** | `09` E5 + `12` + `19` | 3-3.5 weeks | `PARTIALLY DONE` - nav restructure and single Trading destination **built and owner-tested 2 Sep 2026**. **Provider registration, credentials and the per-title catalogue switch code-complete 4 Sep 2026** (`12` s4.1a). **Contest wizard from `configSchema` + pre-flight validation code-complete 4 Sep 2026** (`12` s2.1) - creates a **draft**. **The publish control is code-complete 5 Sep 2026** (`12` s3.1a), which also made the competitions list game-aware: `draft` admitted as a status, its own badge, a Drafts count, a provider game badge, and the trading Edit button **withheld** from provider contests because `PUT /api/competitions/[id]` blind-assigns that form's body. **The round inspector and manual resolution are code-complete 5 Sep 2026** (`12` s4.2a) - read-only inspection plus **ending** a stuck round (void/abandoned/expired) with a mandatory reason; it deliberately **cannot enter a score**. **Provider health code-complete 6 Sep 2026** (`12` s4.2b), which completed the five admin destinations. **Provider contest editing code-complete 7 Sep 2026** (`12` s2.2) - the Edit button now **routes by game** rather than being withheld, and the withholding turned out to be covering a **live mass-assignment vulnerability on the trading path**: `PUT /api/competitions/[id]` authenticated on token validity rather than section access, so any admin-token holder could rewrite `gameKey`, `status`, `prizePool` or `currentParticipants` on any contest, trading contests included. **Live-contest controls code-complete 7 Sep 2026** (`12` s3.2a): the plan named three routes and there were **seven**, five of which authenticated on admin-at-all rather than section access and one — `POST /api/finalize-old-competitions` — on **nothing at all** (**R40**, unauthenticated and live). **Pausing a provider contest did nothing** (**R41**): `isPaused` was never read by `round-launch.service.ts`, so an operator got a success toast, a PAUSED banner and a notification while players carried on — and the route is what `IncidentsSection.tsx` calls when an incident is raised. Resume was also extending `endTime`, which gates nothing a player plays inside. Cancelling now voids live rounds through a shared `contest-round-cleanup.ts`, and the operator's control panel — which said **seven trading-shaped things**, including "All positions will be closed at current prices" above the emergency-cancel confirm on a contest with no positions — takes its wording from a model-free `contest-control-copy.ts`. **A fourth defect was fixed 7 Sep 2026 while verifying the X6 mapping work (R42)**: `apps/admin`'s `finalizeCompetition` had **no provider dispatch at all**, so a provider contest reaching the admin cron was refused and left `active` - and since both apps run that cron every minute, whether one settled was a coin flip. Nothing was paid and nothing completed, which is worse than R26's missing stage. **The contest clock and the prize split were fixed 7 Sep 2026** (`12` s2.3), both owner-reported and both the "control that appears to exist and does nothing" shape: the wizard's step is *labelled* "Timing & prizes" and rendered **no prize control**, so every provider contest ever created paid `contest-draft.ts`'s hard-coded 50/30/20 and took its hard-coded 10% fee, while the editor's percentage-only version could not add or remove a rank at all; and the play window was **two more operator-set dates** that nothing kept related to the contest, so `playWindowEnd` - the field `createRound` actually clamps to - could shut play before the contest ended. **Analytics by game and provider, plus the new Game Performance screen, are code-complete 7 Sep 2026** (`12` s5.1a): the analytics route was **guarded on token validity rather than section access** (seventh instance), "Prize %" had **never worked for any game** because nothing writes `metadata.percentage`, "Final P&L" was unconditional and so read `+0.00` for every provider winner (R46 one screen along), and every headline card was captioned as an all-time total while covering the last 50 contests. Game Performance carries **no money at all**, deliberately: it is granted by a new `game-performance` games section while revenue stays behind `analytics` and `financial`. **The Game Master creation gate is code-complete 7 Sep 2026** (`19` s3.2a), and it is the **permission half only** - both routes now refuse a provider contest with a message naming the missing capability, rather than stamping one `gameKey: "provider"` when `gameKey` is immutable. `limits.allowedGameTypes` is declared, defaults to `["trading"]`, and both routes resolve it through one mirrored model-free module with precedence **override → package → cached limits → default** that reports which decided. Three defects came with it (**R47**), none about games: `POST /api/gamemasters/sync-referrals` had **no authentication on either handler** while all four siblings required section access; `update_limits` was a **mass assignment** onto the subdocument holding the daily cap, participant cap and revenue share, written with the raw driver so the schema's `min: 2` never ran; and the **"Comps: ON" badge read the cached flag under a tooltip crediting the package**, so an administrator's explicit deny rendered green while every create was refused. The main route also floored `minParticipants` at **1**. The **creation UI and the construction half are blocked by `19` s5's economic constraint**, not by effort. **Five AI routes were guarded 8 Sep 2026 (R51)** - every handler under `apps/admin/app/api/ai/` had **no authorization of any kind**, so any caller reaching the origin could spend the platform's OpenAI key on an arbitrary prompt, and two of them **write** (badge thresholds and journey milestones); found by counting exported handlers against guards, third instance after R40 and R47. **The game contest wizard was rebuilt on trading's chrome 8 Sep 2026** (`12` s2.8), from an owner report that the two wizards looked like two products: the progress rail, Quick Preview, step cards and the AI content panel are now **one shared shell** in `components/admin/wizard/`, and the assistant's prompt - one hard-coded string saying "trading competition platform... content that attracts traders" - is **composed from the catalogue row** by `ai-contest-vocabulary.ts`, with `gameKey` from the body a lookup key and nothing else. **The trading form moved onto that same shell 8 Sep 2026** (`12` s2.8a), in its own commit so a revert cannot take the game wizard's look with it, and **its client-side market refusal went with it** - `handleSubmit` returned early on `!marketStatus.isOpen`, refusing an operator scheduling Monday's competition on a Saturday, which is the 4 September decision that had never reached the screen. The market **card** deliberately stayed in the trading form rather than moving into the shell. **The admin front page learned about competitions 8 Sep 2026** (`12` s5.1b), and the row read as an aggregate needing a game dimension added when in fact **the page counted no contests at all, of any game** - no competition model, no participant model and no game field appeared anywhere on it. There is now a Live competitions card grouped on `gameKey`, seats attributed to the **contest's** game rather than to the seat's own label (which defaults to `trading` and which the raw-driver Game Master route never sets - R7), and the page's data feed moved from `verifyAdminAuth` to `guardSection("overview")` - eighth instance of that class. It carries **no money at all**, deliberately, for the same RBAC reason as Game Performance. **Trading's own six admin screens are withheld once the platform has stopped trading 8 Sep 2026** (`12` s5.1c), which closed `12` s9's group criterion at the same time: s5's two named components are reached only through the TRADING destination, so withholding the destination closed both rows and four screens neither row named. It is withheld once trading is off **and** has nothing live, because the screens that operate a running trading contest are needed for as long as it runs - and it **hides without revoking**, so a deep link still opens the screen and the tab strip inside it still works. Still outstanding within `12` s5: the per-round provider cost the commercial question needs, which has no data source until X4. Also still outstanding, and not closed by s2.8a: the trading form remains **2,716 lines** and the trading **editor** exposes fewer fields than the trading create form. **A third per-title control landed 9 Sep 2026** (`12` s4.2c, `22` s9): a **Play style** switch on the Games list writing `provider_game.playModeOverride` through its own section-guarded route and audit line, with the resolved style badged on the wizard's game picker. It is a **second** field rather than an edit to the provider's `playMode`, which every catalogue sync rewrites; it is kept out of the title-and-logo editor because it decides when entry closes and how many attempts a paying player gets; and it **withholds itself on a `head_to_head` title with the reason**, since two people cannot play each other at different times. **No rule changed** - `22` s8.2 is unaltered - and no provider-facing change was needed, so the requirements document stays at 1.4 |
-| **X6.5** | **Admin wording pass** - brought forward from X8 so operators never work a games platform labelled "trading" | `14` | 0.5-1 week | `IN PROGRESS` since 15 Sep 2026. **A1-A6 code-complete; adjust-results UI code-complete 17 Sep 2026 (`12` s3.2c).** A1–A6 as previously recorded. **Outstanding:** **A5 only** - owner wiki content by decision - plus the `closePosition` completed/finalizing gap from R77 (not A5). A document listing the adjust-results screen as outstanding is correct as history and stale as a present fact - **say which** |
+| **X6.5** | **Admin wording pass** - brought forward from X8 so operators never work a games platform labelled "trading" | `14` | 0.5-1 week | `IN PROGRESS` since 15 Sep 2026. **A1-A6 code-complete; adjust-results UI code-complete 17 Sep 2026 (`12` s3.2c).** **Three engineering leftovers closed 18 Sep 2026:** `closePosition` refuses `completed`/`finalizing`, sidebar writes `?activeTab=`, Financial → Analytics cross-link. **Outstanding: A5 only** - owner wiki content by decision. A document listing the adjust-results screen or those three leftovers as outstanding is correct as history and stale as a present fact - **say which** |
 | **X7** | Player UI + points, leaderboards, badges, levels, **profile and cross-game stats**, **per-game GM analytics** | `09` E6 + `13` + `05` + `19` | 3-4 weeks | **CODE-COMPLETE 16 Sep 2026** — steps 1–5 (`UserGameStats` writer + stats-backed leaderboard in R14 parallel + private profile cross-game standing + badge/XP scope by `gameKey` + GM earnings stamped/grouped by `gameKey`). **R96b** still needs owner input. Leaderboard default still legacy (Q14). Backfill for GM earning labels is report-only until `--apply` |
 | **X8** | Player wording, `tradingEnabled`, infrastructure gating | `14` + `15` | 1-1.5 weeks | `NOT STARTED` |
 | **X9** | Resilience, reconciliation, monitoring | `09` E7 | 1 week | `NOT STARTED` |
@@ -638,7 +641,7 @@ several read as "does not exist" until you look.
 | Player user search | **Exists**, and already returns friend/block/pending flags | `GET /api/messaging/search/users` |
 | Challenge availability | **A platform-wide boolean, plus a per-game opt-out since 14 Sep 2026** (`20` s1.1a). The boolean had no UI in either app until then, while the create route enforced it throughout | `UserPresence.acceptingChallenges`, `UserGamePreference.willingToBeChallenged` (main app only) |
 | General player preferences | **No such model.** Only notification prefs, `settings.privacy`, and the presence toggle | - |
-| Onboarding | A dismissible checklist, **and one of its five steps is "place your first trade"** | `components/dashboard/GettingStartedCard.tsx` |
+| Onboarding | A dismissible checklist — **game-aware since 18 Sep 2026** (`20` s5). Play step no longer "place your first trade"; trading-off omits trade/position wording | `components/dashboard/GettingStartedCard.tsx`, `lib/utils/getting-started-steps.ts` |
 | Rate limiting | **Exists** with named presets (deposit, withdrawal, login). Add a preset, do not write a second limiter | `lib/utils/rate-limiter.ts` |
 | Payment provider pattern | The model to copy for **game registration UX** - but **not** for storage: it embeds `credentials[]` in the readable document and has a `saveToEnv` flag that writes secrets to `.env` | `apps/admin/components/admin/PaymentProvidersSection.tsx`, `payment-provider.model.ts` |
 
@@ -755,7 +758,7 @@ is an index, not an account.
 | **18** - Redesign the other screen | **Not started** |
 | **19** - AI on the game content screen | **Done** (19.1 storage, 19.2 assistant), both 10 Sep. Setting out to build it found that four of the six content fields the contract REQUIRES were being discarded on every sync (**R63**), so that shipped first. Owner decision the same day: **the AI never writes `rulesSummary` or `howToPlay`**, which are the provider's and are quoted back in prize disputes - enforced by the suggestion type having no such field rather than by a rule somebody must remember. **No SEO or meta description**, deliberately: a provider title has no public page of its own yet, so the field would be written and read by nothing |
 | **20** - AI must be game-agnostic | **Done 10 Sep** (task doc **20.1**). Game-agnostic was already true and pinned since `12` s2.8; what was missing was the *facts*, and it was unbuildable until 19.1 stored the provider's rules. `describeGameFacts` is now the one producer both assistants read, and `VOCABULARY_SELECT` the one projection that fills it - the routes each had their own, which is a field the prompt describes and one screen never fetches. **Three of the eleven facts are deliberately withheld**: attempts and the chosen structure do not exist when the panel runs, and the supported modes would let the model promise a live race for a contest scheduled as play-any-time |
-| **21-24** - Game Performance section | **Done 10 Sep** (task doc **21.1**, **R64**). **The task's premise is false where it points** - the screen actually called Game Performance measures the round lifecycle and names no game, nothing hardcodes Circuit-style labels, and the player's result surfaces have rendered the breakdown generically since 7 Sep, so **22-24 were already satisfied there**. The defect was the admin **per-user Performance tab**, which gated the whole tab on `totalTrades === 0`. **Task 22's declared metric schema is a deliberate deviation and must not be "finished off"**. The **player's own dashboard has the same gap** and is the natural next slice, which is why the service is not mirrored |
+| **21-24** - Game Performance section | **Done 10 Sep** (task doc **21.1**, **R64**). Admin per-user tab closed. **Player dashboard twin CLOSED 18 Sep 2026** — Performance tab game panel. **GettingStarted game-aware CLOSED 18 Sep 2026** (`20` s5). **Public arena leaderboard CLOSED 18 Sep 2026** (`13` s5.1c). **Arena Score-vs-PnL chrome CLOSED 18 Sep 2026** (`13` s5.1e). **R92 player challenge page CLOSED 18 Sep 2026**. **Mega-action (R21) CLOSED 18 Sep 2026** — extract + trade-fetch gate + hide trading chrome. **Per-game summary cards CLOSED 18 Sep 2026** (`13` s5.1f) |
 | **25-27** - Consistency, model review, backward compatibility | **Not started** |
 | **28** - Settlement server-side | **Not verified, likely already true.** Worth confirming rather than assuming - the claim is exactly the kind an aside makes |
 | **29** - Prevent double settlement | **Done.** Optimistic lock on the admin finalize path |
@@ -832,6 +835,228 @@ Newest at the top.
 **Deferred:** what was consciously left for later
 **Next chat should:** the single clearest next action
 ```
+
+---
+
+### 18 Sep 2026 - ARENA SCORE-VS-PNL CHROME (`13` s5.1e)
+
+**Closed the s5.1c leftover.** Server already sorted provider contests on score; `/arena` and
+`TraderChampionshipClient` still painted every row as trading PnL (green/red on `livePnl`).
+
+**What changed**
+- `lib/utils/broadcast-metric.ts` — shared ContestsSidebar twin (Score / neutral cyan vs P&L).
+  Model-free (R58).
+- Arena: `mapEvent` threads `score` / `rank` / `gameType` / `gameKey`; `ranked()` keeps API
+  order for provider; Leaderboard / TraderCard / Spotlight / Podium / H2H paint Score chrome.
+- Championship: EC avatar borders, LR / TP / map dots use `describeBroadcastMetric`; provider
+  seats sort on score, not pnl.
+- `__tests__/games/arena-score-chrome.test.ts` — 12 tests (helper + ranked + structural).
+
+~~**Not built:** per-game summary cards (13 s5)~~ **CLOSED later the same day** (`13` s5.1f) —
+say which. Never verified by eye (needs a live provider contest on `/arena`).
+
+**Next chat should:** owner A5 / X4a / Track A, or remaining player-surface polish.
+
+### 18 Sep 2026 - PER-GAME SUMMARY CARDS (`13` s5.1f)
+
+Section 5's last outstanding row. Profile already had `UserGameStats` via
+`getPlayerGameProfile` (X7 step 3); the dashboard never loaded it.
+
+**What changed**
+- `lib/actions/comprehensive-dashboard.actions.ts` — `getPlayerGameProfile` in parallel with
+  R64 performance (fail soft); payload field `gameStanding`.
+- `components/dashboard/GameSummaryCards.tsx` — contests entered, best finish, rating per
+  stored game. Empty list → null. `bestRank <= 0` → dash. Trading rating → dash (PnL stays
+  on Performance). Q14 caption on the strip. Local view type only (R58).
+- Mounted on Overview after `HeroStatsBar`. Never filters on `getEnabledGameTypes()` (R29).
+- `__tests__/dashboard/game-summary-cards.test.ts` — 6 structural tests.
+
+**Not a second aggregate:** reads the same service as the profile standing card; does not
+recompute points or invent games the player has not played.
+
+**Never verified by eye** (dashboard behind sign-in).
+
+**Next chat should:** owner A5 / X4a / Track A.
+
+### 18 Sep 2026 - R92 FULLY CLOSED (PLAYER CHALLENGE PAGE CANARY)
+
+**The last R92 offender was already fixed in code** — `app/(root)/challenges/[id]/page.tsx`
+early-returns into `ProviderChallengeLobby` via `hasProviderChallengeGameLabel`, which shows
+score head-to-head and never the trading Final Results card. The canary in
+`analytics-terminology.test.ts` still asserted it was an offender because it looked for
+`hasProviderGameLabel|isProviderGame` and never matched the challenge-specific helper, so it
+stayed green on correct code (R60 canary aimed at the wrong string).
+
+**What changed:** canary **flipped, not deleted** — asserts the branch, `ProviderChallengeLobby`,
+and that every `myStats.pnl` read sits *after* the early return. Docs amended so R92 is no
+longer "one reader remains".
+
+~~**Not built:** Arena client Score-vs-PnL chrome still deferred~~ **CLOSED later the same day**
+(`13` s5.1e) — say which. Never verified by eye. (**R21 mega-action CLOSED later the same day** —
+say which.)
+
+### 18 Sep 2026 - R21 DASHBOARD MEGA-ACTION CLOSED
+
+**Closed risk R21.** The ~1,800-line `getComprehensiveDashboardData` was split and trading
+fetches were gated so a games-only player never pays for `TradeHistory` / open positions /
+forex, and never sees zeroed trading chrome.
+
+**What changed**
+- Extract (behaviour-free): `lib/actions/dashboard/{types,charts,process-competitions,process-challenges}.ts`.
+  Composer thinned to ~874 lines; `ComprehensiveDashboardData` re-exported for existing importers.
+- Gate: `needsTradeHistory = tradingEnabled || TradeHistory.exists(userId)` (R29 keeps former
+  traders). Skips both `TradeHistory.find`s, the aggregate, and `TradingPosition` + forex when false.
+- UI: `showTradingChrome` in `DashboardLayout` — absent rings/streaks/trades/holidays, not empty zeros.
+- `__tests__/dashboard/r21-dashboard-extract.test.ts` — 9 structural tests.
+
+**Not built:** ~~per-game summary cards (13 s5)~~ **CLOSED later the same day** (`13` s5.1f) —
+say which. ~~Arena client Score-vs-PnL chrome~~ **CLOSED later
+the same day** (`13` s5.1e) — say which. Never verified by eye (dashboard behind sign-in).
+
+### 18 Sep 2026 - PUBLIC ARENA LEADERBOARD (`13` s5.1c)
+
+**Closed the named exception** left by s5.1b: `GET /api/dashboard/competitions` ranked every
+provider contest on `pnl` and tied every player at zero on the public `/arena` broadcast.
+
+**What changed**
+- `sortParticipants` exported from `dashboard-contest-rank.service.ts` (already the signed-in
+  dashboard's answer).
+- Arena route: selects `score`, labels `gameType`/`gameKey`, provider contests go through
+  `sortParticipants`; trading keeps the in-route live-PnL sort (`aHasTrades`).
+- Canary in `provider-dashboard-cards.test.ts` **flipped, not deleted** (R60).
+- Side-fix: R64 twin's inline `scoreDirection` literals in the dashboard action violated the
+  "action must not sort" structural ban — replaced with `import type { PlayerGamePerformanceRow }`.
+
+~~**Not built:** arena client Score-vs-PnL chrome~~ **CLOSED later the same day** (`13` s5.1e) —
+say which. Never verified by eye (`/arena` is public but needs a live provider contest).
+(**R21 CLOSED later the same day** — say which.)
+
+### 18 Sep 2026 - GETTINGSTARTED GAME-AWARE (20 s5)
+
+**Closed the first-run checklist's trading-only play step** ahead of X11.5, because it is
+a logic change (which steps exist / when complete), not a wording pass.
+
+**What changed**
+- `lib/utils/getting-started-steps.ts` — single builder; play step is always "Play Your
+  First Contest"; when `tradingEnabled` is false the description never mentions a trade
+  or position; completion is `hasPlacedTrade || hasPlayedGame`.
+- `GettingStartedCard.tsx` — imports the builder; trader-shaped chrome copy neutralized.
+- `getComprehensiveDashboardData` exposes `tradingEnabled` from `getEnabledGameTypes`
+  (creation/discovery only — does not filter `gamePerformance`, R29).
+- `DashboardLayout` derives `hasPlayedGame` from `gamePerformance` round counts.
+- `__tests__/dashboard/getting-started-game-aware.test.ts` — 5 tests.
+
+**Not built:** interest inference / matchmaking (rest of X11.5). Never verified by eye.
+(**R21 CLOSED later the same day; challenge result page already CLOSED** — say which.)
+
+### 18 Sep 2026 - R64 PLAYER TWIN CLOSED (DASHBOARD GAME PERFORMANCE)
+
+**Shipped:** player Performance tab shows ranked game rounds via
+`getPlayerGamePerformance` (main-app service) + `PlayerGamePerformancePanel`, fetched in
+`getComprehensiveDashboardData`. Panel sits **above** labelled Trading performance; empty
+list → null. 5 structural tests.
+
+**Files touched:** `lib/services/games/player-game-performance.service.ts`,
+`components/dashboard/PlayerGamePerformancePanel.tsx`, `DashboardLayout.tsx`,
+`comprehensive-dashboard.actions.ts`, admin service header,
+`__tests__/dashboard/player-game-performance-r64.test.ts`, `17`, `PROGRESS`.
+
+**Deviated from plan:** services behaviourally aligned, not forced byte-identical. No
+TerminologyContext on player (admin-only).
+
+**Owner tested:** structural suite green; never verified by eye (sign-in).
+
+**Deferred:** ~~mega-action (R21)~~ — **CLOSED later the same day** (see R21 work-log entry above).
+**R99** catalogue merge remains owner-deferred.
+
+**Next chat should:** owner X4a / commercial Track A / A5 wiki (per-game summary cards CLOSED
+— `13` s5.1f).
+
+---
+
+### 18 Sep 2026 - R1 RESIDUAL CLOSED (UNDER-COUNT PRIZE-POOL SAFEGUARD)
+
+**Shipped:** finalize-time prize-pool integrity now **raises** an under-counted pool as well
+as capping an over-count. Shared helper `lib/services/settlement/prize-pool-integrity.ts`
+(mirrored into admin), wired into both apps' `competition-end.actions.ts` and both
+`provider-settlement.service.ts` copies. Loud log both directions; persists the corrected
+`prizePool`. Free contests (`entryFee` 0) untouched. Entry still owns the `$inc` — this is
+a safety net for a future writer that forgets it.
+
+**Files touched:** `lib/services/settlement/prize-pool-integrity.ts` (+ admin mirror),
+`lib/actions/trading/competition-end.actions.ts`,
+`apps/admin/lib/actions/trading/competition-end.actions.ts`,
+both `provider-settlement.service.ts` copies,
+`__tests__/services/prize-pool-integrity.test.ts`,
+`__tests__/services/provider-settlement.test.ts`,
+`External game plans/17-risk-register.md`, `External game plans/PROGRESS.md`.
+
+**Deviated from plan:** no separate "admin alert" document — same `console.error` pattern
+the over-count branch already used; inventing a second alert channel was out of scope.
+
+**Owner tested:** unit + provider settlement under-count case green (9 related tests).
+
+**Deferred:** none on this residual. Commercial Gate 1 / X4a click-acceptance stay owner.
+
+**Next chat should:** ~~**R99** catalogue alignment~~ — owner-deferred; **R64 player twin**
+shipped same day; next is dashboard trading-shaped leftovers or owner X4a / commercial.
+
+---
+
+### 18 Sep 2026 - X4a HANDOFF (CLICK ACCEPTANCE + COMMERCIAL)
+
+**Shipped:** no product code — X4a click acceptance cannot be closed without an admin session
+and two player sessions. Engineering confirmed the runbook path, fixed a **stale
+`deploy/README.md` step** that still promised Circuit Perfect after its retirement, and
+aligned `21` s4.1e with the deploy twin (one-minute Sprint contest, rebuild reminder).
+
+**Files touched:** `deploy/README.md`, `External game plans/21-reference-provider-and-mock-game.md`,
+`External game plans/PROGRESS.md`.
+
+**Deviated from plan:** none — this is the owner/commercial track `10` and `21` already named.
+
+**Owner tested:** awaiting owner. Steps: deploy games-service → register ChartVolt Games →
+sync → enable → one-minute Sprint contest → publish → two players → confirm payout order.
+
+**Deferred / parallel:** commercial Track A (Gate 1 emails) — no engineering. Risk X8 open
+until click-acceptance lands and/or a third-party provider is signed.
+
+**Next chat should:** wait for owner click-acceptance result or commercial Gate 1 replies;
+do not invent further X4a code until a runbook step fails.
+
+---
+
+### 18 Sep 2026 - X6.5 ENGINEERING LEFTOVERS (NOT A5)
+
+**Shipped:** three X6.5 leftovers other than A5. (1) `closePosition` refuses `cancelled` |
+`completed` | `finalizing` — closing after/during the leaderboard snapshot can no longer
+move capital settlement already used. (2) Admin sidebar / trading tabs / overview
+`navigateToSection` `router.replace`s `?activeTab=` so the address bar tracks the section
+(inbound deep links already worked). (3) Financial dashboard overview cross-links to
+Competition Analytics for by-game / by-provider contest revenue rather than duplicating
+the arithmetic.
+
+**Files touched:** `lib/actions/trading/position.actions.ts`,
+`apps/admin/components/admin/AdminDashboard.tsx`,
+`apps/admin/components/admin/FinancialDashboard.tsx`,
+`__tests__/services/close-position-terminal-status.test.ts`,
+`__tests__/admin/sidebar-url-sync.test.ts`,
+`__tests__/admin/financial-analytics-cross-link.test.ts`,
+`External game plans/12-admin-panel-plan.md`, `17-risk-register.md` (R77 amendment),
+`PROGRESS.md`.
+
+**Deviated from plan:** none — these are the three leftovers `12` s1.1a / s3.2b / s5.1a
+named for X6.5.
+
+**Owner tested:** not verified by eye (admin / trading behind sign-in). 9 structural tests green.
+
+**Deferred:** X6.5 **A5** only (admin wiki - owner content). X4a click acceptance and
+commercial provider search are owner/commercial tracks, not further engineering on this
+list.
+
+**Next chat should:** owner runs `21` s4.1e click-acceptance runbook and/or commercial
+provider search; engineering idle on X6.5 until A5 content is supplied, or start X8 /
+other backlog the owner names.
 
 ---
 
@@ -2700,13 +2925,14 @@ rate where a document named one).
 owner picked out as "an hour or two, and they stop X7 inheriting the same pattern", which is the
 right reason: every one of them is a screen X7 would otherwise have copied.
 
-**R92's admin half is closed and ONE reader remains.** `ChallengesAdminSection.tsx`'s detail drawer
+**R92's admin half is closed and the player page was already branched** — recorded 16 Sep as
+"ONE reader remains". **That remainder closed 18 Sep 2026**: the canary was wrong about the
+present tense (it never matched `hasProviderChallengeGameLabel`), and was flipped rather than
+deleted. Correct as history that it was listed outstanding — **say which**.
+`ChallengesAdminSection.tsx`'s detail drawer
 wrote the four trading figures **twice, once per side**, and now routes both through the shared
 `ChallengeStatRows`; both copies of `lib/actions/user/profile.actions.ts` report by game and let an
-absent figure stay absent. What is left is **`app/(root)/challenges/[id]/page.tsx`, the player's own
-challenge result page**, which is **X7 by phase rather than deferred by effort** - and it is the
-worst of the seven, because the person reading `$0.00` and `0 trades` for a puzzle is the person who
-paid. Its canary is now the only surviving R92 offender assertion.
+absent figure stay absent.
 
 **Removing a phantom zero is not a display-only change, and this is the finding worth carrying.**
 Closing the two actions **forced a player-UI change nobody had scoped**: `ProfileOverview.tsx` and
@@ -2761,7 +2987,8 @@ the main app and 226 in admin, byte-identical before and after against a `git st
 194 figure is a root `tsc --noEmit` spanning the tests and is **not** comparable to the old "16 main"
 baseline, which covered a narrower program; do not read the difference as a regression.
 
-**Deferred:** the player's own challenge result page (X7). **A5** remains owner work and is now
+**Deferred:** ~~the player's own challenge result page (X7)~~ — **CLOSED 18 Sep 2026** (canary
+flip; lobby branch already shipped). **A5** remains owner work and is now
 scheduled **last** in X6.5 by owner decision. **R93** and **R75** await owner scope calls.
 
 **Next chat should:** take **A5**'s reword plus the empty game-administration topic skeleton, which
@@ -5814,10 +6041,11 @@ dashboard action, and **two more in `app/api/dashboard/competitions/route.ts`**.
 the **public, unauthenticated broadcast display** behind `/arena`, `TraderChampionshipClient.tsx`
 and `deploy/competition-dashboard.html`, and it is trading-shaped - selecting neither `score` nor
 `gameType`, so it would rank a provider contest on `pnl` and tie every player at zero **with no
-sign-in in front of it**. It is **recorded as a named exception carrying a test that asserts it
-is STILL an offender**, not fixed: it is its own finding and its own commit, and a stale
-exception reads as a known problem long after it is solved while silently re-permitting the
-defect (the R60 rule). When it is fixed the canary goes red.
+sign-in in front of it**. It was **recorded as a named exception carrying a test that asserts it
+is STILL an offender**, not fixed in this slice: it is its own finding and its own commit, and a
+stale exception reads as a known problem long after it is solved while silently re-permitting the
+defect (the R60 rule). **CLOSED 18 Sep 2026** (`13` **s5.1c**) — correct as history, stale as a
+present fact, so **say which**.
 
 **The property that was engineered for is AGREEMENT with the action, not liveness.** The player
 sees a figure on load and the endpoint's figure in the same place fifteen seconds later, so any
@@ -5858,8 +6086,10 @@ session.
 
 **Deferred, and not to be summarised as done:**
 
-- **`app/api/dashboard/competitions/route.ts`** - the public arena display, above. Named
-  exception, canary test, its own commit.
+- ~~**`app/api/dashboard/competitions/route.ts`** - the public arena display~~ — **CLOSED 18 Sep
+  2026** (`13` **s5.1c**). Provider contests sort through `sortParticipants`; trading keeps
+  live-PnL. Canary flipped, not deleted. Correct as history that it was a named exception —
+  **say which**.
 - **The play screen's standings sidebar** is still one-shot, and `LiveContestRefresher` must
   **not** be mounted on it - a test forbids it, because that page hosts a live round in an iframe
   and a refresh underneath it can disturb an attempt somebody paid for.
@@ -11087,8 +11317,10 @@ baseline** by stash-diff (main 15, admin 223 - note the recorded main figure of 
 one); `check:mirrors` clean at 79 mirrored, 0 drifted; lints at the pre-existing warning count
 on every touched file. **35 probes across the two harnesses, every one red on the expected test.**
 
-**Deferred:** the trading panels themselves, the per-game summary cards, the mega-action split
-(R21), and `07`'s `provider_health_check` model, which was deliberately not created.
+**Deferred:** the trading panels themselves, ~~the per-game summary cards~~ **CLOSED 18 Sep 2026**
+(`13` s5.1f) — say which, ~~the mega-action split
+(R21)~~ (**CLOSED 18 Sep 2026** — say which), and `07`'s `provider_health_check` model, which was
+deliberately not created.
 
 **Next chat should:** X4a's remaining half - deploy `games-service` to the server, register it
 through the admin screens, and drive one round end to end by clicking.
@@ -13748,7 +13980,7 @@ provider webhook this plan specifies.
 |---|---|
 | ~21 mirrored files, 3 drifted | **75 mirrored model files, 11 drifted.** Plus 19 action and 51 service files duplicated. There were also **112 stale committed declaration files** (57 `.d.ts` + 55 `.d.ts.map`) - all deleted 1 Sep 2026, and never a real third copy since TypeScript ignored them |
 | Mirror drift means "the admin cannot see the field" | **Wrong as stated, measured 1 Sep 2026.** `.lean()` and `toObject()` do not hide the field, and an ordinary `save()` does not strip it. Drift is **write-side**: a missing *enum value* rejects the write outright, and the narrower app cannot write the field at all - silently, while reporting success. The one exception is real and severe: **ordinary `doc.field` access reads `undefined`**, which is how three admin routes lost the ability to restore branding images after a redeploy |
-| The finalize-time safeguard masks the prize-pool gap | It does **not**. It only fires when the pool is too *high*, so an under-counted pool is under-distributed with no correction and no log |
+| The finalize-time safeguard masks the prize-pool gap | It did **not** until 18 Sep 2026. Stage 0 only capped the *high* side; **R1 residual CLOSED** — `prize-pool-integrity.ts` now raises under-counts and caps over-counts at finalize (both apps, trading + provider). Entry still owns the `$inc`; this is a safety net |
 | Two competition join paths | **Four** entry writers, one of which has no callers. Also the challenge *accept* path skips restriction and fraud checks, on a route real players use |
 | Stage 0 is 5-8 days | **6-9 days** |
 

@@ -105,6 +105,12 @@ export default function ArenaPage() {
           liveEquity: (p.liveEquity as number) || 0,
           livePnl: (p.livePnl as number) || 0,
           liveRoi: (p.liveRoi as number) || 0,
+          // Reason: do not coerce absent score to 0 — ContestsSidebar / R50 read-side.
+          score:
+            typeof p.score === 'number' && Number.isFinite(p.score)
+              ? (p.score as number)
+              : undefined,
+          rank: typeof p.rank === 'number' ? (p.rank as number) : undefined,
           realizedPnl: (p.realizedPnl as number) || 0,
           unrealizedPnl: (p.unrealizedPnl as number) || 0,
           currentCapital: (p.currentCapital as number) || 0,
@@ -140,6 +146,8 @@ export default function ArenaPage() {
           description: (ev.description as string) || undefined,
           allowedAssets: (ev.assetClasses as string[]) || (ev.allowedAssets as string[]) || undefined,
           participants,
+          gameType: typeof ev.gameType === 'string' ? (ev.gameType as string) : undefined,
+          gameKey: typeof ev.gameKey === 'string' ? (ev.gameKey as string) : undefined,
         };
       };
 
@@ -270,7 +278,7 @@ export default function ArenaPage() {
   const handleSelectTrader = useCallback((p: Participant) => { setTraderModal(p); }, []);
   const traderRank = useMemo(() => {
     if (!traderModal || !selected) return 1;
-    const sorted = ranked(selected.participants);
+    const sorted = ranked(selected.participants, selected.gameType);
     return Math.max(1, sorted.findIndex(p => p.userId === traderModal.userId) + 1);
   }, [traderModal, selected]);
 
@@ -519,7 +527,13 @@ export default function ArenaPage() {
       </div>
 
       {traderModal && selected && (
-        <TraderCard participant={traderModal} rank={traderRank} startCap={selected.startingCapital} onClose={() => setTraderModal(null)} />
+        <TraderCard
+          participant={traderModal}
+          rank={traderRank}
+          startCap={selected.startingCapital}
+          gameType={selected.gameType}
+          onClose={() => setTraderModal(null)}
+        />
       )}
     </div>
   );

@@ -15,7 +15,12 @@ export async function GET() {
 
   try {
     await connectToDatabase();
-    const rows = await ProviderGame.find({ chartvoltEnabled: true })
+    // Reason: deprecated titles (e.g. circuit-perfect) stay in the catalogue for history
+    // but must not be offered as badge scope — chartvoltEnabled alone is not enough.
+    const rows = await ProviderGame.find({
+      chartvoltEnabled: true,
+      providerStatus: "active",
+    })
       .select({ gameKey: 1, displayName: 1 })
       .lean();
 

@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import type { AEvent, CandleData, BubbleTrade } from '../types';
 import { CV, getTier } from '../constants';
-import { ranked, fmtEquity, fmtRoi, fmtPnl, calcRoi, calcProfitFactor, riskLevel, getTraderTitle, calcSharpe, getAllPositions } from '../helpers';
+import { ranked, fmtEquity, fmtRoi, fmtPnl, calcRoi, calcProfitFactor, riskLevel, getTraderTitle, calcSharpe, getAllPositions, describeBroadcastMetric, isProviderBroadcast } from '../helpers';
 import Avatar from '../Avatar';
 import ArenaIcon from '../ArenaIcon';
 import BroadcastChart from '../BroadcastChart';
@@ -24,18 +24,27 @@ const mono = '"SF Mono", Consolas, "Courier New", monospace';
 const SpotlightScene: React.FC<SpotlightSceneProps> = ({
   event, chartSymbol, chartTf, candles, bubbles, availableSymbols, onSymbolChange, onTfChange,
 }) => {
-  const sorted = useMemo(() => ranked(event.participants), [event.participants]);
+  const sorted = useMemo(
+    () => ranked(event.participants, event.gameType),
+    [event.participants, event.gameType],
+  );
   const [idx, setIdx] = useState(0);
-  const p = sorted[idx];
+  const p = sorted.at(idx);
   if (!p) return <div style={{ color: CV.gray, padding: 40, textAlign: 'center' }}>No participants</div>;
 
   const rank = idx + 1;
   const roi = calcRoi(p.liveEquity, event.startingCapital);
   const pf = calcProfitFactor(p.averageWin, p.averageLoss, p.winningTrades, p.losingTrades);
   const tier = getTier(rank);
-  const risk = riskLevel(p, event.startingCapital);
-  const title = getTraderTitle(p, event.startingCapital);
+  const risk = riskLevel(p, event.startingCapital, event.gameType);
+  const title = getTraderTitle(p, event.startingCapital, event.gameType);
   const sharpe = calcSharpe(roi, pf);
+  const metric = describeBroadcastMetric({
+    gameType: event.gameType,
+    score: p.score,
+    livePnl: p.livePnl,
+  });
+  const provider = isProviderBroadcast(event.gameType);
 
   return (
     <div style={{ display: 'flex', gap: 16 }}>
@@ -110,11 +119,18 @@ const SpotlightScene: React.FC<SpotlightSceneProps> = ({
           <div style={{ padding: '16px 20px' }}>
             {/* Hero grid */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 14 }}>
-              {[
-                { label: 'EQUITY', value: fmtEquity(p.liveEquity), color: CV.teal },
-                { label: 'ROI', value: fmtRoi(roi), color: roi >= 0 ? CV.teal : CV.red },
-                { label: 'P&L', value: fmtPnl(p.livePnl), color: p.livePnl >= 0 ? CV.teal : CV.red },
-              ].map((s, i) => (
+              {(provider
+                ? [
+                    { label: metric.label.toUpperCase(), value: metric.value, color: metric.color },
+                    { label: 'RANK', value: `#${rank}`, color: CV.gold },
+                    { label: 'STATUS', value: p.status || 'active', color: CV.lgt },
+                  ]
+                : [
+                    { label: 'EQUITY', value: fmtEquity(p.liveEquity), color: CV.teal },
+                    { label: 'ROI', value: fmtRoi(roi), color: roi >= 0 ? CV.teal : CV.red },
+                    { label: 'P&L', value: fmtPnl(p.livePnl), color: p.livePnl >= 0 ? CV.teal : CV.red },
+                  ]
+              ).map((s, i) => (
                 <div key={i} style={{
                   background: `linear-gradient(135deg, ${CV.bg3}, ${CV.bg4})`,
                   borderRadius: 10, padding: '10px 6px', textAlign: 'center',

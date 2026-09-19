@@ -3,7 +3,7 @@
 import React from 'react';
 import type { Participant } from './types';
 import { CV, getTier } from './constants';
-import { fmt, fmtEquity, fmtRoi, fmtPnl, calcRoi, calcProfitFactor, calcSharpe, riskLevel, getTraderTitle } from './helpers';
+import { fmt, fmtEquity, fmtRoi, fmtPnl, calcRoi, calcProfitFactor, calcSharpe, riskLevel, getTraderTitle, describeBroadcastMetric, isProviderBroadcast } from './helpers';
 import Avatar from './Avatar';
 import ArenaIcon from './ArenaIcon';
 
@@ -11,16 +11,23 @@ interface TraderCardProps {
   participant: Participant;
   rank: number;
   startCap: number;
+  gameType?: string | null;
   onClose: () => void;
 }
 
-const TraderCard: React.FC<TraderCardProps> = ({ participant: p, rank, startCap, onClose }) => {
+const TraderCard: React.FC<TraderCardProps> = ({ participant: p, rank, startCap, gameType, onClose }) => {
   const tier = getTier(rank);
   const roi = calcRoi(p.liveEquity, startCap);
   const pf = calcProfitFactor(p.averageWin, p.averageLoss, p.winningTrades, p.losingTrades);
   const sharpe = calcSharpe(roi, pf);
-  const risk = riskLevel(p, startCap);
-  const titleObj = getTraderTitle(p, startCap);
+  const risk = riskLevel(p, startCap, gameType);
+  const titleObj = getTraderTitle(p, startCap, gameType);
+  const metric = describeBroadcastMetric({
+    gameType,
+    score: p.score,
+    livePnl: p.livePnl,
+  });
+  const provider = isProviderBroadcast(gameType);
 
   const statRow = (label: string, value: string, color?: string, icon?: string) => (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 0', borderBottom: `1px solid ${CV.bd0}60` }}>
@@ -136,11 +143,18 @@ const TraderCard: React.FC<TraderCardProps> = ({ participant: p, rank, startCap,
         <div style={{ padding: '18px 24px' }}>
           {/* Hero stats */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 18 }}>
-            {[
-              { label: 'Equity', value: fmtEquity(p.liveEquity), color: CV.teal, icon: 'Wallet' },
-              { label: 'ROI', value: fmtRoi(roi), color: roi >= 0 ? CV.teal : CV.red, icon: 'TrendingUp' },
-              { label: 'P&L', value: fmtPnl(p.livePnl), color: p.livePnl >= 0 ? CV.teal : CV.red, icon: 'DollarSign' },
-            ].map((s, i) => (
+            {(provider
+              ? [
+                  { label: metric.label, value: metric.value, color: metric.color, icon: 'Target' },
+                  { label: 'Rank', value: `#${rank}`, color: CV.gold, icon: 'Trophy' },
+                  { label: 'Status', value: p.status || 'active', color: CV.lgt, icon: 'Activity' },
+                ]
+              : [
+                  { label: 'Equity', value: fmtEquity(p.liveEquity), color: CV.teal, icon: 'Wallet' },
+                  { label: 'ROI', value: fmtRoi(roi), color: roi >= 0 ? CV.teal : CV.red, icon: 'TrendingUp' },
+                  { label: 'P&L', value: fmtPnl(p.livePnl), color: p.livePnl >= 0 ? CV.teal : CV.red, icon: 'DollarSign' },
+                ]
+            ).map((s, i) => (
               <div key={i} style={{
                 background: `linear-gradient(135deg, ${CV.bg3}, ${CV.bg4})`,
                 borderRadius: 12, padding: '12px 8px', textAlign: 'center',

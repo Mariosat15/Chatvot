@@ -226,7 +226,9 @@ who has to think in games rather than trades.
 > would otherwise have copied - `ChallengesAdminSection.tsx`'s drawer, which wrote the four
 > trading figures **twice, once per side**, and **both** copies of `profile.actions.ts` - and
 > the remaining reader is the player's own challenge result page, which is X7 by phase rather
-> than deferred by effort. **The transferable finding is that removing a phantom zero is not
+> than deferred by effort. **AMENDED 18 September 2026: that last reader CLOSED (R92)** — the
+> player challenge page branches to `ProviderChallengeLobby` before any `myStats.pnl` read;
+> canary flipped. **Say which.** **The transferable finding is that removing a phantom zero is not
 > a display-only change:** `ProfileOverview.tsx` and `ProfileContent.tsx` each called
 > `pnl.toFixed(2)` inline, so the moment the action returned `null` both would have thrown -
 > **something downstream was relying on the zero being printable** - and the answer is
@@ -418,11 +420,13 @@ and it can happen in parallel with X7.
 > operator owns words and does not own a `GAME_ICONS` key or a Tailwind class. **CLOSED**, with
 > R89, R90 and R91 found on the way.
 
-**One player-side item is deliberately *not* in this chapter.** The getting-started card
-(`components/dashboard/GettingStartedCard.tsx`) has a step "place your first trade". That
+**One player-side item was deliberately *not* in this chapter.** The getting-started card
+(`components/dashboard/GettingStartedCard.tsx`) had a step "place your first trade". That
 is a **logic** change - which steps exist and when they count as complete - not a string
-change, so it belongs with the onboarding work in `20` section 5. A wording pass that
-merely relabels it leaves a new player on a games platform with a trading task.
+change, so it belonged with the onboarding work in `20` section 5. **CLOSED 18 Sep 2026**
+(`20` s5 BUILT) — a wording pass that merely relabelled it would have left a new player
+on a games platform with a trading task; the play step is now game-aware and gated on
+`tradingEnabled`.
 
 ---
 

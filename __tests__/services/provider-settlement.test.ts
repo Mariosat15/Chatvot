@@ -504,6 +504,22 @@ describe("settling a provider competition", () => {
     expect(competition?.prizePool).toBe(300);
   });
 
+  it("raises a prize pool under-counted below the fees actually collected", async () => {
+    // Reason: R1 residual. Stage 0 only capped the high side — a forgotten $inc
+    // on prizePool underpaid winners with no correction and no log. Seed three
+    // seats at 100 each but store a pool of 100 (one fee), then assert settlement
+    // distributes as if 300 were collected (rank-1 share ≈ 144 after platform fee).
+    const competitionId = await seedFinishedProviderContest({
+      prizePool: 100,
+    });
+
+    await finalizeCompetition(competitionId);
+
+    expect(await wonBy(PLAYERS[0].id)).toBeCloseTo(144, 2);
+    const competition = await readCompetition(competitionId);
+    expect(competition?.prizePool).toBe(300);
+  });
+
   it("refuses a contest whose game has no module, leaving it untouched", async () => {
     const competitionId = await seedFinishedProviderContest({
       gameType: "chess",

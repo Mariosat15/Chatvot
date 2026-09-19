@@ -7,6 +7,10 @@ import { completeContest } from "./contest-completion.service";
 import { assessUnresolvedRounds } from "./unresolved-rounds";
 import { refundExcludedParticipants } from "./exclusion-refund";
 import { isUnscoredContest, refundUnscoredContest } from "./unscored-refund";
+import {
+  logPrizePoolIntegrityViolation,
+  reconcilePrizePoolAgainstCollectedFees,
+} from "./prize-pool-integrity";
 import type { SettlementLeaderboardEntry } from "./types";
 
 /**
@@ -282,19 +286,29 @@ export async function settleProviderCompetition(
     );
   }
 
-  // The same integrity cap the trading path applies. A stored pool higher than the fees
-  // actually collected means phantom credits would be created out of a bug elsewhere.
-  //
-  // `participantCount` is the post-refund figure deliberately: computing the cap from the
-  // original count would leave headroom for exactly the fees that were just handed back,
-  // so the cap would stop catching the case it exists for.
-  const actualCollectedFees = participantCount * (competition.entryFee || 0);
+  // R1 integrity: cap over-count, raise under-count. `participantCount` is the
+  // post-refund figure deliberately — using the pre-refund count would leave
+  // headroom for fees just handed back (over) or under-raise after an exclude.
+  const entryFee = competition.entryFee || 0;
+  const storedPrizePool = prizePool;
+  const integrity = reconcilePrizePoolAgainstCollectedFees(
+    prizePool,
+    participantCount,
+    entryFee,
+  );
+  prizePool = integrity.prizePool;
+  const actualCollectedFees = integrity.collectedFees;
 
-  if (prizePool > actualCollectedFees && actualCollectedFees > 0) {
-    console.error(
-      `🚨 [PROVIDER] PRIZE POOL INTEGRITY VIOLATION for ${competitionId}! stored ${prizePool}, collected ${actualCollectedFees}. Capping.`,
-    );
-    prizePool = actualCollectedFees;
+  if (integrity.correction) {
+    logPrizePoolIntegrityViolation({
+      label: "PROVIDER",
+      contestId: competitionId,
+      stored: storedPrizePool,
+      collected: actualCollectedFees,
+      participantCount,
+      entryFee,
+      correction: integrity.correction,
+    });
     await Competition.findByIdAndUpdate(
       competitionId,
       { $set: { prizePool: actualCollectedFees } },

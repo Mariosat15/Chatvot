@@ -50,9 +50,11 @@ import {
  * `users`, so a prize figure here would widen who can read the platform's money while looking
  * like a convenience.
  *
- * NOT MIRRORED, deliberately. The player's own dashboard needs the same generalisation and does
- * not have it yet - that is the next slice - and a file mirrored before anything imports it is
- * R42 exactly: two copies that agree with each other while one of them runs.
+ * NOT MIRRORED into the player app as a dead twin. The player twin shipped 18 Sep 2026
+ * at `lib/services/games/player-game-performance.service.ts` + dashboard Performance
+ * tab — keep the two services behaviourally aligned (best-score sort, ranked mode,
+ * SCORE_PRODUCING_ROUND_STATUSES). A file mirrored before anything imported it was
+ * R42; that reason no longer applies once the player caller exists.
  */
 
 /**

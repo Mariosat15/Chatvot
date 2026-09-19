@@ -3,7 +3,7 @@
 import React, { useMemo } from 'react';
 import type { AEvent, Participant } from '../types';
 import { CV, getTier } from '../constants';
-import { ranked, fmtEquity, fmtRoi, fmtPnl, calcRoi, calcProfitFactor, riskLevel, getTraderTitle } from '../helpers';
+import { ranked, fmtEquity, fmtRoi, fmtPnl, calcRoi, calcProfitFactor, riskLevel, getTraderTitle, describeBroadcastMetric, isProviderBroadcast } from '../helpers';
 import Avatar from '../Avatar';
 import ArenaIcon from '../ArenaIcon';
 
@@ -15,27 +15,42 @@ interface H2HSceneProps {
 const mono = '"SF Mono", Consolas, "Courier New", monospace';
 
 /** Single trader column for H2H */
-const TraderColumn: React.FC<{ p: Participant; rank: number; startCap: number; side: 'left' | 'right'; accent: string }> = ({
-  p, rank, startCap, side, accent,
+const TraderColumn: React.FC<{
+  p: Participant;
+  rank: number;
+  startCap: number;
+  side: 'left' | 'right';
+  accent: string;
+  gameType?: string | null;
+}> = ({
+  p, rank, startCap, side, accent, gameType,
 }) => {
   const roi = calcRoi(p.liveEquity, startCap);
   const tier = getTier(rank);
   const pf = calcProfitFactor(p.averageWin, p.averageLoss, p.winningTrades, p.losingTrades);
-  const risk = riskLevel(p, startCap);
-  const title = getTraderTitle(p, startCap);
+  const risk = riskLevel(p, startCap, gameType);
+  const title = getTraderTitle(p, startCap, gameType);
+  const metric = describeBroadcastMetric({ gameType, score: p.score, livePnl: p.livePnl });
+  const provider = isProviderBroadcast(gameType);
   const align = side === 'left' ? 'flex-end' : 'flex-start';
   const txtAlign = side === 'left' ? ('right' as const) : ('left' as const);
 
-  const stats = [
-    { label: 'Equity', value: fmtEquity(p.liveEquity), color: CV.teal },
-    { label: 'ROI', value: fmtRoi(roi), color: roi >= 0 ? CV.teal : CV.red },
-    { label: 'P&L', value: fmtPnl(p.livePnl), color: p.livePnl >= 0 ? CV.teal : CV.red },
-    { label: 'Win Rate', value: `${p.winRate.toFixed(1)}%`, color: p.winRate > 50 ? CV.teal : CV.red },
-    { label: 'Trades', value: `${p.totalTrades}`, color: CV.txt },
-    { label: 'P.Factor', value: pf === Infinity ? '∞' : pf.toFixed(2), color: pf > 1 ? CV.teal : CV.red },
-    { label: 'Max DD', value: `${p.maxDrawdownPercentage.toFixed(1)}%`, color: CV.red },
-    { label: 'Risk', value: risk.label, color: risk.color },
-  ];
+  const stats = provider
+    ? [
+        { label: metric.label, value: metric.value, color: metric.color },
+        { label: 'Rank', value: `#${rank}`, color: CV.gold },
+        { label: 'Status', value: p.status || 'active', color: CV.txt },
+      ]
+    : [
+        { label: 'Equity', value: fmtEquity(p.liveEquity), color: CV.teal },
+        { label: 'ROI', value: fmtRoi(roi), color: roi >= 0 ? CV.teal : CV.red },
+        { label: 'P&L', value: fmtPnl(p.livePnl), color: p.livePnl >= 0 ? CV.teal : CV.red },
+        { label: 'Win Rate', value: `${p.winRate.toFixed(1)}%`, color: p.winRate > 50 ? CV.teal : CV.red },
+        { label: 'Trades', value: `${p.totalTrades}`, color: CV.txt },
+        { label: 'P.Factor', value: pf === Infinity ? '∞' : pf.toFixed(2), color: pf > 1 ? CV.teal : CV.red },
+        { label: 'Max DD', value: `${p.maxDrawdownPercentage.toFixed(1)}%`, color: CV.red },
+        { label: 'Risk', value: risk.label, color: risk.color },
+      ];
 
   return (
     <div style={{
@@ -119,7 +134,10 @@ const TraderColumn: React.FC<{ p: Participant; rank: number; startCap: number; s
 };
 
 const H2HScene: React.FC<H2HSceneProps> = ({ event }) => {
-  const sorted = useMemo(() => ranked(event.participants), [event.participants]);
+  const sorted = useMemo(
+    () => ranked(event.participants, event.gameType),
+    [event.participants, event.gameType],
+  );
   const a = sorted[0];
   const b = sorted[1];
 
@@ -200,7 +218,7 @@ const H2HScene: React.FC<H2HSceneProps> = ({ event }) => {
 
       {/* Columns */}
       <div style={{ display: 'flex', gap: 32, alignItems: 'flex-start', position: 'relative' }}>
-        <TraderColumn p={a} rank={1} startCap={event.startingCapital} side="left" accent={CV.teal} />
+        <TraderColumn p={a} rank={1} startCap={event.startingCapital} side="left" accent={CV.teal} gameType={event.gameType} />
 
         {/* VS divider */}
         <div style={{
@@ -224,7 +242,7 @@ const H2HScene: React.FC<H2HSceneProps> = ({ event }) => {
           }} />
         </div>
 
-        <TraderColumn p={b} rank={2} startCap={event.startingCapital} side="right" accent={CV.red} />
+        <TraderColumn p={b} rank={2} startCap={event.startingCapital} side="right" accent={CV.red} gameType={event.gameType} />
       </div>
     </div>
   );

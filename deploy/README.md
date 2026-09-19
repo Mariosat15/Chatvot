@@ -1023,18 +1023,20 @@ secret, so an operator editing only the environment would otherwise wipe all fou
 
 ### Step 6: Sync the catalogue, then enable
 
-1. **Sync games** on the provider's row. Two titles should appear: **Circuit Sprint**
-   (higher score wins) and **Circuit Perfect** (fastest clean solve wins).
+1. **Sync games** on the provider's row. **One** title should appear: **Circuit Sprint**
+   (higher score wins; timed). ~~Circuit Perfect~~ was retired 8 September 2026 — a document
+   saying two titles appear is correct as history and stale as a present fact.
 2. **Enable the provider.** It refuses if the callback token or callback secret is missing,
    and the refusal names which — that is deliberate, because a provider enabled without them
    accepts rounds and then refuses every result.
-3. **Enable each title.** Two switches per title exist on purpose: the provider says whether a
+3. **Enable the title.** Two switches per title exist on purpose: the provider says whether a
    title is available, and we say whether it is live here. A supplier's opinion is an input,
    never a decision.
 4. Turn on external games platform-wide in **Settings → White Label** if it is still off.
 
-Then create a contest from **Competitions → Create** and pick the game. Publish it, and it is
-playable.
+Then create a contest from **Competitions → Create** and pick the game. **Set playing time to
+one minute** (shortest dropdown option) for a quick acceptance run — Sprint's catalogue
+ceiling is an hour, so a full-length contest is a long demo. Publish it, and it is playable.
 
 ### Updating it later
 

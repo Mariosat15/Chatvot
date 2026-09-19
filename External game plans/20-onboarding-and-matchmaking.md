@@ -376,6 +376,22 @@ string change.
 Gate the trading step on `tradingEnabled` (`15` section 2) so an operator who turns
 trading off does not leave new players with an impossible checklist item.
 
+> **BUILT 18 September 2026 (ahead of X11.5).** The live code is
+> `lib/utils/getting-started-steps.ts`, `components/dashboard/GettingStartedCard.tsx`,
+> `tradingEnabled` on `getComprehensiveDashboardData`, and
+> `__tests__/dashboard/getting-started-game-aware.test.ts` (5 tests). **Five facts drift
+> easily.** **"Place Your First Trade" is gone** — the play step is always
+> `Play Your First Contest`, and when `tradingEnabled` is false its description never
+> mentions a trade or a position (DoD in section 9). **Completion is either signal** —
+> `hasPlacedTrade` OR any `gamePerformance` row with `rounds.started` / `rounds.scored`
+> — so a games-only player is not stranded on an empty trade count. **`tradingEnabled`
+> comes from `getEnabledGameTypes()` for creation/discovery only** and must not filter
+> the game-performance fetch (R29). **The step list is built once** in the model-free
+> helper; the card imports it and a test forbids restating titles beside the import.
+> **Not built with this:** interest inference, the matchmaking generalisation, or a
+> `/games` join href — join still points at `/competitions` until the catalogue browse
+> surface is the default. Never verified by eye (sign-in).
+
 ---
 
 ## 6. Data model summary
@@ -499,8 +515,9 @@ the entry-path writers before unifying them and found four instead of two.
       stop receiving invitations without blocking individuals.
 - [ ] Suspended and restricted accounts are never matched, via the shared
       `checkAccountStanding` guard rather than a second implementation.
-- [ ] The getting-started card contains no trading-only step when `tradingEnabled` is
-      false.
+- [x] The getting-started card contains no trading-only step when `tradingEnabled` is
+      false. **Done 18 September 2026, section 5 BUILT.** A games-only first play
+      (rounds) also completes the play step without a trade.
 - [x] ~~Open challenges cannot loosen a required field on `Challenge`, per section 6.~~
       **Deliberately not met, 14 September 2026** - the three opponent fields are
       conditionally required on `Challenge` and there is no `OpenChallenge` collection. See

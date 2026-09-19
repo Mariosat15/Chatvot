@@ -15,10 +15,14 @@ interface RaceSceneProps {
   onSelectTrader: (p: Participant) => void;
 }
 
-/** SVG Race line chart (equity race lines) */
-const RaceLineChart: React.FC<{ participants: Participant[]; startCap: number }> = ({ participants, startCap }) => {
+/** SVG Race line chart (equity race lines) — trading visualisation; provider still ranks by API order. */
+const RaceLineChart: React.FC<{
+  participants: Participant[];
+  startCap: number;
+  gameType?: string | null;
+}> = ({ participants, startCap, gameType }) => {
   const W = 700, H = 220;
-  const sorted = ranked(participants).slice(0, 8);
+  const sorted = ranked(participants, gameType).slice(0, 8);
   const points = sorted.map((p, ci) => {
     const roi = calcRoi(p.liveEquity, startCap);
     const steps = 20;
@@ -28,7 +32,7 @@ const RaceLineChart: React.FC<{ participants: Participant[]; startCap: number }>
       const y = roi * t + (Math.sin(t * Math.PI * 4 + ci) * 2);
       pts.push({ x: (s / steps) * W, y });
     }
-    return { pts, color: TRADER_COLORS[ci] ?? CV.gray, name: p.username };
+    return { pts, color: TRADER_COLORS.at(ci) ?? CV.gray, name: p.username };
   });
 
   const allY = points.flatMap(p => p.pts.map(pt => pt.y));
@@ -76,7 +80,10 @@ const RaceLineChart: React.FC<{ participants: Participant[]; startCap: number }>
 };
 
 const RaceScene: React.FC<RaceSceneProps> = ({ event, previousEquities, onSelectTrader }) => {
-  const sorted = useMemo(() => ranked(event.participants), [event.participants]);
+  const sorted = useMemo(
+    () => ranked(event.participants, event.gameType),
+    [event.participants, event.gameType],
+  );
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -101,7 +108,11 @@ const RaceScene: React.FC<RaceSceneProps> = ({ event, previousEquities, onSelect
             <span style={{ color: CV.gray, fontSize: 11, fontWeight: 600 }}>{event.name}</span>
           </div>
         </div>
-        <RaceLineChart participants={event.participants} startCap={event.startingCapital} />
+        <RaceLineChart
+          participants={event.participants}
+          startCap={event.startingCapital}
+          gameType={event.gameType}
+        />
       </div>
 
       {/* Full race lanes */}
@@ -122,7 +133,7 @@ const RaceScene: React.FC<RaceSceneProps> = ({ event, previousEquities, onSelect
         {sorted.map((p, i) => {
           const progress = raceProgress(p.liveEquity, event.startingCapital);
           const roi = calcRoi(p.liveEquity, event.startingCapital);
-          const title = getTraderTitle(p, event.startingCapital);
+          const title = getTraderTitle(p, event.startingCapital, event.gameType);
           const prevEq = previousEquities.get(p.userId) ?? p.liveEquity;
           const momentum = calcMomentum(p.liveEquity, prevEq);
 
@@ -145,7 +156,7 @@ const RaceScene: React.FC<RaceSceneProps> = ({ event, previousEquities, onSelect
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
                 {i < 3 ? (
-                  <ArenaIcon name="Medal" size={16} color={MEDAL_COLORS[i]} />
+                  <ArenaIcon name="Medal" size={16} color={MEDAL_COLORS.at(i) ?? CV.gold} />
                 ) : (
                   <span style={{ color: CV.gray, fontWeight: 700, fontSize: 14 }}>#{i + 1}</span>
                 )}

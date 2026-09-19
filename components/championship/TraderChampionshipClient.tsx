@@ -1,6 +1,14 @@
 "use client";
 
+/* eslint-disable @next/next/no-img-element */
+// Reason: championship avatars are arbitrary remote URLs from participant profiles;
+// next/image requires a configured remotePatterns allow-list we do not have for them.
+
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import {
+  describeBroadcastMetric,
+  isProviderBroadcast,
+} from "@/lib/utils/broadcast-metric";
 
 // ─── Injected CSS ──────────────────────────────────────────────────────────────
 const CSS = `
@@ -24,8 +32,9 @@ const CSS = `
 interface RawParticipant {
   userId: string; username: string; profileImage?: string | null;
   livePnl?: number; liveRoi?: number; liveEquity?: number;
+  score?: number; rank?: number;
   totalTrades?: number; winRate?: number; maxDrawdownPercentage?: number;
-  currentOpenPositions?: number; rank?: number; status?: string;
+  currentOpenPositions?: number; status?: string;
 }
 interface RawEvent {
   id: string; name?: string; status: string; type?: string;
@@ -34,6 +43,7 @@ interface RawEvent {
   currentParticipants?: number; maxParticipants?: number;
   participants?: RawParticipant[];
   openPositions?: Array<{ leverage?: number; quantity?: number; userId?: string }>;
+  gameType?: string; gameKey?: string;
 }
 interface ApiRes {
   competitions?: RawEvent[]; challenges?: RawEvent[];
@@ -46,6 +56,10 @@ interface Trader {
   userId: string; username: string; img: string | null;
   pnl: number; roi: number; equity: number; trades: number;
   winRate: number; drawdown: number;
+  score?: number;
+  gameType?: string;
+  /** Sort key: pnl for trading, score for provider (never mixed as one meaning). */
+  sortKey: number;
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -123,22 +137,33 @@ export default function TraderChampionshipClient() {
     let trades = 0, lots = 0, low = 0, med = 0, high = 0, winners = 0, losers = 0;
 
     for (const ev of withData) {
+      const provider = isProviderBroadcast(ev.gameType);
       (ev.openPositions || []).forEach(p => { lots += p.quantity || 0; });
       (ev.participants || []).forEach(p => {
+        const score =
+          typeof p.score === "number" && Number.isFinite(p.score) ? p.score : undefined;
+        const pnl = p.livePnl || 0;
+        // Reason: never rank a provider seat on livePnl (capital default / flat).
+        const sortKey = provider
+          ? (score ?? Number.NEGATIVE_INFINITY)
+          : pnl;
         const t: Trader = {
           userId: p.userId, username: p.username || "Trader", img: p.profileImage || null,
-          pnl: p.livePnl || 0, roi: p.liveRoi || 0, equity: p.liveEquity || 0,
+          pnl, roi: p.liveRoi || 0, equity: p.liveEquity || 0,
           trades: p.totalTrades || 0, winRate: p.winRate || 0, drawdown: p.maxDrawdownPercentage || 0,
+          score, gameType: ev.gameType, sortKey,
         };
         trades += t.trades;
-        if (t.pnl > 0) winners++; else if (t.pnl < 0) losers++;
+        if (!provider) {
+          if (t.pnl > 0) winners++; else if (t.pnl < 0) losers++;
+        }
         if (t.drawdown < 5) low++; else if (t.drawdown < 15) med++; else high++;
         const ex = traderMap.get(t.userId);
-        if (!ex || t.pnl > ex.pnl) traderMap.set(t.userId, t);
+        if (!ex || t.sortKey > ex.sortKey) traderMap.set(t.userId, t);
       });
     }
 
-    const leaders = Array.from(traderMap.values()).sort((a, b) => b.pnl - a.pnl);
+    const leaders = Array.from(traderMap.values()).sort((a, b) => b.sortKey - a.sortKey);
     const nextEnd = active.map(e => e.endTime ? new Date(e.endTime).getTime() : 0).filter(n => n > Date.now()).sort((a, b) => a - b)[0];
     let cd = "LIVE";
     if (nextEnd) {
@@ -309,6 +334,7 @@ function EC({ ev, delay }: { ev: RawEvent; delay: number }) {
   const maxP = ev.maxParticipants || 0;
   const endStr = ev.endTime ? new Date(ev.endTime).toLocaleDateString() : "TBD";
   const startStr = ev.startTime ? new Date(ev.startTime).toLocaleDateString() : "TBD";
+  const provider = isProviderBroadcast(ev.gameType);
 
   return (
     <div className="cs-anim" style={{
@@ -324,21 +350,28 @@ function EC({ ev, delay }: { ev: RawEvent; delay: number }) {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, fontSize: 11 }}>
         <div><span style={{ color: "#64748b" }}>Prize: </span><span style={{ color: "#fbbf24", fontWeight: 700 }}>{fmt$(ev.prizePool || 0)}</span></div>
         <div><span style={{ color: "#64748b" }}>Entry: </span><span style={{ color: "#22d3ee", fontWeight: 700 }}>{ev.entryFee ? fmt$(ev.entryFee) : "Free"}</span></div>
-        <div><span style={{ color: "#64748b" }}>Traders: </span><span style={{ color: "#e2e8f0", fontWeight: 600 }}>{pCount}{maxP ? `/${maxP}` : ""}</span></div>
+        <div><span style={{ color: "#64748b" }}>{provider ? "Players: " : "Traders: "}</span><span style={{ color: "#e2e8f0", fontWeight: 600 }}>{pCount}{maxP ? `/${maxP}` : ""}</span></div>
         <div><span style={{ color: "#64748b" }}>{ev.status === "upcoming" ? "Starts: " : "Ends: "}</span><span style={{ color: "#e2e8f0", fontWeight: 600 }}>{ev.status === "upcoming" ? startStr : endStr}</span></div>
       </div>
       {/* Participants preview */}
       {(ev.participants?.length || 0) > 0 && (
         <div style={{ display: "flex", gap: 4, marginTop: 8, flexWrap: "wrap" }}>
-          {ev.participants!.slice(0, 6).map(p => (
-            <div key={p.userId} style={{
-              width: 22, height: 22, borderRadius: "50%", border: `1.5px solid ${(p.livePnl || 0) >= 0 ? "#10b981" : "#ef4444"}`,
-              overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center",
-              background: p.profileImage ? "#0f172a" : avBg(p.username), fontSize: 7, fontWeight: 800, color: "#fff",
-            }}>
-              {p.profileImage ? <img src={p.profileImage} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : ini(p.username)}
-            </div>
-          ))}
+          {ev.participants!.slice(0, 6).map(p => {
+            const metric = describeBroadcastMetric({
+              gameType: ev.gameType,
+              score: p.score,
+              livePnl: p.livePnl || 0,
+            });
+            return (
+              <div key={p.userId} title={`${p.username}: ${metric.label} ${metric.value}`} style={{
+                width: 22, height: 22, borderRadius: "50%", border: `1.5px solid ${metric.color}`,
+                overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center",
+                background: p.profileImage ? "#0f172a" : avBg(p.username), fontSize: 7, fontWeight: 800, color: "#fff",
+              }}>
+                {p.profileImage ? <img src={p.profileImage} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : ini(p.username)}
+              </div>
+            );
+          })}
           {(ev.participants!.length > 6) && <div style={{ fontSize: 10, color: "#64748b", alignSelf: "center" }}>+{ev.participants!.length - 6}</div>}
         </div>
       )}
@@ -349,8 +382,13 @@ function EC({ ev, delay }: { ev: RawEvent; delay: number }) {
 /* ── Leaderboard Row ── */
 function LR({ t, r, d }: { t: Trader; r: number; d: number }) {
   const top3 = r <= 3;
-  const g = t.pnl >= 0;
-  const mult = Math.max(1, Math.round(Math.abs(t.roi) / 10));
+  const metric = describeBroadcastMetric({
+    gameType: t.gameType,
+    score: t.score,
+    livePnl: t.pnl,
+  });
+  const provider = isProviderBroadcast(t.gameType);
+  const mult = provider ? null : Math.max(1, Math.round(Math.abs(t.roi) / 10));
   return (
     <div className="cs-anim" style={{
       display: "flex", alignItems: "center", gap: 7, padding: "5px 7px", borderRadius: 8,
@@ -359,12 +397,17 @@ function LR({ t, r, d }: { t: Trader; r: number; d: number }) {
       animationDelay: `${d}ms`,
     }}>
       <div style={{ width: 22, height: 22, borderRadius: 5, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 900, flexShrink: 0, background: r === 1 ? "linear-gradient(135deg,#fbbf24,#b45309)" : r === 2 ? "linear-gradient(135deg,#cbd5e1,#64748b)" : r === 3 ? "linear-gradient(135deg,#c2884b,#7c5a2e)" : "rgba(30,41,59,0.7)", color: r <= 3 ? "#000" : "#64748b" }}>{r}</div>
-      <div style={{ width: 28, height: 28, borderRadius: "50%", border: `2px solid ${g ? "rgba(16,185,129,0.7)" : "rgba(239,68,68,0.7)"}`, boxShadow: `0 0 8px ${g ? "rgba(16,185,129,0.3)" : "rgba(239,68,68,0.3)"}`, overflow: "hidden", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: t.img ? "#0f172a" : avBg(t.username), fontSize: 9, fontWeight: 800, color: "#fff" }}>
+      <div style={{ width: 28, height: 28, borderRadius: "50%", border: `2px solid ${metric.color}`, boxShadow: `0 0 8px ${metric.color}55`, overflow: "hidden", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: t.img ? "#0f172a" : avBg(t.username), fontSize: 9, fontWeight: 800, color: "#fff" }}>
         {t.img ? <img src={t.img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : ini(t.username)}
       </div>
       <div style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 600, color: "#e2e8f0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.username}</div>
-      <div style={{ fontSize: 12, fontWeight: 700, color: g ? "#10b981" : "#ef4444", whiteSpace: "nowrap" }}>{g ? "+" : "-"}{fmt$(t.pnl)}</div>
-      <div style={{ fontSize: 9, fontWeight: 900, padding: "2px 5px", borderRadius: 4, background: g ? "rgba(16,185,129,0.12)" : "rgba(239,68,68,0.12)", color: g ? "#10b981" : "#ef4444", border: `1px solid ${g ? "rgba(16,185,129,0.25)" : "rgba(239,68,68,0.25)"}` }}>{mult}x</div>
+      <div style={{ fontSize: 12, fontWeight: 700, color: metric.color, whiteSpace: "nowrap" }}>{metric.value}</div>
+      {mult != null && (
+        <div style={{ fontSize: 9, fontWeight: 900, padding: "2px 5px", borderRadius: 4, background: metric.tone === "positive" ? "rgba(16,185,129,0.12)" : "rgba(239,68,68,0.12)", color: metric.color, border: `1px solid ${metric.color}40` }}>{mult}x</div>
+      )}
+      {provider && (
+        <div style={{ fontSize: 8, fontWeight: 800, padding: "2px 5px", borderRadius: 4, background: "rgba(34,211,238,0.12)", color: "#22d3ee", border: "1px solid rgba(34,211,238,0.25)", letterSpacing: 0.5 }}>{metric.label.toUpperCase()}</div>
+      )}
     </div>
   );
 }
@@ -388,18 +431,28 @@ function WMap({ traders }: { traders: Trader[] }) {
           return <line key={`ln-${t.userId}`} x1={`${a.x}%`} y1={`${a.y}%`} x2={`${b.x}%`} y2={`${b.y}%`} stroke="rgba(6,182,212,0.15)" strokeWidth=".5" strokeDasharray="4 4" />;
         })}
         {traders.slice(0, 20).map(t => {
-          const p = mxy(t.userId); const g = t.pnl >= 0;
+          const p = mxy(t.userId);
+          const metric = describeBroadcastMetric({
+            gameType: t.gameType,
+            score: t.score,
+            livePnl: t.pnl,
+          });
           return (
             <g key={`d-${t.userId}`}>
-              <circle cx={`${p.x}%`} cy={`${p.y}%`} r="8" fill={g ? "rgba(16,185,129,0.12)" : "rgba(239,68,68,0.12)"}><animate attributeName="r" values="8;14;8" dur="2.5s" repeatCount="indefinite" /></circle>
-              <circle cx={`${p.x}%`} cy={`${p.y}%`} r="3" fill={g ? "#10b981" : "#ef4444"} stroke={g ? "#a7f3d0" : "#fca5a5"} strokeWidth="1"><animate attributeName="r" values="3;4.5;3" dur="2s" repeatCount="indefinite" /></circle>
+              <circle cx={`${p.x}%`} cy={`${p.y}%`} r="8" fill={`${metric.color}22`}><animate attributeName="r" values="8;14;8" dur="2.5s" repeatCount="indefinite" /></circle>
+              <circle cx={`${p.x}%`} cy={`${p.y}%`} r="3" fill={metric.color} stroke={metric.color} strokeWidth="1"><animate attributeName="r" values="3;4.5;3" dur="2s" repeatCount="indefinite" /></circle>
             </g>
           );
         })}
       </svg>
       {traders.slice(0, 5).map(t => {
-        const p = mxy(t.userId); const g = t.pnl >= 0;
-        return <div key={`lb-${t.userId}`} style={{ position: "absolute", left: `${p.x}%`, top: `${p.y + 4}%`, transform: "translateX(-50%)", fontSize: 9, fontWeight: 700, color: g ? "#a7f3d0" : "#fca5a5", textShadow: "0 0 8px rgba(0,0,0,.9)", whiteSpace: "nowrap", pointerEvents: "none" }}>{t.username}</div>;
+        const p = mxy(t.userId);
+        const metric = describeBroadcastMetric({
+          gameType: t.gameType,
+          score: t.score,
+          livePnl: t.pnl,
+        });
+        return <div key={`lb-${t.userId}`} style={{ position: "absolute", left: `${p.x}%`, top: `${p.y + 4}%`, transform: "translateX(-50%)", fontSize: 9, fontWeight: 700, color: metric.color, textShadow: "0 0 8px rgba(0,0,0,.9)", whiteSpace: "nowrap", pointerEvents: "none" }}>{t.username}</div>;
       })}
       {traders.length === 0 && (
         <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8 }}>
@@ -444,17 +497,21 @@ function Donut({ w, lo }: { w: number; lo: number }) {
 }
 
 function TP({ t, r }: { t: Trader; r: number }) {
-  const g = t.pnl >= 0;
+  const metric = describeBroadcastMetric({
+    gameType: t.gameType,
+    score: t.score,
+    livePnl: t.pnl,
+  });
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "5px 0", borderBottom: "1px solid rgba(6,182,212,0.06)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
         <span style={{ fontSize: 11, fontWeight: 800, color: r <= 3 ? "#fbbf24" : "#64748b", width: 16 }}>{r}.</span>
-        <div style={{ width: 20, height: 20, borderRadius: "50%", border: `1.5px solid ${g ? "#10b981" : "#ef4444"}`, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", background: t.img ? "#0f172a" : avBg(t.username), fontSize: 7, fontWeight: 800, color: "#fff" }}>
+        <div style={{ width: 20, height: 20, borderRadius: "50%", border: `1.5px solid ${metric.color}`, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", background: t.img ? "#0f172a" : avBg(t.username), fontSize: 7, fontWeight: 800, color: "#fff" }}>
           {t.img ? <img src={t.img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : ini(t.username)}
         </div>
         <span style={{ fontSize: 11, color: "#e2e8f0", fontWeight: 500 }}>{t.username}</span>
       </div>
-      <span style={{ fontSize: 11, fontWeight: 700, color: g ? "#10b981" : "#ef4444" }}>{g ? "+" : "-"}{fmt$(t.pnl)}</span>
+      <span style={{ fontSize: 11, fontWeight: 700, color: metric.color }}>{metric.value}</span>
     </div>
   );
 }

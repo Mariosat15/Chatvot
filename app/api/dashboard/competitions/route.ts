@@ -1,3 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, security/detect-object-injection */
+// Reason: public arena broadcast route — pre-existing `any` surface; Score chrome
+// (13 s5.1e) only threaded gameType through ranking. Typing the whole file is a
+// separate cleanup and must not ride this commit.
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import Competition from "@/database/models/trading/competition.model";
@@ -8,6 +12,8 @@ import TradingPosition from "@/database/models/trading/trading-position.model";
 import PriceSnapshot from "@/database/models/trading/price-snapshot.model";
 import mongoose from "mongoose";
 import { computeProfitFactor } from "@/lib/services/trading-metrics";
+import { createDashboardRankResolver } from "@/lib/services/games/dashboard-contest-rank.service";
+import { hasProviderGameLabel } from "@/lib/services/games/contest-config";
 
 export const dynamic = "force-dynamic";
 
@@ -78,7 +84,7 @@ export async function GET() {
           },
         })
           .select(
-            "competitionId userId username currentCapital availableCapital usedMargin unrealizedPnl realizedPnl pnl pnlPercentage totalTrades winningTrades losingTrades winRate averageWin averageLoss largestWin largestLoss currentOpenPositions maxDrawdown maxDrawdownPercentage status currentRank highestRank enteredAt lastTradeAt",
+            "competitionId userId username currentCapital availableCapital usedMargin unrealizedPnl realizedPnl pnl pnlPercentage totalTrades winningTrades losingTrades winRate averageWin averageLoss largestWin largestLoss currentOpenPositions maxDrawdown maxDrawdownPercentage status currentRank highestRank enteredAt lastTradeAt score",
           )
           .lean()
       : [];
@@ -89,7 +95,7 @@ export async function GET() {
           challengeId: { $in: activeChallengeIds },
         })
           .select(
-            "challengeId userId username role currentCapital availableCapital usedMargin unrealizedPnl realizedPnl pnl pnlPercentage totalTrades winningTrades losingTrades winRate averageWin averageLoss largestWin largestLoss currentOpenPositions maxDrawdown maxDrawdownPercentage status isWinner prizeReceived joinedAt lastTradeAt",
+            "challengeId userId username role currentCapital availableCapital usedMargin unrealizedPnl realizedPnl pnl pnlPercentage totalTrades winningTrades losingTrades winRate averageWin averageLoss largestWin largestLoss currentOpenPositions maxDrawdown maxDrawdownPercentage status isWinner prizeReceived joinedAt lastTradeAt score",
           )
           .lean()
       : [];
@@ -297,6 +303,9 @@ export async function GET() {
         status: p.status,
         isDisqualified,
         rankValue,
+        // Reason: provider boards rank on score. Absent stays absent (R50 read-side) —
+        // coercing to 0 would put every non-player at the top of a lower-is-better title.
+        score: typeof p.score === "number" ? p.score : undefined,
         profitFactor: +profitFactor.toFixed(2),
         lastTradeAt: p.lastTradeAt || null,
         enteredAt: p.enteredAt || (p as any).joinedAt || null,
@@ -338,7 +347,11 @@ export async function GET() {
     }
 
     // ── 11. Format competitions ────────────────────────────────────────────────
-    const formattedCompetitions = (competitions as any[]).map((c) => {
+    // Reason: one resolver per request — direction memo is shared across contests.
+    const { sortParticipants } = createDashboardRankResolver();
+
+    const formattedCompetitions = await Promise.all(
+      (competitions as any[]).map(async (c) => {
       const cid = c._id.toString();
       const isActive = c.status === "active";
       const isCompleted = ["completed", "finalizing", "emergency_ended"].includes(
@@ -350,6 +363,7 @@ export async function GET() {
       );
       const startingCapital = (c.startingCapital as number) || 10000;
       const rankingMethod = c.rules?.rankingMethod || "pnl";
+      const providerContest = hasProviderGameLabel(c);
 
       let participants: unknown[] = [];
       if (isActive || isCompleted) {
@@ -360,21 +374,43 @@ export async function GET() {
           enrichParticipant(p as Record<string, unknown>, startingCapital, rankingMethod),
         );
 
-        enriched.sort((a, b) => {
-          if (a.isDisqualified && !b.isDisqualified) return 1;
-          if (!a.isDisqualified && b.isDisqualified) return -1;
-          const aHasTrades = a.totalTrades > 0;
-          const bHasTrades = b.totalTrades > 0;
-          if (aHasTrades && !bHasTrades) return -1;
-          if (!aHasTrades && bHasTrades) return 1;
-          return b.rankValue - a.rankValue;
-        });
+        // Reason: trading contests keep the live-PnL sort (open positions). Provider
+        // contests have no positions and no meaningful pnl — they must use the shared
+        // score sorter or every player ties at zero on a public screen (R37 shape).
+        if (providerContest) {
+          const eligible = enriched.filter((p) => !p.isDisqualified);
+          const disqualified = enriched.filter((p) => p.isDisqualified);
+          const sorted = await sortParticipants(
+            {
+              status: c.status,
+              gameType: c.gameType,
+              gameKey: c.gameKey,
+              rules: c.rules,
+            },
+            eligible,
+          );
+          let rank = 1;
+          participants = [...sorted, ...disqualified].map((p, i) => {
+            if (i > 0) rank = i + 1;
+            return { ...p, rank };
+          });
+        } else {
+          enriched.sort((a, b) => {
+            if (a.isDisqualified && !b.isDisqualified) return 1;
+            if (!a.isDisqualified && b.isDisqualified) return -1;
+            const aHasTrades = a.totalTrades > 0;
+            const bHasTrades = b.totalTrades > 0;
+            if (aHasTrades && !bHasTrades) return -1;
+            if (!aHasTrades && bHasTrades) return 1;
+            return b.rankValue - a.rankValue;
+          });
 
-        let rank = 1;
-        participants = enriched.map((p, i) => {
-          if (i > 0) rank = i + 1;
-          return { ...p, rank };
-        });
+          let rank = 1;
+          participants = enriched.map((p, i) => {
+            if (i > 0) rank = i + 1;
+            return { ...p, rank };
+          });
+        }
       }
 
       const winners = isCompleted
@@ -402,6 +438,10 @@ export async function GET() {
           c.currentParticipants || participants.length || 0,
         maxParticipants: c.maxParticipants || 0,
         rankingMethod,
+        // Reason: the broadcast client needs the label to render Score vs PnL; absent
+        // means trading (invariant 5).
+        gameType: c.gameType,
+        gameKey: c.gameKey,
         assetClasses: c.assetClasses || [],
         isPaused: c.isPaused || false,
         participants: participants.slice(0, 20),
@@ -409,45 +449,63 @@ export async function GET() {
         winners,
         prizeDistribution,
       };
-    });
+    }),
+    );
 
     // ── 12. Format challenges ──────────────────────────────────────────────────
-    const formattedChallenges = (challenges as any[]).map((c) => {
+    const formattedChallenges = await Promise.all(
+      (challenges as any[]).map(async (c) => {
       const cid = c._id.toString();
       const startingCapital = (c.startingCapital as number) || 10000;
       const isActive = c.status === "active";
       const isCompleted = c.status === "completed";
+      const providerChallenge = hasProviderGameLabel(c);
 
       let participants: unknown[] = [];
       if (isActive || isCompleted) {
         const raw = (challengeParticipants as any[]).filter(
           (p) => p.challengeId?.toString?.() === cid || p.challengeId === cid,
         );
-        participants = raw.map((p) => {
-          const enriched = enrichParticipant(
+        const enriched = raw.map((p) => {
+          const row = enrichParticipant(
             p as Record<string, unknown>,
             startingCapital,
             "pnl",
           );
-          return { ...enriched, role: p.role, isWinner: p.isWinner || false };
+          return { ...row, role: p.role, isWinner: p.isWinner || false };
         });
-        participants.sort((a: unknown, b: unknown) => {
-          const ap = a as Record<string, unknown>;
-          const bp = b as Record<string, unknown>;
-          if (ap.isDisqualified && !bp.isDisqualified) return 1;
-          if (!ap.isDisqualified && bp.isDisqualified) return -1;
-          const aHasTrades = ((ap.totalTrades as number) || 0) > 0;
-          const bHasTrades = ((bp.totalTrades as number) || 0) > 0;
-          if (aHasTrades && !bHasTrades) return -1;
-          if (!aHasTrades && bHasTrades) return 1;
-          return (
-            ((bp.rankValue as number) || 0) - ((ap.rankValue as number) || 0)
+
+        if (providerChallenge) {
+          const eligible = enriched.filter((p) => !p.isDisqualified);
+          const disqualified = enriched.filter((p) => p.isDisqualified);
+          const sorted = await sortParticipants(
+            {
+              status: c.status,
+              gameType: c.gameType,
+              gameKey: c.gameKey,
+              rules: { rankingMethod: "pnl" },
+            },
+            eligible,
           );
-        });
-        participants = participants.map((p, i) => ({
-          ...(p as object),
-          rank: i + 1,
-        }));
+          participants = [...sorted, ...disqualified].map((p, i) => ({
+            ...p,
+            rank: i + 1,
+          }));
+        } else {
+          enriched.sort((a, b) => {
+            if (a.isDisqualified && !b.isDisqualified) return 1;
+            if (!a.isDisqualified && b.isDisqualified) return -1;
+            const aHasTrades = (a.totalTrades || 0) > 0;
+            const bHasTrades = (b.totalTrades || 0) > 0;
+            if (aHasTrades && !bHasTrades) return -1;
+            if (!aHasTrades && bHasTrades) return 1;
+            return (b.rankValue || 0) - (a.rankValue || 0);
+          });
+          participants = enriched.map((p, i) => ({
+            ...p,
+            rank: i + 1,
+          }));
+        }
       }
 
       const winners = isCompleted
@@ -467,6 +525,8 @@ export async function GET() {
         name: challengeName,
         description: c.description || `${c.duration || 60}-minute challenge`,
         status: c.status as string,
+        gameType: c.gameType,
+        gameKey: c.gameKey,
         startTime: c.startTime || c.createdAt,
         endTime: c.endTime,
         entryFee: c.entryFee || 0,
@@ -475,12 +535,15 @@ export async function GET() {
         currentParticipants: participants.length || 2,
         maxParticipants: 2,
         rankingMethod: "pnl",
+        assetClasses: c.assetClasses || [],
+        isPaused: false,
         participants: participants.slice(0, 2),
         openPositions: [],
         winners,
         prizeDistribution: [],
       };
-    });
+    }),
+    );
 
     // ── 13. Aggregate stats ────────────────────────────────────────────────────
     const allEvents = [...formattedCompetitions, ...formattedChallenges];

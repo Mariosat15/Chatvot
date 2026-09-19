@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import Link from "next/link";
 import {
   Card,
   CardContent,
@@ -1442,6 +1443,32 @@ export default function FinancialDashboard() {
 
         {/* OVERVIEW TAB */}
         <TabsContent value="overview" className="space-y-6">
+          {/* Reason: by-game / by-provider entry-fee and fee revenue live on Competition
+              Analytics (`12` s5.1a), not here — duplicating the arithmetic on two screens
+              that can disagree is worse than a cross-link. X6.5 leftover from s5.1a. */}
+          <Card className="bg-gray-900 border-cyan-500/30">
+            <CardContent className="py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium text-white">
+                  Entry fees, fee revenue and pots by game
+                </p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Contest revenue by game and by provider is on Competition Analytics —
+                  the same figures both screens must agree on.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                className="border-cyan-500/50 text-cyan-300 hover:bg-cyan-950/40 shrink-0"
+                asChild
+              >
+                <Link href="/dashboard?activeTab=analytics">
+                  Open Analytics
+                  <ArrowRightLeft className="h-4 w-4 ml-2" />
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
           {/* TOP SUMMARY - 3 Key Numbers */}
           {(() => {
             // Reason: Centralize obligation & safe-to-spend calculations so
@@ -6029,7 +6056,7 @@ export default function FinancialDashboard() {
 
       {/* Vendor Payment Dialog */}
       <Dialog open={showVendorPayDialog} onOpenChange={setShowVendorPayDialog}>
-        <DialogContent className="bg-gray-900 border-gray-700 max-w-lg">
+        <DialogContent className="bg-gray-900 border-gray-700 ">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-white">
               <Building2 className="h-5 w-5 text-purple-400" />
@@ -6238,7 +6265,7 @@ export default function FinancialDashboard() {
         open={showAddBalanceDialog}
         onOpenChange={setShowAddBalanceDialog}
       >
-        <DialogContent className="bg-gray-900 border-gray-700 max-w-lg">
+        <DialogContent className="bg-gray-900 border-gray-700 ">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-white">
               <DollarSign className="h-5 w-5 text-teal-400" />
@@ -6388,7 +6415,7 @@ export default function FinancialDashboard() {
         open={showAddExpenseDialog}
         onOpenChange={setShowAddExpenseDialog}
       >
-        <DialogContent className="bg-gray-900 border-gray-700 max-w-lg">
+        <DialogContent className="bg-gray-900 border-gray-700 ">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-white">
               <AlertTriangle className="h-5 w-5 text-rose-400" />
@@ -6592,7 +6619,7 @@ export default function FinancialDashboard() {
         open={!!selectedTransaction}
         onOpenChange={() => setSelectedTransaction(null)}
       >
-        <DialogContent className="bg-gray-900 border-gray-700 max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent size="lg" className="bg-gray-900 border-gray-700 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-white">
               <ArrowRightLeft className="h-5 w-5 text-indigo-400" />

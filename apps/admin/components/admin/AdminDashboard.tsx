@@ -82,6 +82,7 @@ import TerminologySettingsSection from "@/components/admin/TerminologySettingsSe
 import TradingRiskSection from "@/components/admin/TradingRiskSection";
 import SymbolsSection from "@/components/admin/SymbolsSection";
 import CurrencySettingsSection from "@/components/admin/CurrencySettingsSection";
+import CreditConversionSection from "@/components/admin/CreditConversionSection";
 import FinancialDashboard from "@/components/admin/FinancialDashboard";
 import CompetitionAnalytics from "@/components/admin/CompetitionAnalytics";
 import CompetitionsListSection from "@/components/admin/CompetitionsListSection";
@@ -1025,18 +1026,36 @@ export default function AdminDashboard({
     );
   };
 
+  // Reason: deep links already worked inbound via `?activeTab=`, but sidebar clicks
+  // only called setActiveSection — the address bar stayed on the previous section, so
+  // every bookmark and wiki screenshot of "where I am" was wrong after one click.
+  // replace (not push) keeps Back for leaving the panel rather than stepping every tab.
+  const navigateToSection = useCallback(
+    (sectionId: string) => {
+      if (!hasAccessToSection(sectionId)) {
+        toast.error("You do not have access to this section");
+        return;
+      }
+      setActiveSection(sectionId);
+      setMobileMenuOpen(false);
+      if (isTradingSection(sectionId)) {
+        setExpandedMenus((prev) =>
+          prev.includes("trading-menu") ? prev : [...prev, "trading-menu"],
+        );
+      }
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("activeTab", sectionId);
+      router.replace(`/dashboard?${params.toString()}`, { scroll: false });
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- hasAccessToSection closes over allowedSections/isSuperAdmin
+    [router, searchParams],
+  );
+
   const handleMenuClick = (item: MenuItem, childId?: string) => {
     if (item.children && !childId) {
       toggleMenu(item.id);
     } else {
-      const targetSection = childId || item.id;
-      // Check access before navigating
-      if (!hasAccess(targetSection)) {
-        toast.error("You do not have access to this section");
-        return;
-      }
-      setActiveSection(targetSection);
-      setMobileMenuOpen(false);
+      navigateToSection(childId || item.id);
     }
   };
 
@@ -1092,9 +1111,7 @@ export default function AdminDashboard({
           <div className="space-y-8">
             <AdminOverviewDashboard
               key={currentRefreshKey}
-              onNavigate={(section) =>
-                hasAccess(section) && setActiveSection(section)
-              }
+              onNavigate={navigateToSection}
             />
             <LiveOpsPanel key={`live-ops-${currentRefreshKey}`} />
           </div>
@@ -1188,7 +1205,15 @@ export default function AdminDashboard({
       case "trading-risk":
         return <TradingRiskSection key={currentRefreshKey} />;
       case "currency":
-        return <CurrencySettingsSection key={currentRefreshKey} />;
+        // Reason: R93 — CreditConversionSection was built and never mounted; the
+        // EUR→credits rate API is already granted by `currency`, so stacking it
+        // here reuses that grant instead of inventing an add-only section id.
+        return (
+          <div key={currentRefreshKey} className="space-y-8">
+            <CurrencySettingsSection />
+            <CreditConversionSection />
+          </div>
+        );
       case "fees":
         return <FeeSettingsSection key={currentRefreshKey} />;
       case "payment-providers":
@@ -1562,7 +1587,7 @@ export default function AdminDashboard({
             {isTradingSection(activeSection) && hasAccess(activeSection) && (
               <TradingSectionTabs
                 activeSection={activeSection}
-                onSelect={setActiveSection}
+                onSelect={navigateToSection}
                 hasAccess={hasAccess}
               />
             )}

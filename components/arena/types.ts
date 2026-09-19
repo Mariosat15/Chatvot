@@ -10,6 +10,9 @@ export interface OpenPos {
 export interface Participant {
   userId: string; username: string; profileImage: string | null;
   liveEquity: number; livePnl: number; liveRoi: number;
+  /** Provider contests only. Absent means no scored round yet (R50). */
+  score?: number;
+  rank?: number;
   realizedPnl: number; unrealizedPnl: number;
   currentCapital: number; availableCapital: number; usedMargin: number;
   totalTrades: number; winningTrades: number; losingTrades: number;
@@ -29,6 +32,9 @@ export interface AEvent {
   participants: Participant[];
   rankingMethod?: string;
   tieBreaker?: string;
+  /** Absent means trading (invariant 5). */
+  gameType?: string;
+  gameKey?: string;
 }
 
 export interface PriceMap { [sym: string]: number }

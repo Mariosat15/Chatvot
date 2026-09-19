@@ -36,9 +36,9 @@ const CARD = "components/dashboard/ActiveCompetitionCard.tsx";
 const TABLE = "components/dashboard/CompetitionsTable.tsx";
 const RANK_SERVICE = "lib/services/games/dashboard-contest-rank.service.ts";
 /**
- * The public arena broadcast display. A NAMED EXCEPTION carrying its own copy of the
- * comparator, with a test below asserting it is still an offender - see that test for why an
- * exception needs a canary rather than a comment.
+ * The public arena broadcast display. Fixed 18 Sep 2026 to sort provider contests through
+ * `sortParticipants` (same answer as the signed-in dashboard). The canary below was flipped,
+ * not deleted - see that test for why.
  */
 const ARENA_ROUTE = "app/api/dashboard/competitions/route.ts";
 
@@ -189,25 +189,34 @@ describe("the live rank is sorted in exactly one place", () => {
     expect(loopAt).toBeGreaterThan(createdAt);
   });
 
-  it("the arena broadcast route is STILL an offender", () => {
+  it("the arena broadcast route sorts provider contests through the shared sorter", () => {
     /**
-     * A DELIBERATELY-LISTED EXCEPTION DOUBLES AS A CANARY FOR THE RULE ITSELF, which is the
-     * R60 lesson: a stale exception reads as a known problem long after it is solved, and
-     * silently re-permits the defect in that file.
+     * FLIPPED 18 Sep 2026, not deleted. The previous assertion that this route was STILL an
+     * offender is the R60 canary form: a stale exception reads as a known problem long after
+     * it is solved and silently re-permits the defect. The claim is unchanged - the arena must
+     * not invent a third ranking answer - and only the location of the sorter moved.
      *
-     * `/api/dashboard/competitions` is the PUBLIC, unauthenticated broadcast display behind
-     * `/arena` and `TraderChampionshipClient`. It carries two more copies of the comparator
-     * and it was left alone on purpose: folding a 545-line public route into the commit that
-     * extracted this would have destroyed the only evidence the extraction offers, which is
-     * that the existing guards stayed green. Recorded rather than swept.
-     *
-     * It is also trading-shaped - it selects neither `score` nor `gameType` - so it would
-     * rank a provider contest on `pnl` and tie every player at zero ON A PUBLIC SCREEN. That
-     * is its own finding and its own commit. When it is fixed, this test goes red and should
-     * be deleted along with the exception.
+     * `/api/dashboard/competitions` is the PUBLIC, unauthenticated broadcast behind `/arena`.
+     * Before this fix it ranked every provider contest on `pnl` and tied every player at zero
+     * with no error and no log line (R37 shape, one screen along). Trading contests keep their
+     * live-PnL sort in-route so open-position equity still moves the board; provider contests
+     * go through `sortParticipants`, the same function the signed-in dashboard uses.
      */
     const code = readCode(ARENA_ROUTE);
+
+    // The call, with its arguments - an import is not a use.
+    expect(code).toMatch(/createDashboardRankResolver\(\)/);
+    expect(code).toMatch(/await\s+sortParticipants\(/);
+    expect(code.match(/createDashboardRankResolver\(\)/g) || []).toHaveLength(1);
+
+    // Selects the score the sorter reads, and labels the contest so the client can tell.
+    expect(code).toMatch(/\bscore\b/);
+    expect(code).toMatch(/hasProviderGameLabel\(/);
+    expect(code).toMatch(/gameType:\s*c\.gameType/);
+
+    // Trading branch still owns its live-PnL comparator. Provider must not invent a third.
     expect(code).toMatch(/aHasTrades/);
+    // resolveRank is the card's one-viewer answer; the arena needs the ordered list.
     expect(code).not.toMatch(/resolveRank\(/);
   });
 });

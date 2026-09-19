@@ -144,12 +144,20 @@ export function createDashboardRankResolver() {
     return resolved;
   }
 
-  async function resolveRank({
-    competition,
-    participants,
-    userId,
-    fallbackRank,
-  }: ResolveDashboardRankArgs): Promise<number> {
+  /**
+   * Sort a contest's participants for a live board.
+   *
+   * WHY THIS IS EXPORTED SEPARATELY FROM `resolveRank`. The dashboard card only needs the
+   * viewer's position. The public `/arena` broadcast needs the full ordered list (and keeps
+   * trading contests on its own live-PnL sort). One sorter for provider contests means the
+   * arena cannot invent a third ranking answer while still looking correct.
+   *
+   * Disqualified rows are excluded — callers that want them at the bottom re-append them.
+   */
+  async function sortParticipants(
+    competition: DashboardRankableContest,
+    participants: DashboardRankableParticipant[],
+  ): Promise<DashboardRankableParticipant[]> {
     const rankingMethod = competition.rules?.rankingMethod || "pnl";
     // Reason: the DISPLAY helper, not the launch helper. `isProviderContest` also demands a
     // provider key and a game code, because a contest missing those cannot launch a round.
@@ -157,11 +165,6 @@ export function createDashboardRankResolver() {
     // and loss - so the strict helper would rank its players on `pnl` and tie every one of
     // them at zero.
     const isProviderGame = hasProviderGameLabel(competition);
-
-    // Reason: participation.currentRank from the database can be stale or 0.
-    if (competition.status !== "active" || participants.length === 0) {
-      return fallbackRank;
-    }
 
     // Reason: a provider game reports one score and no trades, so BOTH halves of the
     // trading comparator misfire on it. `getDashboardRankingValue` reads `pnl`, which is
@@ -186,7 +189,7 @@ export function createDashboardRankResolver() {
           )
         : getDashboardRankingValue(p, rankingMethod);
 
-    const sorted = [...participants]
+    return [...participants]
       .filter((p: any) => (p.status || "active") !== "disqualified")
       .sort((a: any, b: any) => {
         if (!isProviderGame) {
@@ -197,9 +200,23 @@ export function createDashboardRankResolver() {
         }
         return rankingValue(b) - rankingValue(a);
       });
+  }
+
+  async function resolveRank({
+    competition,
+    participants,
+    userId,
+    fallbackRank,
+  }: ResolveDashboardRankArgs): Promise<number> {
+    // Reason: participation.currentRank from the database can be stale or 0.
+    if (competition.status !== "active" || participants.length === 0) {
+      return fallbackRank;
+    }
+
+    const sorted = await sortParticipants(competition, participants);
     const idx = sorted.findIndex((p: any) => p.userId?.toString() === userId);
     return idx === -1 ? fallbackRank : idx + 1;
   }
 
-  return { resolveRank };
+  return { resolveRank, sortParticipants };
 }

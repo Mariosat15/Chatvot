@@ -18,7 +18,10 @@ interface DerbyTrackProps {
 }
 
 const DerbyTrack: React.FC<DerbyTrackProps> = ({ event, previousEquities, onSelectTrader, compact }) => {
-  const sorted = useMemo(() => ranked(event.participants), [event.participants]);
+  const sorted = useMemo(
+    () => ranked(event.participants, event.gameType),
+    [event.participants, event.gameType],
+  );
   const topN = compact ? sorted.slice(0, 8) : sorted;
   const finalLap = useMemo(() => {
     const ms = new Date(event.endDate).getTime() - Date.now();
@@ -117,7 +120,7 @@ const DerbyTrack: React.FC<DerbyTrackProps> = ({ event, previousEquities, onSele
           const roi = calcRoi(p.liveEquity, event.startingCapital);
           const prevEq = previousEquities?.get(p.userId) ?? p.liveEquity;
           const momentum = calcMomentum(p.liveEquity, prevEq);
-          const titleObj = getTraderTitle(p, event.startingCapital);
+          const titleObj = getTraderTitle(p, event.startingCapital, event.gameType);
           const isLeader = i === 0;
 
           return (
@@ -148,7 +151,7 @@ const DerbyTrack: React.FC<DerbyTrackProps> = ({ event, previousEquities, onSele
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
                 {i < 3 ? (
-                  <ArenaIcon name="Medal" size={16} color={MEDAL_COLORS[i]} />
+                  <ArenaIcon name="Medal" size={16} color={MEDAL_COLORS.at(i) ?? CV.gold} />
                 ) : (
                   <span style={{ color: CV.gray, fontWeight: 800, fontSize: 12 }}>#{i + 1}</span>
                 )}
