@@ -642,7 +642,7 @@ export default function FraudHistorySection() {
 
       {/* Entry Detail Dialog */}
       <Dialog open={entryDialogOpen} onOpenChange={setEntryDialogOpen}>
-        <DialogContent className="max-w-2xl bg-zinc-900 border-zinc-800">
+        <DialogContent size="lg" className=" bg-zinc-900 border-zinc-800">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {selectedEntry &&
@@ -914,7 +914,7 @@ export default function FraudHistorySection() {
 
       {/* User History Dialog */}
       <Dialog open={userDialogOpen} onOpenChange={setUserDialogOpen}>
-        <DialogContent className="max-w-4xl bg-zinc-900 border-zinc-800">
+        <DialogContent size="xl" className=" bg-zinc-900 border-zinc-800">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <User className="h-5 w-5" />

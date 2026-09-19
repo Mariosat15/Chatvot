@@ -1155,7 +1155,7 @@ export default function GamificationWizardSection() {
 
       {/* Badge Details Dialog */}
       <Dialog open={showBadgeDetails} onOpenChange={setShowBadgeDetails}>
-        <DialogContent className="max-w-4xl max-h-[80vh] bg-gray-900 border-gray-700">
+        <DialogContent size="xl" className=" max-h-[80vh] bg-gray-900 border-gray-700">
           <DialogHeader>
             <DialogTitle className="text-white">Badge Agent — Detailed Results</DialogTitle>
             <DialogDescription className="text-gray-400">
@@ -1327,7 +1327,7 @@ export default function GamificationWizardSection() {
 
       {/* Milestone Details Dialog */}
       <Dialog open={showMilestoneDetails} onOpenChange={setShowMilestoneDetails}>
-        <DialogContent className="max-w-4xl max-h-[80vh] bg-gray-900 border-gray-700">
+        <DialogContent size="xl" className=" max-h-[80vh] bg-gray-900 border-gray-700">
           <DialogHeader>
             <DialogTitle className="text-white">Milestone Agent — Detailed Results</DialogTitle>
           </DialogHeader>

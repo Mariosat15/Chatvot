@@ -92,7 +92,7 @@ export default function ChargebackCompleteDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent >
         <DialogHeader>
           <DialogTitle>Complete chargeback — apply clawback</DialogTitle>
         </DialogHeader>

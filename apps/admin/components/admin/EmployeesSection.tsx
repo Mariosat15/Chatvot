@@ -1287,7 +1287,7 @@ export default function EmployeesSection() {
 
       {/* Create Employee Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent className="bg-gray-900 border-gray-700 max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent size="lg" className="bg-gray-900 border-gray-700 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-white">Add New Employee</DialogTitle>
             <DialogDescription className="text-gray-400">
@@ -1496,7 +1496,7 @@ export default function EmployeesSection() {
 
       {/* Edit Employee Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="bg-gray-900 border-gray-700 max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent size="lg" className="bg-gray-900 border-gray-700 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-white">Edit Employee</DialogTitle>
             <DialogDescription className="text-gray-400">
@@ -1703,7 +1703,7 @@ export default function EmployeesSection() {
 
       {/* Role Template Dialog */}
       <Dialog open={showTemplateDialog} onOpenChange={setShowTemplateDialog}>
-        <DialogContent className="bg-gray-900 border-gray-700 max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent size="lg" className="bg-gray-900 border-gray-700 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-white">
               {editingTemplate ? "Edit Role Template" : "Create Role Template"}

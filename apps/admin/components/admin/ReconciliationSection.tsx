@@ -2009,7 +2009,7 @@ export default function ReconciliationSection() {
           setDetailDialog({ open, run: detailDialog.run })
         }
       >
-        <DialogContent className="bg-gray-900 border-gray-700 max-w-3xl max-h-[80vh] overflow-y-auto">
+        <DialogContent size="xl" className="bg-gray-900 border-gray-700 max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-white flex items-center gap-2">
               <History className="h-5 w-5 text-purple-400" />

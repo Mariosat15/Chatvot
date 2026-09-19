@@ -174,7 +174,7 @@ export default function ChargebackCreateDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent size="lg" >
         <DialogHeader>
           <DialogTitle>Create chargeback case</DialogTitle>
         </DialogHeader>

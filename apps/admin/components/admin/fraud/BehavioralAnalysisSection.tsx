@@ -596,7 +596,7 @@ export default function BehavioralAnalysisSection() {
 
       {/* Profile Detail Dialog */}
       <Dialog open={showProfileDialog} onOpenChange={setShowProfileDialog}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-gray-900 border-gray-700">
+        <DialogContent size="xl" className=" max-h-[90vh] overflow-y-auto bg-gray-900 border-gray-700">
           <DialogHeader>
             <DialogTitle className="text-gray-100 flex items-center gap-2">
               <Activity className="h-5 w-5 text-blue-400" />

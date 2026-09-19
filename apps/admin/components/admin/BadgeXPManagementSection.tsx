@@ -2518,7 +2518,7 @@ export default function BadgeXPManagementSection() {
 
       {/* AI Generated Badges Dialog */}
       <Dialog open={showAiResults} onOpenChange={setShowAiResults}>
-        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+        <DialogContent size="xl" className=" max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold flex items-center gap-3">
               <Sparkles className="h-6 w-6 text-purple-400" />
@@ -2677,7 +2677,7 @@ export default function BadgeXPManagementSection() {
 
       {/* AI Balance Evaluation Dialog */}
       <Dialog open={showAiEvaluation} onOpenChange={setShowAiEvaluation}>
-        <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto">
+        <DialogContent size="full" className=" max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold flex items-center gap-3">
               <BarChart3 className="h-6 w-6 text-emerald-400" />

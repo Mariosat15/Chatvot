@@ -1999,7 +1999,7 @@ export default function FraudMonitoringSection() {
         open={showInvestigationDialog}
         onOpenChange={setShowInvestigationDialog}
       >
-        <DialogContent className="bg-gray-900 border-gray-700 text-gray-100 max-w-2xl">
+        <DialogContent size="lg" className="bg-gray-900 border-gray-700 text-gray-100 ">
           <DialogHeader>
             <DialogTitle className="text-2xl text-gray-100 flex items-center gap-3">
               {investigationActionType === "dismiss" && (
@@ -2436,7 +2436,7 @@ export default function FraudMonitoringSection() {
 
       {/* Reset All Security Data Dialog */}
       <Dialog open={showResetDialog} onOpenChange={setShowResetDialog}>
-        <DialogContent className="bg-gray-900 border-gray-700 text-gray-100 max-w-lg">
+        <DialogContent className="bg-gray-900 border-gray-700 text-gray-100 ">
           <DialogHeader>
             <DialogTitle className="text-2xl text-gray-100 flex items-center gap-3">
               <AlertOctagon className="h-6 w-6 text-red-500" />

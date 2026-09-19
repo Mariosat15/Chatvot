@@ -673,7 +673,7 @@ export default function FailedDepositsSection() {
 
       {/* Cancel/Dismiss Dialog */}
       <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
-        <DialogContent className="bg-gray-900 border-gray-700 max-w-md">
+        <DialogContent size="sm" className="bg-gray-900 border-gray-700 ">
           <DialogHeader>
             <DialogTitle className="text-white flex items-center gap-2">
               <XCircle className="h-5 w-5 text-red-400" />
@@ -755,7 +755,7 @@ export default function FailedDepositsSection() {
 
       {/* Details Dialog */}
       <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
-        <DialogContent className="bg-gray-900 border-gray-700 max-w-2xl">
+        <DialogContent size="lg" className="bg-gray-900 border-gray-700 ">
           <DialogHeader>
             <DialogTitle className="text-white flex items-center gap-2">
               <Eye className="h-5 w-5 text-blue-400" />

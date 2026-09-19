@@ -350,16 +350,19 @@ who has to think in games rather than trades.
 > `apps/admin/components/admin/wiki/game-administration-skeleton.tsx` and are spread into
 > `AdminWikiSection.tsx` after Competitions / before Fraud. Each skeleton carries an outline
 > of what to author and a "To be completed" banner — **body authoring remains owner work**,
-> by the 15 Sep decision. Pinned by `__tests__/admin/wiki-a5-game-admin.test.ts` (3 tests).
-> A document listing A5's reword or skeleton as outstanding is correct as history and stale
-> as a present fact — **say which**.
+> by the 15 Sep decision. **Owner 19 Sep 2026: fill these bodies at the END OF ALL other
+> work** — not next, not interleaved with eng. Pinned by `__tests__/admin/wiki-a5-game-admin.test.ts`
+> (3 tests). A document listing A5's reword or skeleton as outstanding is correct as history
+> and stale as a present fact — **say which**. A document treating wiki fill as the next
+> action is stale from 19 Sep — **say which**.
 
 **A5 and A6 are the two that get forgotten, and both are worse than a stale label.** The
 wiki is what an operator reads when they are unsure, and the AI agent actively advises
 them - a knowledge base that still describes a trading-only platform will confidently give
 wrong guidance. Prerequisite B had to update both for exactly this reason; treat them as
 part of the pass, not as documentation to catch up later. **A6 and A5's engineering half
-are now both closed; only the owner-authored wiki bodies remain.**
+are now both closed; only the owner-authored wiki bodies remain, and those are scheduled
+last of all (19 Sep).**
 
 ### 3.2 Player passes - X8
 

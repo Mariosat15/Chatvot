@@ -269,7 +269,7 @@ export default function TransactionDetailDialog({
 
   return (
     <Dialog open={!!tx} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="bg-gray-900 border-gray-700 max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent size="lg" className="bg-gray-900 border-gray-700 max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-white">
             <ArrowRightLeft className="h-5 w-5 text-indigo-400" />

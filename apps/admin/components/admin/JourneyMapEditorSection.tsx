@@ -4187,7 +4187,7 @@ export default function JourneyMapEditorSection() {
 
       {/* Generator Dialog - Hide when step 2 is active (fullscreen mode) */}
       <Dialog open={generatorOpen && generatorStep !== 2} onOpenChange={setGeneratorOpen}>
-        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+        <DialogContent size="full" className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Wand2 className="h-5 w-5" />
@@ -4881,7 +4881,7 @@ export default function JourneyMapEditorSection() {
 
       {/* Full Sequence Generation Dialog */}
       <Dialog open={showSequenceDialog} onOpenChange={setShowSequenceDialog}>
-        <DialogContent className="max-w-lg">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Wand2 className="h-5 w-5 text-purple-500" />
@@ -4952,7 +4952,7 @@ export default function JourneyMapEditorSection() {
 
       {/* Visual Placement Wizard Dialog */}
       <Dialog open={showPlacementWizard} onOpenChange={setShowPlacementWizard}>
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden">
+        <DialogContent size="full" className="max-h-[90vh] overflow-hidden">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <MapPin className="h-5 w-5 text-green-500" />

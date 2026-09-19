@@ -922,7 +922,7 @@ export default function TutorialsSection() {
 
       {/* Edit dialog */}
       <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
-        <DialogContent className="max-w-lg">
+        <DialogContent >
           <DialogHeader>
             <DialogTitle>Edit tutorial</DialogTitle>
           </DialogHeader>
@@ -1016,7 +1016,7 @@ export default function TutorialsSection() {
 
       {/* Preview dialog */}
       <Dialog open={!!previewing} onOpenChange={(o) => !o && setPreviewing(null)}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent size="xl" >
           <DialogHeader>
             <DialogTitle>{previewing?.title}</DialogTitle>
           </DialogHeader>

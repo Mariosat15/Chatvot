@@ -137,7 +137,7 @@ export default function IndicatorSelector({
         </Button>
       </DialogTrigger>
 
-      <DialogContent className="bg-[#131722] border-[#2b2b43] text-white max-w-2xl max-h-[80vh] overflow-y-auto">
+      <DialogContent size="lg" className="bg-[#131722] border-[#2b2b43] text-white max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-white flex items-center gap-2">
             <Activity className="h-5 w-5" />
