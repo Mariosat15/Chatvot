@@ -1,7 +1,10 @@
 import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { unstable_noStore as noStore } from "next/cache";
 import { FingerprintProvider } from "@/contexts/FingerprintProvider";
+import { TerminologyProvider } from "@/contexts/TerminologyContext";
+import { getTerms } from "@/lib/services/terminology.service";
 import GlobalPresenceTracker from "@/components/GlobalPresenceTracker";
 import ChallengePopup from "@/components/challenges/ChallengePopup";
 import UserSidebar from "@/components/UserSidebar";
@@ -14,6 +17,9 @@ const emailVerifiedCache = new Map<string, { verified: boolean; ts: number }>();
 const EMAIL_VERIFIED_TTL_MS = 5 * 60 * 1000;
 
 const Layout = async ({ children }: { children: React.ReactNode }) => {
+  // Reason: an operator rename must reach the next request; a static bake freezes defaults.
+  noStore();
+  const terms = await getTerms();
   const session = await auth.api.getSession({ headers: await headers() });
 
   if (!session?.user) redirect("/sign-in");
@@ -55,34 +61,36 @@ const Layout = async ({ children }: { children: React.ReactNode }) => {
 
   return (
     <FingerprintProvider>
-      {/* Global presence tracking for online/offline status */}
-      <GlobalPresenceTracker userId={session.user.id} />
+      <TerminologyProvider terms={terms}>
+        {/* Global presence tracking for online/offline status */}
+        <GlobalPresenceTracker userId={session.user.id} />
 
-      {/* Real-time challenge popup notifications (WS push) */}
-      <ChallengePopup userId={session.user.id} />
+        {/* Real-time challenge popup notifications (WS push) */}
+        <ChallengePopup userId={session.user.id} />
 
-      <div className="min-h-screen bg-gray-950 text-gray-400 flex">
-        {/* Sidebar Navigation - Desktop Only */}
-        <UserSidebar user={user} />
+        <div className="min-h-screen bg-gray-950 text-gray-400 flex">
+          {/* Sidebar Navigation - Desktop Only */}
+          <UserSidebar user={user} />
 
-        {/* Main Content Area */}
-        <main className="flex-1 min-h-screen overflow-x-hidden">
-          {/* Mobile header spacing */}
-          <div className="lg:hidden h-16" />
+          {/* Main Content Area */}
+          <main className="flex-1 min-h-screen overflow-x-hidden">
+            {/* Mobile header spacing */}
+            <div className="lg:hidden h-16" />
 
-          {/* Page Content - Responsive padding */}
-          <div className="px-3 py-3 sm:px-4 sm:py-4 md:px-5 lg:px-6 pb-20 lg:pb-6">
-            <AnnouncementBanner />
-            {children}
-          </div>
+            {/* Page Content - Responsive padding */}
+            <div className="px-3 py-3 sm:px-4 sm:py-4 md:px-5 lg:px-6 pb-20 lg:pb-6">
+              <AnnouncementBanner />
+              {children}
+            </div>
 
-          {/* Mobile bottom nav spacing */}
-          <div className="lg:hidden h-16" />
-        </main>
-      </div>
+            {/* Mobile bottom nav spacing */}
+            <div className="lg:hidden h-16" />
+          </main>
+        </div>
 
-      {/* Mobile Bottom Navigation */}
-      <MobileBottomNav />
+        {/* Mobile Bottom Navigation */}
+        <MobileBottomNav />
+      </TerminologyProvider>
     </FingerprintProvider>
   );
 };

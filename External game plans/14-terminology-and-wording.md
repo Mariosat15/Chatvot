@@ -368,19 +368,40 @@ last of all (19 Sep).**
 
 Ordered by visibility, so the highest-impact strings change first.
 
-| Pass | Scope | ~strings | Who |
-|---|---|---|---|
-| 1 | Navigation - `UserSidebar.tsx`, `MobileBottomNav.tsx` | ~10 | Developer |
-| 2 | Level titles, via the `XPConfig` database record | 20 | Admin |
-| 3 | Contest shell in `components/contest/` | ~50 | Developer |
-| 4 | Leaderboard columns and headings | ~25 | Developer |
-| 5 | Dashboard header and section titles | ~30 | Developer |
-| 6 | Profile tabs and headings | ~30 | Developer |
-| 7 | Notification and email templates (database) | ~25 templates | Admin |
-| 8 | Badge and milestone **content** - never IDs | data | Admin |
-| 9 | Landing and hero content (database) | data | Admin |
-| 10 | Help centre core | ~40 | Counted in `13` |
-| 11 | Legal pages | separate | Legal |
+| Pass | Scope | ~strings | Who | Status |
+|---|---|---|---|---|
+| 1 | Navigation - `UserSidebar.tsx`, `MobileBottomNav.tsx` | ~10 | Developer | **BUILT 19 Sep 2026** — see s3.2a |
+| 2 | Level titles, via the `XPConfig` database record | 20 | Admin | Outstanding (R88 closed in X6.5; content still operator) |
+| 3 | Contest shell in `components/contest/` | ~50 | Developer | Outstanding (path corrected below) |
+| 4 | Leaderboard columns and headings | ~25 | Developer | Outstanding |
+| 5 | Dashboard header and section titles | ~30 | Developer | Outstanding |
+| 6 | Profile tabs and headings | ~30 | Developer | Outstanding |
+| 7 | Notification and email templates (database) | ~25 templates | Admin | Outstanding |
+| 8 | Badge and milestone **content** - never IDs | data | Admin | Outstanding |
+| 9 | Landing and hero content (database) | data | Admin | Outstanding |
+| 10 | Help centre core | ~40 | Counted in `13` | Outstanding |
+| 11 | Legal pages | separate | Legal | Outstanding |
+
+#### 3.2a Pass 1 — player navigation (BUILT 19 Sep 2026)
+
+**What shipped:** `contexts/TerminologyContext.tsx` (player mirror of the admin provider),
+mounted in `app/(root)/layout.tsx` with `getTerms()` + `noStore()`, and both nav surfaces
+reading tokens:
+
+| Site | Was | Token |
+|---|---|---|
+| `UserSidebar` section header | `"Trading"` | `terms.games` |
+| `UserSidebar` / level fallback | `"Trader"` | `terms.player` |
+| Competitions / Challenges / Leaderboard labels | hard-coded | `terms.contests` / `terms.challenges` / `terms.leaderboard` |
+| Mobile bottom nav same three | hard-coded | same |
+
+Routes stay `/competitions`, `/challenges`, `/leaderboard` — identifiers are never-rename
+(chapter 14 s6). **15 tests** in `__tests__/player/terminology-delivery.test.ts`; the
+admin delivery tripwire that asserted "no main-app TerminologyContext" was **flipped**, and
+`vitest.config.ts` now aliases `@/contexts/TerminologyContext` to the main-app file.
+
+**Not built:** passes 2–11; auth/landing trees still have no provider until a later pass
+reaches them.
 
 Passes 2, 7, 8 and 9 are **database content, editable in admin by someone who is not a
 developer**. That is roughly three days of work that does not consume engineering time,

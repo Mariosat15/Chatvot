@@ -7,6 +7,8 @@ import { GameIcon } from "@/components/ui/GameIcon";
 import type { GameIconName } from "@/lib/constants/game-icons";
 import { LogOut } from "lucide-react";
 import { signOut } from "@/lib/actions/auth.actions";
+import { useTerms } from "@/contexts/TerminologyContext";
+import type { TerminologyPack } from "@/lib/constants/terminology";
 
 interface NavItem {
   href: string;
@@ -16,61 +18,72 @@ interface NavItem {
   activeColor: string;
 }
 
-const navItems: NavItem[] = [
-  {
-    href: "/dashboard",
-    label: "Dashboard",
-    iconName: "headset",
-    color: "text-blue-400",
-    activeColor: "bg-blue-500/20",
-  },
-  {
-    href: "/competitions",
-    label: "Competitions",
-    iconName: "trophy",
-    color: "text-yellow-400",
-    activeColor: "bg-yellow-500/20",
-  },
-  {
-    href: "/challenges",
-    label: "Challenges",
-    iconName: "sword",
-    color: "text-red-400",
-    activeColor: "bg-red-500/20",
-  },
-  {
-    href: "/marketplace",
-    label: "Market",
-    iconName: "pouch1",
-    color: "text-purple-400",
-    activeColor: "bg-purple-500/20",
-  },
-  {
-    href: "/leaderboard",
-    label: "Leaderboard",
-    iconName: "goldMedal",
-    color: "text-amber-400",
-    activeColor: "bg-amber-500/20",
-  },
-  {
-    href: "/wallet",
-    label: "Wallet",
-    iconName: "chest1",
-    color: "text-green-400",
-    activeColor: "bg-green-500/20",
-  },
-  {
-    href: "/profile",
-    label: "Profile",
-    iconName: "helmet1",
-    color: "text-cyan-400",
-    activeColor: "bg-cyan-500/20",
-  },
-];
+/**
+ * Labels that are renameable nouns come from the terminology pack (X8 pass 1).
+ *
+ * // Reason: same as UserSidebar — a module-level constant cannot call `useTerms`, and
+ * // hard-coding "Competitions" beside a provider that can rename it is the silence the
+ * // token layer exists to end. Routes stay `/competitions` etc.
+ */
+function buildNavItems(terms: TerminologyPack): NavItem[] {
+  return [
+    {
+      href: "/dashboard",
+      label: "Dashboard",
+      iconName: "headset",
+      color: "text-blue-400",
+      activeColor: "bg-blue-500/20",
+    },
+    {
+      href: "/competitions",
+      label: terms.contests,
+      iconName: "trophy",
+      color: "text-yellow-400",
+      activeColor: "bg-yellow-500/20",
+    },
+    {
+      href: "/challenges",
+      label: terms.challenges,
+      iconName: "sword",
+      color: "text-red-400",
+      activeColor: "bg-red-500/20",
+    },
+    {
+      href: "/marketplace",
+      label: "Market",
+      iconName: "pouch1",
+      color: "text-purple-400",
+      activeColor: "bg-purple-500/20",
+    },
+    {
+      href: "/leaderboard",
+      label: terms.leaderboard,
+      iconName: "goldMedal",
+      color: "text-amber-400",
+      activeColor: "bg-amber-500/20",
+    },
+    {
+      href: "/wallet",
+      label: "Wallet",
+      iconName: "chest1",
+      color: "text-green-400",
+      activeColor: "bg-green-500/20",
+    },
+    {
+      href: "/profile",
+      label: "Profile",
+      iconName: "helmet1",
+      color: "text-cyan-400",
+      activeColor: "bg-cyan-500/20",
+    },
+  ];
+}
 
 export default function MobileBottomNav() {
   const pathname = usePathname();
   const router = useRouter();
+  const terms = useTerms();
+  const navItems = buildNavItems(terms);
   const isActive = (path: string) => {
     if (path === "/") return pathname === "/";
     return pathname.startsWith(path);

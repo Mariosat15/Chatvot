@@ -14,6 +14,9 @@ import NotificationDropdown from "@/components/notifications/NotificationDropdow
 import { GameIcon } from "@/components/ui/GameIcon";
 import { useUnreadMessages } from "@/hooks/useUnreadMessages";
 import { GM_SUBSCRIPTION_CHANGED } from "@/lib/events/gm-subscription";
+import { useTerms } from "@/contexts/TerminologyContext";
+import type { TerminologyPack } from "@/lib/constants/terminology";
+import { isValidGameIconName } from "@/lib/constants/game-icons";
 import {
   LogOut,
   Menu,
@@ -41,59 +44,69 @@ interface NavItem {
   numericBadge?: number;
 }
 
-const mainNavItems: NavItem[] = [
-  {
-    href: "/dashboard",
-    label: "Dashboard",
-    icon: <GameIcon name="headset" size={22} />,
-    color: "text-blue-400",
-    gradient: "from-blue-500/20 to-blue-600/5",
-  },
-  {
-    href: "/competitions",
-    label: "Competitions",
-    icon: <GameIcon name="trophy" size={22} />,
-    color: "text-yellow-400",
-    gradient: "from-yellow-500/20 to-yellow-600/5",
-    badge: "HOT",
-  },
-  {
-    href: "/challenges",
-    label: "1v1 Challenges",
-    icon: <GameIcon name="sword" size={22} />,
-    color: "text-red-400",
-    gradient: "from-red-500/20 to-red-600/5",
-  },
-  {
-    href: "/marketplace",
-    label: "Marketplace",
-    icon: <GameIcon name="pouch1" size={22} />,
-    color: "text-purple-400",
-    gradient: "from-purple-500/20 to-purple-600/5",
-  },
-  {
-    href: "/leaderboard",
-    label: "Leaderboard",
-    icon: <GameIcon name="goldMedal" size={22} />,
-    color: "text-emerald-400",
-    gradient: "from-emerald-500/20 to-emerald-600/5",
-  },
-  {
-    href: "/arena",
-    label: "Live Arena",
-    icon: <GameIcon name="crown" size={22} />,
-    color: "text-cyan-300",
-    gradient: "from-cyan-500/20 to-blue-600/5",
-    badge: "LIVE",
-  },
-  {
-    href: "/messaging",
-    label: "Messages",
-    icon: <GameIcon name="flag" size={22} />,
-    color: "text-pink-400",
-    gradient: "from-pink-500/20 to-pink-600/5",
-  },
-];
+/**
+ * Labels that are renameable nouns come from the terminology pack (X8 pass 1).
+ *
+ * // Reason: a module-level constant cannot call `useTerms`, and hard-coding "Competitions"
+ * // beside a provider that can rename it is exactly the silence the token layer exists to
+ * // end. Routes stay `/competitions` etc. — identifiers are never-rename.
+ */
+function buildMainNavItems(terms: TerminologyPack): NavItem[] {
+  return [
+    {
+      href: "/dashboard",
+      label: "Dashboard",
+      icon: <GameIcon name="headset" size={22} />,
+      color: "text-blue-400",
+      gradient: "from-blue-500/20 to-blue-600/5",
+    },
+    {
+      href: "/competitions",
+      label: terms.contests,
+      icon: <GameIcon name="trophy" size={22} />,
+      color: "text-yellow-400",
+      gradient: "from-yellow-500/20 to-yellow-600/5",
+      badge: "HOT",
+    },
+    {
+      href: "/challenges",
+      // Reason: keep the "1v1 " prefix — it is format, not the noun; the noun is the token.
+      label: `1v1 ${terms.challenges}`,
+      icon: <GameIcon name="sword" size={22} />,
+      color: "text-red-400",
+      gradient: "from-red-500/20 to-red-600/5",
+    },
+    {
+      href: "/marketplace",
+      label: "Marketplace",
+      icon: <GameIcon name="pouch1" size={22} />,
+      color: "text-purple-400",
+      gradient: "from-purple-500/20 to-purple-600/5",
+    },
+    {
+      href: "/leaderboard",
+      label: terms.leaderboard,
+      icon: <GameIcon name="goldMedal" size={22} />,
+      color: "text-emerald-400",
+      gradient: "from-emerald-500/20 to-emerald-600/5",
+    },
+    {
+      href: "/arena",
+      label: "Live Arena",
+      icon: <GameIcon name="crown" size={22} />,
+      color: "text-cyan-300",
+      gradient: "from-cyan-500/20 to-blue-600/5",
+      badge: "LIVE",
+    },
+    {
+      href: "/messaging",
+      label: "Messages",
+      icon: <GameIcon name="flag" size={22} />,
+      color: "text-pink-400",
+      gradient: "from-pink-500/20 to-pink-600/5",
+    },
+  ];
+}
 
 const accountNavItems: NavItem[] = [
   {
@@ -122,6 +135,8 @@ const accountNavItems: NavItem[] = [
 const UserSidebar = ({ user }: UserSidebarProps) => {
   const pathname = usePathname();
   const router = useRouter();
+  const terms = useTerms();
+  const mainNavItems = buildMainNavItems(terms);
   const { images } = useWhiteLabelImages();
   const { profileImage: userProfileImage } = useUserProfileImage();
   const { unreadCount: unreadMessages } = useUnreadMessages();
@@ -172,7 +187,8 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
         if (response.ok) {
           const data = await response.json();
           setUserLevel({
-            title: data.currentTitle || "Trader",
+            // Reason: X8 pass 1 — fallback title is the `player` token, never hard-coded "Trader".
+            title: data.currentTitle || terms.player,
             level: data.currentLevel || 1,
             color: data.currentColor || "#22c55e",
             icon: data.currentIcon || "⚔️",
@@ -183,7 +199,7 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
     checkGameMasterStatus();
     fetchFeatureFlags();
     fetchUserLevel();
-  }, [checkGameMasterStatus]);
+  }, [checkGameMasterStatus, terms.player]);
 
   // Refresh GM status when something elsewhere mutates it (purchase,
   // renewal, deletion) and when the tab regains focus (catches cross-tab
@@ -406,12 +422,19 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
             {!isCollapsed && (
               <div className="flex-1 min-w-0">
                 <h3 className="font-bold text-white truncate flex items-center gap-1">
-                  {user?.name || "Trader"}
+                  {user?.name || terms.player}
                   <GameIcon name="star1" size={14} />
                 </h3>
                 <p className="text-xs text-gray-400 truncate">{user?.email}</p>
                 <div className="flex items-center gap-1 mt-1">
-                  <GameIcon name={(userLevel?.icon as any) || "sword"} size={12} />
+                  <GameIcon
+                    name={
+                      userLevel?.icon && isValidGameIconName(userLevel.icon)
+                        ? userLevel.icon
+                        : "sword"
+                    }
+                    size={12}
+                  />
                   <span className="text-[11px] font-medium" style={{ color: userLevel?.color || "#22c55e" }}>
                     {userLevel ? `${userLevel.title} • Lv ${userLevel.level}` : "Loading..."}
                   </span>
@@ -428,7 +451,8 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
         <div className="space-y-1">
           {!isCollapsed && (
             <h4 className="px-3 mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-              Trading
+              {/* Reason: chapter 14 s4 — section header was "Trading"; token is `games`. */}
+              {terms.games}
             </h4>
           )}
           {mainNavItems

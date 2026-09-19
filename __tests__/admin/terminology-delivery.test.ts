@@ -148,43 +148,41 @@ describe("the AppSettingsProvider defect is CLOSED (R110)", () => {
   });
 });
 
-describe("the vitest alias for the admin context is still unambiguous", () => {
+describe("main-app and admin TerminologyContext resolve apart", () => {
   /*
-    A TRIPWIRE FOR X7, not a claim about today.
+    Flipped from the X6.5 tripwire that asserted the main-app file did not exist.
 
-    `vitest.config.ts` maps the bare specifier `@/contexts/TerminologyContext` to the ADMIN
-    copy, because `@` maps to the repository root here and fourteen admin components import
-    the context through that alias - `provider-contest-schedule-and-prizes.test.ts` imports
-    one of them for real, and without the entry it stops loading rather than failing an
-    assertion.
-
-    That mapping is only correct while there is exactly one such module. X7 delivers tokens to
-    the PLAYER screens, which is the obvious moment a main-app `contexts/TerminologyContext`
-    appears - and on that day every main-app file importing it resolves to the admin copy IN
-    TESTS ONLY, because `next build` uses each app's own tsconfig and would be perfectly
-    happy. That is the quiet direction: two apps' screens sharing one provider instance in the
-    harness, with the suite green.
-
-    // Reason this asserts absence rather than the alias's contents: the alias is correct as
-    // written, so there is nothing about it to pin. What can change is the assumption under
-    // it. When this goes red, do not delete it - scope the alias to the admin path prefix and
-    // give the main-app module its own entry, then flip this to assert both resolve apart.
+    // Reason: X8 pass 1 created `contexts/TerminologyContext.tsx`. Leaving the vitest alias
+    // on the admin copy would have every main-app `useTerms()` resolve to admin IN TESTS
+    // ONLY — the quiet direction the original tripwire existed to catch. Both files must
+    // exist, and the bare `@/contexts/TerminologyContext` alias must point at the MAIN one.
+    // Admin delivery imports the admin file by its explicit `@/apps/admin/contexts/...` path.
   */
-  it("has no main-app contexts/TerminologyContext competing for the alias", () => {
+  it("both apps ship their own TerminologyContext module", () => {
     expect(existsSync(join(ROOT, "contexts", "TerminologyContext.tsx"))).toBe(
-      false,
+      true,
     );
-    expect(existsSync(join(ROOT, "contexts", "TerminologyContext.ts"))).toBe(
-      false,
-    );
+    expect(
+      existsSync(join(ROOT, "apps", "admin", "contexts", "TerminologyContext.tsx")),
+    ).toBe(true);
+  });
+
+  it("the vitest alias for @/contexts/TerminologyContext points at the main-app file", () => {
+    const config = readCode("vitest.config.ts");
+    const aliasKey = config.indexOf('"@/contexts/TerminologyContext"');
+    expect(aliasKey).toBeGreaterThan(-1);
+    // Slice the alias value, not the whole file — a comment naming the admin path must not
+    // satisfy (or defeat) the assertion.
+    const afterKey = config.slice(aliasKey, aliasKey + 280);
+    expect(afterKey).toMatch(/contexts[/\\]TerminologyContext\.tsx/);
+    expect(afterKey).not.toMatch(/apps[/\\]admin[/\\]contexts[/\\]TerminologyContext/);
   });
 
   it("the alias entry sits above the catch-all, or it never fires", () => {
     /*
       Vite tries aliases IN ORDER, so this entry below `"@"` is silently dead - and dead in
       the way that reads as working, because `@/contexts/...` would then resolve against the
-      repository root and fail exactly as it did before the entry was added. The config's own
-      docblock states the rule; this is what holds it.
+      repository root. The config's own docblock states the rule; this is what holds it.
     */
     const config = readCode("vitest.config.ts");
     const specific = config.indexOf('"@/contexts/TerminologyContext"');

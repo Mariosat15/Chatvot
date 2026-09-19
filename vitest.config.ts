@@ -54,27 +54,26 @@ export default defineConfig({
         "apps/admin/lib/admin/section-route-guard.ts",
       ),
       /**
-       * The admin terminology context, reached by every game contest screen X6.5 tokenised.
+       * Terminology context — MAIN-APP copy under `contexts/TerminologyContext.tsx`.
        *
-       * Reason it is needed at all: the structural suites read these components as TEXT and so
-       * never resolve the import, but `provider-contest-schedule-and-prizes.test.ts` imports
-       * `PrizeDistributionEditor` for real. The moment a noun on it became a token, that suite
-       * stopped LOADING - `Cannot find module`, zero tests, which reads as the suite being
-       * broken rather than as one import being unresolvable. Note the shape of the failure:
-       * `next build` resolves this specifier correctly against the admin tsconfig, so the
-       * typecheck, the lint and the app were all fine and only the harness could see it. That
-       * is R58 from the opposite direction, and it is why the alias is the fix rather than
-       * rewriting fourteen imports to relative paths - the aliased form is what the app uses.
+       * Until X8 pass 1 there was no main-app module, so this alias pointed at the admin
+       * copy so `PrizeDistributionEditor` could load under vitest. That assumption ended
+       * the day the player shell mounted its own provider: leaving the alias on admin would
+       * resolve every main-app `useTerms()` import to the admin file IN TESTS ONLY
+       * (`next build` uses each app's tsconfig and would be fine). Same quiet direction the
+       * tripwire in `__tests__/admin/terminology-delivery.test.ts` was written to catch.
        *
-       * THE TRAP THIS CARRIES INTO X7, pinned by a test rather than left as a comment: there is
-       * no main-app `contexts/TerminologyContext` today, which is the only reason this entry is
-       * unambiguous. X7 delivers tokens to the PLAYER screens and is the obvious moment one
-       * appears - at which point every main-app file importing it would resolve here, to the
-       * admin copy, in tests only. See `__tests__/admin/terminology-delivery.test.ts`.
+       * Admin components under test still import `@/contexts/TerminologyContext`; both
+       * modules share the same public surface (`TerminologyProvider` / `useTerms` /
+       * `requireTerms`), so they resolve here safely. The admin delivery suite imports the
+       * admin file by its explicit path (`@/apps/admin/contexts/...`) and pins that copy
+       * separately.
+       *
+       * Must stay ABOVE `@`: Vite tries aliases in order.
        */
       "@/contexts/TerminologyContext": path.resolve(
         __dirname,
-        "apps/admin/contexts/TerminologyContext.tsx",
+        "contexts/TerminologyContext.tsx",
       ),
       "@": path.resolve(__dirname, "."),
     },
