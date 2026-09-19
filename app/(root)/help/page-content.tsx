@@ -53,6 +53,8 @@ import {
   DEFAULT_CREDIT_VALUE_IN_BASE_CURRENCY,
   DEFAULT_EUR_TO_CREDITS_RATE,
 } from "@/lib/utils/credit-value";
+import { useTerms } from "@/contexts/TerminologyContext";
+import type { TerminologyPack } from "@/lib/constants/terminology";
 
 interface HelpPageContentProps {
   isLoggedIn: boolean;
@@ -127,30 +129,32 @@ interface HelpSettings {
   };
 }
 
-const menuSections = [
-  { id: "getting-started", title: "🚀 Getting Started", icon: Book },
-  { id: "dashboard", title: "📊 Dashboard", icon: LayoutDashboard },
-  { id: "competitions", title: "🏆 Competitions", icon: Trophy },
-  { id: "challenges", title: "⚔️ 1v1 Challenges", icon: Swords },
-  { id: "matchmaking", title: "💖 Match Cards", icon: Heart },
-  { id: "score-system", title: "⚡ Score System", icon: Zap },
-  { id: "trading", title: "📈 Trading Guide", icon: TrendingUp },
-  { id: "marketplace", title: "🛒 Marketplace", icon: ShoppingBag },
-  { id: "leaderboard", title: "🥇 Leaderboard", icon: Medal },
-  { id: "credits", title: "💰 Credits & Wallet", icon: Coins },
-  { id: "profile", title: "👤 Profile & Stats", icon: User },
-  { id: "arsenal", title: "🎯 Trading Arsenal", icon: Briefcase },
-  { id: "gamemaster", title: "👑 Game Master", icon: Award },
-  { id: "notifications", title: "🔔 Notifications", icon: Bell },
-  { id: "journey", title: "🗺️ Trader's Journey", icon: Map },
-  { id: "trader-levels", title: "👑 Trader Levels", icon: Award },
-  { id: "badge-system", title: "🏅 Badge System", icon: Award },
-  { id: "risk-management", title: "🛡️ Risk Management", icon: Shield },
-  { id: "account-security", title: "🔒 Account Security", icon: Eye },
-  { id: "support", title: "💬 Support & Messaging", icon: MessageSquare },
-  { id: "invoices", title: "📄 Invoices & Billing", icon: FileText },
-  { id: "faq", title: "❓ FAQ", icon: HelpCircle },
-];
+function buildMenuSections(terms: TerminologyPack) {
+  return [
+    { id: "getting-started", title: "🚀 Getting Started", icon: Book },
+    { id: "dashboard", title: "📊 Dashboard", icon: LayoutDashboard },
+    { id: "competitions", title: `🏆 ${terms.contests}`, icon: Trophy },
+    { id: "challenges", title: `⚔️ 1v1 ${terms.challenges}`, icon: Swords },
+    { id: "matchmaking", title: "💖 Match Cards", icon: Heart },
+    { id: "score-system", title: `⚡ ${terms.score} System`, icon: Zap },
+    { id: "trading", title: "📈 Trading Guide", icon: TrendingUp },
+    { id: "marketplace", title: "🛒 Marketplace", icon: ShoppingBag },
+    { id: "leaderboard", title: `🥇 ${terms.leaderboard}`, icon: Medal },
+    { id: "credits", title: "💰 Credits & Wallet", icon: Coins },
+    { id: "profile", title: "👤 Profile & Stats", icon: User },
+    { id: "arsenal", title: "🎯 Trading Arsenal", icon: Briefcase },
+    { id: "gamemaster", title: "👑 Game Master", icon: Award },
+    { id: "notifications", title: "🔔 Notifications", icon: Bell },
+    { id: "journey", title: `🗺️ ${terms.player}'s Journey`, icon: Map },
+    { id: "trader-levels", title: `👑 ${terms.player} ${terms.levels}`, icon: Award },
+    { id: "badge-system", title: "🏅 Badge System", icon: Award },
+    { id: "risk-management", title: "🛡️ Risk Management", icon: Shield },
+    { id: "account-security", title: "🔒 Account Security", icon: Eye },
+    { id: "support", title: "💬 Support & Messaging", icon: MessageSquare },
+    { id: "invoices", title: "📄 Invoices & Billing", icon: FileText },
+    { id: "faq", title: "❓ FAQ", icon: HelpCircle },
+  ];
+}
 
 // Default settings as fallback (mirrors lib/constants/levels.ts — keep in sync)
 const defaultSettings: HelpSettings = {
@@ -210,6 +214,8 @@ const defaultSettings: HelpSettings = {
 };
 
 export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
+  const terms = useTerms();
+  const menuSections = buildMenuSections(terms);
   const [activeSection, setActiveSection] = useState("getting-started");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [settings, setSettings] = useState<HelpSettings>(defaultSettings);
@@ -247,8 +253,11 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
 
   // Helper to format XP range
   const formatXPRange = (index: number) => {
-    const current = settings.levels[index];
-    const next = settings.levels[index + 1];
+    // Reason: numeric index into the levels array from our own settings payload —
+    // Array.at avoids the object-injection lint on bracket access.
+    const current = settings.levels.at(index);
+    const next = settings.levels.at(index + 1);
+    if (!current) return "";
     if (!next) return `${current.minXP}+ XP`;
     return `${current.minXP}-${next.minXP - 1} XP`;
   };
@@ -388,14 +397,14 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                   href="/competitions"
                   className="text-yellow-400 hover:text-yellow-300 underline"
                 >
-                  Competitions
+                  {terms.contests}
                 </Link>{" "}
                 and{" "}
                 <Link
                   href="/challenges"
                   className="text-yellow-400 hover:text-yellow-300 underline"
                 >
-                  1v1 Challenges
+                  1v1 {terms.challenges}
                 </Link>{" "}
                 using {settings.credits.name.toLowerCase()} you fund yourself.
                 Below is the exact step-by-step path from sign-up to your
@@ -685,7 +694,7 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                     href="/challenges"
                     className="text-yellow-400 hover:text-yellow-300 underline"
                   >
-                    1v1 Challenges
+                    1v1 {terms.challenges}
                   </Link>{" "}
                   — head-to-head, shorter, instant payout.
                 </p>
@@ -825,13 +834,13 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                     href="/competitions"
                     className="text-yellow-400 hover:text-yellow-300 flex items-center gap-1"
                   >
-                    <Trophy className="h-3 w-3" /> Competitions
+                    <Trophy className="h-3 w-3" /> {terms.contests}
                   </Link>
                   <Link
                     href="/challenges"
                     className="text-yellow-400 hover:text-yellow-300 flex items-center gap-1"
                   >
-                    <Swords className="h-3 w-3" /> Challenges
+                    <Swords className="h-3 w-3" /> {terms.challenges}
                   </Link>
                   <Link
                     href="/marketplace"
@@ -843,7 +852,7 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                     href="/leaderboard"
                     className="text-yellow-400 hover:text-yellow-300 flex items-center gap-1"
                   >
-                    <Medal className="h-3 w-3" /> Leaderboard
+                    <Medal className="h-3 w-3" /> {terms.leaderboard}
                   </Link>
                   <Link
                     href="/wallet"
@@ -1296,7 +1305,9 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
           >
             <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
               <Trophy className="h-6 w-6 text-yellow-500" />
-              <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white">🏆 Competitions</h2>
+              <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white">
+                🏆 {terms.contests}
+              </h2>
             </div>
 
             <div className="space-y-6 text-gray-300">
@@ -1862,7 +1873,7 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
             <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
               <Swords className="h-6 w-6 text-red-500" />
               <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white">
-                ⚔️ 1v1 Challenges
+                ⚔️ 1v1 {terms.challenges}
               </h2>
             </div>
 
@@ -4552,7 +4563,9 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
           >
             <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
               <Medal className="h-6 w-6 text-amber-500" />
-              <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white">🥇 Leaderboard</h2>
+              <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white">
+                🥇 {terms.leaderboard}
+              </h2>
             </div>
 
             <div className="space-y-6 text-gray-300">
@@ -7736,7 +7749,7 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
             <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
               <Map className="h-6 w-6 text-amber-400" />
               <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white">
-                🗺️ Trader&apos;s Journey
+                🗺️ {terms.player}&apos;s Journey
               </h2>
             </div>
 
@@ -8155,7 +8168,7 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
             <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
               <Award className="h-6 w-6 text-yellow-500" />
               <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white">
-                👑 Trader Levels &amp; Titles
+                👑 {terms.player} {terms.levels} &amp; Titles
               </h2>
             </div>
 
@@ -8287,7 +8300,7 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                   </div>
                   <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
                     <p className="font-semibold text-yellow-400 mb-1 flex items-center gap-2">
-                      <Trophy className="h-3.5 w-3.5" /> Competitions
+                      <Trophy className="h-3.5 w-3.5" /> {terms.contests}
                     </p>
                     <p className="text-xs text-gray-400">
                       <strong className="text-white">+25 XP</strong> for
@@ -8298,7 +8311,7 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                   </div>
                   <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
                     <p className="font-semibold text-red-400 mb-1 flex items-center gap-2">
-                      <Swords className="h-3.5 w-3.5" /> 1v1 Challenges
+                      <Swords className="h-3.5 w-3.5" /> 1v1 {terms.challenges}
                     </p>
                     <p className="text-xs text-gray-400">
                       <strong className="text-white">+15 XP</strong> for
@@ -10616,7 +10629,7 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                   ],
                 },
                 {
-                  title: "🏆 Competitions",
+                  title: `🏆 ${terms.contests}`,
                   sectionId: "competitions",
                   items: [
                     {
@@ -10642,7 +10655,7 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                   ],
                 },
                 {
-                  title: "⚔️ 1v1 Challenges",
+                  title: `⚔️ 1v1 ${terms.challenges}`,
                   sectionId: "challenges",
                   items: [
                     {
@@ -10716,7 +10729,7 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                   ],
                 },
                 {
-                  title: "🗺️ Journey, Badges & Trader Levels",
+                  title: `🗺️ Journey, Badges & ${terms.player} ${terms.levels}`,
                   sectionId: "journey",
                   items: [
                     {

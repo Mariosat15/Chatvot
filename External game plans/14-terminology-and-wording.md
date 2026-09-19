@@ -379,7 +379,7 @@ Ordered by visibility, so the highest-impact strings change first.
 | 7 | Notification and email templates (database) | ~25 templates | Admin | Outstanding |
 | 8 | Badge and milestone **content** - never IDs | data | Admin | Outstanding |
 | 9 | Landing and hero content (database) | data | Admin | Outstanding |
-| 10 | Help centre core | ~40 | Counted in `13` | Outstanding |
+| 10 | Help centre chrome (TOC, H2s, FAQ groups, quick-nav) | ~40 | Developer | **BUILT 19 Sep 2026** — see s3.2f |
 | 11 | Legal pages | separate | Legal | Outstanding |
 
 #### 3.2a Pass 1 — player navigation (BUILT 19 Sep 2026)
@@ -486,6 +486,25 @@ in `__tests__/player/profile-terminology.test.ts`.
 
 **Not built:** passes 2, 7–11; orphaned `ProfileOverview` / `ProfileContent`; public profile
 API copy.
+
+#### 3.2f Pass 10 — help centre chrome (BUILT 19 Sep 2026)
+
+**What shipped:** TOC, section H2s, FAQ group titles, quick-nav and a few high-visibility
+link labels on `/help`. Body prose is largely left alone — challenge facts were already
+corrected in `13` s9.1a; Trading Guide / Arsenal stay trading-literal (chapter 14 s5).
+
+| Site | Mechanism | Tokens |
+|---|---|---|
+| `buildMenuSections(terms)` TOC | `useTerms()` | `contests`, `challenges`, `score`, `leaderboard`, `player`, `levels` |
+| Section H2s (contests / challenges / leaderboard / journey / levels) | same | same |
+| FAQ group titles | same | `contests`, `challenges`, `player`, `levels` |
+| Quick-nav + welcome / XP tile link labels | same | `contests`, `challenges`, `leaderboard` |
+
+**7 tests** in `__tests__/player/help-terminology.test.ts`. Routes stay `/competitions`,
+`/challenges`, `/leaderboard`.
+
+**Not built:** passes 2, 7–9, 11; remaining body prose that still says "Competitions" /
+"Trader" inside paragraphs; level-title ladder strings inside the help page (pass 2).
 
 ---
 
