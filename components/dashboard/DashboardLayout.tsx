@@ -25,6 +25,7 @@ import CreditBreakdownChart from "./CreditBreakdownChart";
 import GettingStartedCard from "./GettingStartedCard";
 import PlayerGamePerformancePanel from "./PlayerGamePerformancePanel";
 import GameSummaryCards from "./GameSummaryCards";
+import { useTerms } from "@/contexts/TerminologyContext";
 
 const EquityChart = dynamic(() => import("./EquityChart"), { ssr: false });
 const DailyCreditFlow = dynamic(() => import("./DailyCreditFlow"), {
@@ -41,6 +42,7 @@ interface DashboardLayoutProps {
 }
 
 export default function DashboardLayout({ data }: DashboardLayoutProps) {
+  const terms = useTerms();
   const {
     overview,
     charts,
@@ -115,7 +117,7 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
           </TabsTrigger>
           <TabsTrigger value="contests" className="gap-1.5 text-xs sm:text-sm">
             <Trophy className="w-4 h-4 hidden sm:block" />
-            Contests
+            {terms.contests}
           </TabsTrigger>
           <TabsTrigger value="tutorials" className="gap-1.5 text-xs sm:text-sm">
             <GraduationCap className="w-4 h-4 hidden sm:block" />

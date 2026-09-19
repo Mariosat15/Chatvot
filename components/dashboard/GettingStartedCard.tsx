@@ -13,6 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTerms } from "@/contexts/TerminologyContext";
 import {
   buildGettingStartedSteps,
   type GettingStartedFacts,
@@ -47,6 +48,7 @@ export default function GettingStartedCard({
   hasCompletedMilestone,
   hasChallengedUser,
 }: GettingStartedCardProps) {
+  const terms = useTerms();
   const [dismissed, setDismissed] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -63,7 +65,7 @@ export default function GettingStartedCard({
     hasCompletedMilestone,
     hasChallengedUser,
   };
-  const steps = buildGettingStartedSteps(facts);
+  const steps = buildGettingStartedSteps(facts, terms);
 
   const completedCount = steps.filter((s) => s.completed).length;
   const allComplete = completedCount === steps.length;

@@ -14,6 +14,7 @@
 import type { ReactNode } from "react";
 import { Medal, Trophy, Gamepad2 } from "lucide-react";
 import { motion } from "framer-motion";
+import { useTerms } from "@/contexts/TerminologyContext";
 
 export interface GameSummaryRowView {
   gameKey: string;
@@ -41,6 +42,7 @@ export default function GameSummaryCards({
 }: {
   standing: GameSummaryStandingView;
 }) {
+  const terms = useTerms();
   if (standing.perGame.length === 0) return null;
 
   return (
@@ -48,7 +50,7 @@ export default function GameSummaryCards({
       <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <h3 className="flex items-center gap-2 text-sm font-medium uppercase tracking-wide text-gray-400">
           <Gamepad2 className="h-4 w-4 text-emerald-400" />
-          By game
+          By {terms.game}
         </h3>
         {standing.startsFromCaption ? (
           <p className="text-xs text-gray-500 max-w-xl">

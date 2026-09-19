@@ -12,6 +12,7 @@ import {
   buildGettingStartedSteps,
   hasCompletedFirstPlay,
 } from "@/lib/utils/getting-started-steps";
+import { TERMS } from "@/lib/constants/terminology";
 
 const ROOT = process.cwd();
 
@@ -42,7 +43,9 @@ describe("GettingStarted game-aware steps (20 s5)", () => {
     });
     const play = steps.find((s) => s.id === "play");
     expect(play).toBeDefined();
-    expect(play!.title).toBe("Play Your First Contest");
+    // Reason: X8 pass 5 — title uses terms.contest (default "Competition"), not a
+    // hard-coded "Contest". Flipped rather than deleted; claim is still no trade wording.
+    expect(play!.title).toBe(`Play Your First ${TERMS.contest}`);
     expect(play!.description.toLowerCase()).not.toMatch(/trade|position|trader/);
     // Reason: no step id "trade" may survive — that is the old trading-only step.
     expect(steps.some((s) => s.id === "trade")).toBe(false);

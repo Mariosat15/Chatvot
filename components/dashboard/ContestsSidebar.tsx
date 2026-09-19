@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { PERFORMANCE_INTERVALS } from "@/lib/utils/performance";
 import MatchmakingCards from "@/components/leaderboard/MatchmakingCards";
+import { useTerms } from "@/contexts/TerminologyContext";
 
 interface CompetitionData {
   id: string;
@@ -309,6 +310,7 @@ function TimeLeft({ endTime }: { endTime: Date }) {
  * Shows up to ~5 items with a scroll arrow indicator when more are available.
  */
 function ChallengesList({ challenges }: { challenges: ChallengeData[] }) {
+  const terms = useTerms();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showScrollArrow, setShowScrollArrow] = useState(false);
 
@@ -341,7 +343,7 @@ function ChallengesList({ challenges }: { challenges: ChallengeData[] }) {
   return (
     <div className="relative">
       <p className="text-[11px] text-gray-500 uppercase tracking-wider mb-1.5 px-0.5">
-        Active Challenges ({challenges.length})
+        Active {terms.challenges} ({challenges.length})
       </p>
       {/* Reason: max-h-[340px] shows roughly 5 compact cards before scrolling */}
       <div
@@ -416,6 +418,7 @@ export default function ContestsSidebar({
   challenges,
   fullWidth = false,
 }: ContestsSidebarProps) {
+  const terms = useTerms();
   // Reason: Default to challenges tab per user request — challenges and
   // matchmaking are the primary engagement feature on the dashboard.
   const [tab, setTab] = useState<"competitions" | "challenges">("challenges");
@@ -629,7 +632,7 @@ export default function ContestsSidebar({
           }`}
         >
           <Trophy className="w-3.5 h-3.5" />
-          Competitions
+          {terms.contests}
           {activeComps.length > 0 && (
             <span className="w-5 h-5 rounded-full bg-yellow-500/20 text-yellow-400 text-[11px] flex items-center justify-center">
               {activeComps.length}
@@ -645,7 +648,7 @@ export default function ContestsSidebar({
           }`}
         >
           <Swords className="w-3.5 h-3.5" />
-          Challenges
+          {terms.challenges}
           {activeChallenges.length > 0 && (
             <span className="w-5 h-5 rounded-full bg-purple-500/20 text-purple-400 text-[11px] flex items-center justify-center">
               {activeChallenges.length}
@@ -675,7 +678,7 @@ export default function ContestsSidebar({
               <div className="text-lg font-bold text-blue-400">
                 #{competitions.stats.averageRank.toFixed(0) || "–"}
               </div>
-              <div className="text-[11px] text-gray-500">Avg Rank</div>
+              <div className="text-[11px] text-gray-500">Avg {terms.rank}</div>
             </div>
           </div>
 
@@ -683,12 +686,12 @@ export default function ContestsSidebar({
           {activeComps.length === 0 ? (
             <div className="text-center py-6">
               <Trophy className="w-8 h-8 text-gray-600 mx-auto mb-2" />
-              <p className="text-xs text-gray-500">No active competitions</p>
+              <p className="text-xs text-gray-500">No active {terms.contests}</p>
               <Link
                 href="/competitions"
                 className="text-xs text-yellow-500 hover:text-yellow-400 mt-1 inline-block"
               >
-                Browse competitions →
+                Browse {terms.contests} →
               </Link>
             </div>
           ) : (

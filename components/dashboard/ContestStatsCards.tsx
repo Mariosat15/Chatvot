@@ -4,6 +4,7 @@ import { Trophy, Award, Swords, Crown } from "lucide-react";
 import { useAppSettings } from "@/contexts/AppSettingsContext";
 import { motion } from "framer-motion";
 import { formatVolts } from "@/lib/utils/format-volts";
+import { useTerms } from "@/contexts/TerminologyContext";
 
 function HorizontalBar({
   label,
@@ -64,6 +65,7 @@ export default function ContestStatsCards({
   challengeStats,
 }: ContestStatsCardsProps) {
   const { settings } = useAppSettings();
+  const terms = useTerms();
 
   const hasActivity = competitionStats.total > 0 || challengeStats.total > 0;
 
@@ -80,7 +82,7 @@ export default function ContestStatsCards({
       >
         <div className="flex items-center gap-2 mb-3 sm:mb-4">
           <Trophy className="w-5 h-5 text-yellow-400" />
-          <h3 className="text-base sm:text-lg font-semibold text-white">Competitions</h3>
+          <h3 className="text-base sm:text-lg font-semibold text-white">{terms.contests}</h3>
         </div>
 
         <div className="space-y-3 sm:space-y-4">
@@ -100,7 +102,7 @@ export default function ContestStatsCards({
                   symbol: settings?.credits?.symbol,
                 })}
               </p>
-              <p className="text-[11px] sm:text-xs text-gray-400">Total Prizes</p>
+              <p className="text-[11px] sm:text-xs text-gray-400">Total {terms.prizes}</p>
             </div>
           </div>
 
@@ -137,7 +139,9 @@ export default function ContestStatsCards({
       >
         <div className="flex items-center gap-2 mb-3 sm:mb-4">
           <Swords className="w-5 h-5 text-orange-400" />
-          <h3 className="text-base sm:text-lg font-semibold text-white">1v1 Challenges</h3>
+          <h3 className="text-base sm:text-lg font-semibold text-white">
+            1v1 {terms.challenges}
+          </h3>
         </div>
 
         <div className="space-y-3 sm:space-y-4">
@@ -162,7 +166,7 @@ export default function ContestStatsCards({
           </div>
 
           <HorizontalBar
-            label="Total Challenges"
+            label={`Total ${terms.challenges}`}
             value={challengeStats.total}
             maxValue={Math.max(challengeStats.total, 10)}
             color="#f97316"

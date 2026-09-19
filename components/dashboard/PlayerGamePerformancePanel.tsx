@@ -2,6 +2,7 @@
 
 import { Archive, Gamepad2, Trophy } from "lucide-react";
 import { humanizeMetric } from "@/lib/utils/humanize-metric";
+import { useTerms } from "@/contexts/TerminologyContext";
 
 /**
  * Player-facing twin of admin `PlayerGamePerformance` (R64 residual).
@@ -11,7 +12,7 @@ import { humanizeMetric } from "@/lib/utils/humanize-metric";
  * `humanizeMetric`. Empty list → null (pure traders see unchanged trading UI).
  *
  * View type is local (R58): the service imports Mongoose models and must not
- * reach a `"use client"` file. No TerminologyContext in the player app.
+ * reach a `"use client"` file. Section labels read `useTerms()` (X8 pass 5).
  */
 
 export interface PlayerGamePerformanceRowView {
@@ -49,6 +50,7 @@ export default function PlayerGamePerformancePanel({
 }: {
   games: PlayerGamePerformanceRowView[];
 }) {
+  const terms = useTerms();
   if (games.length === 0) return null;
 
   return (
@@ -56,11 +58,12 @@ export default function PlayerGamePerformancePanel({
       <div>
         <h3 className="flex items-center gap-2 text-lg font-semibold text-white">
           <Gamepad2 className="h-5 w-5 text-emerald-400" />
-          Game Performance
+          {terms.game} Performance
         </h3>
         <p className="mt-1 text-xs text-gray-500">
-          Every game you have played a ranked round in. Each game is measured on
-          what it reports, so two games here will not show the same rows.
+          Every {terms.game} you have played a ranked {terms.round} in. Each{" "}
+          {terms.game} is measured on what it reports, so two {terms.games} here
+          will not show the same rows.
         </p>
       </div>
 
@@ -108,22 +111,22 @@ export default function PlayerGamePerformancePanel({
           </div>
 
           <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Tile label="Rounds played" value={game.rounds.started.toLocaleString()} />
+            <Tile label={`${terms.rounds} played`} value={game.rounds.started.toLocaleString()} />
             <Tile
               label="Scored"
               value={game.rounds.scored.toLocaleString()}
               hint="incl. partial runs"
             />
             <Tile
-              label="Average round"
+              label={`Average ${terms.round}`}
               value={duration(game.averagePlaySeconds)}
             />
             <Tile
-              label="Contests"
+              label={terms.contests}
               value={`${game.competitions}`}
               hint={
                 game.challenges > 0
-                  ? `+ ${game.challenges} challenge${game.challenges === 1 ? "" : "s"}`
+                  ? `+ ${game.challenges} ${game.challenges === 1 ? terms.challenge : terms.challenges}`
                   : undefined
               }
             />

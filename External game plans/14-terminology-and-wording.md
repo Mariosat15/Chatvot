@@ -374,7 +374,7 @@ Ordered by visibility, so the highest-impact strings change first.
 | 2 | Level titles, via the `XPConfig` database record | 20 | Admin | Outstanding (R88 closed in X6.5; content still operator) |
 | 3 | Contest shell — `components/games/` (+ trading lobby keeps trading language) | ~50 | Developer | **BUILT 19 Sep 2026** — see s3.2b |
 | 4 | Leaderboard columns and headings | ~25 | Developer | **BUILT 19 Sep 2026** — see s3.2c |
-| 5 | Dashboard header and section titles | ~30 | Developer | Outstanding |
+| 5 | Dashboard header and section titles | ~30 | Developer | **BUILT 19 Sep 2026** — see s3.2d |
 | 6 | Profile tabs and headings | ~30 | Developer | Outstanding |
 | 7 | Notification and email templates (database) | ~25 templates | Admin | Outstanding |
 | 8 | Badge and milestone **content** - never IDs | data | Admin | Outstanding |
@@ -444,6 +444,27 @@ token. **10 tests** in `__tests__/player/leaderboard-terminology.test.ts`.
 
 **Not built:** passes 2, 5–11; MatchmakingCards skill-band labels; remaining explainer
 metric jargon that is not a renameable shell noun.
+
+#### 3.2d Pass 5 — dashboard headers and section titles (BUILT 19 Sep 2026)
+
+**What shipped:** tab and section chrome on the player dashboard, plus the
+getting-started checklist nouns.
+
+| File | Mechanism | Tokens |
+|---|---|---|
+| `DashboardLayout.tsx` | `useTerms()` | `contests` (tab) |
+| `ContestsSidebar.tsx` | `useTerms()` | `contests`, `challenges`, `rank` |
+| `ContestStatsCards.tsx` | `useTerms()` | `contests`, `challenges`, `prizes` |
+| `PlayerGamePerformancePanel.tsx` | `useTerms()` | `game`, `games`, `round`, `rounds`, `contests`, `challenge`, `challenges` |
+| `GameSummaryCards.tsx` | `useTerms()` | `game` |
+| `GettingStartedCard.tsx` + `getting-started-steps.ts` | `useTerms()` → builder | `contest`, `contests`, `game`, `round`, `players`, `challenge`, `player` |
+
+**Trading chrome untouched** (PnL charts, "Active Traders", etc.). **10 tests** in
+`__tests__/player/dashboard-terminology.test.ts`; getting-started suite title assertion
+**flipped** onto `TERMS.contest`.
+
+**Not built:** passes 2, 6–11; LiveDashboardWrapper / CompetitionsTable orphaned surfaces;
+AccountStatusCard restriction labels.
 
 ---
 
