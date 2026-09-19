@@ -14,6 +14,7 @@ import LeaderboardRankCard from "@/components/leaderboard/LeaderboardRankCard";
 import RankingsExplainer, {
   type ExplainerWeight,
 } from "@/components/leaderboard/RankingsExplainer";
+import { useTerms } from "@/contexts/TerminologyContext";
 import type { GlobalLeaderboardEntry } from "@/lib/actions/leaderboard/global-leaderboard.actions";
 import type { GameLeaderboardEntry } from "@/lib/services/games/game-leaderboard.service";
 
@@ -36,17 +37,22 @@ interface MyPosition {
  * without adding a decision a player needed. The owner asked for three
  * leaderboards that share Trading's chrome so switching boards changes the
  * numbers, not the screen.
+ *
+ * X8 pass 4: board labels and page chrome read `useTerms()`. Trading stays a
+ * literal game name beside `terms.leaderboard` — there is no trading token
+ * (chapter 14 boundary 1).
  */
 export default function LeaderboardClient({
   currentUserId,
 }: {
   currentUserId: string;
 }) {
+  const terms = useTerms();
   const [board, setBoard] = useState<string>(GLOBAL_BOARD);
-  const [boards, setBoards] = useState<BoardOption[]>([
-    { id: GLOBAL_BOARD, label: "Global Leaderboard" },
-    { id: TRADING_BOARD, label: "Trading Leaderboard" },
-    { id: GAMES_BOARD, label: "Games Leaderboard" },
+  const [boards, setBoards] = useState<BoardOption[]>(() => [
+    { id: GLOBAL_BOARD, label: `Global ${terms.leaderboard}` },
+    { id: TRADING_BOARD, label: `Trading ${terms.leaderboard}` },
+    { id: GAMES_BOARD, label: `${terms.games} ${terms.leaderboard}` },
   ]);
 
   const [globalEntries, setGlobalEntries] = useState<GlobalBoardRow[]>([]);
@@ -205,14 +211,14 @@ export default function LeaderboardClient({
     return (
       <div className="flex min-h-screen flex-col gap-6">
         <LeaderboardPageHeader
-          title="GAMES LEADERBOARD"
-          subtitle="Players ranked across every game they play"
+          title={`${terms.games} ${terms.leaderboard}`}
+          subtitle={`${terms.players} ranked across every ${terms.game} they play`}
           boardPicker={picker}
         />
         <LeaderboardRankCard
           position={myPosition}
-          unitLabel="players"
-          unrankedMessage="Finish a game contest to appear on this board"
+          unitLabel={terms.players}
+          unrankedMessage={`Finish a ${terms.game} ${terms.contest} to appear on this board`}
         />
         <GameLeaderboardTable
           entries={statsEntries}
@@ -228,11 +234,11 @@ export default function LeaderboardClient({
         />
         <RankingsExplainer
           weights={[]}
-          intro="Points you earn for finishing a game contest, added up across every game. This is one of the seven things that decide your place on the Global Leaderboard."
+          intro={`Points you earn for finishing a ${terms.game} ${terms.contest}, added up across every ${terms.game}. This is one of the seven things that decide your place on the Global ${terms.leaderboard}.`}
           notes={[
-            "Points come from where you finish and how big the contest was, so a win against more players is worth more.",
-            "A game being switched off does not remove what you earned in it.",
-            "Click a player’s name to open their card.",
+            `Points come from where you finish and how big the ${terms.contest} was, so a win against more ${terms.players} is worth more.`,
+            `A ${terms.game} being switched off does not remove what you earned in it.`,
+            `Click a ${terms.player} name to open their card.`,
           ]}
         />
       </div>
@@ -242,14 +248,14 @@ export default function LeaderboardClient({
   return (
     <div className="flex min-h-screen flex-col gap-6">
       <LeaderboardPageHeader
-        title="GLOBAL LEADERBOARD"
+        title={`Global ${terms.leaderboard}`}
         subtitle="Everything you do on ChartVolt, in one standing"
         boardPicker={picker}
       />
       <LeaderboardRankCard
         position={myPosition}
-        unitLabel="players"
-        unrankedMessage="Play a game or trade in a competition to appear on this board"
+        unitLabel={terms.players}
+        unrankedMessage={`Play a ${terms.game} or trade in a ${terms.contest} to appear on this board`}
       />
       <GlobalLeaderboardTable
         entries={globalEntries}
@@ -264,10 +270,10 @@ export default function LeaderboardClient({
         weights={globalWeights}
         intro="Your global place is built from seven things. For each one you are ranked against everyone else who does it, and those positions are combined using the shares below."
         notes={[
-          "You are never penalised for something you do not do. If you only play games, the share that would have gone to trading is spread across the things you do take part in — a games-only player can reach #1.",
+          `You are never penalised for something you do not do. If you only play ${terms.games}, the share that would have gone to trading is spread across the things you do take part in — a ${terms.games}-only ${terms.player} can reach #1.`,
           "A dash means that part has not counted for you yet.",
-          "Trading Leaderboard and Games Leaderboard each show the full figures behind those two shares.",
-          "Click a player’s name to open their card.",
+          `Trading ${terms.leaderboard} and ${terms.games} ${terms.leaderboard} each show the full figures behind those two shares.`,
+          `Click a ${terms.player} name to open their card.`,
         ]}
       />
     </div>

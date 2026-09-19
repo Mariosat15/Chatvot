@@ -30,6 +30,7 @@ import RankingsExplainer from "@/components/leaderboard/RankingsExplainer";
 import ProfileCard from "@/components/profile/ProfileCard";
 import ProfileImage from "@/components/ui/ProfileImage";
 import ChallengeCreateDialog from "@/components/challenges/ChallengeCreateDialog";
+import { useTerms } from "@/contexts/TerminologyContext";
 import { cn } from "@/lib/utils";
 
 // Types
@@ -119,6 +120,7 @@ export default function LeaderboardContent({
   loading: paginationLoading = false,
   boardPicker,
 }: LeaderboardContentProps) {
+  const terms = useTerms();
   const isPaginated = typeof propTotalCount === "number" && typeof onPageChange === "function";
   const totalCount = propTotalCount ?? leaderboard.length;
   const [viewMode, setViewMode] = useState<"table" | "cards">("table");
@@ -338,7 +340,7 @@ export default function LeaderboardContent({
   return (
     <div className="flex min-h-screen flex-col gap-6">
       <LeaderboardPageHeader
-        title="TRADING LEADERBOARD"
+        title={`Trading ${terms.leaderboard}`}
         subtitle="Traders ranked by how they have traded"
         boardPicker={boardPicker}
         actions={
@@ -451,7 +453,7 @@ export default function LeaderboardContent({
                   {/* Rank Filter */}
                   <div className="space-y-2">
                     <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1">
-                      <GameIcon name="trophy" size={14} /> Rank
+                      <GameIcon name="trophy" size={14} /> {terms.rank}
                     </label>
                     <select
                       value={filters.rankRange}
@@ -537,7 +539,7 @@ export default function LeaderboardContent({
           <div className="rounded-2xl bg-gray-900/80 border border-gray-800 backdrop-blur-sm overflow-hidden shadow-2xl">
             {/* Table Header */}
             <div className="hidden lg:grid grid-cols-[70px_minmax(180px,1fr)_80px_80px_80px_80px_80px_70px_80px_200px] gap-2 px-6 py-4 bg-gray-950/50 border-b border-gray-800">
-              <SortHeader column="rank" label="Rank" />
+              <SortHeader column="rank" label={terms.rank} />
               <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
                 Trader
               </span>
@@ -549,9 +551,9 @@ export default function LeaderboardContent({
                 label="P.Factor"
                 align="right"
               />
-              <SortHeader column="competitions" label="Comps" align="right" />
+              <SortHeader column="competitions" label={terms.contests} align="right" />
               <SortHeader column="badges" label="Badges" align="right" />
-              <SortHeader column="score" label="Score" align="right" />
+              <SortHeader column="score" label={terms.score} align="right" />
               <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
                 Actions
               </span>
@@ -991,14 +993,14 @@ export default function LeaderboardContent({
           */}
           <RankingsExplainer
             weights={[]}
-            intro="Your trading score adds up points from everything below. It is one of the seven things that decide your place on the Global Leaderboard."
+            intro={`Your trading ${terms.score} adds up points from everything below. It is one of the seven things that decide your place on the Global ${terms.leaderboard}.`}
             notes={[
               "Profit is worth the most — both the amount you made and how much you made relative to what you started with.",
               "How often you win, and how much you win compared with what you lose, come next.",
-              "Winning a competition is worth more than finishing on the podium, and a podium is worth more than a challenge win.",
+              `Winning a ${terms.contest} is worth more than finishing on the podium, and a podium is worth more than a ${terms.challenge} win.`,
               "Badges add a little, and legendary badges add more.",
               "A very high profit factor is capped, so one lucky run without a single loss cannot take the top spot on its own.",
-              "Click a player’s name to open their card.",
+              `Click a ${terms.player} name to open their card.`,
             ]}
           />
         </>

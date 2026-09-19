@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Swords, Circle, Loader2 } from "lucide-react";
 import ChallengeCreateDialog from "@/components/challenges/ChallengeCreateDialog";
 import VsScreen, { VsOpponent } from "@/components/challenges/VsScreen";
+import { useTerms } from "@/contexts/TerminologyContext";
 
 interface LeaderboardChallengeButtonProps {
   userId: string;
@@ -103,6 +104,7 @@ export default function LeaderboardChallengeButton({
   profileImage,
   compact = false,
 }: LeaderboardChallengeButtonProps) {
+  const terms = useTerms();
   const [onlineStatus, setOnlineStatus] = useState<OnlineUser | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [showVsScreen, setShowVsScreen] = useState(false);
@@ -202,7 +204,7 @@ export default function LeaderboardChallengeButton({
                 className={`h-2 w-2 ${isOnline ? "fill-green-400 text-green-400" : "fill-gray-500 text-gray-500"}`}
               />
               <Swords className="h-3.5 w-3.5" />
-              {canChallenge ? "Challenge" : "Offline"}
+              {canChallenge ? terms.challenge : "Offline"}
             </>
           )}
         </button>
@@ -252,7 +254,7 @@ export default function LeaderboardChallengeButton({
             />
             <Swords className="h-4 w-4" />
             <span className="hidden sm:inline">
-              {canChallenge ? "Challenge" : "Offline"}
+              {canChallenge ? terms.challenge : "Offline"}
             </span>
           </>
         )}

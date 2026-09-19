@@ -373,7 +373,7 @@ Ordered by visibility, so the highest-impact strings change first.
 | 1 | Navigation - `UserSidebar.tsx`, `MobileBottomNav.tsx` | ~10 | Developer | **BUILT 19 Sep 2026** — see s3.2a |
 | 2 | Level titles, via the `XPConfig` database record | 20 | Admin | Outstanding (R88 closed in X6.5; content still operator) |
 | 3 | Contest shell — `components/games/` (+ trading lobby keeps trading language) | ~50 | Developer | **BUILT 19 Sep 2026** — see s3.2b |
-| 4 | Leaderboard columns and headings | ~25 | Developer | Outstanding |
+| 4 | Leaderboard columns and headings | ~25 | Developer | **BUILT 19 Sep 2026** — see s3.2c |
 | 5 | Dashboard header and section titles | ~30 | Developer | Outstanding |
 | 6 | Profile tabs and headings | ~30 | Developer | Outstanding |
 | 7 | Notification and email templates (database) | ~25 templates | Admin | Outstanding |
@@ -424,6 +424,26 @@ read belongs with a later cleanup if per-request cost matters.
 
 **Not built:** passes 2, 4–11; remaining strings inside `components/games/` (results screen,
 pre-flight copy, etc.).
+
+#### 3.2c Pass 4 — leaderboard columns and headings (BUILT 19 Sep 2026)
+
+**What shipped:** board picker labels, page titles and table chrome on `/leaderboard`.
+
+| File | Mechanism | Tokens |
+|---|---|---|
+| `app/api/leaderboard/route.ts` | `getTerms()` | `leaderboard`, `games` (picker labels) |
+| `LeaderboardClient.tsx` | `useTerms()` | `leaderboard`, `games`, `players`, `contest`, `game`, `player` |
+| `GlobalLeaderboardTable.tsx` | `useTerms()` | `rank`, `player`, `games`, `contests`, `level`, `score`, `players` |
+| `GameLeaderboardTable.tsx` | `useTerms()` | `rank`, `player`, `score`, `players`, `games`, `game`, `contest` |
+| `LeaderboardContent.tsx` (Trading board) | `useTerms()` | `leaderboard`, `rank`, `score`, `contests`, `contest`, `challenge`, `player` — **Trader / P&L stay literal** |
+| `LeaderboardChallengeButton.tsx` | `useTerms()` | `challenge` |
+
+**Trading board keeps trading metric nouns** (Trader, P&L, Win Rate) — chapter 14
+boundary 1 / section 5. "Trading" beside `terms.leaderboard` is the game name, not a
+token. **10 tests** in `__tests__/player/leaderboard-terminology.test.ts`.
+
+**Not built:** passes 2, 5–11; MatchmakingCards skill-band labels; remaining explainer
+metric jargon that is not a renameable shell noun.
 
 ---
 

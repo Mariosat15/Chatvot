@@ -29,6 +29,7 @@ import {
   rankRowTint,
 } from "@/components/leaderboard/leaderboard-row-chrome";
 import { cn } from "@/lib/utils";
+import { useTerms } from "@/contexts/TerminologyContext";
 import type { GameLeaderboardEntry } from "@/lib/services/games/game-leaderboard.service";
 
 interface MyPosition {
@@ -63,6 +64,7 @@ export default function GameLeaderboardTable({
   showRating?: boolean;
   startsFromCaption: string;
 }) {
+  const terms = useTerms();
   const [search, setSearch] = useState("");
   const [rankRange, setRankRange] = useState("all");
   const [showFilters, setShowFilters] = useState(false);
@@ -146,7 +148,7 @@ export default function GameLeaderboardTable({
           <div className="px-4 pb-4 border-t border-gray-800 pt-4 grid grid-cols-2 sm:grid-cols-3 gap-3">
             <div className="space-y-2">
               <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Rank
+                {terms.rank}
               </label>
               <select
                 value={rankRange}
@@ -165,7 +167,7 @@ export default function GameLeaderboardTable({
                 <Users className="h-4 w-4 text-gray-500" />
                 <span className="text-sm font-semibold text-gray-300">
                   {totalCount === 0
-                    ? "0 players"
+                    ? `0 ${terms.players}`
                     : `Showing ${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, totalCount)} of ${totalCount}`}
                 </span>
               </div>
@@ -182,12 +184,12 @@ export default function GameLeaderboardTable({
           )}
         >
           <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-            Rank
+            {terms.rank}
           </span>
           <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-            Player
+            {terms.player}
           </span>
-          {["Points", "Wins", "Podiums", "Entered", "Streak", "Score"].map(
+          {["Points", "Wins", "Podiums", "Entered", "Streak", terms.score].map(
             (label) => (
               <span
                 key={label}
@@ -208,8 +210,8 @@ export default function GameLeaderboardTable({
               <Users className="h-8 w-8 text-gray-600 mx-auto mb-3" />
               <p className="text-gray-400 font-medium">
                 {entries.length === 0
-                  ? "No games standings yet. Finish a game contest and you will appear here."
-                  : "No players match your filters"}
+                  ? `No ${terms.games} standings yet. Finish a ${terms.game} ${terms.contest} and you will appear here.`
+                  : `No ${terms.players} match your filters`}
               </p>
             </div>
           ) : (

@@ -13,6 +13,7 @@ import {
 } from "@/lib/services/games/game-leaderboard.service";
 import { OVERALL_GAME_KEY } from "@/database/models/games/user-game-stats.model";
 import { getGlobalBoard } from "@/lib/services/leaderboard/global-board.service";
+import { getTerms } from "@/lib/services/terminology.service";
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
 
@@ -79,12 +80,14 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search") || undefined;
 
     // Reason: always the same three labels. Games is offered even when empty so
-    // the dropdown does not jump when the first game contest settles.
+    // the dropdown does not jump when the first game contest settles. Nouns come
+    // from getTerms() (X8 pass 4) so an operator rename reaches the picker.
     const tabs = await listLeaderboardTabs();
+    const terms = await getTerms();
     const boards = [
-      { id: "global", label: "Global Leaderboard" },
-      { id: "trading", label: "Trading Leaderboard" },
-      { id: "games", label: "Games Leaderboard" },
+      { id: "global", label: `Global ${terms.leaderboard}` },
+      { id: "trading", label: `Trading ${terms.leaderboard}` },
+      { id: "games", label: `${terms.games} ${terms.leaderboard}` },
     ];
 
     const board = resolveBoardId({
