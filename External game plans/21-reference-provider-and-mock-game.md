@@ -487,7 +487,8 @@ operator and a player can actually get there.
 session, and this environment has neither. So it is the owner's run, and the steps are:**
 
 *(Engineering handoff confirmed 18 September 2026 — no further code blocks this runbook.
-`deploy/README.md` ChartVolt Games section is the operational twin; keep them aligned.)*
+`deploy/README.md` ChartVolt Games section is the operational twin; keep them aligned.
+**A5 wiki engineering closed 19 Sep 2026** and does not affect this runbook.)*
 
 1. **Deploy.** `games-service` on the server, `pm2 start ecosystem.config.js --only chartvolt-games`,
    with `npm run setup:env` having written the `.env`. The play surface arrives at

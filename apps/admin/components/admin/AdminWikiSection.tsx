@@ -65,6 +65,7 @@ import {
   ShieldAlert,
   Camera,
 } from "lucide-react";
+import { GAME_ADMIN_WIKI_TOPICS } from "@/components/admin/wiki/game-administration-skeleton";
 
 interface WikiTopic {
   id: string;
@@ -97,9 +98,9 @@ export default function AdminWikiSection() {
             </h2>
             <p className="text-gray-300 leading-relaxed">
               This comprehensive control center gives you complete power over
-              your trading competition platform. From creating competitions to
-              detecting fraud, managing payments to analyzing performance -
-              everything is here.
+              your multi-game competition platform. From creating contests across
+              trading and provider games to detecting fraud, managing payments to
+              analyzing performance — everything is here.
             </p>
           </div>
 
@@ -112,9 +113,23 @@ export default function AdminWikiSection() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="text-sm text-gray-300">
-                Create, manage, and monitor trading competitions. Set prizes,
-                rules, minimum participants, entry fees, and track live
-                standings.
+                Create, manage, and monitor competitions for every game on the
+                platform. Set prizes, rules, minimum participants, entry fees,
+                and track live standings.
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gray-800 border-gray-700">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg text-emerald-400 flex items-center gap-2">
+                  <Layers className="h-5 w-5" />
+                  Game Administration
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm text-gray-300">
+                Register providers, sync the catalogue, publish provider contests,
+                and resolve rounds. See the Game Administration topics in this
+                wiki for the operator outline.
               </CardContent>
             </Card>
 
@@ -126,7 +141,7 @@ export default function AdminWikiSection() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="text-sm text-gray-300">
-                Manage user accounts, credit balances, view trading stats,
+                Manage user accounts, credit balances, view per-game performance,
                 suspend, ban, or edit users.
               </CardContent>
             </Card>
@@ -593,6 +608,9 @@ export default function AdminWikiSection() {
         </div>
       ),
     },
+
+    // A5 — Game Administration skeletons (bodies are owner work)
+    ...GAME_ADMIN_WIKI_TOPICS,
 
     // ==================== FRAUD DETECTION ====================
     {
