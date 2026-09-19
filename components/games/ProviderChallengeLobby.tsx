@@ -32,6 +32,7 @@ import {
 } from "@/components/neon/Cards";
 import { NEON_LABEL, NEON_PANEL, NEON_TABLE_HEAD, accentClasses } from "@/components/neon/tokens";
 import { formatVolts } from "@/lib/utils/format-volts";
+import { getTerms } from "@/lib/services/terminology.service";
 import { getChallengePlayState } from "@/lib/services/games/challenge-round-status.service";
 import { isProviderChallenge } from "@/lib/services/games/challenge-round-config";
 import {
@@ -136,6 +137,8 @@ export default async function ProviderChallengeLobby({
   userId,
 }: ProviderChallengeLobbyProps) {
   await connectToDatabase();
+  // Reason: X8 pass 3 — one getTerms() per lobby render.
+  const terms = await getTerms();
 
   const presentation = await getGamePresentation(
     challenge?.gameConfig?.providerKey,
@@ -202,7 +205,7 @@ export default async function ProviderChallengeLobby({
   const isCancelled = status === "cancelled";
 
   const gameName =
-    presentation.gameName === UNKNOWN_GAME_NAME ? "Game" : presentation.gameName;
+    presentation.gameName === UNKNOWN_GAME_NAME ? terms.game : presentation.gameName;
   const scoreLabel = presentation.scoreType === "duration_ms" ? "Time" : "Score";
 
   const countdownTarget = isActive
@@ -264,7 +267,11 @@ export default async function ProviderChallengeLobby({
   return (
     <div className="flex min-h-screen flex-col gap-4 overflow-x-hidden p-3 sm:gap-6 sm:p-4 md:p-8">
       <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4">
-        <NeonPill href="/challenges" icon={ArrowLeft} label="Back to Challenges" />
+        <NeonPill
+          href="/challenges"
+          icon={ArrowLeft}
+          label={`Back to ${terms.challenges}`}
+        />
         <div className="hidden sm:block">
           <UTCClock />
         </div>
@@ -273,15 +280,15 @@ export default async function ProviderChallengeLobby({
       <NeonHero
         banner={providerBanner(challenge?.gameConfig?.gameCode)}
         badge={{ icon: Gamepad2, label: gameName }}
-        title={`Challenge vs ${opponentName ?? "opponent"}`}
+        title={`${terms.challenge} vs ${opponentName ?? terms.opponent}`}
         subtitle={
           isChallenger
             ? openSeat
               ? "You opened this to anyone"
-              : "You challenged"
+              : `You challenged`
             : openSeat
               ? "Open to anyone"
-              : "Challenged you"
+              : `Challenged you`
         }
         status={<NeonStatusBadge status={status} />}
       >

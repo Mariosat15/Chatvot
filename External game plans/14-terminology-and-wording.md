@@ -372,7 +372,7 @@ Ordered by visibility, so the highest-impact strings change first.
 |---|---|---|---|---|
 | 1 | Navigation - `UserSidebar.tsx`, `MobileBottomNav.tsx` | ~10 | Developer | **BUILT 19 Sep 2026** — see s3.2a |
 | 2 | Level titles, via the `XPConfig` database record | 20 | Admin | Outstanding (R88 closed in X6.5; content still operator) |
-| 3 | Contest shell in `components/contest/` | ~50 | Developer | Outstanding (path corrected below) |
+| 3 | Contest shell — `components/games/` (+ trading lobby keeps trading language) | ~50 | Developer | **BUILT 19 Sep 2026** — see s3.2b |
 | 4 | Leaderboard columns and headings | ~25 | Developer | Outstanding |
 | 5 | Dashboard header and section titles | ~30 | Developer | Outstanding |
 | 6 | Profile tabs and headings | ~30 | Developer | Outstanding |
@@ -402,6 +402,30 @@ admin delivery tripwire that asserted "no main-app TerminologyContext" was **fli
 
 **Not built:** passes 2–11; auth/landing trees still have no provider until a later pass
 reaches them.
+
+#### 3.2b Pass 3 — provider contest shell (BUILT 19 Sep 2026)
+
+**What shipped:** high-visibility nouns on the provider lobbies and arena panels.
+
+| File | Mechanism | Tokens |
+|---|---|---|
+| `ProviderContestLobby.tsx` | `getTerms()` | `contests`, `players`, `prizePool`, `entryFee`, `leaderboard`, `contest`, `game` |
+| `ProviderChallengeLobby.tsx` | `getTerms()` | `challenges`, `challenge`, `opponent`, `game` |
+| `ArenaLeaderboardPanel.tsx` | `useTerms()` (client) | `leaderboard`, `players`, `contest`, `score` |
+| `ArenaContestPanel.tsx` | `getTerms()` (async) | `prizePool`, `entryFee`, `players`, `round`, `score`, `rank`, `attempt` |
+| `ArenaIdentity.tsx` | `getTerms()` (async) | `contest` |
+
+**Trading lobby untouched** (chapter 14 s5). **7 tests** in
+`__tests__/player/contest-shell-terminology.test.ts`.
+
+**Deviation:** arena identity + contest panel each call `getTerms()` rather than receiving
+a pack from the play page — same answer while overrides are platform-wide; threading one
+read belongs with a later cleanup if per-request cost matters.
+
+**Not built:** passes 2, 4–11; remaining strings inside `components/games/` (results screen,
+pre-flight copy, etc.).
+
+---
 
 Passes 2, 7, 8 and 9 are **database content, editable in admin by someone who is not a
 developer**. That is roughly three days of work that does not consume engineering time,

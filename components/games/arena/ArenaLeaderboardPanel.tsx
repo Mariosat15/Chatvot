@@ -19,6 +19,7 @@ import {
   describeRoundActivity,
   roundActivityToneClass,
 } from "@/lib/utils/round-activity";
+import { useTerms } from "@/contexts/TerminologyContext";
 import { useArenaLive } from "./ArenaLiveStandings";
 
 /**
@@ -75,6 +76,7 @@ export default function ArenaLeaderboardPanel({
   /** Beside the score column, so a time trial does not say "Score". */
   scoreLabel?: string;
 }) {
+  const terms = useTerms();
   const { rows } = useArenaLive();
   const [tab, setTab] = useState<Tab>("ranking");
 
@@ -95,7 +97,7 @@ export default function ArenaLeaderboardPanel({
           }`}
         >
           <Trophy className="h-3.5 w-3.5 shrink-0" />
-          Leaderboard
+          {terms.leaderboard}
         </button>
         <button
           type="button"
@@ -106,7 +108,7 @@ export default function ArenaLeaderboardPanel({
           }`}
         >
           <Users className="h-3.5 w-3.5 shrink-0" />
-          Players ({rows.length})
+          {terms.players} ({rows.length})
         </button>
       </div>
 
@@ -120,7 +122,7 @@ export default function ArenaLeaderboardPanel({
         <NeonScopeStrip
           scopes={["Global"]}
           unavailable={["Friends", "Country"]}
-          unavailableTitle="Everyone in this competition is shown"
+          unavailableTitle={`Everyone in this ${terms.contest.toLowerCase()} is shown`}
         />
       )}
 
@@ -140,7 +142,7 @@ export default function ArenaLeaderboardPanel({
         <NeonButton
           href={`/competitions/${competitionId}?view=details`}
           tone="outline"
-          label="View Full Leaderboard"
+          label={`View Full ${terms.leaderboard}`}
           trailingIcon={ArrowRight}
         />
       </div>
@@ -149,12 +151,13 @@ export default function ArenaLeaderboardPanel({
 }
 
 function BoardTab({ scoreLabel }: { scoreLabel: string }) {
+  const terms = useTerms();
   const { rows, currentUserId } = useArenaLive();
 
   if (rows.length === 0) {
     return (
       <p className="px-2 py-6 text-center text-xs text-gray-500">
-        No scores yet. Be the first.
+        No {terms.score.toLowerCase()}s yet. Be the first.
       </p>
     );
   }

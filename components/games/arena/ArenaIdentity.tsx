@@ -13,6 +13,7 @@ import {
 import { accentClasses } from "@/components/neon/tokens";
 import type { GamePresentation } from "@/lib/services/games/game-presentation.service";
 import type { HeroFeatureIcon } from "@/lib/services/games/hero-features";
+import { getTerms } from "@/lib/services/terminology.service";
 import { resolveHeroFeatures, splitGameTitle } from "./arena-facts";
 
 /**
@@ -98,11 +99,12 @@ const FEATURE_ICONS = new Map<HeroFeatureIcon, LucideIcon>([
  */
 const NEUTRAL_ICON: LucideIcon = Circle;
 
-export function ArenaIdentity({
+export async function ArenaIdentity({
   presentation,
   minParticipants,
   maxParticipants,
 }: Props) {
+  const terms = await getTerms();
   const { title, subtitle } = splitGameTitle(presentation.gameName);
   const features = resolveHeroFeatures(
     presentation.heroFeatures,
@@ -132,8 +134,8 @@ export function ArenaIdentity({
           */}
           <span className="inline-block rounded border border-violet-500/40 bg-violet-500/10 px-1.5 py-px text-[9px] font-bold uppercase tracking-[0.18em] text-violet-300">
             {presentation.category
-              ? `${presentation.category} competition`
-              : "Competition"}
+              ? `${presentation.category} ${terms.contest}`
+              : terms.contest}
           </span>
 
           {/*

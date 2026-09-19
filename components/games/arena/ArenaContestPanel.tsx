@@ -14,6 +14,7 @@ import type { PlayState } from "@/components/games/play-state";
 import type { GamePresentation } from "@/lib/services/games/game-presentation.service";
 import { attemptProgress, clock, scoreText, scoringSummary } from "./arena-facts";
 import { formatVolts } from "@/lib/utils/format-volts";
+import { getTerms } from "@/lib/services/terminology.service";
 
 /**
  * The contest's own facts, beside the board: pot, entry, size, clock, attempts, your score.
@@ -98,7 +99,8 @@ function StatePill({ contestStatus, isPaused }: { contestStatus: string; isPause
   );
 }
 
-export function ArenaContestPanel({ facts, state, presentation, rank }: Props) {
+export async function ArenaContestPanel({ facts, state, presentation, rank }: Props) {
+  const terms = await getTerms();
   const attempt = attemptProgress(state.attemptsUsed, state.attemptsPermitted);
   // The round clock is the CONFIGURED playing time for one attempt, which is what a player
   // wants to know before pressing Play. `maxRoundSeconds` is resolved server-side from the
@@ -133,7 +135,7 @@ export function ArenaContestPanel({ facts, state, presentation, rank }: Props) {
             {
               icon: Trophy,
               accent: "prize",
-              label: "Prize pool",
+              label: terms.prizePool,
               value: formatVolts(facts.prizePool, {
                 symbol: facts.creditSymbol,
               }),
@@ -141,7 +143,7 @@ export function ArenaContestPanel({ facts, state, presentation, rank }: Props) {
             {
               icon: Ticket,
               accent: "entry",
-              label: "Entry",
+              label: terms.entryFee,
               value: formatVolts(facts.entryFee, {
                 symbol: facts.creditSymbol,
               }),
@@ -149,7 +151,7 @@ export function ArenaContestPanel({ facts, state, presentation, rank }: Props) {
             {
               icon: Users,
               accent: "players",
-              label: "Players",
+              label: terms.players,
               value:
                 typeof facts.currentParticipants === "number"
                   ? `${facts.currentParticipants}${facts.maxParticipants ? ` / ${facts.maxParticipants}` : ""}`
@@ -158,7 +160,7 @@ export function ArenaContestPanel({ facts, state, presentation, rank }: Props) {
             {
               icon: Timer,
               accent: "waiting",
-              label: "Round time",
+              label: `${terms.round} time`,
               // An absent round length says nothing rather than guessing. A default
               // would be an invented deadline in front of a paying player.
               value: roundClock ?? "—",
@@ -171,13 +173,13 @@ export function ArenaContestPanel({ facts, state, presentation, rank }: Props) {
             {
               icon: Gauge,
               accent: "score",
-              label: "Your score",
+              label: `Your ${terms.score.toLowerCase()}`,
               value: scoreText(state.participantScore),
             },
             {
               icon: Medal,
               accent: "prize",
-              label: "Rank",
+              label: terms.rank,
               // A dash, never `#—` and never a position. See the `rank` prop.
               value: typeof rank === "number" ? `#${rank}` : "—",
             },
@@ -189,7 +191,7 @@ export function ArenaContestPanel({ facts, state, presentation, rank }: Props) {
         {attempt && (
           <div>
             <div className="flex items-baseline justify-between">
-              <span className={NEON_LABEL}>Attempt</span>
+              <span className={NEON_LABEL}>{terms.attempt}</span>
               <span className="text-xs font-semibold text-gray-200">
                 {attempt.current} of {attempt.total}
               </span>

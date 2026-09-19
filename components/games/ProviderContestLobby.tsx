@@ -32,6 +32,7 @@ import {
 } from "@/components/neon/Cards";
 import { NEON_LABEL, NEON_PANEL } from "@/components/neon/tokens";
 import { formatVolts } from "@/lib/utils/format-volts";
+import { getTerms } from "@/lib/services/terminology.service";
 import { getPlayState } from "@/lib/services/games/round-status.service";
 import {
   getGamePresentation,
@@ -139,6 +140,8 @@ export default async function ProviderContestLobby({
   registrationClosed,
 }: ProviderContestLobbyProps) {
   await connectToDatabase();
+  // Reason: X8 pass 3 — one getTerms() per lobby render; children must not call it again.
+  const terms = await getTerms();
 
   /*
     The player-facing name comes from the catalogue, which is the editable content layer - never
@@ -229,7 +232,7 @@ export default async function ProviderContestLobby({
     has left the catalogue, which already renders its own warning card further down.
   */
   const gameName =
-    presentation.gameName === UNKNOWN_GAME_NAME ? "Game" : presentation.gameName;
+    presentation.gameName === UNKNOWN_GAME_NAME ? terms.game : presentation.gameName;
 
   /*
     The column heading comes from the game's own score type, which is the smallest possible step
@@ -379,7 +382,7 @@ export default async function ProviderContestLobby({
         <NeonPill
           href="/competitions"
           icon={ArrowLeft}
-          label="Back to Competitions"
+          label={`Back to ${terms.contests}`}
         />
         <div className="hidden sm:block">
           <UTCClock />
@@ -403,13 +406,13 @@ export default async function ProviderContestLobby({
           <StatCard
             icon={Trophy}
             accent="prize"
-            label="Prize pool"
+            label={terms.prizePool}
             value={formatVolts(competition.prizePool ?? 0, { symbol: creditSymbol })}
           />
           <StatCard
             icon={Link2}
             accent="entry"
-            label="Entry fee"
+            label={terms.entryFee}
             value={
               competition.entryFee
                 ? formatVolts(competition.entryFee, { symbol: creditSymbol })
@@ -419,7 +422,7 @@ export default async function ProviderContestLobby({
           <StatCard
             icon={Users}
             accent="players"
-            label="Players"
+            label={terms.players}
             value={`${competition.currentParticipants ?? 0} / ${competition.maxParticipants ?? 0}`}
             note={
               status === "upcoming" && competition.minParticipants > 0 ? (
@@ -434,7 +437,7 @@ export default async function ProviderContestLobby({
                   Minimum {competition.minParticipants}
                   {(competition.currentParticipants ?? 0) <
                   competition.minParticipants
-                    ? " - needs more players"
+                    ? ` - needs more ${terms.players.toLowerCase()}`
                     : " - reached"}
                 </p>
               ) : undefined
@@ -517,7 +520,7 @@ export default async function ProviderContestLobby({
           <NeonPanel
             icon={Trophy}
             accent="prize"
-            title="Leaderboard"
+            title={terms.leaderboard}
             action={
               /*
                 "players", never "traders". The trading lobby's equivalent pill says traders, and
@@ -574,7 +577,11 @@ export default async function ProviderContestLobby({
             <ContestCountdown
               target={countdownTarget}
               serverNow={state?.serverNow}
-              label={isActive ? "Time remaining" : "Competition starts in"}
+              label={
+                isActive
+                  ? "Time remaining"
+                  : `${terms.contest} starts in`
+              }
               variant={isActive ? "end" : "start"}
               details={scheduleDetails}
             />
