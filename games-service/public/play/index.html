@@ -1,0 +1,554 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <!--
+      `viewport-fit=cover` and no user scaling: this is a drag-driven game on a grid sized to the
+      viewport, so a pinch-zoom mid-drag moves the board under the finger. Zoom is a genuine
+      accessibility control, which is why the grid scales itself to the available space instead -
+      a larger phone gets larger cells rather than a scrollable board.
+    -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <!--
+      The launch token appears once, in this document's own URL. `no-referrer` stops it travelling
+      in a `Referer` header from anything this page fetches or links to; every request after the
+      first sends it in a request body instead.
+    -->
+    <meta name="referrer" content="no-referrer" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Circuit</title>
+    <link rel="stylesheet" href="/play/app.css" />
+  </head>
+  <body>
+    <!--
+      Every screen ships in the document and is toggled with `hidden`, rather than being built in
+      JavaScript. A timed game must not wait for a second round trip to show its board, and the
+      one thing this page must never do is make the player's clock pay for our loading.
+
+      WHAT IS MARKUP HERE AND WHAT IS NOT. The shells, the artwork and the layout are markup. Every
+      word a player reads about a title - its name, its rules, how it scores - is filled in from
+      the round state, because the page used to hold its own copy of the rules and the two had
+      already drifted from the catalogue's. See `src/games/instructions.ts`.
+    -->
+    <main id="app">
+      <section id="screen-loading" class="screen">
+        <div class="spinner" aria-hidden="true"></div>
+        <p class="muted">Loading your round...</p>
+      </section>
+
+      <section id="screen-intro" class="screen scroll" hidden>
+        <!--
+          The rules, drawn. A player who has never seen a flow puzzle does not learn it from three
+          sentences, and this is a paid contest, so the seconds spent working out the interaction
+          come out of their score. The path animates itself along the route a finger would take.
+
+          Inline rather than an image file: it is the only way to have artwork that costs no extra
+          request, needs no entry in the asset allowlist, and inherits the palette. The animation
+          is switched off under `prefers-reduced-motion` in the stylesheet.
+        -->
+        <svg
+          class="diagram"
+          viewBox="0 0 180 100"
+          role="img"
+          aria-label="A path drawn between two terminals numbered one, filling every square"
+        >
+          <!--
+            Built out of the same parts as the real board - cell face and lip, wire halo and core,
+            socket bloom, rim and ring - so a player recognises the thing they are about to be
+            handed. It is drawn by hand here rather than by `board.js`, because the illustration
+            wants a chosen shape and a chosen route, and reusing the renderer would mean
+            introducing a fake puzzle for it to draw.
+          -->
+          <!--
+            Its own gradient, with its own id. The board's `#cell-face` is created by `board.js`
+            when the grid is built, which is after Start - so pointing at it here would resolve to
+            nothing on the one screen this artwork appears on, and an unresolved paint server is
+            not an error, it is a transparent fill. The illustration would simply lose its cells.
+          -->
+          <defs>
+            <linearGradient id="cell-face-flat" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#183053" />
+              <stop offset="0.55" stop-color="#102340" />
+              <stop offset="1" stop-color="#0b1a31" />
+            </linearGradient>
+          </defs>
+          <g class="diagram-grid">
+            <rect x="10" y="10" width="38" height="38" rx="8" />
+            <rect x="52" y="10" width="38" height="38" rx="8" />
+            <rect x="94" y="10" width="38" height="38" rx="8" />
+            <rect x="10" y="52" width="38" height="38" rx="8" />
+            <rect x="52" y="52" width="38" height="38" rx="8" />
+            <rect x="94" y="52" width="38" height="38" rx="8" />
+          </g>
+          <polyline
+            class="diagram-trace diagram-trace-halo"
+            points="29,29 71,29 113,29 113,71 71,71 29,71"
+            fill="none"
+          />
+          <polyline
+            class="diagram-trace"
+            points="29,29 71,29 113,29 113,71 71,71 29,71"
+            fill="none"
+          />
+          <polyline
+            class="diagram-trace diagram-trace-core"
+            points="29,29 71,29 113,29 113,71 71,71 29,71"
+            fill="none"
+          />
+          <g class="diagram-terminals">
+            <circle class="diagram-bloom" cx="29" cy="29" r="18" />
+            <circle class="diagram-rim" cx="29" cy="29" r="14" />
+            <circle class="diagram-ring" cx="29" cy="29" r="10" />
+            <text x="29" y="29">1</text>
+            <circle class="diagram-bloom" cx="29" cy="71" r="18" />
+            <circle class="diagram-rim" cx="29" cy="71" r="14" />
+            <circle class="diagram-ring" cx="29" cy="71" r="10" />
+            <text x="29" y="71">1</text>
+          </g>
+        </svg>
+
+        <h1 id="intro-title">Circuit</h1>
+        <p id="intro-limit" class="lead"></p>
+
+        <div class="panels">
+          <section class="panel">
+            <h2 class="panel-title">How to play</h2>
+            <ul id="intro-rules" class="rules"></ul>
+          </section>
+
+          <!-- Hidden by the script when a title reports no scoring summary, rather than rendering
+               an empty heading. -->
+          <section class="panel" id="intro-scoring-panel">
+            <h2 class="panel-title">How you score</h2>
+            <p id="intro-scoring" class="panel-body"></p>
+          </section>
+        </div>
+
+        <button id="start" class="primary large" type="button">Start</button>
+        <p id="intro-note" class="muted small"></p>
+      </section>
+
+      <section id="screen-play" class="screen play" hidden>
+        <!--
+          THE ROUND HEADER. Three instrument cells and the two controls.
+
+          Every caption is written by `roundHeaderCells` together with its value, so a label can
+          never end up over the wrong figure - which is exactly how a board count gets read as a
+          time. The captions are script-written rather than fixed markup because the first cell
+          asks a DIFFERENT QUESTION for each title: Circuit Perfect has a fixed set of boards and
+          so has a denominator, Circuit Sprint has no finishing line and so has none. Hard-coded
+          text would have to invent one.
+
+          The shells stay in the document, because a timed game must not wait for JavaScript to
+          show its instruments - and the clock's VALUE is written by `renderClock` rather than by
+          the header, since it is the one figure that changes four times a second.
+
+          THERE IS NO SCORE CELL, and its absence is a decision rather than an omission. See the
+          instruments section of `presentation.js`.
+        -->
+        <header class="bar round-bar">
+          <div class="round-cells">
+            <div class="readout">
+              <span id="cell-board-label" class="readout-label"></span>
+              <span id="cell-board-value" class="readout-value"></span>
+            </div>
+            <div class="readout readout-clock">
+              <span id="cell-clock-label" class="readout-label"></span>
+              <span id="clock" class="readout-value clock" aria-live="off"></span>
+            </div>
+            <div class="readout">
+              <span id="cell-coverage-label" class="readout-label"></span>
+              <span id="cell-coverage-value" class="readout-value"></span>
+            </div>
+          </div>
+          <div class="round-controls">
+            <!--
+              The label, the title and `aria-pressed` are all written by `renderSoundControl` from
+              one call to `soundControlCopy`, so the button cannot announce one state and show
+              another. It ships with the label of its DEFAULT state rather than empty: the script
+              replaces it within a frame, but a button that is briefly nameless is a button a
+              screen reader may reach and read as "button".
+            -->
+            <button
+              id="mute"
+              class="ghost icon-btn sound-btn"
+              type="button"
+              aria-pressed="false"
+              aria-label="Mute sound"
+              title="Mute sound"
+            >
+              &#128266;
+            </button>
+            <!-- Leave keeps its word. An unlabelled exit icon on a paid attempt is the one control
+                 a player must not have to guess at. -->
+            <button id="leave" class="ghost small-btn" type="button">Leave</button>
+          </div>
+        </header>
+
+        <!--
+          THE ARENA: the board, then the figures under it.
+
+          IT WAS A RAIL, THE BOARD AND A RAIL UNTIL 11 SEPTEMBER 2026, and the owner's report is
+          why it is not any more: *"when we choose medium and large the system makes the board
+          smaller"*. The board is width-bound in the platform's arena - the frame is a middle
+          column of 450 to 650 pixels and a cell is square - so the two rails beside it were
+          taking about a third of the width the grid divides up, and an 8x8 divided what was left
+          into cells at their floor while a 4x4 looked fine. Nothing errored; the large board was
+          simply drawn small. So the actions moved into the footer beside Submit and the figures
+          moved under the board, and the grid gets the whole width at every size.
+
+          THE FIGURES STAY INSIDE THE ARENA AND THE BUTTONS DO NOT, which is not tidiness.
+          `chromeHeightOf` sums the `.bar` rows and then adds whatever the arena has over and
+          above the board - so a strip inside the arena is counted by the subtraction and a row of
+          buttons inside the footer is counted by the sum. Either place is accounted for; a third
+          `.bar` between them would be too, but the coverage meter belongs against the board it
+          describes.
+
+          The board is the FIRST row in document order, so nothing here needs `order` - grid
+          auto-placement follows order-modified document order, and an `order` rule that fires at
+          one width leaves every other width arranged by the DOM.
+        -->
+        <div class="arena">
+          <div id="board-wrap" class="board-wrap">
+            <!--
+              The reactions - the solved sweep and the refusal shake - are classes on this element
+              and not on the `<svg>`. Accepting a board replaces the whole grid with the next one
+              in the same tick, so an animation started on the SVG is discarded before a frame is
+              drawn.
+            -->
+            <div id="board-stage" class="board-stage">
+              <!--
+                The bezel is a SIBLING of the grid rather than part of it, and overhangs it by
+                `--board-art-overhang`. Drawn inside the `<svg>` it would sit in the element that
+                hit-tests drags, and `cellAt` maps a finger to a cell by proportion of that
+                element's box - so every touch would be off by the frame, worst at the edges, with
+                nothing on screen to suggest why. See `BOARD_ART_OVERHANG` in `presentation.js`.
+              -->
+              <div class="board-art" aria-hidden="true"></div>
+              <!-- `touch-action: none` lives in the stylesheet: a drag must not scroll the page. -->
+              <svg id="board" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Puzzle grid">
+              </svg>
+            </div>
+          </div>
+
+          <!--
+            The figures. The bar is the current board's COVERAGE, not its pairs joined, because
+            this puzzle is only complete when every square is used too - a bar driven by pairs
+            would sit at full while the server refused the board. The tiles below it are built by
+            `playStatTiles`, which omits one rather than showing an empty value.
+          -->
+          <aside id="stat-rail" class="stat-rail">
+            <div class="board-meter">
+              <div class="board-meter-head">
+                <span class="board-meter-label">This board</span>
+                <span id="board-meter-value" class="board-meter-value">0%</span>
+              </div>
+              <div
+                id="board-meter-track"
+                class="board-meter-track"
+                role="progressbar"
+                aria-label="Squares filled on this board"
+                aria-valuemin="0"
+                aria-valuemax="100"
+                aria-valuenow="0"
+              >
+                <div id="board-meter-fill" class="board-meter-fill"></div>
+              </div>
+            </div>
+            <div id="stat-tiles" class="stat-tiles"></div>
+          </aside>
+        </div>
+
+        <footer class="bar footer">
+          <p id="hint" class="hint" aria-live="polite"></p>
+          <div class="footer-actions">
+            <!--
+              Two actions, and deliberately not the three the reference design shows. Undo removes
+              the path drawn last and is strictly weaker than Clear; a HINT is forbidden outright,
+              because it would improve a score in a paid contest. The reasoning is in `undoState`.
+
+              They sit beside Submit rather than beside the board, so the grid keeps the full
+              width - see the arena's comment above.
+            -->
+            <div class="action-rail">
+              <button id="undo" class="ghost rail-btn" type="button" disabled>
+                <span class="rail-btn-icon" aria-hidden="true">&#8630;</span>
+                <span class="rail-btn-label">Undo</span>
+              </button>
+              <button id="clear" class="ghost rail-btn" type="button">
+                <span class="rail-btn-icon" aria-hidden="true">&#10005;</span>
+                <span class="rail-btn-label">Clear</span>
+              </button>
+            </div>
+            <button id="submit" class="primary submit-wide" type="button" disabled>
+              Submit solution
+            </button>
+          </div>
+        </footer>
+      </section>
+
+      <section id="screen-result" class="screen scroll" hidden>
+        <!--
+          Two pieces of artwork, one shown at a time, chosen by `resultCopy().triumphant`. A round
+          that ran its clock out having solved nothing gets the neutral one: a trophy over an empty
+          result reads as sarcasm.
+        -->
+        <div class="result-art" aria-hidden="true">
+          <svg class="art art-win" viewBox="0 0 120 120">
+            <circle class="art-halo" cx="60" cy="60" r="52" />
+            <polyline class="art-trace" points="30,60 50,80 90,40" fill="none" />
+          </svg>
+          <svg class="art art-neutral" viewBox="0 0 120 120">
+            <circle class="art-halo" cx="60" cy="60" r="52" />
+            <line class="art-trace" x1="38" y1="60" x2="82" y2="60" />
+          </svg>
+        </div>
+
+        <h1 id="result-title">Round ended</h1>
+
+        <div class="stat">
+          <span id="result-stat" class="stat-value">0</span>
+          <span id="result-stat-label" class="stat-label">boards finished</span>
+        </div>
+
+        <p id="result-next" class="lead"></p>
+        <button id="done" class="primary large" type="button">Back to contest</button>
+      </section>
+
+      <section id="screen-error" class="screen" hidden>
+        <h1>Something went wrong</h1>
+        <p id="error-detail" class="lead"></p>
+        <button id="retry" class="ghost" type="button">Try again</button>
+      </section>
+    </main>
+
+    <!--
+      A CLASSIC SCRIPT IN FRONT OF THE MODULE, AND WHY IT IS NOT BELT-AND-BRACES.
+
+      Everything below this comment is one module graph: `app.js` imports `board.js` and
+      `presentation.js`. If any single file in that graph fails to arrive, the browser abandons
+      the WHOLE graph - the importer does not evaluate either - so not one line of the game runs.
+      There is then nothing on the screen but the loading section above, nothing in any server
+      log, and no message to the platform, which sits behind its own opaque overlay waiting for a
+      `ready` that can never come. That is exactly what a player reported on 8 September 2026,
+      and the reason it was diagnosed from a browser console rather than from the product is that
+      the product had no way to say it.
+
+      This script is a classic one and it is deliberately the only script on the page that is:
+      a classic script cannot be taken down by a module that 404s, so it is still running in the
+      one situation the module graph is not. It watches for a boot that never happens, names the
+      file if the browser told us which one, and - the load-bearing part - sends `ready` so the
+      platform drops its overlay and the player can actually read the message and leave.
+
+      IT MUST FIRE BEFORE THE PLATFORM'S OWN TIMEOUT (`READY_TIMEOUT_MS`, 12s in
+      `components/games/ProviderGameFrame.tsx`). The platform's panel is the honest fallback for
+      a frame that never even loaded its document; this one can say more, because it is inside
+      the document. If this deadline were the longer of the two, the player would get the vaguer
+      message and this would be dead code that still looked correct.
+    -->
+    <script>
+      (function () {
+        var BOOT_DEADLINE_MS = 8000;
+
+        /*
+         * WHY THE FAILING FILE IS FOUND IN THE RESOURCE TIMELINE AND NOT ON THE ERROR EVENT.
+         *
+         * Verified in a browser on 8 September 2026, with `presentation.js` deliberately 404ing:
+         * the `error` event fires on the `<script>` element that STARTED the graph, so its
+         * `src` is `app.js` - a file that loaded perfectly. Naming it told the player, and
+         * anybody they reported it to, to go and look at the wrong file. A nested module has no
+         * element of its own, so there is nothing else on the event to read.
+         *
+         * `performance.getEntriesByType("resource")` records the nested request, and Chromium
+         * exposes `responseStatus` on it, so the actual 404 can be named exactly. Safari does not
+         * implement `responseStatus`, which is why an unnamed message is a supported outcome
+         * rather than a bug - and why the error listener stays: it still tells us a resource
+         * failed, which picks the wording, even where the status is unavailable.
+         *
+         * The listener must be in the CAPTURE phase. Resource errors do not bubble, so a listener
+         * on `window` without the `true` never sees them at all.
+         */
+        var resourceFailed = false;
+        window.addEventListener(
+          "error",
+          function (event) {
+            var target = event.target;
+            if (target && target !== window && (target.src || target.href)) {
+              resourceFailed = true;
+            }
+          },
+          true,
+        );
+
+        function failedResourceUrls() {
+          var urls = [];
+          if (!window.performance || !window.performance.getEntriesByType) return urls;
+          var entries = window.performance.getEntriesByType("resource");
+          for (var i = 0; i < entries.length; i += 1) {
+            if (typeof entries[i].responseStatus === "number" && entries[i].responseStatus >= 400) {
+              urls.push(String(entries[i].name));
+            }
+          }
+          return urls;
+        }
+
+        function shortName(url) {
+          return String(url).split("?")[0].split("/").pop();
+        }
+
+        function giveUp(urls) {
+          var detail = document.getElementById("error-detail");
+          if (detail) {
+            detail.textContent =
+              (urls.length
+                ? "The game could not load one of its files (" + shortName(urls[0]) + ")."
+                : resourceFailed
+                  ? "The game could not load one of its files."
+                  : "The game's code did not finish loading.") +
+              " Your attempt is already open, so reloading does not cost another one. If it" +
+              " keeps failing, leave the round and its result will be resolved for you.";
+          }
+
+          var screens = document.querySelectorAll(".screen");
+          for (var i = 0; i < screens.length; i += 1) screens[i].hidden = true;
+          var error = document.getElementById("screen-error");
+          if (error) error.hidden = false;
+
+          // The retry button's real handler lives in `app.js`, which by definition never ran, so
+          // it would be a control that does nothing. Reloading is the correct action here anyway:
+          // a live round resumes rather than starting a second one.
+          var retry = document.getElementById("retry");
+          if (retry) {
+            retry.onclick = function () {
+              window.location.reload();
+            };
+          }
+
+          /*
+           * `"*"` as the target origin, matching `tellPlatform` in `app.js`. This message carries
+           * no secret - it is the single word `ready` - and the platform verifies the SOURCE
+           * window and the origin at its end, which is the check that matters.
+           */
+          try {
+            window.parent.postMessage({ type: "ready" }, "*");
+          } catch (ignored) {
+            /* No parent, or a parent we may not talk to. The panel above is still on screen. */
+          }
+        }
+
+        /**
+         * Claim the single automatic recovery attempt, or refuse to take one.
+         *
+         * WHY THIS IS GUARDED BY STORAGE AND NOT BY A COUNTER. The recovery reloads the page, so
+         * a counter in a variable resets on the way and the reload becomes a loop - a player
+         * watching a round flicker for ever, which is worse than the panel. `sessionStorage`
+         * survives the reload and dies with the tab.
+         *
+         * It FAILS CLOSED: if the write throws, we take no attempt at all. A browser that refuses
+         * storage is exactly the one where a loop could not be detected.
+         */
+        /**
+         * The SECOND witness, and the reason one is not enough.
+         *
+         * `window.__circuitLoaded` is set by `app.js`, so an unset flag means "*this* build of
+         * app.js did not run" - which is **not** the same fact as "the game did not start".
+         * Cloudflare gives every asset a four-hour lifetime in the browser (R54), while THIS
+         * document is never cached at all, because its URL carries a single-use token. So a
+         * player can hold a perfectly good `app.js` from before the flag existed and load today's
+         * markup around it: the game runs, the flag is never set, and a watchdog trusting the
+         * flag alone **wipes a working board out from under somebody mid-round**. That happened,
+         * in production, within an hour of the flag shipping.
+         *
+         * The game hides `#screen-loading` the moment it renders anything, so a painted screen is
+         * proof of life that does not depend on the module's cooperation. Two witnesses, each
+         * covering the other's blind spot: act only when both agree nothing is running.
+         */
+        function gameHasPainted() {
+          var loading = document.getElementById("screen-loading");
+          if (loading && loading.hidden) return true;
+          var screens = document.querySelectorAll(".screen");
+          for (var i = 0; i < screens.length; i += 1) {
+            if (screens[i].id !== "screen-loading" && !screens[i].hidden) return true;
+          }
+          return false;
+        }
+
+        function claimRetry() {
+          try {
+            if (window.sessionStorage.getItem("circuit-cache-retry")) return false;
+            window.sessionStorage.setItem("circuit-cache-retry", "1");
+            return true;
+          } catch (ignored) {
+            return false;
+          }
+        }
+
+        window.setTimeout(function () {
+          // The flag is set at the top of `app.js`, so it means "the code arrived and began
+          // running" rather than "the game is playable" - a round that is merely slow to fetch is
+          // the platform's 12-second panel to report, not ours. `gameHasPainted` is the second
+          // witness; see its comment for why an unset flag is not on its own evidence of a fault.
+          if (window.__circuitLoaded || gameHasPainted()) return;
+
+          var urls = failedResourceUrls();
+
+          /*
+           * WHY IT RE-FETCHES BEFORE GIVING UP, AND WHY THAT IS A FIX RATHER THAN A RETRY.
+           *
+           * Measured on the live site, 8 September 2026: Cloudflare rewrites `Cache-Control` on
+           * everything it serves to `max-age=14400`, INCLUDING our 404s - the service sends
+           * `no-store` on a refused asset and it does not survive the edge. So a file that was
+           * genuinely missing for ten minutes this morning is remembered by each player's browser
+           * as missing for FOUR HOURS, and no deploy can reach it: the browser never asks again.
+           * The server was fixed and the game stayed broken, which is the worst failure mode
+           * available because every check on our side reports success.
+           *
+           * `cache: "reload"` bypasses the browser's copy AND replaces it with what the server
+           * says now. So if the refusal was stale, this both proves it and cures it, and the
+           * reload afterwards finds the module present. If the file is genuinely gone the fetch
+           * fails again and we fall through to the panel, which is the honest outcome.
+           *
+           * Only attempted when a URL was actually recorded as failing: a boot that stalled for
+           * some other reason must not be answered by reloading the page underneath the player.
+           */
+          if (urls.length > 0 && claimRetry()) {
+            var checks = [];
+            for (var j = 0; j < urls.length; j += 1) {
+              checks.push(
+                fetch(urls[j], { cache: "reload" }).then(
+                  function (response) {
+                    return response.ok;
+                  },
+                  function () {
+                    return false;
+                  },
+                ),
+              );
+            }
+            Promise.all(checks).then(
+              function (results) {
+                for (var k = 0; k < results.length; k += 1) {
+                  if (!results[k]) {
+                    giveUp(urls);
+                    return;
+                  }
+                }
+                window.location.reload();
+              },
+              function () {
+                giveUp(urls);
+              },
+            );
+            return;
+          }
+
+          giveUp(urls);
+        }, BOOT_DEADLINE_MS);
+      })();
+    </script>
+    <script type="module" src="/play/app.js"></script>
+  </body>
+</html>

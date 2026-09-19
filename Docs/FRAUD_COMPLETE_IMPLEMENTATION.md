@@ -84,7 +84,10 @@
 - 5-minute caching for performance
 - Helper functions for common checks
 - `getFraudSettings()` - Get all settings
-- `shouldBlockEntry(score)` - Check if should block
+- ~~`shouldBlockEntry(score)`~~ - **DELETED 2 Sep 2026.** A suspicion score no longer
+  blocks entry on its own; only a `UserRestriction` does. See the correction banner in
+  `FRAUD_SETTINGS_SYSTEM.md` and Prerequisite B in
+  `New games plan/00a-STAGE-0-prerequisite-fixes-DO-FIRST.md`
 - `shouldCreateAlert(score)` - Check if should alert
 - Auto cache invalidation on updates
 
@@ -137,7 +140,7 @@ Block/Alert/Allow based on settings
   torRiskScore: 50,
   
   // Risk Thresholds
-  entryBlockThreshold: 70,    // Block if risk > 70
+  entryBlockThreshold: 70,    // Escalate for review if risk > 70. Does NOT block (2 Sep 2026)
   alertThreshold: 40,         // Alert if risk > 40
   
   // Auto-Actions

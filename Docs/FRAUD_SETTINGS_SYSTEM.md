@@ -1,5 +1,31 @@
 # 🎛️ Fraud Detection Settings System - COMPLETE
 
+> ## ⚠️ CORRECTION — 2 September 2026: `entryBlockThreshold` no longer blocks
+>
+> **Everything below about `entryBlockThreshold` blocking competition entry is stale.**
+> The field still exists and keeps its name in the schema, but it is now a **review /
+> escalation threshold**: crossing it raises the account for investigation and blocks
+> nothing.
+>
+> It was removed as a blocking mechanism because it created **no `UserRestriction`**, so
+> the block appeared on no admin screen, notified the player of nothing, could not be
+> lifted by anybody, and — the reason it was reported as a live incident — **ignored
+> `autoSuspendEnabled` entirely**, so admins who had deliberately left automatic
+> suspension off still got automatic, permanent lockouts.
+>
+> **The rule now: scores raise alerts, restrictions block.** Blocking entry is solely the
+> job of `UserRestriction`, which is visible, notified and liftable. Automatic blocking
+> happens only when `autoSuspendEnabled` is on, and then through a normal restriction.
+>
+> **`shouldBlockEntry()` (referenced in the Helper Functions section below) has been
+> deleted** from both `lib/services/fraud-settings.service.ts` and its admin mirror. Do not
+> reintroduce it — a dead helper that does the removed thing makes the defect a one-line
+> change that reads like using an existing API.
+>
+> Full write-up: **Prerequisite B** in
+> `New games plan/00a-STAGE-0-prerequisite-fixes-DO-FIRST.md`. Behaviour is pinned by
+> `__tests__/services/fraud-entry-block.test.ts`.
+
 ## Overview
 Comprehensive admin control panel for managing all fraud detection systems, thresholds, and behaviors.
 
@@ -201,10 +227,10 @@ await isDeviceFingerprintingEnabled()
 await isVPNDetectionEnabled()
 
 // Get thresholds
-await getEntryBlockThreshold()
+await getEntryBlockThreshold()   // review/escalation threshold - does NOT block
 
 // Decision helpers
-await shouldBlockEntry(riskScore)
+// await shouldBlockEntry(riskScore)   ← DELETED 2 Sep 2026. See the banner at the top.
 await shouldCreateAlert(riskScore)
 
 // Clear cache after update

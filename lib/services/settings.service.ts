@@ -1,11 +1,13 @@
-'use server';
+"use server";
 
-import { connectToDatabase } from '@/database/mongoose';
-import { WhiteLabel } from '@/database/models/whitelabel.model';
-import PaymentProvider from '@/database/models/payment-provider.model';
+import { connectToDatabase } from "@/database/mongoose";
+import { WhiteLabel } from "@/database/models/whitelabel.model";
+import PaymentProvider, { type IPaymentProvider } from "@/database/models/payment-provider.model";
 
 // Cache for settings to avoid repeated database queries
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let settingsCache: any = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let paymentProvidersCache: any = null;
 let lastFetch = 0;
 const CACHE_TTL = 60000; // 1 minute cache
@@ -16,44 +18,49 @@ const CACHE_TTL = 60000; // 1 minute cache
 export async function getSettings() {
   try {
     const now = Date.now();
-    
+
     // Return cached settings if still valid
-    if (settingsCache && (now - lastFetch) < CACHE_TTL) {
+    if (settingsCache && now - lastFetch < CACHE_TTL) {
       return settingsCache;
     }
 
     await connectToDatabase();
-    
-    let settings = await WhiteLabel.findOne();
-    
+
+    let settings = await WhiteLabel.findOne().lean();
+
     // Create default settings if none exist
     if (!settings) {
-      settings = await WhiteLabel.create({
-        companyName: 'ChartVolt',
-        nodeEnv: 'development',
-        nextPublicBaseUrl: 'http://localhost:3000',
+      const created = await WhiteLabel.create({
+        companyName: "ChartVolt",
+        nodeEnv: "development",
+        nextPublicBaseUrl: "http://localhost:3000",
       });
+      settings = created.toObject() as unknown as typeof settings;
     }
 
     settingsCache = settings;
     lastFetch = now;
-    
+
     return settings;
   } catch (error) {
-    console.error('Error fetching settings:', error);
+    console.error("Error fetching settings:", error);
     // Return minimal fallback settings
     return {
-      companyName: 'ChartVolt',
-      nodeEnv: process.env.NODE_ENV || 'development',
-      nextPublicBaseUrl: process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000',
-      nodemailerEmail: process.env.NODEMAILER_EMAIL || '',
-      nodemailerPassword: process.env.NODEMAILER_PASSWORD || '',
-      geminiApiKey: process.env.GEMINI_API_KEY || '',
-      massiveApiKey: process.env.MASSIVE_API_KEY || '',
-      nextPublicMassiveApiKey: process.env.NEXT_PUBLIC_MASSIVE_API_KEY || '',
-      mongodbUri: process.env.MONGODB_URI || '',
-      betterAuthSecret: process.env.BETTER_AUTH_SECRET || '',
-      betterAuthUrl: process.env.BETTER_AUTH_URL || '',
+      companyName: "ChartVolt",
+      nodeEnv: process.env.NODE_ENV || "development",
+      nextPublicBaseUrl:
+        process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000",
+      nodemailerEmail: process.env.NODEMAILER_EMAIL || "",
+      nodemailerPassword: process.env.NODEMAILER_PASSWORD || "",
+      massiveApiKey: process.env.MASSIVE_API_KEY || "",
+      openaiApiKey: process.env.OPENAI_API_KEY || "",
+      openaiModel: process.env.OPENAI_MODEL || "gpt-4o-mini",
+      openaiEnabled: process.env.OPENAI_ENABLED === "true",
+      openaiForEmails: process.env.OPENAI_FOR_EMAILS === "true",
+      nextPublicMassiveApiKey: process.env.NEXT_PUBLIC_MASSIVE_API_KEY || "",
+      mongodbUri: process.env.MONGODB_URI || "",
+      betterAuthSecret: process.env.BETTER_AUTH_SECRET || "",
+      betterAuthUrl: process.env.BETTER_AUTH_URL || "",
     };
   }
 }
@@ -64,22 +71,22 @@ export async function getSettings() {
 export async function getPaymentProviders() {
   try {
     const now = Date.now();
-    
+
     // Return cached providers if still valid
-    if (paymentProvidersCache && (now - lastFetch) < CACHE_TTL) {
+    if (paymentProvidersCache && now - lastFetch < CACHE_TTL) {
       return paymentProvidersCache;
     }
 
     await connectToDatabase();
-    
-    const providers = await PaymentProvider.find({ isActive: true });
-    
+
+    const providers = await PaymentProvider.find({ isActive: true }).lean();
+
     paymentProvidersCache = providers;
     lastFetch = now;
-    
+
     return providers;
   } catch (error) {
-    console.error('Error fetching payment providers:', error);
+    console.error("Error fetching payment providers:", error);
     return [];
   }
 }
@@ -87,12 +94,14 @@ export async function getPaymentProviders() {
 /**
  * Get a specific setting value
  */
-export async function getSetting(key: string, fallback: any = '') {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function getSetting(key: string, fallback: any = "") {
   try {
     const settings = await getSettings();
-    return settings[key] || fallback;
+    const settingsMap = new Map(Object.entries(settings));
+    return settingsMap.get(key) || fallback;
   } catch (error) {
-    console.error(`Error getting setting ${key}:`, error);
+    console.error("Error getting setting", key, error);
     return fallback;
   }
 }
@@ -103,15 +112,16 @@ export async function getSetting(key: string, fallback: any = '') {
 export async function getPaymentProviderCredentials(slug: string) {
   try {
     await connectToDatabase();
-    
-    const provider = await PaymentProvider.findOne({ slug, isActive: true });
-    
+
+    const provider = await PaymentProvider.findOne({ slug, isActive: true }).lean() as IPaymentProvider | null;
+
     if (!provider) {
       return null;
     }
 
     // Convert credentials array to object for easy access
     const credentials: Record<string, string> = {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     provider.credentials.forEach((cred: any) => {
       credentials[cred.key] = cred.value;
     });
@@ -123,7 +133,7 @@ export async function getPaymentProviderCredentials(slug: string) {
       displayName: provider.displayName,
     };
   } catch (error) {
-    console.error(`Error getting payment provider ${slug}:`, error);
+    console.error("Error getting payment provider", slug, error);
     return null;
   }
 }
@@ -132,7 +142,7 @@ export async function getPaymentProviderCredentials(slug: string) {
  * Clear settings cache (call after updating settings)
  */
 export async function clearSettingsCache() {
-  'use server';
+  "use server";
   settingsCache = null;
   paymentProvidersCache = null;
   lastFetch = 0;
@@ -142,53 +152,64 @@ export async function clearSettingsCache() {
  * Get Stripe credentials (helper function)
  */
 export async function getStripeCredentials() {
-  return await getPaymentProviderCredentials('stripe');
+  return await getPaymentProviderCredentials("stripe");
 }
 
 /**
  * Get environment variable with database fallback
  */
-export async function getEnv(key: string, fallback: string = ''): Promise<string> {
+export async function getEnv(
+  key: string,
+  fallback: string = "",
+): Promise<string> {
   // Essential variables that must come from .env (for app startup)
   const essentialEnvVars = [
-    'MONGODB_URI',
-    'BETTER_AUTH_SECRET',
-    'BETTER_AUTH_URL',
-    'NODE_ENV',
-    'ADMIN_EMAIL',
-    'ADMIN_PASSWORD',
-    'ADMIN_JWT_SECRET',
+    "MONGODB_URI",
+    "BETTER_AUTH_SECRET",
+    "BETTER_AUTH_URL",
+    "NODE_ENV",
+    "ADMIN_EMAIL",
+    "ADMIN_PASSWORD",
+    "ADMIN_JWT_SECRET",
   ];
 
   // If it's an essential variable, read from process.env
   if (essentialEnvVars.includes(key)) {
-    return process.env[key] || fallback;
+    const envMap = new Map(Object.entries(process.env));
+    return envMap.get(key) || fallback;
   }
 
   // For all other variables, try database first, then fall back to process.env
   try {
     const settings = await getSettings();
-    
-    // Map environment variable names to database field names
-    const dbKeyMap: Record<string, string> = {
-      'NODEMAILER_EMAIL': 'nodemailerEmail',
-      'NODEMAILER_PASSWORD': 'nodemailerPassword',
-      'GEMINI_API_KEY': 'geminiApiKey',
-      'MASSIVE_API_KEY': 'massiveApiKey',
-      'NEXT_PUBLIC_MASSIVE_API_KEY': 'nextPublicMassiveApiKey',
-      'NEXT_PUBLIC_BASE_URL': 'nextPublicBaseUrl',
-    };
 
-    const dbKey = dbKeyMap[key];
-    if (dbKey && settings[dbKey]) {
-      return settings[dbKey];
+    // Map environment variable names to database field names
+    const dbKeyMap = new Map<string, string>([
+      ["NODEMAILER_EMAIL", "nodemailerEmail"],
+      ["NODEMAILER_PASSWORD", "nodemailerPassword"],
+      ["MASSIVE_API_KEY", "massiveApiKey"],
+      ["NEXT_PUBLIC_MASSIVE_API_KEY", "nextPublicMassiveApiKey"],
+      ["NEXT_PUBLIC_BASE_URL", "nextPublicBaseUrl"],
+      ["OPENAI_API_KEY", "openaiApiKey"],
+      ["OPENAI_MODEL", "openaiModel"],
+      ["OPENAI_ENABLED", "openaiEnabled"],
+      ["OPENAI_FOR_EMAILS", "openaiForEmails"],
+      ["PEXELS_API_KEY", "pexelsApiKey"],
+      ["IP_INTELLIGENCE_API_KEY", "ipIntelligenceApiKey"],
+    ]);
+
+    const dbKey = dbKeyMap.get(key);
+    const settingsMap = new Map<string, unknown>(Object.entries(settings));
+    if (dbKey && settingsMap.get(dbKey)) {
+      return settingsMap.get(dbKey) as string;
     }
 
     // Fall back to process.env
-    return process.env[key] || fallback;
-  } catch (error) {
+    const envMap = new Map(Object.entries(process.env));
+    return envMap.get(key) || fallback;
+  } catch {
     // If database is unavailable, fall back to process.env
-    return process.env[key] || fallback;
+    const envMap = new Map(Object.entries(process.env));
+    return envMap.get(key) || fallback;
   }
 }
-

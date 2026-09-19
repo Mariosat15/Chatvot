@@ -1,0 +1,116 @@
+---
+globs: app/api/**,lib/actions/**,apps/admin/app/api/**,apps/admin/lib/actions/**
+description: API routes and server actions rules for ChartVolt
+---
+
+# API Routes & Server Actions — ChartVolt
+
+## 🏗️ Architecture Overview
+
+- **Next.js API Routes:** `app/api/**/route.ts` — RESTful endpoints (GET/POST/PUT/DELETE).
+- **Server Actions:** `lib/actions/**/*.actions.ts` — Called directly from React components via `"use server"`.
+- **Admin API:** `apps/admin/app/api/**/route.ts` — Separate admin endpoints (different auth).
+- **Admin Actions:** `apps/admin/lib/actions/**/*.actions.ts` — Admin-side server actions.
+- **Standalone API:** `api-server/` — Express server for external integrations.
+
+## 📐 Server Action Rules
+
+### Return Pattern (CRITICAL)
+
+Server actions **MUST** return a result object — **never throw errors**.
+
+```typescript
+// ✅ CORRECT — always return
+return { success: false, error: "Market is closed. Trading resumes Sunday 22:00 UTC." };
+return { success: true, message: "Order placed successfully", data: order };
+
+// ❌ WRONG — thrown errors are stripped in production builds
+throw new Error("Market is closed");
+```
+
+// Reason: Next.js strips Error.message in production Server Component renders.
+
+### Structure
+
+1. Validate inputs early — return error if invalid.
+2. `await connectToDatabase()` — always connect before any DB operation.
+3. Authenticate — verify the user session.
+4. Run business logic guards (market hours, restrictions, margin checks).
+5. Perform the operation inside a try/catch.
+6. Return `{ success, message/error, data? }`.
+7. Call `revalidatePath()` if the mutation affects a rendered page.
+
+### Naming
+
+- Files: `kebab-case.actions.ts` (e.g., `order.actions.ts`, `competition.actions.ts`).
+- Functions: `camelCase` verbs (e.g., `placeOrder`, `closePosition`, `enterCompetition`).
+
+## 📐 API Route Rules
+
+### Pattern
+
+```typescript
+export async function GET(req: NextRequest) {
+  try {
+    await connectToDatabase();
+    // ... logic
+    return NextResponse.json({ success: true, data });
+  } catch (error) {
+    console.error("❌ Route error:", error);
+    return NextResponse.json(
+      { success: false, error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+```
+
+### Auth
+
+- Main app: Uses `better-auth` — call `getAuth()` from `lib/better-auth/auth.ts` to get the session.
+- Admin app: Uses JWT-based auth — check via admin middleware (`apps/admin/middleware.ts`).
+- Public routes (landing, settings): No auth required — document clearly with a comment.
+
+### Response Format
+
+Always return consistent JSON:
+
+```typescript
+{ success: true, data: { ... } }           // Success
+{ success: false, error: "Human message" }  // Error
+```
+
+## 🔄 Mirroring: Main ↔ Admin
+
+Many server actions exist in **both** apps:
+
+| Main App | Admin App |
+|---|---|
+| `lib/actions/trading/order.actions.ts` | `apps/admin/lib/actions/trading/order.actions.ts` |
+| `lib/actions/trading/position.actions.ts` | `apps/admin/lib/actions/trading/position.actions.ts` |
+
+**When changing logic in one, check and update the other.**
+
+## 📁 Key API Route Groups
+
+| Path | Purpose |
+|---|---|
+| `app/api/trading/` | Candles, prices, positions, orders, PnL |
+| `app/api/competitions/` | Competition CRUD and entry |
+| `app/api/challenges/` | 1v1 challenge management |
+| `app/api/user/` | Profile, settings, stats |
+| `app/api/wallet/` | Deposits, withdrawals, balance |
+| `app/api/nuvei/` & `app/api/stripe/` & `app/api/paddle/` | Payment integrations |
+| `app/api/messaging/` | Chat and messaging system |
+| `app/api/settings/` | Public app settings (branding, SEO) |
+| `app/api/simulator/` | Paper trading simulator |
+| `app/api/fraud/` | Fraud detection and device tracking |
+| `app/api/kyc/` | KYC verification flow |
+
+## ⚠️ Common Pitfalls
+
+- **Never** expose internal error details to the client — log them server-side, return a generic message.
+- **Always** call `connectToDatabase()` — don't assume the connection is alive.
+- **Rate-limit sensitive endpoints** (login, registration, password reset).
+- **Validate all user inputs** — never trust client data.
+- Use `revalidatePath()` sparingly — only when the mutation affects a currently rendered page.

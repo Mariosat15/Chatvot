@@ -1,0 +1,118 @@
+# Snyk (https://snyk.io) policy file
+# This file documents accepted risks and false positives
+
+version: v1.25.0
+
+ignore:
+  # HIGH - Development-only JWT fallbacks (protected by production checks)
+  # These fallback secrets only work in development mode - production throws an error
+  SNYK-JS-JSONWEBTOKEN-3181154:
+    - "websocket-server/index.ts":
+        reason: "Dev-only fallback protected by NODE_ENV check - throws in production"
+        expires: "2027-01-01T00:00:00.000Z"
+    - "lib/services/messaging/websocket.service.ts":
+        reason: "Dev-only fallback protected by NODE_ENV check - returns null in production"
+        expires: "2027-01-01T00:00:00.000Z"
+    - "apps/admin/lib/admin/jwt-secret.ts":
+        reason: "Centralized JWT utility - throws in production if secret not set"
+        expires: "2027-01-01T00:00:00.000Z"
+
+  # HIGH - False positives: Field name mappings, NOT actual secrets
+  # These are database field names like "nodemailerPassword", not actual passwords
+  SNYK-CODE-HARDCODEDSECRET:
+    - "apps/admin/lib/services/settings.service.ts":
+        reason: "False positive - these are field NAME mappings like 'nodemailerPassword', not actual secrets"
+        expires: "2027-01-01T00:00:00.000Z"
+    - "lib/services/settings.service.ts":
+        reason: "False positive - these are field NAME mappings like 'nodemailerPassword', not actual secrets"
+        expires: "2027-01-01T00:00:00.000Z"
+  
+  # LOW - False positives: Audit log placeholders, NOT credentials
+  SNYK-CODE-HARDCODEDCREDENTIALS:
+    - "apps/admin/app/api/admin/reset-all-users/route.ts":
+        reason: "False positive - 'system@internal' is audit log placeholder for system actions, not a credential"
+        expires: "2027-01-01T00:00:00.000Z"
+    - "apps/admin/app/api/admin/reset-all-employees/route.ts":
+        reason: "False positive - 'system@internal' is audit log placeholder for system actions, not a credential"
+        expires: "2027-01-01T00:00:00.000Z"
+
+  # MEDIUM - HTTP intentional for internal service
+  SNYK-CODE-CLEARTEXT:
+    - "websocket-server/index.ts":
+        reason: "HTTP is intentional - server runs behind nginx which handles SSL termination"
+        expires: "2027-01-01T00:00:00.000Z"
+
+  # MEDIUM - Open Redirect false positives (URL validation already implemented)
+  SNYK-CODE-OPENREDIRECT:
+    - "components/kyc/KYCVerification.tsx":
+        reason: "URL validation implemented - checks HTTPS protocol before redirect"
+        expires: "2027-01-01T00:00:00.000Z"
+    - "components/trading/DepositModal.tsx":
+        reason: "URL validation implemented - checks HTTPS protocol before redirect"
+        expires: "2027-01-01T00:00:00.000Z"
+    - "components/wallet/BankAccountsSection.tsx":
+        reason: "URL validation implemented - checks HTTPS protocol before redirect"
+        expires: "2027-01-01T00:00:00.000Z"
+    - "apps/admin/components/admin/UpcomingPaymentsWidget.tsx":
+        reason: "URL validation implemented - checks protocol and uses noopener,noreferrer"
+        expires: "2027-01-01T00:00:00.000Z"
+    - "apps/admin/components/admin/VendorSubscriptionsSection.tsx":
+        reason: "URL validation implemented - checks protocol and uses noopener,noreferrer"
+        expires: "2027-01-01T00:00:00.000Z"
+
+  # MEDIUM - Prototype Pollution false positive (isSafeKey check implemented)
+  SNYK-CODE-PROTOTYPEPOLLUTION:
+    - "apps/admin/app/api/vendors/route.ts":
+        reason: "Protected by isSafeKey() check that filters __proto__, constructor, prototype"
+        expires: "2027-01-01T00:00:00.000Z"
+    - "apps/admin/components/admin/PaymentProvidersSection.tsx":
+        reason: "False positive - array indices from map(), not user-controlled keys"
+        expires: "2027-01-01T00:00:00.000Z"
+
+  # MEDIUM - XSS false positives (React useState values in controlled components)
+  # These are NOT user-controlled inputs - they're internal state managed by React
+  SNYK-CODE-DOMXSS:
+    - "app/enterprise/page.tsx":
+        reason: "React useState - admin-controlled href values, not user input"
+        expires: "2027-01-01T00:00:00.000Z"
+    - "app/landing/page-content.tsx":
+        reason: "React useState - internal state for navigation, not user input"
+        expires: "2027-01-01T00:00:00.000Z"
+    - "components/landing/sections/LeaderboardPreview.tsx":
+        reason: "React useState - displays database-sourced avatar URLs, sanitized at source"
+        expires: "2027-01-01T00:00:00.000Z"
+    - "components/profile/TradingArsenalSection.tsx":
+        reason: "Admin-controlled content from database"
+        expires: "2027-01-01T00:00:00.000Z"
+    - "apps/admin/components/admin/BadgeXPManagementSection.tsx":
+        reason: "Admin panel - admin-controlled badge images"
+        expires: "2027-01-01T00:00:00.000Z"
+    - "apps/admin/components/admin/MarketplaceSection.tsx":
+        reason: "Admin panel - admin-controlled marketplace images"
+        expires: "2027-01-01T00:00:00.000Z"
+    - "apps/admin/components/admin/PendingPaymentsSection.tsx":
+        reason: "Admin panel - internal payment data display"
+        expires: "2027-01-01T00:00:00.000Z"
+    - "app/(root)/messaging/MessagingClient.tsx":
+        reason: "User avatars from database - sanitized at upload/storage"
+        expires: "2027-01-01T00:00:00.000Z"
+    - "components/notifications/NotificationDropdown.tsx":
+        reason: "Internal notification links from backend, not user input"
+        expires: "2027-01-01T00:00:00.000Z"
+    - "apps/admin/components/admin/AuditLogSection.tsx":
+        reason: "Admin panel - CSV export functionality, not injection risk"
+        expires: "2027-01-01T00:00:00.000Z"
+    - "apps/admin/components/admin/FinancialDashboard.tsx":
+        reason: "Admin panel - CSV export functionality, not injection risk"
+        expires: "2027-01-01T00:00:00.000Z"
+    - "apps/admin/components/admin/TradingHistorySection.tsx":
+        reason: "Admin panel - CSV export functionality, not injection risk"
+        expires: "2027-01-01T00:00:00.000Z"
+    - "apps/admin/components/admin/InvoiceTemplateSection.tsx":
+        reason: "Admin panel - admin edits their own invoice template HTML"
+        expires: "2027-01-01T00:00:00.000Z"
+    - "test-complete-payment.html":
+        reason: "Test file only - not deployed to production"
+        expires: "2027-01-01T00:00:00.000Z"
+
+patch: {}

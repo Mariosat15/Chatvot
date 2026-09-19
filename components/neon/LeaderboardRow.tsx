@@ -1,0 +1,269 @@
+import { Crown, Medal, Trophy } from "lucide-react";
+import ProfileImage from "@/components/ui/ProfileImage";
+import {
+  NEON_ROW,
+  NEON_ROW_FLUSH,
+  NEON_ROW_FLUSH_LEADER,
+  NEON_ROW_FLUSH_PODIUM,
+  NEON_ROW_FLUSH_YOU,
+  NEON_ROW_PODIUM,
+  NEON_ROW_YOU,
+} from "@/components/neon/tokens";
+
+/**
+ * The leaderboard row pieces from the sheet's `TABLE ROW` block - the rank marker, the initials
+ * avatar and the row shell itself.
+ *
+ * ONLY THE PIECES ARE SHARED, NOT THE ROW. The two boards genuinely differ: a game board shows
+ * rank, player and one score, and a trading board shows account value, profit and loss, win
+ * rate and a trade count. One component taking both column sets would need a flag saying which
+ * game it is, which is the shape that makes a new game silently render as trading. Each board
+ * owns its own grid and borrows the marker, the avatar and the shell from here.
+ *
+ * THE ROW SHELL IS A FUNCTION OF THREE FACTS and the order they are tested in is the design.
+ * "This is you" wins over "this is the podium", because a player scanning a long board is
+ * looking for themselves first and the highlight is what they scan for; a podium tint that
+ * overrode it would hide the one row they came to read.
+ *
+ * ONE EXCEPTION, ON THE FLUSH BOARD ONLY, SINCE 11 SEPTEMBER 2026: the leader's row is framed
+ * in gold whoever they are, because the owner's leaderboard reference draws it that way with
+ * "You" sitting in it. The rule above loses nothing - the leader is the top row, the one place
+ * on a board nobody has to scan for, and the "you" marker is still written beside the name.
+ * The card form keeps its three states: it is what the trading lobby renders, and the trading
+ * board was not part of that request.
+ */
+
+export function neonRowClasses({
+  rank,
+  isCurrentUser,
+  variant = "card",
+}: {
+  rank: number;
+  isCurrentUser: boolean;
+  /**
+   * `card` is the sheet's tile - bordered, rounded, with a gap beneath it. `flush` is the same
+   * three states drawn as a table row, for a board long enough that the tiles are most of the
+   * panel. See the tokens for why both exist rather than one replacing the other.
+   */
+  variant?: "card" | "flush";
+}): string {
+  if (variant === "flush") {
+    if (rank === 1) return NEON_ROW_FLUSH_LEADER;
+    if (isCurrentUser) return NEON_ROW_FLUSH_YOU;
+    if (rank >= 1 && rank <= 3) return NEON_ROW_FLUSH_PODIUM;
+    return NEON_ROW_FLUSH;
+  }
+
+  if (isCurrentUser) return NEON_ROW_YOU;
+  if (rank >= 1 && rank <= 3) return NEON_ROW_PODIUM;
+  return NEON_ROW;
+}
+
+/**
+ * A medal for the top three and a plain number below that.
+ *
+ * The rank is rendered as given and is never derived from the row's position in the array.
+ * Ranking is decided once, server-side, by `calculateRankings` - which knows whether the game
+ * scores upward or downward - so a component that numbered its own rows would quietly disagree
+ * with the payout for every lower-is-better game.
+ */
+export function NeonRankBadge({
+  rank,
+  size = "md",
+  style = "medals",
+}: {
+  rank: number;
+  /**
+   * `sm` is for a dense board in a narrow rail. The plate shrinks; the marker does not change,
+   * because which players are marked is the information and it must read the same everywhere.
+   */
+  size?: "sm" | "md";
+  /**
+   * `medals` is the sheet's marker - a trophy and two medals for the paying positions, and what
+   * the trading board has always shown. `plates` is the owner's leaderboard reference of
+   * 11 September 2026: a gold crown for the leader and a blue numbered plate for everyone else,
+   * second and third included. It is an option rather than a replacement because the two say
+   * different things - the medals mark the three paying positions, the plates mark only the
+   * top - and swapping the trading board's marker was not asked for.
+   */
+  style?: "medals" | "plates";
+}) {
+  const plate = size === "sm" ? "h-7 w-7" : "h-8 w-8";
+  const glyph = size === "sm" ? "h-3.5 w-3.5" : "h-4 w-4";
+
+  if (style === "plates") {
+    if (rank === 1) {
+      return (
+        <span
+          className={`flex ${plate} items-center justify-center rounded-lg border border-[#FFC01B]/70 bg-[#FFB300]/20`}
+        >
+          <Crown className={`${glyph} text-[#FFD72D]`} />
+        </span>
+      );
+    }
+    return (
+      <span
+        className={`flex ${plate} items-center justify-center rounded-lg border border-[#1B7DFF]/50 bg-[#1B7DFF]/15 text-xs font-bold text-sky-200`}
+      >
+        {rank > 0 ? rank : "-"}
+      </span>
+    );
+  }
+
+  if (rank === 1) {
+    return (
+      <span
+        className={`flex ${plate} items-center justify-center rounded-lg border border-amber-500/40 bg-amber-500/15`}
+      >
+        <Trophy className={`${glyph} text-amber-300`} />
+      </span>
+    );
+  }
+
+  if (rank === 2) {
+    return (
+      <span
+        className={`flex ${plate} items-center justify-center rounded-lg border border-slate-400/40 bg-slate-400/15`}
+      >
+        <Medal className={`${glyph} text-slate-300`} />
+      </span>
+    );
+  }
+
+  if (rank === 3) {
+    return (
+      <span
+        className={`flex ${plate} items-center justify-center rounded-lg border border-orange-500/40 bg-orange-500/15`}
+      >
+        <Medal className={`${glyph} text-orange-300`} />
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className={`flex ${plate} items-center justify-center rounded-lg border border-[#1B2540] bg-[#080C18] text-xs font-bold text-gray-400`}
+    >
+      {rank > 0 ? rank : "-"}
+    </span>
+  );
+}
+
+/**
+ * The avatar beside a player's name: their picture when the caller supplies one, their
+ * initials when it does not.
+ *
+ * THIS USED TO SAY "INITIALS RATHER THAN A PROFILE PHOTO, DELIBERATELY", and the two reasons
+ * it gave are kept here because one of them is still a cost: fifty remote avatars is fifty
+ * requests on the screen a player refreshes most often, and a photo can put a face on a public
+ * board. On 11 September 2026 the owner ordered players' avatars shown on the standings, and
+ * the second reason turned out not to apply: the picture used is the one the platform's global
+ * leaderboard has published under `/leaderboard` all along (`profileImage || image`), so
+ * nothing is shown here that is not already shown there. The first is paid knowingly - the
+ * boards are capped at fifty rows, and the chip is drawn at a fixed size so an image arriving
+ * late changes nothing around it.
+ *
+ * `src` is optional and the caller decides whether to pass it. A board that has not looked a
+ * picture up renders initials for everybody, which is the honest rendering of "I do not know",
+ * rather than a broken image for everybody.
+ *
+ * The look is the owner's reference: a round chip with a cyan ring over a violet-to-blue
+ * gradient, which is also what the initials sit on when there is no picture - so a board where
+ * half the players have photos and half do not still reads as one set of chips.
+ */
+export function NeonAvatar({
+  name,
+  size = "md",
+  src,
+}: {
+  name: string;
+  /**
+   * `xs` is the arena band's compact feed - a 20px chip in a 22px row.
+   *
+   * IT KEEPS THE 2px RING, which is the only decision here worth a sentence. Thinning the
+   * border to `border` at this size is the obvious tidy-up and it costs the chip its identity:
+   * the ring is what makes an avatar read as an avatar rather than as a coloured dot, and at
+   * 20px the dot reading is one hairline away.
+   */
+  size?: "xs" | "sm" | "md";
+  src?: string | null;
+}) {
+  const initials =
+    name
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((part) => part.charAt(0))
+      .join("")
+      .toUpperCase() || "?";
+
+  const chipSize =
+    size === "xs"
+      ? "h-5 w-5 text-[8px]"
+      : size === "sm"
+        ? "h-7 w-7 text-[10px]"
+        : "h-8 w-8 text-[11px]";
+
+  const chip = `${chipSize} shrink-0 rounded-full border-2 border-[#32C2FF] bg-gradient-to-br from-[#811AF4] to-[#0C96DB] font-bold text-white`;
+
+  if (src) {
+    return (
+      <ProfileImage
+        src={src}
+        alt=""
+        fallbackLetter={initials}
+        size="sm"
+        className={chip}
+        // Reason: a truthy value, or `ProfileImage` substitutes its own primary-tinted fallback
+        // shell over the chip's gradient when the picture fails to load.
+        fallbackClassName="text-white"
+      />
+    );
+  }
+
+  return (
+    <span className={`flex ${chip} items-center justify-center`}>{initials}</span>
+  );
+}
+
+/** The player's name, with the "you" marker and the leader's crown the sheet draws. */
+export function NeonPlayerName({
+  name,
+  isCurrentUser,
+  isLeader = false,
+  showYouMarker = true,
+}: {
+  name: string;
+  isCurrentUser: boolean;
+  isLeader?: boolean;
+  /**
+   * The word `you` after the name. Optional since 11 September 2026, on the owner's fifth
+   * leaderboard reference, which draws a ranking table with no badges in it at all.
+   *
+   * TURNING IT OFF LOSES NOTHING, which is the test for removing furniture rather than hiding
+   * information: `isCurrentUser` also tints the name sky, and that tint is on the name itself
+   * rather than beside it, so it survives on the leader's gold row where a row tint could not.
+   * The default is `true` so the boards that have always drawn it are untouched.
+   */
+  showYouMarker?: boolean;
+}) {
+  return (
+    <span className="flex min-w-0 items-center gap-1.5">
+      <span
+        className={`truncate text-sm font-medium ${
+          isCurrentUser ? "text-sky-200" : "text-gray-200"
+        }`}
+      >
+        {name}
+      </span>
+      {isLeader && (
+        <Crown className="h-3.5 w-3.5 shrink-0 text-amber-300" />
+      )}
+      {isCurrentUser && showYouMarker && (
+        <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-sky-400">
+          you
+        </span>
+      )}
+    </span>
+  );
+}
