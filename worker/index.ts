@@ -12,6 +12,7 @@
  * - competition-end: Check for expired competitions (every 1 minute)
  * - challenge-finalize: Check for expired challenges (every 1 minute)
  * - round-reconciliation: Poll lost provider results / apply unresolved policy (every 1 minute)
+ * - provider-kill-switch: Auto-disable providers down >15 min (every 1 minute)
  * - trade-queue: Process limit orders (every 1 minute) — TP/SL handled by real-time service
  * - evaluate-badges: Evaluate user badges (every 1 hour)
  * (price-cache REMOVED — WEB app WebSocket writes prices to PriceCache)
@@ -41,6 +42,7 @@ import { runMarginCheck } from "./jobs/margin-check.job";
 import { runCompetitionEndCheck } from "./jobs/competition-end.job";
 import { runChallengeFinalizeCheck } from "./jobs/challenge-finalize.job";
 import { runRoundReconciliationCheck } from "./jobs/round-reconciliation.job";
+import { runProviderKillSwitchCheck } from "./jobs/provider-kill-switch.job";
 import { runTradeQueueProcessor } from "./jobs/trade-queue.job";
 // NOTE: price-cache job REMOVED — WebSocket streamer already writes prices every 1s.
 // The worker's price-cache job was redundant (external API call + ~33 upserts/minute duplicating
@@ -220,6 +222,35 @@ agenda.define("round-reconciliation", async () => {
     }
   } catch (error) {
     console.error(`🔁 [ROUND RECONCILIATION] Failed:`, error);
+  }
+});
+
+/**
+ * Provider Kill Switch Job (X9 / E7)
+ * Disables new contests/rounds for a provider that has been down >15 minutes.
+ */
+agenda.define("provider-kill-switch", async () => {
+  try {
+    const result = await runProviderKillSwitchCheck();
+
+    if (
+      result.disabled > 0 ||
+      result.alerts > 0 ||
+      result.errors.length > 0
+    ) {
+      console.log(
+        `🛑 [PROVIDER KILL SWITCH] examined=${result.examined} updated=${result.updated} disabled=${result.disabled} alerts=${result.alerts} skipped=${result.skipped}`,
+      );
+    }
+
+    if (result.errors.length > 0) {
+      console.error(
+        `🛑 [PROVIDER KILL SWITCH] Errors: ${result.errors.length}`,
+      );
+      result.errors.forEach((e) => console.error(`     - ${e}`));
+    }
+  } catch (error) {
+    console.error(`🛑 [PROVIDER KILL SWITCH] Failed:`, error);
   }
 });
 
@@ -467,6 +498,7 @@ async function startWorker(): Promise<void> {
     await agenda.every("1 minute", "competition-end");
     await agenda.every("1 minute", "challenge-finalize");
     await agenda.every("1 minute", "round-reconciliation");
+    await agenda.every("1 minute", "provider-kill-switch");
     await agenda.every("1 minute", "early-end-check");
     await agenda.every("1 minute", "trade-queue");
     // price-cache REMOVED — redundant with WEB app's WebSocket PriceCache writes

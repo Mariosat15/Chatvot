@@ -466,8 +466,9 @@ describe("structural guards", () => {
   });
 
   it("neither the service nor the panel reads the stored health field", () => {
-    // THE DEFECT THIS PINS: `healthStatus` defaults to "down" and has no writer, so any
-    // read of it renders a working provider as permanently down.
+    // THE DEFECT THIS PINS: `healthStatus` defaults to "down". The X9 kill-switch worker
+    // WRITES it, but the admin health dashboard must still DERIVE its verdict — reading the
+    // stored default would paint every quiet provider red. lastHealthCheckAt is the same.
     expect(readCode(SERVICE)).not.toMatch(/\.healthStatus/);
     expect(readCode(PANEL)).not.toMatch(/\.healthStatus|lastHealthCheckAt/);
   });

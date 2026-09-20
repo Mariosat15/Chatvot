@@ -35,6 +35,19 @@ export interface IGameProvider extends Document {
   };
   healthStatus: "healthy" | "degraded" | "down";
   lastHealthCheckAt?: Date;
+  /**
+   * When the provider first entered `healthStatus: "down"` continuously.
+   * Cleared on recovery. The automatic kill switch (07 s3.3) disables new
+   * contests/rounds after this has been set for more than 15 minutes.
+   * Absent means "not currently in a sustained down state".
+   */
+  healthDownSince?: Date;
+  /**
+   * Consecutive minute probes that observed failure evidence. Three → degraded;
+   * further sustained failure → down. Reset on a healthy probe. Written by the
+   * X9 kill-switch worker; the admin health screen still DERIVES its verdict.
+   */
+  healthFailureStreak: number;
   lastCatalogueSyncAt?: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -87,6 +100,10 @@ const GameProviderSchema = new Schema<IGameProvider>(
     // checked has not been shown to work, and the chapter 07 section 3 kill switch keys
     // off this value. Defaulting to healthy would let an unverified provider straight
     // past a guard whose whole purpose is to stop that.
+    //
+    // Written by the X9 kill-switch worker (`provider-kill-switch.service.ts`). The admin
+    // health dashboard still DERIVES its verdict from rounds/events and must not read
+    // this field — a stale "down" default would paint every quiet provider red.
     healthStatus: {
       type: String,
       enum: ["healthy", "degraded", "down"],
@@ -94,6 +111,14 @@ const GameProviderSchema = new Schema<IGameProvider>(
     },
     lastHealthCheckAt: {
       type: Date,
+    },
+    healthDownSince: {
+      type: Date,
+    },
+    healthFailureStreak: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
     lastCatalogueSyncAt: {
       type: Date,

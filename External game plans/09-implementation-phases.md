@@ -586,8 +586,12 @@ on the grounds that a component is heavily used, grep for its importer.**
   the player. **Same day:** a live round whose competition/challenge row is missing
   is **voided once** (not skip+alert forever). Say schedule code-complete, not E7/X9 done.
 - Provider health checks and automatic degradation — **health dashboard BUILT (X6)**;
-  **automatic degradation that acts is still owed**
-- Automatic kill switch after sustained downtime — **owed**
+  **automatic degradation that WRITES status + acts BUILT 20 Sep 2026** (X9 slice 2:
+  `provider-kill-switch.service.ts`). Admin health still derives; stored fields are
+  for the worker only.
+- Automatic kill switch after sustained downtime — **BUILT 20 Sep 2026** (X9 slice 2).
+  15 minutes continuously `down` → `enabled: false` + `provider_kill_switch` alert.
+  Idle (`no_evidence`) does not kill. Manual disable already existed under X6.
 - Pause and extend on outage — **manual pause/extend BUILT (X6)**; **outage-driven
   auto pause+extend owed**
 - Every alert from `06` section 10 — **partial** (unresolved-past-grace now fires

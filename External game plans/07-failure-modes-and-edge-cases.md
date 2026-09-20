@@ -230,6 +230,16 @@ their scores, and the contest completes late rather than not at all.
 
 ### 3.3 The automatic kill switch
 
+> **BUILT 20 September 2026 (X9 slice 2).** `lib/services/game-providers/provider-kill-switch.service.ts`
+> on Agenda every minute. Evidence from recent rounds/events; three consecutive failures →
+> `degraded`; five → `down` with `healthDownSince`; after 15 minutes continuously down,
+> `enabled: false` on both `GameProvider` and `WhiteLabel.gameProviders`, plus a critical
+> `provider_kill_switch` SecurityAlert. Idle providers (`no_evidence`) do not accumulate
+> streak. Admin health dashboard still **derives** its verdict and must not read the stored
+> `healthStatus` (default `"down"` would paint every quiet provider red). Manual disable
+> already existed (`setProviderEnabled`). Say kill-switch code-complete, not E7/X9 done —
+> outage pause/extend, full `06` s10 monitors and re-settle remain.
+
 If a provider is `down` for more than 15 minutes, automatically disable **new**
 contest creation and new round creation for that provider, and notify admins. Live
 contests continue under the rules above.
