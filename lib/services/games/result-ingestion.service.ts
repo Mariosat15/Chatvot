@@ -19,6 +19,7 @@ import {
   safeEqual,
   verifyCallbackSignature,
 } from "./callback-verification";
+import { voidIngestSecurityAlerts } from "./provider-ingest-alerts";
 
 /**
  * THE ONLY WAY A PROVIDER SCORE ENTERS THIS SYSTEM (X3, chapter 02 section 10 rule 3).
@@ -183,6 +184,11 @@ export async function ingestProviderCallback(
       error: "Bearer token mismatch.",
       signatureValid: false,
     });
+    voidIngestSecurityAlerts({
+      providerKey,
+      result: "signature_invalid",
+      eventId,
+    });
     return {
       accepted: false,
       result: "signature_invalid",
@@ -217,6 +223,11 @@ export async function ingestProviderCallback(
       error: "HMAC mismatch.",
       signatureValid: false,
     });
+    voidIngestSecurityAlerts({
+      providerKey,
+      result: "signature_invalid",
+      eventId,
+    });
     return {
       accepted: false,
       result: "signature_invalid",
@@ -248,6 +259,11 @@ export async function ingestProviderCallback(
       result: "signature_invalid",
       error: `Adapter rejected the callback: ${adapterVerdict.reason}`,
       signatureValid: false,
+    });
+    voidIngestSecurityAlerts({
+      providerKey,
+      result: "signature_invalid",
+      eventId,
     });
     return {
       accepted: false,
@@ -422,6 +438,13 @@ export async function applyResult(args: {
       roundId: round.roundId,
       signatureValid: true,
     });
+    voidIngestSecurityAlerts({
+      providerKey: round.providerKey,
+      result: "score_out_of_range",
+      eventId,
+      roundId: round.roundId,
+      scoreOutOfRange: true,
+    });
     return {
       accepted: false,
       result: "score_out_of_range",
@@ -445,6 +468,16 @@ export async function applyResult(args: {
   round.resultReceivedAt = new Date();
   round.resultSource = source;
   await round.save();
+
+  if (round.integrityFlags && round.integrityFlags.length > 0) {
+    voidIngestSecurityAlerts({
+      providerKey: round.providerKey,
+      result: "scored",
+      eventId,
+      roundId: round.roundId,
+      integrityFlags: round.integrityFlags,
+    });
+  }
 
   // ── GATE 11b: carry the score up to the participant, where ranking reads it ────────────
   //

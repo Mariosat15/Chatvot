@@ -92,6 +92,9 @@ export async function call<T>(options: CallOptions): Promise<ProviderResult<T>> 
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  // Reason: chapter 06 s10 "Provider latency p95 > 5s". Measured here — the only place
+  // every adapter HTTP call passes through — and stamped onto the round at create time.
+  const startedAt = Date.now();
 
   let response: Response;
   let text: string;
@@ -107,6 +110,7 @@ export async function call<T>(options: CallOptions): Promise<ProviderResult<T>> 
     });
     text = await response.text();
   } catch (error) {
+    const latencyMs = Date.now() - startedAt;
     const timedOut = error instanceof Error && error.name === "AbortError";
     return {
       success: false,
@@ -115,10 +119,13 @@ export async function call<T>(options: CallOptions): Promise<ProviderResult<T>> 
         : "Provider is unreachable.",
       code: timedOut ? "PROVIDER_TIMEOUT" : "PROVIDER_UNREACHABLE",
       retryable: true,
+      latencyMs,
     };
   } finally {
     clearTimeout(timer);
   }
+
+  const latencyMs = Date.now() - startedAt;
 
   if (!response.ok) {
     let parsed: ProviderErrorBody = {};
@@ -138,11 +145,12 @@ export async function call<T>(options: CallOptions): Promise<ProviderResult<T>> 
         `Provider returned HTTP ${response.status}.`,
       code: parsed.error?.code ?? `HTTP_${response.status}`,
       retryable: retryableFor(response.status, parsed.error?.retryable),
+      latencyMs,
     };
   }
 
   try {
-    return { success: true, data: JSON.parse(text) as T };
+    return { success: true, data: JSON.parse(text) as T, latencyMs };
   } catch {
     return {
       success: false,
@@ -151,6 +159,7 @@ export async function call<T>(options: CallOptions): Promise<ProviderResult<T>> 
       // Retryable: a truncated response is far more often a transient fault than a permanent
       // one, and the alternative loses a round that may well have been created.
       retryable: true,
+      latencyMs,
     };
   }
 }

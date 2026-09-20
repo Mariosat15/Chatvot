@@ -73,8 +73,15 @@ export type ProviderRoundStatus =
  * the HTTP status.
  */
 export type ProviderResult<T> =
-  | { success: true; data: T }
-  | { success: false; error: string; code?: string; retryable?: boolean };
+  | { success: true; data: T; /** Wall-clock ms for the HTTP round-trip, when measured. */ latencyMs?: number }
+  | {
+      success: false;
+      error: string;
+      code?: string;
+      retryable?: boolean;
+      /** Wall-clock ms until failure/timeout, when measured. */
+      latencyMs?: number;
+    };
 
 /**
  * One title as the catalogue reports it, already normalised to our vocabulary.

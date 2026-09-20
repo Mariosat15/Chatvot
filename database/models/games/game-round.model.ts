@@ -59,6 +59,11 @@ export interface IGameRound extends Document {
   startedAt?: Date;
   completedAt?: Date;
   durationMs?: number;
+  /**
+   * Wall-clock ms for the provider createRound HTTP call (chapter 06 s10 latency).
+   * Absent on rounds created before X9 monitors, or when the adapter did not measure.
+   */
+  providerCreateLatencyMs?: number;
   expiresAt: Date;
   launchUrlExpiresAt?: Date;
   replayUrl?: string;
@@ -191,6 +196,8 @@ const GameRoundSchema = new Schema<IGameRound>(
     startedAt: { type: Date },
     completedAt: { type: Date },
     durationMs: { type: Number },
+    // Reason: chapter 06 s10 provider latency p95. Stamped at createRound success only.
+    providerCreateLatencyMs: { type: Number },
     // Reason: always at or before the contest's play window end (chapter 07 section 4).
     // A round that can outlive its contest is a score that arrives after settlement.
     expiresAt: { type: Date, required: true },

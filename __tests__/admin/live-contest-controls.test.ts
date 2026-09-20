@@ -119,6 +119,8 @@ const ADMIN = "apps/admin";
 const LIST_ROUTE = `${ADMIN}/app/api/competitions/route.ts`;
 const CRUD_ROUTE = `${ADMIN}/app/api/competitions/[id]/route.ts`;
 const PAUSE_ROUTE = `${ADMIN}/app/api/competitions/[id]/pause/route.ts`;
+const PAUSE_SERVICE = "lib/services/games/contest-pause.service.ts";
+const ADMIN_PAUSE_SERVICE = `${ADMIN}/lib/services/games/contest-pause.service.ts`;
 const CANCEL_ROUTE = `${ADMIN}/app/api/competitions/[id]/cancel/route.ts`;
 const EMERGENCY_ROUTE = `${ADMIN}/app/api/competitions/[id]/emergency-cancel/route.ts`;
 const ADJUST_ROUTE = `${ADMIN}/app/api/competitions/[id]/adjust-results/route.ts`;
@@ -385,8 +387,11 @@ describe("resume extends the play window, not only the end time", () => {
       short, so a two-hour pause simply consumed two hours of their playing time.
 
       It reads as correct because the field the code extends is the one called "end".
+
+      As of X9 the math lives in `contest-pause.service.ts` (shared with the outage worker),
+      not in the admin route. The route is a thin wrapper; re-aiming here is the property.
     */
-    const source = code(PAUSE_ROUTE);
+    const source = code(PAUSE_SERVICE);
     expect(source).toMatch(/competition\.playWindowEnd\s*=/);
     expect(source).toMatch(/playWindowEnd\)\.getTime\(\)\s*\+\s*pauseDuration/);
   });
@@ -394,16 +399,22 @@ describe("resume extends the play window, not only the end time", () => {
   it("moves playWindowStart ONLY while it is still in the future", () => {
     // Shifting a window that has already opened would re-close it, refusing play that was
     // legitimately available a moment earlier - worse than not compensating at all.
-    const source = code(PAUSE_ROUTE);
-    const startBlock = source.match(
-      /if\s*\(\s*\n?\s*competition\.playWindowStart\s*&&[\s\S]*?\n\s{6}\}/,
-    );
-    expect(startBlock).not.toBeNull();
-    expect(startBlock![0]).toMatch(/>\s*now/);
+    const source = code(PAUSE_SERVICE);
+    const startIdx = source.indexOf("competition.playWindowStart &&");
+    expect(startIdx).toBeGreaterThan(-1);
+    const block = source.slice(startIdx, startIdx + 280);
+    expect(block).toMatch(/>\s*now/);
+    expect(block).toMatch(/playWindowStart\s*=/);
   });
 
   it("returns both window fields, so an operator can see the compensation landed", () => {
+    // GET status still surfaces them; the service return type carries them too.
     expect(code(PAUSE_ROUTE)).toMatch(/playWindowEnd:\s*competition\.playWindowEnd/);
+    expect(code(PAUSE_SERVICE)).toMatch(/playWindowEnd:\s*competition\.playWindowEnd/);
+  });
+
+  it("keeps the admin and main pause services byte-identical", () => {
+    expect(code(PAUSE_SERVICE)).toBe(code(ADMIN_PAUSE_SERVICE));
   });
 });
 
@@ -417,19 +428,24 @@ describe("the pause notification does not say trading for a game", () => {
       Derived through the same helper the list and edit paths use. A caller-supplied game type
       would be a way to change what a player is told about a contest, which is the same rule
       that stops the market-hours gate taking its deciding value from a request.
+
+      The route still derives and passes `activityNoun`; the service also falls back from
+      stored `gameType` when the caller omits it (outage worker).
     */
     const source = code(PAUSE_ROUTE);
     expect(source).toMatch(/hasProviderGameLabel\(\s*competition\s*\)/);
     expect(source).toMatch(/isProviderGame\s*\?\s*"Play"\s*:\s*"Trading"/);
+    expect(code(PAUSE_SERVICE)).toMatch(/activityNounFor/);
   });
 
   it("uses the noun in both the pause and the resume message", () => {
-    const source = code(PAUSE_ROUTE);
-    const uses = source.match(/\$\{activityNoun\}/g) ?? [];
+    const source = code(PAUSE_SERVICE);
+    const uses = source.match(/\$\{noun\}/g) ?? [];
     expect(uses.length).toBe(2);
   });
 
   it("has no remaining hard-coded 'Trading is' in a player-facing message", () => {
+    expect(code(PAUSE_SERVICE)).not.toMatch(/Trading is (temporarily suspended|now active)/);
     expect(code(PAUSE_ROUTE)).not.toMatch(/Trading is (temporarily suspended|now active)/);
   });
 });

@@ -148,7 +148,8 @@ export function nextHealthState(input: {
   return { streak, healthStatus, healthDownSince };
 }
 
-async function loadEvidence(
+/** Recent round/event counts for one provider. Exported for the outage pause sibling. */
+export async function loadProviderEvidence(
   providerKey: string,
   since: Date,
 ): Promise<Parameters<typeof classifyProviderEvidence>[0]> {
@@ -179,6 +180,13 @@ async function loadEvidence(
     signatureInvalid: eventCount("signature_invalid"),
     scored: eventCount("scored"),
   };
+}
+
+async function loadEvidence(
+  providerKey: string,
+  since: Date,
+): Promise<Parameters<typeof classifyProviderEvidence>[0]> {
+  return loadProviderEvidence(providerKey, since);
 }
 
 /**

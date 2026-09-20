@@ -28,6 +28,16 @@ export type SecurityAlertType =
   // Reason: chapter 07 s3.3 — automatic kill switch after sustained provider downtime.
   // Add-only; documents may store it.
   | "provider_kill_switch"
+  // Reason: chapter 06 s10 threshold monitors (X9). Add-only; never remove — documents may store.
+  | "provider_signature_invalid"
+  | "contest_stuck_finalizing"
+  | "prize_pool_mismatch"
+  | "provider_callback_failure_rate"
+  | "provider_latency_high"
+  | "provider_score_out_of_range"
+  | "provider_integrity_flag"
+  | "repeat_challenge_pairing"
+  | "catalogue_sync_stale"
   | "other";
 
 export type SecurityAlertSeverity = "low" | "medium" | "high" | "critical";
@@ -78,6 +88,15 @@ const SecurityAlertSchema = new Schema<ISecurityAlert>(
         "rate_limit_exceeded",
         "round_unresolved",
         "provider_kill_switch",
+        "provider_signature_invalid",
+        "contest_stuck_finalizing",
+        "prize_pool_mismatch",
+        "provider_callback_failure_rate",
+        "provider_latency_high",
+        "provider_score_out_of_range",
+        "provider_integrity_flag",
+        "repeat_challenge_pairing",
+        "catalogue_sync_stale",
         "other",
       ],
       index: true,

@@ -593,9 +593,11 @@ on the grounds that a component is heavily used, grep for its importer.**
   15 minutes continuously `down` → `enabled: false` + `provider_kill_switch` alert.
   Idle (`no_evidence`) does not kill. Manual disable already existed under X6.
 - Pause and extend on outage — **manual pause/extend BUILT (X6)**; **outage-driven
-  auto pause+extend owed**
-- Every alert from `06` section 10 — **partial** (unresolved-past-grace now fires
-  from the scheduled net; threshold monitors still owed)
+  auto pause+extend BUILT 20 Sep 2026** (X9 slice 3: `provider-outage-pause.service.ts`
+  + shared `contest-pause.service.ts`). System marker `system:provider-outage`;
+  manual pauses never auto-resumed; recovery probes even when kill-switched off.
+- Every alert from `06` section 10 — **BUILT 20 Sep 2026** (X9 slice 4). Threshold
+  job + ingest-time alerts + `round_unresolved` from the scheduled net. Deduped.
 - Admin health dashboard — **BUILT (X6)**
 - Re-settlement capability — **owed** (adjust-results exists; dedicated re-settle does not)
 

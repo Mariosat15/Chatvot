@@ -3,14 +3,20 @@ import { guardSection } from "@/lib/admin/section-route-guard";
 import { hasProviderGameLabel } from "@/lib/admin/contest-game-label";
 import { connectToDatabase } from "@/database/mongoose";
 import Competition from "@/database/models/trading/competition.model";
-import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
-import { notificationService } from "@/lib/services/notification.service";
+import {
+  pauseContest,
+  resumeContest,
+} from "@/lib/services/games/contest-pause.service";
 
 /**
  * POST /api/competitions/[id]/pause
  * Pause or resume an active competition
  *
  * Body: { action: 'pause' | 'resume', reason?: string }
+ *
+ * THE FIELD UPDATES AND EXTEND MATH live in `contest-pause.service.ts` (mirrored),
+ * so the X9 outage worker and this route cannot drift. This file keeps auth,
+ * request parsing, and the activity-noun derivation from the stored label.
  *
  * TWO THINGS WERE WRONG HERE UNTIL 7 SEPTEMBER 2026, and the second is the interesting one.
  *
@@ -48,8 +54,9 @@ export async function POST(
 
     await connectToDatabase();
 
-    // Find the competition
-    const competition = await Competition.findById(id);
+    const competition = await Competition.findById(id).select(
+      "name gameType status",
+    );
     if (!competition) {
       return NextResponse.json(
         { error: "Competition not found" },
@@ -57,200 +64,79 @@ export async function POST(
       );
     }
 
-    // Only active competitions can be paused/resumed
-    if (competition.status !== "active") {
-      return NextResponse.json(
-        {
-          error: `Cannot ${action} a competition with status: ${competition.status}. Only active competitions can be paused/resumed.`,
-        },
-        { status: 400 },
-      );
-    }
-
-    const now = new Date();
-
     /*
       WHAT THE PLAYER IS TOLD, which must not say "trading" for a game with no market.
-      X6.5 is the wording pass; this one cannot wait for it, because the notification is
-      generated here and sent immediately, and a puzzle player told "trading is suspended" has
-      been handed a sentence about a product they did not buy.
-
       Derived from the stored label via the same helper the list and edit paths use - never
-      from caller input, for the same reason the market-hours capability gate is not allowed
-      to take its deciding value from a request. An unlabelled contest resolves to trading,
-      which is invariant 5 and is correct for every existing row.
+      from caller input.
     */
     const isProviderGame = hasProviderGameLabel(competition);
     const activityNoun = isProviderGame ? "Play" : "Trading";
 
     if (action === "pause") {
-      // Check if already paused
-      if (competition.isPaused) {
-        return NextResponse.json(
-          { error: "Competition is already paused" },
-          { status: 400 },
-        );
-      }
-
-      if (!reason) {
-        return NextResponse.json(
-          { error: "Pause reason is required" },
-          { status: 400 },
-        );
-      }
-
-      // Pause the competition
-      competition.isPaused = true;
-      competition.pausedAt = now;
-      competition.pauseReason = reason;
-
-      // Add to pause history
-      if (!competition.pauseHistory) {
-        competition.pauseHistory = [];
-      }
-      competition.pauseHistory.push({
-        pausedAt: now,
-        reason,
-        pausedBy: admin.id,
-      });
-
-      await competition.save();
-
-      // Notify all participants
-      const participants = await CompetitionParticipant.find({
+      const result = await pauseContest({
         competitionId: id,
-        status: { $in: ["active", "joined"] },
-      }).select("userId");
-
-      for (const participant of participants) {
-        await notificationService.createCustom({
-          userId: participant.userId.toString(),
-          type: "competition_paused",
-          title: "⏸️ Competition Paused",
-          message: `${competition.name} has been paused. ${activityNoun} is temporarily suspended. Reason: ${reason}`,
-          icon: "pause-circle",
-          category: "trading",
-          priority: "urgent",
-          color: "yellow",
-        });
+        reason: reason ?? "",
+        pausedBy: admin.id,
+        activityNoun,
+      });
+      if (!result.success) {
+        const status =
+          result.code === "not_found"
+            ? 404
+            : result.code === "reason_required" ||
+                result.code === "already_paused" ||
+                result.code === "not_active"
+              ? 400
+              : 400;
+        return NextResponse.json({ error: result.error }, { status });
       }
 
       console.log(
-        `⏸️ [Competition] Paused: ${competition.name} (${id}) - Reason: ${reason}`,
+        `⏸️ [Competition] Paused: ${result.name} (${id}) - Reason: ${result.pauseReason}`,
       );
 
       return NextResponse.json({
         success: true,
         message: "Competition paused successfully",
         competition: {
-          id: competition._id,
-          name: competition.name,
-          isPaused: competition.isPaused,
-          pausedAt: competition.pausedAt,
-          pauseReason: competition.pauseReason,
-        },
-      });
-    } else if (action === "resume") {
-      // Check if actually paused
-      if (!competition.isPaused) {
-        return NextResponse.json(
-          { error: "Competition is not paused" },
-          { status: 400 },
-        );
-      }
-
-      // Calculate pause duration
-      const pausedAt = competition.pausedAt || now;
-      const pauseDuration = now.getTime() - pausedAt.getTime();
-
-      // Update the competition
-      competition.isPaused = false;
-      competition.pauseReason = undefined;
-
-      // Add pause duration to total
-      competition.totalPauseDuration =
-        (competition.totalPauseDuration || 0) + pauseDuration;
-
-      // Extend end time by pause duration to maintain fair competition time
-      const currentEndTime = new Date(competition.endTime);
-      competition.endTime = new Date(currentEndTime.getTime() + pauseDuration);
-
-      /*
-        AND THE PLAY WINDOW, because for a provider contest `endTime` is not what gates play.
-        `createRound` enforces `playWindowEnd`; the launch service enforces `playWindowStart`.
-        Extending only `endTime` gave the fairness compensation to trading and silently
-        withheld it from every provider game - the contest ran longer while the window players
-        actually play inside stayed exactly as short, so a two-hour pause simply consumed two
-        hours of their playing time. No error, and it reads as correct because the field the
-        code extends is the one called "end".
-
-        `playWindowStart` moves only while it is still in the future. Shifting a window that
-        has already opened would re-close it, refusing play that was legitimately available a
-        moment earlier - which is worse than not compensating at all.
-      */
-      if (competition.playWindowEnd) {
-        competition.playWindowEnd = new Date(
-          new Date(competition.playWindowEnd).getTime() + pauseDuration,
-        );
-      }
-      if (
-        competition.playWindowStart &&
-        new Date(competition.playWindowStart) > now
-      ) {
-        competition.playWindowStart = new Date(
-          new Date(competition.playWindowStart).getTime() + pauseDuration,
-        );
-      }
-
-      // Update pause history
-      if (competition.pauseHistory && competition.pauseHistory.length > 0) {
-        const lastPause =
-          competition.pauseHistory[competition.pauseHistory.length - 1];
-        if (!lastPause.resumedAt) {
-          lastPause.resumedAt = now;
-          lastPause.duration = pauseDuration;
-          lastPause.resumedBy = admin.id;
-        }
-      }
-
-      await competition.save();
-
-      // Notify all participants
-      const participants = await CompetitionParticipant.find({
-        competitionId: id,
-        status: { $in: ["active", "joined"] },
-      }).select("userId");
-
-      for (const participant of participants) {
-        await notificationService.createCustom({
-          userId: participant.userId.toString(),
-          type: "competition_resumed",
-          title: "▶️ Competition Resumed",
-          message: `${competition.name} has been resumed. ${activityNoun} is now active again. End time extended by ${Math.round(pauseDuration / 60000)} minutes.`,
-          icon: "play-circle",
-          category: "trading",
-          priority: "high",
-          color: "green",
-        });
-      }
-
-      console.log(
-        `▶️ [Competition] Resumed: ${competition.name} (${id}) - Paused for ${Math.round(pauseDuration / 60000)} minutes`,
-      );
-
-      return NextResponse.json({
-        success: true,
-        message: "Competition resumed successfully",
-        competition: {
-          id: competition._id,
-          name: competition.name,
-          isPaused: competition.isPaused,
-          totalPauseDuration: competition.totalPauseDuration,
-          newEndTime: competition.endTime,
-          pauseDuration,
+          id: result.competitionId,
+          name: result.name,
+          isPaused: result.isPaused,
+          pausedAt: result.pausedAt,
+          pauseReason: result.pauseReason,
         },
       });
     }
+
+    const result = await resumeContest({
+      competitionId: id,
+      resumedBy: admin.id,
+      activityNoun,
+    });
+    if (!result.success) {
+      const status = result.code === "not_found" ? 404 : 400;
+      return NextResponse.json({ error: result.error }, { status });
+    }
+
+    console.log(
+      `▶️ [Competition] Resumed: ${result.name} (${id}) - Paused for ${Math.round(result.pauseDurationMs / 60000)} minutes`,
+    );
+
+    return NextResponse.json({
+      success: true,
+      message: "Competition resumed successfully",
+      competition: {
+        id: result.competitionId,
+        name: result.name,
+        isPaused: result.isPaused,
+        totalPauseDuration: result.totalPauseDuration,
+        newEndTime: result.endTime,
+        pauseDuration: result.pauseDurationMs,
+        // Reason: operator confirmation that the play-window compensation landed (R41).
+        playWindowStart: result.playWindowStart,
+        playWindowEnd: result.playWindowEnd,
+      },
+    });
   } catch (error) {
     console.error("Error in competition pause/resume:", error);
     return NextResponse.json(

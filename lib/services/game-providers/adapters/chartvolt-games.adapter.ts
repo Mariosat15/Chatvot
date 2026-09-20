@@ -384,7 +384,7 @@ export class ChartVoltGamesAdapter implements GameProviderAdapter {
       if (!Number.isNaN(parsed.getTime())) created.launchUrlExpiresAt = parsed;
     }
 
-    return { success: true, data: created };
+    return { success: true, data: created, latencyMs: response.latencyMs };
   }
 
   async fetchRound(

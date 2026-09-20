@@ -244,18 +244,26 @@ the existing financial reconciliation already sets.
 
 ## 10. Monitoring and alerts
 
-| Alert | Threshold | Severity |
-|---|---|---|
-| Invalid signature received | Any occurrence | **Critical** - either an attack or a broken deployment |
-| Round unresolved past its grace period | Any occurrence | **Critical** - money is waiting |
-| Contest stuck in settling | > 10 minutes | **Critical** |
-| Prizes paid + fee != prize pool | Any discrepancy | **Critical** |
-| Callback failure rate | > 1% in an hour | High |
-| Provider latency | p95 > 5s | High |
-| Score outside declared range | Any occurrence | High |
-| Integrity flag raised | Any occurrence | Medium - queue for review |
-| Repeat challenge pairing | Above threshold | Medium |
-| Catalogue sync failing | > 24h stale | Low |
+> **BUILT 20 September 2026 (X9 slice 4).** Threshold scans run every minute via
+> `provider-threshold-monitors.service.ts` (stuck finalizing, prize-pool mismatch,
+> callback failure rate, createRound p95 latency, catalogue stale, repeat challenge
+> pairing). **Any-occurrence** alerts fire at ingestion (`provider-ingest-alerts.ts`
+> from `result-ingestion.service.ts`) or from the reconciliation net (`round_unresolved`)
+> — they must not live only on a poller. Dedup fingerprints suppress threshold re-alerts
+> for an hour. Say monitors code-complete, not E7/X9 done — dedicated re-settle remains.
+
+| Alert | Threshold | Severity | Where it fires |
+|---|---|---|---|
+| Invalid signature received | Any occurrence | **Critical** - either an attack or a broken deployment | Ingest |
+| Round unresolved past its grace period | Any occurrence | **Critical** - money is waiting | Reconciliation net (X9 slice 1) |
+| Contest stuck in settling | > 10 minutes | **Critical** | Threshold job |
+| Prizes paid + fee != prize pool | Any discrepancy | **Critical** | Threshold job |
+| Callback failure rate | > 1% in an hour | High | Threshold job |
+| Provider latency | p95 > 5s | High | Threshold job (`providerCreateLatencyMs`) |
+| Score outside declared range | Any occurrence | High | Ingest |
+| Integrity flag raised | Any occurrence | Medium - queue for review | Ingest |
+| Repeat challenge pairing | ≥ 5 directed pairs / 24h | Medium | Threshold job |
+| Catalogue sync failing | > 24h stale | Low | Threshold job |
 
 The first four are the ones worth waking someone for, because each one means money
 is either at risk or already wrong.

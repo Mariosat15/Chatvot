@@ -217,11 +217,22 @@ rate and callback arrival rate. Three consecutive failures marks the provider
 
 ### 3.2 Response by contest state
 
+> **Play-in-progress pause/extend BUILT 20 September 2026 (X9 slice 3).**
+> `lib/services/game-providers/provider-outage-pause.service.ts` on Agenda every minute.
+> When `GameProvider.healthStatus === "down"`, every active provider contest for that key
+> is paused via shared `contest-pause.service.ts` with `pausedBy: "system:provider-outage"`.
+> On evidence `ok` (same classifier as the kill-switch), those system pauses are resumed and
+> `playWindowEnd` / `endTime` are extended by the pause duration — identical math to the
+> admin resume control. **Manual pauses are never auto-resumed.** Recovery probes even when
+> the provider is already `enabled: false` (kill-switch); re-enable stays an operator action.
+> Not-yet-open / registration-open responses and full `06` s10 monitors remain. Say outage
+> pause code-complete, not E7/X9 done.
+
 | State | Response |
 |---|---|
 | **Not yet open** | Hide the contest. Postpone or cancel with full refunds before anyone pays |
 | **Registration open, play not started** | Stop new entries. If not recovered before play opens, cancel and refund everyone |
-| **Play in progress** | **Pause the contest** and extend the play window by the outage duration. Show players an honest message |
+| **Play in progress** | **Pause the contest** and extend the play window by the outage duration. Show players an honest message — **BUILT (X9 slice 3)** |
 | **Settling** | Poll until the grace period ends, then apply the unresolved policy |
 | **Completed** | Unaffected |
 
@@ -238,7 +249,8 @@ their scores, and the contest completes late rather than not at all.
 > streak. Admin health dashboard still **derives** its verdict and must not read the stored
 > `healthStatus` (default `"down"` would paint every quiet provider red). Manual disable
 > already existed (`setProviderEnabled`). Say kill-switch code-complete, not E7/X9 done —
-> outage pause/extend, full `06` s10 monitors and re-settle remain.
+> full `06` s10 monitors (**BUILT X9 slice 4**) and re-settle remain. Outage pause/extend:
+> **BUILT X9 slice 3** (see s3.2).
 
 If a provider is `down` for more than 15 minutes, automatically disable **new**
 contest creation and new round creation for that provider, and notify admins. Live
@@ -330,7 +342,8 @@ Easy to defer, expensive to add after the first incident.
 | Provider health panel in admin | Otherwise "is it us or them" takes an hour every time |
 | Manual round resolution tool | Support must be able to set a score with a reason and an audit entry |
 | Re-settlement capability | Contests will occasionally need correcting after payout |
-| Pause and extend on a contest | The single most useful outage response |
+| Pause and extend on a contest | The single most useful outage response — **BUILT X9 slice 3** (play-in-progress); pre-start responses still owed |
+
 | Per-provider kill switch | Must be usable without a deployment |
 
 ---
@@ -345,7 +358,7 @@ Every one of these should be executed deliberately in the sandbox, not hoped abo
 - [x] Send the same callback twice, confirm one score
 - [x] Send two different scores for one round, confirm the discrepancy alert
 - [x] Send a result after settlement, confirm it is recorded but not applied
-- [ ] Take the provider offline mid-contest, confirm pause and extend
+- [x] Take the provider offline mid-contest, confirm pause and extend — **code-complete X9 slice 3** (owner click still owed; needs worker restart for Agenda job)
 - [ ] Cancel a contest with live rounds, confirm full refunds
 - [ ] Settle the same contest twice, confirm winners paid once
 - [ ] Run a contest end to end with real (small) entry fees before going public
@@ -366,7 +379,8 @@ than on effort:
 
 | Rehearsal | Blocked on | Why it cannot be faked now |
 |---|---|---|
-| Provider offline, pause and extend | E7/X8 (section 3.2) | Needs the health monitor and the pause mechanism, neither of which exists |
+| Provider offline, pause and extend | E7/X9 (section 3.2) | **BUILT 20 Sep 2026** (X9 slice 3). Not-yet-open / registration responses still owed |
+
 | Cancel a contest with live rounds | E4/X5 (section 5) | Needs contest cancellation to know about rounds |
 | Settle the same contest twice | E4/X5 (section 6 #4) | Needs provider settlement to exist before it can be made idempotent |
 | End to end with real entry fees | E9 pilot | Needs a real provider and real money |

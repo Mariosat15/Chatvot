@@ -360,6 +360,15 @@ export async function createRound(
   round.status = "launched";
   round.providerRoundId = created.data.providerRoundId;
   round.launchUrlExpiresAt = created.data.launchUrlExpiresAt;
+  // Reason: chapter 06 s10 latency monitor reads this. Optional — adapters that do not
+  // measure leave it absent and the p95 check skips providers with too few samples.
+  if (
+    typeof created.latencyMs === "number" &&
+    Number.isFinite(created.latencyMs) &&
+    created.latencyMs >= 0
+  ) {
+    round.providerCreateLatencyMs = created.latencyMs;
+  }
   await round.save();
 
   return {

@@ -13,6 +13,8 @@
  * - challenge-finalize: Check for expired challenges (every 1 minute)
  * - round-reconciliation: Poll lost provider results / apply unresolved policy (every 1 minute)
  * - provider-kill-switch: Auto-disable providers down >15 min (every 1 minute)
+ * - provider-outage-pause: Pause live contests on provider down; resume+extend on recovery
+ * - provider-threshold-monitors: Chapter 06 s10 threshold SecurityAlerts (every 1 minute)
  * - trade-queue: Process limit orders (every 1 minute) — TP/SL handled by real-time service
  * - evaluate-badges: Evaluate user badges (every 1 hour)
  * (price-cache REMOVED — WEB app WebSocket writes prices to PriceCache)
@@ -43,6 +45,8 @@ import { runCompetitionEndCheck } from "./jobs/competition-end.job";
 import { runChallengeFinalizeCheck } from "./jobs/challenge-finalize.job";
 import { runRoundReconciliationCheck } from "./jobs/round-reconciliation.job";
 import { runProviderKillSwitchCheck } from "./jobs/provider-kill-switch.job";
+import { runProviderOutagePauseCheck } from "./jobs/provider-outage-pause.job";
+import { runProviderThresholdMonitorsCheck } from "./jobs/provider-threshold-monitors.job";
 import { runTradeQueueProcessor } from "./jobs/trade-queue.job";
 // NOTE: price-cache job REMOVED — WebSocket streamer already writes prices every 1s.
 // The worker's price-cache job was redundant (external API call + ~33 upserts/minute duplicating
@@ -251,6 +255,62 @@ agenda.define("provider-kill-switch", async () => {
     }
   } catch (error) {
     console.error(`🛑 [PROVIDER KILL SWITCH] Failed:`, error);
+  }
+});
+
+/**
+ * Provider Outage Pause Job (X9 / E7)
+ * Pauses live contests while a provider is down; resumes and extends on recovery.
+ */
+agenda.define("provider-outage-pause", async () => {
+  try {
+    const result = await runProviderOutagePauseCheck();
+
+    if (
+      result.paused > 0 ||
+      result.resumed > 0 ||
+      result.errors.length > 0
+    ) {
+      console.log(
+        `⏸️ [PROVIDER OUTAGE] down=${result.examinedDown} paused=${result.paused} resumed=${result.resumed} alreadyPaused=${result.skippedAlreadyPaused}`,
+      );
+    }
+
+    if (result.errors.length > 0) {
+      console.error(`⏸️ [PROVIDER OUTAGE] Errors: ${result.errors.length}`);
+      result.errors.forEach((e) => console.error(`     - ${e}`));
+    }
+  } catch (error) {
+    console.error(`⏸️ [PROVIDER OUTAGE] Failed:`, error);
+  }
+});
+
+/**
+ * Provider Threshold Monitors Job (X9 / E7)
+ * Chapter 06 s10: stuck finalizing, prize mismatch, callback failure rate,
+ * latency p95, catalogue stale, repeat challenge pairing.
+ */
+agenda.define("provider-threshold-monitors", async () => {
+  try {
+    const result = await runProviderThresholdMonitorsCheck();
+
+    if (
+      result.alerts > 0 ||
+      result.errors.length > 0
+    ) {
+      console.log(
+        `📡 [THRESHOLD MONITORS] examined=${result.examined} alerts=${result.alerts} skippedDup=${result.skippedDuplicate}`,
+      );
+    }
+
+    if (result.errors.length > 0) {
+      console.error(
+        `📡 [THRESHOLD MONITORS] Errors: ${result.errors.length}`,
+      );
+      result.errors.forEach((e) => console.error(`     - ${e}`));
+    }
+  } catch (error) {
+    console.error(`📡 [THRESHOLD MONITORS] Failed:`, error);
   }
 });
 
@@ -499,6 +559,8 @@ async function startWorker(): Promise<void> {
     await agenda.every("1 minute", "challenge-finalize");
     await agenda.every("1 minute", "round-reconciliation");
     await agenda.every("1 minute", "provider-kill-switch");
+    await agenda.every("1 minute", "provider-outage-pause");
+    await agenda.every("1 minute", "provider-threshold-monitors");
     await agenda.every("1 minute", "early-end-check");
     await agenda.every("1 minute", "trade-queue");
     // price-cache REMOVED — redundant with WEB app's WebSocket PriceCache writes
