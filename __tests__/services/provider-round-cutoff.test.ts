@@ -342,7 +342,8 @@ describe("settlement waits out the result grace window", () => {
 
       TWO GUARDS HOLD THIS AND NEITHER CAN BE PROBED ALONE - the query filter on
       `LIVE_ROUND_STATUSES`, and the transition check inside the loop, which refuses
-      `completed -> unresolved` because `ROUND_TRANSITIONS` maps `completed` to nothing.
+      `completed -> unresolved` because `ROUND_TRANSITIONS` maps `completed` only to
+      `voided` (dispute re-settle), never to `unresolved`.
       The cleanup service documents that check as unreachable, and that is true of normal
       operation and of the `cancelled` outcome; it stops being true exactly when the filter
       is the thing that breaks, which is the case this assertion is for. So the probe

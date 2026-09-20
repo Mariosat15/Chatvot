@@ -37,8 +37,12 @@ import SettledResultPanel from "@/components/admin/competitions/SettledResultPan
 import AdjustResultsPanel, {
   type AdjustableSeat,
 } from "@/components/admin/competitions/AdjustResultsPanel";
+import ResettlePanel, {
+  type ResettleRoundRow,
+} from "@/components/admin/competitions/ResettlePanel";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
+import GameRound from "@/database/models/games/game-round.model";
 import { formatVolts } from "@/lib/utils/format-volts";
 import { getTerms } from "@/lib/services/terminology.service";
 
@@ -144,6 +148,7 @@ const AdminCompetitionViewPage = async ({
       operator's SettledResultPanel already shows, then the ledger, then zero.
     */
     let adjustSeats: AdjustableSeat[] = [];
+    let resettleRounds: ResettleRoundRow[] = [];
     if (isCompleted) {
       const seats = await CompetitionParticipant.find({ competitionId: id })
         .select("_id userId username currentRank qualificationStatus")
@@ -188,6 +193,38 @@ const AdminCompetitionViewPage = async ({
             settled?.qualificationStatus ?? seat.qualificationStatus ?? null,
         };
       });
+
+      // Provider re-settle needs the scoring rounds still on the board. Loaded only when
+      // the contest is a provider game — trading has no rounds to void.
+      if (isProviderGame) {
+        const nameByUser = new Map(
+          seats.map((s) => [s.userId, s.username || "Anonymous"] as const),
+        );
+        const roundDocs = await GameRound.find({
+          contestId: competition._id,
+          contestType: "competition",
+          status: { $in: ["completed", "abandoned", "expired", "voided"] },
+        })
+          .select("roundId userId status rawScore attemptNumber")
+          .sort({ attemptNumber: 1 })
+          .lean<
+            {
+              roundId: string;
+              userId: string;
+              status: string;
+              rawScore?: number | null;
+              attemptNumber: number;
+            }[]
+          >();
+        resettleRounds = roundDocs.map((r) => ({
+          roundId: r.roundId,
+          userId: r.userId,
+          username: nameByUser.get(r.userId),
+          status: r.status,
+          rawScore: r.rawScore,
+          attemptNumber: r.attemptNumber,
+        }));
+      }
     }
 
     // Get Game Master earnings for this competition
@@ -765,6 +802,13 @@ const AdminCompetitionViewPage = async ({
                   competitionId={id}
                   seats={adjustSeats}
                   creditSymbol={creditSymbol}
+                />
+              )}
+
+              {isCompleted && isProviderGame && resettleRounds.length > 0 && (
+                <ResettlePanel
+                  competitionId={id}
+                  rounds={resettleRounds}
                 />
               )}
             </div>

@@ -249,7 +249,8 @@ their scores, and the contest completes late rather than not at all.
 > streak. Admin health dashboard still **derives** its verdict and must not read the stored
 > `healthStatus` (default `"down"` would paint every quiet provider red). Manual disable
 > already existed (`setProviderEnabled`). Say kill-switch code-complete, not E7/X9 done —
-> full `06` s10 monitors (**BUILT X9 slice 4**) and re-settle remain. Outage pause/extend:
+> full `06` s10 monitors (**BUILT X9 slice 4**) and re-settle (**BUILT X9 slice 5**). Outage pause/extend:
+
 > **BUILT X9 slice 3** (see s3.2).
 
 If a provider is `down` for more than 15 minutes, automatically disable **new**
@@ -341,7 +342,7 @@ Easy to defer, expensive to add after the first incident.
 | Unresolved-round alert | Silence is the failure mode. Nobody discovers it except an angry player |
 | Provider health panel in admin | Otherwise "is it us or them" takes an hour every time |
 | Manual round resolution tool | Support must be able to set a score with a reason and an audit entry |
-| Re-settlement capability | Contests will occasionally need correcting after payout |
+| Re-settlement capability | Contests will occasionally need correcting after payout — **BUILT X9 slice 5** |
 | Pause and extend on a contest | The single most useful outage response — **BUILT X9 slice 3** (play-in-progress); pre-start responses still owed |
 
 | Per-provider kill switch | Must be usable without a deployment |

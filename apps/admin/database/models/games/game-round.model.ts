@@ -125,9 +125,13 @@ export const ROUND_TRANSITIONS = new Map<RoundStatus, readonly RoundStatus[]>([
   ["pending", ["launched", "expired", "voided"]],
   ["launched", ["completed", "abandoned", "expired", "voided", "unresolved"]],
   ["unresolved", ["completed", "abandoned", "expired", "voided"]],
-  ["completed", []],
-  ["abandoned", []],
-  ["expired", []],
+  // Reason: `completed`/`abandoned`/`expired` → `voided` is the dispute path only
+  // (X9 dedicated re-settle). Ingestion never uses it; `provider-resettle.service.ts`
+  // is the sole writer. Without this, a provider-confirmed bad result cannot leave
+  // the scoring set and every re-rank is a no-op.
+  ["completed", ["voided"]],
+  ["abandoned", ["voided"]],
+  ["expired", ["voided"]],
   ["voided", []],
 ]);
 

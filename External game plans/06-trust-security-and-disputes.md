@@ -208,6 +208,15 @@ idempotent and reversible, with a full audit trail of both the original and the
 corrected outcome. Discovering this requirement during a live dispute is the worst
 possible time.
 
+> **BUILT 20 September 2026 (X9 slice 5).** `lib/services/settlement/provider-resettle.service.ts`
+> (mirrored) voids selected rounds (`completed`/`abandoned`/`expired` → `voided`),
+> re-syncs `participant.score` from remaining rounds, claws back every
+> `finalLeaderboard` prize, re-ranks with the same engine as first settle, and pays
+> again. Admin UI: `ResettlePanel` on `/competitions/view/[id]` for completed provider
+> contests; route `POST /api/competitions/[id]/re-settle` behind `competitions` grant +
+> incident id. **Not reversed:** platform fee, Game Master share, XP/badges. Adjust-results
+> remains the manual rank/prize editor and must not write scores.
+
 ---
 
 ## 8. Secrets and access
@@ -250,7 +259,8 @@ the existing financial reconciliation already sets.
 > pairing). **Any-occurrence** alerts fire at ingestion (`provider-ingest-alerts.ts`
 > from `result-ingestion.service.ts`) or from the reconciliation net (`round_unresolved`)
 > — they must not live only on a poller. Dedup fingerprints suppress threshold re-alerts
-> for an hour. Say monitors code-complete, not E7/X9 done — dedicated re-settle remains.
+> for an hour. Say monitors code-complete, not E7/X9 done — dedicated re-settle was
+> **BUILT the same day** (slice 5; see s7.2).
 
 | Alert | Threshold | Severity | Where it fires |
 |---|---|---|---|

@@ -599,7 +599,11 @@ on the grounds that a component is heavily used, grep for its importer.**
 - Every alert from `06` section 10 — **BUILT 20 Sep 2026** (X9 slice 4). Threshold
   job + ingest-time alerts + `round_unresolved` from the scheduled net. Deduped.
 - Admin health dashboard — **BUILT (X6)**
-- Re-settlement capability — **owed** (adjust-results exists; dedicated re-settle does not)
+- Re-settlement capability — **BUILT 20 Sep 2026** (X9 slice 5). Dedicated
+  `provider-resettle.service.ts` + `POST /api/competitions/[id]/re-settle` +
+  `ResettlePanel` on the completed provider contest view. Voids disputed rounds,
+  re-syncs scores, claws back old prizes, re-ranks and pays. Adjust-results stays
+  the hand-edit path. Fees/GM/XP not reversed.
 
 **Done when:** the provider can be taken offline mid-contest and the contest still
 completes correctly, late, with players correctly informed.
