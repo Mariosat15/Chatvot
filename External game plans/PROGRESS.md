@@ -336,6 +336,9 @@ This plan has two tracks. **As of 20 September 2026** (owner):
   integrity. Admin health still DERIVES its verdict.
   **X9 itself is not done:** dedicated re-settle still owed. R99 merge stays owner if
   still owed.
+- **Game contest Schedule & Entry is 24h UTC (20 Sep)** — same pattern as trading
+  (Current Server Time + 0–23). Owner: re-test create after deploy; previous AM/PM
+  refusals were clock confusion, not a broken pre-flight.
 
 ### Track A - commercial (OWNER COMPLETE 20 Sep 2026)
 
@@ -858,6 +861,33 @@ Newest at the top.
 **Deferred:** what was consciously left for later
 **Next chat should:** the single clearest next action
 ```
+
+---
+
+### 20 Sep 2026 - X6: game contest schedule matches trading (24h UTC + server clock)
+
+**Owner report:** Schedule & Entry used a 12-hour AM/PM picker with no zone. Start
+11:56 PM / end 12:10 PM same day → amber "play is 10 minutes but contest runs 0
+seconds" and Launch refusal "play window must end after it starts". Trading already
+shows Current Server Time (UTC) and 0–23 hour boxes.
+
+**Cause:** `datetime-local` (browser AM/PM, local zone) on wizard + editor; draft
+converted with local `Date` getters. Arithmetic was correct; the times were not what
+the operator meant.
+
+**Shipped:**
+- `UtcScheduleFields.tsx` — trading-style UTC banner, date + 0–23 / 0–59, presets,
+  "Run for" duration chips, live red when end ≤ start.
+- `contest-draft.ts` — `utcDraftToIso` / `isoToUtcDraft` / `defaultUpcomingUtcWindow`
+  (seed ~1h ahead, 1h long). Wizard seeds that window on open.
+- Wired into `StepSchedule` + `ProviderContestEditor`; review shows UTC strings.
+- Tests: `__tests__/admin/provider-contest-utc-schedule.test.ts` + schedule/prizes
+  structural guard forbids `datetime-local` on both screens; round-clock expectations
+  use `Z`.
+
+**Owner tested:** not yet — needs a fresh create through Schedule & Entry / Launch.
+**Next chat should:** owner verifies a game contest creates with UTC times; then
+optional X9 re-settle if still owed.
 
 ---
 

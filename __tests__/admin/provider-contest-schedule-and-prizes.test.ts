@@ -107,8 +107,8 @@ describe("the contest clock is the play window", () => {
     expect(body.playWindowStart).toBe(body.startTime);
     expect(body.playWindowEnd).toBe(body.endTime);
     // Not merely equal to each other - equal to the dates the operator actually typed.
-    expect(body.startTime).toBe(new Date("2026-09-10T13:00").toISOString());
-    expect(body.endTime).toBe(new Date("2026-09-10T14:00").toISOString());
+    expect(body.startTime).toBe(new Date("2026-09-10T13:00:00Z").toISOString());
+    expect(body.endTime).toBe(new Date("2026-09-10T14:00:00Z").toISOString());
   });
 
   it("derives it on edit too, which is the half that is easy to miss", () => {
@@ -124,7 +124,7 @@ describe("the contest clock is the play window", () => {
     );
 
     expect(body.playWindowEnd).toBe(body.endTime);
-    expect(body.playWindowEnd).toBe(new Date("2026-09-10T16:30").toISOString());
+    expect(body.playWindowEnd).toBe(new Date("2026-09-10T16:30:00Z").toISOString());
     expect(body.playWindowStart).toBe(body.startTime);
   });
 
@@ -165,10 +165,24 @@ describe("the contest clock is the play window", () => {
     // The whole reason the derivation is a function. Two call sites, one definition; a third
     // literal `playWindowStart:` assignment means somebody has written the rule twice.
     const source = code(DRAFT);
-    const assignments = source.match(/playWindowStart:\s*localToIso/g) ?? [];
+    const assignments = source.match(/playWindowStart:\s*utcDraftToIso/g) ?? [];
     expect(assignments).toHaveLength(1);
-    expect(source).toMatch(/playWindowStart:\s*localToIso\(draft\.startTime\)/);
-    expect(source).toMatch(/playWindowEnd:\s*localToIso\(draft\.endTime\)/);
+    expect(source).toMatch(/playWindowStart:\s*utcDraftToIso\(draft\.startTime\)/);
+    expect(source).toMatch(/playWindowEnd:\s*utcDraftToIso\(draft\.endTime\)/);
+  });
+
+  it("uses the trading-style 24h UTC picker, never datetime-local", () => {
+    /*
+      The AM/PM control is what made start 23:56 / end 12:10 look plausible and fail as a
+      zero-length window. Both screens must share UtcScheduleFields; a leftover
+      datetime-local on either restores the whole defect for that path.
+    */
+    for (const source of [wizardScreen(), code(EDITOR)]) {
+      expect(source).toMatch(/UtcScheduleFields/);
+      expect(source).not.toMatch(/type=["']datetime-local["']/);
+    }
+    expect(code(DRAFT)).toMatch(/isoToUtcDraft/);
+    expect(code(DRAFT)).toMatch(/defaultUpcomingUtcWindow/);
   });
 });
 

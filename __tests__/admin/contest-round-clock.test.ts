@@ -141,7 +141,7 @@ describe("describeRoundFit - turning the reserved ceiling into a moment", () => 
     // Non-null: `lastAttemptStart` is optional since the start policy became a setting, and
     // it is present exactly when the contest reserves - which the default does.
     expect(fit!.lastAttemptStart!.getTime()).toBe(
-      new Date("2026-09-08T13:55").getTime(),
+      new Date("2026-09-08T13:55:00Z").getTime(),
     );
     expect(fit!.windowTooShort).toBe(false);
   });
@@ -168,7 +168,7 @@ describe("describeRoundFit - turning the reserved ceiling into a moment", () => 
 
     expect(fit!.reservedSeconds).toBe(120);
     expect(fit!.lastAttemptStart!.getTime()).toBe(
-      new Date("2026-09-08T13:58").getTime(),
+      new Date("2026-09-08T13:58:00Z").getTime(),
     );
   });
 
@@ -189,7 +189,7 @@ describe("describeRoundFit - turning the reserved ceiling into a moment", () => 
 
     expect(fit!.reservedSeconds).toBe(300);
     expect(fit!.lastAttemptStart!.getTime()).toBe(
-      new Date("2026-09-08T13:55").getTime(),
+      new Date("2026-09-08T13:55:00Z").getTime(),
     );
   });
 
@@ -234,7 +234,7 @@ describe("describeRoundFit - turning the reserved ceiling into a moment", () => 
   });
 
   it("says nothing while the dates are still half-typed", () => {
-    // `datetime-local` is empty until the operator finishes, and an "Invalid Date" rendered
+    // UTC draft strings are empty until the operator finishes, and an "Invalid Date" rendered
     // into a sentence about their contest reads as the form being broken.
     expect(
       describeRoundFit({
@@ -483,7 +483,7 @@ describe("the refusal stops contradicting the operator's own setting", () => {
 
     expect(fit!.reservedSeconds).toBe(900);
     expect(fit!.lastAttemptStart!.getTime()).toBe(
-      new Date("2026-09-08T13:45").getTime(),
+      new Date("2026-09-08T13:45:00Z").getTime(),
     );
   });
 });

@@ -37,6 +37,7 @@ import {
   type ContestDraft,
   describeDurationSeconds,
   describeRoundFit,
+  defaultUpcomingUtcWindow,
   emptyDraft,
   toRequestBody,
 } from "./contest-draft";
@@ -145,7 +146,10 @@ export function ProviderContestWizard({ titles }: ProviderContestWizardProps) {
   // hands `WizardStepRail` a new array and a new `currentStep` object.
   const STEPS = useMemo(() => buildSteps(terms), [terms]);
   const [step, setStep] = useState<number>(STEP_GAME);
-  const [draft, setDraft] = useState<ContestDraft>(emptyDraft);
+  const [draft, setDraft] = useState<ContestDraft>(() => ({
+    ...emptyDraft,
+    ...defaultUpcomingUtcWindow(),
+  }));
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
   const [warnings, setWarnings] = useState<string[]>([]);

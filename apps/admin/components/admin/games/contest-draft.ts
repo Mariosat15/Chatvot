@@ -25,7 +25,12 @@ export interface ContestDraft {
   description: string;
 
   /**
-   * `datetime-local` strings, which are local-time and have no zone.
+   * UTC wall-clock strings as `YYYY-MM-DDTHH:mm` (no zone suffix).
+   *
+   * THEY ARE UTC, NOT THE OPERATOR'S BROWSER ZONE. The schedule UI is the trading-style
+   * 24-hour UTC picker (`UtcScheduleFields`); `utcDraftToIso` appends `:00Z` so the server
+   * stores the instant shown on screen. Reading them with `new Date(value)` without `Z`
+   * would reintroduce the local-zone shift the picker was built to kill.
    *
    * THERE IS ONE CONTEST CLOCK AND NO SEPARATE PLAY WINDOW. The draft used to carry
    * `playWindowStart` and `playWindowEnd` as two more operator-set dates; see
@@ -167,9 +172,8 @@ export function toRequestBody(
     maxParticipants: draft.maxParticipants,
     platformFeePercentage: draft.platformFeePercentage,
     prizeDistribution: draft.prizeDistribution,
-    // Sent as-is. The `datetime-local` value carries no zone, so `new Date()` on the server
-    // would read it in the SERVER's zone, not the operator's. Appending nothing and letting
-    // the browser resolve it is the fix: `toISOString` here pins the operator's own zone.
+    // UTC draft → absolute ISO. The schedule UI shows UTC; pinning `Z` here is what keeps
+    // the stored instant identical to the numbers on screen.
     ...deriveWindow(draft),
     // The operator's chosen shape (task document 11), and CREATE ONLY - `toEditRequestBody`
     // deliberately omits it. The create service validates it against the title's supported
@@ -211,10 +215,10 @@ export function toRequestBody(
  */
 function deriveWindow(draft: ContestDraft): Record<string, string> {
   return {
-    startTime: localToIso(draft.startTime),
-    endTime: localToIso(draft.endTime),
-    playWindowStart: localToIso(draft.startTime),
-    playWindowEnd: localToIso(draft.endTime),
+    startTime: utcDraftToIso(draft.startTime),
+    endTime: utcDraftToIso(draft.endTime),
+    playWindowStart: utcDraftToIso(draft.startTime),
+    playWindowEnd: utcDraftToIso(draft.endTime),
   };
 }
 
@@ -289,8 +293,10 @@ export function describeRoundFit(input: {
   );
   if (attemptSeconds === undefined) return undefined;
 
-  const start = new Date(input.startTime);
-  const end = new Date(input.endTime);
+  // Reason: draft values are UTC wall-clock without a zone; parse through utcDraftToIso
+  // so a browser in UTC+3 cannot shrink a one-hour window to "0 seconds".
+  const start = new Date(utcDraftToIso(input.startTime));
+  const end = new Date(utcDraftToIso(input.endTime));
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
     return undefined;
   }
@@ -398,33 +404,76 @@ export function toEditRequestBody(
 }
 
 /**
- * Converts a `datetime-local` value to an absolute instant in the operator's zone.
+ * Converts a UTC draft value (`YYYY-MM-DDTHH:mm`) to an absolute ISO instant.
  *
  * Returns the input unchanged when empty or unparseable, so the server produces the "this
  * date is required / not valid" message rather than this function inventing one.
+ *
+ * Renamed from `localToIso` on 20 September 2026: the schedule UI is UTC, matching trading.
+ * A bare `new Date("2026-09-20T13:00")` is still local in every browser, which is exactly
+ * the shift that made a correctly typed end time land before the start.
  */
-function localToIso(value: string): string {
+function utcDraftToIso(value: string): string {
   if (!value) return value;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toISOString();
+  // Already absolute (edit forms sometimes pass a stored ISO through unchanged).
+  if (/[zZ]|[+-]\d{2}:\d{2}$/.test(value)) {
+    const absolute = new Date(value);
+    return Number.isNaN(absolute.getTime()) ? value : absolute.toISOString();
+  }
+  // Fixed-length date + hour:minute only — no nested optional groups (eslint
+  // security/detect-unsafe-regex). Seconds, if present, are ignored; we always write :00Z.
+  const match = value.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/);
+  if (!match) {
+    const fallback = new Date(value);
+    return Number.isNaN(fallback.getTime()) ? value : fallback.toISOString();
+  }
+  const instant = new Date(`${match[1]}T${match[2]}:00Z`);
+  return Number.isNaN(instant.getTime()) ? value : instant.toISOString();
 }
 
 /**
  * The inverse, for populating the edit form from stored dates.
  *
- * Builds the string from LOCAL getters rather than slicing `toISOString()`, which is the
- * obvious version and is wrong by the operator's UTC offset: a contest starting at 09:00
- * local would render as 07:00 in a UTC+2 browser, and an operator who saved without
- * touching the field would silently move the start time two hours earlier.
+ * Builds the string from UTC getters. The previous LOCAL version (`isoToLocal`) was correct
+ * while the input was `datetime-local`; once the picker is UTC it would have shown 09:00 UTC
+ * as 12:00 in a UTC+3 browser and silently moved every saved contest three hours earlier on
+ * the next untouched save.
  */
-export function isoToLocal(value: string | Date | undefined | null): string {
+export function isoToUtcDraft(value: string | Date | undefined | null): string {
   if (!value) return "";
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return "";
 
   const pad = (n: number) => String(n).padStart(2, "0");
   return (
-    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
-    `T${pad(date.getHours())}:${pad(date.getMinutes())}`
+    `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}` +
+    `T${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}`
   );
+}
+
+/** @deprecated Use `isoToUtcDraft`. Kept so any leftover import fails loudly at typecheck once removed. */
+export const isoToLocal = isoToUtcDraft;
+
+/**
+ * A ready-to-edit window: start about one hour from now (UTC), lasting one hour.
+ *
+ * Empty date fields are how an operator lands on Launch with nothing set and then fights
+ * AM/PM. Seeding a valid upcoming window means the common case is "tweak and go", and the
+ * duration chips on the schedule step can still shorten or lengthen it in one click.
+ */
+export function defaultUpcomingUtcWindow(now: Date = new Date()): {
+  startTime: string;
+  endTime: string;
+} {
+  const start = new Date(now.getTime() + 60 * 60 * 1000);
+  // Round up to the next 5 UTC minutes so the defaults look intentional, not noisy.
+  const minutes = start.getUTCMinutes();
+  const rounded = Math.ceil(minutes / 5) * 5;
+  start.setUTCMinutes(rounded === 60 ? 0 : rounded, 0, 0);
+  if (rounded === 60) start.setUTCHours(start.getUTCHours() + 1);
+  const end = new Date(start.getTime() + 60 * 60 * 1000);
+  return {
+    startTime: isoToUtcDraft(start),
+    endTime: isoToUtcDraft(end),
+  };
 }

@@ -11,7 +11,8 @@ import { RoundClockNote } from "../RoundClockNote";
 import { RoundStartPolicyField } from "../RoundStartPolicyField";
 import type { ContestDraft } from "../contest-draft";
 import type { ContestableTitle } from "../contest-types";
-import { DateField, NumberField } from "./fields";
+import { UtcScheduleFields } from "../UtcScheduleFields";
+import { NumberField } from "./fields";
 import { DEFAULT_CREDIT_SYMBOL } from "@/lib/utils/format-volts";
 
 /**
@@ -109,20 +110,22 @@ export function StepSchedule({
         />
       ) : null}
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <DateField
-          label={shape.copy.startLabel}
-          value={draft.startTime}
-          onChange={(v) => patch({ startTime: v })}
-          hint={shape.copy.startHint}
-        />
-        <DateField
-          label={shape.copy.endLabel}
-          value={draft.endTime}
-          onChange={(v) => patch({ endTime: v })}
-          hint={shape.copy.endHint}
-        />
-      </div>
+      {/*
+        Trading-style 24h UTC picker — same answers as CompetitionCreatorForm's schedule
+        step. `datetime-local` was the previous control; browsers paint it as AM/PM with no
+        zone, which is how a start of 23:56 and an end of 12:10 on the same day looked
+        "fine" to the operator and failed pre-flight as a zero-length window.
+      */}
+      <UtcScheduleFields
+        startLabel={shape.copy.startLabel}
+        endLabel={shape.copy.endLabel}
+        startHint={shape.copy.startHint}
+        endHint={shape.copy.endHint}
+        startTime={draft.startTime}
+        endTime={draft.endTime}
+        onStartChange={(v) => patch({ startTime: v })}
+        onEndChange={(v) => patch({ endTime: v })}
+      />
 
       <RoundClockNote
         variant="timing"

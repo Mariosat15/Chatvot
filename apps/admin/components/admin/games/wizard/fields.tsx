@@ -55,29 +55,6 @@ export function FieldShell({
   );
 }
 
-export function DateField({
-  label,
-  value,
-  onChange,
-  hint,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  hint?: ReactNode;
-}) {
-  return (
-    <FieldShell label={label} hint={hint}>
-      <Input
-        type="datetime-local"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="bg-gray-800 border-gray-600 text-gray-100 h-12"
-      />
-    </FieldShell>
-  );
-}
-
 export function NumberField({
   label,
   value,

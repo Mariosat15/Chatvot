@@ -56,11 +56,9 @@ export function StepReview({
               ) : null}
             </SummaryRow>
             <SummaryRow label="Name">{draft.name || "-"}</SummaryRow>
-            <SummaryRow label="Runs">
+            <SummaryRow label="Runs (UTC)">
               {draft.startTime && draft.endTime
-                ? `${new Date(draft.startTime).toLocaleString()} to ${new Date(
-                    draft.endTime,
-                  ).toLocaleString()}`
+                ? `${draft.startTime.replace("T", " ")} → ${draft.endTime.replace("T", " ")} UTC`
                 : "-"}
             </SummaryRow>
             <SummaryRow label={terms.entryFee}>

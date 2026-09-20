@@ -25,9 +25,10 @@ import { RoundStartPolicyField } from "./RoundStartPolicyField";
 import {
   type ContestDraft,
   emptyDraft,
-  isoToLocal,
+  isoToUtcDraft,
   toEditRequestBody,
 } from "./contest-draft";
+import { UtcScheduleFields } from "./UtcScheduleFields";
 import { isClosedToEdits } from "@/lib/admin/provider-contest-edit-policy";
 import { DEFAULT_CREDIT_SYMBOL } from "@/lib/utils/format-volts";
 import { playShapeRules, type PlayMode } from "@/lib/services/games/play-shape";
@@ -444,30 +445,17 @@ export function ProviderContestEditor({
         <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">
           Timing
         </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {/*
-            THE LABELS AND HINTS COME FROM THE SHAPE, not from this file. On a simultaneous
-            contest the start is the gun and also the moment entry closes, which "Contest
-            starts" with no hint does not say - and the operator most needs to know it here,
-            because moving the start moves the entry deadline with it.
-          */}
-          <DateField
-            id="startTime"
-            label={shape.copy.startLabel}
-            hint={shape.copy.startHint}
-            value={draft.startTime}
-            disabled={entered}
-            onChange={(v) => patch({ startTime: v })}
-          />
-          <DateField
-            id="endTime"
-            label={shape.copy.endLabel}
-            hint={shape.copy.endHint}
-            value={draft.endTime}
-            disabled={entered}
-            onChange={(v) => patch({ endTime: v })}
-          />
-        </div>
+        <UtcScheduleFields
+          startLabel={shape.copy.startLabel}
+          endLabel={shape.copy.endLabel}
+          startHint={shape.copy.startHint}
+          endHint={shape.copy.endHint}
+          startTime={draft.startTime}
+          endTime={draft.endTime}
+          disabled={entered}
+          onStartChange={(v) => patch({ startTime: v })}
+          onEndChange={(v) => patch({ endTime: v })}
+        />
         {/*
           The two play-window fields were here and are gone; the window is derived from the
           contest clock in `contest-draft.ts`. Removing them from the wizard alone would not
@@ -647,8 +635,8 @@ function draftFromStored(contest: StoredContest): ContestDraft {
     settings: contest.gameConfig?.settings ?? {},
     name: contest.name ?? "",
     description: contest.description ?? "",
-    startTime: isoToLocal(contest.startTime),
-    endTime: isoToLocal(contest.endTime),
+    startTime: isoToUtcDraft(contest.startTime),
+    endTime: isoToUtcDraft(contest.endTime),
     entryFee: contest.entryFee ?? 0,
     minParticipants: contest.minParticipants ?? 2,
     maxParticipants: contest.maxParticipants ?? 100,
@@ -706,40 +694,6 @@ function NumberField({
         onChange={(e) => onChange(Number(e.target.value))}
         className="mt-2 bg-gray-700 border-gray-600 text-gray-100 disabled:opacity-50"
       />
-    </div>
-  );
-}
-
-function DateField({
-  id,
-  label,
-  value,
-  disabled,
-  hint,
-  onChange,
-}: {
-  id: string;
-  label: string;
-  value: string;
-  disabled?: boolean;
-  /** What this moment means under the contest's shape. From `play-shape.ts`, never local. */
-  hint?: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <div>
-      <Label htmlFor={id} className="text-gray-200">
-        {label}
-      </Label>
-      <Input
-        id={id}
-        type="datetime-local"
-        value={value}
-        disabled={disabled}
-        onChange={(e) => onChange(e.target.value)}
-        className="mt-2 bg-gray-700 border-gray-600 text-gray-100 disabled:opacity-50"
-      />
-      {hint ? <p className="mt-1 text-xs text-gray-500">{hint}</p> : null}
     </div>
   );
 }

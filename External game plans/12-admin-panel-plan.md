@@ -437,6 +437,16 @@ suite, so **comments are stripped first and every assertion matches a construct*
 element with its props, or an operator - never a bare identifier that an import line would
 satisfy.
 
+> **AMENDED 20 September 2026 — the clock is UTC, matching trading.** The one-clock rule
+> above is unchanged. What changed is *how* an operator sets it: both screens used
+> `datetime-local` (browser 12-hour AM/PM, no zone), which produced a live refusal when
+> start was 23:56 and end was 12:10 on the same day — correct arithmetic on the wrong
+> times. Live code is `UtcScheduleFields.tsx` (Current Server Time UTC, 0–23 / 0–59,
+> duration chips) and `utcDraftToIso` / `isoToUtcDraft` / `defaultUpcomingUtcWindow` in
+> `contest-draft.ts`. Pinned by `__tests__/admin/provider-contest-utc-schedule.test.ts`
+> and an extra structural assertion in the schedule-and-prizes suite that forbids
+> `datetime-local` on either screen. **Nothing about play-window derivation moved.**
+
 ### 2.4 The contest VIEW screen, and why the payout looked broken - BUILT 7 September 2026
 
 **R46.** The owner reported that on a contest named `newww` "the prizes, the distribution is a
