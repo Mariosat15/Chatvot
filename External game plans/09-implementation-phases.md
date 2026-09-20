@@ -596,6 +596,9 @@ on the grounds that a component is heavily used, grep for its importer.**
   auto pause+extend BUILT 20 Sep 2026** (X9 slice 3: `provider-outage-pause.service.ts`
   + shared `contest-pause.service.ts`). System marker `system:provider-outage`;
   manual pauses never auto-resumed; recovery probes even when kill-switched off.
+  **Pre-start rows BUILT same day (leftover):** refuse entry while down/disabled,
+  hide empty upcoming from hubs, cancel+refund at play open if still blocked
+  (`provider-entry-gate.ts`).
 - Every alert from `06` section 10 — **BUILT 20 Sep 2026** (X9 slice 4). Threshold
   job + ingest-time alerts + `round_unresolved` from the scheduled net. Deduped.
 - Admin health dashboard — **BUILT (X6)**

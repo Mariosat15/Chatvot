@@ -30,11 +30,20 @@ export async function GET() {
         status: 1, // Active first, then upcoming
         startTime: 1,
       })
-      .limit(6)
+      .limit(12)
       .toArray();
 
+    // Reason: chapter 07 s3.2 — hide empty upcoming provider contests during an outage.
+    // Fetch a few extra then filter so a short outage does not empty the landing strip.
+    const { listProvidersBlockingEntries, shouldHideUpcomingEmptyDuringOutage } =
+      await import("@/lib/services/game-providers/provider-entry-gate");
+    const blocking = await listProvidersBlockingEntries();
+    const visible = competitions
+      .filter((c) => !shouldHideUpcomingEmptyDuringOutage(c as never, blocking))
+      .slice(0, 6);
+
     // Format competitions for display
-    const formattedCompetitions = competitions.map((comp) => {
+    const formattedCompetitions = visible.map((comp) => {
       const now = new Date();
       const startTime = new Date(comp.startTime);
       const endTime = new Date(comp.endTime);

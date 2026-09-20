@@ -218,6 +218,10 @@ rate and callback arrival rate. Three consecutive failures marks the provider
 ### 3.2 Response by contest state
 
 > **Play-in-progress pause/extend BUILT 20 September 2026 (X9 slice 3).**
+> Pre-start rows (**not yet open** / **registration open**) **BUILT 20 September 2026**
+> (X9 leftover): `provider-entry-gate.ts` refuses new entry while the provider is `down`
+> or kill-switched off; empty upcoming contests are hidden from hubs; if still blocked
+> when play opens, Inngest + `getCompetitionById` cancel and refund in full.
 > `lib/services/game-providers/provider-outage-pause.service.ts` on Agenda every minute.
 > When `GameProvider.healthStatus === "down"`, every active provider contest for that key
 > is paused via shared `contest-pause.service.ts` with `pausedBy: "system:provider-outage"`.
@@ -225,13 +229,12 @@ rate and callback arrival rate. Three consecutive failures marks the provider
 > `playWindowEnd` / `endTime` are extended by the pause duration — identical math to the
 > admin resume control. **Manual pauses are never auto-resumed.** Recovery probes even when
 > the provider is already `enabled: false` (kill-switch); re-enable stays an operator action.
-> Not-yet-open / registration-open responses and full `06` s10 monitors remain. Say outage
-> pause code-complete, not E7/X9 done.
+> Say outage responses code-complete (all three table rows).
 
 | State | Response |
 |---|---|
-| **Not yet open** | Hide the contest. Postpone or cancel with full refunds before anyone pays |
-| **Registration open, play not started** | Stop new entries. If not recovered before play opens, cancel and refund everyone |
+| **Not yet open** | Hide the contest. Postpone or cancel with full refunds before anyone pays — **BUILT** (hide empty upcoming; cancel-at-gun covers the rest) |
+| **Registration open, play not started** | Stop new entries. If not recovered before play opens, cancel and refund everyone — **BUILT** |
 | **Play in progress** | **Pause the contest** and extend the play window by the outage duration. Show players an honest message — **BUILT (X9 slice 3)** |
 | **Settling** | Poll until the grace period ends, then apply the unresolved policy |
 | **Completed** | Unaffected |
@@ -343,7 +346,7 @@ Easy to defer, expensive to add after the first incident.
 | Provider health panel in admin | Otherwise "is it us or them" takes an hour every time |
 | Manual round resolution tool | Support must be able to set a score with a reason and an audit entry |
 | Re-settlement capability | Contests will occasionally need correcting after payout — **BUILT X9 slice 5** |
-| Pause and extend on a contest | The single most useful outage response — **BUILT X9 slice 3** (play-in-progress); pre-start responses still owed |
+| Pause and extend on a contest | The single most useful outage response — **BUILT X9** (all three 07 s3.2 rows) |
 
 | Per-provider kill switch | Must be usable without a deployment |
 

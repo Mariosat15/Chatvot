@@ -56,6 +56,11 @@ import { checkActor, checkLevelRequirement } from "./contest-entry/guards";
 import { buildParticipantSeat } from "./contest-entry/participant-seat";
 import { runPostEntrySideEffects } from "./contest-entry/side-effects";
 import { fail } from "./contest-entry/types";
+import {
+  PROVIDER_OUTAGE_ENTRY_MESSAGE,
+  providerBlocksContestEntry,
+  providerKeyFromContest,
+} from "./game-providers/provider-entry-gate";
 
 export type {
   ContestEntryActor,
@@ -168,6 +173,18 @@ export async function enterContest(
             startingCapital: competition.startingCapital,
           },
         };
+      }
+
+      // Reason: chapter 07 s3.2 — while a provider is down (or kill-switched off), stop
+      // taking new entry fees. After the seat check so a double-click still returns
+      // idempotent success. Before any wallet read so a refusal cannot debit.
+      const outageProviderKey = providerKeyFromContest(competition);
+      if (outageProviderKey) {
+        const blocked = await providerBlocksContestEntry(outageProviderKey);
+        if (blocked) {
+          await session.abortTransaction();
+          return fail("provider_unavailable", PROVIDER_OUTAGE_ENTRY_MESSAGE);
+        }
       }
 
       if (competition.currentParticipants >= competition.maxParticipants) {

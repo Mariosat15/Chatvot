@@ -43,6 +43,7 @@ const STATUS_BY_CODE: Record<ContestEntryFailureCode, number> = {
   level_requirement: 403,
   no_wallet: 400,
   insufficient_balance: 400,
+  provider_unavailable: 503,
   contended: 409,
   failed: 500,
 };

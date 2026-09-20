@@ -39,7 +39,16 @@ export const getCompetitions = async (filters?: {
       .limit(filters?.limit || 50)
       .lean();
 
-    return JSON.parse(JSON.stringify(competitions));
+    // Reason: chapter 07 s3.2 — hide empty upcoming provider contests while the
+    // provider is down so hubs do not advertise a contest nobody can enter yet.
+    const { listProvidersBlockingEntries, shouldHideUpcomingEmptyDuringOutage } =
+      await import("@/lib/services/game-providers/provider-entry-gate");
+    const blocking = await listProvidersBlockingEntries();
+    const visible = (competitions as Array<Record<string, unknown>>).filter(
+      (c) => !shouldHideUpcomingEmptyDuringOutage(c as never, blocking),
+    );
+
+    return JSON.parse(JSON.stringify(visible));
   } catch (error) {
     console.error("Error getting competitions:", error);
     throw new Error("Failed to get competitions");
@@ -100,10 +109,29 @@ export const getCompetitionById = async (competitionId: string) => {
       const actualParticipants =
         competition.currentParticipants || participantCount;
 
-      if (actualParticipants < minParticipants) {
-        // Cancel the competition and refund all participants
+      // Reason: chapter 07 s3.2 — same cancel-at-gun as the Inngest start loop. This
+      // backup path must not activate a provider contest while the provider is down.
+      let cancelForOutage = false;
+      if (competition.gameType === "provider") {
+        const { providerKeyFromContest, providerBlocksContestEntry } =
+          await import("@/lib/services/game-providers/provider-entry-gate");
+        const key = providerKeyFromContest(competition);
+        if (key && (await providerBlocksContestEntry(key))) {
+          cancelForOutage = true;
+        }
+      }
+
+      if (cancelForOutage || actualParticipants < minParticipants) {
+        const reason = cancelForOutage
+          ? (
+              await import("@/lib/services/game-providers/provider-entry-gate")
+            ).PROVIDER_OUTAGE_CANCEL_REASON
+          : `Competition cancelled - did not meet minimum ${minParticipants} participants (only ${actualParticipants} joined)`;
+
         console.log(
-          `🚫 AUTO-CANCELLING "${competition.name}" - only ${actualParticipants}/${minParticipants} participants`,
+          cancelForOutage
+            ? `🚫 AUTO-CANCELLING "${competition.name}" - provider outage at play open`
+            : `🚫 AUTO-CANCELLING "${competition.name}" - only ${actualParticipants}/${minParticipants} participants`,
         );
 
         try {
@@ -113,7 +141,7 @@ export const getCompetitionById = async (competitionId: string) => {
           // which executes during SSR render — revalidatePath is forbidden during render.
           await cancelCompetitionAndRefund(
             competitionId,
-            `Competition cancelled - did not meet minimum ${minParticipants} participants (only ${actualParticipants} joined)`,
+            reason,
             true, // skipRevalidation — called during render
           );
 

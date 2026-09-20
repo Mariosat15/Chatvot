@@ -30,8 +30,7 @@ export async function GET() {
     const now = new Date();
     const windowStart = new Date(now.getTime() - 48 * 60 * 60 * 1000);
 
-    // ── 1. Fetch competitions ──────────────────────────────────────────────────
-    const competitions = await Competition.find({
+    const competitionsRaw = await Competition.find({
       $or: [
         { status: { $in: ["active", "upcoming"] } },
         {
@@ -43,6 +42,14 @@ export async function GET() {
       .sort({ startTime: -1 })
       .limit(50)
       .lean();
+
+    // Reason: chapter 07 s3.2 — same hide rule as getCompetitions / landing.
+    const { listProvidersBlockingEntries, shouldHideUpcomingEmptyDuringOutage } =
+      await import("@/lib/services/game-providers/provider-entry-gate");
+    const blockingProviders = await listProvidersBlockingEntries();
+    const competitions = competitionsRaw.filter(
+      (c) => !shouldHideUpcomingEmptyDuringOutage(c as never, blockingProviders),
+    );
 
     // ── 2. Fetch challenges ────────────────────────────────────────────────────
     const challenges = await Challenge.find({

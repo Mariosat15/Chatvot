@@ -237,7 +237,7 @@ export const updateCompetitionStatuses = inngest.createFunction(
         status: "upcoming",
         startTime: { $lte: now },
       }).select(
-        "_id name participants minParticipants currentParticipants entryFee prizePool",
+        "_id name participants minParticipants currentParticipants entryFee prizePool gameType gameConfig",
       );
 
       let cancelledCount = 0;
@@ -254,10 +254,34 @@ export const updateCompetitionStatuses = inngest.createFunction(
           `📊 Competition "${comp.name}": ${participantCount}/${minRequired} participants`,
         );
 
-        if (participantCount < minRequired) {
-          // Cancel the competition - not enough participants
+        // Reason: chapter 07 s3.2 — registration-open outage response. If the provider is
+        // still down when play would open, cancel and refund rather than starting a contest
+        // nobody can play. Same money path as the min-participants cancel below.
+        let cancelForOutage = false;
+        if (comp.gameType === "provider") {
+          const { providerKeyFromContest, providerBlocksContestEntry } =
+            await import(
+              "@/lib/services/game-providers/provider-entry-gate"
+            );
+          const key = providerKeyFromContest(comp);
+          if (key && (await providerBlocksContestEntry(key))) {
+            cancelForOutage = true;
+          }
+        }
+
+        if (cancelForOutage || participantCount < minRequired) {
+          const reason = cancelForOutage
+            ? (
+                await import(
+                  "@/lib/services/game-providers/provider-entry-gate"
+                )
+              ).PROVIDER_OUTAGE_CANCEL_REASON
+            : `Competition cancelled - did not meet minimum ${minRequired} participants (${participantCount}/${minRequired})`;
+
           console.log(
-            `🚫 CANCELLING "${comp.name}" - only ${participantCount} participants, need ${minRequired}`,
+            cancelForOutage
+              ? `🚫 CANCELLING "${comp.name}" - provider outage at play open`
+              : `🚫 CANCELLING "${comp.name}" - only ${participantCount} participants, need ${minRequired}`,
           );
 
           // R43: this used to set `status: "cancelled"` here, BEFORE calling the refund.
@@ -275,7 +299,7 @@ export const updateCompetitionStatuses = inngest.createFunction(
               await import("@/lib/actions/trading/competition-cancel.actions");
             const refund = await cancelCompetitionAndRefund(
               comp._id.toString(),
-              `Competition cancelled - did not meet minimum ${minRequired} participants (${participantCount}/${minRequired})`,
+              reason,
             );
 
             // Report what actually happened, not what was asked for. The old log printed
