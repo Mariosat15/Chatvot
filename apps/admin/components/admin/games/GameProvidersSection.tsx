@@ -10,6 +10,7 @@ import {
   Gamepad2,
   AlertTriangle,
   Power,
+  ShieldAlert,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +33,16 @@ import type { GameProviderRow } from "./provider-types";
  * The screen shows the whole chain per provider so an operator can tell at a glance which
  * of the three is the reason a game is not live. That question is otherwise answered by
  * reading three separate places and guessing.
+ *
+ * A FOURTH SWITCH SITS BESIDE THE PROVIDER'S, AND IT IS NOT A FOURTH LINK IN THAT CHAIN.
+ * The three above answer "may this run". `autoOutageResponseEnabled` answers a different
+ * question - "may the platform take this provider off sale by itself when it looks to be
+ * having an outage" - and it defaults to off (owner decision, 20 September 2026). With it
+ * off the platform still watches and still raises the critical alert; what it will not do
+ * is disable the provider, refuse entries or pause live contests without an operator. The
+ * two are deliberately rendered as separate controls with their own wording, because a
+ * single switch could only ever mean "the opposite of whatever applies right now", which
+ * is the same reasoning as the Game Master creation override having two directions.
  */
 
 export default function GameProvidersSection() {
@@ -145,6 +156,43 @@ export default function GameProvidersSection() {
     }
   };
 
+  /*
+   * Deliberately a SECOND handler rather than a parameter on the one above. The two send
+   * different fields, tell the operator different things and are refused together by the
+   * route, so folding them into one function with a flag would put the "which decision is
+   * this" branch in three places instead of none.
+   */
+  const handleAutoResponseToggle = async (
+    provider: GameProviderRow,
+    autoOutageResponseEnabled: boolean,
+  ) => {
+    setPendingKey(provider.providerKey);
+    try {
+      const response = await fetch(`/api/games/providers/${provider.providerKey}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ autoOutageResponseEnabled }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        toast.error(data.error ?? "Something went wrong. Please contact support.");
+        return;
+      }
+
+      toast.success(
+        autoOutageResponseEnabled
+          ? `The platform may now take ${provider.displayName} off sale by itself during a sustained outage.`
+          : `Outages at ${provider.displayName} will be alerted only. Taking it off sale is a manual decision.`,
+      );
+      await load();
+    } catch {
+      toast.error("Something went wrong. Please contact support.");
+    } finally {
+      setPendingKey(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24 text-white/50">
@@ -222,6 +270,9 @@ export default function GameProvidersSection() {
               masterEnabled={masterEnabled}
               pending={pendingKey === provider.providerKey}
               onToggle={(enabled) => handleProviderToggle(provider, enabled)}
+              onToggleAutoResponse={(auto) =>
+                handleAutoResponseToggle(provider, auto)
+              }
               onCredentials={() => setCredentialsFor(provider)}
               onCatalogue={() => setCatalogueFor(provider)}
             />
@@ -257,6 +308,7 @@ function ProviderCard({
   masterEnabled,
   pending,
   onToggle,
+  onToggleAutoResponse,
   onCredentials,
   onCatalogue,
 }: {
@@ -264,6 +316,7 @@ function ProviderCard({
   masterEnabled: boolean;
   pending: boolean;
   onToggle: (enabled: boolean) => void;
+  onToggleAutoResponse: (autoOutageResponseEnabled: boolean) => void;
   onCredentials: () => void;
   onCatalogue: () => void;
 }) {
@@ -333,6 +386,52 @@ function ProviderCard({
           <span>Cannot be enabled yet: {blockers.join("; ")}.</span>
         </div>
       )}
+
+      {/*
+        Both switches are described in terms of what they PERMIT, never in terms of the
+        field name. An operator deciding whether to hand the platform the ability to take
+        a provider off sale needs to know that it means refused entries and paused live
+        contests; "automatic outage response" on its own says none of that.
+      */}
+      <div className="mt-3 space-y-2 rounded-lg border border-white/10 bg-black/20 p-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-xs font-medium text-white/80">
+              Provider switch (above) — yours alone
+            </div>
+            <p className="mt-0.5 text-xs text-white/50">
+              Turning this provider off stops new {terms.contests} and challenges being
+              created or entered on its {terms.games}. Nothing but an operator does this
+              unless you switch the line below on.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-start justify-between gap-3 border-t border-white/10 pt-2">
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 text-xs font-medium text-white/80">
+              <ShieldAlert
+                className={`h-3.5 w-3.5 ${
+                  provider.autoOutageResponseEnabled
+                    ? "text-amber-300"
+                    : "text-white/35"
+                }`}
+              />
+              Let the platform act on an outage by itself
+            </div>
+            <p className="mt-0.5 text-xs text-white/50">
+              {provider.autoOutageResponseEnabled
+                ? `On: after a sustained outage the platform will disable this provider, refuse new entries and pause live ${terms.contests} without waiting for you.`
+                : `Off: outages raise a critical alert and nothing else. Disabling, refusing entries and pausing live ${terms.contests} stay your decision.`}
+            </p>
+          </div>
+          <Switch
+            checked={provider.autoOutageResponseEnabled}
+            disabled={pending}
+            onCheckedChange={onToggleAutoResponse}
+          />
+        </div>
+      </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
         <Button size="sm" variant="outline" onClick={onCredentials}>

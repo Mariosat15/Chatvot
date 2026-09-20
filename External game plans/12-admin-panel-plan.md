@@ -1760,6 +1760,48 @@ the two apart. The test that had to be written asserts a **missing** credential 
 which is also the case that matters, because a badge saying "set" for a token that was never
 stored leaves the operator no way to discover why enabling refuses them.
 
+### 4.1b Two switches, not one - BUILT 20 September 2026
+
+**`CODE-COMPLETE`, never verified by eye** (the screen is behind an admin sign-in the
+automated browser has no session for). The provider card now carries **two** switches, and
+the second one is the owner's decision of 20 September 2026: **the platform must never take a
+provider off sale, stop contest creation, refuse entry or pause a running contest by itself
+unless an operator has switched that behaviour on for that provider.**
+
+| Piece | File |
+|---|---|
+| Fields (both model copies) | `autoOutageResponseEnabled` (no schema default), `outageAlertedAt` in `database/models/games/game-provider.model.ts` |
+| The one predicate + its query form | `systemMayActOnOutage`, `PROVIDER_AUTO_OUTAGE_FILTER` in `lib/services/game-providers/provider-entry-gate.ts` |
+| Consumers | `provider-kill-switch.service.ts`, `provider-outage-pause.service.ts`, the entry gate |
+| Service + route | `setProviderAutoOutageResponse` in `provider-admin.service.ts`; the `PATCH` in `apps/admin/app/api/games/providers/[providerKey]/route.ts` |
+| UI | the second `Switch` on `ProviderCard` in `apps/admin/components/admin/games/GameProvidersSection.tsx` |
+| Tests / probes | `__tests__/admin/game-providers-admin.test.ts`, the two worker suites, `tools/probe-provider-auto-outage.ps1` (12 probes, each red on exactly one named test) |
+
+**Facts that drift easily.**
+
+- **The two switches answer two different questions and the copy has to say so.** The first
+  is *is this provider on sale* - an operator's decision, immediate, manual, and the only way
+  a provider is ever taken off sale now. The second is *may the platform make that decision
+  for me while I am asleep* - off by default. One switch labelled "enabled" beside a worker
+  that flips it is exactly the control that appears to work and does something else.
+- **Withholding the ACTION must not withhold the WARNING**, and the tests are paired for that
+  reason. The kill switch still classifies evidence, still moves `healthStatus`, and still
+  raises its critical alert with the flag off - only the `enabled: false` write is withheld,
+  and `summary.withheld` counts it. A document describing the flag as switching the monitor
+  off is describing the version nobody built.
+- **The route refuses a request carrying both switches** rather than picking an order. They
+  are two decisions and each gets its own audit entry; a request setting both leaves one line
+  describing half of what happened.
+- **`autoOutageResponseEnabled` carries no schema default**, on the `playModeOverride`
+  precedent: `default: false` writes a real `false` onto every row, making "nobody has said"
+  indistinguishable from an operator's explicit no. The predicate tests `=== true`, so absent
+  reads as withheld either way.
+- **Resume is deliberately not gated** - see `07` s3.2. The flag governs intervening, never
+  undoing an intervention, and the moment an operator switches it off mid-outage is exactly
+  when a gated resume would strand every system-paused contest paused for ever.
+- **Nothing here is mirrored except the model.** `check:mirrors` covers the two
+  `game-provider.model.ts` copies and says nothing about the service, the route or the card.
+
 ### 4.2 The rules an operator enters, and the limit of "no developer needed"
 
 Two different things get called "rules", and conflating them causes a promise that cannot

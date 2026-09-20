@@ -38,11 +38,36 @@ $probes = @(
     Expect = "blocks an observed-down provider"
   },
   @{
+    # Re-aimed 20 Sep 2026. The permission gate now sits IN FRONT of the evidence
+    # rule, so an unstamped provider is already refused for want of consent and
+    # the old target test stayed green against a raw-status read. The only
+    # assertion that can still see this is the opted-in-but-never-checked case.
     Name = "R111: gate must not read the raw status"
     File = $Gate
     Find = 'return providerObservedDown(provider);'
     Replace = 'return provider.healthStatus === "down";'
-    Expect = "admits entry to a provider that has never been health checked"
+    Expect = "needs the evidence AND the permission"
+  },
+  @{
+    Name = "automatic block is withheld without consent"
+    File = $Gate
+    Find = 'if (provider.autoOutageResponseEnabled !== true) return false;'
+    Replace = 'if (false) return false;'
+    Expect = "withholds the automatic block unless the operator opted in"
+  },
+  @{
+    Name = "query form carries the consent as well as the evidence"
+    File = $Gate
+    Find = '  autoOutageResponseEnabled: true,'
+    Replace = ''
+    Expect = "the query form carries the permission as well as the evidence"
+  },
+  @{
+    Name = "entry list query uses the consent form"
+    File = $Gate
+    Find = '$or: [{ enabled: false }, PROVIDER_AUTO_OUTAGE_FILTER],'
+    Replace = '$or: [{ enabled: false }, PROVIDER_OBSERVED_DOWN_FILTER],'
+    Expect = "both readers of the stored status go through the shared rule"
   },
   @{
     Name = "observed-down needs the status, not only the stamp"
@@ -54,14 +79,14 @@ $probes = @(
   @{
     Name = "single-provider read projects the stamp"
     File = $Gate
-    Find = '.select("enabled healthStatus healthDownSince")'
+    Find = '.select("enabled healthStatus healthDownSince autoOutageResponseEnabled")'
     Replace = '.select("enabled healthStatus")'
     Expect = "both readers of the stored status go through the shared rule"
   },
   @{
     Name = "R111: pause worker must not read the raw status (structural)"
     File = $Pause
-    Find = '    PROVIDER_OBSERVED_DOWN_FILTER,'
+    Find = '    PROVIDER_AUTO_OUTAGE_FILTER,'
     Replace = '    { healthStatus: "down" },'
     Expect = "both readers of the stored status go through the shared rule"
   },
@@ -69,7 +94,7 @@ $probes = @(
     Name = "R111: pause worker must not read the raw status (behavioural)"
     File = $Pause
     Suite = $PauseSuite
-    Find = '    PROVIDER_OBSERVED_DOWN_FILTER,'
+    Find = '    PROVIDER_AUTO_OUTAGE_FILTER,'
     Replace = '    { healthStatus: "down" },'
     Expect = "does not pause a provider that has never been health checked"
   },

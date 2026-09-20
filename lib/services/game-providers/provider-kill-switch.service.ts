@@ -6,9 +6,17 @@
  *      round/event evidence (short window — "is it broken now").
  *   2. Bump or reset `healthFailureStreak`. Three consecutive failures →
  *      `degraded`; sustained failure → `down` and stamp `healthDownSince`.
- *   3. If `down` for more than 15 minutes, set `enabled: false` (new contests
- *      and rounds refuse via `resolveEnabledProvider`). Live contests continue.
- *   4. Record a critical SecurityAlert once per disable.
+ *   3. If `down` for more than 15 minutes, record a critical SecurityAlert — once
+ *      per outage episode, whatever happens next.
+ *   4. THEN, and only if the operator set `autoOutageResponseEnabled` on that
+ *      provider, set `enabled: false` (new contests and rounds refuse via
+ *      `resolveEnabledProvider`). Live contests continue either way.
+ *
+ * Owner decision, 20 September 2026: step 4 is opt-in per provider and off by
+ * default. Taking a supplier off sale is an operator's call. Step 3 is not opt-in,
+ * because the operator making that call needs to be told there is one to make —
+ * and the alert used to be a side effect of the disable, so without splitting them
+ * switching the automation off would also switch off the notice.
  *
  * No catalogue HTTP ping in this slice — evidence is the same shape the admin
  * health screen already trusts. Idle providers (`no_evidence`) do not accumulate
@@ -47,6 +55,12 @@ export interface KillSwitchProviderResult {
   healthStatus: "healthy" | "degraded" | "down";
   disabled: boolean;
   alerted: boolean;
+  /**
+   * The outage lasted long enough to act on, and the operator has not opted in.
+   * Reported rather than left silent: "0 disabled" is the same number whether
+   * nothing was wrong or four providers were down and nobody had asked us to act.
+   */
+  autoResponseWithheld: boolean;
 }
 
 export interface RunProviderKillSwitchSummary {
@@ -54,6 +68,8 @@ export interface RunProviderKillSwitchSummary {
   updated: number;
   disabled: number;
   alerts: number;
+  /** Outages past the 15-minute mark that were left alone because the flag is off. */
+  withheld: number;
   skipped: number;
   errors: string[];
   providers: KillSwitchProviderResult[];
@@ -191,8 +207,13 @@ async function loadEvidence(
 
 /**
  * Disable new contests/rounds for a provider. Claims via `enabled: true` so a
- * retried Agenda pass cannot double-alert. WhiteLabel is updated too because
+ * retried Agenda pass cannot disable twice. WhiteLabel is updated too because
  * `resolveEnabledProvider` reads that flag, not the GameProvider row.
+ *
+ * Correction, 20 September 2026: this claim used to gate the alert as well. It no
+ * longer does — `claimOutageAlert` owns that — because an operator who has opted
+ * out of automatic disabling still needs telling. The comment said "double-alert"
+ * and is corrected in place rather than retensed, since it was true for a fortnight.
  */
 async function disableProvider(providerKey: string): Promise<boolean> {
   const claimed = await GameProvider.findOneAndUpdate(
@@ -223,6 +244,34 @@ async function disableProvider(providerKey: string): Promise<boolean> {
 }
 
 /**
+ * Claim the one alert this outage episode is allowed, atomically.
+ *
+ * Previously the `enabled: true → false` write was the claim, which made the
+ * alert impossible without the disable. `outageAlertedAt` is the claim now: it is
+ * set only when it is absent or older than the current `healthDownSince`, so a
+ * retried Agenda pass finds it already stamped and a *later* outage — which gets
+ * a fresh `healthDownSince`, the old one being `$unset` on recovery — re-arms it.
+ */
+async function claimOutageAlert(
+  providerKey: string,
+  downSince: Date,
+  now: Date,
+): Promise<boolean> {
+  const claimed = await GameProvider.findOneAndUpdate(
+    {
+      providerKey,
+      $or: [
+        { outageAlertedAt: { $exists: false } },
+        { outageAlertedAt: null },
+        { outageAlertedAt: { $lt: downSince } },
+      ],
+    },
+    { $set: { outageAlertedAt: now } },
+  );
+  return Boolean(claimed);
+}
+
+/**
  * One Agenda pass over every enabled provider.
  */
 export async function runProviderKillSwitch(
@@ -233,6 +282,7 @@ export async function runProviderKillSwitch(
     updated: 0,
     disabled: 0,
     alerts: 0,
+    withheld: 0,
     skipped: 0,
     errors: [],
     providers: [],
@@ -246,6 +296,7 @@ export async function runProviderKillSwitch(
       healthStatus?: "healthy" | "degraded" | "down";
       healthFailureStreak?: number;
       healthDownSince?: Date | null;
+      autoOutageResponseEnabled?: boolean;
     }[]
   >();
 
@@ -289,33 +340,46 @@ export async function runProviderKillSwitch(
 
       let disabled = false;
       let alerted = false;
+      let autoResponseWithheld = false;
 
       if (
         next.healthStatus === "down" &&
         next.healthDownSince &&
         now.getTime() - next.healthDownSince.getTime() >= KILL_SWITCH_DOWN_MS
       ) {
-        disabled = await disableProvider(key);
-        if (disabled) {
-          summary.disabled += 1;
+        const mayAct = provider.autoOutageResponseEnabled === true;
 
+        // Alert first, and unconditionally. The operator who has asked to make
+        // this decision themselves is exactly the one who must hear about it.
+        if (await claimOutageAlert(key, next.healthDownSince, now)) {
           const alert = await recordSecurityAlert({
             alertType: "provider_kill_switch",
             severity: "critical",
             source: "provider-kill-switch",
             provider: key,
-            reason: `Provider "${key}" was automatically disabled after being down for more than 15 minutes. New contests and rounds are blocked; live contests continue.`,
+            reason: mayAct
+              ? `Provider "${key}" has been down for more than 15 minutes and is being automatically disabled. New contests and rounds are blocked; live contests continue.`
+              : `Provider "${key}" has been down for more than 15 minutes. Automatic response is OFF for this provider, so nothing has been blocked — new contests, entries and rounds are still being accepted. Switch the provider off by hand if you want it taken out of sale.`,
             metadata: {
               providerKey: key,
               healthDownSince: next.healthDownSince.toISOString(),
               streak: next.streak,
               observationMs: KILL_SWITCH_OBSERVATION_MS,
+              autoOutageResponseEnabled: mayAct,
             },
           });
           if (alert) {
             alerted = true;
             summary.alerts += 1;
           }
+        }
+
+        if (mayAct) {
+          disabled = await disableProvider(key);
+          if (disabled) summary.disabled += 1;
+        } else {
+          autoResponseWithheld = true;
+          summary.withheld += 1;
         }
       }
 
@@ -326,6 +390,7 @@ export async function runProviderKillSwitch(
         healthStatus: next.healthStatus,
         disabled,
         alerted,
+        autoResponseWithheld,
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

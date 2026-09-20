@@ -24,6 +24,7 @@ export type ProviderAvailabilityFacts = {
   enabled: boolean;
   healthStatus: "healthy" | "degraded" | "down" | string;
   healthDownSince?: Date | string | null;
+  autoOutageResponseEnabled?: boolean | null;
 };
 
 /**
@@ -61,16 +62,50 @@ export const PROVIDER_OBSERVED_DOWN_FILTER = {
 } as const;
 
 /**
- * A provider that is kill-switched off, or observed to be sustainedly down,
- * must not take new entry fees. Degraded still accepts entries — play may be
- * slow, but the contest can run.
+ * MAY THE PLATFORM ACT ON THIS OUTAGE BY ITSELF?
+ *
+ * Owner decision, 20 September 2026. `providerObservedDown` stays a statement of
+ * fact — the provider really is down and we really did observe it — and this is
+ * the separate question of whether anybody asked us to do something about it.
+ * Keeping the two apart is the point: the health worker, the alert and the admin
+ * health panel all still want the fact, and only the four automatic consequences
+ * (disable, refuse entries, pause live contests, cancel at the gun) want this.
+ *
+ * `=== true` rather than a truthy test, because absent is what every provider
+ * registered before the field existed reads as, and absent means nobody chose.
+ */
+export function systemMayActOnOutage(
+  provider: Pick<
+    ProviderAvailabilityFacts,
+    "healthStatus" | "healthDownSince" | "autoOutageResponseEnabled"
+  >,
+): boolean {
+  if (provider.autoOutageResponseEnabled !== true) return false;
+  return providerObservedDown(provider);
+}
+
+/** Query form of `systemMayActOnOutage`, for the two outage workers. */
+export const PROVIDER_AUTO_OUTAGE_FILTER = {
+  autoOutageResponseEnabled: true,
+  ...PROVIDER_OBSERVED_DOWN_FILTER,
+} as const;
+
+/**
+ * A provider that an operator has switched off, or one that is observed to be
+ * sustainedly down AND has been opted in to automatic handling, must not take
+ * new entry fees. Degraded still accepts entries — play may be slow, but the
+ * contest can run.
+ *
+ * `enabled` is checked unconditionally and deliberately: it is the operator's own
+ * switch, so it is honoured whatever the automation setting says. Gating it too
+ * would leave an operator unable to take a provider off sale at all.
  */
 export function providerBlocksEntries(
   provider: ProviderAvailabilityFacts | null | undefined,
 ): boolean {
   if (!provider) return true;
   if (provider.enabled === false) return true;
-  return providerObservedDown(provider);
+  return systemMayActOnOutage(provider);
 }
 
 export function providerKeyFromContest(contest: {
@@ -105,16 +140,18 @@ export function shouldHideUpcomingEmptyDuringOutage(
   if (seats > 0) return false;
   const key = providerKeyFromContest(contest);
   if (!key) return false;
-  if (blockingProviderKeys instanceof Set) {
-    return blockingProviderKeys.has(key);
-  }
-  return blockingProviderKeys.includes(key);
+  // Reason: narrow with `in`. Neither `instanceof Set` nor `Array.isArray` narrows a
+  // readonly union — the remaining branch keeps both members and so has neither
+  // `includes` nor `has`.
+  return "has" in blockingProviderKeys
+    ? blockingProviderKeys.has(key)
+    : blockingProviderKeys.includes(key);
 }
 
 /** Provider keys that currently refuse new paid entry. */
 export async function listProvidersBlockingEntries(): Promise<Set<string>> {
   const rows = await GameProvider.find({
-    $or: [{ enabled: false }, PROVIDER_OBSERVED_DOWN_FILTER],
+    $or: [{ enabled: false }, PROVIDER_AUTO_OUTAGE_FILTER],
   })
     .select("providerKey")
     .lean<{ providerKey: string }[]>();
@@ -129,7 +166,7 @@ export async function providerBlocksContestEntry(
   providerKey: string,
 ): Promise<boolean> {
   const row = await GameProvider.findOne({ providerKey })
-    .select("enabled healthStatus healthDownSince")
+    .select("enabled healthStatus healthDownSince autoOutageResponseEnabled")
     .lean<ProviderAvailabilityFacts | null>();
   return providerBlocksEntries(row);
 }

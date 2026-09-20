@@ -48,6 +48,37 @@ export interface IGameProvider extends Document {
    * X9 kill-switch worker; the admin health screen still DERIVES its verdict.
    */
   healthFailureStreak: number;
+  /**
+   * Whether the platform may act on this provider's outage BY ITSELF.
+   *
+   * Owner decision, 20 September 2026: taking a provider off sale is an operator's
+   * call, never the platform's. With this off - which is the default and what every
+   * existing row means - the health worker still watches, still records the status and
+   * still raises the critical alert, and then stops. It does not flip `enabled`, does
+   * not refuse new entries, does not pause live contests and does not cancel a contest
+   * at its gun. `enabled` remains the one switch, and only a human moves it.
+   *
+   * With it on, an operator has asked for the chapter 07 section 3 automation, and all
+   * four of those consequences apply.
+   *
+   * Reason it is per provider rather than one platform setting: a first-party provider
+   * we run ourselves and a contracted third party do not warrant the same trust, and a
+   * single switch forces the more cautious answer on both.
+   */
+  autoOutageResponseEnabled: boolean;
+  /**
+   * When the critical outage alert was last raised, used to claim it once per outage.
+   *
+   * Reason it exists at all: the alert used to be claimed by the `enabled: true → false`
+   * write, so it could only fire on a pass that also disabled the provider. Now that
+   * disabling is opt-in the alert has to survive without it, or switching the automation
+   * off would also switch off the only notice that anything is wrong - which is the
+   * opposite of what an operator asking to decide for themselves needs.
+   *
+   * Compared against `healthDownSince`, which is `$unset` on recovery, so a later outage
+   * always has a start after this stamp and re-arms the alert.
+   */
+  outageAlertedAt?: Date;
   lastCatalogueSyncAt?: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -119,6 +150,18 @@ const GameProviderSchema = new Schema<IGameProvider>(
       type: Number,
       default: 0,
       min: 0,
+    },
+    // Reason: defaults to FALSE, and the default is the decision rather than a starting
+    // point. A schema default fixes future rows only, so every provider registered before
+    // this field existed reads as absent - and absent has to mean "nobody asked for
+    // automation", because nobody did. Defaulting to true would switch the old behaviour
+    // back on everywhere and make this whole change invisible.
+    autoOutageResponseEnabled: {
+      type: Boolean,
+      default: false,
+    },
+    outageAlertedAt: {
+      type: Date,
     },
     lastCatalogueSyncAt: {
       type: Date,

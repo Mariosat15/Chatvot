@@ -36,7 +36,10 @@ import {
   KILL_SWITCH_DEGRADED_STREAK,
 } from "../../lib/services/game-providers/provider-kill-switch.service";
 
-const recordAlert = vi.fn(async () => ({ _id: "alert" }));
+// Reason: declare the parameters. A zero-arg mock makes `mock.calls` a tuple of
+// length 0, so reading `calls[0][0]` — which is how the alert's contents are
+// asserted below — fails to typecheck while the test itself passes.
+const recordAlert = vi.fn(async (..._args: unknown[]) => ({ _id: "alert" }));
 
 vi.mock("@/lib/services/security/security-alert.service", () => ({
   recordSecurityAlert: (...args: unknown[]) => recordAlert(...args),
@@ -226,17 +229,10 @@ describe("runProviderKillSwitch", () => {
     expect(row?.healthFailureStreak).toBe(0);
   });
 
-  it("disables after sustained down and alerts once", async () => {
-    const downSince = new Date(Date.now() - KILL_SWITCH_DOWN_MS - 60_000);
-    await seedEnabledProvider({
-      healthStatus: "down",
-      healthFailureStreak: KILL_SWITCH_DOWN_STREAK,
-      healthDownSince: downSince,
-    });
-
-    // Failure evidence so no_evidence does not freeze the prior state alone.
+  /** A round of failure evidence, so `no_evidence` does not freeze the prior state. */
+  async function seedFailureEvidence() {
     await GameRound.create({
-      roundId: `cv_rnd_kill_${Date.now()}`,
+      roundId: `cv_rnd_kill_${Date.now()}_${Math.random().toString(36).slice(2)}`,
       providerKey: MOCK_PROVIDER_KEY,
       gameCode: "mock",
       gameKey: `provider:${MOCK_PROVIDER_KEY}:mock`,
@@ -249,9 +245,61 @@ describe("runProviderKillSwitch", () => {
       expiresAt: new Date(Date.now() + 60_000),
       pollAttempts: 0,
     });
+  }
+
+  /**
+   * THE DEFAULT, AND IT IS THE ONE THAT CHANGED (owner decision, 20 Sep 2026).
+   *
+   * The platform may watch and must shout; it may not take a provider off sale
+   * on its own. This is deliberately asserted as a pair with the test below:
+   * asserting only that a flagless provider survives is equally green against a
+   * worker that has stopped noticing outages altogether, which is why the alert
+   * is required here rather than merely permitted.
+   */
+  it("alerts but does NOT disable when automatic response was never enabled", async () => {
+    const downSince = new Date(Date.now() - KILL_SWITCH_DOWN_MS - 60_000);
+    await seedEnabledProvider({
+      healthStatus: "down",
+      healthFailureStreak: KILL_SWITCH_DOWN_STREAK,
+      healthDownSince: downSince,
+    });
+    await seedFailureEvidence();
+
+    const summary = await runProviderKillSwitch(new Date());
+    expect(summary.disabled).toBe(0);
+    expect(summary.withheld).toBe(1);
+    expect(recordAlert).toHaveBeenCalledTimes(1);
+
+    const row = await GameProvider.findOne({
+      providerKey: MOCK_PROVIDER_KEY,
+    }).lean<{ enabled?: boolean; outageAlertedAt?: Date }>();
+    expect(row?.enabled).toBe(true);
+    expect(row?.outageAlertedAt).toBeInstanceOf(Date);
+
+    // Still enabled, so the worker examines it again every minute. The alert is
+    // claimed per outage episode rather than per pass, or an unattended outage
+    // pages somebody sixty times an hour and the next real one is ignored.
+    recordAlert.mockClear();
+    const again = await runProviderKillSwitch(new Date());
+    expect(again.disabled).toBe(0);
+    expect(again.withheld).toBe(1);
+    expect(recordAlert).not.toHaveBeenCalled();
+  });
+
+  it("disables after sustained down and alerts once", async () => {
+    const downSince = new Date(Date.now() - KILL_SWITCH_DOWN_MS - 60_000);
+    await seedEnabledProvider({
+      healthStatus: "down",
+      healthFailureStreak: KILL_SWITCH_DOWN_STREAK,
+      healthDownSince: downSince,
+      autoOutageResponseEnabled: true,
+    });
+
+    await seedFailureEvidence();
 
     const summary = await runProviderKillSwitch(new Date());
     expect(summary.disabled).toBe(1);
+    expect(summary.withheld).toBe(0);
     expect(recordAlert).toHaveBeenCalledTimes(1);
     expect(recordAlert.mock.calls[0][0]).toMatchObject({
       alertType: "provider_kill_switch",

@@ -68,6 +68,7 @@ const { WhiteLabel } = await import("../../database/models/whitelabel.model");
 const {
   registerProvider,
   setProviderEnabled,
+  setProviderAutoOutageResponse,
   saveCredentials,
   completeRotation,
   listProviders,
@@ -657,6 +658,135 @@ describe("X6 game providers admin", () => {
     it("defaults a freshly cached title to off", async () => {
       const title = await seedTitle();
       expect(title.chartvoltEnabled).toBe(false);
+    });
+  });
+
+  // ------------------------------------------- the automatic-outage-response switch
+
+  /**
+   * OWNER DECISION, 20 SEPTEMBER 2026: the platform does not take a provider off sale by
+   * itself. Disabling a provider stops every new competition and challenge on its games, so
+   * it is an operator's decision, made with the manual switch. The automation that used to
+   * do it unasked is now a second, separate switch that is off until somebody turns it on.
+   *
+   * The two switches answer two different questions and the copy on the card says so:
+   * `enabled` is "are these games on sale", `autoOutageResponseEnabled` is "may the platform
+   * take them off sale without me". Conflating them is the reason the pair is tested here
+   * together rather than in two places.
+   */
+  describe("automatic outage response", () => {
+    beforeEachRegisterMock();
+
+    it("is off on a freshly registered provider", async () => {
+      // A schema default fixes future rows only, so this is also the statement that no
+      // existing provider silently acquired the automation when the field was added.
+      const stored = await GameProvider.findOne({
+        providerKey: MOCK_PROVIDER_KEY,
+      });
+      expect(stored?.autoOutageResponseEnabled).toBe(false);
+
+      const row = (await listProviders()).find(
+        (p) => p.providerKey === MOCK_PROVIDER_KEY,
+      );
+      expect(row?.autoOutageResponseEnabled).toBe(false);
+    });
+
+    it("turns on and off again, and never touches the sale switch", async () => {
+      /*
+       * The load-bearing half is the `enabled` assertion, in BOTH directions.
+       *
+       * A provider is on sale and has no automation: that is the new default, and an
+       * implementation that reused `setProviderEnabled`'s update - or wrote both fields in
+       * one `$set` - would take the games off sale as a side effect of an operator saying
+       * "watch this one for me", which reads in the audit log exactly like the automatic
+       * shutdown this change exists to remove.
+       */
+      const on = await setProviderAutoOutageResponse(MOCK_PROVIDER_KEY, true);
+      expect(on.success).toBe(true);
+      let stored = await GameProvider.findOne({
+        providerKey: MOCK_PROVIDER_KEY,
+      });
+      expect(stored?.autoOutageResponseEnabled).toBe(true);
+      expect(stored?.enabled).toBe(false); // registration leaves it off; unchanged.
+
+      const off = await setProviderAutoOutageResponse(MOCK_PROVIDER_KEY, false);
+      expect(off.success).toBe(true);
+      stored = await GameProvider.findOne({ providerKey: MOCK_PROVIDER_KEY });
+      expect(stored?.autoOutageResponseEnabled).toBe(false);
+      expect(stored?.enabled).toBe(false);
+    });
+
+    it("refuses an unknown provider rather than creating one", async () => {
+      const result = await setProviderAutoOutageResponse("nobody", true);
+      expect(result.success).toBe(false);
+      expect(await GameProvider.countDocuments({ providerKey: "nobody" })).toBe(
+        0,
+      );
+    });
+
+    it("refuses a request that carries both switches, so each is audited on its own", () => {
+      /*
+       * Two decisions in one request produce one audit entry, and the entry can only
+       * describe one of them. "Provider disabled" with no record that the automation was
+       * turned on at the same moment is the version of this screen that cannot answer "who
+       * took these games off sale, and did they mean to".
+       *
+       * Structural rather than behavioural because the refusal is in the route, and the
+       * assertion names both field reads so a check on one alone cannot satisfy it.
+       */
+      const route = readCode(
+        "apps/admin/app/api/games/providers/[providerKey]/route.ts",
+      );
+      expect(route).toMatch(
+        /typeof\s+body\.enabled\s*===\s*"boolean"\s*&&\s*typeof\s+body\.autoOutageResponseEnabled\s*===\s*"boolean"/,
+      );
+      // The CALL, not the name: the import line names it too, so a bare `toContain` is
+      // satisfied by a route that imports the service and never reaches it.
+      expect(route).toMatch(
+        /await setProviderAutoOutageResponse\(\s*providerKey,\s*body\.autoOutageResponseEnabled,?\s*\)/,
+      );
+
+      // The refusal has to precede both handlers, or the first one runs and the request is
+      // then rejected having already changed something.
+      const refusalIndex = route.indexOf("one at a time");
+      const autoHandlerIndex = route.indexOf(
+        "await setProviderAutoOutageResponse(",
+      );
+      const enabledHandlerIndex = route.indexOf("await setProviderEnabled(");
+      expect(refusalIndex).toBeGreaterThan(-1);
+      expect(autoHandlerIndex).toBeGreaterThan(refusalIndex);
+      expect(enabledHandlerIndex).toBeGreaterThan(refusalIndex);
+    });
+
+    it("records which automation was changed, and what it now permits", () => {
+      // An audit line saying only "settings updated" is unreadable six weeks later, and
+      // this is the setting that decides whether the platform may stop taking money.
+      const route = readCode(
+        "apps/admin/app/api/games/providers/[providerKey]/route.ts",
+      );
+      expect(route).toMatch(/Automatic outage response \$\{/);
+      expect(route).toContain("newValue: body.autoOutageResponseEnabled");
+    });
+
+    it("renders both switches on the card, each saying what it permits", () => {
+      /*
+       * Asserted as TWO `<Switch` elements with two distinct handlers, because a card that
+       * renders one switch and describes two is the screen an operator reads as "I have
+       * turned the automation off" while their games are still being pulled by a worker.
+       */
+      const section = readCode(
+        "apps/admin/components/admin/games/GameProvidersSection.tsx",
+      );
+      const switches = (section.match(/<Switch\b/g) ?? []).length;
+      expect(switches).toBeGreaterThanOrEqual(2);
+      expect(section).toContain("onCheckedChange={onToggleAutoResponse}");
+      expect(section).toContain("onCheckedChange={onToggle}");
+      expect(section).toContain("provider.autoOutageResponseEnabled");
+
+      // Reason: the difference between the two is the only thing that makes the pair
+      // usable, so the copy must name the consequence rather than the field.
+      expect(section).toMatch(/by itself/i);
+      expect(section).toMatch(/stay your decision/i);
     });
   });
 

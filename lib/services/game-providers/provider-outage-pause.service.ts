@@ -29,7 +29,7 @@ import {
   loadProviderEvidence,
   KILL_SWITCH_OBSERVATION_MS,
 } from "@/lib/services/game-providers/provider-kill-switch.service";
-import { PROVIDER_OBSERVED_DOWN_FILTER } from "@/lib/services/game-providers/provider-entry-gate";
+import { PROVIDER_AUTO_OUTAGE_FILTER } from "@/lib/services/game-providers/provider-entry-gate";
 
 export interface OutagePauseSummary {
   examinedDown: number;
@@ -68,12 +68,15 @@ export async function runProviderOutagePause(
 
   const since = new Date(now.getTime() - KILL_SWITCH_OBSERVATION_MS);
 
-  // --- Pause: every provider OBSERVED to be down ---
-  // Reason: `healthStatus` alone defaults to "down", so the bare status query
-  // matched every provider that has never been health checked and would have
-  // system-paused perfectly healthy live contests. See `providerObservedDown`.
+  // --- Pause: providers OBSERVED down whose operator asked us to act ---
+  // Two conditions, for two different reasons. `healthStatus` alone defaults to
+  // "down", so the bare status query matched every provider that has never been
+  // health checked and would have system-paused perfectly healthy live contests
+  // (R111). And `autoOutageResponseEnabled` is the operator's consent: pausing a
+  // contest people are playing is an intervention, so it is opt-in per provider.
+  // See `systemMayActOnOutage`.
   const downProviders = await GameProvider.find(
-    PROVIDER_OBSERVED_DOWN_FILTER,
+    PROVIDER_AUTO_OUTAGE_FILTER,
   ).lean<{ providerKey: string }[]>();
 
   for (const provider of downProviders) {
@@ -110,6 +113,11 @@ export async function runProviderOutagePause(
   }
 
   // --- Resume: system-outage pauses whose provider evidence is ok again ---
+  // Deliberately NOT gated on `autoOutageResponseEnabled`. The flag governs whether
+  // we may intervene, not whether we may undo an intervention we already made — and
+  // an operator switching the automation off mid-outage is the likeliest moment for
+  // it to matter. Gated, that switch would strand every system-paused contest paused
+  // for ever, with nothing to log and nobody told.
   const pausedContests = await Competition.find({
     status: "active",
     isPaused: true,

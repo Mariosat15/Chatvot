@@ -244,6 +244,23 @@ rate and callback arrival rate. Three consecutive failures marks the provider
 > that s3.3 below already carried this exact caution and scoped it to the *health dashboard* —
 > the caution was right and its scope was too narrow.
 
+> **AMENDED AGAIN 20 September 2026 (owner decision), and this is the larger change of the
+> two: every automatic response in this section is now OPT-IN PER PROVIDER.** The table
+> below describes what the platform does when an operator has switched
+> `GameProvider.autoOutageResponseEnabled` on for that provider. The field **defaults to
+> `false`**, and with it off the platform **watches and alerts and changes nothing** — it
+> does not stop entry, does not hide a contest, does not pause a running one and does not
+> take the provider off sale. A document presenting any row below as unconditional is
+> describing the version the owner rejected. The predicate is `systemMayActOnOutage`, which
+> is `providerObservedDown` **and** the consent, with `PROVIDER_AUTO_OUTAGE_FILTER` as its
+> query form; **`providerObservedDown` survives unchanged and is still the evidence half**,
+> so R111 above is not superseded by this — a consented provider still needs the stamp.
+> **One asymmetry is deliberate and is the thing most likely to be "tidied" away: RESUME is
+> NOT gated on the consent.** The flag governs whether we may intervene, never whether we
+> may undo an intervention already made, and an operator switching the automation off
+> mid-outage is the likeliest moment for it to matter — gated, that switch would strand
+> every system-paused contest paused for ever, with nothing to log and nobody told.
+
 | State | Response |
 |---|---|
 | **Not yet open** | Hide the contest. Postpone or cancel with full refunds before anyone pays — **BUILT** (hide empty upcoming; cancel-at-gun covers the rest) |
@@ -272,6 +289,23 @@ their scores, and the contest completes late rather than not at all.
 > full `06` s10 monitors (**BUILT X9 slice 4**) and re-settle (**BUILT X9 slice 5**). Outage pause/extend:
 
 > **BUILT X9 slice 3** (see s3.2).
+
+> **AMENDED 20 September 2026 (owner decision): the kill switch no longer disables a
+> provider unless an operator asked it to.** The paragraph below said "automatically
+> disable", and that is now conditional on `autoOutageResponseEnabled`, which defaults to
+> `false`. **What is unconditional is the watching and the shouting** — the worker still
+> classifies evidence, still moves `healthStatus` and `healthFailureStreak`, and still
+> raises the critical `provider_kill_switch` alert — so a document describing the
+> withholding as the worker being switched off is wrong, and the pair of tests is written
+> that way on purpose: asserting only that a flagless provider survives is equally green
+> against a worker that has stopped noticing outages altogether. Two further facts.
+> **`RunProviderKillSwitchSummary.withheld` counts the providers it declined to disable**,
+> which is the difference between "no outage" and "an outage nobody let me act on" — the
+> `classify, never merely count` rule applied to the summary. And **the alert is claimed
+> once per outage EPISODE, not once per pass**, by an atomic `outageAlertedAt` update
+> keyed against `healthDownSince`: a withheld provider stays `enabled: true`, so the
+> worker examines it again every minute, and without the claim an unattended outage pages
+> somebody sixty times an hour until the next real one is ignored.
 
 If a provider is `down` for more than 15 minutes, automatically disable **new**
 contest creation and new round creation for that provider, and notify admins. Live

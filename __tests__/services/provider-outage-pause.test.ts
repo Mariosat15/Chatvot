@@ -87,6 +87,10 @@ async function seedProvider(overrides: Record<string, unknown> = {}) {
     healthStatus: "down",
     healthFailureStreak: 5,
     healthDownSince: new Date(Date.now() - 5 * 60_000),
+    // Reason: this helper seeds the case where the worker is SUPPOSED to act, so
+    // the opt-in is part of that case (owner decision, 20 Sep 2026). The default
+    // is off, and the test below seeds a provider without it deliberately.
+    autoOutageResponseEnabled: true,
     ...overrides,
   });
 }
@@ -182,6 +186,27 @@ describe("runProviderOutagePause — pause on down", () => {
   });
 
   /**
+   * Owner decision, 20 Sep 2026: the platform does not take a provider's games
+   * out of play on its own. Pausing a live contest is the most visible thing
+   * this worker can do — a banner and a notification to every participant — so
+   * it is withheld unless an operator has switched the automation on for that
+   * provider. Note the evidence here is a REAL observed outage: the point is
+   * that an outage alone is no longer authority to act.
+   */
+  it("does not pause when automatic outage response was never enabled", async () => {
+    await seedProvider({ autoOutageResponseEnabled: false });
+    const contest = await seedActiveContest();
+
+    const summary = await runProviderOutagePause(new Date());
+    expect(summary.paused).toBe(0);
+    expect(summary.skippedAlreadyPaused).toBe(0);
+
+    const row = await Competition.findById(contest._id);
+    expect(row?.isPaused).not.toBe(true);
+    expect(row?.pauseHistory ?? []).toHaveLength(0);
+  });
+
+  /**
    * R111, 20 Sep 2026. `healthStatus` defaults to `"down"` and the kill-switch
    * worker leaves it alone while there is no evidence, so the bare status query
    * this worker used to run matched every provider that has never produced a
@@ -263,6 +288,40 @@ describe("runProviderOutagePause — resume on recovery", () => {
     // Health cleared for the next kill-switch pass; enable stays operator-owned.
     expect(provider?.healthStatus).toBe("healthy");
     expect(provider?.enabled).toBe(false);
+  });
+
+  /**
+   * THE ASYMMETRY, AND IT IS DELIBERATE. The opt-in governs whether the platform
+   * may intervene, never whether it may undo an intervention it already made —
+   * and an operator switching the automation off mid-outage is the likeliest
+   * moment for that to matter. Gated both ways, that switch would strand every
+   * system-paused contest paused for ever, with nothing to log and nobody told.
+   */
+  it("resumes a system pause even after the automation was switched off", async () => {
+    const pausedAt = new Date(Date.now() - 30 * 60_000);
+    await seedProvider({
+      autoOutageResponseEnabled: false,
+      healthStatus: "down",
+    });
+    const contest = await seedActiveContest({
+      isPaused: true,
+      pausedAt,
+      pauseReason: "Provider outage",
+      pauseHistory: [
+        {
+          pausedAt,
+          reason: "Provider outage",
+          pausedBy: SYSTEM_OUTAGE_PAUSED_BY,
+        },
+      ],
+    });
+    await seedOkEvidence();
+
+    const summary = await runProviderOutagePause(new Date());
+    expect(summary.resumed).toBe(1);
+
+    const row = await Competition.findById(contest._id);
+    expect(row?.isPaused).toBe(false);
   });
 
   it("never auto-resumes a manual pause", async () => {

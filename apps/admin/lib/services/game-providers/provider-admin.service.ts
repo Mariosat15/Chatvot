@@ -62,6 +62,13 @@ export interface ProviderSummary {
   // mirrored migration for a cosmetic gain, and the `entryBlockThreshold` precedent is to
   // keep the name and document it as historical) but they leave this service. Health is
   // DERIVED by `lib/services/games/provider-health.service.ts` from rounds and deliveries.
+  /**
+   * Whether the platform may take this provider off sale by itself during an outage.
+   *
+   * Deliberately NOT the health verdict, which is still derived and still absent from
+   * this shape for the reason above. This is a stored operator decision, not a reading.
+   */
+  autoOutageResponseEnabled: boolean;
   lastCatalogueSyncAt?: Date;
   /** False when no code adapter is installed for this key. Blocks enabling. */
   adapterInstalled: boolean;
@@ -157,6 +164,7 @@ export async function listProviders(): Promise<ProviderSummary[]> {
       logoUrl: provider.logoUrl,
       baseUrl: provider.baseUrl,
       enabled: provider.enabled,
+      autoOutageResponseEnabled: provider.autoOutageResponseEnabled === true,
       lastCatalogueSyncAt: provider.lastCatalogueSyncAt,
       adapterInstalled: Boolean(getProviderAdapter(provider.providerKey)),
       // Presence only. Never the values.
@@ -360,6 +368,36 @@ export async function setProviderEnabled(
     ];
   }
   await settings.save();
+
+  return { success: true };
+}
+
+/**
+ * Turn the automatic outage response on or off for one provider.
+ *
+ * SEPARATE FROM `setProviderEnabled` ON PURPOSE. They read as two halves of one
+ * setting and they are two different decisions: `enabled` is whether the provider
+ * is on sale right now, this is whether the platform may change that answer without
+ * being asked. Folding them into one call would mean one audit entry covering two
+ * decisions, and an operator could not tell afterwards which one they had made.
+ *
+ * Unlike enabling, this takes NO adapter or credential check. Those refusals exist
+ * because enabling into a broken configuration is a switch that silently does
+ * nothing; this switch only ever narrows or widens what a worker may do later, and
+ * a provider with no adapter is skipped by that worker anyway.
+ */
+export async function setProviderAutoOutageResponse(
+  providerKey: string,
+  autoOutageResponseEnabled: boolean,
+): Promise<ProviderAdminResult> {
+  await connectToDatabase();
+
+  const updated = await GameProvider.findOneAndUpdate(
+    { providerKey },
+    { $set: { autoOutageResponseEnabled } },
+    { new: true },
+  );
+  if (!updated) return { success: false, error: "Provider not found." };
 
   return { success: true };
 }

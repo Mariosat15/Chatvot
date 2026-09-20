@@ -31,6 +31,11 @@ export interface GameProviderRow {
   // down, so they are deliberately kept off the wire. Health is derived from rounds and
   // deliveries by `provider-health.service.ts` instead. Same reasoning as deleting a dead
   // helper rather than leaving it as a one-line invitation to reintroduce the defect.
+  //
+  // `autoOutageResponseEnabled` is a different kind of thing from those two and is here
+  // for that reason: it is a stored operator decision, not a health reading, so nothing
+  // about it can report a working provider as down.
+  autoOutageResponseEnabled: boolean;
   lastCatalogueSyncAt?: string;
   adapterInstalled: boolean;
   credentials: ProviderCredentialStatus | null;
