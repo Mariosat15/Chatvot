@@ -371,14 +371,14 @@ Ordered by visibility, so the highest-impact strings change first.
 | Pass | Scope | ~strings | Who | Status |
 |---|---|---|---|---|
 | 1 | Navigation - `UserSidebar.tsx`, `MobileBottomNav.tsx` | ~10 | Developer | **BUILT 19 Sep 2026** — see s3.2a |
-| 2 | Level titles, via the `XPConfig` database record | 20 | Admin | Outstanding (R88 closed in X6.5; content still operator) |
+| 2 | Level titles, via the `XPConfig` database record | 20 | Admin | **OWNER DONE 20 Sep 2026** (R88 eng closed earlier; content operator-reported) |
 | 3 | Contest shell — `components/games/` (+ trading lobby keeps trading language) | ~50 | Developer | **BUILT 19 Sep 2026** — see s3.2b |
 | 4 | Leaderboard columns and headings | ~25 | Developer | **BUILT 19 Sep 2026** — see s3.2c |
 | 5 | Dashboard header and section titles | ~30 | Developer | **BUILT 19 Sep 2026** — see s3.2d |
 | 6 | Profile tabs and headings | ~30 | Developer | **BUILT 19 Sep 2026** — see s3.2e |
-| 7 | Notification and email templates (database) | ~25 templates | Admin | Outstanding |
-| 8 | Badge and milestone **content** - never IDs | data | Admin | Outstanding |
-| 9 | Landing and hero content (database) | data | Admin | Outstanding |
+| 7 | Notification and email templates (database) | ~25 templates | Admin | **OWNER DONE 20 Sep 2026** |
+| 8 | Badge and milestone **content** - never IDs | data | Admin | **OWNER DONE 20 Sep 2026** |
+| 9 | Landing and hero content (database) | data | Admin | **OWNER DONE 20 Sep 2026** |
 | 10 | Help centre chrome (TOC, H2s, FAQ groups, quick-nav) | ~40 | Developer | **BUILT 19 Sep 2026** — see s3.2f |
 | 11 | Legal pages (`SitePage` ToS / privacy / action-terms) | separate | Legal | **ENG TRIPWIRE BUILT 20 Sep 2026** — see s3.2g; **content review still Legal** |
 
@@ -534,7 +534,7 @@ decide games-first vs simulated-trading language; re-prompt acceptance if materi
 align landing `footerRiskDisclaimer` / LP risk copy with counsel (adjacent to pass 9).
 Do **not** treat a green suite as sign-off on contract wording.
 
-**Not built by eng:** pass 2, 7–9 (admin/content); counsel-approved body rewrites.
+**Owner content (passes 2, 7–9): DONE 20 Sep 2026** (owner-reported). **Still Legal:** counsel-approved body rewrites (pass 11).
 
 ---
 

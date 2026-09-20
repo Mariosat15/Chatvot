@@ -28,9 +28,10 @@ import type { UnresolvedRoundPolicy } from "./round-types";
  *
  * WHAT THIS PHASE BUILDS, AND WHAT IT DOES NOT
  * --------------------------------------------
- * X3 builds the decision. Running it on a schedule is E7/X8's job (chapter 09), so nothing
- * here assumes a worker - `reconcileRound` is called once per round and the caller owns the
- * loop. That also makes the schedule testable without waiting real minutes.
+ * X3 builds the decision. Running it on a schedule was E7/X9's job — and as of 20 Sep
+ * 2026 that caller is `run-round-reconciliation.ts` on the Agenda worker. This file still
+ * does not know a worker exists: `reconcileRound` is called once per round and the caller
+ * owns the loop, which is what keeps the schedule testable without waiting real minutes.
  *
  * The `exclude` policy's REFUND is deliberately not performed here. See
  * `applyUnresolvedPolicy` for why.
@@ -294,8 +295,9 @@ async function applyUnresolvedPolicy(
  * Finds rounds the net should look at, using the `{ status, expiresAt }` index.
  *
  * Reason it returns rounds rather than reconciling them: the caller owns the per-contest
- * config, and E7/X8 owns the schedule. Keeping the query separate means the worker can page
- * through a backlog without this file knowing a worker exists.
+ * config, and the Agenda job in `run-round-reconciliation.ts` owns the schedule. Keeping
+ * the query separate means the worker can page through a backlog without this file knowing
+ * a worker exists.
  */
 export async function findRoundsNeedingReconciliation(
   limit = 100,

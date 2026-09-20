@@ -80,9 +80,9 @@ in-house game on the backlog as insurance moved *forward* to before X4 rather th
 doubles as the reference implementation that proves the provider seam. **Two things not to
 misread.** It **modifies** the external-only decision - the sentence "no in-house game is
 built" is now false, though the programme is still external-*first* and `New games plan` P2's
-Trivia game is still not being built. And **risk X8 is reduced when X4a ships, not now**: until
-the game is playable the exposure is exactly what it was, and the existence of a plan must not
-be allowed to feel like a mitigation.
+Trivia game is still not being built. And **risk X8 was reduced when X4a shipped by click** — **CLOSED 20 Sep 2026** (owner
+reported the click-acceptance runbook succeeded). A document saying it stays open until
+the game is playable is correct as history and stale as a present fact — **say which**.
 
 ---
 

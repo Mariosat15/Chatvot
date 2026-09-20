@@ -22,6 +22,9 @@ export type SecurityAlertType =
   | "brute_force_detected"
   | "ato_attempt"
   | "rate_limit_exceeded"
+  // Reason: chapter 06 s10 names "Round unresolved past grace" as Critical. Added
+  // add-only for X9's scheduled reconciliation net — never remove; documents may store it.
+  | "round_unresolved"
   | "other";
 
 export type SecurityAlertSeverity = "low" | "medium" | "high" | "critical";
@@ -70,6 +73,7 @@ const SecurityAlertSchema = new Schema<ISecurityAlert>(
         "brute_force_detected",
         "ato_attempt",
         "rate_limit_exceeded",
+        "round_unresolved",
         "other",
       ],
       index: true,

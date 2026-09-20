@@ -31,6 +31,8 @@ export type NotificationType =
   | "competition_prize_received"
   | "competition_disqualified"
   | "competition_cancelled"
+  // Provider round never reported (X9 reconciliation stage 4)
+  | "round_unresolved"
   // 1v1 Challenges
   | "challenge_received"
   | "challenge_accepted"
@@ -1204,6 +1206,28 @@ function getDefaultTemplates(): Partial<INotificationTemplate>[] {
       channels: { inApp: true, email: true, push: false },
       actionUrl: "/challenges",
       actionText: "Create Another",
+    },
+    {
+      templateId: "round_unresolved",
+      name: "Round Unresolved",
+      description:
+        "Sent when the reconciliation net gives up waiting for a provider result (stage 4)",
+      // Reason: competition category covers the paid multiplayer case; challenge rounds
+      // still use this template and pass their own actionUrl. A second template would
+      // duplicate the policy wording and drift.
+      category: "competition",
+      type: "round_unresolved",
+      title: "Round result not received",
+      message: "{{policyMessage}}",
+      icon: "⚠️",
+      priority: "high",
+      color: "#EF4444",
+      isEnabled: true,
+      isDefault: true,
+      isCustom: false,
+      channels: { inApp: true, email: true, push: true },
+      actionUrl: "{{actionUrl}}",
+      actionText: "View Contest",
     },
     {
       templateId: "challenge_won",

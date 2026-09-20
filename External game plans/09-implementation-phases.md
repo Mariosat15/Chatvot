@@ -580,13 +580,19 @@ on the grounds that a component is heavily used, grep for its importer.**
 
 ### E7 - Resilience, reconciliation and monitoring
 
-- Reconciliation job on the worker
-- Provider health checks and automatic degradation
-- Automatic kill switch after sustained downtime
-- Pause and extend on outage
-- Every alert from `06` section 10
-- Admin health dashboard
-- Re-settlement capability
+- **Reconciliation job on the worker** — **BUILT 20 Sep 2026** (X9 slice 1).
+  `run-round-reconciliation.ts` + Agenda `round-reconciliation` every minute.
+  Stage 4 writes `unresolved`, records `round_unresolved` SecurityAlert, notifies
+  the player. Say schedule code-complete, not E7/X9 done.
+- Provider health checks and automatic degradation — **health dashboard BUILT (X6)**;
+  **automatic degradation that acts is still owed**
+- Automatic kill switch after sustained downtime — **owed**
+- Pause and extend on outage — **manual pause/extend BUILT (X6)**; **outage-driven
+  auto pause+extend owed**
+- Every alert from `06` section 10 — **partial** (unresolved-past-grace now fires
+  from the scheduled net; threshold monitors still owed)
+- Admin health dashboard — **BUILT (X6)**
+- Re-settlement capability — **owed** (adjust-results exists; dedicated re-settle does not)
 
 **Done when:** the provider can be taken offline mid-contest and the contest still
 completes correctly, late, with players correctly informed.

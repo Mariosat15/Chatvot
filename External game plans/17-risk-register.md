@@ -24,7 +24,7 @@ chapter covers risks to the programme and to the application.
 | **X2** | Single supplier on the critical path | **High** | Medium | All |
 | **X3** | No cost floor - per-round fee kills cheap contests | **High** | Medium | Before X4 |
 | **X7** | Game Master provider contest is net loss-making | **High** | **High** if ungated | Before X6 |
-| **X8** | **No fallback game** now external-only is decided - X2 with its mitigation removed | **High** | Medium | Before X4 - **mitigation approved 5 Sep 2026 (X4a, `21`), STILL OPEN until it ships** |
+| **X8** | **No fallback game** now external-only is decided - X2 with its mitigation removed | **High** | Medium | **CLOSED 20 Sep 2026** — X4a click-accepted (owner); hedge game live by click (`21`) |
 | **X13** | Trading-only matchmaker silently returns trading matches on a games platform | **High** | **High** | X11.5 |
 | **X14** | Inferred game interest read as consent to stranger invitations | **High** | Medium | X11.5 |
 | **R29** | **Disabling a game retroactively demotes players** who earned levels, points or ranks in it | **High** | **High** | **X1** - the design decision is made there |
@@ -594,13 +594,15 @@ the last point at which the answer is still cheap, since X4 is where spend start
 against a specific provider's sandbox. Keeping a two-to-three week in-house game on the
 backlog converts X2 and X8 from existential to inconvenient. `10` section 5.
 
-**Mitigation APPROVED 5 September 2026, and the risk STAYS OPEN.** Open question 10 was
-answered yes: phase **X4a** (`21`) builds a real in-house game to a player-facing standard,
-which also serves as the reference implementation that proves the provider seam. **Do not
-downgrade this entry on the strength of that.** Until the game is playable the exposure is
-exactly what it was, and the whole failure mode of a risk register is entries marked mitigated
-because a plan exists. Close it when a player can pay to enter the in-house game and be paid,
-not when the chapter is written.
+**Mitigation APPROVED 5 September 2026.** Open question 10 was answered yes: phase **X4a**
+(`21`) builds a real in-house game to a player-facing standard, which also serves as the
+reference implementation that proves the provider seam.
+
+**CLOSED 20 September 2026 (owner).** The owner reported the click-acceptance runbook
+succeeded (deploy -> register ChartVolt Games -> sync -> publish -> two players -> confirm
+money). That is the condition this entry named: a player can pay to enter the in-house game
+and be paid. A document saying risk X8 is still open is correct as history and stale as a
+present fact — **say which**. Eng+runbook were complete 19 Sep; closing waited on the click.
 
 **Two notes for whoever closes it.** The mitigation is **cheaper than the 2-3 weeks estimated
 above for a reason worth knowing**: because the game speaks the provider protocol rather than

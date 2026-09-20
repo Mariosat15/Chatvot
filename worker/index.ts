@@ -11,6 +11,7 @@
  * - margin-check: Backup margin monitoring (every 1 minute, covers competitions + challenges)
  * - competition-end: Check for expired competitions (every 1 minute)
  * - challenge-finalize: Check for expired challenges (every 1 minute)
+ * - round-reconciliation: Poll lost provider results / apply unresolved policy (every 1 minute)
  * - trade-queue: Process limit orders (every 1 minute) — TP/SL handled by real-time service
  * - evaluate-badges: Evaluate user badges (every 1 hour)
  * (price-cache REMOVED — WEB app WebSocket writes prices to PriceCache)
@@ -39,6 +40,7 @@ import { connectToDatabase, disconnectFromDatabase } from "./config/database";
 import { runMarginCheck } from "./jobs/margin-check.job";
 import { runCompetitionEndCheck } from "./jobs/competition-end.job";
 import { runChallengeFinalizeCheck } from "./jobs/challenge-finalize.job";
+import { runRoundReconciliationCheck } from "./jobs/round-reconciliation.job";
 import { runTradeQueueProcessor } from "./jobs/trade-queue.job";
 // NOTE: price-cache job REMOVED — WebSocket streamer already writes prices every 1s.
 // The worker's price-cache job was redundant (external API call + ~33 upserts/minute duplicating
@@ -95,7 +97,8 @@ const agenda = new Agenda({
       // NOTE: serverMonitoringMode is NOT supported by Agenda's bundled MongoDB driver (v4.x).
       // It's only available in MongoDB driver v6+. The worker's own Mongoose connection
       // already uses serverMonitoringMode:"poll" — this only affects Agenda's internal client.
-    } as any,
+      // Reason: Agenda's db.options typing is narrower than MongoClientOptions; Record keeps the cast explicit without `any`.
+    } as Record<string, unknown>,
   },
   processEvery: "30 seconds",
   maxConcurrency: 3,
@@ -188,6 +191,35 @@ agenda.define("challenge-finalize", async () => {
     }
   } catch (error) {
     console.error(`⚔️ [CHALLENGE FINALIZE] Failed:`, error);
+  }
+});
+
+/**
+ * Round Reconciliation Job (X9 / E7)
+ * Polls lost provider webhooks and applies unresolved-round policy past grace.
+ */
+agenda.define("round-reconciliation", async () => {
+  try {
+    const result = await runRoundReconciliationCheck();
+
+    if (
+      result.reconciled > 0 ||
+      result.policiesApplied > 0 ||
+      result.errors.length > 0
+    ) {
+      console.log(
+        `🔁 [ROUND RECONCILIATION] examined=${result.examined} reconciled=${result.reconciled} resolved=${result.resolved} policies=${result.policiesApplied} alerts=${result.alerts} notified=${result.notified}`,
+      );
+    }
+
+    if (result.errors.length > 0) {
+      console.error(
+        `🔁 [ROUND RECONCILIATION] Errors: ${result.errors.length}`,
+      );
+      result.errors.forEach((e) => console.error(`     - ${e}`));
+    }
+  } catch (error) {
+    console.error(`🔁 [ROUND RECONCILIATION] Failed:`, error);
   }
 });
 
@@ -434,6 +466,7 @@ async function startWorker(): Promise<void> {
     await agenda.every("1 minute", "margin-check");
     await agenda.every("1 minute", "competition-end");
     await agenda.every("1 minute", "challenge-finalize");
+    await agenda.every("1 minute", "round-reconciliation");
     await agenda.every("1 minute", "early-end-check");
     await agenda.every("1 minute", "trade-queue");
     // price-cache REMOVED — redundant with WEB app's WebSocket PriceCache writes
