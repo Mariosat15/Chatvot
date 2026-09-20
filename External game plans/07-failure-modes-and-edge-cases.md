@@ -231,6 +231,19 @@ rate and callback arrival rate. Three consecutive failures marks the provider
 > the provider is already `enabled: false` (kill-switch); re-enable stays an operator action.
 > Say outage responses code-complete (all three table rows).
 
+> **AMENDED 20 September 2026 (R111), and the sentence above about `healthStatus === "down"`
+> is the thing that was wrong.** That field **defaults to `"down"`**, and the kill-switch
+> passes the previous status through on `no_evidence`, so a provider that has never produced
+> a scored round carries the default for ever. Read literally, this section refused every
+> entry on a brand-new provider and paused any contest already running on it — **a deadlock,
+> because entry creates the first round, the round produces the evidence, and the evidence is
+> what clears the status.** Both readers now go through `providerObservedDown` /
+> `PROVIDER_OBSERVED_DOWN_FILTER`, which require **`healthDownSince` as well as the status**:
+> a stored `"down"` with no stamp is a state nothing but the schema can produce. **A document
+> describing the response as keyed on `healthStatus` alone is describing the defect.** Note
+> that s3.3 below already carried this exact caution and scoped it to the *health dashboard* —
+> the caution was right and its scope was too narrow.
+
 | State | Response |
 |---|---|
 | **Not yet open** | Hide the contest. Postpone or cancel with full refunds before anyone pays — **BUILT** (hide empty upcoming; cancel-at-gun covers the rest) |
@@ -250,7 +263,11 @@ their scores, and the contest completes late rather than not at all.
 > `enabled: false` on both `GameProvider` and `WhiteLabel.gameProviders`, plus a critical
 > `provider_kill_switch` SecurityAlert. Idle providers (`no_evidence`) do not accumulate
 > streak. Admin health dashboard still **derives** its verdict and must not read the stored
-> `healthStatus` (default `"down"` would paint every quiet provider red). Manual disable
+> `healthStatus` (default `"down"` would paint every quiet provider red — **and R111 is that
+> same caution needed one file along: it was written here for the dashboard and not applied to
+> the entry gate or the pause worker, which read the raw status and deadlocked a new provider.
+> The rule generalises to every reader of this field, never just the one it was first noticed
+> on**). Manual disable
 > already existed (`setProviderEnabled`). Say kill-switch code-complete, not E7/X9 done —
 > full `06` s10 monitors (**BUILT X9 slice 4**) and re-settle (**BUILT X9 slice 5**). Outage pause/extend:
 

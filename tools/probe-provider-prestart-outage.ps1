@@ -21,16 +21,57 @@ function Write-Utf8([string]$Path, [string]$Text) {
 function Collapse([string]$s) { return ($s -replace "\s+", " ") }
 
 $Suite = "__tests__/services/provider-prestart-outage.test.ts"
+# Reason: parameterised per probe — two of these are pinned by a test in the
+# outage-pause suite, and run against the default one they report "no test ran",
+# which reads exactly like a broken harness rather than a missing guard.
+$PauseSuite = "__tests__/services/provider-outage-pause.test.ts"
 $Gate = "lib/services/game-providers/provider-entry-gate.ts"
+$Pause = "lib/services/game-providers/provider-outage-pause.service.ts"
 $Entry = "lib/services/contest-entry.service.ts"
 
 $probes = @(
   @{
-    Name = "down blocks entries"
+    Name = "observed-down blocks entries"
     File = $Gate
-    Find = 'return provider.healthStatus === "down";'
+    Find = 'return providerObservedDown(provider);'
     Replace = 'return false;'
-    Expect = "blocks down and disabled"
+    Expect = "blocks an observed-down provider"
+  },
+  @{
+    Name = "R111: gate must not read the raw status"
+    File = $Gate
+    Find = 'return providerObservedDown(provider);'
+    Replace = 'return provider.healthStatus === "down";'
+    Expect = "admits entry to a provider that has never been health checked"
+  },
+  @{
+    Name = "observed-down needs the status, not only the stamp"
+    File = $Gate
+    Find = 'if (provider.healthStatus !== "down") return false;'
+    Replace = 'if (false) return false;'
+    Expect = "requires the stamp as well as the status"
+  },
+  @{
+    Name = "single-provider read projects the stamp"
+    File = $Gate
+    Find = '.select("enabled healthStatus healthDownSince")'
+    Replace = '.select("enabled healthStatus")'
+    Expect = "both readers of the stored status go through the shared rule"
+  },
+  @{
+    Name = "R111: pause worker must not read the raw status (structural)"
+    File = $Pause
+    Find = '    PROVIDER_OBSERVED_DOWN_FILTER,'
+    Replace = '    { healthStatus: "down" },'
+    Expect = "both readers of the stored status go through the shared rule"
+  },
+  @{
+    Name = "R111: pause worker must not read the raw status (behavioural)"
+    File = $Pause
+    Suite = $PauseSuite
+    Find = '    PROVIDER_OBSERVED_DOWN_FILTER,'
+    Replace = '    { healthStatus: "down" },'
+    Expect = "does not pause a provider that has never been health checked"
   },
   @{
     Name = "hide empty upcoming"
@@ -58,19 +99,28 @@ foreach ($p in $probes) {
     continue
   }
   Write-Utf8 $path ($orig.Replace($p.Find, $p.Replace))
+  # Reason: NOT named $suite. PowerShell variable names are case-INSENSITIVE, so
+  # a lowercase local overwrites $Suite for every later probe — the two probes
+  # after the first per-probe override then ran against the wrong file and
+  # reported a skipped run, which reads exactly like a missing guard.
+  $targetSuite = if ($p.ContainsKey("Suite")) { $p.Suite } else { $Suite }
   try {
-    $out = & npx vitest run $Suite -t $p.Expect 2>&1 | Out-String
+    $out = & npx vitest run $targetSuite -t $p.Expect 2>&1 | Out-String
     $flat = Collapse $out
   }
   finally {
     Write-Utf8 $path $orig
   }
-  $passCount = if ($flat -match "Tests\s+(\d+)\s+failed") { [int]$Matches[1] } else { -1 }
-  if ($passCount -eq 1) {
-    Write-Host "RED×1 $($p.Name) → $($p.Expect)" -ForegroundColor Green
+  # Reason: read the LAST "Tests N failed" — the failure detail block above the
+  # summary also contains the word, and a zero-test run prints no "failed" at
+  # all, which must be reported rather than read as a pass.
+  $m = [regex]::Matches($flat, "Tests\s+(\d+)\s+failed")
+  $failCount = if ($m.Count -gt 0) { [int]$m[$m.Count - 1].Groups[1].Value } else { -1 }
+  if ($failCount -eq 1) {
+    Write-Host "RED x1  $($p.Name) -> $($p.Expect)" -ForegroundColor Green
   } else {
-    Write-Host "UNEXPECTED $($p.Name) failed=$passCount" -ForegroundColor Red
-    Write-Host $flat.Substring(0, [Math]::Min(400, $flat.Length))
+    Write-Host "UNEXPECTED $($p.Name) failed=$failCount" -ForegroundColor Red
+    Write-Host $flat.Substring([Math]::Max(0, $flat.Length - 600))
     $failed++
   }
 }

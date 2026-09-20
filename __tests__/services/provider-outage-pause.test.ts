@@ -181,6 +181,26 @@ describe("runProviderOutagePause — pause on down", () => {
     expect(summary.skippedAlreadyPaused).toBe(1);
   });
 
+  /**
+   * R111, 20 Sep 2026. `healthStatus` defaults to `"down"` and the kill-switch
+   * worker leaves it alone while there is no evidence, so the bare status query
+   * this worker used to run matched every provider that has never produced a
+   * scored round — and system-paused perfectly healthy live contests, with a
+   * banner and a notification to every participant. Only an OBSERVED outage,
+   * carrying `healthDownSince`, may pause anything.
+   */
+  it("does not pause a provider that has never been health checked", async () => {
+    await seedProvider({ healthDownSince: null });
+    const contest = await seedActiveContest();
+
+    const summary = await runProviderOutagePause(new Date());
+    expect(summary.examinedDown).toBe(0);
+    expect(summary.paused).toBe(0);
+
+    const row = await Competition.findById(contest._id);
+    expect(row?.isPaused).not.toBe(true);
+  });
+
   it("does not pause contests for a different provider", async () => {
     await seedProvider();
     await seedActiveContest({

@@ -11,8 +11,10 @@ import { join } from "node:path";
 import {
   PROVIDER_OUTAGE_CANCEL_REASON,
   PROVIDER_OUTAGE_ENTRY_MESSAGE,
+  PROVIDER_OBSERVED_DOWN_FILTER,
   providerBlocksEntries,
   providerKeyFromContest,
+  providerObservedDown,
   shouldHideUpcomingEmptyDuringOutage,
 } from "../../lib/services/game-providers/provider-entry-gate";
 
@@ -24,10 +26,16 @@ function readCode(relativePath: string): string {
     .replace(/^\s*\/\/.*$/gm, "");
 }
 
+const DOWN_SINCE = new Date("2026-09-20T09:00:00.000Z");
+
 describe("providerBlocksEntries", () => {
-  it("blocks down and disabled, admits healthy and degraded", () => {
+  it("blocks an observed-down provider and a disabled one, admits healthy and degraded", () => {
     expect(
-      providerBlocksEntries({ enabled: true, healthStatus: "down" }),
+      providerBlocksEntries({
+        enabled: true,
+        healthStatus: "down",
+        healthDownSince: DOWN_SINCE,
+      }),
     ).toBe(true);
     expect(
       providerBlocksEntries({ enabled: false, healthStatus: "healthy" }),
@@ -38,8 +46,85 @@ describe("providerBlocksEntries", () => {
     expect(
       providerBlocksEntries({ enabled: true, healthStatus: "degraded" }),
     ).toBe(false);
-    // Reason: missing provider → fail closed (cannot verify health).
+    // Reason: missing provider → fail closed (cannot verify health). Unlike the
+    // default-status case below, that is recoverable: register the provider.
     expect(providerBlocksEntries(null)).toBe(true);
+  });
+
+  /**
+   * THE DEFECT THIS PINS (R111, 20 Sep 2026). `healthStatus` defaults to
+   * `"down"` and the kill-switch worker passes the previous status through on
+   * `no_evidence`, so a provider that has never produced a scored round keeps
+   * the default for ever. Reading the status alone refused every entry, which
+   * stopped the first round being created, which is what would have produced
+   * the evidence — a deadlock no operator could break from inside the product.
+   *
+   * This assertion was FLIPPED, not added: the original test above asserted
+   * that `{ enabled: true, healthStatus: "down" }` blocks.
+   */
+  it("admits entry to a provider that has never been health checked", () => {
+    expect(
+      providerBlocksEntries({ enabled: true, healthStatus: "down" }),
+    ).toBe(false);
+    expect(
+      providerBlocksEntries({
+        enabled: true,
+        healthStatus: "down",
+        healthDownSince: null,
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("providerObservedDown", () => {
+  it("requires the stamp as well as the status", () => {
+    expect(
+      providerObservedDown({
+        healthStatus: "down",
+        healthDownSince: DOWN_SINCE,
+      }),
+    ).toBe(true);
+    expect(providerObservedDown({ healthStatus: "down" })).toBe(false);
+    // Reason: a stamp left behind on a recovered provider must not block. The
+    // worker `$unset`s it, but the status is the authority on direction.
+    expect(
+      providerObservedDown({
+        healthStatus: "healthy",
+        healthDownSince: DOWN_SINCE,
+      }),
+    ).toBe(false);
+  });
+
+  it("the query form matches both shapes of an unstamped field in one clause", () => {
+    // Reason: absent and explicitly null are the two shapes an unstamped date
+    // takes, and `$type: "date"` excludes both. A `$ne: null` spelling would
+    // admit an absent field on some driver versions.
+    expect(PROVIDER_OBSERVED_DOWN_FILTER).toEqual({
+      healthStatus: "down",
+      healthDownSince: { $type: "date" },
+    });
+  });
+
+  it("both readers of the stored status go through the shared rule", () => {
+    const gate = readCode(
+      "lib/services/game-providers/provider-entry-gate.ts",
+    );
+    const pause = readCode(
+      "lib/services/game-providers/provider-outage-pause.service.ts",
+    );
+    // The bare status query is what R111 was: neither file may carry one.
+    // Reason: the gate's own delegation is asserted BEHAVIOURALLY above rather
+    // than here — a `toContain("providerObservedDown(")` is satisfied by the
+    // function's own declaration, so it would pass against a gate that defines
+    // the rule and then tests the raw status itself.
+    expect(gate).not.toMatch(/\{\s*healthStatus:\s*"down"\s*\}/);
+    expect(pause).not.toMatch(/\{\s*healthStatus:\s*"down"\s*\}/);
+    expect(pause).toContain("PROVIDER_OBSERVED_DOWN_FILTER");
+    // The single-provider read must project the stamp, or the predicate can
+    // only ever answer "not down" and the gate stops working entirely.
+    expect(gate).toMatch(
+      /\.select\("enabled healthStatus healthDownSince"\)/,
+    );
   });
 });
 

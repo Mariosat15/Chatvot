@@ -29,6 +29,7 @@ import {
   loadProviderEvidence,
   KILL_SWITCH_OBSERVATION_MS,
 } from "@/lib/services/game-providers/provider-kill-switch.service";
+import { PROVIDER_OBSERVED_DOWN_FILTER } from "@/lib/services/game-providers/provider-entry-gate";
 
 export interface OutagePauseSummary {
   examinedDown: number;
@@ -67,10 +68,13 @@ export async function runProviderOutagePause(
 
   const since = new Date(now.getTime() - KILL_SWITCH_OBSERVATION_MS);
 
-  // --- Pause: every provider currently marked down ---
-  const downProviders = await GameProvider.find({
-    healthStatus: "down",
-  }).lean<{ providerKey: string }[]>();
+  // --- Pause: every provider OBSERVED to be down ---
+  // Reason: `healthStatus` alone defaults to "down", so the bare status query
+  // matched every provider that has never been health checked and would have
+  // system-paused perfectly healthy live contests. See `providerObservedDown`.
+  const downProviders = await GameProvider.find(
+    PROVIDER_OBSERVED_DOWN_FILTER,
+  ).lean<{ providerKey: string }[]>();
 
   for (const provider of downProviders) {
     summary.examinedDown += 1;

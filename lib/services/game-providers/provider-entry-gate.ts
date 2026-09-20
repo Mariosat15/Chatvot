@@ -23,18 +23,54 @@ export const PROVIDER_OUTAGE_CANCEL_REASON =
 export type ProviderAvailabilityFacts = {
   enabled: boolean;
   healthStatus: "healthy" | "degraded" | "down" | string;
+  healthDownSince?: Date | string | null;
 };
 
 /**
- * A provider that is `down` or kill-switched off must not take new entry fees.
- * Degraded still accepts entries — play may be slow, but the contest can run.
+ * `healthStatus` DEFAULTS TO `"down"` AND IS NOT EVIDENCE OF AN OUTAGE.
+ *
+ * The field is written only by the kill-switch worker, and `nextHealthState`
+ * passes the previous status through on `no_evidence` — so a provider that has
+ * never produced a scored round keeps the schema default for ever. Reading the
+ * status alone therefore refuses entry to a brand-new provider, which stops the
+ * first round being created, which is what would have produced the evidence.
+ * That is not fail-closed, it is unrecoverable without a database edit, and it
+ * is the same field the admin health panel deliberately does not read.
+ *
+ * `healthDownSince` is the observed half: the worker stamps it only when a real
+ * failure streak pushes a provider down, and `$unset`s it on recovery. Absent
+ * means "never seen to be down", which is the default's actual meaning.
+ */
+export function providerObservedDown(
+  provider: Pick<
+    ProviderAvailabilityFacts,
+    "healthStatus" | "healthDownSince"
+  >,
+): boolean {
+  if (provider.healthStatus !== "down") return false;
+  return provider.healthDownSince != null;
+}
+
+/**
+ * Query form of `providerObservedDown`. `$type: "date"` covers both shapes an
+ * unstamped field takes — absent and explicitly `null` — in one clause.
+ */
+export const PROVIDER_OBSERVED_DOWN_FILTER = {
+  healthStatus: "down",
+  healthDownSince: { $type: "date" },
+} as const;
+
+/**
+ * A provider that is kill-switched off, or observed to be sustainedly down,
+ * must not take new entry fees. Degraded still accepts entries — play may be
+ * slow, but the contest can run.
  */
 export function providerBlocksEntries(
   provider: ProviderAvailabilityFacts | null | undefined,
 ): boolean {
   if (!provider) return true;
   if (provider.enabled === false) return true;
-  return provider.healthStatus === "down";
+  return providerObservedDown(provider);
 }
 
 export function providerKeyFromContest(contest: {
@@ -78,7 +114,7 @@ export function shouldHideUpcomingEmptyDuringOutage(
 /** Provider keys that currently refuse new paid entry. */
 export async function listProvidersBlockingEntries(): Promise<Set<string>> {
   const rows = await GameProvider.find({
-    $or: [{ enabled: false }, { healthStatus: "down" }],
+    $or: [{ enabled: false }, PROVIDER_OBSERVED_DOWN_FILTER],
   })
     .select("providerKey")
     .lean<{ providerKey: string }[]>();
@@ -93,7 +129,7 @@ export async function providerBlocksContestEntry(
   providerKey: string,
 ): Promise<boolean> {
   const row = await GameProvider.findOne({ providerKey })
-    .select("enabled healthStatus")
+    .select("enabled healthStatus healthDownSince")
     .lean<ProviderAvailabilityFacts | null>();
   return providerBlocksEntries(row);
 }

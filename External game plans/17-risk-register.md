@@ -87,6 +87,7 @@ which**. |
 | **R106** | **Journey generation produced two maps and trading-only milestones.** `buildJourneyBlueprint` emitted **one map per catalogue scope**, so trading + one provider game yielded exactly two maps while operators still expected the historic ~10-map sequence. Activity milestones carried only trading `completeCondition`s, so a games-only player could not proceed. There was also no master enable/disable for the journey system | **High** | **Was LIVE until regenerate; live-data CLOSED 18 Sep 2026.** No money moved. **Nothing was backfilled** — regeneration replaced the stored design | **CLOSED 17 Sep 2026 (code) + 18 Sep 2026 (owner Generate Full Sequence replace).** Fixed 10-map dual-path blueprint (`journey-map-shells.ts` + `orCompleteConditions`), OR evaluation in both progress services, gaming condition types, master `journey_settings` toggle |
 | **R109** | **Ten themed maps were still identical under the hood.** After R106, Sequence cards showed flat **750 XP / 12 milestones**, every canvas fell back to Pirate Cove art (`backgroundImage` never written), every start was `account_created`, and zones were Foundations/Ascent/Summit on every theme — so Space Station still began like Map 1 | **High** | **Was LIVE until regenerate; live-data CLOSED 18 Sep 2026.** Display + content; no money | **CLOSED 17 Sep 2026 (code) + 18 Sep 2026 (owner Generate Full Sequence replace).** Progressive budgets/counts, theme zones, Map-1 onboarding + `map_completed` gates, stamped art URLs, `resolveMapBackgroundImage`, progress evaluation for `map_completed` |
 | **R110** | **Admin `AppSettingsProvider` was mounted nowhere.** Nineteen components called `useAppSettings()` and every one received `createContext` defaults, so a configured credit symbol never reached an admin screen. Terminology correctly shipped its own provider; the credit-symbol silence was a separate live defect | Low | **Was LIVE and DISPLAY only** — no money miscomputed, nothing to backfill | **CLOSED 18 Sep 2026.** Mounted in `apps/admin/app/layout.tsx`; `GET /api/settings` is admin-at-all so every signed-in employee can load the display pack; `PUT` stays `currency`. Terminology canary flipped, not deleted |
+| **R111** | **A provider that had never been checked was treated as one that had failed, and the result was a deadlock.** `game_provider.healthStatus` **defaults to `"down"`** and the kill-switch worker passes the previous status through on `no_evidence`, so a provider that has never produced a scored round keeps the default for ever. Both readers of that field asked `healthStatus === "down"` and nothing more, so X9's pre-start gate refused every entry with *"the game provider is having an outage"* and `runProviderOutagePause` paused contests already running. **Entry is what creates the first round, the round is what produces the evidence, and the evidence is what clears the status** — so refusing entry removed the only path out and no operator could break it from inside the product. ChartVolt Games was in exactly that state | **High** | **LIVE and BLOCKING** — but no money moved, nothing settled wrongly and **nothing was backfilled**, the defect being a refusal rather than a stored value; paused contests resume on the worker's next pass. **The original test asserted the defect** (`healthStatus: "down"` blocks), which is right about an observed outage and wrong about a default — flipped, not deleted | **CLOSED 20 Sep 2026.** One rule, `providerObservedDown` / `PROVIDER_OBSERVED_DOWN_FILTER`, and both readers go through it. It requires the **status as well as the stamp**, the query is `{ $type: "date" }` rather than `$ne: null` because absent and `null` are two shapes, and the single-provider read had to learn to **project** `healthDownSince` or the predicate can only answer "not down". See the detail section |
 | **R107** | **Journey editor selection did not load the selected map; Required Badges showed raw badge ids.** Clicking a sequence card only set `selectedSequenceMap`, so the highlight moved while Current Map / Milestones / Zones kept map 1's data. Separately, `MilestoneDetailModal` resolved badge names only through `lib/constants/badges`, so blueprint ids like `trading_beat_top_trader_flag` rendered as snake_case | **Medium** | **LIVE and DISPLAY / EDITOR only** — no money, no wrong unlocks from the naming half; the editor half blocked editing maps 2–10. **Nothing was backfilled** | **CLOSED 17 Sep 2026.** `selectAndLoadMap` + tab-change reload by mapId; `resolveBadgeDisplayName` + milestones API enrichment from `getBadgesFromDB` |
 | **R108** | **Badge Simulator reported every `game_*` condition as unrecognized; `consecutive_trading_days` could never earn.** Simulator allow-list drifted from the registry; mock omitted `gameStats`/`gameTypes`; evaluator switch missed the registry streak name; vitest JSON blew `maxBuffer` | **Medium** | **LIVE for the simulator report and for streak badges in production**; Games badges were already earnable in production (registry door) — the simulator lied. **Nothing was backfilled** | **CLOSED 17 Sep 2026.** `isSupportedConditionType` + gameStats mocks; evaluator `consecutive_trading_days`; blueprint ladders for season/best score; vitest `--outputFile` |
 | R8 | Bulk find-and-replace on wording | High | Medium | X8 |
@@ -5653,6 +5654,71 @@ credit symbol and noun overrides are different packs.
 `__tests__/admin/privileged-route-guards.test.ts`.
 
 **Not verified by eye** (admin behind sign-in).
+
+---
+
+### R111 - A provider that has never been checked was treated as one that had failed - **CLOSED 20 Sep 2026**
+
+**What it is.** `game_provider.healthStatus` **defaults to `"down"`**, and the kill-switch worker
+is its only writer. That worker passes the previous status straight through when it finds
+`no_evidence` — no completed round in the window — so a provider that has never produced a
+scored round keeps the default **for ever**. Both readers of the stored status asked
+`healthStatus === "down"` and nothing more, so X9's pre-start outage gate refused every entry
+with *"the game provider is having an outage"*, and `runProviderOutagePause` paused any contest
+already running on that provider.
+
+**It is a deadlock, and that is what makes it worse than a wrong refusal.** Entry is what creates
+the first round; the first round is what produces the evidence; the evidence is what clears the
+status. Refusing entry removes the only path out, so **no operator could break it from inside the
+product** — the sole remedy was editing the database by hand. Our own first-party provider,
+ChartVolt Games, was in exactly that state.
+
+**How it was found.** The owner hit the refusal on a live contest. Note what could not have found
+it: every layer reported success, the gate's own tests were green, and **the original test
+asserted the defect** — `{ enabled: true, healthStatus: "down" }` blocks — which is correct about
+an observed outage and wrong about a default. It was flipped, not deleted.
+
+**The general form, and it is a rule this register has met before from the other side.** A schema
+default is a stored value (`entryBlockThreshold`, `canEnterChallenges`, R50's phantom `score: 0`),
+so **a reader must ask whether the value it is trusting could only have arrived by accident.**
+Here the *shape* of the answer is the evidence: a stored `"down"` with no `healthDownSince` is a
+state nothing but the schema can produce, because the worker stamps the date whenever it observes
+one. **"Never asked" and "asked and failed" are different facts**, and one field already
+distinguished them.
+
+**Harm.** LIVE and **blocking**, not merely reporting — but no money moved, nothing settled
+wrongly and **nothing was backfilled**: the defect is a refusal, so the wrong outcome is an
+absent entry rather than a stored value. The paused contests resume on the worker's next pass
+now the query is correct.
+
+**The fix.** One rule, `providerObservedDown`, exported beside its query form
+`PROVIDER_OBSERVED_DOWN_FILTER` in `provider-entry-gate.ts`, and **both** readers go through it.
+Three things about it are load-bearing:
+
+- **It requires the status as well as the stamp.** A stamp left behind on a recovered provider
+  must not block; the worker `$unset`s it, but the status is the authority on direction.
+- **The query is `healthDownSince: { $type: "date" }`, never `$ne: null`.** Absent and explicitly
+  `null` are the two shapes an unstamped field takes and `$type` excludes both — "missing has
+  three shapes" applied to a query rather than to a backfill filter.
+- **The single-provider read had to learn to project the stamp.** Without it the predicate can
+  only ever answer "not down" and the gate stops working entirely, which is the opposite failure
+  and is silent in the direction nobody complains about. A test asserts the `.select()`.
+
+The shared-rule guard is **structural for the pause worker and behavioural for the gate**: a
+`toContain("providerObservedDown(")` is satisfied by the function's own declaration, so it would
+pass against a gate that defines the rule and then reads the raw status itself.
+
+**Files:** `lib/services/game-providers/provider-entry-gate.ts`,
+`lib/services/game-providers/provider-outage-pause.service.ts`,
+`__tests__/services/provider-prestart-outage.test.ts` (12 tests),
+`__tests__/services/provider-outage-pause.test.ts` (10 tests),
+`tools/probe-provider-prestart-outage.ps1` (8 probes, red on exactly one failure each).
+
+**A harness lesson that cost a false result.** Two probes reported `failed=-1`, which reads like
+a broken guard. **PowerShell is case-insensitive in variable names**, so a loop-local `$suite`
+overwrote the script's `$Suite` parameter and those two probes ran against the wrong test file,
+where every test was filtered out — a passing run over zero tests. Renamed to `$targetSuite`, and
+the failure count is now read from the **last** `Tests N failed` line rather than the first match.
 
 ---
 
