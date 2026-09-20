@@ -11,6 +11,11 @@
  * Categories:
  *   "page"         — Regular full-page site pages (terms, privacy, about, etc.)
  *   "action_terms" — Short pop-up terms shown before critical user actions
+ *
+ * // Reason: X8 pass 11 / risk R11 — this file is seed counsel copy, not a
+ * terminology token target. Do not import `TERMS` / `getTerms` here. Live wording
+ * is edited in Admin → Site Pages after legal review; a deploy-time find-replace
+ * would change what users already accepted without a new acceptance record.
  */
 
 export type DefaultPageCategory = "page" | "action_terms";

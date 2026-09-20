@@ -380,7 +380,7 @@ Ordered by visibility, so the highest-impact strings change first.
 | 8 | Badge and milestone **content** - never IDs | data | Admin | Outstanding |
 | 9 | Landing and hero content (database) | data | Admin | Outstanding |
 | 10 | Help centre chrome (TOC, H2s, FAQ groups, quick-nav) | ~40 | Developer | **BUILT 19 Sep 2026** — see s3.2f |
-| 11 | Legal pages | separate | Legal | Outstanding |
+| 11 | Legal pages (`SitePage` ToS / privacy / action-terms) | separate | Legal | **ENG TRIPWIRE BUILT 20 Sep 2026** — see s3.2g; **content review still Legal** |
 
 #### 3.2a Pass 1 — player navigation (BUILT 19 Sep 2026)
 
@@ -505,6 +505,36 @@ corrected in `13` s9.1a; Trading Guide / Arsenal stay trading-literal (chapter 1
 
 **Not built:** passes 2, 7–9, 11; remaining body prose that still says "Competitions" /
 "Trader" inside paragraphs; level-title ladder strings inside the help page (pass 2).
+
+#### 3.2g Pass 11 — legal surfaces (ENG TRIPWIRE 20 Sep 2026; content still Legal)
+
+**This is not a tokenisation pass.** Risk **R11**: `SitePage` ToS / privacy / action-terms
+and `legal/ChartVolt-Regulatory-Defence-Pack.html` are contractual. Rewording them through
+`terms.*` would change what players have already accepted without a new acceptance record,
+and would bypass counsel. Chapter 14 already marked the owner as **Legal**, not Developer.
+
+**What engineering shipped:**
+
+| Surface | Role | Guard |
+|---|---|---|
+| `app/[slug]/page.tsx` | Renders `/terms`, `/privacy`, other CMS pages | Must not import `useTerms` / `getTerms` |
+| `components/ActionTermsDialog.tsx` | Money-action popups (`ACTION_TERM_SLUGS`) | Same; loads `/api/action-terms/[slug]` |
+| `lib/constants/default-pages.ts` | Seed for ToS, privacy, five action-terms | Same; header cites R11 |
+| `legal/ChartVolt-Regulatory-Defence-Pack.html` | Counsel pack, not player CMS | Exists; not a token target |
+
+**Inventory (live after seed):** system pages `terms`, `privacy`; action-terms
+`terms-credit-purchase`, `terms-withdrawal`, `terms-marketplace`, `terms-competition-entry`,
+`terms-challenge`. Related-page sidebar labels stay "Terms of Service" / "Privacy Policy"
+etc. — not contest tokens.
+
+**6 tests** in `__tests__/player/legal-terminology.test.ts`.
+
+**Still Legal (not eng):** review and edit live `SitePage` rows in Admin → Site Pages;
+decide games-first vs simulated-trading language; re-prompt acceptance if material;
+align landing `footerRiskDisclaimer` / LP risk copy with counsel (adjacent to pass 9).
+Do **not** treat a green suite as sign-off on contract wording.
+
+**Not built by eng:** pass 2, 7–9 (admin/content); counsel-approved body rewrites.
 
 ---
 

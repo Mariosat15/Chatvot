@@ -91,7 +91,7 @@ which**. |
 | **R108** | **Badge Simulator reported every `game_*` condition as unrecognized; `consecutive_trading_days` could never earn.** Simulator allow-list drifted from the registry; mock omitted `gameStats`/`gameTypes`; evaluator switch missed the registry streak name; vitest JSON blew `maxBuffer` | **Medium** | **LIVE for the simulator report and for streak badges in production**; Games badges were already earnable in production (registry door) — the simulator lied. **Nothing was backfilled** | **CLOSED 17 Sep 2026.** `isSupportedConditionType` + gameStats mocks; evaluator `consecutive_trading_days`; blueprint ladders for season/best score; vitest `--outputFile` |
 | R8 | Bulk find-and-replace on wording | High | Medium | X8 |
 | R9 | Fraud throttle blind to provider entries | High | High | X5 |
-| R11 | Legal wording changed without review | High | Medium | X8 |
+| R11 | Legal wording changed without review | High | Medium | X8 — eng tripwire 20 Sep (`14` s3.2g); **bodies still Legal** |
 | R12 | Badge or milestone IDs renamed | High | Medium | X7 |
 | R17 | Disabling trading strands active contests | High | Medium | X8 |
 | X4 | We cannot fix the provider's game | Medium | High | X12 |
@@ -891,6 +891,14 @@ tested.
 `SitePage` holds the terms of service. `legal/ChartVolt-Regulatory-Defence-Pack.html`
 depends on specific characterisations of skill and money flow. **Neither is a wording
 pass.** Route through legal review.
+
+> **AMENDED 20 September 2026.** X8 pass 11's **engineering** half shipped as a tripwire
+> (`14` s3.2g, `__tests__/player/legal-terminology.test.ts`): the CMS page renderer,
+> `ActionTermsDialog`, and `default-pages.ts` seed must not import `useTerms` / `getTerms`.
+> That closes the failure mode where a later wording pass quietly tokenises contracts.
+> **It does not close this risk.** Contract body rewrites, acceptance re-prompts and the
+> defence pack remain Legal. A document saying pass 11 is "done" because the suite is
+> green is wrong; one saying eng did nothing is stale — **say which**.
 
 ### R12 - Badge or milestone IDs renamed
 

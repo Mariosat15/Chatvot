@@ -408,6 +408,8 @@ export default function ActionTermsDialog({
 
 // ─── Slugs ──────────────────────────────────────────────────────────────────
 // Reason: Export known slug constants so integration points don't use magic strings.
+// X8 pass 11 / R11: bodies for these slugs are SitePage CMS copy. Do not wire
+// useTerms/getTerms into the dialog — reword via Admin → Site Pages after counsel.
 export const ACTION_TERM_SLUGS = {
   CREDIT_PURCHASE: "terms-credit-purchase",
   WITHDRAWAL: "terms-withdrawal",
