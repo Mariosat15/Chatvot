@@ -111,6 +111,14 @@ $results += Invoke-Probe `
     -To 'if (false && round.contestType === "practice") {' `
     -TestName "does not reconcile a practice round even when expired"
 
+# 5. Orphan void restored to skip-and-spam (the live production failure mode)
+$results += Invoke-Probe `
+    -Name "orphan contest voids once" `
+    -File "lib/services/games/run-round-reconciliation.ts" `
+    -From 'if (config.orphan) {' `
+    -To 'if (false && config.orphan) {' `
+    -TestName "voids a live round whose challenge is gone and does not re-alert on the next pass"
+
 Write-Host ""
 Write-Host "======== SUMMARY ========" -ForegroundColor Cyan
 foreach ($r in $results) {

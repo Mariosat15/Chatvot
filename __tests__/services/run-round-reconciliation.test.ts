@@ -389,8 +389,42 @@ describe("runRoundReconciliation - challenge config", () => {
   });
 });
 
+describe("runRoundReconciliation - orphan contest", () => {
+  it("voids a live round whose challenge is gone and does not re-alert on the next pass", async () => {
+    const challengeId = await seedChallenge();
+    const created = await launchChallengeRound(challengeId);
+    await expireRound(created.roundId, new Date(Date.now() - 60 * 60 * 1000));
+    await Challenge.deleteOne({ _id: challengeId });
+
+    const first = await runRoundReconciliation(new Date());
+    expect(first.orphansRetired).toBe(1);
+    expect(first.alerts).toBe(1);
+    expect(first.skipped).toBe(0);
+
+    const voided = await GameRound.findOne({ roundId: created.roundId });
+    expect(voided?.status).toBe("voided");
+    expect(voided?.resultSource).toBe("manual");
+    expect(voided?.integrityFlags).toContain("orphan_contest_missing");
+
+    expect(recordAlert).toHaveBeenCalledTimes(1);
+    expect(recordAlert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        alertType: "round_unresolved",
+        severity: "critical",
+        reason: expect.stringContaining("not found"),
+      }),
+    );
+
+    recordAlert.mockClear();
+    const second = await runRoundReconciliation(new Date());
+    expect(second.examined).toBe(0);
+    expect(second.orphansRetired).toBe(0);
+    expect(recordAlert).not.toHaveBeenCalled();
+  });
+});
+
 describe("runRoundReconciliation - batch isolation", () => {
-  it("continues after one round throws on a missing contest", async () => {
+  it("voids an orphan and still settles the sibling contest in the same pass", async () => {
     const goodId = await seedCompetition();
     const good = await launchCompetitionRound(goodId);
     await Competition.updateOne(
@@ -406,8 +440,9 @@ describe("runRoundReconciliation - batch isolation", () => {
 
     // Orphan round: contestId points at nothing.
     const orphanId = new Types.ObjectId();
+    const orphanRoundId = `orphan-${crypto.randomBytes(4).toString("hex")}`;
     await GameRound.create({
-      roundId: `orphan-${crypto.randomBytes(4).toString("hex")}`,
+      roundId: orphanRoundId,
       providerKey: MOCK_PROVIDER_KEY,
       gameCode: GAME_CODE,
       gameKey: GAME_KEY,
@@ -425,10 +460,14 @@ describe("runRoundReconciliation - batch isolation", () => {
     const summary = await runRoundReconciliation(new Date());
 
     expect(summary.examined).toBe(2);
-    // Orphan is skipped (with critical alert); good one still gets the policy.
+    expect(summary.orphansRetired).toBe(1);
     expect(summary.policiesApplied).toBe(1);
-    expect(summary.skipped).toBe(1);
-    expect(summary.alerts).toBeGreaterThanOrEqual(2);
+    // Reason: the old path counted orphans as skipped forever; retiring them must not
+    // inflate skipped, or a probe that restores skip-only stays green against this suite.
+    expect(summary.skipped).toBe(0);
+
+    const orphan = await GameRound.findOne({ roundId: orphanRoundId });
+    expect(orphan?.status).toBe("voided");
 
     const settled = await GameRound.findOne({ roundId: good.roundId });
     expect(settled?.status).toBe("unresolved");

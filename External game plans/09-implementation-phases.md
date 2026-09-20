@@ -583,7 +583,8 @@ on the grounds that a component is heavily used, grep for its importer.**
 - **Reconciliation job on the worker** — **BUILT 20 Sep 2026** (X9 slice 1).
   `run-round-reconciliation.ts` + Agenda `round-reconciliation` every minute.
   Stage 4 writes `unresolved`, records `round_unresolved` SecurityAlert, notifies
-  the player. Say schedule code-complete, not E7/X9 done.
+  the player. **Same day:** a live round whose competition/challenge row is missing
+  is **voided once** (not skip+alert forever). Say schedule code-complete, not E7/X9 done.
 - Provider health checks and automatic degradation — **health dashboard BUILT (X6)**;
   **automatic degradation that acts is still owed**
 - Automatic kill switch after sustained downtime — **owed**

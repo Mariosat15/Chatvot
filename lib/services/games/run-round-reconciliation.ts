@@ -8,11 +8,22 @@
  *
  * MAIN APP ONLY. Mirroring ahead of an admin caller is how R42 left two agreeing copies
  * with one of them unreachable.
+ *
+ * ORPHAN ROUNDS (contest row gone). Skipping + alerting forever is how a deleted challenge
+ * pages critical every minute with nobody able to act — the contest that would carry the
+ * policy no longer exists. Void once (same status as a cancelled contest's live rounds),
+ * alert once, leave the live set. `unresolved` would be wrong here: settlement re-derives
+ * from that status against a contest it cannot load.
  */
 
 import Competition from "@/database/models/trading/competition.model";
 import Challenge from "@/database/models/trading/challenge.model";
-import type { IGameRound } from "@/database/models/games/game-round.model";
+import GameRound, {
+  canTransitionRound,
+  LIVE_ROUND_STATUSES,
+  type IGameRound,
+  type RoundStatus,
+} from "@/database/models/games/game-round.model";
 import { recordSecurityAlert } from "@/lib/services/security/security-alert.service";
 import { resolveUnresolvedPolicy } from "@/lib/services/settlement/unresolved-rounds";
 import { deriveChallengeWindow } from "./challenge-window";
@@ -24,12 +35,17 @@ import {
 } from "./reconciliation.service";
 import { DEFAULT_RESULT_GRACE_SECONDS } from "./round-types";
 
+/** Integrity flag stamped when a live round is voided because its contest row is gone. */
+export const ORPHAN_CONTEST_MISSING_FLAG = "orphan_contest_missing";
+
 export interface RunRoundReconciliationSummary {
   examined: number;
   reconciled: number;
   resolved: number;
   policiesApplied: number;
   skipped: number;
+  /** Live rounds voided because competition/challenge no longer exists. */
+  orphansRetired: number;
   alerts: number;
   notified: number;
   errors: string[];
@@ -50,6 +66,7 @@ export async function runRoundReconciliation(
     resolved: 0,
     policiesApplied: 0,
     skipped: 0,
+    orphansRetired: 0,
     alerts: 0,
     notified: 0,
     errors: [],
@@ -67,6 +84,25 @@ export async function runRoundReconciliation(
 
       const config = await resolveRoundConfig(round);
       if (!config.ok) {
+        if (config.orphan) {
+          const retired = await retireOrphanRound(round);
+          if (retired) {
+            summary.orphansRetired++;
+            summary.resolved++;
+            await fireAlert(round, {
+              roundId: round.roundId,
+              stage: "policy",
+              resolved: true,
+              alert: "critical",
+              detail: config.reason,
+            });
+            summary.alerts++;
+          } else {
+            summary.skipped++;
+          }
+          continue;
+        }
+
         summary.skipped++;
         await fireAlert(round, {
           roundId: round.roundId,
@@ -108,12 +144,13 @@ export async function runRoundReconciliation(
 
 type ConfigResult =
   | { ok: true; value: RoundReconciliationConfig }
-  | { ok: false; reason: string };
+  | { ok: false; reason: string; orphan?: boolean };
 
 async function resolveRoundConfig(round: IGameRound): Promise<ConfigResult> {
   if (!round.contestId) {
     return {
       ok: false,
+      orphan: true,
       reason: `Round ${round.roundId} has no contestId; cannot load reconciliation config.`,
     };
   }
@@ -131,6 +168,7 @@ async function resolveRoundConfig(round: IGameRound): Promise<ConfigResult> {
     if (!competition) {
       return {
         ok: false,
+        orphan: true,
         reason: `Competition ${String(round.contestId)} not found for round ${round.roundId}.`,
       };
     }
@@ -164,6 +202,7 @@ async function resolveRoundConfig(round: IGameRound): Promise<ConfigResult> {
     if (!challenge) {
       return {
         ok: false,
+        orphan: true,
         reason: `Challenge ${String(round.contestId)} not found for round ${round.roundId}.`,
       };
     }
@@ -191,8 +230,49 @@ async function resolveRoundConfig(round: IGameRound): Promise<ConfigResult> {
 
   return {
     ok: false,
+    orphan: true,
     reason: `Unknown contestType "${String(round.contestType)}" on round ${round.roundId}.`,
   };
+}
+
+/**
+ * End a live round whose contest row is gone so the next Agenda pass cannot see it.
+ *
+ * Idempotent under concurrency: the filter requires a live status, so a second worker
+ * finding the same orphan gets `null` and counts as skipped rather than re-alerting.
+ */
+async function retireOrphanRound(round: IGameRound): Promise<boolean> {
+  if (!canTransitionRound(round.status as RoundStatus, "voided")) {
+    return false;
+  }
+
+  const updated = await GameRound.findOneAndUpdate(
+    {
+      roundId: round.roundId,
+      status: { $in: LIVE_ROUND_STATUSES },
+    },
+    {
+      $set: {
+        status: "voided",
+        // Reason: same shape as contest-round-cleanup's cancelled outcome — a platform
+        // decision that the attempt is unusable, not a policy give-up with a contest still
+        // there to settle.
+        resultSource: "manual",
+        resultReceivedAt: new Date(),
+      },
+      $addToSet: { integrityFlags: ORPHAN_CONTEST_MISSING_FLAG },
+    },
+    { new: true },
+  );
+
+  if (!updated) {
+    return false;
+  }
+
+  console.warn(
+    `🛑 [ROUND RECONCILIATION] Voided orphan round ${round.roundId} (${round.contestType} ${String(round.contestId)} missing)`,
+  );
+  return true;
 }
 
 async function fireAlert(
