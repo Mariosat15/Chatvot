@@ -24,8 +24,9 @@ import { normalizeReviewPacket } from "@/lib/services/fraud/review-packet";
  * suspicion score) that the admin could neither see nor undo.
  *
  * That score-based block is gone - see `lib/services/fraud/entry-fraud-gate.service.ts`
- * section 4 - so an investigation on its own now restricts nothing. This route
- * makes the consequence explicit and reversible:
+ * sections 2 and 4 - so an investigation on its own now restricts nothing. The
+ * silent DEVICE_RISK_BLOCKED path was removed for the same reason on 20 Sep 2026.
+ * This route makes the consequence explicit and reversible:
  *
  *   restrict: false → alert goes to "investigating", player is told their
  *                     account is under review and remains fully active.

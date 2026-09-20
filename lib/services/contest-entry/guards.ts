@@ -39,9 +39,10 @@ export async function checkAccountStanding(
     return fail("restricted", restriction.reason || refusalMessage);
   }
 
-  // Enforces the VPN/proxy/Tor/datacenter blocks, device-risk and suspicion-score
-  // thresholds, and the per-hour entry throttle. Admin-configurable, and fails OPEN so a
-  // detection outage never blocks a legitimate player.
+  // Enforces the VPN/proxy/Tor/datacenter blocks and the per-hour entry throttle.
+  // Deliberately does NOT refuse on suspicion score or device fingerprint risk —
+  // those raise alerts; only a UserRestriction blocks. Admin-configurable, and
+  // fails OPEN so a detection outage never blocks a legitimate player.
   const { assertEntryFraudGate } = await import(
     "@/lib/services/fraud/entry-fraud-gate.service"
   );

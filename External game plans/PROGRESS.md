@@ -314,6 +314,12 @@ project low risk.
 
 This plan has two tracks. **As of 20 September 2026** (owner):
 
+- **Fraud entry lockout FIXED 20 Sep (eng)** — `DEVICE_RISK_BLOCKED` / "security review
+  of your device" **deleted** from `assertEntryFraudGate`. Device fingerprinting still
+  alerts; only **UserRestriction** (admin Restrict/Ban, or Auto-Suspend when ON and
+  saved) blocks competition or challenge entry. Investigation alone never restricts
+  (already the open-route default). Auto-Suspend switch now **saves immediately**.
+  Stuck players can enter again on deploy with no clear script. See work log.
 - **X4a OWNER CLICK-ACCEPTED 20 Sep** — live path done (deploy -> register ChartVolt
   Games -> sync -> publish -> two players -> confirm money). Eng+runbook were complete
   19 Sep (`21` s4.1e). **Risk X8 CLOSED.**
@@ -326,9 +332,10 @@ This plan has two tracks. **As of 20 September 2026** (owner):
 - **A5 wiki bodies remain LAST OF ALL.**
 - **X9 schedule slice CODE-COMPLETE 20 Sep** — Agenda runs
   `findRoundsNeedingReconciliation` / `reconcileRound` every minute with stage-4
-  `SecurityAlert` + `round_unresolved` notify. **X9 itself is not done:** auto
-  kill-switch, outage pause/extend, full `06` s10 monitors, re-settle still owed.
-  R99 merge stays owner if still owed.
+  `SecurityAlert` + `round_unresolved` notify. **Orphan fix same day:** a live round
+  whose competition/challenge row is gone is voided once (not alerted every minute).
+  **X9 itself is not done:** auto kill-switch, outage pause/extend, full `06` s10
+  monitors, re-settle still owed. R99 merge stays owner if still owed.
 
 ### Track A - commercial (OWNER COMPLETE 20 Sep 2026)
 
@@ -468,7 +475,7 @@ numbers in chapters `01`-`09` remain resolvable. **Plan against the X-phases bel
 | **X6.5** | **Admin wording pass** - brought forward from X8 so operators never work a games platform labelled "trading" | `14` | 0.5-1 week | **A1–A6 + A5 engineering CLOSED.** A1–A4/A6 from 15 Sep; adjust-results UI 17 Sep (`12` s3.2c); leftovers 18 Sep; **A5 eng 19 Sep 2026** — overview reworded to multi-game, ten empty Game Administration wiki topics (`wiki/game-administration-skeleton.tsx`), 3 tests. **Outstanding: owner fills the skeleton bodies — LAST OF ALL (owner 19 Sep), not next.** A document listing A5 eng as outstanding is correct as history and stale as a present fact — **say which** |
 | **X7** | Player UI + points, leaderboards, badges, levels, **profile and cross-game stats**, **per-game GM analytics** | `09` E6 + `13` + `05` + `19` | 3-4 weeks | **CODE-COMPLETE 16 Sep 2026** — steps 1–5 (`UserGameStats` writer + stats-backed leaderboard in R14 parallel + private profile cross-game standing + badge/XP scope by `gameKey` + GM earnings stamped/grouped by `gameKey`). **R96b** still needs owner input. Leaderboard default still legacy (Q14). Backfill for GM earning labels is report-only until `--apply` |
 | **X8** | Player wording, `tradingEnabled`, infrastructure gating | `14` + `15` | 1-1.5 weeks | **OWNER CONTENT + ENG SHELL COMPLETE 20 Sep 2026** — developer passes 1+3+4+5+6+10 + pass 11 eng tripwire **BUILT**; owner content passes 2/7/8/9 **DONE** (owner-reported). Pass 11 **contract bodies still Legal (R11)**. A5 wiki bodies still **LAST OF ALL** |
-| **X9** | Resilience, reconciliation, monitoring | `09` E7 | 1 week | **`IN PROGRESS` — schedule slice CODE-COMPLETE 20 Sep 2026.** Worker Agenda job `round-reconciliation` every 1 minute; orchestrator `lib/services/games/run-round-reconciliation.ts`; `round_unresolved` SecurityAlert + notification template. **Not X9 done:** automatic kill-switch, outage-driven pause/extend, full `06` s10 threshold monitors, dedicated re-settle. Admin health dashboard + manual pause/extend already X6 |
+| **X9** | Resilience, reconciliation, monitoring | `09` E7 | 1 week | **`IN PROGRESS` — schedule slice CODE-COMPLETE 20 Sep 2026; orphan-round void same day.** Worker Agenda job `round-reconciliation` every 1 minute; orchestrator `lib/services/games/run-round-reconciliation.ts`; `round_unresolved` SecurityAlert + notification template; missing contest voids once. **Not X9 done:** automatic kill-switch, outage-driven pause/extend, full `06` s10 threshold monitors, dedicated re-settle. Admin health dashboard + manual pause/extend already X6 |
 | **X10** | Challenges - **any game, and any opponent** | `09` E8 + `20` s2 | 1-1.5 weeks | `NOT STARTED` as a phase - **one piece pulled forward and built 12 Sep 2026**: both apps' `challenge-finalize.actions.ts` now determine the winner, resolve ties and pay out through the same shared `lib/services/settlement/` stages a competition uses (`challenge-settlement.service.ts`, mirrored), closing the referral-fee divergence `19` s1's "Where it happens" row used to leave unchecked. **This is settlement plumbing only** - it does not touch matchmaking, provider-game challenge creation, or "any opponent"; a provider challenge still cannot be created (`19` s5's economic constraint). **AMENDED - that last clause is stale as a present fact and correct as history; say which.** The **"any game" half shipped 13 Sep 2026** (`13` s4.1z, `12` s4.2d): a provider game can be created, played and settled as a challenge, with per-title defaults. The **"any opponent" half shipped on 14 Sep 2026 in two slices** - the opponent **picker** (`13` s4.1aa), so a player can choose anybody by friend list or search, and **open challenges** (`03` s2.4a), so a player can name nobody at all and the first claimant takes the seat. **Three gaps that slice left were closed the same day** - the whole lifecycle now notifies, emails and pops up with a click target (`13` s11.1a), an open seat has an expiry of its own (`03` s2.4b), and the create dialog states a game challenge's two clocks rather than offering them (`13` s4.1ab). ~~**Per-game willingness** is what remains of X10's opponent work~~ - **and it shipped later the same day** (`20` s1.1a), so that clause is correct as history and stale as a present fact; **say which**. It also gave the platform-wide master switch `UserPresence.acceptingChallenges` its **first** UI in either app, having been enforced by the create route all along, and fixed a live defect where `PUT /api/user/presence` 404ed for any player with no presence document. **Matchmaking remains X11.5** |
 | **X11** | Games catalogue + games-first navigation | `16` | ~2 weeks | `NOT STARTED` |
 | **X11.5** | **Smart onboarding and challenge matchmaking** | `20` | 2-3 weeks | `NOT STARTED` |
@@ -854,6 +861,62 @@ Newest at the top.
 
 ---
 
+### 20 Sep 2026 - FRAUD: DELETE DEVICE_RISK_BLOCKED (entry lockout without restriction)
+
+**Owner report:** player saw "Entry is temporarily blocked due to a security review of
+your device. Please contact support" with no Restrict/Ban and Auto-Suspend off;
+investigation alone must not lock; admin Restrict/Ban or Auto-Suspend only; remove
+that message entirely.
+
+**Cause:** `assertEntryFraudGate` section 3 refused when the user's highest device
+`riskScore` met `deviceFingerprintBlockThreshold` (default 70) while fingerprinting
+was on — **no UserRestriction**, so Lift did not apply. Same failure class as the
+old suspicion-score block (Prerequisite B). Challenge create and competition join
+both called the gate; after removal both agree on UserRestriction-only for account
+lockout (IP blocks and hourly throttle remain as transient network/rate gates).
+
+**Shipped:**
+- Deleted the device-risk refusal from `lib/services/fraud/entry-fraud-gate.service.ts`
+  (comment left in place; do not reintroduce).
+- `deviceFingerprintBlockThreshold` kept on both fraud-settings models as **inert**
+  (no mirrored migration for a cosmetic drop).
+- Auto-Suspend toggle (and threshold on slider release) **saves immediately** in
+  `FraudSettingsSection.tsx` and clears the main-app cache.
+- Device fingerprinting card copy now says it alerts only.
+- Investigation open route already defaulted `restrict: false`; comment updated.
+- Tests: 2 new device-risk cases in `__tests__/services/fraud-entry-block.test.ts`
+  (11 total, green).
+
+**Not needed:** clear-device-risk script — after deploy the gate no longer refuses, so
+stuck players enter again with no stored flag to clear.
+
+**Next chat should:** resume X9 (kill-switch / outage pause / monitors / re-settle),
+or commit this fraud fix if the owner asks.
+
+---
+
+### 20 Sep 2026 - X9 ORPHAN ROUND: VOID ONCE (stop every-minute spam)
+
+**Found in production** after the schedule slice shipped: a live `game_round` whose
+challenge row had been deleted kept raising `round_unresolved` critical every minute,
+because the orchestrator skipped + alerted and left the round in `LIVE_ROUND_STATUSES`.
+
+**Shipped:** when competition/challenge is missing (or `contestId` / unknown
+`contestType`), `retireOrphanRound` voids the round once (`resultSource: "manual"`,
+`integrityFlags` += `orphan_contest_missing`), alerts once, leaves the live set.
+Deliberately **not** `unresolved` — that status is for a contest that still exists and
+has a configured policy. Misconfigured-but-present contests (no play window) still
+skip+alert; that is a different failure.
+
+**Tests:** suite now 8; probe harness 5 RED×1 (new probe restores skip-only).
+
+**Deploy:** restart `chartvolt-worker`; the stuck production round voids on the next
+pass and the spam stops.
+
+**Next chat should:** continue X9 (kill-switch / outage pause / monitors / re-settle).
+
+---
+
 ### 20 Sep 2026 - OWNER CLEARS X4a CLICK / TRACK A / X8 CONTENT (risk X8 closed; next eng X9)
 
 **Shipped:** nothing in product code — documentation only. Owner reported three items
@@ -892,8 +955,8 @@ without counsel.
   `worker/index.ts`.
 - `SecurityAlertType` gains `round_unresolved` (add-only). Notification template
   `round_unresolved` seeded in both template models.
-- `__tests__/services/run-round-reconciliation.test.ts` (7), `tools/probe-round-reconciliation.ps1`
-  (4 probes RED×1).
+- `__tests__/services/run-round-reconciliation.test.ts` (7 → **8** after orphan fix),
+  `tools/probe-round-reconciliation.ps1` (4 → **5** probes RED×1).
 
 **Not shipped (still X9 / E7):** automatic kill-switch after sustained downtime;
 outage-driven pause+extend; full `06` s10 threshold monitors (latency, callback %,

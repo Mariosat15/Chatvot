@@ -21,9 +21,10 @@
  * off still got automatic, unliftable lockouts.
  *
  * These tests pin the rule that replaced it: a score escalates for review, and only a
- * restriction blocks. Each one asserts the CODE and REASON the gate returns, not merely
- * that something was allowed or refused - a gate that refuses for a different cause than
- * the test intends would otherwise pass.
+ * restriction blocks. Device fingerprint risk likewise never refuses entry on its own
+ * (DEVICE_RISK_BLOCKED removed 20 Sep 2026). Each one asserts the CODE and REASON the
+ * gate returns, not merely that something was allowed or refused - a gate that refuses
+ * for a different cause than the test intends would otherwise pass.
  */
 
 import {
@@ -207,6 +208,62 @@ describe("what may block a player from paid contest entry", () => {
           await import("@/database/models/fraud/suspicion-score.model")
         ).default;
         await SuspicionScore.deleteMany({});
+      }
+    });
+  });
+
+  describe("device fingerprint risk, on its own", () => {
+    it("does not block entry when device risk meets the historical threshold", async () => {
+      // Reason: until 20 Sep 2026 this returned DEVICE_RISK_BLOCKED with
+      // "security review of your device". Fingerprinting still alerts; it must
+      // never refuse. Restore the gate's former body and this goes red.
+      await seedSettings({
+        deviceFingerprintingEnabled: true,
+        deviceFingerprintBlockThreshold: 70,
+      });
+
+      const DeviceFingerprint = (
+        await import("@/database/models/fraud/device-fingerprint.model")
+      ).default;
+      await DeviceFingerprint.create({
+        userId: USER,
+        fingerprintId: "test-device-hash-aaaaaaaa",
+        riskScore: 100,
+      });
+
+      const { assertEntryFraudGate } = await import(
+        "@/lib/services/fraud/entry-fraud-gate.service"
+      );
+      const result = await assertEntryFraudGate({ userId: USER });
+
+      expect(result.allowed).toBe(true);
+      expect(result.code).not.toBe("DEVICE_RISK_BLOCKED");
+      expect(result.reason).toBeUndefined();
+    });
+
+    it("never returns DEVICE_RISK_BLOCKED at any stored threshold", async () => {
+      const { assertEntryFraudGate } = await import(
+        "@/lib/services/fraud/entry-fraud-gate.service"
+      );
+      const DeviceFingerprint = (
+        await import("@/database/models/fraud/device-fingerprint.model")
+      ).default;
+
+      for (const threshold of [1, 40, 70, 99]) {
+        await seedSettings({
+          deviceFingerprintingEnabled: true,
+          deviceFingerprintBlockThreshold: threshold,
+        });
+        await DeviceFingerprint.deleteMany({});
+        await DeviceFingerprint.create({
+          userId: USER,
+          fingerprintId: `test-device-hash-${threshold}`,
+          riskScore: 100,
+        });
+
+        const result = await assertEntryFraudGate({ userId: USER });
+        expect(result.code).not.toBe("DEVICE_RISK_BLOCKED");
+        expect(result.allowed).toBe(true);
       }
     });
   });

@@ -3,7 +3,7 @@ import { Schema, model, models, Document } from "mongoose";
 export interface IFraudSettings extends Document {
   // Device Fingerprinting
   deviceFingerprintingEnabled: boolean;
-  deviceFingerprintBlockThreshold: number; // 0-100, block entry if risk > this
+  deviceFingerprintBlockThreshold: number; // historical; inert for entry (alerts only since 20 Sep 2026)
 
   // VPN/Proxy Detection
   vpnDetectionEnabled: boolean;

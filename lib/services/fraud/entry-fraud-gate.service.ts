@@ -3,22 +3,23 @@
  *
  * Central risk gate for competition / challenge ENTRY:
  *   - blockVPN / blockProxy / blockTor / blockDatacenterIPs → block entry by IP
- *   - maxEntriesPerHour            → throttle rapid competition entries
- *   - deviceFingerprintBlockThreshold → block entry from a high-risk device
+ *   - maxEntriesPerHour → throttle rapid competition entries
  *
  * Design: capability/threshold-driven, backward-compatible (does nothing until
- * an admin raises a threshold below 100 or turns a block on), and FAILS OPEN on
- * any internal error so a detection hiccup never blocks a legitimate player.
+ * an admin turns a block on or lowers the hourly cap), and FAILS OPEN on any
+ * internal error so a detection hiccup never blocks a legitimate player.
  *
- * What this gate deliberately does NOT do: refuse entry on the strength of a
- * user's suspicion score. `entryBlockThreshold` is an alert/review threshold,
- * not a block. Section 4 below explains why at length - it is the one thing
- * about this file most likely to get "helpfully" put back.
+ * What this gate deliberately does NOT do:
+ *   - refuse entry on a user's suspicion score (`entryBlockThreshold` is review
+ *     only — section 4 below);
+ *   - refuse entry on a device fingerprint risk score
+ *     (`deviceFingerprintBlockThreshold` is inert — section 2 below).
  *
- * Every refusal here is transient and self-clearing: a different network, an
- * hour's wait, or a device whose risk an admin resets. Nothing in this gate can
- * lock an account out indefinitely. Indefinite blocks belong to
- * `UserRestriction`, where they are visible to admins and can be lifted.
+ * Every refusal here is transient and self-clearing: a different network, or an
+ * hour's wait. Nothing in this gate can lock an account out indefinitely.
+ * Indefinite blocks belong to `UserRestriction`, where they are visible to
+ * admins and can be lifted — created by admin Restrict/Ban, or by Auto-Suspend
+ * when that Fraud Setting is switched on.
  */
 
 import { getFraudSettings } from "@/lib/services/fraud-settings.service";
@@ -57,7 +58,32 @@ export async function assertEntryFraudGate(params: {
       }
     }
 
-    // 2. Per-hour entry throttle (competition participants created in last hour).
+    // 2. Device fingerprint risk: DELIBERATELY DOES NOT BLOCK.
+    //
+    // Reason: until 20 September 2026 this returned DEVICE_RISK_BLOCKED whenever
+    // the user's highest device `riskScore` met `deviceFingerprintBlockThreshold`
+    // (schema default 70) while fingerprinting was enabled. That was an
+    // *invisible, irreversible* block with the same shape as the old suspicion-
+    // score refusal below:
+    //
+    //   - it created no UserRestriction, so the account appeared nowhere on the
+    //     Restricted Users screen and Lift did not apply;
+    //   - the player saw only "Entry is temporarily blocked due to a security
+    //     review of your device" with no admin path to clear it;
+    //   - investigation alone never wrote a restriction, so an account "under
+    //     review" looked locked when the real cause was this silent gate;
+    //   - challenge create and competition join both called this gate, but the
+    //     message was easy to misread as "under investigation".
+    //
+    // Device fingerprinting still runs and still raises alerts / suspicion
+    // scores. Blocking entry is the sole job of `UserRestriction` — admin
+    // Restrict/Ban, or Auto-Suspend when `autoSuspendEnabled` is on.
+    //
+    // `deviceFingerprintBlockThreshold` remains on the settings document so we
+    // do not mirror-migrate a cosmetic drop; nothing reads it for a refusal.
+    // Do not reintroduce a device-risk refusal here.
+
+    // 3. Per-hour entry throttle (competition participants created in last hour).
     const maxPerHour = settings.maxEntriesPerHour ?? 0;
     if (maxPerHour > 0) {
       try {
@@ -80,32 +106,6 @@ export async function assertEntryFraudGate(params: {
         }
       } catch (err) {
         console.warn("⚠️ Entry gate: hourly-entry count failed (skipping):", err);
-      }
-    }
-
-    // 3. Device-risk block — highest-risk device fingerprint for this user.
-    const deviceThreshold = settings.deviceFingerprintBlockThreshold ?? 100;
-    if (settings.deviceFingerprintingEnabled && deviceThreshold < 100) {
-      try {
-        const DeviceFingerprint = (
-          await import("@/database/models/fraud/device-fingerprint.model")
-        ).default;
-        const riskiest = await DeviceFingerprint.findOne({ userId })
-          .sort({ riskScore: -1 })
-          .select({ riskScore: 1 })
-          .lean();
-        const deviceRisk =
-          (riskiest as { riskScore?: number } | null)?.riskScore ?? 0;
-        if (deviceRisk >= deviceThreshold) {
-          return {
-            allowed: false,
-            reason:
-              "Entry is temporarily blocked due to a security review of your device. Please contact support.",
-            code: "DEVICE_RISK_BLOCKED",
-          };
-        }
-      } catch (err) {
-        console.warn("⚠️ Entry gate: device-risk check failed (skipping):", err);
       }
     }
 

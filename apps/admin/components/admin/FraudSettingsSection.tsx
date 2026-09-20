@@ -190,6 +190,58 @@ export default function FraudSettingsSection() {
     }
   };
 
+  /**
+   * Persist one Auto-Suspend field immediately.
+   *
+   * Reason: the Auto-Suspend switch used to only update local state until the
+   * operator remembered to click Save Changes. Turning it ON looked applied
+   * while the main app still read the previous value from cache — and turning
+   * it OFF left automatic suspensions running. Money-adjacent toggles save on
+   * the click that changes them.
+   */
+  const saveAutoSuspendNow = async (
+    patch: Partial<Pick<FraudSettings, "autoSuspendEnabled" | "autoSuspendThreshold">>,
+  ) => {
+    if (!settings) return;
+    const next = { ...settings, ...patch };
+    setSettings(next);
+    setSaving(true);
+    try {
+      const response = await fetch("/api/fraud/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(next),
+      });
+      if (!response.ok) {
+        toast.error("Failed to save Auto-Suspend setting");
+        setSettings(settings);
+        return;
+      }
+      try {
+        const baseUrl =
+          process.env.NEXT_PUBLIC_APP_URL ||
+          process.env.NEXT_PUBLIC_BASE_URL ||
+          "";
+        await fetch(`${baseUrl}/api/fraud/clear-cache`, { method: "POST" });
+      } catch {
+        // Cache clears on the next 30s tick if this fails.
+      }
+      toast.success(
+        patch.autoSuspendEnabled === true
+          ? "Auto-Suspend is ON — high-risk accounts will be restricted."
+          : patch.autoSuspendEnabled === false
+            ? "Auto-Suspend is OFF — only an admin Restrict/Ban will lock an account."
+            : "Auto-Suspend threshold saved.",
+      );
+    } catch (error) {
+      console.error("Error saving Auto-Suspend:", error);
+      toast.error("Error saving Auto-Suspend setting");
+      setSettings(settings);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleResetSettings = async () => {
     if (
       !confirm(
@@ -947,7 +999,10 @@ export default function FraudSettingsSection() {
                 />
               </div>
               <CardDescription className="text-gray-500 text-xs">
-                Track unique device signatures to detect multi-accounts
+                Track unique device signatures to detect multi-accounts. A high
+                device risk score raises alerts only — it never blocks contest
+                entry by itself. To lock an account, use Restrict/Ban or turn on
+                Auto-Suspend.
               </CardDescription>
             </CardHeader>
             {settings.deviceFingerprintingEnabled && (
@@ -1339,13 +1394,17 @@ export default function FraudSettingsSection() {
                 </CardTitle>
                 <Switch
                   checked={settings.autoSuspendEnabled}
+                  disabled={saving}
                   onCheckedChange={(checked) =>
-                    updateSetting("autoSuspendEnabled", checked)
+                    void saveAutoSuspendNow({ autoSuspendEnabled: checked })
                   }
                 />
               </div>
               <CardDescription className="text-gray-500 text-xs">
-                Automatically suspend accounts that exceed the risk threshold
+                Automatically suspend accounts that exceed the risk threshold.
+                Saves immediately — you do not need Save Changes for this
+                switch. Investigation alone never restricts; only this, or an
+                admin Restrict/Ban, does.
               </CardDescription>
             </CardHeader>
             {settings.autoSuspendEnabled && (
@@ -1364,17 +1423,33 @@ export default function FraudSettingsSection() {
                     min="70"
                     max="100"
                     value={settings.autoSuspendThreshold}
+                    disabled={saving}
                     onChange={(e) =>
                       updateSetting(
                         "autoSuspendThreshold",
                         parseInt(e.target.value),
                       )
                     }
+                    onMouseUp={(e) =>
+                      void saveAutoSuspendNow({
+                        autoSuspendThreshold: parseInt(
+                          (e.target as HTMLInputElement).value,
+                        ),
+                      })
+                    }
+                    onTouchEnd={(e) =>
+                      void saveAutoSuspendNow({
+                        autoSuspendThreshold: parseInt(
+                          (e.target as HTMLInputElement).value,
+                        ),
+                      })
+                    }
                     className="w-full accent-red-500"
                   />
                   <p className="text-xs text-gray-500 mt-2">
                     Accounts with risk score ≥ {settings.autoSuspendThreshold}{" "}
-                    will be automatically suspended
+                    will be automatically suspended. Threshold saves when you
+                    release the slider.
                   </p>
                 </div>
               </CardContent>

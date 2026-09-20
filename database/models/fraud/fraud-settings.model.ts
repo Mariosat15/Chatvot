@@ -3,7 +3,10 @@ import { Schema, model, models, Document } from "mongoose";
 export interface IFraudSettings extends Document {
   // Device Fingerprinting
   deviceFingerprintingEnabled: boolean;
-  deviceFingerprintBlockThreshold: number; // 0-100, block entry if risk > this
+  // Reason: name and field kept to avoid a mirrored migration. Since 20 Sep 2026
+  // this BLOCKS NOTHING — device risk raises alerts only. Entry refusal is
+  // UserRestriction alone; see `entry-fraud-gate.service.ts` section 2.
+  deviceFingerprintBlockThreshold: number; // historical; inert for entry
 
   // VPN/Proxy Detection
   vpnDetectionEnabled: boolean;

@@ -260,8 +260,9 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // 🛡️ FRAUD ENTRY GATE — VPN/Proxy/Tor/Datacenter blocks + device/risk
-      // thresholds + per-hour throttle (admin-configurable, fail-open).
+      // 🛡️ FRAUD ENTRY GATE — VPN/Proxy/Tor/Datacenter blocks + per-hour throttle
+      // (admin-configurable, fail-open). Device risk and suspicion score do NOT
+      // refuse here — only a UserRestriction does.
       const gateIp =
         request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
         request.headers.get("x-real-ip") ||
