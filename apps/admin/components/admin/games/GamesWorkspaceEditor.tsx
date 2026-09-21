@@ -152,7 +152,13 @@ export default function GamesWorkspaceEditor({
     case "theme":
       return (
         <PanelCard>
-          <GamePageThemeEditor title={title} onSaved={onTitlePatch} />
+          {/* Reason: remount on title switch so unsaved theme edits cannot
+              bleed onto the next game (same class as GeneralTab's useEffect). */}
+          <GamePageThemeEditor
+            key={title.gameKey}
+            title={title}
+            onSaved={onTitlePatch}
+          />
         </PanelCard>
       );
     case "live":

@@ -67,6 +67,19 @@ describe("Games workspace structure", () => {
     expect((editor.match(/<GameContentDialog/g) ?? []).length).toBe(2);
   });
 
+  it("remounts the page theme editor when the selected title changes", () => {
+    // Reason: without key={gameKey}, local theme state from game A is Saved onto
+    // game B when the operator switches titles (21 Sep 2026).
+    expect(editor).toMatch(
+      /<GamePageThemeEditor[\s\S]*?key=\{title\.gameKey\}/,
+    );
+    const themeEditor = readCode(
+      "apps/admin/components/admin/games/GamePageThemeEditor.tsx",
+    );
+    expect(themeEditor).toContain("hydrateFromTitle");
+    expect(themeEditor).toMatch(/useEffect\([\s\S]*\[title\]/);
+  });
+
   it("withholds Duplicate and Delete by name", () => {
     expect(editor).toMatch(/Duplicate and delete are withheld/i);
     expect(editor.toLowerCase()).not.toContain("ondelete");

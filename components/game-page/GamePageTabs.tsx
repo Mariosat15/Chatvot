@@ -5,7 +5,6 @@ import Link from "next/link";
 const TABS = [
   { id: "overview", label: "Overview" },
   { id: "how-it-works", label: "How It Works" },
-  { id: "leaderboards", label: "Leaderboards" },
   { id: "prizes", label: "Prizes" },
   { id: "challenges", label: "Challenges" },
   { id: "rules", label: "Rules" },
@@ -21,7 +20,7 @@ export function GamePageTabs({
 }) {
   const current = active || "overview";
   return (
-    <div className="flex max-w-full gap-1 overflow-x-auto pb-1">
+    <div className="flex max-w-full gap-1 overflow-x-auto border-b border-[var(--gp-border)] pb-px">
       {TABS.map((tab) => {
         const isActive = current === tab.id;
         const href =
@@ -34,8 +33,8 @@ export function GamePageTabs({
             href={href}
             className={
               isActive
-                ? "shrink-0 rounded-lg bg-white/10 px-3 py-2 text-xs font-semibold text-white"
-                : "shrink-0 rounded-lg px-3 py-2 text-xs font-medium text-[var(--gp-muted)] hover:bg-white/5 hover:text-white"
+                ? "-mb-px shrink-0 border-b-2 border-[var(--gp-accent)] px-3 py-2.5 text-xs font-semibold text-white"
+                : "shrink-0 px-3 py-2.5 text-xs font-medium text-[var(--gp-muted)] hover:text-white"
             }
           >
             {tab.label}

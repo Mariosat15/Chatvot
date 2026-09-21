@@ -1,16 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { CalendarDays } from "lucide-react";
-import {
-  challengeCreateHref,
-  resolvePlayNowHref,
-} from "@/lib/services/games/game-page-helpers";
+import { challengeCreateHref } from "@/lib/services/games/game-page-helpers";
 import type { GamePageData } from "@/lib/services/games/game-page.types";
 import { themeCssVariables } from "@/lib/services/games/game-page-themes";
 import { GamePageTabs } from "./GamePageTabs";
-import { GamePageOverview } from "./GamePageOverview";
-import { GamePagePanel, PlayNowButton } from "./GamePageChrome";
+import { GamePageOverview, HowItWorksSteps } from "./GamePageOverview";
+import { GamePagePanel } from "./GamePageChrome";
 
 function Hero({ game }: { game: GamePageData }) {
   return (
@@ -21,12 +17,12 @@ function Hero({ game }: { game: GamePageData }) {
           <img
             src={game.bannerUrl}
             alt=""
-            className="h-full w-full object-cover opacity-50"
+            className="h-full w-full object-cover opacity-45"
           />
         ) : (
           <div className="h-full w-full bg-gradient-to-br from-[var(--gp-accent-2)]/40 via-[var(--gp-bg)] to-[var(--gp-accent)]/20" />
         )}
-        <div className="absolute inset-0 bg-gradient-to-r from-[var(--gp-bg)] via-[var(--gp-bg)]/85 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[var(--gp-bg)] via-[var(--gp-bg)]/88 to-[var(--gp-bg)]/40" />
       </div>
 
       <div className="relative grid gap-6 p-6 sm:p-8 lg:grid-cols-[auto_1fr_auto] lg:items-end">
@@ -172,15 +168,15 @@ export function GamePageView({
   game: GamePageData;
   tab: string;
 }) {
-  const playHref = resolvePlayNowHref(game, game.joinableContests);
   const vars = themeCssVariables(game.theme);
+  const current = tab || "overview";
 
   return (
     <div
       className="min-h-[70vh] text-[var(--gp-text)]"
       style={{ ...vars, background: "var(--gp-bg)" } as React.CSSProperties}
     >
-      <div className="mx-auto max-w-7xl space-y-5 px-4 py-6 sm:px-6">
+      <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6">
         <nav className="text-xs text-[var(--gp-muted)]">
           <Link href="/games" className="hover:text-white">
             Games
@@ -191,55 +187,21 @@ export function GamePageView({
 
         <Hero game={game} />
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <GamePageTabs slug={game.slug} active={tab} />
-          <PlayNowButton href={playHref} />
-        </div>
+        <GamePageTabs slug={game.slug} active={current} />
 
-        {tab === "overview" || !tab ? <GamePageOverview game={game} /> : null}
-        {tab === "how-it-works" ? (
+        {current === "overview" ? <GamePageOverview game={game} /> : null}
+        {current === "how-it-works" ? (
           <GamePagePanel>
-            <h2 className="text-sm font-bold text-[var(--gp-accent)]">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-[var(--gp-accent)]">
               How It Works
             </h2>
-            {(game.howItWorksSteps ?? []).length > 0 ? (
-              <ol className="mt-4 grid gap-4 sm:grid-cols-3">
-                {(game.howItWorksSteps ?? []).map((step, i) => (
-                  <li
-                    key={`${step.title}-${i}`}
-                    className="rounded-xl border border-[var(--gp-border)] p-4"
-                  >
-                    <p className="text-xs font-bold text-[var(--gp-accent)]">
-                      Step {i + 1}
-                    </p>
-                    <p className="mt-1 font-semibold text-white">{step.title}</p>
-                    <p className="mt-1 text-xs text-[var(--gp-muted)]">
-                      {step.detail}
-                    </p>
-                  </li>
-                ))}
-              </ol>
-            ) : (
-              <p className="mt-3 text-sm text-[var(--gp-muted)]">
-                Steps appear when how-to-play content is set in All Games.
-              </p>
-            )}
+            <div className="mt-4">
+              <HowItWorksSteps game={game} />
+            </div>
           </GamePagePanel>
         ) : null}
-        {tab === "leaderboards" ? (
-          <GamePagePanel>
-            <h2 className="flex items-center gap-2 text-sm font-bold text-[var(--gp-accent)]">
-              <CalendarDays className="h-4 w-4" />
-              Leaderboards
-            </h2>
-            <p className="mt-3 text-sm text-[var(--gp-muted)]">
-              Per-game leaderboards use the platform stats board. Open Rankings
-              from the main nav when seasonal tabs are available for this game.
-            </p>
-          </GamePagePanel>
-        ) : null}
-        {tab === "prizes" ? <RulesTab game={game} /> : null}
-        {tab === "challenges" ? (
+        {current === "prizes" ? <RulesTab game={game} /> : null}
+        {current === "challenges" ? (
           <GamePagePanel className="space-y-3">
             <h2 className="text-sm font-bold text-[var(--gp-accent)]">
               Challenges
@@ -264,8 +226,8 @@ export function GamePageView({
             )}
           </GamePagePanel>
         ) : null}
-        {tab === "rules" ? <RulesTab game={game} /> : null}
-        {tab === "gallery" ? <GalleryTab game={game} /> : null}
+        {current === "rules" ? <RulesTab game={game} /> : null}
+        {current === "gallery" ? <GalleryTab game={game} /> : null}
       </div>
     </div>
   );

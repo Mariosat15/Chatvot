@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -27,27 +27,53 @@ interface Props {
   onSaved: (patch: Partial<ProviderTitleRow>) => void;
 }
 
-export default function GamePageThemeEditor({ title, onSaved }: Props) {
+function hydrateFromTitle(title: ProviderTitleRow) {
   const categorySlug = normaliseCategorySlug(title.category);
   const resolved = resolveGamePageTheme(title.pageThemeId, categorySlug);
-  const [themeId, setThemeId] = useState<string>(
-    title.pageThemeId || resolved.id,
-  );
-  const [quote, setQuote] = useState(title.stylizedQuote ?? "");
-  const [skill, setSkill] = useState(title.skillLevelLabel ?? "All Levels");
-  const [desktop, setDesktop] = useState(
-    title.supportedDevices?.desktop !== false,
-  );
-  const [tablet, setTablet] = useState(title.supportedDevices?.tablet !== false);
-  const [mobile, setMobile] = useState(title.supportedDevices?.mobile !== false);
-  const [tags, setTags] = useState((title.descriptionTags ?? []).join(", "));
-  const [steps, setSteps] = useState(
-    title.howItWorksSteps?.map((s) => ({
-      title: s.title,
-      detail: s.detail,
-    })) ?? [],
-  );
+  return {
+    themeId: title.pageThemeId || resolved.id,
+    quote: title.stylizedQuote ?? "",
+    skill: title.skillLevelLabel ?? "All Levels",
+    desktop: title.supportedDevices?.desktop !== false,
+    tablet: title.supportedDevices?.tablet !== false,
+    mobile: title.supportedDevices?.mobile !== false,
+    tags: (title.descriptionTags ?? []).join(", "),
+    steps:
+      title.howItWorksSteps?.map((s) => ({
+        title: s.title,
+        detail: s.detail,
+      })) ?? [],
+  };
+}
+
+export default function GamePageThemeEditor({ title, onSaved }: Props) {
+  const initial = hydrateFromTitle(title);
+  const [themeId, setThemeId] = useState<string>(initial.themeId);
+  const [quote, setQuote] = useState(initial.quote);
+  const [skill, setSkill] = useState(initial.skill);
+  const [desktop, setDesktop] = useState(initial.desktop);
+  const [tablet, setTablet] = useState(initial.tablet);
+  const [mobile, setMobile] = useState(initial.mobile);
+  const [tags, setTags] = useState(initial.tags);
+  const [steps, setSteps] = useState(initial.steps);
   const [saving, setSaving] = useState(false);
+
+  // Reason: without this, switching titles in All Games keeps the previous
+  // title's local state and Save writes it onto the newly selected game
+  // (production report 21 Sep 2026 — "theme is the same for all games").
+  // `title` is the dependency (not a field list) so a post-save patch also
+  // rehydrates; remount via key={gameKey} covers the switch case either way.
+  useEffect(() => {
+    const next = hydrateFromTitle(title);
+    setThemeId(next.themeId);
+    setQuote(next.quote);
+    setSkill(next.skill);
+    setDesktop(next.desktop);
+    setTablet(next.tablet);
+    setMobile(next.mobile);
+    setTags(next.tags);
+    setSteps(next.steps);
+  }, [title]);
 
   async function save() {
     setSaving(true);

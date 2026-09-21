@@ -8,6 +8,8 @@
 > **Hotfix 21 Sep 2026:** `gallery` / `howItWorksSteps` / `descriptionTags` are always
 > arrays after aggregation (empty `[]` when unset) — an undefined gallery crashed SSR
 > with `.slice` after a Page-theme save without assets.
+> **Layout pass 21 Sep 2026:** no top Play Now / Ready to Play box; no Leaderboards tab;
+> How It Works is a full-width step band; Page Theme editor remounts per `gameKey`.
 > The block below is the original Cursor brief kept for history.
 
 ---
