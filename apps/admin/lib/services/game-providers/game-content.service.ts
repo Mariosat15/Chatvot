@@ -32,7 +32,12 @@ export type ContentUpdateResult =
  * renders an empty slot where it should have rendered nothing at all. Same distinction as
  * `entryBlockThreshold`: a stored value and an absent one are different facts.
  */
-function buildUpdate(content: GameContentInput) {
+/**
+ * Shared with the Trading page editor — same clear-vs-leave semantics, same allow-list
+ * already enforced by `validateGameContent`. Exported so two writers cannot drift on how
+ * empty strings become `$unset`.
+ */
+export function buildContentMongoUpdate(content: GameContentInput) {
   const $set: Record<string, unknown> = {};
   const $unset: Record<string, ""> = {};
 
@@ -79,7 +84,7 @@ export async function updateGameContent(
   // DIFFERENT provider's title through this provider's URL.
   const updated = await ProviderGame.findOneAndUpdate(
     { providerKey, gameCode },
-    buildUpdate(validated.content),
+    buildContentMongoUpdate(validated.content),
     { new: true },
   ).lean();
 

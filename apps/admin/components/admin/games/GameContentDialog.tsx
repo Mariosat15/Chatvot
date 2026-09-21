@@ -69,6 +69,18 @@ interface Props {
    * without duplicating save logic — each tab sends only its fields (partial update).
    */
   sections?: "all" | "copy" | "artwork";
+  /**
+   * Override the provider content PATCH URL. Trading uses `/api/games/trading/page-content`
+   * and sends `{ content }` with no `gameCode` — provider titles keep the default.
+   */
+  contentEndpoint?: string;
+  /**
+   * Override the artwork upload URL. Trading uses `/api/games/trading/artwork`.
+   * Passed through to each `GameArtworkField`.
+   */
+  artworkEndpoint?: string;
+  /** Hide the AI assist panel (Trading has no catalogue AI vocabulary for now). */
+  hideAiAssist?: boolean;
 }
 
 interface Draft {
@@ -125,6 +137,9 @@ export default function GameContentDialog({
   onSaved,
   inline = false,
   sections = "all",
+  contentEndpoint,
+  artworkEndpoint,
+  hideAiAssist = false,
 }: Props) {
   const terms = useTerms();
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -221,10 +236,17 @@ export default function GameContentDialog({
 
     setSaving(true);
     try {
-      const response = await fetch(`/api/games/providers/${providerKey}/games/content`, {
+      const endpoint =
+        contentEndpoint ??
+        `/api/games/providers/${providerKey}/games/content`;
+      const response = await fetch(endpoint, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ gameCode: title.gameCode, content }),
+        body: JSON.stringify(
+          contentEndpoint
+            ? { content }
+            : { gameCode: title.gameCode, content },
+        ),
       });
       const data = await response.json();
 
@@ -289,12 +311,14 @@ export default function GameContentDialog({
             and above the two it cannot, so the sentence explaining the difference is read
             before an operator wonders why the two big boxes were skipped.
           */}
+          {!hideAiAssist && (
           <GameContentAiPanel
             gameKey={title.gameKey}
             onApply={(patch) =>
               setDraft((current) => (current ? { ...current, ...patch } : current))
             }
           />
+          )}
 
           <Field
             label="Title"
@@ -399,6 +423,7 @@ export default function GameContentDialog({
               hint={`Square. Shown beside the title and, later, on the dashboard tile ${terms.players} click.`}
               value={draft.thumbnailUrl}
               onChange={(url) => set("thumbnailUrl", url)}
+              uploadEndpoint={artworkEndpoint}
             />
             <GameArtworkField
               providerKey={providerKey}
@@ -408,6 +433,7 @@ export default function GameContentDialog({
               hint={`Wide. The strip behind the ${terms.contest} heading. Unset falls back to a generic banner.`}
               value={draft.bannerUrl}
               onChange={(url) => set("bannerUrl", url)}
+              uploadEndpoint={artworkEndpoint}
             />
           </div>
 
@@ -448,6 +474,7 @@ export default function GameContentDialog({
                 hint={`Small square, beside the numbered steps. A diagram of the ${terms.game}, not a logo.`}
                 value={draft.howToPlayImageUrl}
                 onChange={(url) => set("howToPlayImageUrl", url)}
+                uploadEndpoint={artworkEndpoint}
               />
               <GameArtworkField
                 providerKey={providerKey}
@@ -457,6 +484,7 @@ export default function GameContentDialog({
                 hint="Small landscape, beside the ticked tips. A badge or a slogan graphic."
                 value={draft.highlightsImageUrl}
                 onChange={(url) => set("highlightsImageUrl", url)}
+                uploadEndpoint={artworkEndpoint}
               />
             </div>
           </div>
@@ -478,6 +506,7 @@ export default function GameContentDialog({
                 hint="Wide still shown in the middle column. Falls back to built-in art for Circuit themes when empty."
                 value={draft.gameplayPreviewUrl}
                 onChange={(url) => set("gameplayPreviewUrl", url)}
+                uploadEndpoint={artworkEndpoint}
               />
               <div className="space-y-1.5">
                 <Label className="text-xs text-white/60">Gameplay video URL</Label>
@@ -534,6 +563,7 @@ export default function GameContentDialog({
                           ),
                         )
                       }
+                      uploadEndpoint={artworkEndpoint}
                     />
                     <div className="flex flex-col gap-2 sm:pt-6">
                       <Input

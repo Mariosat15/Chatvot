@@ -113,6 +113,12 @@ export const ADMIN_SECTIONS = [
   "email-templates",
   "notifications",
   "trading-risk",
+  /*
+    Trading player page editor (Page content / Assets / Page theme). Own grant rather than
+    a slice of symbols or game-providers: rewriting the /games/trading catalogue card is
+    not the same trust as changing margin limits or enabling a provider title. Add-only.
+  */
+  "trading-page",
   "currency",
   "fees",
   "payment-providers",

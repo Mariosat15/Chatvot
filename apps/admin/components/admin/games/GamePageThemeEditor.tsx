@@ -25,6 +25,11 @@ import type { ProviderTitleRow } from "./provider-types";
 interface Props {
   title: ProviderTitleRow;
   onSaved: (patch: Partial<ProviderTitleRow>) => void;
+  /**
+   * Override the content PATCH URL. Trading uses `/api/games/trading/page-content`
+   * and sends `{ content }` with no `gameCode`.
+   */
+  contentEndpoint?: string;
 }
 
 function hydrateFromTitle(title: ProviderTitleRow) {
@@ -46,7 +51,11 @@ function hydrateFromTitle(title: ProviderTitleRow) {
   };
 }
 
-export default function GamePageThemeEditor({ title, onSaved }: Props) {
+export default function GamePageThemeEditor({
+  title,
+  onSaved,
+  contentEndpoint,
+}: Props) {
   const initial = hydrateFromTitle(title);
   const [themeId, setThemeId] = useState<string>(initial.themeId);
   const [quote, setQuote] = useState(initial.quote);
@@ -93,14 +102,18 @@ export default function GamePageThemeEditor({ title, onSaved }: Props) {
         howItWorksSteps: steps.filter((s) => s.title.trim() && s.detail.trim()),
       };
 
-      const response = await fetch(
-        `/api/games/providers/${title.providerKey}/games/content`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ gameCode: title.gameCode, content }),
-        },
-      );
+      const endpoint =
+        contentEndpoint ??
+        `/api/games/providers/${title.providerKey}/games/content`;
+      const response = await fetch(endpoint, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          contentEndpoint
+            ? { content }
+            : { gameCode: title.gameCode, content },
+        ),
+      });
       const data = await response.json();
       if (!response.ok) {
         toast.error(data.error ?? "Something went wrong. Please contact support.");

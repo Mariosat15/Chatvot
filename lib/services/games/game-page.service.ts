@@ -25,19 +25,8 @@ import {
   listContestsForGame,
   type BrowsableGame,
 } from "@/lib/services/games/player-catalogue.service";
-
-/** Matches `TRADING_CATALOGUE_CARD` in player-catalogue — kept local so that card stays private. */
-const TRADING_PAGE_COPY = {
-  displayName: "Trading",
-  tagline: "Compete on live forex markets with virtual capital.",
-  description:
-    "Join timed trading contests, manage risk with simulated capital, and climb the leaderboard on real market prices.",
-  category: "trading",
-  rulesSummary:
-    "Rankings use your contest trading performance. Liquidation and trade-floor rules follow each contest's settings.",
-  howToPlay:
-    "Enter a contest, open the trading terminal when it starts, place trades within the rules, and finish with the strongest result when the clock ends.",
-} as const;
+import { loadTradingPageContent } from "@/lib/services/games/trading-page-content";
+import type { TradingPageStoredContent } from "@/lib/services/games/trading-page-content";
 
 const PROVIDER_PAGE_SELECT = [
   "providerKey",
@@ -252,28 +241,61 @@ function mapStatus(
 function buildTradingPage(
   card: BrowsableGame,
   contests: GamePageContestSummary[],
+  content: TradingPageStoredContent,
 ): GamePageData {
-  const howToPlay = splitHowToPlay(TRADING_PAGE_COPY.howToPlay);
-  const theme = resolveGamePageTheme("trading-forge", "trading");
+  const howToPlay = splitHowToPlay(content.howToPlay);
+  const highlights = mapHighlights(content.highlights);
+  const bannerFeatures = mapHeroFeatures(content.heroFeatures);
+  const authoredSteps = Array.isArray(content.howItWorksSteps)
+    ? content.howItWorksSteps
+        .filter(
+          (s) =>
+            typeof s?.title === "string" &&
+            s.title.trim() !== "" &&
+            typeof s?.detail === "string" &&
+            s.detail.trim() !== "",
+        )
+        .map((s) => ({
+          title: s.title.trim(),
+          detail: s.detail.trim(),
+          icon: s.icon || undefined,
+        }))
+    : [];
+  const howItWorksSteps =
+    authoredSteps.length > 0
+      ? authoredSteps
+      : deriveHowItWorksSteps(howToPlay);
+  const theme = resolveGamePageTheme(content.pageThemeId, "trading");
 
   return {
     id: TRADING_GAME_TYPE,
     slug: card.slug,
     gameKey: card.gameKey,
     kind: "trading",
-    title: TRADING_PAGE_COPY.displayName,
-    tagline: TRADING_PAGE_COPY.tagline,
+    title: content.displayName,
+    tagline: content.tagline,
     genre: "Trading",
     categorySlug: "trading",
-    description: TRADING_PAGE_COPY.description,
-    rulesSummary: TRADING_PAGE_COPY.rulesSummary,
-    howToPlay,
-    howItWorksSteps: deriveHowItWorksSteps(howToPlay),
-    pageThemeId: "trading-forge",
+    description: content.description,
+    rulesSummary: content.rulesSummary,
+    howToPlay: howToPlay.length > 0 ? howToPlay : undefined,
+    logoUrl: content.thumbnailUrl,
+    bannerUrl: content.bannerUrl,
+    howItWorksImageUrl: content.howToPlayImageUrl,
+    gameTipsImageUrl: content.highlightsImageUrl,
+    highlights,
+    bannerFeatures,
+    heroFeatures: bannerFeatures,
+    howItWorksSteps,
+    pageThemeId: content.pageThemeId,
     theme,
-    gallery: [],
-    descriptionTags: [],
-    supportedDevices: { ...DEFAULT_DEVICES },
+    stylizedQuote: content.stylizedQuote,
+    gallery: mapGallery(content.gallery),
+    descriptionTags: deriveDescriptionTags(content.descriptionTags, highlights),
+    supportedDevices: resolveDevices(content.supportedDevices),
+    skillLevelLabel: content.skillLevelLabel,
+    gameplayPreviewUrl: content.gameplayPreviewUrl,
+    gameplayVideoUrl: content.gameplayVideoUrl,
     formats: {
       competition: true,
       challenge: true,
@@ -403,7 +425,8 @@ export async function getGamePageData(
   const contests = await listContestsForGame(card.gameKey);
 
   if (card.kind === "trading" || card.slug === TRADING_GAME_TYPE) {
-    return buildTradingPage(card, contests);
+    const content = await loadTradingPageContent();
+    return buildTradingPage(card, contests, content);
   }
 
   const title = await ProviderGame.findOne({ gameKey: card.gameKey })

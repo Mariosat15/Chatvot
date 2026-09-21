@@ -10,6 +10,10 @@
 > with `.slice` after a Page-theme save without assets.
 > **Layout pass 21 Sep 2026:** no top Play Now / Ready to Play box; no Leaderboards tab;
 > How It Works is a full-width step band; Page Theme editor remounts per `gameKey`.
+> **Trading page editor 21 Sep 2026:** Trading → **Trading Page** (`trading-page` grant)
+> reuses Page content / Assets / Page theme (no Settings). Store is `game_page_content`
+> singleton `gameKey: "trading"` — not a fake `provider_game` row. Player `/games/trading`
+> and the catalogue card read it with `TRADING_PAGE_DEFAULTS` fallback.
 > The block below is the original Cursor brief kept for history.
 
 ---

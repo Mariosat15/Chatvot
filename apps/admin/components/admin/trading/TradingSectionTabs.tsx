@@ -6,6 +6,7 @@ import {
   Gauge,
   History,
   HeartPulse,
+  LayoutTemplate,
   LineChart,
   TrendingUp,
 } from "lucide-react";
@@ -18,6 +19,7 @@ const TAB_ICONS: Record<string, React.ReactNode> = {
   "trading-risk": <Gauge className="h-4 w-4" />,
   "price-health": <HeartPulse className="h-4 w-4" />,
   "trading-history": <History className="h-4 w-4" />,
+  "trading-page": <LayoutTemplate className="h-4 w-4" />,
 };
 
 interface TradingSectionTabsProps {
@@ -43,7 +45,7 @@ export default function TradingSectionTabs({
   const visibleTabs = TRADING_SECTION_TABS.filter((tab) => hasAccess(tab.id));
 
   // Reason: a single reachable screen needs no switcher, and an employee granted
-  // one trading section should not learn the names of the five they cannot open.
+  // one trading section should not learn the names of the others they cannot open.
   if (visibleTabs.length < 2) return null;
 
   return (

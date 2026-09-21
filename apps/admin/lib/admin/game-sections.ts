@@ -31,6 +31,7 @@ export const TRADING_SECTION_TABS: readonly GameSectionTab[] = [
   { id: "trading-risk", label: "Risk & Margin" },
   { id: "price-health", label: "Price Health" },
   { id: "trading-history", label: "Trading History" },
+  { id: "trading-page", label: "Trading Page" },
 ] as const;
 
 export const TRADING_SECTION_IDS: readonly string[] = TRADING_SECTION_TABS.map(
@@ -38,7 +39,7 @@ export const TRADING_SECTION_IDS: readonly string[] = TRADING_SECTION_TABS.map(
 );
 
 /**
- * The collapsible sidebar parent holding the six tabs above.
+ * The collapsible sidebar parent holding the trading tabs above.
  *
  * **Deliberately not an `AdminSection`** - it renders nothing of its own, and a grant that maps
  * to no screen is exactly where privilege widening starts. It is named here because the sidebar

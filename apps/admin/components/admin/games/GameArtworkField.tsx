@@ -29,6 +29,8 @@ interface Props {
   hint: string;
   value: string;
   onChange: (url: string) => void;
+  /** Override upload URL (Trading page editor). Default: provider artwork route. */
+  uploadEndpoint?: string;
 }
 
 /**
@@ -60,6 +62,7 @@ export default function GameArtworkField({
   hint,
   value,
   onChange,
+  uploadEndpoint,
 }: Props) {
   const [uploading, setUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -73,7 +76,8 @@ export default function GameArtworkField({
       form.append("slot", slot);
 
       const response = await fetch(
-        `/api/games/providers/${providerKey}/games/artwork`,
+        uploadEndpoint ??
+          `/api/games/providers/${providerKey}/games/artwork`,
         { method: "POST", body: form },
       );
       const data = await response.json();

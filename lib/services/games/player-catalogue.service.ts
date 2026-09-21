@@ -6,6 +6,8 @@ import { WhiteLabel } from "@/database/models/whitelabel.model";
 import { getEnabledGameTypes, TRADING_GAME_TYPE } from "@/lib/games";
 import { getProviderAdapter } from "@/lib/services/game-providers/registry";
 import { resolveGameCategory } from "@/lib/services/games/game-categories";
+import { loadTradingPageContent } from "@/lib/services/games/trading-page-content";
+import { TRADING_PAGE_DEFAULTS } from "@/lib/services/games/trading-page-defaults";
 
 /**
  * Player-facing games catalogue (X11 Slice 1).
@@ -56,21 +58,40 @@ export interface CatalogueContestSummary {
   endTime: string;
 }
 
-/** The trading card — one first-party module, not a hard-coded provider title. */
-const TRADING_CATALOGUE_CARD: BrowsableGame = {
+/** Fallback when the DB read fails mid-list — same copy the store seeds from. */
+const TRADING_CATALOGUE_FALLBACK: BrowsableGame = {
   slug: TRADING_GAME_TYPE,
   gameKey: TRADING_GAME_TYPE,
   kind: "trading",
-  displayName: "Trading",
-  tagline: "Compete on live forex markets with virtual capital.",
-  description:
-    "Join timed trading contests, manage risk with simulated capital, and climb the leaderboard on real market prices.",
+  displayName: TRADING_PAGE_DEFAULTS.displayName,
+  tagline: TRADING_PAGE_DEFAULTS.tagline,
+  description: TRADING_PAGE_DEFAULTS.description,
   category: "Trading",
-  rulesSummary:
-    "Rankings use your contest trading performance. Liquidation and trade-floor rules follow each contest's settings.",
-  howToPlay:
-    "Enter a contest, open the trading terminal when it starts, place trades within the rules, and finish with the strongest result when the clock ends.",
+  rulesSummary: TRADING_PAGE_DEFAULTS.rulesSummary,
+  howToPlay: TRADING_PAGE_DEFAULTS.howToPlay,
 };
+
+async function tradingCatalogueCard(): Promise<BrowsableGame> {
+  try {
+    const content = await loadTradingPageContent();
+    return {
+      slug: TRADING_GAME_TYPE,
+      gameKey: TRADING_GAME_TYPE,
+      kind: "trading",
+      displayName: content.displayName,
+      tagline: content.tagline,
+      description: content.description,
+      category: "Trading",
+      thumbnailUrl: content.thumbnailUrl,
+      bannerUrl: content.bannerUrl,
+      rulesSummary: content.rulesSummary,
+      howToPlay: content.howToPlay,
+    };
+  } catch (error) {
+    console.warn("⚠️ Trading page content unavailable; using defaults:", error);
+    return TRADING_CATALOGUE_FALLBACK;
+  }
+}
 
 const LIVE_STATUSES = ["upcoming", "active"] as const;
 
@@ -156,7 +177,7 @@ export async function listBrowsableGames(): Promise<BrowsableGame[]> {
   const out: BrowsableGame[] = [];
 
   if (enabledTypes.includes(TRADING_GAME_TYPE)) {
-    out.push(TRADING_CATALOGUE_CARD);
+    out.push(await tradingCatalogueCard());
   }
 
   // Reason: provider discovery is gated by externalGamesEnabled inside the helper, not by
@@ -184,7 +205,7 @@ export async function getBrowsableGameBySlug(
   if (trimmed === TRADING_GAME_TYPE) {
     const enabledTypes = await getEnabledGameTypes();
     return enabledTypes.includes(TRADING_GAME_TYPE)
-      ? TRADING_CATALOGUE_CARD
+      ? await tradingCatalogueCard()
       : null;
   }
 

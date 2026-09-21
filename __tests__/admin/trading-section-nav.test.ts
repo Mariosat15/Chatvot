@@ -67,11 +67,11 @@ describe("trading admin sections are individually permissioned", () => {
   });
 
   it("collapsing the menu did not collapse the permissions", () => {
-    // Reason: the failure this pins is a future refactor replacing the six ids
+    // Reason: the failure this pins is a future refactor replacing the tab ids
     // with a single "trading" grant, which would hand anyone who can see symbols
     // the ability to change risk and margin limits too.
-    expect(TRADING_SECTION_TABS.length).toBe(6);
-    expect(new Set(TRADING_SECTION_TABS.map((t) => t.id)).size).toBe(6);
+    expect(TRADING_SECTION_TABS.length).toBe(7);
+    expect(new Set(TRADING_SECTION_TABS.map((t) => t.id)).size).toBe(7);
   });
 
   it("the sidebar gates each trading screen separately", () => {

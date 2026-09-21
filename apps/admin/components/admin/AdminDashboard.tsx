@@ -72,6 +72,7 @@ import {
   Megaphone,
   Video,
   Gamepad2,
+  LayoutTemplate,
 } from "lucide-react";
 import { toast } from "sonner";
 import CredentialsSection from "@/components/admin/CredentialsSection";
@@ -138,6 +139,7 @@ import GameMasterDashboardSection from "@/components/admin/GameMasterDashboardSe
 import GameMasterManagementSection from "@/components/admin/GameMasterManagementSection";
 import PriceHealthWidget from "@/components/admin/PriceHealthWidget";
 import TradingSectionTabs from "@/components/admin/trading/TradingSectionTabs";
+import TradingPageSection from "@/components/admin/trading/TradingPageSection";
 import { isTradingSection, TRADING_MENU_ID } from "@/lib/admin/game-sections";
 import { TRADING_SURFACE_VISIBLE_BY_DEFAULT } from "@/lib/admin/trading-surface";
 import VendorSubscriptionsSection from "@/components/admin/VendorSubscriptionsSection";
@@ -158,7 +160,7 @@ interface AdminDashboardProps {
   role?: string;
   allowedSections?: string[];
   /**
-   * Whether trading's own six screens are still worth offering (`12` s9).
+   * Whether trading's own screens are still worth offering (`12` s9).
    *
    * Optional and defaulting to visible on purpose: the flag arrives through a prop, so a future
    * caller can forget it, and losing the screens that operate a live trading contest is a far
@@ -327,6 +329,11 @@ const menuGroups: MenuGroup[] = [
             id: "trading-history",
             label: "Trading History",
             icon: <History className="h-4 w-4" />,
+          },
+          {
+            id: "trading-page",
+            label: "Trading Page",
+            icon: <LayoutTemplate className="h-4 w-4" />,
           },
         ],
       },
@@ -1144,6 +1151,8 @@ export default function AdminDashboard({
         );
       case "trading-history":
         return <TradingHistorySection key={currentRefreshKey} />;
+      case "trading-page":
+        return <TradingPageSection key={currentRefreshKey} />;
       case "financial":
         return <FinancialDashboard key={currentRefreshKey} />;
       case "analytics":
