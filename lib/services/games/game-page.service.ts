@@ -164,8 +164,10 @@ function mapHighlights(
 
 function mapGallery(
   rows?: { url: string; title?: string; type?: string }[] | null,
-): GamePageGalleryItem[] | undefined {
-  if (!Array.isArray(rows) || rows.length === 0) return undefined;
+): GamePageGalleryItem[] {
+  // Reason: always an array — Overview calls `.slice` and an undefined gallery crashes
+  // the whole page with no empty-state path (production 21 Sep 2026).
+  if (!Array.isArray(rows) || rows.length === 0) return [];
   return rows
     .filter((row) => typeof row.url === "string" && row.url.trim() !== "")
     .map((row, index) => ({
@@ -195,10 +197,13 @@ function resolveDevices(
  * First three non-empty lines; title = short leading phrase or "Step N".
  */
 export function deriveHowItWorksSteps(
-  howToPlayLines: string[],
-): GamePageHowItWorksStep[] | undefined {
-  const lines = howToPlayLines.filter((line) => line.trim() !== "").slice(0, 3);
-  if (lines.length === 0) return undefined;
+  howToPlayLines: string[] | null | undefined,
+): GamePageHowItWorksStep[] {
+  // Reason: callers must survive absent howToPlay — `.filter` on undefined is the
+  // same crash class as gallery.slice (production 21 Sep 2026).
+  const source = Array.isArray(howToPlayLines) ? howToPlayLines : [];
+  const lines = source.filter((line) => line.trim() !== "").slice(0, 3);
+  if (lines.length === 0) return [];
 
   return lines.map((line, index) => {
     const trimmed = line.trim();
@@ -221,18 +226,17 @@ export function deriveHowItWorksSteps(
 function deriveDescriptionTags(
   authored?: string[] | null,
   highlights?: { title: string; description: string }[] | null,
-): string[] | undefined {
+): string[] {
   if (Array.isArray(authored) && authored.length > 0) {
     const cleaned = authored
       .map((tag) => (typeof tag === "string" ? tag.trim() : ""))
       .filter((tag) => tag !== "");
-    return cleaned.length > 0 ? cleaned : undefined;
+    return cleaned;
   }
-  if (!Array.isArray(highlights) || highlights.length === 0) return undefined;
-  const fromHighlights = highlights
+  if (!Array.isArray(highlights) || highlights.length === 0) return [];
+  return highlights
     .map((h) => h.title?.trim())
     .filter((t): t is string => Boolean(t));
-  return fromHighlights.length > 0 ? fromHighlights : undefined;
 }
 
 function mapStatus(
@@ -267,6 +271,8 @@ function buildTradingPage(
     howItWorksSteps: deriveHowItWorksSteps(howToPlay),
     pageThemeId: "trading-forge",
     theme,
+    gallery: [],
+    descriptionTags: [],
     supportedDevices: { ...DEFAULT_DEVICES },
     formats: {
       competition: true,

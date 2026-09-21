@@ -40,7 +40,7 @@ function Hero({ game }: { game: GamePageData }) {
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-3xl font-black text-[var(--gp-accent)]">
-              {game.title.slice(0, 1)}
+              {(game.title || "?").slice(0, 1)}
             </div>
           )}
         </div>
@@ -140,7 +140,8 @@ function RulesTab({ game }: { game: GamePageData }) {
 }
 
 function GalleryTab({ game }: { game: GamePageData }) {
-  if (game.gallery.length === 0) {
+  const gallery = game.gallery ?? [];
+  if (gallery.length === 0) {
     return (
       <GamePagePanel>
         <p className="text-sm text-[var(--gp-muted)]">
@@ -151,7 +152,7 @@ function GalleryTab({ game }: { game: GamePageData }) {
   }
   return (
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      {game.gallery.map((item) => (
+      {gallery.map((item) => (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           key={item.id}
@@ -201,9 +202,9 @@ export function GamePageView({
             <h2 className="text-sm font-bold text-[var(--gp-accent)]">
               How It Works
             </h2>
-            {game.howItWorksSteps.length > 0 ? (
+            {(game.howItWorksSteps ?? []).length > 0 ? (
               <ol className="mt-4 grid gap-4 sm:grid-cols-3">
-                {game.howItWorksSteps.map((step, i) => (
+                {(game.howItWorksSteps ?? []).map((step, i) => (
                   <li
                     key={`${step.title}-${i}`}
                     className="rounded-xl border border-[var(--gp-border)] p-4"

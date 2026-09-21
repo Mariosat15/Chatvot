@@ -110,13 +110,16 @@ export interface GamePageData {
   theme: GamePageTheme;
 
   stylizedQuote?: string;
-  gallery?: GamePageGalleryItem[];
+  /** Always an array after aggregation — empty means no Featured strip. */
+  gallery: GamePageGalleryItem[];
   supportedDevices?: GamePageSupportedDevices;
   skillLevelLabel?: string;
   gameplayPreviewUrl?: string;
   gameplayVideoUrl?: string;
-  howItWorksSteps?: GamePageHowItWorksStep[];
-  descriptionTags?: string[];
+  /** Always an array after aggregation — empty shows the how-to placeholder. */
+  howItWorksSteps: GamePageHowItWorksStep[];
+  /** Always an array after aggregation — empty hides the tag row. */
+  descriptionTags: string[];
 
   typicalDurationSeconds?: number;
   maxDurationSeconds?: number;

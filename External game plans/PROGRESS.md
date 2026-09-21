@@ -877,6 +877,14 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 21 Sep 2026 - Game page SSR crash on undefined gallery (HOTFIX)
+
+**Cause:** After an operator saved Page theme fields without gallery assets, `getGamePageData` left `gallery` / related arrays undefined. Overview called `game.gallery.slice(0, 3)` and took the whole `/games/[slug]` page down (`Cannot read properties of undefined (reading 'slice')` in the GamePageView SSR chunk).
+
+**Fix:** Aggregation always returns `[]` for `gallery`, `howItWorksSteps`, and `descriptionTags` (`mapGallery`, trading builder, `deriveHowItWorksSteps` / `deriveDescriptionTags`). UI uses `?? []` on those reads. Types mark the three as required arrays. Pinning test: `__tests__/services/game-page-aggregation.test.ts`.
+
+**Not a payout bug.** Deploy the web app after pull.
+
 ### 21 Sep 2026 - X11 player game page themes + admin Page theme tab (CODE-COMPLETE)
 
 **Shipped:** Player `/games/[slug]` rebuilt to the Circuit Sprint mock layout (hero, tabs, three-column overview, Game Info, modes, Featured gallery). Ready-made themes in `lib/services/games/game-page-themes.ts` (mirrored admin copy, byte-identical test): **circuit-neon** first, plus racing-heat, strategy-steel, arcade-volt, trading-forge, default. Explicit `pageThemeId` wins; absent resolves from category. New operator fields on both `provider_game` copies: `pageThemeId`, `stylizedQuote`, `gallery`, `supportedDevices`, `skillLevelLabel`, `howItWorksSteps`, `descriptionTags`, `gameplayPreviewUrl`, `gameplayVideoUrl`. Admin All Games gains **Page theme** tab (`GamePageThemeEditor`); Assets tab gains gameplay preview + gallery uploads (`gameplay-preview` / `gallery` artwork slots). Play Now prefers live → upcoming → practice stub → challenge. Practice is an honest stub page (no round launcher). VOLTS only via `formatVolts`.

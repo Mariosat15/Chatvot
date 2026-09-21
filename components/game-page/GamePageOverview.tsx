@@ -29,7 +29,7 @@ export function GamePageOverview({ game }: { game: GamePageData }) {
     game.typicalDurationSeconds,
     game.maxDurationSeconds,
   );
-  const featured = game.gallery.slice(0, 3);
+  const featured = (game.gallery ?? []).slice(0, 3);
   const useCircuitArt =
     game.slug === "circuit-sprint" ||
     game.categorySlug === "puzzle" ||
@@ -47,9 +47,9 @@ export function GamePageOverview({ game }: { game: GamePageData }) {
               game.tagline ||
               "Details for this game will appear here once an operator adds them."}
           </p>
-          {game.descriptionTags.length > 0 ? (
+          {(game.descriptionTags ?? []).length > 0 ? (
             <div className="mt-4 flex flex-wrap gap-2">
-              {game.descriptionTags.map((tag) => (
+              {(game.descriptionTags ?? []).map((tag) => (
                 <span
                   key={tag}
                   className="rounded-md border border-[var(--gp-border)] px-2 py-0.5 text-[11px] text-[var(--gp-text)]"
@@ -65,9 +65,9 @@ export function GamePageOverview({ game }: { game: GamePageData }) {
           <h2 className="text-sm font-bold uppercase tracking-wider text-[var(--gp-accent)]">
             How It Works
           </h2>
-          {game.howItWorksSteps.length > 0 ? (
+          {(game.howItWorksSteps ?? []).length > 0 ? (
             <ol className="mt-4 grid gap-3 sm:grid-cols-3">
-              {game.howItWorksSteps.map((step, i) => (
+              {(game.howItWorksSteps ?? []).map((step, i) => (
                 <li
                   key={`${step.title}-${i}`}
                   className="relative flex flex-col items-start gap-2 rounded-xl border border-[var(--gp-border)] bg-black/20 p-3"

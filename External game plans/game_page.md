@@ -5,6 +5,9 @@
 > `app/(root)/games/[slug]/`, admin `GamePageThemeEditor` + content/artwork fields on
 > `provider_game`. Themes: circuit-neon (Circuit Sprint mock), racing-heat, strategy-steel,
 > arcade-volt, trading-forge, default. Practice is a stub. Never verified by eye.
+> **Hotfix 21 Sep 2026:** `gallery` / `howItWorksSteps` / `descriptionTags` are always
+> arrays after aggregation (empty `[]` when unset) — an undefined gallery crashed SSR
+> with `.slice` after a Page-theme save without assets.
 > The block below is the original Cursor brief kept for history.
 
 ---
