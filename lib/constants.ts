@@ -1,5 +1,6 @@
 export const NAV_ITEMS = [
   { href: "/", label: "Dashboard" },
+  { href: "/games", label: "Games" },
   { href: "/competitions", label: "Competitions" },
   { href: "/challenges", label: "1v1 Challenges" },
   { href: "/marketplace", label: "Marketplace" },

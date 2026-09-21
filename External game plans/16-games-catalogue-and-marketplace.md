@@ -67,6 +67,38 @@ touching the second.
 Keep both. Some players browse by game, others by what starts soonest or has the biggest
 pot. Replacing one with the other loses half the audience.
 
+> **BUILT 21 September 2026 — X11 Slice 1 (authoritative for what exists today).**
+>
+> **Live code:** `lib/services/games/player-catalogue.service.ts`,
+> `app/(root)/games/page.tsx`, `app/(root)/games/[slug]/page.tsx`,
+> `components/games/catalogue/*`, plus Games in `UserSidebar` / `MobileBottomNav` /
+> `NAV_ITEMS` (HOT on Games). **Nothing here is mirrored** — main-app player surface only.
+>
+> **Eight facts drift easily.**
+>
+> 1. **There is no `GameCatalogueEntry` yet** — Slice 1 reads `provider_game` presentation
+>    plus a first-class Trading card. The merchandising model above is **deferred to Slice 2**
+>    because one live title already has editable content fields; a second table would be empty
+>    overhead until a second title needs independent pages over one provider row. A document
+>    saying the catalogue model shipped with Slice 1 is wrong.
+> 2. **Slug is `trading` or the title's `gameCode`**, not a separate permanent merchandising
+>    slug. `gameKey` remains the join key for contests.
+> 3. **Provider discovery hard-gates `externalGamesEnabled`** (same reasoning as challenges) —
+>    the admin contest reader's warning is not enough for a player hub.
+> 4. **`/competitions` is retained** and still has no HOT badge; Games carries HOT.
+> 5. **Contest rows link to `/competitions/[id]`, never a launch URL** — prefetch must not
+>    consume an attempt.
+> 6. **Empty game page is designed** (`GameEmptyContests`) — challenges link when 1v1 is
+>    supported, always a path to Competitions; never a blank page.
+> 7. **League table and the player's own record on this page are not built** — X7 already
+>    has leaderboards and profile standing elsewhere; do not invent a third board here.
+> 8. **Admin "Game Catalogue" merchandising section is not built** — operators keep using
+>    Provider Games content dialog. Discovery-only hide when a title is toggled off (existing
+>    switches); live contests are never cancelled by that toggle.
+>
+> 23 tests (`player-catalogue`, `games-catalogue-routes`, `games-first-nav`). Never verified
+> by eye.
+
 ### New admin section - Game Catalogue
 
 Full editing with live preview, artwork upload, drag to reorder, feature, hide, mark

@@ -61,12 +61,21 @@ function buildMainNavItems(terms: TerminologyPack): NavItem[] {
       gradient: "from-blue-500/20 to-blue-600/5",
     },
     {
+      href: "/games",
+      // Reason: X11 Slice 1 — games-first discovery. HOT moves here from Competitions;
+      // `/competitions` stays for "what starts soonest" browsing.
+      label: "Games",
+      icon: <GameIcon name="joystick1" size={22} />,
+      color: "text-sky-400",
+      gradient: "from-sky-500/20 to-cyan-600/5",
+      badge: "HOT",
+    },
+    {
       href: "/competitions",
       label: terms.contests,
       icon: <GameIcon name="trophy" size={22} />,
       color: "text-yellow-400",
       gradient: "from-yellow-500/20 to-yellow-600/5",
-      badge: "HOT",
     },
     {
       href: "/challenges",

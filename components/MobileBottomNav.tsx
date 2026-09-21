@@ -35,6 +35,14 @@ function buildNavItems(terms: TerminologyPack): NavItem[] {
       activeColor: "bg-blue-500/20",
     },
     {
+      href: "/games",
+      // Reason: X11 Slice 1 — games-first; mobile primary strip includes Games above contests.
+      label: "Games",
+      iconName: "joystick1",
+      color: "text-sky-400",
+      activeColor: "bg-sky-500/20",
+    },
+    {
       href: "/competitions",
       label: terms.contests,
       iconName: "trophy",
