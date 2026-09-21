@@ -47,6 +47,22 @@ describe("trading page editor", () => {
     expect(TRADING_PAGE_DEFAULTS.displayName).toBe("Trading");
   });
 
+  // Reason: R58 — TradingPageSection is "use client" and imports this module. The
+  // `@/lib/games` barrel connects mongoose → mongodb driver → next build dies with
+  // 17 Module-not-found errors. types is model-free; the barrel is not.
+  it("defaults import TRADING_GAME_TYPE from types, never the games barrel", () => {
+    const source = stripComments(
+      readFileSync(
+        path.join(ROOT, "apps/admin/lib/services/games/trading-page-defaults.ts"),
+        "utf8",
+      ),
+    );
+    expect(source).toMatch(
+      /from\s+["']@\/lib\/games\/types["']/,
+    );
+    expect(source).not.toMatch(/from\s+["']@\/lib\/games["']/);
+  });
+
   it("trading-page is a real section grant and a Trading tab", () => {
     expect(ADMIN_SECTIONS as readonly string[]).toContain("trading-page");
     expect(TRADING_SECTION_TABS.map((t) => t.id)).toContain("trading-page");

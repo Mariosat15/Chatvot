@@ -5,7 +5,9 @@
  * and the player app falls back to it. Pin with a byte-identical test.
  */
 
-import { TRADING_GAME_TYPE } from "@/lib/games";
+// Reason: admin client `TradingPageSection` imports this module. `@/lib/games` is the
+// barrel that connects mongoose (R58); types is model-free.
+import { TRADING_GAME_TYPE } from "@/lib/games/types";
 
 export const TRADING_PAGE_GAME_KEY = TRADING_GAME_TYPE;
 
