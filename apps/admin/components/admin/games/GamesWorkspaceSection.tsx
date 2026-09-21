@@ -45,6 +45,7 @@ const TAB_IDS = [
   "challenge",
   "content",
   "assets",
+  "theme",
   "live",
 ] as const;
 
@@ -389,6 +390,7 @@ export default function GamesWorkspaceSection() {
                           ["challenge", `${terms.challenge} defaults`],
                           ["content", "Page content"],
                           ["assets", "Assets"],
+                          ["theme", "Page theme"],
                           ["live", "Live & publish"],
                         ] as const
                       ).map(([id, label]) => (

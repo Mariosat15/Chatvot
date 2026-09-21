@@ -29,7 +29,7 @@ describe("Games workspace structure", () => {
     "apps/admin/components/admin/games/ProviderCatalogueDialog.tsx",
   );
 
-  it("exposes the seven planned tabs and no more", () => {
+  it("exposes the planned tabs including page theme and no more", () => {
     for (const id of [
       "general",
       "settings",
@@ -37,6 +37,7 @@ describe("Games workspace structure", () => {
       "challenge",
       "content",
       "assets",
+      "theme",
       "live",
     ]) {
       expect(section).toContain(`"${id}"`);
@@ -45,7 +46,8 @@ describe("Games workspace structure", () => {
       section.indexOf("const TAB_IDS"),
       section.indexOf("export type WorkspaceTab"),
     );
-    expect((tabIdsBlock.match(/"/g) ?? []).length).toBe(14);
+    // Eight tab ids → sixteen quote characters.
+    expect((tabIdsBlock.match(/"/g) ?? []).length).toBe(16);
   });
 
   it("keeps providers reachable without a second section id", () => {
@@ -58,6 +60,7 @@ describe("Games workspace structure", () => {
     expect(editor).toContain("<GameScoringDialog");
     expect(editor).toContain("<GameChallengeDefaultsDialog");
     expect(editor).toContain("<GameContentDialog");
+    expect(editor).toContain("<GamePageThemeEditor");
     expect(editor).toContain("inline");
     expect(editor).toContain('sections="copy"');
     expect(editor).toContain('sections="artwork"');

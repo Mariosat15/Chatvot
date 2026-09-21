@@ -31,9 +31,19 @@ export const ARTWORK_SLOTS = new Set([
   // decision per title and the panel is ours.
   "how-to-play",
   "highlight",
+  // Player `/games/[slug]` media (X11 page themes). `gallery` may be uploaded more than once
+  // — filenames carry a timestamp so repeats do not collide.
+  "gameplay-preview",
+  "gallery",
 ] as const);
 
-export type ArtworkSlot = "logo" | "banner" | "how-to-play" | "highlight";
+export type ArtworkSlot =
+  | "logo"
+  | "banner"
+  | "how-to-play"
+  | "highlight"
+  | "gameplay-preview"
+  | "gallery";
 
 export function isArtworkSlot(value: unknown): value is ArtworkSlot {
   return typeof value === "string" && ARTWORK_SLOTS.has(value as ArtworkSlot);

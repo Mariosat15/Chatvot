@@ -114,6 +114,16 @@ export interface ProviderTitleRow {
   // Ours as well, and absent is an instruction rather than a gap: the banner works four
   // features out from the title's declared settings when this is unset.
   heroFeatures?: { icon: string; label: string }[];
+  /** Ready-made player page theme. Ours. Absent = resolve from category. */
+  pageThemeId?: string;
+  stylizedQuote?: string;
+  gameplayPreviewUrl?: string;
+  gameplayVideoUrl?: string;
+  gallery?: { url: string; title?: string; type?: string }[];
+  supportedDevices?: { desktop?: boolean; tablet?: boolean; mobile?: boolean };
+  skillLevelLabel?: string;
+  howItWorksSteps?: { title: string; detail: string; icon?: string }[];
+  descriptionTags?: string[];
   /**
    * The provider's own declaration of what this title's settings are, RAW.
    *

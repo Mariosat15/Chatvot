@@ -31,6 +31,7 @@ import GamePlayStyleControl from "./GamePlayStyleControl";
 import GameScoringDialog from "./GameScoringDialog";
 import GameChallengeDefaultsDialog from "./GameChallengeDefaultsDialog";
 import GameContentDialog from "./GameContentDialog";
+import GamePageThemeEditor from "./GamePageThemeEditor";
 import {
   CONTENT_LIMITS,
 } from "@/lib/admin/game-content-fields";
@@ -146,6 +147,12 @@ export default function GamesWorkspaceEditor({
             onOpenChange={() => undefined}
             onSaved={onTitlePatch}
           />
+        </PanelCard>
+      );
+    case "theme":
+      return (
+        <PanelCard>
+          <GamePageThemeEditor title={title} onSaved={onTitlePatch} />
         </PanelCard>
       );
     case "live":

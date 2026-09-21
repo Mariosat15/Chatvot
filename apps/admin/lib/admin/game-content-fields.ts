@@ -21,6 +21,7 @@ import {
   HERO_FEATURE_LIMIT,
   isHeroFeatureIcon,
 } from "@/lib/services/games/hero-features";
+import { isGamePageThemeId } from "@/lib/services/games/game-page-themes";
 
 /** Fields an operator owns. A value outside this set is REFUSED, never ignored - see below. */
 export const EDITABLE_CONTENT_FIELDS: ReadonlySet<string> = new Set([
@@ -47,6 +48,16 @@ export const EDITABLE_CONTENT_FIELDS: ReadonlySet<string> = new Set([
   // banner works four out from the title's declared settings when nothing is stored, so an
   // empty list restores those rather than emptying the strip. See `hero-features.ts`.
   "heroFeatures",
+  // Player game-page layout (game_page.md). Ours; never sync-owned.
+  "pageThemeId",
+  "stylizedQuote",
+  "gameplayPreviewUrl",
+  "gameplayVideoUrl",
+  "gallery",
+  "supportedDevices",
+  "skillLevelLabel",
+  "howItWorksSteps",
+  "descriptionTags",
 ]);
 
 /**
@@ -148,6 +159,15 @@ export const AI_NEVER_WRITABLE_CONTENT_FIELDS: ReadonlyMap<string, string> = new
   // the number - which is the hardest kind of wrong to notice. An operator typing it is
   // making their own claim with their own name against it.
   ["heroFeatures", "the banner's statements of fact about the contest, which a model cannot check"],
+  ["pageThemeId", "a layout preset, not prose"],
+  ["stylizedQuote", "layout chrome, not marketing copy the assistant invents"],
+  ["gameplayPreviewUrl", "an image address, not prose"],
+  ["gameplayVideoUrl", "a media address, not prose"],
+  ["gallery", "image addresses, not prose"],
+  ["supportedDevices", "platform flags, not prose"],
+  ["skillLevelLabel", "a short Game Info label, not generative copy"],
+  ["howItWorksSteps", "operator-authored steps that must match how the game is played"],
+  ["descriptionTags", "short tags, not generative paragraphs"],
 ]);
 
 export const CONTENT_LIMITS = {
@@ -170,6 +190,15 @@ export const CONTENT_LIMITS = {
   // column for.
   heroFeatures: HERO_FEATURE_LIMIT,
   heroFeatureLabel: HERO_FEATURE_LABEL_MAX_LENGTH,
+  stylizedQuote: 80,
+  skillLevelLabel: 40,
+  gallery: 12,
+  galleryTitle: 60,
+  howItWorksSteps: 6,
+  howItWorksTitle: 40,
+  howItWorksDetail: 160,
+  descriptionTags: 8,
+  descriptionTag: 32,
 } as const;
 
 /**
@@ -210,6 +239,24 @@ export interface GameHeroFeature {
   label: string;
 }
 
+export interface GameGalleryItem {
+  url: string;
+  title?: string;
+  type?: string;
+}
+
+export interface GameHowItWorksStep {
+  title: string;
+  detail: string;
+  icon?: string;
+}
+
+export interface GameSupportedDevices {
+  desktop?: boolean;
+  tablet?: boolean;
+  mobile?: boolean;
+}
+
 export interface GameContentInput {
   displayName?: string;
   tagline?: string;
@@ -223,6 +270,15 @@ export interface GameContentInput {
   highlightsImageUrl?: string;
   highlights?: GameHighlight[];
   heroFeatures?: GameHeroFeature[];
+  pageThemeId?: string;
+  stylizedQuote?: string;
+  gameplayPreviewUrl?: string;
+  gameplayVideoUrl?: string;
+  gallery?: GameGalleryItem[];
+  supportedDevices?: GameSupportedDevices;
+  skillLevelLabel?: string;
+  howItWorksSteps?: GameHowItWorksStep[];
+  descriptionTags?: string[];
 }
 
 export type ContentValidation =
@@ -344,6 +400,7 @@ export function validateGameContent(body: unknown): ContentValidation {
     "bannerUrl",
     "howToPlayImageUrl",
     "highlightsImageUrl",
+    "gameplayPreviewUrl",
   ] as const) {
     if (!(field in raw)) continue;
     const value = trimmedString(raw[field]);
@@ -433,6 +490,192 @@ export function validateGameContent(body: unknown): ContentValidation {
       features.push({ icon: row.icon, label });
     }
     content.heroFeatures = features;
+  }
+
+  if ("pageThemeId" in raw) {
+    const value = trimmedString(raw.pageThemeId);
+    if (value === null) return { ok: false, error: `"pageThemeId" must be text.` };
+    // Empty clears so category-based resolution returns on the player page.
+    if (value !== "" && !isGamePageThemeId(value)) {
+      return { ok: false, error: "Pick one of the offered page themes." };
+    }
+    content.pageThemeId = value;
+  }
+
+  if ("stylizedQuote" in raw) {
+    const value = trimmedString(raw.stylizedQuote);
+    if (value === null) return { ok: false, error: `"stylizedQuote" must be text.` };
+    if (value.length > CONTENT_LIMITS.stylizedQuote) {
+      return {
+        ok: false,
+        error: `The hero quote must be ${CONTENT_LIMITS.stylizedQuote} characters or fewer.`,
+      };
+    }
+    content.stylizedQuote = value;
+  }
+
+  if ("skillLevelLabel" in raw) {
+    const value = trimmedString(raw.skillLevelLabel);
+    if (value === null) return { ok: false, error: `"skillLevelLabel" must be text.` };
+    if (value.length > CONTENT_LIMITS.skillLevelLabel) {
+      return {
+        ok: false,
+        error: `The skill level label must be ${CONTENT_LIMITS.skillLevelLabel} characters or fewer.`,
+      };
+    }
+    content.skillLevelLabel = value;
+  }
+
+  if ("gameplayVideoUrl" in raw) {
+    const value = trimmedString(raw.gameplayVideoUrl);
+    if (value === null) return { ok: false, error: `"gameplayVideoUrl" must be text.` };
+    if (value.length > CONTENT_LIMITS.url) {
+      return { ok: false, error: "That video address is too long to store." };
+    }
+    if (value !== "" && !isRenderableImageUrl(value) && !value.startsWith("https://")) {
+      return {
+        ok: false,
+        error: "A gameplay video must be an https address.",
+      };
+    }
+    // Reason: https:// is enough for video embeds; isRenderableImageUrl also accepts
+    // relative paths which are fine for posters but unusual for external watch links.
+    if (value !== "" && !(value.startsWith("/") || value.startsWith("https://"))) {
+      return { ok: false, error: "A gameplay video must be an https address or uploaded path." };
+    }
+    content.gameplayVideoUrl = value;
+  }
+
+  if ("gallery" in raw) {
+    const list = raw.gallery;
+    if (!Array.isArray(list)) return { ok: false, error: "Gallery must be a list." };
+    if (list.length > CONTENT_LIMITS.gallery) {
+      return {
+        ok: false,
+        error: `A title can carry at most ${CONTENT_LIMITS.gallery} gallery images.`,
+      };
+    }
+    const gallery: GameGalleryItem[] = [];
+    for (const entry of list) {
+      if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+        return { ok: false, error: "Each gallery item needs an image address." };
+      }
+      const row = entry as Record<string, unknown>;
+      const url = trimmedString(row.url);
+      if (!url) return { ok: false, error: "Each gallery item needs an image address." };
+      if (url.length > CONTENT_LIMITS.url || !isRenderableImageUrl(url)) {
+        return {
+          ok: false,
+          error: "Each gallery image must be an uploaded file or an https address.",
+        };
+      }
+      const title = trimmedString(row.title) ?? "";
+      if (title.length > CONTENT_LIMITS.galleryTitle) {
+        return {
+          ok: false,
+          error: `A gallery title must be ${CONTENT_LIMITS.galleryTitle} characters or fewer.`,
+        };
+      }
+      const type = trimmedString(row.type) ?? "";
+      gallery.push({
+        url,
+        ...(title ? { title } : {}),
+        ...(type ? { type } : {}),
+      });
+    }
+    content.gallery = gallery;
+  }
+
+  if ("supportedDevices" in raw) {
+    const value = raw.supportedDevices;
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return { ok: false, error: "Supported devices must be an object of flags." };
+    }
+    const row = value as Record<string, unknown>;
+    const devices: GameSupportedDevices = {};
+    // Reason: named fields rather than `row[key]` — ESLint treats dynamic object
+    // indexing as injection even when the key list is a fixed const union.
+    if ("desktop" in row) {
+      if (typeof row.desktop !== "boolean") {
+        return { ok: false, error: "supportedDevices.desktop must be true or false." };
+      }
+      devices.desktop = row.desktop;
+    }
+    if ("tablet" in row) {
+      if (typeof row.tablet !== "boolean") {
+        return { ok: false, error: "supportedDevices.tablet must be true or false." };
+      }
+      devices.tablet = row.tablet;
+    }
+    if ("mobile" in row) {
+      if (typeof row.mobile !== "boolean") {
+        return { ok: false, error: "supportedDevices.mobile must be true or false." };
+      }
+      devices.mobile = row.mobile;
+    }
+    content.supportedDevices = devices;
+  }
+
+  if ("howItWorksSteps" in raw) {
+    const list = raw.howItWorksSteps;
+    if (!Array.isArray(list)) return { ok: false, error: "How-it-works steps must be a list." };
+    if (list.length > CONTENT_LIMITS.howItWorksSteps) {
+      return {
+        ok: false,
+        error: `A title can carry at most ${CONTENT_LIMITS.howItWorksSteps} how-it-works steps.`,
+      };
+    }
+    const steps: GameHowItWorksStep[] = [];
+    for (const entry of list) {
+      if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+        return { ok: false, error: "Each how-it-works step needs a title and a detail." };
+      }
+      const row = entry as Record<string, unknown>;
+      const title = trimmedString(row.title);
+      const detail = trimmedString(row.detail);
+      if (!title || !detail) {
+        return { ok: false, error: "Each how-it-works step needs both a title and a detail." };
+      }
+      if (title.length > CONTENT_LIMITS.howItWorksTitle) {
+        return {
+          ok: false,
+          error: `A step title must be ${CONTENT_LIMITS.howItWorksTitle} characters or fewer.`,
+        };
+      }
+      if (detail.length > CONTENT_LIMITS.howItWorksDetail) {
+        return {
+          ok: false,
+          error: `A step detail must be ${CONTENT_LIMITS.howItWorksDetail} characters or fewer.`,
+        };
+      }
+      const icon = trimmedString(row.icon) ?? "";
+      steps.push({ title, detail, ...(icon ? { icon } : {}) });
+    }
+    content.howItWorksSteps = steps;
+  }
+
+  if ("descriptionTags" in raw) {
+    const list = raw.descriptionTags;
+    if (!Array.isArray(list)) return { ok: false, error: "Description tags must be a list." };
+    if (list.length > CONTENT_LIMITS.descriptionTags) {
+      return {
+        ok: false,
+        error: `A title can carry at most ${CONTENT_LIMITS.descriptionTags} description tags.`,
+      };
+    }
+    const tags: string[] = [];
+    for (const entry of list) {
+      const tag = trimmedString(entry);
+      if (!tag) return { ok: false, error: "Description tags cannot be blank." };
+      if (tag.length > CONTENT_LIMITS.descriptionTag) {
+        return {
+          ok: false,
+          error: `Each tag must be ${CONTENT_LIMITS.descriptionTag} characters or fewer.`,
+        };
+      }
+      tags.push(tag);
+    }
+    content.descriptionTags = tags;
   }
 
   if (Object.keys(content).length === 0) {

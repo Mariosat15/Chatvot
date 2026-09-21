@@ -82,6 +82,9 @@ interface Draft {
   bannerUrl: string;
   howToPlayImageUrl: string;
   highlightsImageUrl: string;
+  gameplayPreviewUrl: string;
+  gameplayVideoUrl: string;
+  gallery: { url: string; title: string }[];
   highlights: { title: string; detail: string }[];
   heroFeatures: { icon: string; label: string }[];
 }
@@ -101,6 +104,14 @@ function draftFrom(title: ProviderTitleRow): Draft {
     bannerUrl: title.bannerUrl ?? "",
     howToPlayImageUrl: title.howToPlayImageUrl ?? "",
     highlightsImageUrl: title.highlightsImageUrl ?? "",
+    gameplayPreviewUrl: title.gameplayPreviewUrl ?? "",
+    gameplayVideoUrl: title.gameplayVideoUrl ?? "",
+    gallery: title.gallery
+      ? title.gallery.map((row) => ({
+          url: row.url ?? "",
+          title: row.title ?? "",
+        }))
+      : [],
     highlights: title.highlights ? title.highlights.map((row) => ({ ...row })) : [],
     heroFeatures: title.heroFeatures ? title.heroFeatures.map((row) => ({ ...row })) : [],
   };
@@ -197,6 +208,15 @@ export default function GameContentDialog({
       content.bannerUrl = draft.bannerUrl;
       content.howToPlayImageUrl = draft.howToPlayImageUrl;
       content.highlightsImageUrl = draft.highlightsImageUrl;
+      content.gameplayPreviewUrl = draft.gameplayPreviewUrl;
+      content.gameplayVideoUrl = draft.gameplayVideoUrl;
+      content.gallery = draft.gallery
+        .filter((row) => row.url.trim() !== "")
+        .map((row) => ({
+          url: row.url.trim(),
+          ...(row.title.trim() ? { title: row.title.trim() } : {}),
+          type: "image",
+        }));
     }
 
     setSaving(true);
@@ -438,6 +458,117 @@ export default function GameContentDialog({
                 value={draft.highlightsImageUrl}
                 onChange={(url) => set("highlightsImageUrl", url)}
               />
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div>
+              <Label>Player page media</Label>
+              <p className="text-xs text-white/50">
+                Preview still and optional video link for the Overview tab. Gallery images
+                appear under Featured.
+              </p>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <GameArtworkField
+                providerKey={providerKey}
+                gameCode={title.gameCode}
+                slot="gameplay-preview"
+                label="Gameplay preview"
+                hint="Wide still shown in the middle column. Falls back to built-in art for Circuit themes when empty."
+                value={draft.gameplayPreviewUrl}
+                onChange={(url) => set("gameplayPreviewUrl", url)}
+              />
+              <div className="space-y-1.5">
+                <Label className="text-xs text-white/60">Gameplay video URL</Label>
+                <Input
+                  value={draft.gameplayVideoUrl}
+                  placeholder="https://…"
+                  className="border-gray-700 bg-gray-900 text-white"
+                  onChange={(e) => set("gameplayVideoUrl", e.target.value)}
+                />
+                <p className="text-[11px] text-white/40">
+                  Opens in a new tab from Watch Gameplay. Leave blank to hide the link.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Featured gallery</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={draft.gallery.length >= CONTENT_LIMITS.gallery}
+                  onClick={() =>
+                    set("gallery", [...draft.gallery, { url: "", title: "" }])
+                  }
+                >
+                  <Plus className="mr-1.5 h-3.5 w-3.5" />
+                  Add image
+                </Button>
+              </div>
+              {draft.gallery.length === 0 ? (
+                <p className="rounded-lg border border-dashed border-white/10 px-3 py-4 text-center text-xs text-white/40">
+                  No gallery images. The Featured strip stays hidden until you add some.
+                </p>
+              ) : (
+                draft.gallery.map((row, at) => (
+                  <div
+                    key={at}
+                    className="grid gap-2 rounded-lg border border-white/10 bg-white/5 p-3 sm:grid-cols-[1fr_auto]"
+                  >
+                    <GameArtworkField
+                      providerKey={providerKey}
+                      gameCode={title.gameCode}
+                      slot="gallery"
+                      label={`Gallery ${at + 1}`}
+                      hint="Screenshot for the Featured strip."
+                      value={row.url}
+                      onChange={(url) =>
+                        set(
+                          "gallery",
+                          draft.gallery.map((g, i) =>
+                            i === at ? { ...g, url } : g,
+                          ),
+                        )
+                      }
+                    />
+                    <div className="flex flex-col gap-2 sm:pt-6">
+                      <Input
+                        value={row.title}
+                        placeholder="Caption (optional)"
+                        maxLength={CONTENT_LIMITS.galleryTitle}
+                        className="border-gray-700 bg-gray-900 text-white"
+                        onChange={(e) =>
+                          set(
+                            "gallery",
+                            draft.gallery.map((g, i) =>
+                              i === at ? { ...g, title: e.target.value } : g,
+                            ),
+                          )
+                        }
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="justify-self-start text-red-300"
+                        onClick={() =>
+                          set(
+                            "gallery",
+                            draft.gallery.filter((_, i) => i !== at),
+                          )
+                        }
+                      >
+                        <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                        Remove
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
             </>

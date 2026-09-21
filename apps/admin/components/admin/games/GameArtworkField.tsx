@@ -48,6 +48,8 @@ const PREVIEW_SHAPE: Record<ArtworkSlot, string> = {
   banner: "aspect-[3/1]",
   "how-to-play": "aspect-[4/3]",
   highlight: "aspect-square",
+  "gameplay-preview": "aspect-video",
+  gallery: "aspect-video",
 };
 
 export default function GameArtworkField({

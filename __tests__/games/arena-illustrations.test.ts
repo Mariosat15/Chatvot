@@ -294,8 +294,11 @@ describe("the operator's upload reaches the title", () => {
     expect(code).toMatch(/slot="highlight"/);
     // Saved AND handed back to the parent row. Omitting the second leaves the row holding the
     // old value, so reopening shows the picture the operator just replaced.
-    expect(code).toMatch(/howToPlayImageUrl: draft\.howToPlayImageUrl/);
-    expect(code).toMatch(/highlightsImageUrl: draft\.highlightsImageUrl/);
+    // Reason: workspace artwork tab builds a partial `content` object with assignments, not
+    // a shorthand object literal — assert the assignment so a rewrite that drops the field
+    // still fails.
+    expect(code).toMatch(/content\.howToPlayImageUrl\s*=\s*draft\.howToPlayImageUrl/);
+    expect(code).toMatch(/content\.highlightsImageUrl\s*=\s*draft\.highlightsImageUrl/);
   });
 
   it("validates both by the same clause as every other image address", () => {
@@ -327,7 +330,7 @@ describe("the operator's upload reaches the title", () => {
     expect(isArtworkSlot("highlight")).toBe(true);
     expect(isArtworkSlot("__proto__")).toBe(false);
     expect(isArtworkSlot("constructor")).toBe(false);
-    expect(ARTWORK_SLOTS.size).toBe(4);
+    expect(ARTWORK_SLOTS.size).toBe(6);
   });
 
   it("shares one list between the form and the route", () => {

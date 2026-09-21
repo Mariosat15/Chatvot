@@ -32,6 +32,27 @@ export interface IProviderGame extends Document {
   highlightsImageUrl?: string;
   /** Ours. The hero banner's four small claims. Absent means the derived four - see below. */
   heroFeatures?: { icon: string; label: string }[];
+  /**
+   * Ready-made page theme preset id (`circuit-neon`, `racing-heat`, …).
+   * Ours, not the provider's. Absent means resolve from `category` then `default`.
+   */
+  pageThemeId?: string;
+  /** Glowing hero quote (e.g. "EVERY MOVE COUNTS"). Ours. Absent means omit. */
+  stylizedQuote?: string;
+  /** Optional gameplay screenshot / video poster for the Overview preview. Ours. */
+  gameplayPreviewUrl?: string;
+  /** Optional external gameplay video URL ("Watch Gameplay"). Ours. */
+  gameplayVideoUrl?: string;
+  /** Gallery images for Overview featured strip + Gallery tab. Ours. */
+  gallery?: { url: string; title?: string; type?: string }[];
+  /** Platforms shown on Available On. Absent means all three. Ours. */
+  supportedDevices?: { desktop?: boolean; tablet?: boolean; mobile?: boolean };
+  /** Skill-level label for Game Info (e.g. "All Levels"). Ours. */
+  skillLevelLabel?: string;
+  /** Operator-authored How It Works steps. Absent means derive from howToPlay lines. */
+  howItWorksSteps?: { title: string; detail: string; icon?: string }[];
+  /** Small tags under the description card. Absent means highlight titles. */
+  descriptionTags?: string[];
   family: "independent" | "head_to_head";
   playMode?: "anytime" | "scheduled";
   /** OUR answer, when the provider's is absent or wrong for how we want to run it. */
@@ -199,6 +220,50 @@ const ProviderGameSchema = new Schema<IProviderGame>(
           label: { type: String, required: true, trim: true },
         },
       ],
+      default: undefined,
+    },
+
+    // Player game-page layout (owner, 21 Sep 2026 — game_page.md).
+    //
+    // OURS, in no sync allow-list. These decide how `/games/[slug]` looks and what optional
+    // artwork it shows; a provider sync must never wipe an operator's theme choice or gallery.
+    // NO DEFAULTS that write a decision nobody took (`pageThemeId` absent = resolve from
+    // category; `supportedDevices` absent = all three on the reader). Same `playModeOverride`
+    // precedent: absence and a stored value are different facts.
+    pageThemeId: { type: String, trim: true },
+    stylizedQuote: { type: String, trim: true },
+    gameplayPreviewUrl: { type: String, trim: true },
+    gameplayVideoUrl: { type: String, trim: true },
+    gallery: {
+      type: [
+        {
+          _id: false,
+          url: { type: String, required: true, trim: true },
+          title: { type: String, trim: true },
+          type: { type: String, trim: true },
+        },
+      ],
+      default: undefined,
+    },
+    supportedDevices: {
+      desktop: { type: Boolean },
+      tablet: { type: Boolean },
+      mobile: { type: Boolean },
+    },
+    skillLevelLabel: { type: String, trim: true },
+    howItWorksSteps: {
+      type: [
+        {
+          _id: false,
+          title: { type: String, required: true, trim: true },
+          detail: { type: String, required: true, trim: true },
+          icon: { type: String, trim: true },
+        },
+      ],
+      default: undefined,
+    },
+    descriptionTags: {
+      type: [{ type: String, trim: true }],
       default: undefined,
     },
 
