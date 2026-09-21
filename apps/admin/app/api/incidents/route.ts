@@ -3,6 +3,7 @@ import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import Incident from "@/database/models/incident.model";
 import { auditLogService } from "@/lib/services/audit-log.service";
+import { stampIncidentSubject } from "@/lib/services/incidents/incident-subject-stamp";
 
 /**
  * GET /api/incidents
@@ -12,13 +13,6 @@ export async function GET(request: NextRequest) {
   try {
     const guard = await guardSection("incidents");
     if (!guard.ok) return guard.response;
-    const auth = {
-      adminId: guard.admin.id,
-      email: guard.admin.email,
-      name: guard.admin.name,
-      role: guard.admin.role,
-      isSuperAdmin: guard.admin.role === "super_admin",
-    };
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
@@ -93,6 +87,9 @@ export async function POST(request: NextRequest) {
       evidence,
       priority,
       tags,
+      roundId,
+      subjectType,
+      gameKey,
     } = body;
 
     if (!type || !severity || !title || !description) {
@@ -104,9 +101,23 @@ export async function POST(request: NextRequest) {
 
     await connectToDatabase();
 
-    const incident = await Incident.create({
+    const stamped = await stampIncidentSubject({
       competitionId,
       challengeId,
+      roundId,
+      subjectType,
+      gameKey,
+    });
+    if (!stamped.ok) {
+      return NextResponse.json({ error: stamped.error }, { status: 400 });
+    }
+
+    const incident = await Incident.create({
+      competitionId: stamped.subject.competitionId,
+      challengeId: stamped.subject.challengeId,
+      roundId: stamped.subject.roundId,
+      subjectType: stamped.subject.subjectType,
+      gameKey: stamped.subject.gameKey,
       type,
       severity,
       status: "open",

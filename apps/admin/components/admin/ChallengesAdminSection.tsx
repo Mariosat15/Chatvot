@@ -47,8 +47,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -57,6 +55,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import ChallengeSettingsSection from "./ChallengeSettingsSection";
+import HubWithheldAction from "@/components/admin/incidents/HubWithheldAction";
 import ChallengeStatRows from "./competitions/ChallengeStatRows";
 import { hasProviderGameLabel } from "@/lib/admin/contest-game-label";
 import { showsTradingConfiguration } from "@/lib/admin/contest-result-presentation";
@@ -236,8 +235,6 @@ export default function ChallengesAdminSection() {
   const [challengeToCancel, setChallengeToCancel] = useState<Challenge | null>(
     null,
   );
-  const [cancelReason, setCancelReason] = useState("");
-  const [isCancelling, setIsCancelling] = useState(false);
 
   // View dialog state
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
@@ -312,43 +309,7 @@ export default function ChallengesAdminSection() {
 
   const handleCancelClick = (challenge: Challenge) => {
     setChallengeToCancel(challenge);
-    setCancelReason("");
     setCancelDialogOpen(true);
-  };
-
-  const handleCancelConfirm = async () => {
-    if (!challengeToCancel) return;
-
-    setIsCancelling(true);
-    try {
-      const response = await fetch("/api/challenges", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "cancel",
-          challengeId: challengeToCancel._id,
-          reason: cancelReason || "Cancelled by admin",
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to cancel challenge");
-      }
-
-      toast.success(data.message || "Challenge cancelled successfully");
-      fetchChallenges();
-      setCancelDialogOpen(false);
-      setChallengeToCancel(null);
-      setCancelReason("");
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to cancel challenge",
-      );
-    } finally {
-      setIsCancelling(false);
-    }
   };
 
   const handleViewClick = (challenge: Challenge) => {
@@ -1342,44 +1303,15 @@ export default function ChallengesAdminSection() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-4">
-            {challengeToCancel && (
-              <div className="p-4 bg-gray-800 rounded-lg">
-                <p className="text-white font-semibold">
-                  {challengeToCancel.challengerName} vs{" "}
-                  {challengeToCancel.challengedName}
-                </p>
-                <p className="text-sm text-gray-400 mt-1">
-                  Entry Fee: {cs}{challengeToCancel.entryFee} each • Prize: {cs}
-                  {challengeToCancel.winnerPrize}
-                </p>
-              </div>
-            )}
-
-            <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
-              <p className="text-sm text-red-300">
-                <strong>⚠️ This action will:</strong>
-              </p>
-              <ul className="mt-2 space-y-1 text-sm text-red-300/80 list-disc list-inside">
-                <li>Immediately cancel the challenge</li>
-                <li>Refund entry fees to all participants</li>
-                <li>This action cannot be undone</li>
-              </ul>
-            </div>
-
-            <div>
-              <Label htmlFor="cancelReason" className="text-gray-300">
-                Reason for cancellation (optional)
-              </Label>
-              <Textarea
-                id="cancelReason"
-                value={cancelReason}
-                onChange={(e) => setCancelReason(e.target.value)}
-                placeholder="e.g., User request, Technical issues..."
-                className="mt-2 bg-gray-800 border-gray-600 text-gray-100"
-                rows={3}
-              />
-            </div>
+          <div className="py-4">
+            <HubWithheldAction
+              action="Cancelling this challenge and refunding entry fees"
+              detail={
+                challengeToCancel
+                  ? `${challengeToCancel.challengerName} vs ${challengeToCancel.challengedName || "an open seat"} is cancelled from Incident Management.`
+                  : undefined
+              }
+            />
           </div>
 
           <DialogFooter>
@@ -1388,24 +1320,7 @@ export default function ChallengesAdminSection() {
               onClick={() => setCancelDialogOpen(false)}
               className="border-gray-600"
             >
-              Keep Challenge
-            </Button>
-            <Button
-              onClick={handleCancelConfirm}
-              disabled={isCancelling}
-              className="bg-red-500 hover:bg-red-600 text-white"
-            >
-              {isCancelling ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Cancelling...
-                </>
-              ) : (
-                <>
-                  <Ban className="h-4 w-4 mr-2" />
-                  Cancel & Refund
-                </>
-              )}
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>

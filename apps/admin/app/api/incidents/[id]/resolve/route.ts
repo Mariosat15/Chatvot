@@ -8,6 +8,7 @@ import { PlatformTransaction } from "@/database/models/platform-financials.model
 import { notificationService } from "@/lib/services/notification.service";
 import { auditLogService } from "@/lib/services/audit-log.service";
 import mongoose from "mongoose";
+import { formatVolts } from "@/lib/utils/format-volts";
 
 // Helper to get user from collection
 async function getUserById(userId: string) {
@@ -70,19 +71,12 @@ interface ResolveRequestBody {
  * Get resolution options and calculate amounts
  */
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const guard = await guardSection("incidents");
     if (!guard.ok) return guard.response;
-    const auth = {
-      adminId: guard.admin.id,
-      email: guard.admin.email,
-      name: guard.admin.name,
-      role: guard.admin.role,
-      isSuperAdmin: guard.admin.role === "super_admin",
-    };
 
     const { id: incidentId } = await params;
     await connectToDatabase();
@@ -166,8 +160,8 @@ export async function GET(
         type: "result_adjustment",
         label: "Result Adjustment",
         description:
-          "Recalculate competition results using snapshot prices (requires manual review)",
-        totalAmount: 0, // Variable - requires manual calculation
+          "Correct ranks or prizes, or re-settle a game contest, from the incident's solutions. This refund does not do that.",
+        totalAmount: 0,
         affectedUsers: totalParticipants,
         perUserAmount: 0,
         requiresManualReview: true,
@@ -252,8 +246,20 @@ export async function POST(
       "result_adjustment",
     ];
     if (!validTypes.includes(resolutionType)) {
+      await mongoSession.abortTransaction();
       return NextResponse.json(
         { error: "Invalid resolutionType" },
+        { status: 400 },
+      );
+    }
+
+    if (resolutionType === "result_adjustment") {
+      await mongoSession.abortTransaction();
+      return NextResponse.json(
+        {
+          error:
+            "Result adjustment is applied from the incident's solutions, not as a refund.",
+        },
         { status: 400 },
       );
     }
@@ -298,7 +304,6 @@ export async function POST(
 
     // Determine users to compensate and amounts
     let usersToCompensate: Array<{ userId: string; amount: number }> = [];
-    let totalCompensation = 0;
 
     // Smart affected users: use specified or all participants
     const specifiedAffectedUsers = incident.affectedUsers || [];
@@ -330,15 +335,7 @@ export async function POST(
         userId: p.userId as string,
         amount: entryFee,
       }));
-    } else if (resolutionType === "result_adjustment") {
-      // Use custom amounts or skip compensation (manual adjustment)
-      if (customAmounts && customAmounts.length > 0) {
-        usersToCompensate = customAmounts;
-      }
     }
-
-    // Calculate total
-    totalCompensation = usersToCompensate.reduce((sum, u) => sum + u.amount, 0);
 
     // Process compensations
     const compensationResults: Array<{
@@ -427,7 +424,7 @@ export async function POST(
           await notificationService.sendInstant({
             userId: comp.userId,
             title: "💰 Compensation Received",
-            message: `You have been credited €${comp.amount.toFixed(2)} as compensation for incident resolution.`,
+            message: `You have been credited ${formatVolts(comp.amount)} as compensation for incident resolution.`,
             icon: "gift",
             category: "trading",
             priority: "high",
@@ -449,7 +446,7 @@ export async function POST(
         successCount++;
 
         console.log(
-          `   ✅ Compensated ${username}: €${comp.amount.toFixed(2)}`,
+          `   ✅ Compensated ${username}: ${formatVolts(comp.amount)}`,
         );
       } catch (error) {
         compensationResults.push({
@@ -490,7 +487,7 @@ export async function POST(
       action: "incident_resolved",
       by: auth.adminId || "admin",
       byEmail: auth.email,
-      details: `Resolved with ${resolutionType}. ${successCount} compensations issued totaling €${actualTotalCompensated.toFixed(2)}`,
+      details: `Resolved with ${resolutionType}. ${successCount} compensations issued totaling ${formatVolts(actualTotalCompensated)}`,
       metadata: {
         resolutionType,
         totalCompensation: actualTotalCompensated,
@@ -522,7 +519,7 @@ export async function POST(
               competitionId: incident.competitionId,
               competitionName: competition?.name,
             },
-            description: `Incident resolution (${resolutionType}): ${successCount} users, €${actualTotalCompensated.toFixed(2)} total`,
+            description: `Incident resolution (${resolutionType}): ${successCount} users, ${formatVolts(actualTotalCompensated)} total`,
             processedBy: auth.adminId,
             processedByEmail: auth.email,
           },
@@ -531,14 +528,14 @@ export async function POST(
       );
 
       console.log(
-        `   📊 [PlatformTransaction] Recorded expense: -€${actualTotalCompensated.toFixed(2)}`,
+        `   📊 [PlatformTransaction] Recorded expense: -${formatVolts(actualTotalCompensated)}`,
       );
     }
 
     await mongoSession.commitTransaction();
 
     console.log(
-      `🔧 [IncidentResolve] Complete: ${resolutionType}, ${successCount} compensations, €${actualTotalCompensated.toFixed(2)} total`,
+      `🔧 [IncidentResolve] Complete: ${resolutionType}, ${successCount} compensations, ${formatVolts(actualTotalCompensated)} total`,
     );
 
     // Log to audit trail

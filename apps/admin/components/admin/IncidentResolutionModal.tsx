@@ -4,7 +4,6 @@
 // Reason: R59 DialogContent size= sweep — pre-existing lint debt blocked --max-warnings=0 on touch. Width fix only; do not treat as licence for new debt.
 
 import { useState, useEffect } from "react";
-import { useAppSettings } from "@/contexts/AppSettingsContext";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
@@ -29,6 +28,7 @@ import {
   FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatVolts } from "@/lib/utils/format-volts";
 
 interface ResolutionOption {
   type: string;
@@ -83,6 +83,7 @@ interface IncidentResolutionModalProps {
   isOpen: boolean;
   onClose: () => void;
   onResolved: () => void;
+  onRequestRemediation?: () => void;
 }
 
 export default function IncidentResolutionModal({
@@ -90,9 +91,8 @@ export default function IncidentResolutionModal({
   isOpen,
   onClose,
   onResolved,
+  onRequestRemediation,
 }: IncidentResolutionModalProps) {
-  const { settings } = useAppSettings();
-  const cs = settings?.currency?.symbol || "€";
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [data, setData] = useState<ResolveData | null>(null);
@@ -131,6 +131,18 @@ export default function IncidentResolutionModal({
   };
 
   const handleResolve = async () => {
+    if (selectedType === "result_adjustment") {
+      if (!onRequestRemediation) {
+        toast.error(
+          "Result adjustment is applied from the incident's solutions.",
+        );
+        return;
+      }
+      onRequestRemediation();
+      onClose();
+      return;
+    }
+
     if (!notes.trim()) {
       toast.error("Please provide resolution notes");
       return;
@@ -151,7 +163,7 @@ export default function IncidentResolutionModal({
 
       if (result.success) {
         toast.success(
-          `Incident resolved! ${result.resolution.compensationsIssued} compensations issued totaling ${cs}${result.resolution.totalCompensation.toFixed(2)}`,
+          `Incident resolved! ${result.resolution.compensationsIssued} compensations issued totaling ${formatVolts(result.resolution.totalCompensation)}`,
         );
         onResolved();
         onClose();
@@ -268,7 +280,7 @@ export default function IncidentResolutionModal({
                       <div className="flex items-center gap-2">
                         <DollarSign className="h-4 w-4 text-green-400" />
                         <span className="text-gray-300">
-                          Entry fee: {cs}{data.summary.entryFee}
+                          Entry fee: {formatVolts(data.summary.entryFee)}
                         </span>
                       </div>
                       <div className="col-span-2 flex items-center gap-2">
@@ -329,7 +341,7 @@ export default function IncidentResolutionModal({
                       {option.totalAmount > 0 && (
                         <div className="text-right">
                           <p className="text-lg font-bold text-red-400">
-                            -{cs}{option.totalAmount.toFixed(2)}
+                            -{formatVolts(option.totalAmount)}
                           </p>
                           <p className="text-xs text-gray-500">
                             Platform expense
@@ -341,7 +353,7 @@ export default function IncidentResolutionModal({
                     {option.totalAmount > 0 && (
                       <div className="mt-3 flex gap-4 text-xs text-gray-400">
                         <span>{option.affectedUsers} users</span>
-                        <span>{cs}{option.perUserAmount.toFixed(2)} each</span>
+                        <span>{formatVolts(option.perUserAmount)} each</span>
                       </div>
                     )}
 
@@ -388,7 +400,7 @@ export default function IncidentResolutionModal({
                   This resolution will automatically credit{" "}
                   <strong>{selectedOption.affectedUsers} users</strong> with a
                   total of{" "}
-                  <strong>{cs}{selectedOption.totalAmount.toFixed(2)}</strong>.
+                  <strong>{formatVolts(selectedOption.totalAmount)}</strong>.
                   This amount will be recorded as a platform expense in the
                   Financial Dashboard.
                 </p>

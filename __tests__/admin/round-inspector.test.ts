@@ -98,15 +98,18 @@ describe("manual resolution cannot enter a score", () => {
 });
 
 describe("the action list has exactly one definition", () => {
-  it("the dialog reads the shared module rather than declaring its own list", () => {
+  it("the dialog does not declare its own list", () => {
+    // Reason: the dialog used to import RESOLUTION_ACTIONS and render the endings. Ending a
+    // round is now hub-driven, so the one definition is the catalogue the incident door
+    // reads. A second list in this dialog is the drift the original test existed to stop.
     const code = source("components", "admin", "games", "ResolveRoundDialog.tsx");
-    // "One rule, two copies" is the shape behind four separate defects here, and no mirror
-    // guard can see it. The drift it invites is a button offering an id the server has since
-    // renamed, which fails with a 400 that reads like a permissions problem.
-    expect(code).toContain("round-resolution-actions");
-    expect(code).toContain("RESOLUTION_ACTIONS");
-    // The giveaway of a second copy: the consequence wording written out again in the component.
+    expect(code).not.toContain("RESOLUTION_ACTIONS");
     expect(code).not.toContain("scores nothing for the player");
+    expect(code).not.toMatch(/\/resolve/);
+    expect(code).toContain("HubWithheldAction");
+    const catalogue = source("lib", "admin", "incident-actions.ts");
+    expect(catalogue).toContain("round-resolution-actions");
+    expect(catalogue).toContain("RESOLUTION_ACTIONS");
   });
 
   it("the server service reads the same module too", () => {

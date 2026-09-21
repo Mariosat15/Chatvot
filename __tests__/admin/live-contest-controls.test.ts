@@ -132,6 +132,8 @@ const CANCEL_ACTION_ADMIN = `${ADMIN}/lib/actions/trading/competition-cancel.act
 const CANCEL_ACTION_MAIN = "lib/actions/trading/competition-cancel.actions.ts";
 const CONTROL_PANEL = `${ADMIN}/components/admin/CompetitionAdminActions.tsx`;
 const CONTROL_COPY = `${ADMIN}/lib/admin/contest-control-copy.ts`;
+const REMEDIATION_DIALOG = `${ADMIN}/components/admin/incidents/RemediationDialog.tsx`;
+const INCIDENT_ACTIONS = `${ADMIN}/lib/admin/incident-actions.ts`;
 const VIEW_PAGE = `${ADMIN}/app/competitions/view/[id]/page.tsx`;
 
 /** Every lifecycle route, so a new one cannot be added outside the auth sweep unnoticed. */
@@ -547,10 +549,9 @@ describe("the live-contest control panel is game-aware", () => {
 
       Then the word-level version failed on CORRECT code. The emergency toast keeps
       "N positions closed" in its trading branch, and it must: an operator running a trading
-      contest still needs to be told what happened to their positions. So the claim "no trading
-      wording anywhere in this file" is simply false, and the honest one is narrower - no
-      trading wording that is not either sourced from the copy module or branched on the flag.
-      Scoping to the JSX is what expresses that: the branched strings live in the handlers.
+      contest still needs to be told what happened to their positions. That toast moved to
+      the incident remediation dialog when emergency cancel left this panel. The honest
+      claim on THIS file is now no trading wording in the rendered markup at all.
     */
     const panel = code(CONTROL_PANEL);
     // Anchored on the opening tag, not on `return (` - which first matched
@@ -572,8 +573,12 @@ describe("the live-contest control panel is game-aware", () => {
     // The emergency toast. Both branches are asserted, because a ternary with the provider arm
     // missing reads exactly as correct as one with both - and the trading arm is the one that
     // was already there.
-    const panel = code(CONTROL_PANEL);
-    const toast = panel.match(/isProviderGame\s*\n?\s*\?[\s\S]*?voidedRounds[\s\S]*?\n\s*\);/);
+    //
+    // Reason: the toast left CompetitionAdminActions when emergency cancel became hub-only.
+    // Re-aimed at the remediation dialog rather than deleted, so a trading contest still
+    // reports closed positions and a game contest still reports voided rounds.
+    const dialog = code(REMEDIATION_DIALOG);
+    const toast = dialog.match(/isProviderGame\s*\n?\s*\?[\s\S]*?voidedRounds[\s\S]*?\n\s*\);/);
     expect(toast, "the emergency toast is not branched on the flag").not.toBeNull();
     expect(toast![0]).toMatch(/rounds voided/);
     expect(toast![0]).toMatch(/positions closed/);
@@ -606,7 +611,14 @@ describe("the live-contest control panel is game-aware", () => {
     */
     const panel = code(CONTROL_PANEL);
 
-    for (const list of ["pauseConsequences", "emergencyConsequences"]) {
+    // Pause stays on the contest panel (reversible, needed while watching). Emergency
+    // consequences left with the hub and must not be restated here.
+    expect(panel).not.toMatch(/copy\.emergencyConsequences\.map/);
+    expect(code(INCIDENT_ACTIONS)).toMatch(
+      /contestControlCopy\(s\.isProviderGame\)\.emergencyConsequences/,
+    );
+
+    for (const list of ["pauseConsequences"]) {
       const mapIndex = panel.indexOf(`copy.${list}.map`);
       expect(mapIndex, `${list} is not rendered from the module`).toBeGreaterThan(-1);
 
@@ -688,12 +700,14 @@ describe("the live-contest control panel is game-aware", () => {
     // "0 positions closed" on a puzzle contest reads as though the action failed. Same
     // reasoning as the round dialog reporting whether settlement was actually released rather
     // than announcing that it was.
-    const panel = code(CONTROL_PANEL);
-    expect(panel).toMatch(/voidedRounds/);
-    expect(panel).toMatch(/closedPositions/);
-    // And the resume toast names the play window, because extending only `endTime` was the
-    // defect and an operator had no way to see whether the compensation landed.
-    expect(panel).toMatch(/Play window and end time extended/);
+    //
+    // Reason: voidedRounds and closedPositions moved with the emergency toast into the
+    // remediation dialog. The resume toast stayed on this panel, because pause and resume
+    // are still done in place.
+    const dialog = code(REMEDIATION_DIALOG);
+    expect(dialog).toMatch(/voidedRounds/);
+    expect(dialog).toMatch(/closedPositions/);
+    expect(code(CONTROL_PANEL)).toMatch(/Play window and end time extended/);
   });
 });
 

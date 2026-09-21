@@ -37,10 +37,38 @@ export interface IAuditLogEntry {
   metadata?: Record<string, unknown>;
 }
 
+export type IncidentSubjectType =
+  | "competition"
+  | "challenge"
+  | "round"
+  | "system";
+
+export type IncidentActionOutcome = "applied" | "refused" | "failed";
+
+export interface IIncidentActionTaken {
+  actionId: string;
+  subjectType: IncidentSubjectType;
+  subjectId: string;
+  reason: string;
+  outcome: IncidentActionOutcome;
+  detail?: string;
+  by: string;
+  byEmail?: string;
+  at: Date;
+}
+
 export interface IIncident extends Document {
   // Reference
   competitionId?: string;
   challengeId?: string;
+  /**
+   * What this incident is about. Absent on rows written before the hub, which is
+   * a different fact from `system` — those rows are read by which id they carry.
+   */
+  subjectType?: IncidentSubjectType;
+  roundId?: string;
+  gameKey?: string;
+  actionsTaken?: IIncidentActionTaken[];
 
   // Classification
   type:
@@ -129,6 +157,29 @@ const ResultAdjustmentSchema = new Schema(
   { _id: false },
 );
 
+const ActionTakenSchema = new Schema(
+  {
+    actionId: { type: String, required: true },
+    subjectType: {
+      type: String,
+      enum: ["competition", "challenge", "round", "system"],
+      required: true,
+    },
+    subjectId: { type: String, required: true },
+    reason: { type: String, required: true },
+    outcome: {
+      type: String,
+      enum: ["applied", "refused", "failed"],
+      required: true,
+    },
+    detail: { type: String },
+    by: { type: String, required: true },
+    byEmail: { type: String },
+    at: { type: Date, required: true, default: Date.now },
+  },
+  { _id: false },
+);
+
 const AuditLogEntrySchema = new Schema(
   {
     timestamp: { type: Date, required: true, default: Date.now },
@@ -151,6 +202,21 @@ const IncidentSchema: Schema = new Schema(
       type: String,
       index: true,
     },
+    // Add-only. No default: a row from before the hub has no subject type, and
+    // that is not the same as an incident about the platform itself.
+    subjectType: {
+      type: String,
+      enum: ["competition", "challenge", "round", "system"],
+      index: true,
+    },
+    roundId: {
+      type: String,
+      index: true,
+    },
+    gameKey: {
+      type: String,
+    },
+    actionsTaken: [ActionTakenSchema],
     type: {
       type: String,
       enum: [

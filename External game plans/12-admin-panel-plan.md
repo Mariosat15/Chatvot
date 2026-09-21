@@ -1627,6 +1627,59 @@ content - owner). The `closePosition` completed / finalizing gap closed 18 Septe
 **Guarded by `__tests__/admin/adjust-results-ui.test.ts`.** Asserts the mount gate, the seat
 builder, the literal fetch URL (an import is not a use), and the absence of wallet imports.
 
+> **AMENDED 21 September 2026 by `12` s3.3.** Fact 1 above is correct as history and stale
+> as a present fact: `AdjustResultsPanel` no longer POSTs. It withholds the control and
+> names Incident Management. The route is unchanged and is now reached from
+> `POST /api/incidents/[id]/act`. The test that pinned the fetch was flipped, not deleted.
+
+---
+
+### 3.3 What was built - one incident hub for every contest that goes wrong (21 September 2026)
+
+**The live code is** `apps/admin/lib/admin/incident-actions.ts`,
+`apps/admin/lib/services/incidents/incident-act.service.ts`,
+`incident-subjects.service.ts`, `incident-subject-stamp.ts`,
+`apps/admin/app/api/incidents/[id]/act/route.ts`,
+`apps/admin/app/api/incidents/subjects/route.ts`,
+`apps/admin/components/admin/IncidentsSection.tsx` and
+`apps/admin/components/admin/incidents/`. **Nothing here is mirrored** except the additive
+fields on both `incident.model.ts` copies, which `check:mirrors` covers.
+
+**Eight facts drift easily.**
+
+1. **One catalogue, and it does not restate a consequence.** `incident-actions.ts` imports
+   `contestControlCopy` and `RESOLUTION_ACTIONS`. A sentence about closing positions or
+   voiding rounds that appears in a component is the defect, and a test walks
+   `apps/admin/components` for the three distinctive phrases.
+2. **The hub does not widen privilege.** `guardSection("incidents")` then
+   `guardSection(action.section)` (`competitions`, `challenges` or `round-inspector`).
+   An incidents-only employee is refused. Action ids are a `Map`, never an object lookup.
+3. **Applicability comes from the stored subject.** The list is computed from status,
+   `isPaused`, the game label and whether `finalLeaderboard` exists. A caller cannot
+   offer an action the route will then refuse.
+4. **`subjectType` has no schema default.** An old row with the field absent is not the
+   same fact as `system`. New creates stamp it from the stored ids, and a caller-supplied
+   type or `gameKey` that disagrees is refused.
+5. **Pause and resume stay in both places, and that is a recorded deviation.** They are
+   reversible, and an operator watching a contest has to be able to stop play immediately.
+   Emergency cancel, cancel-with-refund, re-settle, adjust-results, round resolution and
+   challenge cancel are hub-only. The in-place panels withhold them with a refusal that
+   names Incident Management and links to `/dashboard?activeTab=incidents`, rather than
+   greying the control out.
+6. **Result adjustment is no longer a dead end.** Choosing it in the resolution modal
+   opens the remediation dialog (`adjust_results` / `re_settle`) and does not POST a
+   no-op. A POST of `result_adjustment` itself returns 400.
+7. **The player is told a credit amount, not a euro amount.** The notification uses
+   `formatVolts`. `WalletTransaction.currency` stays `"EUR"` because that is the ledger
+   convention, and changing it was out of scope. Nothing was backfilled — the sentence
+   was wrong, the credit was not.
+8. **The money writers were not copied.** Pause, resume, emergency cancel, upcoming
+   cancel, re-settle and round resolution call the existing services. Adjust-results and
+   challenge cancel call the existing route handlers. A second writer beside those is
+   the defect this slice exists to avoid.
+
+**Not verified by eye** — the screen is behind an admin sign-in.
+
 ---
 
 ## 4. Provider-specific sections

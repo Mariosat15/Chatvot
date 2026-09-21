@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import {
   XCircle,
   Clock,
-  AlertTriangle,
   Loader2,
   Pause,
   Play,
@@ -25,6 +24,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { contestControlCopy } from "@/lib/admin/contest-control-copy";
+import HubWithheldAction from "@/components/admin/incidents/HubWithheldAction";
 
 interface CompetitionAdminActionsProps {
   competitionId: string;
@@ -73,9 +73,6 @@ export default function CompetitionAdminActions({
 }: CompetitionAdminActionsProps) {
   const router = useRouter();
   const copy = contestControlCopy(isProviderGame);
-  const [isCancelling, setIsCancelling] = useState(false);
-  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
-  const [cancelReason, setCancelReason] = useState("");
   const [countdown, setCountdown] = useState("");
 
   // Emergency controls state
@@ -84,11 +81,6 @@ export default function CompetitionAdminActions({
   const [isPausing, setIsPausing] = useState(false);
   const [pauseDialogOpen, setPauseDialogOpen] = useState(false);
   const [newPauseReason, setNewPauseReason] = useState("");
-
-  const [emergencyCancelDialogOpen, setEmergencyCancelDialogOpen] =
-    useState(false);
-  const [emergencyCancelReason, setEmergencyCancelReason] = useState("");
-  const [isEmergencyCancelling, setIsEmergencyCancelling] = useState(false);
 
   const isUpcoming = status === "upcoming";
   const isActive = status === "active";
@@ -138,43 +130,6 @@ export default function CompetitionAdminActions({
 
     return () => clearInterval(interval);
   }, [startTime, endTime, isUpcoming]);
-
-  const handleCancelCompetition = async () => {
-    if (!cancelReason.trim()) {
-      toast.error("Please provide a reason for cancellation");
-      return;
-    }
-
-    setIsCancelling(true);
-    try {
-      const response = await fetch(
-        `/api/competitions/${competitionId}/cancel`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ reason: cancelReason }),
-        },
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to cancel competition");
-      }
-
-      toast.success(
-        `Competition cancelled! ${data.refundedCount} participants refunded.`,
-      );
-      setCancelDialogOpen(false);
-      router.refresh();
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to cancel competition",
-      );
-    } finally {
-      setIsCancelling(false);
-    }
-  };
 
   // Pause/Resume handlers
   const handlePauseCompetition = async () => {
@@ -245,51 +200,6 @@ export default function CompetitionAdminActions({
       );
     } finally {
       setIsPausing(false);
-    }
-  };
-
-  // Emergency Cancel (for active competitions)
-  const handleEmergencyCancel = async () => {
-    if (!emergencyCancelReason.trim()) {
-      toast.error("Please provide a reason for emergency cancellation");
-      return;
-    }
-
-    setIsEmergencyCancelling(true);
-    try {
-      const response = await fetch(
-        `/api/competitions/${competitionId}/emergency-cancel`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ reason: emergencyCancelReason }),
-        },
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to emergency cancel competition");
-      }
-
-      // Reports what the action actually did to THIS contest. "0 positions closed" on a puzzle
-      // contest reads as though the action failed - the same reason the round dialog reports
-      // whether settlement was really released rather than announcing that it was.
-      toast.success(
-        isProviderGame
-          ? `Competition emergency cancelled! ${data.details?.voidedRounds || 0} rounds voided, ${data.details?.refundedCount || 0} participants refunded.`
-          : `Competition emergency cancelled! ${data.details?.closedPositions || 0} positions closed, ${data.details?.refundedCount || 0} participants refunded.`,
-      );
-      setEmergencyCancelDialogOpen(false);
-      router.refresh();
-    } catch (error) {
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Failed to emergency cancel competition",
-      );
-    } finally {
-      setIsEmergencyCancelling(false);
     }
   };
 
@@ -385,101 +295,19 @@ export default function CompetitionAdminActions({
             <div>
               <p className="text-sm font-semibold text-green-400">COMPLETED</p>
               <p className="text-xs text-green-300/70">
-                Contest has ended. Use Adjust results below the settled snapshot
-                to correct a rank or prize (incident required).
+                Contest has ended. A rank or a prize is corrected from Incident
+                Management, which records the reason.
               </p>
             </div>
           </div>
         </div>
       )}
 
-      {/* Cancel Button - Only for upcoming competitions */}
       {isUpcoming && (
-        <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
-          <DialogTrigger asChild>
-            <Button
-              variant="destructive"
-              className="w-full bg-red-600 hover:bg-red-700"
-            >
-              <XCircle className="h-4 w-4 mr-2" />
-              Cancel Competition
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="bg-gray-900 border-gray-700">
-            <DialogHeader>
-              <DialogTitle className="text-red-400 flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5" />
-                Cancel Competition
-              </DialogTitle>
-              <DialogDescription className="text-gray-400">
-                Are you sure you want to cancel{" "}
-                <span className="text-white font-semibold">
-                  &ldquo;{competitionName}&rdquo;
-                </span>
-                ?
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-4 py-4">
-              <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
-                <p className="text-sm text-red-300">
-                  <strong>Warning:</strong> This action will:
-                </p>
-                <ul className="mt-2 space-y-1 text-sm text-red-300/80 list-disc list-inside">
-                  <li>Immediately cancel the competition</li>
-                  <li>
-                    Refund <strong>{participantCount}</strong> participant(s)
-                    their full entry fees
-                  </li>
-                  <li>Send notification to all participants</li>
-                  <li>This action cannot be undone</li>
-                </ul>
-              </div>
-
-              <div>
-                <Label htmlFor="cancelReason" className="text-gray-300">
-                  Reason for cancellation *
-                </Label>
-                <Textarea
-                  id="cancelReason"
-                  value={cancelReason}
-                  onChange={(e) => setCancelReason(e.target.value)}
-                  placeholder="e.g., Not enough participants, Technical issues, Schedule conflict..."
-                  className="mt-2 bg-gray-800 border-gray-600 text-gray-100"
-                  rows={3}
-                />
-              </div>
-            </div>
-
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setCancelDialogOpen(false)}
-                className="border-gray-600"
-              >
-                Keep Competition
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={handleCancelCompetition}
-                disabled={isCancelling || !cancelReason.trim()}
-                className="bg-red-600 hover:bg-red-700"
-              >
-                {isCancelling ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Cancelling...
-                  </>
-                ) : (
-                  <>
-                    <XCircle className="h-4 w-4 mr-2" />
-                    Cancel & Refund All
-                  </>
-                )}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <HubWithheldAction
+          action="Cancelling this contest and refunding entry fees"
+          detail={`${participantCount} participant(s) of ${competitionName} are refunded from Incident Management.`}
+        />
       )}
 
       {/* ============================================ */}
@@ -605,92 +433,10 @@ export default function CompetitionAdminActions({
             </Button>
           )}
 
-          {/* Emergency Cancel */}
-          <Dialog
-            open={emergencyCancelDialogOpen}
-            onOpenChange={setEmergencyCancelDialogOpen}
-          >
-            <DialogTrigger asChild>
-              <Button
-                variant="destructive"
-                className="w-full bg-red-600 hover:bg-red-700"
-              >
-                <ShieldAlert className="h-4 w-4 mr-2" />
-                Emergency Cancel
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="bg-gray-900 border-gray-700">
-              <DialogHeader>
-                <DialogTitle className="text-red-400 flex items-center gap-2">
-                  <ShieldAlert className="h-5 w-5" />
-                  Emergency Cancel Competition
-                </DialogTitle>
-                <DialogDescription className="text-gray-400">
-                  {copy.emergencyDialogDescription}
-                </DialogDescription>
-              </DialogHeader>
-
-              <div className="space-y-4 py-4">
-                <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
-                  <p className="text-sm text-red-300">
-                    <strong>⚠️ CRITICAL ACTION:</strong> This will:
-                  </p>
-                  <ul className="mt-2 space-y-1 text-sm text-red-300/80 list-disc list-inside">
-                    {copy.emergencyConsequences.map((consequence) => (
-                      <li key={consequence}>{consequence}</li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div>
-                  <Label
-                    htmlFor="emergencyCancelReason"
-                    className="text-gray-300"
-                  >
-                    Reason for emergency cancellation *
-                  </Label>
-                  <Textarea
-                    id="emergencyCancelReason"
-                    value={emergencyCancelReason}
-                    onChange={(e) => setEmergencyCancelReason(e.target.value)}
-                    placeholder="e.g., Critical price feed failure, System compromise, Unfair conditions detected..."
-                    className="mt-2 bg-gray-800 border-gray-600 text-gray-100"
-                    rows={3}
-                  />
-                </div>
-              </div>
-
-              <DialogFooter>
-                <Button
-                  variant="outline"
-                  onClick={() => setEmergencyCancelDialogOpen(false)}
-                  className="border-gray-600"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  variant="destructive"
-                  onClick={handleEmergencyCancel}
-                  disabled={
-                    isEmergencyCancelling || !emergencyCancelReason.trim()
-                  }
-                  className="bg-red-600 hover:bg-red-700"
-                >
-                  {isEmergencyCancelling ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Processing...
-                    </>
-                  ) : (
-                    <>
-                      <ShieldAlert className="h-4 w-4 mr-2" />
-                      Emergency Cancel & Refund
-                    </>
-                  )}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+          <HubWithheldAction
+            action="Emergency-cancelling this contest"
+            detail={`${competitionName} is ended and refunded from Incident Management.`}
+          />
         </div>
       )}
 

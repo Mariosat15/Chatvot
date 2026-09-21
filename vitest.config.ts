@@ -53,6 +53,18 @@ export default defineConfig({
         __dirname,
         "apps/admin/lib/admin/section-route-guard.ts",
       ),
+      "@/lib/admin/contest-control-copy": path.resolve(
+        __dirname,
+        "apps/admin/lib/admin/contest-control-copy.ts",
+      ),
+      "@/lib/admin/round-resolution-actions": path.resolve(
+        __dirname,
+        "apps/admin/lib/admin/round-resolution-actions.ts",
+      ),
+      "@/lib/admin/incident-actions": path.resolve(
+        __dirname,
+        "apps/admin/lib/admin/incident-actions.ts",
+      ),
       /**
        * Terminology context — MAIN-APP copy under `contexts/TerminologyContext.tsx`.
        *

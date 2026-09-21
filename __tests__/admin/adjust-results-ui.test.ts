@@ -27,6 +27,8 @@ const PANEL =
 const VIEW_PAGE = "apps/admin/app/competitions/view/[id]/page.tsx";
 const ROUTE =
   "apps/admin/app/api/competitions/[id]/adjust-results/route.ts";
+const RESOLVE =
+  "apps/admin/app/api/incidents/[id]/resolve/route.ts";
 
 describe("adjust-results has a UI caller on the completed contest view", () => {
   it("mounts AdjustResultsPanel on the contest view page", () => {
@@ -57,13 +59,14 @@ describe("adjust-results has a UI caller on the completed contest view", () => {
 });
 
 describe("the panel talks only to the existing adjust-results route", () => {
-  it("POSTs the literal adjust-results URL (an import is not a use)", () => {
+  it("does not POST adjust-results itself", () => {
+    // Reason: the panel used to be the UI caller. Adjusting a settled prize is now
+    // hub-driven, so a fetch here would be a second door that skips the incident record.
+    // The route file below is still the writer; the incident act service calls it.
     const code = readCode(PANEL);
-    // Match the call with its method, not a bare path string in a comment that was stripped.
-    expect(code).toMatch(
-      /fetch\(\s*`\/api\/competitions\/\$\{competitionId\}\/adjust-results`/,
-    );
-    expect(code).toMatch(/method:\s*["']POST["']/);
+    expect(code).not.toMatch(/fetch\(/);
+    expect(code).not.toMatch(/adjust-results/);
+    expect(code).toMatch(/HubWithheldAction/);
   });
 
   it("does not import wallet, participant or settlement modules", () => {
@@ -77,29 +80,27 @@ describe("the panel talks only to the existing adjust-results route", () => {
     expect(code).not.toMatch(/CreditWallet|WalletTransaction/);
   });
 
-  it("requires an incident id before submitting", () => {
+  it("does not submit a correction of its own", () => {
+    // Reason: the early-return on a blank incident id lived in this panel. The hub's
+    // act route now requires the reason, so a handleSubmit here would be the old door.
     const code = readCode(PANEL);
-    // The paste field is primary; the optional picker is best-effort behind incidents grant.
-    expect(code).toMatch(/incidentId/);
-    expect(code).toMatch(/Paste incident ObjectId/);
-    // Assert the early return, not a bare toast string that could live elsewhere.
-    const submitStart = code.indexOf("const handleSubmit");
-    expect(submitStart).toBeGreaterThan(-1);
-    const submitBody = code.slice(submitStart, submitStart + 800);
-    expect(submitBody).toMatch(/!incidentId\.trim\(\)/);
+    expect(code).not.toMatch(/handleSubmit/);
+    expect(code).not.toMatch(/incidentId/);
   });
 
-  it("surfaces per-row outcomes rather than collapsing to one toast", () => {
+  it("names the hub rather than showing per-row outcomes", () => {
     const code = readCode(PANEL);
-    expect(code).toMatch(/setLastResults/);
-    expect(code).toMatch(/lastResults\.map/);
+    expect(code).not.toMatch(/setLastResults/);
+    expect(code).toMatch(/HubWithheldAction/);
   });
 
-  it("uses formatVolts and useTerms - no hard-coded euro or trader nouns", () => {
-    const code = readCode(PANEL);
+  it("the resolve path uses formatVolts and does not quote a euro to the player", () => {
+    // Reason: the panel no longer renders amounts. The player-facing sentence is the
+    // compensation notification on the resolve route, which used to say "credited €X".
+    const code = readCode(RESOLVE);
     expect(code).toMatch(/formatVolts\(/);
-    expect(code).toMatch(/useTerms\(/);
-    expect(code).not.toMatch(/€|EUR|Trader|traders/);
+    expect(code).toMatch(/You have been credited \$\{formatVolts\(/);
+    expect(code).not.toMatch(/credited €/);
   });
 });
 
