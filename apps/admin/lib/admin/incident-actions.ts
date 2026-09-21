@@ -19,6 +19,14 @@ import {
 
 export { MIN_REASON_LENGTH };
 
+/**
+ * Terminal statuses. An irreversible solution or a refund resolution lands here,
+ * and neither Apply a solution nor Refund entry fees may run again.
+ */
+export function isIncidentClosed(status: string): boolean {
+  return status === "resolved" || status === "rejected";
+}
+
 export type IncidentSubjectKind = "competition" | "challenge" | "round" | "system";
 
 export type IncidentActionSection =

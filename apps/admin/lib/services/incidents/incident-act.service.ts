@@ -18,6 +18,8 @@ import {
   actionsForSubject,
   resolutionActionFor,
   roundNeedsDecision,
+  isIncidentClosed,
+  INCIDENT_ACTIONS,
   type IncidentSubjectFacts,
   type IncidentSubjectKind,
 } from "@/lib/admin/incident-actions";
@@ -350,6 +352,7 @@ export async function readIncidentActions(incidentId: string): Promise<
 > {
   await connectToDatabase();
   const incident = await Incident.findById(incidentId).lean<{
+    status?: string;
     subjectType?: string;
     roundId?: string;
     challengeId?: string;
@@ -360,11 +363,16 @@ export async function readIncidentActions(incidentId: string): Promise<
   if (!loaded.subject) {
     return { ok: false, status: 400, error: loaded.error || "No subject." };
   }
+  // Reason: a closed incident must offer no catalogue, even if the subject would
+  // still admit an action (e.g. pause after a prior refund resolution).
+  const actions = isIncidentClosed(incident.status ?? "")
+    ? []
+    : actionsForSubject(loaded.subject.facts);
   return {
     ok: true,
     subject: loaded.subject.facts,
     subjectId: loaded.subject.id,
-    actions: actionsForSubject(loaded.subject.facts),
+    actions,
   };
 }
 
@@ -386,11 +394,22 @@ export async function performIncidentAction(input: {
   const incident = await Incident.findById(input.incidentId);
   if (!incident) return { ok: false, status: 404, error: "Incident not found." };
 
+  // Reason: UI can hide the button; the server must still refuse a second cancel
+  // or re-settle against a closed record.
+  if (isIncidentClosed(String(incident.status ?? ""))) {
+    return {
+      ok: false,
+      status: 409,
+      error: "This incident is closed. Raise a new one if further action is needed.",
+    };
+  }
+
   const loaded = await loadIncidentSubject(incident);
   if (!loaded.subject) {
     return { ok: false, status: 400, error: loaded.error || "No subject." };
   }
 
+  const actionDef = INCIDENT_ACTIONS.get(input.actionId);
   const applicable = actionsForSubject(loaded.subject.facts).some(
     (action) => action.id === input.actionId,
   );
@@ -426,6 +445,33 @@ export async function performIncidentAction(input: {
     }
   }
 
+  // Reason: irreversible solutions (cancel, void round, re-settle, …) close the
+  // incident so the same money move cannot be confirmed twice. Pause/resume stay
+  // open so the operator can reverse them from the same record.
+  const closesIncident =
+    finalOutcome === "applied" && actionDef?.irreversible === true;
+  const resolvedAt = new Date();
+  const auditEntries = [
+    {
+      timestamp: resolvedAt,
+      action: input.actionId,
+      by: input.actor.id,
+      byEmail: input.actor.email,
+      details: `${finalOutcome}: ${detail}`,
+    },
+    ...(closesIncident
+      ? [
+          {
+            timestamp: resolvedAt,
+            action: "incident_resolved",
+            by: input.actor.id,
+            byEmail: input.actor.email,
+            details: `Resolved by applying ${input.actionId}. ${detail}`,
+          },
+        ]
+      : []),
+  ];
+
   await Incident.updateOne(
     { _id: incident._id },
     {
@@ -439,16 +485,27 @@ export async function performIncidentAction(input: {
           detail,
           by: input.actor.id,
           byEmail: input.actor.email,
-          at: new Date(),
+          at: resolvedAt,
         },
-        auditLog: {
-          timestamp: new Date(),
-          action: input.actionId,
-          by: input.actor.id,
-          byEmail: input.actor.email,
-          details: `${finalOutcome}: ${detail}`,
-        },
+        auditLog: { $each: auditEntries },
       },
+      ...(closesIncident
+        ? {
+            $set: {
+              status: "resolved",
+              resolvedBy: input.actor.id,
+              resolvedByEmail: input.actor.email,
+              resolvedAt,
+              resolution: {
+                summary: input.reason,
+                action: input.actionId,
+                compensations: [],
+                resultAdjustments: [],
+                resolvedAt,
+              },
+            },
+          }
+        : {}),
     },
   );
 

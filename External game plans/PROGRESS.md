@@ -317,6 +317,7 @@ project low risk.
 This plan has two tracks. **As of 21 September 2026**:
 
 - **R113 CLOSED 21 Sep (eng)** — `prize_pool_mismatch` no longer false-alerts contests that settled under `refund_entry_fees`. Monitor counts wallet `competition_refund` rows; admin no-winners notice names refunds when that was the policy. Settlement was always correct.
+- **Incident close-after-solution FIXED 21 Sep (eng)** — irreversible Apply a solution (cancel, void round, re-settle, …) marks the incident `resolved`; both hub buttons hide on resolved/rejected; act route refuses a second apply with 409. Pause/resume stay open on purpose.
 - **Incident hub BUILT 21 Sep (eng)** — Incident Management is the one place an operator pauses, cancels, re-settles, adjusts, ends a round or cancels a challenge, for trading and for games. Pause/resume also stay on the contest. See `12` s3.3 and R112. Not verified by eye.
 
 **As of 20 September 2026** (owner):
@@ -859,6 +860,20 @@ remains outstanding is the **opponent** half listed above, not the game half.
 ## WORK LOG
 
 Newest at the top.
+
+### 21 Sep 2026 - X6 - incident closes when an irreversible solution is applied
+
+**Shipped:** An irreversible catalogue action applied from **Apply a solution** now sets `status: "resolved"`, stamps `resolvedBy` / `resolvedAt`, writes an `incident_resolved` audit line, and returns empty actions on a later GET. The act route refuses a closed incident with 409. The detail panel hides both **Apply a solution** and **Refund entry fees** when status is `resolved` or `rejected`, and says the incident is closed. Pause/resume stay open so they can be reversed from the same record. Refund resolution already closed the incident; Apply a solution did not, which is why a cancelled contest still offered a second solution (owner report).
+
+**Files touched:** `incident-actions.ts` (`isIncidentClosed`); `incident-act.service.ts`; `IncidentDetailPanel.tsx`; `__tests__/admin/incident-hub.test.ts`; this file.
+
+**Deviated from plan:** none — closes a hole in the hub that shipped earlier today.
+
+**Owner tested:** not by eye. Structural tests pin the gate and the close path.
+
+**Deferred:** historical incidents that were acted on before this fix stay open if nobody used Refund; an operator can dismiss them by raising nothing further, or re-open is not offered — they may need a one-off status edit if any remain.
+
+**Next chat should:** refresh Incident Management after deploy and confirm a cancel no longer shows Apply a solution.
 
 ### 21 Sep 2026 - X9 - prize_pool_mismatch stopped false-alerting refunded unscored contests (R113)
 

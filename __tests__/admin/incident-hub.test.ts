@@ -13,6 +13,8 @@ import { join } from "node:path";
 import {
   actionsForSubject,
   explainInapplicable,
+  isIncidentClosed,
+  INCIDENT_ACTIONS,
   type IncidentSubjectFacts,
 } from "../../apps/admin/lib/admin/incident-actions";
 
@@ -173,6 +175,51 @@ describe("the refusal names the hub", () => {
     );
     expect(code).toMatch(/Incident Management/);
     expect(code).toMatch(/\/dashboard\?activeTab=incidents/);
+  });
+});
+
+describe("a closed incident cannot take another solution", () => {
+  it("resolved and rejected are closed; open is not", () => {
+    expect(isIncidentClosed("resolved")).toBe(true);
+    expect(isIncidentClosed("rejected")).toBe(true);
+    expect(isIncidentClosed("open")).toBe(false);
+    expect(isIncidentClosed("investigating")).toBe(false);
+  });
+
+  it("cancel-and-refund is irreversible so Apply a solution closes the record", () => {
+    // Reason: pause stays open on purpose; money moves must not.
+    expect(INCIDENT_ACTIONS.get("cancel_upcoming")?.irreversible).toBe(true);
+    expect(INCIDENT_ACTIONS.get("pause_contest")?.irreversible).toBe(false);
+  });
+
+  it("the detail panel withholds both buttons once the incident is closed", () => {
+    // Reason: Refund was gated; Apply a solution was not — a resolved incident
+    // still showed the amber button (owner report, 21 Sep 2026).
+    const code = readCode(
+      "apps/admin/components/admin/incidents/IncidentDetailPanel.tsx",
+    );
+    expect(code).toMatch(/status === "resolved"/);
+    expect(code).toMatch(/status === "rejected"/);
+    expect(code).toMatch(/This incident is closed/);
+    const gate = code.indexOf("closed ?");
+    const applyAt = code.indexOf("Apply a solution");
+    const refundAt = code.indexOf("Refund entry fees");
+    expect(gate).toBeGreaterThan(-1);
+    expect(applyAt).toBeGreaterThan(gate);
+    expect(refundAt).toBeGreaterThan(gate);
+    // Reason: a second unguarded Apply somewhere else would sit before the gate.
+    expect(code.indexOf("Apply a solution", applyAt + 1)).toBe(-1);
+  });
+
+  it("the act service refuses a closed incident and closes on irreversible apply", () => {
+    const code = readCode(
+      "apps/admin/lib/services/incidents/incident-act.service.ts",
+    );
+    expect(code).toMatch(/isIncidentClosed\(/);
+    expect(code).toMatch(/status:\s*409/);
+    expect(code).toMatch(/actionDef\?\.irreversible === true/);
+    expect(code).toMatch(/status:\s*"resolved"/);
+    expect(code).toMatch(/action:\s*"incident_resolved"/);
   });
 });
 
