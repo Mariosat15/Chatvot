@@ -321,6 +321,12 @@ export function resolveNoWinnersNotice(input: {
    */
   participantCount: number;
   terms: TerminologyPack;
+  /**
+   * Where the pot went when nobody scored. Absent / `unclaimed_pool` keeps the historical
+   * sentence; `refund_entry_fees` must not claim an unclaimed-pool booking that was never
+   * written (R113's sibling on the view screen).
+   */
+  unscoredContestPolicy?: "unclaimed_pool" | "refund_entry_fees" | null;
 }): string | null {
   if (!input.isCompleted || !input.noWinners) return null;
 
@@ -328,6 +334,10 @@ export function resolveNoWinnersNotice(input: {
 
   if (input.participantCount === 0) {
     return `This ${terms.contest} finished with no ${terms.players}, so no ${terms.prizes} were awarded.`;
+  }
+
+  if (input.unscoredContestPolicy === "refund_entry_fees") {
+    return `No ${terms.prizes} were awarded. Nobody finished in a paying position - on a ${terms.game} ${terms.contest} that usually means nobody recorded a ${terms.score}. Entry fees were returned to each ${terms.player}, less the platform fee.`;
   }
 
   return `No ${terms.prizes} were awarded. Nobody finished in a paying position - on a ${terms.game} ${terms.contest} that usually means nobody recorded a ${terms.score}. The ${terms.prizePool}, less the platform fee, was recorded as an unclaimed pool rather than paid out.`;

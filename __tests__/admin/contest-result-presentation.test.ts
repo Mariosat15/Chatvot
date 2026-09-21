@@ -168,6 +168,24 @@ describe("admin contest result presentation - nobody was paid", () => {
     expect(notice).toMatch(/unclaimed pool/i);
   });
 
+  it("names entry-fee refunds when that was the unscored policy", () => {
+    // Reason: the view always said "unclaimed pool" even when settlement wrote
+    // competition_refund rows and no unclaimed_pool PlatformTransaction (R113).
+    const notice = resolveNoWinnersNotice({
+      isCompleted: true,
+      noWinners: true,
+      participantCount: 2,
+      terms,
+      unscoredContestPolicy: "refund_entry_fees",
+    });
+
+    if (notice === null) {
+      throw new Error("expected a no-winners notice for a refund-policy contest");
+    }
+    expect(notice).toMatch(/returned/i);
+    expect(notice).not.toMatch(/unclaimed pool/i);
+  });
+
   it("distinguishes an empty contest from one nobody scored in", () => {
     const empty = resolveNoWinnersNotice({
       isCompleted: true,

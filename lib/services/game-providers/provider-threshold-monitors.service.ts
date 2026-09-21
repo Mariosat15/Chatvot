@@ -15,6 +15,7 @@ import GameProvider from "@/database/models/games/game-provider.model";
 import GameRound from "@/database/models/games/game-round.model";
 import ProviderEvent from "@/database/models/games/provider-event.model";
 import PlatformTransaction from "@/database/models/platform-financials.model";
+import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import SecurityAlert from "@/database/models/security-alert.model";
 import {
   recordSecurityAlert,
@@ -201,7 +202,26 @@ async function checkPrizePoolMismatch(
       .lean<{ amount: number; transactionType: string }[]>();
 
     const booked = feeRows.reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
-    const accounted = prizes + booked;
+
+    // Reason: under `refund_entry_fees`, settlement returns the net pot via
+    // WalletTransaction `competition_refund` and books only the platform fee —
+    // there is no `unclaimed_pool` row. Counting platform books alone falsely
+    // alerts every correctly-settled unscored contest (R113).
+    // `competitionId` is declared String on WalletTransaction; match the id
+    // string, never an ObjectId, or the sum silently stays zero.
+    const refundRows = await WalletTransaction.find({
+      competitionId: id,
+      transactionType: "competition_refund",
+      status: "completed",
+    })
+      .select("amount")
+      .lean<{ amount: number }[]>();
+
+    const refunded = refundRows.reduce(
+      (sum, row) => sum + (Number(row.amount) || 0),
+      0,
+    );
+    const accounted = prizes + booked + refunded;
     const pool = Number(c.prizePool) || 0;
 
     if (Math.abs(accounted - pool) <= MONEY_EPSILON) continue;
@@ -210,13 +230,14 @@ async function checkPrizePoolMismatch(
       alertType: "prize_pool_mismatch",
       severity: "critical",
       source: "provider-threshold-monitors",
-      reason: `Competition "${c.name}": prizes (${prizes.toFixed(2)}) + booked fees/unclaimed (${booked.toFixed(2)}) = ${accounted.toFixed(2)}, but prizePool is ${pool.toFixed(2)}.`,
+      reason: `Competition "${c.name}": prizes (${prizes.toFixed(2)}) + booked fees/unclaimed (${booked.toFixed(2)}) + refunds (${refunded.toFixed(2)}) = ${accounted.toFixed(2)}, but prizePool is ${pool.toFixed(2)}.`,
       fingerprint: `prize-mismatch:${id}`,
       metadata: {
         contestId: id,
         prizePool: pool,
         prizesPaid: prizes,
         bookedFees: booked,
+        refunded,
         accounted,
         feeTypes: feeRows.map((r) => r.transactionType),
       },

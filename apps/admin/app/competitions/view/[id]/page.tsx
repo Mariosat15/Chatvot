@@ -126,6 +126,7 @@ const AdminCompetitionViewPage = async ({
       noWinners: competition.noWinners,
       participantCount: competition.currentParticipants ?? 0,
       terms,
+      unscoredContestPolicy: competition.unscoredContestPolicy ?? null,
     });
 
     // Get actual prizes won from database (WalletTransaction)

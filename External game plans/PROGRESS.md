@@ -316,6 +316,7 @@ project low risk.
 
 This plan has two tracks. **As of 21 September 2026**:
 
+- **R113 CLOSED 21 Sep (eng)** — `prize_pool_mismatch` no longer false-alerts contests that settled under `refund_entry_fees`. Monitor counts wallet `competition_refund` rows; admin no-winners notice names refunds when that was the policy. Settlement was always correct.
 - **Incident hub BUILT 21 Sep (eng)** — Incident Management is the one place an operator pauses, cancels, re-settles, adjusts, ends a round or cancels a challenge, for trading and for games. Pause/resume also stay on the contest. See `12` s3.3 and R112. Not verified by eye.
 
 **As of 20 September 2026** (owner):
@@ -858,6 +859,32 @@ remains outstanding is the **opponent** half listed above, not the game half.
 ## WORK LOG
 
 Newest at the top.
+
+### 21 Sep 2026 - X9 - prize_pool_mismatch stopped false-alerting refunded unscored contests (R113)
+
+**Shipped:** `checkPrizePoolMismatch` now accounts for completed WalletTransaction `competition_refund` rows (keyed by string `competitionId`) alongside prizes and PlatformTransaction fee/unclaimed/GM rows. Admin `resolveNoWinnersNotice` branches on `unscoredContestPolicy`: `refund_entry_fees` says entry fees were returned less the platform fee; absent / `unclaimed_pool` keeps the historical sentence. Owner's Warrior's / Circuit Sniper case (pool 20 = fee 2 + refunds 9+9, empty leaderboard) no longer alerts.
+
+**Files touched:** `provider-threshold-monitors.service.ts`; `__tests__/services/provider-threshold-monitors.test.ts` (20 tests); `tools/probe-provider-threshold-monitors.ps1` (+1 probe); `contest-result-presentation.ts` + view page; `__tests__/admin/contest-result-presentation.test.ts`; `17-risk-register.md` R113; this file.
+
+**Deviated from plan:** none — this is the approved fix after the incident-hub commit. Existing false SecurityAlert fingerprints are not purged; operators dismiss them.
+
+**Owner tested:** not by eye. Ledger already matched screenshots before the fix; the green test reproduces that equation.
+
+**Deferred:** dedicated re-settle (still X9 outstanding). Do not treat dismissed historical false alerts as evidence of a money defect.
+
+**Next chat should:** X10 polish / X11 catalogue, or wait on a signed provider for X4. Dismiss any lingering `prize_pool_mismatch` rows for refunded unscored contests after deploy.
+
+```
+### [DATE] - [PHASE] - [STATUS]
+**Shipped:** what was actually built and merged
+**Files touched:** the significant ones
+**Deviated from plan:** what was done differently and why
+**Owner tested:** what was verified, and the outcome
+**Deferred:** what was consciously left for later
+**Next chat should:** the single clearest next action
+```
+
+---
 
 ### 21 Sep 2026 - X6 - incident hub is the one place an operator fixes a contest
 

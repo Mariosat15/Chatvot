@@ -1,13 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import IncidentResolutionModal from "../IncidentResolutionModal";
-import IncidentDetailPanel from "./IncidentDetailPanel";
-import IncidentList from "./IncidentList";
-import LiveOperationsBoard from "./LiveOperationsBoard";
-import RaiseIncidentDialog from "./RaiseIncidentDialog";
-import RemediationDialog from "./RemediationDialog";
-import type { IncidentRecord, LiveSubject } from "./types";
+import IncidentResolutionModal from "./IncidentResolutionModal";
+import IncidentDetailPanel from "./incidents/IncidentDetailPanel";
+import IncidentList from "./incidents/IncidentList";
+import LiveOperationsBoard from "./incidents/LiveOperationsBoard";
+import RaiseIncidentDialog from "./incidents/RaiseIncidentDialog";
+import RemediationDialog from "./incidents/RemediationDialog";
+import type { IncidentRecord, LiveSubject } from "./incidents/types";
 
 export default function IncidentsSection() {
   const [subjects, setSubjects] = useState<LiveSubject[]>([]);

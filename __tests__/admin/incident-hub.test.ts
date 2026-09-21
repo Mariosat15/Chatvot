@@ -176,6 +176,27 @@ describe("the refusal names the hub", () => {
   });
 });
 
+describe("IncidentsSection import paths", () => {
+  it("resolves children from the incidents folder and the sibling resolution modal", () => {
+    // Reason: the shell lives in `components/admin/` while the split pieces live in
+    // `components/admin/incidents/`. Wrong relatives (`../IncidentResolutionModal`,
+    // `./IncidentList`) pass every structural test that never opens the shell and
+    // fail only at `next build` — which is how production went down (21 Sep 2026).
+    const code = readCode("apps/admin/components/admin/IncidentsSection.tsx");
+    expect(code).toMatch(
+      /from\s+["']\.\/IncidentResolutionModal["']/,
+    );
+    expect(code).toMatch(/from\s+["']\.\/incidents\/IncidentDetailPanel["']/);
+    expect(code).toMatch(/from\s+["']\.\/incidents\/IncidentList["']/);
+    expect(code).toMatch(/from\s+["']\.\/incidents\/LiveOperationsBoard["']/);
+    expect(code).toMatch(/from\s+["']\.\/incidents\/RaiseIncidentDialog["']/);
+    expect(code).toMatch(/from\s+["']\.\/incidents\/RemediationDialog["']/);
+    expect(code).toMatch(/from\s+["']\.\/incidents\/types["']/);
+    expect(code).not.toMatch(/from\s+["']\.\.\/IncidentResolutionModal["']/);
+    expect(code).not.toMatch(/from\s+["']\.\/IncidentList["']/);
+  });
+});
+
 describe("raising an incident uses the board subject id", () => {
   it("sends the id on the field the stamp reads for that kind", () => {
     const code = readCode(

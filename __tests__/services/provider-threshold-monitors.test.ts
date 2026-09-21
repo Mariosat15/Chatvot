@@ -39,6 +39,7 @@ import GameProvider from "../../database/models/games/game-provider.model";
 import GameRound from "../../database/models/games/game-round.model";
 import ProviderEvent from "../../database/models/games/provider-event.model";
 import PlatformTransaction from "../../database/models/platform-financials.model";
+import WalletTransaction from "../../database/models/trading/wallet-transaction.model";
 import SecurityAlert from "../../database/models/security-alert.model";
 import { MOCK_PROVIDER_KEY } from "../../lib/services/game-providers/adapters/mock.adapter";
 import {
@@ -68,6 +69,7 @@ const COLLECTIONS = [
   "game_round",
   "provider_event",
   "platformtransactions",
+  "wallettransactions",
   "securityalerts",
 ];
 
@@ -187,6 +189,83 @@ describe("runProviderThresholdMonitors", () => {
       }),
     );
     expect(summary.alerts).toBeGreaterThanOrEqual(1);
+  });
+
+  it("does not alert when entry-fee refunds close the prize-pool equation", async () => {
+    // Reason: live false alerts on Warrior's / Circuit Sniper. Settlement booked
+    // platform_fee 2 + two competition_refund rows of 9 (= 20) against prizePool 20,
+    // with an empty finalLeaderboard. Counting only prizes + PlatformTransaction
+    // saw 0 + 2 and raised prize_pool_mismatch every minute (R113).
+    const id = new mongoose.Types.ObjectId();
+    const updatedAt = new Date();
+    await Competition.collection.insertOne({
+      _id: id,
+      name: "Refunded Unscored",
+      slug: "refunded-unscored",
+      description: "x",
+      status: "completed",
+      gameKey: "provider:chartvolt-games:circuit-sprint",
+      entryFee: 10,
+      minParticipants: 2,
+      maxParticipants: 10,
+      currentParticipants: 2,
+      startTime: new Date(),
+      endTime: new Date(),
+      registrationDeadline: new Date(),
+      competitionType: "time_based",
+      prizePool: 20,
+      platformFeePercentage: 10,
+      prizeDistribution: [{ rank: 1, percentage: 100 }],
+      finalLeaderboard: [],
+      noWinners: true,
+      unscoredContestPolicy: "refund_entry_fees",
+      createdBy: "507f1f77bcf86cd799439011",
+      updatedAt,
+      createdAt: updatedAt,
+    });
+    await PlatformTransaction.collection.insertOne({
+      transactionType: "platform_fee",
+      amount: 2,
+      amountEUR: 2,
+      currency: "USD",
+      description: "fee",
+      sourceType: "competition",
+      sourceId: id.toString(),
+      createdAt: updatedAt,
+      updatedAt,
+    });
+    // competitionId is String on the schema — seed the string form production writes.
+    await WalletTransaction.collection.insertMany([
+      {
+        userId: "507f1f77bcf86cd799439011",
+        transactionType: "competition_refund",
+        amount: 9,
+        balanceBefore: 0,
+        balanceAfter: 9,
+        competitionId: id.toString(),
+        status: "completed",
+        description: "unscored refund",
+        createdAt: updatedAt,
+        updatedAt,
+      },
+      {
+        userId: "507f1f77bcf86cd799439012",
+        transactionType: "competition_refund",
+        amount: 9,
+        balanceBefore: 0,
+        balanceAfter: 9,
+        competitionId: id.toString(),
+        status: "completed",
+        description: "unscored refund",
+        createdAt: updatedAt,
+        updatedAt,
+      },
+    ]);
+
+    await runProviderThresholdMonitors(new Date());
+    expect(recordAlert).not.toHaveBeenCalledWith(
+      expect.objectContaining({ alertType: "prize_pool_mismatch" }),
+    );
   });
 
   it("alerts when callback failure rate exceeds 1% with enough events", async () => {

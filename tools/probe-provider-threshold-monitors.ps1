@@ -106,6 +106,13 @@ $results += Invoke-Probe `
     -To '"contest_stuck_finalizing",' `
     -TestName "SecurityAlert schema enum includes every 06 s10 type"
 
+$results += Invoke-Probe `
+    -Name "prize mismatch ignores wallet refunds" `
+    -File "lib/services/game-providers/provider-threshold-monitors.service.ts" `
+    -From 'const accounted = prizes + booked + refunded;' `
+    -To 'const accounted = prizes + booked;' `
+    -TestName "does not alert when entry-fee refunds close the prize-pool equation"
+
 Write-Host ""
 Write-Host "===== SUMMARY =====" -ForegroundColor Cyan
 $results | ForEach-Object { Write-Host ("{0}: {1}" -f $_.Name, $_.Outcome) }
