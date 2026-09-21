@@ -62,6 +62,13 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSaved: (content: Partial<ProviderTitleRow>) => void;
+  /** In-page form for the Games workspace tabs. */
+  inline?: boolean;
+  /**
+   * Which blocks to show. The workspace splits Page Content and Assets into two tabs
+   * without duplicating save logic — each tab sends only its fields (partial update).
+   */
+  sections?: "all" | "copy" | "artwork";
 }
 
 interface Draft {
@@ -105,16 +112,22 @@ export default function GameContentDialog({
   open,
   onOpenChange,
   onSaved,
+  inline = false,
+  sections = "all",
 }: Props) {
   const terms = useTerms();
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
 
+  const showCopy = sections === "all" || sections === "copy";
+  const showArtwork = sections === "all" || sections === "artwork";
+
   useEffect(() => {
-    if (open && title) setDraft(draftFrom(title));
-  }, [open, title]);
+    if ((open || inline) && title) setDraft(draftFrom(title));
+  }, [open, inline, title]);
 
   if (!title || !draft) return null;
+  if (!inline && !open) return null;
 
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
     setDraft((current) => (current ? { ...current, [key]: value } : current));
@@ -147,20 +160,43 @@ export default function GameContentDialog({
     // Reason: a half-filled card renders as a bug on the player's screen rather than as an
     // operator leaving something out, so it is caught here with a message naming the row
     // instead of arriving as the server's generic refusal.
-    const incomplete = draft.highlights.findIndex(
-      (row) => row.title.trim() === "" || row.detail.trim() === "",
-    );
-    if (incomplete >= 0) {
-      toast.error(`Highlight ${incomplete + 1} needs both a title and a detail.`);
-      return;
+    if (showCopy) {
+      const incomplete = draft.highlights.findIndex(
+        (row) => row.title.trim() === "" || row.detail.trim() === "",
+      );
+      if (incomplete >= 0) {
+        toast.error(`Highlight ${incomplete + 1} needs both a title and a detail.`);
+        return;
+      }
+
+      // Same reason, one field along. An empty label on the banner is a floating glyph with no
+      // words under it, in a fixed-height column beside three that have them.
+      const blank = draft.heroFeatures.findIndex((row) => row.label.trim() === "");
+      if (blank >= 0) {
+        toast.error(`Banner feature ${blank + 1} needs a label.`);
+        return;
+      }
     }
 
-    // Same reason, one field along. An empty label on the banner is a floating glyph with no
-    // words under it, in a fixed-height column beside three that have them.
-    const blank = draft.heroFeatures.findIndex((row) => row.label.trim() === "");
-    if (blank >= 0) {
-      toast.error(`Banner feature ${blank + 1} needs a label.`);
-      return;
+    // Reason: a partial body is intentional when the workspace splits copy and artwork into
+    // tabs. Sending the whole draft from the artwork tab would overwrite copy the operator
+    // had open but not saved on the other tab — silent data loss wearing a success toast.
+    const content: Record<string, unknown> = {};
+    if (showCopy) {
+      content.displayName = draft.displayName;
+      content.tagline = draft.tagline;
+      content.description = draft.description;
+      content.rulesSummary = draft.rulesSummary;
+      content.howToPlay = draft.howToPlay;
+      content.category = draft.category;
+      content.highlights = draft.highlights;
+      content.heroFeatures = draft.heroFeatures;
+    }
+    if (showArtwork) {
+      content.thumbnailUrl = draft.thumbnailUrl;
+      content.bannerUrl = draft.bannerUrl;
+      content.howToPlayImageUrl = draft.howToPlayImageUrl;
+      content.highlightsImageUrl = draft.highlightsImageUrl;
     }
 
     setSaving(true);
@@ -168,7 +204,7 @@ export default function GameContentDialog({
       const response = await fetch(`/api/games/providers/${providerKey}/games/content`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ gameCode: title.gameCode, content: draft }),
+        body: JSON.stringify({ gameCode: title.gameCode, content }),
       });
       const data = await response.json();
 
@@ -177,27 +213,14 @@ export default function GameContentDialog({
         return;
       }
 
-      toast.success(`Content saved for ${draft.displayName}.`);
+      toast.success(`Content saved for ${draft.displayName || title.displayName}.`);
       // Reason: every field the draft carries, and the two new ones are why this is worth a
       // comment. Omitting a saved field here leaves the parent row holding the OLD value, so
       // reopening the dialog shows the text the operator just replaced - and saving again
       // writes it back over the server's copy. A silent revert of an edit that reported
       // success, which is this codebase's recurring failure shape.
-      onSaved({
-        displayName: draft.displayName,
-        tagline: draft.tagline,
-        description: draft.description,
-        rulesSummary: draft.rulesSummary,
-        howToPlay: draft.howToPlay,
-        category: draft.category,
-        thumbnailUrl: draft.thumbnailUrl,
-        bannerUrl: draft.bannerUrl,
-        howToPlayImageUrl: draft.howToPlayImageUrl,
-        highlightsImageUrl: draft.highlightsImageUrl,
-        highlights: draft.highlights,
-        heroFeatures: draft.heroFeatures,
-      });
-      onOpenChange(false);
+      onSaved(content as Partial<ProviderTitleRow>);
+      if (!inline) onOpenChange(false);
     } catch {
       toast.error("Something went wrong. Please contact support.");
     } finally {
@@ -205,22 +228,40 @@ export default function GameContentDialog({
     }
   };
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={`max-h-[88vh] overflow-y-auto ${DIALOG_WIDTH_MEDIUM}`}>
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-violet-400" />
-            {terms.game} page content — {title.displayName}
-          </DialogTitle>
-          <DialogDescription>
-            What {terms.players} see on this {terms.game}&apos;s {terms.contest} screens. The
-            provider supplies how the {terms.game} <em>works</em>; everything here is ours and a
-            catalogue sync will never overwrite it.
-          </DialogDescription>
-        </DialogHeader>
+  const header = inline ? (
+    <div className="mb-4 space-y-1">
+      <h3 className="flex items-center gap-2 text-lg font-semibold text-white">
+        <Sparkles className="h-5 w-5 text-violet-400" />
+        {sections === "artwork"
+          ? `${terms.game} assets`
+          : sections === "copy"
+            ? `Page content`
+            : `${terms.game} page content`}
+      </h3>
+      <p className="text-sm text-white/60">
+        What {terms.players} see on this {terms.game}&apos;s {terms.contest} screens. The
+        provider supplies how the {terms.game} <em>works</em>; everything here is ours and a
+        catalogue sync will never overwrite it.
+      </p>
+    </div>
+  ) : (
+    <DialogHeader>
+      <DialogTitle className="flex items-center gap-2">
+        <Sparkles className="h-5 w-5 text-violet-400" />
+        {terms.game} page content — {title.displayName}
+      </DialogTitle>
+      <DialogDescription>
+        What {terms.players} see on this {terms.game}&apos;s {terms.contest} screens. The
+        provider supplies how the {terms.game} <em>works</em>; everything here is ours and a
+        catalogue sync will never overwrite it.
+      </DialogDescription>
+    </DialogHeader>
+  );
 
+  const fields = (
         <div className="space-y-5">
+          {showCopy && (
+            <>
           {/*
             The assistant PROPOSES into this form and never posts anything itself, so its
             suggestions are subject to the same Save press, the same validation and the same
@@ -324,7 +365,11 @@ export default function GameContentDialog({
               onChange={(event) => set("howToPlay", event.target.value)}
             />
           </Field>
+            </>
+          )}
 
+          {showArtwork && (
+            <>
           <div className="grid gap-4 sm:grid-cols-2">
             <GameArtworkField
               providerKey={providerKey}
@@ -395,7 +440,11 @@ export default function GameContentDialog({
               />
             </div>
           </div>
+            </>
+          )}
 
+          {showCopy && (
+            <>
           {/*
             The hero banner's strip (owner, 11 September 2026).
 
@@ -572,17 +621,37 @@ export default function GameContentDialog({
               ))
             )}
           </div>
+            </>
+          )}
         </div>
+  );
 
-        <DialogFooter>
+  const body = (
+    <>
+      {header}
+      {fields}
+      <DialogFooter className={inline ? "mt-6" : undefined}>
+        {!inline && (
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={saving}>
-            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Save content
-          </Button>
-        </DialogFooter>
+        )}
+        <Button onClick={handleSave} disabled={saving}>
+          {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Save content
+        </Button>
+      </DialogFooter>
+    </>
+  );
+
+  if (inline) {
+    return <div className="space-y-1">{body}</div>;
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className={`max-h-[88vh] overflow-y-auto ${DIALOG_WIDTH_MEDIUM}`}>
+        {body}
       </DialogContent>
     </Dialog>
   );

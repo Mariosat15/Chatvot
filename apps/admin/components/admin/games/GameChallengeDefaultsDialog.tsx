@@ -60,6 +60,8 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSaved: (defaults: Pick<ProviderTitleRow, "challengeDefaults">) => void;
+  /** In-page form for the Games workspace; same route and validation as the modal. */
+  inline?: boolean;
 }
 
 interface Bounds {
@@ -82,6 +84,7 @@ export default function GameChallengeDefaultsDialog({
   open,
   onOpenChange,
   onSaved,
+  inline = false,
 }: Props) {
   const [bounds, setBounds] = useState<Bounds | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -97,7 +100,7 @@ export default function GameChallengeDefaultsDialog({
   // of a rule the server enforces, and the two drift in the quiet direction - the control offers
   // a length the save then refuses, naming a range this screen never showed.
   useEffect(() => {
-    if (!open || !title) return;
+    if ((!open && !inline) || !title) return;
     let live = true;
 
     (async () => {
@@ -117,14 +120,14 @@ export default function GameChallengeDefaultsDialog({
     return () => {
       live = false;
     };
-  }, [open, title, providerKey]);
+  }, [open, inline, title, providerKey]);
 
   // The draft is seeded through the SAME resolver a player's dialog will use, never from the
   // stored object directly. An operator must see what a player would see - including a stored
   // setting the schema has since stopped accepting, which the resolver drops back to the
   // declared default rather than leaving as a value that cannot be saved again.
   useEffect(() => {
-    if (!open || !title || !bounds) return;
+    if ((!open && !inline) || !title || !bounds) return;
     const effective = resolveChallengeDefaults({
       fields,
       stored: title.challengeDefaults,
@@ -140,7 +143,7 @@ export default function GameChallengeDefaultsDialog({
     // deliberately not a dependency - including it re-seeds the draft on each keystroke and
     // discards what the operator is typing.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, title, bounds]);
+  }, [open, inline, title, bounds]);
 
   const changeSetting = useCallback((name: string, value: unknown) => {
     setDraft((current) =>
@@ -149,6 +152,7 @@ export default function GameChallengeDefaultsDialog({
   }, []);
 
   if (!title) return null;
+  if (!inline && !open) return null;
 
   const save = async (clearing: boolean) => {
     if (!clearing && !draft) return;
@@ -190,7 +194,7 @@ export default function GameChallengeDefaultsDialog({
           ? `${terms.challenge} defaults cleared for ${title.displayName}.`
           : `${terms.challenge} defaults saved for ${title.displayName}.`,
       );
-      onOpenChange(false);
+      if (!inline) onOpenChange(false);
     } catch {
       toast.error("Something went wrong. Please contact support.");
     } finally {
@@ -198,128 +202,148 @@ export default function GameChallengeDefaultsDialog({
     }
   };
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={`max-h-[88vh] overflow-y-auto ${DIALOG_WIDTH_MEDIUM}`}>
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Swords className="h-5 w-5 text-fuchsia-400" />
-            {terms.challenge} defaults — {title.displayName}
-          </DialogTitle>
-          <DialogDescription>
-            What a {terms.player}&apos;s {terms.challenge} form opens pre-filled with. They can
-            still change any of it; this is the answer they get if they change nothing.
-          </DialogDescription>
-        </DialogHeader>
+  const header = inline ? (
+    <div className="mb-4 space-y-1">
+      <h3 className="flex items-center gap-2 text-lg font-semibold text-white">
+        <Swords className="h-5 w-5 text-fuchsia-400" />
+        {terms.challenge} defaults
+      </h3>
+      <p className="text-sm text-white/60">
+        What a {terms.player}&apos;s {terms.challenge} form opens pre-filled with. They can
+        still change any of it; this is the answer they get if they change nothing.
+      </p>
+    </div>
+  ) : (
+    <DialogHeader>
+      <DialogTitle className="flex items-center gap-2">
+        <Swords className="h-5 w-5 text-fuchsia-400" />
+        {terms.challenge} defaults — {title.displayName}
+      </DialogTitle>
+      <DialogDescription>
+        What a {terms.player}&apos;s {terms.challenge} form opens pre-filled with. They can
+        still change any of it; this is the answer they get if they change nothing.
+      </DialogDescription>
+    </DialogHeader>
+  );
 
-        {parsed && !parsed.ok ? (
-          // Refused with the reason rather than a form with the settings quietly missing: a
-          // schema we cannot validate means we cannot tell a valid answer from an invalid one,
-          // so saving a length alone would leave an operator believing they had chosen a board
-          // size they had not.
-          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-200">
-            <div className="flex items-start gap-2">
-              <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>
-                This {terms.game}&apos;s settings are not supported, so nothing can be pre-filled
-                for it:{" "}
-                {parsed.error}
-              </span>
-            </div>
+  const formBody =
+    parsed && !parsed.ok ? (
+      <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-200">
+        <div className="flex items-start gap-2">
+          <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            This {terms.game}&apos;s settings are not supported, so nothing can be pre-filled
+            for it: {parsed.error}
+          </span>
+        </div>
+      </div>
+    ) : !bounds || !draft ? (
+      <div className="flex items-center justify-center py-10 text-white/50">
+        <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading limits…
+      </div>
+    ) : (
+      <div className="space-y-5">
+        <div className="space-y-1.5">
+          <Label htmlFor="challenge-minutes" className="text-sm">
+            How long the {terms.challenge} runs
+          </Label>
+          <Input
+            id="challenge-minutes"
+            inputMode="numeric"
+            value={draft.durationMinutes}
+            disabled={saving}
+            onChange={(event) =>
+              setDraft((current) =>
+                current ? { ...current, durationMinutes: event.target.value } : current,
+              )
+            }
+          />
+          <p className="text-xs text-white/50">
+            Minutes, between {bounds.minMinutes} and {bounds.maxMinutes}. Both{" "}
+            {terms.players} have this long from the moment the {terms.challenge} is accepted.
+          </p>
+        </div>
+
+        <div className="flex items-start justify-between gap-4 rounded-lg border border-white/10 bg-white/5 p-3">
+          <div>
+            <Label htmlFor="reserve-round" className="text-sm">
+              Reserve a whole {terms.round} before the end
+            </Label>
+            <p className="mt-1 text-xs text-white/50">
+              Off for every {terms.game} we run today. Off, a {terms.player} who starts late
+              gets a shorter {terms.round} and is told how much time they have. On, they are
+              refused once a full {terms.round} no longer fits — turn it on only for a{" "}
+              {terms.game} where a cut-short run is worth nothing.
+            </p>
           </div>
-        ) : !bounds || !draft ? (
-          <div className="flex items-center justify-center py-10 text-white/50">
-            <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading limits…
+          <Switch
+            id="reserve-round"
+            checked={draft.reserveFullRound}
+            disabled={saving}
+            onCheckedChange={(checked) =>
+              setDraft((current) =>
+                current ? { ...current, reserveFullRound: checked } : current,
+              )
+            }
+          />
+        </div>
+
+        <div className="space-y-3 rounded-lg border border-white/10 bg-white/5 p-3">
+          <div>
+            <Label className="text-sm">This {terms.game}&apos;s own settings</Label>
+            <p className="mt-1 text-xs text-white/50">
+              Declared by the provider. A {terms.player} sees these same questions, opened
+              with whatever is chosen here.
+            </p>
           </div>
+          <ConfigSchemaFields
+            fields={fields}
+            values={draft.settings}
+            onChange={changeSetting}
+            disabled={saving}
+          />
+        </div>
+      </div>
+    );
+
+  const body = (
+    <>
+      {header}
+      {formBody}
+      <DialogFooter className={`gap-2 sm:justify-between ${inline ? "mt-6" : ""}`}>
+        {title.challengeDefaults ? (
+          <Button variant="ghost" onClick={() => save(true)} disabled={saving}>
+            Clear defaults
+          </Button>
         ) : (
-          <div className="space-y-5">
-            <div className="space-y-1.5">
-              <Label htmlFor="challenge-minutes" className="text-sm">
-                How long the {terms.challenge} runs
-              </Label>
-              <Input
-                id="challenge-minutes"
-                inputMode="numeric"
-                value={draft.durationMinutes}
-                disabled={saving}
-                onChange={(event) =>
-                  setDraft((current) =>
-                    current ? { ...current, durationMinutes: event.target.value } : current,
-                  )
-                }
-              />
-              <p className="text-xs text-white/50">
-                Minutes, between {bounds.minMinutes} and {bounds.maxMinutes}. Both{" "}
-                {terms.players} have this long from the moment the {terms.challenge} is
-                accepted.
-              </p>
-            </div>
-
-            <div className="flex items-start justify-between gap-4 rounded-lg border border-white/10 bg-white/5 p-3">
-              <div>
-                <Label htmlFor="reserve-round" className="text-sm">
-                  Reserve a whole {terms.round} before the end
-                </Label>
-                <p className="mt-1 text-xs text-white/50">
-                  Off for every {terms.game} we run today. Off, a {terms.player} who starts late
-                  gets a shorter {terms.round} and is told how much time they have. On, they are
-                  refused once a full {terms.round} no longer fits — turn it on only for a{" "}
-                  {terms.game} where a cut-short run is worth nothing.
-                </p>
-              </div>
-              <Switch
-                id="reserve-round"
-                checked={draft.reserveFullRound}
-                disabled={saving}
-                onCheckedChange={(checked) =>
-                  setDraft((current) =>
-                    current ? { ...current, reserveFullRound: checked } : current,
-                  )
-                }
-              />
-            </div>
-
-            <div className="space-y-3 rounded-lg border border-white/10 bg-white/5 p-3">
-              <div>
-                <Label className="text-sm">This {terms.game}&apos;s own settings</Label>
-                <p className="mt-1 text-xs text-white/50">
-                  Declared by the provider. A {terms.player} sees these same questions, opened
-                  with whatever is chosen here.
-                </p>
-              </div>
-              <ConfigSchemaFields
-                fields={fields}
-                values={draft.settings}
-                onChange={changeSetting}
-                disabled={saving}
-              />
-            </div>
-          </div>
+          <span />
         )}
-
-        <DialogFooter className="gap-2 sm:justify-between">
-          {/* Clearing is offered only when there is something stored, for the reason the provider
-              cards record: a control that cannot do anything teaches an operator nothing. */}
-          {title.challengeDefaults ? (
-            <Button variant="ghost" onClick={() => save(true)} disabled={saving}>
-              Clear defaults
-            </Button>
-          ) : (
-            <span />
-          )}
-          <div className="flex gap-2">
+        <div className="flex gap-2">
+          {!inline && (
             <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>
               Cancel
             </Button>
-            <Button
-              onClick={() => save(false)}
-              disabled={saving || !draft || (parsed !== undefined && !parsed.ok)}
-            >
-              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Save defaults
-            </Button>
-          </div>
-        </DialogFooter>
+          )}
+          <Button
+            onClick={() => save(false)}
+            disabled={saving || !draft || (parsed !== undefined && !parsed.ok)}
+          >
+            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Save defaults
+          </Button>
+        </div>
+      </DialogFooter>
+    </>
+  );
+
+  if (inline) {
+    return <div className="space-y-1">{body}</div>;
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className={`max-h-[88vh] overflow-y-auto ${DIALOG_WIDTH_MEDIUM}`}>
+        {body}
       </DialogContent>
     </Dialog>
   );

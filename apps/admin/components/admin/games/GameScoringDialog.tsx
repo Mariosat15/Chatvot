@@ -60,6 +60,11 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSaved: (rules: Partial<ProviderTitleRow>) => void;
+  /**
+   * Render the form body in-page (Games workspace tabs) instead of a modal.
+   * Same fields, same route, same audit line — only the chrome changes.
+   */
+  inline?: boolean;
 }
 
 interface Draft {
@@ -90,16 +95,20 @@ export default function GameScoringDialog({
   open,
   onOpenChange,
   onSaved,
+  inline = false,
 }: Props) {
   const terms = useTerms();
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (open && title) setDraft(draftFrom(title));
-  }, [open, title]);
+    // Reason: inline mode stays mounted while the tab is selected, so `open` is always true
+    // once the parent has a title — reseeding from the live row when the selection changes.
+    if ((open || inline) && title) setDraft(draftFrom(title));
+  }, [open, inline, title]);
 
   if (!title || !draft) return null;
+  if (!inline && !open) return null;
 
   const direction =
     title.scoreDirection === "lower_is_better" ? "lower_is_better" : "higher_is_better";
@@ -162,7 +171,7 @@ export default function GameScoringDialog({
         scoreUnit: data.scoreUnit ?? undefined,
       });
       toast.success(`${terms.prize} eligibility saved for ${title.displayName}.`);
-      onOpenChange(false);
+      if (!inline) onOpenChange(false);
     } catch {
       toast.error("Something went wrong. Please contact support.");
     } finally {
@@ -170,22 +179,36 @@ export default function GameScoringDialog({
     }
   };
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={`max-h-[88vh] overflow-y-auto ${DIALOG_WIDTH_MEDIUM}`}>
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Trophy className="h-5 w-5 text-amber-400" />
-            {terms.prize} eligibility — {title.displayName}
-          </DialogTitle>
-          <DialogDescription>
-            Which {terms.score} values are worth a {terms.prize} on this {terms.game}. A{" "}
-            {terms.player} refused here still appears on the {terms.leaderboard}; their share
-            is spread across the {terms.players} who did record one.
-          </DialogDescription>
-        </DialogHeader>
+  const header = inline ? (
+    <div className="mb-4 space-y-1">
+      <h3 className="flex items-center gap-2 text-lg font-semibold text-white">
+        <Trophy className="h-5 w-5 text-amber-400" />
+        {terms.prize} eligibility
+      </h3>
+      <p className="text-sm text-white/60">
+        Which {terms.score} values are worth a {terms.prize} on this {terms.game}. A{" "}
+        {terms.player} refused here still appears on the {terms.leaderboard}; their share is
+        spread across the {terms.players} who did record one.
+      </p>
+    </div>
+  ) : (
+    <DialogHeader>
+      <DialogTitle className="flex items-center gap-2">
+        <Trophy className="h-5 w-5 text-amber-400" />
+        {terms.prize} eligibility — {title.displayName}
+      </DialogTitle>
+      <DialogDescription>
+        Which {terms.score} values are worth a {terms.prize} on this {terms.game}. A{" "}
+        {terms.player} refused here still appears on the {terms.leaderboard}; their share is
+        spread across the {terms.players} who did record one.
+      </DialogDescription>
+    </DialogHeader>
+  );
 
-        <div className="space-y-5">
+  const body = (
+    <>
+      {header}
+      <div className="space-y-5">
           <div className="rounded-lg border border-white/10 bg-white/5 p-3">
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -289,15 +312,28 @@ export default function GameScoringDialog({
           </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>
-            Cancel
-          </Button>
+        <DialogFooter className={inline ? "mt-6" : undefined}>
+          {!inline && (
+            <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>
+              Cancel
+            </Button>
+          )}
           <Button onClick={handleSave} disabled={saving}>
             {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Save eligibility
           </Button>
         </DialogFooter>
+    </>
+  );
+
+  if (inline) {
+    return <div className="space-y-1">{body}</div>;
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className={`max-h-[88vh] overflow-y-auto ${DIALOG_WIDTH_MEDIUM}`}>
+        {body}
       </DialogContent>
     </Dialog>
   );

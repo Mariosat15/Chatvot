@@ -352,11 +352,15 @@ describe("the screen", () => {
   });
 
   /*
-    Saving must hand back EVERY field the form edits. Omitting one leaves the parent row
-    holding the old value, so reopening shows the text the operator just replaced and saving
-    again writes it back - a silent revert of an edit that reported success. This was real:
-    `rulesSummary` and `howToPlay` were missing from this object when they were added on
-    10 September 2026.
+    Saving must hand back EVERY field the form edits (when sections="all"). Omitting one
+    leaves the parent row holding the old value, so reopening shows the text the operator
+    just replaced and saving again writes it back - a silent revert of an edit that reported
+    success. This was real: `rulesSummary` and `howToPlay` were missing from this object when
+    they were added on 10 September 2026.
+
+    Since the Games workspace (21 Sep 2026) the dialog also supports partial `sections`
+    (copy | artwork). The builder still assigns every draft field under the matching branch;
+    onSaved receives that same `content` object rather than a hand-written literal.
   */
   it("hands every edited field back to the list after a save", () => {
     const dialog = read(DIALOG_FILE);
@@ -368,19 +372,37 @@ describe("the screen", () => {
     const draftFields = [...draftBody.matchAll(/^\s{2}(\w+):/gm)].map((m) => m[1]);
     expect(draftFields.length).toBeGreaterThan(5);
 
-    const savedAt = dialog.indexOf("onSaved({");
-    expect(savedAt, "no onSaved call").toBeGreaterThan(-1);
-    const savedBody = dialog.slice(savedAt, dialog.indexOf("});", savedAt));
-    expect(savedBody.length).toBeGreaterThan(50);
+    // Reason: the workspace passes partial sections, so the save builds `content` then
+    // `onSaved(content)`. Assert every Draft field is assigned onto that object somewhere —
+    // a field missing from both the copy and artwork branches is the silent-revert bug.
+    const contentBuildAt = dialog.indexOf("const content: Record<string, unknown>");
+    expect(contentBuildAt, "no content builder").toBeGreaterThan(-1);
+    const contentBuild = dialog.slice(
+      contentBuildAt,
+      dialog.indexOf("setSaving(true)", contentBuildAt),
+    );
+    expect(contentBuild.length).toBeGreaterThan(50);
 
     for (const field of draftFields) {
-      expect(savedBody, `${field} is edited but not handed back after saving`).toMatch(
-        // Reason: the pattern is built from an identifier read out of the file under test,
-        // not from input. `\s*` rather than a literal so a reformat cannot fail the guard.
+      expect(contentBuild, `${field} is edited but not put on the save body`).toMatch(
         // eslint-disable-next-line security/detect-non-literal-regexp
-        new RegExp(`\\b${field}:\\s*draft\\.${field}\\b`),
+        new RegExp(`content\\.${field}\\s*=\\s*draft\\.${field}`),
       );
     }
+
+    expect(dialog).toMatch(/onSaved\(content as Partial</);
+  });
+
+  it("splits copy and artwork so a partial tab cannot overwrite the other", () => {
+    // Reason: saving Assets with a full draft would blank unsaved Page content, and the
+    // reverse. The two branches must stay separate; merging them into one object for every
+    // save is the defect the sections prop exists to prevent.
+    const dialog = read(DIALOG_FILE);
+    expect(dialog).toContain('sections?: "all" | "copy" | "artwork"');
+    expect(dialog).toContain("showCopy");
+    expect(dialog).toContain("showArtwork");
+    expect(dialog).toMatch(/if \(showCopy\)/);
+    expect(dialog).toMatch(/if \(showArtwork\)/);
   });
 
   it("sends the game key and nothing else about the game", () => {

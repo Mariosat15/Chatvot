@@ -72,7 +72,6 @@ import {
   Megaphone,
   Video,
   Gamepad2,
-  Plug,
 } from "lucide-react";
 import { toast } from "sonner";
 import CredentialsSection from "@/components/admin/CredentialsSection";
@@ -90,7 +89,7 @@ import ChallengesAdminSection from "@/components/admin/ChallengesAdminSection";
 import DatabaseSection from "@/components/admin/DatabaseSection";
 import UsersSection from "@/components/admin/UsersSection";
 import PaymentProvidersSection from "@/components/admin/PaymentProvidersSection";
-import GameProvidersSection from "@/components/admin/games/GameProvidersSection";
+import GamesWorkspaceSection from "@/components/admin/games/GamesWorkspaceSection";
 import RoundInspectorSection from "@/components/admin/games/RoundInspectorSection";
 import ProviderHealthSection from "@/components/admin/games/ProviderHealthSection";
 import GamePerformanceSection from "@/components/admin/games/GamePerformanceSection";
@@ -335,9 +334,13 @@ const menuGroups: MenuGroup[] = [
       // provider supplies games, it is not a game, and burying it under one game's
       // destination would imply otherwise.
       {
+        // Reason: X11 Slice 2 — the destination is the Games workspace (list + per-title
+        // editor). Providers stay reachable as a segment inside it. The section id stays
+        // `game-providers` so every grant and deep link keeps working (ADMIN_SECTIONS is
+        // add-only; renaming would orphan every employee document storing the old id).
         id: "game-providers",
-        label: "Game Providers",
-        icon: <Plug className="h-5 w-5" />,
+        label: "All Games",
+        icon: <Gamepad2 className="h-5 w-5" />,
         color: "text-violet-400",
         bgColor: "bg-violet-500/10 hover:bg-violet-500/20",
       },
@@ -1219,7 +1222,7 @@ export default function AdminDashboard({
       case "payment-providers":
         return <PaymentProvidersSection key={currentRefreshKey} />;
       case "game-providers":
-        return <GameProvidersSection key={currentRefreshKey} />;
+        return <GamesWorkspaceSection key={currentRefreshKey} />;
       case "round-inspector":
         return <RoundInspectorSection key={currentRefreshKey} />;
       case "provider-health":

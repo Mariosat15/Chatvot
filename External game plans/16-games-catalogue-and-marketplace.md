@@ -92,9 +92,12 @@ pot. Replacing one with the other loses half the audience.
 >    supported, always a path to Competitions; never a blank page.
 > 7. **League table and the player's own record on this page are not built** — X7 already
 >    has leaderboards and profile standing elsewhere; do not invent a third board here.
-> 8. **Admin "Game Catalogue" merchandising section is not built** — operators keep using
->    Provider Games content dialog. Discovery-only hide when a title is toggled off (existing
->    switches); live contests are never cancelled by that toggle.
+> 8. **Admin "Game Catalogue" merchandising section is not built** — **AMENDED 21 Sep 2026:**
+>    operators now have a **centralised Games workspace** under GAMES → All Games
+>    (`12` s4.1c) that edits the same `provider_game` fields the old catalogue dialogs did.
+>    What is still deferred is **`GameCatalogueEntry`** (featured / coming-soon / reorder as
+>    a second table). Discovery-only hide when a title is toggled off (existing switches);
+>    live contests are never cancelled by that toggle.
 >
 > 23 tests (`player-catalogue`, `games-catalogue-routes`, `games-first-nav`). Never verified
 > by eye.

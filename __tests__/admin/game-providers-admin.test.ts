@@ -822,7 +822,15 @@ describe("X6 game providers admin", () => {
 
       expect(dashboard).toContain('id: "game-providers"');
       expect(dashboard).toContain('case "game-providers"');
-      expect(dashboard).toContain("<GameProvidersSection");
+      // X11 Slice 2: the destination is the Games workspace; providers stay a segment inside it.
+      expect(dashboard).toContain("<GamesWorkspaceSection");
+      expect(dashboard).not.toContain("<GameProvidersSection");
+
+      const workspace = readCode(
+        "apps/admin/components/admin/games/GamesWorkspaceSection.tsx",
+      );
+      expect(workspace).toContain("<GameProvidersSection");
+      expect(workspace).toContain("GamesWorkspaceEditor");
 
       // Reason: a section id present in ADMIN_SECTIONS but absent from the menu can be
       // granted and never reached; present in the menu but absent from ADMIN_SECTIONS it
@@ -833,6 +841,16 @@ describe("X6 game providers admin", () => {
       expect(gamesGroupIndex).toBeGreaterThan(-1);
       expect(providerItemIndex).toBeGreaterThan(gamesGroupIndex);
       expect(providerItemIndex).toBeLessThan(userManagementIndex);
+    });
+
+    it("keeps the Games workspace grant on game-providers, not a new section id", () => {
+      // ADMIN_SECTIONS is add-only. A rename would orphan every employee document storing
+      // the old id while reviewing as a tidy label change.
+      const dashboard = readCode("apps/admin/components/admin/AdminDashboard.tsx");
+      expect(dashboard).toMatch(/label:\s*"All Games"/);
+      expect(ADMIN_SECTIONS).toContain("game-providers");
+      expect(ADMIN_SECTIONS).not.toContain("all-games");
+      expect(ADMIN_SECTIONS).not.toContain("games-workspace");
     });
   });
 

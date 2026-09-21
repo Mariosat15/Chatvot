@@ -1855,6 +1855,37 @@ unless an operator has switched that behaviour on for that provider.**
 - **Nothing here is mirrored except the model.** `check:mirrors` covers the two
   `game-provider.model.ts` copies and says nothing about the service, the route or the card.
 
+### 4.1c Centralised Games workspace - BUILT 21 September 2026
+
+The per-title settings that used to live in the catalogue table's five dialogs are now one
+screen. **UI reorganisation only** — same routes, same field names, same validation, same
+`game-providers` grant. Chapter `16`'s Slice 2 merchandising model is **still not built**.
+
+| Piece | File |
+|---|---|
+| Menu label + render | `AdminDashboard.tsx` — label **All Games**, id still `game-providers`, renders `GamesWorkspaceSection` |
+| Workspace shell | `apps/admin/components/admin/games/GamesWorkspaceSection.tsx` — list, search, header, tabs; Providers view embeds `GameProvidersSection` |
+| Tab bodies | `GamesWorkspaceEditor.tsx` — General, settings, scoring, challenge, content, assets, live |
+| Inline dialogs | `GameScoringDialog` / `GameChallengeDefaultsDialog` / `GameContentDialog` (`inline`, content also `sections`) |
+| Tests | `__tests__/admin/games-workspace.test.ts`; wiring assertions in `game-providers-admin.test.ts` |
+
+**Six facts drift easily.**
+
+1. **There is still no `GameCatalogueEntry`** — this Slice 2 is the workspace, not the
+   merchandising model in `16`. A document saying the second table shipped with the workspace
+   is wrong.
+2. **The section id did not change** — renaming would orphan every employee grant; the label
+   alone moved to All Games.
+3. **Add means sync via Providers** — there is no create-title API; the violet control switches
+   view rather than greying out a dead button.
+4. **Page content and Assets are one dialog, two `sections`** — partial PATCH bodies so
+   saving artwork cannot blank copy and the reverse.
+5. **Duplicate and Delete are withheld** — `gameKey` is immutable and joined to history;
+   disable under Live & publish.
+6. **Nothing here is mirrored** — admin-only UI; `check:mirrors` says nothing about it.
+
+**Not verified by eye.**
+
 ### 4.2 The rules an operator enters, and the limit of "no developer needed"
 
 Two different things get called "rules", and conflating them causes a promise that cannot
