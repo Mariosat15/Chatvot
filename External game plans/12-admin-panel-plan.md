@@ -1855,7 +1855,7 @@ unless an operator has switched that behaviour on for that provider.**
 - **Nothing here is mirrored except the model.** `check:mirrors` covers the two
   `game-provider.model.ts` copies and says nothing about the service, the route or the card.
 
-### 4.1c Centralised Games workspace - BUILT 21 September 2026
+### 4.1c Centralised Games workspace - BUILT 21 September 2026 (amended same day)
 
 The per-title settings that used to live in the catalogue table's five dialogs are now one
 screen. **UI reorganisation only** — same routes, same field names, same validation, same
@@ -1864,12 +1864,15 @@ screen. **UI reorganisation only** — same routes, same field names, same valid
 | Piece | File |
 |---|---|
 | Menu label + render | `AdminDashboard.tsx` — label **All Games**, id still `game-providers`, renders `GamesWorkspaceSection` |
-| Workspace shell | `apps/admin/components/admin/games/GamesWorkspaceSection.tsx` — list, search, header, tabs; Providers view embeds `GameProvidersSection` |
-| Tab bodies | `GamesWorkspaceEditor.tsx` — General, settings, scoring, challenge, content, assets, live |
+| Workspace shell | `GamesWorkspaceSection.tsx` — list, header (View on platform + Save), tabs, right rail (preview / visibility / quick actions / stats) |
+| Tab bodies | `GamesWorkspaceEditor.tsx` — editable General (content PATCH), settings, scoring, challenge, content, assets, live |
 | Inline dialogs | `GameScoringDialog` / `GameChallengeDefaultsDialog` / `GameContentDialog` (`inline`, content also `sections`) |
-| Tests | `__tests__/admin/games-workspace.test.ts`; wiring assertions in `game-providers-admin.test.ts` |
+| Player page URL | `apps/admin/lib/admin/player-app-url.ts` — `NEXT_PUBLIC_APP_URL` then `NEXT_PUBLIC_BASE_URL` |
+| Title stats | `GET .../games/performance?gameCode=` under `game-providers` grant |
+| Providers catalogue | `ProviderCatalogueDialog.tsx` — **sync + Live toggle only**; no play style / scoring / challenge / content |
+| Tests | `__tests__/admin/games-workspace.test.ts`; retargeted catalogue assertions in scoring / play-style / challenge-defaults suites |
 
-**Six facts drift easily.**
+**Seven facts drift easily.**
 
 1. **There is still no `GameCatalogueEntry`** — this Slice 2 is the workspace, not the
    merchandising model in `16`. A document saying the second table shipped with the workspace
@@ -1879,10 +1882,16 @@ screen. **UI reorganisation only** — same routes, same field names, same valid
 3. **Add means sync via Providers** — there is no create-title API; the violet control switches
    view rather than greying out a dead button.
 4. **Page content and Assets are one dialog, two `sections`** — partial PATCH bodies so
-   saving artwork cannot blank copy and the reverse.
+   saving artwork cannot blank copy and the reverse. General also PATCHes `displayName` /
+   tagline / description / category through the same content route.
 5. **Duplicate and Delete are withheld** — `gameKey` is immutable and joined to history;
    disable under Live & publish.
-6. **Nothing here is mirrored** — admin-only UI; `check:mirrors` says nothing about it.
+6. **View on platform must leave the admin origin** — a relative `/games/...` from admin is a
+   dead link; `playerGamePageHref` builds against the player app URL.
+7. **Per-title settings are All Games only** — the Providers catalogue must not remount the
+   five editors; that was the dual-writer the workspace exists to remove.
+
+**Theme:** admin `gray-800` / `gray-700` chrome, not a custom navy palette.
 
 **Not verified by eye.**
 

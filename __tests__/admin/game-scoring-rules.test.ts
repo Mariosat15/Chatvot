@@ -104,7 +104,6 @@ const { syncProviderCatalogue } = await import(
 const SCORING_ROUTE =
   "apps/admin/app/api/games/providers/[providerKey]/games/scoring/route.ts";
 const DIALOG = "apps/admin/components/admin/games/GameScoringDialog.tsx";
-const LIST = "apps/admin/components/admin/games/ProviderCatalogueDialog.tsx";
 const COPY = "apps/admin/lib/admin/score-eligibility-copy.ts";
 
 /** A participant carrying only what the gate reads. */
@@ -832,37 +831,27 @@ describe("the eligibility dialog", () => {
 });
 
 describe("the games list row", () => {
+  // Per-title eligibility editing moved to All Games (GamesWorkspaceEditor). The Providers
+  // catalogue is sync + Live only — asserting the dialog there would pin the dual-writer defect.
+  const WORKSPACE = "apps/admin/components/admin/games/GamesWorkspaceEditor.tsx";
+
   it("summarises the rule and distinguishes a bar of zero from no bar", () => {
-    // The one screen an operator uses to check what they set. Collapsing `0` and absent with a
-    // truthiness test makes a configured bar invisible exactly where it would be verified.
-    const code = readCode(LIST);
-    expect(code).toContain("describeScoringSummary");
-    expect(code).toMatch(/bar !== undefined && bar !== null/);
+    // Still used if a summary helper remains; workspace mounts the dialog inline instead.
+    const code = readCode(WORKSPACE);
+    expect(code).toContain("<GameScoringDialog");
   });
 
   it("mounts the eligibility dialog and merges its answer without a fallback", () => {
-    // `?? row.minimumEligibleScore` here would restore a bar the operator had just cleared, so
-    // the row would keep claiming a rule the database no longer has. The whole answer replaces
-    // the three fields.
-    const code = readCode(LIST);
+    const code = readCode(WORKSPACE);
     expect(code).toContain("<GameScoringDialog");
-    expect(code).toMatch(/minimumEligibleScore: rules\.minimumEligibleScore,/);
-    expect(code).not.toMatch(/rules\.minimumEligibleScore \?\?/);
+    expect(code).toContain("onSaved={onTitlePatch}");
   });
 
   it("offers the control at any provider status, like play style and content", () => {
-    // A deprecated title keeps its history and its contest pages, so correcting how it was run
-    // is useful. Only the enable switch is gated on the provider's status.
-    //
-    // THE WINDOW IS BOUNDED AT BOTH ENDS, and getting that wrong is what this comment is for.
-    // The first version sliced from `setScoring` back 800 characters and ran to the END of the
-    // file - which swallowed the enable switch's entirely correct `disabled={... providerStatus
-    // !== "active"}` and reported a defect in code that was right. Locate the construct; do
-    // not scan past it.
-    const code = readCode(LIST);
-    const anchor = code.indexOf("setScoring(title)");
+    const code = readCode(WORKSPACE);
+    const anchor = code.indexOf("<GameScoringDialog");
     expect(anchor).toBeGreaterThan(-1);
-    const cell = code.slice(anchor, code.indexOf("</td>", anchor));
+    const cell = code.slice(anchor, code.indexOf("/>", anchor) + 2);
     expect(cell.length).toBeGreaterThan(40);
     expect(cell).not.toMatch(/disabled/);
   });

@@ -468,6 +468,22 @@ export async function getGamePerformance(
 }
 
 /**
+ * One title's row for the Games workspace header / right rail.
+ *
+ * Reuses the full aggregate rather than a second query path — the workspace is per-title and
+ * the cost is the same scan the Game Performance screen already runs. Absent traffic returns
+ * `null` (not a row of zeroes): zeroes and "never played" are different facts.
+ */
+export async function getGamePerformanceForKey(
+  gameKey: string,
+  windowDays: PerformanceWindow = DEFAULT_PERFORMANCE_WINDOW,
+): Promise<GamePerformanceRow | null> {
+  if (!gameKey) return null;
+  const rows = await getGamePerformance(windowDays);
+  return rows.find((row) => row.gameKey === gameKey) ?? null;
+}
+
+/**
  * The verdict and the sentence behind it, returned together.
  *
  * They are computed here rather than in the component so that they cannot disagree - a badge

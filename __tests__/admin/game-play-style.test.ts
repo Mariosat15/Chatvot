@@ -537,7 +537,7 @@ describe("PATCH .../games/play-style", () => {
 // =======================================================================================
 
 const CONTROL = "apps/admin/components/admin/games/GamePlayStyleControl.tsx";
-const CATALOGUE = "apps/admin/components/admin/games/ProviderCatalogueDialog.tsx";
+const CATALOGUE = "apps/admin/components/admin/games/GamesWorkspaceEditor.tsx";
 const PICKER = "apps/admin/components/admin/games/wizard/StepChooseGame.tsx";
 
 describe("the Play style control", () => {
@@ -578,13 +578,18 @@ describe("the Play style control", () => {
 });
 
 describe("where the play style is shown", () => {
-  it("appears on the Games list, exactly once", () => {
+  it("appears on All Games, exactly once", () => {
     // Counted, not merely found: a second copy of this control on one row would give an
     // operator two switches for one setting, and whichever they used last would win.
-    const catalogue = readCode(CATALOGUE);
-    const uses = catalogue.match(/<GamePlayStyleControl\b/g) ?? [];
+    // Providers catalogue no longer mounts it — settings live only under All Games.
+    const workspace = readCode(CATALOGUE);
+    const uses = workspace.match(/<GamePlayStyleControl\b/g) ?? [];
     expect(uses.length).toBe(1);
-    expect(catalogue).toContain("Play style");
+    expect(workspace).toContain("Play style");
+    const providersCatalogue = readCode(
+      "apps/admin/components/admin/games/ProviderCatalogueDialog.tsx",
+    );
+    expect(providersCatalogue).not.toContain("<GamePlayStyleControl");
   });
 
   it("appears on the wizard's game picker", () => {

@@ -2,15 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import {
-  Loader2,
-  RefreshCw,
-  Gamepad2,
-  Info,
-  Sparkles,
-  Swords,
-  Trophy,
-} from "lucide-react";
+import { Loader2, RefreshCw, Gamepad2, Info } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -28,33 +20,14 @@ import type {
 } from "./provider-types";
 import { resolveGameCategory } from "@/lib/services/games/game-categories";
 import { useTerms } from "@/contexts/TerminologyContext";
-import type { TerminologyPack } from "@/lib/constants/terminology";
 import { DIALOG_WIDTH_WIDE } from "@/lib/admin/dialog-widths";
-import GameContentDialog from "./GameContentDialog";
-import GamePlayStyleControl from "./GamePlayStyleControl";
-import GameScoringDialog from "./GameScoringDialog";
-import GameChallengeDefaultsDialog from "./GameChallengeDefaultsDialog";
 
 /**
- * One provider's game catalogue, with our own enable switch per title.
+ * One provider's catalogue: sync + Live on ChartVolt only.
  *
- * BOTH SWITCHES ARE SHOWN ON EVERY ROW, and that is the whole point of the screen. The
- * provider's `providerStatus` is their opinion; `chartvoltEnabled` is our decision. Showing
- * only ours would leave an operator unable to tell "we have not enabled it yet" from "the
- * provider has withdrawn it" - two situations needing opposite actions.
- *
- * A SYNC NEVER ENABLES ANYTHING. Pulling a catalogue is safe to press at any time: it adds
- * and updates rows, reports titles the provider has stopped listing without deleting them,
- * and leaves every ChartVolt switch exactly as it was.
- *
- * THERE ARE FIVE CONTROLS PER ROW AND THEY WRITE THROUGH FIVE ROUTES, deliberately. The
- * enable switch, the Play style, the prize eligibility, the challenge defaults and the
- * player-facing content each have their own endpoint and their own audit line, because one
- * route inferring which edit it was being asked for from the fields present is how a content
- * save silently changes a game's live state - or how a typo fix turns a puzzle into a gun-start
- * race, moves the bar deciding who gets paid, or reinstates the late-start refusal R73 removed.
- * Play style, prize eligibility and challenge defaults also survive a sync where the provider's
- * own declarations do not, which is the whole reason they are separate fields.
+ * Per-title settings (play style, scoring, challenge defaults, page content, assets) live
+ * exclusively under All Games. Offering them here again created two writers for one decision
+ * and left operators unsure which screen was authoritative.
  */
 
 interface Props {
@@ -76,9 +49,6 @@ export default function ProviderCatalogueDialog({
   const [syncing, setSyncing] = useState(false);
   const [pendingCode, setPendingCode] = useState<string | null>(null);
   const [lastSync, setLastSync] = useState<CatalogueSyncSummary | null>(null);
-  const [editing, setEditing] = useState<ProviderTitleRow | null>(null);
-  const [scoring, setScoring] = useState<ProviderTitleRow | null>(null);
-  const [challenging, setChallenging] = useState<ProviderTitleRow | null>(null);
 
   const providerKey = provider?.providerKey;
 
@@ -178,12 +148,13 @@ export default function ProviderCatalogueDialog({
             {terms.games} — {provider.displayName}
           </DialogTitle>
           <DialogDescription>
-            The provider decides what it offers. You decide what goes live here. A{" "}
-            {terms.game} needs both.
+            Sync the catalogue and flip Live on ChartVolt. Edit play style, scoring,{" "}
+            {terms.challenge} defaults and page content under{" "}
+            <strong className="font-medium text-white/80">All {terms.games}</strong>.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/5 p-3">
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-gray-700 bg-gray-800/50 p-3">
           <div className="text-sm text-white/70">
             {provider.lastCatalogueSyncAt
               ? `Last synced ${new Date(provider.lastCatalogueSyncAt).toLocaleString()}`
@@ -206,9 +177,7 @@ export default function ProviderCatalogueDialog({
               <span>
                 {lastSync.missingFromProvider.length} title(s) in our list were not returned
                 by the provider this time. They have been kept, not deleted — a title with
-                past {terms.rounds} cannot be removed without orphaning those results, and an
-                absent
-                item is as likely to be a partial failure upstream as a real withdrawal.
+                past {terms.rounds} cannot be removed without orphaning those results.
               </span>
             </div>
           </div>
@@ -220,31 +189,23 @@ export default function ProviderCatalogueDialog({
           </div>
         ) : titles.length === 0 ? (
           <div className="py-12 text-center text-sm text-white/50">
-            No {terms.games} cached yet. Press <strong>Sync catalogue</strong> to pull the list from
-            this provider.
+            No {terms.games} cached yet. Press <strong>Sync catalogue</strong> to pull the list
+            from this provider.
           </div>
         ) : (
-          // Reason: the dialog is as wide as a large screen allows, but eight columns of
-          // controls still need about 76rem. Below that the TABLE scrolls sideways rather
-          // than the cells compressing - a Play style select squeezed to 90px is unusable,
-          // whereas a scrollbar is at least honest about there being more to the right.
-          <div className="overflow-x-auto rounded-lg border border-white/10">
-            <table className="w-full min-w-[76rem] text-sm">
-              <thead className="bg-white/5 text-left text-xs uppercase tracking-wide text-white/50">
+          <div className="overflow-x-auto rounded-lg border border-gray-700">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-800/80 text-left text-xs uppercase tracking-wide text-white/50">
                 <tr>
                   <th className="whitespace-nowrap px-3 py-2">{terms.game}</th>
                   <th className="whitespace-nowrap px-3 py-2">Formats</th>
-                  <th className="whitespace-nowrap px-3 py-2">Play style</th>
-                  <th className="whitespace-nowrap px-3 py-2">{terms.prize} eligibility</th>
-                  <th className="whitespace-nowrap px-3 py-2">{terms.challenge} defaults</th>
                   <th className="whitespace-nowrap px-3 py-2">Provider says</th>
                   <th className="whitespace-nowrap px-3 py-2">Live on ChartVolt</th>
-                  <th className="whitespace-nowrap px-3 py-2">{terms.player}-facing content</th>
                 </tr>
               </thead>
               <tbody>
                 {titles.map((title) => (
-                  <tr key={title.gameCode} className="border-t border-white/5">
+                  <tr key={title.gameCode} className="border-t border-gray-700/80">
                     <td className="px-3 py-2.5 align-top">
                       <div className="font-medium text-white/90">{title.displayName}</div>
                       <div className="flex flex-wrap items-center gap-1.5">
@@ -274,65 +235,6 @@ export default function ProviderCatalogueDialog({
                       </div>
                     </td>
                     <td className="px-3 py-2.5 align-top">
-                      {/*
-                        Settable whatever the provider's status is, like the content button and
-                        unlike the switch between them. A deprecated title still has contests in
-                        its history and can still be looked at, so correcting how it was run is
-                        useful; putting it back in front of players is not.
-                      */}
-                      <GamePlayStyleControl
-                        providerKey={provider.providerKey}
-                        title={title}
-                        onChanged={(next) =>
-                          setTitles((current) =>
-                            current.map((row) =>
-                              row.gameCode === title.gameCode
-                                ? { ...row, ...next }
-                                : row,
-                            ),
-                          )
-                        }
-                      />
-                    </td>
-                    <td className="px-3 py-2.5 align-top">
-                      {/*
-                        Settable at any provider status, for the same reason as the Play style
-                        and the content button: correcting how a title's history was run is
-                        useful, putting it back in front of players is not.
-                      */}
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setScoring(title)}
-                      >
-                        <Trophy className="mr-1.5 h-3.5 w-3.5" />
-                        {describeScoringSummary(title)}
-                      </Button>
-                    </td>
-                    <td className="px-3 py-2.5 align-top">
-                      {/*
-                        WITHHELD WITH THE REASON on a title nobody can challenge, rather than
-                        offered and refused on save. `supportsOneVsOne` is the provider's
-                        declaration that their game can be played one against one, so a challenge
-                        on this title is never created and there is nothing to pre-fill - and a
-                        disabled button teaches an operator nothing about why.
-                      */}
-                      {title.supportsOneVsOne ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setChallenging(title)}
-                        >
-                          <Swords className="mr-1.5 h-3.5 w-3.5" />
-                          {describeChallengeDefaults(title, terms)}
-                        </Button>
-                      ) : (
-                        <span className="text-xs text-white/40">
-                          Not playable one against one
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2.5 align-top">
                       <ProviderStatusBadge status={title.providerStatus} />
                     </td>
                     <td className="px-3 py-2.5 align-top">
@@ -356,207 +258,44 @@ export default function ProviderCatalogueDialog({
                         </div>
                       )}
                     </td>
-                    <td className="px-3 py-2.5 align-top">
-                      {/*
-                        Editable whatever the provider's status is, unlike the switch beside
-                        it. A deprecated title keeps its history and its contest pages, so
-                        being able to correct its wording is useful; putting it back in front
-                        of players is not.
-                      */}
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setEditing(title)}
-                      >
-                        <Sparkles className="mr-1.5 h-3.5 w-3.5" />
-                        {title.tagline || title.bannerUrl || title.highlights?.length
-                          ? "Edit content"
-                          : "Add content"}
-                      </Button>
-                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         )}
-
-        <GameContentDialog
-          providerKey={provider.providerKey}
-          title={editing}
-          open={editing !== null}
-          onOpenChange={(next) => {
-            if (!next) setEditing(null);
-          }}
-          onSaved={(content) => {
-            // Reason: merged into the local row rather than refetching, so the Edit/Add
-            // label and the operator's own copy update without a round trip. `onChanged`
-            // is not called - the provider list above counts titles and enabled titles,
-            // neither of which a content edit can change.
-            setTitles((current) =>
-              current.map((row) =>
-                row.gameCode === editing?.gameCode ? { ...row, ...content } : row,
-              ),
-            );
-          }}
-        />
-
-        <GameScoringDialog
-          providerKey={provider.providerKey}
-          title={scoring}
-          open={scoring !== null}
-          onOpenChange={(next) => {
-            if (!next) setScoring(null);
-          }}
-          onSaved={(rules) => {
-            // Reason: merged locally rather than refetched, so the row's summary updates at
-            // once. `onChanged` is deliberately not called - the provider list above counts
-            // titles and enabled titles, and an eligibility edit changes neither.
-            //
-            // The merge must be a SPREAD of the whole `rules` object, not a field-by-field
-            // assignment with `??` fallbacks: the route answers `minimumEligibleScore: null`
-            // when the bar has been cleared, `onSaved` maps that to `undefined`, and any
-            // `?? row.minimumEligibleScore` here would restore the value that was just
-            // deleted - so the row would keep claiming a bar the database no longer has.
-            setTitles((current) =>
-              current.map((row) =>
-                row.gameCode === scoring?.gameCode
-                  ? {
-                      ...row,
-                      zeroIsValidResult: rules.zeroIsValidResult,
-                      minimumEligibleScore: rules.minimumEligibleScore,
-                      scoreUnit: rules.scoreUnit,
-                    }
-                  : row,
-              ),
-            );
-          }}
-        />
-
-        <GameChallengeDefaultsDialog
-          providerKey={provider.providerKey}
-          title={challenging}
-          open={challenging !== null}
-          onOpenChange={(next) => {
-            if (!next) setChallenging(null);
-          }}
-          onSaved={(defaults) => {
-            // Reason: merged locally rather than refetched, so the row's summary updates at
-            // once. `onChanged` is deliberately not called - the provider list above counts
-            // titles and enabled titles, and pre-filling a challenge form changes neither.
-            //
-            // Assigned from the SAVED object rather than with a `??` fallback onto the row: the
-            // route answers `stored: null` when the defaults have been cleared, `onSaved` maps
-            // that to `undefined`, and any fallback here would restore what was just deleted -
-            // so the button would keep claiming a length nobody has chosen. Same trap as the
-            // eligibility merge above.
-            setTitles((current) =>
-              current.map((row) =>
-                row.gameCode === challenging?.gameCode
-                  ? { ...row, challengeDefaults: defaults.challengeDefaults }
-                  : row,
-              ),
-            );
-          }}
-        />
       </DialogContent>
     </Dialog>
   );
 }
 
-/**
- * The row's one-line summary of who gets paid.
- *
- * It names the RULE and never the game, so a title nobody has seen summarises itself. It also
- * distinguishes an absent bar from a bar of zero - `minimumEligibleScore === undefined` is
- * "no minimum", a stored `0` is a real instruction and prints as one - because collapsing the
- * two with a truthiness test is how a configured bar becomes invisible on the screen an
- * operator uses to check it.
- */
-/**
- * The genre, in the Game cell rather than a column of its own (task document 9).
- *
- * It is here at all because an operator could not see a title's genre without opening the
- * content dialog, one title at a time - which is the wrong shape for the question a genre
- * answers, that being "what does this catalogue actually contain". A column would make an
- * already seven-column table unreadable, and genre is an identity fact about the title rather
- * than a control, so it belongs beside the game code.
- *
- * AN UNRECOGNISED GENRE IS SHOWN IN A DIFFERENT COLOUR, not hidden and not corrected. It is a
- * real grouping key with real titles filed under it, and the operator is the only person who
- * can decide whether the mock catalogue's `quiz` should become `trivia` - so the screen's job
- * is to make the two distinguishable, not to pick.
- */
 function GenreBadge({ category }: { category?: string }) {
   const resolved = resolveGameCategory(category);
-  // Nothing at all rather than a placeholder. A title with no genre has not been described
-  // yet, and "Uncategorised" in a table reads like a genre somebody chose.
   if (!resolved) return null;
-
   return (
-    <span
-      className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+    <Badge
+      className={
         resolved.isKnown
-          ? "bg-violet-500/15 text-violet-300"
-          : "bg-amber-500/15 text-amber-300"
-      }`}
-      title={
-        resolved.isKnown
-          ? `Genre: ${resolved.label}`
-          : `Genre "${resolved.slug}" is not one of the standard ones. It still works; pick a standard genre in Content if you want it grouped with others.`
+          ? "border-violet-500/40 bg-violet-500/15 text-violet-300"
+          : "border-amber-500/40 bg-amber-500/15 text-amber-300"
       }
     >
       {resolved.label}
-    </span>
+    </Badge>
   );
 }
 
-function describeScoringSummary(title: ProviderTitleRow): string {
-  const bar = title.minimumEligibleScore;
-  if (bar !== undefined && bar !== null) {
-    return `Min ${bar}${title.scoreUnit ? ` ${title.scoreUnit}` : ""}`;
-  }
-  return title.zeroIsValidResult === true ? "Zero counts" : "Zero wins nothing";
-}
-
-/**
- * The row's one-line summary of what a player's challenge form will open with.
- *
- * It distinguishes "nobody has decided" from a stored answer, because those are different facts
- * and the whole point of the control is to take a decision. It also reports the reserving join
- * rule where it is set, since that is the one setting here that can refuse a paying player a
- * round - the same reasoning as the eligibility summary naming a bar rather than hiding it.
- *
- * NO GAME NAME AND NO SETTING NAME. A title's own settings are the provider's, so summarising
- * them would mean knowing what they are called.
- */
-function describeChallengeDefaults(
-  title: ProviderTitleRow,
-  terms: TerminologyPack,
-): string {
-  const defaults = title.challengeDefaults;
-  if (!defaults) return "Set defaults";
-
-  const parts: string[] = [];
-  if (defaults.durationMinutes !== undefined) parts.push(`${defaults.durationMinutes} min`);
-  if (defaults.roundStartPolicy === "reserve_full_round")
-    parts.push(`full ${terms.round}`);
-  const settingsCount = Object.keys(defaults.settings ?? {}).length;
-  if (settingsCount > 0) parts.push(`${settingsCount} setting${settingsCount === 1 ? "" : "s"}`);
-
-  return parts.length > 0 ? parts.join(" · ") : "Set defaults";
-}
-
 function ProviderStatusBadge({ status }: { status: string }) {
-  const tone =
-    status === "active"
-      ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
-      : status === "maintenance"
-        ? "border-amber-500/40 bg-amber-500/10 text-amber-300"
-        : "border-white/20 bg-white/5 text-white/50";
-
+  const live = status === "active";
   return (
-    <Badge variant="outline" className={tone}>
+    <Badge
+      variant="outline"
+      className={
+        live
+          ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
+          : "border-white/20 bg-white/5 text-white/50"
+      }
+    >
       {status}
     </Badge>
   );

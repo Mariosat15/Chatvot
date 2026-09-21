@@ -949,11 +949,13 @@ describe("the Challenge defaults dialog", () => {
     expect(control).not.toMatch(/\b1440\b/);
   });
 
-  it("appears on the Games list exactly once", () => {
+  it("appears on All Games exactly once", () => {
     // Counted: two of these on one row would give an operator two dialogs for one setting, and
-    // whichever they saved last would win.
-    const catalogue = readCode("apps/admin/components/admin/games/ProviderCatalogueDialog.tsx");
-    const uses = catalogue.match(/<GameChallengeDefaultsDialog\b/g) ?? [];
+    // whichever they saved last would win. Providers catalogue deliberately does not mount it.
+    const workspace = readCode("apps/admin/components/admin/games/GamesWorkspaceEditor.tsx");
+    const uses = workspace.match(/<GameChallengeDefaultsDialog\b/g) ?? [];
     expect(uses.length).toBe(1);
+    const catalogue = readCode("apps/admin/components/admin/games/ProviderCatalogueDialog.tsx");
+    expect(catalogue).not.toContain("<GameChallengeDefaultsDialog");
   });
 });
