@@ -3,7 +3,7 @@ import { ArrowLeft, Gamepad2 } from "lucide-react";
 import { NeonGridBackdrop } from "@/components/neon/Cards";
 import { NeonHero } from "@/components/neon/Hero";
 import { NeonPill } from "@/components/neon/Buttons";
-import { GameRulesPanel } from "@/components/games/GameRulesPanel";
+import GameRulesPanel from "@/components/games/GameRulesPanel";
 import { GameContestList } from "@/components/games/catalogue/GameContestList";
 import { GameEmptyContests } from "@/components/games/catalogue/GameEmptyContests";
 import {
