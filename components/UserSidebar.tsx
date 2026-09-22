@@ -147,7 +147,7 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
   const terms = useTerms();
   const mainNavItems = buildMainNavItems(terms);
   const { images } = useWhiteLabelImages();
-  const { profileImage: avatarSrc } = useUserProfileImage();
+  const { profileImage: avatarSrc, hasCustomImage } = useUserProfileImage();
   const { unreadCount: unreadMessages } = useUnreadMessages();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -350,21 +350,21 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
           )}
         >
           {isCollapsed ? (
-            /* Reason: collapsed width is ~80px — show the live app logo (wordmark
-               or mark) with contain, not the separate favicon. Operators often
-               update App Logo and leave Favicon on the old mark, so the rail
-               kept showing the previous brand after a logo swap. */
+            /* Reason: collapsed rail is ~80px — only the square Brand Icon
+               (favicon) fits. The wide App Logo wordmark crops into gibberish
+               inside a circle. Expanded state below still uses appLogo. */
             <div className="relative flex h-12 w-12 items-center justify-center">
               <div className="absolute inset-0 rounded-full bg-yellow-500/20 blur-xl" />
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={images.appLogo}
+                src={images.favicon}
                 alt="logo"
                 width={48}
                 height={48}
                 className="relative z-10 h-11 w-11 cursor-pointer object-contain"
                 onError={(e) => {
-                  (e.target as HTMLImageElement).src = "/assets/icons/logo.svg";
+                  (e.target as HTMLImageElement).src =
+                    "/assets/images/brand-icon.jpg";
                 }}
               />
             </div>
@@ -417,7 +417,12 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
                 "relative ring-2 ring-gray-900 transition-all duration-300",
                 isCollapsed ? "h-11 w-11" : "h-14 w-14",
               )}>
-                <AvatarImage src={avatarSrc} className="object-cover" />
+                <AvatarImage
+                  src={avatarSrc}
+                  // Reason: brand icon is square art — contain keeps the mark
+                  // intact; a personal photo should cover the circle.
+                  className={hasCustomImage ? "object-cover" : "object-contain bg-black"}
+                />
                 <AvatarFallback className={cn(
                   "bg-gradient-to-br from-yellow-500 to-orange-500 text-gray-900 font-bold",
                   isCollapsed ? "text-sm" : "text-lg",

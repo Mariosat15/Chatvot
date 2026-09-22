@@ -529,11 +529,23 @@ export default function ImagesSection() {
           />
 
           <ImageUploadCard
-            title="Profile Image"
-            description="Default user profile avatar image"
+            title="Brand Icon"
+            description="Square mark for collapsed sidebar, browser tab, and default avatar when a user has no personal photo"
+            field="favicon"
+            currentPath={images.favicon}
+            recommendations="MUST be square — controller + chart + bolt only, NEVER the full ChartVolt wordmark. Ideal 256×256 or 512×512 PNG/JPG on black. This is what appears in the collapsed menu and as the default user avatar."
+            isUploading={uploading.favicon}
+            onFileSelect={handleFileSelect("favicon")}
+            lastUploadedName={uploadedNames.favicon}
+            preview="square"
+          />
+
+          <ImageUploadCard
+            title="Profile Image (legacy)"
+            description="Optional square fallback if Brand Icon is empty — prefer uploading Brand Icon instead"
             field="profileImage"
             currentPath={images.profileImage}
-            recommendations="Square avatar for accounts with no personal photo. Upload the new ChartVolt icon mark (controller + bolt), not the full wordmark — ~256×256 PNG."
+            recommendations="Square only. Do NOT upload the App Logo wordmark here — it crops badly in a circle. Prefer Brand Icon above."
             isUploading={uploading.profileImage}
             onFileSelect={handleFileSelect("profileImage")}
             lastUploadedName={uploadedNames.profileImage}
@@ -550,18 +562,6 @@ export default function ImagesSection() {
             onFileSelect={handleFileSelect("dashboardPreview")}
             lastUploadedName={uploadedNames.dashboardPreview}
             preview="landscape"
-          />
-
-          <ImageUploadCard
-            title="Favicon"
-            description="Browser tab icon — also used when the sidebar is collapsed"
-            field="favicon"
-            currentPath={images.favicon}
-            recommendations="Must be square (64×64 or 128×128). Use the controller+bolt mark alone, not the full ChartVolt wordmark."
-            isUploading={uploading.favicon}
-            onFileSelect={handleFileSelect("favicon")}
-            lastUploadedName={uploadedNames.favicon}
-            preview="square"
           />
         </div>
 
@@ -581,10 +581,10 @@ export default function ImagesSection() {
                 and will be used throughout the application automatically.
               </p>
               <p className="text-xs text-gray-400 mt-2">
-                App / Email logos are wide wordmarks shown at ~40px tall in the
-                header and sidebar. Crop the file tightly — empty margins make
-                the mark look tiny. Favicon must stay square (collapsed sidebar).
-                Profile is square; dashboard preview is landscape.
+                App / Email logos are wide wordmarks (expanded sidebar + header).
+                Brand Icon is the square mark for collapsed sidebar, browser tab,
+                and default avatars — never put the wordmark there. Dashboard
+                preview is landscape.
               </p>
             </div>
           </div>

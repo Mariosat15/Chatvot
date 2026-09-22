@@ -19,7 +19,7 @@ import Link from "next/link";
 
 const UserDropdown = ({ user }: { user: User }) => {
   const router = useRouter();
-  const { profileImage, frameUrl } = useUserProfileImage();
+  const { profileImage, frameUrl, hasCustomImage } = useUserProfileImage();
 
   const handleSignOut = async () => {
     await signOut();
@@ -40,6 +40,7 @@ const UserDropdown = ({ user }: { user: User }) => {
               frameUrl={frameUrl}
               name={user?.name || user?.email}
               size="md"
+              imageFit={hasCustomImage ? "cover" : "contain"}
             />
           </div>
           <div className="hidden md:flex flex-col items-start mr-1">
@@ -66,6 +67,7 @@ const UserDropdown = ({ user }: { user: User }) => {
                 frameUrl={frameUrl}
                 name={user?.name || user?.email}
                 size="lg"
+                imageFit={hasCustomImage ? "cover" : "contain"}
               />
             </div>
             <div className="flex flex-col flex-1 min-w-0">

@@ -72,8 +72,8 @@ const defaultSettings: AppSettings = {
     accentColor: "#F59E0B",
     appLogo: "/assets/images/logo.png",
     emailLogo: "/assets/images/logo.png",
-    favicon: "/favicon.ico",
-    profileImage: "/assets/images/PROFILE.png",
+    favicon: "/assets/images/brand-icon.jpg",
+    profileImage: "/assets/images/brand-icon.jpg",
   },
 };
 

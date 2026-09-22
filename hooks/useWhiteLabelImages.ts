@@ -13,9 +13,10 @@ interface WhiteLabelImages {
 const defaultImages: WhiteLabelImages = {
   appLogo: "/assets/images/logo.png",
   emailLogo: "/assets/images/logo.png",
-  profileImage: "/assets/images/PROFILE.png",
+  profileImage: "/assets/images/brand-icon.jpg",
   dashboardPreview: "/assets/images/dashboard-preview.png",
-  favicon: "/favicon.ico",
+  // Reason: square controller+bolt mark — never the wide App Logo wordmark.
+  favicon: "/assets/images/brand-icon.jpg",
 };
 
 // Add cache-busting query param to image URLs

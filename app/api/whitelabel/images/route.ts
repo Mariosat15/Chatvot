@@ -26,9 +26,9 @@ export async function GET() {
       {
         appLogo: "/assets/images/logo.png",
         emailLogo: "/assets/images/logo.png",
-        profileImage: "/assets/images/PROFILE.png",
+        profileImage: "/assets/images/brand-icon.jpg",
         dashboardPreview: "/assets/images/dashboard-preview.png",
-        favicon: "/favicon.ico",
+        favicon: "/assets/images/brand-icon.jpg",
       },
       {
         headers: {

@@ -76,8 +76,14 @@ export async function GET() {
         ...JSON.parse(JSON.stringify(settings)).branding,
         appLogo: whiteLabel?.appLogo || "/assets/images/logo.png",
         emailLogo: whiteLabel?.emailLogo || "/assets/images/logo.png",
-        favicon: whiteLabel?.favicon || "/favicon.ico",
-        profileImage: whiteLabel?.profileImage || "/assets/images/PROFILE.png",
+        favicon:
+          !whiteLabel?.favicon ||
+          whiteLabel.favicon === "/favicon.ico" ||
+          whiteLabel.favicon.endsWith("/favicon.ico")
+            ? "/assets/images/brand-icon.jpg"
+            : whiteLabel.favicon,
+        profileImage:
+          whiteLabel?.profileImage || "/assets/images/brand-icon.jpg",
         // SEO / Open Graph — editable from admin > Settings > Branding
         seoTitle: whiteLabel?.seoTitle || "",
         seoDescription: whiteLabel?.seoDescription || "",

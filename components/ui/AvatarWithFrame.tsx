@@ -10,6 +10,8 @@ interface AvatarWithFrameProps {
   size?: "xs" | "sm" | "md" | "lg" | "xl" | "2xl";
   className?: string;
   showFallback?: boolean;
+  /** Personal photo = cover; brand icon fallback = contain so the mark is not cropped. */
+  imageFit?: "cover" | "contain";
 }
 
 const SIZES = {
@@ -45,8 +47,21 @@ export default function AvatarWithFrame({
   size = "md",
   className,
   showFallback = true,
+  imageFit = "cover",
 }: AvatarWithFrameProps) {
-  const sizeConfig = SIZES[size];
+  // Reason: Map lookup avoids security/detect-object-injection on SIZES[size].
+  const sizeConfig =
+    size === "xs"
+      ? SIZES.xs
+      : size === "sm"
+        ? SIZES.sm
+        : size === "lg"
+          ? SIZES.lg
+          : size === "xl"
+            ? SIZES.xl
+            : size === "2xl"
+              ? SIZES["2xl"]
+              : SIZES.md;
   const initials = name?.charAt(0)?.toUpperCase() || "?";
 
   return (
@@ -62,15 +77,19 @@ export default function AvatarWithFrame({
       >
         <div
           className={cn(
-            "rounded-full overflow-hidden flex items-center justify-center bg-gray-800",
+            "rounded-full overflow-hidden flex items-center justify-center bg-black",
             frameUrl ? sizeConfig.avatar : "w-full h-full",
           )}
         >
           {avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- user/frame URLs are dynamic white-label paths
             <img
               src={avatarUrl}
               alt={name || "Avatar"}
-              className="w-full h-full object-cover"
+              className={cn(
+                "w-full h-full",
+                imageFit === "contain" ? "object-contain" : "object-cover",
+              )}
               onError={(e) => {
                 // Hide broken images
                 e.currentTarget.style.display = "none";
@@ -98,6 +117,7 @@ export default function AvatarWithFrame({
       {/* Frame Layer (top) - only rendered if frameUrl exists */}
       {frameUrl && (
         <div className="absolute inset-0 pointer-events-none z-10">
+          {/* eslint-disable-next-line @next/next/no-img-element -- marketplace frame URLs are dynamic */}
           <img
             src={frameUrl}
             alt="Profile Frame"

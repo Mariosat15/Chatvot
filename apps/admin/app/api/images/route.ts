@@ -19,10 +19,10 @@ export async function GET() {
     return NextResponse.json({
       appLogo: settings.appLogo || "/assets/images/logo.png",
       emailLogo: settings.emailLogo || "/assets/images/logo.png",
-      profileImage: settings.profileImage || "/assets/images/PROFILE.png",
+      profileImage: settings.profileImage || "/assets/images/brand-icon.jpg",
       dashboardPreview:
         settings.dashboardPreview || "/assets/images/dashboard-preview.png",
-      favicon: settings.favicon || "/favicon.ico",
+      favicon: settings.favicon || "/assets/images/brand-icon.jpg",
       // SEO / Open Graph fields
       seoTitle: settings.seoTitle || "",
       seoDescription: settings.seoDescription || "",

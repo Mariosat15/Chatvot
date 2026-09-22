@@ -217,7 +217,8 @@ const WhiteLabelSchema = new Schema<WhiteLabelDocument>(
     },
     profileImage: {
       type: String,
-      default: "/assets/images/PROFILE.png",
+      // Reason: square Brand Icon — never the wide App Logo wordmark.
+      default: "/assets/images/brand-icon.jpg",
     },
     dashboardPreview: {
       type: String,
@@ -225,7 +226,8 @@ const WhiteLabelSchema = new Schema<WhiteLabelDocument>(
     },
     favicon: {
       type: String,
-      default: "/favicon.ico",
+      // Reason: collapsed sidebar + default avatar use this square mark.
+      default: "/assets/images/brand-icon.jpg",
     },
 
     // SEO / Open Graph
