@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readFile, writeFile, mkdir } from "fs/promises";
 import path from "path";
+import { webpAliasFilename } from "@/lib/utils/webp-alias-filename";
 
 // Reason: Track which missing filenames have already been warned about to avoid
 // spamming server logs on every request for the same missing image.
@@ -21,6 +22,7 @@ export async function GET(
     // Sanitize filename to prevent directory traversal
     // Also strip query params
     const sanitizedFilename = path.basename(filename.split("?")[0]);
+    const webpAlias = webpAliasFilename(sanitizedFilename);
 
     // Look in this app's public folder, then the admin app's (monorepo: web app at the
     // root, admin at apps/admin).
@@ -41,6 +43,7 @@ export async function GET(
     // `cwd: __dirname`, so in production `process.cwd()` is already that directory and
     // they could only ever resolve to the same two paths.
     let fileBuffer: Buffer | null = null;
+    let servedName = sanitizedFilename;
 
     try {
       fileBuffer = await readFile(
@@ -70,12 +73,43 @@ export async function GET(
           ),
         );
       } catch {
-        // Not on disk at all - fall through to the database restore below.
+        // Not on disk at all - fall through.
+      }
+    }
+
+    // Reason: Image Optimizer deleted the .png after writing .webp; gallery rows
+    // that still name the .png must still resolve or Featured tiles stay blank.
+    if (!fileBuffer && webpAlias) {
+      try {
+        fileBuffer = await readFile(
+          path.join(process.cwd(), "public", "assets", "images", webpAlias),
+        );
+        servedName = webpAlias;
+      } catch {
+        // try admin copy
+      }
+      if (!fileBuffer) {
+        try {
+          fileBuffer = await readFile(
+            path.join(
+              process.cwd(),
+              "apps",
+              "admin",
+              "public",
+              "assets",
+              "images",
+              webpAlias,
+            ),
+          );
+          servedName = webpAlias;
+        } catch {
+          // fall through to DB
+        }
       }
     }
 
     if (fileBuffer) {
-      const ext = sanitizedFilename.split(".").pop()?.toLowerCase();
+      const ext = servedName.split(".").pop()?.toLowerCase();
 
       return new NextResponse(fileBuffer as unknown as BodyInit, {
         headers: {
@@ -97,10 +131,15 @@ export async function GET(
       const { readBrandingAsset } = await import(
         "@/lib/services/branding-assets.service"
       );
-      const fileEntry = await readBrandingAsset(sanitizedFilename);
+      let fileEntry = await readBrandingAsset(sanitizedFilename);
+      let restoreName = sanitizedFilename;
+      if (!fileEntry && webpAlias) {
+        fileEntry = await readBrandingAsset(webpAlias);
+        if (fileEntry) restoreName = webpAlias;
+      }
 
       if (fileEntry) {
-        console.log(`🔄 [Serve] Restoring branding image from DB: ${sanitizedFilename}`);
+        console.log(`🔄 [Serve] Restoring branding image from DB: ${restoreName}`);
         const buffer = fileEntry.data;
 
         // Auto-restore file to disk for future requests.
@@ -117,9 +156,9 @@ export async function GET(
             "images",
           );
           await mkdir(restoreDir, { recursive: true });
-          await writeFile(path.join(restoreDir, sanitizedFilename), buffer);
+          await writeFile(path.join(restoreDir, restoreName), buffer);
           console.log(
-            `✅ [Serve] Auto-restored to disk: ${path.join(restoreDir, sanitizedFilename)}`,
+            `✅ [Serve] Auto-restored to disk: ${path.join(restoreDir, restoreName)}`,
           );
         } catch (restoreErr) {
           console.warn(`⚠️ [Serve] Could not auto-restore to disk:`, restoreErr);

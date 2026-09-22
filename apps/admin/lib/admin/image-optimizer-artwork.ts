@@ -150,3 +150,69 @@ export async function retargetArtworkAfterOptimize(input: {
   await rewriteScalarUrlFields(oldFilename, newFilename);
   await rewriteGalleryUrls(oldFilename, newFilename);
 }
+
+const RASTER_STEM = /^(.+)\.(png|jpe?g|gif|bmp|tiff)$/i;
+
+/**
+ * Rows optimized before gallery retarget still name deleted `.png` files while
+ * `branding_asset` holds the `.webp`. Rewrite every matching scalar + gallery URL.
+ * Report-only until `apply: true`.
+ */
+export async function repairStaleOptimizedArtworkUrls(opts: {
+  apply: boolean;
+}): Promise<{ pairs: Array<{ oldFilename: string; newFilename: string; matched: number }> }> {
+  await connectToDatabase();
+  // Reason: dynamic import keeps this module usable from the optimize route
+  // without pulling the model into every caller that only renames one file.
+  const { BrandingAsset } = await import(
+    "@/database/models/branding-asset.model"
+  );
+
+  const webps = (await BrandingAsset.find({ filename: /\.webp$/i })
+    .select("filename")
+    .lean()) as Array<{ filename: string }>;
+
+  const pairs: Array<{
+    oldFilename: string;
+    newFilename: string;
+    matched: number;
+  }> = [];
+
+  for (const row of webps) {
+    const stem = row.filename.replace(/\.webp$/i, "");
+    for (const ext of [".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff"]) {
+      const oldFilename = `${stem}${ext}`;
+      if (!RASTER_STEM.test(oldFilename)) continue;
+
+      const pattern = escapeRegex(oldFilename);
+      const [pgScalar, gpcScalar, pgGallery, gpcGallery] = await Promise.all([
+        countScalarMatches(ProviderGame, pattern),
+        countScalarMatches(GamePageContent, pattern),
+        ProviderGame.countDocuments({ "gallery.url": { $regex: pattern } }),
+        GamePageContent.countDocuments({ "gallery.url": { $regex: pattern } }),
+      ]);
+      const matched = pgScalar + gpcScalar + pgGallery + gpcGallery;
+      if (matched === 0) continue;
+
+      pairs.push({ oldFilename, newFilename: row.filename, matched });
+      if (opts.apply) {
+        await rewriteScalarUrlFields(oldFilename, row.filename);
+        await rewriteGalleryUrls(oldFilename, row.filename);
+      }
+    }
+  }
+
+  return { pairs };
+}
+
+async function countScalarMatches(
+   
+  Model: { countDocuments: (filter: Record<string, unknown>) => Promise<number> },
+  pattern: string,
+): Promise<number> {
+  let total = 0;
+  for (const field of ARTWORK_URL_FIELDS) {
+    total += await Model.countDocuments({ [field]: { $regex: pattern } });
+  }
+  return total;
+}

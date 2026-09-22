@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { readFile, access, writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { constants } from "fs";
+import { webpAliasFilename } from "@/lib/utils/webp-alias-filename";
 
 // Reason: Track which missing filenames have already been warned about to avoid
 // spamming server logs on every request for the same missing image.
@@ -22,58 +23,60 @@ export async function GET(
     // Sanitize filename to prevent directory traversal
     // Also strip query params
     const sanitizedFilename = path.basename(filename.split("?")[0]);
+    const webpAlias = webpAliasFilename(sanitizedFilename);
 
     // Try multiple possible locations for the file
     // Production path comes first for speed in production
-    const possiblePaths = [
-      // Production: /var/www/chartvolt/public/assets/images (main upload location)
-      path.join(
-        "/var/www/chartvolt",
-        "public",
-        "assets",
-        "images",
-        sanitizedFilename,
-      ),
-      // Production admin fallback
-      path.join(
-        "/var/www/chartvolt",
-        "apps",
-        "admin",
-        "public",
-        "assets",
-        "images",
-        sanitizedFilename,
-      ),
-      // Local dev: main app's public folder (monorepo, from apps/admin)
-      path.join(
-        process.cwd(),
-        "..",
-        "..",
-        "public",
-        "assets",
-        "images",
-        sanitizedFilename,
-      ),
-      // Local dev: admin app's own public folder
-      path.join(process.cwd(), "public", "assets", "images", sanitizedFilename),
-    ];
+    const candidates = [sanitizedFilename, ...(webpAlias ? [webpAlias] : [])];
 
     let filePath: string | null = null;
+    let servedName = sanitizedFilename;
 
-    for (const possiblePath of possiblePaths) {
-      try {
-        await access(possiblePath, constants.R_OK);
-        filePath = possiblePath;
-        break;
-      } catch {
-        // File doesn't exist at this path, try next
+    for (const name of candidates) {
+      const possiblePaths = [
+        // Production: /var/www/chartvolt/public/assets/images (main upload location)
+        path.join("/var/www/chartvolt", "public", "assets", "images", name),
+        // Production admin fallback
+        path.join(
+          "/var/www/chartvolt",
+          "apps",
+          "admin",
+          "public",
+          "assets",
+          "images",
+          name,
+        ),
+        // Local dev: main app's public folder (monorepo, from apps/admin)
+        path.join(
+          process.cwd(),
+          "..",
+          "..",
+          "public",
+          "assets",
+          "images",
+          name,
+        ),
+        // Local dev: admin app's own public folder
+        path.join(process.cwd(), "public", "assets", "images", name),
+      ];
+
+      for (const possiblePath of possiblePaths) {
+        try {
+          await access(possiblePath, constants.R_OK);
+          filePath = possiblePath;
+          servedName = name;
+          break;
+        } catch {
+          // File doesn't exist at this path, try next
+        }
       }
+      if (filePath) break;
     }
 
     // If file found on disk, serve it directly
     if (filePath) {
       const fileBuffer = await readFile(filePath);
-      const ext = sanitizedFilename.split(".").pop()?.toLowerCase();
+      const ext = servedName.split(".").pop()?.toLowerCase();
       const contentType = getContentType(ext);
 
       return new NextResponse(fileBuffer, {
@@ -96,20 +99,32 @@ export async function GET(
       const { readBrandingAsset } = await import(
         "@/lib/services/branding-assets.service"
       );
-      const fileEntry = await readBrandingAsset(sanitizedFilename);
+      let fileEntry = await readBrandingAsset(sanitizedFilename);
+      let restoreName = sanitizedFilename;
+      if (!fileEntry && webpAlias) {
+        fileEntry = await readBrandingAsset(webpAlias);
+        if (fileEntry) restoreName = webpAlias;
+      }
 
       if (fileEntry) {
-        console.log(`🔄 [Serve] Restoring branding image from DB: ${sanitizedFilename}`);
+        console.log(`🔄 [Serve] Restoring branding image from DB: ${restoreName}`);
         const buffer = fileEntry.data;
 
         // Auto-restore file to disk for future requests
+        // Reason: prefer admin's own public folder (cwd) over the hardcoded
+        // /var/www path so a local restore lands where this process reads next.
         try {
-          const restoreDir = possiblePaths[0] ? path.dirname(possiblePaths[0]) : null;
-          if (restoreDir) {
-            await mkdir(restoreDir, { recursive: true });
-            await writeFile(path.join(restoreDir, sanitizedFilename), buffer);
-            console.log(`✅ [Serve] Auto-restored to disk: ${path.join(restoreDir, sanitizedFilename)}`);
-          }
+          const restoreDir = path.join(
+            process.cwd(),
+            "public",
+            "assets",
+            "images",
+          );
+          await mkdir(restoreDir, { recursive: true });
+          await writeFile(path.join(restoreDir, restoreName), buffer);
+          console.log(
+            `✅ [Serve] Auto-restored to disk: ${path.join(restoreDir, restoreName)}`,
+          );
         } catch (restoreErr) {
           console.warn(`⚠️ [Serve] Could not auto-restore to disk:`, restoreErr);
         }
@@ -132,7 +147,7 @@ export async function GET(
     if (!warnedMissing.has(sanitizedFilename)) {
       warnedMissing.add(sanitizedFilename);
       console.warn(
-        `⚠️ Branding image not found: ${sanitizedFilename} (checked ${possiblePaths.length} paths + DB). Re-upload from Admin > Settings > Branding to fix.`,
+        `⚠️ Branding image not found: ${sanitizedFilename} (checked 4 paths + DB). Re-upload from Admin > Settings > Branding to fix.`,
       );
     }
 
