@@ -37,7 +37,8 @@ const GAME_ICON_PATHS = {
   marketplace: '/game-icons/nav/nav-marketplace.jpg',
   settings: '/game-icons/nav/nav-profile.jpg',
   help: '/game-icons/nav/nav-help.jpg',
-  notifications: '/game-icons/nav/nav-messages.jpg',
+  notifications: '/game-icons/nav/nav-notifications.jpg',
+  logout: '/game-icons/nav/nav-logout.png',
 
   // ========================================
   // Trading Actions

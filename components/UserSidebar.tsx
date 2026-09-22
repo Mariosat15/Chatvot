@@ -18,7 +18,6 @@ import { useTerms } from "@/contexts/TerminologyContext";
 import type { TerminologyPack } from "@/lib/constants/terminology";
 import { isValidGameIconName } from "@/lib/constants/game-icons";
 import {
-  LogOut,
   Menu,
   X,
   ChevronRight,
@@ -548,10 +547,10 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
           )}
         >
           <div className={cn(
-            "flex items-center justify-center rounded-lg bg-gray-800/50 group-hover:bg-red-500/20 transition-colors",
-            isCollapsed ? "w-8 h-8" : "w-9 h-9",
+            "flex items-center justify-center overflow-hidden rounded-lg bg-black/60 group-hover:bg-red-500/20 transition-colors",
+            isCollapsed ? "h-9 w-9" : "h-10 w-10",
           )}>
-            <LogOut className={cn(isCollapsed ? "h-4 w-4" : "h-5 w-5")} />
+            <GameIcon name="logout" size={40} className={NAV_ICON} alt="Sign out" />
           </div>
           {!isCollapsed && <span className="font-medium">Sign Out</span>}
         </Button>

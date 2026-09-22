@@ -23,6 +23,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { PERFORMANCE_INTERVALS } from "@/lib/utils/performance";
+import { GameIcon } from "@/components/ui/GameIcon";
 import { NOTIFICATION_PUSH_EVENT } from "@/lib/utils/notification-events";
 
 interface Notification {
@@ -48,17 +49,16 @@ const PRIORITY_STYLES: Record<string, string> = {
 };
 
 // Reason: Some older notifications stored Lucide icon names as strings instead of emojis.
-// This map converts them to actual React components so they render as icons, not text.
-const LUCIDE_ICON_MAP: Record<string, React.ReactNode> = {
-  "user-plus": <UserPlus className="h-5 w-5" />,
-  "users": <Users className="h-5 w-5" />,
-  "message-circle": <MessageCircle className="h-5 w-5" />,
-  "bell": <Bell className="h-5 w-5" />,
-};
+// Map (not Record) so a request-shaped key cannot walk Object.prototype.
+const LUCIDE_ICON_MAP = new Map<string, React.ReactNode>([
+  ["user-plus", <UserPlus className="h-5 w-5" />],
+  ["users", <Users className="h-5 w-5" />],
+  ["message-circle", <MessageCircle className="h-5 w-5" />],
+  ["bell", <Bell className="h-5 w-5" />],
+]);
 
 function renderNotificationIcon(icon: string): React.ReactNode {
-  if (LUCIDE_ICON_MAP[icon]) return LUCIDE_ICON_MAP[icon];
-  return icon;
+  return LUCIDE_ICON_MAP.get(icon) ?? icon;
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -242,9 +242,14 @@ export default function NotificationDropdown() {
           variant="ghost"
           size="icon"
           aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`}
-          className="relative text-gray-400 hover:text-white hover:bg-gray-800"
+          className="relative h-10 w-10 overflow-hidden rounded-lg bg-black/60 p-0 text-gray-400 hover:bg-gray-800 hover:text-white"
         >
-          <Bell className="h-5 w-5" />
+          <GameIcon
+            name="notifications"
+            size={40}
+            className="!h-full !w-full"
+            alt="Notifications"
+          />
           {unreadCount > 0 && (
             <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-yellow-400 opacity-75" />
