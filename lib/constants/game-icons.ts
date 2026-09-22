@@ -13,16 +13,18 @@ export const GAME_ICONS = {
   // ========================================
   // Navigation & Core
   // ========================================
-  dashboard: '/game-icons/hedset.png',
-  competitions: '/game-icons/1. TROPHY.png',
-  challenges: '/game-icons/9. Sword.png',
-  leaderboard: '/game-icons/3. GOLD MEDAL.png',
-  wallet: '/game-icons/chest 1.png',
-  profile: '/game-icons/helmet 1.png',
-  marketplace: '/game-icons/pouch 1.png',
-  settings: '/game-icons/15. Key.png',
-  help: '/game-icons/20. GuideBook.png',
-  notifications: '/game-icons/17. Flag.png',
+  // Reason: Sep 2026 neon nav set — shared by sidebar + semantic aliases so every
+  // user-side GameIcon for these destinations picks up the new art automatically.
+  dashboard: '/game-icons/nav/nav-dashboard.jpg',
+  competitions: '/game-icons/nav/nav-competitions.jpg',
+  challenges: '/game-icons/nav/nav-challenges.jpg',
+  leaderboard: '/game-icons/nav/nav-leaderboard.jpg',
+  wallet: '/game-icons/nav/nav-wallet.jpg',
+  profile: '/game-icons/nav/nav-profile.jpg',
+  marketplace: '/game-icons/nav/nav-marketplace.jpg',
+  settings: '/game-icons/nav/nav-profile.jpg',
+  help: '/game-icons/nav/nav-help.jpg',
+  notifications: '/game-icons/nav/nav-messages.jpg',
 
   // ========================================
   // Trading Actions
@@ -48,7 +50,7 @@ export const GAME_ICONS = {
   rank7: '/game-icons/medal 6 .png',
   medal7: '/game-icons/medal 7.png',
   
-  trophy: '/game-icons/1. TROPHY.png',
+  trophy: '/game-icons/nav/nav-competitions.jpg',
   trophyStar: '/game-icons/2. STAR TROPHY.png',
   trophyGame: '/game-icons/16. GAME TROPHY.png',
   trophyFootball: '/game-icons/15. FOOTBALL TROPHY.png',
@@ -58,7 +60,7 @@ export const GAME_ICONS = {
   trophy2: '/game-icons/trophy 2 .png',
   trophy3: '/game-icons/trophy 3 .png',
   
-  goldMedal: '/game-icons/3. GOLD MEDAL.png',
+  goldMedal: '/game-icons/nav/nav-leaderboard.jpg',
   champion: '/game-icons/11. CHAMPION AWARD.png',
   victory: '/game-icons/20. VICTORY AWARD.png',
 
@@ -103,12 +105,12 @@ export const GAME_ICONS = {
   gemsAlt: '/game-icons/4. Gems.png',
   treasure: '/game-icons/treasure.png',
   chest: '/game-icons/chest.png',
-  chest1: '/game-icons/chest 1.png',
+  chest1: '/game-icons/nav/nav-wallet.jpg',
   chest2: '/game-icons/chest 2.png',
   chest3: '/game-icons/chest 3.png',
   chest4: '/game-icons/chest 4.png',
   chest14: '/game-icons/14. Chest.png',
-  pouch1: '/game-icons/pouch 1.png',
+  pouch1: '/game-icons/nav/nav-marketplace.jpg',
   pouch2: '/game-icons/pouch 2.png',
   money: '/game-icons/5. money.png',
   moneyDeposit: '/game-icons/money deposite.png',
@@ -155,7 +157,7 @@ export const GAME_ICONS = {
   // ========================================
   // Game Weapons
   // ========================================
-  sword: '/game-icons/sword.png',
+  sword: '/game-icons/nav/nav-challenges.jpg',
   sword1: '/game-icons/sword 1 .png',
   sword2: '/game-icons/sword 2 .png',
   sword3: '/game-icons/sword 3 .png',
@@ -199,7 +201,7 @@ export const GAME_ICONS = {
   shield4: '/game-icons/shield 4.png',
   magicShield3D: '/game-icons/Magic Shiled 3D.png',
   
-  helmet1: '/game-icons/helmet 1.png',
+  helmet1: '/game-icons/nav/nav-profile.jpg',
   helmet2: '/game-icons/helmet 2.png',
   helmet3: '/game-icons/helmet 3.png',
   helmet4: '/game-icons/helmet 4.png',
@@ -211,7 +213,7 @@ export const GAME_ICONS = {
   
   key: '/game-icons/15. Key.png',
   banner: '/game-icons/18. Banner.png',
-  flag: '/game-icons/17. Flag.png',
+  flag: '/game-icons/nav/nav-messages.jpg',
   pirateFlag: '/game-icons/Pirate Flag.png',
   piratesFlag: '/game-icons/Pirates Flag.png',
   crown: '/game-icons/16. Crown.png',
@@ -220,7 +222,7 @@ export const GAME_ICONS = {
   mapLarge: '/game-icons/Map.png',
   pirateMap: '/game-icons/Pirate Map.png',
   maps: '/game-icons/19. Maps.png',
-  guideBook: '/game-icons/20. GuideBook.png',
+  guideBook: '/game-icons/nav/nav-help.jpg',
   compass: '/game-icons/Compass.png',
   eyePatch: '/game-icons/Eye Patch.png',
   pirateHook: '/game-icons/Pirate Hook.png',
@@ -303,10 +305,10 @@ export const GAME_ICONS = {
   // ========================================
   // Gaming Hardware
   // ========================================
-  joystick1: '/game-icons/joystick 1.png',
+  joystick1: '/game-icons/nav/nav-games.jpg',
   joystick2: '/game-icons/joystick 2.png',
   joystick3: '/game-icons/joystick 3.png',
-  headset: '/game-icons/hedset.png',
+  headset: '/game-icons/nav/nav-dashboard.jpg',
   keyboard: '/game-icons/keyboard.png',
   wasd: '/game-icons/WASD.png',
   mic: '/game-icons/mic.png',
@@ -736,6 +738,8 @@ export type GameIconName = keyof typeof GAME_ICONS;
 
 // Helper to get icon path
 export function getGameIconPath(name: GameIconName): string {
+  // Reason: name is typed as keyof GAME_ICONS — not a free-form object index.
+  // eslint-disable-next-line security/detect-object-injection
   return GAME_ICONS[name];
 }
 

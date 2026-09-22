@@ -37,15 +37,20 @@ export function GameCatalogueCard({ game }: { game: BrowsableGame }) {
       <div
         className={`${NEON_PANEL} flex h-full w-full flex-col overflow-hidden p-0 transition-colors group-hover:border-sky-500/40`}
       >
-        <div className="relative h-36 w-full shrink-0 overflow-hidden bg-[#07101F]">
+        <div className="relative aspect-[16/10] w-full shrink-0 overflow-hidden bg-[#07101F]">
+          {/*
+            Reason: object-cover cropped ChartVolt / Circuit Sprint banners
+            (owner). Shared aspect keeps cards equal height; contain shows the
+            full upload edge-to-edge on the wider axis without stretch.
+          */}
           <Image
             src={banner.src}
             alt={banner.alt}
             fill
             sizes="(max-width: 768px) 100vw, 33vw"
-            className="object-cover object-center transition-transform duration-300 group-hover:scale-[1.03]"
+            className="object-contain object-center transition-transform duration-300 group-hover:scale-[1.02]"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0A0F1F] via-[#0A0F1F]/40 to-transparent" />
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#0A0F1F] via-transparent to-transparent" />
           {game.category ? (
             <span
               className={`absolute left-3 top-3 rounded-md border border-[#1B2540] bg-[#0A0F1F]/85 px-2 py-0.5 ${NEON_LABEL} text-[10px]`}

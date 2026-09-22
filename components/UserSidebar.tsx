@@ -51,12 +51,14 @@ interface NavItem {
  * // beside a provider that can rename it is exactly the silence the token layer exists to
  * // end. Routes stay `/competitions` etc. — identifiers are never-rename.
  */
+const NAV_ICON = "!h-full !w-full";
+
 function buildMainNavItems(terms: TerminologyPack): NavItem[] {
   return [
     {
       href: "/dashboard",
       label: "Dashboard",
-      icon: <GameIcon name="headset" size={22} />,
+      icon: <GameIcon name="headset" size={40} className={NAV_ICON} />,
       color: "text-blue-400",
       gradient: "from-blue-500/20 to-blue-600/5",
     },
@@ -65,7 +67,7 @@ function buildMainNavItems(terms: TerminologyPack): NavItem[] {
       // Reason: X11 Slice 1 — games-first discovery. HOT moves here from Competitions;
       // `/competitions` stays for "what starts soonest" browsing.
       label: "Games",
-      icon: <GameIcon name="joystick1" size={22} />,
+      icon: <GameIcon name="joystick1" size={40} className={NAV_ICON} />,
       color: "text-sky-400",
       gradient: "from-sky-500/20 to-cyan-600/5",
       badge: "HOT",
@@ -73,7 +75,7 @@ function buildMainNavItems(terms: TerminologyPack): NavItem[] {
     {
       href: "/competitions",
       label: terms.contests,
-      icon: <GameIcon name="trophy" size={22} />,
+      icon: <GameIcon name="trophy" size={40} className={NAV_ICON} />,
       color: "text-yellow-400",
       gradient: "from-yellow-500/20 to-yellow-600/5",
     },
@@ -81,28 +83,28 @@ function buildMainNavItems(terms: TerminologyPack): NavItem[] {
       href: "/challenges",
       // Reason: keep the "1v1 " prefix — it is format, not the noun; the noun is the token.
       label: `1v1 ${terms.challenges}`,
-      icon: <GameIcon name="sword" size={22} />,
+      icon: <GameIcon name="sword" size={40} className={NAV_ICON} />,
       color: "text-red-400",
       gradient: "from-red-500/20 to-red-600/5",
     },
     {
       href: "/marketplace",
       label: "Marketplace",
-      icon: <GameIcon name="pouch1" size={22} />,
+      icon: <GameIcon name="pouch1" size={40} className={NAV_ICON} />,
       color: "text-purple-400",
       gradient: "from-purple-500/20 to-purple-600/5",
     },
     {
       href: "/leaderboard",
       label: terms.leaderboard,
-      icon: <GameIcon name="goldMedal" size={22} />,
+      icon: <GameIcon name="goldMedal" size={40} className={NAV_ICON} />,
       color: "text-emerald-400",
       gradient: "from-emerald-500/20 to-emerald-600/5",
     },
     {
       href: "/arena",
       label: "Live Arena",
-      icon: <GameIcon name="crown" size={22} />,
+      icon: <GameIcon name="crown" size={40} className={NAV_ICON} />,
       color: "text-cyan-300",
       gradient: "from-cyan-500/20 to-blue-600/5",
       badge: "LIVE",
@@ -110,7 +112,7 @@ function buildMainNavItems(terms: TerminologyPack): NavItem[] {
     {
       href: "/messaging",
       label: "Messages",
-      icon: <GameIcon name="flag" size={22} />,
+      icon: <GameIcon name="flag" size={40} className={NAV_ICON} />,
       color: "text-pink-400",
       gradient: "from-pink-500/20 to-pink-600/5",
     },
@@ -121,21 +123,21 @@ const accountNavItems: NavItem[] = [
   {
     href: "/profile",
     label: "Profile",
-    icon: <GameIcon name="helmet1" size={22} />,
+    icon: <GameIcon name="helmet1" size={40} className={NAV_ICON} />,
     color: "text-cyan-400",
     gradient: "from-cyan-500/20 to-cyan-600/5",
   },
   {
     href: "/wallet",
     label: "Wallet",
-    icon: <GameIcon name="chest1" size={22} />,
+    icon: <GameIcon name="chest1" size={40} className={NAV_ICON} />,
     color: "text-green-400",
     gradient: "from-green-500/20 to-green-600/5",
   },
   {
     href: "/help",
     label: "Help Center",
-    icon: <GameIcon name="guideBook" size={22} />,
+    icon: <GameIcon name="guideBook" size={40} className={NAV_ICON} />,
     color: "text-orange-400",
     gradient: "from-orange-500/20 to-orange-600/5",
   },
@@ -288,11 +290,13 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
           <div className="relative">
             <div
               className={cn(
-                "flex items-center justify-center rounded-lg transition-all duration-300",
-                isCollapsed ? "w-8 h-8 [&_img]:!w-[18px] [&_img]:!h-[18px]" : "w-9 h-9",
+                // Reason: black neon JPGs fill the tile via object-contain; no shrink
+                // override — cropping comes from forcing a smaller img than the box.
+                "flex items-center justify-center overflow-hidden rounded-lg transition-all duration-300",
+                isCollapsed ? "h-9 w-9" : "h-10 w-10",
                 active
                   ? `${item.color.replace("text-", "bg-")}/20 ${item.color}`
-                  : "bg-gray-800/50 text-gray-400 group-hover:text-gray-200",
+                  : "bg-black/60 text-gray-400 group-hover:text-gray-200",
               )}
             >
               {item.icon}
@@ -499,7 +503,7 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
               item={{
                 href: "/gamemaster",
                 label: "GM Dashboard",
-                icon: <GameIcon name="crown" size={22} />,
+                icon: <GameIcon name="crown" size={40} className={NAV_ICON} />,
                 color: "text-yellow-400",
                 gradient: "from-yellow-500/20 to-amber-600/5",
                 badge: "GM",

@@ -63,6 +63,15 @@ describe("games catalogue routes", () => {
     expect(card).toMatch(/line-clamp-2/);
   });
 
+  it("catalogue card artwork is full-width and not cropped", () => {
+    const card = readCode(CARD);
+    // Reason: object-cover sliced ChartVolt / Circuit Sprint banners. Shared
+    // aspect keeps row heights equal; contain shows the full upload.
+    expect(card).toMatch(/aspect-\[16\/10\]/);
+    expect(card).toMatch(/object-contain/);
+    expect(card).not.toMatch(/object-cover/);
+  });
+
   it("empty game page is designed, not a blank return", () => {
     const page = readCode(GAME_PAGE);
     const empty = readCode(EMPTY);

@@ -57,21 +57,20 @@ export function GamePageHero({ game }: { game: GamePageData }) {
       <div className="relative flex min-h-[300px] flex-col justify-between gap-6 p-6 md:min-h-[340px] md:flex-row md:items-end md:p-8 lg:p-10">
         <div className="max-w-3xl space-y-4">
           {/*
-            Reason: owner wants the game/trading mark to read as a hero brand
-            signal — large top-left square that auto-fills (object-contain) so
-            square icons and wide wordmarks both fill the box without stretch.
-            Sitting beside the title at ~80px left it looking like a favicon.
+            Reason: logos are often wide wordmarks. A fixed square left black
+            letterbox bars (owner). Full-width of the copy column, height from
+            the image aspect — no crop, no stretch.
           */}
-          <div className="flex h-36 w-36 shrink-0 items-center justify-center overflow-hidden rounded-[14px] border border-[var(--gp-border)] bg-black/55 sm:h-40 sm:w-40 md:h-44 md:w-44 lg:h-48 lg:w-48">
+          <div className="w-full max-w-xl overflow-hidden rounded-[14px] border border-[var(--gp-border)] bg-black/55">
             {game.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={game.logoUrl}
                 alt={`${game.title} logo`}
-                className="h-full w-full object-contain p-2"
+                className="block h-auto w-full object-contain"
               />
             ) : (
-              <div className="flex h-full w-full items-center justify-center text-4xl font-black text-[var(--gp-accent)] sm:text-5xl">
+              <div className="flex min-h-[7rem] w-full items-center justify-center text-4xl font-black text-[var(--gp-accent)] sm:min-h-[8rem] sm:text-5xl">
                 {(game.title || "?").slice(0, 1)}
               </div>
             )}
