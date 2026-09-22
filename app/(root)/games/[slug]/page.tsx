@@ -16,7 +16,6 @@ const ALLOWED_TABS = new Set([
   "how-it-works",
   "competitions",
   "leaderboards",
-  "prizes",
   "challenges",
   "rules",
   "gallery",
@@ -32,8 +31,11 @@ export default async function GamePage({
   const { slug } = await params;
   const query = await searchParams;
   const rawTab = Array.isArray(query.tab) ? query.tab[0] : query.tab;
+  // Reason: Prizes was removed — it duplicated Rules. Old ?tab=prizes links land on Rules.
+  const normalised =
+    rawTab === "prizes" ? "rules" : rawTab;
   const tab =
-    rawTab && ALLOWED_TABS.has(rawTab) ? rawTab : "overview";
+    normalised && ALLOWED_TABS.has(normalised) ? normalised : "overview";
 
   const game = await getGamePageData(slug);
   if (!game) notFound();

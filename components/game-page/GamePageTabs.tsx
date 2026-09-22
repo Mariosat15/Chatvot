@@ -7,7 +7,6 @@ const TABS = [
   { id: "how-it-works", label: "How It Works" },
   { id: "competitions", label: "Competitions" },
   { id: "leaderboards", label: "Leaderboard" },
-  { id: "prizes", label: "Prizes" },
   { id: "challenges", label: "Challenges" },
   { id: "rules", label: "Rules" },
   { id: "gallery", label: "Gallery" },

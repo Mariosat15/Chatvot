@@ -153,7 +153,6 @@ export function GamePageView({
             </Link>
           </GamePagePanel>
         ) : null}
-        {current === "prizes" ? <RulesTab game={game} /> : null}
         {current === "challenges" ? (
           <GamePagePanel className="space-y-3">
             <h2 className="text-[18px] font-bold text-[var(--gp-accent)]">

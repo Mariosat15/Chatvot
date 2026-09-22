@@ -53,7 +53,6 @@ describe("player game page layout", () => {
       "how-it-works",
       "competitions",
       "leaderboards",
-      "prizes",
       "challenges",
       "rules",
       "gallery",
@@ -61,6 +60,9 @@ describe("player game page layout", () => {
       expect(tabs).toContain(`"${id}"`);
       expect(page).toContain(`"${id}"`);
     }
+    // Reason: Prizes duplicated Rules content — removed from the strip.
+    expect(tabs).not.toContain('"prizes"');
+    expect(view).not.toMatch(/current === "prizes"/);
     expect(view).toContain("leaderboards");
     expect(view).toContain("competitions");
   });
