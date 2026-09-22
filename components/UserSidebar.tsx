@@ -374,10 +374,10 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
               <img
                 src={images.appLogo}
                 alt="logo"
-                width={140}
-                height={32}
-                className="relative z-10 cursor-pointer"
-                style={{ width: "auto", height: "32px" }}
+                width={200}
+                height={40}
+                className="relative z-10 cursor-pointer object-contain"
+                style={{ width: "auto", height: "40px", maxWidth: "200px" }}
                 onError={(e) => {
                   (e.target as HTMLImageElement).src = "/assets/icons/logo.svg";
                 }}
@@ -581,9 +581,10 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
           <img
             src={images.appLogo}
             alt="logo"
-            width={120}
-            height={28}
-            style={{ width: "auto", height: "28px" }}
+            width={160}
+            height={36}
+            className="object-contain"
+            style={{ width: "auto", height: "36px", maxWidth: "160px" }}
             onError={(e) => {
               (e.target as HTMLImageElement).src = "/assets/icons/logo.svg";
             }}

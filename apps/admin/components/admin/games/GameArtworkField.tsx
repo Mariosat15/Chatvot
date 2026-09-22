@@ -38,20 +38,30 @@ interface Props {
  *
  * Reason: the preview crops, so a square frame around a wide banner hides half of it and the
  * operator approves an image they have not seen. These match the shapes the player-facing
- * screens draw - a square logo, a wide hero, a landscape illustration beside the rules, and
- * a square emblem on the feature cards.
+ * screens draw. Logo is a wide wordmark box (not square) so ChartVolt-style marks are not
+ * shrunk to a postage stamp; banners stay cinematic; tips/gallery stay landscape.
  *
  * A `Record` keyed by a union rather than a chain of ternaries: the key is a prop of a known
  * type, so the compiler requires a shape for every slot the moment a fifth one is added,
  * where a ternary would silently fall through to whatever the last branch says.
  */
 const PREVIEW_SHAPE: Record<ArtworkSlot, string> = {
-  logo: "aspect-square",
+  logo: "aspect-[5/2] max-h-40",
   banner: "aspect-[3/1]",
   "how-to-play": "aspect-[4/3]",
   highlight: "aspect-square",
   "gameplay-preview": "aspect-video",
   gallery: "aspect-video",
+};
+
+/** Logos and tips must show the whole mark; heroes may crop for fill. */
+const PREVIEW_FIT: Record<ArtworkSlot, string> = {
+  logo: "object-contain",
+  banner: "object-cover",
+  "how-to-play": "object-contain",
+  highlight: "object-cover",
+  "gameplay-preview": "object-contain",
+  gallery: "object-contain",
 };
 
 export default function GameArtworkField({
@@ -113,7 +123,12 @@ export default function GameArtworkField({
           // Served by an API route with a database fallback, so it is not a statically
           // analysable asset and `next/image`'s optimiser cannot fetch it; see the note above.
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={value} alt={`${label} preview`} className="h-full w-full object-cover" />
+          <img
+            src={value}
+            alt={`${label} preview`}
+            /* eslint-disable-next-line security/detect-object-injection -- slot is a closed union */
+            className={`h-full w-full bg-black ${PREVIEW_FIT[slot]}`}
+          />
         ) : (
           <span className="px-3 text-center text-xs text-white/30">Nothing uploaded</span>
         )}

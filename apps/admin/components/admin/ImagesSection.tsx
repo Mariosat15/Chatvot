@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -53,6 +53,7 @@ function ImageUploadCard({
   isUploading,
   onFileSelect,
   lastUploadedName,
+  preview = "square",
 }: {
   title: string;
   description: string;
@@ -62,6 +63,8 @@ function ImageUploadCard({
   isUploading: boolean;
   onFileSelect: (file: File) => void;
   lastUploadedName?: string;
+  /** square = avatar/favicon; wide = app/email wordmark; landscape = screenshots */
+  preview?: "square" | "wide" | "landscape";
 }) {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     console.log("[ImageUploadCard] onChange triggered for", field);
@@ -74,19 +77,31 @@ function ImageUploadCard({
     e.target.value = "";
   };
 
+  // Reason: App/email logos are wide wordmarks (icon + ChartVolt + tagline). A
+  // fixed 128×128 preview with object-contain made them look tiny after upload
+  // even when the file was fine. Match the preview box to the artwork shape.
+  const previewBox =
+    preview === "wide"
+      ? "relative h-24 w-56 sm:h-28 sm:w-72"
+      : preview === "landscape"
+        ? "relative h-28 w-44 sm:h-32 sm:w-52"
+        : "relative h-32 w-32";
+
   return (
     <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-6 hover:border-purple-500/50 transition-all">
       <div className="flex items-start gap-6">
         {/* Preview */}
         <div className="flex-shrink-0">
           {currentPath ? (
-            <div className="relative h-32 w-32 bg-gray-900 border-2 border-gray-700 rounded-xl overflow-hidden shadow-lg">
+            <div
+              className={`${previewBox} bg-black border-2 border-gray-700 rounded-xl overflow-hidden shadow-lg`}
+            >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 key={currentPath}
                 src={currentPath}
                 alt={title}
-                className="absolute inset-0 w-full h-full object-contain p-3"
+                className="absolute inset-0 h-full w-full object-contain p-1.5"
                 onError={(e) => {
                   console.error(`Failed to load image: ${currentPath}`);
                   (e.target as HTMLImageElement).style.display = "none";
@@ -94,7 +109,9 @@ function ImageUploadCard({
               />
             </div>
           ) : (
-            <div className="h-32 w-32 bg-gray-900 border-2 border-dashed border-gray-600 rounded-xl flex items-center justify-center">
+            <div
+              className={`${previewBox} bg-gray-900 border-2 border-dashed border-gray-600 rounded-xl flex items-center justify-center`}
+            >
               <ImageIconLucide className="h-12 w-12 text-gray-600" />
             </div>
           )}
@@ -203,7 +220,7 @@ export default function ImagesSection() {
           siteUrl: data.siteUrl || "",
         });
       }
-    } catch (error) {
+    } catch {
       toast.error("Failed to load images");
     } finally {
       setIsFetching(false);
@@ -345,7 +362,7 @@ export default function ImagesSection() {
         const data = await response.json();
         toast.error(data.error || "Save failed");
       }
-    } catch (error) {
+    } catch {
       toast.error("An error occurred");
     } finally {
       setIsLoading(false);
@@ -386,7 +403,7 @@ export default function ImagesSection() {
       } else {
         toast.error(data.error || "Upload failed");
       }
-    } catch (error) {
+    } catch {
       toast.error("An error occurred during upload");
     } finally {
       setUploading((prev) => ({ ...prev, authPageDashboardImage: false }));
@@ -435,7 +452,7 @@ export default function ImagesSection() {
         const data = await response.json();
         toast.error(data.error || "Save failed");
       }
-    } catch (error) {
+    } catch {
       toast.error("An error occurred");
     } finally {
       setIsLoading(false);
@@ -492,10 +509,11 @@ export default function ImagesSection() {
             description="Main application logo displayed in header and navigation"
             field="appLogo"
             currentPath={images.appLogo}
-            recommendations="Recommended: 150x50px, PNG with transparency"
+            recommendations="Wide wordmark (icon + ChartVolt + tagline). Export tightly cropped — empty black margins make it look tiny. Ideal ~800×240 PNG on black or transparent. Do not use a 16:9 canvas with the mark in the middle."
             isUploading={uploading.appLogo}
             onFileSelect={handleFileSelect("appLogo")}
             lastUploadedName={uploadedNames.appLogo}
+            preview="wide"
           />
 
           <ImageUploadCard
@@ -503,10 +521,11 @@ export default function ImagesSection() {
             description="Logo used in email templates (welcome, alerts, summaries)"
             field="emailLogo"
             currentPath={images.emailLogo}
-            recommendations="Recommended: 150x50px, PNG with transparency"
+            recommendations="Same as App Logo — wide wordmark, tight crop. Recommended ~600×180 PNG."
             isUploading={uploading.emailLogo}
             onFileSelect={handleFileSelect("emailLogo")}
             lastUploadedName={uploadedNames.emailLogo}
+            preview="wide"
           />
 
           <ImageUploadCard
@@ -514,10 +533,11 @@ export default function ImagesSection() {
             description="Default user profile avatar image"
             field="profileImage"
             currentPath={images.profileImage}
-            recommendations="Recommended: 200x200px, Square format, PNG"
+            recommendations="Recommended: 200×200px, square, PNG"
             isUploading={uploading.profileImage}
             onFileSelect={handleFileSelect("profileImage")}
             lastUploadedName={uploadedNames.profileImage}
+            preview="square"
           />
 
           <ImageUploadCard
@@ -525,21 +545,23 @@ export default function ImagesSection() {
             description="Preview image used in welcome emails"
             field="dashboardPreview"
             currentPath={images.dashboardPreview}
-            recommendations="Recommended: 600x400px, JPEG or PNG"
+            recommendations="Recommended: 600×400px, JPEG or PNG"
             isUploading={uploading.dashboardPreview}
             onFileSelect={handleFileSelect("dashboardPreview")}
             lastUploadedName={uploadedNames.dashboardPreview}
+            preview="landscape"
           />
 
           <ImageUploadCard
             title="Favicon"
-            description="Browser tab icon for the application (appears in browser tabs and bookmarks)"
+            description="Browser tab icon — also used when the sidebar is collapsed"
             field="favicon"
             currentPath={images.favicon}
-            recommendations="Recommended: 32x32px or 64x64px, ICO, PNG, or SVG"
+            recommendations="Must be square (64×64 or 128×128). Use the controller+bolt mark alone, not the full ChartVolt wordmark."
             isUploading={uploading.favicon}
             onFileSelect={handleFileSelect("favicon")}
             lastUploadedName={uploadedNames.favicon}
+            preview="square"
           />
         </div>
 
@@ -557,6 +579,12 @@ export default function ImagesSection() {
                   public/assets/images/
                 </code>{" "}
                 and will be used throughout the application automatically.
+              </p>
+              <p className="text-xs text-gray-400 mt-2">
+                App / Email logos are wide wordmarks shown at ~40px tall in the
+                header and sidebar. Crop the file tightly — empty margins make
+                the mark look tiny. Favicon must stay square (collapsed sidebar).
+                Profile is square; dashboard preview is landscape.
               </p>
             </div>
           </div>

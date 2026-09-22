@@ -28,7 +28,16 @@ async function getAuthPageSettings() {
           appLogo: 1,
         })
         .lean(),
-    ])) as any[];
+    ])) as [
+      {
+        authPageTestimonialText?: string;
+        authPageTestimonialAuthor?: string;
+        authPageTestimonialRole?: string;
+        authPageTestimonialRating?: number;
+        authPageDashboardImage?: string;
+      } | null,
+      { appLogo?: string } | null,
+    ];
 
     return {
       testimonialText:
@@ -70,7 +79,7 @@ const Layout = async ({ children }: { children: React.ReactNode }) => {
       <section className="auth-left-section scrollbar-hide-default">
         <Link href="/" className="auth-logo">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={authSettings.logo} alt="logo" className="h-8 w-auto" />
+          <img src={authSettings.logo} alt="logo" className="h-10 w-auto max-w-[200px] object-contain" />
         </Link>
 
         <div className="pb-6 lg:pb-8 flex-1">{children}</div>

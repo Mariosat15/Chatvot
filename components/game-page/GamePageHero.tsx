@@ -39,13 +39,13 @@ export function GamePageHero({ game }: { game: GamePageData }) {
 
   return (
     <div className="relative min-h-[300px] overflow-hidden rounded-[12px] border border-[var(--gp-card-border,rgba(40,130,255,.35))] md:min-h-[340px]">
-      <div className="absolute inset-0">
+      <div className="absolute inset-0 bg-black">
         {game.bannerUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={game.bannerUrl}
             alt=""
-            className="h-full w-full object-cover"
+            className="h-full w-full object-contain object-right"
           />
         ) : (
           <div className="h-full w-full bg-gradient-to-br from-[var(--gp-accent-2)]/50 via-[var(--gp-bg)] to-[var(--gp-accent)]/30" />
@@ -57,13 +57,13 @@ export function GamePageHero({ game }: { game: GamePageData }) {
       <div className="relative flex min-h-[300px] flex-col justify-between gap-6 p-6 md:min-h-[340px] md:flex-row md:items-end md:p-8 lg:p-10">
         <div className="max-w-3xl space-y-4">
           <div className="flex flex-wrap items-center gap-4">
-            <div className="h-16 w-16 shrink-0 overflow-hidden rounded-[12px] border border-[var(--gp-border)] bg-black/50 sm:h-20 sm:w-20">
+            <div className="flex h-16 w-28 shrink-0 items-center justify-center overflow-hidden rounded-[12px] border border-[var(--gp-border)] bg-black/50 sm:h-20 sm:w-36">
               {game.logoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={game.logoUrl}
                   alt={`${game.title} logo`}
-                  className="h-full w-full object-cover"
+                  className="h-full w-full object-contain p-1"
                 />
               ) : (
                 <div className="flex h-full w-full items-center justify-center text-2xl font-black text-[var(--gp-accent)]">
