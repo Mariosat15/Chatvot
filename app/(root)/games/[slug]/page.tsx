@@ -14,6 +14,7 @@ export const dynamic = "force-dynamic";
 const ALLOWED_TABS = new Set([
   "overview",
   "how-it-works",
+  "competitions",
   "leaderboards",
   "prizes",
   "challenges",

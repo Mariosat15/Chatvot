@@ -1,113 +1,50 @@
 "use client";
 
 import Link from "next/link";
-import { challengeCreateHref } from "@/lib/services/games/game-page-helpers";
+import type { CSSProperties } from "react";
+import { Zap } from "lucide-react";
+import {
+  challengeCreateHref,
+  competitionBrowseHref,
+  resolvePlayNowHref,
+} from "@/lib/services/games/game-page-helpers";
 import type { GamePageData } from "@/lib/services/games/game-page.types";
 import { themeCssVariables } from "@/lib/services/games/game-page-themes";
 import { GamePageTabs } from "./GamePageTabs";
-import { GamePageOverview, HowItWorksSteps } from "./GamePageOverview";
-import { GamePagePanel } from "./GamePageChrome";
-
-function Hero({ game }: { game: GamePageData }) {
-  return (
-    <div className="relative overflow-hidden rounded-2xl border border-[var(--gp-border)]">
-      <div className="absolute inset-0">
-        {game.bannerUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={game.bannerUrl}
-            alt=""
-            className="h-full w-full object-cover opacity-45"
-          />
-        ) : (
-          <div className="h-full w-full bg-gradient-to-br from-[var(--gp-accent-2)]/40 via-[var(--gp-bg)] to-[var(--gp-accent)]/20" />
-        )}
-        <div className="absolute inset-0 bg-gradient-to-r from-[var(--gp-bg)] via-[var(--gp-bg)]/88 to-[var(--gp-bg)]/40" />
-      </div>
-
-      <div className="relative grid gap-6 p-6 sm:p-8 lg:grid-cols-[auto_1fr_auto] lg:items-end">
-        <div className="h-24 w-24 overflow-hidden rounded-2xl border border-[var(--gp-border)] bg-black/40 sm:h-28 sm:w-28">
-          {game.logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={game.logoUrl}
-              alt={`${game.title} logo`}
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center text-3xl font-black text-[var(--gp-accent)]">
-              {(game.title || "?").slice(0, 1)}
-            </div>
-          )}
-        </div>
-
-        <div className="max-w-2xl space-y-3">
-          {game.genre ? (
-            <span
-              className="inline-flex rounded-md px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-white"
-              style={{ background: "var(--gp-badge)" }}
-            >
-              {game.genre}
-            </span>
-          ) : null}
-          <h1 className="text-3xl font-black italic tracking-tight text-white sm:text-5xl">
-            {game.title}
-          </h1>
-          {game.tagline ? (
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[var(--gp-accent)]">
-              {game.tagline}
-            </p>
-          ) : null}
-          {game.description ? (
-            <p className="line-clamp-2 text-sm text-[var(--gp-muted)]">
-              {game.description}
-            </p>
-          ) : null}
-          {game.bannerFeatures && game.bannerFeatures.length > 0 ? (
-            <div className="flex flex-wrap gap-2 pt-1">
-              {game.bannerFeatures.map((f) => (
-                <span
-                  key={f.title}
-                  className="rounded-full border border-[var(--gp-border)] bg-black/30 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--gp-text)]"
-                >
-                  {f.title}
-                </span>
-              ))}
-            </div>
-          ) : null}
-        </div>
-
-        {game.stylizedQuote ? (
-          <p className="max-w-[10rem] text-right text-lg font-black italic leading-tight text-[var(--gp-accent)] drop-shadow-[0_0_12px_var(--gp-glow)] lg:self-center">
-            {game.stylizedQuote}
-          </p>
-        ) : null}
-      </div>
-    </div>
-  );
-}
+import { GamePageOverview } from "./GamePageOverview";
+import { GamePageHero } from "./GamePageHero";
+import { GamePageContests } from "./GamePageContests";
+import { GamePageHowItWorks } from "./GamePageHowItWorks";
+import { GamePageFeatured } from "./GamePageFeatured";
+import { GamePagePanel, GP_CTA_PRIMARY, GP_CTA_GREEN } from "./GamePageChrome";
 
 function RulesTab({ game }: { game: GamePageData }) {
+  const howTo =
+    Array.isArray(game.howToPlay) && game.howToPlay.length > 0
+      ? game.howToPlay.join("\n")
+      : "";
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <GamePagePanel>
-        <h2 className="text-sm font-bold text-[var(--gp-accent)]">Rules</h2>
-        <p className="mt-3 whitespace-pre-wrap text-sm text-[var(--gp-muted)]">
+        <h2 className="text-[18px] font-bold text-[var(--gp-accent)]">Rules</h2>
+        <p className="mt-3 whitespace-pre-wrap text-[15px] text-[var(--gp-muted)]">
           {game.rulesSummary || "Rules will appear here when published."}
         </p>
       </GamePagePanel>
       <GamePagePanel>
-        <h2 className="text-sm font-bold text-[var(--gp-accent)]">How to play</h2>
-        <p className="mt-3 whitespace-pre-wrap text-sm text-[var(--gp-muted)]">
-          {game.howToPlay || "How-to-play text will appear here when published."}
+        <h2 className="text-[18px] font-bold text-[var(--gp-accent)]">
+          How to play
+        </h2>
+        <p className="mt-3 whitespace-pre-wrap text-[15px] text-[var(--gp-muted)]">
+          {howTo || "How-to-play text will appear here when published."}
         </p>
       </GamePagePanel>
       {game.prizeEligibility ? (
         <GamePagePanel className="lg:col-span-2">
-          <h2 className="text-sm font-bold text-[var(--gp-accent)]">
+          <h2 className="text-[18px] font-bold text-[var(--gp-accent)]">
             Prize eligibility
           </h2>
-          <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-[var(--gp-muted)]">
+          <ul className="mt-3 list-disc space-y-1 pl-5 text-[15px] text-[var(--gp-muted)]">
             <li>
               A score of zero{" "}
               {game.prizeEligibility.zeroScoreEligible
@@ -140,23 +77,36 @@ function GalleryTab({ game }: { game: GamePageData }) {
   if (gallery.length === 0) {
     return (
       <GamePagePanel>
-        <p className="text-sm text-[var(--gp-muted)]">
+        <p className="text-[15px] text-[var(--gp-muted)]">
           No screenshots yet. Upload gallery assets in All Games → Assets.
         </p>
       </GamePagePanel>
     );
   }
+  return <GamePageFeatured game={game} />;
+}
+
+function StickyEnterBar({ game }: { game: GamePageData }) {
+  const href =
+    resolvePlayNowHref(game, game.joinableContests) ??
+    competitionBrowseHref(game.slug);
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      {gallery.map((item) => (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          key={item.id}
-          src={item.url}
-          alt={item.title || "Gallery image"}
-          className="aspect-video w-full rounded-xl border border-[var(--gp-border)] object-cover"
-        />
-      ))}
+    <div className="sticky bottom-3 z-40 mt-6 overflow-hidden rounded-[12px] border border-[var(--gp-card-border,rgba(40,130,255,.35))] bg-[var(--gp-panel,#07152c)]/95 px-4 py-3 shadow-[0_0_40px_rgba(0,0,0,.5)] backdrop-blur">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-[var(--gp-accent)] to-[var(--gp-accent-2)] text-sm font-black text-[#021018]">
+            CV
+          </div>
+          <p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-[var(--gp-muted)]">
+            <span className="text-[var(--gp-gold,#ffd33d)]">Better traders</span>{" "}
+            <span className="text-[var(--gp-accent)]">brighter tomorrow</span>
+          </p>
+        </div>
+        <Link href={href} className={`${GP_CTA_PRIMARY} !px-4 !py-2 !text-[13px]`}>
+          <Zap className="h-4 w-4" />
+          Enter Now
+        </Link>
+      </div>
     </div>
   );
 }
@@ -173,11 +123,11 @@ export function GamePageView({
 
   return (
     <div
-      className="min-h-[70vh] text-[var(--gp-text)]"
-      style={{ ...vars, background: "var(--gp-bg)" } as React.CSSProperties}
+      className="min-h-[70vh] text-[15px] text-[var(--gp-text)]"
+      style={{ ...vars, background: "var(--gp-bg)" } as CSSProperties}
     >
-      <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6">
-        <nav className="text-xs text-[var(--gp-muted)]">
+      <div className="mx-auto max-w-[1480px] space-y-4 px-4 py-6 sm:px-6 lg:px-8">
+        <nav className="text-[13px] text-[var(--gp-muted)]">
           <Link href="/games" className="hover:text-white">
             Games
           </Link>
@@ -185,42 +135,45 @@ export function GamePageView({
           <span className="text-white">{game.title}</span>
         </nav>
 
-        <Hero game={game} />
-
+        <GamePageHero game={game} />
         <GamePageTabs slug={game.slug} active={current} />
 
         {current === "overview" ? <GamePageOverview game={game} /> : null}
-        {current === "how-it-works" ? (
-          <GamePagePanel>
-            <h2 className="text-sm font-bold uppercase tracking-wider text-[var(--gp-accent)]">
-              How It Works
-            </h2>
-            <div className="mt-4">
-              <HowItWorksSteps game={game} />
-            </div>
+        {current === "how-it-works" ? <GamePageHowItWorks game={game} /> : null}
+        {current === "competitions" ? <GamePageContests game={game} /> : null}
+        {current === "leaderboards" ? (
+          <GamePagePanel className="space-y-4">
+            <h2 className="text-[20px] font-bold text-white">Leaderboard</h2>
+            <p className="text-[15px] text-[var(--gp-muted)]">
+              See how you rank across ChartVolt. Open the live leaderboard to
+              compare results for {game.title}.
+            </p>
+            <Link href="/leaderboard" className={GP_CTA_GREEN + " !w-auto"}>
+              Open Leaderboard
+            </Link>
           </GamePagePanel>
         ) : null}
         {current === "prizes" ? <RulesTab game={game} /> : null}
         {current === "challenges" ? (
           <GamePagePanel className="space-y-3">
-            <h2 className="text-sm font-bold text-[var(--gp-accent)]">
+            <h2 className="text-[18px] font-bold text-[var(--gp-accent)]">
               Challenges
             </h2>
             {game.formats.challenge ? (
               <>
-                <p className="text-sm text-[var(--gp-muted)]">
+                <p className="text-[15px] text-[var(--gp-muted)]">
                   Start a 1v1 at {game.title}. Entry amounts follow what
                   operators configured for this title.
                 </p>
                 <Link
                   href={challengeCreateHref(game.slug)}
-                  className="inline-flex rounded-xl bg-gradient-to-r from-[var(--gp-cta-from)] to-[var(--gp-cta-to)] px-4 py-2 text-sm font-semibold text-white"
+                  className={GP_CTA_PRIMARY}
                 >
                   Create 1v1 Challenge
                 </Link>
               </>
             ) : (
-              <p className="text-sm text-[var(--gp-muted)]">
+              <p className="text-[15px] text-[var(--gp-muted)]">
                 This title is not available as a 1v1 challenge.
               </p>
             )}
@@ -228,7 +181,12 @@ export function GamePageView({
         ) : null}
         {current === "rules" ? <RulesTab game={game} /> : null}
         {current === "gallery" ? <GalleryTab game={game} /> : null}
+
+        <StickyEnterBar game={game} />
       </div>
     </div>
   );
 }
+
+// Re-export for callers that imported steps from the view.
+export { HowItWorksSteps } from "./GamePageHowItWorks";

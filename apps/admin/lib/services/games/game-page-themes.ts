@@ -43,6 +43,7 @@ const THEME_IDS: readonly GamePageThemeId[] = [
 function vars(parts: {
   background: string;
   panel: string;
+  panel2?: string;
   accent: string;
   accent2: string;
   accent3: string;
@@ -53,10 +54,13 @@ function vars(parts: {
   ctaFrom: string;
   ctaTo: string;
   badge: string;
+  gold?: string;
+  green?: string;
 }): Record<string, string> {
   return {
     "--gp-background": parts.background,
     "--gp-panel": parts.panel,
+    "--gp-panel2": parts.panel2 ?? "#091b35",
     "--gp-accent": parts.accent,
     "--gp-accent2": parts.accent2,
     "--gp-accent3": parts.accent3,
@@ -67,6 +71,10 @@ function vars(parts: {
     "--gp-cta-from": parts.ctaFrom,
     "--gp-cta-to": parts.ctaTo,
     "--gp-badge": parts.badge,
+    "--gp-gold": parts.gold ?? "#ffd33d",
+    "--gp-green": parts.green ?? "#15e89d",
+    "--gp-card-border": "rgba(40,130,255,.35)",
+    "--gp-card-shadow": "inset 0 0 24px rgba(0,130,255,.05)",
   };
 }
 
@@ -158,21 +166,24 @@ export const GAME_PAGE_THEMES: readonly GamePageTheme[] = [
   {
     id: "trading-forge",
     label: "Trading Forge",
-    description: "Amber and slate for the trading game.",
+    description: "Deep navy with cyan and purple — Trading premium mock.",
     categoryHints: ["trading"],
     cssVars: vars({
-      background: "#0c0a09",
-      panel: "#1c1917",
-      accent: "#f59e0b",
-      accent2: "#64748b",
-      accent3: "#eab308",
-      text: "#fafaf9",
-      muted: "#a8a29e",
-      border: "rgba(245, 158, 11, 0.35)",
-      glow: "rgba(245, 158, 11, 0.35)",
-      ctaFrom: "#d97706",
-      ctaTo: "#f59e0b",
-      badge: "#f59e0b",
+      background: "#020817",
+      panel: "#07152c",
+      panel2: "#091b35",
+      accent: "#00d9ff",
+      accent2: "#a855f7",
+      accent3: "#ffd33d",
+      text: "#f4f8ff",
+      muted: "#8ea9c9",
+      border: "rgba(40, 130, 255, 0.35)",
+      glow: "rgba(0, 217, 255, 0.45)",
+      ctaFrom: "#1d8fff",
+      ctaTo: "#00d9ff",
+      badge: "#a855f7",
+      gold: "#ffd33d",
+      green: "#15e89d",
     }),
   },
   {
@@ -263,6 +274,7 @@ export function themeCssVariables(
   return {
     ...src,
     "--gp-bg": src["--gp-background"] ?? "",
+    "--gp-panel-2": src["--gp-panel2"] ?? "#091b35",
     "--gp-accent-2": src["--gp-accent2"] ?? "",
     "--gp-accent-3": src["--gp-accent3"] ?? "",
   };

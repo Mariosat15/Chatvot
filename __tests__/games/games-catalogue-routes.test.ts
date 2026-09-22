@@ -21,7 +21,7 @@ const HUB = "app/(root)/games/page.tsx";
 const GAME_PAGE = "app/(root)/games/[slug]/page.tsx";
 const CARD = "components/games/catalogue/GameCatalogueCard.tsx";
 const CONTESTS = "components/games/catalogue/GameContestList.tsx";
-const EMPTY = "components/games/catalogue/GameEmptyContests.tsx";
+const EMPTY = "components/game-page/GamePageContests.tsx";
 
 describe("games catalogue routes", () => {
   it("ships /games and /games/[slug] pages", () => {
@@ -35,8 +35,9 @@ describe("games catalogue routes", () => {
     // Next.js issues when prefetching a <Link>, so launch-on-load burns paid attempts on hover.
     expect(code).not.toMatch(/createRound|launchContestRound|launchRound/);
     expect(code).not.toMatch(/\/play["'`]/);
-    expect(code).toMatch(/getBrowsableGameBySlug/);
-    expect(code).toMatch(/listContestsForGame/);
+    // Reason: content comes from the aggregated game-page service; a GET only reads.
+    expect(code).toMatch(/getGamePageData/);
+    expect(code).toMatch(/GamePageView/);
   });
 
   it("catalogue cards and contest rows link to lobbies / game pages, never /play", () => {
@@ -53,8 +54,8 @@ describe("games catalogue routes", () => {
   it("empty game page is designed, not a blank return", () => {
     const page = readCode(GAME_PAGE);
     const empty = readCode(EMPTY);
-    expect(page).toMatch(/GameEmptyContests/);
-    expect(empty).toMatch(/No contests open yet/);
+    expect(page).toMatch(/GamePageView/);
+    expect(empty).toMatch(/No Contests Open Yet/i);
     expect(empty).toMatch(/\/competitions/);
   });
 });
