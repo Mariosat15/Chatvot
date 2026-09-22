@@ -82,7 +82,7 @@ export function GamePageInfoSidebar({ game }: { game: GamePageData }) {
   ];
 
   return (
-    <aside className="flex h-full flex-col gap-4">
+    <aside className="flex h-full min-h-full flex-col gap-3">
       <GamePagePanel>
         <h2 className="text-[13px] font-bold uppercase tracking-[0.16em] text-[var(--gp-accent)]">
           Game Info

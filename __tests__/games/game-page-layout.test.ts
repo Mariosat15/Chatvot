@@ -65,14 +65,18 @@ describe("player game page layout", () => {
     expect(view).toContain("competitions");
   });
 
-  it("uses a wider shell and cinematic hero", () => {
+  it("uses a cinematic hero that does not crop the banner art", () => {
     expect(view).toContain("max-w-[1480px]");
     expect(hero).toMatch(/min-h-\[300px\]/);
     expect(hero).toMatch(/md:min-h-\[340px\]/);
+    // Reason: object-cover sliced trophy / circuit art on the edges; contain
+    // keeps the full upload while the dark scrim still holds the copy.
+    expect(hero).toMatch(/object-contain/);
+    expect(hero).not.toMatch(/object-cover/);
   });
 
   it("uses a 65/35 overview with play-mode cards", () => {
-    expect(overview).toContain("lg:grid-cols-[1.65fr_1fr]");
+    expect(overview).toMatch(/lg:grid-cols-\[1\.85fr_1fr\]/);
     expect(overview).toContain("GamePageInfoSidebar");
     expect(sidebar).toMatch(/Play Modes/i);
     expect(sidebar).toContain("hover:border-[var(--gp-gold");
@@ -81,9 +85,11 @@ describe("player game page layout", () => {
   it("lets the overview preview image grow to the sidebar height", () => {
     // Reason: a fixed aspect-* box left a dark empty band under the image
     // whenever Game Info was taller — trading and provider pages both hit it.
+    // object-contain (not cover) so operator artwork is not cropped while the
+    // panel still flex-grows to match the sidebar.
     expect(overview).not.toMatch(/aspect-\[16\/10\]|aspect-video/);
     expect(overview).toMatch(/flex-1/);
-    expect(overview).toMatch(/object-cover/);
+    expect(overview).toMatch(/object-contain/);
     expect(overview).toMatch(/absolute inset-0/);
   });
 
@@ -95,7 +101,10 @@ describe("player game page layout", () => {
     expect(contests).toMatch(/object-contain/);
     expect(contests).toMatch(/h-auto w-full/);
     expect(tips).toMatch(/object-contain/);
-    expect(tips).toMatch(/h-auto w-full/);
+    // Tips image column flex-fills the leftover width and row height so there
+    // is no dead band between the tip list and the artwork.
+    expect(tips).toMatch(/flex-1/);
+    expect(tips).toMatch(/lg:flex-row/);
     expect(tips).not.toMatch(/object-cover/);
   });
 

@@ -21,13 +21,13 @@ export function GamePageOverview({ game }: { game: GamePageData }) {
   return (
     <div className="space-y-4">
       {/*
-        Reason: the preview used a fixed aspect ratio, so when the info sidebar
-        was taller the left column left a dark empty band under the image. Stretch
-        the column to the sidebar height and let the image panel grow (`flex-1`)
-        with `object-cover` so both trading and provider titles fill the gap.
+        Reason: stretch both columns to the same height so the info sidebar's
+        Enter Now sits at the bottom with no dark band under it, and the left
+        preview grows to match. A wide left track + tight gap closes the empty
+        strip between the marketing art and the sidebar (owner annotation).
       */}
-      <div className="grid items-stretch gap-4 lg:grid-cols-[1.65fr_1fr]">
-        <div className="flex h-full min-h-0 flex-col gap-4">
+      <div className="grid items-stretch gap-3 lg:grid-cols-[1.85fr_1fr]">
+        <div className="flex h-full min-h-0 flex-col gap-3">
           <GamePagePanel className="shrink-0">
             <h2 className="text-[13px] font-bold uppercase tracking-[0.16em] text-[var(--gp-accent)]">
               About {game.title}
@@ -52,13 +52,13 @@ export function GamePageOverview({ game }: { game: GamePageData }) {
           </GamePagePanel>
 
           <GamePagePanel className="flex min-h-[240px] flex-1 flex-col overflow-hidden p-0 sm:min-h-[280px]">
-            <div className="relative min-h-[200px] flex-1 bg-black/50">
+            <div className="relative min-h-[200px] flex-1 bg-black">
               {marketingUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={marketingUrl}
                   alt={`${game.title} preview`}
-                  className="absolute inset-0 h-full w-full object-cover"
+                  className="absolute inset-0 h-full w-full object-contain"
                 />
               ) : useCircuitArt ? (
                 <div className="absolute inset-0">
