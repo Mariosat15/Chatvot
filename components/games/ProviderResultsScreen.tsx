@@ -20,7 +20,7 @@ import {
 } from "@/components/neon/Cards";
 import { NeonButton } from "@/components/neon/Buttons";
 import { NeonHero, NeonStatusBadge } from "@/components/neon/Hero";
-import { providerBanner } from "@/components/neon/banners";
+import { resolveProviderBanner } from "@/components/neon/banners";
 import { NEON_TABLE_HEAD } from "@/components/neon/tokens";
 import { humanizeMetric } from "@/lib/utils/humanize-metric";
 import { competitionDetailsHref } from "@/lib/utils/competition-details-view";
@@ -95,6 +95,8 @@ export function ProviderResultsScreen({
   startTime,
   endTime,
   gameCode,
+  bannerUrl,
+  gameName,
   creditSymbol,
   refundedAmount,
 }: {
@@ -105,6 +107,9 @@ export function ProviderResultsScreen({
   startTime: string;
   endTime: string;
   gameCode?: string | null;
+  /** Catalogue / operator upload from Games & Trading settings. */
+  bannerUrl?: string | null;
+  gameName?: string | null;
   /** `AppSettings.credits.symbol`. Replaced a `currencySymbol` prop handed the fiat symbol. */
   creditSymbol?: string;
   /**
@@ -158,7 +163,11 @@ export function ProviderResultsScreen({
         difference that gets reported as a broken page.
       */}
       <NeonHero
-        banner={providerBanner(gameCode)}
+        banner={resolveProviderBanner({
+          bannerUrl,
+          gameName: gameName ?? contestName,
+          gameCode,
+        })}
         title={contestName}
         subtitle={description}
         status={<NeonStatusBadge status="completed" />}

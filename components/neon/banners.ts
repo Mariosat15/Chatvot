@@ -3,25 +3,21 @@ import type { NeonHeroBanner } from "@/components/neon/Hero";
 /**
  * Which banner a contest wears.
  *
- * WHY A LOCAL MAP AND NOT A CATALOGUE FIELD, which is the design that should eventually replace
- * this. The hard constraints already make page content contractual for a provider - "tagline,
- * description, rules summary, how-to-play, thumbnail and banner" - so a real provider's banner
- * belongs on `provider_game` as a `bannerUrl` alongside the `thumbnailUrl` that is already
- * there. Adding it now means a mirrored model change in both apps, a new entry in the catalogue
- * sync's field allow-list and an admin control, for a field whose only value would come from a
- * provider we have not signed. **It belongs with X4**, when a real partner's artwork arrives and
- * there is something to store. Recorded here rather than left as a silent gap.
+ * PREFERENCE ORDER (since Sep 2026): operator / catalogue `bannerUrl` from Games & Trading
+ * page settings first, then the neon map keyed by game code, then the championship trophy.
+ * Play pages already preferred the catalogue upload; lobbies and results now share the same
+ * helper so a title's artwork is one decision everywhere a hero appears.
  *
  * `thumbnailUrl` IS DELIBERATELY NOT USED AS A FALLBACK. A thumbnail is roughly square and a
  * hero is roughly four to one, so using one stretches a portrait into a letterbox - which looks
  * like a bug rather than like a missing asset, and is worse than the generic banner.
  *
- * AND THE REASON A HARD-CODED MAP IS ACCEPTABLE HERE when a hard-coded game list is banned
- * elsewhere: the rule that matters - no aggregate may enumerate game types - exists because an
- * aggregate that misses a game keeps computing, keeps rendering, and is silently wrong. A game
- * with no artwork falls through to a trophy, which is *visibly* generic to anyone who looks at
- * the page. The failure announces itself, so a fallback is a real answer rather than a hidden
- * defect. **Do not extend this reasoning to anything that produces a number.**
+ * AND THE REASON A HARD-CODED MAP IS ACCEPTABLE AS A FALLBACK when a hard-coded game list is
+ * banned elsewhere: the rule that matters - no aggregate may enumerate game types - exists
+ * because an aggregate that misses a game keeps computing, keeps rendering, and is silently
+ * wrong. A game with no artwork falls through to a trophy, which is *visibly* generic to anyone
+ * who looks at the page. The failure announces itself, so a fallback is a real answer rather
+ * than a hidden defect. **Do not extend this reasoning to anything that produces a number.**
  */
 
 /*
@@ -83,6 +79,19 @@ export function tradingBanner(): NeonHeroBanner {
 }
 
 /**
+ * Prefer the Trading page content banner (Games & Trading settings), else neon trading art.
+ */
+export function resolveTradingBanner(
+  bannerUrl?: string | null,
+): NeonHeroBanner {
+  const url = typeof bannerUrl === "string" ? bannerUrl.trim() : "";
+  if (url) {
+    return { src: url, alt: "Trading contest banner" };
+  }
+  return tradingBanner();
+}
+
+/**
  * The banner for a provider contest.
  *
  * Takes the game code rather than the contest, so this file never learns what a contest is and
@@ -91,6 +100,27 @@ export function tradingBanner(): NeonHeroBanner {
 export function providerBanner(gameCode?: string | null): NeonHeroBanner {
   if (!gameCode) return CHAMPIONSHIP;
   return BY_GAME_CODE.get(gameCode) ?? CHAMPIONSHIP;
+}
+
+/**
+ * Prefer catalogue / operator `bannerUrl`, else the neon map for the game code.
+ *
+ * ONE DEFINITION for lobby, play and results — a screen that resolves the banner itself is a
+ * second place the next title's artwork can be forgotten.
+ */
+export function resolveProviderBanner(opts: {
+  bannerUrl?: string | null;
+  gameName?: string | null;
+  gameCode?: string | null;
+}): NeonHeroBanner {
+  const url = typeof opts.bannerUrl === "string" ? opts.bannerUrl.trim() : "";
+  if (url) {
+    return {
+      src: url,
+      alt: (opts.gameName && opts.gameName.trim()) || "Contest banner",
+    };
+  }
+  return providerBanner(opts.gameCode);
 }
 
 /** Exposed so a test can assert every banner in the map resolves to a file that exists. */

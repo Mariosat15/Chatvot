@@ -1,6 +1,6 @@
 import { CandlestickChart, Clock, Link2, Trophy, Users } from "lucide-react";
 import { NeonHero, NeonStatusBadge } from "@/components/neon/Hero";
-import { tradingBanner } from "@/components/neon/banners";
+import { resolveTradingBanner } from "@/components/neon/banners";
 import { StatCard } from "@/components/neon/Cards";
 import InlineCountdown from "@/components/trading/InlineCountdown";
 import { formatVolts } from "@/lib/utils/format-volts";
@@ -29,6 +29,11 @@ export interface TradingLobbyHeroProps {
   competition: any;
   /** `AppSettings.credits.symbol`. Replaced a `currSymbol` prop handed the fiat symbol. */
   creditSymbol?: string;
+  /**
+   * Optional banner from Games & Trading page settings (`GamePageContent.bannerUrl`).
+   * Absent → neon trading fallback.
+   */
+  bannerUrl?: string | null;
   isActive: boolean;
   isUpcoming: boolean;
   isCompleted: boolean;
@@ -38,6 +43,7 @@ export interface TradingLobbyHeroProps {
 export default function TradingLobbyHero({
   competition,
   creditSymbol,
+  bannerUrl,
   isActive,
   isUpcoming,
   isCompleted,
@@ -45,7 +51,7 @@ export default function TradingLobbyHero({
 }: TradingLobbyHeroProps) {
   return (
     <NeonHero
-      banner={tradingBanner()}
+      banner={resolveTradingBanner(bannerUrl)}
       badge={{ icon: CandlestickChart, label: "Trading" }}
       title={competition.name}
       subtitle={competition.description}

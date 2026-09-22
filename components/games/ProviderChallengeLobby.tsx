@@ -20,7 +20,7 @@ import ChallengeEntryActions from "@/components/trading/ChallengeEntryActions";
 import ContestCountdown from "@/components/games/ContestCountdown";
 import GameRulesPanel from "@/components/games/GameRulesPanel";
 import { NeonHero, NeonStatusBadge } from "@/components/neon/Hero";
-import { providerBanner } from "@/components/neon/banners";
+import { resolveProviderBanner } from "@/components/neon/banners";
 import { NeonPill } from "@/components/neon/Buttons";
 import {
   NeonCountPill,
@@ -278,7 +278,11 @@ export default async function ProviderChallengeLobby({
       </div>
 
       <NeonHero
-        banner={providerBanner(challenge?.gameConfig?.gameCode)}
+        banner={resolveProviderBanner({
+          bannerUrl: presentation?.bannerUrl,
+          gameName: presentation?.gameName ?? gameName,
+          gameCode: challenge?.gameConfig?.gameCode,
+        })}
         badge={{ icon: Gamepad2, label: gameName }}
         title={`${terms.challenge} vs ${opponentName ?? terms.opponent}`}
         subtitle={

@@ -24,6 +24,7 @@ import { GameIcon } from "@/components/ui/GameIcon";
 import { hasProviderGameLabel } from "@/lib/services/games/contest-config";
 import { getProviderContestResults } from "@/lib/services/games/contest-results.service";
 import { ProviderResultsScreen } from "@/components/games/ProviderResultsScreen";
+import { getGamePresentation } from "@/lib/services/games/game-presentation.service";
 import { findUnscoredRefund } from "@/lib/services/settlement/unscored-refund";
 import AppSettingsModel from "@/database/models/app-settings.model";
 
@@ -96,7 +97,8 @@ const CompetitionResultsPage = async ({
       the right place for the composition - it is already the layer that knows about currency
       settings, which are nothing to do with a contest either.
     */
-    const [providerResults, refundedAmount, appSettings] = await Promise.all([
+    const [providerResults, refundedAmount, appSettings, presentation] =
+      await Promise.all([
       getProviderContestResults(competition, session.user.id),
       findUnscoredRefund(competitionId, session.user.id),
       // `credits.symbol`, not `currency.symbol`: a prize and a refunded entry fee are both
@@ -104,6 +106,10 @@ const CompetitionResultsPage = async ({
       AppSettingsModel.findById("app-settings")
         .lean<{ credits?: { symbol?: string } } | null>()
         .catch(() => null),
+      getGamePresentation(
+        competition.gameConfig?.providerKey,
+        competition.gameConfig?.gameCode ?? competition.gameCode,
+      ),
     ]);
 
     // No seat means there is nothing personal to show. The lobby has the public leaderboard,
@@ -152,6 +158,8 @@ const CompetitionResultsPage = async ({
           startTime={new Date(competition.startTime).toISOString()}
           endTime={new Date(competition.endTime).toISOString()}
           gameCode={competition.gameCode}
+          bannerUrl={presentation?.bannerUrl}
+          gameName={presentation?.gameName}
           creditSymbol={appSettings?.credits?.symbol || undefined}
           refundedAmount={refundedAmount}
         />

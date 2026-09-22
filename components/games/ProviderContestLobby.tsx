@@ -20,7 +20,7 @@ import ContestCountdown from "@/components/games/ContestCountdown";
 import GameRulesPanel from "@/components/games/GameRulesPanel";
 import PrizeTable from "@/components/competitions/PrizeTable";
 import { NeonHero, NeonStatusBadge } from "@/components/neon/Hero";
-import { providerBanner } from "@/components/neon/banners";
+import { resolveProviderBanner } from "@/components/neon/banners";
 import { NeonPill } from "@/components/neon/Buttons";
 import {
   NeonCountPill,
@@ -391,12 +391,15 @@ export default async function ProviderContestLobby({
 
       <NeonHero
         /*
-          The artwork is chosen by the game's own code, so a second title gets its own banner
-          without touching this file. A game we have no art for falls through to a generic
-          trophy, which is visibly generic rather than silently wrong - see `banners.ts` for why
-          that is an acceptable fallback here and would not be in anything producing a number.
+          Catalogue bannerUrl from Games & Trading settings first; neon map only when the
+          operator has not uploaded one. Same helper as play + results so one title cannot
+          wear three different heroes across the journey.
         */
-        banner={providerBanner(competition?.gameConfig?.gameCode)}
+        banner={resolveProviderBanner({
+          bannerUrl: presentation?.bannerUrl,
+          gameName: presentation?.gameName ?? gameName,
+          gameCode: competition?.gameConfig?.gameCode,
+        })}
         badge={{ icon: Gamepad2, label: gameName }}
         title={competition.name}
         subtitle={competition.description}

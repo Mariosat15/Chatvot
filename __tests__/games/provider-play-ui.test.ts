@@ -1032,9 +1032,12 @@ describe("the two lobbies are built from one design kit", () => {
   });
 
   it("points every hero banner at a file that exists", async () => {
-    const { allNeonBanners, providerBanner } = await import(
-      "../../components/neon/banners"
-    );
+    const {
+      allNeonBanners,
+      providerBanner,
+      resolveProviderBanner,
+      resolveTradingBanner,
+    } = await import("../../components/neon/banners");
 
     /*
       A banner whose file is missing renders as a broken image: no error, no log line, and the
@@ -1060,6 +1063,25 @@ describe("the two lobbies are built from one design kit", () => {
     expect(providerBanner("a-game-nobody-has-drawn-yet").src).toBe(
       providerBanner(null).src,
     );
+
+    // Catalogue upload wins over the neon map; blank/whitespace does not.
+    expect(
+      resolveProviderBanner({
+        bannerUrl: "https://cdn.example/circuit-sprint-banner.webp",
+        gameName: "Circuit Sprint",
+        gameCode: "circuit-sprint",
+      }).src,
+    ).toBe("https://cdn.example/circuit-sprint-banner.webp");
+    expect(
+      resolveProviderBanner({
+        bannerUrl: "   ",
+        gameCode: "circuit-sprint",
+      }).src,
+    ).toBe(providerBanner("circuit-sprint").src);
+    expect(
+      resolveTradingBanner("https://cdn.example/trading-banner.webp").src,
+    ).toBe("https://cdn.example/trading-banner.webp");
+    expect(resolveTradingBanner(null).src).toMatch(/banner-trading/);
   });
 
   it("picks the arena's hero by game, in the one place allowed to know the game", () => {
@@ -1086,11 +1108,37 @@ describe("the two lobbies are built from one design kit", () => {
       decision - the third being the one a test on the page alone cannot see.
     */
     const page = readCode("app/(root)/competitions/[id]/play/page.tsx");
-    expect(page).toMatch(/providerBanner\(contest\?\.gameConfig\?\.gameCode\)/);
+    expect(page).toMatch(/resolveProviderBanner\(/);
+    expect(page).toMatch(/bannerUrl:\s*presentation\.bannerUrl/);
     expect(page).toMatch(/banner=\{banner\}/);
 
     const layout = readCode("components/games/arena/GameArenaLayout.tsx");
     expect(layout).not.toMatch(/providerBanner/);
+    expect(layout).not.toMatch(/resolveProviderBanner/);
+  });
+
+  it("prefers catalogue bannerUrl on competition and challenge lobbies", () => {
+    /*
+      THE OWNER'S SCREENSHOT: a Circuit Sprint challenge wore the championship trophy because
+      the lobby called `providerBanner(gameCode)` and ignored `presentation.bannerUrl` that
+      Games & Trading settings already store. Play pages preferred the upload; lobbies must
+      share the same helper so one title cannot wear three heroes.
+    */
+    for (const lobby of [
+      "components/games/ProviderContestLobby.tsx",
+      "components/games/ProviderChallengeLobby.tsx",
+    ]) {
+      const code = readCode(lobby);
+      expect(code).toMatch(/resolveProviderBanner\(/);
+      expect(code).toMatch(/bannerUrl:\s*presentation\?\.bannerUrl/);
+      expect(code).not.toMatch(/banner=\{providerBanner\(/);
+    }
+
+    const tradingHero = readCode(
+      "components/trading/lobby/TradingLobbyHero.tsx",
+    );
+    expect(tradingHero).toMatch(/resolveTradingBanner\(/);
+    expect(tradingHero).toMatch(/bannerUrl/);
   });
 
   it("renders no trading panel on the game lobby", () => {

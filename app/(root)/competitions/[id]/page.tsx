@@ -34,6 +34,7 @@ import { unstable_noStore as noStore } from "next/cache";
 import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import AppSettingsModel from "@/database/models/app-settings.model";
+import { loadTradingPageContent } from "@/lib/services/games/trading-page-content";
 
 interface CompetitionDetailsPageProps {
   params: Promise<{ id: string }>;
@@ -329,6 +330,13 @@ const CompetitionDetailsPage = async ({
     const difficultyData = getDifficultyData();
 
     /*
+      Banner from Games & Trading page settings when the operator uploaded one; neon trading
+      art otherwise. Loaded only on this branch so a provider contest never pays for a trading
+      content read it will not render.
+    */
+    const tradingPage = await loadTradingPageContent();
+
+    /*
       The difficulty tint, emoji and description used to be three ninety-line dictionaries
       here. They are presentation for one card, so they moved into
       `components/trading/lobby/TradingLobbySidebar.tsx` with the card that renders them - as
@@ -378,6 +386,7 @@ const CompetitionDetailsPage = async ({
         <TradingLobbyHero
           competition={competition}
           creditSymbol={creditSymbol}
+          bannerUrl={tradingPage.bannerUrl}
           isActive={isActive}
           isUpcoming={isUpcoming}
           isCompleted={isCompleted}

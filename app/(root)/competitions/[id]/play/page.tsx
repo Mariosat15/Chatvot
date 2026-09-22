@@ -26,7 +26,7 @@ import {
 import ArenaLeaderboardPanel from "@/components/games/arena/ArenaLeaderboardPanel";
 import GameRulesPanel from "@/components/games/GameRulesPanel";
 import { NeonCountPill, NeonHeadedPanel } from "@/components/neon/Cards";
-import { providerBanner } from "@/components/neon/banners";
+import { resolveProviderBanner } from "@/components/neon/banners";
 import { Button } from "@/components/ui/button";
 
 /**
@@ -195,12 +195,14 @@ export default async function PlayPage({ params }: PlayPageProps) {
     `game-content-editor.test.ts` forbids a game code anywhere in that folder, because a
     screen that can name a game is a screen that can special-case one.
 
-    This is the one place that legitimately knows which game it is, so it picks. Precedence:
-    the operator's uploaded banner, then the title's own drawn artwork, then a generic trophy.
+    This is the one place that legitimately knows which game it is, so it picks via the shared
+    helper (operator upload → neon map → championship trophy).
   */
-  const banner = presentation.bannerUrl
-    ? { src: presentation.bannerUrl, alt: presentation.gameName }
-    : providerBanner(contest?.gameConfig?.gameCode);
+  const banner = resolveProviderBanner({
+    bannerUrl: presentation.bannerUrl,
+    gameName: presentation.gameName,
+    gameCode: contest?.gameConfig?.gameCode,
+  });
 
   const prizePositions = Array.isArray(contest?.prizeDistribution)
     ? contest.prizeDistribution.length

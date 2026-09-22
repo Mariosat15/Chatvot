@@ -21,7 +21,7 @@ import ChallengeStandingsPanel, {
 } from "@/components/games/arena/ChallengeStandingsPanel";
 import GameRulesPanel from "@/components/games/GameRulesPanel";
 import { NeonHeadedPanel, NeonRow } from "@/components/neon/Cards";
-import { providerBanner } from "@/components/neon/banners";
+import { resolveProviderBanner } from "@/components/neon/banners";
 import { formatVolts } from "@/lib/utils/format-volts";
 import { Button } from "@/components/ui/button";
 
@@ -196,12 +196,13 @@ export default async function ChallengePlayPage({ params }: ChallengePlayPagePro
     THE ARTWORK IS CHOSEN HERE RATHER THAN IN THE LAYOUT, and that is a guard rather than a
     preference: `game-content-editor.test.ts` forbids a game code anywhere in the arena folder,
     because a screen that can name a game is a screen that can special-case one. This page
-    already knows which game it is, so it picks. Operator banner first, then the title's own
-    drawn artwork, then the generic trophy.
+    already knows which game it is, so it picks via the shared helper.
   */
-  const banner = presentation.bannerUrl
-    ? { src: presentation.bannerUrl, alt: presentation.gameName }
-    : providerBanner(challenge?.gameConfig?.gameCode);
+  const banner = resolveProviderBanner({
+    bannerUrl: presentation.bannerUrl,
+    gameName: presentation.gameName,
+    gameCode: challenge?.gameConfig?.gameCode,
+  });
 
   return (
     <GameArenaLayout
