@@ -533,7 +533,7 @@ export default function ImagesSection() {
             description="Default user profile avatar image"
             field="profileImage"
             currentPath={images.profileImage}
-            recommendations="Recommended: 200×200px, square, PNG"
+            recommendations="Square avatar for accounts with no personal photo. Upload the new ChartVolt icon mark (controller + bolt), not the full wordmark — ~256×256 PNG."
             isUploading={uploading.profileImage}
             onFileSelect={handleFileSelect("profileImage")}
             lastUploadedName={uploadedNames.profileImage}

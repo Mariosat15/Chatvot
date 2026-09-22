@@ -25,11 +25,11 @@ const Header = ({ user }: { user: User }) => {
           <Image
             src={logoSrc}
             alt="logo"
-            width={200}
-            height={44}
+            width={240}
+            height={56}
             priority
             className="cursor-pointer object-contain"
-            style={{ width: "auto", height: "40px", maxWidth: "200px" }}
+            style={{ width: "auto", height: "48px", maxWidth: "240px" }}
             onError={() => setImgError(true)}
             unoptimized
           />

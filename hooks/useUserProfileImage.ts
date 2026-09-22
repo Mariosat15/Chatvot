@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 
-const DEFAULT_PROFILE_IMAGE = "/assets/images/PROFILE.png";
+const FALLBACK_PROFILE_IMAGE = "/assets/images/PROFILE.png";
 
 /**
  * Hook to fetch and manage the current user's profile image and frame
@@ -10,17 +10,19 @@ const DEFAULT_PROFILE_IMAGE = "/assets/images/PROFILE.png";
  */
 export function useUserProfileImage() {
   const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [brandingDefault, setBrandingDefault] = useState(FALLBACK_PROFILE_IMAGE);
   const [frameUrl, setFrameUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchProfileImage = useCallback(async () => {
     try {
-      const response = await fetch("/api/user/profile", {
-        cache: "no-store",
-      });
+      const [profileRes, brandingRes] = await Promise.all([
+        fetch("/api/user/profile", { cache: "no-store" }),
+        fetch(`/api/whitelabel/images?_=${Date.now()}`, { cache: "no-store" }),
+      ]);
 
-      if (response.ok) {
-        const data = await response.json();
+      if (profileRes.ok) {
+        const data = await profileRes.json();
         const userImage = data.user?.profileImage || data.profileImage;
         const userFrame = data.user?.activeFrameUrl || null;
         setProfileImage(userImage || null);
@@ -28,6 +30,16 @@ export function useUserProfileImage() {
       } else {
         setProfileImage(null);
         setFrameUrl(null);
+      }
+
+      // Reason: Branding → Profile Image is the operator-chosen default avatar.
+      // Hard-coding PROFILE.png left the old mark on every account without a
+      // personal photo after a logo refresh.
+      if (brandingRes.ok) {
+        const branding = await brandingRes.json();
+        if (typeof branding.profileImage === "string" && branding.profileImage) {
+          setBrandingDefault(branding.profileImage);
+        }
       }
     } catch (error) {
       console.error("Failed to fetch user profile image:", error);
@@ -42,13 +54,13 @@ export function useUserProfileImage() {
     fetchProfileImage();
   }, [fetchProfileImage]);
 
-  // Return the actual image or default if none exists
-  const displayImage = profileImage || DEFAULT_PROFILE_IMAGE;
+  const hasCustomImage = !!profileImage;
+  const displayImage = profileImage || brandingDefault;
 
   return {
     profileImage: displayImage,
     frameUrl,
-    hasCustomImage: !!profileImage,
+    hasCustomImage,
     hasFrame: !!frameUrl,
     loading,
     refresh: fetchProfileImage,

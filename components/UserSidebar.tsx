@@ -147,7 +147,7 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
   const terms = useTerms();
   const mainNavItems = buildMainNavItems(terms);
   const { images } = useWhiteLabelImages();
-  const { profileImage: userProfileImage } = useUserProfileImage();
+  const { profileImage: avatarSrc } = useUserProfileImage();
   const { unreadCount: unreadMessages } = useUnreadMessages();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -341,43 +341,46 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
       {/* Logo */}
-      <div className="p-4 border-b border-gray-800/50">
+      <div className={cn("border-b border-gray-800/50", isCollapsed ? "p-2" : "px-3 py-4")}>
         <Link
           href="/dashboard"
           className={cn(
-            "flex items-center",
-            isCollapsed ? "justify-center" : "gap-3",
+            "flex w-full items-center justify-center",
+            isCollapsed ? "min-h-12" : "min-h-16",
           )}
         >
           {isCollapsed ? (
-            /* Reason: When collapsed, show the square favicon/icon instead of the
-               full text logo to prevent squishing in the narrow w-20 sidebar. */
-            <div className="relative w-10 h-10 flex items-center justify-center">
-              <div className="absolute inset-0 bg-yellow-500/20 blur-xl rounded-full" />
+            /* Reason: collapsed width is ~80px — show the live app logo (wordmark
+               or mark) with contain, not the separate favicon. Operators often
+               update App Logo and leave Favicon on the old mark, so the rail
+               kept showing the previous brand after a logo swap. */
+            <div className="relative flex h-12 w-12 items-center justify-center">
+              <div className="absolute inset-0 rounded-full bg-yellow-500/20 blur-xl" />
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={images.favicon}
+                src={images.appLogo}
                 alt="logo"
-                width={32}
-                height={32}
-                className="relative z-10 cursor-pointer rounded-lg object-contain"
-                style={{ width: "32px", height: "32px" }}
+                width={48}
+                height={48}
+                className="relative z-10 h-11 w-11 cursor-pointer object-contain"
                 onError={(e) => {
                   (e.target as HTMLImageElement).src = "/assets/icons/logo.svg";
                 }}
               />
             </div>
           ) : (
-            <div className="relative">
-              <div className="absolute inset-0 bg-yellow-500/20 blur-xl rounded-full" />
+            /* Reason: 40px left a wide ChartVolt wordmark looking postage-stamp
+               sized and left-aligned in a ~256px rail. Fill the rail width and
+               centre it so the mark reads as the brand, not a corner icon. */
+            <div className="relative flex w-full max-w-[220px] items-center justify-center">
+              <div className="absolute inset-0 bg-yellow-500/15 blur-2xl" />
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={images.appLogo}
                 alt="logo"
-                width={200}
-                height={40}
-                className="relative z-10 cursor-pointer object-contain"
-                style={{ width: "auto", height: "40px", maxWidth: "200px" }}
+                width={220}
+                height={64}
+                className="relative z-10 h-14 w-auto max-w-full cursor-pointer object-contain sm:h-16"
                 onError={(e) => {
                   (e.target as HTMLImageElement).src = "/assets/icons/logo.svg";
                 }}
@@ -412,9 +415,9 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
               )} />
               <Avatar className={cn(
                 "relative ring-2 ring-gray-900 transition-all duration-300",
-                isCollapsed ? "h-9 w-9" : "h-12 w-12",
+                isCollapsed ? "h-11 w-11" : "h-14 w-14",
               )}>
-                <AvatarImage src={userProfileImage} />
+                <AvatarImage src={avatarSrc} className="object-cover" />
                 <AvatarFallback className={cn(
                   "bg-gradient-to-br from-yellow-500 to-orange-500 text-gray-900 font-bold",
                   isCollapsed ? "text-sm" : "text-lg",
@@ -581,10 +584,10 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
           <img
             src={images.appLogo}
             alt="logo"
-            width={160}
-            height={36}
+            width={180}
+            height={44}
             className="object-contain"
-            style={{ width: "auto", height: "36px", maxWidth: "160px" }}
+            style={{ width: "auto", height: "40px", maxWidth: "180px" }}
             onError={(e) => {
               (e.target as HTMLImageElement).src = "/assets/icons/logo.svg";
             }}
