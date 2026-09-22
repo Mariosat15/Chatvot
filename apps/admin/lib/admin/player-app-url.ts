@@ -12,9 +12,9 @@ export function getPlayerAppBaseUrl(): string {
   return raw.replace(/\/$/, "");
 }
 
-/** Player catalogue page for one title — slug is `gameCode` (see player-catalogue.service). */
-export function playerGamePageHref(gameCode: string): string {
-  const path = `/games/${encodeURIComponent(gameCode)}`;
+/** Player catalogue page for one title — pass the catalogue entry slug (seeded as gameCode / trading). */
+export function playerGamePageHref(slug: string): string {
+  const path = `/games/${encodeURIComponent(slug)}`;
   const base = getPlayerAppBaseUrl();
   return base ? `${base}${path}` : path;
 }

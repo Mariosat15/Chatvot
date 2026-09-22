@@ -307,7 +307,10 @@ function buildTradingPage(
       practice: false,
     },
     status: "active",
-    joinableContests: contests,
+    joinableContests: card.comingSoon ? [] : contests,
+    comingSoon: card.comingSoon,
+    seoTitle: card.seoTitle,
+    seoDescription: card.seoDescription,
   };
 }
 
@@ -432,7 +435,11 @@ function buildProviderPage(
         : title.challengeDefaults && typeof title.challengeDefaults === "object"
           ? title.challengeDefaults
           : undefined,
-    joinableContests: contests,
+    // Reason: coming-soon must not advertise seats (plan acceptance).
+    joinableContests: card.comingSoon ? [] : contests,
+    comingSoon: card.comingSoon,
+    seoTitle: card.seoTitle,
+    seoDescription: card.seoDescription,
   };
 }
 
@@ -445,7 +452,10 @@ export async function getGamePageData(
   const card = await getBrowsableGameBySlug(slug);
   if (!card) return null;
 
-  const contests = await listContestsForGame(card.gameKey);
+  // Reason: still load contests for non-coming-soon; coming-soon forces [] in the builders.
+  const contests = card.comingSoon
+    ? []
+    : await listContestsForGame(card.gameKey);
 
   if (card.kind === "trading" || card.slug === TRADING_GAME_TYPE) {
     const content = await loadTradingPageContent();

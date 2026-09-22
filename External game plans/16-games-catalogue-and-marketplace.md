@@ -67,6 +67,39 @@ touching the second.
 Keep both. Some players browse by game, others by what starts soonest or has the biggest
 pot. Replacing one with the other loses half the audience.
 
+
+> **BUILT 22 September 2026 — thin `GameCatalogueEntry` merchandising (option 1, authoritative).**
+>
+> **Live code:** mirrored `database/models/games/game-catalogue-entry.model.ts`,
+> `lib/services/games/game-catalogue-entry.service.ts` (mirrored, byte-identical test),
+> player discovery rewrite in `player-catalogue.service.ts`, admin
+> `CatalogueMerchandisingPanel` + `GET/PATCH /api/games/catalogue/[gameKey]`.
+>
+> **Nine facts drift easily.**
+>
+> 1. **It is a thin shop window, not chapter 16's full content model** — no
+>    `displayName` / rules / artwork on the entry. Content stays on `provider_game`
+>    and trading `game_page_content` (owner choice 22 Sep 2026). A document describing
+>    content fields on the entry is describing the plan, not the build.
+> 2. **Slug seeds as `trading` or the title's `gameCode`** so existing
+>    `/games/circuit-sprint` links keep working; permanent after create (no rename in v1).
+>    Collision fallback: `{providerKey}-{gameCode}`.
+> 3. **`gameKey` is unique per entry in v1** — several catalogue pages over one title stay deferred.
+> 4. **Ensure never deletes** — disable leaves the row; discovery gates hide it (R29).
+>    Upserts are `$setOnInsert` so operator merchandising survives sync.
+> 5. **Ensure runs after catalogue sync and as a player-list safety net** (idempotent).
+> 6. **`isVisible: false` removes hub and slug resolution**; live contests stay reachable by
+>    direct link.
+> 7. **`comingSoon` still resolves the page** but empties joinable contests / join CTAs.
+> 8. **Hub sorts by `sortOrder` then slug**; featured cards get a separate section when any exist.
+> 9. **Admin controls live on All Games (side rail) and Trading Page (Merchandising tab)**,
+>    not a separate Game Catalogue menu section — grant is `game-providers` or `trading-page`.
+>
+> Tests: `player-catalogue.test.ts`, `catalogue-merchandising.test.ts`. Never verified by eye.
+>
+> The Slice 1 BUILT note below remains correct as history for the content/discovery split;
+> facts 1 and 8 there that said "no GameCatalogueEntry" are **stale as present facts**.
+
 > **BUILT 21 September 2026 — X11 Slice 1 (authoritative for what exists today).**
 >
 > **Live code:** `lib/services/games/player-catalogue.service.ts`,
@@ -76,13 +109,11 @@ pot. Replacing one with the other loses half the audience.
 >
 > **Eight facts drift easily.**
 >
-> 1. **There is no `GameCatalogueEntry` yet** — Slice 1 reads `provider_game` presentation
->    plus a first-class Trading card. The merchandising model above is **deferred to Slice 2**
->    because one live title already has editable content fields; a second table would be empty
->    overhead until a second title needs independent pages over one provider row. A document
->    saying the catalogue model shipped with Slice 1 is wrong.
-> 2. **Slug is `trading` or the title's `gameCode`**, not a separate permanent merchandising
->    slug. `gameKey` remains the join key for contests.
+> 1. **There was no `GameCatalogueEntry` in Slice 1** (correct as history) — discovery read
+>    `provider_game` plus Trading. **Thin merchandising shipped 22 Sep 2026** (see amendment
+>    above). Full content-on-entry fields remain unimplemented on purpose.
+> 2. **Slug is still `trading` or `gameCode` after seed** — now stored on the entry and
+>    permanent. `gameKey` remains the join key for contests.
 > 3. **Provider discovery hard-gates `externalGamesEnabled`** (same reasoning as challenges) —
 >    the admin contest reader's warning is not enough for a player hub.
 > 4. **`/competitions` is retained** and still has no HOT badge; Games carries HOT.
@@ -92,12 +123,9 @@ pot. Replacing one with the other loses half the audience.
 >    supported, always a path to Competitions; never a blank page.
 > 7. **League table and the player's own record on this page are not built** — X7 already
 >    has leaderboards and profile standing elsewhere; do not invent a third board here.
-> 8. **Admin "Game Catalogue" merchandising section is not built** — **AMENDED 21 Sep 2026:**
->    operators now have a **centralised Games workspace** under GAMES → All Games
->    (`12` s4.1c) that edits the same `provider_game` fields the old catalogue dialogs did.
->    What is still deferred is **`GameCatalogueEntry`** (featured / coming-soon / reorder as
->    a second table). Discovery-only hide when a title is toggled off (existing switches);
->    live contests are never cancelled by that toggle.
+> 8. **Admin merchandising is on All Games / Trading Page, not a separate menu section** —
+>    **AMENDED 22 Sep 2026:** thin `GameCatalogueEntry` controls ship beside the workspace
+>    (`12` s4.1d). Hide is discovery-only; live contests are never cancelled by that toggle.
 >
 > 23 tests (`player-catalogue`, `games-catalogue-routes`, `games-first-nav`). Never verified
 > by eye.

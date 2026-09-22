@@ -231,5 +231,16 @@ export async function syncProviderCatalogue(
     { $set: { lastCatalogueSyncAt: new Date() } },
   );
 
+  // Reason: shop-window rows for newly enabled titles. Idempotent; never deletes; never
+  // overwrites operator merchandising. Player list also calls ensure as a safety net.
+  try {
+    const { ensureCatalogueEntries } = await import(
+      "@/lib/services/games/game-catalogue-entry.service"
+    );
+    await ensureCatalogueEntries();
+  } catch (error) {
+    console.warn("⚠️ Catalogue entry ensure after sync failed:", error);
+  }
+
   return { ...base, success: true };
 }

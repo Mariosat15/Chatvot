@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, LayoutTemplate, Image as ImageIcon, Palette } from "lucide-react";
+import { Loader2, LayoutTemplate, Image as ImageIcon, Palette, Store } from "lucide-react";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import GameContentDialog from "@/components/admin/games/GameContentDialog";
 import GamePageThemeEditor from "@/components/admin/games/GamePageThemeEditor";
+import CatalogueMerchandisingPanel from "@/components/admin/games/CatalogueMerchandisingPanel";
 import type { ProviderTitleRow } from "@/components/admin/games/provider-types";
 import {
   TRADING_PAGE_ARTWORK_CODE,
@@ -14,13 +15,13 @@ import {
 } from "@/lib/services/games/trading-page-defaults";
 
 /**
- * Page Content / Assets / Page Theme for Trading — same editors as All Games, no Settings.
+ * Page Content / Assets / Page Theme / Merchandising for Trading — same editors as All Games.
  *
  * Settings for trading (symbols, risk, market hours) already live on the other Trading tabs.
  * This destination only edits what players see on `/games/trading`.
  */
 
-type PageTab = "content" | "assets" | "theme";
+type PageTab = "content" | "assets" | "theme" | "merchandising";
 
 const CONTENT_ENDPOINT = "/api/games/trading/page-content";
 const ARTWORK_ENDPOINT = "/api/games/trading/artwork";
@@ -29,6 +30,7 @@ const TABS: { id: PageTab; label: string; icon: React.ReactNode }[] = [
   { id: "content", label: "Page content", icon: <LayoutTemplate className="h-4 w-4" /> },
   { id: "assets", label: "Assets", icon: <ImageIcon className="h-4 w-4" /> },
   { id: "theme", label: "Page theme", icon: <Palette className="h-4 w-4" /> },
+  { id: "merchandising", label: "Merchandising", icon: <Store className="h-4 w-4" /> },
 ];
 
 function asTitleRow(content: Record<string, unknown>): ProviderTitleRow {
@@ -206,6 +208,13 @@ export default function TradingPageSection() {
             title={title}
             contentEndpoint={CONTENT_ENDPOINT}
             onSaved={onSaved}
+          />
+        )}
+        {tab === "merchandising" && (
+          <CatalogueMerchandisingPanel
+            key={title.gameKey}
+            gameKey={TRADING_PAGE_GAME_KEY}
+            fallbackSlug="trading"
           />
         )}
       </Card>

@@ -522,6 +522,24 @@ export async function setTitleEnabled(
 
   title.chartvoltEnabled = enabled;
   await title.save();
+
+  // Reason: enabling a title should create its shop-window row immediately so All Games
+  // merchandising and /games do not wait for the next sync. Never delete on disable.
+  if (enabled) {
+    try {
+      const { ensureProviderCatalogueEntry } = await import(
+        "@/lib/services/games/game-catalogue-entry.service"
+      );
+      await ensureProviderCatalogueEntry({
+        providerKey: title.providerKey,
+        gameCode: title.gameCode,
+        gameKey: title.gameKey,
+      });
+    } catch (error) {
+      console.warn("⚠️ Catalogue entry ensure after enable failed:", error);
+    }
+  }
+
   return { success: true };
 }
 

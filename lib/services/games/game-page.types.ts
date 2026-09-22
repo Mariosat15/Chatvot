@@ -140,4 +140,12 @@ export interface GamePageData {
   gameSettings?: Record<string, unknown>;
 
   joinableContests: GamePageContestSummary[];
+
+  /**
+   * From the thin catalogue entry. Coming-soon pages still render content but must not
+   * advertise joinable contests (joinableContests is forced empty by the aggregator).
+   */
+  comingSoon?: boolean;
+  seoTitle?: string;
+  seoDescription?: string;
 }

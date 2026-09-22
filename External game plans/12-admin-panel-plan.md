@@ -1859,7 +1859,7 @@ unless an operator has switched that behaviour on for that provider.**
 
 The per-title settings that used to live in the catalogue table's five dialogs are now one
 screen. **UI reorganisation only** — same routes, same field names, same validation, same
-`game-providers` grant. Chapter `16`'s Slice 2 merchandising model is **still not built**.
+`game-providers` grant. Chapter `16`'s full content-on-entry model is **still not built**; **thin merchandising shipped as s4.1d** (22 Sep 2026).
 
 | Piece | File |
 |---|---|
@@ -1874,9 +1874,9 @@ screen. **UI reorganisation only** — same routes, same field names, same valid
 
 **Seven facts drift easily.**
 
-1. **There is still no `GameCatalogueEntry`** — this Slice 2 is the workspace, not the
-   merchandising model in `16`. A document saying the second table shipped with the workspace
-   is wrong.
+1. **There was no `GameCatalogueEntry` in s4.1c** (correct as history) — the workspace alone.
+   **Thin merchandising shipped in s4.1d** (22 Sep). Full content fields on the entry remain
+   unimplemented on purpose.
 2. **The section id did not change** — renaming would orphan every employee grant; the label
    alone moved to All Games.
 3. **Add means sync via Providers** — there is no create-title API; the violet control switches
@@ -1892,6 +1892,36 @@ screen. **UI reorganisation only** — same routes, same field names, same valid
    five editors; that was the dual-writer the workspace exists to remove.
 
 **Theme:** admin `gray-800` / `gray-700` chrome, not a custom navy palette.
+
+**Not verified by eye.**
+
+
+### 4.1d Thin GameCatalogueEntry merchandising - BUILT 22 September 2026
+
+Shop-window controls for how games appear on `/games`. **Does not store page content** —
+names, rules and artwork stay on `provider_game` / `game_page_content` (owner option 1).
+
+| Piece | File |
+|---|---|
+| Model (mirrored) | `database/models/games/game-catalogue-entry.model.ts` |
+| Ensure + PATCH helpers (mirrored) | `lib/services/games/game-catalogue-entry.service.ts` |
+| Admin UI | `CatalogueMerchandisingPanel.tsx` on All Games side rail + Trading Page Merchandising tab |
+| Route | `GET/PATCH /api/games/catalogue/[gameKey]` — `guardAnySection(["game-providers","trading-page"])` |
+| Player reader | `player-catalogue.service.ts` merges entry + content |
+| Tests | `__tests__/services/player-catalogue.test.ts`, `__tests__/admin/catalogue-merchandising.test.ts` |
+
+**Eight facts drift easily.**
+
+1. **Content fields from `16`'s table are deliberately absent** — a document describing
+   displayName on the entry is describing the rejected option.
+2. **Ensure never deletes and never overwrites operator fields** — `$setOnInsert` only.
+3. **Slug is read-only in the UI** — permanent after create; seed = `gameCode` / `trading`.
+4. **One entry per `gameKey` in v1** — multi-page-per-title deferred.
+5. **Hide is discovery-only** — contest deep links keep working.
+6. **Coming soon empties join CTAs / joinable contests** on the game page, not the hub card.
+7. **Nothing here compares under `check:mirrors` except the model** — the service is pinned
+   byte-identical by a test.
+8. **s4.1c's "no GameCatalogueEntry" claim is history** — correct for the workspace-only slice.
 
 **Not verified by eye.**
 

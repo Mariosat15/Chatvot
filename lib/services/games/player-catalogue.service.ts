@@ -1,25 +1,26 @@
 import { connectToDatabase } from "@/database/mongoose";
 import Competition from "@/database/models/trading/competition.model";
+import GameCatalogueEntry from "@/database/models/games/game-catalogue-entry.model";
 import GameProvider from "@/database/models/games/game-provider.model";
 import ProviderGame from "@/database/models/games/provider-game.model";
 import { WhiteLabel } from "@/database/models/whitelabel.model";
 import { getEnabledGameTypes, TRADING_GAME_TYPE } from "@/lib/games";
 import { getProviderAdapter } from "@/lib/services/game-providers/registry";
 import { resolveGameCategory } from "@/lib/services/games/game-categories";
+import {
+  ensureCatalogueEntries,
+} from "@/lib/services/games/game-catalogue-entry.service";
 import { loadTradingPageContent } from "@/lib/services/games/trading-page-content";
 import { TRADING_PAGE_DEFAULTS } from "@/lib/services/games/trading-page-defaults";
 
 /**
- * Player-facing games catalogue (X11 Slice 1).
+ * Player-facing games catalogue (X11 Slice 1 + thin merchandising Slice 2).
  *
- * BUILT ON EXISTING DATA — `provider_game` presentation plus trading as a first-class card.
- * There is deliberately NO `GameCatalogueEntry` merchandising model yet: with one live
- * provider title that already has editable content fields, a second table is empty
- * overhead. Slice 2 adds that model when a second title needs independent merchandising
- * over one provider row. See `External game plans/16` BUILT note.
+ * Discovery reads `game_catalogue_entry` for order / featured / visible / coming-soon,
+ * then merges page presentation from `provider_game` or trading `game_page_content`.
+ * Content is NOT stored on the merchandising row (owner option 1, 22 Sep 2026).
  *
- * MAIN-APP ONLY. `apps/admin` already owns catalogue editing through the provider Games
- * content dialog; mirroring a player reader ahead of a caller is the R42 trap.
+ * MAIN-APP ONLY for this reader. Admin edits merchandising through the workspace PATCH.
  *
  * Discovery may call `getEnabledGameTypes()`; stats and leaderboard reads must not (R29).
  */
@@ -27,7 +28,7 @@ import { TRADING_PAGE_DEFAULTS } from "@/lib/services/games/trading-page-default
 export type BrowsableGameKind = "trading" | "provider";
 
 export interface BrowsableGame {
-  /** URL segment under `/games/[slug]`. Trading is `"trading"`; provider titles use `gameCode`. */
+  /** URL segment under `/games/[slug]` — from the catalogue entry (seeded as gameCode / trading). */
   slug: string;
   /** Immutable join key for contests and stats. */
   gameKey: string;
@@ -44,6 +45,11 @@ export interface BrowsableGame {
   providerKey?: string;
   gameCode?: string;
   supportsOneVsOne?: boolean;
+  isFeatured: boolean;
+  comingSoon: boolean;
+  sortOrder: number;
+  seoTitle?: string;
+  seoDescription?: string;
 }
 
 export interface CatalogueContestSummary {
@@ -59,7 +65,10 @@ export interface CatalogueContestSummary {
 }
 
 /** Fallback when the DB read fails mid-list — same copy the store seeds from. */
-const TRADING_CATALOGUE_FALLBACK: BrowsableGame = {
+const TRADING_CATALOGUE_FALLBACK: Omit<
+  BrowsableGame,
+  "isFeatured" | "comingSoon" | "sortOrder" | "seoTitle" | "seoDescription"
+> = {
   slug: TRADING_GAME_TYPE,
   gameKey: TRADING_GAME_TYPE,
   kind: "trading",
@@ -71,7 +80,12 @@ const TRADING_CATALOGUE_FALLBACK: BrowsableGame = {
   howToPlay: TRADING_PAGE_DEFAULTS.howToPlay,
 };
 
-async function tradingCatalogueCard(): Promise<BrowsableGame> {
+async function tradingContentCard(): Promise<
+  Omit<
+    BrowsableGame,
+    "isFeatured" | "comingSoon" | "sortOrder" | "seoTitle" | "seoDescription"
+  >
+> {
   try {
     const content = await loadTradingPageContent();
     return {
@@ -93,8 +107,6 @@ async function tradingCatalogueCard(): Promise<BrowsableGame> {
   }
 }
 
-const LIVE_STATUSES = ["upcoming", "active"] as const;
-
 function mapProviderTitle(title: {
   providerKey: string;
   gameCode: string;
@@ -108,9 +120,11 @@ function mapProviderTitle(title: {
   rulesSummary?: string;
   howToPlay?: string;
   supportsOneVsOne?: boolean;
-}): BrowsableGame {
+}): Omit<
+  BrowsableGame,
+  "slug" | "isFeatured" | "comingSoon" | "sortOrder" | "seoTitle" | "seoDescription"
+> {
   return {
-    slug: title.gameCode,
     gameKey: title.gameKey,
     kind: "provider",
     displayName: title.displayName,
@@ -127,23 +141,60 @@ function mapProviderTitle(title: {
   };
 }
 
+const LIVE_STATUSES = ["upcoming", "active"] as const;
+
+type EntryLean = {
+  slug: string;
+  gameKey: string;
+  gameType: "trading" | "provider";
+  providerKey?: string;
+  gameCode?: string;
+  sortOrder: number;
+  isFeatured: boolean;
+  isVisible: boolean;
+  comingSoon: boolean;
+  seoTitle?: string;
+  seoDescription?: string;
+};
+
+function withMerchandising(
+  base: Omit<
+    BrowsableGame,
+    "slug" | "isFeatured" | "comingSoon" | "sortOrder" | "seoTitle" | "seoDescription"
+  > & { slug?: string },
+  entry: EntryLean,
+): BrowsableGame {
+  return {
+    ...base,
+    slug: entry.slug,
+    isFeatured: Boolean(entry.isFeatured),
+    comingSoon: Boolean(entry.comingSoon),
+    sortOrder: typeof entry.sortOrder === "number" ? entry.sortOrder : 100,
+    seoTitle: entry.seoTitle || undefined,
+    seoDescription: entry.seoDescription || undefined,
+  };
+}
+
 /**
- * Provider titles a player may discover — same three switches as
- * `listChallengeableTitles`, WITHOUT the 1v1-only gates, WITH a hard
- * `externalGamesEnabled` gate (player has no "draft ahead of launch" case).
+ * Provider titles that may back a catalogue card — same switches as before.
+ * Does not apply merchandising visibility (that is on the entry).
  */
-async function listProviderCatalogueTitles(): Promise<BrowsableGame[]> {
+async function loadPlayableProviderTitles(): Promise<
+  Map<
+    string,
+    ReturnType<typeof mapProviderTitle>
+  >
+> {
   const settings = await WhiteLabel.findOne()
     .select("externalGamesEnabled")
     .lean<{ externalGamesEnabled?: boolean } | null>();
 
-  // Reason: hard gate. A card that fails on enter is worse than an absent card.
-  if (!settings?.externalGamesEnabled) return [];
+  if (!settings?.externalGamesEnabled) return new Map();
 
   const providers = await GameProvider.find({ enabled: true }).lean<
     { providerKey: string }[]
   >();
-  if (providers.length === 0) return [];
+  if (providers.length === 0) return new Map();
 
   const enabledKeys = providers.map((p) => p.providerKey);
   const titles = await ProviderGame.find({
@@ -154,37 +205,48 @@ async function listProviderCatalogueTitles(): Promise<BrowsableGame[]> {
     .select(
       "providerKey gameCode gameKey displayName tagline description category thumbnailUrl bannerUrl rulesSummary howToPlay supportsOneVsOne",
     )
-    .sort({ displayName: 1 })
     .lean();
 
-  return titles
-    .filter((title) => Boolean(getProviderAdapter(title.providerKey)))
-    .map(mapProviderTitle);
+  const map = new Map<string, ReturnType<typeof mapProviderTitle>>();
+  for (const title of titles) {
+    if (!getProviderAdapter(title.providerKey)) continue;
+    map.set(title.gameKey, mapProviderTitle(title));
+  }
+  return map;
 }
 
 /**
  * Every game a signed-in player may browse.
  *
- * Trading first when enabled (`getEnabledGameTypes` / invariant 5). Provider rows only when
- * the platform master switch and the three title switches allow them.
- *
- * MUST NOT enumerate game codes. Cards come from stored rows (plus the one trading module).
+ * Reads visible catalogue entries (ensure first), merges content, gates trading via
+ * enabledGameTypes and providers via the playable-title map.
  */
 export async function listBrowsableGames(): Promise<BrowsableGame[]> {
   await connectToDatabase();
+  await ensureCatalogueEntries();
 
   const enabledTypes = await getEnabledGameTypes();
+  const tradingOn = enabledTypes.includes(TRADING_GAME_TYPE);
+  const providerTitles = await loadPlayableProviderTitles();
+
+  const entries = await GameCatalogueEntry.find({ isVisible: true })
+    .sort({ sortOrder: 1, slug: 1 })
+    .lean<EntryLean[]>();
+
   const out: BrowsableGame[] = [];
 
-  if (enabledTypes.includes(TRADING_GAME_TYPE)) {
-    out.push(await tradingCatalogueCard());
-  }
+  for (const entry of entries) {
+    if (entry.gameType === "trading") {
+      if (!tradingOn) continue;
+      const content = await tradingContentCard();
+      out.push(withMerchandising(content, entry));
+      continue;
+    }
 
-  // Reason: provider discovery is gated by externalGamesEnabled inside the helper, not by
-  // whether "provider" appears in enabledGameTypes alone — a misconfigured type list must
-  // not surface titles the hard gate would refuse on play.
-  const providers = await listProviderCatalogueTitles();
-  out.push(...providers);
+    const title = providerTitles.get(entry.gameKey);
+    if (!title) continue;
+    out.push(withMerchandising(title, entry));
+  }
 
   return out;
 }
@@ -192,7 +254,8 @@ export async function listBrowsableGames(): Promise<BrowsableGame[]> {
 /**
  * Resolve `/games/[slug]` → catalogue card.
  *
- * Returns `null` for unknown or disabled slugs — never throws. Pages call `notFound()`.
+ * Returns `null` for unknown, hidden, or disabled slugs — never throws. Pages call `notFound()`.
+ * Coming-soon titles still resolve (shown, not joinable).
  */
 export async function getBrowsableGameBySlug(
   slug: string | undefined | null,
@@ -201,18 +264,22 @@ export async function getBrowsableGameBySlug(
   if (!trimmed) return null;
 
   await connectToDatabase();
+  await ensureCatalogueEntries();
 
-  if (trimmed === TRADING_GAME_TYPE) {
+  const entry = await GameCatalogueEntry.findOne({ slug: trimmed }).lean<EntryLean | null>();
+  if (!entry || !entry.isVisible) return null;
+
+  if (entry.gameType === "trading") {
     const enabledTypes = await getEnabledGameTypes();
-    return enabledTypes.includes(TRADING_GAME_TYPE)
-      ? await tradingCatalogueCard()
-      : null;
+    if (!enabledTypes.includes(TRADING_GAME_TYPE)) return null;
+    const content = await tradingContentCard();
+    return withMerchandising(content, entry);
   }
 
-  // Reason: slug is gameCode (plan). Filter the already-gated list so a disabled title
-  // cannot be reached by guessing its code — same answer as absent from the hub.
-  const titles = await listProviderCatalogueTitles();
-  return titles.find((t) => t.slug === trimmed) ?? null;
+  const providerTitles = await loadPlayableProviderTitles();
+  const title = providerTitles.get(entry.gameKey);
+  if (!title) return null;
+  return withMerchandising(title, entry);
 }
 
 function tradingContestFilter(): Record<string, unknown> {

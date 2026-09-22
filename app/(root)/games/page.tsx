@@ -7,13 +7,16 @@ import { listBrowsableGames } from "@/lib/services/games/player-catalogue.servic
 export const dynamic = "force-dynamic";
 
 /**
- * Games catalogue hub (X11 Slice 1).
+ * Games catalogue hub (X11 Slice 1 + thin merchandising).
  *
  * Server component only — listing is a read. Never launches a round.
+ * Order / featured / coming-soon come from `game_catalogue_entry`.
  */
 
 export default async function GamesCataloguePage() {
   const games = await listBrowsableGames();
+  const featured = games.filter((g) => g.isFeatured);
+  const rest = games.filter((g) => !g.isFeatured);
 
   return (
     <div className="relative mx-auto max-w-6xl space-y-8 px-4 py-8 sm:px-6">
@@ -40,10 +43,27 @@ export default async function GamesCataloguePage() {
           </p>
         </div>
       ) : (
-        <div className="grid items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {games.map((game) => (
-            <GameCatalogueCard key={game.gameKey} game={game} />
-          ))}
+        <div className="space-y-10">
+          {featured.length > 0 ? (
+            <section className="space-y-4">
+              <h2 className={`${NEON_HEADING} text-xl`}>Featured</h2>
+              <div className="grid items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {featured.map((game) => (
+                  <GameCatalogueCard key={game.gameKey} game={game} />
+                ))}
+              </div>
+            </section>
+          ) : null}
+          <section className="space-y-4">
+            {featured.length > 0 ? (
+              <h2 className={`${NEON_HEADING} text-xl`}>All games</h2>
+            ) : null}
+            <div className="grid items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {(featured.length > 0 ? rest : games).map((game) => (
+                <GameCatalogueCard key={game.gameKey} game={game} />
+              ))}
+            </div>
+          </section>
         </div>
       )}
     </div>

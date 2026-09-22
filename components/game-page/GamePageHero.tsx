@@ -31,12 +31,14 @@ function heroChips(game: GamePageData) {
 
 export function GamePageHero({ game }: { game: GamePageData }) {
   const chips = heroChips(game);
+  const comingSoon = Boolean(game.comingSoon);
   const enterHref =
     resolvePlayNowHref(game, game.joinableContests) ??
     competitionBrowseHref(game.slug);
-  const challengeHref = game.formats.challenge
-    ? challengeCreateHref(game.slug)
-    : null;
+  const challengeHref =
+    !comingSoon && game.formats.challenge
+      ? challengeCreateHref(game.slug)
+      : null;
 
   return (
     <div className="relative min-h-[300px] overflow-hidden rounded-[12px] border border-[var(--gp-card-border,rgba(40,130,255,.35))] md:min-h-[340px]">
@@ -134,10 +136,16 @@ export function GamePageHero({ game }: { game: GamePageData }) {
           ) : null}
 
           <div className="flex flex-wrap gap-3 pt-2">
-            <Link href={enterHref} className={GP_CTA_PRIMARY}>
-              Enter Competition
-              <ArrowRight className="h-4 w-4" />
-            </Link>
+            {comingSoon ? (
+              <span className={`${GP_CTA_SECONDARY} pointer-events-none opacity-90`}>
+                Coming soon
+              </span>
+            ) : (
+              <Link href={enterHref} className={GP_CTA_PRIMARY}>
+                Enter Competition
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            )}
             {challengeHref ? (
               <Link href={challengeHref} className={GP_CTA_SECONDARY}>
                 <Swords className="h-4 w-4 text-[var(--gp-accent-2)]" />

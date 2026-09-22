@@ -32,6 +32,27 @@ function timeLabel(iso: string, status: "active" | "upcoming"): string {
 }
 
 export function GamePageContests({ game }: { game: GamePageData }) {
+  if (game.comingSoon) {
+    return (
+      <GamePagePanel>
+        <h2 className="text-[20px] font-bold uppercase tracking-wide text-white md:text-[22px]">
+          Coming Soon
+        </h2>
+        <p className="mt-2 text-[15px] text-[var(--gp-muted)]">
+          Contests for {game.title} are not open yet. Check back when this game
+          leaves coming soon.
+        </p>
+        <div className="mt-4 flex flex-wrap gap-3">
+          <Link
+            href="/games"
+            className={`${GP_CTA_SECONDARY} !px-4 !py-2.5 !text-[13px]`}
+          >
+            Back to games
+          </Link>
+        </div>
+      </GamePagePanel>
+    );
+  }
   if (game.joinableContests.length === 0) {
     return (
       <GamePagePanel>

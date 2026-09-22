@@ -88,6 +88,15 @@ function GalleryTab({ game }: { game: GamePageData }) {
 }
 
 function StickyEnterBar({ game }: { game: GamePageData }) {
+  if (game.comingSoon) {
+    return (
+      <div className="sticky bottom-3 z-40 mt-6 overflow-hidden rounded-[12px] border border-sky-500/30 bg-[var(--gp-panel,#07152c)]/95 px-4 py-3 shadow-[0_0_40px_rgba(0,0,0,.5)] backdrop-blur">
+        <p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-sky-300">
+          Coming soon — contests and challenges are not open yet for this game.
+        </p>
+      </div>
+    );
+  }
   const href =
     resolvePlayNowHref(game, game.joinableContests) ??
     competitionBrowseHref(game.slug);
@@ -159,7 +168,11 @@ export function GamePageView({
             <h2 className="text-[18px] font-bold text-[var(--gp-accent)]">
               Challenges
             </h2>
-            {game.formats.challenge ? (
+            {game.comingSoon ? (
+              <p className="text-[15px] text-[var(--gp-muted)]">
+                Challenges will open when this game leaves coming soon.
+              </p>
+            ) : game.formats.challenge ? (
               <>
                 <p className="text-[15px] text-[var(--gp-muted)]">
                   Start a 1v1 at {game.title}. Entry amounts follow what

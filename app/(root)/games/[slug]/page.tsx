@@ -42,3 +42,17 @@ export default async function GamePage({
 
   return <GamePageView game={game} tab={tab} />;
 }
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
+  const game = await getGamePageData(slug);
+  if (!game) return {};
+  return {
+    title: game.seoTitle || game.title,
+    description: game.seoDescription || game.tagline || game.description,
+  };
+}

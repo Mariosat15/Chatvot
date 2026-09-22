@@ -45,6 +45,7 @@ const { TRADING_GAME_TYPE } = await import("@/lib/games");
 const COLLECTIONS = [
   "game_provider",
   "provider_game",
+  "game_catalogue_entry",
   "whitelabels",
   "competitions",
 ];
@@ -243,12 +244,51 @@ describe("getBrowsableGameBySlug", () => {
     expect(await getBrowsableGameBySlug("trading")).toBeNull();
   });
 
-  it("resolves a provider title by gameCode slug", async () => {
+  it("resolves a provider title by catalogue slug (seeded as gameCode)", async () => {
     await seedSettings();
     await seedProviderTitle();
     const game = await getBrowsableGameBySlug(GAME_CODE);
     expect(game?.gameKey).toBe(GAME_KEY);
     expect(game?.slug).toBe(GAME_CODE);
+  });
+
+  it("returns null for a hidden catalogue entry even when the title is playable", async () => {
+    await seedSettings();
+    await seedProviderTitle();
+    const GameCatalogueEntry = (
+      await import("@/database/models/games/game-catalogue-entry.model")
+    ).default;
+    await listBrowsableGames();
+    await GameCatalogueEntry.updateOne(
+      { gameKey: GAME_KEY },
+      { $set: { isVisible: false } },
+    );
+    expect(await getBrowsableGameBySlug(GAME_CODE)).toBeNull();
+    expect(
+      (await listBrowsableGames()).filter((g) => g.gameKey === GAME_KEY),
+    ).toEqual([]);
+  });
+
+  it("honours sortOrder and comingSoon / isFeatured on the hub list", async () => {
+    await seedSettings();
+    await seedProviderTitle();
+    const GameCatalogueEntry = (
+      await import("@/database/models/games/game-catalogue-entry.model")
+    ).default;
+    await listBrowsableGames();
+    await GameCatalogueEntry.updateOne(
+      { gameKey: GAME_KEY },
+      { $set: { sortOrder: -10, isFeatured: true, comingSoon: true } },
+    );
+    await GameCatalogueEntry.updateOne(
+      { gameKey: TRADING_GAME_TYPE },
+      { $set: { sortOrder: 50 } },
+    );
+
+    const games = await listBrowsableGames();
+    expect(games.map((g) => g.slug)).toEqual([GAME_CODE, TRADING_GAME_TYPE]);
+    expect(games[0].isFeatured).toBe(true);
+    expect(games[0].comingSoon).toBe(true);
   });
 
   it("returns null for an unknown slug — never throws", async () => {
@@ -351,5 +391,45 @@ describe("player-catalogue.service structural guards", () => {
   it("does not switch on gameCode or gameKey for presentation", () => {
     expect(source).not.toMatch(/switch\s*\(\s*gameCode/);
     expect(source).not.toMatch(/switch\s*\(\s*.*gameKey/);
+  });
+
+  it("reads merchandising from game_catalogue_entry / GameCatalogueEntry", () => {
+    expect(source).toMatch(/GameCatalogueEntry/);
+    expect(source).toMatch(/ensureCatalogueEntries/);
+  });
+});
+
+describe("game-catalogue-entry model mirrors", () => {
+  it("model is byte-identical in both apps", () => {
+    const main = readFileSync(
+      join(process.cwd(), "database/models/games/game-catalogue-entry.model.ts"),
+      "utf8",
+    );
+    const admin = readFileSync(
+      join(
+        process.cwd(),
+        "apps/admin/database/models/games/game-catalogue-entry.model.ts",
+      ),
+      "utf8",
+    );
+    expect(admin).toBe(main);
+  });
+
+  it("service is byte-identical in both apps", () => {
+    const main = readFileSync(
+      join(
+        process.cwd(),
+        "lib/services/games/game-catalogue-entry.service.ts",
+      ),
+      "utf8",
+    );
+    const admin = readFileSync(
+      join(
+        process.cwd(),
+        "apps/admin/lib/services/games/game-catalogue-entry.service.ts",
+      ),
+      "utf8",
+    );
+    expect(admin).toBe(main);
   });
 });

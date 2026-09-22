@@ -32,6 +32,7 @@ import GameScoringDialog from "./GameScoringDialog";
 import GameChallengeDefaultsDialog from "./GameChallengeDefaultsDialog";
 import GameContentDialog from "./GameContentDialog";
 import GamePageThemeEditor from "./GamePageThemeEditor";
+import CatalogueMerchandisingPanel from "./CatalogueMerchandisingPanel";
 import {
   CONTENT_LIMITS,
 } from "@/lib/admin/game-content-fields";
@@ -448,7 +449,12 @@ function SideRail({
   onProvidersChanged: () => void;
 }) {
   const terms = useTerms();
-  const pageHref = playerGamePageHref(title.gameCode);
+  const [catalogueSlug, setCatalogueSlug] = useState(title.gameCode);
+  const pageHref = playerGamePageHref(catalogueSlug || title.gameCode);
+
+  useEffect(() => {
+    setCatalogueSlug(title.gameCode);
+  }, [title.gameKey, title.gameCode]);
 
   return (
     <div className="space-y-4">
@@ -517,9 +523,22 @@ function SideRail({
           onTitlePatch={onTitlePatch}
           onProvidersChanged={onProvidersChanged}
         />
-        <p className="mt-2 text-[11px] text-white/35">
-          Featured / KYC gates are not on this catalogue row yet.
+      </PanelCard>
+
+      <PanelCard>
+        <SectionTitle>Merchandising</SectionTitle>
+        <p className="mt-1 text-[11px] text-white/40">
+          Hub order, featured, hide, and coming soon. Page copy stays under Content /
+          Assets.
         </p>
+        <div className="mt-3">
+          <CatalogueMerchandisingPanel
+            key={title.gameKey}
+            gameKey={title.gameKey}
+            fallbackSlug={title.gameCode}
+            onSlugKnown={setCatalogueSlug}
+          />
+        </div>
       </PanelCard>
 
       <PanelCard>

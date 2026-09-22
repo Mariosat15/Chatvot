@@ -51,13 +51,29 @@ export function GameCatalogueCard({ game }: { game: BrowsableGame }) {
             className="object-contain object-center transition-transform duration-300 group-hover:scale-[1.02]"
           />
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#0A0F1F] via-transparent to-transparent" />
-          {game.category ? (
-            <span
-              className={`absolute left-3 top-3 rounded-md border border-[#1B2540] bg-[#0A0F1F]/85 px-2 py-0.5 ${NEON_LABEL} text-[10px]`}
-            >
-              {game.category}
-            </span>
-          ) : null}
+          <div className="absolute left-3 top-3 flex flex-wrap gap-1.5">
+            {game.isFeatured ? (
+              <span
+                className={`rounded-md border border-amber-500/40 bg-[#0A0F1F]/85 px-2 py-0.5 ${NEON_LABEL} text-[10px] text-amber-300`}
+              >
+                Featured
+              </span>
+            ) : null}
+            {game.comingSoon ? (
+              <span
+                className={`rounded-md border border-sky-500/40 bg-[#0A0F1F]/85 px-2 py-0.5 ${NEON_LABEL} text-[10px] text-sky-300`}
+              >
+                Coming soon
+              </span>
+            ) : null}
+            {game.category ? (
+              <span
+                className={`rounded-md border border-[#1B2540] bg-[#0A0F1F]/85 px-2 py-0.5 ${NEON_LABEL} text-[10px]`}
+              >
+                {game.category}
+              </span>
+            ) : null}
+          </div>
         </div>
         <div className="flex flex-1 items-start justify-between gap-3 p-4">
           <div className="min-w-0 flex-1 space-y-1">
