@@ -254,13 +254,17 @@ describe("the standings panel's chrome", () => {
       `ArenaLiveStandings.tsx` - so a whole-file ban on "Standings" fails on a correct file, and
       a guard that fires on correct code is the one the next reader deletes. The claim is about
       the heading a player sees, so it is asserted where headings are written.
+
+      AMENDED for the terminology layer: the heading and the leave button read
+      `terms.leaderboard`, never a hard-coded "Leaderboard", so an operator rename reaches
+      both. The claim is unchanged - the noun is still the leaderboard token, not "Standings".
     */
     const rendered = panel.slice(panel.indexOf("export default function"));
     expect(rendered.length).toBeGreaterThan(500);
-    expect(rendered).toMatch(/Leaderboard/);
+    expect(rendered).toMatch(/terms\.leaderboard/);
     expect(rendered).not.toMatch(/Standings/);
     expect(panel).toMatch(
-      /<NeonButton[\s\S]{0,300}tone="outline"[\s\S]{0,200}label="View Full Leaderboard"/,
+      /<NeonButton[\s\S]{0,300}tone="outline"[\s\S]{0,200}label=\{`View Full \$\{terms\.leaderboard\}`\}/,
     );
     // The hand-rolled link it replaces is gone - the button is the same one the results screen
     // draws, so the two cannot drift.
@@ -274,27 +278,33 @@ describe("the standings panel's chrome", () => {
   });
 
   it("counts players in the reference's form, and never traders", () => {
+    /*
+      Counts the VISIBLE (scoped) rows, not the full board — otherwise Friends shows a
+      Global count beside a filtered list. Noun is the players token, never "traders".
+    */
     const panel = readCode(ARENA_PANEL);
-    expect(panel).toMatch(/Players \(\{rows\.length\}\)/);
+    expect(panel).toMatch(/terms\.players\} \(\{visibleRows\.length\}\)/);
     expect(panel).not.toMatch(/traders/i);
   });
 
-  it("draws all three of the reference scopes, with the two we cannot answer disabled", () => {
+  it("draws all three of the reference scopes, with Friends wired and Country disabled", () => {
     /*
-      FLIPPED ON THE OWNER'S SECOND INSTRUCTION, 11 SEPTEMBER 2026, AND THE OLD REASON IS KEPT
-      RATHER THAN DELETED because it is the reason the two are drawn the way they are. This test
-      used to assert `Friends` and `Country` appeared NOWHERE, on the grounds that neither has a
-      data source and a tab that does nothing teaches a player the screen is broken. The owner
-      asked for all three twice.
+      AMENDED 22 SEPTEMBER 2026. This test used to assert both Friends and Country were
+      dead labels. Friends is now selectable: `Friendship.getUserFriends` exists and the
+      panel filters the ranked board client-side. Country stays dead — publishing a
+      player's country on a public board remains later work.
 
-      So they are drawn, and the objection is answered by HOW: `NEON_TAB_DEAD` rather than
-      `NEON_TAB_IDLE`, `aria-disabled`, a title saying what the board is showing instead, and no
-      handler. The assertion that matters is therefore not that they exist - it is that they are
-      not selectable, because a `<button onClick>` here is precisely the control that appears to
-      work and does nothing.
+      The load-bearing half is still HOW the dead one is drawn: `NEON_TAB_DEAD`,
+      `aria-disabled`, a title, and no handler on THAT label. Friends being a button is
+      the intended change, not a regression.
     */
     const panel = readCode(ARENA_PANEL);
-    expect(panel).toMatch(/unavailable=\{\["Friends", "Country"\]\}/);
+    expect(panel).toMatch(/scopes=\{\["Global", "Friends"\]\}/);
+    expect(panel).toMatch(/unavailable=\{\["Country"\]\}/);
+    expect(panel).toMatch(/onChange=\{/);
+    expect(panel).toMatch(/filterRowsForScope/);
+    // Friends must not still sit in the unavailable list.
+    expect(panel).not.toMatch(/unavailable=\{\["Friends", "Country"\]\}/);
 
     const cards = readCode(KIT_CARDS);
     const stripAt = cards.indexOf("export function NeonScopeStrip");
@@ -304,10 +314,12 @@ describe("the standings panel's chrome", () => {
     expect(endAt).toBeGreaterThan(0);
     const body = strip.slice(0, endAt);
 
-    // The dead scopes get the dead token, are announced as disabled, and carry no handler.
+    // Dead scopes stay dead; selectable scopes may be buttons when onChange is set.
     expect(body).toMatch(/NEON_TAB_DEAD/);
     expect(body).toMatch(/aria-disabled="true"/);
-    expect(body).not.toMatch(/onClick/);
-    expect(body).not.toMatch(/<button/);
+    // The unavailable map must not create buttons - only the selectable branch does.
+    const unavailableBlock = body.slice(body.indexOf("unavailable.map"));
+    expect(unavailableBlock).not.toMatch(/<button/);
+    expect(unavailableBlock).not.toMatch(/onClick/);
   });
 });

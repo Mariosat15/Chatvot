@@ -55,6 +55,12 @@ export interface ArenaLiveState {
   activity: Record<string, RoundActivitySummary>;
   feed: ArenaActivityEntry[];
   currentUserId: string;
+  /**
+   * Friend user ids for the Friends scope filter. Loaded once on the server —
+   * not re-fetched with the poll, because friendship changes mid-round are rare
+   * and a second reader of friendships beside the standings poll is two clocks.
+   */
+  friendIds: readonly string[];
 }
 
 const ArenaLiveContext = createContext<ArenaLiveState | null>(null);
@@ -82,6 +88,8 @@ const DEFAULT_INTERVAL_MS = 15_000;
 interface ProviderProps {
   competitionId: string;
   currentUserId: string;
+  /** Friend ids for the Friends board scope. Empty array = no friends, not "unknown". */
+  friendIds?: readonly string[];
   /** The server's first answer, so the rail is correct before any fetch has happened. */
   initial: {
     rows: ProviderLeaderboardRow[];
@@ -108,6 +116,7 @@ interface ProviderProps {
 export function ArenaLiveProvider({
   competitionId,
   currentUserId,
+  friendIds = [],
   initial,
   active,
   intervalMs = DEFAULT_INTERVAL_MS,
@@ -188,7 +197,9 @@ export function ArenaLiveProvider({
   }, [active, competitionId, intervalMs, clearTimer]);
 
   return (
-    <ArenaLiveContext.Provider value={{ ...live, currentUserId }}>
+    <ArenaLiveContext.Provider
+      value={{ ...live, currentUserId, friendIds }}
+    >
       {children}
     </ArenaLiveContext.Provider>
   );

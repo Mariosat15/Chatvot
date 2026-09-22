@@ -144,6 +144,18 @@ export const RateLimiters = {
       keyPrefix: "login",
     }),
 
+  // Challenge invitations: 10 creates per minute per user.
+  // Reason: X15 mitigation 2 (`20` s2.3). Without this, one player can invite the
+  // entire platform. Reuses `checkRateLimit` - do not write a second limiter.
+  // Open and directed creates share the bucket; accept is not an invitation and
+  // is not limited here.
+  challengeInvite: (userId: string) =>
+    checkRateLimit(userId, {
+      maxRequests: 10,
+      windowMs: 60 * 1000,
+      keyPrefix: "challenge_invite",
+    }),
+
   // API general: 60 requests per minute per user
   apiGeneral: (userId: string) =>
     checkRateLimit(userId, {

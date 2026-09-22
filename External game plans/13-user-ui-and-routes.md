@@ -1395,14 +1395,12 @@ the **GLOBAL / FRIENDS / COUNTRY** leaderboard tabs, and the **RECENT PLAYERS** 
 > carries no score by design, and a hint improves a score in a paid contest. Read `21` s4.1q
 > before restating any of this.
 >
-> **A third amendment, same day (`13` s4.1y): the three leaderboard tabs are now DRAWN.** They
-> still cannot be answered *from this rail* - `Friendship.getUserFriends` exists in
-> `database/models/messaging/friend.model.ts` and is not called here, and publishing a player's
-> country on a public board is a disclosure the owner later answered yes to, scheduled as later
-> work. `GLOBAL` is lit and the other two are rendered as disabled labels with the reason in a
-> title attribute. **Drawn and unanswerable is not the same as built**, and a document listing
-> them as absent is stale while one listing them as working is wrong. The sentence that there
-> is no friends model anywhere was **false** and is corrected here rather than deleted.
+> **A third amendment, same day (`13` s4.1y): the three leaderboard tabs are now DRAWN.** On that
+> day Friends and Country were still unanswerable from this rail. **AMENDED 22 Sep 2026: Friends
+> is wired** (`listFriendUserIds` + client filter); Country stays a dead label. A document listing
+> Friends as unanswerable is correct as history and stale as a present fact - **say which**. The
+> sentence that there is no friends model anywhere was **false** and is corrected here rather
+> than deleted.
 
 #### What the platform half actually lacked
 
@@ -2616,21 +2614,30 @@ prop rather than three booleans a caller can get half right:
   a row background cannot.
 - **The `= #1` pill is suppressed and two rows sharing a rank plate is the statement.**
 
-#### FRIENDS AND COUNTRY ARE DRAWN AND CANNOT BE ANSWERED, WHICH IS A LABELLED FACT
+#### FRIENDS IS WIRED; COUNTRY STAYS A DEAD LABEL
+
+> **AMENDED 22 SEPTEMBER 2026.** The paragraph below used to say both Friends and Country were
+> drawn and unanswerable. **Friends is selectable now**; Country is still dead. Correct as
+> history for the 12 Sep build, stale as a present fact - **say which.**
 
 The claim that there is **no friends model anywhere in `database/models`** was **false** - the
 search stopped at the top of that folder and missed `database/models/messaging/friend.model.ts`,
-which holds `Friendship` and `FriendRequest` with `getUserFriends` and `areFriends`. The tabs
-are greyed because this rail does not call them, not because the data does not exist. `country`
-does exist on the user card; the owner answered yes to showing it, scheduled as later work
-rather than this slice. So all three scopes are drawn, `GLOBAL` lit and the other two on
-`NEON_TAB_DEAD` with `aria-disabled`, a title explaining that everyone in the contest is shown,
-no hover and no handler - **rendered as a `<span>`, so there is no control that appears to work.**
+which holds `Friendship` and `FriendRequest` with `getUserFriends` and `areFriends`. On 12 Sep
+the tabs were greyed because this rail did not call them; **Friends now does**, through
+`listFriendUserIds` on the play page and `filterRowsForScope` in the panel. `country` still
+exists on the user card and publishing it on a public board remains later work.
+
+**What shipped for Friends.** Ids load once with the page (not on the standings poll — a second
+reader of friendships beside the poll is two clocks). The panel filters the already-ranked board
+client-side, so switching Global ↔ Friends cannot produce two disagreeing answers. The viewer
+is always kept on a Friends board, even with no friends in the contest — otherwise an empty rail
+reads as "nobody played". Order is never recomputed here (R37). Matchmaking is deliberately
+not used (X13). Country stays `NEON_TAB_DEAD` + `aria-disabled` + title, rendered as a `<span>`.
 
 **This reverses a decision recorded in s4.1q**, whose guard asserted the rail draws *no* dead
-scope tabs. That test was **flipped rather than deleted**, keeping the original objection verbatim
-as the reason for *how* they are drawn. It is the second time the owner has overridden a recorded
-guard here, so a document citing the old rule as current is stale - **say which.**
+scope tabs. That test was **flipped rather than deleted** on 12 Sep, and flipped again on 22 Sep
+so Friends is selectable while Country stays dead. A document citing either earlier rule as
+current is stale - **say which.**
 
 #### THE POLLING CONTRACT IS UNTOUCHED, AND THAT IS THE CONSTRAINT THAT SHAPED THE REBUILD
 

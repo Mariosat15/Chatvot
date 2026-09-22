@@ -29,6 +29,11 @@ import {
 import { CHALLENGE_ROUND_START_POLICY } from "@/lib/services/games/challenge-round-config";
 import { resolveAcceptDeadline } from "@/lib/services/challenges/accept-deadline";
 import type { RoundStartPolicy } from "@/lib/services/games/round-types";
+import BlockedUser from "@/database/models/messaging/blocked-user.model";
+import {
+  getRateLimitHeaders,
+  RateLimiters,
+} from "@/lib/utils/rate-limiter";
 
 // Request timeout for this route (5 seconds)
 const _REQUEST_TIMEOUT_MS = 5000;
@@ -214,6 +219,28 @@ export async function POST(request: NextRequest) {
 
     await connectToDatabase();
 
+    // Skip most validation in simulator mode
+    const isInSimulatorMode = allowSimulatorMode;
+
+    // X15 mitigation 2 (`20` s2.3): rate-limit invitations sent. Before settings /
+    // wallet work so a flood never reaches the money path. Simulator skips - attack
+    // harnesses need to fire repeatedly. Accept is not an invitation.
+    if (!isInSimulatorMode) {
+      const inviteLimit = RateLimiters.challengeInvite(challengerId);
+      if (!inviteLimit.success) {
+        return NextResponse.json(
+          {
+            error:
+              "Too many challenge invitations. Please wait a moment before trying again.",
+          },
+          {
+            status: 429,
+            headers: getRateLimitHeaders(inviteLimit),
+          },
+        );
+      }
+    }
+
     // PERFORMANCE: Batch fetch settings in parallel with timeout (saves ~100ms)
     const [settings, tradingRiskSettings] = await withTimeout(
       Promise.all([
@@ -223,9 +250,6 @@ export async function POST(request: NextRequest) {
       DB_TIMEOUT_MS,
       "Settings fetch",
     );
-
-    // Skip most validation in simulator mode
-    const isInSimulatorMode = allowSimulatorMode;
 
     // Known in both modes (no DB dependency), because the provider resolver below needs
     // it to size the synthetic play window before the market-hours gate runs - see
@@ -387,6 +411,18 @@ export async function POST(request: NextRequest) {
       // the accept route. The check is not skipped, it moves to where the answer exists.
       if (!isOpenChallenge && challengedId === challengerId) {
         return errorResponse("You cannot challenge yourself", 400);
+      }
+
+      // X15 mitigation 1 (`20` s2.3): honour the block list on BOTH sides.
+      // `isBlockedByEither`, not `isBlocked` - a directional check would let a blocked
+      // player still initiate. Open challenges name nobody here; the accept route
+      // applies the same check when the seat is claimed. Before any wallet read.
+      if (
+        !isOpenChallenge &&
+        challengedId &&
+        (await BlockedUser.isBlockedByEither(challengerId, challengedId))
+      ) {
+        return errorResponse("You cannot challenge this user", 403);
       }
 
       // Validate entry fee (with safe defaults)

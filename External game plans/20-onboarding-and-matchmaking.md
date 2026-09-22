@@ -254,25 +254,52 @@ mistake it for the feature.
 | Game picker on challenge create | New, but designed | `03` section 2 covers the mechanics; only the opponent half was missing |
 | **Open challenges** - post a challenge, first eligible player accepts | **New** | The genuinely new mechanic |
 | Decline path | **Exists** | `POST /api/challenges/[id]/decline` |
-| Block list | **Exists** | `BlockedUser`, `Friendship.blockedBy`; `isBlockedByEither` is the check to use |
-| Rate limit | **Exists as a utility**, needs a preset | `lib/utils/rate-limiter.ts` has `RateLimiters` presets for deposits, withdrawals, login. A `challengeInvite` preset is a small addition |
+| Block list | **Exists**, enforced on challenges 22 Sep 2026 | `BlockedUser`, `Friendship.blockedBy`; `isBlockedByEither` on create (directed) and accept |
+| Rate limit | **Exists**, preset added 22 Sep 2026 | `lib/utils/rate-limiter.ts` — `RateLimiters.challengeInvite` (10/min). Wired on `POST /api/challenges` |
 | Per-game opt-in | **New** | Section 1 |
 
 ### 2.3 The three controls that are not optional
 
-**Open question 15 must be answered by the owner before X10 starts:** may anyone challenge
-anyone, only friends, or only players who opted in per game? The design below assumes
-"anyone who opted in", because it is the only one of the three that satisfies the owner's
-brief without creating an unmanaged harassment surface.
+> **BUILT 22 September 2026 (X15 mitigations 1 and 2) — and open question 15 is still
+> OWNER.** The three controls below were the non-optional companion to "challenge any
+> user"; mitigations **1** and **2** shipped without waiting on Q15, because they are
+> correct under every answer to it. Mitigation **3** (per-game willingness + the master
+> `acceptingChallenges` switch) already shipped on 14 Sep 2026 (`20` s1.1a). What Q15
+> still decides is whether *creating* a challenge is further restricted to friends —
+> that gate is deliberately **not** built here.
+>
+> **Live code:** `BlockedUser.isBlockedByEither` on `POST /api/challenges` (directed
+> only; open challenges check at accept) and on `POST /api/challenges/[id]/accept`
+> (directed and open-seat claims); `RateLimiters.challengeInvite` (10/min per user) on
+> create, skipped in simulator mode. Tests: `__tests__/challenges/challenge-abuse-controls.test.ts`
+> (7) + the X15 case in `__tests__/services/challenge-accept-guards.test.ts`. **Nothing
+> was backfilled** — no invitation that should have been refused was stored differently
+> from one that was accepted.
+>
+> **Six facts drift easily.** The create check uses **`isBlockedByEither`, never
+> `isBlocked`** — a directional check lets a blocked player still initiate. Open
+> challenges **withhold** the create check (nobody to compare) and apply it on accept
+> when the seat is claimed. The rate limit is on **create only** — accept is not an
+> invitation. It reuses `checkRateLimit`; there is no second limiter. Simulator mode
+> **skips** the rate limit so attack harnesses can fire. And **reporting is still an
+> owner policy decision**, not designed here.
+
+**Open question 15 must be answered by the owner before friends-only create is gated:**
+may anyone challenge anyone, only friends, or only players who opted in per game? The
+design below assumes "anyone who opted in", because it is the only one of the three that
+satisfies the owner's brief without creating an unmanaged harassment surface.
 
 Whatever the answer, three controls ship with the feature or the feature does not ship:
 
 1. **Honour the existing block list on both sides.** `BlockedUser.isBlockedByEither` -
    not `isBlocked`, which is directional and would let a blocked player still initiate.
+   **BUILT 22 Sep 2026** on create (directed) and accept (both).
 2. **A rate limit on invitations sent.** Without it, one player can invite the entire
    platform. Reuse `checkRateLimit`; do not write a second limiter.
+   **BUILT 22 Sep 2026** as `RateLimiters.challengeInvite` (10/min).
 3. **A way to stop receiving them** that is not "block every individual". This is what
    per-game `willingToBeChallenged` and the global `acceptingChallenges` are for.
+   **BUILT 14 Sep 2026** (`20` s1.1a).
 
 There is a fourth control the platform does **not** have: **there is no player-facing
 report-user feature.** Blocking exists; reporting does not. Letting strangers initiate
@@ -488,7 +515,7 @@ the entry-path writers before unifying them and found four instead of two.
 |---|---|---|---|
 | **X13** | The **trading-only matchmaker keeps working** after a second game arrives, silently returning trading matches on a games platform. No error, no empty state | **High** | Change the service, do not call it from a new place. A test that asserts a match in a non-trading game, which must fail before the change |
 | **X14** | **Inference read as consent.** A player who paid to enter a competition starts receiving stranger invitations they never asked for | **High** | Section 3.2 - inference drives suggestions, the opt-in drives invitations. Never one from the other |
-| **X15** | **"Challenge any user" becomes a harassment surface.** No player-facing report feature exists | Medium | Rate limit, block checks on both sides, per-game opt-out. Reporting is an owner policy decision, raised in section 2.3 |
+| **X15** | **"Challenge any user" becomes a harassment surface.** No player-facing report feature exists | Medium | **Mitigations 1+2 BUILT 22 Sep 2026** (block list + invite rate limit); mitigation 3 (opt-out) built 14 Sep. Reporting remains an owner policy decision, raised in section 2.3 |
 | **X16** | **Overall rank used instead of per-game rating**, pairing mismatched opponents while appearing correct | Medium | `05` section 4 rating per `gameKey`. A test with a player strong in one game and weak in another |
 | **X17** | **Scope creep into a recommendation engine.** R24 is already High | Medium | Section 3.3 - counts, not models. A change of approach needs its own decision record |
 | **X18** | **Empty matchmaking at launch**, because nobody has declared anything | Medium | Inference ships **before** the picker, not after. That ordering is the mitigation |

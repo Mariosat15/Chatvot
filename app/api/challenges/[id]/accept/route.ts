@@ -13,6 +13,7 @@ import { gameNeedsMarketHours } from "@/lib/games";
 import { buildChallengeParticipantSeat } from "@/lib/services/challenges/challenge-participant-seat";
 import { isUnclaimedOpenChallenge } from "@/lib/utils/open-challenge";
 import { randomBytes } from "crypto";
+import BlockedUser from "@/database/models/messaging/blocked-user.model";
 
 // POST - Accept a challenge
 export async function POST(
@@ -111,6 +112,24 @@ export async function POST(
       await dbSession.abortTransaction();
       return NextResponse.json(
         { error: "Only the challenged user can accept" },
+        { status: 403 },
+      );
+    }
+
+    // X15 mitigation 1 (`20` s2.3): honour the block list on BOTH sides.
+    // Same helper as create - `isBlockedByEither`, not the directional `isBlocked`.
+    // Covers directed accepts and open-seat claims: a player who blocked the
+    // challenger (or was blocked by them) must not be able to take the seat and
+    // be debited. Before any wallet read, same ordering as `checkAccountStanding`.
+    if (
+      await BlockedUser.isBlockedByEither(
+        challenge.challengerId,
+        session.user.id,
+      )
+    ) {
+      await dbSession.abortTransaction();
+      return NextResponse.json(
+        { error: "You cannot accept this challenge" },
         { status: 403 },
       );
     }

@@ -564,28 +564,51 @@ export function NeonCountPill({
  */
 export function NeonScopeStrip({
   scopes,
+  value,
+  onChange,
   unavailable = [],
   unavailableTitle = "Not available yet",
 }: {
   scopes: string[];
+  /** When set with `onChange`, the matching scope is lit and others are idle buttons. */
+  value?: string;
+  onChange?: (scope: string) => void;
   /** Present in the reference, no data source here. Drawn dim and not selectable. */
   unavailable?: string[];
   unavailableTitle?: string;
 }) {
   const size = "px-2 py-1 text-[10px] font-semibold uppercase tracking-wider";
+  const selectable = typeof onChange === "function";
+  const active = value ?? scopes[0];
 
   return (
     <div className="flex items-stretch gap-1.5 px-3 pt-2.5">
-      {scopes.map((scope, index) => (
-        <span
-          key={scope}
-          className={`${NEON_TAB_SHAPE} ${size} ${
-            index === 0 ? NEON_TAB_ACTIVE : NEON_TAB_IDLE
-          }`}
-        >
-          {scope}
-        </span>
-      ))}
+      {scopes.map((scope) => {
+        const isActive = scope === active;
+        const className = `${NEON_TAB_SHAPE} ${size} ${
+          isActive ? NEON_TAB_ACTIVE : NEON_TAB_IDLE
+        }`;
+
+        if (selectable) {
+          return (
+            <button
+              key={scope}
+              type="button"
+              aria-pressed={isActive}
+              onClick={() => onChange(scope)}
+              className={className}
+            >
+              {scope}
+            </button>
+          );
+        }
+
+        return (
+          <span key={scope} className={className}>
+            {scope}
+          </span>
+        );
+      })}
       {unavailable.map((scope) => (
         <span
           key={scope}

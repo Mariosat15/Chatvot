@@ -45,6 +45,7 @@ import {
  *   wallet balance           always
  *   account restriction      ADDED 1 Sep 2026
  *   fraud gate               ADDED 1 Sep 2026
+ *   block list (either side) ADDED 22 Sep 2026 (X15 mitigation 1)
  *
  * Why it was only reachable here: the challenge CREATE route checks both, so reading one
  * route would never have found it. The last two now come from `checkAccountStanding` in
@@ -239,6 +240,7 @@ describe("challenge accept - guards (sub-defect 1b)", () => {
       "challengeparticipants",
       "creditwallets",
       "wallettransactions",
+      "blocked_users",
     ]);
   }, 120_000);
 
@@ -339,6 +341,29 @@ describe("challenge accept - guards (sub-defect 1b)", () => {
       expect(await readChallenge(challengeId)).toMatchObject({
         status: "active",
       });
+    });
+
+    it("refuses when either side has blocked the other (X15)", async () => {
+      // Reason: `20` s2.3 mitigation 1. Create already refuses a directed invite across a
+      // block; accept must refuse too, or a block raised after the invite (or an open
+      // seat claimed by someone the challenger blocked) still debits both wallets.
+      // Uses `isBlockedByEither` - seeding the reverse direction proves the route is not
+      // calling the directional `isBlocked(challenger, accepter)`.
+      const challengeId = await seedPendingChallenge();
+      await mongoose.connection.db?.collection("blocked_users").insertOne({
+        blockerUserId: DEFAULT_USER_ID,
+        blockerUserName: "Test Player",
+        blockedUserId: CHALLENGER_ID,
+        blockedUserName: "Challenger",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      const { status, body } = await callAccept(challengeId);
+
+      expect(status).toBe(403);
+      expect(body.error).toMatch(/cannot accept this challenge/i);
+      await expectNoEntry(challengeId);
     });
 
     it("attributes both entry-fee ledger rows to their challenge", async () => {

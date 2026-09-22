@@ -14,6 +14,7 @@ import AppSettingsModel from "@/database/models/app-settings.model";
 import { getPlayState } from "@/lib/services/games/round-status.service";
 import { getGamePresentation } from "@/lib/services/games/game-presentation.service";
 import { getArenaStandings } from "@/lib/services/games/arena-standings.service";
+import { listFriendUserIds } from "@/lib/services/messaging/friend-ids.service";
 import { ProviderRoundHost } from "@/components/games/ProviderRoundHost";
 import PrizeTable from "@/components/competitions/PrizeTable";
 import { GameArenaLayout } from "@/components/games/arena/GameArenaLayout";
@@ -153,7 +154,7 @@ export default async function PlayPage({ params }: PlayPageProps) {
   // content layer an operator owns - never from the provider key, and never from `gameKey`,
   // which is an internal join key that happens to be human-readable and would leak our own
   // naming into a player screen.
-  const [presentation, standings, settings] = await Promise.all([
+  const [presentation, standings, settings, friendIds] = await Promise.all([
     getGamePresentation(contest?.gameConfig?.providerKey, contest?.gameConfig?.gameCode),
     /*
       THE BOARD, WHAT EACH PLAYER HAS BEEN DOING, AND THE CALLER'S OWN RANK, from one shared
@@ -181,6 +182,10 @@ export default async function PlayPage({ params }: PlayPageProps) {
     AppSettingsModel.findOne()
       .select("credits.symbol")
       .lean<{ credits?: { symbol?: string } } | null>(),
+    // Friends scope on the standings rail. Loaded once with the page, not with the poll —
+    // friendship changes mid-round are rare and a second clock beside the standings fetch is
+    // how two answers disagree. Empty array means no friends, never "unknown".
+    listFriendUserIds(session.user.id),
   ]);
 
   const competitionName = contest?.name ?? "this competition";
@@ -222,6 +227,7 @@ export default async function PlayPage({ params }: PlayPageProps) {
     <ArenaLiveProvider
       competitionId={competitionId}
       currentUserId={session.user.id}
+      friendIds={friendIds}
       initial={{
         rows: standings.rows,
         activity: standings.activity,
