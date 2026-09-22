@@ -40,7 +40,7 @@ export default async function GamesCataloguePage() {
           </p>
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {games.map((game) => (
             <GameCatalogueCard key={game.gameKey} game={game} />
           ))}

@@ -27,12 +27,17 @@ export function GameCatalogueCard({ game }: { game: BrowsableGame }) {
   return (
     <Link
       href={`/games/${game.slug}`}
-      className="group block focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60 rounded-2xl"
+      className="group flex h-full focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60 rounded-2xl"
     >
+      {/*
+        Reason: grid rows stretch by default, but the card must also be h-full
+        flex-col or a one-line tagline leaves a shorter box beside a two-line
+        neighbour (owner: boxes must always match).
+      */}
       <div
-        className={`${NEON_PANEL} overflow-hidden p-0 transition-colors group-hover:border-sky-500/40`}
+        className={`${NEON_PANEL} flex h-full w-full flex-col overflow-hidden p-0 transition-colors group-hover:border-sky-500/40`}
       >
-        <div className="relative h-36 w-full overflow-hidden bg-[#07101F]">
+        <div className="relative h-36 w-full shrink-0 overflow-hidden bg-[#07101F]">
           <Image
             src={banner.src}
             alt={banner.alt}
@@ -49,15 +54,19 @@ export function GameCatalogueCard({ game }: { game: BrowsableGame }) {
             </span>
           ) : null}
         </div>
-        <div className="flex items-start justify-between gap-3 p-4">
-          <div className="min-w-0 space-y-1">
+        <div className="flex flex-1 items-start justify-between gap-3 p-4">
+          <div className="min-w-0 flex-1 space-y-1">
             <h2 className={`${NEON_HEADING} text-lg truncate`}>
               {game.displayName}
             </h2>
+            {/* Reason: always reserve two lines so short and long taglines
+                produce the same card height within a row. */}
             {game.tagline ? (
-              <p className="text-sm text-gray-400 line-clamp-2">{game.tagline}</p>
+              <p className="min-h-[2.5rem] text-sm leading-5 text-gray-400 line-clamp-2">
+                {game.tagline}
+              </p>
             ) : (
-              <p className="text-sm text-gray-500 flex items-center gap-1.5">
+              <p className="flex min-h-[2.5rem] items-center gap-1.5 text-sm leading-5 text-gray-500">
                 <Gamepad2 className="h-3.5 w-3.5 shrink-0" />
                 Open game page
               </p>

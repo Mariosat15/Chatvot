@@ -56,43 +56,48 @@ export function GamePageHero({ game }: { game: GamePageData }) {
 
       <div className="relative flex min-h-[300px] flex-col justify-between gap-6 p-6 md:min-h-[340px] md:flex-row md:items-end md:p-8 lg:p-10">
         <div className="max-w-3xl space-y-4">
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="flex h-16 w-28 shrink-0 items-center justify-center overflow-hidden rounded-[12px] border border-[var(--gp-border)] bg-black/50 sm:h-20 sm:w-36">
-              {game.logoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={game.logoUrl}
-                  alt={`${game.title} logo`}
-                  className="h-full w-full object-contain p-1"
-                />
+          {/*
+            Reason: owner wants the game/trading mark to read as a hero brand
+            signal — large top-left square that auto-fills (object-contain) so
+            square icons and wide wordmarks both fill the box without stretch.
+            Sitting beside the title at ~80px left it looking like a favicon.
+          */}
+          <div className="flex h-36 w-36 shrink-0 items-center justify-center overflow-hidden rounded-[14px] border border-[var(--gp-border)] bg-black/55 sm:h-40 sm:w-40 md:h-44 md:w-44 lg:h-48 lg:w-48">
+            {game.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={game.logoUrl}
+                alt={`${game.title} logo`}
+                className="h-full w-full object-contain p-2"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-4xl font-black text-[var(--gp-accent)] sm:text-5xl">
+                {(game.title || "?").slice(0, 1)}
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            {game.genre ? (
+              <span
+                className="inline-flex rounded-md px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-white"
+                style={{ background: "var(--gp-badge)" }}
+              >
+                {game.genre}
+              </span>
+            ) : null}
+            <h1 className="text-[32px] font-black italic leading-[1.05] tracking-tight text-white sm:text-[40px] lg:text-[46px]">
+              {game.tagline ? (
+                <>
+                  <span className="text-[var(--gp-gold,#ffd33d)]">
+                    {game.title}
+                  </span>
+                  <span className="mt-1 block text-white">{game.tagline}</span>
+                </>
               ) : (
-                <div className="flex h-full w-full items-center justify-center text-2xl font-black text-[var(--gp-accent)]">
-                  {(game.title || "?").slice(0, 1)}
-                </div>
+                game.title
               )}
-            </div>
-            <div className="space-y-2">
-              {game.genre ? (
-                <span
-                  className="inline-flex rounded-md px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-white"
-                  style={{ background: "var(--gp-badge)" }}
-                >
-                  {game.genre}
-                </span>
-              ) : null}
-              <h1 className="text-[32px] font-black italic leading-[1.05] tracking-tight text-white sm:text-[40px] lg:text-[46px]">
-                {game.tagline ? (
-                  <>
-                    <span className="text-[var(--gp-gold,#ffd33d)]">
-                      {game.title}
-                    </span>
-                    <span className="mt-1 block text-white">{game.tagline}</span>
-                  </>
-                ) : (
-                  game.title
-                )}
-              </h1>
-            </div>
+            </h1>
           </div>
 
           {game.description ? (

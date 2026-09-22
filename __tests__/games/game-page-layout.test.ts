@@ -75,6 +75,10 @@ describe("player game page layout", () => {
     // keeps the full upload while the dark scrim still holds the copy.
     expect(hero).toMatch(/object-contain/);
     expect(hero).not.toMatch(/object-cover/);
+    // Reason: game/trading logo must read as a hero brand mark (owner red
+    // square) — large top-left box, not the old ~80×144 favicon-sized chip.
+    expect(hero).toMatch(/lg:h-48 lg:w-48/);
+    expect(hero).not.toMatch(/h-16 w-28/);
   });
 
   it("uses a 65/35 overview with play-mode cards", () => {

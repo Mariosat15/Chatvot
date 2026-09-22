@@ -51,6 +51,18 @@ describe("games catalogue routes", () => {
     expect(contests).not.toMatch(/\/competitions\/\$\{c\.id\}\/play/);
   });
 
+  it("catalogue cards stay equal height regardless of tagline length", () => {
+    const card = readCode(CARD);
+    const hub = readCode(HUB);
+    // Reason: a one-line tagline beside a two-line neighbour made uneven boxes
+    // (owner). Stretch the grid + card, and reserve two lines for copy.
+    expect(hub).toMatch(/items-stretch/);
+    expect(card).toMatch(/h-full/);
+    expect(card).toMatch(/flex-col/);
+    expect(card).toMatch(/min-h-\[2\.5rem\]/);
+    expect(card).toMatch(/line-clamp-2/);
+  });
+
   it("empty game page is designed, not a blank return", () => {
     const page = readCode(GAME_PAGE);
     const empty = readCode(EMPTY);
