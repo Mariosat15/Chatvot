@@ -93,19 +93,18 @@ describe("player game page layout", () => {
     expect(overview).toMatch(/absolute inset-0/);
   });
 
-  it("shows contest and tips banners without cropping baked-in copy", () => {
+  it("fills the tips banner edge to edge without distorting", () => {
     const contests = readCode("components/game-page/GamePageContests.tsx");
     const tips = readCode("components/game-page/GamePageTips.tsx");
-    // Reason: operator banners carry logos and headlines — cover + fixed aspect
-    // sliced them. Natural height + contain is the auto-support rule.
+    // Reason: contest banners still use natural height + contain (baked-in
+    // copy). Tips artwork sits beside a short tip list in a wide flex column —
+    // contain left black side gaps; cover fills left→right without stretch.
     expect(contests).toMatch(/object-contain/);
     expect(contests).toMatch(/h-auto w-full/);
-    expect(tips).toMatch(/object-contain/);
-    // Tips image column flex-fills the leftover width and row height so there
-    // is no dead band between the tip list and the artwork.
+    expect(tips).toMatch(/object-cover/);
+    expect(tips).not.toMatch(/object-contain/);
     expect(tips).toMatch(/flex-1/);
     expect(tips).toMatch(/lg:flex-row/);
-    expect(tips).not.toMatch(/object-cover/);
   });
 
   it("places How It Works as a full-width step band", () => {

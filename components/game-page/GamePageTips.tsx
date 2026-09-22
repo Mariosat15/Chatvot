@@ -27,10 +27,10 @@ export function GamePageTips({ game }: { game: GamePageData }) {
   return (
     <GamePagePanel className="overflow-hidden !p-0">
       {/*
-        Reason: a 50/50 grid left a dead band between short tip copy and the
-        artwork. Text stays content-width; the image column takes the leftover
-        and stretches to the row height so the banner fills the gap without a
-        fixed aspect crop (object-contain — baked-in logos must stay readable).
+        Reason: tips text is content-width; the image column takes leftover
+        width and row height. object-cover fills left→right with no letterbox
+        bars and no aspect distortion (cover scales uniformly; may crop a
+        little top/bottom). object-contain left black side gaps (owner).
       */}
       <div className="flex flex-col lg:min-h-[220px] lg:flex-row lg:items-stretch">
         <div className="shrink-0 space-y-4 p-5 lg:w-[min(100%,300px)] lg:max-w-[34%] lg:py-6 lg:pl-6 lg:pr-4">
@@ -59,16 +59,16 @@ export function GamePageTips({ game }: { game: GamePageData }) {
             </ul>
           ) : null}
         </div>
-        <div className="relative min-h-[160px] flex-1 overflow-hidden bg-black/40 lg:min-h-0">
+        <div className="relative min-h-[180px] flex-1 overflow-hidden bg-black lg:min-h-0">
           {game.gameTipsImageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={game.gameTipsImageUrl}
               alt={`${game.title} tips`}
-              className="absolute inset-0 h-full w-full object-contain"
+              className="absolute inset-0 h-full w-full object-cover object-center"
             />
           ) : (
-            <div className="flex h-full min-h-[160px] items-center justify-center text-[var(--gp-muted)] lg:min-h-full">
+            <div className="flex h-full min-h-[180px] items-center justify-center text-[var(--gp-muted)] lg:min-h-full">
               Tips artwork
             </div>
           )}
