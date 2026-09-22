@@ -14,6 +14,10 @@
 > reuses Page content / Assets / Page theme (no Settings). Store is `game_page_content`
 > singleton `gameKey: "trading"` — not a fake `provider_game` row. Player `/games/trading`
 > and the catalogue card read it with `TRADING_PAGE_DEFAULTS` fallback.
+> **Circuit Sprint chrome defaults 22 Sep 2026:** when `gameCode === "circuit-sprint"` and
+> `pageThemeId` / `stylizedQuote` / `howItWorksSteps` are empty, `circuit-sprint-page-defaults.ts`
+> fills the mock quote, circuit-neon theme and three How It Works steps at read time.
+> Operator-authored values still win. Admin editor is unchanged (empty stays empty until save).
 > The block below is the original Cursor brief kept for history.
 
 ---

@@ -260,13 +260,13 @@ mistake it for the feature.
 
 ### 2.3 The three controls that are not optional
 
-> **BUILT 22 September 2026 (X15 mitigations 1 and 2) — and open question 15 is still
-> OWNER.** The three controls below were the non-optional companion to "challenge any
-> user"; mitigations **1** and **2** shipped without waiting on Q15, because they are
-> correct under every answer to it. Mitigation **3** (per-game willingness + the master
-> `acceptingChallenges` switch) already shipped on 14 Sep 2026 (`20` s1.1a). What Q15
-> still decides is whether *creating* a challenge is further restricted to friends —
-> that gate is deliberately **not** built here.
+> **BUILT 22 September 2026 (X15 mitigations 1 and 2) — and open question 15 is CLOSED
+> the same day.** The three controls below were the non-optional companion to "challenge
+> any user"; mitigations **1** and **2** shipped without waiting on Q15. Mitigation **3**
+> (per-game willingness + the master `acceptingChallenges` switch) already shipped on
+> 14 Sep 2026 (`20` s1.1a). **Owner answer 22 Sep 2026: creating a challenge is NOT
+> restricted to friends** — anyone may create; the friends-only create gate stays
+> deliberately unbuilt.
 >
 > **Live code:** `BlockedUser.isBlockedByEither` on `POST /api/challenges` (directed
 > only; open challenges check at accept) and on `POST /api/challenges/[id]/accept`
@@ -284,10 +284,9 @@ mistake it for the feature.
 > **skips** the rate limit so attack harnesses can fire. And **reporting is still an
 > owner policy decision**, not designed here.
 
-**Open question 15 must be answered by the owner before friends-only create is gated:**
-may anyone challenge anyone, only friends, or only players who opted in per game? The
-design below assumes "anyone who opted in", because it is the only one of the three that
-satisfies the owner's brief without creating an unmanaged harassment surface.
+**Open question 15 is CLOSED (22 Sep 2026):** anyone on the platform may be challenged
+(subject to block, rate limit, master switch and per-game opt-out). A friends-only
+*create* gate must not be added without reversing this decision.
 
 Whatever the answer, three controls ship with the feature or the feature does not ship:
 

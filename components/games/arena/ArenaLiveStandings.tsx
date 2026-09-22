@@ -54,6 +54,12 @@ export interface ArenaLiveState {
   rows: ProviderLeaderboardRow[];
   activity: Record<string, RoundActivitySummary>;
   feed: ArenaActivityEntry[];
+  /**
+   * Normalised country codes keyed by user id. Travels with every poll so a
+   * joiner mid-contest can appear under Country. Never printed as a column —
+   * the panel only filters with it.
+   */
+  countries: Record<string, string>;
   currentUserId: string;
   /**
    * Friend user ids for the Friends scope filter. Loaded once on the server —
@@ -95,6 +101,7 @@ interface ProviderProps {
     rows: ProviderLeaderboardRow[];
     activity: Record<string, RoundActivitySummary>;
     feed: ArenaActivityEntry[];
+    countries?: Record<string, string>;
   };
   /**
    * Whether the contest is running, derived on the server from the STORED status.
@@ -122,7 +129,12 @@ export function ArenaLiveProvider({
   intervalMs = DEFAULT_INTERVAL_MS,
   children,
 }: ProviderProps) {
-  const [live, setLive] = useState(initial);
+  const [live, setLive] = useState({
+    rows: initial.rows,
+    activity: initial.activity,
+    feed: initial.feed,
+    countries: initial.countries ?? {},
+  });
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const clearTimer = useCallback(() => {
@@ -155,14 +167,20 @@ export function ArenaLiveProvider({
         // says "nobody has played", which is a false statement about a contest in progress.
         if (!Array.isArray(data?.rows)) return;
 
-        setLive({
+        setLive((prev) => ({
           rows: data.rows,
           activity:
             data.activity && typeof data.activity === "object"
               ? data.activity
               : {},
           feed: Array.isArray(data.feed) ? data.feed : [],
-        });
+          // Reason: absent countries means an older payload — keep the last good
+          // map rather than wiping Country mid-contest.
+          countries:
+            data.countries && typeof data.countries === "object"
+              ? data.countries
+              : prev.countries,
+        }));
       } catch {
         // Reason: a failed poll leaves the last good answer on screen. There is nothing useful
         // to tell a player about one missed refresh, and a banner would be on screen more often

@@ -232,6 +232,7 @@ export default async function PlayPage({ params }: PlayPageProps) {
         rows: standings.rows,
         activity: standings.activity,
         feed: standings.feed,
+        countries: standings.countries,
       }}
       // The STORED status, never a clock here: a contest whose end time has passed is still
       // `active` until a cron finalizes it, so deciding in the browser would stop the refresh

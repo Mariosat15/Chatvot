@@ -1,6 +1,9 @@
 import { getCompetitionLeaderboard } from "@/lib/actions/trading/competition.actions";
 import { getContestActivity } from "./contest-activity.service";
-import { attachProfileImages, type WithProfileImage } from "./leaderboard-avatars";
+import {
+  attachArenaBoardExtras,
+  type WithProfileImage,
+} from "./leaderboard-avatars";
 import type { RoundActivitySummary } from "@/lib/utils/round-activity";
 
 /**
@@ -41,6 +44,13 @@ export interface ArenaStandings {
   /** The most recent rounds across the contest, newest first, with names attached. */
   feed: ArenaFeedEntry[];
   /**
+   * Normalised country codes keyed by user id, for the Country board scope.
+   *
+   * Absent when the player has no country set. Never rendered as a column — the panel only
+   * filters with it. Travels with every poll so a joiner mid-contest can appear under Country.
+   */
+  countries: Record<string, string>;
+  /**
    * The caller's own position, READ off the row the server already ranked.
    *
    * Never worked out here. `calculateRankings` resolves the contest's score direction once from
@@ -67,11 +77,9 @@ export async function getArenaStandings(
   const leaderboard = await getCompetitionLeaderboard(competitionId, limit);
   const ranked: RankedRow[] = Array.isArray(leaderboard) ? leaderboard : [];
 
-  // The picture is attached AFTER ranking and never read by it: the rows above are the ranked
-  // truth, and this adds one display field to each. Done here rather than in the page so the
-  // polling route produces the same rows - a board whose avatars vanish on the first refresh
-  // is the "two answers" failure this service exists to prevent.
-  const rows = await attachProfileImages(ranked);
+  // Picture + country map AFTER ranking: one user lookup, two display concerns. Done here rather
+  // than in the page so the polling route produces the same extras.
+  const { rows, countries } = await attachArenaBoardExtras(ranked);
 
   const activity = await getContestActivity(
     competitionId,
@@ -91,6 +99,7 @@ export async function getArenaStandings(
       username: nameByUser.get(entry.userId),
       activity: entry,
     })),
+    countries,
     yourRank: rows.find((row) => row.userId === userId)?.currentRank,
   };
 }

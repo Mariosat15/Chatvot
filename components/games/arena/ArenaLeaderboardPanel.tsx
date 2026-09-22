@@ -30,11 +30,14 @@ import { useArenaLive } from "./ArenaLiveStandings";
  * The arena's leaderboard rail: two heading tabs, three scope pills, a four-column ranking
  * table, and the way out at the bottom.
  *
- * FRIENDS IS WIRED; COUNTRY IS NOT. Friends filters the already-ranked board client-side
- * against ids loaded once with the page (`listFriendUserIds`). Country stays a dead label —
- * publishing a player's country on a public board is a disclosure scheduled as later work
- * (`13` s4.1y). Filtering on the client keeps the standings poll as the single producer so
- * switching scopes cannot produce two disagreeing answers.
+ * ALL THREE SCOPES ARE WIRED. Global is the ranked board as the server sent it. Friends
+ * filters against ids loaded once with the page (`listFriendUserIds`). Country filters
+ * against a side map of normalised country codes that travels with every standings poll —
+ * never printed as a column (publishing where players live as a field is a different
+ * product decision from "show me people from my country").
+ *
+ * Filtering on the client keeps the standings poll as the single producer so switching
+ * scopes cannot produce two disagreeing answers.
  *
  * WHY IT IS ONE COMPONENT RATHER THAN CHROME COMPOSED IN THE LAYOUT, which is where it lived
  * until 11 September 2026. The owner rejected that version as "structurally wrong… a small
@@ -53,14 +56,37 @@ type Tab = "ranking" | "players";
 const SCOPE_LABEL = new Map<ArenaBoardScope, string>([
   ["global", "Global"],
   ["friends", "Friends"],
+  ["country", "Country"],
 ]);
 
 function scopeFromLabel(label: string): ArenaBoardScope {
-  return label === "Friends" ? "friends" : "global";
+  if (label === "Friends") return "friends";
+  if (label === "Country") return "country";
+  return "global";
 }
 
 function labelForScope(scope: ArenaBoardScope): string {
   return SCOPE_LABEL.get(scope) ?? "Global";
+}
+
+function emptyCopy(
+  scope: ArenaBoardScope,
+  terms: ReturnType<typeof useTerms>,
+  kind: "ranking" | "players",
+): string {
+  if (scope === "friends") {
+    return kind === "ranking"
+      ? `None of your friends have entered this ${terms.contest.toLowerCase()} yet.`
+      : "None of your friends have entered yet.";
+  }
+  if (scope === "country") {
+    return kind === "ranking"
+      ? `Nobody from your country has entered this ${terms.contest.toLowerCase()} yet. Add a country on your profile to match others.`
+      : "Nobody from your country has entered yet. Add a country on your profile to match others.";
+  }
+  return kind === "ranking"
+    ? `No ${terms.score.toLowerCase()}s yet. Be the first.`
+    : "Nobody has entered yet.";
 }
 
 export default function ArenaLeaderboardPanel({
@@ -72,13 +98,14 @@ export default function ArenaLeaderboardPanel({
   scoreLabel?: string;
 }) {
   const terms = useTerms();
-  const { rows, friendIds, currentUserId } = useArenaLive();
+  const { rows, friendIds, countries, currentUserId } = useArenaLive();
   const [tab, setTab] = useState<Tab>("ranking");
   const [scope, setScope] = useState<ArenaBoardScope>("global");
 
   const visibleRows = useMemo(
-    () => filterRowsForScope(rows, scope, currentUserId, friendIds),
-    [rows, scope, currentUserId, friendIds],
+    () =>
+      filterRowsForScope(rows, scope, currentUserId, friendIds, countries),
+    [rows, scope, currentUserId, friendIds, countries],
   );
 
   return (
@@ -114,15 +141,13 @@ export default function ArenaLeaderboardPanel({
       </div>
 
       {/*
-        Scope filters BOTH tabs. Country stays unavailable — drawn so the reference is
-        honoured, dead so it cannot appear to work (`NEON_TAB_DEAD` + aria-disabled).
+        All three scopes are selectable. Filtering is client-side against friend
+        ids (page load) and country codes (standings payload).
       */}
       <NeonScopeStrip
-        scopes={["Global", "Friends"]}
+        scopes={["Global", "Friends", "Country"]}
         value={labelForScope(scope)}
         onChange={(label) => setScope(scopeFromLabel(label))}
-        unavailable={["Country"]}
-        unavailableTitle={`Everyone in this ${terms.contest.toLowerCase()} is shown`}
       />
 
       {/*
@@ -164,9 +189,7 @@ function BoardTab({
   if (rows.length === 0) {
     return (
       <p className="px-2 py-6 text-center text-xs text-gray-500">
-        {scope === "friends"
-          ? `None of your friends have entered this ${terms.contest.toLowerCase()} yet.`
-          : `No ${terms.score.toLowerCase()}s yet. Be the first.`}
+        {emptyCopy(scope, terms, "ranking")}
       </p>
     );
   }
@@ -182,7 +205,8 @@ function BoardTab({
 }
 
 /**
- * The roster: everybody with a seat (or friends, when scoped), and what they have been doing.
+ * The roster: everybody with a seat (or friends / country peers, when scoped),
+ * and what they have been doing.
  *
  * ORDERED BY THE SERVER'S RANK, NOT BY NAME. Same people in the same order as the board.
  */
@@ -193,14 +217,13 @@ function PlayersTab({
   rows: ReturnType<typeof useArenaLive>["rows"];
   scope: ArenaBoardScope;
 }) {
+  const terms = useTerms();
   const { activity, currentUserId } = useArenaLive();
 
   if (rows.length === 0) {
     return (
       <p className="px-2 py-6 text-center text-xs text-gray-500">
-        {scope === "friends"
-          ? "None of your friends have entered yet."
-          : "Nobody has entered yet."}
+        {emptyCopy(scope, terms, "players")}
       </p>
     );
   }

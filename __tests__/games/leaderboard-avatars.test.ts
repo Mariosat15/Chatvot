@@ -114,9 +114,9 @@ describe("attachProfileImages", () => {
 
   it("is the one producer, called by the arena service and by the lobby's provider branch", () => {
     const service = readCode(ARENA_SERVICE);
-    expect(service).toMatch(/await attachProfileImages\(/);
-    // After the ranking read - the picture is attached to ranked rows, never read by ranking.
-    expect(service.indexOf("attachProfileImages(")).toBeGreaterThan(
+    // Arena uses the extras helper (picture + country map) so one lookup serves both.
+    expect(service).toMatch(/await attachArenaBoardExtras\(/);
+    expect(service.indexOf("attachArenaBoardExtras(")).toBeGreaterThan(
       service.indexOf("getCompetitionLeaderboard("),
     );
 
@@ -287,24 +287,24 @@ describe("the standings panel's chrome", () => {
     expect(panel).not.toMatch(/traders/i);
   });
 
-  it("draws all three of the reference scopes, with Friends wired and Country disabled", () => {
+  it("draws all three of the reference scopes, all selectable", () => {
     /*
-      AMENDED 22 SEPTEMBER 2026. This test used to assert both Friends and Country were
-      dead labels. Friends is now selectable: `Friendship.getUserFriends` exists and the
-      panel filters the ranked board client-side. Country stays dead — publishing a
-      player's country on a public board remains later work.
+      AMENDED 22 SEPTEMBER 2026 (twice). First Friends was wired; then Country.
+      Both filter the ranked board client-side. Country uses a side map of codes
+      from the standings payload — never a column that prints where people live.
 
-      The load-bearing half is still HOW the dead one is drawn: `NEON_TAB_DEAD`,
-      `aria-disabled`, a title, and no handler on THAT label. Friends being a button is
-      the intended change, not a regression.
+      The load-bearing half is that Country is no longer in `unavailable`, and
+      that `filterRowsForScope` is handed `countries`.
     */
     const panel = readCode(ARENA_PANEL);
-    expect(panel).toMatch(/scopes=\{\["Global", "Friends"\]\}/);
-    expect(panel).toMatch(/unavailable=\{\["Country"\]\}/);
+    expect(panel).toMatch(
+      /scopes=\{\["Global", "Friends", "Country"\]\}/,
+    );
+    expect(panel).not.toMatch(/unavailable=\{\["Country"\]\}/);
+    expect(panel).not.toMatch(/unavailable=\{\["Friends", "Country"\]\}/);
     expect(panel).toMatch(/onChange=\{/);
     expect(panel).toMatch(/filterRowsForScope/);
-    // Friends must not still sit in the unavailable list.
-    expect(panel).not.toMatch(/unavailable=\{\["Friends", "Country"\]\}/);
+    expect(panel).toMatch(/countries/);
 
     const cards = readCode(KIT_CARDS);
     const stripAt = cards.indexOf("export function NeonScopeStrip");
@@ -314,12 +314,68 @@ describe("the standings panel's chrome", () => {
     expect(endAt).toBeGreaterThan(0);
     const body = strip.slice(0, endAt);
 
-    // Dead scopes stay dead; selectable scopes may be buttons when onChange is set.
+    // Dead-scope machinery survives for other callers; this panel just passes none.
     expect(body).toMatch(/NEON_TAB_DEAD/);
     expect(body).toMatch(/aria-disabled="true"/);
-    // The unavailable map must not create buttons - only the selectable branch does.
     const unavailableBlock = body.slice(body.indexOf("unavailable.map"));
     expect(unavailableBlock).not.toMatch(/<button/);
     expect(unavailableBlock).not.toMatch(/onClick/);
+  });
+});
+
+describe("attachArenaBoardExtras", () => {
+  beforeEach(() => lookup.mockReset());
+
+  it("attaches pictures and a country side map without putting country on the row", async () => {
+    const { attachArenaBoardExtras } = await import(
+      "@/lib/services/games/leaderboard-avatars"
+    );
+
+    lookup.mockResolvedValue(
+      new Map([
+        [
+          "u1",
+          {
+            id: "u1",
+            name: "Alice",
+            email: "alice@example.com",
+            profileImage: "/uploads/alice.webp",
+            country: "cy",
+            address: "1 Some Street",
+          },
+        ],
+        [
+          "u2",
+          {
+            id: "u2",
+            name: "Bob",
+            email: "bob@example.com",
+            country: "GB",
+          },
+        ],
+      ]),
+    );
+
+    const { rows, countries } = await attachArenaBoardExtras([
+      { userId: "u1", username: "Alice", currentRank: 1, score: 900 },
+      { userId: "u2", username: "Bob", currentRank: 2, score: 500 },
+    ]);
+
+    expect(rows[0]).toEqual({
+      userId: "u1",
+      username: "Alice",
+      currentRank: 1,
+      score: 900,
+      profileImage: "/uploads/alice.webp",
+    });
+    expect(Object.hasOwn(rows[0], "country")).toBe(false);
+    expect(rows[1]).toEqual({
+      userId: "u2",
+      username: "Bob",
+      currentRank: 2,
+      score: 500,
+    });
+    expect(countries).toEqual({ u1: "CY", u2: "GB" });
+    expect(lookup).toHaveBeenCalledTimes(1);
   });
 });

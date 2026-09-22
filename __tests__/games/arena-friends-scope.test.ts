@@ -61,6 +61,40 @@ describe("filterRowsForScope", () => {
       "friend-b",
     ]);
   });
+
+  it("keeps the viewer and same-country peers on country scope", () => {
+    const countries = {
+      me: "CY",
+      "friend-a": "CY",
+      stranger: "GB",
+      "friend-b": "CY",
+    };
+    expect(
+      filterRowsForScope(rows, "country", "me", [], countries).map(
+        (r) => r.userId,
+      ),
+    ).toEqual(["me", "friend-a", "friend-b"]);
+  });
+
+  it("keeps only the viewer when they have no country set", () => {
+    // Reason: without a country there is nobody to match — falling back to Global
+    // would make Country look broken ("I clicked Country and nothing changed").
+    const countries = { stranger: "GB", "friend-a": "CY" };
+    expect(
+      filterRowsForScope(rows, "country", "me", [], countries).map(
+        (r) => r.userId,
+      ),
+    ).toEqual(["me"]);
+  });
+
+  it("normalises country codes so cy and CY match", () => {
+    const countries = { me: "cy", stranger: "CY", "friend-a": "gb" };
+    expect(
+      filterRowsForScope(rows, "country", "me", [], countries).map(
+        (r) => r.userId,
+      ),
+    ).toEqual(["me", "stranger"]);
+  });
 });
 
 describe("Friends ids load once with the page, never via matchmaking", () => {
@@ -68,6 +102,8 @@ describe("Friends ids load once with the page, never via matchmaking", () => {
     const page = readCode("app/(root)/competitions/[id]/play/page.tsx");
     expect(page).toMatch(/listFriendUserIds\(/);
     expect(page).toMatch(/friendIds=\{friendIds\}/);
+    // Country codes travel with standings, not a second friend-style fetch.
+    expect(page).toMatch(/countries:\s*standings\.countries/);
     // X13: ranking by trading skill for a provider contest is the silent-wrong shape.
     expect(page).not.toMatch(/matchmaking/i);
   });
@@ -76,5 +112,31 @@ describe("Friends ids load once with the page, never via matchmaking", () => {
     const service = readCode("lib/services/messaging/friend-ids.service.ts");
     expect(service).toMatch(/getUserFriends/);
     expect(service).not.toMatch(/matchmaking/i);
+  });
+});
+
+describe("Country scope is wired on the panel, not printed as a column", () => {
+  it("the panel offers Country as a selectable scope", () => {
+    const panel = readCode(
+      "components/games/arena/ArenaLeaderboardPanel.tsx",
+    );
+    expect(panel).toMatch(/scopes=\{\["Global", "Friends", "Country"\]\}/);
+    expect(panel).not.toMatch(/unavailable=\{\["Country"\]\}/);
+    expect(panel).toMatch(/filterRowsForScope/);
+    expect(panel).toMatch(/countries/);
+  });
+
+  it("countries travel on ArenaStandings and never on the leaderboard row type", () => {
+    const service = readCode(
+      "lib/services/games/arena-standings.service.ts",
+    );
+    expect(service).toMatch(/countries:\s*Record/);
+    expect(service).toMatch(/attachArenaBoardExtras/);
+    // Side map, not a column — the row enrichment must not spread `country`.
+    const producer = readCode(
+      "lib/services/games/leaderboard-avatars.ts",
+    );
+    expect(producer).toMatch(/countries\[row\.userId\]/);
+    expect(producer).not.toMatch(/profileImage:[\s\S]{0,80}country/);
   });
 });

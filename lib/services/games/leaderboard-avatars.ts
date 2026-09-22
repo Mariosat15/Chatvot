@@ -1,4 +1,5 @@
 import { getUsersByIds } from "@/lib/utils/user-lookup";
+import { normalizeCountryCode } from "@/lib/utils/arena-scope";
 
 /**
  * Puts each player's profile picture beside their row on a game leaderboard.
@@ -44,4 +45,35 @@ export async function attachProfileImages<T extends { userId: string }>(
     // `undefined`, so `JSON.stringify` on the polling route and the server render agree.
     return picture ? { ...row, profileImage: picture } : row;
   });
+}
+
+/**
+ * Arena board extras: picture on each row + a side map of country codes.
+ *
+ * Country is deliberately NOT written onto the row. The Country scope filters from this map;
+ * putting the code on the row would invite a column that prints where people live, which is a
+ * different product decision from "show me players from my country".
+ *
+ * ONE `getUsersByIds` for both fields so the arena poll does not pay twice.
+ */
+export async function attachArenaBoardExtras<T extends { userId: string }>(
+  rows: T[],
+): Promise<{
+  rows: (T & WithProfileImage)[];
+  countries: Record<string, string>;
+}> {
+  if (rows.length === 0) return { rows, countries: {} };
+
+  const users = await getUsersByIds(rows.map((row) => row.userId));
+  const countries: Record<string, string> = {};
+
+  const enriched = rows.map((row) => {
+    const user = users.get(row.userId);
+    const code = normalizeCountryCode(user?.country);
+    if (code) countries[row.userId] = code;
+    const picture = user?.profileImage;
+    return picture ? { ...row, profileImage: picture } : row;
+  });
+
+  return { rows: enriched, countries };
 }

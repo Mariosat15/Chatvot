@@ -13,6 +13,10 @@ import ProviderGame from "@/database/models/games/provider-game.model";
 import { TRADING_GAME_TYPE } from "@/lib/games";
 import { resolveGameCategory } from "@/lib/services/games/game-categories";
 import { resolveGamePageTheme } from "@/lib/services/games/game-page-themes";
+import {
+  CIRCUIT_SPRINT_PAGE_DEFAULTS,
+  isCircuitSprintGameCode,
+} from "@/lib/services/games/circuit-sprint-page-defaults";
 import type {
   GamePageBannerFeature,
   GamePageContestSummary,
@@ -332,15 +336,34 @@ function buildProviderPage(
         }))
     : [];
 
+  // Reason: Circuit Sprint's Page theme fields start empty after catalogue sync —
+  // without a fallback the hero quote and How It Works band are blank while the
+  // mock chrome is what operators expect until they author their own copy.
+  const sprintDefaults = isCircuitSprintGameCode(title.gameCode)
+    ? CIRCUIT_SPRINT_PAGE_DEFAULTS
+    : null;
+
   const howItWorksSteps =
     authoredSteps.length > 0
       ? authoredSteps
-      : deriveHowItWorksSteps(howToPlayLines);
+      : sprintDefaults
+        ? sprintDefaults.howItWorksSteps.map((s) => ({ ...s }))
+        : deriveHowItWorksSteps(howToPlayLines);
+
+  const authoredTheme =
+    typeof title.pageThemeId === "string" ? title.pageThemeId.trim() : "";
+  const pageThemeId =
+    authoredTheme || sprintDefaults?.pageThemeId || undefined;
 
   const theme = resolveGamePageTheme(
-    title.pageThemeId,
+    pageThemeId,
     category?.slug ?? undefined,
   );
+
+  const stylizedQuote =
+    title.stylizedQuote?.trim() ||
+    sprintDefaults?.stylizedQuote ||
+    undefined;
 
   const playStyle =
     typeof title.playModeOverride === "string" && title.playModeOverride.trim()
@@ -368,9 +391,9 @@ function buildProviderPage(
     highlights,
     bannerFeatures,
     heroFeatures: bannerFeatures,
-    pageThemeId: title.pageThemeId || undefined,
+    pageThemeId,
     theme,
-    stylizedQuote: title.stylizedQuote?.trim() || undefined,
+    stylizedQuote,
     gallery: mapGallery(title.gallery),
     supportedDevices: resolveDevices(title.supportedDevices),
     skillLevelLabel: title.skillLevelLabel?.trim() || undefined,
