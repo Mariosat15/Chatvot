@@ -3,7 +3,7 @@
 import { NextRequest, NextResponse } from "next/server";
 // `mkdir` was imported here and used by nothing - a dead import, removed rather than left,
 // because this file is now linted on every commit that touches it.
-import { readdir, stat, unlink, writeFile } from "fs/promises";
+import { readdir, stat, unlink, writeFile, rename } from "fs/promises";
 import path from "path";
 import { guardSection } from "@/lib/admin/section-route-guard";
 import { IMAGE_DIRECTORIES } from "@/lib/admin/image-optimizer-directories";
@@ -11,6 +11,10 @@ import {
   isReferencedArtworkDir,
   retargetArtworkAfterOptimize,
 } from "@/lib/admin/image-optimizer-artwork";
+import {
+  canOptimizeImage,
+  isImageOptimized,
+} from "@/lib/admin/image-optimizer-policy";
 
 // Dynamically import sharp to handle potential import issues
 async function getSharp() {
@@ -190,9 +194,19 @@ export async function GET() {
             const ext = path.extname(filename).toLowerCase();
             const imageType = getImageType(filename, dir.label);
 
-            // Consider optimized if WebP and under 150KB
-            const isOptimized = ext === ".webp" && fileStats.size < 150 * 1024;
-            const canOptimize = !isOptimized && fileStats.size > 10 * 1024; // Skip tiny files
+            // Reason: type-aware ceilings — artwork WebP at 200–350KB is healthy,
+            // not a candidate. A flat 150KB rule kept re-encoding Featured tiles
+            // forever while reporting success with ~0% savings.
+            const isOptimized = isImageOptimized(
+              ext,
+              fileStats.size,
+              imageType,
+            );
+            const canOptimize = canOptimizeImage(
+              ext,
+              fileStats.size,
+              imageType,
+            );
 
             allImages.push({
               filename,
@@ -330,16 +344,15 @@ export async function POST(request: NextRequest) {
             try {
               const fileStats = await stat(filePath);
               const ext = path.extname(filename).toLowerCase();
-              const isOptimized =
-                ext === ".webp" && fileStats.size < 150 * 1024;
+              const imageType = getImageType(filename, dir.label);
 
-              if (!isOptimized && fileStats.size > 10 * 1024) {
+              if (canOptimizeImage(ext, fileStats.size, imageType)) {
                 imagesToProcess.push({
                   filename,
                   fullPath: filePath,
                   directory: dir.path,
                   directoryLabel: dir.label,
-                  imageType: getImageType(filename, dir.label),
+                  imageType,
                 });
               }
             } catch {
@@ -358,6 +371,24 @@ export async function POST(request: NextRequest) {
     for (const img of imagesToProcess) {
       try {
         const fileStats = await stat(img.fullPath);
+        const ext = path.extname(img.filename).toLowerCase();
+        // Reason: selected mode can still hand us an already-good WebP; refuse to
+        // rewrite referenced artwork that the policy says is done.
+        if (!canOptimizeImage(ext, fileStats.size, img.imageType)) {
+          results.push({
+            filename: img.filename,
+            fullPath: img.fullPath,
+            originalSize: fileStats.size,
+            newSize: fileStats.size,
+            savedBytes: 0,
+            savedPercent: 0,
+            newFilename: img.filename,
+            success: true,
+            error: "Already optimized — left unchanged",
+          });
+          continue;
+        }
+
         const settings =
           IMAGE_SETTINGS[img.imageType] || IMAGE_SETTINGS.default;
 
@@ -373,25 +404,62 @@ export async function POST(request: NextRequest) {
           })
           .toBuffer();
 
+        const savedBytes = fileStats.size - optimizedBuffer.length;
+        const savedPercent = (savedBytes / fileStats.size) * 100;
+
+        // Reason: re-encoding an already-WebP hero often gains <5% and risks a
+        // half-written file on crash. Leave the bytes alone when the pass is noise.
+        if (
+          ext === ".webp" &&
+          savedPercent < 5 &&
+          optimizedBuffer.length >= fileStats.size * 0.95
+        ) {
+          results.push({
+            filename: img.filename,
+            fullPath: img.fullPath,
+            originalSize: fileStats.size,
+            newSize: fileStats.size,
+            savedBytes: 0,
+            savedPercent: 0,
+            newFilename: img.filename,
+            success: true,
+            error: "Negligible savings — left unchanged",
+          });
+          continue;
+        }
+
         // Generate new filename
         const newFilename = img.filename.replace(/\.[^.]+$/, ".webp");
         const newFilePath = path.join(img.directory, newFilename);
 
-        // Write optimized file
-        await writeFile(newFilePath, optimizedBuffer);
+        // Reason: write via a sibling temp then rename so a crash mid-write cannot
+        // leave a truncated WebP that `<img>` then fails to decode (broken Featured).
+        // Windows cannot rename onto an existing path, so drop the destination first
+        // once the temp is safely on disk (source bytes already live in memory).
+        const tempPath = `${newFilePath}.opt-tmp`;
+        await writeFile(tempPath, optimizedBuffer);
+        try {
+          await unlink(newFilePath);
+        } catch {
+          // Destination did not exist yet (PNG→WebP rename case).
+        }
+        await rename(tempPath, newFilePath);
 
-        const savedBytes = fileStats.size - optimizedBuffer.length;
-        const savedPercent = (savedBytes / fileStats.size) * 100;
         totalSaved += Math.max(0, savedBytes);
 
-        // Delete original if different
+        // Delete original if different (and still present)
         if (img.fullPath !== newFilePath) {
-          await unlink(img.fullPath);
+          try {
+            await unlink(img.fullPath);
+          } catch {
+            // Already gone.
+          }
         }
 
         // Reason: game artwork URLs are stored by filename on provider_game /
-        // game_page_content and as branding_asset keys. Renaming on disk without
-        // rewriting those leaves every title broken while this route reports success.
+        // game_page_content (including gallery[].url) and as branding_asset keys.
+        // Renaming on disk without rewriting those leaves every title broken while
+        // this route reports success.
         if (isReferencedArtworkDir(img.directory, img.directoryLabel)) {
           try {
             await retargetArtworkAfterOptimize({

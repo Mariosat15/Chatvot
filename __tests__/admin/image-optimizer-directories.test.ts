@@ -81,6 +81,7 @@ describe("Image Optimizer directories", () => {
     const code = stripComments(route);
     expect(code).toMatch(/retargetArtworkAfterOptimize\s*\(/);
     expect(code).toMatch(/isReferencedArtworkDir\s*\(/);
+    expect(code).toMatch(/image-optimizer-policy/);
   });
 });
 
