@@ -78,6 +78,27 @@ describe("player game page layout", () => {
     expect(sidebar).toContain("hover:border-[var(--gp-gold");
   });
 
+  it("lets the overview preview image grow to the sidebar height", () => {
+    // Reason: a fixed aspect-* box left a dark empty band under the image
+    // whenever Game Info was taller — trading and provider pages both hit it.
+    expect(overview).not.toMatch(/aspect-\[16\/10\]|aspect-video/);
+    expect(overview).toMatch(/flex-1/);
+    expect(overview).toMatch(/object-cover/);
+    expect(overview).toMatch(/absolute inset-0/);
+  });
+
+  it("shows contest and tips banners without cropping baked-in copy", () => {
+    const contests = readCode("components/game-page/GamePageContests.tsx");
+    const tips = readCode("components/game-page/GamePageTips.tsx");
+    // Reason: operator banners carry logos and headlines — cover + fixed aspect
+    // sliced them. Natural height + contain is the auto-support rule.
+    expect(contests).toMatch(/object-contain/);
+    expect(contests).toMatch(/h-auto w-full/);
+    expect(tips).toMatch(/object-contain/);
+    expect(tips).toMatch(/h-auto w-full/);
+    expect(tips).not.toMatch(/object-cover/);
+  });
+
   it("places How It Works as a full-width step band", () => {
     expect(overview).toContain("GamePageHowItWorks");
     expect(howItWorks).toContain("HowItWorksSteps");

@@ -20,9 +20,15 @@ export function GamePageOverview({ game }: { game: GamePageData }) {
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 lg:grid-cols-[1.65fr_1fr]">
-        <div className="space-y-4">
-          <GamePagePanel>
+      {/*
+        Reason: the preview used a fixed aspect ratio, so when the info sidebar
+        was taller the left column left a dark empty band under the image. Stretch
+        the column to the sidebar height and let the image panel grow (`flex-1`)
+        with `object-cover` so both trading and provider titles fill the gap.
+      */}
+      <div className="grid items-stretch gap-4 lg:grid-cols-[1.65fr_1fr]">
+        <div className="flex h-full min-h-0 flex-col gap-4">
+          <GamePagePanel className="shrink-0">
             <h2 className="text-[13px] font-bold uppercase tracking-[0.16em] text-[var(--gp-accent)]">
               About {game.title}
             </h2>
@@ -45,25 +51,27 @@ export function GamePageOverview({ game }: { game: GamePageData }) {
             ) : null}
           </GamePagePanel>
 
-          <GamePagePanel className="overflow-hidden p-0">
-            <div className="relative aspect-[16/10] bg-black/50 sm:aspect-video">
+          <GamePagePanel className="flex min-h-[240px] flex-1 flex-col overflow-hidden p-0 sm:min-h-[280px]">
+            <div className="relative min-h-[200px] flex-1 bg-black/50">
               {marketingUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={marketingUrl}
                   alt={`${game.title} preview`}
-                  className="h-full w-full object-cover"
+                  className="absolute inset-0 h-full w-full object-cover"
                 />
               ) : useCircuitArt ? (
-                <CircuitSprintFallbackArt />
+                <div className="absolute inset-0">
+                  <CircuitSprintFallbackArt />
+                </div>
               ) : (
-                <div className="flex h-full items-center justify-center text-[var(--gp-muted)]">
+                <div className="absolute inset-0 flex items-center justify-center text-[var(--gp-muted)]">
                   <Gamepad2 className="h-16 w-16 opacity-40" />
                 </div>
               )}
             </div>
             {game.gameplayVideoUrl ? (
-              <div className="border-t border-[var(--gp-border)] px-5 py-3">
+              <div className="shrink-0 border-t border-[var(--gp-border)] px-5 py-3">
                 <a
                   href={game.gameplayVideoUrl}
                   target="_blank"

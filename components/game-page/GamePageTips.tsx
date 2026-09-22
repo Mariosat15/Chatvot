@@ -51,16 +51,21 @@ export function GamePageTips({ game }: { game: GamePageData }) {
             </ul>
           ) : null}
         </div>
-        <div className="overflow-hidden rounded-[12px] border border-[var(--gp-border)]">
+        {/*
+          Reason: tips artwork is a full designed banner (logo + headline baked
+          in). object-cover inside a fixed aspect cropped the left of ChartVolt
+          / TRADING TIPS. Let the upload set the height so any ratio works.
+        */}
+        <div className="overflow-hidden rounded-[12px] border border-[var(--gp-border)] bg-[var(--gp-panel-2,#091b35)]">
           {game.gameTipsImageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={game.gameTipsImageUrl}
               alt={`${game.title} tips`}
-              className="aspect-[16/10] w-full object-cover"
+              className="block h-auto w-full object-contain"
             />
           ) : (
-            <div className="flex aspect-[16/10] items-center justify-center bg-[var(--gp-panel-2,#091b35)] text-[var(--gp-muted)]">
+            <div className="flex min-h-[180px] items-center justify-center text-[var(--gp-muted)]">
               Tips artwork
             </div>
           )}

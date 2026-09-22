@@ -82,15 +82,23 @@ export function GamePageContests({ game }: { game: GamePageData }) {
               key={c.id}
               className="flex flex-col overflow-hidden rounded-[12px] border border-[var(--gp-border)] bg-[var(--gp-panel-2,#091b35)]/70"
             >
-              <div className="relative aspect-[16/9] bg-gradient-to-br from-[var(--gp-accent)]/20 to-[var(--gp-accent-2)]/20">
+              {/*
+                Reason: contest banners are operator artwork with baked-in copy
+                (titles, icons, taglines). A fixed 16:9 + object-cover box
+                sliced those off. Natural height + contain auto-supports
+                whatever ratio the upload is.
+              */}
+              <div className="relative bg-gradient-to-br from-[var(--gp-accent)]/20 to-[var(--gp-accent-2)]/20">
                 {game.bannerUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={game.bannerUrl}
                     alt=""
-                    className="h-full w-full object-cover opacity-60"
+                    className="block h-auto w-full object-contain opacity-90"
                   />
-                ) : null}
+                ) : (
+                  <div className="aspect-[16/9]" aria-hidden />
+                )}
                 <span
                   className={`absolute left-3 top-3 rounded-md px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-white ${
                     live

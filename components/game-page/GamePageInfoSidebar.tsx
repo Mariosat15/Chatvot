@@ -82,7 +82,7 @@ export function GamePageInfoSidebar({ game }: { game: GamePageData }) {
   ];
 
   return (
-    <aside className="space-y-4">
+    <aside className="flex h-full flex-col gap-4">
       <GamePagePanel>
         <h2 className="text-[13px] font-bold uppercase tracking-[0.16em] text-[var(--gp-accent)]">
           Game Info
@@ -190,7 +190,7 @@ export function GamePageInfoSidebar({ game }: { game: GamePageData }) {
         </div>
       </GamePagePanel>
 
-      <div className="space-y-2">
+      <div className="mt-auto space-y-2">
         <Link href={enterHref} className={GP_CTA_GREEN}>
           <Play className="h-5 w-5 fill-current" />
           Enter Now
