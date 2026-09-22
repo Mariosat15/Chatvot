@@ -17,6 +17,7 @@ import { GamePageContests } from "./GamePageContests";
 import { GamePageHowItWorks } from "./GamePageHowItWorks";
 import { GamePageFeatured } from "./GamePageFeatured";
 import { GamePagePanel, GP_CTA_PRIMARY, GP_CTA_GREEN } from "./GamePageChrome";
+import { gpSans } from "./game-page-fonts";
 
 function RulesTab({ game }: { game: GamePageData }) {
   const howTo =
@@ -123,7 +124,7 @@ export function GamePageView({
 
   return (
     <div
-      className="min-h-[70vh] text-[15px] text-[var(--gp-text)]"
+      className={`${gpSans.className} min-h-[70vh] text-[15px] text-[var(--gp-text)]`}
       style={{ ...vars, background: "var(--gp-bg)" } as CSSProperties}
     >
       <div className="mx-auto max-w-[1480px] space-y-4 px-4 py-6 sm:px-6 lg:px-8">

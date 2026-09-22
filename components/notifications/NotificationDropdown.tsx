@@ -242,7 +242,7 @@ export default function NotificationDropdown() {
           variant="ghost"
           size="icon"
           aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`}
-          className="relative h-10 w-10 overflow-hidden rounded-lg bg-black/60 p-0 text-gray-400 hover:bg-gray-800 hover:text-white"
+          className="relative h-10 w-10 overflow-hidden rounded-lg bg-transparent p-0 text-gray-400 hover:bg-white/5 hover:text-white"
         >
           <GameIcon
             name="notifications"

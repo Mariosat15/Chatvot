@@ -67,14 +67,16 @@ describe("player game page layout", () => {
     expect(view).toContain("competitions");
   });
 
-  it("uses a cinematic hero that does not crop the banner art", () => {
+  it("uses a cinematic hero whose banner fills the backdrop", () => {
     expect(view).toContain("max-w-[1480px]");
     expect(hero).toMatch(/min-h-\[300px\]/);
     expect(hero).toMatch(/md:min-h-\[340px\]/);
-    // Reason: object-cover sliced trophy / circuit art on the edges; contain
-    // keeps the full upload while the dark scrim still holds the copy.
-    expect(hero).toMatch(/object-contain/);
-    expect(hero).not.toMatch(/object-cover/);
+    // Reason: owner Sep 2026 — banner must fill the hero as a background
+    // (auto-adjust). object-contain left empty bands; cover fills edge to edge.
+    // Logo wordmark still uses contain (separate rule below).
+    expect(hero).toMatch(/object-cover object-right/);
+    expect(hero).toMatch(/gpDisplay/);
+    expect(hero).toMatch(/gpSans/);
     // Reason: game/trading logo is a wide wordmark — full-width of the copy
     // column with natural height, never a fixed square that letterboxes it.
     expect(hero).toMatch(/max-w-xl/);

@@ -9,6 +9,7 @@ import {
   resolvePlayNowHref,
 } from "@/lib/services/games/game-page-helpers";
 import { GP_CTA_PRIMARY, GP_CTA_SECONDARY } from "./GamePageChrome";
+import { gpDisplay, gpSans } from "./game-page-fonts";
 
 const TRADING_CHIPS = [
   { title: "REAL MARKETS", icon: LineChart },
@@ -45,13 +46,16 @@ export function GamePageHero({ game }: { game: GamePageData }) {
           <img
             src={game.bannerUrl}
             alt=""
-            className="h-full w-full object-contain object-right"
+            // Reason: owner wants the banner as a full-bleed backdrop (Sep 2026).
+            // object-contain left empty bands; cover fills the hero. Anchor right so
+            // trophy / arena focal points stay in the open half beside the copy.
+            className="h-full w-full object-cover object-right"
           />
         ) : (
           <div className="h-full w-full bg-gradient-to-br from-[var(--gp-accent-2)]/50 via-[var(--gp-bg)] to-[var(--gp-accent)]/30" />
         )}
-        <div className="absolute inset-0 bg-gradient-to-r from-[#020817] via-[#020817]/92 to-[#020817]/35" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#020817]/90 via-transparent to-[#020817]/40" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#020817] via-[#020817]/88 to-[#020817]/25" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#020817]/85 via-transparent to-[#020817]/35" />
       </div>
 
       <div className="relative flex min-h-[300px] flex-col justify-between gap-6 p-6 md:min-h-[340px] md:flex-row md:items-end md:p-8 lg:p-10">
@@ -76,31 +80,41 @@ export function GamePageHero({ game }: { game: GamePageData }) {
             )}
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-3">
             {game.genre ? (
               <span
-                className="inline-flex rounded-md px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-white"
+                className={`${gpDisplay.className} inline-flex rounded-md px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.22em] text-white`}
                 style={{ background: "var(--gp-badge)" }}
               >
                 {game.genre}
               </span>
             ) : null}
-            <h1 className="text-[32px] font-black italic leading-[1.05] tracking-tight text-white sm:text-[40px] lg:text-[46px]">
-              {game.tagline ? (
-                <>
-                  <span className="text-[var(--gp-gold,#ffd33d)]">
-                    {game.title}
-                  </span>
-                  <span className="mt-1 block text-white">{game.tagline}</span>
-                </>
-              ) : (
-                game.title
-              )}
-            </h1>
+            {game.tagline ? (
+              <div className="space-y-2">
+                <p
+                  className={`${gpDisplay.className} text-[22px] font-bold uppercase tracking-[0.08em] text-[var(--gp-gold,#ffd33d)] sm:text-[26px]`}
+                >
+                  {game.title}
+                </p>
+                <h1
+                  className={`${gpSans.className} text-[28px] font-extrabold leading-[1.15] tracking-tight text-white sm:text-[36px] lg:text-[42px]`}
+                >
+                  {game.tagline}
+                </h1>
+              </div>
+            ) : (
+              <h1
+                className={`${gpDisplay.className} text-[32px] font-bold uppercase tracking-[0.06em] text-[var(--gp-gold,#ffd33d)] sm:text-[40px] lg:text-[46px]`}
+              >
+                {game.title}
+              </h1>
+            )}
           </div>
 
           {game.description ? (
-            <p className="max-w-2xl text-[15px] leading-relaxed text-[var(--gp-muted)] md:text-[16px]">
+            <p
+              className={`${gpSans.className} max-w-2xl text-[15px] font-medium leading-relaxed text-[var(--gp-muted)] md:text-[16px]`}
+            >
               {game.description}
             </p>
           ) : null}

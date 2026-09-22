@@ -289,13 +289,12 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
           <div className="relative">
             <div
               className={cn(
-                // Reason: black neon JPGs fill the tile via object-contain; no shrink
-                // override — cropping comes from forcing a smaller img than the box.
+                // Reason: neon nav PNGs are transparent — no black tile behind them.
                 "flex items-center justify-center overflow-hidden rounded-lg transition-all duration-300",
                 isCollapsed ? "h-9 w-9" : "h-10 w-10",
                 active
                   ? `${item.color.replace("text-", "bg-")}/20 ${item.color}`
-                  : "bg-black/60 text-gray-400 group-hover:text-gray-200",
+                  : "bg-transparent text-gray-400 group-hover:bg-white/5 group-hover:text-gray-200",
               )}
             >
               {item.icon}
@@ -547,7 +546,7 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
           )}
         >
           <div className={cn(
-            "flex items-center justify-center overflow-hidden rounded-lg bg-black/60 group-hover:bg-red-500/20 transition-colors",
+            "flex items-center justify-center overflow-hidden rounded-lg bg-transparent group-hover:bg-red-500/20 transition-colors",
             isCollapsed ? "h-9 w-9" : "h-10 w-10",
           )}>
             <GameIcon name="logout" size={40} className={NAV_ICON} alt="Sign out" />
