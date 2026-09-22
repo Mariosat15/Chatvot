@@ -81,6 +81,8 @@ export default function ImageOptimizerSection() {
     const k = 1024;
     const sizes = ["B", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
+    // Reason: computed index into a fixed local array — not a request-supplied key.
+    // eslint-disable-next-line security/detect-object-injection
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
@@ -522,7 +524,7 @@ export default function ImageOptimizerSection() {
               <Image className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
               <h3 className="font-semibold mb-2">No Images Found</h3>
               <p className="text-muted-foreground">
-                No marketplace images found in the uploads directory.
+                No images found in the scanned upload directories.
               </p>
             </div>
           </CardContent>

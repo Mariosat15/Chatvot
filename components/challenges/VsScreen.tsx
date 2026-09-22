@@ -7,61 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { X, Swords } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-// Level info - should match your app's level config
-const LEVEL_INFO: Record<
-  number,
-  { label: string; color: string; bgColor: string; icon: string }
-> = {
-  1: {
-    label: "Beginner",
-    color: "text-gray-400",
-    bgColor: "bg-gray-500/20",
-    icon: "🌱",
-  },
-  2: {
-    label: "Apprentice",
-    color: "text-green-400",
-    bgColor: "bg-green-500/20",
-    icon: "📈",
-  },
-  3: {
-    label: "Intermediate",
-    color: "text-blue-400",
-    bgColor: "bg-blue-500/20",
-    icon: "📊",
-  },
-  4: {
-    label: "Advanced",
-    color: "text-purple-400",
-    bgColor: "bg-purple-500/20",
-    icon: "💹",
-  },
-  5: {
-    label: "Expert",
-    color: "text-orange-400",
-    bgColor: "bg-orange-500/20",
-    icon: "🔥",
-  },
-  6: {
-    label: "Master",
-    color: "text-red-400",
-    bgColor: "bg-red-500/20",
-    icon: "⚡",
-  },
-  7: {
-    label: "Grandmaster",
-    color: "text-yellow-400",
-    bgColor: "bg-yellow-500/20",
-    icon: "👑",
-  },
-  8: {
-    label: "Legend",
-    color: "text-pink-400",
-    bgColor: "bg-pink-500/20",
-    icon: "🏆",
-  },
-};
+import { resolveVsLevelInfo } from "@/components/challenges/vs-level";
 
 export interface VsOpponent {
   username: string;
@@ -101,7 +47,11 @@ export default function VsScreen({
   const portalRef = useRef<HTMLElement | null>(null);
   const [isMounted, setIsMounted] = useState(false);
 
-  const levelInfo = LEVEL_INFO[opponent.level || 3];
+  // Reason: same ladder as the profile (`TITLE_LEVELS`) so level 9+ never crashes.
+  const levelInfo = resolveVsLevelInfo(opponent.level);
+  // Reason: a missing name used to throw on `.charAt(0)` and take the same path.
+  const opponentName = opponent.username?.trim() || "Opponent";
+  const challengerName = player1Name?.trim() || "You";
 
   // Set up portal target after mount
   useEffect(() => {
@@ -190,7 +140,7 @@ export default function VsScreen({
                       />
                     ) : (
                       <span className="text-2xl sm:text-3xl md:text-4xl font-bold text-white drop-shadow-lg">
-                        {player1Name.charAt(0).toUpperCase()}
+                        {challengerName.charAt(0).toUpperCase()}
                       </span>
                     )}
                   </motion.div>
@@ -201,7 +151,7 @@ export default function VsScreen({
                     transition={{ delay: 0.3 }}
                     className="text-lg sm:text-xl md:text-2xl font-bold text-white mb-2 drop-shadow-lg text-center px-2"
                   >
-                    {player1Name}
+                    {challengerName}
                   </motion.h3>
 
                   {/* Player 1 Badge */}
@@ -251,7 +201,7 @@ export default function VsScreen({
                       />
                     ) : (
                       <span className="text-2xl sm:text-3xl md:text-4xl font-bold text-white drop-shadow-lg">
-                        {opponent.username.charAt(0).toUpperCase()}
+                        {opponentName.charAt(0).toUpperCase()}
                       </span>
                     )}
                   </motion.div>
@@ -262,7 +212,7 @@ export default function VsScreen({
                     transition={{ delay: 0.3 }}
                     className="text-lg sm:text-xl md:text-2xl font-bold text-white mb-2 drop-shadow-lg text-center px-2"
                   >
-                    {opponent.username}
+                    {opponentName}
                   </motion.h3>
 
                   {/* Level Badge */}

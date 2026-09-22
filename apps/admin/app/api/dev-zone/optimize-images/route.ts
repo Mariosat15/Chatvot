@@ -6,6 +6,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { readdir, stat, unlink, writeFile } from "fs/promises";
 import path from "path";
 import { guardSection } from "@/lib/admin/section-route-guard";
+import { IMAGE_DIRECTORIES } from "@/lib/admin/image-optimizer-directories";
+import {
+  isReferencedArtworkDir,
+  retargetArtworkAfterOptimize,
+} from "@/lib/admin/image-optimizer-artwork";
 
 // Dynamically import sharp to handle potential import issues
 async function getSharp() {
@@ -26,113 +31,15 @@ const IMAGE_SETTINGS: Record<
   badge: { width: 256, height: 256, quality: 85 },
   border: { width: 512, height: 512, quality: 80 },
   background: { width: 1920, height: 1080, quality: 75 },
+  // Reason: game banners/heroes are wide; 800×600 crushed them into mush while still
+  // reporting "Optimized". Cap at ~2K so heavy PNGs shrink without killing the art.
+  artwork: { width: 1920, height: 1080, quality: 80 },
   effect: { width: 512, height: 512, quality: 80 },
   gamemaster: { width: 800, height: 600, quality: 85 },
   indicator: { width: 800, height: 600, quality: 85 },
   strategy: { width: 800, height: 600, quality: 85 },
   cosmetic: { width: 512, height: 512, quality: 85 },
   default: { width: 800, height: 600, quality: 80 },
-};
-
-// All possible image directories to scan
-const IMAGE_DIRECTORIES = {
-  production: [
-    {
-      path: "/var/www/chartvolt/public/uploads/marketplace",
-      label: "Marketplace Uploads",
-    },
-    {
-      path: "/var/www/chartvolt/public/assets/avatars",
-      label: "Default Avatars",
-    },
-    { path: "/var/www/chartvolt/public/uploads/cosmetics", label: "Cosmetics" },
-    {
-      path: "/var/www/chartvolt/public/uploads/indicators",
-      label: "Indicators",
-    },
-    {
-      path: "/var/www/chartvolt/public/uploads/strategies",
-      label: "Strategies",
-    },
-    {
-      path: "/var/www/chartvolt/public/uploads/gamemaster",
-      label: "Game Master",
-    },
-    { path: "/var/www/chartvolt/public/uploads", label: "General Uploads" },
-  ],
-  development: [
-    {
-      path: path.join(
-        process.cwd(),
-        "..",
-        "..",
-        "public",
-        "uploads",
-        "marketplace",
-      ),
-      label: "Marketplace Uploads",
-    },
-    {
-      path: path.join(process.cwd(), "..", "..", "public", "assets", "avatars"),
-      label: "Default Avatars",
-    },
-    {
-      path: path.join(
-        process.cwd(),
-        "..",
-        "..",
-        "public",
-        "uploads",
-        "cosmetics",
-      ),
-      label: "Cosmetics",
-    },
-    {
-      path: path.join(
-        process.cwd(),
-        "..",
-        "..",
-        "public",
-        "uploads",
-        "indicators",
-      ),
-      label: "Indicators",
-    },
-    {
-      path: path.join(
-        process.cwd(),
-        "..",
-        "..",
-        "public",
-        "uploads",
-        "strategies",
-      ),
-      label: "Strategies",
-    },
-    {
-      path: path.join(
-        process.cwd(),
-        "..",
-        "..",
-        "public",
-        "uploads",
-        "gamemaster",
-      ),
-      label: "Game Master",
-    },
-    {
-      path: path.join(process.cwd(), "..", "..", "public", "uploads"),
-      label: "General Uploads",
-    },
-    {
-      path: path.join(process.cwd(), "public", "uploads", "marketplace"),
-      label: "Admin Marketplace",
-    },
-    {
-      path: path.join(process.cwd(), "public", "uploads"),
-      label: "Admin Uploads",
-    },
-  ],
 };
 
 interface DirectoryInfo {
@@ -186,8 +93,17 @@ function getImageType(filename: string, dirLabel: string): string {
 
   // Check directory label first
   if (dirLower.includes("avatar")) return "avatar";
+  // Reason: "Game Master" contains "game" — check the specific label before artwork.
   if (dirLower.includes("gamemaster") || dirLower.includes("game master"))
     return "gamemaster";
+  if (
+    dirLower.includes("branding") ||
+    dirLower.includes("hero") ||
+    dirLower.includes("game artwork") ||
+    dirLower.includes("artwork")
+  ) {
+    return "artwork";
+  }
   if (dirLower.includes("indicator")) return "indicator";
   if (dirLower.includes("strateg")) return "strategy";
   if (dirLower.includes("cosmetic")) return "cosmetic";
@@ -196,7 +112,8 @@ function getImageType(filename: string, dirLabel: string): string {
   if (lower.includes("avatar")) return "avatar";
   if (lower.includes("badge")) return "badge";
   if (lower.includes("border")) return "border";
-  if (lower.includes("background")) return "background";
+  if (lower.includes("background") || lower.includes("banner"))
+    return "background";
   if (lower.includes("effect")) return "effect";
   if (lower.includes("gamemaster") || lower.includes("gm-"))
     return "gamemaster";
@@ -470,6 +387,25 @@ export async function POST(request: NextRequest) {
         // Delete original if different
         if (img.fullPath !== newFilePath) {
           await unlink(img.fullPath);
+        }
+
+        // Reason: game artwork URLs are stored by filename on provider_game /
+        // game_page_content and as branding_asset keys. Renaming on disk without
+        // rewriting those leaves every title broken while this route reports success.
+        if (isReferencedArtworkDir(img.directory, img.directoryLabel)) {
+          try {
+            await retargetArtworkAfterOptimize({
+              oldFilename: img.filename,
+              newFilename,
+              buffer: optimizedBuffer,
+            });
+          } catch (retargetError) {
+            console.warn(
+              "⚠️ Artwork retarget failed after optimize:",
+              img.filename,
+              retargetError,
+            );
+          }
         }
 
         results.push({
