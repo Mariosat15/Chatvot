@@ -360,74 +360,53 @@ describe("the wait for a frame that never starts is bounded", () => {
 });
 
 describe("a provider contest is never sent to the trading workspace", () => {
-  it("the trading page redirects a provider contest to the play route", () => {
+  it("the trading page permanently redirects into the play dispatcher", () => {
     const code = readCode(TRADE_PAGE);
 
-    expect(code).toMatch(/if\s*\(isProviderContest\(competition\)\)/);
     expect(code).toMatch(
-      /redirect\(`\/competitions\/\$\{competitionId\}\/play`\)/,
+      /redirect\(`\/competitions\/\$\{competitionId\}\/play/,
     );
+    // Reason: must not still host trading UI — that lives in CompetitionTradingWorkspace.
+    expect(code).not.toMatch(/TradingPageContent/);
+    expect(code).not.toMatch(/isProviderContest/);
   });
 
   /**
-   * The two routes redirect into each other, so their conditions must be exact complements.
-   *
-   * `/trade` bounces when `isProviderContest` is true; `/play` bounces only on the
-   * `not_provider_contest` refusal, which is that same predicate being false. If a later change
-   * made them overlap the result would not be a wrong screen - it would be an infinite redirect,
-   * which in Next.js surfaces as a blank page or a browser error rather than anything that names
-   * the cause.
+   * `/trade` always redirects to `/play`. `/play` renders trading when
+   * `not_provider_contest` and the provider host otherwise. No route redirects back to
+   * `/trade`, so a loop is impossible.
    */
   it("cannot form a redirect loop with the play route", () => {
     const trade = readCode(TRADE_PAGE);
     const play = readCode(PLAY_PAGE);
 
-    // The trading page bounces on the predicate being TRUE.
-    expect(trade).toMatch(/if\s*\(isProviderContest\(competition\)\)\s*\{/);
+    expect(trade).toMatch(
+      /redirect\(`\/competitions\/\$\{competitionId\}\/play/,
+    );
 
-    // The play page bounces on exactly one refusal, and it is the complement of that predicate.
-    const playRedirects =
-      play.match(/redirect\(`\/competitions\/\$\{competitionId\}\/trade`\)/g) ?? [];
-    expect(playRedirects.length).toBe(1);
+    // Play must NOT bounce trading contests out to /trade any more.
+    expect(play).not.toMatch(
+      /redirect\(`\/competitions\/\$\{competitionId\}\/trade`\)/,
+    );
+    expect(play).toMatch(/CompetitionTradingWorkspace/);
     expect(play).toMatch(
       /outcome\.refusal\s*===\s*["']not_provider_contest["']/,
     );
-
-    // And it must not bounce on any other refusal, or a seatless player would ping-pong. Written
-    // as literal patterns rather than built from a loop variable: `new RegExp` on a composed
-    // string is what `security/detect-non-literal-regexp` flags, and the three cases are few
-    // enough that spelling them out is clearer than justifying a suppression.
-    expect(play).not.toMatch(
-      /refusal\s*===\s*["']not_a_participant["'][\s\S]{0,140}?\/trade/,
-    );
-    expect(play).not.toMatch(
-      /refusal\s*===\s*["']misconfigured["'][\s\S]{0,140}?\/trade/,
-    );
-    expect(play).not.toMatch(
-      /refusal\s*===\s*["']failed["'][\s\S]{0,140}?\/trade/,
-    );
   });
 
-  it("the guard runs before the page does its trading work", () => {
-    // A guard placed after the position and margin reads would still redirect, but it would have
-    // spent the queries first - and more importantly it would be one refactor away from
-    // rendering something before it bounces.
+  it("the trade redirect preserves viewOnly", () => {
     const code = readCode(TRADE_PAGE);
-    const guard = code.search(/isProviderContest\(competition\)/);
-    const positions = code.search(/getUserPositions\(/);
-
-    expect(guard).toBeGreaterThan(-1);
-    expect(positions).toBeGreaterThan(guard);
+    expect(code).toMatch(/viewOnly === ["']true["']/);
+    expect(code).toMatch(/\?viewOnly=true/);
   });
 
   it("the contest CTA sends a provider contest to play and a trading contest to trade", () => {
     const code = readCode(ENTRY_BUTTON);
 
     // The strict helper, deliberately: this decides a destination, and /play cannot work without
-    // a provider key and a game code.
+    // a provider key and a game code. Trading may still name /trade — that URL redirects in.
     expect(code).toMatch(/isProviderContest\(competition\)/);
     expect(code).toMatch(/competitions\/\$\{competition\._id\}\/play/);
-    // Trading is untouched - the old destination must still be reachable for a trading contest.
     expect(code).toMatch(/competitions\/\$\{competition\._id\}\/trade/);
   });
 
@@ -2313,8 +2292,12 @@ describe("the arena header can be read before the board is reached", () => {
       Position, not presence. Both were in the same flex row before, so the title competed with
       a badge and a description for one line's worth of attention - which is what "not
       professional" was describing.
+
+      The badge used to end in a hard-coded `competition` template literal; terminology
+      tokens moved that to `terms.contest`. Anchor on the category expression itself so a
+      wording pass cannot quietly retire the order guard.
     */
-    const badgeAt = code.indexOf("competition`");
+    const badgeAt = code.indexOf("presentation.category");
     const headingAt = code.indexOf("<h1");
 
     expect(badgeAt).toBeGreaterThan(0);

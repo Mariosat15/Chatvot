@@ -27,11 +27,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Gamepad2, Server, AlertTriangle } from "lucide-react";
+import { Gamepad2, Server, AlertTriangle, Layers } from "lucide-react";
 import { useTerms } from "@/contexts/TerminologyContext";
 import {
   summariseByGame,
   summariseByProvider,
+  summariseByCategory,
   type AnalyticsContestRow,
   type GameSummaryRow,
 } from "@/lib/admin/contest-analytics-presentation";
@@ -45,6 +46,7 @@ export default function GameRevenueBreakdown({ contests, creditSymbol }: Props) 
   const terms = useTerms();
   const byGame = summariseByGame(contests);
   const byProvider = summariseByProvider(contests);
+  const byCategory = summariseByCategory(contests);
 
   if (byGame.length === 0) return null;
 
@@ -52,6 +54,8 @@ export default function GameRevenueBreakdown({ contests, creditSymbol }: Props) 
   // a byte-for-byte repeat of the game table, and a second identical table teaches an operator
   // that one of the two is redundant - so they stop reading it on the day it stops being.
   const showProviderTable = byProvider.length > 1;
+  // Same for genre: one category means every contest is already in that bucket.
+  const showCategoryTable = byCategory.length > 1;
 
   return (
     <div className="space-y-6">
@@ -64,6 +68,18 @@ export default function GameRevenueBreakdown({ contests, creditSymbol }: Props) 
         showProvider
         creditSymbol={creditSymbol}
       />
+
+      {showCategoryTable && (
+        <SummaryTable
+          title="By genre"
+          description="Same figures grouped by the catalogue genre vocabulary (task 9). Racing, racing and race cannot become three rows — the slug is the key."
+          icon={<Layers className="h-5 w-5 text-amber-400" />}
+          rows={byCategory}
+          firstColumn="Genre"
+          showProvider={false}
+          creditSymbol={creditSymbol}
+        />
+      )}
 
       {showProviderTable && (
         <SummaryTable

@@ -483,6 +483,10 @@ export async function POST(
         startTime: challenge.startTime,
         endTime: challenge.endTime,
         winnerPrize: challenge.winnerPrize,
+        // Reason: ChallengePopup used to hard-code `/trade` after accept. The dispatcher
+        // needs gameType to send a provider challenge to `/play` without an extra hop.
+        gameType: challenge.gameType,
+        gameKey: challenge.gameKey,
       },
     });
   } catch (error) {

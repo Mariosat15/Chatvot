@@ -178,6 +178,24 @@ describe("listBrowsableGames", () => {
     expect(games[1].displayName).toBe("Mock Puzzle");
   });
 
+  /**
+   * Task 9 leftover: discovery filter chips key on categorySlug. Trading must carry both
+   * the label and the slug on the happy path — the fallback already did, and a missing slug
+   * silently drops trading from every genre filter while category still reads "Trading".
+   */
+  it("exposes categorySlug on trading and resolved provider genres", async () => {
+    await seedSettings();
+    await seedProviderTitle({ title: { category: "puzzle" } });
+
+    const games = await listBrowsableGames();
+    const trading = games.find((g) => g.kind === "trading");
+    const provider = games.find((g) => g.kind === "provider");
+    expect(trading?.category).toBe("Trading");
+    expect(trading?.categorySlug).toBe("trading");
+    expect(provider?.category).toBe("Puzzle");
+    expect(provider?.categorySlug).toBe("puzzle");
+  });
+
   it("omits trading when it is not in enabledGameTypes", async () => {
     await seedSettings({ enabledGameTypes: ["provider"] });
     await seedProviderTitle();

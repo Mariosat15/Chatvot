@@ -36,7 +36,10 @@ export interface BrowsableGame {
   displayName: string;
   tagline?: string;
   description?: string;
+  /** Resolved genre label for display. */
   category?: string;
+  /** Vocabulary slug for discovery filtering — never free text. */
+  categorySlug?: string;
   thumbnailUrl?: string;
   bannerUrl?: string;
   rulesSummary?: string;
@@ -76,6 +79,7 @@ const TRADING_CATALOGUE_FALLBACK: Omit<
   tagline: TRADING_PAGE_DEFAULTS.tagline,
   description: TRADING_PAGE_DEFAULTS.description,
   category: "Trading",
+  categorySlug: "trading",
   rulesSummary: TRADING_PAGE_DEFAULTS.rulesSummary,
   howToPlay: TRADING_PAGE_DEFAULTS.howToPlay,
 };
@@ -95,7 +99,10 @@ async function tradingContentCard(): Promise<
       displayName: content.displayName,
       tagline: content.tagline,
       description: content.description,
+      // Reason: discovery filter chips key on categorySlug; without it trading never joins
+      // the genre list even though category reads "Trading" (fallback path already sets both).
       category: "Trading",
+      categorySlug: "trading",
       thumbnailUrl: content.thumbnailUrl,
       bannerUrl: content.bannerUrl,
       rulesSummary: content.rulesSummary,
@@ -131,6 +138,7 @@ function mapProviderTitle(title: {
     tagline: title.tagline || undefined,
     description: title.description || undefined,
     category: resolveGameCategory(title.category)?.label,
+    categorySlug: resolveGameCategory(title.category)?.slug,
     thumbnailUrl: title.thumbnailUrl || undefined,
     bannerUrl: title.bannerUrl || undefined,
     rulesSummary: title.rulesSummary || undefined,

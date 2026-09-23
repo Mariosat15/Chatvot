@@ -52,6 +52,7 @@ interface GameLabelled {
 interface CatalogueTitle {
   gameKey: string;
   displayName?: string | null;
+  category?: string | null;
 }
 
 interface CatalogueProvider {
@@ -206,7 +207,7 @@ export async function GET() {
     const [providerTitles, providers] = await Promise.all([
       providerGameKeys.length > 0
         ? ProviderGame.find({ gameKey: { $in: providerGameKeys } })
-            .select("gameKey displayName providerKey")
+            .select("gameKey displayName providerKey category")
             .lean()
         : Promise.resolve([]),
       providerGameKeys.length > 0
@@ -218,6 +219,12 @@ export async function GET() {
       (providerTitles as CatalogueTitle[]).map((title) => [
         title.gameKey,
         title.displayName,
+      ]),
+    );
+    const titleCategoryByKey = new Map(
+      (providerTitles as CatalogueTitle[]).map((title) => [
+        title.gameKey,
+        title.category ?? null,
       ]),
     );
     const providerNameByKey = new Map(
@@ -478,6 +485,9 @@ export async function GET() {
           providerDisplayName: label.gameConfig?.providerKey
             ? providerNameByKey.get(label.gameConfig.providerKey) ?? null
             : null,
+          category: label.gameKey
+            ? titleCategoryByKey.get(label.gameKey) ?? null
+            : null,
           // Creator info
           gameMasterId: comp.gameMasterId || null,
           gameMasterName: comp.gameMasterName || null,
@@ -631,6 +641,9 @@ export async function GET() {
         gameKey: chalLabel.gameKey,
         gameDisplayName: chalLabel.gameKey
           ? titleNameByKey.get(chalLabel.gameKey) ?? null
+          : null,
+        category: chalLabel.gameKey
+          ? titleCategoryByKey.get(chalLabel.gameKey) ?? null
           : null,
         // The two player ids. Sent because the screen's winner highlight compared
         // `winnerId` against `challengerStats?.toString()` - a STATS OBJECT stringified,

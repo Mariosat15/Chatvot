@@ -3,6 +3,7 @@ import GameRound from "@/database/models/games/game-round.model";
 import ProviderGame from "@/database/models/games/provider-game.model";
 import GameProvider from "@/database/models/games/game-provider.model";
 import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
+import { resolveGameCategory } from "@/lib/services/games/game-categories";
 
 /**
  * Per-game operational metrics: the "New: Game Performance" screen of `12` s5.
@@ -97,6 +98,13 @@ export interface GamePerformanceRow {
   providerName: string;
   /** False when the title has been removed from the catalogue but still has history. */
   inCatalogue: boolean;
+  /**
+   * Genre slug from the vocabulary (task 9). Grouping key — never the free-text raw value.
+   * Absent when the title has no category or left the catalogue.
+   */
+  categorySlug: string | null;
+  /** Operator-facing label derived from the slug; null when uncategorised. */
+  categoryLabel: string | null;
   rounds: {
     started: number;
     /** Ran to the game's own end. See `RAN_FULL_COURSE` - not the same as "scored". */
@@ -300,7 +308,7 @@ export async function getGamePerformance(
           },
         },
       ]),
-      ProviderGame.find().select("gameKey gameCode providerKey displayName").lean(),
+      ProviderGame.find().select("gameKey gameCode providerKey displayName category").lean(),
       GameProvider.find().select("providerKey displayName").lean(),
       // The competitions each game ran in the window, and who played in them.
       //
@@ -359,9 +367,15 @@ export async function getGamePerformance(
       : [];
 
   const titleByKey = new Map(
-    (titles as { gameKey: string; gameCode?: string; providerKey?: string; displayName?: string }[]).map(
-      (title) => [title.gameKey, title],
-    ),
+    (
+      titles as {
+        gameKey: string;
+        gameCode?: string;
+        providerKey?: string;
+        displayName?: string;
+        category?: string;
+      }[]
+    ).map((title) => [title.gameKey, title]),
   );
   const providerNameByKey = new Map(
     (providers as { providerKey: string; displayName?: string }[]).map((p) => [
@@ -427,6 +441,9 @@ export async function getGamePerformance(
       const title = titleByKey.get(gameKey);
       const providerKey = title?.providerKey ?? gameKey.split(":")[1] ?? "unknown";
       const gameCode = title?.gameCode ?? gameKey.split(":")[2] ?? gameKey;
+      // Reason: group on the vocabulary slug, never the raw free-text. Racing/racing/race
+      // would otherwise become three rows that each look complete (task 9).
+      const resolvedCategory = resolveGameCategory(title?.category);
 
       const row: GamePerformanceRow = {
         gameKey,
@@ -435,6 +452,8 @@ export async function getGamePerformance(
         title: title?.displayName || gameCode,
         providerName: providerNameByKey.get(providerKey) || providerKey,
         inCatalogue: Boolean(title),
+        categorySlug: resolvedCategory?.slug ?? null,
+        categoryLabel: resolvedCategory?.label ?? null,
         rounds,
         scoreProducing,
         abandonmentRate: finished > 0 ? rounds.leftEarly / finished : null,

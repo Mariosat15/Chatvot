@@ -18,6 +18,7 @@ import {
   resolveShareOfPool,
   summariseByGame,
   summariseByProvider,
+  summariseByCategory,
   resolveGameFilterOptions,
   filterByGame,
   resolveScopeNote,
@@ -125,6 +126,54 @@ describe("a contest is labelled by its game, and grouped by the immutable key", 
   it("composes a key for a provider contest whose gameKey never got written", () => {
     const badge = resolveGameBadge(providerContest({ gameKey: "" }));
     expect(badge.key).toBe("provider:chartvolt-games:circuit-sprint");
+  });
+});
+
+describe("summariseByCategory — task 9 leftover, genre grouping", () => {
+  /**
+   * THE VOCABULARY SLUG IS THE KEY. Free-text Racing/racing/race must collapse into one row,
+   * which is the entire reason task 9 exists one field along from analytics.
+   */
+  it("groups on the resolved slug so Racing and racing cannot become two rows", () => {
+    const summary = summariseByCategory([
+      providerContest({ category: "Racing", totalCollected: 100 }),
+      providerContest({ category: "racing", totalCollected: 50 }),
+      providerContest({ category: "RACING", totalCollected: 25 }),
+    ]);
+    expect(summary).toHaveLength(1);
+    expect(summary[0].key).toBe("category:racing");
+    expect(summary[0].label).toBe("Racing");
+    expect(summary[0].collected).toBe(175);
+  });
+
+  it("keeps trading in its own bucket, never under a provider genre", () => {
+    const summary = summariseByCategory([
+      contest({ totalCollected: 200 }),
+      providerContest({ category: "puzzle", totalCollected: 80 }),
+    ]);
+    expect(summary.map((r) => r.key).sort()).toEqual([
+      "category:puzzle",
+      "category:trading",
+    ]);
+    const trading = summary.find((r) => r.key === "category:trading");
+    expect(trading?.collected).toBe(200);
+    expect(trading?.isProviderGame).toBe(false);
+  });
+
+  it("puts titles with no genre in one Uncategorised bucket rather than one-per-title", () => {
+    const summary = summariseByCategory([
+      providerContest({ category: null, totalCollected: 10, gameKey: "provider:a:one" }),
+      providerContest({
+        category: "",
+        totalCollected: 20,
+        gameKey: "provider:a:two",
+        gameCode: "two",
+      }),
+    ]);
+    expect(summary).toHaveLength(1);
+    expect(summary[0].key).toBe("category:_uncategorised");
+    expect(summary[0].label).toBe("Uncategorised");
+    expect(summary[0].collected).toBe(30);
   });
 });
 
@@ -477,5 +526,26 @@ describe("the component consumes the shared rules rather than repeating them", (
 
   it("renders the scope note, so no card is captioned as an all-time total", () => {
     expect(stripComments(component)).toMatch(/resolveScopeNote\(/);
+  });
+});
+
+describe("GameRevenueBreakdown surfaces the genre table (task 9 leftover)", () => {
+  const breakdown = readFileSync(
+    join(ADMIN, "components", "admin", "competitions", "GameRevenueBreakdown.tsx"),
+    "utf8",
+  );
+
+  function stripComments(source: string): string {
+    return source
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\{\/\*[\s\S]*?\*\/\}/g, "")
+      .replace(/(^|[^:])\/\/.*$/gm, "$1");
+  }
+
+  it("groups through summariseByCategory and withholds the table at one genre", () => {
+    const code = stripComments(breakdown);
+    expect(code).toMatch(/summariseByCategory\(/);
+    expect(code).toMatch(/byCategory\.length\s*>\s*1/);
+    expect(code).toContain("By genre");
   });
 });

@@ -48,8 +48,9 @@ gameplay component:
 
 ## 1.1a What was built - the provider half of the dispatcher (5 Sep 2026)
 
-**Status: the provider branch is code-complete. The trading branch is not, and the redirect
-therefore runs the opposite way round from the target above.**
+**Status: the provider branch is code-complete. The trading branch shipped later the same
+programme as `13` s1.1ac (23 Sep 2026) — so a document saying the redirect still runs outwards
+is correct as history and stale as a present fact; say which.**
 
 A player who has entered a provider contest can now start a round, play it in the frame, and see a
 confirmed result, **by clicking**. Before this the whole play step was reachable by API and by test
@@ -75,13 +76,12 @@ only. 42 tests, 20 probes all red on the expected test.
 follows this chapter. Getting it wrong would have meant renaming a URL players had bookmarked, or
 running two play routes for ever.
 
-**The redirect currently points outwards, which is the reverse of the target.** A trading contest
-reaching `/play` is sent to `/trade`, not rendered here, because the trading branch needs
-`TradingPageContent` and its six context providers moved - a change to the live trading path
-carrying **R18** and **R19**. When X7 moves them, the redirect flips direction and no URL changes.
-**No loop is possible in either arrangement**: the two guards are exact complements of
-`isProviderContest`, and a test pins that, because an overlap produces an infinite redirect rather
-than a wrong screen.
+**The redirect used to point outwards; it now points inwards (`13` s1.1ac).** A trading contest
+reaching `/play` renders `CompetitionTradingWorkspace` here. `/trade` permanently redirects
+into `/play`. **No loop is possible**: the two guards are exact complements —
+`/trade` always redirects in; `/play` renders trading when `getPlayState` returns
+`not_provider_contest` and never redirects back to `/trade`. A test pins that, because an
+overlap produces an infinite redirect rather than a wrong screen.
 
 ### Five things worth carrying
 
@@ -108,6 +108,30 @@ than a wrong screen.
   with a fresh launch URL, because `createRound` is idempotent on a live round - so resuming costs
   nothing. Labelling it "Play" would tell a player they were spending an attempt they are not, and
   some would decline and let a round expire instead.
+
+### 1.1ac What was built - the trading half of the dispatcher (23 Sep 2026)
+
+**Status: the dispatcher is complete.** `/play` is the gameplay surface for every contest;
+`/trade` is a permanent inward redirect. Same for challenges.
+
+| File | Role |
+|---|---|
+| `components/trading/CompetitionTradingWorkspace.tsx` | Trading competition gameplay (R18/R19). Character-for-character move of the old `/trade` page body; providers mount only after `not_provider_contest` |
+| `components/trading/ChallengeTradingWorkspace.tsx` | Trading challenge sibling |
+| `app/(root)/competitions/[id]/trade/page.tsx` | Thin redirect → `/play`, preserving `viewOnly` |
+| `app/(root)/challenges/[id]/trade/page.tsx` | Thin redirect → `/challenges/[id]/play` |
+| `app/(root)/competitions/[id]/play/page.tsx` | Renders `CompetitionTradingWorkspace` on `not_provider_contest` instead of redirecting out |
+| `app/(root)/challenges/[id]/play/page.tsx` | Renders `ChallengeTradingWorkspace` for non-provider challenges |
+| `components/challenges/ChallengePopup.tsx` | Play CTA always targets `/play` |
+| Accept route | Returns `gameType` / `gameKey` so callers do not guess the surface |
+
+**R18** is held by only mounting the six trading providers after the refusal says the contest
+is not a provider game — a chess player never opens a price feed. **R19** was a
+character-for-character extraction of the old trade page into the workspace component, so a
+behaviour change in the same commit would destroy the only proof nothing moved.
+
+**Pinned by** `__tests__/games/provider-play-ui.test.ts` (inward redirect + no redirect loop).
+**Never verified by eye** — both surfaces are behind sign-in.
 
 ### 1.1b The pre-flight now refuses what the server would refuse (6 September 2026)
 

@@ -655,4 +655,15 @@ describe("the screen carries no money, and that is an RBAC rule", () => {
     );
     expect(stripComments(model)).toContain('"game-performance"');
   });
+
+  /**
+   * Task 9 leftover: group on the vocabulary slug so Racing/racing/race cannot become
+   * three sections. The service must send categorySlug; the component must not re-derive.
+   */
+  it("groups rows by categorySlug from the service, never by display name", () => {
+    const code = stripComments(component);
+    expect(code).toMatch(/groupByCategory\(/);
+    expect(code).toMatch(/row\.categorySlug/);
+    expect(code).not.toMatch(/resolveGameCategory/);
+  });
 });

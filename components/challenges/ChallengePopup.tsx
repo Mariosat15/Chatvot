@@ -89,15 +89,16 @@ function timeLeft(deadline: string): string {
 }
 
 function rankLabel(method: string): string {
-  const labels: Record<string, string> = {
-    pnl: "P&L",
-    roi: "ROI %",
-    total_capital: "Capital",
-    win_rate: "Win Rate",
-    total_wins: "Total Wins",
-    profit_factor: "Profit Factor",
-  };
-  return labels[method] || "P&L";
+  // Map, never object index — method arrives from the challenge payload.
+  const labels = new Map<string, string>([
+    ["pnl", "P&L"],
+    ["roi", "ROI %"],
+    ["total_capital", "Capital"],
+    ["win_rate", "Win Rate"],
+    ["total_wins", "Total Wins"],
+    ["profit_factor", "Profit Factor"],
+  ]);
+  return labels.get(method) || "P&L";
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -124,7 +125,7 @@ export default function ChallengePopup({ userId }: ChallengePopupProps) {
   // ─── WebSocket: listen for instant challenge pushes ──────────────────────
 
   const handleWsMessage = useCallback(
-    (message: { type: string; data: any }) => {
+    (message: { type: string; data: unknown }) => {
       // A stored notification, pushed the instant it was created. One case
       // covers every template, so a new one needs no change here.
       if (message.type === "notification") {
@@ -309,7 +310,8 @@ export default function ChallengePopup({ userId }: ChallengePopupProps) {
         if (res.ok && data.success) {
           toast.success("⚔️ Challenge accepted! Battle begins now!");
           dismissChallenge(challengeId);
-          router.push(`/challenges/${challengeId}/trade`);
+          // Reason: `/play` is the dispatcher for every challenge; `/trade` only redirects in.
+          router.push(`/challenges/${challengeId}/play`);
         } else {
           toast.error(data.error || "Failed to accept challenge");
         }

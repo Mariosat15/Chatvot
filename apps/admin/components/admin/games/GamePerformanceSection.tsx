@@ -44,6 +44,8 @@ interface PerformanceRow {
   title: string;
   providerName: string;
   inCatalogue: boolean;
+  categorySlug: string | null;
+  categoryLabel: string | null;
   rounds: {
     started: number;
     ranFullCourse: number;
@@ -208,14 +210,64 @@ export default function GamePerformanceSection() {
           </p>
         </div>
       ) : (
-        <div className="space-y-4">
-          {rows.map((row) => (
-            <PerformanceCard key={row.gameKey} row={row} />
+        <div className="space-y-8">
+          {groupByCategory(rows).map((group) => (
+            <section key={group.key} className="space-y-4">
+              {/*
+                Task 9 leftover: group on the vocabulary slug so Racing/racing/race cannot
+                become three sections. Uncategorised titles share one bucket at the end.
+              */}
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-white/50">
+                {group.label}
+                <span className="ml-2 font-normal text-white/30">
+                  ({group.rows.length})
+                </span>
+              </h3>
+              <div className="space-y-4">
+                {group.rows.map((row) => (
+                  <PerformanceCard key={row.gameKey} row={row} />
+                ))}
+              </div>
+            </section>
           ))}
         </div>
       )}
     </div>
   );
+}
+
+/**
+ * Groups performance rows by resolved category slug.
+ *
+ * Uncategorised titles land in one bucket rather than one-per-title, so the list stays
+ * scannable when operators have not set a genre yet.
+ */
+function groupByCategory(
+  rows: PerformanceRow[],
+): { key: string; label: string; rows: PerformanceRow[] }[] {
+  const map = new Map<string, { label: string; rows: PerformanceRow[] }>();
+  for (const row of rows) {
+    const key = row.categorySlug ?? "_uncategorised";
+    const label = row.categoryLabel ?? "Uncategorised";
+    const existing = map.get(key);
+    if (existing) {
+      existing.rows.push(row);
+    } else {
+      map.set(key, { label, rows: [row] });
+    }
+  }
+  const groups = [...map.entries()].map(([key, value]) => ({
+    key,
+    label: value.label,
+    rows: value.rows,
+  }));
+  // Uncategorised last; otherwise alphabetical by label.
+  groups.sort((a, b) => {
+    if (a.key === "_uncategorised") return 1;
+    if (b.key === "_uncategorised") return -1;
+    return a.label.localeCompare(b.label);
+  });
+  return groups;
 }
 
 function PerformanceCard({ row }: { row: PerformanceRow }) {
@@ -232,6 +284,11 @@ function PerformanceCard({ row }: { row: PerformanceRow }) {
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-base font-semibold text-white">{row.title}</h3>
+              {row.categoryLabel ? (
+                <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 text-[10px] text-cyan-300">
+                  {row.categoryLabel}
+                </span>
+              ) : null}
               <span className="text-xs text-white/40">{row.providerName}</span>
               {/*
                 A title can leave the catalogue while its rounds stay - a disabled game's rows

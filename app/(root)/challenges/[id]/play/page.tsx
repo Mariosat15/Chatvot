@@ -24,10 +24,12 @@ import { NeonHeadedPanel, NeonRow } from "@/components/neon/Cards";
 import { resolveProviderBanner } from "@/components/neon/banners";
 import { formatVolts } from "@/lib/utils/format-volts";
 import { Button } from "@/components/ui/button";
+import ChallengeTradingWorkspace from "@/components/trading/ChallengeTradingWorkspace";
 
 /**
  * Where a player plays a provider-game 1v1 challenge - the challenge-side sibling of
- * `/competitions/[id]/play`.
+ * `/competitions/[id]/play`. Also the dispatcher for trading challenges: when the challenge
+ * is not a provider game, `ChallengeTradingWorkspace` renders here and `/trade` redirects in.
  *
  * ON THE SAME ARENA AS THE COMPETITION, since 13 September 2026 (owner instruction: "the game
  * screen doesn't have all the elements on like when we play in competitions - use the same
@@ -57,14 +59,19 @@ import { Button } from "@/components/ui/button";
 
 interface ChallengePlayPageProps {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ viewOnly?: string }>;
 }
 
-export default async function ChallengePlayPage({ params }: ChallengePlayPageProps) {
+export default async function ChallengePlayPage({
+  params,
+  searchParams,
+}: ChallengePlayPageProps) {
   // Reason: attempts remaining and the live round change with every play, so a cached render
   // would offer a Play button to a player who has none left, or hide a round they could resume.
   noStore();
 
   const { id: challengeId } = await params;
+  const { viewOnly } = await searchParams;
 
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) {
@@ -82,9 +89,14 @@ export default async function ChallengePlayPage({ params }: ChallengePlayPagePro
       notFound();
     }
 
-    // A trading challenge belongs on the trading workspace, not here.
+    // Trading branch of the challenge dispatcher. `/trade` redirects inwards onto this route.
     if (outcome.refusal === "not_provider_challenge") {
-      redirect(`/challenges/${challengeId}/trade`);
+      return (
+        <ChallengeTradingWorkspace
+          challengeId={challengeId}
+          viewOnly={viewOnly === "true"}
+        />
+      );
     }
 
     return (

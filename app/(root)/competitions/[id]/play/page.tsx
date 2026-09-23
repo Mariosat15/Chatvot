@@ -29,9 +29,10 @@ import GameRulesPanel from "@/components/games/GameRulesPanel";
 import { NeonCountPill, NeonHeadedPanel } from "@/components/neon/Cards";
 import { resolveProviderBanner } from "@/components/neon/banners";
 import { Button } from "@/components/ui/button";
+import CompetitionTradingWorkspace from "@/components/trading/CompetitionTradingWorkspace";
 
 /**
- * Where a player actually plays a provider game.
+ * Where a player actually plays — the `/play` dispatcher for every contest.
  *
  * NOTHING HERE STARTS A ROUND, AND THAT IS THE MOST IMPORTANT PROPERTY OF THE FILE. An attempt
  * is consumed when a round is CREATED (chapter 03 section 1.3), so creating one from a server
@@ -53,25 +54,24 @@ import { Button } from "@/components/ui/button";
  * contest. Building it at the wrong path would have meant either renaming a URL players had
  * already bookmarked, or keeping two play routes for ever.
  *
- * IT IS ONLY HALF OF THE DISPATCHER `13` DESCRIBES, deliberately. The finished design branches on
- * game type and renders the trading gameplay here too, with `/trade` reduced to a permanent
- * redirect *into* this route. That means moving `TradingPageContent` and its six context
- * providers, which is a change to the live trading path and carries R18 (mounting a price feed
- * for a chess player) and R19. So for now the branch runs the other way: a trading contest that
- * reaches this route is redirected OUT to `/trade`. When X7 builds the trading branch, the
- * redirect flips direction and no URL changes.
+ * THE DISPATCHER IS COMPLETE. Trading contests render `CompetitionTradingWorkspace` here;
+ * provider contests render the provider host. `/trade` permanently redirects inwards. R18 is
+ * held by only mounting the trading providers after `not_provider_contest` — a chess player
+ * never opens a price feed. R19 was a character-for-character move of the old trade page.
  */
 
 interface PlayPageProps {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ viewOnly?: string }>;
 }
 
-export default async function PlayPage({ params }: PlayPageProps) {
+export default async function PlayPage({ params, searchParams }: PlayPageProps) {
   // Reason: attempts remaining and the live round change with every play, so a cached render
   // would offer a Play button to a player who has none left, or hide a round they could resume.
   noStore();
 
   const { id: competitionId } = await params;
+  const { viewOnly } = await searchParams;
 
   // A junk id is refused before the session read, because a crawler following a bad link has no
   // session and would otherwise be bounced to `/sign-in` for a contest that cannot exist.
@@ -95,13 +95,15 @@ export default async function PlayPage({ params }: PlayPageProps) {
       notFound();
     }
 
-    // A trading contest goes to the trading workspace. This is the HALF-BUILT DISPATCHER
-    // described in the header: eventually the trading gameplay renders here and `/trade`
-    // redirects inwards, but until the six trading context providers move, the redirect points
-    // outwards. Either way the player lands on the gameplay for their game, which is the
-    // property that has to hold now.
+    // Trading branch of the dispatcher. Providers never reach here (R18). `/trade` redirects
+    // inwards onto this same route, so a trading entrant always plays under `/play`.
     if (outcome.refusal === "not_provider_contest") {
-      redirect(`/competitions/${competitionId}/trade`);
+      return (
+        <CompetitionTradingWorkspace
+          competitionId={competitionId}
+          viewOnly={viewOnly === "true"}
+        />
+      );
     }
 
     return (

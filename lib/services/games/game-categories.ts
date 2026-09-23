@@ -167,8 +167,12 @@ export function resolveGameCategory(
   stored: string | undefined | null,
 ): ResolvedGameCategory | undefined {
   if (typeof stored !== "string") return undefined;
-  const slug = stored.trim();
-  if (slug === "") return undefined;
+  // Reason: analytics and discovery group on the slug. Without normalising here, a provider
+  // sync that wrote "Racing" and an operator edit that wrote "racing" become two rows that
+  // each look complete — the free-text failure task 9 exists to stop. Write-time normalisation
+  // only covers the content dialog; sync and legacy rows still arrive mixed-case.
+  const slug = normaliseCategorySlug(stored);
+  if (!slug) return undefined;
 
   const known = BY_SLUG.get(slug);
   if (known) return { slug: known.slug, label: known.label, isKnown: true };

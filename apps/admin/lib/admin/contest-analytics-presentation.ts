@@ -38,6 +38,7 @@
 import { hasProviderGameLabel } from "./contest-game-label";
 import { resolveResultMetric, type MetricDisplay } from "./contest-result-presentation";
 import type { TerminologyPack } from "@/lib/constants/terminology";
+import { resolveGameCategory } from "@/lib/services/games/game-categories";
 
 /** The game label as it arrives from the analytics route. */
 export interface AnalyticsGameLabel {
@@ -49,6 +50,11 @@ export interface AnalyticsGameLabel {
   gameDisplayName?: string | null;
   /** The provider's `displayName`, when the provider is still registered. */
   providerDisplayName?: string | null;
+  /**
+   * Genre from `provider_game.category` (task 9). Grouping uses the vocabulary slug via
+   * `resolveGameCategory` — never this raw string alone.
+   */
+  category?: string | null;
 }
 
 export interface GameBadge {
@@ -259,6 +265,50 @@ export function summariseByProvider(rows: AnalyticsContestRow[]): GameSummaryRow
         key: `provider:${providerKey}`,
         label: badge.provider ?? providerKey,
         provider: badge.provider,
+        isProviderGame: true,
+      },
+    };
+  });
+}
+
+/**
+ * The same arithmetic grouped by genre (task 9 leftover).
+ *
+ * Keys on the vocabulary slug so Racing/racing/race cannot become three rows. Trading is its
+ * own bucket. Uncategorised provider titles share `_uncategorised` rather than splitting.
+ */
+export function summariseByCategory(rows: AnalyticsContestRow[]): GameSummaryRow[] {
+  return collapse(rows, (row) => {
+    const badge = resolveGameBadge(row);
+    if (!badge.isProviderGame) {
+      return {
+        groupKey: "category:trading",
+        badge: {
+          key: "category:trading",
+          label: "Trading",
+          provider: null,
+          isProviderGame: false,
+        },
+      };
+    }
+    const resolved = resolveGameCategory(row.category);
+    if (!resolved) {
+      return {
+        groupKey: "category:_uncategorised",
+        badge: {
+          key: "category:_uncategorised",
+          label: "Uncategorised",
+          provider: null,
+          isProviderGame: true,
+        },
+      };
+    }
+    return {
+      groupKey: `category:${resolved.slug}`,
+      badge: {
+        key: `category:${resolved.slug}`,
+        label: resolved.label,
+        provider: null,
         isProviderGame: true,
       },
     };

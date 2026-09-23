@@ -137,22 +137,38 @@ describe("resolveGameCategory - display", () => {
     expect(resolveGameCategory("   ")).toBeUndefined();
   });
 
+  it("normalises before lookup so Racing and racing are one genre", () => {
+    // Write-time normalisation only covers the content dialog. Sync and legacy rows arrive
+    // mixed-case; without a read-side normalise, analytics grouping splits them into rows
+    // that each look complete — the free-text failure task 9 exists to stop.
+    expect(resolveGameCategory("Racing")).toEqual({
+      slug: "racing",
+      label: "Racing",
+      isKnown: true,
+    });
+    expect(resolveGameCategory("RACING")).toEqual({
+      slug: "racing",
+      label: "Racing",
+      isKnown: true,
+    });
+  });
+
   it("cannot be steered onto the prototype chain by a stored value", () => {
     // A `Map`, never `BY_SLUG[stored]`. Object indexing returns `Object.prototype` for
     // "__proto__" - truthy, survives a `!found` test, and fails later somewhere unrelated.
     // Fourth instance after the round-inspector action map, the contest-edit field list and
     // the unscored-policy copy.
+    //
+    // Resolve now normalises first (same path as the dialog), so `__proto__` becomes `proto`
+    // and still lands as unknown. The Map lookup is what keeps the chain unreachable; the
+    // old "comes back verbatim" claim was retired when read-side normalisation closed the
+    // Racing/racing split for analytics.
     expect(resolveGameCategory("__proto__")?.isKnown).toBe(false);
     expect(resolveGameCategory("constructor")?.isKnown).toBe(false);
     expect(resolveGameCategory("toString")?.isKnown).toBe(false);
-    // And it comes back verbatim rather than as something plausible. None of the three can be
-    // stored through the dialog - the normaliser strips the underscores - so reaching one of
-    // them means somebody wrote it straight into the database, and a screen that renders it
-    // as `Proto` would hide that.
-    expect(resolveGameCategory("__proto__")?.label).toBe("__proto__");
+    expect(resolveGameCategory("__proto__")?.slug).toBe("proto");
   });
 });
-
 describe("normaliseCategorySlug - what an operator typed", () => {
   it("lower-cases and hyphenates, so one genre is one key however it is typed", () => {
     expect(normaliseCategorySlug("Racing")).toBe("racing");

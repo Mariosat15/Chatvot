@@ -37,7 +37,7 @@ code before citing it.
 | **1** — Volts / ⚡ everywhere instead of EUR | **Done.** `1.1`, then `1.2` for the symbol rather than the word |
 | **2-7** — Prize eligibility, redistribution, unclaimed pool | **Done, 9 Sep.** See the notes under tasks 2, 5, 6 and 7. Seven raw unclaimed-pool writers were found, not the five task 7 names |
 | **8** — Redesign the large game admin screen | Not started |
-| **9** — Game type / category field | **Done.** `9.1`. **The field already existed** - what it lacked was a vocabulary. Analytics grouping (21-24) and discovery filtering are explicitly **not** part of it |
+| **9** — Game type / category field | **Done.** `9.1` + leftovers **23 Sep**. Vocabulary first; analytics grouping + discovery filter closed once merchandising made a second title real |
 | **10** — Competition style / participation mode | **Done.** `10.1`. Turn-based and heat-based are **blocked, not deferred** - see `10.2` |
 | **11** — Game-level supported modes | **Done, 9 Sep.** `11.1`, and `22` s10 is the authoritative account. It **reverses** a decision recorded in `22` s8.3 and in `play-shape.ts` itself - the shape is no longer a property of the title alone - and it closed a latent defect where an ordinary edit re-forced a staggered contest's rules from its title. 49 tests, **37 probes red on exactly the expected test**, two of them re-aimed after reporting `DID NOT APPLY` |
 | **12** — Required timing / runtime settings | Not started |
@@ -708,8 +708,7 @@ first is worth keeping, because "configurable from admin" sounds strictly better
 
 ### Where it now appears
 
-Task 9 asks for the genre to reach six places. Four are done and two are named as outstanding
-rather than implied:
+Task 9 asks for the genre to reach six places. **All six are built as of 23 Sep 2026:**
 
 | Destination | State |
 |---|---|
@@ -718,8 +717,12 @@ rather than implied:
 | The contest wizard's game picker | A genre badge, first in the row, because it is the fastest way to tell two titles apart |
 | AI-generated content | `describeSubject` composes the prompt from the label |
 | The player's arena badge | The label, via `game-presentation.service.ts` |
-| **Game Performance widgets and analytics grouping** | **Not built.** Tasks 21–24, and it wants a *group by* rather than a badge |
-| **Discovery and filtering, banners** | **Not built.** There is one provider game, so a filter with one value is a control that appears to work |
+| **Game Performance widgets and analytics grouping** | **Built 23 Sep.** `summariseByCategory` + Game Performance `groupByCategory` on the vocabulary slug; "By genre" table withheld while only one genre is present |
+| **Discovery and filtering** | **Built 23 Sep.** `GameCatalogueFilters` on `/games?category=<slug>`, withheld when fewer than two distinct slugs are on screen. Merchandising made a second title real |
+
+**Also 23 Sep:** `resolveGameCategory` normalises on **read** (both app copies). Write-time
+normalisation alone left sync/legacy mixed-case rows as separate analytics keys —
+Racing/racing/RACING were three rows that each looked complete.
 
 ### Testing
 
