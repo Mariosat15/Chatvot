@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
       "marketplace_item_created",
       null,
       {
-        itemId: (item._id as any).toString(),
+        itemId: String(item._id),
         name: item.name,
         category: item.category,
         price: item.price,
@@ -252,6 +252,15 @@ export async function PUT(request: NextRequest) {
           `   → challengeReferralFeePercentage: ${oldItem?.gameMasterConfig?.challengeReferralFeePercentage} → ${gmConfig.challengeReferralFeePercentage}`,
         );
       }
+      if (gmConfig.allowedGameTypes !== undefined) {
+        // Reason: creation permission is resolved from the current package first; the
+        // cached subscription.limits copy must stay in step or a GM keeps trading-only
+        // until they re-buy the package (same sync path as referral % / create flag).
+        limitsUpdate["limits.allowedGameTypes"] = gmConfig.allowedGameTypes;
+        console.log(
+          `   → allowedGameTypes: ${JSON.stringify(oldItem?.gameMasterConfig?.allowedGameTypes)} → ${JSON.stringify(gmConfig.allowedGameTypes)}`,
+        );
+      }
 
       // Only update if there are changes
       if (Object.keys(limitsUpdate).length > 0) {
@@ -276,7 +285,7 @@ export async function PUT(request: NextRequest) {
       "marketplace_item_updated",
       null,
       {
-        itemId: (item._id as any).toString(),
+        itemId: String(item._id),
         name: item.name,
         updates: Object.keys(updates),
         subscriptionsUpdated,
@@ -350,7 +359,7 @@ export async function DELETE(request: NextRequest) {
       },
       "marketplace_item_deleted",
       null,
-      { itemId: (item._id as any).toString(), name: item.name },
+      { itemId: String(item._id), name: item.name },
     );
 
     return NextResponse.json({

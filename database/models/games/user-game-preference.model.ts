@@ -10,18 +10,14 @@ import mongoose, { Schema, Document, Model } from "mongoose";
  * per-game rows into the presence document would make a settings change a write
  * to the hottest document the platform has.
  *
- * WHAT IS DELIBERATELY NOT HERE. Chapter `20`'s table also lists
- * `interestLevel`, `inferredAt` and `skillBand`. None of them is declared,
- * because nothing infers interest yet and nothing matches on skill band for a
- * game - that is X11.5. A field declared before anything writes it is the shape
- * behind `requiresSyncPlay`, `isPaused`, `lastSuccessfulRoundAt`, `family` and
- * `playModeOverride`: stored, transported, rendered, and read by nothing. They
- * arrive with the code that populates them.
+ * X11.5 (23 Sep 2026) added `interestLevel`, `inferredAt` and `skillBand` - the
+ * fields chapter `20` listed and the 14 Sep amendment correctly withheld until
+ * inference existed. Willingness (`willingToBeChallenged`) stays independent:
+ * inference never writes it (X14).
  *
  * NOT MIRRORED INTO `apps/admin`, deliberately. Nothing in the admin app reads
- * a player's game preferences, and R42 is the precedent - `provider-finalize.ts`
- * sat mirrored and imported by nothing for three days, two copies agreeing while
- * only one ran. A mirror arrives with its first admin importer.
+ * a player's game preferences, and R42 is the precedent - mirroring ahead of a
+ * caller is worse than not.
  */
 export interface IUserGamePreference extends Document {
   userId: string;
@@ -29,6 +25,19 @@ export interface IUserGamePreference extends Document {
   gameKey: string;
   willingToBeChallenged: boolean;
   declaredAt: Date;
+  /**
+   * How interest was established. Absent means "never inferred and never declared
+   * as interest" - willingness alone does not imply interest for suggestions.
+   */
+  interestLevel?: "declared" | "inferred";
+  /** When inference last wrote this row. Never mistaken for a player declaration. */
+  inferredAt?: Date;
+  /**
+   * Cached `UserGameStats.rating` for match filtering. Denormalised so a match
+   * query does not join per candidate. Not a band enum - the chapter name is kept
+   * so docs and code agree; the value is the numeric rating.
+   */
+  skillBand?: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -62,6 +71,19 @@ const UserGamePreferenceSchema = new Schema<IUserGamePreference>(
       type: Date,
       required: true,
       default: Date.now,
+    },
+    interestLevel: {
+      type: String,
+      enum: ["declared", "inferred"],
+      required: false,
+    },
+    inferredAt: {
+      type: Date,
+      required: false,
+    },
+    skillBand: {
+      type: Number,
+      required: false,
     },
   },
   {

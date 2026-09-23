@@ -8,6 +8,7 @@ import {
 } from "@/lib/services/matchmaking.service";
 
 // GET - Get ranked matches for card swiping or find best match
+// Optional ?gameKey= — trading when absent (backward compatible).
 export async function GET(request: NextRequest) {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
@@ -18,10 +19,10 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const action = searchParams.get("action") || "ranked";
     const limit = parseInt(searchParams.get("limit") || "50", 10);
+    const gameKey = searchParams.get("gameKey");
 
     if (action === "best") {
-      // Find single best match
-      const bestMatch = await findBestMatch(session.user.id);
+      const bestMatch = await findBestMatch(session.user.id, gameKey);
 
       if (!bestMatch) {
         return NextResponse.json({
@@ -34,11 +35,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         success: true,
         match: bestMatch,
+        gameKey: gameKey || "trading",
       });
     }
 
     if (action === "all") {
-      // Get all matchable traders
+      // "all" remains trading-shaped (legacy card deck). Per-game lists use ranked.
       const traders = await getMatchableTraders(session.user.id);
 
       return NextResponse.json({
@@ -48,13 +50,13 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Default: Get ranked matches for card swiping
-    const matches = await getRankedMatches(session.user.id, limit);
+    const matches = await getRankedMatches(session.user.id, limit, gameKey);
 
     return NextResponse.json({
       success: true,
       matches,
       total: matches.length,
+      gameKey: gameKey || "trading",
     });
   } catch (error) {
     console.error("Error in matchmaking:", error);

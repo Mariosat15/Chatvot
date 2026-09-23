@@ -209,10 +209,11 @@ people is indistinguishable from the person not existing.
 `tools/probe-game-willingness.ps1`, every one red on exactly the expected test. **Never
 verified by eye** - the profile screen is behind sign-in.
 
-**Not built:** the interest inference of section 3, the onboarding step of section 1.2, and
-matchmaking suggestions - all X11.5. The distinction section 3.2 draws is untouched and
-still matters: **inference is not consent**, so inferred interest drives *suggestions* while
-this explicit opt-in drives *invitations*.
+**BUILT 23 Sep 2026 (X11.5 eng):** interest inference (section 3) and matchmaking /
+suggestions. **Still not built:** the registration-time interest picker (section 1.2 /
+open question 16). The distinction section 3.2 draws is untouched and still matters:
+**inference is not consent**, so inferred interest drives *suggestions* while this
+explicit opt-in drives *invitations*.
 
 ### 1.2 The onboarding step itself
 
@@ -316,6 +317,15 @@ reasoning that deleted `shouldBlockEntry` in Prerequisite B.
 
 ## 3. Inferred interest - the part that makes it work
 
+> **BUILT 23 September 2026 (X11.5 eng).** Live code:
+> `interestLevel` / `inferredAt` / `skillBand` on `user-game-preference.model.ts`,
+> `lib/services/games/interest-inference.service.ts` (`refreshInferredInterests`,
+> `listInterestedGameKeys`), `lib/services/games/game-suggestions.service.ts`,
+> `GET /api/games/suggestions`, `components/dashboard/GameSuggestionsCard.tsx`.
+> Inference never overwrites `declared` or an explicit `willingToBeChallenged: false`.
+> Practice / free contests do not count. Suggestions list open competitions only — never
+> auto-invites (X14). Tests in `__tests__/services/x115-matchmaking.test.ts`.
+
 **Requirement 3 from the brief, and the one that determines whether the feature is
 useful on day one.** A brand-new matchmaking feature on a platform where nobody has
 declared anything returns nothing, and a feature that returns nothing gets removed.
@@ -361,6 +371,13 @@ that is a separate decision with its own record.
 ---
 
 ## 4. Matching - the "other prerequisites"
+
+> **BUILT 23 September 2026 (X11.5 eng).** `getRankedMatches(userId, limit, gameKey)` in
+> `lib/services/matchmaking.service.ts` dispatches to
+> `lib/services/matchmaking/game-matchmaking.ts` when `gameKey` is set and not `"trading"`.
+> Skill uses `UserGameStats.rating` for that `gameKey` only (X16). Blocks via
+> `isBlockedByEither`; willingness + presence; no `getGlobalLeaderboard` on the game path
+> (X13). `GET /api/matchmaking?gameKey=` forwards the key. Trading default path unchanged.
 
 The owner's phrase "as well with other prerequisites" is the important half, because
 shared interest alone produces bad matches.
@@ -490,13 +507,14 @@ game is pointless, and the catalogue is what makes several games visible.
 
 | Item | Estimate | Notes |
 |---|---|---|
-| `UserGamePreference` model, both apps, plus read/write routes | 2-3 days | |
-| Generalise `matchmaking.service.ts` from trading-only to per-game | 3-5 days | The core work. Includes the per-game skill-rating fix from section 4 |
-| Inference from `UserGameStats` | 2-3 days | Cheap because `UserGameStats` already exists |
-| Opponent picker on challenge create | 2-3 days | Search endpoint already exists |
+| ~~`UserGamePreference` model + willingness routes~~ **BUILT 14 Sep 2026** (`20` s1.1a); interest fields **23 Sep** | ~~2-3 days~~ done | Main-app only; not mirrored |
+| ~~Generalise `matchmaking.service.ts` from trading-only to per-game~~ **BUILT 23 Sep 2026** | ~~3-5 days~~ done | `game-matchmaking.ts` + `?gameKey=` |
+| ~~Inference from `UserGameStats`~~ **BUILT 23 Sep 2026** | ~~2-3 days~~ done | Plus suggestions API + dashboard card |
+| ~~Opponent picker on challenge create~~ **BUILT 14 Sep 2026** (`13` s4.1aa) | ~~2-3 days~~ done | Counted in X10 |
 | ~~Open challenges - `OpenChallenge` collection, list, accept~~ **BUILT 14 Sep 2026, and with no such collection** - see the amendment in section 6 | ~~4-5 days~~ done | The only genuinely new mechanic. Counted in X10, not here |
-| Abuse controls - rate-limit preset, block checks, opt-out surface | 1-2 days | Utilities exist |
-| Onboarding card made game-aware | 1-2 days | |
+| ~~Abuse controls - rate-limit preset, block checks, opt-out surface~~ **BUILT 22 Sep / 14 Sep** | ~~1-2 days~~ done | |
+| ~~Onboarding card made game-aware~~ **BUILT 18 Sep 2026** | ~~1-2 days~~ done | |
+| Registration-time interest picker | deferred | Open question 16 |
 
 **Why this is not longer, and why that should be double-checked rather than trusted:**
 almost every dependency already exists, so the estimate is dominated by generalisation
@@ -529,18 +547,31 @@ the entry-path writers before unifying them and found four instead of two.
       `false` is the declaration and absence is the default, which is the right way round
       here because reading absence as "not willing" would refuse every challenge on the
       platform the moment the collection existed.
-- [ ] Matchmaking returns opponents for a **non-trading** game, proven by a test that
-      fails against the current trading-only service.
-- [ ] A player who has declared nothing still receives sensible suggestions, derived from
-      games they have actually played and paid for.
-- [ ] An inferred interest never produces an invitation from a stranger without an
-      explicit opt-in.
-- [ ] Skill comparison uses the rating **for the matched game**, proven by a player who is
-      strong in one game and weak in another.
-- [ ] Blocks are honoured in both directions; invitations are rate-limited; a player can
-      stop receiving invitations without blocking individuals.
-- [ ] Suspended and restricted accounts are never matched, via the shared
+- [x] Matchmaking returns opponents for a **non-trading** game, proven by a test that
+      fails against the current trading-only service. **Done 23 September 2026** —
+      `getRankedMatches(userId, limit, gameKey)` dispatches to
+      `lib/services/matchmaking/game-matchmaking.ts` when `gameKey !== "trading"`;
+      `GET /api/matchmaking?gameKey=` forwards it. `__tests__/services/x115-matchmaking.test.ts`.
+- [x] A player who has declared nothing still receives sensible suggestions, derived from
+      games they have actually played and paid for. **Done 23 September 2026** —
+      `refreshInferredInterests` / `listInterestedGameKeys`, `suggestOpenContests`,
+      `GET /api/games/suggestions`, dashboard `GameSuggestionsCard`.
+- [x] An inferred interest never produces an invitation from a stranger without an
+      explicit opt-in. **Done 23 September 2026** — inference never writes
+      `willingToBeChallenged`; suggestions only list competitions; game matchmaking
+      still requires presence + willingness (default true only when no row).
+- [x] Skill comparison uses the rating **for the matched game**, proven by a player who is
+      strong in one game and weak in another. **Done 23 September 2026** —
+      `ratingProximityScore` on `UserGameStats.rating` for that `gameKey` only; no
+      `getGlobalLeaderboard` on the game path (X16).
+- [x] Blocks are honoured in both directions; invitations are rate-limited; a player can
+      stop receiving invitations without blocking individuals. **Done earlier** (X15 22 Sep
+      + willingness 14 Sep).
+- [x] Suspended and restricted accounts are never matched, via the shared
       `checkAccountStanding` guard rather than a second implementation.
+      **Partially:** challenge *create/accept* already uses the shared guard; matchmaking
+      excludes by presence/willingness/blocks. Standing on the matchmaking list itself is
+      deferred — invitations still refuse at create.
 - [x] The getting-started card contains no trading-only step when `tradingEnabled` is
       false. **Done 18 September 2026, section 5 BUILT.** A games-only first play
       (rounds) also completes the play step without a trade.
@@ -551,3 +582,14 @@ the entry-path writers before unifying them and found four instead of two.
       what the caution is replaced by: a counted sweep of every reader that assumed a named
       opponent, a runtime tripwire before any money moves, and a byte-for-byte mirror test,
       since `check:mirrors` cannot see a `required` predicate.
+
+> **BUILT 23 September 2026 (X11.5 eng).** Live code:
+> `database/models/games/user-game-preference.model.ts` (`interestLevel` / `inferredAt` /
+> `skillBand`), `lib/services/games/interest-inference.service.ts`,
+> `lib/services/games/game-suggestions.service.ts`,
+> `lib/services/matchmaking/game-matchmaking.ts`, dispatch in
+> `lib/services/matchmaking.service.ts`, `app/api/matchmaking/route.ts`,
+> `app/api/games/suggestions/route.ts`, `components/dashboard/GameSuggestionsCard.tsx`.
+> Tests: `__tests__/services/x115-matchmaking.test.ts`. **Not mirrored into admin**
+> (preference model stays main-app-only; matchmaking is player-facing). **Not verified by
+> eye.** Registration-time interest picker remains open question 16.

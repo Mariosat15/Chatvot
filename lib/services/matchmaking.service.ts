@@ -274,11 +274,32 @@ export async function getMatchableTraders(
 }
 
 /**
+ * Resolve which game a matchmaking request is about.
+ * Absent / blank → trading (backward compatible with MatchmakingCards).
+ */
+export function resolveMatchmakingGameKey(
+  gameKey: string | null | undefined,
+): string {
+  const trimmed = typeof gameKey === "string" ? gameKey.trim() : "";
+  return trimmed || "trading";
+}
+
+/**
  * Find the best match for a trader
  */
 export async function findBestMatch(
   currentUserId: string,
+  gameKey?: string | null,
 ): Promise<MatchResult | null> {
+  const key = resolveMatchmakingGameKey(gameKey);
+  if (key !== "trading") {
+    const { getRankedGameMatches } = await import(
+      "@/lib/services/matchmaking/game-matchmaking"
+    );
+    const ranked = await getRankedGameMatches(currentUserId, key, 1);
+    return ranked[0] ?? null;
+  }
+
   await connectToDatabase();
 
   const leaderboardData = await getGlobalLeaderboard();
@@ -339,12 +360,26 @@ export async function findBestMatch(
 }
 
 /**
- * Get ranked matches for a trader (for card swiping)
+ * Get ranked matches for a trader (for card swiping).
+ *
+ * Optional `gameKey` (X11.5): when set to a non-trading key, ranks by that game's
+ * `UserGameStats.rating` instead of the trading leaderboard. Absent → trading.
+ * This is how risk X13 is closed - change the service, do not call it from a new
+ * place pretending a provider game is trading.
  */
 export async function getRankedMatches(
   currentUserId: string,
   limit: number = 50,
+  gameKey?: string | null,
 ): Promise<MatchResult[]> {
+  const key = resolveMatchmakingGameKey(gameKey);
+  if (key !== "trading") {
+    const { getRankedGameMatches } = await import(
+      "@/lib/services/matchmaking/game-matchmaking"
+    );
+    return getRankedGameMatches(currentUserId, key, limit);
+  }
+
   await connectToDatabase();
 
   const leaderboardData = await getGlobalLeaderboard();

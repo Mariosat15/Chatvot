@@ -145,8 +145,10 @@ limits.allowedGameTypes: string[]   // default ["trading"]
 ```
 
 Default `["trading"]` so no existing Game Master silently gains the ability to create
-provider contests. Editable per tier in `MarketplaceItem.gameMasterConfig`, and per Game
-Master through the existing admin `update_limits` action.
+provider contests. Editable per tier in the **Marketplace** Game Master package editor
+(`MarketplaceSection` → Allowed games to create), and per Game Master through the
+existing admin `update_limits` action. Saving a package syncs `allowedGameTypes` onto
+active subscriptions that use that package.
 
 #### 3.2a What was built - 7 September 2026
 
@@ -215,17 +217,19 @@ percentage as trading - section 5.
 
 ### 3.3 The creation UI
 
-`app/(root)/gamemaster/create-competition/page.tsx` is heavily trading-shaped: it fetches
-`/api/settings/trading-risk`, holds `leverageAllowed`, `assetClasses`,
-`startingTradingPoints`, trading ranking methods, `minimumTrades`,
-`disqualifyOnLiquidation`, and has an "Assets and leverage" step with a leverage slider.
+> **BUILT 23 September 2026.** When resolved `allowedGameTypes` includes only trading, the
+> existing trading wizard is unchanged (no one-option friction picker). When `provider` is
+> granted, `CreateCompetitionGate` offers a title picker from `listContestableTitles` and
+> `ProviderContestCreateForm` renders schema-driven settings via `ChallengeSettingsFields`
+> (branch on field **type**, never game code). Forex market-closed client block is scoped
+> off the provider path. Live code:
+> `app/(root)/gamemaster/create-competition/`, `CreateCompetitionGate.tsx`,
+> `ProviderContestCreateForm.tsx`, `GET /api/gamemaster/competitions/creation-options`.
+> **Admin GM portal create UI is deliberately not built** — API parity only; the product
+> surface is the player `/gamemaster/create-competition` route.
 
-It needs the **same game picker and dynamic settings step as the admin wizard** in `12`
-section 2 - and it should reuse those components rather than growing a parallel
-implementation. If the admin wizard renders a form from `configSchema`, the Game Master
-wizard must render the identical form.
-
-Only games in `limits.allowedGameTypes` appear in the picker.
+Only games in `limits.allowedGameTypes` appear in the picker (and only contestable
+catalogue titles that pass the same enablement as admin).
 
 ### 3.4 Tier limits that need a per-game dimension
 
@@ -286,11 +290,19 @@ with no writer anywhere. Neither blocks this project; both belong on a defect li
 
 ## 5. The problem trading never had
 
-**A Game Master's share is calculated as a percentage of the entry fee, before any
-provider cost is deducted. A trading contest has no per-round cost. A provider contest
-does.**
+**A Game Master's share is calculated as a percentage of referred players' entry fees,
+then capped at and carved OUT of the platform fee.** That is already how
+`settleFeesAndGameMasters` / `capGameMasterEarnings` work - marketplace packages set the
+referral %, the contest sets the platform fee %, and the platform keeps the remainder.
+Owner restatement, 23 Sep 2026: e.g. platform fee 10%, GM package 3% → GM gets up to 3pp,
+platform nets ~7%. **No settlement formula change.**
 
-Worked example, using the Elite tier at 10%:
+**What this section originally blocked was creation when a third party charges per round.**
+A trading contest has no per-round cost. A third-party provider contest can: the existing
+cap is against **gross** platform fee, so gross fee minus GM share minus provider cost can
+be negative.
+
+Worked example (third-party cost, Elite-style numbers):
 
 | | Trading contest | Provider contest at 2c/round |
 |---|---|---|
@@ -298,34 +310,38 @@ Worked example, using the Elite tier at 10%:
 | Players, all referred by one Game Master | 20 | 20 |
 | Prize pool | 20.00 | 20.00 |
 | Platform fee at 10% | 2.00 | 2.00 |
-| Game Master share, 10% of entry fees | 2.00 | 2.00 |
+| Game Master share (referral % of entry fees, capped at platform fee) | up to 2.00 | up to 2.00 |
 | Provider cost | 0.00 | 0.40 |
-| **Platform result** | **0.00 - break even** | **-0.40 - a loss** |
-
-The existing cap does not save us. It caps the Game Master share at the **gross** platform
-fee, and gross fee minus Game Master share minus provider cost is negative. The platform
-pays to run the contest, and pays the Game Master for the privilege.
+| **Platform result** | **non-negative** | **-0.40 - a loss** |
 
 It gets worse with `best_of_n` attempts, where provider cost multiplies while the entry
 fee does not.
 
-### Options
+### Owner decision, 23 September 2026 — creation gate SUSPENDED for now
+
+**ChartVolt ships the games itself for now; we do not pay a third-party provider per
+round.** With provider cost at zero, the loss case above does not apply, and Game Masters
+may create provider contests once the construction path exists (permission gate already
+did). Package default `allowedGameTypes` stays `["trading"]` - operators grant `provider`
+per package or override. Marketplace packages continue to govern the GM referral %.
+
+**When a signed third-party provider with real per-round pricing lands (X4), re-apply the
+gate:** compute the share on **net** platform fee after provider cost (and/or a minimum
+entry fee) before enabling creation on those titles. Do not quietly leave first-party
+economics as the rule for a paying supplier.
+
+### Options (still the long-term menu when third-party cost returns)
 
 | Option | Effect | Verdict |
 |---|---|---|
-| **Exclude provider games from Game Master creation at launch** | `limits.allowedGameTypes` stays `["trading"]` | **The safe default.** Costs nothing and blocks nothing permanently |
-| Deduct provider cost before calculating the share | Correct, and changes the cap from gross to net platform fee | The right long-term answer. Needs provider cost known at settlement time |
+| ~~Exclude provider games from Game Master creation~~ | Was the safe default while cost was unknown | **Superseded 23 Sep 2026** for zero-cost / first-party titles |
+| Deduct provider cost before calculating the share | Correct; changes the cap from gross to net platform fee | The right answer when X4 pricing exists |
 | Set a **minimum entry fee** for Game Master provider contests | Simple, understandable, enforceable | Good companion to the above |
 | A lower per-game referral percentage | Uses `referralFeePercentageByGame` | Fine, but a percentage cannot fix a fixed per-round cost at low fees |
 
-**Recommendation:** launch with `allowedGameTypes` at `["trading"]`, enable provider games
-for Game Masters only once provider pricing is settled and the share is calculated on
-**net** platform fee after provider cost. Record the decision in `PROGRESS.md`.
-
-Note this also means a Game Master **still earns from provider contests their referred
-players enter** - because earning follows referred players, not created contests. Only
-*creation* is gated. That is the right split: the revenue share works from day one, and
-only the ability to create a potentially loss-making contest is held back.
+Note: a Game Master **still earns from provider contests their referred players enter**
+regardless of who created the contest - earning follows referred players, not created
+contests. That half was never gated.
 
 ---
 
@@ -337,10 +353,10 @@ only the ability to create a potentially loss-making contest is held back.
 | ~~`limits.allowedGameTypes`, default `["trading"]`~~ **BUILT 7 Sep 2026** | X1 | 0.5 day |
 | ~~Admin-app finalization Game Master earnings gap (section 4)~~ **BUILT 5 Sep 2026 (R26)** | X1 or X5 | 1-2 days |
 | ~~Challenge finalization on the shared payout/fee code, both apps (section 4)~~ **BUILT 12 Sep 2026** | X10 | ~1 day |
-| Provider-cost treatment decided and implemented | Before enabling provider games for Game Masters | 1-2 days |
-| Minimum entry fee for Game Master provider contests | Same | 0.5 day |
-| **Game Master creation API accepts a game and `gameConfig`** | X6 | 2 days - **partly built 7 Sep 2026, see below** |
-| Game Master creation UI: game picker plus dynamic settings | X6 | 3 days - **not built, and blocked** |
+| ~~Provider-cost treatment~~ **SUSPENDED 23 Sep 2026** for first-party / zero-cost titles; revisit at X4 | Before third-party paid titles | 1-2 days later |
+| Minimum entry fee for Game Master provider contests | With X4 pricing | 0.5 day |
+| **Game Master creation API accepts a game and `gameConfig`** | X6 | 2 days - **permission 7 Sep; construction 23 Sep 2026** |
+| ~~Game Master creation UI: game picker plus dynamic settings~~ **BUILT 23 Sep 2026** | X6 | 3 days |
 | ~~Per-game analytics, Game Master and admin~~ **BUILT 16 Sep 2026 (X7 step 5)** | X7 | 2 days |
 | ~~Implement or remove `toggleCompetitionCreation`~~ **BUILT 7 Sep 2026** | X6 | 0.5 day |
 | Tier wording | X8 | Database content, non-developer |
@@ -349,22 +365,17 @@ only the ability to create a potentially loss-making contest is held back.
 That is an order of magnitude more than the "roughly four days of residuals" the earlier
 draft claimed, and it is why this chapter exists.
 
-**What "accepts a game" means as built, stated precisely so a summary cannot round it up.**
-Both routes now take a `gameType`, resolve what the Game Master is permitted, check it, and
-**refuse anything but trading with a message naming the missing capability**. So the
-permission half is complete and the *construction* half is not: a provider contest needs a
-catalogue title, settings validated against that title's `configSchema`, round settings and
-the pre-flight checklist, which is sections 3.1 and 3.3 of this chapter and is not built.
-**A Game Master still cannot create a provider contest**, and the reason is now a refusal
-rather than a silent trading label.
+**What "accepts a game" means as built (23 Sep 2026).** Both routes take a `gameType`,
+resolve what the Game Master is permitted (`allowedGameTypes`), check the route can
+construct it (`ROUTE_CREATABLE_GAME_TYPES` includes `provider`), and for provider contests
+call shared `createProviderContest` then `publishProviderContest` so the contest lands
+`upcoming` with `gameKey: provider:<providerKey>:<gameCode>` and optional `gameMasterId`.
+Permission alone is still not enough - without a package/override grant the create is
+403. Default `allowedGameTypes` remains `["trading"]`.
 
-**The creation UI is deliberately not built, and it is blocked rather than deferred.** A
-game picker offering one game is friction on the path Game Masters use daily - the same
-reasoning that makes the admin picker redirect straight to trading when no provider game
-exists - and section 5's economic constraint means `allowedGameTypes` should stay
-`["trading"]` until the revenue share is computed on **net** platform fee. Building the
-picker first would produce a control whose only option is the one already there. It unblocks
-when section 5 is answered, not when somebody has three days.
+**The creation UI** is built on `/gamemaster/create-competition`: when the resolved limits
+include `provider`, a title picker and schema-driven settings appear; when only trading is
+allowed, the trading wizard is unchanged (no one-option friction picker).
 
 ---
 
@@ -382,25 +393,24 @@ when section 5 is answered, not when somebody has three days.
       caller's value with a floor of **1**, so a paid single-player contest was reachable;
       the admin route hardcoded 2 and was correct. Both now share the one constant, and
       `validateOverrideUpdate` applies the same floor to a per-Game-Master participant cap
-- [ ] A Game Master creating a provider contest sees the **same** settings form as an
-      admin, generated from `configSchema`
-- [ ] No trading field is required to create a provider contest
+- [x] A Game Master creating a provider contest sees settings generated from
+      `configSchema` - **done 23 Sep 2026** on `/gamemaster/create-competition`
+- [x] No trading field is required to create a provider contest - **done 23 Sep 2026**
 - [ ] A Game Master earns correctly when a referred player enters a **provider**
-      competition, and when they enter a **provider challenge**. **The mechanism is now
-      shared and correct for a trading challenge** - since 12 Sep 2026,
-      `settleFeesAndGameMasters()` runs for every challenge exactly as it does for every
-      competition - but no provider challenge can be created yet (section 5's economic
-      constraint plus the unbuilt provider-challenge creation path), so this box stays
-      open until one can be
-- [ ] The Game Master share still **never exceeds the platform fee**, asserted by test
+      competition, and when they enter a **provider challenge**. **Competition path is the
+      shared fee stage (unchanged).** Provider challenges remain a separate creation path
+- [x] The Game Master share still **never exceeds the platform fee** - asserted by the
+      existing settlement / `capGameMasterEarnings` suite (unchanged 23 Sep)
 - [ ] **Platform margin after provider cost is never negative** on a Game Master-created
-      contest, asserted by test
+      contest - **deferred to X4** while ChartVolt ships games at zero provider cost
+      (owner, 23 Sep 2026)
 - [x] A competition finalized through the **admin app** pays Game Master earnings
       identically to the main app - **done 5 Sep 2026 (R26)**, proven by a parity suite that
       settles the same fixture through both apps and compares every ledger row, including
       that the platform fee is booked **net** of the commission. **Historical contests
       finalized by the admin cron were not backfilled**
-- [ ] Earnings and referrals are reportable by game, for both the Game Master and the
-      admin
-- [ ] Nothing about trading Game Masters changes - proven by the same historical
-      regression approach as `11` section 4
+- [x] Earnings and referrals are reportable by game, for both the Game Master and the
+      admin - **done 16 Sep 2026 (X7 step 5)**
+- [x] Nothing about trading Game Masters changes - **done 23 Sep 2026**: trading create
+      path unchanged (raw `insertOne` → `upcoming`); provider is an additive branch;
+      package default still `["trading"]`; settlement fee arithmetic untouched

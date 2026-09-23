@@ -10,6 +10,7 @@ import {
   MIN_CONTEST_PARTICIPANTS,
   resolveCreationLimits,
 } from "@/lib/services/gamemaster/game-permissions";
+import { createGameMasterProviderCompetition } from "@/lib/services/gamemaster/create-provider-competition";
 
 /**
  * GET /api/gamemaster/competitions
@@ -118,20 +119,8 @@ export async function POST(request: NextRequest) {
       startingCapital,
     } = body;
 
-    // Validate required fields
-    if (
-      !name ||
-      !entryFee ||
-      !prizePool ||
-      !maxParticipants ||
-      !startTime ||
-      !endTime
-    ) {
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 },
-      );
-    }
+    // Trading-specific required fields (incl. prizePool on this portal) are checked after
+    // the game-type branch. Provider contests do not use them.
 
     await connectToDatabase();
     const db = mongoose.connection.db;
@@ -247,6 +236,62 @@ export async function POST(request: NextRequest) {
     if (!capability.ok) {
       return NextResponse.json(
         { error: capability.message, reason: capability.reason },
+        { status: 400 },
+      );
+    }
+
+    if (verdict.gameType === "provider") {
+      const user = await db.collection("user").findOne({ id: auth.userId });
+      const gameMasterName = user?.name || auth.name || "Game Master";
+
+      const providerResult = await createGameMasterProviderCompetition({
+        body,
+        userId: auth.userId!,
+        gameMasterName,
+        maxUsersPerCompetition: effectiveLimits.maxUsersPerCompetition,
+      });
+
+      if (!providerResult.ok) {
+        return NextResponse.json(
+          {
+            error: providerResult.error,
+            errors: providerResult.errors,
+            warnings: providerResult.warnings,
+            competitionId: providerResult.competitionId,
+          },
+          { status: 400 },
+        );
+      }
+
+      await db.collection("gamemastersubscriptions").updateOne(
+        { _id: subscription._id },
+        {
+          $inc: {
+            currentPeriodCompetitionsCreated: 1,
+            totalCompetitionsCreated: 1,
+          },
+        },
+      );
+
+      return NextResponse.json({
+        success: true,
+        competitionId: providerResult.competitionId,
+        slug: providerResult.slug,
+        warnings: providerResult.warnings,
+        message: "Competition created successfully",
+      });
+    }
+
+    if (
+      !name ||
+      !entryFee ||
+      !prizePool ||
+      !maxParticipants ||
+      !startTime ||
+      !endTime
+    ) {
+      return NextResponse.json(
+        { error: "Missing required fields" },
         { status: 400 },
       );
     }

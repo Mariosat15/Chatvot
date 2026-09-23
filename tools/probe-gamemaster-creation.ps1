@@ -208,23 +208,24 @@ export const MIN_CONTEST_PARTICIPANTS = 1;
     -TestName "raises 1 and absent to 2, because no paid format is single-player"
 
 # ---------------------------------------------------------------------------------------
-# 7. Route capability is a SEPARATE question from permission. Collapsing it means the day
-#    somebody grants `provider` the route stamps `gameKey: "provider"` on a real contest -
-#    and `gameKey` is immutable, so that cannot be corrected in place afterwards.
+# 7. Provider construction is live (23 Sep 2026). Narrowing the list back to trading-only
+#    reintroduces game_not_supported_here for every granted provider GM - the hole this
+#    phase closed. The immutable-wrong-key risk is now guarded by the create helper, not
+#    by refusing the game type at the route gate.
 # ---------------------------------------------------------------------------------------
 $results += Invoke-Probe `
-    -Name "Route claims it can build any permitted game type" `
+    -Name "Route capability narrowed back to trading only" `
     -File $GATE `
     -From @'
-export const ROUTE_CREATABLE_GAME_TYPES: readonly string[] = ["trading"];
-'@ `
-    -To @'
 export const ROUTE_CREATABLE_GAME_TYPES: readonly string[] = [
   "trading",
   "provider",
 ];
 '@ `
-    -TestName "refuses a game type the route cannot actually build"
+    -To @'
+export const ROUTE_CREATABLE_GAME_TYPES: readonly string[] = ["trading"];
+'@ `
+    -TestName "accepts trading and provider; still refuses an unknown type"
 
 # ---------------------------------------------------------------------------------------
 # 8. R31 on the read side, in this module. `??` is the plausible modernisation of `||` and

@@ -17,7 +17,6 @@ import {
   Star,
   Palette,
   Image as ImageIcon,
-  User,
   Crown,
   Calendar,
   Percent,
@@ -144,6 +143,8 @@ interface GameMasterConfig {
   canCreateCompetitions: boolean;
   canEarnFromChallenges: boolean;
   challengeReferralFeePercentage?: number;
+  /** Which contest families this tier may CREATE. Default trading-only. */
+  allowedGameTypes?: string[];
 }
 
 interface MarketplaceItem {
@@ -167,7 +168,7 @@ interface MarketplaceItem {
   imageUrl?: string;
   iconName?: string; // Selected icon name for non-cosmetic items
   codeTemplate: string;
-  defaultSettings: Record<string, any>;
+  defaultSettings: Record<string, unknown>;
   supportedAssets: string[];
   totalPurchases: number;
   actualPurchases?: number;
@@ -353,6 +354,9 @@ const emptyItem: Partial<MarketplaceItem> = {
     canCreateCompetitions: true,
     canEarnFromChallenges: false,
     challengeReferralFeePercentage: undefined,
+    // Reason: package default stays trading-only so buying a tier never silently
+    // unlocks provider contests; operators opt in per package (19 s5 / s3.2).
+    allowedGameTypes: ["trading"],
   },
   cosmeticType: "avatar",
   supportedAssets: [],
@@ -411,7 +415,7 @@ export default function MarketplaceSection() {
       } else {
         toast.error(data.error || "Failed to seed items");
       }
-    } catch (error) {
+    } catch {
       toast.error("Failed to seed marketplace");
     }
   };
@@ -449,7 +453,7 @@ export default function MarketplaceSection() {
       } else {
         toast.error(data.error || "Failed to save defaults");
       }
-    } catch (error) {
+    } catch {
       toast.error("Failed to save marketplace defaults");
     } finally {
       setSavingDefaults(false);
@@ -635,7 +639,7 @@ export default function MarketplaceSection() {
       } else {
         toast.error(data.error || "Failed to create item");
       }
-    } catch (error) {
+    } catch {
       toast.error("Failed to create item");
     } finally {
       setSaving(false);
@@ -663,7 +667,7 @@ export default function MarketplaceSection() {
       } else {
         toast.error(data.error || "Failed to update item");
       }
-    } catch (error) {
+    } catch {
       toast.error("Failed to update item");
     } finally {
       setSaving(false);
@@ -686,15 +690,16 @@ export default function MarketplaceSection() {
       } else {
         toast.error(data.error || "Failed to delete item");
       }
-    } catch (error) {
+    } catch {
       toast.error("Failed to delete item");
     }
   };
 
   const handleDuplicate = (item: MarketplaceItem) => {
     // Strip DB-only fields, then set safe defaults for the copy
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { _id, createdAt, totalPurchases, actualPurchases, ...rest } = item as any;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- omit fields from spread
+    const { _id, createdAt, totalPurchases, actualPurchases, ...rest } =
+      item as MarketplaceItem & Record<string, unknown>;
     const duplicated: Partial<MarketplaceItem> = {
       ...rest,
       name: `${item.name} (Copy)`,
@@ -725,7 +730,7 @@ export default function MarketplaceSection() {
         toast.success(item.isPublished ? "Item unpublished" : "Item published");
         fetchItems();
       }
-    } catch (error) {
+    } catch {
       toast.error("Failed to update item");
     }
   };
@@ -951,6 +956,7 @@ export default function MarketplaceSection() {
                             {/* Show image preview for all items with images */}
                             {item.imageUrl ? (
                               <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-gray-800 border border-gray-700 flex-shrink-0">
+                                {/* eslint-disable-next-line @next/next/no-img-element -- admin list thumb; next/image not needed */}
                                 <img
                                   src={item.imageUrl}
                                   alt={item.name}
@@ -1058,7 +1064,27 @@ export default function MarketplaceSection() {
                               variant="ghost"
                               size="sm"
                               onClick={() => {
-                                setEditingItem(item);
+                                // Reason: older packages have no allowedGameTypes stored;
+                                // hydrate to ["trading"] so Save persists an explicit list
+                                // and the checkboxes match what the gate already applies.
+                                if (
+                                  item.category === "gamemaster" &&
+                                  item.gameMasterConfig
+                                ) {
+                                  const cfg = item.gameMasterConfig;
+                                  setEditingItem({
+                                    ...item,
+                                    gameMasterConfig: {
+                                      ...cfg,
+                                      allowedGameTypes:
+                                        cfg.allowedGameTypes?.length
+                                          ? cfg.allowedGameTypes
+                                          : ["trading"],
+                                    },
+                                  });
+                                } else {
+                                  setEditingItem(item);
+                                }
                                 setIsEditOpen(true);
                               }}
                             >
@@ -1478,6 +1504,7 @@ export default function MarketplaceSection() {
                       <div className="space-y-3">
                         <div className="flex items-center gap-4 p-4 bg-gray-800/50 border border-gray-700 rounded-xl">
                           <div className="relative w-24 h-24 rounded-xl border-2 border-cyan-500/50 shadow-lg shadow-cyan-500/20 overflow-hidden bg-gray-900 flex items-center justify-center">
+                            {/* eslint-disable-next-line @next/next/no-img-element -- upload preview blob URL */}
                             <img
                               src={editingItem.imageUrl}
                               alt="Preview"
@@ -1791,7 +1818,7 @@ export default function MarketplaceSection() {
                               <span>
                                 <strong>Warning:</strong> Referral fee must be
                                 LOWER than competition platform fees. This fee
-                                is subtracted from the platform's share. If
+                                is subtracted from the platform&apos;s share. If
                                 total GM fees exceed the platform fee for a
                                 competition, GM earnings will be capped.
                               </span>
@@ -1871,6 +1898,85 @@ export default function MarketplaceSection() {
                           </div>
                         )}
                       </div>
+
+                      {/* Allowed games — which contest families this package may CREATE */}
+                      {editingItem.gameMasterConfig?.canCreateCompetitions !==
+                        false && (
+                        <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-5 space-y-3 col-span-2">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Target className="h-5 w-5 text-cyan-400" />
+                            <div>
+                              <Label className="text-white font-semibold">
+                                Allowed games to create
+                              </Label>
+                              <p className="text-xs text-gray-500 mt-1">
+                                Trading is the default. Tick{" "}
+                                <strong className="text-gray-400">
+                                  Provider games
+                                </strong>{" "}
+                                to let Game Masters on this package create
+                                skill-game contests (Circuit Sprint, etc.).
+                                They still earn from any game their referrals
+                                enter, even without this grant.
+                              </p>
+                            </div>
+                          </div>
+                          {(() => {
+                            const allowed =
+                              editingItem.gameMasterConfig?.allowedGameTypes
+                                ?.length
+                                ? editingItem.gameMasterConfig.allowedGameTypes
+                                : ["trading"];
+                            const toggle = (gameType: string) => {
+                              const next = allowed.includes(gameType)
+                                ? allowed.filter((g) => g !== gameType)
+                                : [...allowed, gameType];
+                              // Reason: empty array is refused by update_limits and
+                              // resolveAllowedGameTypes treats [] as "unset → trading",
+                              // so storing one would silently disagree with the UI.
+                              if (next.length === 0) {
+                                toast.error(
+                                  "Select at least one game type",
+                                );
+                                return;
+                              }
+                              setEditingItem({
+                                ...editingItem,
+                                gameMasterConfig: {
+                                  ...editingItem.gameMasterConfig!,
+                                  allowedGameTypes: next,
+                                },
+                              });
+                            };
+                            return (
+                              <div className="flex flex-wrap gap-4 pt-1">
+                                <label className="flex items-center gap-2 cursor-pointer select-none">
+                                  <input
+                                    type="checkbox"
+                                    checked={allowed.includes("trading")}
+                                    onChange={() => toggle("trading")}
+                                    className="h-4 w-4 rounded border-gray-600 bg-gray-800 text-cyan-500 focus:ring-cyan-500"
+                                  />
+                                  <span className="text-sm text-white">
+                                    Trading
+                                  </span>
+                                </label>
+                                <label className="flex items-center gap-2 cursor-pointer select-none">
+                                  <input
+                                    type="checkbox"
+                                    checked={allowed.includes("provider")}
+                                    onChange={() => toggle("provider")}
+                                    className="h-4 w-4 rounded border-gray-600 bg-gray-800 text-cyan-500 focus:ring-cyan-500"
+                                  />
+                                  <span className="text-sm text-white">
+                                    Provider games
+                                  </span>
+                                </label>
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      )}
 
                       {/* Max Competitions Per Day - Only show if canCreateCompetitions is enabled */}
                       {editingItem.gameMasterConfig?.canCreateCompetitions !==
@@ -2094,6 +2200,27 @@ export default function MarketplaceSection() {
                             Create Comps
                           </div>
                         </div>
+                        {editingItem.gameMasterConfig?.canCreateCompetitions !==
+                          false && (
+                          <div className="bg-gray-900/50 rounded-lg p-3 col-span-2 sm:col-span-1">
+                            <div className="text-sm font-bold text-cyan-400 truncate">
+                              {(
+                                editingItem.gameMasterConfig
+                                  ?.allowedGameTypes?.length
+                                  ? editingItem.gameMasterConfig
+                                      .allowedGameTypes
+                                  : ["trading"]
+                              )
+                                .map((g) =>
+                                  g === "provider" ? "Games" : "Trading",
+                                )
+                                .join(" + ")}
+                            </div>
+                            <div className="text-xs text-gray-400">
+                              Can create
+                            </div>
+                          </div>
+                        )}
                         <div className="bg-gray-900/50 rounded-lg p-3">
                           <div
                             className={`text-2xl font-bold ${editingItem.gameMasterConfig?.canEarnFromChallenges ? "text-orange-400" : "text-red-400"}`}

@@ -294,23 +294,18 @@ export function checkGameMasterCanCreate(
  *
  * A DIFFERENT QUESTION FROM `allowedGameTypes`, AND THE TWO MUST NOT BE COLLAPSED.
  * `allowedGameTypes` asks whether this Game Master is *permitted* a game; this asks whether
- * the route *knows how* to create one. Today only trading, and the gap is not cosmetic: a
- * provider contest needs a catalogue title, settings validated against that title's
- * `configSchema`, round settings, and the pre-flight checklist - which is chapter 19
- * sections 3.1 and 3.3, and is not built.
+ * the route *knows how* to create one.
  *
- * Why it is a refusal rather than something left to fail naturally: `contestGameLabel`
- * derives `gameKey` from the game TYPE when no key is supplied, so a provider contest
- * created here would be stamped `gameKey: "provider"` instead of
- * `provider:<providerKey>:<gameCode>`. `gameKey` is IMMUTABLE - it is the join key for every
- * historical statistic - so that cannot be corrected in place afterwards, and nothing would
- * report it. The contest would settle, pay, and quietly sit outside every per-game figure.
- *
- * So the day somebody grants a Game Master `["trading", "provider"]` they get a refusal that
- * names the missing capability, rather than a contest with a permanently wrong key. Widening
- * the allow-list is necessary and not sufficient, and this is what says so.
+ * Provider construction shipped 23 Sep 2026: the route calls shared `createProviderContest`
+ * + `publishProviderContest`, which stamp `gameKey: provider:<providerKey>:<gameCode>` from
+ * the catalogue title. Permission alone is still not enough - without a package/override
+ * grant the create is 403. Widening this list without a real construction path would have
+ * stamped `gameKey: "provider"` via `contestGameLabel`, which is IMMUTABLE and unrecoverable.
  */
-export const ROUTE_CREATABLE_GAME_TYPES: readonly string[] = ["trading"];
+export const ROUTE_CREATABLE_GAME_TYPES: readonly string[] = [
+  "trading",
+  "provider",
+];
 
 export function checkRouteCanCreateGameType(gameType: GameType): CreationVerdict {
   if (ROUTE_CREATABLE_GAME_TYPES.includes(gameType)) {

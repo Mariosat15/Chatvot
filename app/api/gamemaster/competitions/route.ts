@@ -13,6 +13,7 @@ import {
   clampMinParticipants,
   resolveCreationLimits,
 } from "@/lib/services/gamemaster/game-permissions";
+import { createGameMasterProviderCompetition } from "@/lib/services/gamemaster/create-provider-competition";
 
 /**
  * GET /api/gamemaster/competitions
@@ -159,20 +160,9 @@ export async function POST(request: NextRequest) {
       difficulty,
     } = body;
 
-    // Validate required fields
-    if (
-      !name ||
-      !entryFee ||
-      !startingCapital ||
-      !maxParticipants ||
-      !startTime ||
-      !endTime
-    ) {
-      return NextResponse.json(
-        { success: false, error: "Missing required fields" },
-        { status: 400 },
-      );
-    }
+    // Trading-specific required fields are checked after the game-type branch below.
+    // Provider contests do not carry startingCapital, so enforcing it here would refuse
+    // every game contest before the permission gate ran.
 
     const db = mongoose.connection.db;
     if (!db) {
@@ -267,13 +257,81 @@ export async function POST(request: NextRequest) {
     }
 
     // Separately from whether this Game Master is PERMITTED the game: can this route build
-    // one? Only trading, and it refuses rather than mislabelling - see
-    // `checkRouteCanCreateGameType`, which explains why an immutable `gameKey` makes that
-    // the difference between a visible refusal and unrecoverable data.
+    // one? Trading and provider both can (23 Sep 2026). Provider still needs a catalogue
+    // title and settings - see `createGameMasterProviderCompetition` - never a bare
+    // `contestGameLabel("provider")`, which would stamp an immutable wrong key.
     const capability = checkRouteCanCreateGameType(verdict.gameType);
     if (!capability.ok) {
       return NextResponse.json(
         { success: false, error: capability.message, reason: capability.reason },
+        { status: 400 },
+      );
+    }
+
+    if (verdict.gameType === "provider") {
+      const providerResult = await createGameMasterProviderCompetition({
+        body,
+        userId,
+        gameMasterName: session.user.name || "Game Master",
+        maxUsersPerCompetition: effectiveLimits.maxUsersPerCompetition,
+      });
+
+      if (!providerResult.ok) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: providerResult.error,
+            errors: providerResult.errors,
+            warnings: providerResult.warnings,
+            competitionId: providerResult.competitionId,
+          },
+          { status: 400 },
+        );
+      }
+
+      await db.collection("gamemastersubscriptions").updateOne(
+        { _id: subscription._id },
+        {
+          $inc: {
+            currentPeriodCompetitionsCreated: 1,
+            totalCompetitionsCreated: 1,
+          },
+          $set: { updatedAt: new Date() },
+        },
+      );
+
+      return NextResponse.json({
+        success: true,
+        competition: {
+          id: providerResult.competitionId,
+          slug: providerResult.slug,
+          status: "upcoming",
+        },
+        warnings: providerResult.warnings,
+        limits: {
+          dailyRemaining: Math.max(
+            0,
+            effectiveLimits.maxCompetitionsPerDay -
+              (subscription.currentPeriodCompetitionsCreated ?? 0) -
+              1,
+          ),
+          maxParticipants: effectiveLimits.maxUsersPerCompetition,
+        },
+        message: "Competition created successfully!",
+      });
+    }
+
+    // Trading path below — startingCapital and market fields are required here only.
+    if (
+      !name ||
+      !entryFee ||
+      !startingCapital ||
+      !maxParticipants ||
+      !startTime ||
+      !endTime
+    ) {
+      return NextResponse.json(
+        { success: false, error: "Missing required fields" },
         { status: 400 },
       );
     }

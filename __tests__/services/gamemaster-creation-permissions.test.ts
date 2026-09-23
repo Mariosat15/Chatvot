@@ -277,24 +277,20 @@ describe("daily limit", () => {
 });
 
 describe("route capability", () => {
-  it("refuses a game type the route cannot actually build", () => {
-    // Reason this is separate from the permission check: if `allowedGameTypes` is widened
-    // to "provider" before the route can build a provider contest, the route would stamp a
-    // trading label on a contest the operator asked to be a game contest - a mislabelled
-    // contest, and `gameKey` is immutable so it cannot be corrected in place.
-    expect([...ROUTE_CREATABLE_GAME_TYPES]).toEqual(["trading"]);
+  it("accepts trading and provider; still refuses an unknown type", () => {
+    // Flipped 23 Sep 2026: construction now exists via createGameMasterProviderCompetition.
+    // The comment that explained why provider was refused is the valuable half - keep it:
+    // permission alone is never enough; the route must stamp provider:<key>:<code>, never
+    // bare "provider". That property lives in the create helper and the route branch test.
+    expect([...ROUTE_CREATABLE_GAME_TYPES]).toEqual(["trading", "provider"]);
+    expect(checkRouteCanCreateGameType("trading").ok).toBe(true);
+    expect(checkRouteCanCreateGameType("provider").ok).toBe(true);
 
-    const refusal = checkRouteCanCreateGameType("provider");
+    const refusal = checkRouteCanCreateGameType("roulette" as never);
     expect(refusal.ok).toBe(false);
     if (!refusal.ok) {
-      // Names the missing capability rather than blaming the Game Master's permissions -
-      // the two refusals have to be distinguishable or an operator who has just granted
-      // `provider` cannot tell that granting it was necessary but not sufficient.
-      expect(refusal.message).toMatch(/not available yet/i);
       expect(refusal.reason).toBe("game_not_supported_here");
     }
-
-    expect(checkRouteCanCreateGameType("trading").ok).toBe(true);
   });
 });
 
@@ -450,12 +446,24 @@ describe("both creation routes decide with the shared gate", () => {
   });
 
   it.each([MAIN, ADMIN])(
-    "%s labels the contest with the game type the VERDICT approved",
+    "%s labels the TRADING contest with the game type the VERDICT approved",
     (path) => {
-      // Reason this is asserted rather than assumed: labelling from the raw request while
-      // checking permission against a resolved value lets the two disagree, and `gameKey`
-      // is immutable so a mislabelled contest cannot be corrected in place.
+      // Trading path only. Provider contests get their key from the catalogue via
+      // createAndPublishProviderContest - bare contestGameLabel("provider") is forbidden.
       expect(code(path)).toMatch(/contestGameLabel\s*\(\s*verdict\.gameType/);
+    },
+  );
+
+  it.each([MAIN, ADMIN])(
+    "%s routes provider creates through the shared create+publish helper",
+    (path) => {
+      const source = code(path);
+      expect(source).toMatch(/createGameMasterProviderCompetition\s*\(\s*\{/);
+      expect(source).toMatch(/verdict\.gameType\s*===\s*["']provider["']/);
+      // Never stamp the bare module type as the immutable join key.
+      expect(source).not.toMatch(
+        /contestGameLabel\s*\(\s*["']provider["']\s*\)/,
+      );
     },
   );
 

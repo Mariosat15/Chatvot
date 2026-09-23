@@ -23,6 +23,7 @@ import ContestStatsCards from "./ContestStatsCards";
 import AccountStatusCard from "./AccountStatusCard";
 import CreditBreakdownChart from "./CreditBreakdownChart";
 import GettingStartedCard from "./GettingStartedCard";
+import GameSuggestionsCard from "./GameSuggestionsCard";
 import PlayerGamePerformancePanel from "./PlayerGamePerformancePanel";
 import GameSummaryCards from "./GameSummaryCards";
 import { useTerms } from "@/contexts/TerminologyContext";
@@ -140,6 +141,8 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
           />
 
           <GameSummaryCards standing={gameStanding} />
+
+          <GameSuggestionsCard />
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="lg:col-span-2">
