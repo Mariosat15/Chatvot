@@ -5,7 +5,7 @@
  * notifies a stranger, and never reads willingToBeChallenged as an invitation
  * licence. Matchmaking and challenge create remain separate.
  */
-import Competition from "@/database/models/competition.model";
+import Competition from "@/database/models/trading/competition.model";
 import { listInterestedGameKeys } from "@/lib/services/games/interest-inference.service";
 
 export interface GameSuggestion {

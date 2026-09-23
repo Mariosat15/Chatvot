@@ -59,10 +59,11 @@ export async function POST(request: NextRequest) {
       strategyConfig,
       // Game Master specific
       gameMasterConfig,
-      // Existing values (optional - for refinement)
-      existingName,
-      existingDescription,
+      // Optional operator steer — e.g. "gaming race", "trading action"
+      contentFocus: rawContentFocus,
     } = body;
+
+    const contentFocus = normalizeContentFocus(rawContentFocus);
 
     if (!category) {
       return NextResponse.json(
@@ -110,15 +111,24 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      systemPrompt = getCosmeticPrompt(cosmeticType);
+      systemPrompt = getCosmeticPrompt(cosmeticType, contentFocus);
       userPrompt =
         "Carefully analyze this avatar image. Note all visual details: colors, weapons, armor, effects, pose, expression. Then create a unique name, tagline, and detailed backstory that accurately reflects what you see:";
+      if (contentFocus) {
+        userPrompt += `\n\nOPERATOR THEME FOCUS (mandatory — tone, lore, symbolism, and quote must follow this):\n${contentFocus}`;
+      }
     } else if (category === "indicator") {
       systemPrompt = getIndicatorPrompt(indicatorType, defaultSettings);
       userPrompt = `Generate compelling marketplace content for this trading indicator:\n\nIndicator Type: ${indicatorType || "custom"}\nSettings: ${JSON.stringify(defaultSettings || {}, null, 2)}`;
+      if (contentFocus) {
+        userPrompt += `\n\nOPERATOR THEME FOCUS (use for tone and audience framing; keep the tool facts accurate):\n${contentFocus}`;
+      }
     } else if (category === "strategy") {
       systemPrompt = getStrategyPrompt(strategyConfig);
       userPrompt = `Generate compelling marketplace content for this trading strategy:\n\nStrategy Configuration: ${JSON.stringify(strategyConfig || {}, null, 2)}`;
+      if (contentFocus) {
+        userPrompt += `\n\nOPERATOR THEME FOCUS (use for tone and audience framing; keep the strategy rules accurate):\n${contentFocus}`;
+      }
     } else if (category === "gamemaster") {
       console.log(
         "🎮 [AI Generate] Game Master Config received:",
@@ -128,8 +138,11 @@ export async function POST(request: NextRequest) {
         "🎮 [AI Generate] canCreateCompetitions value:",
         gameMasterConfig?.canCreateCompetitions,
       );
-      systemPrompt = getGameMasterPrompt(gameMasterConfig);
+      systemPrompt = getGameMasterPrompt(gameMasterConfig, contentFocus);
       userPrompt = `Generate compelling marketplace content for this Game Master package:\n\nPackage Configuration: ${JSON.stringify(gameMasterConfig || {}, null, 2)}\n\nIMPORTANT: canCreateCompetitions is ${gameMasterConfig?.canCreateCompetitions === false ? "DISABLED - do NOT mention competition creation" : "ENABLED"}`;
+      if (contentFocus) {
+        userPrompt += `\n\nOPERATOR THEME FOCUS (emphasise this audience / game world in the marketing copy):\n${contentFocus}`;
+      }
       console.log(
         "🎮 [AI Generate] System prompt includes canCreateCompetitions check",
       );
@@ -278,31 +291,53 @@ async function getImageBase64(imageUrl: string): Promise<string | null> {
   return null;
 }
 
-// Prompt for cosmetic avatars
-function getCosmeticPrompt(cosmeticType?: string): string {
-  return `You are a creative writer for a trading platform marketplace. You create compelling, unique names and rich backstories for cosmetic avatar items that traders can purchase.
+// Cap operator steer so a pasted essay cannot blow the prompt budget.
+function normalizeContentFocus(raw: unknown): string | undefined {
+  if (typeof raw !== "string") return undefined;
+  const trimmed = raw.trim().slice(0, 500);
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+// Prompt for cosmetic avatars — theme comes from the operator, not from a trading default.
+function getCosmeticPrompt(
+  cosmeticType?: string,
+  contentFocus?: string,
+): string {
+  const themeBlock = contentFocus
+    ? `THEME FOCUS (mandatory):
+The operator asked for this theme: "${contentFocus}"
+- Place the character in THAT world (name, lore, symbolism, and quote).
+- Do NOT default to trading, markets, charts, or finance unless the focus itself asks for it.`
+    : `THEME DEFAULT (no operator focus was given):
+- This is a multi-game competitive platform (skill contests, races, puzzles, and trading).
+- Write a premium collectible character for competitive play in general.
+- Do NOT force trading/market/finance metaphors. Prefer arena, skill, rivalry, and championship energy unless the image clearly demands something else.`;
+
+  return `You are a creative writer for a competitive multi-game marketplace. You create compelling, unique names and rich backstories for cosmetic avatar items players can purchase.
 
 IMPORTANT: Carefully analyze the actual image - note colors, weapons/items, clothing, pose, mood, and any distinctive features. Your description MUST match what's actually in the image.
 
+${themeBlock}
+
 Your task is to create:
 
-1. **Name** (2-3 words max) - Epic, memorable, trading/gaming themed. Based on what you SEE in the image.
+1. **Name** (2-3 words max) - Epic, memorable, matching the theme above. Based on what you SEE in the image.
 
 2. **Short Tagline** (max 100 characters) - Catchy one-liner describing the character.
 
 3. **Full Description** - Use this EXACT format:
 
 **Origin Story**
-[2-3 paragraphs of creative lore about who this character is, their background, and their role in the trading world. Connect their appearance to their story.]
+[2-3 paragraphs of creative lore about who this character is, their background, and their role in the themed world above. Connect their appearance to their story.]
 
 **Symbolism**
-[List 4-5 visual elements you can see in the image and explain their trading-related meaning]
-• [Visible Item/Feature]: [Trading symbolism]
+[List 4-5 visual elements you can see in the image and explain their meaning in the chosen theme — not trading unless the theme is trading]
+• [Visible Item/Feature]: [Themed symbolism]
 • [Visible Color/Effect]: [What it represents]
 • [Visible Armor/Clothing]: [Its meaning]
 • [Visible Expression/Pose]: [What it conveys]
 
-*"[A memorable quote from the character about trading]"*
+*"[A memorable quote from the character that fits the theme]"*
 
 The cosmetic type is: ${cosmeticType || "avatar"}
 
@@ -328,9 +363,10 @@ function getIndicatorPrompt(
     support_resistance: "Support & Resistance Levels",
   };
 
-  const indicatorName = indicatorType
-    ? indicatorNames[indicatorType] || indicatorType
-    : "Custom Indicator";
+  const indicatorName =
+    indicatorType && Object.hasOwn(indicatorNames, indicatorType)
+      ? indicatorNames[indicatorType as keyof typeof indicatorNames]
+      : indicatorType || "Custom Indicator";
 
   return `You are a professional trading platform content writer. Create compelling marketplace content for a trading indicator.
 
@@ -433,7 +469,9 @@ function buildStrategyPreview(config: Record<string, unknown>): string {
     const conditions  = (rule.conditions as Array<Record<string, unknown>>) || [];
 
     lines.push(`\nRule ${idx + 1}: "${name}"`);
-    lines.push(`  → Signal:   ${SIGNAL_LABELS[signal] ?? signal.toUpperCase()}`);
+    lines.push(
+      `  → Signal:   ${Object.hasOwn(SIGNAL_LABELS, signal) ? SIGNAL_LABELS[signal as keyof typeof SIGNAL_LABELS] : signal.toUpperCase()}`,
+    );
     lines.push(`  → Strength: ${strength} / 5`);
     lines.push(`  → Marker:   Shape=${shape}  Color=${color}  Size=${size}  Show label=${showLabel}`);
 
@@ -570,7 +608,10 @@ Respond in JSON format:
 }
 
 // Prompt for Game Master packages
-function getGameMasterPrompt(config?: Record<string, unknown>): string {
+function getGameMasterPrompt(
+  config?: Record<string, unknown>,
+  contentFocus?: string,
+): string {
   const gmConfig = config || {};
   const canCreateCompetitions = gmConfig.canCreateCompetitions !== false;
   const canEarnFromChallenges = gmConfig.canEarnFromChallenges === true;
@@ -580,7 +621,7 @@ function getGameMasterPrompt(config?: Record<string, unknown>): string {
 
   if (canCreateCompetitions) {
     whatYouGetSection = `
-- **${gmConfig.maxCompetitionsPerDay || 1} Competition${(gmConfig.maxCompetitionsPerDay || 1) > 1 ? "s" : ""} per Day** - Host engaging trading battles for your community
+- **${gmConfig.maxCompetitionsPerDay || 1} Competition${(gmConfig.maxCompetitionsPerDay || 1) > 1 ? "s" : ""} per Day** - Host engaging contests for your community
 - **Up to ${gmConfig.maxUsersPerCompetition || 30} Participants** - Perfect size for competitive events
 - **${gmConfig.referralFeePercentage ?? 5}% Referral Earnings** - Earn from every entry fee your referred users pay
 - **${gmConfig.subscriptionDurationDays || 30} Days Duration** - Full subscription period`;
@@ -620,7 +661,7 @@ YOU MUST NOT include ANY of the following in the generated content:
 - "Max users per competition" or "participants per competition"
 - "Host competitions" or "create competitions" or "run competitions"
 - Any numbers related to competition limits
-- Any mention of managing, hosting, or creating trading events
+- Any mention of managing, hosting, or creating events
 
 YOU MUST ONLY focus on:
 - Referral earnings (the percentage they earn from referred users)
@@ -632,8 +673,12 @@ The GM with this package earns fees when their referred users participate in com
 `
     : "";
 
-  return `You are a professional content writer for a trading competition platform. Create compelling marketplace content for ${packageType}.
-${referralOnlyConstraint}
+  const themeBlock = contentFocus
+    ? `\nTHEME FOCUS from the operator: "${contentFocus}". Emphasise this audience / game world in the marketing copy (still honour package capabilities above).\n`
+    : `\nThis platform runs trading AND skill-based games. Prefer language about contests and communities over trading-only wording unless the package config is clearly trading-only.\n`;
+
+  return `You are a professional content writer for a multi-game competition platform. Create compelling marketplace content for ${packageType}.
+${referralOnlyConstraint}${themeBlock}
 IMPORTANT: This package ${canCreateCompetitions ? "CAN create competitions and earn from referrals" : "CANNOT create competitions - it is REFERRAL-ONLY"}.
 
 Package configuration:
@@ -651,7 +696,7 @@ Create content that:
 1. ${canCreateCompetitions ? "Highlights both competition hosting AND referral earning potential" : "Focuses ENTIRELY on passive referral income - DO NOT mention hosting competitions"}
 2. Explains the earning potential from referrals
 3. Makes the package feel exclusive and valuable
-4. Uses aspirational language that appeals to traders
+4. Uses aspirational language that appeals to hosts and players
 
 Your task is to create:
 
@@ -685,7 +730,7 @@ This is a referral-only package - perfect for influencers who want to earn from 
     : ""
 }
 
-*"[Aspirational quote about ${canCreateCompetitions ? "building a trading community" : "monetizing your influence"}]"*
+*"[Aspirational quote about ${canCreateCompetitions ? "building a competitive community" : "monetizing your influence"}]"*
 
 Respond in JSON format:
 {

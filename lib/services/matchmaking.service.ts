@@ -6,6 +6,7 @@ import {
   getGlobalLeaderboard,
   GlobalLeaderboardEntry,
 } from "@/lib/actions/leaderboard/global-leaderboard.actions";
+import { resolveMatchmakingGameKey } from "@/lib/services/matchmaking/resolve-game-key";
 
 // Trader experience levels based on stats
 export type TraderLevel =
@@ -271,17 +272,6 @@ export async function getMatchableTraders(
   }
 
   return traders;
-}
-
-/**
- * Resolve which game a matchmaking request is about.
- * Absent / blank → trading (backward compatible with MatchmakingCards).
- */
-export function resolveMatchmakingGameKey(
-  gameKey: string | null | undefined,
-): string {
-  const trimmed = typeof gameKey === "string" ? gameKey.trim() : "";
-  return trimmed || "trading";
 }
 
 /**

@@ -379,6 +379,8 @@ export default function MarketplaceSection() {
   const [activeTab, setActiveTab] = useState("basic");
   const [uploadingImage, setUploadingImage] = useState(false);
   const [generatingAI, setGeneratingAI] = useState(false);
+  // Reason: optional steer for AI copy so cosmetics/stories are not locked to trading.
+  const [aiContentFocus, setAiContentFocus] = useState("");
 
   useEffect(() => {
     fetchItems();
@@ -580,6 +582,9 @@ export default function MarketplaceSection() {
       if (editingItem.shortDescription)
         requestBody.existingDescription = editingItem.shortDescription;
 
+      const focus = aiContentFocus.trim();
+      if (focus) requestBody.contentFocus = focus.slice(0, 500);
+
       const response = await fetch("/api/marketplace/generate-content", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -635,6 +640,7 @@ export default function MarketplaceSection() {
         toast.success("Item created successfully");
         setIsCreateOpen(false);
         setEditingItem(emptyItem);
+        setAiContentFocus("");
         fetchItems();
       } else {
         toast.error(data.error || "Failed to create item");
@@ -663,6 +669,7 @@ export default function MarketplaceSection() {
         toast.success("Item updated successfully");
         setIsEditOpen(false);
         setEditingItem(emptyItem);
+        setAiContentFocus("");
         fetchItems();
       } else {
         toast.error(data.error || "Failed to update item");
@@ -889,6 +896,7 @@ export default function MarketplaceSection() {
             <Button
               onClick={() => {
                 setEditingItem(emptyItem);
+                setAiContentFocus("");
                 setIsCreateOpen(true);
               }}
             >
@@ -1085,6 +1093,7 @@ export default function MarketplaceSection() {
                                 } else {
                                   setEditingItem(item);
                                 }
+                                setAiContentFocus("");
                                 setIsEditOpen(true);
                               }}
                             >
@@ -1118,6 +1127,7 @@ export default function MarketplaceSection() {
             setIsCreateOpen(false);
             setIsEditOpen(false);
             setEditingItem(emptyItem);
+            setAiContentFocus("");
           }
         }}
       >
@@ -1546,6 +1556,29 @@ export default function MarketplaceSection() {
                         {/* AI Generate Button - For cosmetics with image */}
                         {editingItem.category === "cosmetic" && (
                           <>
+                            <div className="space-y-2">
+                              <Label
+                                htmlFor="ai-content-focus-cosmetic"
+                                className="text-sm text-purple-300"
+                              >
+                                AI theme focus (optional)
+                              </Label>
+                              <Textarea
+                                id="ai-content-focus-cosmetic"
+                                value={aiContentFocus}
+                                onChange={(e) =>
+                                  setAiContentFocus(e.target.value.slice(0, 500))
+                                }
+                                placeholder="e.g. gaming race champion, circuit puzzle solver, trading floor warrior, neon arena fighter…"
+                                rows={2}
+                                className="bg-gray-800/80 border-purple-500/40 text-white placeholder:text-gray-500"
+                              />
+                              <p className="text-xs text-gray-500">
+                                Tell the AI which world the story should live in.
+                                Leave blank for a general competitive-games vibe
+                                (not trading-only).
+                              </p>
+                            </div>
                             <Button
                               type="button"
                               onClick={handleGenerateWithAI}
@@ -1591,6 +1624,29 @@ export default function MarketplaceSection() {
                         {editingItem.category === "gamemaster" &&
                           "AI will create compelling marketing copy based on package configuration."}
                       </p>
+                      <div className="space-y-2">
+                        <Label
+                          htmlFor="ai-content-focus-general"
+                          className="text-xs text-purple-300"
+                        >
+                          AI theme focus (optional)
+                        </Label>
+                        <Textarea
+                          id="ai-content-focus-general"
+                          value={aiContentFocus}
+                          onChange={(e) =>
+                            setAiContentFocus(e.target.value.slice(0, 500))
+                          }
+                          placeholder="e.g. racing contests, puzzle skill games, trading competitions, community builders…"
+                          rows={2}
+                          className="bg-gray-800/80 border-purple-500/40 text-white placeholder:text-gray-500"
+                        />
+                        <p className="text-xs text-gray-500">
+                          Steer tone and audience. Indicators/strategies stay
+                          accurate to the tool; this only changes how the copy
+                          is framed.
+                        </p>
+                      </div>
                       <Button
                         type="button"
                         onClick={handleGenerateWithAI}
@@ -2510,6 +2566,7 @@ export default function MarketplaceSection() {
                     setIsCreateOpen(false);
                     setIsEditOpen(false);
                     setEditingItem(emptyItem);
+                    setAiContentFocus("");
                   }}
                 >
                   Cancel

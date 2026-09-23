@@ -45,7 +45,8 @@ export async function POST(request: NextRequest) {
     const guard = await guardSection("marketplace");
     if (!guard.ok) return guard.response;
 
-    const { imageUrl, cosmeticType } = await request.json();
+    const { imageUrl, cosmeticType, contentFocus: rawContentFocus } =
+      await request.json();
 
     if (!imageUrl) {
       return NextResponse.json(
@@ -53,6 +54,11 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
+
+    const contentFocus =
+      typeof rawContentFocus === "string"
+        ? rawContentFocus.trim().slice(0, 500) || undefined
+        : undefined;
 
     // Check for OpenAI API key
     const apiKey = process.env.OPENAI_API_KEY;
@@ -163,41 +169,55 @@ export async function POST(request: NextRequest) {
     // Use OpenAI Vision to analyze the image and generate content
     console.log(`🤖 [AI Generate] Calling OpenAI Vision API...`);
 
+    const themeBlock = contentFocus
+      ? `THEME FOCUS (mandatory):
+The operator asked for this theme: "${contentFocus}"
+- Place the character in THAT world (name, lore, symbolism, and quote).
+- Do NOT default to trading, markets, charts, or finance unless the focus itself asks for it.`
+      : `THEME DEFAULT (no operator focus was given):
+- This is a multi-game competitive platform (skill contests, races, puzzles, and trading).
+- Write a premium collectible character for competitive play in general.
+- Do NOT force trading/market/finance metaphors. Prefer arena, skill, rivalry, and championship energy unless the image clearly demands something else.`;
+
+    const userText = contentFocus
+      ? `Carefully analyze this avatar image. Note all visual details: colors, weapons, armor, effects, pose, expression. Then create a unique name, tagline, and detailed backstory that accurately reflects what you see.\n\nOPERATOR THEME FOCUS (mandatory — tone, lore, symbolism, and quote must follow this):\n${contentFocus}`
+      : "Carefully analyze this avatar image. Note all visual details: colors, weapons, armor, effects, pose, expression. Then create a unique name, tagline, and detailed backstory that accurately reflects what you see:";
+
     const response = await openai.chat.completions.create({
       model: "gpt-4o",
       messages: [
         {
           role: "system",
-          content: `You are a creative writer for a trading platform marketplace. You create compelling, unique names and rich backstories for cosmetic avatar items that traders can purchase.
+          content: `You are a creative writer for a competitive multi-game marketplace. You create compelling, unique names and rich backstories for cosmetic avatar items players can purchase.
 
 IMPORTANT: Carefully analyze the actual image - note colors, weapons/items, clothing, pose, mood, and any distinctive features. Your description MUST match what's actually in the image.
 
+${themeBlock}
+
 Your task is to create:
 
-1. **Name** (2-3 words max) - Epic, memorable, trading/gaming themed. Based on what you SEE in the image.
+1. **Name** (2-3 words max) - Epic, memorable, matching the theme above. Based on what you SEE in the image.
 
 2. **Short Tagline** (max 100 characters) - Catchy one-liner describing the character.
 
 3. **Full Description** - Use this EXACT format:
 
 **Origin Story**
-[2-3 paragraphs of creative lore about who this character is, their background, and their role in the trading world. Connect their appearance to their story.]
+[2-3 paragraphs of creative lore about who this character is, their background, and their role in the themed world above. Connect their appearance to their story.]
 
 **Symbolism**
-[List 4-5 visual elements you can see in the image and explain their trading-related meaning]
-• [Visible Item/Feature]: [Trading symbolism]
+[List 4-5 visual elements you can see in the image and explain their meaning in the chosen theme — not trading unless the theme is trading]
+• [Visible Item/Feature]: [Themed symbolism]
 • [Visible Color/Effect]: [What it represents]
 • [Visible Armor/Clothing]: [Its meaning]
 • [Visible Expression/Pose]: [What it conveys]
 
-*"[A memorable quote from the character about trading]"*
+*"[A memorable quote from the character that fits the theme]"*
 
 The cosmetic type is: ${cosmeticType || "avatar"}
 
 Guidelines:
 - BE ACCURATE to what's in the image - describe actual colors, weapons, clothing, effects
-- Names should relate to trading/markets/finance themes creatively
-- Think themes like: market warriors, trading legends, financial mystics, chart masters, assassins, etc.
 - Make it feel like a premium collectible character
 - The symbolism section MUST reference actual visual elements from the image
 
@@ -213,7 +233,7 @@ Respond in JSON format:
           content: [
             {
               type: "text",
-              text: "Carefully analyze this avatar image. Note all visual details: colors, weapons, armor, effects, pose, expression. Then create a unique name, tagline, and detailed backstory that accurately reflects what you see:",
+              text: userText,
             },
             {
               type: "image_url",

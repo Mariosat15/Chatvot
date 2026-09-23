@@ -19,7 +19,7 @@ function code(path: string): string {
 describe("resolveMatchmakingGameKey", () => {
   it("defaults absent and blank to trading", async () => {
     const { resolveMatchmakingGameKey } = await import(
-      "@/lib/services/matchmaking.service"
+      "@/lib/services/matchmaking/resolve-game-key"
     );
     expect(resolveMatchmakingGameKey(undefined)).toBe("trading");
     expect(resolveMatchmakingGameKey(null)).toBe("trading");
@@ -29,7 +29,7 @@ describe("resolveMatchmakingGameKey", () => {
 
   it("preserves a real game key", async () => {
     const { resolveMatchmakingGameKey } = await import(
-      "@/lib/services/matchmaking.service"
+      "@/lib/services/matchmaking/resolve-game-key"
     );
     expect(resolveMatchmakingGameKey("provider:chartvolt-games:circuit-sprint")).toBe(
       "provider:chartvolt-games:circuit-sprint",
