@@ -22,14 +22,12 @@ import {
   Zap,
   Loader2,
   CheckCircle,
-  XCircle,
   ChevronRight,
   ChevronLeft,
   Plus,
   Minus,
   Gauge,
   Lock,
-  Info,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -282,9 +280,12 @@ export default function GMCreateCompetitionContent({
 
     const fetchPlatformSettings = async () => {
       try {
-        const response = await fetch("/api/settings/app");
-        if (response.ok) {
-          const data = await response.json();
+        const [appRes, feeRes] = await Promise.all([
+          fetch("/api/settings/app"),
+          fetch("/api/challenges/settings"),
+        ]);
+        if (appRes.ok) {
+          const data = await appRes.json();
           if (data.settings) {
             setPlatformSettings((prev) => ({
               ...prev,
@@ -292,6 +293,17 @@ export default function GMCreateCompetitionContent({
               creditSymbol: data.settings.credits?.symbol || "⚡",
               currencySymbol: data.settings.currency?.symbol || "€",
               currencyCode: data.settings.currency?.code || "EUR",
+            }));
+          }
+        }
+        // Same admin source the create route stamps — display must match write.
+        if (feeRes.ok) {
+          const feeData = await feeRes.json();
+          const fee = feeData.settings?.platformFeePercentage;
+          if (typeof fee === "number" && Number.isFinite(fee)) {
+            setPlatformSettings((prev) => ({
+              ...prev,
+              platformFeePercentage: fee,
             }));
           }
         }
@@ -436,9 +448,11 @@ export default function GMCreateCompetitionContent({
     field: "rank" | "percentage",
     value: number,
   ) => {
-    const newPrizes = [...prizeDistribution];
-    newPrizes[index][field] = value;
-    setPrizeDistribution(newPrizes);
+    setPrizeDistribution(
+      prizeDistribution.map((row, i) =>
+        i === index ? { ...row, [field]: value } : row,
+      ),
+    );
   };
 
   const addPrizeRank = () => {
@@ -602,7 +616,7 @@ export default function GMCreateCompetitionContent({
           startTime: startTime.toISOString(),
           endTime: endTime.toISOString(),
           leverage: formData.leverageAllowed,
-          platformFeePercentage: platformSettings.platformFeePercentage,
+          // platformFeePercentage omitted — server stamps Challenge Settings.
           assetClasses: selectedAssets,
           prizeDistribution,
           rules: competitionRules,
@@ -691,15 +705,21 @@ export default function GMCreateCompetitionContent({
   ];
 
   const getStepColor = (color: string) => {
-    const colors: Record<string, string> = {
-      blue: "from-blue-500 to-blue-600",
-      green: "from-green-500 to-green-600",
-      purple: "from-purple-500 to-purple-600",
-      orange: "from-orange-500 to-orange-600",
-      yellow: "from-yellow-500 to-yellow-600",
-      red: "from-red-500 to-red-600",
-    };
-    return colors[color] || colors.blue;
+    switch (color) {
+      case "green":
+        return "from-green-500 to-green-600";
+      case "purple":
+        return "from-purple-500 to-purple-600";
+      case "orange":
+        return "from-orange-500 to-orange-600";
+      case "yellow":
+        return "from-yellow-500 to-yellow-600";
+      case "red":
+        return "from-red-500 to-red-600";
+      case "blue":
+      default:
+        return "from-blue-500 to-blue-600";
+    }
   };
 
   if (loading) {
@@ -798,7 +818,7 @@ export default function GMCreateCompetitionContent({
                 Daily Limit Reached
               </h3>
               <p className="text-gray-400 text-sm mt-1">
-                You've created {subscription.limits.maxCompetitionsPerDay}{" "}
+                You&apos;ve created {subscription.limits.maxCompetitionsPerDay}{" "}
                 competition(s) today. Come back tomorrow to create more!
               </p>
             </div>
@@ -1398,11 +1418,11 @@ export default function GMCreateCompetitionContent({
                             </h4>
                             <p className="text-xs text-gray-400 mt-1">
                               When participants you referred join this
-                              competition, you'll earn
+                              competition, you&apos;ll earn
                               <span className="text-green-400 font-bold mx-1">
                                 {subscription.limits.referralFeePercentage}%
                               </span>
-                              of their entry fees from the platform's share.
+                              of their entry fees from the platform&apos;s share.
                             </p>
                             <div className="mt-3 p-3 bg-gray-800/50 rounded-lg">
                               <div className="text-xs text-gray-500 mb-1">
@@ -2103,7 +2123,8 @@ export default function GMCreateCompetitionContent({
                             onClick={() =>
                               setCompetitionRules((prev) => ({
                                 ...prev,
-                                rankingMethod: method.value as any,
+                                rankingMethod:
+                                  method.value as CompetitionRules["rankingMethod"],
                               }))
                             }
                             className={`p-4 rounded-xl border-2 transition-all text-left ${
@@ -2139,7 +2160,8 @@ export default function GMCreateCompetitionContent({
                             onChange={(e) =>
                               setCompetitionRules((prev) => ({
                                 ...prev,
-                                tieBreaker1: e.target.value as any,
+                                tieBreaker1:
+                                  e.target.value as CompetitionRules["tieBreaker1"],
                               }))
                             }
                             className="w-full bg-gray-800 border border-gray-600 text-gray-100 rounded-lg h-11 px-4 focus:ring-2 focus:ring-red-500 focus:border-transparent"
@@ -2363,7 +2385,8 @@ export default function GMCreateCompetitionContent({
                               onClick={() =>
                                 setDifficultySettings({
                                   mode: "manual",
-                                  manualLevel: level.value as any,
+                                  manualLevel:
+                                    level.value as DifficultySettings["manualLevel"],
                                 })
                               }
                               className={`p-3 rounded-xl border-2 transition-all text-center ${
@@ -2601,7 +2624,7 @@ export default function GMCreateCompetitionContent({
                             Your Referral Earnings
                           </h4>
                           <p className="text-xs text-gray-400 mt-1">
-                            You'll earn{" "}
+                            You&apos;ll earn{" "}
                             <span className="text-green-400 font-bold">
                               {subscription.limits.referralFeePercentage}%
                             </span>{" "}

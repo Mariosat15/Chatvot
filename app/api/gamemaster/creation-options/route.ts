@@ -8,6 +8,7 @@ import { listContestableTitles } from "@/lib/services/game-providers/provider-co
 import {
   resolveCreationLimits,
 } from "@/lib/services/gamemaster/game-permissions";
+import { resolveGameMasterPlatformFeePercentage } from "@/lib/services/gamemaster/platform-fee";
 
 /**
  * GET /api/gamemaster/creation-options
@@ -73,6 +74,8 @@ export async function GET() {
 
     const providerAllowed = allowedGameTypes.includes("provider");
     const titles = providerAllowed ? await listContestableTitles() : [];
+    const platformFeePercentage =
+      await resolveGameMasterPlatformFeePercentage();
 
     return NextResponse.json({
       success: true,
@@ -80,6 +83,8 @@ export async function GET() {
       canCreateCompetitions: effectiveLimits.canCreateCompetitions,
       maxUsersPerCompetition: effectiveLimits.maxUsersPerCompetition,
       maxCompetitionsPerDay: effectiveLimits.maxCompetitionsPerDay,
+      // Admin-controlled; GM UI shows this locked and the create route ignores body.
+      platformFeePercentage,
       titles: titles.map((t) => ({
         providerKey: t.providerKey,
         providerName: t.providerName,

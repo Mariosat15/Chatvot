@@ -24,6 +24,11 @@ vi.mock("@/lib/services/game-providers/provider-contest.service", () => ({
     createAndPublish(...args),
 }));
 
+vi.mock("@/lib/services/gamemaster/platform-fee", () => ({
+  FALLBACK_GM_PLATFORM_FEE_PERCENTAGE: 10,
+  resolveGameMasterPlatformFeePercentage: vi.fn().mockResolvedValue(12),
+}));
+
 describe("createGameMasterProviderCompetition validation", () => {
   beforeEach(() => {
     createAndPublish.mockReset();
@@ -97,6 +102,34 @@ describe("createGameMasterProviderCompetition validation", () => {
     expect(arg.settings).toEqual({ durationSeconds: 120 });
     // Cap from package, not a higher body value.
     expect(arg.maxParticipants).toBe(40);
+    // Fee is admin-resolved — body platformFeePercentage is ignored.
+    expect(arg.platformFeePercentage).toBe(12);
+  });
+
+  it("ignores a GM-supplied platformFeePercentage in the body", async () => {
+    const { createGameMasterProviderCompetition } = await import(
+      "@/lib/services/gamemaster/create-provider-competition"
+    );
+
+    await createGameMasterProviderCompetition({
+      body: {
+        name: "Fee probe",
+        description: "desc",
+        providerKey: "chartvolt-games",
+        gameCode: "circuit-sprint",
+        entryFee: 5,
+        maxParticipants: 10,
+        platformFeePercentage: 99,
+        startTime: new Date(Date.now() + 3600_000).toISOString(),
+        endTime: new Date(Date.now() + 7200_000).toISOString(),
+      },
+      userId: "dddddddddddddddddddddddd",
+      gameMasterName: "GM",
+      maxUsersPerCompetition: 30,
+    });
+
+    expect(createAndPublish.mock.calls[0][0].platformFeePercentage).toBe(12);
+    expect(createAndPublish.mock.calls[0][0].platformFeePercentage).not.toBe(99);
   });
 
   it("clamps maxParticipants to the package cap", async () => {
@@ -149,6 +182,10 @@ describe("mirrors stay byte-identical", () => {
       "lib/services/gamemaster/create-provider-competition.ts",
       "apps/admin/lib/services/gamemaster/create-provider-competition.ts",
     ],
+    [
+      "lib/services/gamemaster/platform-fee.ts",
+      "apps/admin/lib/services/gamemaster/platform-fee.ts",
+    ],
   ];
 
   it.each(pairs)("%s matches admin", (main, admin) => {
@@ -160,14 +197,50 @@ describe("mirrors stay byte-identical", () => {
 
 describe("GM create UI reuses schema settings and does not enumerate games", () => {
   const FORM = "components/gamemaster/ProviderContestCreateForm.tsx";
+  const STEPS = "components/gamemaster/provider-contest-wizard-steps.tsx";
   const GATE = "components/gamemaster/CreateCompetitionGate.tsx";
   const OPTIONS = "app/api/gamemaster/creation-options/route.ts";
+  const CREATE_ROUTE = "app/api/gamemaster/competitions/route.ts";
 
   it("provider form uses ChallengeSettingsFields (field-type branch, not game code)", () => {
-    const source = code(FORM);
-    expect(source).toMatch(/ChallengeSettingsFields/);
-    expect(source).not.toMatch(/circuit-sprint|circuit-perfect|gameCode\s*===/);
-    expect(source).toMatch(/gameType:\s*["']provider["']/);
+    const form = code(FORM);
+    const steps = code(STEPS);
+    // Settings live in the step module; orchestrator must still post gameType provider.
+    expect(steps).toMatch(/ChallengeSettingsFields/);
+    expect(form + steps).not.toMatch(/circuit-sprint|circuit-perfect|gameCode\s*===/);
+    expect(form).toMatch(/gameType:\s*["']provider["']/);
+  });
+
+  it("is a multi-step wizard with Creation Progress, not a single page", () => {
+    const form = code(FORM);
+    expect(form).toMatch(/Creation Progress/);
+    expect(form).toMatch(/STEPS/);
+    expect(form).toMatch(/setStep/);
+    // Five steps: basics, settings, schedule, prizes, launch.
+    expect(form).toMatch(/BasicsStep/);
+    expect(form).toMatch(/GameSettingsStep/);
+    expect(form).toMatch(/ScheduleStep/);
+    expect(form).toMatch(/PrizesStep/);
+    expect(form).toMatch(/ReviewStep/);
+  });
+
+  it("locks platform fee — no editable input; display uses LockedPlatformFee", () => {
+    const form = code(FORM);
+    const steps = code(STEPS);
+    expect(steps).toMatch(/LockedPlatformFee/);
+    expect(steps).toMatch(/Set by platform administrators/);
+    // Must not offer an editable Platform fee % field.
+    expect(form + steps).not.toMatch(/setPlatformFeePercentage/);
+    expect(form).not.toMatch(/platformFeePercentage:\s*Number\(/);
+    // Create body must not send platformFeePercentage — server stamps Challenge Settings.
+    const bodyMatch = form.match(/JSON\.stringify\(\{([\s\S]*?)\}\)/);
+    expect(bodyMatch?.[1] ?? "").not.toMatch(/platformFeePercentage/);
+  });
+
+  it("gate passes admin fee from creation-options into the wizard", () => {
+    const source = code(GATE);
+    expect(source).toMatch(/platformFeePercentage=\{platformFeePercentage\}/);
+    expect(source).toMatch(/data\.platformFeePercentage/);
   });
 
   it("gate only shows the picker when provider is allowed and titles exist", () => {
@@ -176,11 +249,19 @@ describe("GM create UI reuses schema settings and does not enumerate games", () 
     expect(source).toMatch(/list\.length\s*>\s*0/);
   });
 
-  it("creation-options lists contestable titles without inventing a second catalogue", () => {
+  it("creation-options lists contestable titles and exposes admin platform fee", () => {
     const source = code(OPTIONS);
     expect(source).toMatch(/listContestableTitles\s*\(/);
-    // Same precedence as the create route - do not re-derive allowedGameTypes here.
     expect(source).toMatch(/resolveCreationLimits\s*\(\s*\{/);
     expect(source).toMatch(/effectiveLimits\.allowedGameTypes/);
+    expect(source).toMatch(/resolveGameMasterPlatformFeePercentage\s*\(/);
+    expect(source).toMatch(/platformFeePercentage/);
+  });
+
+  it("trading and provider create routes ignore body fee and resolve from admin", () => {
+    const source = code(CREATE_ROUTE);
+    expect(source).toMatch(/resolveGameMasterPlatformFeePercentage\s*\(/);
+    // Trading path must not use body.platformFeePercentage || 10.
+    expect(source).not.toMatch(/platformFeePercentage\s*\|\|\s*10/);
   });
 });

@@ -217,14 +217,21 @@ percentage as trading - section 5.
 
 ### 3.3 The creation UI
 
-> **BUILT 23 September 2026.** When resolved `allowedGameTypes` includes only trading, the
-> existing trading wizard is unchanged (no one-option friction picker). When `provider` is
-> granted, `CreateCompetitionGate` offers a title picker from `listContestableTitles` and
-> `ProviderContestCreateForm` renders schema-driven settings via `ChallengeSettingsFields`
-> (branch on field **type**, never game code). Forex market-closed client block is scoped
-> off the provider path. Live code:
+> **BUILT 23 September 2026** (wizard + locked fee same evening). When resolved
+> `allowedGameTypes` includes only trading, the existing trading wizard is unchanged (no
+> one-option friction picker). When `provider` is granted, `CreateCompetitionGate` offers a
+> title picker from `listContestableTitles` and `ProviderContestCreateForm` is a **five-step
+> wizard** (Creation Progress rail matching the trading GM chrome): Basic Info → Game
+> Settings → Schedule & Entry → Prizes → Launch. Schema-driven settings via
+> `ChallengeSettingsFields` (branch on field **type**, never game code). **Platform fee is
+> admin-only**: shown locked from `ChallengeSettings.platformFeePercentage` (via
+> `resolveGameMasterPlatformFeePercentage` / `creation-options`); the create body does not
+> send it, and both POST `/api/gamemaster/competitions` paths ignore any body fee. Forex
+> market-closed client block is scoped off the provider path. Live code:
 > `app/(root)/gamemaster/create-competition/`, `CreateCompetitionGate.tsx`,
-> `ProviderContestCreateForm.tsx`, `GET /api/gamemaster/competitions/creation-options`.
+> `ProviderContestCreateForm.tsx`, `provider-contest-wizard-steps.tsx`,
+> `lib/services/gamemaster/platform-fee.ts` (mirrored),
+> `GET /api/gamemaster/creation-options`.
 > **Admin GM portal create UI is deliberately not built** — API parity only; the product
 > surface is the player `/gamemaster/create-competition` route.
 

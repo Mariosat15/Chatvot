@@ -28,6 +28,7 @@ export default function CreateCompetitionGate({
   const [providerAllowed, setProviderAllowed] = useState(false);
   const [titles, setTitles] = useState<ContestableTitleOption[]>([]);
   const [maxUsers, setMaxUsers] = useState(100);
+  const [platformFeePercentage, setPlatformFeePercentage] = useState(10);
   const [selection, setSelection] = useState<Selection | null>(null);
 
   useEffect(() => {
@@ -50,6 +51,12 @@ export default function CreateCompetitionGate({
         setProviderAllowed(canProvider);
         setTitles(list);
         setMaxUsers(data.maxUsersPerCompetition ?? 100);
+        if (
+          typeof data.platformFeePercentage === "number" &&
+          Number.isFinite(data.platformFeePercentage)
+        ) {
+          setPlatformFeePercentage(data.platformFeePercentage);
+        }
         if (!canProvider) {
           setSelection({ type: "trading" });
         }
@@ -98,6 +105,7 @@ export default function CreateCompetitionGate({
       <ProviderContestCreateForm
         title={selection.title}
         maxUsersPerCompetition={maxUsers}
+        platformFeePercentage={platformFeePercentage}
         onBack={() => setSelection(null)}
       />
     );

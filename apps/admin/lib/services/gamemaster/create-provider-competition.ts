@@ -8,6 +8,7 @@
 import type { CreateProviderContestResult } from "@/lib/services/game-providers/provider-contest.service";
 import { createAndPublishProviderContest } from "@/lib/services/game-providers/provider-contest.service";
 import { clampMinParticipants } from "@/lib/services/gamemaster/game-permissions";
+import { resolveGameMasterPlatformFeePercentage } from "@/lib/services/gamemaster/platform-fee";
 import type { PlayMode } from "@/lib/services/games/play-shape";
 import type {
   AttemptsPolicy,
@@ -25,6 +26,7 @@ export interface GameMasterProviderCreateBody {
   entryFee?: unknown;
   minParticipants?: unknown;
   maxParticipants?: unknown;
+  // Intentionally not read — fee comes from resolveGameMasterPlatformFeePercentage.
   platformFeePercentage?: unknown;
   prizeDistribution?: unknown;
   startTime?: unknown;
@@ -133,7 +135,8 @@ export async function createGameMasterProviderCompetition(args: {
     asDate(body.playWindowStart) ?? startTime;
   const playWindowEnd = asDate(body.playWindowEnd) ?? endTime;
 
-  const platformFeePercentage = asNumber(body.platformFeePercentage) ?? 10;
+  // Reason: never trust body.platformFeePercentage — a GM must not set platform fee.
+  const platformFeePercentage = await resolveGameMasterPlatformFeePercentage();
 
   const prizeDistribution = Array.isArray(body.prizeDistribution)
     ? (body.prizeDistribution as { rank: number; percentage: number }[])

@@ -14,6 +14,7 @@ import {
   resolveCreationLimits,
 } from "@/lib/services/gamemaster/game-permissions";
 import { createGameMasterProviderCompetition } from "@/lib/services/gamemaster/create-provider-competition";
+import { resolveGameMasterPlatformFeePercentage } from "@/lib/services/gamemaster/platform-fee";
 
 /**
  * GET /api/gamemaster/competitions
@@ -151,7 +152,6 @@ export async function POST(request: NextRequest) {
       startTime,
       endTime,
       leverage,
-      platformFeePercentage,
       assetClasses,
       prizeDistribution,
       rules,
@@ -159,6 +159,7 @@ export async function POST(request: NextRequest) {
       riskLimits,
       difficulty,
     } = body;
+    // platformFeePercentage from the body is deliberately ignored — see resolve below.
 
     // Trading-specific required fields are checked after the game-type branch below.
     // Provider contests do not carry startingCapital, so enforcing it here would refuse
@@ -342,9 +343,9 @@ export async function POST(request: NextRequest) {
       effectiveLimits.maxUsersPerCompetition,
     );
 
-    // Calculate prize pool
+    // Calculate prize pool — fee is admin-controlled, never from the GM body.
     const entryFeeNum = parseFloat(entryFee);
-    const platformFee = platformFeePercentage || 10;
+    const platformFee = await resolveGameMasterPlatformFeePercentage();
     const estimatedPrizePool =
       effectiveMaxParticipants * entryFeeNum * (1 - platformFee / 100);
 

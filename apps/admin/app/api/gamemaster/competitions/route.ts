@@ -11,6 +11,7 @@ import {
   resolveCreationLimits,
 } from "@/lib/services/gamemaster/game-permissions";
 import { createGameMasterProviderCompetition } from "@/lib/services/gamemaster/create-provider-competition";
+import { resolveGameMasterPlatformFeePercentage } from "@/lib/services/gamemaster/platform-fee";
 
 /**
  * GET /api/gamemaster/competitions
@@ -360,7 +361,8 @@ export async function POST(request: NextRequest) {
       allowedSymbols: allowedSymbols || ["EUR/USD", "GBP/USD", "USD/JPY"],
       leverage: leverage || 100,
       competitionType: "time_based",
-      platformFeePercentage: 20,
+      // Fee is admin-controlled via ChallengeSettings — never a request body value.
+      platformFeePercentage: await resolveGameMasterPlatformFeePercentage(),
       prizeDistribution: [
         { rank: 1, percentage: 50 },
         { rank: 2, percentage: 30 },
