@@ -14,11 +14,11 @@
 2. **X4a localisation / mobile catalogue** — **CLOSED 24 Sep 2026.** `en`+`el` catalogue copy; Accept-Language; mobile hub/tabs.
 3. **Nine `duel` vocabulary sites** — **CLOSED 24 Sep 2026 (source).** Seven paths rewritten; ban test; report-only `tools/vocabulary/rewrite-duel-seeds.ts` (no `--apply` scheduled, P1 #17).
 4. **Trading create-form monolith** (~2716 lines) + thinner trading editor — **SKIPPED / NEVER (owner, 24 Sep).** Do not schedule. Leave `CompetitionCreatorForm.tsx` alone.
-5. **Verify `ranking-config.service`** before scheduling a full pass (may already be largely done). **← NEXT eng.**
+5. **Verify `ranking-config.service`** — **CLOSED 24 Sep 2026 (verify only).** Service is correctly **trading-only** (P&L / ROI / …). Provider headings already use catalogue `scoreType` on the lobby; dashboard cards say “Score”. **Do not schedule a “full pass”** that stuffs game labels into this file — that would enumerate games. **← was NEXT; done.**
 
 **Also still open (schedule after the five above, or when relevant):**
 
-6. **Task 17** — remove legacy game — half done; needs catalogue re-sync (ops).
+6. **Task 17** — remove legacy game — half done; needs catalogue re-sync (ops). **← NEXT eng when ops can re-sync (or owner picks Task 18).**
 7. **Task 18** — redesign other screen — not started (needs owner reference if any).
 
 **Do not put these back in P0 as open (CLOSED — older lists are stale):**
@@ -88,7 +88,6 @@
 2. ~~X4a localisation / mobile catalogue~~ **CLOSED**
 3. ~~Nine duel vocabulary sites (seeds)~~ **CLOSED (source; DB report-only)**
 4. ~~Trading create-form monolith~~ **NEVER — leave alone (owner)**
-5. **Verify `ranking-config.service`** ← next when owner says start
+5. ~~Verify `ranking-config.service`~~ **CLOSED 24 Sep — no full pass; trading-only by design**
 
-Do **not** schedule X4 until a signed sandbox exists.  
-Keep A5 wiki for the very end (only when owner asks). R11 is owner/lawyers.
+**Next when ready:** Task 17 (ops re-sync) or Task 18 (needs owner reference).

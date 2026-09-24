@@ -765,7 +765,7 @@ screen works" has been read as "the lobby is game-aware", and it is not.
 | The play window, attempts and refusals | **Built, on the play screen** - section 1.1b. The pre-flight now reads `contestStatus` as well, so it refuses what the server would refuse instead of offering a button that errors |
 | The leaderboard's ranking metric | **Built.** R37, `05` s2.0b |
 | The lobby page itself | **Built 6 Sep 2026** - see 4.1b |
-| Ranking labels per game | **Partly built.** The score column's heading comes from the title's `scoreType`, so a time trial says "Time" rather than "Score". The full `ranking-config.service.ts` pass is still outstanding |
+| Ranking labels per game | **Verified 24 Sep 2026 — no `ranking-config` full pass.** Lobby score column uses catalogue `scoreType` (“Time” vs “Score”). `ranking-config.service.ts` stays **trading-only** (P&L methods for WinPotential / trading cards). Expanding it for provider games would be the “enumerate games” failure mode; do not schedule that pass |
 | Filter by game | **NOT built**, and deliberately deferred: there is one provider game, so a filter with one option is friction on a page players use daily. Revisit when the catalogue has a second title |
 
 ### 4.1b The lobby, built as a branch rather than as guards (6 September 2026)
