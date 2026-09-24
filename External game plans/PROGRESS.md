@@ -316,10 +316,11 @@ project low risk.
 
 ## START HERE NEXT
 
-This plan has two tracks. **As of 24 September 2026**:
+This plan has two tracks. **As of 24 September 2026 (evening)**:
 
 - **Prioritized task list:** `External game plans/NEXT-TASKS.md` — one bullet per task, P0→blocked, closed items listed so stale paste-lists are not reopened.
-- **AMBIGUITY A8–A11 + A9 platform wiring CODE-COMPLETE 24 Sep (eng)** — HTML **v1.13–v1.16**. Equal scores break on shorter `durationMs` then earlier `scoreCompletedAt`. Locale maps removed; flat strings + `Accept-Language` only. **Uncommitted** until asked. Next OPEN: A12.
+- **Command Alerts ops CODE-COMPLETE 24 Sep (eng)** — acknowledge / drawer / CSV / Fraud links (`3a84d1ec`). Prefer Acknowledge over Delete for recreating monitors.
+- **AMBIGUITY A8–A11 + A9 platform wiring CODE-COMPLETE 24 Sep (eng)** — HTML **v1.13–v1.16**. Equal scores break on shorter `durationMs` then earlier `scoreCompletedAt`. Locale maps removed; flat strings + `Accept-Language` only. **Preferred next eng:** remaining AMBIGUITY OPEN (A12+).
 - **GM active comps KPI + min-entrants rule CODE-COMPLETE 24 Sep (eng)** — Active = running, draft, or upcoming with `currentParticipants >= minParticipants`; GM dashboard + admin Manage GM / user GM tab show `active/max` and slots left. Commits `b215efe5` / `46b1a868`.
 - **Friday catalogue auto-sync + 7-day stale banner CODE-COMPLETE 24 Sep (eng)** — per-provider toggle, worker job, once-per-episode alert + permanent red admin notice. Commit `ff2e4b04`.
 - **GM provider contests CODE-COMPLETE 23 Sep (eng)** — `19` s5 suspended for first-party / zero-cost titles; construction API + multi-step `/gamemaster/create-competition` wizard; **platform fee locked to Challenge Settings** (GM cannot set it; create routes ignore body). See Game Master creation status row. Not verified by eye.

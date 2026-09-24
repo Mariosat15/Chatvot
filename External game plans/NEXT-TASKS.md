@@ -1,6 +1,6 @@
 # Next tasks — ChartVolt external-first programme
 
-> **Updated 24 September 2026 (afternoon).** One bullet per task, priority order.
+> **Updated 24 September 2026 (evening).** One bullet per task, priority order.
 > Closed / stale-as-open items are listed so a pasted older list is not re-opened by accident.
 > Authoritative phase detail stays in `PROGRESS.md` and the chapter BUILT notes.
 
@@ -8,7 +8,7 @@
 
 ## P0 — Do next (eng, no owner blockers)
 
-1. **games-service `AMBIGUITY-LOG`** — A1–A11 RESOLVED (24 Sep, HTML v1.6–v1.16); remaining OPEN (A12+) need `01` + requirements HTML version bump. Continue from next OPEN entry in the log. **A9 platform wiring closed** the same day — `durationMs` / `scoreCompletedAt` thread through seat sync → settlement → `getProviderTieBreakerValue`.
+1. **games-service `AMBIGUITY-LOG`** — A1–A11 RESOLVED (24 Sep, HTML v1.6–v1.16); remaining OPEN (A12+) need `01` + requirements HTML version bump. Continue from next OPEN entry in the log.
 2. **X4a content + localisation** — catalogue beyond `en`; mobile catalogue support.
 3. **Nine `duel` vocabulary sites** outside help (landing / admin seeds) — migration question for seeded defaults, not a wording-only pass.
 4. **Trading create form monolith** (~2716 lines) + trading editor thinner than create — UI debt, not a games gate.
@@ -52,11 +52,15 @@
 
 ## Do not treat as open (closed / stale on older lists)
 
-- **P0 challenge result page trading metrics** — **R92 CLOSED 18 Sep**; `/challenges/[id]` early-returns to `ProviderChallengeLobby` before any `myStats.pnl` (canary in `__tests__/admin/analytics-terminology.test.ts`).
-- **P0 arena FRIENDS / COUNTRY tabs** — **WIRED 22 Sep** (`13` s4.1y amendment); `listFriendUserIds` + country map + `filterRowsForScope`.
+- **P0 challenge result page trading metrics** — **R92 CLOSED 18 Sep**; `/challenges/[id]` early-returns to `ProviderChallengeLobby` before any `myStats.pnl`.
+- **P0 arena FRIENDS / COUNTRY tabs** — **WIRED 22 Sep** (`13` s4.1y amendment).
 - **P0 player dashboard twin of R64** — **CLOSED 18 Sep**.
 - **P0 public unauth arena broadcast leaderboard** — **CLOSED 18 Sep** (`13` s5.1c).
-- **P0 R1 residual under-count prize-pool** — **CLOSED**; `prize-pool-integrity.ts` raises under-count (mirrored) + tests.
+- **P0 R1 residual under-count prize-pool** — **CLOSED**; `prize-pool-integrity.ts` raises under-count.
+- **Command Alerts ops UI** — **SHIPPED 24 Sep** (`3a84d1ec`): acknowledge → `reviewed`, detail drawer, CSV export, Fraud deep-links. Use Acknowledge (not Delete) so monitors do not recreate the same episode.
+- **Friday catalogue auto-sync + 7-day stale banner** — shipped 24 Sep (`ff2e4b04`).
+- **GM Active comps X/max + min-entrants rule** — shipped 24 Sep.
+- **R114 prize_pool_mismatch counting GM earnings** — fixed 24 Sep (`9514dc36`); dismiss old open rows after deploy.
 - **X11 catalogue + games-first nav** — CODE-COMPLETE 21–22 Sep (eng).
 - **X11.5 interest / matchmaking** — CODE-COMPLETE 23 Sep (eng); Q16 open.
 - **X10 core + X15 abuse controls** — built; Q15 closed 22 Sep.
@@ -69,8 +73,6 @@
 - **X6.5 eng** — CLOSED; A5 bodies = owner last.
 - **X4a** — OWNER CLICK-ACCEPTED 20 Sep; Risk X8 closed.
 - **X0–X3, X5, X7 steps 1–5** — code-complete (ops backfills / R96b content / Q14 as noted).
-- **Friday catalogue auto-sync + 7-day stale banner** — shipped 24 Sep (`ff2e4b04`).
-- **GM Active comps X/max + min-entrants rule** — shipped 24 Sep (`b215efe5` + `46b1a868`).
 
 ---
 
@@ -96,9 +98,11 @@
 
 ## Preferred next eng session
 
-**Continue P0 #1 — `AMBIGUITY-LOG`.** A1–A10 closed 24 Sep (HTML v1.6–v1.15).  
-Next: A11 (locale-map shape) or later OPEN entries.  
+**Continue P0 #1 — `AMBIGUITY-LOG` remaining OPEN entries (A12+),** each with `01` + requirements HTML bump.
 
-Do **not** re-open X11 / X11.5 / challenge-result / FRIENDS / R64 twin / arena broadcast as greenfield.  
+Alternatives if owner prefers product surface: **P0 #2 X4a localisation / mobile catalogue**, or **P0 #3 duel vocabulary migration**.
+
+Do **not** re-open X11 / X11.5 / challenge-result / FRIENDS / R64 twin / arena broadcast / Command Alerts ops as greenfield.  
 Do **not** schedule X4 until a signed sandbox exists.  
-Keep A5 wiki and R11 for the end.
+Keep A5 wiki and R11 for the end.  
+For Command Alerts: **Acknowledge** open noise; Delete is temporary because monitors recreate the same episode.
