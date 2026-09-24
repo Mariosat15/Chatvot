@@ -905,6 +905,24 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 24 Sep 2026 - ranking-config verify (P0 #5) + explain-task-first rule
+
+**Verdict: CLOSED — do not schedule a full pass.**
+
+- `lib/services/ranking-config.service.ts` is **trading-only by design** (P&L, ROI,
+  win rate, …). Callers: `WinPotentialCard`, `win-probability.service`.
+- Provider games already get column labels from catalogue `scoreType` on the lobby
+  (`Time` vs `Score`). Dashboard cards use a hard-coded `"Score"` for provider rows
+  in `ContestsSidebar` — small gap, not a reason to grow ranking-config.
+- A “full pass” that puts provider labels into ranking-config would **enumerate
+  games** and fight the no-developer-needed rule. Wrong tool.
+- Owner: trading create-form monolith (**P0 #4**) **NEVER** — leave alone (confirmed
+  again this session; never started; tree clean).
+- Rule added: `.cursor/rules/explain-task-first.mdc` — one simple novice sentence
+  before every task.
+
+**Next chat should:** Task 17 (ops catalogue re-sync) or Task 18 (owner reference).
+
 ### 24 Sep 2026 - Q16 registration interest + P1 triage
 
 **Q16 BUILT:** `/sign-up` asks Trading / Games / Both. Stored as
