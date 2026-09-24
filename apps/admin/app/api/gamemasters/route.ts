@@ -108,7 +108,7 @@ export async function GET(request: NextRequest) {
     );
 
     // Get actual pending earnings from gamemasterearnings (source of truth)
-    const gmUserIds = gamemasters.map((gm) => gm.userId);
+    const gmUserIds = gamemasters.map((gm) => gm.userId).filter(Boolean);
     const pendingEarningsAgg = await db
       .collection("gamemasterearnings")
       .aggregate([
@@ -128,7 +128,6 @@ export async function GET(request: NextRequest) {
       ]),
     );
 
-    const gmUserIds = gamemasters.map((gm) => gm.userId).filter(Boolean);
     const activeCompsByGm = new Map<string, number>();
     if (gmUserIds.length > 0) {
       const activeAgg = await db
