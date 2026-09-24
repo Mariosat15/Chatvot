@@ -87,6 +87,8 @@ function toRankableParticipant(
     scoreDirection: scoringRules?.direction,
     zeroIsValidResult: scoringRules?.zeroIsValidResult,
     minimumEligibleScore: scoringRules?.minimumEligibleScore,
+    durationMs: participant.durationMs,
+    scoreCompletedAt: participant.scoreCompletedAt,
     currentCapital: participant.currentCapital,
     pnl: participant.pnl,
     pnlPercentage: participant.pnlPercentage,

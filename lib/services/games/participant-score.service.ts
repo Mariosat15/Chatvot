@@ -53,7 +53,13 @@ export type ScoreSyncOutcome =
    * sync that could not run - the row WAS updated, to hold no score. Callers that report the
    * score onward must pass the absence through rather than substituting a nought.
    */
-  | { synced: true; score?: number; roundsCounted: number }
+  | {
+      synced: true;
+      score?: number;
+      durationMs?: number;
+      scoreCompletedAt?: Date;
+      roundsCounted: number;
+    }
   | { synced: false; reason: string };
 
 /**
@@ -136,28 +142,112 @@ export function combineRoundScores(
   policy: AttemptsPolicy,
   direction: ProviderScoreDirection,
 ): number {
-  const usable = scores.filter((value) => Number.isFinite(value));
-  if (usable.length === 0) return 0;
+  return (
+    selectCountedAttempt(
+      scores.map((rawScore) => ({ rawScore })),
+      policy,
+      direction,
+    )?.score ?? 0
+  );
+}
 
-  switch (policy) {
-    case "sum_of_n":
-      return usable.reduce((total, value) => total + value, 0);
+/** One persisted round's facts used to pick the attempt ranking will count. */
+export interface RoundAttemptInput {
+  rawScore?: number;
+  durationMs?: number;
+  completedAt?: Date | string | null;
+}
 
-    case "best_of_n":
-      return direction === "lower_is_better"
-        ? Math.min(...usable)
-        : Math.max(...usable);
+/**
+ * The attempt that ranking will treat as this player's result: score plus the duration /
+ * finish time that A9 uses as tie-breaks.
+ *
+ * For `best_of_n` / `single`, duration and completedAt come from the winning round. When
+ * two rounds share the same best score, the shorter duration (then earlier finish) wins
+ * that pick, matching the eventual ranking rule so the stored seat cannot disagree with
+ * what settlement would have chosen.
+ *
+ * For `sum_of_n`, duration is the sum of finite round durations (total time to the
+ * summed score) and completedAt is the latest finish among contributing rounds.
+ */
+export function selectCountedAttempt(
+  rounds: readonly RoundAttemptInput[],
+  policy: AttemptsPolicy,
+  direction: ProviderScoreDirection,
+):
+  | { score: number; durationMs?: number; scoreCompletedAt?: Date }
+  | undefined {
+  const usable = rounds.filter(
+    (round) => typeof round.rawScore === "number" && Number.isFinite(round.rawScore),
+  );
+  if (usable.length === 0) return undefined;
 
-    case "single":
-      // Reason it is not simply `usable[0]`: the unique index allows one round per attempt
-      // number, and `single` means one attempt - but a contest whose policy was changed, or
-      // a round voided and replayed, can leave more than one completed row. Applying the
-      // same "best" rule is the answer that cannot disadvantage a player for our own
-      // bookkeeping.
-      return direction === "lower_is_better"
-        ? Math.min(...usable)
-        : Math.max(...usable);
+  if (policy === "sum_of_n") {
+    const score = usable.reduce((total, round) => total + (round.rawScore as number), 0);
+    const durations = usable
+      .map((round) => round.durationMs)
+      .filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+    const durationMs = durations.length > 0
+      ? durations.reduce((total, value) => total + value, 0)
+      : undefined;
+    const finishTimes = usable
+      .map((round) =>
+        round.completedAt != null ? new Date(round.completedAt).getTime() : NaN,
+      )
+      .filter((value) => Number.isFinite(value));
+    const scoreCompletedAt =
+      finishTimes.length > 0
+        ? new Date(Math.max(...finishTimes))
+        : undefined;
+    return { score, durationMs, scoreCompletedAt };
   }
+
+  // best_of_n and single: pick one round.
+  const isBetter = (candidate: RoundAttemptInput, incumbent: RoundAttemptInput): boolean => {
+    const cScore = candidate.rawScore as number;
+    const iScore = incumbent.rawScore as number;
+    if (cScore !== iScore) {
+      return direction === "lower_is_better" ? cScore < iScore : cScore > iScore;
+    }
+    const cDur =
+      typeof candidate.durationMs === "number" && Number.isFinite(candidate.durationMs)
+        ? candidate.durationMs
+        : Number.POSITIVE_INFINITY;
+    const iDur =
+      typeof incumbent.durationMs === "number" && Number.isFinite(incumbent.durationMs)
+        ? incumbent.durationMs
+        : Number.POSITIVE_INFINITY;
+    if (cDur !== iDur) return cDur < iDur;
+    const cAt =
+      candidate.completedAt != null
+        ? new Date(candidate.completedAt).getTime()
+        : Number.POSITIVE_INFINITY;
+    const iAt =
+      incumbent.completedAt != null
+        ? new Date(incumbent.completedAt).getTime()
+        : Number.POSITIVE_INFINITY;
+    return cAt < iAt;
+  };
+
+  let best = usable[0]!;
+  for (let i = 1; i < usable.length; i++) {
+    // Reason: `.at` is preferred over `usable[i]` here — the security rule flags any
+    // computed index even when the bound is a loop over a local array we built.
+    const next = usable.at(i);
+    if (next && isBetter(next, best)) best = next;
+  }
+
+  return {
+    score: best.rawScore as number,
+    durationMs:
+      typeof best.durationMs === "number" && Number.isFinite(best.durationMs)
+        ? best.durationMs
+        : undefined,
+    scoreCompletedAt:
+      best.completedAt != null && Number.isFinite(new Date(best.completedAt).getTime())
+        ? new Date(best.completedAt)
+        : undefined,
+  };
 }
 
 /**
@@ -224,13 +314,13 @@ export async function syncParticipantScore(input: {
     contestId,
     userId,
     status: { $in: SCORING_ROUND_STATUSES },
-  }).select("rawScore");
+  }).select("rawScore durationMs completedAt");
   if (session) roundsQuery.session(session);
-  const rounds = await roundsQuery.lean<{ rawScore?: number }[]>();
+  const rounds = await roundsQuery.lean<
+    { rawScore?: number; durationMs?: number; completedAt?: Date }[]
+  >();
 
-  const scores = rounds
-    .map((round) => round.rawScore)
-    .filter((value): value is number => typeof value === "number");
+  const counted = selectCountedAttempt(rounds, policy, scoreDirection);
 
   /*
     NOTHING CONTRIBUTED MEANS NO SCORE, NOT A SCORE OF NOTHING - and the two must be stored
@@ -245,16 +335,18 @@ export async function syncParticipantScore(input: {
 
     `$unset` rather than leaving the field alone, because the sync's contract is that it
     recomputes from persisted rounds - a stale score surviving a re-sync would be a number no
-    round supports, which is the harder kind of wrong to explain.
+    round supports, which is the harder kind of wrong to explain. Duration and finish time
+    travel with the score for the same reason (A9): a stale duration after a void would
+    break a tie that no longer has a scored attempt.
   */
-  const contributed = scores.length > 0;
-  const score = contributed
-    ? combineRoundScores(scores, policy, scoreDirection)
-    : undefined;
+  const contributed = counted != null;
+  const score = counted?.score;
+  const durationMs = counted?.durationMs;
+  const scoreCompletedAt = counted?.scoreCompletedAt;
 
-  // `$set` of a value derived from persisted rows, never `$inc`. See the header.
+  // `$set` of values derived from persisted rows, never `$inc`. See the header.
   //
-  // ONLY `score`. The direction is deliberately NOT stored here, and the first version of
+  // ONLY result fields. The direction is deliberately NOT stored here, and the first version of
   // this file did store it, on the grounds that settlement reads `p.scoreDirection` off the
   // participant. That read was the bug, not the design: chapter 05 section 2 says direction
   // is threaded in at finalization from the catalogue, "because duplicating it per row would
@@ -263,7 +355,19 @@ export async function syncParticipantScore(input: {
   // hold different directions if a title is corrected mid-contest, so half the leaderboard
   // negates and half does not. A uniformly wrong direction is at least coherent and visibly
   // wrong; an incoherent one looks plausible and cannot be explained to a player.
-  const update = contributed ? { $set: { score } } : { $unset: { score: "" } };
+  let update: Record<string, unknown>;
+  if (!contributed) {
+    update = { $unset: { score: "", durationMs: "", scoreCompletedAt: "" } };
+  } else {
+    const $set: Record<string, unknown> = { score };
+    const $unset: Record<string, string> = {};
+    if (typeof durationMs === "number") $set.durationMs = durationMs;
+    else $unset.durationMs = "";
+    if (scoreCompletedAt) $set.scoreCompletedAt = scoreCompletedAt;
+    else $unset.scoreCompletedAt = "";
+    update =
+      Object.keys($unset).length > 0 ? { $set, $unset } : { $set };
+  }
 
   const updated = isChallenge
     ? await ChallengeParticipant.findOneAndUpdate(
@@ -281,5 +385,13 @@ export async function syncParticipantScore(input: {
     return { synced: false, reason: "no participant row for this user in this contest" };
   }
 
-  return { synced: true, score, roundsCounted: scores.length };
+  return {
+    synced: true,
+    score,
+    durationMs,
+    scoreCompletedAt,
+    roundsCounted: rounds.filter(
+      (round) => typeof round.rawScore === "number" && Number.isFinite(round.rawScore),
+    ).length,
+  };
 }

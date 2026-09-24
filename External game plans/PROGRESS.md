@@ -26,7 +26,7 @@
 | **Can an operator rename the platform's nouns?** | **Yes, from 15 Sep 2026** - X6.5's A1 shipped the token layer and A2/A3 put the contest wizard, the contest list and the contest detail screen through it. An operator edits Settings -> Wording and the admin app reads their noun with no deploy. **The instruction in chapter `14` could not work, and following it would have shipped a wording layer that silently served defaults everywhere**: it says to deliver through `AppSettingsProvider` because "the delivery mechanism exists and is proven", and that provider was **mounted nowhere in `apps/admin`** until **R110 (18 Sep 2026)** - nineteen components called `useAppSettings()` and every one of them received the `createContext` defaults, which is why the configured credit symbol never reached an admin screen. **"The mechanism exists and is proven" was a claim about a file, never about a render tree.** Terminology therefore ships through its own `TerminologyProvider` in the admin root layout (still separate — credit symbol and noun overrides are different packs), and the **canary that asserted `AppSettingsProvider` was unmounted was flipped, not deleted**, when R110 mounted it. A document saying the credit symbol never reaches admin screens is correct as history and stale as a present fact — **say which**. **The guard bans three things beyond a missing token**, and the last two are the ones a word list could not express: a renameable noun surviving as a **literal** in displayed text, any **case-folding or pluralisation** of a token (`terms.prize + "s"` is how an operator's renamed noun becomes a word they never chose), and any tokenising of a **route id or status value** - `activeTab=competitions` and `"completed"` are on the never-rename list, so a pass that renames them is a production defect wearing a copy change. Two owner decisions the same day: a token may sit mid-sentence after a determiner, accepting Title Case; and **"Participant(s)" is a synonym of the `players` token** rather than a token of its own, so an operator has one noun to rename instead of two that can disagree. **A3b and A3c landed later the same day**, so a document listing either as outstanding is correct as history and stale as a present fact - **say which**. A3b closed the lowercase prose, and the reason it had been left is worth keeping: the Title Case scanner is scoped that way deliberately, because the lowercase forms are *also* route ids and stored status values, so **the headings were tokenised while the sentences underneath them still explained how a competition works** - the new scanner demands a display signal (a quoted span with a space, or three-plus plain words) rather than matching the word anywhere, or it fires on every route id in the tree. A3c put the operator's nouns inside **both AI content assistants**, which is where the largest inconsistency would have shipped: those two *write sentences*, so a renamed deployment had a wizard labelled Tournament sitting directly above a generated description that said Competition. The clause is a **diff against the defaults, appended and therefore last**, empty when nothing is renamed - which is the only reason `TRADING_SYSTEM_PROMPT_HISTORICAL` survives being asserted character for character - it **enumerates no token** (a diff over `TERMINOLOGY_TOKENS`, so a new token is covered the day it lands), and **`terms` has no default value on any of the three vocabulary functions**, because an optional parameter gives a forgotten call site fluent English in the operator's *old* vocabulary with nothing thrown. **A4 landed 15 Sep too**, 61 sites rather than the ~30 the chapter sized, and it found **R92** - every challenge on both screens reported a P&L, an ROI, a trade count and a win rate, because the snapshot fields declared only trading's numbers and **nothing had ever written a score**, so both halves of the seam were missing at once. **The write half is closed and the read half is not**: `rg` found **seven** readers where the task named two, and the five that remain carry a **canary asserting each is still an offender** - the two worth knowing being the **player's own** result page, which shows the person who paid `$0.00` and `0 trades` (X7 by phase), and the **AI agent**, handed a `challenger_pnl` it will state in a sentence, which is **A6 in this very phase**. The ledger's **labels** are tokenised and its **keys** are not, since those are stored enum values on documents already written. **A6 landed 15 Sep too, so two clauses above are correct as history and stale as present facts - say which.** The agent claim was **wrong** and is corrected rather than reworded: those lines fell back to **`"—"`, not `0`**, so it invented nothing - the defect was that it had **no performance figure** for a provider challenge to explain a win with, and the phantom zeros in that file were on its **competition** reports. Both are closed, so **four readers remain, not five**. A6 was sized as "Content" in the chapter and **two thirds of it were defects**: the knowledge base opened *"ChartVolt is a trading competition platform"*, so asked about a provider game the agent answered out of the trading material - with a starting capital, a leverage setting and screens that do not exist - and **every navigation path in it was stale** since the 2 Sep nav restructure, which is worse than no instruction because the operator concludes the feature is missing. Paths were re-derived **from `menuGroups`, never from the prose**, which is how **R93** surfaced: the credit-conversion screen the file sent operators to is **mounted nowhere**, so the EUR-to-credits rate is genuinely unreachable. The games material **enumerates no game**, pinned by a test. And one thing found there is not a wording defect: the winner tool ordered participants on `pnl` with no stored leaderboard, and **ordering on `score` instead does not fix it** - the direction lives on the catalogue title, so on a time trial a guess names the **loser** and hands them a medal; it now **declines** and says why. **AMENDED 16 Sep 2026: "four readers remain" is correct as history and stale as a present fact - say which.** The owner took the **three admin readers and R90's remainder** ahead of A5, on the grounds that they are an hour or two and they stop X7 inheriting the pattern, so `ChallengesAdminSection.tsx`'s drawer and **both** copies of `profile.actions.ts` are closed and **one** reader remains: the player's own challenge result page, which is X7. The finding from that pass is that **removing a phantom zero is not a display-only change** - two profile screens called `pnl.toFixed(2)` inline, so the moment the action returned `null` they would have thrown; something downstream was relying on the zero being printable, and the answer is one shared rule (`lib/utils/profile-result-metric.ts`) that **decides by GAME rather than by which figures are present**, since `buildParticipantSeat` writes `pnl: 0` onto every seat whatever the game. **Outstanding:** owner-authored bodies for the ten A5 Game Administration wiki skeletons (eng half CLOSED 19 Sep 2026) — **owner decision 19 Sep 2026: fill these at the END OF ALL other work**, not next. A document saying A5's reword or skeleton is outstanding is correct as history and stale as a present fact — **say which**. The player's own challenge result page remains X7. |
 | **The level ladder an operator cannot fully rename** | **R88, found and CLOSED 15 Sep 2026, and it brought three more with it - R89, R90, R91.** Chapter `14` calls the twenty level titles the highest-value single wording change and says it is "a **database edit**, not a code change" - and the last clause is false, which is the **third** time a chapter's claim about the code has been wrong after R7's severity and R31's branch. Two functions share the name `getTitleByXP`: an **async** one reading `XPConfig` from the database, and a **synchronous** one reading a hard-coded twenty-entry array in `lib/constants/levels.ts`. The XP award path uses the database one and **stores its answer** on `UserLevel.currentTitle`; **five read sites use the constant** - the public leaderboard route, both apps' `competition.actions.ts`, the admin global leaderboard, and the contest-entry level gate - so renaming the ladder changes the profile while **every leaderboard row keeps saying "Novice Trader"**, and a player refused paid entry is told the name of a level that no longer exists. Nothing throws and nothing logs. **The leaderboard route is the sharpest instance:** it already receives the `UserLevel` documents **carrying the stored title** and discards that field to recompute from the constant, so the correct value was in hand and thrown away - which is what decides the fix. **Latent, a reporting defect, no money anywhere near it, nothing to backfill** - the stored field is right and the readers ignore it. What it actually costs is that pass 2 is costed as a free admin edit and is not one, and **shipping it as one is worse than not doing it**, since the titles become inconsistent across screens rather than uniformly trading-themed. Both copies of `levels.ts` are byte-identical today and `check:mirrors` compares **models**, so it has never had an opinion about either. **AMENDED on closing it, and three of the sentences above are correct as history and stale as present facts - say which.** There were **six** read sites, not five (`app/(root)/competitions/[id]/page.tsx`), plus `comprehensive-dashboard.actions.ts` making the same disagreement face the *other* way, which is why the dashboard and the profile disagreed with each other rather than both being wrong together - **fifth instance of the counting rule.** And **the prescription in the sentence about the leaderboard route is WRONG**: `currentTitle` is a cache written at XP-award time, so reading it leaves a renamed ladder stale on every row until each player next earns XP - **some rows renamed and some not, which is the inconsistency a player reports as a bug** rather than a uniformly old name nobody questions. The fix reads the **ladder**, once per board and passed in, through `lib/utils/level-title.ts` (mirrored, model-free by R58); the stored title answers only for a rung an operator saved blank; and **icon and colour still come from the code ladder**, matched on the level number, because a title is words an operator owns while an icon is a key into `GAME_ICONS` and a colour is a Tailwind class. **The paid-entry gate is the site that was not a display at all** - it compared against the constant's thresholds, so an operator who moved one got refusals computed on numbers nobody had configured. 50 tests, 19 probes |
 | **Three defects the ladder fix walked into** | **All three found while fixing R88 and none of them by planned work.** **R89** - four routes over the ladder, its XP values and every player's identity with **no authorization of any kind**, found by **counting exported handlers against guards** rather than by reading routes (the ninth instance of that class). Two of them write, and `seed-badges-xp` **force-resets the whole configuration on its GET**, so a URL in a browser was enough; `badges-xp` handed out a paginated list of real users. **LIVE, no attribution, nothing backfilled** - no money moved, but a rewritten ladder changes **who may enter a paid contest**. **R90** - six screens that named the rungs themselves, and the finding is that they read **no ladder at all**: each held the **difficulty-band vocabulary mislabelled as levels**, so they were **wrong by position** rather than stale, and every map stopped at 10 of 20. Live and player-facing, **display only** since the gate compares numbers. **A vocabulary guard is impossible here** - one offending file holds `DIFFICULTY_STYLES` keyed on those identical words, legitimately - so the guard is by **reach** and is **directory-scanned**, which is why it now covers a screen written tomorrow. It was found **twice**: the first pass fixed two files and shipped with no test, which is how sites three to six outlived a fix, a commit and a register entry. `app/(root)/gamemaster/create-competition/page.tsx` was the **recorded remainder**, exempt with its reason and a **canary asserting it is still an offender** - **CLOSED 16 Sep 2026, so that clause is correct as history and stale as a present fact; say which.** The canary fired on the day the defect closed and was **flipped, not deleted**. **The cap was the worse of the two defects and was not in the report**: wrong rung names are a display fault, a `maxLevel` dropdown stopping at 10 of 20 is a **missing capability**, so no Game Master could gate a contest above halfway whatever the operator's ladder said. Closing it needed a **server/client split rather than a prop**, the page having been `"use client"` from its first line with nowhere to `await` the ladder. **R91** - the ladder **editor** seeded its state with a hard-coded ten-rung ladder and `saveLevels` POSTs whatever state holds to a whole-document replacement with no merge and no length check, so **one failed GET followed by one save replaced a renamed twenty-rung ladder with ten stale rungs**. The only **write** in the family. **The fix is a refusal, not a better default** - seeding the canonical twenty would overwrite an operator's renames with ours, and a stored value and an absent one are different facts |
-| **Next action** | **Prefer P0 polish from `NEXT-TASKS.md` (24 Sep):** challenge result page still trading-shaped, or arena FRIENDS tab wiring. **X11 / X11.5 / GM provider create are CODE-COMPLETE (eng) — do not re-open as greenfield.** X4 still blocked on signed outside-provider sandbox. ToS/action-terms still Legal (R11). **A5 wiki bodies LAST OF ALL.** R99 catalogue merge stays owner if still owed. |
+| **Next action** | **Continue `AMBIGUITY-LOG` → `01` + requirements HTML (24 Sep):** **A1–A11 RESOLVED** (HTML **v1.6–v1.16**). Next OPEN entry from the log (A12+). **A9 platform wiring CLOSED** the same day — equal scores break on shorter `durationMs` then earlier `scoreCompletedAt`. **X11 / X11.5 / GM provider create are CODE-COMPLETE (eng) — do not re-open as greenfield.** X4 still blocked on signed outside-provider sandbox. ToS/action-terms still Legal (R11). **A5 wiki bodies LAST OF ALL.** R99 catalogue merge stays owner if still owed. |
 | **Can an operator edit a game on one screen?** | **YES for the admin workspace + thin merchandising, 22 Sep 2026** (12 s4.1c + s4.1d). GAMES → **All Games** (game-providers) opens list + editor + right-rail **Merchandising** (featured / coming soon / visible / sort order / optional SEO). **Trading Page** has the same Merchandising tab. Content stays on provider_game / game_page_content. **Thin GameCatalogueEntry shipped** (option 1) — no second content store; no multi-entry-per-title. Duplicate/Delete withheld. Never verified by eye |
 | **Can a player browse games?** | **YES for Slice 1 + themed detail + thin merchandising, 22 Sep 2026** (16 BUILT notes). Hub /games and /games/[slug] read **visible** GameCatalogueEntry rows (order / featured / coming soon), merging content from provider_game or trading game_page_content. Slug seeds as gameCode / 	rading so Circuit Sprint stays /games/circuit-sprint. Hidden omitted from hub; coming-soon shown without join CTAs. Contests link to existing lobbies. Never verified by eye |
 | **Admin lifecycle controls** | **Code-complete 7 Sep 2026** (`12` s3.2a), and it found the worst authorization defect in the programme. `POST /api/finalize-old-competitions` had **no authentication of any kind** - **R40**, unauthenticated and reachable *today*, unlike almost everything else here. Any anonymous caller could force-finalize every `completed` competition: closing positions at live prices, writing trade history, and hitting an external forex API per position. Scoped to already-completed contests, so no prize and no wallet movement - **do not round that up, and do not round it down either.** No backfill, and **no way to know whether it was ever called**, because a route with no guard has no attribution. Five siblings authenticated on **admin-at-all rather than section access**, the sixth instance of that class. Separately, **pausing a provider contest did nothing at all** (**R41**): `isPaused` was never read by the launch service, so an operator got a success toast, a banner and a notification to every participant while play continued - and this is the route `IncidentsSection.tsx` calls when an incident is raised. Latent, since no provider contest has run in production. The rule from it: **a capability the platform already has does not extend to a new game by itself, and the way it fails is silence** |
@@ -319,6 +319,7 @@ project low risk.
 This plan has two tracks. **As of 24 September 2026**:
 
 - **Prioritized task list:** `External game plans/NEXT-TASKS.md` — one bullet per task, P0→blocked, closed items listed so stale paste-lists are not reopened.
+- **AMBIGUITY A8–A11 + A9 platform wiring CODE-COMPLETE 24 Sep (eng)** — HTML **v1.13–v1.16**. Equal scores break on shorter `durationMs` then earlier `scoreCompletedAt`. Locale maps removed; flat strings + `Accept-Language` only. **Uncommitted** until asked. Next OPEN: A12.
 - **GM active comps KPI + min-entrants rule CODE-COMPLETE 24 Sep (eng)** — Active = running, draft, or upcoming with `currentParticipants >= minParticipants`; GM dashboard + admin Manage GM / user GM tab show `active/max` and slots left. Commits `b215efe5` / `46b1a868`.
 - **Friday catalogue auto-sync + 7-day stale banner CODE-COMPLETE 24 Sep (eng)** — per-provider toggle, worker job, once-per-episode alert + permanent red admin notice. Commit `ff2e4b04`.
 - **GM provider contests CODE-COMPLETE 23 Sep (eng)** — `19` s5 suspended for first-party / zero-cost titles; construction API + multi-step `/gamemaster/create-competition` wizard; **platform fee locked to Challenge Settings** (GM cannot set it; create routes ignore body). See Game Master creation status row. Not verified by eye.
@@ -899,6 +900,106 @@ remains outstanding is the **opponent** half listed above, not the game half.
 ## WORK LOG
 
 Newest at the top.
+
+### 24 Sep 2026 - A9 platform wiring + A11 locale-map (HTML v1.16)
+
+**Shipped:**
+- **A9 platform gap CLOSED** — `durationMs` and `scoreCompletedAt` sync onto the
+  participant seat from the counted round (gate 11b), travel through provider
+  settlement / resettle / challenge settlement, and `getProviderTieBreakerValue`
+  maps settlement's `win_rate` / `join_time` slots onto shorter duration then
+  earlier finish. Equal scores with neither figure still share (intentional).
+  Models mirrored; tests flipped + two end-to-end ranking cases.
+- **A11 RESOLVED** — catalogue text fields stay **flat strings**; honour
+  `Accept-Language` with fallback to first `locales` entry then `en`. Per-field
+  locale maps removed from the contract (adapter cannot consume them). HTML
+  **v1.16**, `01` constraint 1. ChartVolt Games remains `en`-only (no-op header).
+
+**Owner tested:** N/A — ranking change latent until a provider contest with tied
+scores settles; locale rule matches existing sync.
+
+**Deferred:** remaining OPEN ambiguities (A12+); deploy still needs `games-service`
+rebuild for earlier A2/A9 TypeScript if not already built.
+
+**Next chat should:** next OPEN entry in `AMBIGUITY-LOG.md` (A12 fewer locales than
+platform). Uncommitted A8–A11 + A9 wiring — commit/push when asked.
+
+### 24 Sep 2026 - AMBIGUITY-LOG A8–A10 → requirements HTML v1.13–v1.15
+
+**Shipped:**
+- **A8 RESOLVED** — create-round response `status` is required and always the literal
+  `"created"`. HTML **v1.13**, `01` section 4 response table. ChartVolt Games already
+  echoed it from `respond()`.
+- **A9 RESOLVED** — when scores are equal, **shorter `durationMs` wins**, then earlier
+  `completedAt`; remaining ties share. For `higher_is_better`: report time-to-score, not a
+  fixed session clock. For `lower_is_better` duration titles: `durationMs` equals `score`.
+  HTML **v1.14**, `01` s5.1a. Matches `03` s1.5 and Circuit Sprint's existing report.
+- **A10 RESOLVED** — published supported `configSchema` keyword list (section **3.1b**).
+  HTML **v1.15**, `01` s3.1b. Matches `config-schema.ts` allow-lists. Fail-closed was
+  already in v1.3; the list was the missing half. No parser change.
+
+**Deviated / recorded gap:** ~~provider `getProviderTieBreakerValue` still returns a constant,
+so equal primary scores still **share** at settlement until duration is threaded onto
+`RankableParticipant`.~~ **CLOSED later the same day** — see work-log entry above.
+
+**Owner tested:** N/A — first-party ChartVolt Games; no external provider yet.
+
+**Deferred:** remaining OPEN ambiguities (A12+); ~~duration-at-rank wiring~~ closed same day;
+deploy still needs `games-service` rebuild for A2 (`npm run build` + `pm2 restart chartvolt-games`).
+
+**Next chat should:** ~~next OPEN entry in `AMBIGUITY-LOG.md` (A11 locale-map shape).~~
+Superseded by the A9-wiring / A11 entry above. Do not re-open closed polish / X11 / X11.5.
+
+---
+
+### 24 Sep 2026 - AMBIGUITY-LOG A4–A7 → requirements HTML v1.9–v1.12
+
+**Shipped:**
+- **A4 RESOLVED** — `eventType` must be `round.{status}`. HTML **v1.9**, `01` s5.1.
+  ChartVolt Games `eventTypeFor` already mirrored.
+- **A5 RESOLVED** — Practice must not send a result callback; per-round seed, never a contest
+  `contentSeed`. HTML **v1.10**, `01` s4.2 / s4.3. Docs caught up to `isReportable` (log guess
+  was wrong).
+- **A6 RESOLVED** — `expired` counts as an attempt; only `voided` returns it. HTML **v1.11**,
+  `01` s5.1. Matches `countConsumedAttempts`.
+- **A7 RESOLVED** — `scoreRange` required (both bounds); out-of-range scores rejected not
+  clamped. HTML **v1.12**, `01` field table. Both `ProviderCatalogueGame` copies + both
+  ChartVolt Games adapters refuse a title missing either bound.
+
+**Deviated from plan:** A5 resolved against the *code*, not the log's guess.
+
+**Owner tested:** N/A — first-party ChartVolt Games; no external provider yet.
+
+**Deferred:** remaining OPEN ambiguities (A8+); deploy still needs `games-service` rebuild
+for A2 (`npm run build` + `pm2 restart chartvolt-games`).
+
+**Next chat should:** next OPEN entry in `AMBIGUITY-LOG.md` (A8 minor `status: created`;
+A9 duration tie-break). Do not re-open closed polish / X11 / X11.5.
+
+---
+
+### 24 Sep 2026 - AMBIGUITY-LOG A1 + A2 + A3 → requirements HTML v1.6 / v1.7 / v1.8
+
+**Shipped:**
+- **A1 RESOLVED** — Endpoint 2 example comment moved from `gameCode` onto `roundId`
+  (idempotency key). HTML **v1.6**. Chapter `01` already stated `roundId`; no prose change.
+- **A2 RESOLVED** — Outbound (ChartVolt → provider) HMAC is now
+  `{timestamp}.{METHOD}.{path}.{rawBody}` (empty body for GET). HTML **v1.7**, `01` s2.1,
+  both `transport.ts` copies, `games-service` `requirePlatformAuth`, API harness / smoke /
+  adapter tests. **Callbacks stay body-signed.** Pre-1.7 body-only GET signature refused by test.
+- **A3 RESOLVED** — Idempotency preserves the *round*; a re-create with the same `roundId`
+  may mint a fresh launch URL after expiry without a second attempt. HTML **v1.8**, `01` s4.1.
+  ChartVolt Games `reuse()` already behaved this way — docs caught up.
+
+**Deviated from plan:** none — A2/A3 guessed formulas from the log are what shipped.
+
+**Owner tested:** N/A — first-party ChartVolt Games; no external provider yet.
+
+**Deferred:** remaining OPEN ambiguities; deploy needs `games-service` rebuild for A2
+(`npm run build` + `pm2 restart chartvolt-games`) because auth is TypeScript.
+
+**Next chat should:** next OPEN entry in `AMBIGUITY-LOG.md` → amend `01` + HTML version bump.
+Do not re-open closed polish / X11 / X11.5.
 
 ### 24 Sep 2026 - GM active comps = min participants met; Active X/max + Slots Left
 

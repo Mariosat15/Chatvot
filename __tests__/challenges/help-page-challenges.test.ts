@@ -122,10 +122,10 @@ describe("trading is one of two ways to play", () => {
   });
 
   it("does not offer the six trading ranking methods as how every challenge is scored", () => {
-    // Reason: `getProviderRankingValue` ignores `rankingMethod` entirely and
-    // `getProviderTieBreakerValue` always returns 0, so on a game challenge the six methods
-    // and the tie-breakers are controls that do nothing. The tie-breaker heading is the one
-    // that has to carry the scope, because the paragraph under it lists trading fields.
+    // Reason: `getProviderRankingValue` ignores `rankingMethod` entirely, and provider
+    // tie-breaks remap trading slot names onto duration/completedAt rather than win rate
+    // or trade count — so listing those trading fields as how every challenge is scored
+    // is still wrong. The tie-breaker heading is the one that has to carry the scope.
     expect(help()).toMatch(/Tie-breakers \(trading\)/);
   });
 });

@@ -129,7 +129,12 @@ export interface ProviderCatalogueGame {
   supportsContentSeed: boolean;
   scoreDirection: ProviderScoreDirection;
   scoreType: ProviderScoreType;
-  scoreRange?: { min?: number; max?: number };
+  /**
+   * Required by the issued specification (HTML 1.12 / chapter `01`).
+   * Both bounds must be finite numbers. A catalogue entry omitting either is refused at parse.
+   * A reported score outside the range is rejected at ingestion (not clamped).
+   */
+  scoreRange: { min: number; max: number };
   typicalDurationSeconds?: number;
   maxDurationSeconds?: number;
   configSchema?: Record<string, unknown>;

@@ -211,11 +211,14 @@ export async function callApi<T = Record<string, unknown>>(
   if (body) headers["Content-Type"] = "application/json";
 
   if (!options.omitSignature) {
+    // Reason: v1.7 / A2 — sign `{timestamp}.{METHOD}.{path}.{rawBody}`, not the body alone.
+    // A GET signed over "" alone is a constant for the secret and replays on any path.
+    const material = `${timestamp}.${method.toUpperCase()}.${path}.${body}`;
     const signature =
       options.signature ??
       crypto
         .createHmac("sha256", options.secret ?? API_SECRET)
-        .update(body, "utf8")
+        .update(material, "utf8")
         .digest("hex");
     headers["X-Signature"] = `sha256=${signature}`;
   }

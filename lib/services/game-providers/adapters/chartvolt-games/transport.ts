@@ -7,7 +7,12 @@ import type { ProviderConnection } from "./connection";
  * The signed request, and what to make of the answer (chapter 01 sections 2.1 and 6a).
  *
  * Three headers on every call: a bearer API key, a Unix-seconds timestamp, and an HMAC-SHA256
- * over the raw body bytes. The provider rejects a timestamp more than five minutes old.
+ * over the **canonical request string** (requirements HTML v1.7 / ambiguity A2):
+ *
+ *   `{timestamp}.{METHOD}.{path}.{rawBody}`
+ *
+ * with `rawBody` the empty string for a GET. Signing the body alone left every GET with a
+ * constant signature for a given secret — replayable forever on any path.
  */
 
 /** The provider's own timeout expectation, applied in the direction we control. */
@@ -21,6 +26,22 @@ interface CallOptions {
 }
 
 /**
+ * Material both sides HMAC. Exported so tests can recompute without inventing a second formula.
+ *
+ * Reason: method and path are uppercase METHOD and the path as requested after the host
+ * (e.g. `/v1/games`), never a full URL — a host in the signed string breaks the moment a
+ * provider sits behind a reverse proxy that rewrites the Host header.
+ */
+export function outboundSigningMaterial(
+  timestamp: string,
+  method: string,
+  path: string,
+  rawBody: string,
+): string {
+  return `${timestamp}.${method.toUpperCase()}.${path}.${rawBody}`;
+}
+
+/**
  * Serialise once, sign that string, send that string.
  *
  * This is the single most common way a signed integration fails, and it fails in the most
@@ -31,12 +52,15 @@ interface CallOptions {
  */
 function sign(
   connection: ProviderConnection,
+  method: string,
+  path: string,
   body: string,
 ): Record<string, string> {
   const timestamp = Math.floor(Date.now() / 1000).toString();
+  const material = outboundSigningMaterial(timestamp, method, path, body);
   const signature = crypto
     .createHmac("sha256", connection.apiSecret)
-    .update(body, "utf8")
+    .update(material, "utf8")
     .digest("hex");
 
   return {
@@ -86,9 +110,9 @@ export async function call<T>(options: CallOptions): Promise<ProviderResult<T>> 
   const { connection, method, path, body } = options;
 
   // An empty string, not "undefined" and not "{}". The provider signs the raw bytes it
-  // received, so a GET must be signed over exactly nothing.
+  // received, so a GET must be signed over exactly nothing in the body slot.
   const serialised = body === undefined ? "" : JSON.stringify(body);
-  const headers = sign(connection, serialised);
+  const headers = sign(connection, method, path, serialised);
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);

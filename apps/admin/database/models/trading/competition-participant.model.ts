@@ -14,6 +14,10 @@ export interface ICompetitionParticipant extends Document {
   // Invariant 4 in "External game plans/11": every participant gets a score FIELD. It is
   // optional because a value means a result arrived - see the schema path below (R50).
   score?: number;
+  /** Milliseconds for the counted attempt — A9 tie-break. Absent ≠ zero. */
+  durationMs?: number;
+  /** When the counted attempt finished — A9 second tie-break. */
+  scoreCompletedAt?: Date;
   gameKey: string; // Denormalised from the contest for cross-game statistics queries
 
   // Capital & Performance
@@ -105,6 +109,16 @@ const CompetitionParticipantSchema = new Schema<ICompetitionParticipant>(
       type: Number,
       required: false,
     },
+    // Reason: A9 / chapter 03 s1.5 — shorter duration then earlier finish break equal scores.
+    // Optional, no default: absent means "provider did not report", not zero milliseconds.
+    durationMs: {
+      type: Number,
+      required: false,
+    },
+    scoreCompletedAt: {
+      type: Date,
+      required: false,
+    },
     gameKey: {
       type: String,
       required: true,
@@ -127,10 +141,6 @@ const CompetitionParticipantSchema = new Schema<ICompetitionParticipant>(
     // Narrowing this is a change to TRADING's contract, not only an allowance for provider
     // games - the guarantee moved out of the schema and into a predicate, and the predicate
     // is now the only thing standing between a trading participant and a missing balance.
-    //
-    // MUST MATCH THE MAIN APP EXACTLY. `check:mirrors` compares field paths and enum values,
-    // NOT predicate bodies - so a difference here is a validation rule whose outcome depends
-    // on which process saved the document, and the guard would stay green.
     startingCapital: {
       type: Number,
       required: function (this: { gameKey?: string }) {
@@ -296,6 +306,12 @@ CompetitionParticipantSchema.index({ competitionId: 1, pnl: -1 }); // For leader
 CompetitionParticipantSchema.index({ competitionId: 1, score: -1 }); // Game-agnostic leaderboard
 CompetitionParticipantSchema.index({ userId: 1, gameKey: 1 }); // Cross-game player statistics
 CompetitionParticipantSchema.index({ userId: 1, status: 1 });
+// PERFORMANCE: Additional indexes for common queries
+CompetitionParticipantSchema.index({ competitionId: 1, status: 1, pnl: -1 }); // Active participants leaderboard
+CompetitionParticipantSchema.index({ userId: 1, enteredAt: -1 }); // User's competition history
+CompetitionParticipantSchema.index({ competitionId: 1, currentCapital: -1 }); // Capital-based ranking
+// PERFORMANCE: Speeds up margin-check job's participant lookup
+CompetitionParticipantSchema.index({ competitionId: 1, status: 1, currentOpenPositions: 1 });
 
 // Virtual for profit factor (average win / average loss)
 CompetitionParticipantSchema.virtual("profitFactor").get(function () {

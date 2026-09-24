@@ -154,13 +154,16 @@ async function main(): Promise<void> {
     returnUrl: `http://localhost:${PORT}/health`,
   });
 
-  const response = await fetch(`http://127.0.0.1:${PORT}/v1/rounds`, {
+  const path = "/v1/rounds";
+  const timestamp = Math.floor(Date.now() / 1000).toString();
+  const material = `${timestamp}.POST.${path}.${body}`;
+  const response = await fetch(`http://127.0.0.1:${PORT}${path}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${API_KEY}`,
-      "X-Timestamp": Math.floor(Date.now() / 1000).toString(),
-      "X-Signature": `sha256=${crypto.createHmac("sha256", API_SECRET).update(body, "utf8").digest("hex")}`,
+      "X-Timestamp": timestamp,
+      "X-Signature": `sha256=${crypto.createHmac("sha256", API_SECRET).update(material, "utf8").digest("hex")}`,
     },
     body,
   });

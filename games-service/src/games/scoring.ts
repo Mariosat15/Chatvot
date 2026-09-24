@@ -96,12 +96,11 @@ function scoreSprint(boards: BoardOutcome[]): ScoreResult {
   // Duration is reported as the time to the LAST COMPLETED BOARD, not the length of the
   // session.
   //
-  // Reason: the specification says duration is used as a tie-break and that "ties are common",
-  // which is true here - two players who each solve nine boards will often land within a few
-  // points. Every Sprint session lasts exactly the configured clock, so reporting the session
-  // length would make the tie-break identical for the whole field and therefore useless.
-  // Reporting time-to-last-solve makes it meaningful: of two equal scores, the player who got
-  // there sooner is ahead.
+  // Reason (A9 RESOLVED, requirements HTML v1.14 / chapter 03 s1.5): shorter durationMs
+  // wins when scores are equal. Every Sprint session lasts exactly the configured clock, so
+  // reporting the session length would make the tie-break identical for the whole field.
+  // Time-to-last-solve makes it meaningful: of two equal scores, the player who got there
+  // sooner is ahead.
   const firstIssuedAt = boards.length > 0 ? boards[0].issuedAt.getTime() : 0;
   const durationMs = lastSolveAt ? lastSolveAt.getTime() - firstIssuedAt : 0;
 

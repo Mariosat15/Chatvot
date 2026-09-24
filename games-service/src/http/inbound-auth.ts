@@ -8,26 +8,14 @@ import { sendError } from "./errors";
  * Authenticates calls the platform makes to us (section 10, "calls from us to you").
  *
  * Three checks, in the order the specification lists them: a bearer API key we issued, a
- * timestamp no older than five minutes, and an HMAC-SHA256 over the raw request body bytes.
+ * timestamp no older than five minutes, and an HMAC-SHA256 over the **canonical request string**
+ * (requirements HTML v1.7 / ambiguity A2):
  *
- * THE SIGNATURE PROVES NOTHING ON A GET, AND THAT IS THE SPECIFICATION'S GAP
- * -------------------------------------------------------------------------
- * The signature basis is defined as "the raw request body bytes, exactly as sent". A `GET` has
- * no body, so the basis is the empty string, so the signature is a fixed value for a given
- * secret - the same on every GET, forever. Anyone who observes one can replay it indefinitely,
- * and `GET /v1/rounds/{roundId}` is the endpoint that discloses a round's score.
+ *   `{timestamp}.{METHOD}.{path}.{rawBody}`
  *
- * This service implements the rule exactly as written anyway, and the reason is worth stating
- * because the alternative is tempting. Inventing a stronger basis - signing method, path and
- * timestamp - would mean the platform's generic outbound client no longer matches us, and a
- * provider that unilaterally redefines the signing scheme has not improved security, it has
- * broken the integration and blamed the document. The correct fix is a specification revision on
- * both sides, which is recorded as ambiguity A2 and is the kind of finding X4a exists to produce.
- *
- * What carries the weight in the meantime is the bearer token, which is secret, and the
- * timestamp, which bounds a replay to five minutes. Both are checked on every request including
- * GETs, so the endpoint is not unprotected - it is protected by two of the three mechanisms
- * rather than three.
+ * with `rawBody` empty for a GET. Before v1.7 the basis was the raw body alone, which made every
+ * GET signature a constant for a given secret — replayable on any path forever. Callbacks from
+ * us to ChartVolt still sign the raw body only; that direction always has a body.
  */
 
 /** How stale a timestamp may be. The specification asks for five minutes. */
@@ -47,8 +35,23 @@ function safeEqual(a: string, b: string): boolean {
   return crypto.timingSafeEqual(left, right);
 }
 
-function hmacHex(body: string, secret: string): string {
-  return crypto.createHmac("sha256", secret).update(body, "utf8").digest("hex");
+function hmacHex(material: string, secret: string): string {
+  return crypto.createHmac("sha256", secret).update(material, "utf8").digest("hex");
+}
+
+/**
+ * Same formula the platform's outbound client uses. Exported for harnesses and probes.
+ *
+ * Path is whatever follows the host (e.g. `/v1/games`), never a full URL — a Host rewrite at a
+ * proxy must not invalidate a correctly signed request.
+ */
+export function outboundSigningMaterial(
+  timestamp: string,
+  method: string,
+  path: string,
+  rawBody: string,
+): string {
+  return `${timestamp}.${method.toUpperCase()}.${path}.${rawBody}`;
 }
 
 /** Express request with the raw body captured by the JSON parser's `verify` hook. */
@@ -93,18 +96,30 @@ export function requirePlatformAuth(
   }
 
   // ── timestamp ─────────────────────────────────────────────────────────────────────────────
-  const timestamp = checkTimestamp(req.header("x-timestamp"));
+  const timestampHeader = req.header("x-timestamp");
+  const timestamp = checkTimestamp(timestampHeader);
   if (!timestamp.ok) {
     sendError(res, 401, "TIMESTAMP_REJECTED", timestamp.why);
     return;
   }
 
-  // ── signature over the raw bytes ──────────────────────────────────────────────────────────
+  // ── signature over the canonical request string ───────────────────────────────────────────
   //
   // `rawBody` is captured by the JSON parser rather than re-serialised from `req.body`. A
   // signature is over exact bytes, and `JSON.parse` followed by `JSON.stringify` does not
   // reproduce them: key order, whitespace and number formatting all shift.
+  //
+  // Path is `originalUrl` so a mount at `/v1` still sees `/v1/games` — the same string the
+  // platform put in the signed material. `req.url` alone would be `/games` and every call would
+  // fail with SIGNATURE_INVALID while looking correctly configured.
   const rawBody = req.rawBody ?? "";
+  const path = req.originalUrl || req.url || "";
+  const material = outboundSigningMaterial(
+    timestampHeader!,
+    req.method,
+    path,
+    rawBody,
+  );
   const offeredSignature = req.header("x-signature") ?? "";
   if (!offeredSignature) {
     sendError(res, 401, "SIGNATURE_INVALID", "X-Signature header is missing.");
@@ -121,9 +136,9 @@ export function requirePlatformAuth(
     (value): value is string => Boolean(value),
   );
   // Accepting both secrets is the rotation window the specification asks providers to support.
-  const matches = secrets.some((secret) => safeEqual(offered, hmacHex(rawBody, secret)));
+  const matches = secrets.some((secret) => safeEqual(offered, hmacHex(material, secret)));
   if (!matches) {
-    sendError(res, 401, "SIGNATURE_INVALID", "Signature does not match the request body.");
+    sendError(res, 401, "SIGNATURE_INVALID", "Signature does not match the request.");
     return;
   }
 
@@ -137,6 +152,10 @@ export function requirePlatformAuth(
  * rather than re-serialising the object. Reason: this is the single most common integration
  * failure in signed webhooks - serialise once, sign that string, send that string. Returning
  * them together is what makes the mistake awkward to make.
+ *
+ * Callbacks still sign the **raw body only** — that direction always has a JSON body, so the
+ * empty-GET gap never applies. Do not "unify" this onto the outbound canonical string without
+ * amending the platform's callback verifier in the same change.
  */
 export function signOutbound(payload: unknown): { body: string; headers: Record<string, string> } {
   const config = loadConfig();

@@ -416,11 +416,15 @@ async function redistributePrizes(input: {
       scoreDirection: scoringRules.direction,
       zeroIsValidResult: scoringRules.zeroIsValidResult,
       minimumEligibleScore: scoringRules.minimumEligibleScore,
+      // Reason: A9 — same fields settlement passes; without them equal scores stay tied.
+      durationMs: p.durationMs,
+      scoreCompletedAt: p.scoreCompletedAt,
       status: p.status ?? "active",
       enteredAt: p.enteredAt ?? new Date(),
     })),
     {
       rankingMethod: "pnl" as const,
+      // Placeholders: provider module maps these slots to duration then completedAt (A9).
       tieBreaker1: "win_rate" as const,
       tieBreaker2: "join_time" as const,
       minimumTrades: 0,

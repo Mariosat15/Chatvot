@@ -36,7 +36,7 @@ Write-Host ""
 Write-Host "Authentication" -ForegroundColor Cyan
 
 $results += Invoke-Probe -Name "signature is actually verified" -Suite $SuiteApi -File $srcAuth `
-  -Find 'const matches = secrets.some((secret) => safeEqual(offered, hmacHex(rawBody, secret)));' `
+  -Find 'const matches = secrets.some((secret) => safeEqual(offered, hmacHex(material, secret)));' `
   -Replace 'const matches = true;' `
   -ExpectRed "rejects a signature made with the wrong secret" -MaxRed 3
 

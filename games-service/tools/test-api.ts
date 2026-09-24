@@ -104,6 +104,19 @@ async function main(): Promise<number> {
     assert.equal(response.status, 200);
   });
 
+  await test("rejects a GET signed over the body alone (pre-1.7 formula)", async () => {
+    // A2: the old formula produced a constant for a given secret. Presenting that constant
+    // with a current timestamp must still fail — otherwise the revision is cosmetic.
+    const crypto = await import("crypto");
+    const bodyOnly = crypto
+      .createHmac("sha256", API_SECRET)
+      .update("", "utf8")
+      .digest("hex");
+    const response = await callApi("/v1/games", { signature: bodyOnly });
+    assert.equal(response.status, 401);
+    assert.equal((response.body as { error: { code: string } }).error.code, "SIGNATURE_INVALID");
+  });
+
   console.log("");
   console.log("Catalogue (section 6)");
 
@@ -646,15 +659,18 @@ async function main(): Promise<number> {
     const { baseUrl } = await import("./api-harness");
     const crypto = await import("crypto");
     const raw = "{ this is not json";
-    const response = await fetch(`${baseUrl}/v1/rounds`, {
+    const path = "/v1/rounds";
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+    const material = `${timestamp}.POST.${path}.${raw}`;
+    const response = await fetch(`${baseUrl}${path}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${(await import("./api-harness")).API_KEY}`,
-        "X-Timestamp": Math.floor(Date.now() / 1000).toString(),
+        "X-Timestamp": timestamp,
         "X-Signature": `sha256=${crypto
           .createHmac("sha256", API_SECRET)
-          .update(raw, "utf8")
+          .update(material, "utf8")
           .digest("hex")}`,
       },
       body: raw,

@@ -228,6 +228,9 @@ export async function settleProviderCompetition(
       // is what stops one board negating half its rows (R32/R33).
       zeroIsValidResult: scoringRules.zeroIsValidResult,
       minimumEligibleScore: scoringRules.minimumEligibleScore,
+      // Reason: A9 — duration and finish time travel with the score from the sync seam.
+      durationMs: p.durationMs,
+      scoreCompletedAt: p.scoreCompletedAt,
       status: p.status ?? "active",
       enteredAt: p.enteredAt ?? new Date(),
     })),
@@ -235,6 +238,7 @@ export async function settleProviderCompetition(
       // A provider game reports one number, so the six trading ranking methods would be
       // six labels for one behaviour. The module ignores them by design.
       rankingMethod: "pnl" as const,
+      // Placeholders: provider module maps these slots to duration then completedAt (A9).
       tieBreaker1: "win_rate" as const,
       tieBreaker2: "join_time" as const,
       minimumTrades: 0,

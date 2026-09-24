@@ -570,11 +570,13 @@ export async function applyResult(args: {
 /**
  * Gate 10's check against the catalogue's declared range.
  *
- * Reason an ABSENT range passes: chapter 04 section 3.2 makes `scoreRange` optional, and a
- * provider that declares no bounds has told us nothing to enforce. Treating absent as
- * "reject everything" would make every unbounded title unplayable, which is a worse failure
- * than accepting a score we cannot bound. A missing title, by contrast, fails - that is
+ * Reason an ABSENT range still passes at *ingestion*: a title synced before HTML 1.12 may
+ * lack bounds on the stored row, and treating absent as "reject everything" would make every
+ * unbounded title unplayable. The catalogue *parser* now refuses a title that omits the range
+ * (A7), so new syncs cannot create that shape. A missing title, by contrast, fails - that is
  * corrupt data, not a permissive configuration.
+ *
+ * Out-of-range scores are rejected (callback refused, score not stored) — never clamped.
  */
 async function scoreWithinRange(
   gameKey: string,

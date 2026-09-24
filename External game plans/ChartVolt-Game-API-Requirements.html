@@ -208,7 +208,7 @@
     <p class="lede">ChartVolt runs paid skill competitions. We handle the money, the ranking and the rewards. We are looking for partners who can supply the games and tell us what each player scored. This document specifies exactly what your API must do so that we can operate on top of it &mdash; three calls to you, one call back to us.</p>
     <div class="hero-meta">
       <div><b>Document</b><span>Integration requirements</span></div>
-      <div><b>Version</b><span>1.5</span></div>
+      <div><b>Version</b><span>1.16</span></div>
       <div><b>Audience</b><span>Your engineering team</span></div>
       <div><b>Required calls</b><span>3 out, 1 in</span></div>
       <div><b>Money handled by you</b><span>None, ever</span></div>
@@ -512,9 +512,9 @@
       <tr><td><code>supportsContentSeed</code></td><td><span class="b req">Yes</span></td><td><b>A game with <code>false</code> here cannot be used in a multi-player competition.</b> See section 12</td></tr>
       <tr><td><code>scoreDirection</code></td><td><span class="b req">Yes</span></td><td>Speedruns and golf-style scoring are <code>lower_is_better</code>. If this is wrong we rank the entire field backwards and pay the worst player first</td></tr>
       <tr><td><code>scoreType</code></td><td><span class="b req">Yes</span></td><td><code>integer</code>, <code>decimal</code> or <code>duration_ms</code></td></tr>
-      <tr><td><code>scoreRange</code></td><td><span class="b req">Yes</span></td><td>We reject scores outside this range as a safety check against both cheating and bugs</td></tr>
+      <tr><td><code>scoreRange</code></td><td><span class="b req">Yes</span></td><td>Both <code>min</code> and <code>max</code> required. We reject a result whose <code>score</code> falls outside this range &mdash; the callback is refused, the score is not stored, and the round stays unsettled until a valid result arrives (or reconciliation marks it unresolved). A missing range is a catalogue defect; do not omit it</td></tr>
       <tr><td><code>maxDurationSeconds</code></td><td><span class="b req">Yes</span></td><td>A round must be impossible to extend beyond this. We use it to schedule contests</td></tr>
-      <tr><td><code>configSchema</code></td><td><span class="b req">Yes</span></td><td>Valid JSON Schema describing every setting we may send in <code>config</code>. If the title's length is configurable, one property must carry <code>format: "duration-seconds"</code> &mdash; see 3.2</td></tr>
+      <tr><td><code>configSchema</code></td><td><span class="b req">Yes</span></td><td>JSON Schema <b>subset</b> &mdash; see <b>3.1b</b>. We generate our admin form from it. If the title&rsquo;s length is configurable, one property must carry <code>format: "duration-seconds"</code> &mdash; see 3.2</td></tr>
       <tr><td><code>status</code></td><td><span class="b req">Yes</span></td><td><code>active</code>, <code>deprecated</code> or <code>maintenance</code></td></tr>
       <tr><td><code>tagline</code></td><td><span class="b req">Yes</span></td><td>One line under 90 characters, for cards and search results</td></tr>
       <tr><td><code>description</code></td><td><span class="b req">Yes</span></td><td>Two to four sentences. Must say what the player actually <i>does</i> &mdash; this is what someone reads before paying to enter</td></tr>
@@ -534,7 +534,7 @@
   <div class="tw"><table>
     <thead><tr><th style="width:210px">Constraint</th><th>What it means</th></tr></thead>
     <tbody>
-      <tr><td><b>Localised</b></td><td>Text fields must be available in every locale the game declares. Either return a locale map, or honour an <code>Accept-Language</code> header on this endpoint. <b>We will not translate your copy</b></td></tr>
+      <tr><td><b>Localised</b></td><td><b>New clarity in 1.16.</b> Text fields are always <b>flat strings</b> in the response. Honour an <code>Accept-Language</code> header on this endpoint by selecting which language&rsquo;s copy to return; if that locale is missing, fall back to the first entry in <code>locales</code>, then to <code>en</code> if present. <b>Do not send per-field locale maps</b> &mdash; we store flat strings and will not unpack a map. <b>We will not translate your copy</b></td></tr>
       <tr><td><b>No provider branding</b></td><td>Descriptions must not contain your company name, logo or links. To the player this is a ChartVolt game &mdash; contractual attribution is handled once in our footer and legal pages, not in game copy</td></tr>
       <tr><td><b>Stable asset URLs</b></td><td>HTTPS, with a cache policy. We cache and may re-host. URLs that rotate leave broken game pages behind</td></tr>
     </tbody>
@@ -553,6 +553,40 @@
   <div class="cal good">
     <div class="t">Why configSchema is worth doing properly</div>
     <p>We generate our admin settings form <b>directly from your <code>configSchema</code></b>. If it is accurate and complete, you can add a new game to your catalogue and we can start running contests on it <b>without writing or deploying any code</b>. If it is vague, every new title needs developer time on our side, which makes us slow to adopt your releases. This one field largely determines how quickly your catalogue reaches our players.</p>
+  </div>
+
+  <h3 id="schema-subset">3.1b &nbsp;Supported <code>configSchema</code> subset &mdash; fail closed</h3>
+  <p><b>New clarity in version 1.15.</b> We do <b>not</b> implement full JSON Schema. Anything outside the lists below <b>refuses the title</b> at catalogue sync and contest pre-flight &mdash; it is never silently ignored. A partially-understood schema would render a form missing half the real constraints and then validate against the half it understood, which is worse than a refusal.</p>
+
+  <p><b>Root object</b> &mdash; only these keys:</p>
+  <div class="tw"><table>
+    <thead><tr><th style="width:220px">Keyword</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><code>type</code></td><td>Must be <code>"object"</code> if present</td></tr>
+      <tr><td><code>properties</code></td><td>Map of setting names to field schemas</td></tr>
+      <tr><td><code>required</code></td><td>Array of property names</td></tr>
+      <tr><td><code>title</code>, <code>description</code></td><td>Display only</td></tr>
+      <tr><td><code>additionalProperties</code></td><td>Accepted as a key; settings outside <code>properties</code> are still not rendered</td></tr>
+    </tbody>
+  </table></div>
+  <p>An absent or empty schema means &ldquo;this game takes no settings&rdquo; and is valid.</p>
+
+  <p><b>Per property</b> &mdash; <code>type</code> must be one of <code>integer</code> | <code>number</code> | <code>string</code> | <code>boolean</code>, and only these keys:</p>
+  <div class="tw"><table>
+    <thead><tr><th style="width:220px">Keyword</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><code>type</code></td><td>Required</td></tr>
+      <tr><td><code>minimum</code>, <code>maximum</code></td><td>Numbers</td></tr>
+      <tr><td><code>enum</code></td><td>Non-empty list of <b>strings</b> only (renders as a select). Enum on a numeric field is refused</td></tr>
+      <tr><td><code>default</code></td><td>Optional</td></tr>
+      <tr><td><code>title</code>, <code>description</code></td><td>Display only</td></tr>
+      <tr><td><code>format</code></td><td>Only <code>"duration-seconds"</code> (see 3.2). Any other value refuses the schema</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="cal warn">
+    <div class="t">Not supported (non-exhaustive)</div>
+    <p><code>oneOf</code>, <code>anyOf</code>, <code>allOf</code>, <code>pattern</code>, <code>$ref</code>, nested objects, arrays, <code>const</code>, <code>not</code>, <code>if</code>/<code>then</code>/<code>else</code>. If you need richer settings, talk to us before shipping the catalogue entry &mdash; a release on our side is the honest path.</p>
   </div>
 
   <h3 id="format">3.2 &nbsp;One <code>format</code> keyword &mdash; tell us which setting is the play clock</h3>
@@ -624,8 +658,8 @@
 
   <h4>Our request</h4>
 <pre>{
-  "roundId":  "cv_rnd_01JAV3M7Q2XK8T",   <span class="c">// OUR id. Echo it back everywhere.</span>
-  "gameCode": "trivia-blitz",             <span class="c">// Also your idempotency key.</span>
+  "roundId":  "cv_rnd_01JAV3M7Q2XK8T",   <span class="c">// OUR id. Echo it back everywhere. Also your idempotency key.</span>
+  "gameCode": "trivia-blitz",             <span class="c">// which title this round is for</span>
   "mode":     "ranked",                   <span class="c">// "ranked" or "practice"</span>
 
   "player": {
@@ -663,10 +697,13 @@
     <thead><tr><th style="width:220px">Field</th><th>What we need from you</th></tr></thead>
     <tbody>
       <tr><td><code>roundId</code></td><td><b>We generate it, you store it.</b> It appears in your result callback and in our fetch call. Keeping identifier ownership on our side is what makes our reconciliation reliable</td></tr>
+      <tr><td><code>providerRoundId</code></td><td>Yours, for support. Stable for the life of the round</td></tr>
       <tr><td><code>launchUrl</code></td><td>A URL we load in an <b>iframe</b>. It must work embedded, on desktop and mobile, and must carry its own single-use authentication so nobody can replay it</td></tr>
-      <tr><td><code>launchUrlExpiresAt</code></td><td>Short-lived is correct and expected. Tell us when it dies so we can request a fresh round rather than showing a dead frame</td></tr>
+      <tr><td><code>launchUrlExpiresAt</code></td><td>Short-lived is correct and expected. Tell us when it dies so we can call create again with the <b>same</b> <code>roundId</code> and receive a freshly signed URL into the <b>same</b> round &mdash; see section 11. Do <b>not</b> create a second round</td></tr>
+      <tr><td><code>status</code></td><td><b>Required on the response (1.13).</b> Always the literal <code>"created"</code> on a successful create or idempotent reuse that hands us a launchable round. Live progress belongs on the fetch endpoint (section 13), not here</td></tr>
       <tr><td><code>expiresAt</code></td><td>After this moment the round must be <b>unplayable</b> and must report <code>expired</code>. This stops a player finishing long after prizes have been paid</td></tr>
-      <tr><td><code>mode</code></td><td><code>ranked</code> counts towards a paid contest and <b>must</b> produce a result callback. <code>practice</code> is free play and is never scored by us</td></tr>
+      <tr><td><code>mode</code></td><td><code>ranked</code> counts towards a paid contest and <b>must</b> produce a result callback. <code>practice</code> is free play, is never scored by us, and <b>must not</b> produce a result callback (new clarity in 1.10). Our fetch of the round still works for practice &mdash; we just will not accept a score for it</td></tr>
+      <tr><td><code>contentSeed</code></td><td><b>Required on ranked</b> when your title supports seeding. On <code>practice</code> we omit it or send nothing shared with a contest: generate content from a <b>per-round</b> seed of your own. <b>Never reuse a contest seed for practice</b> &mdash; that would let a player rehearse the exact content they are about to be paid to face (1.10)</td></tr>
       <tr><td><code>progressCallbackUrl</code></td><td><b>New in 1.5, and entirely optional.</b> Where you may tell us what the player has done <i>so far</i>, while they are still playing, so a contest board shows more than &ldquo;playing now&rdquo;. We always send the address; ignoring it is fully conformant &mdash; see section 8a</td></tr>
     </tbody>
   </table></div>
@@ -700,7 +737,7 @@
 
 <pre>{
   "eventId":    "acme_ev_01JAV4T8",       <span class="c">// unique per message, forever</span>
-  "eventType":  "round.completed",
+  "eventType":  "round.completed",        <span class="c">// MUST mirror status: round.{status}</span>
   "occurredAt": "2026-08-18T11:34:02Z",
 
   "roundId":         "cv_rnd_01JAV3M7Q2XK8T",   <span class="c">// our id</span>
@@ -735,14 +772,17 @@
 <pre>HTTP 200
 { "received": true, "eventId": "acme_ev_01JAV4T8" }</pre>
 
+  <p><b>New in version 1.9.</b> <code>eventType</code> is not a free-form label. It <b>must</b> be <code>round.</code> followed by the same terminal <code>status</code> you send: <code>round.completed</code>, <code>round.abandoned</code>, <code>round.expired</code>, or <code>round.voided</code>. Do not keep <code>round.completed</code> as a generic &ldquo;the round finished&rdquo; event and put the outcome only in <code>status</code> &mdash; the two fields must agree. We rank and settle on <code>status</code> and <code>score</code>; <code>eventType</code> is for your own routing and for our logs.</p>
+
   <div class="tw"><table>
     <thead><tr><th style="width:200px">Field</th><th style="width:100px">Required</th><th>Notes</th></tr></thead>
     <tbody>
       <tr><td><code>eventId</code></td><td><span class="b req">Yes</span></td><td>Unique per message and stable across your retries. <b>This is how we avoid counting one score twice</b></td></tr>
+      <tr><td><code>eventType</code></td><td><span class="b req">Yes</span></td><td><b>New clarity in 1.9.</b> Exactly <code>round.{status}</code> for the four terminal states in section 13. Must match <code>status</code> on the same message</td></tr>
       <tr><td><code>roundId</code></td><td><span class="b req">Yes</span></td><td>Exactly the value we sent you</td></tr>
       <tr><td><code>status</code></td><td><span class="b req">Yes</span></td><td>One of the four terminal states in section 13</td></tr>
       <tr><td><code>score</code></td><td><span class="b req">Yes</span></td><td>A single number, within the declared <code>scoreRange</code>. <b>We rank on this and nothing else</b></td></tr>
-      <tr><td><code>startedAt</code>, <code>completedAt</code>, <code>durationMs</code></td><td><span class="b req">Yes</span></td><td>We use duration as a tie-break, and ties are common</td></tr>
+      <tr><td><code>startedAt</code>, <code>completedAt</code>, <code>durationMs</code></td><td><span class="b req">Yes</span></td><td><b>New clarity in 1.14.</b> When scores are equal, <b>shorter <code>durationMs</code> wins</b>, then earlier <code>completedAt</code>; remaining ties share the prize. For <code>higher_is_better</code>: report time to achieve the reported score &mdash; <b>not</b> a fixed session length when every player would get the same figure. For <code>lower_is_better</code> titles whose score is itself a duration: set <code>durationMs</code> equal to <code>score</code></td></tr>
       <tr><td><code>replayUrl</code></td><td><span class="b req">Yes</span></td><td>How we answer a player who disputes their score. Should stay valid for at least 90 days</td></tr>
       <tr><td><code>scoreBreakdown</code></td><td><span class="b rec">Wanted</span></td><td>We never rank on it, but we show it to the player. A visible breakdown is what makes a result feel transparent rather than arbitrary</td></tr>
       <tr><td><code>integrity</code></td><td><span class="b rec">Wanted</span></td><td>You see things we cannot &mdash; impossible reaction times, automation patterns. A flag here holds the payout for review instead of paying blindly</td></tr>
@@ -828,8 +868,9 @@
     <tbody>
       <tr><td>Transport</td><td>HTTPS only, TLS 1.2 minimum</td></tr>
       <tr><td>Authentication</td><td><code>Authorization: Bearer {API_KEY}</code> &mdash; a key you issue to us</td></tr>
-      <tr><td>Signature</td><td><code>X-Signature: sha256={HMAC_SHA256(rawBody, API_SECRET)}</code></td></tr>
-      <tr><td>Timestamp</td><td><code>X-Timestamp</code> &mdash; Unix seconds. Please reject anything older than 5 minutes</td></tr>
+      <tr><td>Signature</td><td><code>X-Signature: sha256={HMAC_SHA256(canonical, API_SECRET)}</code> where <code>canonical</code> is <code>{timestamp}.{METHOD}.{path}.{rawBody}</code></td></tr>
+      <tr><td>Canonical string</td><td><b>New in 1.7.</b> <code>timestamp</code> is the same Unix-seconds value as <code>X-Timestamp</code>; <code>METHOD</code> is uppercase (<code>GET</code> / <code>POST</code>); <code>path</code> is the path after the host including any query string (e.g. <code>/v1/games</code> or <code>/v1/rounds/cv_rnd_x</code>), never a full URL; <code>rawBody</code> is the exact body bytes you receive, or the empty string for a GET. Signing the body alone left every GET with a constant signature for a given secret</td></tr>
+      <tr><td>Timestamp</td><td><code>X-Timestamp</code> &mdash; Unix seconds. Please reject anything older than 5 minutes. <b>The timestamp is only a security control because it is inside the signed material</b></td></tr>
       <tr><td>Our timeout</td><td>We abort after <b>10 seconds</b> and may retry</td></tr>
     </tbody>
   </table></div>
@@ -845,7 +886,30 @@
     </tbody>
   </table></div>
 
-  <h4>Signing, in Node.js</h4>
+  <h4>Signing our calls to you, in Node.js</h4>
+<pre>const crypto = require("crypto");
+
+const method    = "GET";                     <span class="c">// or "POST"</span>
+const path      = "/v1/games";                <span class="c">// path after the host, incl. query if any</span>
+const body      = "";                         <span class="c">// empty for GET; exact bytes for POST</span>
+const timestamp = Math.floor(Date.now() / 1000).toString();
+const canonical = `${timestamp}.${method}.${path}.${body}`;
+const signature = crypto
+  .createHmac("sha256", API_SECRET)
+  .update(canonical, "utf8")
+  .digest("hex");
+
+await fetch(`https://you.example${path}`, {
+  method,
+  headers: {
+    "Authorization": `Bearer ${API_KEY}`,
+    "X-Timestamp":   timestamp,
+    "X-Signature":   `sha256=${signature}`
+  }
+  // no body on GET
+});</pre>
+
+  <h4>Signing your calls to us, in Node.js</h4>
 <pre>const crypto = require("crypto");
 
 const body      = JSON.stringify(payload);   <span class="c">// serialise ONCE</span>
@@ -866,7 +930,7 @@ await fetch(url, {
   body                                        <span class="c">// send the SAME string</span>
 });</pre>
 
-  <h4>The same in PHP</h4>
+  <h4>The same callback in PHP</h4>
 <pre>$body      = json_encode($payload);
 $timestamp = (string) time();
 $signature = hash_hmac('sha256', $body, $CALLBACK_SECRET);
@@ -897,7 +961,7 @@ $headers = [
   <div class="tw"><table>
     <thead><tr><th style="width:250px">Situation</th><th>Required behaviour</th></tr></thead>
     <tbody>
-      <tr><td>We call <code>POST /v1/rounds</code> twice with the same <code>roundId</code></td><td><b>Return the same round and the same launch URL.</b> Do not create a second round. A player double-tapping Play must not consume two paid attempts</td></tr>
+      <tr><td>We call <code>POST /v1/rounds</code> twice with the same <code>roundId</code></td><td><b>Return the same round.</b> Do not create a second round &mdash; a player double-tapping Play must not consume two paid attempts. If the previous launch URL is still alive, return it unchanged. If it has expired and the round is still live, <b>mint a freshly signed launch URL</b> for that same round (same content, same progress). Never answer an expired URL with a new <code>roundId</code></td></tr>
       <tr><td>We call it with the same <code>roundId</code> but different parameters</td><td>Reject with <code>409</code>. This means something is wrong and we would rather know than guess</td></tr>
       <tr><td>You send the same <code>eventId</code> twice</td><td>We record one score and reply <code>200</code> both times. Retrying is always safe for you</td></tr>
       <tr><td>You send two different scores for one <code>roundId</code></td><td>We keep the first valid one and raise an internal alert. Please avoid this &mdash; it indicates a real defect</td></tr>
@@ -1017,9 +1081,9 @@ $headers = [
   <div class="tw"><table>
     <thead><tr><th style="width:150px">status</th><th style="width:300px">When to use it</th><th>What we do</th></tr></thead>
     <tbody>
-      <tr><td><code>completed</code></td><td>The player finished the game normally</td><td>Score recorded and ranked</td></tr>
+      <tr><td><code>completed</code></td><td>The player finished the game normally</td><td>Score recorded and ranked. Counts as an attempt</td></tr>
       <tr><td><code>abandoned</code></td><td>The player quit or disconnected and did not return</td><td>Score recorded as reported. Counts as an attempt. <b>Please send a partial score if you can compute one</b> &mdash; a dropped mobile signal should not cost someone a paid entry</td></tr>
-      <tr><td><code>expired</code></td><td><code>expiresAt</code> passed before completion</td><td>Scored zero, or the partial score if you supply one</td></tr>
+      <tr><td><code>expired</code></td><td><code>expiresAt</code> passed before completion</td><td>Scored zero, or the partial score if you supply one. <b>Counts as an attempt</b> (1.11) &mdash; including when the player never opened the launch URL, because the attempt is spent when we create the round. Only <code>voided</code> returns it</td></tr>
       <tr><td><code>voided</code></td><td>You invalidated the round &mdash; your own fault, a bug, or confirmed cheating</td><td>Not scored, and we return the attempt to the player. <b>No money moves</b></td></tr>
     </tbody>
   </table></div>
@@ -1242,9 +1306,21 @@ $headers = [
   </div>
 
   <h3>Document history</h3>
+  <!-- history rows newest-first; bump version badge + footer together -->
   <div class="tw"><table>
     <thead><tr><th style="width:90px">Version</th><th style="width:130px">Date</th><th>Change</th></tr></thead>
     <tbody>
+      <tr><td><b>1.16</b></td><td>24 Sep 2026</td><td><b>Removes the locale-map option for catalogue text.</b> Localised fields stay flat strings; honour <code>Accept-Language</code> with fallback to the first declared locale then <code>en</code>. Per-field maps are refused by design &mdash; our sync cannot consume them. No payload shape change for providers who already send flat strings</td></tr>
+      <tr><td><b>1.15</b></td><td>24 Sep 2026</td><td><b>Publishes the supported <code>configSchema</code> keyword list.</b> Section 3.1b. Full JSON Schema was never implemented; unsupported keywords already refused the title. From 1.15 a provider can see the safe subset without discovering it by trial. No behaviour change</td></tr>
+      <tr><td><b>1.14</b></td><td>24 Sep 2026</td><td><b>Clarifies the duration tie-break.</b> When scores are equal, shorter <code>durationMs</code> wins, then earlier <code>completedAt</code>; remaining ties share. For <code>higher_is_better</code>: report time to achieve the score, not a fixed session clock. For <code>lower_is_better</code> duration titles: <code>durationMs</code> equals <code>score</code>. No payload shape change</td></tr>
+      <tr><td><b>1.13</b></td><td>24 Sep 2026</td><td><b>Documents <code>status</code> on the create-round response.</b> The example always showed <code>"created"</code> but the field table never listed it. From 1.13: required on a successful create or idempotent reuse; always the literal <code>"created"</code>. Live round progress stays on the fetch endpoint. No behaviour change</td></tr>
+      <tr><td><b>1.12</b></td><td>24 Sep 2026</td><td><b>Clarifies <code>scoreRange</code> enforcement.</b> The field was already required. From 1.12: both <code>min</code> and <code>max</code> are required; a result whose <code>score</code> is outside the range is <b>rejected</b> (callback refused, score not stored) rather than clamped or accepted with a warning. ChartVolt&rsquo;s catalogue parser now refuses a title that omits the range</td></tr>
+      <tr><td><b>1.11</b></td><td>24 Sep 2026</td><td><b>Clarifies attempt consumption on <code>expired</code>.</b> Section 13 already said <code>abandoned</code> counts and <code>voided</code> returns the attempt; <code>expired</code> was silent. From 1.11: <code>expired</code> <b>counts as an attempt</b>, including when the player never opened the launch URL &mdash; the attempt is spent when we create the round. Re-mint a launch URL for the same live <code>roundId</code> after expiry (1.8) rather than creating a second round. No API shape change</td></tr>
+      <tr><td><b>1.10</b></td><td>24 Sep 2026</td><td><b>Clarifies practice rounds.</b> A <code>practice</code> round must <b>not</b> produce a result callback (we never score it); our fetch of the round still works. On practice, <code>contentSeed</code> is omitted or unused: generate content from a per-round seed of your own, and <b>never</b> reuse a contest seed &mdash; that would let a player rehearse the exact content of a paid contest. Ranked rounds are unchanged</td></tr>
+      <tr><td><b>1.9</b></td><td>24 Sep 2026</td><td><b>Clarifies <code>eventType</code> on the result callback.</b> The example only ever showed <code>round.completed</code> while section 13 defines four terminal states. From 1.9: <code>eventType</code> <b>must</b> be <code>round.{status}</code> &mdash; <code>round.completed</code>, <code>round.abandoned</code>, <code>round.expired</code>, or <code>round.voided</code> &mdash; and must match <code>status</code> on the same message. We still rank and settle on <code>status</code> and <code>score</code>. If you already send the mirrored form, you are done</td></tr>
+      <tr><td><b>1.8</b></td><td>24 Sep 2026</td><td><b>Clarifies idempotency when a launch URL has expired.</b> Section 11 previously said &ldquo;the same launch URL&rdquo; while the create response said we would request a fresh round after expiry &mdash; those cannot both hold. From 1.8: the <b>round</b> is what must be preserved; a re-create with the same <code>roundId</code> may mint a new launch URL once the old one has died, without consuming a second attempt or resetting progress. Wording in the <code>launchUrlExpiresAt</code> field and the section 11 table updated together</td></tr>
+      <tr><td><b>1.7</b></td><td>24 Sep 2026</td><td><b>Security fix for calls from us to you.</b> Signing was defined as HMAC over the raw body alone. Both required GET endpoints have no body, so the signature was a constant for a given secret and could be replayed on any path. From 1.7, outbound calls sign <code>{timestamp}.{METHOD}.{path}.{rawBody}</code> (empty body for GET). <b>Your callbacks to us are unchanged</b> &mdash; they still sign the raw body. If you already verified our calls with body-only HMAC, update that one check; ChartVolt Games ships both sides together</td></tr>
+      <tr><td><b>1.6</b></td><td>24 Sep 2026</td><td><b>Documentation defect only &mdash; no API change.</b> Endpoint 2's example comment wrongly labelled <code>gameCode</code> as the idempotency key; section 11 and the field table already say it is <code>roundId</code>. An implementer keying on <code>gameCode</code> would return one shared round per title. Comment moved onto the <code>roundId</code> line. Nothing you ship against 1.5 needs rebuilding</td></tr>
       <tr><td><b>1.5</b></td><td>11 Sep 2026</td><td><b>One new optional callback, and nothing you must change.</b> Section 8a: while a round is being played you may POST what the player has done so far to a <code>progressCallbackUrl</code> we now include in every create-round request, so a contest board can show more than &ldquo;playing now&rdquo;. It uses the credentials and the signature you already have, it carries <b>no score field</b>, and it must never be retried or awaited. <b>Ignore it entirely and you remain fully conformant</b> &mdash; your contests still run and settle exactly as they do today. We added it because a spectator watching a live contest could see only that everybody was playing, which made a competition read as a list</td></tr>
       <tr><td><b>1.4</b></td><td>8 Sep 2026</td><td><b>One new optional catalogue field, <code>playMode</code>.</b> Declare <code>"scheduled"</code> if your title only makes sense played by everybody at one appointed moment &mdash; a race, a live quiz &mdash; section 3.2a. <b>Omit it and nothing changes</b>: the default is <code>anytime</code>, which describes every title we run today, so a catalogue built against 1.3 remains valid as it stands. We added it because <code>family</code> answers a different question &mdash; whether your game needs an <i>opponent</i> &mdash; and a race is <code>independent</code> under that definition, so nothing we already had could tell a race from a puzzle. Your API is otherwise unchanged</td></tr>
       <tr><td><b>1.3</b></td><td>8 Sep 2026</td><td><b>One new <code>configSchema</code> keyword.</b> If a title's length of play is configurable, the property carrying it must be marked <code>format: "duration-seconds"</code> &mdash; section 3.2. Nothing else about <code>configSchema</code> changes, and a title whose length is fixed needs no change at all. We added it because a competition has to stop accepting attempts one full playing time before it ends, and without the keyword the only figure available is your <code>maxDurationSeconds</code> ceiling &mdash; which made short contests unplayable on our side</td></tr>
@@ -1253,14 +1329,14 @@ $headers = [
       <tr><td><b>1.0</b></td><td>Initial</td><td>First issue &mdash; the four calls, authentication and signing, idempotency, content seeding, round states, error handling, sandbox, service levels</td></tr>
     </tbody>
   </table></div>
-  <p style="margin-bottom:0">If you have already begun work against an earlier version, almost nothing you have built is invalidated. The 1.1 additions are content fields on the catalogue response. The 1.2 changes are <b>two field renames on the same response</b> &mdash; tell us if you have already shipped the old names and we will accept both during your integration. The 1.3 change is <b>one keyword on one property</b> of a schema you are already sending, and only for titles whose length of play is configurable. The 1.4 change is <b>an optional field with a default</b> &mdash; omit it and your catalogue behaves exactly as it did. The 1.5 change is <b>an entirely optional extra callback</b> &mdash; build it if your game has something to say mid-round, and otherwise do nothing at all.</p>
+  <p style="margin-bottom:0">If you have already begun work against an earlier version, almost nothing you have built is invalidated. The 1.1 additions are content fields on the catalogue response. The 1.2 changes are <b>two field renames on the same response</b> &mdash; tell us if you have already shipped the old names and we will accept both during your integration. The 1.3 change is <b>one keyword on one property</b> of a schema you are already sending, and only for titles whose length of play is configurable. The 1.4 change is <b>an optional field with a default</b> &mdash; omit it and your catalogue behaves exactly as it did. The 1.5 change is <b>an entirely optional extra callback</b> &mdash; build it if your game has something to say mid-round, and otherwise do nothing at all. The 1.6 change is <b>a comment fix on the create-round example</b> &mdash; if you already key idempotency on <code>roundId</code> (as section 11 requires), you are done. The 1.7 change is <b>how you verify our signatures on GET (and POST) calls</b> &mdash; your callbacks to us stay body-signed; only the inbound check from ChartVolt changes. The 1.8 change is <b>wording on what &ldquo;same round&rdquo; means after a launch URL expires</b> &mdash; if you already re-mint the URL for a live round without creating a second one, you are done. The 1.9 change is <b>one naming rule on a field you already send</b> &mdash; if <code>eventType</code> already mirrors <code>status</code> as <code>round.{status}</code>, you are done. The 1.10 change is <b>practice behaviour</b> &mdash; if you already skip the result callback for practice and never reuse a contest <code>contentSeed</code> for it, you are done. The 1.11 change is <b>wording on attempt accounting</b> &mdash; no payload change; <code>expired</code> already consumed an attempt on our side. The 1.12 change is <b>enforcement detail on a field you already send</b> &mdash; if every catalogue title already declares <code>scoreRange.min</code> and <code>scoreRange.max</code>, you are done. The 1.13 change is <b>one documented response field</b> &mdash; if you already return <code>status: &quot;created&quot;</code> on create, you are done. The 1.14 change is <b>wording on what <code>durationMs</code> means</b> &mdash; if you already report time-to-score (not a fixed session length) and shorter-wins ties, you are done. The 1.15 change is <b>a published keyword list</b> &mdash; if your <code>configSchema</code> already stays inside section 3.1b, you are done.</p>
 </section>
 
 </main>
 </div>
 
 <div class="foot">
-  <div>ChartVolt &mdash; Game API Requirements &middot; Version 1.5 &middot; Requirements document for prospective game providers</div>
+  <div>ChartVolt &mdash; Game API Requirements &middot; Version 1.16 &middot; Requirements document for prospective game providers</div>
   <div>Questions on this specification: contact your ChartVolt commercial contact</div>
 </div>
 

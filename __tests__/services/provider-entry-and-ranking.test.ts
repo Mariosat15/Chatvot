@@ -292,22 +292,43 @@ describe("the provider game module", () => {
     ).toBe(0);
   });
 
-  it("declares no tie-breaks, so identical scores are a genuine tie", () => {
-    // Called through the interface, with arguments, precisely because the implementation
-    // ignores them: the contract is that ANY participant and ANY tie-breaker yield the same
-    // constant. Calling it with none would test the implementation's shape instead.
-    const participant = {
-      userId: "u",
-      status: "active",
-      enteredAt: new Date(),
+  it("maps trading-named breakers onto duration then completedAt (A9)", () => {
+    // Settlement still passes win_rate / join_time as rule-slot placeholders. The module
+    // remaps them: any name except join_time/completed_at → shorter durationMs; those two
+    // → earlier scoreCompletedAt. Absent duration returns 0 so equal scores fall through.
+    const faster = {
+      userId: "fast",
+      status: "active" as const,
+      enteredAt: new Date("2026-01-02"),
       score: 70,
+      durationMs: 30_000,
+      scoreCompletedAt: new Date("2026-01-01T12:00:00Z"),
+    };
+    const slower = {
+      userId: "slow",
+      status: "active" as const,
+      enteredAt: new Date("2026-01-01"),
+      score: 70,
+      durationMs: 90_000,
+      scoreCompletedAt: new Date("2026-01-01T12:05:00Z"),
     };
 
-    for (const tieBreaker of ["join_time", "trades_count", "win_rate"]) {
-      expect(
-        providerGameModule.getTieBreakerValue(participant, tieBreaker),
-      ).toBe(0);
-    }
+    expect(
+      providerGameModule.getTieBreakerValue(faster, "win_rate"),
+    ).toBeGreaterThan(
+      providerGameModule.getTieBreakerValue(slower, "win_rate"),
+    );
+    expect(
+      providerGameModule.getTieBreakerValue(faster, "join_time"),
+    ).toBeGreaterThan(
+      providerGameModule.getTieBreakerValue(slower, "join_time"),
+    );
+    expect(
+      providerGameModule.getTieBreakerValue(
+        { userId: "u", status: "active", enteredAt: new Date(), score: 70 },
+        "win_rate",
+      ),
+    ).toBe(0);
   });
 
   it("does not need market hours, which is why weekends work", () => {
@@ -318,16 +339,25 @@ describe("the provider game module", () => {
 
 describe("ranking a provider field end to end", () => {
   const rank = (
-    rows: { userId: string; score: number }[],
+    rows: {
+      userId: string;
+      score: number;
+      durationMs?: number;
+      scoreCompletedAt?: Date;
+      enteredAt?: Date;
+    }[],
     direction?: "lower_is_better",
+    rules: CompetitionRules = TRADING_RULES,
   ) => {
     const participants = rows.map((row) => ({
       userId: row.userId,
       username: row.userId,
       score: row.score,
       scoreDirection: direction,
+      durationMs: row.durationMs,
+      scoreCompletedAt: row.scoreCompletedAt,
       status: "active",
-      enteredAt: new Date("2026-01-01"),
+      enteredAt: row.enteredAt ?? new Date("2026-01-01"),
       // Trading fields the shared interface still declares. Zero for a provider player,
       // and the point of the test is that none of them influence the outcome.
       currentCapital: 0,
@@ -340,7 +370,7 @@ describe("ranking a provider field end to end", () => {
       startingCapital: 0,
     })) as unknown as ParticipantData[];
 
-    return calculateRankings(participants, TRADING_RULES, {
+    return calculateRankings(participants, rules, {
       gameType: "provider",
     });
   };
@@ -369,7 +399,10 @@ describe("ranking a provider field end to end", () => {
     expect(ranked.map((r) => r.userId)).toEqual(["fast", "middling", "slow"]);
   });
 
-  it("ties players on equal scores rather than inventing an order", () => {
+  it("ties players on equal scores when neither duration nor finish time differs", () => {
+    // Reason: without durationMs the first breaker returns 0; with identical enteredAt the
+    // completedAt fallback also ties. Inventing an order from registration alone would be
+    // "first to pay wins money".
     const ranked = rank([
       { userId: "a", score: 70 },
       { userId: "b", score: 70 },
@@ -378,6 +411,54 @@ describe("ranking a provider field end to end", () => {
     expect(ranked[0]?.rank).toBe(1);
     expect(ranked[1]?.rank).toBe(1);
     expect(ranked[0]?.isTied).toBe(true);
+  });
+
+  it("breaks equal scores by shorter durationMs (A9)", () => {
+    // Settlement passes win_rate then join_time; the provider module maps win_rate → duration.
+    const withDuration: CompetitionRules = {
+      ...TRADING_RULES,
+      tieBreaker1: "win_rate",
+      tieBreaker2: "join_time",
+    };
+    const ranked = rank(
+      [
+        { userId: "slow", score: 70, durationMs: 90_000 },
+        { userId: "fast", score: 70, durationMs: 30_000 },
+      ],
+      undefined,
+      withDuration,
+    );
+
+    expect(ranked.map((r) => r.userId)).toEqual(["fast", "slow"]);
+    expect(ranked[0]?.isTied).toBeFalsy();
+  });
+
+  it("breaks equal duration by earlier scoreCompletedAt (A9)", () => {
+    const withDuration: CompetitionRules = {
+      ...TRADING_RULES,
+      tieBreaker1: "win_rate",
+      tieBreaker2: "join_time",
+    };
+    const ranked = rank(
+      [
+        {
+          userId: "later",
+          score: 70,
+          durationMs: 30_000,
+          scoreCompletedAt: new Date("2026-01-01T12:05:00Z"),
+        },
+        {
+          userId: "earlier",
+          score: 70,
+          durationMs: 30_000,
+          scoreCompletedAt: new Date("2026-01-01T12:00:00Z"),
+        },
+      ],
+      undefined,
+      withDuration,
+    );
+
+    expect(ranked.map((r) => r.userId)).toEqual(["earlier", "later"]);
   });
 
   it("does NOT rank a provider field as trading, which would tie everyone at 1", () => {

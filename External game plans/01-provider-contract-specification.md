@@ -42,7 +42,8 @@ These are stated first because they constrain everything else.
 | Method | `POST` for actions, `GET` for reads |
 | Content type | `application/json` |
 | Authentication | `Authorization: Bearer {PROVIDER_API_KEY}` |
-| Request signing | `X-Signature: sha256={HMAC_SHA256(rawBody, PROVIDER_API_SECRET)}` plus `X-Timestamp` |
+| Request signing | `X-Signature: sha256={HMAC_SHA256(canonical, PROVIDER_API_SECRET)}` plus `X-Timestamp` |
+| Canonical string | **`{timestamp}.{METHOD}.{path}.{rawBody}`** (requirements HTML **v1.7**). `timestamp` matches `X-Timestamp`; `METHOD` is uppercase; `path` is the path after the host including query (e.g. `/v1/games`), never a full URL; `rawBody` is the exact body bytes or `""` for GET. **Pre-1.7 body-only HMAC left every GET with a constant signature** (ambiguity A2) |
 | Timeout | ChartVolt aborts after **10 seconds** |
 | Retries | ChartVolt retries idempotent calls up to 3 times with backoff |
 
@@ -140,7 +141,8 @@ ChartVolt decide what contest formats each game can support.
 | `supportsContentSeed` | Yes | See 4.3. **Required for competitions.** A game without it cannot be used for a fair multi-player contest |
 | `scoreDirection` | Yes | `higher_is_better` or `lower_is_better`. Speedruns and golf-style games are the latter. Getting this wrong ranks everyone backwards |
 | `scoreType` | Yes | `integer`, `decimal` or `duration_ms` |
-| `configSchema` | Yes | JSON Schema. **The admin panel renders its settings form directly from this**, so a new game needs no ChartVolt release. If the title's length is configurable, one property must carry `format: "duration-seconds"` - see 3.2 |
+| `scoreRange` | Yes | Both `min` and `max` required (finite numbers). A result whose `score` falls outside is **rejected** at ingestion — callback refused, score not stored — never clamped. A catalogue title omitting either bound is refused at parse. (Requirements HTML version 1.12.) |
+| `configSchema` | Yes | JSON Schema **subset** — see **3.1b**. The admin panel renders its settings form directly from this, so a new game needs no ChartVolt release. If the title's length is configurable, one property must carry `format: "duration-seconds"` - see 3.2 |
 | `typicalDurationSeconds` / `maxDurationSeconds` | Yes | Drives contest scheduling and the result grace period |
 | `status` | Yes | `active`, `deprecated` or `maintenance` |
 
@@ -175,9 +177,18 @@ deciding whether to pay an entry fee. A name and a thumbnail cannot fill that pa
 
 Three constraints on the content itself:
 
-1. **Localised.** Text fields must be available in every locale the game declares
-   in `locales`, either as a locale map or via an `Accept-Language` header on
-   `GET /v1/games`. ChartVolt will not translate provider copy.
+1. **Localised.** Text fields (`displayName`, `tagline`, `description`,
+   `rulesSummary`, `howToPlay`) are **always flat strings** in the catalogue
+   response. Honour an `Accept-Language` header on `GET /v1/games` by selecting
+   which language's copy to return. When the requested locale is missing from
+   your store, fall back to the first entry in `locales`, then to `en` if that
+   list includes it. **Do not send per-field locale maps** (for example
+   `"description": {"en": "...", "el": "..."}`) — ChartVolt stores flat strings
+   and will not unpack a map. ChartVolt will not translate provider copy.
+
+   *(Requirements HTML **v1.16** / ambiguity A11. Earlier drafts offered a locale
+   map as an alternative; that option was removed because an adapter written for
+   flat strings cannot consume a map, so the two shapes were never interchangeable.)*
 2. **No provider branding in the copy.** Descriptions must not contain the
    provider's name, logo or links. To the player, the game is a ChartVolt game -
    the provider is a supplier, not a co-brand. Attribution, where contractually
@@ -197,6 +208,45 @@ score or ranking in a paid contest - no extra time, hints, retries, continues or
 paid unlocks affecting results. See `../New games plan/15-platform-transformation-and-gaps.md`
 section 3.2 for the reasoning. If a game's economics depend on such mechanics, it is
 the wrong game for this platform. Ask before evaluating anything else.
+
+### 3.1b Supported `configSchema` subset (fail closed)
+
+**Requirements HTML version 1.15 / ambiguity A10.** ChartVolt does **not** implement
+full JSON Schema. Anything outside this list **refuses the title** at catalogue sync /
+contest pre-flight — it is never silently ignored. That is deliberate: a partially
+understood schema would render a form missing half the real constraints and then
+validate against the half it understood.
+
+**Root object** — only these keys:
+
+| Keyword | Notes |
+|---|---|
+| `type` | Must be `"object"` if present |
+| `properties` | Map of setting names → field schemas |
+| `required` | Array of property names |
+| `title`, `description` | Display only |
+| `additionalProperties` | Accepted as a key; settings outside `properties` are still not rendered |
+
+An absent or empty schema means "this game takes no settings" and is valid.
+
+**Per-property** — only these keys, and `type` must be one of
+`integer` | `number` | `string` | `boolean`:
+
+| Keyword | Notes |
+|---|---|
+| `type` | Required |
+| `minimum`, `maximum` | Numbers |
+| `enum` | Non-empty list of **strings** only (renders as a select). Enum on a numeric field is refused |
+| `default` | Optional |
+| `title`, `description` | Display only |
+| `format` | Only `"duration-seconds"` (see 3.2). Any other value refuses the schema |
+
+**Not supported** (non-exhaustive — anything not listed above is refused): `oneOf`,
+`anyOf`, `allOf`, `pattern`, `$ref`, nested objects, arrays, `const`, `not`,
+`if`/`then`/`else`.
+
+If you need richer settings, talk to us before shipping the catalogue entry — a release
+on our side is the honest path, not a keyword we pretend to understand.
 
 ### 3.2 One `format` keyword, and why it is required rather than optional
 
@@ -353,22 +403,42 @@ it ignores it and is entirely conformant.
 }
 ```
 
+| Field | Required | Notes |
+|---|---|---|
+| `roundId` | yes | Echo ours back |
+| `providerRoundId` | yes | Yours, stable for the life of the round |
+| `launchUrl` | yes | iframe URL with its own single-use auth |
+| `launchUrlExpiresAt` | yes | Short-lived; after expiry re-create with the **same** `roundId` (A3 / HTML v1.8) |
+| `status` | yes | **Always the literal `"created"`** on a successful create or idempotent reuse that hands us a launchable round (requirements HTML **v1.13** / ambiguity **A8**). Live progress belongs on the fetch endpoint, not here |
+
 ### 4.1 Identifier ownership
 
 `roundId` is **generated by ChartVolt** and acts as the idempotency key. Calling
-create twice with the same `roundId` must return the **same** round and the **same**
-launch URL, not create a second one. This matters because a player double-clicking
-Play must not consume two attempts.
+create twice with the same `roundId` must return the **same** round, not create a
+second one. This matters because a player double-clicking Play must not consume two
+attempts.
+
+**Launch URL after expiry (requirements HTML v1.8 / ambiguity A3).** If the previous
+`launchUrl` is still within `launchUrlExpiresAt`, return it unchanged. If it has
+expired and the round is still live, **mint a freshly signed launch URL** for that
+same round (same content, same progress, same `providerRoundId`). Do **not** invent
+a new `roundId` — that would consume a second paid attempt. The older wording "the
+same launch URL" applied to the double-tap case; returning a dead URL after expiry
+would satisfy the sentence and defeat its purpose.
 
 ### 4.2 `mode`
 
 | Value | Meaning |
 |---|---|
-| `ranked` | Counts towards a paid contest. Result callback required |
-| `practice` | Free play, unranked. Result callback optional, never scored |
+| `ranked` | Counts towards a paid contest. Result callback **required** |
+| `practice` | Free play, unranked. **Do not** send a result callback. Never scored |
 
 Practice mode matters commercially: players will not pay to enter a game they have
 never tried. A provider without it forces us to make first contests free.
+
+We never score practice, so a result callback for it is traffic we would discard.
+Our fetch of the round still works for practice (support, history) — only the
+signed result callback is withheld. (Requirements HTML version 1.10.)
 
 ### 4.3 `contentSeed` - the fairness mechanism
 
@@ -391,6 +461,10 @@ Requirements:
 - Presentation order **may** be shuffled per player (this is desirable - it stops
   players sharing "the answer is B") as long as the underlying content is the same
 - The seed must not be discoverable or predictable by the player
+- **Ranked:** `contentSeed` is required when the title supports seeding
+- **Practice:** omit the contest seed. Generate content from a **per-round** seed of
+  your own. **Never reuse a contest `contentSeed` for practice** — that would let a
+  player rehearse the exact content they are about to be paid to face
 
 ### 4.4 `expiresAt`
 
@@ -442,19 +516,43 @@ The provider POSTs to `resultCallbackUrl` when a round reaches a terminal state.
 
 | `status` | Meaning | ChartVolt behaviour |
 |---|---|---|
-| `completed` | Played to the end | Score recorded and ranked |
+| `completed` | Played to the end | Score recorded and ranked. Counts as an attempt |
 | `abandoned` | Player quit or disconnected and did not return | Score recorded as reported, usually partial. Counts as an attempt |
-| `expired` | `expiresAt` passed before completion | Scored zero, or the partial score if the provider can supply one |
+| `expired` | `expiresAt` passed before completion | Scored zero, or the partial score if the provider can supply one. **Counts as an attempt** — including when the player never opened the launch URL, because the attempt is spent when ChartVolt creates the round. Only `voided` returns it. (Requirements HTML version 1.11.) |
 | `voided` | Provider invalidated the round (fault, bug, confirmed cheating) | Not scored. The attempt is returned to the player |
 
-**A round must always reach a terminal state.** A round that simply stops reporting
-is the single worst failure mode in this integration, because real prize money waits
-on it. See `07-failure-modes-and-edge-cases.md`.
+**`eventType` must mirror `status`.** The payload carries both fields. Send exactly
+`round.completed`, `round.abandoned`, `round.expired`, or `round.voided` — that is,
+`round.` plus the same terminal status on the same message. Do not keep
+`round.completed` as a generic "the round finished" event and put the outcome only in
+`status`. ChartVolt ranks and settles on `status` and `score`; `eventType` is for
+provider routing and our logs. (Requirements HTML version 1.9.)
+
+### 5.1a Timing fields and the duration tie-break
+
+`startedAt`, `completedAt` and `durationMs` are **required** on every terminal result
+callback (requirements HTML **v1.14** / ambiguity **A9**). Ranking after an equal
+`score` follows chapter `03` section 1.5:
+
+1. **Shorter `durationMs` wins**
+2. Then earlier `completedAt`
+3. Remaining ties **share** the combined prize for those positions
+
+What to put in `durationMs`:
+
+| Title shape | Report |
+|---|---|
+| `higher_is_better` | Time taken to **achieve the reported score** — not a fixed session length when every player would get the same figure (that would make the tie-break identical for the whole field and therefore useless) |
+| `lower_is_better` whose score is itself a duration | Set `durationMs` equal to `score` |
 
 ### 5.2 Required timing
 
 The callback must be sent within **60 seconds** of the round reaching a terminal
 state, and the provider must retry for at least 24 hours until it receives a 2xx.
+
+**A round must always reach a terminal state.** A round that simply stops reporting
+is the single worst failure mode in this integration, because real prize money waits
+on it. See `07-failure-modes-and-edge-cases.md`.
 
 ### 5.3 `integrity`
 

@@ -93,6 +93,9 @@ export function listGames(_req: Request, res: Response): void {
   // A short cache is honest about what this is: the platform caches the catalogue and re-syncs
   // periodically, so a long max-age would delay a status change to `maintenance` - the one
   // catalogue field that needs to take effect quickly.
+  //
+  // Accept-Language (A11 / HTML v1.16): every title declares only `en` today, so the header
+  // is a no-op until X4a ships further locales. Response fields stay flat strings either way.
   res.setHeader("Cache-Control", "public, max-age=60");
   res.json({ games: TITLES.map((title) => catalogueEntry(title, assetBase)) });
 }

@@ -155,6 +155,12 @@ function normaliseCatalogueEntry(
   }
   if (!SCORE_TYPES.includes(scoreType as ProviderScoreType)) return null;
 
+  const min = count(entry.scoreRange?.min);
+  const max = count(entry.scoreRange?.max);
+  // Reason: issued spec requires both bounds (A7 / HTML 1.12). Omitting either used to
+  // produce a catalogue row with no range check - every score accepted. Fail closed.
+  if (min === undefined || max === undefined) return null;
+
   const status = GAME_STATUSES.includes(text(entry.status) as ProviderGameStatus)
     ? (text(entry.status) as ProviderGameStatus)
     : // An unrecognised status becomes `maintenance`, not `active`. Fail closed: the cost of
@@ -173,6 +179,7 @@ function normaliseCatalogueEntry(
     supportsContentSeed: flag(entry.supportsContentSeed),
     scoreDirection: scoreDirection as ProviderScoreDirection,
     scoreType: scoreType as ProviderScoreType,
+    scoreRange: { min, max },
     status,
   };
 
@@ -197,14 +204,6 @@ function normaliseCatalogueEntry(
   if (bannerUrl) game.bannerUrl = bannerUrl;
   const category = text(entry.category);
   if (category) game.category = category;
-
-  const min = count(entry.scoreRange?.min);
-  const max = count(entry.scoreRange?.max);
-  if (min !== undefined || max !== undefined) {
-    game.scoreRange = {};
-    if (min !== undefined) game.scoreRange.min = min;
-    if (max !== undefined) game.scoreRange.max = max;
-  }
 
   const typical = count(entry.typicalDurationSeconds);
   if (typical !== undefined) game.typicalDurationSeconds = typical;

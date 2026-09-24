@@ -142,9 +142,8 @@ function respond(round: RoundDoc): CreateRoundOutput {
     providerRoundId: round.providerRoundId,
     launchUrl: launchUrlFor(round.launchToken),
     launchUrlExpiresAt: round.launchUrlExpiresAt.toISOString(),
-    // Echoed because the specification's response example carries it, even though its own field
-    // table never mentions it. Ambiguity A8: a field in an example is a field a provider will
-    // send, and a platform that validates strictly against the table would reject this response.
+    // Always the literal "created" on a successful create or idempotent reuse (A8 RESOLVED,
+    // requirements HTML v1.13). Live progress belongs on the fetch endpoint, not here.
     status: "created",
   };
 }
@@ -154,10 +153,10 @@ function respond(round: RoundDoc): CreateRoundOutput {
  *
  * The launch URL is returned byte-identical whenever it is still alive, which is the case the
  * rule is actually about - a double-tapped Play button retries within seconds. A fresh token is
- * minted only once the stored one has expired, and that is a deliberate, recorded deviation from
- * the literal words "the same launch URL": returning a dead URL would satisfy the sentence and
- * defeat its purpose, which is that the platform gets a working way into the round it already
- * paid for without a second attempt being consumed. Ambiguity A3.
+ * mint only once the stored one has expired, and that is the rule recorded as ambiguity A3
+ * (RESOLVED, requirements HTML v1.8): returning a dead URL would satisfy the older sentence
+ * "the same launch URL" and defeat its purpose, which is that the platform gets a working way
+ * into the round it already paid for without a second attempt being consumed.
  */
 async function reuse(
   existing: RoundDocument,

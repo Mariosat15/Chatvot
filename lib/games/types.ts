@@ -126,6 +126,21 @@ export interface RankableParticipant {
    */
   minimumEligibleScore?: number;
 
+  /**
+   * How long the counted attempt took, in milliseconds.
+   *
+   * Provider ranking: when primary scores are equal, shorter wins (chapter 03 s1.5 / A9).
+   * Absent means "no duration reported" — equal scores then fall through to
+   * `scoreCompletedAt` / join time rather than inventing a figure.
+   */
+  durationMs?: number;
+
+  /**
+   * When the counted attempt finished. Second provider tie-break after duration
+   * (earlier wins). Threaded from the round that produced the stored score.
+   */
+  scoreCompletedAt?: Date;
+
   // Trading metrics. Present only for trading participants.
   currentCapital?: number;
   pnl?: number;

@@ -13,6 +13,10 @@ export interface IChallengeParticipant extends Document {
   // the ranking engine reads whatever the game. It is optional because a value means a
   // result arrived - see the schema path below (R50, challenge half).
   score?: number;
+  /** Milliseconds for the counted attempt — A9 tie-break. Absent ≠ zero. */
+  durationMs?: number;
+  /** When the counted attempt finished — A9 second tie-break. */
+  scoreCompletedAt?: Date;
   gameKey: string; // Denormalised from the challenge for cross-game statistics queries
 
   // Capital & Performance
@@ -117,6 +121,15 @@ const ChallengeParticipantSchema = new Schema<IChallengeParticipant>(
     */
     score: {
       type: Number,
+      required: false,
+    },
+    // Reason: A9 / chapter 03 s1.5 — shorter duration then earlier finish break equal scores.
+    durationMs: {
+      type: Number,
+      required: false,
+    },
+    scoreCompletedAt: {
+      type: Date,
       required: false,
     },
     gameKey: {
@@ -296,6 +309,8 @@ ChallengeParticipantSchema.index({ userId: 1, status: 1 });
 ChallengeParticipantSchema.index({ challengeId: 1, pnl: -1 });
 ChallengeParticipantSchema.index({ challengeId: 1, score: -1 }); // Game-agnostic ranking
 ChallengeParticipantSchema.index({ userId: 1, gameKey: 1 }); // Cross-game player statistics
+// PERFORMANCE: Speeds up early-end-check job's participant lookup
+ChallengeParticipantSchema.index({ challengeId: 1, status: 1 });
 
 const ChallengeParticipant =
   models?.ChallengeParticipant ||

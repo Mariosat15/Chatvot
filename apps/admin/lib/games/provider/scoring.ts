@@ -120,17 +120,31 @@ export function providerHasResult(participant: RankableParticipant): boolean {
 }
 
 /**
- * Provider games declare no tie-breaks.
+ * Provider games ignore trading-named breakers. Settlement still passes `win_rate` /
+ * `join_time` as the two rule slots; this maps them onto chapter 03 s1.5 / A9:
  *
- * Returning a constant makes every tie a genuine tie, which the engine already handles:
- * tied players share the combined prize for the ranks they occupy, under the contest's
- * `tiePrizeDistribution`. That is the correct outcome for two players who scored
- * identically at the same game.
+ *   1. shorter `durationMs` wins (any name except the completed-at slot)
+ *   2. earlier `scoreCompletedAt` wins (`join_time` / `completed_at`)
  *
- * The alternative - breaking ties on join time - was rejected. It looks like a tidy
- * deterministic ordering and it is actually a rule that the first to register wins money,
- * which nothing tells the player and which rewards refreshing the lobby.
+ * Higher return value wins in the engine, so both are negated. Absent duration returns
+ * 0 so equal scores fall through to the next breaker rather than inventing a figure —
+ * inventing join-time-as-first-breaker would be "first to register wins money".
  */
-export function getProviderTieBreakerValue(): number {
+export function getProviderTieBreakerValue(
+  participant: RankableParticipant,
+  tieBreaker: string,
+): number {
+  if (tieBreaker === "join_time" || tieBreaker === "completed_at") {
+    const at = participant.scoreCompletedAt ?? participant.enteredAt;
+    return -new Date(at).getTime();
+  }
+
+  if (
+    typeof participant.durationMs === "number" &&
+    Number.isFinite(participant.durationMs)
+  ) {
+    return -participant.durationMs;
+  }
+
   return 0;
 }

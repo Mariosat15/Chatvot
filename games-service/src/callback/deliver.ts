@@ -70,13 +70,9 @@ export type DeliveryOutcome =
 /**
  * Whether this round's result is ours to report at all.
  *
- * A practice round is not. Section 7 says `ranked` "must produce a result callback" and that
- * practice "is free play and is never scored by us", which leaves whether to send one for practice
- * genuinely undecided - the document neither asks for it nor forbids it. Not sending is the
- * reading taken here, on the grounds that a platform which never scores a practice result has no
- * use for the message, and a stream of events it must accept and discard is a cost with no
- * benefit. The fetch endpoint still reports practice rounds in full, so nothing is hidden.
- * Ambiguity A5.
+ * A practice round is not. Requirements HTML version 1.10 and chapter `01` s4.2: practice
+ * must not produce a result callback (we never score it). The fetch endpoint still reports
+ * practice rounds in full, so nothing is hidden.
  */
 function isReportable(round: RoundDoc): boolean {
   return round.mode === "ranked";

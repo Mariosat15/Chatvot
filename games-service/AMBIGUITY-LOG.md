@@ -15,7 +15,7 @@ behaviour; that choice is a guess until the document says so.
 
 ---
 
-## A1 - The idempotency key is labelled on the wrong field `OPEN` (defect, not ambiguity)
+## A1 - The idempotency key is labelled on the wrong field `RESOLVED` (defect, not ambiguity)
 
 **Where:** Endpoint 2, the request example.
 
@@ -24,21 +24,24 @@ behaviour; that choice is a guess until the document says so.
 "gameCode": "trivia-blitz",             // Also your idempotency key.
 ```
 
-The comment "Also your idempotency key" sits on the **`gameCode`** line. Section 11 is
+The comment "Also your idempotency key" sat on the **`gameCode`** line. Section 11 is
 unambiguous that the key is `roundId` ("We call `POST /v1/rounds` twice with the same
 `roundId` - return the same round and the same launch URL").
 
-**Why it matters more than a typo.** An implementer working from the example rather than the
+**Why it mattered more than a typo.** An implementer working from the example rather than the
 prose would key idempotency on `gameCode`, which would return **one shared round per title** -
 so the second player to press Play receives the first player's round and launch URL. That is a
 data-protection incident and a corrupted contest, and it would pass a naive integration test
 because a single-player rehearsal never has a second player.
 
-**Guessed:** `roundId`. **Fix:** move the comment up one line.
+**Resolved 24 Sep 2026 in requirements HTML version 1.6:** comment moved onto the `roundId`
+line; `gameCode` comment now says "which title this round is for". Chapter `01` already
+stated `roundId` is the key — no prose change needed there. ChartVolt Games already keys on
+`roundId`.
 
 ---
 
-## A2 - There is nothing to sign on the two GET endpoints `OPEN` (security)
+## A2 - There is nothing to sign on the two GET endpoints `RESOLVED` (security)
 
 **Where:** Section 10, "Calls from us to you".
 
@@ -53,16 +56,15 @@ Section 10 also asks the provider to "reject anything older than 5 minutes", but
 is only a header. **Unless the timestamp is inside the signed material, rejecting on it is not
 a security control** - anyone replaying the request can simply send a current timestamp.
 
-**Guessed:** sign `{timestamp}.{method}.{path}.{rawBody}`, with `rawBody` empty for a GET, and
-reject on skew. This is the common convention and it makes the timestamp meaningful.
-
-**This one needs a decision before a provider integration is signed**, because it is the kind
-of thing each side implements differently and then debugs for a day - which the specification
-itself warns about, one paragraph below, for a different reason.
+**Resolved 24 Sep 2026 in requirements HTML version 1.7 and chapter `01` s2.1:** outbound calls
+sign `{timestamp}.{METHOD}.{path}.{rawBody}` (empty body for GET). ChartVolt Games and both
+platform `transport.ts` copies ship the same formula. **Callbacks (provider → ChartVolt) stay
+body-signed** — that direction always has a JSON body. A body-only GET signature is refused
+by a dedicated API test.
 
 ---
 
-## A3 - Idempotency and launch-URL expiry contradict each other `OPEN` (contradiction)
+## A3 - Idempotency and launch-URL expiry contradict each other `RESOLVED` (contradiction)
 
 **Where:** Endpoint 2's field table against section 11.
 
@@ -77,17 +79,15 @@ new `roundId` is "a fresh round", which consumes a second attempt from a paying 
 **Why it will actually happen:** a player opens the contest, is called away, and returns after
 the launch URL's few minutes have lapsed. That is an ordinary Tuesday, not an edge case.
 
-**Guessed:** idempotency preserves the *round*, and a re-request re-mints the *launch URL*
-while the round is still live. So `POST /v1/rounds` with a known `roundId` returns the same
-`providerRoundId`, the same puzzle content and a **freshly signed** launch URL. No attempt is
-consumed, and nothing about the player's progress resets.
-
-**This is the single most consequential guess in this log**, because the alternative reading
-costs a real player a paid attempt.
+**Resolved 24 Sep 2026 in requirements HTML version 1.8 and chapter `01` s4.1:** idempotency
+preserves the *round*; a re-request with the same `roundId` may mint a freshly signed launch
+URL while the round is still live. No attempt consumed, no progress reset. ChartVolt Games
+already implemented this in `create.ts` `reuse()` — the spec now matches the code rather than
+the other way round.
 
 ---
 
-## A4 - No `eventType` is defined for the three non-completed terminal states `OPEN` (gap)
+## A4 - No `eventType` is defined for the three non-completed terminal states `RESOLVED` (gap)
 
 **Where:** Endpoint 3 shows `"eventType": "round.completed"`. Section 13 defines four terminal
 states: `completed`, `abandoned`, `expired`, `voided`.
@@ -98,14 +98,15 @@ The payload carries **both** `eventType` and `status`, and only one example valu
 `eventType: "round.completed"` as a generic "the round finished" event and let `status` carry
 the detail.
 
-**Guessed:** `eventType` mirrors the status - `round.completed`, `round.abandoned`,
-`round.expired`, `round.voided`. **Recommendation for the spec:** say so explicitly, or drop
-`eventType` altogether, since `status` already carries the information and two fields that must
-agree are two fields that will eventually disagree.
+**Resolved 24 Sep 2026 in requirements HTML version 1.9 and chapter `01` s5.1:** `eventType`
+must be `round.{status}` — `round.completed`, `round.abandoned`, `round.expired`, or
+`round.voided` — and must match `status` on the same message. ChartVolt ranks and settles on
+`status` and `score`. ChartVolt Games already derives the four values in `eventTypeFor`
+(`games-service/src/rounds/report.ts`).
 
 ---
 
-## A5 - Whether a practice round must report a result `OPEN`
+## A5 - Whether a practice round must report a result `RESOLVED`
 
 **Where:** Endpoint 2's `mode` row: "`ranked` counts towards a paid contest and **must produce
 a result callback**. `practice` is free play and is never scored by us."
@@ -120,13 +121,16 @@ the paid contest, which would let a player **rehearse the exact puzzles they are
 paid to solve.** That second reading is a fairness hole, so it is worth stating rather than
 leaving to an implementer's taste.
 
-**Guessed:** practice rounds report normally (one code path, and it exercises the same
-plumbing), and practice content is generated from a **per-round** seed that is never a contest
-seed.
+**Resolved 24 Sep 2026 in requirements HTML version 1.10 and chapter `01` s4.2 / s4.3:**
+practice **must not** produce a result callback (fetch still works); practice content comes
+from a **per-round** seed and must never reuse a contest `contentSeed`. ChartVolt Games
+already skipped practice callbacks in `deliver.ts` `isReportable` and seeded practice from
+`providerRoundId` when no contest seed is present — the log's earlier guess ("report
+normally") was wrong; the docs caught up to the code.
 
 ---
 
-## A6 - Does an `expired` round consume the player's attempt? `OPEN`
+## A6 - Does an `expired` round consume the player's attempt? `RESOLVED`
 
 **Where:** Section 13's table says `voided` means "attempt returned" and `abandoned` "counts as
 an attempt". `expired` says only "Scored zero, or the partial score if you supply one".
@@ -136,16 +140,20 @@ time that is clearly right. But the same state covers a player who **never opene
 URL at all** - and charging an attempt for a round that was never rendered will generate
 support tickets, especially when the cause was a launch URL that expired first (see A3).
 
-**Not this service's decision to make**, since attempts are the platform's concept and no
-provider can see them. Flagged because the spec's own table invites the question.
+**Resolved 24 Sep 2026 in requirements HTML version 1.11 and chapter `01` s5.1:** `expired`
+**counts as an attempt**, same as `completed` and `abandoned`. Only `voided` returns it. The
+"never opened" case is intentional under attempt-on-creation (`03` s1.3); re-mint the launch
+URL for the same live `roundId` after expiry (A3 / 1.8) rather than creating a second round.
+The platform already counted non-`voided` rounds in `countConsumedAttempts` — the docs caught
+up to the code. Providers cannot see attempts; this is ChartVolt policy stated for clarity.
 
 ---
 
-## A7 - `scoreRange` is required in the table but optional in our own contract `OPEN` (drift)
+## A7 - `scoreRange` is required in the table but optional in our own contract `RESOLVED` (drift)
 
 Endpoint 1's field table marks `scoreRange` **Yes / required**, and explains it is used to
 "reject scores outside this range as a safety check against both cheating and bugs". The
-platform's internal adapter contract declares it `scoreRange?` - optional.
+platform's internal adapter contract declared it `scoreRange?` - optional.
 
 Minor in isolation, but it is exactly the class of drift the paired-document rule exists for: a
 provider omitting it is within the internal contract and in breach of the issued specification,
@@ -156,95 +164,79 @@ as invalid, clamped, or accepted with an alert? "We reject scores" suggests the 
 means a provider bug becomes an unresolved round rather than a wrong payout - the right
 trade-off, but worth saying.
 
----
-
-## A8 - The `status: "created"` field in the create-round response is undocumented `OPEN` (minor)
-
-Endpoint 2's response example includes `"status": "created"`. It appears in no field table and
-in no state list - section 13's diagram has a `created` box, but as a round state rather than a
-response field. An implementer cannot tell whether it is required, what other values are legal,
-or whether returning a round already `in progress` is meaningful.
-
-**Guessed:** echo `"created"` always. Harmless either way, which is why it is filed as minor
-rather than dropped - an undocumented field in an example is still a field somebody will
-validate against.
+**Resolved 24 Sep 2026 in requirements HTML version 1.12 and chapter `01` field table:** both
+`min` and `max` required; out-of-range results are **rejected** (not clamped). Platform
+`ProviderCatalogueGame.scoreRange` is now required; both adapter copies refuse a title missing
+either bound at catalogue parse. Ingestion already rejected out-of-range scores (gate 10).
 
 ---
 
-## A9 - Which direction the duration tie-break runs `OPEN`
+## A8 - The `status: "created"` field in the create-round response is undocumented `RESOLVED` (minor)
 
-**Where:** Endpoint 3, the `startedAt, completedAt, durationMs` row: "We use duration as a
-tie-break, and ties are common."
+**Resolved 24 Sep 2026** in requirements HTML **v1.13** and `01` section 4 response table.
 
-It does not say **which way**. For a `higher_is_better` points game, the intended reading is
-surely that the faster of two equal scores wins - but for a `lower_is_better` duration game the
-score *is* the duration, so the tie-break is either meaningless or means something else
-entirely.
-
-**Why a provider cannot ignore this.** It changes what `durationMs` should contain. Every
-Circuit Sprint session lasts exactly the configured clock, so reporting session length would
-give the whole field an identical tie-break and quietly make it useless - no error, no warning,
-just a tie that never breaks. This service reports **time to the last completed board** instead,
-which is only the right answer if lower is better.
-
-**Guessed:** lower duration wins. **Recommendation:** say so, and say what a
-`lower_is_better` title should put in `durationMs`, since for those the tie-break needs a
-different field (Circuit Perfect ties break on boards completed, which the platform cannot see).
+Endpoint 2's response example included `"status": "created"` with no field-table row. From
+v1.13: **required** on a successful create or idempotent reuse that hands back a launchable
+round; **always the literal `"created"`**. Live round progress stays on the fetch endpoint
+(section 13). ChartVolt Games already echoed that literal from `respond()` in
+`src/rounds/create.ts`; no behaviour change.
 
 ---
 
-## A10 - Which subset of JSON Schema is actually supported `OPEN` (gap)
+## A9 - Which direction the duration tie-break runs `RESOLVED`
 
-**Where:** Endpoint 1, the `configSchema` row: "Valid JSON Schema describing every setting we
-may send in `config`."
+**Resolved 24 Sep 2026** in requirements HTML **v1.14**, `01` section 5, matching
+`03` section 1.5 and ChartVolt Games' existing report.
 
-The specification asks for valid JSON Schema and never says which keywords the platform
-understands. That matters because the platform's form generator **fails closed** on keywords it
-cannot render - so a provider writing entirely valid JSON Schema using `pattern`, `oneOf` or
-`allOf` can have a whole title refused, having done exactly what the document asked.
+**Rule:** when primary scores are equal, **shorter `durationMs` wins**, then earlier
+`completedAt`; remaining ties share the prize.
 
-Failing closed is the right behaviour - a partially-understood schema would render a form
-missing half the real constraints and then validate against the half it understood - but it
-turns an unstated assumption into a rejected integration.
+**What to put in `durationMs`:**
+- `higher_is_better`: time to achieve the reported score — **not** a fixed session length
+  when every player would get the same figure (Circuit Sprint reports time to the last
+  completed board for this reason).
+- `lower_is_better` titles whose score is already a duration: set `durationMs` equal to
+  `score`.
 
-**Guessed:** the most conservative subset possible - `type`, `properties`, `integer`, `string`,
-`boolean`, `minimum`, `maximum`, `enum`, `default`, `required`, and since 8 September 2026
-`format` with exactly one permitted value. **Recommendation:** publish the
-supported keyword list in the spec, and say plainly that anything else refuses the title rather
-than being ignored. This is cheap to document and expensive to discover.
-
-**Partly addressed, 8 September 2026, and deliberately still `OPEN`.** Version 1.3 of the
-requirements document adds section 3.2, which states in provider-facing prose that ChartVolt
-**fails closed on schema keywords it does not implement**. That is the *behaviour* half of the
-recommendation, and it is the half that turns a silent surprise into a documented one. **The
-list itself is still unpublished**, so a provider still cannot tell which keywords are safe
-without trying them - which is the expensive half. Do not let a summary read this entry as
-closed.
-
-Related, and unstated: `configSchema` is described as required, but nothing says whether the
-platform will send settings the schema does not declare, or omit ones it does. This service
-clamps out-of-range values rather than refusing the round - reaching that state means the two
-sides disagree about the schema, and refusing a paid round mid-contest is worse than playing a
-300-second board when 400 was asked for - and reports which settings it had to correct.
+**Platform note (closed 24 Sep 2026):** `getProviderTieBreakerValue` now maps settlement's
+`win_rate` / `join_time` slots onto shorter `durationMs` then earlier `scoreCompletedAt`.
+Gate 11b syncs both onto the participant seat; provider settlement and resettle pass them
+into `calculateRankings`. Equal scores with neither figure still share — that is intentional.
 
 ---
 
-## A11 - The locale-map option has no defined shape `OPEN` (gap)
+## A10 - Which subset of JSON Schema is actually supported `RESOLVED`
 
-**Where:** Endpoint 1, the "Localised" constraint: "Either return a locale map, or honour an
-`Accept-Language` header on this endpoint."
+**Resolved 24 Sep 2026** in requirements HTML **v1.15** section **3.1b** and `01`
+section **3.1b**. List matches `SUPPORTED_ROOT_KEYS` / `SUPPORTED_FIELD_KEYS` /
+`SUPPORTED_TYPES` / `CONFIG_FIELD_FORMATS` in `lib/services/games/config-schema.ts`.
 
-Two options are offered and only one is specified. If a provider chooses the locale map, no
-field name, nesting or fallback rule is given - `"description": {"en": "...", "el": "..."}`
-alongside a flat `"displayName"`? A parallel `"translations"` object? What happens when a
-requested locale is missing from the map?
+Fail-closed behaviour was already documented in v1.3; the **keyword list** was the
+missing half. No parser change.
 
-**Guessed:** honour `Accept-Language` and return flat strings, because that is the option the
-document actually describes.
+The secondary question in this entry (whether ChartVolt sends settings the schema does
+not declare) remains: this service clamps out-of-range values rather than refusing the
+round. That is operational detail for ChartVolt Games, not a gap in the published subset.
 
-**Worth noting for the platform side too:** an adapter written against flat strings will not
-consume a locale map at all, so the two options are not interchangeable in practice. Either
-specify the map's shape or remove the choice.
+---
+
+## A11 - The locale-map option has no defined shape `RESOLVED`
+
+**Resolved 24 Sep 2026** in requirements HTML **v1.16** and `01` section 3
+constraint 1.
+
+**Rule:** catalogue text fields are **always flat strings**. Honour
+`Accept-Language` on `GET /v1/games`; missing locale falls back to the first
+entry in `locales`, then `en` if present. **Per-field locale maps are not
+supported** — ChartVolt stores flat strings and will not unpack a map.
+
+**Why the map option was removed rather than specified:** an adapter written
+against flat strings cannot consume a map, so the two shapes were never
+interchangeable in practice. Specifying the unused shape would have invited
+providers to send something the sync silently drops.
+
+**ChartVolt Games today:** declares only `en` and returns flat English strings,
+so `Accept-Language` is a no-op until further locales ship (X4a content).
 
 ---
 

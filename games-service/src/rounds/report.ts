@@ -43,11 +43,9 @@ export type EventType =
 /**
  * The event type for a terminal state.
  *
- * The specification's example shows `round.completed` and never names the other three, even
- * though it requires all four states to be reported. Deriving them mechanically from the status
- * is the only choice that can be made from the document, and it is the one a platform parser is
- * most likely to accept - but a provider guessing `round.abandon` or `round.round_abandoned`
- * would be equally within the letter of the document. Ambiguity A4.
+ * Requirements HTML version 1.9 and chapter `01` s5.1: `eventType` must be `round.{status}`
+ * and must match `status` on the same message. Deriving the four values mechanically from the
+ * status is the only reading that keeps the two fields agreeing.
  */
 export function eventTypeFor(status: RoundStatus): EventType | undefined {
   switch (status) {

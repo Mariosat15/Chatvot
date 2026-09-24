@@ -14,6 +14,10 @@ export interface ICompetitionParticipant extends Document {
   // Invariant 4 in "External game plans/11": every participant gets a score FIELD. It is
   // optional because a value means a result arrived - see the schema path below (R50).
   score?: number;
+  /** Milliseconds for the counted attempt — A9 tie-break. Absent ≠ zero. */
+  durationMs?: number;
+  /** When the counted attempt finished — A9 second tie-break. */
+  scoreCompletedAt?: Date;
   gameKey: string; // Denormalised from the contest for cross-game statistics queries
 
   // Capital & Performance
@@ -103,6 +107,16 @@ const CompetitionParticipantSchema = new Schema<ICompetitionParticipant>(
     */
     score: {
       type: Number,
+      required: false,
+    },
+    // Reason: A9 / chapter 03 s1.5 — shorter duration then earlier finish break equal scores.
+    // Optional, no default: absent means "provider did not report", not zero milliseconds.
+    durationMs: {
+      type: Number,
+      required: false,
+    },
+    scoreCompletedAt: {
+      type: Date,
       required: false,
     },
     gameKey: {

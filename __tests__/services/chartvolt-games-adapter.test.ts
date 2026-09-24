@@ -289,9 +289,13 @@ describe("the signed request", () => {
      * sending another - this is the only test here that notices, and the production symptom
      * would be every single call rejected as forged.
      */
+    // Reason: v1.7 / A2 — HMAC is over `{timestamp}.{METHOD}.{path}.{rawBody}`, not the body
+    // alone. Recomputing from the body string alone would stay green on the pre-1.7 defect.
+    const path = new URL(sent.url).pathname;
+    const material = `${sent.headers["X-Timestamp"]}.${sent.method.toUpperCase()}.${path}.${sent.body}`;
     const expected = crypto
       .createHmac("sha256", API_SECRET)
-      .update(sent.body, "utf8")
+      .update(material, "utf8")
       .digest("hex");
     expect(sent.headers["X-Signature"]).toBe(`sha256=${expected}`);
     expect(sent.headers.Authorization).toBe(`Bearer ${API_KEY}`);
@@ -309,17 +313,25 @@ describe("the signed request", () => {
     expect(sent.body).not.toContain(API_SECRET);
   });
 
-  it("signs a GET over an empty string and sends no body", async () => {
+  it("signs a GET over the canonical request string and sends no body", async () => {
     ok({ games: [catalogueEntry()] });
     await adapter.listGames();
 
     const sent = captured[0];
     expect(sent.method).toBe("GET");
     expect(sent.body).toBe("");
-    // Signed over exactly nothing - not "undefined", not "{}". The provider verifies against the
-    // bytes it received, and there were none.
-    const expected = crypto.createHmac("sha256", API_SECRET).update("", "utf8").digest("hex");
+    // Reason: body slot is empty, but method and path are inside the HMAC so a stolen GET
+    // signature cannot be replayed onto `/v1/rounds/{id}` (A2 / requirements HTML v1.7).
+    const path = new URL(sent.url).pathname;
+    const material = `${sent.headers["X-Timestamp"]}.GET.${path}.`;
+    const expected = crypto
+      .createHmac("sha256", API_SECRET)
+      .update(material, "utf8")
+      .digest("hex");
     expect(sent.headers["X-Signature"]).toBe(`sha256=${expected}`);
+    // Control: the pre-1.7 body-only signature must NOT match.
+    const bodyOnly = crypto.createHmac("sha256", API_SECRET).update("", "utf8").digest("hex");
+    expect(sent.headers["X-Signature"]).not.toBe(`sha256=${bodyOnly}`);
   });
 
   it("sends the round request in the shape the specification names", async () => {
