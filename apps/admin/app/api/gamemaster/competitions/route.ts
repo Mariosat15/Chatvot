@@ -10,6 +10,7 @@ import {
   MIN_CONTEST_PARTICIPANTS,
   resolveCreationLimits,
 } from "@/lib/services/gamemaster/game-permissions";
+import { countGameMasterActiveCompetitions } from "@/lib/services/gamemaster/active-competitions";
 import { createGameMasterProviderCompetition } from "@/lib/services/gamemaster/create-provider-competition";
 import { resolveGameMasterPlatformFeePercentage } from "@/lib/services/gamemaster/platform-fee";
 
@@ -207,17 +208,23 @@ export async function POST(request: NextRequest) {
 
     // This route never checked `canCreateCompetitions` at all, in any form, so a Game Master
     // whose package withdraws competition creation could create them here. The shared gate
-    // checks it, the game and the daily quota in one call, in that order.
+    // checks it, the game, the concurrent-active cap and the daily quota in one call.
+    const activeCompetitions = await countGameMasterActiveCompetitions(
+      db,
+      auth.userId,
+    );
     const verdict = checkGameMasterCanCreate({
       limits: effectiveLimits,
       requestedGameType: body.gameType,
       competitionsCreatedToday: subscription.currentPeriodCompetitionsCreated,
+      activeCompetitions,
     });
 
     if (!verdict.ok) {
-      // Reason the daily limit keeps its 429 while the other refusals are 403: the existing
-      // client branches on the status to decide whether to say "try again tomorrow", and a
-      // quota is genuinely rate limiting rather than a permission problem.
+      // Reason the daily / active caps keep 429 while the other refusals are 403: the existing
+      // client branches on the status to decide whether to say "try again tomorrow" / "finish
+      // a contest first", and a quota is genuinely rate limiting rather than a permission
+      // problem.
       return NextResponse.json(
         {
           error: verdict.message,
@@ -228,8 +235,20 @@ export async function POST(request: NextRequest) {
                 created: subscription.currentPeriodCompetitionsCreated,
               }
             : {}),
+          ...(verdict.reason === "active_limit_reached"
+            ? {
+                activeLimit: effectiveLimits.maxActiveCompetitions,
+                active: activeCompetitions,
+              }
+            : {}),
         },
-        { status: verdict.reason === "daily_limit_reached" ? 429 : 403 },
+        {
+          status:
+            verdict.reason === "daily_limit_reached" ||
+            verdict.reason === "active_limit_reached"
+              ? 429
+              : 403,
+        },
       );
     }
 

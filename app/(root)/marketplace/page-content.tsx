@@ -1,5 +1,9 @@
 "use client";
 
+/* Reason: marketplace item art is operator-uploaded arbitrary URLs; next/image needs a
+   configured remote pattern per host, so plain <img> is intentional here. */
+/* eslint-disable @next/next/no-img-element */
+
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { sanitizeHtml } from "@/lib/utils/html-sanitizer";
@@ -39,6 +43,7 @@ import {
   Swords,
   LayoutGrid,
   List,
+  Trophy,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -82,6 +87,7 @@ interface MarketplaceItem {
     subscriptionDurationDays: number;
     referralFeePercentage: number;
     maxCompetitionsPerDay: number;
+    maxActiveCompetitions?: number;
     maxUsersPerCompetition: number;
     canCreateCompetitions: boolean;
     canEarnFromChallenges?: boolean;
@@ -1707,7 +1713,12 @@ function GameMasterCard({
             <span className="text-gray-400">{config.subscriptionDurationDays}d</span>
             <span className="text-emerald-400 font-medium">{config.referralFeePercentage}% ref</span>
             {config.canCreateCompetitions !== false && (
-              <span className="text-blue-400">{config.maxCompetitionsPerDay}/day</span>
+              <span className="text-blue-400">
+                {config.maxCompetitionsPerDay}/day
+                {typeof config.maxActiveCompetitions === "number"
+                  ? ` · ${config.maxActiveCompetitions} active`
+                  : ""}
+              </span>
             )}
           </div>
         )}
@@ -1867,7 +1878,7 @@ function GameMasterCard({
 
             {/* Row 2: Competition settings - Only shown if canCreateCompetitions is true */}
             {config.canCreateCompetitions !== false ? (
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div className="bg-gray-800/50 rounded-xl p-3 border border-gray-700/30">
                   <div className="flex items-center gap-2 text-gray-400 mb-1">
                     <Zap className="h-4 w-4" />
@@ -1875,6 +1886,15 @@ function GameMasterCard({
                   </div>
                   <p className="text-white font-semibold">
                     {config.maxCompetitionsPerDay || 1}
+                  </p>
+                </div>
+                <div className="bg-gray-800/50 rounded-xl p-3 border border-gray-700/30">
+                  <div className="flex items-center gap-2 text-gray-400 mb-1">
+                    <Trophy className="h-4 w-4" />
+                    <span className="text-xs">Max Active</span>
+                  </div>
+                  <p className="text-white font-semibold">
+                    {config.maxActiveCompetitions || 10}
                   </p>
                 </div>
                 <div className="bg-gray-800/50 rounded-xl p-3 border border-gray-700/30">
@@ -2015,11 +2035,6 @@ function ItemDetailModal({
     : isStrategy
       ? Target
       : indicatorInfo?.icon || LineChart;
-  const iconColor = isGameMaster
-    ? "text-yellow-400"
-    : isStrategy
-      ? "text-orange-400"
-      : indicatorInfo?.color || "text-emerald-400";
 
   const borderColor = isGameMaster
     ? "border-yellow-400"

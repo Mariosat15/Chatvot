@@ -5,6 +5,7 @@ import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import GameMasterSubscription from "@/database/models/gamemaster/gamemaster-subscription.model";
 import { resolveCreationLimits } from "@/lib/services/gamemaster/game-permissions";
+import { countGameMasterActiveCompetitions } from "@/lib/services/gamemaster/active-competitions";
 import { loadGameMasterPackageConfig } from "@/lib/services/gamemaster/package-config";
 import { buildSubscriptionLimits } from "@/lib/services/gamemaster/subscription-limits";
 
@@ -62,6 +63,7 @@ export async function GET() {
 
     const limits = {
       maxCompetitionsPerDay: effective.maxCompetitionsPerDay,
+      maxActiveCompetitions: effective.maxActiveCompetitions,
       maxUsersPerCompetition: effective.maxUsersPerCompetition,
       referralFeePercentage: effective.referralFeePercentage,
       canCreateCompetitions: effective.canCreateCompetitions,
@@ -75,10 +77,17 @@ export async function GET() {
         effective.referralFeePercentage,
     };
 
+    const activeCompetitions = db
+      ? await countGameMasterActiveCompetitions(db, userId)
+      : 0;
+
     if (
       db &&
       packageConfig &&
-      subscription.limits?.maxCompetitionsPerDay !== limits.maxCompetitionsPerDay
+      (subscription.limits?.maxCompetitionsPerDay !==
+        limits.maxCompetitionsPerDay ||
+        subscription.limits?.maxActiveCompetitions !==
+          limits.maxActiveCompetitions)
     ) {
       const healed = buildSubscriptionLimits(packageConfig);
       void GameMasterSubscription.updateOne(
@@ -111,6 +120,7 @@ export async function GET() {
           totalCompetitionsCreated: subscription.totalCompetitionsCreated,
           currentPeriodCompetitionsCreated:
             subscription.currentPeriodCompetitionsCreated,
+          activeCompetitions,
         },
       },
     });

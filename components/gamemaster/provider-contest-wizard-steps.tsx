@@ -3,7 +3,10 @@
 import ChallengeSettingsFields from "@/components/challenges/ChallengeSettingsFields";
 import { UtcScheduleFields } from "@/components/gamemaster/UtcScheduleFields";
 import type { ConfigField } from "@/lib/services/games/config-schema";
-import type { PlayMode } from "@/lib/services/games/play-shape";
+import {
+  PLAY_MODE_COPY,
+  type PlayMode,
+} from "@/lib/services/games/play-shape";
 import { Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -129,25 +132,47 @@ export function GameSettingsStep({
   onSetting: (name: string, value: unknown) => void;
   disabled: boolean;
 }) {
+  const modes =
+    supportedPlayModes.length > 0 ? supportedPlayModes : ([playMode] as PlayMode[]);
+  const copy = PLAY_MODE_COPY.get(playMode);
+
   return (
     <StepPanel title="Game Settings" subtitle="Options for this title">
-      {canPickMode && (
-        <Field label="Play style">
+      {/*
+        Always surface play style. When the title supports more than one mode the GM picks;
+        when it supports only one we still explain what that means so the schedule step is
+        not a surprise. Labels come from PLAY_MODE_COPY so they cannot drift from the
+        admin ContestPlayModeField / create service.
+      */}
+      <Field label="How players join">
+        {canPickMode ? (
           <select
             className={inputClass}
             value={playMode}
             onChange={(e) => onPlayMode(e.target.value as PlayMode)}
+            disabled={disabled}
           >
-            {supportedPlayModes.map((mode) => (
+            {modes.map((mode) => (
               <option key={mode} value={mode}>
-                {mode === "scheduled"
-                  ? "Everyone plays at once"
-                  : "Play any time in the window"}
+                {PLAY_MODE_COPY.get(mode)?.label ?? mode}
               </option>
             ))}
           </select>
-        </Field>
-      )}
+        ) : (
+          <div className="rounded-lg border border-gray-700 bg-gray-900/60 px-3 py-2 text-sm text-gray-200">
+            {copy?.label ?? playMode}
+          </div>
+        )}
+        {copy?.detail && (
+          <p className="mt-2 text-xs text-gray-400">{copy.detail}</p>
+        )}
+        {playMode === "scheduled" && (
+          <p className="mt-2 text-xs text-amber-200/90">
+            Entry closes when the competition starts and each player gets one
+            attempt. Those settings are fixed for this play style.
+          </p>
+        )}
+      </Field>
       <div className="rounded-xl border border-gray-700 bg-gray-900/50 p-4">
         <ChallengeSettingsFields
           fields={fields}

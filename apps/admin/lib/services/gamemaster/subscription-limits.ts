@@ -20,6 +20,11 @@
 
 export interface GameMasterPackageConfig {
   maxCompetitionsPerDay?: number;
+  /**
+   * How many of this Game Master's contests may be non-terminal at once
+   * (draft / upcoming / active). Independent of the per-day create quota.
+   */
+  maxActiveCompetitions?: number;
   maxUsersPerCompetition?: number;
   referralFeePercentage?: number;
   canCreateCompetitions?: boolean;
@@ -30,6 +35,7 @@ export interface GameMasterPackageConfig {
 
 export interface GameMasterSubscriptionLimits {
   maxCompetitionsPerDay: number;
+  maxActiveCompetitions: number;
   maxUsersPerCompetition: number;
   referralFeePercentage: number;
   canCreateCompetitions: boolean;
@@ -40,6 +46,9 @@ export interface GameMasterSubscriptionLimits {
 
 export const DEFAULT_GM_LIMITS = {
   maxCompetitionsPerDay: 1,
+  // Reason: generous enough that existing packs without the field do not suddenly
+  // refuse every create; packages that care set it explicitly (Starter 3 / Pro 10 / Elite 20).
+  maxActiveCompetitions: 10,
   maxUsersPerCompetition: 50,
   referralFeePercentage: 5,
 } as const;
@@ -121,6 +130,10 @@ export function buildSubscriptionLimits(
     maxCompetitionsPerDay: numberOrDefault(
       c.maxCompetitionsPerDay,
       DEFAULT_GM_LIMITS.maxCompetitionsPerDay,
+    ),
+    maxActiveCompetitions: numberOrDefault(
+      c.maxActiveCompetitions,
+      DEFAULT_GM_LIMITS.maxActiveCompetitions,
     ),
     maxUsersPerCompetition: numberOrDefault(
       c.maxUsersPerCompetition,

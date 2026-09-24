@@ -41,6 +41,7 @@ import { listGameModules } from "@/lib/games/registry";
  */
 export const EDITABLE_LIMIT_FIELDS = new Set([
   "maxCompetitionsPerDay",
+  "maxActiveCompetitions",
   "maxUsersPerCompetition",
   "referralFeePercentage",
   "canCreateCompetitions",
@@ -67,6 +68,9 @@ interface Bounds {
 // together, because two copies of a bound that drift are worse than one.
 const BOUNDS = new Map<string, Bounds>([
   ["maxCompetitionsPerDay", { min: 1, max: 100 }],
+  // Same floor as the schema: at least one concurrent slot, or a create grant is
+  // unreachable the moment anything is live.
+  ["maxActiveCompetitions", { min: 1, max: 500 }],
   ["maxUsersPerCompetition", { min: 2, max: 100000 }],
   ["referralFeePercentage", { min: 0, max: 50 }],
 ]);
@@ -153,6 +157,7 @@ export function validateLimitsUpdate(
     // reasoning that made `ACTIONS["__proto__"]` reachable on the round inspector, and three
     // named assignments cost nothing.
     if (key === "maxCompetitionsPerDay") merged.maxCompetitionsPerDay = value;
+    else if (key === "maxActiveCompetitions") merged.maxActiveCompetitions = value;
     else if (key === "maxUsersPerCompetition") merged.maxUsersPerCompetition = value;
     else if (key === "referralFeePercentage") merged.referralFeePercentage = value;
   }
@@ -164,7 +169,11 @@ export type OverrideUpdateResult =
   | {
       ok: true;
       override: "enabled" | "disabled" | null;
-      overrideLimits: { maxCompetitionsPerDay?: number; maxUsersPerCompetition?: number };
+      overrideLimits: {
+        maxCompetitionsPerDay?: number;
+        maxActiveCompetitions?: number;
+        maxUsersPerCompetition?: number;
+      };
     }
   | { ok: false; error: string };
 
@@ -204,6 +213,7 @@ export function validateOverrideUpdate(body: {
 
   const overrideLimits: {
     maxCompetitionsPerDay?: number;
+    maxActiveCompetitions?: number;
     maxUsersPerCompetition?: number;
   } = {};
 
@@ -215,7 +225,11 @@ export function validateOverrideUpdate(body: {
 
     const source = raw as Record<string, unknown>;
     for (const key of Object.keys(source)) {
-      if (key !== "maxCompetitionsPerDay" && key !== "maxUsersPerCompetition") {
+      if (
+        key !== "maxCompetitionsPerDay" &&
+        key !== "maxActiveCompetitions" &&
+        key !== "maxUsersPerCompetition"
+      ) {
         return {
           ok: false,
           error: `"${key}" is not an override limit.`,
@@ -224,6 +238,7 @@ export function validateOverrideUpdate(body: {
     }
 
     const perDay = source.maxCompetitionsPerDay;
+    const maxActive = source.maxActiveCompetitions;
     const perContest = source.maxUsersPerCompetition;
 
     if (perDay !== undefined) {
@@ -234,6 +249,20 @@ export function validateOverrideUpdate(body: {
         };
       }
       overrideLimits.maxCompetitionsPerDay = perDay;
+    }
+
+    if (maxActive !== undefined) {
+      if (
+        typeof maxActive !== "number" ||
+        !Number.isFinite(maxActive) ||
+        maxActive < 1
+      ) {
+        return {
+          ok: false,
+          error: `"maxActiveCompetitions" must be a number of at least 1.`,
+        };
+      }
+      overrideLimits.maxActiveCompetitions = maxActive;
     }
 
     if (perContest !== undefined) {

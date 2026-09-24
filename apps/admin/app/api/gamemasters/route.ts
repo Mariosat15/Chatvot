@@ -122,7 +122,10 @@ export async function GET(request: NextRequest) {
       ])
       .toArray();
     const actualPendingEarnings = new Map(
-      pendingEarningsAgg.map((e: any) => [e._id, e.pendingEarnings || 0]),
+      pendingEarningsAgg.map((e: { _id: string; pendingEarnings?: number }) => [
+        e._id,
+        e.pendingEarnings || 0,
+      ]),
     );
 
     return NextResponse.json({
@@ -135,6 +138,8 @@ export async function GET(request: NextRequest) {
           ? {
               maxCompetitionsPerDay:
                 currentPackageSettings.maxCompetitionsPerDay,
+              maxActiveCompetitions:
+                currentPackageSettings.maxActiveCompetitions ?? 10,
               maxUsersPerCompetition:
                 currentPackageSettings.maxUsersPerCompetition,
               referralFeePercentage:

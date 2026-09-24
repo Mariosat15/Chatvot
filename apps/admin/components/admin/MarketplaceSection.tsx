@@ -139,6 +139,7 @@ interface GameMasterConfig {
   subscriptionDurationDays: number;
   referralFeePercentage: number;
   maxCompetitionsPerDay: number;
+  maxActiveCompetitions: number;
   maxUsersPerCompetition: number;
   canCreateCompetitions: boolean;
   canEarnFromChallenges: boolean;
@@ -350,6 +351,7 @@ const emptyItem: Partial<MarketplaceItem> = {
     subscriptionDurationDays: 30,
     referralFeePercentage: 5,
     maxCompetitionsPerDay: 1,
+    maxActiveCompetitions: 10,
     maxUsersPerCompetition: 50,
     canCreateCompetitions: true,
     canEarnFromChallenges: false,
@@ -2071,6 +2073,44 @@ export default function MarketplaceSection() {
                         </div>
                       )}
 
+                      {/* Max active competitions at once */}
+                      {editingItem.gameMasterConfig?.canCreateCompetitions !==
+                        false && (
+                        <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-5 space-y-3">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Trophy className="h-5 w-5 text-cyan-400" />
+                            <Label className="text-white font-semibold">
+                              Max Active Competitions
+                            </Label>
+                          </div>
+                          <Input
+                            type="number"
+                            value={
+                              editingItem.gameMasterConfig
+                                ?.maxActiveCompetitions || 10
+                            }
+                            onChange={(e) =>
+                              setEditingItem({
+                                ...editingItem,
+                                gameMasterConfig: {
+                                  ...editingItem.gameMasterConfig!,
+                                  maxActiveCompetitions:
+                                    parseInt(e.target.value) || 1,
+                                },
+                              })
+                            }
+                            min={1}
+                            max={500}
+                            className="bg-gray-800 border-gray-600 text-white text-lg h-12"
+                          />
+                          <p className="text-xs text-gray-500">
+                            How many draft, upcoming, or live competitions this
+                            Game Master may hold at once (independent of the
+                            daily create quota)
+                          </p>
+                        </div>
+                      )}
+
                       {/* Max Users Per Competition - Only show if competitions are enabled */}
                       {editingItem.gameMasterConfig?.canCreateCompetitions !==
                         false && (
@@ -2317,6 +2357,18 @@ export default function MarketplaceSection() {
                             </div>
                           </div>
                         )}
+                        {editingItem.gameMasterConfig?.canCreateCompetitions !==
+                          false && (
+                          <div className="bg-gray-900/50 rounded-lg p-3">
+                            <div className="text-2xl font-bold text-cyan-400">
+                              {editingItem.gameMasterConfig
+                                ?.maxActiveCompetitions || 10}
+                            </div>
+                            <div className="text-xs text-gray-400">
+                              Active Max
+                            </div>
+                          </div>
+                        )}
                       </div>
                       {editingItem.gameMasterConfig?.canCreateCompetitions ===
                         false &&
@@ -2344,15 +2396,15 @@ export default function MarketplaceSection() {
                       <ul className="text-sm text-gray-300 space-y-1">
                         <li>
                           • <strong>Starter:</strong> 30 days, 5% fee, 1
-                          comp/day, 30 max users → ~299 credits
+                          comp/day, 3 active, 30 max users → ~299 credits
                         </li>
                         <li>
                           • <strong>Pro:</strong> 30 days, 7.5% fee, 3
-                          comps/day, 75 max users → ~599 credits
+                          comps/day, 10 active, 75 max users → ~599 credits
                         </li>
                         <li>
                           • <strong>Elite:</strong> 30 days, 10% fee, 10
-                          comps/day, 150 max users → ~999 credits
+                          comps/day, 20 active, 150 max users → ~999 credits
                         </li>
                       </ul>
                     </div>

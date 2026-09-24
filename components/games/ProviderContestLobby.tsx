@@ -551,6 +551,7 @@ export default async function ProviderContestLobby({
             participantStatus={participantStatus}
             registrationClosed={registrationClosed}
             levelLadder={levelLadder}
+            currentUserId={userId}
           />
 
           {/*

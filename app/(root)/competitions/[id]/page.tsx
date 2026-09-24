@@ -490,6 +490,7 @@ const CompetitionDetailsPage = async ({
             registrationClosed={registrationClosed}
             formatUTCDate={formatUTCDate}
             levelLadder={ladder}
+            currentUserId={userId}
           />
         </div>
       </div>

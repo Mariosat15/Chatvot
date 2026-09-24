@@ -52,10 +52,12 @@ export type CreationRefusalReason =
   | "creation_not_permitted"
   | "game_not_permitted"
   | "game_not_supported_here"
-  | "daily_limit_reached";
+  | "daily_limit_reached"
+  | "active_limit_reached";
 
 export interface GameMasterCreationLimits {
   maxCompetitionsPerDay: number;
+  maxActiveCompetitions: number;
   maxUsersPerCompetition: number;
   referralFeePercentage: number;
   canCreateCompetitions: boolean;
@@ -73,6 +75,7 @@ export interface GameMasterCreationLimits {
 /** The shape of the `limits` subdocument as it is STORED, i.e. every field optional. */
 export interface StoredGameMasterLimits {
   maxCompetitionsPerDay?: number | null;
+  maxActiveCompetitions?: number | null;
   maxUsersPerCompetition?: number | null;
   referralFeePercentage?: number | null;
   canCreateCompetitions?: boolean | null;
@@ -84,6 +87,7 @@ export interface StoredGameMasterLimits {
 /** The `gameMasterConfig` on a marketplace package, as stored. */
 export interface StoredPackageConfig {
   maxCompetitionsPerDay?: number | null;
+  maxActiveCompetitions?: number | null;
   maxUsersPerCompetition?: number | null;
   referralFeePercentage?: number | null;
   canCreateCompetitions?: boolean | null;
@@ -100,6 +104,7 @@ export interface ResolveCreationLimitsInput {
   /** `subscription.overrideLimits`, which apply only while the override is `enabled`. */
   overrideLimits?: {
     maxCompetitionsPerDay?: number | null;
+    maxActiveCompetitions?: number | null;
     maxUsersPerCompetition?: number | null;
   } | null;
 }
@@ -194,6 +199,12 @@ export function resolveCreationLimits(
       limits.maxCompetitionsPerDay,
       DEFAULT_GM_LIMITS.maxCompetitionsPerDay,
     ),
+    maxActiveCompetitions: cap(
+      overrides.maxActiveCompetitions,
+      pkg?.maxActiveCompetitions,
+      limits.maxActiveCompetitions,
+      DEFAULT_GM_LIMITS.maxActiveCompetitions,
+    ),
     maxUsersPerCompetition: cap(
       overrides.maxUsersPerCompetition,
       pkg?.maxUsersPerCompetition,
@@ -235,15 +246,20 @@ export interface CheckCreationInput {
   requestedGameType?: string | null;
   /** `subscription.currentPeriodCompetitionsCreated` after any daily reset. */
   competitionsCreatedToday: number;
+  /**
+   * How many of this Game Master's contests are currently draft / upcoming / active.
+   * Counted by the route via `countGameMasterActiveCompetitions` — never inferred here.
+   */
+  activeCompetitions: number;
 }
 
 /**
  * May this Game Master create this contest right now?
  *
  * Refusals are checked in the order an operator would want to hear them: the permission to
- * create at all, then the game, then the daily quota. A Game Master told "daily limit
- * reached" when their package forbids creation entirely would wait until tomorrow and be
- * refused again.
+ * create at all, then the game, then the concurrent-active cap, then the daily quota. A Game
+ * Master told "daily limit reached" when they already hold too many open contests would wait
+ * until tomorrow and be refused again for a different reason.
  */
 export function checkGameMasterCanCreate(
   input: CheckCreationInput,
@@ -273,6 +289,15 @@ export function checkGameMasterCanCreate(
       // a permanent product statement rather than a setting. Naming the refused game keeps it
       // accurate when a second entry is granted.
       message: `Your Game Master package does not allow creating ${gameType} competitions.`,
+      gameType,
+    };
+  }
+
+  if (input.activeCompetitions >= input.limits.maxActiveCompetitions) {
+    return {
+      ok: false,
+      reason: "active_limit_reached",
+      message: `You already have ${input.activeCompetitions} active competition(s). Your package allows ${input.limits.maxActiveCompetitions} at once. Wait for one to finish or cancel a draft before creating another.`,
       gameType,
     };
   }

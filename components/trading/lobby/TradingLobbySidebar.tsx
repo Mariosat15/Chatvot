@@ -94,6 +94,8 @@ export interface TradingLobbySidebarProps {
   formatUTCDate: (date: Date) => string;
   /** The operator's level ladder, passed straight through to the entry button (R88/R90). */
   levelLadder: TitleLevel[];
+  /** Viewer id for the own-contest entry ban. */
+  currentUserId?: string;
 }
 
 export default function TradingLobbySidebar({
@@ -112,6 +114,7 @@ export default function TradingLobbySidebar({
   registrationClosed,
   formatUTCDate,
   levelLadder,
+  currentUserId,
 }: TradingLobbySidebarProps) {
   const difficulty =
     DIFFICULTY_STYLES.get(difficultyData.level) ?? {
@@ -138,6 +141,7 @@ export default function TradingLobbySidebar({
           userLevel={userLevel}
           registrationClosed={registrationClosed}
           levelLadder={levelLadder}
+          currentUserId={currentUserId}
         />
       )}
 

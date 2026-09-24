@@ -38,6 +38,7 @@ interface GameMaster {
   renewalPrice: number;
   limits: {
     maxCompetitionsPerDay: number;
+    maxActiveCompetitions?: number;
     maxUsersPerCompetition: number;
     referralFeePercentage: number;
     canCreateCompetitions: boolean;

@@ -5,6 +5,7 @@ import { auth } from "@/lib/better-auth/auth";
 import { connectToDatabase } from "@/database/mongoose";
 import { listContestableTitles } from "@/lib/services/game-providers/provider-contest.service";
 import { resolveCreationLimits } from "@/lib/services/gamemaster/game-permissions";
+import { countGameMasterActiveCompetitions } from "@/lib/services/gamemaster/active-competitions";
 import { loadGameMasterPackageConfig } from "@/lib/services/gamemaster/package-config";
 import { resolveGameMasterPlatformFeePercentage } from "@/lib/services/gamemaster/platform-fee";
 
@@ -75,13 +76,20 @@ export async function GET() {
         ? subscription.currentPeriodCompetitionsCreated
         : 0;
 
+    const activeCompetitions = await countGameMasterActiveCompetitions(
+      db,
+      session.user.id,
+    );
+
     return NextResponse.json({
       success: true,
       allowedGameTypes,
       canCreateCompetitions: effectiveLimits.canCreateCompetitions,
       maxUsersPerCompetition: effectiveLimits.maxUsersPerCompetition,
       maxCompetitionsPerDay: effectiveLimits.maxCompetitionsPerDay,
+      maxActiveCompetitions: effectiveLimits.maxActiveCompetitions,
       competitionsCreatedToday,
+      activeCompetitions,
       // Admin-controlled; GM UI shows this locked and the create route ignores body.
       platformFeePercentage,
       titles: titles.map((t) => ({

@@ -40,10 +40,12 @@ import type { TitleLevel } from "@/lib/constants/levels";
 interface GMSubscription {
   limits: {
     maxCompetitionsPerDay: number;
+    maxActiveCompetitions: number;
     maxUsersPerCompetition: number;
     referralFeePercentage: number;
   };
   currentPeriodCompetitionsCreated: number;
+  activeCompetitions: number;
   packageName: string;
 }
 
@@ -207,9 +209,20 @@ export default function GMCreateCompetitionContent({
 
         if (data.success && data.isGameMaster && data.subscription) {
           setSubscription({
-            limits: data.subscription.limits,
+            limits: {
+              maxCompetitionsPerDay:
+                data.subscription.limits.maxCompetitionsPerDay ?? 1,
+              maxActiveCompetitions:
+                data.subscription.limits.maxActiveCompetitions ?? 10,
+              maxUsersPerCompetition:
+                data.subscription.limits.maxUsersPerCompetition ?? 50,
+              referralFeePercentage:
+                data.subscription.limits.referralFeePercentage ?? 5,
+            },
             currentPeriodCompetitionsCreated:
               data.subscription.stats?.currentPeriodCompetitionsCreated || 0,
+            activeCompetitions:
+              data.subscription.stats?.activeCompetitions || 0,
             packageName: data.subscription.packageName || "Game Master",
           });
           // Set max participants based on package limit
@@ -537,10 +550,17 @@ export default function GMCreateCompetitionContent({
 
     if (!subscription || submitting || success) return;
 
-    // Check daily limit
+    // Check package caps (daily + concurrent active)
     const remainingToday =
       subscription.limits.maxCompetitionsPerDay -
       subscription.currentPeriodCompetitionsCreated;
+    const remainingActive =
+      subscription.limits.maxActiveCompetitions -
+      subscription.activeCompetitions;
+    if (remainingActive <= 0) {
+      toast.error("Active competition limit reached");
+      return;
+    }
     if (remainingToday <= 0) {
       toast.error("Daily competition limit reached");
       return;
@@ -739,7 +759,12 @@ export default function GMCreateCompetitionContent({
   const remainingToday =
     subscription.limits.maxCompetitionsPerDay -
     subscription.currentPeriodCompetitionsCreated;
-  const canCreate = remainingToday > 0;
+  const remainingActive =
+    subscription.limits.maxActiveCompetitions -
+    subscription.activeCompetitions;
+  const blockedByActive = remainingActive <= 0;
+  const blockedByDaily = remainingToday <= 0 && !blockedByActive;
+  const canCreate = remainingToday > 0 && remainingActive > 0;
 
   return (
     <div className="min-h-screen bg-[#0a0a0f] pb-16 lg:pb-0">
@@ -765,7 +790,9 @@ export default function GMCreateCompetitionContent({
                 </h1>
                 <p className="text-gray-400 text-sm truncate">
                   {subscription.packageName} • {remainingToday} /{" "}
-                  {subscription.limits.maxCompetitionsPerDay} remaining today
+                  {subscription.limits.maxCompetitionsPerDay} remaining today •{" "}
+                  {remainingActive} /{" "}
+                  {subscription.limits.maxActiveCompetitions} active slots
                 </p>
               </div>
             </div>
@@ -780,16 +807,37 @@ export default function GMCreateCompetitionContent({
                 )}
               >
                 {canCreate
-                  ? `${remainingToday} competition(s) available`
-                  : "Daily limit reached"}
+                  ? `${remainingToday} today · ${remainingActive} active slots`
+                  : blockedByActive
+                    ? "Active limit reached"
+                    : "Daily limit reached"}
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Daily Limit Warning */}
-      {!canCreate && (
+      {/* Cap warnings */}
+      {blockedByActive && (
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 mt-4 sm:mt-8">
+          <div className="p-3 sm:p-4 bg-red-500/10 border border-red-500/30 rounded-2xl flex items-start gap-3 sm:gap-4">
+            <AlertCircle className="h-6 w-6 text-red-400 flex-shrink-0" />
+            <div>
+              <h3 className="font-semibold text-red-400">
+                Active Competition Limit Reached
+              </h3>
+              <p className="text-gray-400 text-sm mt-1">
+                You already have {subscription.activeCompetitions} active
+                competition(s) (limit{" "}
+                {subscription.limits.maxActiveCompetitions}). Wait for one to
+                finish or cancel a draft before creating another.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {blockedByDaily && (
         <div className="max-w-7xl mx-auto px-3 sm:px-4 mt-4 sm:mt-8">
           <div className="p-3 sm:p-4 bg-red-500/10 border border-red-500/30 rounded-2xl flex items-start gap-3 sm:gap-4">
             <AlertCircle className="h-6 w-6 text-red-400 flex-shrink-0" />
@@ -959,6 +1007,12 @@ export default function GMCreateCompetitionContent({
                     <span>Daily Competitions:</span>
                     <span className="text-yellow-400 font-semibold">
                       {subscription.limits.maxCompetitionsPerDay}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-gray-400">
+                    <span>Max Active:</span>
+                    <span className="text-yellow-400 font-semibold">
+                      {subscription.limits.maxActiveCompetitions}
                     </span>
                   </div>
                   <div className="flex justify-between text-gray-400">

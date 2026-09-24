@@ -452,6 +452,7 @@ The **Starter Package** is your gateway to becoming a Game Master on ChartVolt. 
 ## What You Get
 
 - **1 Competition per Day** - Host daily trading battles for your community
+- **Up to 3 active at once** - Keep a small pipeline without stacking past your package
 - **Up to 30 Participants** - Perfect size for intimate, competitive events
 - **5% Referral Earnings** - Earn from every entry fee your referred users pay
 - **30 Days Duration** - Full month of Game Master privileges
@@ -484,6 +485,7 @@ When users sign up using your unique referral link and join ANY competition on t
   riskLevel: "low",
   gameMasterConfig: {
     maxCompetitionsPerDay: 1,
+    maxActiveCompetitions: 3,
     maxUsersPerCompetition: 30,
     referralFeePercentage: 5,
     subscriptionDurationDays: 30,
@@ -504,6 +506,7 @@ The **Pro Package** is designed for Game Masters who are serious about building 
 ## What You Get
 
 - **3 Competitions per Day** - Run morning, afternoon, and evening events
+- **Up to 10 active at once** - Keep a pipeline of contests without stacking past your package
 - **Up to 75 Participants** - Scale your competitions for bigger prize pools
 - **7.5% Referral Earnings** - 50% more earnings than Starter tier
 - **30 Days Duration** - Full month of enhanced privileges
@@ -540,6 +543,7 @@ At 7.5% referral rate, just 8,000 credits in entry fees from your referrals pays
   riskLevel: "low",
   gameMasterConfig: {
     maxCompetitionsPerDay: 3,
+    maxActiveCompetitions: 10,
     maxUsersPerCompetition: 75,
     referralFeePercentage: 7.5,
     subscriptionDurationDays: 30,
@@ -561,6 +565,7 @@ The **Elite Package** is for Game Masters who refuse to compromise. Maximum powe
 ## What You Get
 
 - **10 Competitions per Day** - Run events around the clock
+- **Up to 20 active at once** - Scale your calendar without losing track of open contests
 - **Up to 150 Participants** - Host massive tournaments with huge prize pools
 - **10% Referral Earnings** - The highest referral rate available
 - **30 Days Duration** - Full month of elite privileges
@@ -620,6 +625,7 @@ At 10% referral rate, your passive income potential is unmatched:
   riskLevel: "low",
   gameMasterConfig: {
     maxCompetitionsPerDay: 10,
+    maxActiveCompetitions: 20,
     maxUsersPerCompetition: 150,
     referralFeePercentage: 10,
     subscriptionDurationDays: 30,

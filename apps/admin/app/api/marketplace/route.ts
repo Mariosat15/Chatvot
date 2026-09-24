@@ -225,6 +225,13 @@ export async function PUT(request: NextRequest) {
           `   → maxCompetitionsPerDay: ${oldItem?.gameMasterConfig?.maxCompetitionsPerDay} → ${gmConfig.maxCompetitionsPerDay}`,
         );
       }
+      if (gmConfig.maxActiveCompetitions !== undefined) {
+        limitsUpdate["limits.maxActiveCompetitions"] =
+          gmConfig.maxActiveCompetitions;
+        console.log(
+          `   → maxActiveCompetitions: ${oldItem?.gameMasterConfig?.maxActiveCompetitions} → ${gmConfig.maxActiveCompetitions}`,
+        );
+      }
       if (gmConfig.maxUsersPerCompetition !== undefined) {
         limitsUpdate["limits.maxUsersPerCompetition"] =
           gmConfig.maxUsersPerCompetition;

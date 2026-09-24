@@ -131,6 +131,11 @@ export interface IStrategyConfig {
 // Game Master Package Configuration
 export interface IGameMasterConfig {
   maxCompetitionsPerDay: number; // How many competitions GM can create per day
+  /**
+   * Max contests that may be draft/upcoming/active at once for this package.
+   * Independent of the daily create quota.
+   */
+  maxActiveCompetitions?: number;
   maxUsersPerCompetition: number; // Max participants in GM-created competitions
   referralFeePercentage: number; // % of entry fees from referred users in competitions (e.g., 5 = 5%)
   subscriptionDurationDays: number; // Subscription period (typically 30 for monthly)
@@ -359,6 +364,7 @@ const MarketplaceItemSchema = new Schema<IMarketplaceItem>(
     iconName: String, // Lucide icon name for non-cosmetic items
     gameMasterConfig: {
       maxCompetitionsPerDay: { type: Number, min: 1, default: 1 },
+      maxActiveCompetitions: { type: Number, min: 1, default: 10 },
       maxUsersPerCompetition: { type: Number, min: 2, default: 50 },
       referralFeePercentage: { type: Number, min: 0, max: 50, default: 5 },
       subscriptionDurationDays: { type: Number, min: 1, default: 30 },

@@ -22,6 +22,7 @@ export type ContestEntryFailureCode =
   | "no_wallet"
   | "insufficient_balance"
   | "provider_unavailable"
+  | "own_contest"
   | "contended"
   | "failed";
 

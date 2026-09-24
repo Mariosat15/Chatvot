@@ -38,6 +38,7 @@ interface GMSubscription {
   renewalPrice: number;
   limits: {
     maxCompetitionsPerDay: number;
+    maxActiveCompetitions?: number;
     maxUsersPerCompetition: number;
     referralFeePercentage: number;
     canCreateCompetitions: boolean;
@@ -574,6 +575,10 @@ function OverviewTab({
               <InfoRow
                 label="Max Competitions/Day"
                 value={gm.limits?.maxCompetitionsPerDay || 1}
+              />
+              <InfoRow
+                label="Max Active Competitions"
+                value={gm.limits?.maxActiveCompetitions || 10}
               />
               <InfoRow
                 label="Max Users/Competition"

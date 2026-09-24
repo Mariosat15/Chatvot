@@ -622,6 +622,7 @@ function getGameMasterPrompt(
   if (canCreateCompetitions) {
     whatYouGetSection = `
 - **${gmConfig.maxCompetitionsPerDay || 1} Competition${(gmConfig.maxCompetitionsPerDay || 1) > 1 ? "s" : ""} per Day** - Host engaging contests for your community
+- **Up to ${gmConfig.maxActiveCompetitions || 10} Active at Once** - Concurrent live/upcoming contests your package allows
 - **Up to ${gmConfig.maxUsersPerCompetition || 30} Participants** - Perfect size for competitive events
 - **${gmConfig.referralFeePercentage ?? 5}% Referral Earnings** - Earn from every entry fee your referred users pay
 - **${gmConfig.subscriptionDurationDays || 30} Days Duration** - Full subscription period`;
@@ -687,6 +688,7 @@ Package configuration:
 ${
   canCreateCompetitions
     ? `- Max Competitions Per Day: ${gmConfig.maxCompetitionsPerDay || 1}
+- Max Active Competitions at Once: ${gmConfig.maxActiveCompetitions || 10}
 - Max Users Per Competition: ${gmConfig.maxUsersPerCompetition || 30}`
     : "- Competition Creation: DISABLED (Referral-Only Package)"
 }

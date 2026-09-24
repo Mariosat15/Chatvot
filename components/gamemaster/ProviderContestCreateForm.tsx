@@ -61,6 +61,9 @@ interface Props {
   /** Package daily cap — banner + Launch gate only; earlier steps stay editable. */
   maxCompetitionsPerDay: number;
   competitionsCreatedToday: number;
+  /** Concurrent draft/upcoming/active cap from the package. */
+  maxActiveCompetitions: number;
+  activeCompetitions: number;
   onBack: () => void;
 }
 
@@ -96,6 +99,8 @@ export default function ProviderContestCreateForm({
   platformFeePercentage,
   maxCompetitionsPerDay,
   competitionsCreatedToday,
+  maxActiveCompetitions,
+  activeCompetitions,
   onBack,
 }: Props) {
   const router = useRouter();
@@ -129,7 +134,13 @@ export default function ProviderContestCreateForm({
     0,
     maxCompetitionsPerDay - competitionsCreatedToday,
   );
-  const canCreate = remainingToday > 0;
+  const remainingActive = Math.max(
+    0,
+    maxActiveCompetitions - activeCompetitions,
+  );
+  const canCreate = remainingToday > 0 && remainingActive > 0;
+  const blockedByActive = remainingActive <= 0;
+  const blockedByDaily = remainingToday <= 0 && !blockedByActive;
 
   const prizeTotal = prizes.reduce((s, p) => s + Number(p.percentage || 0), 0);
   const entryNum = Number(entryFee) || 0;
@@ -166,9 +177,13 @@ export default function ProviderContestCreateForm({
   }
 
   function goNext() {
-    // Reason: daily cap blocks the whole wizard from step 1 — same as trading GM.
+    // Reason: either package cap blocks the whole wizard from step 1 — same as trading GM.
     if (!canCreate) {
-      toast.error("Daily competition limit reached");
+      toast.error(
+        blockedByActive
+          ? "Active competition limit reached"
+          : "Daily competition limit reached",
+      );
       return;
     }
     const err = validateStep(step);
@@ -181,7 +196,11 @@ export default function ProviderContestCreateForm({
 
   async function handleCreate() {
     if (!canCreate) {
-      toast.error("Daily competition limit reached");
+      toast.error(
+        blockedByActive
+          ? "Active competition limit reached"
+          : "Daily competition limit reached",
+      );
       return;
     }
     for (let n = 1; n <= 4; n++) {
@@ -219,7 +238,7 @@ export default function ProviderContestCreateForm({
           endTime: endIso,
           playWindowStart: startIso,
           playWindowEnd: endIso,
-          playMode: canPickMode ? playMode : undefined,
+          playMode,
           attemptsPolicy: "single",
           unresolvedRoundPolicy: "score_zero",
           unscoredContestPolicy: "refund_entry_fees",
@@ -264,13 +283,29 @@ export default function ProviderContestCreateForm({
             {title.providerName}
             {title.category ? ` · ${title.category}` : ""}
             {" · "}
-            {canCreate
-              ? `${remainingToday} / ${maxCompetitionsPerDay} remaining today`
-              : "Daily limit reached"}
+            {remainingToday} / {maxCompetitionsPerDay} remaining today
+            {" · "}
+            {remainingActive} / {maxActiveCompetitions} active slots
           </p>
         </div>
 
-        {!canCreate && (
+        {blockedByActive && (
+          <div className="mb-6 flex items-start gap-3 rounded-2xl border border-red-500/30 bg-red-500/10 p-3 sm:p-4">
+            <AlertCircle className="h-6 w-6 shrink-0 text-red-400" />
+            <div>
+              <h3 className="font-semibold text-red-400">
+                Active Competition Limit Reached
+              </h3>
+              <p className="mt-1 text-sm text-gray-400">
+                You already have {activeCompetitions} active competition(s)
+                (limit {maxActiveCompetitions}). Wait for one to finish or
+                cancel a draft before creating another.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {blockedByDaily && (
           <div className="mb-6 flex items-start gap-3 rounded-2xl border border-red-500/30 bg-red-500/10 p-3 sm:p-4">
             <AlertCircle className="h-6 w-6 shrink-0 text-red-400" />
             <div>

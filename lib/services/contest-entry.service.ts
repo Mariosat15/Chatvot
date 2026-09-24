@@ -138,6 +138,23 @@ export async function enterContest(
         );
       }
 
+      // Reason: a Game Master entering their own paid contest would debit their wallet into
+      // a pot they control the schedule of, and ranking themselves against their community
+      // is a conflict of interest. Refuse before any wallet read so a refusal cannot leave
+      // a debit applied. Trusted simulator actors still skip this (synthetic users).
+      if (
+        !actor.trusted &&
+        typeof competition.gameMasterId === "string" &&
+        competition.gameMasterId.length > 0 &&
+        competition.gameMasterId === actor.userId
+      ) {
+        await session.abortTransaction();
+        return fail(
+          "own_contest",
+          "You cannot enter a competition you created as a Game Master.",
+        );
+      }
+
       // Reason: a legacy bug set registrationDeadline an hour BEFORE startTime, which would
       // close entries before the contest existed. Treat startTime as the floor.
       if (competition.registrationDeadline) {

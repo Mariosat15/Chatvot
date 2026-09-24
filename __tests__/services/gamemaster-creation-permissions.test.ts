@@ -183,6 +183,7 @@ describe("allowedGameTypes", () => {
       limits: resolveCreationLimits({}),
       requestedGameType: "provider",
       competitionsCreatedToday: 0,
+      activeCompetitions: 0,
     });
 
     expect(verdict.ok).toBe(false);
@@ -196,6 +197,7 @@ describe("allowedGameTypes", () => {
       }),
       requestedGameType: "provider",
       competitionsCreatedToday: 0,
+      activeCompetitions: 0,
     });
 
     expect(verdict.ok).toBe(true);
@@ -205,6 +207,7 @@ describe("allowedGameTypes", () => {
   it("buildSubscriptionLimits carries allowedGameTypes onto the cached copy", () => {
     const limits = buildSubscriptionLimits({
       maxCompetitionsPerDay: 4,
+      maxActiveCompetitions: 8,
       maxUsersPerCompetition: 50,
       referralFeePercentage: 0,
       canCreateCompetitions: true,
@@ -212,6 +215,7 @@ describe("allowedGameTypes", () => {
     });
 
     expect(limits.allowedGameTypes).toEqual(["trading", "provider"]);
+    expect(limits.maxActiveCompetitions).toBe(8);
     // R31 again, on the WRITE side: buying a 0% package must store 0%.
     expect(limits.referralFeePercentage).toBe(0);
   });
@@ -229,6 +233,7 @@ describe("the refusal message names the right cause", () => {
       }),
       requestedGameType: "trading",
       competitionsCreatedToday: 0,
+      activeCompetitions: 0,
     });
 
     expect(verdict.ok).toBe(false);
@@ -245,6 +250,7 @@ describe("the refusal message names the right cause", () => {
       }),
       requestedGameType: "trading",
       competitionsCreatedToday: 0,
+      activeCompetitions: 0,
     });
 
     expect(verdict.ok).toBe(false);
@@ -263,6 +269,7 @@ describe("daily limit", () => {
         limits,
         requestedGameType: "trading",
         competitionsCreatedToday: 1,
+        activeCompetitions: 0,
       }).ok,
     ).toBe(true);
 
@@ -270,9 +277,62 @@ describe("daily limit", () => {
       limits,
       requestedGameType: "trading",
       competitionsCreatedToday: 2,
+      activeCompetitions: 0,
     });
     expect(atCap.ok).toBe(false);
     if (!atCap.ok) expect(atCap.reason).toBe("daily_limit_reached");
+  });
+});
+
+describe("concurrent active limit", () => {
+  it("refuses at the active cap independently of the daily quota", () => {
+    // Reason: a package can allow 10 creates/day while only 3 may be live at once.
+    // Checking only the daily counter would let a GM stockpile past the concurrent limit.
+    const limits = resolveCreationLimits({
+      packageConfig: {
+        maxCompetitionsPerDay: 10,
+        maxActiveCompetitions: 3,
+      },
+    });
+
+    expect(
+      checkGameMasterCanCreate({
+        limits,
+        requestedGameType: "trading",
+        competitionsCreatedToday: 0,
+        activeCompetitions: 2,
+      }).ok,
+    ).toBe(true);
+
+    const atCap = checkGameMasterCanCreate({
+      limits,
+      requestedGameType: "trading",
+      competitionsCreatedToday: 0,
+      activeCompetitions: 3,
+    });
+    expect(atCap.ok).toBe(false);
+    if (!atCap.ok) {
+      expect(atCap.reason).toBe("active_limit_reached");
+      expect(atCap.message).toMatch(/active/i);
+    }
+  });
+
+  it("checks the active cap before the daily one when both are hit", () => {
+    const limits = resolveCreationLimits({
+      packageConfig: {
+        maxCompetitionsPerDay: 1,
+        maxActiveCompetitions: 1,
+      },
+    });
+
+    const verdict = checkGameMasterCanCreate({
+      limits,
+      requestedGameType: "trading",
+      competitionsCreatedToday: 1,
+      activeCompetitions: 1,
+    });
+    expect(verdict.ok).toBe(false);
+    if (!verdict.ok) expect(verdict.reason).toBe("active_limit_reached");
   });
 });
 
@@ -377,6 +437,17 @@ describe("update_limits is an allow-list, not a spread", () => {
       expect(result.limits.maxCompetitionsPerDay).toBe(3);
       expect(result.limits.referralFeePercentage).toBe(5);
     }
+  });
+
+  it("accepts maxActiveCompetitions within bounds", () => {
+    const result = validateLimitsUpdate(stored, { maxActiveCompetitions: 12 });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.limits.maxActiveCompetitions).toBe(12);
+  });
+
+  it("refuses maxActiveCompetitions below 1", () => {
+    const result = validateLimitsUpdate(stored, { maxActiveCompetitions: 0 });
+    expect(result.ok).toBe(false);
   });
 
   it("refuses an empty allowedGameTypes rather than storing a lockout", () => {
@@ -581,6 +652,10 @@ describe("the creation badge reports a decision rather than making one", () => {
 describe("the gate is mirrored and stays model-free", () => {
   const MAIN = "lib/services/gamemaster/game-permissions.ts";
   const ADMIN = "apps/admin/lib/services/gamemaster/game-permissions.ts";
+  const ACTIVE = "lib/services/gamemaster/active-competitions.ts";
+  const ACTIVE_ADMIN = "apps/admin/lib/services/gamemaster/active-competitions.ts";
+  const LIMITS = "lib/services/gamemaster/subscription-limits.ts";
+  const LIMITS_ADMIN = "apps/admin/lib/services/gamemaster/subscription-limits.ts";
 
   it("both copies exist and agree", () => {
     // `check:mirrors` compares MODELS, so it has no opinion about this file. Two copies of
@@ -591,12 +666,61 @@ describe("the gate is mirrored and stays model-free", () => {
     );
   });
 
+  it("active-competitions counter is byte-identical in both apps", () => {
+    expect(read(ACTIVE_ADMIN).replace(/\r\n/g, "\n")).toBe(
+      read(ACTIVE).replace(/\r\n/g, "\n"),
+    );
+  });
+
+  it("subscription-limits is byte-identical in both apps", () => {
+    expect(read(LIMITS_ADMIN).replace(/\r\n/g, "\n")).toBe(
+      read(LIMITS).replace(/\r\n/g, "\n"),
+    );
+  });
+
   it.each([MAIN, ADMIN])("%s imports no model", (path) => {
     // It has to be importable from a raw-driver route and from a client-adjacent context,
     // and invariant 2 bans model imports from this layer.
     const source = code(path);
     expect(source).not.toMatch(/from\s+["']@?\/?.*database\/models/);
     expect(source).not.toMatch(/mongoose/i);
+  });
+});
+
+describe("both creation routes count active competitions before the gate", () => {
+  const MAIN = "app/api/gamemaster/competitions/route.ts";
+  const ADMIN = "apps/admin/app/api/gamemaster/competitions/route.ts";
+
+  it.each([MAIN, ADMIN])(
+    "%s passes activeCompetitions into checkGameMasterCanCreate",
+    (path) => {
+      const source = code(path);
+      expect(source).toMatch(/countGameMasterActiveCompetitions\s*\(/);
+      expect(source).toMatch(/activeCompetitions\s*,/);
+      expect(source).toMatch(/active_limit_reached/);
+    },
+  );
+});
+
+describe("contest entry refuses a Game Master joining their own contest", () => {
+  const ENTRY = "lib/services/contest-entry.service.ts";
+  const TYPES = "lib/services/contest-entry/types.ts";
+  const BUTTON = "components/trading/CompetitionEntryButton.tsx";
+
+  it("service refuses when gameMasterId matches the actor", () => {
+    const source = code(ENTRY);
+    expect(source).toMatch(/own_contest/);
+    expect(source).toMatch(/gameMasterId\s*===\s*actor\.userId/);
+  });
+
+  it("own_contest is a declared refusal code", () => {
+    expect(code(TYPES)).toMatch(/"own_contest"/);
+  });
+
+  it("entry button withholds when currentUserId matches competition.gameMasterId", () => {
+    const source = code(BUTTON);
+    expect(source).toMatch(/isOwnContest/);
+    expect(source).toMatch(/gameMasterId\s*===\s*currentUserId/);
   });
 });
 
@@ -627,6 +751,13 @@ describe("GM dashboard and status show live package comps/day", () => {
     expect(source).toMatch(/loadGameMasterPackageConfig\s*\(/);
     // Response must ship the resolved `limits` object, not the raw cached subdocument.
     expect(source).toMatch(/maxCompetitionsPerDay:\s*effective\.maxCompetitionsPerDay/);
+    expect(source).toMatch(/maxActiveCompetitions:\s*effective\.maxActiveCompetitions/);
+  });
+
+  it("marketplace sync pushes maxActiveCompetitions onto subscriptions", () => {
+    expect(code(MARKETPLACE)).toMatch(
+      /limits\.maxActiveCompetitions/,
+    );
   });
 
   it("marketplace sync matches string and ObjectId packageId", () => {

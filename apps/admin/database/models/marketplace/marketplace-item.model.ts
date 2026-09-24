@@ -133,6 +133,8 @@ export interface IGameMasterConfig {
   subscriptionDurationDays: number; // How long the subscription lasts (e.g., 30 days)
   referralFeePercentage: number; // % of entry fees earned from referrals in competitions (e.g., 5, 7.5, 10)
   maxCompetitionsPerDay: number; // How many competitions can be created per day
+  /** Max contests that may be draft/upcoming/active at once. Independent of daily quota. */
+  maxActiveCompetitions?: number;
   maxUsersPerCompetition: number; // Max participants in GM-created competitions
   canCreateCompetitions: boolean; // Whether this package allows GM to create competitions (true = can create, false = earn only from admin competitions)
   canEarnFromChallenges: boolean; // Whether GM earns referral fees from 1v1 challenges
@@ -350,6 +352,7 @@ const MarketplaceItemSchema = new Schema<IMarketplaceItem>(
       subscriptionDurationDays: { type: Number, default: 30 },
       referralFeePercentage: { type: Number, default: 5 },
       maxCompetitionsPerDay: { type: Number, default: 1 },
+      maxActiveCompetitions: { type: Number, min: 1, default: 10 },
       maxUsersPerCompetition: { type: Number, default: 50 },
       canCreateCompetitions: { type: Boolean, default: true },
       canEarnFromChallenges: { type: Boolean, default: false },

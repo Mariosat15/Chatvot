@@ -57,6 +57,12 @@ interface CompetitionEntryButtonProps {
    * and the compiler names them, so the guarantee costs nothing and needs no test.
    */
   levelLadder: TitleLevel[];
+  /**
+   * Signed-in viewer id. When it matches `competition.gameMasterId`, entry is withheld —
+   * a Game Master must not pay into a pot they schedule. Server still refuses; this is the
+   * visible half so they do not hit terms then a toast.
+   */
+  currentUserId?: string;
 }
 
 export default function CompetitionEntryButton({
@@ -68,6 +74,7 @@ export default function CompetitionEntryButton({
   userLevel,
   registrationClosed = false,
   levelLadder,
+  currentUserId,
 }: CompetitionEntryButtonProps) {
   const [entering, setEntering] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
@@ -168,6 +175,15 @@ export default function CompetitionEntryButton({
 
   const levelReqMessage = getLevelReqMessage();
 
+  // Reason: a Game Master entering their own paid contest is a conflict of interest
+  // (schedule control + pot they earn from). Contests with no gameMasterId are admin-run.
+  const isOwnContest =
+    typeof currentUserId === "string" &&
+    currentUserId.length > 0 &&
+    typeof competition.gameMasterId === "string" &&
+    competition.gameMasterId.length > 0 &&
+    competition.gameMasterId === currentUserId;
+
   // Reason: Block entry if registration deadline has passed, even if competition is still "active"
   const canEnter =
     (isActive || isUpcoming) &&
@@ -175,7 +191,8 @@ export default function CompetitionEntryButton({
     canAfford &&
     !isUserIn &&
     meetsLevelReq &&
-    !registrationClosed;
+    !registrationClosed &&
+    !isOwnContest;
 
   /*
     HOW LONG IS LEFT TO JOIN, which this panel never said.
@@ -247,6 +264,11 @@ export default function CompetitionEntryButton({
 
     if (isUserIn) {
       toast.info("You are already in this competition");
+      return;
+    }
+
+    if (isOwnContest) {
+      toast.error("You cannot enter a competition you created as a Game Master.");
       return;
     }
 
@@ -529,6 +551,11 @@ export default function CompetitionEntryButton({
                 <Lock className="mr-2 h-4 w-4" />
                 Registration Closed
               </>
+            ) : isOwnContest ? (
+              <>
+                <Ban className="mr-2 h-4 w-4" />
+                Your Own Competition
+              </>
             ) : !meetsLevelReq ? (
               <>
                 <Lock className="mr-2 h-4 w-4" />
@@ -555,6 +582,16 @@ export default function CompetitionEntryButton({
               <Lock className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
               <p className="text-xs text-red-400">
                 Registration for this competition has closed. No new entries are being accepted.
+              </p>
+            </div>
+          )}
+
+          {isOwnContest && !isUserIn && (
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+              <Ban className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-400">
+                You created this competition as a Game Master, so you cannot enter it as a
+                player.
               </p>
             </div>
           )}

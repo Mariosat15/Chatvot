@@ -33,6 +33,7 @@ export interface IGameMasterSubscription extends Document {
   // Package Limits (copied from package at activation)
   limits: {
     maxCompetitionsPerDay: number;
+    maxActiveCompetitions: number;
     maxUsersPerCompetition: number;
     referralFeePercentage: number; // % of entry fees from referred users in competitions
     canCreateCompetitions: boolean; // Whether package allows competition creation
@@ -49,6 +50,7 @@ export interface IGameMasterSubscription extends Document {
   // Only applies when competitionCreationOverride === 'enabled'
   overrideLimits?: {
     maxCompetitionsPerDay?: number;
+    maxActiveCompetitions?: number;
     maxUsersPerCompetition?: number;
   };
 
@@ -165,6 +167,12 @@ const GameMasterSubscriptionSchema = new Schema<IGameMasterSubscription>(
         required: true,
         default: 1,
       },
+      maxActiveCompetitions: {
+        type: Number,
+        required: true,
+        default: 10,
+        min: 1,
+      },
       maxUsersPerCompetition: {
         type: Number,
         required: true,
@@ -215,6 +223,10 @@ const GameMasterSubscriptionSchema = new Schema<IGameMasterSubscription>(
     },
     overrideLimits: {
       maxCompetitionsPerDay: {
+        type: Number,
+        min: 1,
+      },
+      maxActiveCompetitions: {
         type: Number,
         min: 1,
       },
