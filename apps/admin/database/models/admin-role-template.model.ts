@@ -187,6 +187,7 @@ export const DEFAULT_ROLE_TEMPLATES: RoleTemplateInput[] = [
       "performance-simulator",
       "image-optimizer",
       "dependency-updates",
+      "command-alerts",
       "database",
       "ai-agent",
       "ai-knowledge",

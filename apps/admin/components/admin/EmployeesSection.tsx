@@ -179,6 +179,7 @@ const SECTION_LABELS: Record<string, string> = {
   "performance-simulator": "Performance Simulator",
   "image-optimizer": "Image Optimizer",
   "dependency-updates": "Dependency Updates",
+  "command-alerts": "Command Alerts",
   "data-cleanup": "Data Cleanup",
   // Admin
   employees: "Employees",
@@ -237,6 +238,7 @@ const SECTION_GROUPS = {
     "performance-simulator",
     "image-optimizer",
     "dependency-updates",
+    "command-alerts",
     "data-cleanup",
   ],
   Admin: ["employees"],

@@ -115,6 +115,7 @@ import ServerFleetSection from "@/components/admin/ServerFleetSection";
 import ServerOptionsSection from "@/components/admin/ServerOptionsSection";
 import DevSettingsSection from "@/components/admin/DevSettingsSection";
 import ImageOptimizerSection from "@/components/admin/ImageOptimizerSection";
+import CommandAlertsSection from "@/components/admin/CommandAlertsSection";
 import TradingHistorySection from "@/components/admin/TradingHistorySection";
 import PerformanceSimulatorSection from "@/components/admin/PerformanceSimulatorSection";
 import WithdrawalSettingsSection from "@/components/admin/WithdrawalSettingsSection";
@@ -768,6 +769,11 @@ const menuGroups: MenuGroup[] = [
             icon: <Package className="h-4 w-4" />,
           },
           {
+            id: "command-alerts",
+            label: "Command Alerts",
+            icon: <AlertTriangle className="h-4 w-4" />,
+          },
+          {
             id: "data-cleanup",
             label: "Data Cleanup",
             icon: <Trash2 className="h-4 w-4" />,
@@ -1258,6 +1264,8 @@ export default function AdminDashboard({
         return <PerformanceSimulatorSection key={currentRefreshKey} />;
       case "dependency-updates":
         return <DependencyUpdatesSection key={currentRefreshKey} />;
+      case "command-alerts":
+        return <CommandAlertsSection key={currentRefreshKey} />;
       case "image-optimizer":
         return <ImageOptimizerSection key={currentRefreshKey} />;
       case "data-cleanup":

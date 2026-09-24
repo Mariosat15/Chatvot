@@ -901,6 +901,23 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 24 Sep 2026 - Dev Zone Command Alerts (SecurityAlert feed)
+
+**Shipped:** Admin **Dev Zone → Command Alerts** — paginated live feed of the same
+`SecurityAlert` documents that print `🚨 [SECURITY]` in PM2 / worker logs. No log
+scraping, no websocket; soft 30s poll only while the tab is visible. Filters by
+category (provider / security / payment / other), severity, open/ack/all, and text
+search; page sizes 10/25/50/100; delete selected or matching filters (cap 5k);
+auto-delete toggle with retention **1 / 5 / 7 / 30** days (off by default; daily
+Agenda job `security-alert-purge`). Section id `command-alerts` (add-only).
+
+**Live code:** `CommandAlertsSection` + RetentionCard + Table,
+`/api/dev-zone/command-alerts`, `lib/services/security/security-alert-ops.service.ts`,
+`database/models/security-alert-settings.model.ts`, `worker/jobs/security-alert-purge.job.ts`.
+
+**Tests:** `__tests__/admin/command-alerts.test.ts`. **Restart the worker** after
+deploy so the purge job is registered. Never verified by eye.
+
 ### 24 Sep 2026 - R114 prize_pool_mismatch ignored paid GM earnings
 
 **False alert, not a wrong payout.** "This is annw" settled correctly: prize 18 + platform fee 1.50 (net of GM) + Martha GM referral 0.50 = prizePool 20. `checkPrizePoolMismatch` summed prizes + PlatformTransaction + refunds and never counted WalletTransaction `gamemaster_earning` — sibling of R113. Equation now includes completed `gamemaster_earning` by `competitionId`. Two tests. Dismiss the existing SecurityAlert; restart the worker after deploy. **Nothing backfilled.**

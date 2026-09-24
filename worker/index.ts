@@ -16,6 +16,7 @@
  * - provider-outage-pause: Pause live contests on provider down; resume+extend on recovery
  * - provider-threshold-monitors: Chapter 06 s10 threshold SecurityAlerts (every 1 minute)
  * - catalogue-friday-auto-sync: Opt-in Friday 00:00 UTC catalogue pull (hourly tick)
+ * - security-alert-purge: Dev Zone auto-delete of old SecurityAlerts (daily, off by default)
  * - trade-queue: Process limit orders (every 1 minute) — TP/SL handled by real-time service
  * - evaluate-badges: Evaluate user badges (every 1 hour)
  * (price-cache REMOVED — WEB app WebSocket writes prices to PriceCache)
@@ -49,6 +50,7 @@ import { runProviderKillSwitchCheck } from "./jobs/provider-kill-switch.job";
 import { runProviderOutagePauseCheck } from "./jobs/provider-outage-pause.job";
 import { runProviderThresholdMonitorsCheck } from "./jobs/provider-threshold-monitors.job";
 import { runCatalogueFridayAutoSyncCheck } from "./jobs/catalogue-friday-auto-sync.job";
+import { runSecurityAlertPurgeCheck } from "./jobs/security-alert-purge.job";
 import { runTradeQueueProcessor } from "./jobs/trade-queue.job";
 // NOTE: price-cache job REMOVED — WebSocket streamer already writes prices every 1s.
 // The worker's price-cache job was redundant (external API call + ~33 upserts/minute duplicating
@@ -346,6 +348,18 @@ agenda.define("catalogue-friday-auto-sync", async () => {
 });
 
 /**
+ * Security alert retention purge (Dev Zone → Command Alerts).
+ * Daily; no-ops when auto-delete is off.
+ */
+agenda.define("security-alert-purge", async () => {
+  try {
+    await runSecurityAlertPurgeCheck();
+  } catch (error) {
+    console.error(`🧹 [SECURITY ALERT PURGE] Failed:`, error);
+  }
+});
+
+/**
  * Trade Queue Processor Job
  * - Processes pending limit orders every minute
  * - BACKUP sweep for TP/SL (real-time triggering happens in WebSocket handler!)
@@ -593,6 +607,7 @@ async function startWorker(): Promise<void> {
     await agenda.every("1 minute", "provider-outage-pause");
     await agenda.every("1 minute", "provider-threshold-monitors");
     await agenda.every("1 hour", "catalogue-friday-auto-sync");
+    await agenda.every("1 day", "security-alert-purge");
     await agenda.every("1 minute", "early-end-check");
     await agenda.every("1 minute", "trade-queue");
     // price-cache REMOVED — redundant with WEB app's WebSocket PriceCache writes

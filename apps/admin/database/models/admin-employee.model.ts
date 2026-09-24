@@ -149,6 +149,13 @@ export const ADMIN_SECTIONS = [
   "image-optimizer",
   "dependency-updates",
   /*
+    Command Alerts is a real screen (CommandAlertsSection, menu id command-alerts)
+    listing SecurityAlert rows that already print in PM2. Added so
+    guardSection("command-alerts") can name the calling screen. Add-only;
+    nobody's access widens.
+  */
+  "command-alerts",
+  /*
     Data Cleanup and Data Maintenance are real screens (DataCleanupSection /
     DataMaintenanceSection, menu ids data-cleanup / data-maintenance) and were never
     ADMIN_SECTIONS values, so only a super admin could open the tab and no grant could
