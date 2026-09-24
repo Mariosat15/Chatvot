@@ -5,6 +5,10 @@ export interface DashboardStats {
   activeReferredUsers: number;
   totalCompetitions: number;
   activeCompetitions: number;
+  /** Package concurrent cap — denominator for Active / Slots Left KPIs. */
+  maxActiveCompetitions?: number;
+  /** maxActiveCompetitions − activeCompetitions, floored at 0. */
+  remainingActiveSlots?: number;
   completedCompetitions: number;
   totalEarnings: number;
   paidEarnings: number;
@@ -17,6 +21,7 @@ export interface CompetitionItem {
   name: string;
   status: string;
   participants: number;
+  minParticipants?: number;
   maxParticipants: number;
   prizePool: number;
   entryFee: number;
@@ -69,6 +74,7 @@ export interface SubscriptionData {
   totalCompetitionsCreated?: number;
   limits: {
     maxCompetitionsPerDay?: number;
+    maxActiveCompetitions?: number;
     maxUsersPerCompetition?: number;
     referralFeePercentage?: number;
     challengeReferralFeePercentage?: number;

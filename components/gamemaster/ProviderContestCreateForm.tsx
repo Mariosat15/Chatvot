@@ -298,8 +298,9 @@ export default function ProviderContestCreateForm({
               </h3>
               <p className="mt-1 text-sm text-gray-400">
                 You already have {activeCompetitions} active competition(s)
-                (limit {maxActiveCompetitions}). Wait for one to finish or
-                cancel a draft before creating another.
+                (limit {maxActiveCompetitions}). Wait for one to finish (or
+                for an upcoming contest to drop below its minimum entrants)
+                before creating another.
               </p>
             </div>
           </div>

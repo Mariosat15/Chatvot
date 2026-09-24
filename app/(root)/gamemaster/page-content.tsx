@@ -10,6 +10,7 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { OverviewTab, CompetitionsTab, ReferralsTab, EarningsTab } from "./gamemaster-dashboard-tabs";
+import { isGameMasterActiveCompetition } from "@/lib/services/gamemaster/active-competitions";
 import { WarningBanner, RefField, KPI, SubscriptionPanel, CancelModal } from "./gamemaster-dashboard-helpers";
 import { useGmSubscription } from "./use-gm-subscription";
 import type { DashboardStats, CompetitionItem, EarningItem, ReferralItem, SubscriptionData, EarningsByGameRow } from "./gamemaster-dashboard-types";
@@ -124,7 +125,13 @@ export default function GameMasterDashboardContent() {
     if (!data?.recentCompetitions) return null;
     const comps = data.recentCompetitions;
     return {
-      active: comps.filter((c) => c.status === "active").length,
+      active: comps.filter((c) =>
+        isGameMasterActiveCompetition({
+          status: c.status,
+          currentParticipants: c.participants,
+          minParticipants: c.minParticipants,
+        }),
+      ).length,
       completed: comps.filter((c) => c.status === "completed").length,
       upcoming: comps.filter((c) => c.status === "upcoming").length,
       cancelled: comps.filter((c) => c.status === "cancelled").length,
@@ -222,12 +229,23 @@ export default function GameMasterDashboardContent() {
         </div>
 
         {/* KPI Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-2 sm:gap-3">
           <KPI icon={TrendingUp} color="emerald" label="Total Earnings" value={`⚡ ${(stats?.totalEarnings ?? 0).toFixed(2)}`} />
           <KPI icon={Clock} color="yellow" label="Pending" value={`⚡ ${(stats?.pendingEarnings ?? 0).toFixed(2)}`} />
           <KPI icon={Users} color="blue" label="Total Referrals" value={String(stats?.totalReferredUsers ?? 0)} />
           <KPI icon={Users} color="purple" label="Active Referrals" value={String(stats?.activeReferredUsers ?? 0)} />
-          <KPI icon={Trophy} color="amber" label="Competitions" value={String(stats?.totalCompetitions ?? 0)} />
+          <KPI
+            icon={Trophy}
+            color="emerald"
+            label="Active Competitions"
+            value={`${stats?.activeCompetitions ?? 0}/${stats?.maxActiveCompetitions ?? sub.limits?.maxActiveCompetitions ?? 10}`}
+          />
+          <KPI
+            icon={Trophy}
+            color="amber"
+            label="Slots Left"
+            value={`${stats?.remainingActiveSlots ?? Math.max(0, (stats?.maxActiveCompetitions ?? sub.limits?.maxActiveCompetitions ?? 10) - (stats?.activeCompetitions ?? 0))}/${stats?.maxActiveCompetitions ?? sub.limits?.maxActiveCompetitions ?? 10}`}
+          />
           <KPI icon={Calendar} color={daysRemaining <= 3 ? "red" : daysRemaining <= 7 ? "yellow" : "emerald"} label="Days Left" value={String(daysRemaining)} pulse={daysRemaining <= 3 && daysRemaining > 0} />
         </div>
 

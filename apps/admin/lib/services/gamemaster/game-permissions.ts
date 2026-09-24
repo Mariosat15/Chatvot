@@ -297,7 +297,7 @@ export function checkGameMasterCanCreate(
     return {
       ok: false,
       reason: "active_limit_reached",
-      message: `You already have ${input.activeCompetitions} active competition(s). Your package allows ${input.limits.maxActiveCompetitions} at once. Wait for one to finish or cancel a draft before creating another.`,
+      message: `You already have ${input.activeCompetitions} active competition(s). Your package allows ${input.limits.maxActiveCompetitions} at once. Wait for one to finish (or for an upcoming contest to drop below its minimum entrants) before creating another.`,
       gameType,
     };
   }

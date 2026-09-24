@@ -258,6 +258,39 @@ export async function GET(request: NextRequest) {
       pendingEarningsAgg.map((e: any) => [e._id, e.pendingEarnings || 0]),
     );
 
+    // Concurrent active contests per GM (same rule as create gate + GM dashboard).
+    const gmUserIds = gmSubscriptions.map((gm: any) => gm.userId).filter(Boolean);
+    const activeCompsByGm = new Map<string, number>();
+    if (gmUserIds.length > 0) {
+      const activeAgg = await db
+        .collection("competitions")
+        .aggregate([
+          {
+            $match: {
+              gameMasterId: { $in: gmUserIds },
+              $or: [
+                { status: "active" },
+                { status: "draft" },
+                {
+                  status: "upcoming",
+                  $expr: {
+                    $gte: [
+                      { $ifNull: ["$currentParticipants", 0] },
+                      { $ifNull: ["$minParticipants", 2] },
+                    ],
+                  },
+                },
+              ],
+            },
+          },
+          { $group: { _id: "$gameMasterId", count: { $sum: 1 } } },
+        ])
+        .toArray();
+      for (const row of activeAgg) {
+        activeCompsByGm.set(row._id, row.count || 0);
+      }
+    }
+
     // Reason: Use TradeHistory as SINGLE SOURCE OF TRUTH for totalTrades and winRate.
     // This matches getCombinedTradingStats (profile) and getComprehensiveDashboardData (dashboard).
     // CompetitionParticipant/ChallengeParticipant aggregate fields can drift from actual trade records.
@@ -508,11 +541,22 @@ export async function GET(request: NextRequest) {
               endDate: gmSubscription.endDate,
               autoRenew: gmSubscription.autoRenew,
               totalReferredUsers: gmSubscription.totalReferredUsers || 0,
+              activeReferredUsers: gmSubscription.activeReferredUsers || 0,
               totalEarnings: gmSubscription.totalEarnings || 0,
               // Use calculated pending earnings from gamemasterearnings (source of truth)
               pendingEarnings: actualPendingEarnings.get(userId) || 0,
               totalCompetitionsCreated:
                 gmSubscription.totalCompetitionsCreated || 0,
+              currentPeriodCompetitionsCreated:
+                gmSubscription.currentPeriodCompetitionsCreated || 0,
+              activeCompetitions: activeCompsByGm.get(userId) || 0,
+              maxActiveCompetitions:
+                gmSubscription.limits?.maxActiveCompetitions ?? 10,
+              remainingActiveSlots: Math.max(
+                0,
+                (gmSubscription.limits?.maxActiveCompetitions ?? 10) -
+                  (activeCompsByGm.get(userId) || 0),
+              ),
               limits: gmSubscription.limits,
               isPaused: gmSubscription.isPaused || false,
               scheduledForDeletion:

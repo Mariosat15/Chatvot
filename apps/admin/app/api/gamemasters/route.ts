@@ -128,6 +128,38 @@ export async function GET(request: NextRequest) {
       ]),
     );
 
+    const gmUserIds = gamemasters.map((gm) => gm.userId).filter(Boolean);
+    const activeCompsByGm = new Map<string, number>();
+    if (gmUserIds.length > 0) {
+      const activeAgg = await db
+        .collection("competitions")
+        .aggregate([
+          {
+            $match: {
+              gameMasterId: { $in: gmUserIds },
+              $or: [
+                { status: "active" },
+                { status: "draft" },
+                {
+                  status: "upcoming",
+                  $expr: {
+                    $gte: [
+                      { $ifNull: ["$currentParticipants", 0] },
+                      { $ifNull: ["$minParticipants", 2] },
+                    ],
+                  },
+                },
+              ],
+            },
+          },
+          { $group: { _id: "$gameMasterId", count: { $sum: 1 } } },
+        ])
+        .toArray();
+      for (const row of activeAgg) {
+        activeCompsByGm.set(row._id as string, (row.count as number) || 0);
+      }
+    }
+
     return NextResponse.json({
       gamemasters: gamemasters.map((gm) => {
         // Get CURRENT package settings (not cached subscription limits)
@@ -152,6 +184,9 @@ export async function GET(request: NextRequest) {
               canCreateCompetitions: gm.limits?.canCreateCompetitions ?? true,
             };
 
+        const activeCompetitions = activeCompsByGm.get(gm.userId) || 0;
+        const maxActive = currentLimits.maxActiveCompetitions ?? 10;
+
         return {
           id: gm._id.toString(),
           userId: gm.userId,
@@ -172,6 +207,9 @@ export async function GET(request: NextRequest) {
           // Use calculated pending earnings from gamemasterearnings (source of truth)
           pendingEarnings: actualPendingEarnings.get(gm.userId) || 0,
           totalCompetitionsCreated: gm.totalCompetitionsCreated,
+          activeCompetitions,
+          maxActiveCompetitions: maxActive,
+          remainingActiveSlots: Math.max(0, maxActive - activeCompetitions),
           createdAt: gm.createdAt,
         };
       }),

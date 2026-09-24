@@ -830,7 +830,8 @@ export default function GMCreateCompetitionContent({
                 You already have {subscription.activeCompetitions} active
                 competition(s) (limit{" "}
                 {subscription.limits.maxActiveCompetitions}). Wait for one to
-                finish or cancel a draft before creating another.
+                finish (or for an upcoming contest to drop below its minimum
+                entrants) before creating another.
               </p>
             </div>
           </div>

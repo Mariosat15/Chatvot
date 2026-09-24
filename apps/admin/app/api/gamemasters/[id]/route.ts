@@ -9,6 +9,10 @@ import {
   resolveCreationLimits,
   type StoredPackageConfig,
 } from "@/lib/services/gamemaster/game-permissions";
+import {
+  countGameMasterActiveCompetitions,
+  remainingActiveCompetitionSlots,
+} from "@/lib/services/gamemaster/active-competitions";
 import mongoose from "mongoose";
 import { ObjectId } from "mongodb";
 
@@ -113,6 +117,7 @@ export async function GET(
         name: 1,
         status: 1,
         currentParticipants: 1,
+        minParticipants: 1,
         prizePool: 1,
         startTime: 1,
         endTime: 1,
@@ -120,6 +125,11 @@ export async function GET(
       .sort({ createdAt: -1 })
       .limit(20)
       .toArray();
+
+    const activeCompetitions = await countGameMasterActiveCompetitions(
+      db,
+      subscription.userId,
+    );
 
     // Get earnings history
     const earnings = await db
@@ -197,6 +207,12 @@ export async function GET(
         currentPeriodCompetitionsCreated:
           subscription.currentPeriodCompetitionsCreated,
         totalCompetitionsCreated: subscription.totalCompetitionsCreated,
+        activeCompetitions,
+        maxActiveCompetitions: currentLimits.maxActiveCompetitions,
+        remainingActiveSlots: remainingActiveCompetitionSlots(
+          activeCompetitions,
+          currentLimits.maxActiveCompetitions,
+        ),
         totalEarnings: subscription.totalEarnings,
         // Use calculated pending earnings from gamemasterearnings (source of truth)
         pendingEarnings: actualPendingEarnings,
@@ -221,6 +237,7 @@ export async function GET(
         name: c.name,
         status: c.status,
         participants: c.currentParticipants,
+        minParticipants: c.minParticipants ?? 2,
         prizePool: c.prizePool,
         startTime: c.startTime,
         endTime: c.endTime,

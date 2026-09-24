@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import CompetitionCreationControl from "./gamemaster/CompetitionCreationControl";
+import { isGameMasterActiveCompetition } from "@/lib/services/gamemaster/active-competitions";
 
 // ─── Interfaces ───────────────────────────────────────────────────────
 interface GMSubscription {
@@ -55,6 +56,10 @@ interface GMSubscription {
   totalReferredUsers: number;
   totalEarnings: number;
   totalCompetitionsCreated: number;
+  /** Concurrent active contests (min participants met, or running / draft). */
+  activeCompetitions?: number;
+  maxActiveCompetitions?: number;
+  remainingActiveSlots?: number;
   createdAt: string;
   pendingEarnings: number;
   activeReferredUsers: number;
@@ -80,6 +85,7 @@ interface GMCompetition {
   name: string;
   status: string;
   participants: number;
+  minParticipants?: number;
   prizePool: number;
   startTime: string;
   endTime: string;
@@ -140,9 +146,16 @@ export default function GameMasterDetailView({
 
   // ─── Computed Stats ──────────────────────────────
   const compStats = useMemo(() => {
-    const active = data.competitions.filter(
-      (c) => c.status === "active",
-    ).length;
+    const active =
+      typeof gm.activeCompetitions === "number"
+        ? gm.activeCompetitions
+        : data.competitions.filter((c) =>
+            isGameMasterActiveCompetition({
+              status: c.status,
+              currentParticipants: c.participants,
+              minParticipants: c.minParticipants,
+            }),
+          ).length;
     const completed = data.competitions.filter(
       (c) => c.status === "completed",
     ).length;
@@ -160,6 +173,12 @@ export default function GameMasterDetailView({
       (s, c) => s + (c.participants || 0),
       0,
     );
+    const maxActive =
+      gm.maxActiveCompetitions ?? gm.limits.maxActiveCompetitions ?? 10;
+    const remaining =
+      typeof gm.remainingActiveSlots === "number"
+        ? gm.remainingActiveSlots
+        : Math.max(0, maxActive - active);
     return {
       active,
       completed,
@@ -168,8 +187,11 @@ export default function GameMasterDetailView({
       totalPrizePool,
       totalParticipants,
       total: data.competitions.length,
+      maxActive,
+      remaining,
+      created: gm.totalCompetitionsCreated,
     };
-  }, [data.competitions]);
+  }, [data.competitions, gm]);
 
   const earningStats = useMemo(() => {
     const paid = data.earnings
@@ -344,7 +366,7 @@ export default function GameMasterDetailView({
       </div>
 
       {/* ─── KPI Cards ──────────────────────────────── */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-3">
         <KPICard
           label="Days Left"
           value={daysRemaining}
@@ -363,6 +385,11 @@ export default function GameMasterDetailView({
           color="blue"
         />
         <KPICard
+          label="Active Referrals"
+          value={gm.activeReferredUsers}
+          color="cyan"
+        />
+        <KPICard
           label="Total Earnings"
           value={(gm.totalEarnings ?? 0).toFixed(2)}
           color="green"
@@ -375,14 +402,19 @@ export default function GameMasterDetailView({
           prefix=""
         />
         <KPICard
-          label="Competitions"
-          value={gm.totalCompetitionsCreated}
+          label="Comps Created"
+          value={compStats.created}
           color="purple"
         />
         <KPICard
           label="Active Comps"
-          value={compStats.active}
+          value={`${compStats.active}/${compStats.maxActive}`}
           color="emerald"
+        />
+        <KPICard
+          label="Slots Left"
+          value={`${compStats.remaining}/${compStats.maxActive}`}
+          color="amber"
         />
       </div>
 
@@ -470,6 +502,8 @@ function KPICard({
     ["blue", "text-blue-400"],
     ["purple", "text-purple-400"],
     ["emerald", "text-emerald-400"],
+    ["amber", "text-amber-400"],
+    ["cyan", "text-cyan-400"],
     ["white", "text-white"],
   ]);
   return (
@@ -504,6 +538,9 @@ function OverviewTab({
     totalPrizePool: number;
     totalParticipants: number;
     total: number;
+    maxActive: number;
+    remaining: number;
+    created: number;
   };
   earningStats: {
     paid: number;
@@ -634,13 +671,18 @@ function OverviewTab({
           <div className="grid grid-cols-2 gap-4">
             <MiniStat
               label="Total Created"
-              value={compStats.total}
+              value={compStats.created}
               color="white"
             />
             <MiniStat
               label="Active"
-              value={compStats.active}
+              value={`${compStats.active}/${compStats.maxActive}`}
               color="green"
+            />
+            <MiniStat
+              label="Slots Left"
+              value={`${compStats.remaining}/${compStats.maxActive}`}
+              color="amber"
             />
             <MiniStat
               label="Completed"
@@ -678,6 +720,9 @@ function CompetitionsTab({
     totalPrizePool: number;
     totalParticipants: number;
     total: number;
+    maxActive?: number;
+    remaining?: number;
+    created?: number;
   };
   getStatusColor: (s: string) => string;
 }) {
@@ -1039,6 +1084,7 @@ function MiniStat({
     ["blue", "text-blue-400"],
     ["purple", "text-purple-400"],
     ["emerald", "text-emerald-400"],
+    ["amber", "text-amber-400"],
     ["gray", "text-gray-300"],
     ["white", "text-white"],
   ]);

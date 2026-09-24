@@ -897,6 +897,19 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 24 Sep 2026 - GM active comps = min participants met; Active X/max + Slots Left
+
+**Owner request:** Player GM dashboard — Active competitions `4/10`, Competitions card
+becomes slots left `6/10`. Admin Manage Game Masters + user GM panel — show active,
+created, and other useful stats. **Active** must include an upcoming contest that has
+already met `minParticipants` even if it has not started.
+
+**Fix:** `isGameMasterActiveCompetition` / Mongo `$expr` filter in both
+`active-competitions.ts` copies — `active` | `draft` | (`upcoming` with
+`currentParticipants >= minParticipants`). Empty upcoming no longer occupies a
+concurrent slot. Dashboard + create gate + admin list/detail/user panel KPIs show
+`active/max` and `remaining/max`. Tests: `gamemaster-active-competitions.test.ts`.
+
 ### 24 Sep 2026 - Friday catalogue auto-sync + 7-day stale banner
 
 **Owner request:** Games sync admin — toggle for auto-sync each Friday 00:00 UTC;

@@ -82,11 +82,17 @@ export interface GameMasterData {
   endDate?: string;
   autoRenew?: boolean;
   totalReferredUsers?: number;
+  activeReferredUsers?: number;
   totalEarnings?: number;
   pendingEarnings?: number;
   totalCompetitionsCreated?: number;
+  currentPeriodCompetitionsCreated?: number;
+  activeCompetitions?: number;
+  maxActiveCompetitions?: number;
+  remainingActiveSlots?: number;
   limits?: {
     maxCompetitionsPerDay: number;
+    maxActiveCompetitions?: number;
     maxUsersPerCompetition: number;
     referralFeePercentage: number;
     canCreateCompetitions: boolean;

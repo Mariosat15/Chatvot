@@ -12,6 +12,10 @@ import { labelForGameKey } from "@/lib/services/games/game-leaderboard.service";
 import { resolveCreationLimits } from "@/lib/services/gamemaster/game-permissions";
 import { loadGameMasterPackageConfig } from "@/lib/services/gamemaster/package-config";
 import { buildSubscriptionLimits } from "@/lib/services/gamemaster/subscription-limits";
+import {
+  countActiveCompetitionsInList,
+  remainingActiveCompetitionSlots,
+} from "@/lib/services/gamemaster/active-competitions";
 
 /**
  * GET /api/gamemaster/dashboard
@@ -102,6 +106,7 @@ export async function GET() {
 
     const displayLimits = {
       maxCompetitionsPerDay: effective.maxCompetitionsPerDay,
+      maxActiveCompetitions: effective.maxActiveCompetitions,
       maxUsersPerCompetition: effective.maxUsersPerCompetition,
       referralFeePercentage: effective.referralFeePercentage,
       canCreateCompetitions: effective.canCreateCompetitions,
@@ -155,7 +160,7 @@ export async function GET() {
     // ── Competitions ────────────────────────────────────────────────
     const competitions = await Competition.find({ gameMasterId: userId })
       .select(
-        "name status currentParticipants maxParticipants prizePool entryFee startTime endTime createdAt",
+        "name status currentParticipants minParticipants maxParticipants prizePool entryFee startTime endTime createdAt",
       )
       .sort({ createdAt: -1 })
       .limit(50)
@@ -166,6 +171,7 @@ export async function GET() {
           name: c.name,
           status: c.status,
           participants: c.currentParticipants || 0,
+          minParticipants: c.minParticipants ?? 2,
           maxParticipants: c.maxParticipants || 0,
           prizePool: c.prizePool || 0,
           entryFee: c.entryFee || 0,
@@ -240,13 +246,24 @@ export async function GET() {
     );
 
     // ── Competition Counts ──────────────────────────────────────────
+    // Reason: "active" includes upcoming contests that already met minParticipants
+    // (they will run even though status is not yet `active`). Matches the create gate.
     const totalCompetitions = competitions.length;
-    const activeCompetitions = competitions.filter(
-      (c) => c.status === "active",
-    ).length;
+    const activeCompetitions = countActiveCompetitionsInList(
+      competitions.map((c) => ({
+        status: c.status,
+        currentParticipants: c.participants,
+        minParticipants: c.minParticipants,
+      })),
+    );
     const completedCompetitions = competitions.filter(
       (c) => c.status === "completed",
     ).length;
+    const maxActiveCompetitions = displayLimits.maxActiveCompetitions;
+    const remainingActiveSlots = remainingActiveCompetitionSlots(
+      activeCompetitions,
+      maxActiveCompetitions,
+    );
 
     return NextResponse.json({
       success: true,
@@ -266,6 +283,8 @@ export async function GET() {
           activeReferredUsers: referredUsers.filter((r) => r.isActive).length,
           totalCompetitions,
           activeCompetitions,
+          maxActiveCompetitions,
+          remainingActiveSlots,
           completedCompetitions,
           ...earningsSummary,
         },

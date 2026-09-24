@@ -4709,7 +4709,7 @@ export default function UserFullDetailPanel({
                     </Card>
 
                     {/* GM Stats Grid */}
-                    <div className="grid grid-cols-4 gap-4">
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                       <Card className="bg-gray-800/50 border-gray-700">
                         <CardContent className="p-4">
                           <div className="flex items-center gap-3">
@@ -4722,6 +4722,24 @@ export default function UserFullDetailPanel({
                               </p>
                               <p className="text-xl font-bold text-white">
                                 {gmData.totalReferredUsers || 0}
+                              </p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card className="bg-gray-800/50 border-gray-700">
+                        <CardContent className="p-4">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-cyan-500/20 rounded-lg">
+                              <Users className="h-5 w-5 text-cyan-400" />
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-400">
+                                Active Referrals
+                              </p>
+                              <p className="text-xl font-bold text-white">
+                                {gmData.activeReferredUsers || 0}
                               </p>
                             </div>
                           </div>
@@ -4776,6 +4794,60 @@ export default function UserFullDetailPanel({
                               </p>
                               <p className="text-xl font-bold text-white">
                                 {gmData.totalCompetitionsCreated || 0}
+                              </p>
+                              <p className="text-[10px] text-gray-500 mt-0.5">
+                                Today:{" "}
+                                {gmData.currentPeriodCompetitionsCreated || 0}/
+                                {gmData.limits?.maxCompetitionsPerDay || 0}
+                              </p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card className="bg-gray-800/50 border-gray-700">
+                        <CardContent className="p-4">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-emerald-500/20 rounded-lg">
+                              <Trophy className="h-5 w-5 text-emerald-400" />
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-400">
+                                Active Competitions
+                              </p>
+                              <p className="text-xl font-bold text-emerald-400">
+                                {gmData.activeCompetitions ?? 0}/
+                                {gmData.maxActiveCompetitions ??
+                                  gmData.limits?.maxActiveCompetitions ??
+                                  10}
+                              </p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card className="bg-gray-800/50 border-gray-700">
+                        <CardContent className="p-4">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-orange-500/20 rounded-lg">
+                              <BarChart3 className="h-5 w-5 text-orange-400" />
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-400">
+                                Slots Left
+                              </p>
+                              <p className="text-xl font-bold text-orange-400">
+                                {gmData.remainingActiveSlots ??
+                                  Math.max(
+                                    0,
+                                    (gmData.maxActiveCompetitions ??
+                                      gmData.limits?.maxActiveCompetitions ??
+                                      10) - (gmData.activeCompetitions ?? 0),
+                                  )}
+                                /
+                                {gmData.maxActiveCompetitions ??
+                                  gmData.limits?.maxActiveCompetitions ??
+                                  10}
                               </p>
                             </div>
                           </div>
@@ -4903,6 +4975,16 @@ export default function UserFullDetailPanel({
                                 </p>
                                 <p className="text-2xl font-bold text-white">
                                   {gmData.limits?.maxCompetitionsPerDay || 0}
+                                </p>
+                              </div>
+                              <div className="p-4 bg-gray-900/50 rounded-lg border border-gray-700">
+                                <p className="text-sm text-gray-400 mb-1">
+                                  Max Active Competitions
+                                </p>
+                                <p className="text-2xl font-bold text-white">
+                                  {gmData.maxActiveCompetitions ??
+                                    gmData.limits?.maxActiveCompetitions ??
+                                    10}
                                 </p>
                               </div>
                               <div className="p-4 bg-gray-900/50 rounded-lg border border-gray-700">

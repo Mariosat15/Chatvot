@@ -46,6 +46,9 @@ interface GameMaster {
   totalReferredUsers: number;
   totalEarnings: number;
   totalCompetitionsCreated: number;
+  activeCompetitions?: number;
+  maxActiveCompetitions?: number;
+  remainingActiveSlots?: number;
   createdAt: string;
 }
 
@@ -610,7 +613,9 @@ export default function GameMasterManagementSection({
                 <th className="px-4 py-3">User</th>
                 <th className="px-4 py-3">Package</th>
                 <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Comps</th>
+                <th className="px-4 py-3">Create</th>
+                <th className="px-4 py-3">Created</th>
+                <th className="px-4 py-3">Active</th>
                 <th className="px-4 py-3">Referral Code</th>
                 <th className="px-4 py-3">Referrals</th>
                 <th className="px-4 py-3">Earnings</th>
@@ -655,6 +660,17 @@ export default function GameMasterManagementSection({
                       {gm.limits?.canCreateCompetitions !== false
                         ? "ON"
                         : "OFF"}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-gray-300">
+                    {gm.totalCompetitionsCreated ?? 0}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="text-emerald-400 font-medium">
+                      {gm.activeCompetitions ?? 0}/
+                      {gm.maxActiveCompetitions ??
+                        gm.limits?.maxActiveCompetitions ??
+                        10}
                     </span>
                   </td>
                   <td className="px-4 py-3">
