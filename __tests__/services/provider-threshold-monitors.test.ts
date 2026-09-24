@@ -268,6 +268,116 @@ describe("runProviderThresholdMonitors", () => {
     );
   });
 
+  it("does not alert when net platform fee + GM earning close the prize-pool equation", async () => {
+    // Reason: live false alert on "This is annw". Settlement books platform_fee NET
+    // of GM commission (1.50) and pays the GM via WalletTransaction gamemaster_earning
+    // (0.50). prizes 18 + fee 1.50 = 19.50 looked short of pool 20 while the missing
+    // 0.50 sat in the GM's wallet. Same shape as R113: the equation omitted a real
+    // money row settlement already wrote.
+    const id = new mongoose.Types.ObjectId();
+    const updatedAt = new Date();
+    await Competition.collection.insertOne({
+      _id: id,
+      name: "This is annw",
+      slug: "this-is-annw",
+      description: "x",
+      status: "completed",
+      gameKey: "provider:chartvolt-games:circuit-sprint",
+      entryFee: 10,
+      minParticipants: 2,
+      maxParticipants: 20,
+      currentParticipants: 2,
+      startTime: new Date(),
+      endTime: new Date(),
+      registrationDeadline: new Date(),
+      competitionType: "time_based",
+      prizePool: 20,
+      platformFeePercentage: 10,
+      prizeDistribution: [
+        { rank: 1, percentage: 70 },
+        { rank: 2, percentage: 20 },
+        { rank: 3, percentage: 10 },
+      ],
+      finalLeaderboard: [{ prizeAmount: 18 }],
+      createdBy: "507f1f77bcf86cd799439011",
+      updatedAt,
+      createdAt: updatedAt,
+    });
+    await PlatformTransaction.collection.insertOne({
+      transactionType: "platform_fee",
+      amount: 1.5,
+      amountEUR: 1.5,
+      currency: "USD",
+      description: "Platform fee (10% - 0.50 GM fees)",
+      sourceType: "competition",
+      sourceId: id.toString(),
+      createdAt: updatedAt,
+      updatedAt,
+    });
+    await WalletTransaction.collection.insertOne({
+      userId: "6aa8da0a1e65e16b9f6af275",
+      transactionType: "gamemaster_earning",
+      amount: 0.5,
+      balanceBefore: 0,
+      balanceAfter: 0.5,
+      competitionId: id.toString(),
+      status: "completed",
+      description: "Game Master referral earnings",
+      createdAt: updatedAt,
+      updatedAt,
+    });
+
+    await runProviderThresholdMonitors(new Date());
+    expect(recordAlert).not.toHaveBeenCalledWith(
+      expect.objectContaining({ alertType: "prize_pool_mismatch" }),
+    );
+  });
+
+  it("still alerts when GM earnings are missing and the pool does not close", async () => {
+    const id = new mongoose.Types.ObjectId();
+    const updatedAt = new Date();
+    await Competition.collection.insertOne({
+      _id: id,
+      name: "Short Pool",
+      slug: "short-pool",
+      description: "x",
+      status: "completed",
+      gameKey: "provider:chartvolt-games:circuit-sprint",
+      entryFee: 10,
+      minParticipants: 2,
+      maxParticipants: 20,
+      currentParticipants: 2,
+      startTime: new Date(),
+      endTime: new Date(),
+      registrationDeadline: new Date(),
+      competitionType: "time_based",
+      prizePool: 20,
+      platformFeePercentage: 10,
+      prizeDistribution: [{ rank: 1, percentage: 100 }],
+      finalLeaderboard: [{ prizeAmount: 18 }],
+      createdBy: "507f1f77bcf86cd799439011",
+      updatedAt,
+      createdAt: updatedAt,
+    });
+    await PlatformTransaction.collection.insertOne({
+      transactionType: "platform_fee",
+      amount: 1.5,
+      amountEUR: 1.5,
+      currency: "USD",
+      description: "net fee",
+      sourceType: "competition",
+      sourceId: id.toString(),
+      createdAt: updatedAt,
+      updatedAt,
+    });
+    // No gamemaster_earning row — 18 + 1.5 = 19.5 ≠ 20, genuine shortfall.
+
+    await runProviderThresholdMonitors(new Date());
+    expect(recordAlert).toHaveBeenCalledWith(
+      expect.objectContaining({ alertType: "prize_pool_mismatch" }),
+    );
+  });
+
   it("alerts when callback failure rate exceeds 1% with enough events", async () => {
     const now = new Date();
     const docs = [];

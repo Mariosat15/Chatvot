@@ -225,7 +225,27 @@ async function checkPrizePoolMismatch(
       (sum, row) => sum + (Number(row.amount) || 0),
       0,
     );
-    const accounted = prizes + booked + refunded;
+
+    // Reason: platform_fee is booked NET of Game Master commission
+    // (`fees.service.ts`: netPlatformFee = gross − gmEarnings). The GM share is
+    // credited as WalletTransaction `gamemaster_earning`, not as a PlatformTransaction.
+    // Omitting it makes every contest with a paid referrer look short by exactly the
+    // GM amount (live: "This is annw" 18 + 1.50 = 19.50 vs pool 20, missing the 0.50
+    // Martha earned). `retained_gm_fee` already covers the inactive-GM case in `booked`.
+    const gmRows = await WalletTransaction.find({
+      competitionId: id,
+      transactionType: "gamemaster_earning",
+      status: "completed",
+    })
+      .select("amount")
+      .lean<{ amount: number }[]>();
+
+    const gmPaid = gmRows.reduce(
+      (sum, row) => sum + (Number(row.amount) || 0),
+      0,
+    );
+
+    const accounted = prizes + booked + refunded + gmPaid;
     const pool = Number(c.prizePool) || 0;
 
     if (Math.abs(accounted - pool) <= MONEY_EPSILON) continue;
@@ -234,13 +254,14 @@ async function checkPrizePoolMismatch(
       alertType: "prize_pool_mismatch",
       severity: "critical",
       source: "provider-threshold-monitors",
-      reason: `Competition "${c.name}": prizes (${prizes.toFixed(2)}) + booked fees/unclaimed (${booked.toFixed(2)}) + refunds (${refunded.toFixed(2)}) = ${accounted.toFixed(2)}, but prizePool is ${pool.toFixed(2)}.`,
+      reason: `Competition "${c.name}": prizes (${prizes.toFixed(2)}) + booked fees/unclaimed (${booked.toFixed(2)}) + GM earnings (${gmPaid.toFixed(2)}) + refunds (${refunded.toFixed(2)}) = ${accounted.toFixed(2)}, but prizePool is ${pool.toFixed(2)}.`,
       fingerprint: `prize-mismatch:${id}`,
       metadata: {
         contestId: id,
         prizePool: pool,
         prizesPaid: prizes,
         bookedFees: booked,
+        gmEarningsPaid: gmPaid,
         refunded,
         accounted,
         feeTypes: feeRows.map((r) => r.transactionType),

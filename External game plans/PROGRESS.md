@@ -901,6 +901,10 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 24 Sep 2026 - R114 prize_pool_mismatch ignored paid GM earnings
+
+**False alert, not a wrong payout.** "This is annw" settled correctly: prize 18 + platform fee 1.50 (net of GM) + Martha GM referral 0.50 = prizePool 20. `checkPrizePoolMismatch` summed prizes + PlatformTransaction + refunds and never counted WalletTransaction `gamemaster_earning` — sibling of R113. Equation now includes completed `gamemaster_earning` by `competitionId`. Two tests. Dismiss the existing SecurityAlert; restart the worker after deploy. **Nothing backfilled.**
+
 ### 24 Sep 2026 - A9 platform wiring + A11 locale-map (HTML v1.16)
 
 **Shipped:**
