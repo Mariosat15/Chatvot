@@ -18,8 +18,8 @@
 
 **Also still open (schedule after the five above, or when relevant):**
 
-6. **Task 17** — remove legacy game — half done; needs catalogue re-sync (ops). **← NEXT eng when ops can re-sync (or owner picks Task 18).**
-7. **Task 18** — redesign other screen — not started (needs owner reference if any).
+6. **Task 17** — remove legacy game — **CLOSED 18 Sep 2026 (ops) / verified 24 Sep.** Circuit Perfect deprecated; pickers filter `active`; owner re-sync done.
+7. **Task 18** — redesign other screen — **← NEXT** when owner supplies a reference image.
 
 **Do not put these back in P0 as open (CLOSED — older lists are stale):**
 
@@ -60,11 +60,11 @@
 ## P3 — 35-task leftovers / later
 
 27. **Task 8** — large admin redesign (needs reference).
-28. **Tasks 15–16** — artwork optimize on upload only.
-29. **Task 17** — remove legacy game (needs re-sync) — also under P0 #6.
-30. **Task 18** — redesign other screen — also under P0 #7.
-31. **Tasks 25–27, 31–35** — consistency / audit.
-32. **Task 28** — settlement guard still useful.
+28. ~~**Tasks 15–16** — artwork optimize on upload~~ → **CLOSED 24 Sep** (`15.1`).
+29. ~~**Task 17** — remove legacy game~~ → **CLOSED** (also under P0 #6).
+30. **Task 18** — redesign other screen — also under P0 #7 (needs owner reference).
+31. ~~**Tasks 25–27, 31–35** — consistency / audit~~ → **CLOSED 24 Sep** (audit; see task doc).
+32. ~~**Task 28** — settlement guard~~ → **CLOSED 24 Sep** (`28.1` standing test).
 33. **Per-game marketplace** — not scheduled.
 34. **X12** — hardening / pilot / launch.
 
@@ -75,6 +75,7 @@
 - **Command Alerts** — acknowledge / drawer / CSV / Fraud links (`3a84d1ec`). Prefer **Acknowledge** over Delete (Delete comes back — monitors recreate the episode).
 - **Friday catalogue auto-sync + 7-day stale banner** (`ff2e4b04`).
 - **GM Active comps `X/max` + min-entrants rule**.
+- **P3 Tasks 15–16 / 25–28 / 31–35** — artwork WebP-on-upload + settlement client guard + audits (24 Sep).
 - **R114** — `prize_pool_mismatch` false alerts from GM earnings counting.
 - X11 / X11.5 / X10 core / X15 / `/play`↔`/trade` / GM provider create / X4a click-accepted / X9 / X8 eng+owner content.
 
@@ -90,4 +91,5 @@
 4. ~~Trading create-form monolith~~ **NEVER — leave alone (owner)**
 5. ~~Verify `ranking-config.service`~~ **CLOSED 24 Sep — no full pass; trading-only by design**
 
-**Next when ready:** Task 17 (ops re-sync) or Task 18 (needs owner reference).
+**Next when ready:** Task 18 (needs owner reference image). Tasks 15–16 / 25–28 / 31–35
+closed 24 Sep. Task 17 closed. Task 8 still needs a reference too.

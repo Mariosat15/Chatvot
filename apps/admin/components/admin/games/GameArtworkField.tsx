@@ -98,7 +98,9 @@ export default function GameArtworkField({
       }
 
       onChange(data.url);
-      toast.success(`${label} uploaded. Press Save content to attach it.`);
+      toast.success(
+        `${label} uploaded and optimised. Press Save content to attach it.`,
+      );
     } catch {
       toast.error("The image could not be uploaded.");
     } finally {
@@ -179,7 +181,9 @@ export default function GameArtworkField({
         }}
       />
 
-      <p className="text-xs text-white/50">{hint}</p>
+      <p className="text-xs text-white/50">
+        {hint} Uploads are resized and saved as WebP automatically.
+      </p>
     </div>
   );
 }

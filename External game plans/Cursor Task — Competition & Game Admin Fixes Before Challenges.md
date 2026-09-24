@@ -24,8 +24,9 @@ The implementation must remain generic enough to support many different game typ
 
 # STATE OF THE LIST
 
-**Last measured 9 September 2026.** Each "done" row names the sub-section holding the account
-of what was actually built, because that section is authoritative and this table is a summary.
+**Last measured 24 September 2026** (was 9 Sep; rows below name the sub-section that is
+authoritative). Each "done" row names the sub-section holding the account of what was
+actually built, because that section is authoritative and this table is a summary.
 
 **Read this table as a claim about the code, not as evidence about it.** The `PROGRESS.md`
 decision log carries the same warning for a reason: *"content seeding is mandatory"* sat on
@@ -40,20 +41,20 @@ code before citing it.
 | **9** — Game type / category field | **Done.** `9.1` + leftovers **23 Sep**. Vocabulary first; analytics grouping + discovery filter closed once merchandising made a second title real |
 | **10** — Competition style / participation mode | **Done.** `10.1`. Turn-based and heat-based are **blocked, not deferred** - see `10.2` |
 | **11** — Game-level supported modes | **Done, 9 Sep.** `11.1`, and `22` s10 is the authoritative account. It **reverses** a decision recorded in `22` s8.3 and in `play-shape.ts` itself - the shape is no longer a property of the title alone - and it closed a latent defect where an ordinary edit re-forced a staggered contest's rules from its title. 49 tests, **37 probes red on exactly the expected test**, two of them re-aimed after reporting `DID NOT APPLY` |
-| **12** — Required timing / runtime settings | Not started |
-| **13** — Data-driven game configuration | Not started |
+| **12** — Required timing / runtime settings | **Done, 10 Sep.** `12.1`. Wizard already adapted; editor learned the play shape (**R61**) |
+| **13** — Data-driven game configuration | **Done, 10 Sep.** `13.1`. Schema already existed; closing sentence closed **R62** |
 | **14** — Score configuration | **Done, 9 Sep.** `14.1`. Three operator-owned fields on `provider_game`, their own route and audit line, and a preview pinned **behaviourally** against the gate. 55 tests, **28 probes red on exactly the expected test.** The eligibility *rule* is unchanged - task 2's `> 0` is now the default rather than a constant |
-| **15-16** — Image optimizer for game artwork | **Scoped down by owner decision, 9 Sep: on upload only.** Existing files are left alone, so there is no retro-scan to write. See task 15's note - this is a refusal with a reason, not an omission |
-| **17** — Remove the legacy game | **Half done.** Circuit Perfect was deprecated 8 Sep and the wizard already filters on `providerStatus: "active"`, so the code is correct. It still needs a **catalogue re-sync** before it leaves the picker, which is an operational step and not a code change |
-| **18** — Redesign the other screen | Not started |
-| **19** — AI on the game content screen | Not started |
-| **20** — AI must be game-agnostic | **Mostly done 8 Sep** for the contest wizard's assistant. Task 19's screen is the remaining gap |
+| **15-16** — Image optimizer for game artwork | **Done, 24 Sep.** `15.1`. Optimise **on upload only** (owner, 9 Sep). Sharp → WebP + per-slot resize in `storeGameArtwork`. No retro-scan. 7 tests |
+| **17** — Remove the legacy game | **CLOSED 18 Sep 2026 (ops) / verified 24 Sep.** Circuit Perfect is `deprecated` in games-service (not deleted — `gameKey` is history). Pickers/catalogue filter `providerStatus: "active"` + `chartvoltEnabled`. Owner catalogue re-sync completed 18 Sep so it left the live pickers. A document saying re-sync is still owed is correct as history only — **say which** |
+| **18** — Redesign the other screen | Not started — needs owner reference image before eng starts |
+| **19** — AI on the game content screen | **Done, 10 Sep.** `19.1` storage + `19.2` assistant. AI never writes `rulesSummary` / `howToPlay` |
+| **20** — AI must be game-agnostic | **Done, 10 Sep.** `20.1`. Contest + game-content assistants share `describeGameFacts`; no game-code switch |
 | **21-24** — Game Performance section | **Done, 10 Sep (R64).** `21.1`. **Task 21's premise is false where it points** - the Game Performance screen names no game, and the player's result surfaces have rendered the reported breakdown generically since 7 Sep, so 22-24 were already satisfied there. What was genuinely broken is the admin **per-user Performance tab**, which gated *the whole tab* on `totalTrades === 0`, so a games-only player read "This client has no closed trades yet". 33 tests, **22 probes red on exactly one failure**. Task 22's declared schema is a **deliberate deviation** - the metrics come from the reported breakdown, never a per-category table |
-| **25-27** — Consistency, model review, backward compatibility | Not started |
-| **28** — Settlement must be server-side | **Checked and true, for the four payout entry points.** Of the 40 files referencing `distributePrizesWithTies`, `recordUnclaimedPool`, `settleFeesAndGameMasters` or `finalizeCompetition`, **none** declares `"use client"`. Note what that does *not* cover: it names four functions, so a fifth payout path would not appear in it. A standing guard belongs with task 30 |
+| **25-27** — Consistency, model review, backward compatibility | **Done, 24 Sep (audit).** `25.1` / `26.1` / `27.1`. Shared Games workspace + WizardShell; models already carry the required fields; defaults + resolvers keep legacy rows loading |
+| **28** — Settlement must be server-side | **Done, 24 Sep.** `28.1`. Standing tree walk: no money settlement API in a `"use client"` module. 2 tests |
 | **29** — Prevent double settlement | **Done, 9 Sep.** `apps/admin`'s finalize now takes the same optimistic lock the main app does, with the release filtered on `status: "finalizing"` |
 | **30** — Tests for the new prize rules | **Done, 9 Sep.** 21 cases in `__tests__/services/prize-rule-matrix.test.ts` (7 game, 7 trading, 4 arithmetic, 1 the reachable divide-by-zero, 2 mirror) plus 5 database-backed idempotency cases in `settlement-retry-idempotency.test.ts`. **24 probes red on exactly the expected test** across `tools/probe-prize-eligibility.ps1` (14) and `tools/probe-prize-redistribution.ps1` (10). Two probes came back green and are recorded in `30.1` with the reason - one was two guards covering each other, the other a mutation that changes no observable and which corrected a wrong comment in the production code |
-| **31-35** — Mode logic tests, UI validation, per-game reviews, final audit | Not started |
+| **31-35** — Mode logic tests, UI validation, per-game reviews, final audit | **Done, 24 Sep (audit).** `31.1`–`35.1`. Mode logic already in `play-shape.test.ts`; UI copy from `PLAY_MODE_COPY`; agnostic arena guards cover 33–34; Task 35 greps documented |
 
 **The Challenges work named at the top of this document is still gated.** It is not "next";
 it is after this list. Two things about it are already decided and worth not rediscovering:
@@ -1515,6 +1516,33 @@ Do not load a huge banner-sized source image just to display a 100px thumbnail.
 
 ---
 
+## 15.1 — WHAT WAS BUILT, 24 September 2026 (Tasks 15–16)
+
+**Owner decision, 9 Sep 2026, still load-bearing:** optimise **on upload only**. Existing
+files are left alone. Pointing the Dev Zone Image Optimizer at `public/assets` as the
+primary fix would rename files that `provider_game.thumbnailUrl` / `bannerUrl` and
+`branding_asset` still name (R57). So Task 15's bulk-optimizer list is **scoped down**,
+not ignored — new uploads never land heavy.
+
+**Shipped:**
+
+- `apps/admin/lib/admin/game-artwork-optimize.ts` — Sharp resize (fit inside, no enlarge)
+  + WebP encode per `ArtworkSlot` ceiling (logo 512², banner 1920×1080, …).
+- `storeGameArtwork` always writes `.webp` after encode; corrupt buffers refuse with 400
+  rather than storing a bad file under a WebP name.
+- `GameArtworkField` toast + hint: "uploaded and optimised" / "resized and saved as WebP".
+- `__tests__/admin/game-artwork-optimize.test.ts` — 7 tests (slot specs, WebP magic bytes,
+  no enlarge, EXIF rotate path).
+
+**Deliberately not built:** retro-scan of existing artwork; AVIF; a separate Image Optimizer
+destination that lists every game file. The bulk optimizer may still retarget an image if an
+operator opts in — that is not how new uploads work.
+
+**Live code:** `game-artwork-optimize.ts`, `game-artwork-storage.ts`, `GameArtworkField.tsx`.
+Nothing mirrored — admin-only upload path.
+
+---
+
 # TASK 17 — REMOVE LEGACY GAME
 
 Remove the:
@@ -2167,6 +2195,49 @@ Legacy data should be handled safely.
 
 ---
 
+## 25.1 / 26.1 / 27.1 — WHAT WAS AUDITED, 24 September 2026
+
+**These three are one audit, not three builds.** The programme already delivered the
+shared admin surface and the model fields the tasks name. This pass checked the live
+code against the checklists rather than inventing a second Games admin stack.
+
+### Task 25 — consistency
+
+Already one system:
+
+- GAMES → **All Games** workspace (`GamesWorkspaceSection` / `GamesWorkspaceEditor`) —
+  one list, shared eight-tab editor for every title.
+- Provider contest create/edit on **WizardShell** + shared step bodies.
+- Shared field modules: `ContestPlayModeField`, `RoundStartPolicyField`,
+  `UnscoredPolicyField`, `GameContentDialog`, scoring / play-style dialogs in `inline`
+  mode.
+
+**Still Task 8 / Task 18:** large visual redesign of screens the owner has not yet
+referenced with images. Consistency of *chrome* is Done; a pixel-perfect restyle of
+every leftover screen is not this task.
+
+### Task 26 — models
+
+On `provider_game` (both apps) today: `category`, `playMode`, `playModeOverride`,
+`supportedPlayModes`, `scoreDirection` / `scoreType` / `scoreRange` (provider-owned),
+`scoreUnit`, `zeroIsValidResult`, `minimumEligibleScore`, `thumbnailUrl` / `bannerUrl`
+(+ artwork slots), `providerStatus` / `chartvoltEnabled`, content fields for AI
+vocabulary. Contest stores its own `playMode`, round policies, scoring settings.
+
+**Deliberate deviation (Task 22):** no per-category performance-metric schema — metrics
+come from the provider's reported `scoreBreakdown`. A document scheduling that table is
+proposing permanent blank rows.
+
+### Task 27 — backward compatibility
+
+Programme-wide pattern already in force: schema defaults where safe; resolvers that
+treat absent / `null` / `""` as defaults (`resolvePlayMode`, `resolveGameCategory`,
+`resolveScoringRules`); empty `supportedPlayModes` unions the title's own style in;
+`chartvoltEnabled` defaults false so a sync never auto-publishes. No migration required
+for this audit — legacy trading contests and pre-field provider rows keep loading.
+
+---
+
 # TASK 28 — COMPETITION SETTLEMENT MUST BE SERVER-SIDE
 
 Prize eligibility and prize redistribution rules must be enforced by the backend.
@@ -2186,6 +2257,25 @@ The backend must be authoritative for:
 - settlement status
 
 The frontend should display the backend result.
+
+---
+
+## 28.1 — WHAT WAS BUILT, 24 September 2026
+
+The 9 Sep check grepped four payout names and found zero `"use client"` declarations.
+That proves the past. **`__tests__/services/settlement-server-side-guard.test.ts`**
+proves the future: a tree walk of main + admin refuses any of
+
+`distributePrizesWithTies`, `recordUnclaimedPool`, `settleFeesAndGameMasters`,
+`finalizeCompetition`, `finalizeProviderCompetition`, `payContestPrizes`,
+`cancelCompetitionAndRefund`
+
+appearing in a client module (comments stripped first). A fifth payout path is an edit
+to the allow-list, not a silent gap. 2 tests, both green.
+
+Eligibility, ranking, redistribution and unclaimed-pool arithmetic already live in
+`lib/services/settlement/` and the ranking modules — this task adds the standing
+boundary, not a second money writer.
 
 ---
 
@@ -2420,6 +2510,60 @@ Determine whether each occurrence is valid.
 Competition-facing values must use Volts.
 
 Remove obsolete hardcoded assumptions.
+
+---
+
+## 31.1–35.1 — WHAT WAS AUDITED, 24 September 2026
+
+### Task 31 — mode logic tests
+
+Already covered by `__tests__/services/play-shape.test.ts` (and the provider-contest
+create/edit behavioural suites): anytime vs scheduled forcing, unsupported mode refused,
+supported set refresh when the title changes, `Competition.playMode` frozen after create,
+`head_to_head` beats the operator. No new suite required — a document describing Task 31
+as unbuilt is describing a gap that closed with Task 11 / `22` s10.
+
+### Task 32 — UI validation
+
+`PLAY_MODE_COPY` + `ContestPlayModeField` already show operator-facing labels and help:
+
+- **Join any time** — "Players enter and play whenever they like while the contest is open…"
+- **Everyone at once** — "Every player's board opens at the same moment…"
+
+plus the amber consequence box on the scheduled branch. Genre comes from
+`resolveGameCategory` / badges on the picker. Wording differs from the task's sample
+("Asynchronous / Flexible Entry") on purpose — plain English, shared with the player app
+via the mirrored module.
+
+### Tasks 33–34 — per-game reviews
+
+Code side already enforces "configure through metadata, no special-case Circuit Sprint":
+
+- Arena agnostic guard (`arena-game-agnostic.test.ts`) forbids game-shaped nouns in quoted
+  strings on the platform arena.
+- Performance rows render reported `scoreBreakdown` via `humanizeMetric` — no per-title
+  metric table.
+- Circuit Perfect is `deprecated` (Task 17); pickers filter `active`.
+
+**Ops / owner:** re-open Circuit Sprint in admin after deploy and confirm category, modes,
+scoring, artwork and AI facts look right against the live catalogue. That is a click-check,
+not a code gap. Never verified by eye from this session.
+
+### Task 35 — final consistency audit
+
+Grepped 24 Sep 2026:
+
+| Hit class | Verdict |
+|---|---|
+| `EUR` / `€` in wallet, deposits, invoices, forex | **Valid** — real money / trading capital, not competition pots (Task 1 carve-outs) |
+| `Circuit Sprint` in comments / theme descriptions / `circuit-sprint-page-defaults` | **Valid** — fallback chrome keyed by `gameCode`, or historical Reason comments |
+| `banner-circuit-sprint-*.webp` | **Valid** — artwork asset for that title |
+| Hardcoded performance labels (`laps`, `lap time`) in player arena components | **Absent** — agnostic guard would fail |
+| Prize calculation duplication | Prize projection lives in `lib/utils/prize-projection.ts` (mirrored); lobbies share `PrizeTable` |
+
+**Still open elsewhere (not this list):** Task 8 / 18 visual redesigns; per-game marketplace;
+X12 pilot. A document treating Task 35 as permission to rewrite trading capital labels as
+Volts is wrong.
 
 ---
 

@@ -2,6 +2,7 @@ import { writeFile, mkdir, unlink } from "fs/promises";
 import path from "path";
 import { putBrandingAsset } from "@/lib/services/branding-assets.service";
 import type { ArtworkSlot } from "./game-artwork-slots";
+import { optimizeGameArtworkBuffer } from "./game-artwork-optimize";
 
 /**
  * Store an uploaded game image so that BOTH web servers can serve it.
@@ -19,9 +20,13 @@ import type { ArtworkSlot } from "./game-artwork-slots";
  * It used to be inline here, a base64 entry in the shared `WhiteLabel` document, and that
  * document hit MongoDB's 16MB ceiling on 8 September 2026 - so a game logo could not be
  * saved at all, and neither could any other image on the platform.
+ *
+ * Tasks 15–16 (owner, 9 Sep 2026): every new upload is resized and encoded as WebP here,
+ * before either write. Existing files are left alone — the bulk optimizer may still touch
+ * them when an operator chooses to, and then must retarget URLs (`image-optimizer-artwork`).
  */
 
-/** Extensions we will store, as a Map so a crafted extension cannot reach Object.prototype. */
+/** Extensions we will accept as input. Output is always WebP after optimize. */
 const IMAGE_TYPES: ReadonlyMap<string, string> = new Map([
   ["png", "image/png"],
   ["jpg", "image/jpeg"],
@@ -77,8 +82,8 @@ export async function storeGameArtwork(
   slot: ArtworkSlot,
 ): Promise<ArtworkResult> {
   const extension = (file.name.split(".").pop() ?? "").toLowerCase();
-  const contentType = IMAGE_TYPES.get(extension);
-  if (!contentType) {
+  const declaredType = IMAGE_TYPES.get(extension);
+  if (!declaredType) {
     return {
       success: false,
       error: `Use a PNG, JPG, WebP or GIF image. "${extension || file.name}" is not one we can serve.`,
@@ -105,13 +110,34 @@ export async function storeGameArtwork(
   // name: `file.name` is attacker-supplied and a `../` in it would escape the directory. The
   // timestamp also cache-busts, which matters because the serve route is fronted by a CDN
   // that has rewritten our cache headers before (R54).
+  //
+  // Extension is always `.webp` — optimize runs before write, so the stored name must match
+  // the bytes. Writing a `.png` name over WebP bytes is how a player gets a broken image.
   const safeSlug = `${providerKey}-${gameCode}`.replace(/[^a-z0-9-]/gi, "").slice(0, 60);
-  const filename = `game-${slot}-${safeSlug || "title"}-${Date.now()}.${extension}`;
+  const filename = `game-${slot}-${safeSlug || "title"}-${Date.now()}.webp`;
 
-  const buffer = Buffer.from(await file.arrayBuffer());
+  const raw = Buffer.from(await file.arrayBuffer());
+
+  let optimized;
+  try {
+    optimized = await optimizeGameArtworkBuffer(raw, slot);
+  } catch (error) {
+    console.error("❌ [Game artwork] Optimize failed:", error);
+    return {
+      success: false,
+      error:
+        "That image could not be processed. Try a different PNG, JPG or WebP file.",
+    };
+  }
+
+  if (optimized.originalBytes > optimized.optimizedBytes * 1.05) {
+    console.log(
+      `📊 [Game artwork] ${slot}: ${optimized.originalBytes} → ${optimized.optimizedBytes} bytes`,
+    );
+  }
 
   try {
-    await writeFile(path.join(directory, filename), buffer);
+    await writeFile(path.join(directory, filename), optimized.buffer);
   } catch (error) {
     console.error("❌ [Game artwork] Could not write the file:", error);
     return { success: false, error: "The image could not be saved." };
@@ -122,7 +148,7 @@ export async function storeGameArtwork(
   // treats it as a nicety. An image that exists on one server only is a defect the operator
   // cannot see from the screen they uploaded it on.
   try {
-    await putBrandingAsset(filename, buffer, contentType);
+    await putBrandingAsset(filename, optimized.buffer, optimized.contentType);
   } catch (error) {
     console.error("❌ [Game artwork] Stored on disk but not in the database:", error);
     return {
