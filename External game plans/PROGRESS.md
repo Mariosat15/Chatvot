@@ -901,6 +901,24 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 24 Sep 2026 - Command Alerts: acknowledge, drawer, CSV, fraud links
+
+**Shipped on top of the same-day Command Alerts screen:** **Acknowledge** (POST
+`action: acknowledge`) sets `status: reviewed` so the row drops out of the live
+Open list without deleting history — use this for monitors that recreate
+(`prize_pool_mismatch`, `catalogue_sync_stale`) instead of Delete. **Detail
+drawer** opens full reason, metadata JSON, IDs, and ack note without leaving the
+page. **CSV export** downloads the filtered list (cap 5k). **Fraud deep-links**
+go to Users → fraud panel when `userId` is present, else Fraud Monitoring for
+security-category types. Status filter open / acknowledged / all.
+
+**Live code:** `CommandAlertDetailDrawer.tsx`, `command-alert-links.ts`,
+`acknowledgeSecurityAlertsByIds` / `listSecurityAlertsForExport` /
+`securityAlertsToCsv` in `security-alert-ops.service.ts`, route POST + GET
+`?format=csv`.
+
+**Tests:** `__tests__/admin/command-alerts.test.ts` (16). Never verified by eye.
+
 ### 24 Sep 2026 - Dev Zone Command Alerts (SecurityAlert feed)
 
 **Shipped:** Admin **Dev Zone → Command Alerts** — paginated live feed of the same

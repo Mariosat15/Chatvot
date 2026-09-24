@@ -25,6 +25,7 @@ import {
   CommandAlertsTable,
   type CommandAlertRow,
 } from "@/components/admin/CommandAlertsTable";
+import { CommandAlertDetailDrawer } from "@/components/admin/CommandAlertDetailDrawer";
 
 type CommandAlert = CommandAlertRow;
 
@@ -59,6 +60,8 @@ export default function CommandAlertsSection() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [detail, setDetail] = useState<CommandAlert | null>(null);
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams();
@@ -147,6 +150,64 @@ export default function CommandAlertsSection() {
     }
   };
 
+  const acknowledgeIds = async (ids: string[]) => {
+    if (!ids.length) return;
+    try {
+      const res = await fetch("/api/dev-zone/command-alerts", {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "acknowledge", ids }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success)
+        throw new Error(data.error || "acknowledge failed");
+      toast.success(
+        `Acknowledged ${data.acknowledged} alert(s) — still in history`,
+      );
+      if (detail && ids.includes(detail._id)) setDetail(null);
+      await fetchAlerts();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to acknowledge alerts");
+    }
+  };
+
+  const exportCsv = async () => {
+    setExporting(true);
+    try {
+      const params = new URLSearchParams(queryString);
+      params.set("format", "csv");
+      const res = await fetch(`/api/dev-zone/command-alerts?${params}`, {
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(
+          (data as { error?: string }).error || "export failed",
+        );
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download =
+        res.headers
+          .get("Content-Disposition")
+          ?.match(/filename="([^"]+)"/)?.[1] || "command-alerts.csv";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast.success("CSV downloaded (up to 5,000 matching rows)");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to export CSV");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const deleteIds = async (ids: string[]) => {
     if (!ids.length) return;
     if (
@@ -166,6 +227,7 @@ export default function CommandAlertsSection() {
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || "delete failed");
       toast.success(`Deleted ${data.deleted} alert(s)`);
+      if (detail && ids.includes(detail._id)) setDetail(null);
       await fetchAlerts();
     } catch (err) {
       console.error(err);
@@ -235,6 +297,8 @@ export default function CommandAlertsSection() {
             Live SecurityAlert feed — the same events that appear as{" "}
             <code className="text-lime-300/80">🚨 [SECURITY]</code> in worker /
             app logs. No file tailing; light poll while this tab is open.
+            Deleting a row does not stop the monitor — if the condition still
+            exists it will recreate; prefer Acknowledge to clear the live list.
           </p>
         </div>
         <button
@@ -377,14 +441,25 @@ export default function CommandAlertsSection() {
         total={total}
         page={page}
         totalPages={totalPages}
+        exporting={exporting}
         onToggle={toggleSelect}
         onSelectPage={(ids) => setSelected(new Set(ids))}
         onClearSelection={() => setSelected(new Set())}
         onDeleteIds={(ids) => void deleteIds(ids)}
         onDeleteMatching={() => void deleteMatching()}
+        onAcknowledgeIds={(ids) => void acknowledgeIds(ids)}
+        onExportCsv={() => void exportCsv()}
+        onOpenDetail={setDetail}
         onCopy={(text) => void copyText(text)}
         onPrev={() => setPage((p) => Math.max(1, p - 1))}
         onNext={() => setPage((p) => p + 1)}
+      />
+
+      <CommandAlertDetailDrawer
+        alert={detail}
+        onClose={() => setDetail(null)}
+        onAcknowledge={(id) => void acknowledgeIds([id])}
+        onDelete={(id) => void deleteIds([id])}
       />
     </div>
   );

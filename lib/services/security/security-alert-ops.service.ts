@@ -185,6 +185,115 @@ export async function pageSecurityAlerts(
   };
 }
 
+/**
+ * Mark alerts as acknowledged. Keeps the documents; they drop out of the default
+ * "open" live list. Returns how many were updated.
+ */
+export async function acknowledgeSecurityAlertsByIds(
+  ids: string[],
+  adminId: string,
+  note?: string,
+): Promise<number> {
+  if (!ids.length) return 0;
+  await connectToDatabase();
+  const result = await SecurityAlert.updateMany(
+    { _id: { $in: ids }, acknowledged: false },
+    {
+      $set: {
+        acknowledged: true,
+        acknowledgedBy: adminId,
+        acknowledgedAt: new Date(),
+        ...(typeof note === "string" && note.trim()
+          ? { acknowledgmentNote: note.trim() }
+          : {}),
+      },
+    },
+  );
+  return result.modifiedCount ?? 0;
+}
+
+/**
+ * Rows for CSV export — same filters as the list, capped at 5,000 (same as bulk delete).
+ */
+export async function listSecurityAlertsForExport(
+  input: PageSecurityAlertsInput,
+): Promise<ISecurityAlert[]> {
+  await connectToDatabase();
+  const filter = buildAlertFilter(input);
+  return SecurityAlert.find(filter)
+    .sort({ createdAt: -1 })
+    .limit(5000)
+    .lean<ISecurityAlert[]>();
+}
+
+/** Flatten one alert into CSV-safe string fields. */
+export function securityAlertToCsvRow(alert: ISecurityAlert): string[] {
+  const created =
+    alert.createdAt instanceof Date
+      ? alert.createdAt.toISOString()
+      : String(alert.createdAt ?? "");
+  const ackAt =
+    alert.acknowledgedAt instanceof Date
+      ? alert.acknowledgedAt.toISOString()
+      : alert.acknowledgedAt
+        ? String(alert.acknowledgedAt)
+        : "";
+  let metadata = "";
+  try {
+    metadata = alert.metadata ? JSON.stringify(alert.metadata) : "";
+  } catch {
+    metadata = "";
+  }
+  return [
+    String(alert._id),
+    created,
+    String(alert.alertType ?? ""),
+    String(alert.severity ?? ""),
+    String(alert.source ?? ""),
+    String(alert.provider ?? ""),
+    String(alert.userId ?? ""),
+    String(alert.ip ?? ""),
+    String(alert.reason ?? ""),
+    alert.acknowledged ? "yes" : "no",
+    String(alert.acknowledgedBy ?? ""),
+    ackAt,
+    metadata,
+  ];
+}
+
+const CSV_HEADER = [
+  "id",
+  "createdAt",
+  "alertType",
+  "severity",
+  "source",
+  "provider",
+  "userId",
+  "ip",
+  "reason",
+  "acknowledged",
+  "acknowledgedBy",
+  "acknowledgedAt",
+  "metadata",
+] as const;
+
+/** Escape one CSV cell (RFC 4180-ish). */
+function csvEscape(value: string): string {
+  if (/[",\n\r]/.test(value)) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  return value;
+}
+
+/** Build a full CSV document from alert rows. */
+export function securityAlertsToCsv(alerts: ISecurityAlert[]): string {
+  const lines = [CSV_HEADER.join(",")];
+  for (const a of alerts) {
+    lines.push(securityAlertToCsvRow(a).map(csvEscape).join(","));
+  }
+  return lines.join("\r\n") + "\r\n";
+}
+
 /** Delete specific alert ids. Returns how many were removed. */
 export async function deleteSecurityAlertsByIds(
   ids: string[],

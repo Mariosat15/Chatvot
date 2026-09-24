@@ -11,6 +11,9 @@ import {
   deleteSecurityAlertsMatching,
   getSecurityAlertRetentionSettings,
   setSecurityAlertRetentionSettings,
+  acknowledgeSecurityAlertsByIds,
+  listSecurityAlertsForExport,
+  securityAlertsToCsv,
   COMMAND_ALERT_PAGE_SIZES,
   type PageSecurityAlertsInput,
 } from "../../../../../../lib/services/security/security-alert-ops.service";
@@ -69,6 +72,7 @@ function parseListInput(searchParams: URLSearchParams): PageSecurityAlertsInput 
 /**
  * GET /api/dev-zone/command-alerts
  * Paginated SecurityAlerts (same events that print 🚨 [SECURITY] in PM2).
+ * Pass format=csv to download the filtered set (cap 5,000).
  */
 export async function GET(request: NextRequest) {
   const guard = await guardSection("command-alerts");
@@ -77,6 +81,21 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const input = parseListInput(searchParams);
+
+    if (searchParams.get("format") === "csv") {
+      const rows = await listSecurityAlertsForExport(input);
+      const csv = securityAlertsToCsv(rows);
+      const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+      return new NextResponse(csv, {
+        status: 200,
+        headers: {
+          "Content-Type": "text/csv; charset=utf-8",
+          "Content-Disposition": `attachment; filename="command-alerts-${stamp}.csv"`,
+          "Cache-Control": "no-store",
+        },
+      });
+    }
+
     const [page, settings] = await Promise.all([
       pageSecurityAlerts(input),
       getSecurityAlertRetentionSettings(),
@@ -93,6 +112,61 @@ export async function GET(request: NextRequest) {
     console.error("GET /api/dev-zone/command-alerts failed:", err);
     return NextResponse.json(
       { success: false, error: "Failed to load command alerts" },
+      { status: 500 },
+    );
+  }
+}
+
+/**
+ * POST /api/dev-zone/command-alerts
+ * Acknowledge one or many alerts (keeps history; drops them from the open live list).
+ * body: { action: "acknowledge", ids: string[], note?: string }
+ */
+export async function POST(request: NextRequest) {
+  const guard = await guardSection("command-alerts");
+  if (!guard.ok) return guard.response;
+
+  let body: { action?: unknown; ids?: unknown; note?: unknown };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json(
+      { success: false, error: "Invalid JSON" },
+      { status: 400 },
+    );
+  }
+
+  if (body.action !== "acknowledge") {
+    return NextResponse.json(
+      { success: false, error: 'action must be "acknowledge"' },
+      { status: 400 },
+    );
+  }
+
+  const ids = Array.isArray(body.ids)
+    ? body.ids.filter((id): id is string => typeof id === "string")
+    : [];
+  if (!ids.length) {
+    return NextResponse.json(
+      { success: false, error: "ids[] required" },
+      { status: 400 },
+    );
+  }
+
+  const note = typeof body.note === "string" ? body.note : undefined;
+  const adminId = guard.admin.id || guard.admin.email || "admin";
+
+  try {
+    const acknowledged = await acknowledgeSecurityAlertsByIds(
+      ids,
+      adminId,
+      note,
+    );
+    return NextResponse.json({ success: true, acknowledged });
+  } catch (err) {
+    console.error("POST /api/dev-zone/command-alerts failed:", err);
+    return NextResponse.json(
+      { success: false, error: "Failed to acknowledge alerts" },
       { status: 500 },
     );
   }

@@ -35,8 +35,12 @@ import {
   setSecurityAlertRetentionSettings,
   getSecurityAlertRetentionSettings,
   runSecurityAlertAutoPurge,
+  acknowledgeSecurityAlertsByIds,
+  listSecurityAlertsForExport,
+  securityAlertsToCsv,
   COMMAND_ALERT_PAGE_SIZES,
 } from "../../lib/services/security/security-alert-ops.service";
+import { fraudDeepLinkForAlert } from "../../apps/admin/lib/admin/command-alert-links";
 
 const ROOT = process.cwd();
 const ROUTE = join(
@@ -79,10 +83,53 @@ describe("command-alerts route grant", () => {
     const code = stripComments(readFileSync(ROUTE, "utf8"));
     const handlers = code.match(handlerPattern()) ?? [];
     const guards = code.match(guardCallPattern()) ?? [];
-    expect(handlers.length).toBe(3); // GET, PATCH, DELETE
+    expect(handlers.length).toBe(4); // GET, POST (ack), PATCH, DELETE
     expect(guards.length).toBeGreaterThanOrEqual(handlers.length);
-    // Reason: guardedSections returns every call site; three handlers → three identical ids.
+    // Reason: guardedSections returns every call site; four handlers → four identical ids.
     expect(new Set(guardedSections(code))).toEqual(new Set(["command-alerts"]));
+  });
+
+  it("POST acknowledges and GET can export CSV", () => {
+    const code = stripComments(readFileSync(ROUTE, "utf8"));
+    expect(code).toMatch(/acknowledgeSecurityAlertsByIds\s*\(/);
+    expect(code).toMatch(/action\s*!==\s*"acknowledge"/);
+    expect(code).toMatch(/get\("format"\)\s*===\s*"csv"/);
+    expect(code).toMatch(/securityAlertsToCsv\s*\(/);
+  });
+
+  it("UI wires acknowledge, drawer, CSV and fraud deep-links", () => {
+    const section = stripComments(
+      readFileSync(
+        join(ROOT, "apps/admin/components/admin/CommandAlertsSection.tsx"),
+        "utf8",
+      ),
+    );
+    const table = stripComments(
+      readFileSync(
+        join(ROOT, "apps/admin/components/admin/CommandAlertsTable.tsx"),
+        "utf8",
+      ),
+    );
+    const drawer = stripComments(
+      readFileSync(
+        join(ROOT, "apps/admin/components/admin/CommandAlertDetailDrawer.tsx"),
+        "utf8",
+      ),
+    );
+    const links = stripComments(
+      readFileSync(
+        join(ROOT, "apps/admin/lib/admin/command-alert-links.ts"),
+        "utf8",
+      ),
+    );
+    expect(section).toMatch(/action:\s*"acknowledge"/);
+    expect(section).toMatch(/format.*csv|set\("format",\s*"csv"\)/);
+    expect(section).toMatch(/CommandAlertDetailDrawer/);
+    expect(table).toMatch(/fraudDeepLinkForAlert/);
+    expect(table).toMatch(/onAcknowledgeIds/);
+    expect(drawer).toMatch(/fraudDeepLinkForAlert/);
+    expect(links).toMatch(/activeTab=users/);
+    expect(links).toMatch(/activeTab=fraud/);
   });
 
   it("is wired into AdminDashboard menu and case", () => {
@@ -211,5 +258,79 @@ describe("security-alert-ops", () => {
     const ran = await runSecurityAlertAutoPurge();
     expect(ran.skipped).toBe(false);
     expect(ran.deleted).toBe(1);
+  });
+
+  it("acknowledge keeps the row but drops it from the open list", async () => {
+    const [a, b] = await SecurityAlert.create([
+      {
+        alertType: "brute_force_detected",
+        severity: "high",
+        source: "/api/auth",
+        reason: "open one",
+        acknowledged: false,
+        userId: "aaaaaaaaaaaaaaaaaaaaaaaa",
+      },
+      {
+        alertType: "other",
+        severity: "low",
+        source: "test",
+        reason: "already done",
+        acknowledged: true,
+      },
+    ]);
+
+    const n = await acknowledgeSecurityAlertsByIds(
+      [String(a._id), String(b._id)],
+      "admin-1",
+      "looked at",
+    );
+    // Reason: only unacknowledged rows are updated — b was already ack.
+    expect(n).toBe(1);
+
+    const open = await pageSecurityAlerts({ page: 1, pageSize: 10 });
+    expect(open.total).toBe(0);
+
+    const all = await pageSecurityAlerts({
+      page: 1,
+      pageSize: 10,
+      includeAcknowledged: true,
+    });
+    expect(all.total).toBe(2);
+    const updated = all.alerts.find((r) => String(r._id) === String(a._id));
+    expect(updated?.acknowledged).toBe(true);
+    expect(updated?.acknowledgedBy).toBe("admin-1");
+  });
+
+  it("CSV export includes header and escapes commas in reason", async () => {
+    await SecurityAlert.create({
+      alertType: "prize_pool_mismatch",
+      severity: "critical",
+      source: "provider-threshold-monitors",
+      reason: "pool off, fees booked",
+      acknowledged: false,
+    });
+    const rows = await listSecurityAlertsForExport({ page: 1, pageSize: 10 });
+    const csv = securityAlertsToCsv(rows);
+    expect(csv.startsWith("id,createdAt,alertType")).toBe(true);
+    expect(csv).toContain("prize_pool_mismatch");
+    expect(csv).toMatch(/"pool off, fees booked"/);
+  });
+});
+
+describe("fraudDeepLinkForAlert", () => {
+  it("prefers the user panel when userId is present", () => {
+    const link = fraudDeepLinkForAlert({
+      userId: "bbbbbbbbbbbbbbbbbbbbbbbb",
+      alertType: "brute_force_detected",
+    });
+    expect(link?.href).toContain("activeTab=users");
+    expect(link?.href).toContain("userId=bbbbbbbbbbbbbbbbbbbbbbbb");
+  });
+
+  it("falls back to Fraud Monitoring for security types without a user", () => {
+    const link = fraudDeepLinkForAlert({
+      alertType: "csrf_violation",
+    });
+    expect(link?.href).toBe("/dashboard?activeTab=fraud");
   });
 });

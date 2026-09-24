@@ -6,12 +6,17 @@ import {
   ChevronLeft,
   ChevronRight,
   Copy,
+  Download,
+  ExternalLink,
+  Eye,
   Trash2,
 } from "lucide-react";
+import Link from "next/link";
 import {
   categoryForAlertType,
   labelForCategory,
 } from "@/lib/admin/command-alert-categories";
+import { fraudDeepLinkForAlert } from "@/lib/admin/command-alert-links";
 
 export interface CommandAlertRow {
   _id: string;
@@ -22,6 +27,13 @@ export interface CommandAlertRow {
   reason: string;
   acknowledged: boolean;
   createdAt: string;
+  userId?: string;
+  ip?: string;
+  userAgent?: string;
+  metadata?: Record<string, unknown>;
+  acknowledgedBy?: string;
+  acknowledgedAt?: string;
+  acknowledgmentNote?: string;
 }
 
 const SEVERITY_CLASS = {
@@ -51,11 +63,15 @@ interface Props {
   total: number;
   page: number;
   totalPages: number;
+  exporting?: boolean;
   onToggle: (id: string) => void;
   onSelectPage: (ids: string[]) => void;
   onClearSelection: () => void;
   onDeleteIds: (ids: string[]) => void;
   onDeleteMatching: () => void;
+  onAcknowledgeIds: (ids: string[]) => void;
+  onExportCsv: () => void;
+  onOpenDetail: (alert: CommandAlertRow) => void;
   onCopy: (text: string) => void;
   onPrev: () => void;
   onNext: () => void;
@@ -68,21 +84,37 @@ export function CommandAlertsTable({
   total,
   page,
   totalPages,
+  exporting,
   onToggle,
   onSelectPage,
   onClearSelection,
   onDeleteIds,
   onDeleteMatching,
+  onAcknowledgeIds,
+  onExportCsv,
+  onOpenDetail,
   onCopy,
   onPrev,
   onNext,
 }: Props) {
   const allOnPageSelected =
     alerts.length > 0 && alerts.every((a) => selected.has(a._id));
+  const selectedOpenIds = alerts
+    .filter((a) => selected.has(a._id) && !a.acknowledged)
+    .map((a) => a._id);
 
   return (
     <>
       <div className="flex flex-wrap items-center gap-2 text-sm">
+        <button
+          type="button"
+          onClick={() => onAcknowledgeIds(selectedOpenIds)}
+          disabled={selectedOpenIds.length === 0}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600/20 text-emerald-300 border border-emerald-500/40 disabled:opacity-40"
+        >
+          <CheckCircle2 className="h-3.5 w-3.5" />
+          Acknowledge selected ({selectedOpenIds.length})
+        </button>
         <button
           type="button"
           onClick={() =>
@@ -100,6 +132,15 @@ export function CommandAlertsTable({
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-900/40 text-red-200 border border-red-700/50"
         >
           Delete matching filters
+        </button>
+        <button
+          type="button"
+          onClick={onExportCsv}
+          disabled={exporting || total === 0}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-800 text-gray-200 border border-gray-600 disabled:opacity-40"
+        >
+          <Download className="h-3.5 w-3.5" />
+          {exporting ? "Exporting…" : "Export CSV"}
         </button>
         <span className="text-gray-500 text-xs ml-auto">
           {total} matching · page {page}/{totalPages}
@@ -124,7 +165,7 @@ export function CommandAlertsTable({
               <th className="p-3">Severity</th>
               <th className="p-3">Type / Category</th>
               <th className="p-3">Reason</th>
-              <th className="p-3 w-20" />
+              <th className="p-3 w-28" />
             </tr>
           </thead>
           <tbody>
@@ -137,6 +178,7 @@ export function CommandAlertsTable({
             )}
             {alerts.map((a) => {
               const cat = categoryForAlertType(a.alertType);
+              const link = fraudDeepLinkForAlert(a);
               return (
                 <tr
                   key={a._id}
@@ -177,9 +219,44 @@ export function CommandAlertsTable({
                       {a.provider ? ` · ${a.provider}` : ""}
                     </div>
                   </td>
-                  <td className="p-3 text-gray-200 max-w-xl">{a.reason}</td>
+                  <td className="p-3 text-gray-200 max-w-xl">
+                    <button
+                      type="button"
+                      onClick={() => onOpenDetail(a)}
+                      className="text-left hover:text-white"
+                    >
+                      {a.reason}
+                    </button>
+                  </td>
                   <td className="p-3">
                     <div className="flex gap-1">
+                      <button
+                        type="button"
+                        title="Details"
+                        onClick={() => onOpenDetail(a)}
+                        className="p-1.5 rounded hover:bg-gray-800 text-gray-400"
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                      </button>
+                      {!a.acknowledged && (
+                        <button
+                          type="button"
+                          title="Acknowledge"
+                          onClick={() => onAcknowledgeIds([a._id])}
+                          className="p-1.5 rounded hover:bg-emerald-900/40 text-emerald-400"
+                        >
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                      {link && (
+                        <Link
+                          href={link.href}
+                          title={link.label}
+                          className="p-1.5 rounded hover:bg-blue-900/40 text-blue-400"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                        </Link>
+                      )}
                       <button
                         type="button"
                         title="Copy reason"
