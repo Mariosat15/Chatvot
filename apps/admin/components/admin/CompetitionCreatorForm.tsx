@@ -38,6 +38,7 @@ import { useAppSettings } from "@/contexts/AppSettingsContext";
 import AIGeneratorDialog from "@/components/admin/AIGeneratorDialog";
 import { calculateCompetitionDifficulty } from "@/lib/utils/competition-difficulty";
 import type { TitleLevel } from "@/lib/constants/levels";
+import { WHITE_DATE_INPUT_CLASS } from "@/components/admin/games/UtcScheduleFields";
 import { formatVolts } from "@/lib/utils/format-volts";
 import {
   WizardShell,
@@ -1274,13 +1275,13 @@ export default function CompetitionCreatorForm({
                         >
                           Date *
                         </Label>
-                        <Input
+                        <input
                           id="startDate"
                           name="startDate"
                           type="date"
                           value={formData.startDate}
                           onChange={handleInputChange}
-                          className="bg-gray-800 border-gray-600 text-gray-100 h-11 focus:ring-2 focus:ring-purple-500"
+                          className={`${WHITE_DATE_INPUT_CLASS} mt-1`}
                           required
                         />
                       </div>
@@ -1418,13 +1419,13 @@ export default function CompetitionCreatorForm({
                         >
                           Date *
                         </Label>
-                        <Input
+                        <input
                           id="endDate"
                           name="endDate"
                           type="date"
                           value={formData.endDate}
                           onChange={handleInputChange}
-                          className="bg-gray-800 border-gray-600 text-gray-100 h-11 focus:ring-2 focus:ring-purple-500"
+                          className={`${WHITE_DATE_INPUT_CLASS} mt-1`}
                           required
                         />
                       </div>

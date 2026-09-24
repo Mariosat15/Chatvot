@@ -29,6 +29,8 @@ export default function CreateCompetitionGate({
   const [titles, setTitles] = useState<ContestableTitleOption[]>([]);
   const [maxUsers, setMaxUsers] = useState(100);
   const [platformFeePercentage, setPlatformFeePercentage] = useState(10);
+  const [maxCompetitionsPerDay, setMaxCompetitionsPerDay] = useState(1);
+  const [competitionsCreatedToday, setCompetitionsCreatedToday] = useState(0);
   const [selection, setSelection] = useState<Selection | null>(null);
 
   useEffect(() => {
@@ -51,6 +53,8 @@ export default function CreateCompetitionGate({
         setProviderAllowed(canProvider);
         setTitles(list);
         setMaxUsers(data.maxUsersPerCompetition ?? 100);
+        setMaxCompetitionsPerDay(data.maxCompetitionsPerDay ?? 1);
+        setCompetitionsCreatedToday(data.competitionsCreatedToday ?? 0);
         if (
           typeof data.platformFeePercentage === "number" &&
           Number.isFinite(data.platformFeePercentage)
@@ -106,6 +110,8 @@ export default function CreateCompetitionGate({
         title={selection.title}
         maxUsersPerCompetition={maxUsers}
         platformFeePercentage={platformFeePercentage}
+        maxCompetitionsPerDay={maxCompetitionsPerDay}
+        competitionsCreatedToday={competitionsCreatedToday}
         onBack={() => setSelection(null)}
       />
     );

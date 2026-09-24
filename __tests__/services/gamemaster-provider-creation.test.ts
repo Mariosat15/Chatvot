@@ -272,10 +272,21 @@ describe("GM create UI reuses schema settings and does not enumerate games", () 
     expect(steps).toMatch(/UtcScheduleFields/);
     expect(steps + form).not.toMatch(/type=["']datetime-local["']/);
     expect(utc).toMatch(/Current Server Time \(UTC\)/);
-    expect(utc).toMatch(/WHITE_DATE_PICKER_CLASS|brightness-0/);
+    expect(utc).toMatch(/WHITE_DATE_PICKER_CLASS|color-scheme:light|\[color-scheme:light\]/);
+    expect(utc).toMatch(/bg-white/);
     expect(utc).toMatch(/type=["']date["']/);
     // Create must append Z so the POST matches the UTC wall-clock on screen.
     expect(form).toMatch(/utcDraftToIso/);
+  });
+
+  it("shows daily limit banner and disables wizard from the start", () => {
+    const form = code(FORM);
+    expect(form).toMatch(/Daily Limit Reached/);
+    expect(form).toMatch(/maxCompetitionsPerDay/);
+    expect(form).toMatch(/competitionsCreatedToday/);
+    // Next and Create both gate on canCreate — not Launch-only.
+    expect(form).toMatch(/onClick=\{goNext\}[\s\S]*?disabled=\{!canCreate\}/);
+    expect(form).toMatch(/disabled=\{submitting \|\| !canCreate\}/);
   });
 
   it("utcDraftToIso treats YYYY-MM-DDTHH:mm as UTC, not local", async () => {

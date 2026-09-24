@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { Calendar, Clock } from "lucide-react";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 /**
@@ -28,15 +27,27 @@ const TIME_PRESETS = [
 
 const DURATION_PRESETS_MINUTES = [15, 30, 60, 120, 240] as const;
 
-/** Native date picker glyph — white on dark fields (WebKit / Chromium). */
+/**
+ * Light calendar popup on dark screens.
+ *
+ * Reason: a dark-styled `type="date"` with inverted icons still paints the *popup*
+ * black on Windows/Chrome (color-scheme inherits from the page), so operators cannot
+ * read days. Force a white field + `color-scheme: light` so the native calendar is
+ * white with dark text — the "white picker" every create flow must use.
+ */
 export const WHITE_DATE_PICKER_CLASS =
+  "[color-scheme:light] " +
   "[&::-webkit-calendar-picker-indicator]:cursor-pointer " +
-  "[&::-webkit-calendar-picker-indicator]:opacity-100 " +
-  "[&::-webkit-calendar-picker-indicator]:brightness-0 " +
-  "[&::-webkit-calendar-picker-indicator]:invert";
+  "[&::-webkit-calendar-picker-indicator]:opacity-100";
 
-const DATE_PICKER_CLASS =
-  `bg-gray-800 border-gray-600 text-gray-100 h-11 focus:ring-2 focus:ring-cyan-500 ${WHITE_DATE_PICKER_CLASS}`;
+/** Full class list for a contest date field — white surface, readable value, white popup. */
+export const WHITE_DATE_INPUT_CLASS =
+  `h-11 w-full rounded-md border border-gray-300 bg-white px-3 text-base text-gray-900 ` +
+  `shadow-xs outline-none focus-visible:border-cyan-500 focus-visible:ring-[3px] ` +
+  `focus-visible:ring-cyan-500/40 disabled:cursor-not-allowed disabled:opacity-50 ` +
+  WHITE_DATE_PICKER_CLASS;
+
+const DATE_PICKER_CLASS = WHITE_DATE_INPUT_CLASS;
 
 export function splitUtcDraft(value: string): { date: string; time: string } {
   if (!value || !value.includes("T")) return { date: "", time: "12:00" };
@@ -218,7 +229,11 @@ function ScheduleHalf({
           <Label htmlFor={`${id}-date`} className="text-gray-400 text-xs">
             Date *
           </Label>
-          <Input
+          {/*
+            Native input, not the shadcn Input — that component's dark theme tokens fight
+            color-scheme:light and leave a black calendar on a dark field.
+          */}
+          <input
             id={`${id}-date`}
             type="date"
             value={date}

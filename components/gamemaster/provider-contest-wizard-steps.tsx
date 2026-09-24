@@ -190,8 +190,8 @@ export function ScheduleStep({
   return (
     <StepPanel title="Schedule & Entry" subtitle="When it runs and what it costs">
       <UtcScheduleFields
-        startLabel="Starts"
-        endLabel="Ends"
+        startLabel="Start Time"
+        endLabel="End Time"
         startTime={startTime}
         endTime={endTime}
         onStartChange={onStart}

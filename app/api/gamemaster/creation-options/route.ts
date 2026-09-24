@@ -68,12 +68,20 @@ export async function GET() {
     const platformFeePercentage =
       await resolveGameMasterPlatformFeePercentage();
 
+    // Daily reset is owned by the create route; surface the raw counter here so the
+    // game wizard can show the same banner trading uses without a second status fetch.
+    const competitionsCreatedToday =
+      typeof subscription.currentPeriodCompetitionsCreated === "number"
+        ? subscription.currentPeriodCompetitionsCreated
+        : 0;
+
     return NextResponse.json({
       success: true,
       allowedGameTypes,
       canCreateCompetitions: effectiveLimits.canCreateCompetitions,
       maxUsersPerCompetition: effectiveLimits.maxUsersPerCompetition,
       maxCompetitionsPerDay: effectiveLimits.maxCompetitionsPerDay,
+      competitionsCreatedToday,
       // Admin-controlled; GM UI shows this locked and the create route ignores body.
       platformFeePercentage,
       titles: titles.map((t) => ({

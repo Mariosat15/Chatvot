@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft,
+  AlertCircle,
   Calendar,
   CheckCircle,
   ChevronLeft,
@@ -20,7 +21,10 @@ import { cn } from "@/lib/utils";
 import { defaultConfigValues } from "@/lib/services/games/config-schema";
 import type { ConfigField } from "@/lib/services/games/config-schema";
 import type { PlayMode } from "@/lib/services/games/play-shape";
-import { utcDraftToIso } from "@/components/gamemaster/UtcScheduleFields";
+import {
+  joinUtcDraft,
+  utcDraftToIso,
+} from "@/components/gamemaster/UtcScheduleFields";
 import {
   BasicsStep,
   GameSettingsStep,
@@ -54,6 +58,9 @@ interface Props {
   maxUsersPerCompetition: number;
   /** Admin-controlled fee from Challenge Settings — display only; create ignores body. */
   platformFeePercentage: number;
+  /** Package daily cap — banner + Launch gate only; earlier steps stay editable. */
+  maxCompetitionsPerDay: number;
+  competitionsCreatedToday: number;
   onBack: () => void;
 }
 
@@ -71,6 +78,12 @@ const DEFAULT_PRIZES: PrizeShare[] = [
   { rank: 3, percentage: 10 },
 ];
 
+function defaultUtcDraft(daysFromNow: number, time: string): string {
+  const d = new Date(Date.now() + daysFromNow * 24 * 60 * 60 * 1000);
+  const ymd = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+  return joinUtcDraft(ymd, time);
+}
+
 /**
  * Game Master wizard for creating a provider contest.
  *
@@ -81,6 +94,8 @@ export default function ProviderContestCreateForm({
   title,
   maxUsersPerCompetition,
   platformFeePercentage,
+  maxCompetitionsPerDay,
+  competitionsCreatedToday,
   onBack,
 }: Props) {
   const router = useRouter();
@@ -95,8 +110,12 @@ export default function ProviderContestCreateForm({
   const [maxParticipants, setMaxParticipants] = useState(
     String(Math.min(20, maxUsersPerCompetition)),
   );
-  const [startTime, setStartTime] = useState("");
-  const [endTime, setEndTime] = useState("");
+  // Reason: seed tomorrow/day-after UTC so the white calendar opens on a usable day and
+  // start is after server time without forcing an empty datetime-local.
+  const [startTime, setStartTime] = useState(() =>
+    defaultUtcDraft(1, "12:00"),
+  );
+  const [endTime, setEndTime] = useState(() => defaultUtcDraft(1, "18:00"));
   const [playMode, setPlayMode] = useState<PlayMode>(title.playMode);
   const [prizes, setPrizes] = useState<PrizeShare[]>(DEFAULT_PRIZES);
   const [submitting, setSubmitting] = useState(false);
@@ -105,6 +124,12 @@ export default function ProviderContestCreateForm({
   const fee = Number.isFinite(platformFeePercentage)
     ? platformFeePercentage
     : 10;
+
+  const remainingToday = Math.max(
+    0,
+    maxCompetitionsPerDay - competitionsCreatedToday,
+  );
+  const canCreate = remainingToday > 0;
 
   const prizeTotal = prizes.reduce((s, p) => s + Number(p.percentage || 0), 0);
   const entryNum = Number(entryFee) || 0;
@@ -141,6 +166,11 @@ export default function ProviderContestCreateForm({
   }
 
   function goNext() {
+    // Reason: daily cap blocks the whole wizard from step 1 — same as trading GM.
+    if (!canCreate) {
+      toast.error("Daily competition limit reached");
+      return;
+    }
     const err = validateStep(step);
     if (err) {
       toast.error(err);
@@ -150,6 +180,10 @@ export default function ProviderContestCreateForm({
   }
 
   async function handleCreate() {
+    if (!canCreate) {
+      toast.error("Daily competition limit reached");
+      return;
+    }
     for (let n = 1; n <= 4; n++) {
       const err = validateStep(n);
       if (err) {
@@ -229,8 +263,26 @@ export default function ProviderContestCreateForm({
           <p className="text-sm text-gray-400">
             {title.providerName}
             {title.category ? ` · ${title.category}` : ""}
+            {" · "}
+            {canCreate
+              ? `${remainingToday} / ${maxCompetitionsPerDay} remaining today`
+              : "Daily limit reached"}
           </p>
         </div>
+
+        {!canCreate && (
+          <div className="mb-6 flex items-start gap-3 rounded-2xl border border-red-500/30 bg-red-500/10 p-3 sm:p-4">
+            <AlertCircle className="h-6 w-6 shrink-0 text-red-400" />
+            <div>
+              <h3 className="font-semibold text-red-400">Daily Limit Reached</h3>
+              <p className="mt-1 text-sm text-gray-400">
+                You&apos;ve created {competitionsCreatedToday} competition(s)
+                today (limit {maxCompetitionsPerDay}). Come back tomorrow to
+                create more!
+              </p>
+            </div>
+          </div>
+        )}
 
         {!title.schema.ok ? (
           <p className="rounded-lg border border-red-800 bg-red-950/40 p-4 text-sm text-red-200">
@@ -392,7 +444,8 @@ export default function ProviderContestCreateForm({
                     <button
                       type="button"
                       onClick={goNext}
-                      className="inline-flex items-center gap-2 rounded-lg bg-cyan-600 px-5 py-2.5 font-medium hover:bg-cyan-500"
+                      disabled={!canCreate}
+                      className="inline-flex items-center gap-2 rounded-lg bg-cyan-600 px-5 py-2.5 font-medium hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       Next
                       <ChevronRight className="h-4 w-4" />
@@ -400,12 +453,14 @@ export default function ProviderContestCreateForm({
                   ) : (
                     <button
                       type="button"
-                      disabled={submitting}
+                      disabled={submitting || !canCreate}
                       onClick={handleCreate}
-                      className="inline-flex items-center gap-2 rounded-lg bg-cyan-600 px-5 py-2.5 font-medium hover:bg-cyan-500 disabled:opacity-50"
+                      className="inline-flex items-center gap-2 rounded-lg bg-cyan-600 px-5 py-2.5 font-medium hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
-                      Create competition
+                      {canCreate
+                        ? "Create competition"
+                        : "Daily limit reached"}
                     </button>
                   )}
                 </div>

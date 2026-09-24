@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { Calendar, Clock } from "lucide-react";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 /**
@@ -32,6 +31,21 @@ const TIME_PRESETS = [
 
 /** How long to run after the chosen start — one click instead of re-typing the end. */
 const DURATION_PRESETS_MINUTES = [15, 30, 60, 120, 240] as const;
+
+/**
+ * Light calendar popup. Same rule as the Game Master copy: dark fields make the native
+ * Windows/Chrome calendar unreadable; white field + color-scheme:light is the fix.
+ */
+export const WHITE_DATE_PICKER_CLASS =
+  "[color-scheme:light] " +
+  "[&::-webkit-calendar-picker-indicator]:cursor-pointer " +
+  "[&::-webkit-calendar-picker-indicator]:opacity-100";
+
+export const WHITE_DATE_INPUT_CLASS =
+  `h-11 w-full rounded-md border border-gray-300 bg-white px-3 text-base text-gray-900 ` +
+  `shadow-xs outline-none focus-visible:border-emerald-500 focus-visible:ring-[3px] ` +
+  `focus-visible:ring-emerald-500/40 disabled:cursor-not-allowed disabled:opacity-50 ` +
+  WHITE_DATE_PICKER_CLASS;
 
 export function splitUtcDraft(value: string): { date: string; time: string } {
   if (!value || !value.includes("T")) return { date: "", time: "12:00" };
@@ -194,13 +208,13 @@ function ScheduleHalf({
           <Label htmlFor={`${id}-date`} className="text-gray-400 text-xs">
             Date *
           </Label>
-          <Input
+          <input
             id={`${id}-date`}
             type="date"
             value={date}
             disabled={disabled}
             onChange={(e) => onChange(joinUtcDraft(e.target.value, time))}
-            className="bg-gray-800 border-gray-600 text-gray-100 h-11 focus:ring-2 focus:ring-emerald-500"
+            className={WHITE_DATE_INPUT_CLASS}
           />
         </div>
         <div>

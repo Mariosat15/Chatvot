@@ -14,7 +14,6 @@ import {
   TrendingDown,
   Shield,
   Users,
-  Clock,
   Target,
   Award,
   AlertCircle,
@@ -31,7 +30,11 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { WHITE_DATE_PICKER_CLASS } from "@/components/gamemaster/UtcScheduleFields";
+import {
+  UtcScheduleFields,
+  joinUtcDraft,
+  splitUtcDraft,
+} from "@/components/gamemaster/UtcScheduleFields";
 import type { TitleLevel } from "@/lib/constants/levels";
 
 interface GMSubscription {
@@ -195,30 +198,6 @@ export default function GMCreateCompetitionContent({
     loading: true,
   });
 
-  // Current UTC time for display
-  const [currentUTC, setCurrentUTC] = useState(new Date());
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentUTC(new Date());
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const formatUTCTime = (date: Date) => {
-    const hours = date.getUTCHours().toString().padStart(2, "0");
-    const minutes = date.getUTCMinutes().toString().padStart(2, "0");
-    const seconds = date.getUTCSeconds().toString().padStart(2, "0");
-    return `${hours}:${minutes}:${seconds}`;
-  };
-
-  const formatUTCDate = (date: Date) => {
-    const year = date.getUTCFullYear();
-    const month = (date.getUTCMonth() + 1).toString().padStart(2, "0");
-    const day = date.getUTCDate().toString().padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  };
-
   // Fetch GM subscription data
   useEffect(() => {
     const fetchSubscription = async () => {
@@ -359,18 +338,18 @@ export default function GMCreateCompetitionContent({
     formData.endTime,
   ]);
 
-  // Set default dates
+  // Set default dates in UTC — local calendar days near midnight disagree with the server clock
   useEffect(() => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    const dayAfter = new Date();
-    dayAfter.setDate(dayAfter.getDate() + 2);
+    const now = new Date();
+    const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    const dayAfter = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+    const utcYmd = (d: Date) =>
+      `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
 
     setFormData((prev) => ({
       ...prev,
-      startDate: tomorrow.toISOString().split("T")[0],
-      endDate: dayAfter.toISOString().split("T")[0],
+      startDate: utcYmd(tomorrow),
+      endDate: utcYmd(dayAfter),
     }));
   }, []);
 
@@ -819,8 +798,10 @@ export default function GMCreateCompetitionContent({
                 Daily Limit Reached
               </h3>
               <p className="text-gray-400 text-sm mt-1">
-                You&apos;ve created {subscription.limits.maxCompetitionsPerDay}{" "}
-                competition(s) today. Come back tomorrow to create more!
+                You&apos;ve created{" "}
+                {subscription.currentPeriodCompetitionsCreated} competition(s)
+                today (limit {subscription.limits.maxCompetitionsPerDay}). Come
+                back tomorrow to create more!
               </p>
             </div>
           </div>
@@ -1469,253 +1450,36 @@ export default function GMCreateCompetitionContent({
                   </div>
 
                   <div className="p-8 space-y-6">
-                    {/* Current UTC Time */}
-                    <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <Clock className="h-5 w-5 text-blue-400 animate-pulse" />
-                          <div>
-                            <div className="text-xs text-blue-300 font-semibold uppercase">
-                              Current Server Time (UTC)
-                            </div>
-                            <div
-                              className="text-xl font-bold text-blue-100 tabular-nums"
-                              suppressHydrationWarning
-                            >
-                              {formatUTCTime(currentUTC)}
-                            </div>
-                          </div>
-                        </div>
-                        <div
-                          className="text-xs text-blue-400 tabular-nums"
-                          suppressHydrationWarning
-                        >
-                          {formatUTCDate(currentUTC)}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Duration Preview */}
-                    {formData.startDate &&
-                      formData.startTime &&
-                      formData.endDate &&
-                      formData.endTime && (
-                        <div className="p-6 bg-purple-500/10 border border-purple-500/30 rounded-xl">
-                          <div className="flex items-start gap-3">
-                            <Clock className="h-5 w-5 text-purple-400 mt-1" />
-                            <div className="flex-1">
-                              <h4 className="text-sm font-semibold text-purple-300 mb-2">
-                                Competition Schedule (UTC)
-                              </h4>
-                              <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                  <div className="text-xs text-gray-500">
-                                    Start Time (UTC)
-                                  </div>
-                                  <div className="text-sm text-purple-300 font-bold mt-1">
-                                    {formData.startDate} {formData.startTime}{" "}
-                                    UTC
-                                  </div>
-                                </div>
-                                <div>
-                                  <div className="text-xs text-gray-500">
-                                    End Time (UTC)
-                                  </div>
-                                  <div className="text-sm text-purple-300 font-bold mt-1">
-                                    {formData.endDate} {formData.endTime} UTC
-                                  </div>
-                                </div>
-                              </div>
-                              {(() => {
-                                const start = new Date(
-                                  `${formData.startDate}T${formData.startTime}:00Z`,
-                                );
-                                const end = new Date(
-                                  `${formData.endDate}T${formData.endTime}:00Z`,
-                                );
-                                const hours = Math.round(
-                                  (end.getTime() - start.getTime()) /
-                                    (1000 * 60 * 60),
-                                );
-                                const days = Math.floor(hours / 24);
-                                return (
-                                  <div className="mt-3 text-lg font-bold text-purple-400">
-                                    Duration: {days > 0 ? `${days} days, ` : ""}
-                                    {hours % 24} hours
-                                  </div>
-                                );
-                              })()}
-                            </div>
-                          </div>
-                        </div>
+                    {/*
+                      Shared UTC schedule (white calendar + 0–23 hour boxes + server clock).
+                      type="time" was the black AM/PM control operators could not read or
+                      click into — same defect as the game create path.
+                    */}
+                    <UtcScheduleFields
+                      startLabel="Start Time"
+                      endLabel="End Time"
+                      startTime={joinUtcDraft(
+                        formData.startDate,
+                        formData.startTime,
                       )}
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {/* Start Time */}
-                      <div className="p-6 bg-gray-800/50 border border-gray-600 rounded-xl">
-                        <h3 className="text-sm font-semibold text-gray-300 mb-4 flex items-center gap-2">
-                          <Calendar className="h-4 w-4 text-purple-400" />
-                          Start Time
-                        </h3>
-                        <div className="space-y-4">
-                          <div>
-                            <label
-                              htmlFor="startDate"
-                              className="text-gray-400 text-xs"
-                            >
-                              Date *
-                            </label>
-                            <input
-                              id="startDate"
-                              name="startDate"
-                              type="date"
-                              value={formData.startDate}
-                              onChange={handleInputChange}
-                              className={cn(
-                                "w-full bg-gray-800 border border-gray-600 text-gray-100 h-11 rounded-lg px-4 focus:ring-2 focus:ring-purple-500 focus:border-transparent mt-1",
-                                WHITE_DATE_PICKER_CLASS,
-                              )}
-                              required
-                            />
-                          </div>
-                          <div>
-                            <label
-                              htmlFor="startTime"
-                              className="text-gray-400 text-xs flex items-center justify-between"
-                            >
-                              <span>Time (UTC) *</span>
-                              <span
-                                className="text-blue-400 font-mono text-xs"
-                                suppressHydrationWarning
-                              >
-                                Now: {formatUTCTime(currentUTC)}
-                              </span>
-                            </label>
-                            <input
-                              id="startTime"
-                              name="startTime"
-                              type="time"
-                              value={formData.startTime}
-                              onChange={handleInputChange}
-                              className={cn(
-                                "w-full bg-gray-800 border border-gray-600 text-gray-100 h-11 rounded-lg px-4 focus:ring-2 focus:ring-purple-500 focus:border-transparent mt-1",
-                                WHITE_DATE_PICKER_CLASS,
-                              )}
-                              required
-                            />
-                            {/* Quick Time Presets */}
-                            <div className="flex flex-wrap gap-1 mt-3">
-                              {[
-                                "00:00",
-                                "06:00",
-                                "09:00",
-                                "12:00",
-                                "15:00",
-                                "18:00",
-                                "21:00",
-                              ].map((time) => (
-                                <button
-                                  key={time}
-                                  type="button"
-                                  onClick={() =>
-                                    setFormData((prev) => ({
-                                      ...prev,
-                                      startTime: time,
-                                    }))
-                                  }
-                                  className={`px-2 py-1 text-xs rounded ${formData.startTime === time ? "bg-purple-500 text-white" : "bg-gray-700 text-gray-300 hover:bg-gray-600"}`}
-                                >
-                                  {time}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* End Time */}
-                      <div className="p-6 bg-gray-800/50 border border-gray-600 rounded-xl">
-                        <h3 className="text-sm font-semibold text-gray-300 mb-4 flex items-center gap-2">
-                          <Calendar className="h-4 w-4 text-purple-400" />
-                          End Time
-                        </h3>
-                        <div className="space-y-4">
-                          <div>
-                            <label
-                              htmlFor="endDate"
-                              className="text-gray-400 text-xs"
-                            >
-                              Date *
-                            </label>
-                            <input
-                              id="endDate"
-                              name="endDate"
-                              type="date"
-                              value={formData.endDate}
-                              onChange={handleInputChange}
-                              min={formData.startDate}
-                              className={cn(
-                                "w-full bg-gray-800 border border-gray-600 text-gray-100 h-11 rounded-lg px-4 focus:ring-2 focus:ring-purple-500 focus:border-transparent mt-1",
-                                WHITE_DATE_PICKER_CLASS,
-                              )}
-                              required
-                            />
-                          </div>
-                          <div>
-                            <label
-                              htmlFor="endTime"
-                              className="text-gray-400 text-xs flex items-center justify-between"
-                            >
-                              <span>Time (UTC) *</span>
-                              <span
-                                className="text-blue-400 font-mono text-xs"
-                                suppressHydrationWarning
-                              >
-                                Now: {formatUTCTime(currentUTC)}
-                              </span>
-                            </label>
-                            <input
-                              id="endTime"
-                              name="endTime"
-                              type="time"
-                              value={formData.endTime}
-                              onChange={handleInputChange}
-                              className={cn(
-                                "w-full bg-gray-800 border border-gray-600 text-gray-100 h-11 rounded-lg px-4 focus:ring-2 focus:ring-purple-500 focus:border-transparent mt-1",
-                                WHITE_DATE_PICKER_CLASS,
-                              )}
-                              required
-                            />
-                            {/* Quick Time Presets */}
-                            <div className="flex flex-wrap gap-1 mt-3">
-                              {[
-                                "00:00",
-                                "06:00",
-                                "09:00",
-                                "12:00",
-                                "15:00",
-                                "18:00",
-                                "21:00",
-                              ].map((time) => (
-                                <button
-                                  key={time}
-                                  type="button"
-                                  onClick={() =>
-                                    setFormData((prev) => ({
-                                      ...prev,
-                                      endTime: time,
-                                    }))
-                                  }
-                                  className={`px-2 py-1 text-xs rounded ${formData.endTime === time ? "bg-purple-500 text-white" : "bg-gray-700 text-gray-300 hover:bg-gray-600"}`}
-                                >
-                                  {time}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                      endTime={joinUtcDraft(formData.endDate, formData.endTime)}
+                      onStartChange={(value) => {
+                        const { date, time } = splitUtcDraft(value);
+                        setFormData((prev) => ({
+                          ...prev,
+                          startDate: date,
+                          startTime: time,
+                        }));
+                      }}
+                      onEndChange={(value) => {
+                        const { date, time } = splitUtcDraft(value);
+                        setFormData((prev) => ({
+                          ...prev,
+                          endDate: date,
+                          endTime: time,
+                        }));
+                      }}
+                    />
 
                     <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl">
                       <div className="flex items-start gap-2">
