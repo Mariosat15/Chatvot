@@ -69,6 +69,7 @@ const {
   registerProvider,
   setProviderEnabled,
   setProviderAutoOutageResponse,
+  setProviderAutoCatalogueSyncFriday,
   saveCredentials,
   completeRotation,
   listProviders,
@@ -724,37 +725,44 @@ describe("X6 game providers admin", () => {
       );
     });
 
-    it("refuses a request that carries both switches, so each is audited on its own", () => {
+    it("refuses a request that carries more than one switch, so each is audited on its own", () => {
       /*
        * Two decisions in one request produce one audit entry, and the entry can only
        * describe one of them. "Provider disabled" with no record that the automation was
        * turned on at the same moment is the version of this screen that cannot answer "who
        * took these games off sale, and did they mean to".
        *
-       * Structural rather than behavioural because the refusal is in the route, and the
-       * assertion names both field reads so a check on one alone cannot satisfy it.
+       * Structural rather than behavioural because the refusal is in the route. Assert the
+       * switchFlags count (> 1) rather than a specific pair — a third switch must not
+       * quietly escape the one-decision rule.
        */
       const route = readCode(
         "apps/admin/app/api/games/providers/[providerKey]/route.ts",
       );
-      expect(route).toMatch(
-        /typeof\s+body\.enabled\s*===\s*"boolean"\s*&&\s*typeof\s+body\.autoOutageResponseEnabled\s*===\s*"boolean"/,
-      );
+      expect(route).toMatch(/switchFlags\s*>\s*1/);
+      expect(route).toMatch(/autoCatalogueSyncFriday/);
       // The CALL, not the name: the import line names it too, so a bare `toContain` is
       // satisfied by a route that imports the service and never reaches it.
       expect(route).toMatch(
         /await setProviderAutoOutageResponse\(\s*providerKey,\s*body\.autoOutageResponseEnabled,?\s*\)/,
       );
+      expect(route).toMatch(
+        /await setProviderAutoCatalogueSyncFriday\(\s*providerKey,\s*body\.autoCatalogueSyncFriday,?\s*\)/,
+      );
 
-      // The refusal has to precede both handlers, or the first one runs and the request is
+      // The refusal has to precede all handlers, or the first one runs and the request is
       // then rejected having already changed something.
-      const refusalIndex = route.indexOf("one at a time");
+      const refusalIndex = route.indexOf("one provider switch at a time");
       const autoHandlerIndex = route.indexOf(
         "await setProviderAutoOutageResponse(",
+      );
+      const fridayHandlerIndex = route.indexOf(
+        "await setProviderAutoCatalogueSyncFriday(",
       );
       const enabledHandlerIndex = route.indexOf("await setProviderEnabled(");
       expect(refusalIndex).toBeGreaterThan(-1);
       expect(autoHandlerIndex).toBeGreaterThan(refusalIndex);
+      expect(fridayHandlerIndex).toBeGreaterThan(refusalIndex);
       expect(enabledHandlerIndex).toBeGreaterThan(refusalIndex);
     });
 
@@ -766,27 +774,67 @@ describe("X6 game providers admin", () => {
       );
       expect(route).toMatch(/Automatic outage response \$\{/);
       expect(route).toContain("newValue: body.autoOutageResponseEnabled");
+      expect(route).toMatch(/Friday catalogue auto-sync \$\{/);
+      expect(route).toContain("newValue: body.autoCatalogueSyncFriday");
     });
 
-    it("renders both switches on the card, each saying what it permits", () => {
+    it("renders the sale, outage and Friday-sync switches, each saying what it permits", () => {
       /*
-       * Asserted as TWO `<Switch` elements with two distinct handlers, because a card that
-       * renders one switch and describes two is the screen an operator reads as "I have
-       * turned the automation off" while their games are still being pulled by a worker.
+       * Asserted as THREE `<Switch` elements with distinct handlers on the card (plus the
+       * master switch on the section). A card that renders one switch and describes two is
+       * the screen an operator reads as "I have turned the automation off" while their
+       * games are still being pulled by a worker.
        */
-      const section = readCode(
-        "apps/admin/components/admin/games/GameProvidersSection.tsx",
+      const card = readCode(
+        "apps/admin/components/admin/games/ProviderCard.tsx",
       );
-      const switches = (section.match(/<Switch\b/g) ?? []).length;
-      expect(switches).toBeGreaterThanOrEqual(2);
-      expect(section).toContain("onCheckedChange={onToggleAutoResponse}");
-      expect(section).toContain("onCheckedChange={onToggle}");
-      expect(section).toContain("provider.autoOutageResponseEnabled");
+      const switches = (card.match(/<Switch\b/g) ?? []).length;
+      expect(switches).toBeGreaterThanOrEqual(3);
+      expect(card).toContain("onCheckedChange={onToggleAutoResponse}");
+      expect(card).toContain("onCheckedChange={onToggleFridaySync}");
+      expect(card).toContain("onCheckedChange={onToggle}");
+      expect(card).toContain("provider.autoOutageResponseEnabled");
+      expect(card).toContain("provider.autoCatalogueSyncFriday");
 
       // Reason: the difference between the two is the only thing that makes the pair
       // usable, so the copy must name the consequence rather than the field.
-      expect(section).toMatch(/by itself/i);
-      expect(section).toMatch(/stay your decision/i);
+      expect(card).toMatch(/by itself/i);
+      expect(card).toMatch(/stay your decision/i);
+      expect(card).toMatch(/Friday at 00:00 UTC/i);
+    });
+
+    it("is off on a freshly registered provider for Friday auto-sync too", async () => {
+      const stored = await GameProvider.findOne({
+        providerKey: MOCK_PROVIDER_KEY,
+      });
+      expect(stored?.autoCatalogueSyncFriday).toBe(false);
+
+      const row = (await listProviders()).find(
+        (p) => p.providerKey === MOCK_PROVIDER_KEY,
+      );
+      expect(row?.autoCatalogueSyncFriday).toBe(false);
+    });
+
+    it("turns Friday auto-sync on and off without touching the sale switch", async () => {
+      const on = await setProviderAutoCatalogueSyncFriday(
+        MOCK_PROVIDER_KEY,
+        true,
+      );
+      expect(on.success).toBe(true);
+      let stored = await GameProvider.findOne({
+        providerKey: MOCK_PROVIDER_KEY,
+      });
+      expect(stored?.autoCatalogueSyncFriday).toBe(true);
+      expect(stored?.enabled).toBe(false);
+
+      const off = await setProviderAutoCatalogueSyncFriday(
+        MOCK_PROVIDER_KEY,
+        false,
+      );
+      expect(off.success).toBe(true);
+      stored = await GameProvider.findOne({ providerKey: MOCK_PROVIDER_KEY });
+      expect(stored?.autoCatalogueSyncFriday).toBe(false);
+      expect(stored?.enabled).toBe(false);
     });
   });
 

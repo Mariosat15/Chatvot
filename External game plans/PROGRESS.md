@@ -897,6 +897,20 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 24 Sep 2026 - Friday catalogue auto-sync + 7-day stale banner
+
+**Owner request:** Games sync admin — toggle for auto-sync each Friday 00:00 UTC;
+stale alert only after **>7 days** (was 24h); **once** in security logs per episode;
+permanent red notice in admin until a sync clears it.
+
+**Shipped:** `autoCatalogueSyncFriday` + `lastFridayAutoSyncClaimKey` on both
+`game_provider` copies (default off). Toggle on `ProviderCard` / PATCH route
+(`setProviderAutoCatalogueSyncFriday`). Worker job `catalogue-friday-auto-sync`
+(hourly tick; acts Friday 00:00–00:59 UTC). `CATALOGUE_STALE_MS` = 7 days via
+`catalogue-sync-freshness.ts` (mirrored); fingerprint once-per-episode;
+red banners on providers list + catalogue dialog. Tests: freshness + Friday sync
+(8), threshold monitors + game-providers-admin updated.
+
 ### 23 Sep 2026 (evening) - GM provider create: wizard + locked platform fee
 
 **Defect:** GM game-contest create was a single page with an editable Platform fee %;

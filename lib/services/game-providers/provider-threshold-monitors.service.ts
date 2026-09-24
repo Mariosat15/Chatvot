@@ -22,6 +22,13 @@ import {
   type RecordSecurityAlertInput,
 } from "@/lib/services/security/security-alert.service";
 import type { SecurityAlertType } from "@/database/models/security-alert.model";
+import {
+  CATALOGUE_STALE_MS,
+  catalogueStaleFingerprint,
+  isCatalogueSyncStale,
+} from "./catalogue-sync-freshness";
+
+export { CATALOGUE_STALE_MS } from "./catalogue-sync-freshness";
 
 /** Contest stuck in settling — chapter 06 s10. */
 export const STUCK_FINALIZING_MS = 10 * 60 * 1000;
@@ -36,9 +43,6 @@ export const CALLBACK_FAILURE_MIN_EVENTS = 20;
 export const LATENCY_WINDOW_MS = 60 * 60 * 1000;
 export const LATENCY_P95_MS = 5_000;
 export const LATENCY_MIN_SAMPLES = 5;
-
-/** Catalogue sync stale. */
-export const CATALOGUE_STALE_MS = 24 * 60 * 60 * 1000;
 
 /**
  * Repeat challenge pairing. Chapter says "above threshold" without a number.
@@ -349,8 +353,6 @@ async function checkCatalogueStale(
   now: Date,
   summary: ThresholdMonitorSummary,
 ): Promise<void> {
-  const cutoff = new Date(now.getTime() - CATALOGUE_STALE_MS);
-
   const providers = await GameProvider.find({})
     .select("providerKey displayName enabled lastCatalogueSyncAt")
     .lean<
@@ -371,23 +373,31 @@ async function checkCatalogueStale(
     const last = p.lastCatalogueSyncAt
       ? new Date(p.lastCatalogueSyncAt)
       : null;
-    const stale = !last || last.getTime() < cutoff.getTime();
-    if (!stale) continue;
+    if (!isCatalogueSyncStale(last, now)) continue;
 
-    await alertOnce(summary, {
-      alertType: "catalogue_sync_stale",
-      severity: "low",
-      source: "provider-threshold-monitors",
-      provider: p.providerKey,
-      reason: last
-        ? `Catalogue for "${p.displayName}" was last synced more than 24 hours ago (${last.toISOString()}).`
-        : `Catalogue for "${p.displayName}" has never been synced.`,
-      fingerprint: `catalogue-stale:${p.providerKey}:${dayBucket(now)}`,
-      metadata: {
-        providerKey: p.providerKey,
-        lastCatalogueSyncAt: last?.toISOString() ?? null,
+    const fingerprint = catalogueStaleFingerprint(p.providerKey, last);
+    // Reason: oncePerEpisode. The admin banner is the lasting signal; a SecurityAlert
+    // every hour (the old dayBucket + DEDUPE_MS combo) was log spam. Fingerprint stays
+    // stable until sync moves lastCatalogueSyncAt, and we ignore the hourly window.
+    await alertOnce(
+      summary,
+      {
+        alertType: "catalogue_sync_stale",
+        severity: "low",
+        source: "provider-threshold-monitors",
+        provider: p.providerKey,
+        reason: last
+          ? `Catalogue for "${p.displayName}" was last synced more than 7 days ago (${last.toISOString()}).`
+          : `Catalogue for "${p.displayName}" has never been synced.`,
+        fingerprint,
+        metadata: {
+          providerKey: p.providerKey,
+          lastCatalogueSyncAt: last?.toISOString() ?? null,
+          staleAfterMs: CATALOGUE_STALE_MS,
+        },
       },
-    });
+      { oncePerEpisode: true },
+    );
   }
 }
 
@@ -471,16 +481,23 @@ function dayBucket(now: Date): string {
 async function alertOnce(
   summary: ThresholdMonitorSummary,
   input: RecordSecurityAlertInput & { fingerprint: string },
+  options?: { oncePerEpisode?: boolean },
 ): Promise<void> {
   const { fingerprint, ...alertInput } = input;
-  const recent = await SecurityAlert.findOne({
+  const query: Record<string, unknown> = {
     alertType: alertInput.alertType as SecurityAlertType,
     "metadata.fingerprint": fingerprint,
     acknowledged: false,
-    createdAt: { $gte: new Date(Date.now() - DEDUPE_MS) },
-  })
-    .select("_id")
-    .lean();
+  };
+  // Reason: ordinary threshold alerts re-arm hourly so an unresolved issue stays visible
+  // in the feed. Catalogue-stale is different — the admin sync banner is permanent until
+  // sync, so re-creating the alert every hour is pure log noise. oncePerEpisode skips the
+  // time window and relies on the fingerprint changing when the underlying fact changes.
+  if (!options?.oncePerEpisode) {
+    query.createdAt = { $gte: new Date(Date.now() - DEDUPE_MS) };
+  }
+
+  const recent = await SecurityAlert.findOne(query).select("_id").lean();
 
   if (recent) {
     summary.skippedDuplicate += 1;
@@ -491,5 +508,15 @@ async function alertOnce(
     ...alertInput,
     metadata: { ...(alertInput.metadata ?? {}), fingerprint },
   });
-  if (doc) summary.alerts += 1;
+  if (doc) {
+    summary.alerts += 1;
+    // Reason: catalogue-stale used to recreate every hour; the lasting signal is the
+    // admin banner. One console line when the episode opens is enough — not every
+    // ordinary threshold alert (those already have their own hourly dedupe).
+    if (options?.oncePerEpisode) {
+      console.warn(
+        `⚠️ [THRESHOLD MONITORS] ${alertInput.alertType}: ${alertInput.reason}`,
+      );
+    }
+  }
 }

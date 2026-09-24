@@ -343,7 +343,7 @@ describe("runProviderThresholdMonitors", () => {
     );
   });
 
-  it("alerts when an enabled provider catalogue is stale beyond 24h", async () => {
+  it("alerts when an enabled provider catalogue is stale beyond 7 days", async () => {
     await GameProvider.create({
       providerKey: MOCK_PROVIDER_KEY,
       displayName: "Mock",
@@ -360,6 +360,58 @@ describe("runProviderThresholdMonitors", () => {
         provider: MOCK_PROVIDER_KEY,
       }),
     );
+  });
+
+  it("does not alert when the catalogue was synced inside the 7-day window", async () => {
+    await GameProvider.create({
+      providerKey: MOCK_PROVIDER_KEY,
+      displayName: "Mock",
+      baseUrl: "https://mock.example",
+      enabled: true,
+      // 24h old — under the old threshold this would fire; under 7 days it must not.
+      lastCatalogueSyncAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+    });
+
+    await runProviderThresholdMonitors(new Date());
+    expect(recordAlert).not.toHaveBeenCalledWith(
+      expect.objectContaining({ alertType: "catalogue_sync_stale" }),
+    );
+  });
+
+  it("raises catalogue_sync_stale only once per stale episode", async () => {
+    const last = new Date(Date.now() - CATALOGUE_STALE_MS - 60_000);
+    await GameProvider.create({
+      providerKey: MOCK_PROVIDER_KEY,
+      displayName: "Mock",
+      baseUrl: "https://mock.example",
+      enabled: true,
+      lastCatalogueSyncAt: last,
+    });
+
+    // Seed the unacked alert the first pass would have written, then run again —
+    // oncePerEpisode must skip rather than re-create after DEDUPE_MS would have expired.
+    const { default: SecurityAlert } = await import(
+      "@/database/models/security-alert.model"
+    );
+    const { catalogueStaleFingerprint } = await import(
+      "@/lib/services/game-providers/catalogue-sync-freshness"
+    );
+    await SecurityAlert.create({
+      alertType: "catalogue_sync_stale",
+      severity: "low",
+      source: "provider-threshold-monitors",
+      provider: MOCK_PROVIDER_KEY,
+      reason: "seed",
+      acknowledged: false,
+      metadata: {
+        fingerprint: catalogueStaleFingerprint(MOCK_PROVIDER_KEY, last),
+      },
+      createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
+    });
+
+    const summary = await runProviderThresholdMonitors(new Date());
+    expect(recordAlert).not.toHaveBeenCalled();
+    expect(summary.skippedDuplicate).toBeGreaterThanOrEqual(1);
   });
 
   it("skips catalogue-stale for a disabled provider", async () => {

@@ -36,6 +36,9 @@ export interface GameProviderRow {
   // for that reason: it is a stored operator decision, not a health reading, so nothing
   // about it can report a working provider as down.
   autoOutageResponseEnabled: boolean;
+  // Reason: same shape as autoOutageResponseEnabled — a stored operator decision, not a
+  // health reading. Off by default; Friday 00:00 UTC sync only when an operator opts in.
+  autoCatalogueSyncFriday: boolean;
   lastCatalogueSyncAt?: string;
   adapterInstalled: boolean;
   credentials: ProviderCredentialStatus | null;

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, RefreshCw, Gamepad2, Info } from "lucide-react";
+import { Loader2, RefreshCw, Gamepad2, Info, AlertTriangle } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -21,6 +21,7 @@ import type {
 import { resolveGameCategory } from "@/lib/services/games/game-categories";
 import { useTerms } from "@/contexts/TerminologyContext";
 import { DIALOG_WIDTH_WIDE } from "@/lib/admin/dialog-widths";
+import { isCatalogueSyncStale } from "@/lib/services/game-providers/catalogue-sync-freshness";
 
 /**
  * One provider's catalogue: sync + Live on ChartVolt only.
@@ -139,6 +140,8 @@ export default function ProviderCatalogueDialog({
 
   if (!provider) return null;
 
+  const catalogueStale = isCatalogueSyncStale(provider.lastCatalogueSyncAt);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className={`max-h-[85vh] overflow-y-auto ${DIALOG_WIDTH_WIDE}`}>
@@ -154,11 +157,35 @@ export default function ProviderCatalogueDialog({
           </DialogDescription>
         </DialogHeader>
 
+        {catalogueStale && (
+          <div
+            role="alert"
+            className="flex items-start gap-2 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-100"
+          >
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />
+            <div>
+              <div className="font-medium text-red-50">
+                Catalogue sync overdue (more than 7 days)
+              </div>
+              <p className="mt-0.5 text-red-100/80">
+                {provider.lastCatalogueSyncAt
+                  ? `Last synced ${new Date(provider.lastCatalogueSyncAt).toLocaleString()}. `
+                  : "This catalogue has never been synced. "}
+                Press <strong className="font-medium text-red-50">Sync catalogue</strong> —
+                this notice stays until a sync succeeds.
+              </p>
+            </div>
+          </div>
+        )}
+
         <div className="flex items-center justify-between gap-3 rounded-lg border border-gray-700 bg-gray-800/50 p-3">
           <div className="text-sm text-white/70">
             {provider.lastCatalogueSyncAt
               ? `Last synced ${new Date(provider.lastCatalogueSyncAt).toLocaleString()}`
               : "This catalogue has never been synced."}
+            {provider.autoCatalogueSyncFriday
+              ? " · Friday 00:00 UTC auto-sync is on."
+              : ""}
           </div>
           <Button size="sm" onClick={handleSync} disabled={syncing}>
             {syncing ? (

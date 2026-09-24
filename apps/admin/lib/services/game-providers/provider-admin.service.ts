@@ -69,6 +69,7 @@ export interface ProviderSummary {
    * this shape for the reason above. This is a stored operator decision, not a reading.
    */
   autoOutageResponseEnabled: boolean;
+  autoCatalogueSyncFriday: boolean;
   lastCatalogueSyncAt?: Date;
   /** False when no code adapter is installed for this key. Blocks enabling. */
   adapterInstalled: boolean;
@@ -165,6 +166,7 @@ export async function listProviders(): Promise<ProviderSummary[]> {
       baseUrl: provider.baseUrl,
       enabled: provider.enabled,
       autoOutageResponseEnabled: provider.autoOutageResponseEnabled === true,
+      autoCatalogueSyncFriday: provider.autoCatalogueSyncFriday === true,
       lastCatalogueSyncAt: provider.lastCatalogueSyncAt,
       adapterInstalled: Boolean(getProviderAdapter(provider.providerKey)),
       // Presence only. Never the values.
@@ -395,6 +397,29 @@ export async function setProviderAutoOutageResponse(
   const updated = await GameProvider.findOneAndUpdate(
     { providerKey },
     { $set: { autoOutageResponseEnabled } },
+    { new: true },
+  );
+  if (!updated) return { success: false, error: "Provider not found." };
+
+  return { success: true };
+}
+
+/**
+ * Turns Friday 00:00 UTC automatic catalogue sync on or off for one provider.
+ *
+ * Same shape as {@link setProviderAutoOutageResponse}: a separate decision from the sale
+ * switch, audited on its own, no adapter/credential gate (a provider with no adapter is
+ * skipped by the worker with a warning).
+ */
+export async function setProviderAutoCatalogueSyncFriday(
+  providerKey: string,
+  autoCatalogueSyncFriday: boolean,
+): Promise<ProviderAdminResult> {
+  await connectToDatabase();
+
+  const updated = await GameProvider.findOneAndUpdate(
+    { providerKey },
+    { $set: { autoCatalogueSyncFriday } },
     { new: true },
   );
   if (!updated) return { success: false, error: "Provider not found." };

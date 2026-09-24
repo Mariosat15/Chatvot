@@ -15,6 +15,7 @@
  * - provider-kill-switch: Auto-disable providers down >15 min (every 1 minute)
  * - provider-outage-pause: Pause live contests on provider down; resume+extend on recovery
  * - provider-threshold-monitors: Chapter 06 s10 threshold SecurityAlerts (every 1 minute)
+ * - catalogue-friday-auto-sync: Opt-in Friday 00:00 UTC catalogue pull (hourly tick)
  * - trade-queue: Process limit orders (every 1 minute) — TP/SL handled by real-time service
  * - evaluate-badges: Evaluate user badges (every 1 hour)
  * (price-cache REMOVED — WEB app WebSocket writes prices to PriceCache)
@@ -47,6 +48,7 @@ import { runRoundReconciliationCheck } from "./jobs/round-reconciliation.job";
 import { runProviderKillSwitchCheck } from "./jobs/provider-kill-switch.job";
 import { runProviderOutagePauseCheck } from "./jobs/provider-outage-pause.job";
 import { runProviderThresholdMonitorsCheck } from "./jobs/provider-threshold-monitors.job";
+import { runCatalogueFridayAutoSyncCheck } from "./jobs/catalogue-friday-auto-sync.job";
 import { runTradeQueueProcessor } from "./jobs/trade-queue.job";
 // NOTE: price-cache job REMOVED — WebSocket streamer already writes prices every 1s.
 // The worker's price-cache job was redundant (external API call + ~33 upserts/minute duplicating
@@ -315,6 +317,35 @@ agenda.define("provider-threshold-monitors", async () => {
 });
 
 /**
+ * Friday catalogue auto-sync (00:00 UTC).
+ * Hourly tick; the service no-ops except Friday 00:00–00:59 UTC for providers
+ * with autoCatalogueSyncFriday enabled.
+ */
+agenda.define("catalogue-friday-auto-sync", async () => {
+  try {
+    const result = await runCatalogueFridayAutoSyncCheck();
+
+    if (result.skippedReason) return;
+
+    if (
+      result.synced > 0 ||
+      result.failed > 0 ||
+      result.errors.length > 0
+    ) {
+      console.log(
+        `📡 [CATALOGUE FRIDAY SYNC] examined=${result.examined} synced=${result.synced} failed=${result.failed} skippedAdapter=${result.skippedNoAdapter} skippedClaim=${result.skippedAlreadyRun}`,
+      );
+    }
+
+    if (result.errors.length > 0) {
+      result.errors.forEach((e) => console.error(`     - ${e}`));
+    }
+  } catch (error) {
+    console.error(`📡 [CATALOGUE FRIDAY SYNC] Failed:`, error);
+  }
+});
+
+/**
  * Trade Queue Processor Job
  * - Processes pending limit orders every minute
  * - BACKUP sweep for TP/SL (real-time triggering happens in WebSocket handler!)
@@ -561,6 +592,7 @@ async function startWorker(): Promise<void> {
     await agenda.every("1 minute", "provider-kill-switch");
     await agenda.every("1 minute", "provider-outage-pause");
     await agenda.every("1 minute", "provider-threshold-monitors");
+    await agenda.every("1 hour", "catalogue-friday-auto-sync");
     await agenda.every("1 minute", "early-end-check");
     await agenda.every("1 minute", "trade-queue");
     // price-cache REMOVED — redundant with WEB app's WebSocket PriceCache writes

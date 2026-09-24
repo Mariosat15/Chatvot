@@ -6,21 +6,19 @@ import {
   Plug,
   Plus,
   Loader2,
-  KeyRound,
-  Gamepad2,
   AlertTriangle,
   Power,
-  ShieldAlert,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import ProviderRegisterDialog from "./ProviderRegisterDialog";
 import ProviderCredentialsDialog from "./ProviderCredentialsDialog";
 import ProviderCatalogueDialog from "./ProviderCatalogueDialog";
+import ProviderCard from "./ProviderCard";
 import { useTerms } from "@/contexts/TerminologyContext";
 import type { GameProviderRow } from "./provider-types";
+import { isCatalogueSyncStale } from "@/lib/services/game-providers/catalogue-sync-freshness";
 
 /**
  * Game providers admin screen (X6, chapter 12 section 4).
@@ -34,15 +32,13 @@ import type { GameProviderRow } from "./provider-types";
  * of the three is the reason a game is not live. That question is otherwise answered by
  * reading three separate places and guessing.
  *
- * A FOURTH SWITCH SITS BESIDE THE PROVIDER'S, AND IT IS NOT A FOURTH LINK IN THAT CHAIN.
- * The three above answer "may this run". `autoOutageResponseEnabled` answers a different
- * question - "may the platform take this provider off sale by itself when it looks to be
- * having an outage" - and it defaults to off (owner decision, 20 September 2026). With it
- * off the platform still watches and still raises the critical alert; what it will not do
- * is disable the provider, refuse entries or pause live contests without an operator. The
- * two are deliberately rendered as separate controls with their own wording, because a
- * single switch could only ever mean "the opposite of whatever applies right now", which
- * is the same reasoning as the Game Master creation override having two directions.
+ * TWO MORE SWITCHES SIT BESIDE THE PROVIDER'S, AND THEY ARE NOT LINKS IN THAT CHAIN.
+ * The three above answer "may this run". `autoOutageResponseEnabled` answers "may the
+ * platform take this provider off sale by itself when it looks to be having an outage".
+ * `autoCatalogueSyncFriday` answers "may the worker pull this catalogue every Friday at
+ * 00:00 UTC". Both default off. They are deliberately separate controls with their own
+ * wording, because a single switch could only ever mean "the opposite of whatever applies
+ * right now".
  */
 
 export default function GameProvidersSection() {
@@ -193,6 +189,37 @@ export default function GameProvidersSection() {
     }
   };
 
+  const handleFridaySyncToggle = async (
+    provider: GameProviderRow,
+    autoCatalogueSyncFriday: boolean,
+  ) => {
+    setPendingKey(provider.providerKey);
+    try {
+      const response = await fetch(`/api/games/providers/${provider.providerKey}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ autoCatalogueSyncFriday }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        toast.error(data.error ?? "Something went wrong. Please contact support.");
+        return;
+      }
+
+      toast.success(
+        autoCatalogueSyncFriday
+          ? `${provider.displayName} will sync its catalogue every Friday at 00:00 UTC.`
+          : `Friday auto-sync is off for ${provider.displayName}. Use Sync catalogue when you want a refresh.`,
+      );
+      await load();
+    } catch {
+      toast.error("Something went wrong. Please contact support.");
+    } finally {
+      setPendingKey(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24 text-white/50">
@@ -252,6 +279,29 @@ export default function GameProvidersSection() {
         </div>
       </Card>
 
+      {providers.some(
+        (p) => p.enabled && isCatalogueSyncStale(p.lastCatalogueSyncAt),
+      ) && (
+        <div
+          role="alert"
+          className="flex items-start gap-3 rounded-lg border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-100"
+        >
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-400" />
+          <div>
+            <div className="font-medium text-red-50">
+              Catalogue sync overdue (more than 7 days)
+            </div>
+            <p className="mt-1 text-red-100/80">
+              At least one enabled provider has not synced in over seven days (or has never
+              been synced). Open that provider&apos;s {terms.games} list and press{" "}
+              <strong className="font-medium text-red-50">Sync catalogue</strong> — this
+              notice clears once a sync succeeds. The security log records this once per
+              episode; it does not repeat every minute.
+            </p>
+          </div>
+        </div>
+      )}
+
       {providers.length === 0 ? (
         <Card className="border-dashed border-white/15 bg-transparent p-12 text-center">
           <Plug className="mx-auto mb-3 h-8 w-8 text-white/25" />
@@ -272,6 +322,9 @@ export default function GameProvidersSection() {
               onToggle={(enabled) => handleProviderToggle(provider, enabled)}
               onToggleAutoResponse={(auto) =>
                 handleAutoResponseToggle(provider, auto)
+              }
+              onToggleFridaySync={(auto) =>
+                handleFridaySyncToggle(provider, auto)
               }
               onCredentials={() => setCredentialsFor(provider)}
               onCatalogue={() => setCatalogueFor(provider)}
@@ -300,149 +353,5 @@ export default function GameProvidersSection() {
         onChanged={load}
       />
     </div>
-  );
-}
-
-function ProviderCard({
-  provider,
-  masterEnabled,
-  pending,
-  onToggle,
-  onToggleAutoResponse,
-  onCredentials,
-  onCatalogue,
-}: {
-  provider: GameProviderRow;
-  masterEnabled: boolean;
-  pending: boolean;
-  onToggle: (enabled: boolean) => void;
-  onToggleAutoResponse: (autoOutageResponseEnabled: boolean) => void;
-  onCredentials: () => void;
-  onCatalogue: () => void;
-}) {
-  const terms = useTerms();
-  const hasCallbackSecret = Boolean(provider.credentials?.hasCallbackSecret);
-
-  // Reason for computing this rather than only disabling the switch: an operator needs to
-  // know WHY a provider cannot go live, and the switch alone cannot say.
-  const blockers: string[] = [];
-  if (!provider.adapterInstalled) blockers.push("no connector installed in the code");
-  if (!hasCallbackSecret) blockers.push("no callback secret stored");
-
-  return (
-    <Card className="border-white/10 bg-white/5 p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="truncate font-semibold text-white">
-              {provider.displayName}
-            </span>
-            {provider.credentials && (
-              <Badge variant="outline" className="text-xs">
-                {provider.credentials.environment}
-              </Badge>
-            )}
-          </div>
-          <div className="truncate font-mono text-xs text-white/40">
-            {provider.providerKey}
-          </div>
-          <div className="mt-1 truncate text-xs text-white/50">{provider.baseUrl}</div>
-        </div>
-
-        <div className="flex shrink-0 items-center gap-2">
-          {pending && <Loader2 className="h-4 w-4 animate-spin text-white/40" />}
-          <Switch
-            checked={provider.enabled}
-            disabled={pending || (!provider.enabled && blockers.length > 0)}
-            onCheckedChange={onToggle}
-          />
-        </div>
-      </div>
-
-      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-        <Badge
-          variant="outline"
-          className={
-            provider.enabled
-              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
-              : "border-white/20 bg-white/5 text-white/50"
-          }
-        >
-          {provider.enabled ? "Enabled" : "Disabled"}
-        </Badge>
-        <Badge variant="outline" className="border-white/20 bg-white/5 text-white/60">
-          {provider.enabledTitleCount} of {provider.titleCount} {terms.games} live
-        </Badge>
-        {provider.enabled && !masterEnabled && (
-          <Badge className="border-amber-500/40 bg-amber-500/10 text-amber-300">
-            Master switch off — nothing runs
-          </Badge>
-        )}
-      </div>
-
-      {blockers.length > 0 && (
-        <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 p-2.5 text-xs text-amber-200">
-          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          <span>Cannot be enabled yet: {blockers.join("; ")}.</span>
-        </div>
-      )}
-
-      {/*
-        Both switches are described in terms of what they PERMIT, never in terms of the
-        field name. An operator deciding whether to hand the platform the ability to take
-        a provider off sale needs to know that it means refused entries and paused live
-        contests; "automatic outage response" on its own says none of that.
-      */}
-      <div className="mt-3 space-y-2 rounded-lg border border-white/10 bg-black/20 p-3">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="text-xs font-medium text-white/80">
-              Provider switch (above) — yours alone
-            </div>
-            <p className="mt-0.5 text-xs text-white/50">
-              Turning this provider off stops new {terms.contests} and challenges being
-              created or entered on its {terms.games}. Nothing but an operator does this
-              unless you switch the line below on.
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-start justify-between gap-3 border-t border-white/10 pt-2">
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5 text-xs font-medium text-white/80">
-              <ShieldAlert
-                className={`h-3.5 w-3.5 ${
-                  provider.autoOutageResponseEnabled
-                    ? "text-amber-300"
-                    : "text-white/35"
-                }`}
-              />
-              Let the platform act on an outage by itself
-            </div>
-            <p className="mt-0.5 text-xs text-white/50">
-              {provider.autoOutageResponseEnabled
-                ? `On: after a sustained outage the platform will disable this provider, refuse new entries and pause live ${terms.contests} without waiting for you.`
-                : `Off: outages raise a critical alert and nothing else. Disabling, refusing entries and pausing live ${terms.contests} stay your decision.`}
-            </p>
-          </div>
-          <Switch
-            checked={provider.autoOutageResponseEnabled}
-            disabled={pending}
-            onCheckedChange={onToggleAutoResponse}
-          />
-        </div>
-      </div>
-
-      <div className="mt-4 flex flex-wrap gap-2">
-        <Button size="sm" variant="outline" onClick={onCredentials}>
-          <KeyRound className="mr-2 h-3.5 w-3.5" />
-          Credentials
-        </Button>
-        <Button size="sm" variant="outline" onClick={onCatalogue}>
-          <Gamepad2 className="mr-2 h-3.5 w-3.5" />
-          {terms.games}
-        </Button>
-      </div>
-    </Card>
   );
 }

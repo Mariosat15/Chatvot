@@ -67,6 +67,24 @@ export interface IGameProvider extends Document {
    */
   autoOutageResponseEnabled: boolean;
   /**
+   * Whether the worker may pull this provider's catalogue every Friday at 00:00 UTC.
+   *
+   * Owner decision, 24 September 2026: sync stays a deliberate act by default. With this
+   * off - which is the default and what every existing row means - only an operator click
+   * (or a future job that does not exist) refreshes titles. With it on, the Friday
+   * auto-sync job runs the same catalogue path as the admin button.
+   *
+   * Defaults to FALSE for the same reason as `autoOutageResponseEnabled`: a schema default
+   * of true would switch automation on for every provider registered before the field
+   * existed and make the opt-in invisible.
+   */
+  autoCatalogueSyncFriday: boolean;
+  /**
+   * `YYYY-MM-DD` (UTC) of the Friday the auto-sync job last claimed for this provider.
+   * Prevents a second run in the same midnight hour after a worker restart.
+   */
+  lastFridayAutoSyncClaimKey?: string;
+  /**
    * When the critical outage alert was last raised, used to claim it once per outage.
    *
    * Reason it exists at all: the alert used to be claimed by the `enabled: true → false`
@@ -159,6 +177,13 @@ const GameProviderSchema = new Schema<IGameProvider>(
     autoOutageResponseEnabled: {
       type: Boolean,
       default: false,
+    },
+    autoCatalogueSyncFriday: {
+      type: Boolean,
+      default: false,
+    },
+    lastFridayAutoSyncClaimKey: {
+      type: String,
     },
     outageAlertedAt: {
       type: Date,
