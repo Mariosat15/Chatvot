@@ -229,6 +229,8 @@ export async function launchChallengeRound(
         ),
       },
       returnUrl: `${baseUrl}/challenges/${challengeId}`,
+      // Origin only — never the full return path. White-label pages can differ from returnUrl.
+      parentOrigin: new URL(baseUrl).origin,
       resultCallbackUrl: `${baseUrl}/api/games/providers/${config.providerKey}/events`,
       // Supplied unconditionally, exactly as the competition launch service does - see
       // `contract.ts` for why the provider's use of it is optional.

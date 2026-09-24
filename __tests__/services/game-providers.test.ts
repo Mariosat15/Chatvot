@@ -157,6 +157,7 @@ describe("the mock adapter is a faithful liar", () => {
       expiresAt: new Date(Date.now() + 60_000),
       resultCallbackUrl: "https://x.test/cb",
       returnUrl: "https://x.test/back",
+    parentOrigin: "https://chartvolt.test",
     };
     const first = await adapter.createRound(request);
     const second = await adapter.createRound(request);

@@ -151,25 +151,26 @@ const sound = createSound();
  * ---------------------------------------------------------------------------------------- */
 
 /**
- * The four messages of the frame contract, and why the target origin is `*`.
+ * The four messages of the frame contract, and why the target origin prefers `parentOrigin`.
  *
- * Nothing secret crosses this boundary by design: the platform's message type has no score, no
- * rank and no player field, and `height` is the only number in it. So `*` discloses nothing.
+ * ChartVolt always sends `parentOrigin` on create (requirements HTML v1.18 / A13) — the exact
+ * origin of the page hosting this iframe. That is the only safe `postMessage` target. Deriving
+ * one from `returnUrl` looks stricter and fails silently: the browser drops the message, the
+ * platform never receives `ready`, and the player watches a spinner over a running game.
  *
- * The alternative is worse rather than stricter. We do not know the embedding origin - the round
- * carries a `returnUrl`, but that is where to send the player afterwards, not necessarily the page
- * we are inside, and on a white-labelled deployment the two differ. A target origin derived from
- * the wrong field does not warn: the message is dropped silently, the platform never receives
- * `ready`, and the player watches a loading spinner over a game that is running perfectly.
- *
- * The check that actually matters is on the receiving side, and the platform makes it: it compares
- * `event.origin` against the launch URL it loaded and `event.source` against the frame's own
- * window, which no unrelated page can satisfy.
+ * Rounds created before that field existed have no `parentOrigin`. Falling back to `*` is safe
+ * here because the message type carries no score, rank or player field — `height` is the only
+ * number. The check that matters is on the receiving side: `event.origin` against the launch URL
+ * and `event.source` against this frame's window.
  */
 function tellPlatform(type, extra) {
   if (window.parent === window) return;
+  const target =
+    state && typeof state.parentOrigin === "string" && state.parentOrigin.length > 0
+      ? state.parentOrigin
+      : "*";
   try {
-    window.parent.postMessage(Object.assign({ type }, extra || {}), "*");
+    window.parent.postMessage(Object.assign({ type }, extra || {}), target);
   } catch {
     /* A frame that cannot post is still a playable game. */
   }

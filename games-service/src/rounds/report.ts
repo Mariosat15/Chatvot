@@ -70,14 +70,36 @@ export function eventTypeFor(status: RoundStatus): EventType | undefined {
  * a expiry sweep - there is nothing to expire, and the specification wants these links to
  * outlive the dispute rather than the deployment.
  */
-export function replayUrl(round: Pick<RoundDoc, "providerRoundId">): string {
+function replayTokenFor(providerRoundId: string): string {
   const config = loadConfig();
-  const token = crypto
+  return crypto
     .createHmac("sha256", config.inbound.apiSecret)
-    .update(`replay:${round.providerRoundId}`, "utf8")
+    .update(`replay:${providerRoundId}`, "utf8")
     .digest("hex")
     .slice(0, 32);
-  return `${config.publicUrl}/replay/${round.providerRoundId}?t=${token}`;
+}
+
+export function replayUrl(round: Pick<RoundDoc, "providerRoundId">): string {
+  const config = loadConfig();
+  return `${config.publicUrl}/replay/${round.providerRoundId}?t=${replayTokenFor(round.providerRoundId)}`;
+}
+
+/**
+ * Constant-time check of the replay query token.
+ *
+ * Reason: a timing-leaky equality on a short HMAC would let an attacker walk the token space
+ * faster than a blind guess. `timingSafeEqual` needs equal lengths, so unequal lengths refuse
+ * without comparing.
+ */
+export function verifyReplayToken(providerRoundId: string, token: string): boolean {
+  if (!providerRoundId || !token) return false;
+  const expected = replayTokenFor(providerRoundId);
+  if (expected.length !== token.length) return false;
+  try {
+    return crypto.timingSafeEqual(Buffer.from(expected, "utf8"), Buffer.from(token, "utf8"));
+  } catch {
+    return false;
+  }
 }
 
 export interface ResultBody {

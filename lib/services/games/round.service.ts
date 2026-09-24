@@ -239,6 +239,7 @@ export async function createRound(
       resultCallbackUrl: input.resultCallbackUrl,
       progressCallbackUrl: input.progressCallbackUrl,
       returnUrl: input.returnUrl,
+      parentOrigin: input.parentOrigin,
     });
 
     if (!replay.success) {
@@ -335,6 +336,7 @@ export async function createRound(
     resultCallbackUrl: input.resultCallbackUrl,
     progressCallbackUrl: input.progressCallbackUrl,
     returnUrl: input.returnUrl,
+    parentOrigin: input.parentOrigin,
   });
 
   if (!created.success) {

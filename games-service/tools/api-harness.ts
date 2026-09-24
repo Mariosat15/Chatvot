@@ -192,6 +192,8 @@ export interface CallOptions {
   timestamp?: number;
   signature?: string;
   omitSignature?: boolean;
+  /** Extra request headers (e.g. Accept-Language). Not signed. */
+  headers?: Record<string, string>;
 }
 
 export async function callApi<T = Record<string, unknown>>(
@@ -207,6 +209,7 @@ export async function callApi<T = Record<string, unknown>>(
   const headers: Record<string, string> = {
     Authorization: `Bearer ${options.apiKey ?? API_KEY}`,
     "X-Timestamp": timestamp,
+    ...(options.headers ?? {}),
   };
   if (body) headers["Content-Type"] = "application/json";
 

@@ -23,6 +23,8 @@ interface CallOptions {
   method: "GET" | "POST";
   path: string;
   body?: unknown;
+  /** Extra headers that are not part of the signed material (e.g. Accept-Language). */
+  headers?: Record<string, string>;
 }
 
 /**
@@ -112,7 +114,10 @@ export async function call<T>(options: CallOptions): Promise<ProviderResult<T>> 
   // An empty string, not "undefined" and not "{}". The provider signs the raw bytes it
   // received, so a GET must be signed over exactly nothing in the body slot.
   const serialised = body === undefined ? "" : JSON.stringify(body);
-  const headers = sign(connection, method, path, serialised);
+  const headers = {
+    ...sign(connection, method, path, serialised),
+    ...(options.headers ?? {}),
+  };
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);

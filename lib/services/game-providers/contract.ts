@@ -181,6 +181,13 @@ export interface CreateRoundRequest {
    */
   progressCallbackUrl?: string;
   returnUrl: string;
+  /**
+   * Origin of the page that hosts the play iframe (scheme + host + optional port).
+   *
+   * Always sent. Providers must use it as the `postMessage` target origin. It is not
+   * `returnUrl` — on a white-label those can differ. Requirements HTML **v1.18** / A13.
+   */
+  parentOrigin: string;
 }
 
 export interface CreateRoundResponse {

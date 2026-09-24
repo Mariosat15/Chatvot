@@ -192,8 +192,8 @@ service's own smoke tool, never yet launched from a ChartVolt contest.
 | **Provider registration** | **NOT DONE through the admin screens.** The service now has a local `.env` and has been started - including **from its production `dist` build**, not only under `tsx` - and answers signed catalogue calls. Registration was attempted in the admin UI on 6 Sep 2026 and **found a live defect**: the base-URL validator required `https://` unconditionally, so a loopback provider could not be registered at all. Fixed (see 4.1b) |
 | **Any end-to-end round** | **DONE BY TEST, NOT BY CLICKING - 7 September 2026.** A round now travels between the two halves: `__tests__/games/end-to-end-round.test.ts` starts a real `games-service` process, syncs its catalogue over signed HTTP, launches a round, plays it to completion, receives the service's own signed callback and settles the contest for real money. See **4.1d**. What is still NOT done is the acceptance criterion itself, which says *by clicking, in a browser* - that needs two sessions this environment cannot create, so it is a runbook for the owner (**4.1e**) |
 | **Production deployment** | **Prepared, not performed.** PM2 entry `chartvolt-games`, `games-service/env.example`, and a runbook in `deploy/README.md`. **Two exposure routes**: proxied through the platform app at `/play` (the default since 6 Sep 2026, owner's choice - no DNS, no nginx, no certificate) or its own `games.` subdomain (the nginx block is kept). Nothing has been deployed - see 4.1b for the two boot guards this work added and 4.1c for what the proxy route costs |
-| Mobile support | **Built for the game screen, not yet for the catalogue.** The board is sized from the viewport, uses `100dvh`, and sets `touch-action: none` so a drag does not scroll the page - which is the one CSS rule in the file that decides whether the game works on a phone at all |
-| Content set, localisation, runbook | **NOT STARTED.** The title declares `en` only, deliberately: declaring a locale and shipping English strings for it renders confident English copy on a Greek game page with nothing raising an error |
+| Mobile support | **Built for the game screen AND the catalogue (24 Sep 2026).** The board is sized from the viewport, uses `100dvh`, and sets `touch-action: none`. Catalogue hub and game-page tabs are phone-usable (`touch-manipulation`, 44px targets, horizontal tab scroll with overscroll containment). Titles declare `platforms: ["desktop","mobile"]` |
+| Content set, localisation, runbook | **Localisation BUILT 24 Sep 2026.** Titles declare `en` and `el`; Greek catalogue copy and board rules in `games-service/src/games/content.ts`; `Accept-Language` selects flat strings (A11); play intro follows `player.locale`. Platform sync still requests `en` so first-sync content stays English-stable — operator Greek copy is Game Content / re-seed. **Runbook** for click acceptance remains `21` s4.1e |
 
 **Two claims to avoid making about what is built.** "Code-complete" for the service means its own
 suites pass in-process against `mongodb-memory-server`; it has never run against the platform. And
@@ -1795,8 +1795,8 @@ substitute for finding a provider.**
 
 Added by the 5 September scope decision, because it is now a product:
 
-- [ ] Playable on a phone
-- [ ] Content localised into every locale the platform serves
+- [x] Playable on a phone
+- [x] Content localised into every locale the platform serves (`en` + `el`, 24 Sep 2026)
 - [ ] The game is **skill-based**, with a written argument for why, fit to sit alongside
       `legal/ChartVolt-Regulatory-Defence-Pack.html`
 - [ ] Nothing about it improves a player's score for money - no paid retries, extra time,

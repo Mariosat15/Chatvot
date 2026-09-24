@@ -66,8 +66,9 @@ export const TERMS = {
   // A challenge is exactly two players. The word is fixed by a hard constraint in the
   // programme rules: use "challenge", NEVER "duel" - there is a `Challenge` model,
   // `/challenges` routes, a `challengesEnabled` flag and `challenge_entry` /
-  // `challenge_refund` ledger values, and nine remaining `duel` strings elsewhere in the
-  // codebase are a separate migration (`13` s9.1a), not a wording preference.
+  // `challenge_refund` ledger values. The nine product-string sites in `13` s9.1a were
+  // rewritten 24 Sep 2026; seeded DB rows stay report-only until ops `--apply`
+  // (`tools/vocabulary/rewrite-duel-seeds.ts`).
   challenge: "Challenge",
   challenges: "Challenges",
 

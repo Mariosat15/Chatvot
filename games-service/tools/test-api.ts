@@ -46,6 +46,7 @@ function createBody(overrides: Record<string, unknown> = {}) {
     expiresAt: FUTURE(),
     resultCallbackUrl: "",
     returnUrl: "https://chartvolt.test/contests/1",
+    parentOrigin: "https://chartvolt.test",
     ...overrides,
   };
 }
@@ -184,9 +185,10 @@ async function main(): Promise<number> {
      * and the page never mentioned that a path can be redrawn at all. A player learned one set of
      * rules on the game page and a different set inside the game.
      *
-     * They now live in `instructions.ts` and both consumers compose from it. This is what holds
-     * that: the catalogue's own strings are compared against the shared list, so a title that
-     * reverts to a hand-written paragraph fails here rather than at a support desk.
+     * They now live in `content.ts` (re-exported from `instructions.ts`) and both consumers
+     * compose from it. This is what holds that: the catalogue's own strings are compared against
+     * the shared list, so a title that reverts to a hand-written paragraph fails here rather
+     * than at a support desk.
      *
      * The play surface's half of the same property is asserted in `test-play.ts` - the state
      * carries `boardRules`, and the page has no rules of its own to disagree with.
@@ -208,7 +210,7 @@ async function main(): Promise<number> {
       // the argument.
       assert.ok(
         game.howToPlay.length > BOARD_RULES.join(" ").length,
-        `${game.gameCode}'s howToPlay adds nothing of its own`,
+        `${game.gameCode}'s howToPlay is only the shared rules with no pacing note`,
       );
     }
 
@@ -216,6 +218,55 @@ async function main(): Promise<number> {
     // plus a dropped pacing note would produce.
     const prose = new Set(response.body.games.map((game) => game.howToPlay));
     assert.equal(prose.size, response.body.games.length, "two titles share one how-to-play");
+  });
+
+  await test("Accept-Language el returns Greek catalogue copy", async () => {
+    // A11 / X4a: flat strings selected by Accept-Language. Declaring el without shipping
+    // Greek would be the confident-wrong-copy failure A12 exists to stop.
+    const response = await callApi<{
+      games: { gameCode: string; tagline: string; howToPlay: string; locales: string[] }[];
+    }>("/v1/games", { headers: { "Accept-Language": "el" } });
+    assert.equal(response.status, 200);
+
+    const sprint = response.body.games.find((g) => g.gameCode === "circuit-sprint");
+    assert.ok(sprint);
+    assert.deepEqual(sprint!.locales, ["en", "el"]);
+    assert.match(sprint!.tagline, /πλέγμα|ρολόι|boards/i);
+    // Greek board rules must appear; English ones must not (otherwise Accept-Language is a no-op).
+    assert.match(sprint!.howToPlay, /τερματικό/);
+    assert.ok(!sprint!.howToPlay.includes("Drag from one terminal"));
+  });
+
+  await test("Accept-Language falls back when the requested locale is undeclared", async () => {
+    const response = await callApi<{
+      games: { gameCode: string; tagline: string }[];
+    }>("/v1/games", { headers: { "Accept-Language": "fr, de;q=0.8" } });
+    assert.equal(response.status, 200);
+    const sprint = response.body.games.find((g) => g.gameCode === "circuit-sprint");
+    assert.ok(sprint);
+    // First declared is en — English tagline, not Greek.
+    assert.equal(
+      sprint!.tagline,
+      "Wire the grid. Beat the clock. As many boards as you can.",
+    );
+  });
+
+  await test("every title declares desktop and mobile platforms", async () => {
+    // X4a mobile catalogue: platforms is the catalogue claim that phones are supported.
+    // The game screen already sizes from the viewport; this is the half the catalogue owns.
+    const response = await callApi<{
+      games: { gameCode: string; platforms: string[] }[];
+    }>("/v1/games");
+    for (const game of response.body.games) {
+      assert.ok(
+        game.platforms.includes("desktop"),
+        `${game.gameCode} missing desktop`,
+      );
+      assert.ok(
+        game.platforms.includes("mobile"),
+        `${game.gameCode} missing mobile`,
+      );
+    }
   });
 
   await test("every advertised artwork URL actually resolves", async () => {
@@ -592,6 +643,41 @@ async function main(): Promise<number> {
     // compiling it as a pattern is both flagged by the linter and wrong the day it contains a
     // regex metacharacter.
     assert.ok(!token.includes(API_SECRET), "the replay token contains the signing secret");
+  });
+
+  await test("replay refuses a live round and serves an attempt summary once terminal", async () => {
+    await clearRounds();
+    const { baseUrl } = await import("./api-harness");
+    // Practice: no shared contest content, so the ranked expiresAt gate does not apply —
+    // terminal alone is enough (A14). Ranked still waits on expiresAt in serveReplay.
+    const practice = createBody({
+      resultCallbackUrl: callbackUrl,
+      mode: "practice",
+      contentSeed: undefined,
+    });
+    const created = await callApi<{ providerRoundId: string }>("/v1/rounds", {
+      method: "POST",
+      body: practice,
+    });
+    assert.equal(created.status, 201);
+    const replayPath = new URL(
+      (await callApi<{ replayUrl: string }>(`/v1/rounds/${practice.roundId}`)).body.replayUrl,
+    );
+    const live = await fetch(`${baseUrl}${replayPath.pathname}${replayPath.search}`);
+    assert.equal(live.status, 403);
+
+    await callApi(`/v1/rounds/${practice.roundId}/void`, {
+      method: "POST",
+      body: { reason: "Replay test." },
+    });
+    const after = await fetch(`${baseUrl}${replayPath.pathname}${replayPath.search}`);
+    assert.equal(after.status, 200);
+    const html = await after.text();
+    assert.ok(html.includes("Your attempt"));
+    assert.ok(html.includes("voided"));
+    assert.ok(!/puzzle|board-|grid/i.test(html) || html.includes("Boards solved"));
+    const bad = await fetch(`${baseUrl}${replayPath.pathname}?t=${"0".repeat(32)}`);
+    assert.equal(bad.status, 404);
   });
 
   console.log("");

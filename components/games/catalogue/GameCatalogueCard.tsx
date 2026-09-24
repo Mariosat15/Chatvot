@@ -27,7 +27,7 @@ export function GameCatalogueCard({ game }: { game: BrowsableGame }) {
   return (
     <Link
       href={`/games/${game.slug}`}
-      className="group flex h-full focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60 rounded-2xl"
+      className="group flex h-full min-h-[44px] touch-manipulation focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60 rounded-2xl"
     >
       {/*
         Reason: grid rows stretch by default, but the card must also be h-full

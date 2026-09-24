@@ -8,7 +8,7 @@ export interface ThemeUniqueEntry {
   content: { heroTitle: string; heroSubtitle: string; heroDescription: string; ctaPrimaryText: string; ctaSecondaryText: string };
 }
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 export const themeUniqueData: Record<string, ThemeUniqueEntry> = {
   // ── Gaming ───────────────────────────────────────────────────────────────
   "gaming-neon": {
@@ -71,7 +71,7 @@ export const themeUniqueData: Record<string, ThemeUniqueEntry> = {
   "warrior": {
     icons: { trophy: "⚔️", battle: "🗡️", users: "🛡️", currency: "🪙", power: "💪", achievement: "🏰", stats: "📜", special: "🔥" },
     hero: { titlePrefix: "⚔️", ctaIcon: "🗡️" },
-    content: { heroTitle: "DRAW YOUR BLADE, WARRIOR", heroSubtitle: "Battle-hardened. Market-proven.", heroDescription: "Every trade is a duel. Sharpen your sword, raise your shield, and charge into the arena of champions.", ctaPrimaryText: "Draw Blade", ctaSecondaryText: "Enter Arena" },
+    content: { heroTitle: "DRAW YOUR BLADE, WARRIOR", heroSubtitle: "Battle-hardened. Market-proven.", heroDescription: "Every trade is a challenge. Sharpen your sword, raise your shield, and charge into the arena of champions.", ctaPrimaryText: "Draw Blade", ctaSecondaryText: "Enter Arena" },
   },
   "wizard": {
     icons: { trophy: "🔮", battle: "✨", users: "🧙", currency: "💎", power: "⚡", achievement: "📚", stats: "🌟", special: "🪄" },

@@ -15,7 +15,7 @@ money, how it protects the company, the bank, and the customer, and how it plans
 **ChartVolt is a gamified trading competition platform.** Users trade against **real,
 live market prices** using **virtual capital** — so they get the full thrill and skill of
 trading **without risking money on the markets themselves**. Instead, they compete for
-prize pools in tournaments and head-to-head duels.
+prize pools in tournaments and head-to-head challenges.
 
 Think of it as **"fantasy sports for traders"**: real-time data, real skill, real prizes —
 but the financial risk is capped at a small, known entry fee rather than open market exposure.
@@ -26,7 +26,7 @@ but the financial risk is capped at a small, known entry fee rather than open ma
 |--------|-----------|
 | **Live trading simulator** | Real-time forex prices (bid/ask), leverage, stop-loss/take-profit, margin and liquidation — a realistic trading engine, fully simulated. |
 | **Competitions** | Multi-player tournaments with an entry fee, a shared prize pool, a live leaderboard, and automated start/finish. |
-| **1v1 Challenges** | Head-to-head duels — two traders, winner takes the pot (minus a small platform fee). |
+| **1v1 Challenges** | Head-to-head contests — two traders, winner takes the pot (minus a small platform fee). |
 | **Global leaderboard** | Platform-wide ranking by performance, wins, and achievements. |
 | **Marketplace** | Spend in-app credits on trading indicators, strategies, cosmetics, and creator packages. |
 | **Game Master program** | Power users buy a package to host their own competitions and earn referral income. |
@@ -281,7 +281,7 @@ Gross transaction volume flowing through the wallet is several times larger.*
 ## 9. One-Paragraph Summary (for a pitch)
 
 > **ChartVolt turns trading into a fair, fun, capped-risk competition.** Users trade live
-> markets with virtual capital, compete in tournaments and 1v1 duels for real prize pools,
+> markets with virtual capital, compete in tournaments and 1v1 challenges for real prize pools,
 > and progress through levels, badges, and a creator-driven ecosystem. The platform earns
 > from transparent fees and product sales — never from user losses — and protects the
 > company, the bank, and the customer with KYC, fraud detection, cryptographically verified

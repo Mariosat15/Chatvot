@@ -1,6 +1,11 @@
 import type { Request, Response } from "express";
 
 import { loadConfig } from "../config";
+import {
+  copyFor,
+  howToPlayFor,
+} from "../games/content";
+import { resolveLocaleFromHeader } from "../games/locale";
 import { TITLES, type TitleDefinition } from "../games/titles";
 
 /**
@@ -30,6 +35,10 @@ import { TITLES, type TitleDefinition } from "../games/titles";
  * rotate leave broken game pages behind". These are stable and derived from the game code, so
  * they satisfy the property that matters even though the hosting is not what a real provider
  * would use.
+ *
+ * Labels on the generated SVGs stay English (title.displayName / tagline). Localising the
+ * rasterised text inside a cacheable asset URL would either fork every URL by locale or serve
+ * wrong labels from a shared cache - neither is worth it for decorative placeholders.
  */
 function artwork(title: TitleDefinition, assetBase: string) {
   const base = `${assetBase}/assets/${title.gameCode}`;
@@ -42,23 +51,35 @@ function artwork(title: TitleDefinition, assetBase: string) {
 }
 
 /**
- * The catalogue entry for one title.
+ * The catalogue entry for one title in one locale.
  *
  * Field names and nesting follow section 6 exactly. Reason for building this explicitly rather
  * than spreading the title object: a spread would publish every internal field a title gains
  * later, and a catalogue is a public contract. The same rule the platform applies to its own
  * catalogue sync - a named allow-list, never a spread of the remote payload - is worth applying
  * in the outbound direction too.
+ *
+ * Text fields are resolved through `content.ts` for the requested locale (A11): always flat
+ * strings, never a map.
  */
-export function catalogueEntry(title: TitleDefinition, assetBase: string) {
+export function catalogueEntry(
+  title: TitleDefinition,
+  assetBase: string,
+  locale?: string,
+) {
+  const resolved =
+    locale ??
+    resolveLocaleFromHeader(undefined, title.locales);
+  const copy = copyFor(title.gameCode, resolved);
+
   return {
     gameCode: title.gameCode,
-    displayName: title.displayName,
+    displayName: copy.displayName,
 
-    tagline: title.tagline,
-    description: title.description,
-    rulesSummary: title.rulesSummary,
-    howToPlay: title.howToPlay,
+    tagline: copy.tagline,
+    description: copy.description,
+    rulesSummary: copy.rulesSummary,
+    howToPlay: howToPlayFor(title.gameCode, resolved),
     category: title.category,
     tags: title.tags,
 
@@ -86,7 +107,7 @@ export function catalogueEntry(title: TitleDefinition, assetBase: string) {
   };
 }
 
-export function listGames(_req: Request, res: Response): void {
+export function listGames(req: Request, res: Response): void {
   const config = loadConfig();
   const assetBase = config.assetBaseUrl || config.publicUrl;
 
@@ -94,8 +115,16 @@ export function listGames(_req: Request, res: Response): void {
   // periodically, so a long max-age would delay a status change to `maintenance` - the one
   // catalogue field that needs to take effect quickly.
   //
-  // Accept-Language (A11 / HTML v1.16): every title declares only `en` today, so the header
-  // is a no-op until X4a ships further locales. Response fields stay flat strings either way.
+  // Accept-Language (A11): pick a declared locale per title. Vary so a shared cache cannot
+  // serve Greek copy to an English sync (or the reverse).
+  const acceptLanguage = req.header("accept-language");
+
   res.setHeader("Cache-Control", "public, max-age=60");
-  res.json({ games: TITLES.map((title) => catalogueEntry(title, assetBase)) });
+  res.setHeader("Vary", "Accept-Language");
+  res.json({
+    games: TITLES.map((title) => {
+      const locale = resolveLocaleFromHeader(acceptLanguage, title.locales);
+      return catalogueEntry(title, assetBase, locale);
+    }),
+  });
 }

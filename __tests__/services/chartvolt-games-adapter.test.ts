@@ -172,6 +172,7 @@ function newRoundRequest() {
     expiresAt: new Date("2026-09-06T12:00:00.000Z"),
     resultCallbackUrl: "https://chartvolt.test/api/games/providers/chartvolt-games/events",
     returnUrl: "https://chartvolt.test/competitions/1/play",
+    parentOrigin: "https://chartvolt.test",
   };
 }
 
@@ -367,6 +368,7 @@ describe("the signed request", () => {
       "expiresAt",
       "gameCode",
       "mode",
+      "parentOrigin",
       "player",
       "resultCallbackUrl",
       "returnUrl",

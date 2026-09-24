@@ -61,7 +61,7 @@ export default async function GamesCataloguePage({
   const rest = filtered.filter((g) => !g.isFeatured);
 
   return (
-    <div className="relative mx-auto max-w-6xl space-y-8 px-4 py-8 sm:px-6">
+    <div className="relative mx-auto max-w-6xl space-y-8 px-4 py-6 sm:px-6 sm:py-8">
       <NeonGridBackdrop />
       <header className="space-y-2">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-400/80">

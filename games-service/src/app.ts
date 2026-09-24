@@ -12,6 +12,7 @@ import { ApiError, sendError } from "./http/errors";
 import { requirePlatformAuth, type SignedRequest } from "./http/inbound-auth";
 import { servePlayAsset, servePlayPage } from "./http/play-page";
 import { getState, postLeave, postSession, postSubmit } from "./http/play-routes";
+import { serveReplay } from "./http/replay";
 import { getRound, postRound, postVoidRound } from "./http/rounds";
 import { armRound, finishRoundForTesting, redeliver, requireSandbox } from "./http/sandbox";
 
@@ -140,6 +141,9 @@ export function createApp() {
   app.get("/play/api/state", wrap(getState));
   app.post("/play/api/submit", wrap(postSubmit));
   app.post("/play/api/leave", wrap(postLeave));
+
+  // Ambiguity A14 / R35 — token-scoped attempt summary, never puzzle content.
+  app.get("/replay/:providerRoundId", wrap(serveReplay));
 
   // ── JSON for everything, including the two cases no handler sees ───────────────────────────────
   //

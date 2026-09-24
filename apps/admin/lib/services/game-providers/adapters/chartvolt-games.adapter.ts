@@ -257,6 +257,11 @@ export class ChartVoltGamesAdapter implements GameProviderAdapter {
       connection: connection.connection,
       method: "GET",
       path: "/v1/games",
+      // Reason: A11 — catalogue text is locale-selected flat strings. Sync defaults to
+      // English so firstSyncOnly content stays stable; operators who want Greek copy
+      // edit via Game Content or re-seed a fresh title. The provider still honours
+      // Accept-Language for any caller that sends it (tests, future live reads).
+      headers: { "Accept-Language": "en" },
     });
     if (!response.success) return response;
 
@@ -351,6 +356,7 @@ export class ChartVoltGamesAdapter implements GameProviderAdapter {
         resultCallbackUrl: request.resultCallbackUrl,
         progressCallbackUrl: request.progressCallbackUrl,
         returnUrl: request.returnUrl,
+        parentOrigin: request.parentOrigin,
       },
     });
     if (!response.success) return response;

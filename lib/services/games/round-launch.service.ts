@@ -271,6 +271,8 @@ export async function launchContestRound(
         ),
       },
       returnUrl: `${baseUrl}/competitions/${competitionId}`,
+      // Origin only — never the full return path. White-label pages can differ from returnUrl.
+      parentOrigin: new URL(baseUrl).origin,
       resultCallbackUrl: `${baseUrl}/api/games/providers/${config.providerKey}/events`,
       // Supplied UNCONDITIONALLY, and it is the provider's choice whether to use it. The
       // platform cannot know which titles have anything to say mid-round, and withholding the

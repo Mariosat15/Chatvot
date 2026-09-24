@@ -29,6 +29,8 @@ export interface CreateRoundInput {
   resultCallbackUrl?: unknown;
   progressCallbackUrl?: unknown;
   returnUrl?: unknown;
+  /** Origin of the hosting page — required (HTML v1.18 / A13). */
+  parentOrigin?: unknown;
 }
 
 export interface CreateRoundOutput {
@@ -91,6 +93,37 @@ function requireDeliverableUrl(value: unknown, field: string): string {
 }
 
 /**
+ * Validates the embedding origin ChartVolt always sends on create (HTML v1.18 / A13).
+ *
+ * Must be scheme + host + optional port only. A path or query would mean somebody confused
+ * this field with `returnUrl`, and using that as a `postMessage` target fails silently.
+ */
+function requireParentOrigin(value: unknown): string {
+  const raw = requireString(value, "parentOrigin");
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw badRequest("'parentOrigin' is not a valid origin.");
+  }
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+    throw badRequest("'parentOrigin' must be an http or https origin.");
+  }
+  if (
+    (parsed.pathname !== "/" && parsed.pathname !== "") ||
+    parsed.search !== "" ||
+    parsed.hash !== "" ||
+    parsed.username !== "" ||
+    parsed.password !== ""
+  ) {
+    throw badRequest(
+      "'parentOrigin' must be an origin (scheme + host + optional port) with no path, query or hash.",
+    );
+  }
+  return parsed.origin;
+}
+
+/**
  * A stable hash of the parameters that decide what the player faces.
  *
  * WHAT COUNTS AS A "PARAMETER" IS NOT IN THE DOCUMENT
@@ -104,7 +137,7 @@ function requireDeliverableUrl(value: unknown, field: string): string {
  *
  * The line drawn here is: anything that changes the content, the scoring or whose round it is.
  * Game, mode, player, seed and the resolved config. Deliberately excluded are `expiresAt`,
- * `returnUrl` and `resultCallbackUrl`, none of which change what the player faces.
+ * `returnUrl`, `parentOrigin` and `resultCallbackUrl`, none of which change what the player faces.
  *
  * The config is hashed AFTER resolution, not as sent. Reason: two requests asking for
  * `durationSeconds: 120` and omitting it entirely describe the same round, because the default
@@ -250,6 +283,7 @@ export async function createRound(input: CreateRoundInput): Promise<CreateRoundO
     input.returnUrl === undefined || input.returnUrl === null
       ? undefined
       : requireString(input.returnUrl, "returnUrl");
+  const parentOrigin = requireParentOrigin(input.parentOrigin);
 
   const rawSeed = input.contentSeed;
   if (rawSeed !== undefined && rawSeed !== null && typeof rawSeed !== "string") {
@@ -305,6 +339,7 @@ export async function createRound(input: CreateRoundInput): Promise<CreateRoundO
       resultCallbackUrl,
       progressCallbackUrl,
       returnUrl,
+      parentOrigin,
       status: "created",
       boards: [],
       sandbox: {},

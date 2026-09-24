@@ -299,7 +299,7 @@ export const TEMPLATE_TRADE_WARS: TemplateDefinition = {
         items: [
           {
             icon: "Swords",
-            title: "1v1 Duels",
+            title: "1v1 Challenges",
             description:
               "Challenge any trader to a direct skill showdown. Two enter, one leaves victorious with the prize.",
           },
@@ -348,9 +348,9 @@ export const TEMPLATE_TRADE_WARS: TemplateDefinition = {
           },
           {
             name: "Elena T.",
-            role: "Duel Specialist · Barcelona",
+            role: "Challenge Specialist · Barcelona",
             quote:
-              "Nothing beats the tension of a 1v1 duel where every pip matters. It's chess with money and the clock is ticking.",
+              "Nothing beats the tension of a 1v1 challenge where every pip matters. It's chess with money and the clock is ticking.",
             rating: 5,
           },
         ],
@@ -364,7 +364,7 @@ export const TEMPLATE_TRADE_WARS: TemplateDefinition = {
       content: {
         headline: "War Statistics",
         items: [
-          { value: "1v1", label: "Duels Available", icon: "Swords" },
+          { value: "1v1", label: "Challenges Available", icon: "Swords" },
           { value: "3v3", label: "Squad Battles", icon: "Users" },
           { value: "Multi-Round", label: "Campaigns", icon: "Map" },
           { value: "€75K+", label: "Monthly War Prizes", icon: "Trophy" },
@@ -648,7 +648,7 @@ export const TEMPLATE_LUCKY_TRADER: TemplateDefinition = {
             step: 3,
             title: "Battle Other Traders",
             description:
-              "Enter the competitive arena and battle other traders. Win duels, climb ranks, earn rare loot.",
+              "Enter the competitive arena and battle other traders. Win challenges, climb ranks, earn rare loot.",
             icon: "Swords",
           },
           {

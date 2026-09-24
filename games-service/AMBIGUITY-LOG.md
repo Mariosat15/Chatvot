@@ -235,73 +235,71 @@ against flat strings cannot consume a map, so the two shapes were never
 interchangeable in practice. Specifying the unused shape would have invited
 providers to send something the sync silently drops.
 
-**ChartVolt Games today:** declares only `en` and returns flat English strings,
-so `Accept-Language` is a no-op until further locales ship (X4a content).
+**ChartVolt Games (X4a, 24 Sep 2026):** declares `en` and `el`. Greek catalogue
+copy and board rules live in `src/games/content.ts`. `Accept-Language: el`
+returns Greek flat strings; undeclared tags fall back per the rule above.
+In-frame intro copy follows `player.locale` the same way. Platform catalogue
+sync sends `Accept-Language: en` so first-sync content stays English-stable.
 
 ---
 
-## A12 - Nothing says a title may declare fewer locales than the platform serves `OPEN` (minor)
+## A12 - Nothing says a title may declare fewer locales than the platform serves `RESOLVED`
 
-The spec requires text fields to exist "in every locale you declare", which is the right
-constraint and is the one this service is honouring by declaring **only `en`** until real
-translations exist - declaring a locale and shipping English strings for it would render
-confident English copy on a Greek game page with nothing raising an error.
+**Resolved 24 Sep 2026** in requirements HTML **v1.17** and `01` section 3
+constraint 1 (locale reach).
 
-What is unstated is the consequence: is a title that declares only `en` hidden from players in
-other locales, shown with English copy, or refused at catalogue sync? A provider needs to know
-whether declaring fewer locales costs them reach or costs them the integration.
+**Rule:** declaring fewer locales than ChartVolt's site languages is **allowed and
+normal**. It does **not** hide the title, refuse catalogue sync, or fail
+integration. Players whose preferred language is missing see the best available
+copy via the existing `Accept-Language` fallback (requested → first declared →
+`en`). The cost of a short `locales` list is English (or first-declared) copy on
+those pages — never a silent sync failure and never a missing catalogue card.
 
----
-
-## A13 - The provider is never told the origin it is embedded in `OPEN` (gap, found building the play surface)
-
-**Where:** Section 7, the frame messages, and endpoint 2's request fields.
-
-The game is required to talk to the platform with `postMessage`, and `postMessage` takes a
-**target origin**. Nothing in the specification supplies one. `POST /v1/rounds` sends
-`returnUrl`, but that is where to send the player *afterwards*, which is not the same fact - on
-a white-labelled deployment the page hosting the frame and the page the player returns to can be
-different origins, and the document never says they agree.
-
-**Why the safe-looking guess is the dangerous one.** Deriving the target origin from `returnUrl`
-looks stricter and fails **silently**: the browser drops the message with no error the page can
-see, so the platform never receives `ready` and shows a loading spinner over a game that is
-running perfectly. There is no log line on either side.
-
-**Guessed:** post to `*`, and say why in the file. It discloses nothing, because the platform's
-own message type has no score, rank or player field - `height` is the only number that crosses
-the boundary. The check that matters is on the receiving side and the platform already makes it:
-it compares `event.origin` against the launch URL it loaded **and** `event.source` against the
-frame's own window, which no unrelated page can satisfy.
-
-**Fix:** add a `parentOrigin` to the create-round request. It costs one field and it lets a
-provider be strict without guessing. Note this is also the field a **CSP `frame-src`** allowlist
-would need on the platform side, which is still unwritten - see `13` s1.1a.
+**Why not hide or refuse:** a provider who ships `en` first while translations
+catch up is doing the right thing; refusing them would push them to declare Greek
+and ship English strings, which A11 already called out as confident wrong copy
+with nothing raising an error.
 
 ---
 
-## A14 - `replayUrl` is required on every result and its behaviour is undefined `OPEN` (gap)
+## A13 - The provider is never told the origin it is embedded in `RESOLVED`
 
-**Where:** Section 8's result body.
+**Resolved 24 Sep 2026** in requirements HTML **v1.18** and `01` section 4
+(`parentOrigin` on create-round).
 
-Every terminal result carries a `replayUrl`, and the specification says nothing about what it
-must serve, who may open it, whether it needs to authenticate, or how long it must keep working.
-A dispute over prize money is exactly when someone follows it, which is also the point at which
-"it 404s" is the worst possible answer.
+**Rule:** ChartVolt **always sends** `parentOrigin` on `POST /v1/rounds` — the
+exact origin of the page that hosts the iframe (scheme + host + port, no path).
+Providers **must** use it as the `postMessage` target origin. It is **not** the
+same fact as `returnUrl` (where the player goes afterwards); on a white-label
+those can differ.
 
-**What this service does today, stated plainly because it is a known gap rather than a
-decision:** it builds `{publicUrl}/replay/{providerRoundId}?t={token}` from a hash of the round,
-and **no route serves that path.** So the platform is being handed a URL that answers
-`NOT_FOUND`. It is not a live defect - nothing on the platform side renders or follows the field
-yet, and the admin round inspector shows the raw delivery rather than linking out of it - but it
-is a promise made in a signed payload and it must not be left implied.
+**Absent / pre-1.18 clients:** a provider may use `*` only while the frame
+message type carries no score, rank or player field. ChartVolt Games prefers
+`parentOrigin` when stored and falls back to `*` for older rounds.
 
-**Needs an owner decision, not a guess:** a replay that shows the player's own paths is a
-support and dispute tool worth having; a replay that shows *the puzzle* is a content leak, since
-a contest's boards are shared and a losing player could read a live contest's content from their
-own finished round. The safe form is almost certainly "the player's submitted paths, after the
-contest's play window has closed, behind the single-use token" - which is a scoping question the
-specification should answer for every provider rather than leaving each to invent.
+**Platform:** both competition and challenge launch paths derive the value from
+the public base URL origin and pass it through the adapter.
+
+---
+
+## A14 - `replayUrl` is required on every result and its behaviour is undefined `RESOLVED`
+
+**Resolved 24 Sep 2026** in requirements HTML **v1.19**, `01` section 5, and
+risk **R35** (closed for the contract; third-party compliance is still their
+duty).
+
+**Rule:**
+1. Serve the **player's own submitted attempt** (paths drawn, boards finished,
+   timing) — **never the puzzle content** of a contest that may still be live.
+2. **Token-scoped** to that round (single-use query token or equivalent).
+3. **Not available before the round is terminal.** For ranked rounds, also wait
+   until the round's `expiresAt` has passed (or the contest play window has
+   closed — whichever the provider uses as the hard stop), so a finisher cannot
+   read live contest material via their own replay.
+4. Stay reachable for **at least 90 days** (unchanged).
+
+**ChartVolt Games:** `GET /replay/{providerRoundId}?t=…` verifies the HMAC token
+and serves a summary page once the round is terminal; earlier requests get 403.
 
 ---
 

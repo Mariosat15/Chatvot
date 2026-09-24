@@ -76,6 +76,8 @@ function createBody(overrides: Record<string, unknown> = {}) {
     contentSeed: `cv_ctst_${++seedCounter}`,
     expiresAt: FUTURE(),
     resultCallbackUrl: "",
+    returnUrl: "https://chartvolt.test/contests/1",
+    parentOrigin: "https://chartvolt.test",
     ...overrides,
   };
 }
@@ -2076,6 +2078,23 @@ async function main(): Promise<number> {
     assert.deepEqual(state.body.boardRules, [...BOARD_RULES]);
     // Before the round starts is exactly when the player is reading them.
     assert.equal(state.body.status, "created");
+  });
+
+  await test("player.locale el returns Greek board rules in the play state", async () => {
+    // X4a: the same locale chain as Accept-Language, applied to the in-frame intro.
+    await clearRounds();
+    const { boardRulesFor, copyFor } = await import("../src/games/content");
+    const { SPRINT_CODE } = await import("../src/games/titles");
+
+    const { token } = await openRound({
+      player: { playerId: "cv_p_el", displayName: "Ελένη", locale: "el-GR" },
+    });
+    const state = await callPlay<PlayStateBody>(`/play/api/state?t=${token}`, undefined, "GET");
+
+    assert.equal(state.status, 200);
+    assert.deepEqual(state.body.boardRules, [...boardRulesFor("el")]);
+    assert.equal(state.body.scoring, copyFor(SPRINT_CODE, "el").rulesSummary);
+    assert.ok(!state.body.boardRules?.some((r) => r.includes("Drag from")));
   });
 
   await test("the state carries no score, no rank and no prize, on any status", async () => {

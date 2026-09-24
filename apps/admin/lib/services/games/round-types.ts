@@ -325,6 +325,11 @@ export interface CreateRoundInput {
   config: RoundContestConfig;
   /** Where the player returns after playing. */
   returnUrl: string;
+  /**
+   * Origin of the page hosting the play iframe. Always derived from the public base URL —
+   * never from caller input. Requirements HTML v1.18 / A13.
+   */
+  parentOrigin: string;
   /** Where the provider posts the result. */
   resultCallbackUrl: string;
   /**

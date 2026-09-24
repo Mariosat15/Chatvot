@@ -37,17 +37,19 @@
  * resolver - which is weaker than a game somebody plays, and is the price of the decision
  * rather than an oversight.
  *
- * ONLY `en` IS DECLARED, DELIBERATELY
- * -----------------------------------
- * The specification requires that "text fields above must exist in every locale you declare",
- * and the plan treats page content as contractual. Declaring `es`, `de` and `el` and shipping
- * English strings for them would be worse than declaring one locale: the platform would render
- * confident English copy on a Greek game page and nobody would get an error. Locales are added
- * here when the translations exist, not when the audience does.
+ * LOCALES ARE `en` AND `el` SINCE X4a (24 Sep 2026)
+ * -------------------------------------------------
+ * The specification requires that "text fields above must exist in every locale you declare".
+ * Declaring a locale without shipping its strings renders confident wrong-language copy with
+ * nothing raising an error. Greek copy lives in `content.ts`; `Accept-Language` on
+ * `GET /v1/games` selects it (A11). English remains the default and the artwork label language.
  */
 
 import { PuzzleShape } from "../engine/generate";
-import { howToPlayProse } from "./instructions";
+import { copyFor, howToPlayFor, TITLE_LOCALES } from "./content";
+import { PERFECT_CODE, SPRINT_CODE } from "./titles-codes";
+
+export { PERFECT_CODE, SPRINT_CODE } from "./titles-codes";
 
 export type ScoreDirection = "higher_is_better" | "lower_is_better";
 export type ScoreType = "integer" | "decimal" | "duration_ms";
@@ -125,9 +127,6 @@ export function shapeFor(size: GridSize): PuzzleShape {
   return GRID_SHAPES[size];
 }
 
-export const SPRINT_CODE = "circuit-sprint";
-export const PERFECT_CODE = "circuit-perfect";
-
 /**
  * How long a Sprint session may be set to, in seconds.
  *
@@ -163,22 +162,20 @@ export const SPRINT_DURATION = {
  * made from the document alone.
  */
 
+const sprintEn = copyFor(SPRINT_CODE, "en");
+
 export const SPRINT: TitleDefinition = {
   gameCode: SPRINT_CODE,
-  displayName: "Circuit Sprint",
-  tagline: "Wire the grid. Beat the clock. As many boards as you can.",
-  description:
-    "A fast spatial puzzle. Each board has pairs of matching terminals, and you connect " +
-    "each pair with a path so that no two paths cross and every square is used. Solve as " +
-    "many boards as you can before the timer runs out. Every player in a contest gets the " +
-    "same boards in the same order.",
-  rulesSummary:
-    "1,000 points for every board you complete, plus a speed bonus of up to 200 for solving " +
-    "quickly. An unfinished board scores nothing. Highest total wins; ties are broken by the " +
-    "time of your last completed board.",
+  // English defaults on the title object: artwork SVGs and any caller that does not
+  // go through Accept-Language still get a stable language. Catalogue and play pick
+  // locale via `content.ts`.
+  displayName: sprintEn.displayName,
+  tagline: sprintEn.tagline,
+  description: sprintEn.description,
+  rulesSummary: sprintEn.rulesSummary,
   // Composed from the shared rules, so the game page and the pre-round panel cannot disagree.
-  // See `instructions.ts` - they had already drifted when they were two hand-written copies.
-  howToPlay: howToPlayProse("The next board appears as soon as you complete one."),
+  // See `content.ts` / `instructions.ts` - they had already drifted as two hand-written copies.
+  howToPlay: howToPlayFor(SPRINT_CODE, "en"),
   category: "puzzle",
   tags: ["puzzle", "logic", "fast", "mobile-friendly", "no-text"],
   family: "independent",
@@ -237,29 +234,20 @@ export const SPRINT: TitleDefinition = {
     },
     required: ["durationSeconds", "gridSize"],
   },
-  locales: ["en"],
+  locales: [...TITLE_LOCALES],
   platforms: ["desktop", "mobile"],
   status: "active",
 };
 
+const perfectEn = copyFor(PERFECT_CODE, "en");
+
 export const PERFECT: TitleDefinition = {
   gameCode: PERFECT_CODE,
-  displayName: "Circuit Perfect",
-  tagline: "Five boards. One clock. Every square counts.",
-  description:
-    "The same spatial puzzle as Circuit Sprint, scored the other way round. You are given a " +
-    "fixed set of boards and your score is the total time you take to finish them all, so " +
-    "the fastest player wins. Every player in a contest gets the same boards in the same " +
-    "order.",
-  rulesSummary:
-    "Your score is your total time in milliseconds, and the LOWEST score wins. Every board " +
-    "you leave unfinished adds a two-minute penalty to your time, so finishing all of them is " +
-    "always better than rushing and giving up. Ties are broken by the number of boards " +
-    "completed.",
-  howToPlay: howToPlayProse(
-    "The clock runs from your first move to your last, so a board you are still thinking " +
-      "about is still costing you.",
-  ),
+  displayName: perfectEn.displayName,
+  tagline: perfectEn.tagline,
+  description: perfectEn.description,
+  rulesSummary: perfectEn.rulesSummary,
+  howToPlay: howToPlayFor(PERFECT_CODE, "en"),
   category: "puzzle",
   tags: ["puzzle", "logic", "time-trial", "mobile-friendly", "no-text"],
   family: "independent",
@@ -299,7 +287,7 @@ export const PERFECT: TitleDefinition = {
     },
     required: ["boardCount", "gridSize", "unfinishedPenaltyMs"],
   },
-  locales: ["en"],
+  locales: [...TITLE_LOCALES],
   platforms: ["desktop", "mobile"],
   // Retired by the owner, 8 September 2026. `deprecated` rather than removed from `TITLES`,
   // so history keyed on this game code still resolves and the platform's pre-flight refuses

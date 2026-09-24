@@ -189,6 +189,13 @@ Three constraints on the content itself:
    *(Requirements HTML **v1.16** / ambiguity A11. Earlier drafts offered a locale
    map as an alternative; that option was removed because an adapter written for
    flat strings cannot consume a map, so the two shapes were never interchangeable.)*
+
+   **Locale reach (requirements HTML **v1.17** / ambiguity A12).** Declaring fewer
+   locales than ChartVolt's site languages is **allowed and normal**. It does not
+   hide the title, refuse catalogue sync, or fail the integration. Players whose
+   preferred language is missing see the best available copy via the fallback above.
+   The cost of a short `locales` list is English (or first-declared) copy on those
+   pages — never a silent sync failure and never a missing catalogue card.
 2. **No provider branding in the copy.** Descriptions must not contain the
    provider's name, logo or links. To the player, the game is a ChartVolt game -
    the provider is a supplier, not a co-brand. Attribution, where contractually
@@ -383,13 +390,21 @@ producing one score.
   "expiresAt": "2026-08-18T14:00:00Z",
   "resultCallbackUrl": "https://chartvolt.com/api/games/providers/acme/events",
   "progressCallbackUrl": "https://chartvolt.com/api/games/providers/acme/progress",
-  "returnUrl": "https://chartvolt.com/contests/774219"
+  "returnUrl": "https://chartvolt.com/contests/774219",
+  "parentOrigin": "https://chartvolt.com"
 }
 ```
 
 `progressCallbackUrl` is **always sent and never required to be used** - see section
 5.5. A provider with nothing useful to say between the start of a round and the end of
 it ignores it and is entirely conformant.
+
+`parentOrigin` is **always sent** (requirements HTML **v1.18** / ambiguity A13). It is
+the origin of the page that hosts your iframe (scheme + host + optional port, no path).
+Use it as the `postMessage` target origin. It is **not** the same fact as `returnUrl`
+(where the player goes afterwards); on a white-label those can differ. Deriving a target
+from `returnUrl` fails silently — the browser drops the message and ChartVolt never
+receives `ready`.
 
 ### Response
 
@@ -511,6 +526,19 @@ The provider POSTs to `resultCallbackUrl` when a round reaches a terminal state.
   }
 }
 ```
+
+### 5.0 `replayUrl` (requirements HTML **v1.19** / ambiguity A14 / risk R35)
+
+Required on every terminal result. Must:
+
+1. Serve the **player's own submitted attempt** (paths drawn, boards finished, timing)
+   — **never the puzzle content** of a contest that may still be live (boards are
+   identical across players by `contentSeed`).
+2. Be **token-scoped** to that round (unguessable query token or equivalent).
+3. Refuse until the round is **terminal**. For ranked rounds, also wait until the
+   round's `expiresAt` has passed (or the contest play window has closed), so a
+   finisher cannot read live contest material via their own replay.
+4. Stay reachable for **at least 90 days**.
 
 ### 5.1 Terminal statuses
 

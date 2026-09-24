@@ -152,6 +152,7 @@ async function main(): Promise<void> {
     expiresAt: new Date(Date.now() + 60 * 60_000).toISOString(),
     resultCallbackUrl,
     returnUrl: `http://localhost:${PORT}/health`,
+    parentOrigin: `http://localhost:${PORT}`,
   });
 
   const path = "/v1/rounds";

@@ -210,28 +210,24 @@ people is indistinguishable from the person not existing.
 verified by eye** - the profile screen is behind sign-in.
 
 **BUILT 23 Sep 2026 (X11.5 eng):** interest inference (section 3) and matchmaking /
-suggestions. **Still not built:** the registration-time interest picker (section 1.2 /
-open question 16). The distinction section 3.2 draws is untouched and still matters:
-**inference is not consent**, so inferred interest drives *suggestions* while this
-explicit opt-in drives *invitations*.
+suggestions. **Q16 CLOSED 24 Sep 2026:** registration asks Trading / Games / Both
+(`user.signupInterest` + `signupInterestAt`). Informational only — not a matchmaking or
+challenge gate. The distinction section 3.2 draws is untouched and still matters:
+**inference is not consent**, so inferred interest drives *suggestions* while the
+challenge willingness opt-in drives *invitations*.
 
 ### 1.2 The onboarding step itself
 
-**Open question 16 is unresolved and this section does not pre-empt it:** whether
-interests are collected during registration or prompted later is a product decision, and
-adding steps to registration measurably costs completions.
+**Open question 16 is CLOSED (24 Sep 2026):** interests are collected during
+registration as Trading / Games / Both. Live code: `lib/utils/signup-interest.ts`,
+`app/(auth)/sign-up/page.tsx`, `$set` in `lib/actions/auth.actions.ts`. A second
+GettingStartedCard prompt is **not** required for Q16.
 
-What the design does guarantee is that **the answer does not matter to the engine**.
-Section 3 means a player who never answers is still matchable. So the onboarding step can
-be added, moved, or deferred entirely without the feature breaking - which is the reason
-to build inference first and the picker second, not the other way round.
+What the design still guarantees is that **the answer does not matter to the engine**.
+Section 3 means a player who never answers (legacy accounts) is still matchable.
 
 Extend the existing `GettingStartedCard.tsx` rather than adding a second first-run
-surface. It already has a dismissal mechanism, it is already rendered from
-`DashboardLayout.tsx`, and a platform with two competing "getting started" widgets is
-worse than one imperfect one.
-
-**Its steps must become game-aware in the same pass** - see section 5.
+surface when game-aware steps land — see section 5.
 
 ---
 
@@ -514,7 +510,7 @@ game is pointless, and the catalogue is what makes several games visible.
 | ~~Open challenges - `OpenChallenge` collection, list, accept~~ **BUILT 14 Sep 2026, and with no such collection** - see the amendment in section 6 | ~~4-5 days~~ done | The only genuinely new mechanic. Counted in X10, not here |
 | ~~Abuse controls - rate-limit preset, block checks, opt-out surface~~ **BUILT 22 Sep / 14 Sep** | ~~1-2 days~~ done | |
 | ~~Onboarding card made game-aware~~ **BUILT 18 Sep 2026** | ~~1-2 days~~ done | |
-| Registration-time interest picker | deferred | Open question 16 |
+| Registration-time interest picker | **BUILT 24 Sep** | Q16 closed — Trading / Games / Both |
 
 **Why this is not longer, and why that should be double-checked rather than trusted:**
 almost every dependency already exists, so the estimate is dominated by generalisation
@@ -592,4 +588,4 @@ the entry-path writers before unifying them and found four instead of two.
 > `app/api/games/suggestions/route.ts`, `components/dashboard/GameSuggestionsCard.tsx`.
 > Tests: `__tests__/services/x115-matchmaking.test.ts`. **Not mirrored into admin**
 > (preference model stays main-app-only; matchmaking is player-facing). **Not verified by
-> eye.** Registration-time interest picker remains open question 16.
+> eye.** Q16 registration interest picker closed 24 Sep 2026.

@@ -146,7 +146,7 @@ export function ArenaEmptyState({
           className="text-center max-w-md mx-auto"
           style={{ color: theme?.colors?.textMuted }}
         >
-          No active duels right now. Be the first to throw down the gauntlet —
+          No active challenges right now. Be the first to throw down the gauntlet —
           pick an opponent, set the stakes, and let the charts decide.
         </p>
       </div>
@@ -284,7 +284,7 @@ export function ChallengeStatsBar({
     {
       gameIcon: GAME_ICONS.swordNumbered,
       value: stats.totalActive,
-      label: "Active Duels",
+      label: "Active Challenges",
       color: effectiveColors.secondary,
     },
     {

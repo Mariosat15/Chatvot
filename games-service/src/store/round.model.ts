@@ -167,6 +167,13 @@ export interface RoundDoc {
   /** Optional, unlike the result callback - see `progress.ts` for why. */
   progressCallbackUrl?: string;
   returnUrl?: string;
+  /**
+   * Origin of the page that hosts the play iframe (scheme + host + port).
+   *
+   * Used as the `postMessage` target. Not the same fact as `returnUrl` — on a white-label those
+   * can differ. Requirements HTML v1.18 / ambiguity A13.
+   */
+  parentOrigin?: string;
 
   /* ---- play ---- */
   status: RoundStatus;
@@ -247,6 +254,7 @@ const RoundSchema = new Schema<RoundDoc>(
     resultCallbackUrl: { type: String, required: true },
     progressCallbackUrl: { type: String },
     returnUrl: { type: String },
+    parentOrigin: { type: String },
 
     status: {
       type: String,

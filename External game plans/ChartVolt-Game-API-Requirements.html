@@ -208,7 +208,7 @@
     <p class="lede">ChartVolt runs paid skill competitions. We handle the money, the ranking and the rewards. We are looking for partners who can supply the games and tell us what each player scored. This document specifies exactly what your API must do so that we can operate on top of it &mdash; three calls to you, one call back to us.</p>
     <div class="hero-meta">
       <div><b>Document</b><span>Integration requirements</span></div>
-      <div><b>Version</b><span>1.16</span></div>
+      <div><b>Version</b><span>1.19</span></div>
       <div><b>Audience</b><span>Your engineering team</span></div>
       <div><b>Required calls</b><span>3 out, 1 in</span></div>
       <div><b>Money handled by you</b><span>None, ever</span></div>
@@ -534,7 +534,7 @@
   <div class="tw"><table>
     <thead><tr><th style="width:210px">Constraint</th><th>What it means</th></tr></thead>
     <tbody>
-      <tr><td><b>Localised</b></td><td><b>New clarity in 1.16.</b> Text fields are always <b>flat strings</b> in the response. Honour an <code>Accept-Language</code> header on this endpoint by selecting which language&rsquo;s copy to return; if that locale is missing, fall back to the first entry in <code>locales</code>, then to <code>en</code> if present. <b>Do not send per-field locale maps</b> &mdash; we store flat strings and will not unpack a map. <b>We will not translate your copy</b></td></tr>
+      <tr><td><b>Localised</b></td><td><b>New clarity in 1.16.</b> Text fields are always <b>flat strings</b> in the response. Honour an <code>Accept-Language</code> header on this endpoint by selecting which language&rsquo;s copy to return; if that locale is missing, fall back to the first entry in <code>locales</code>, then to <code>en</code> if present. <b>Do not send per-field locale maps</b> &mdash; we store flat strings and will not unpack a map. <b>We will not translate your copy</b>. <b>New clarity in 1.17.</b> Declaring fewer locales than ChartVolt&rsquo;s site languages is <b>allowed and normal</b> &mdash; it does not hide the title, refuse catalogue sync, or fail the integration. The cost is English (or first-declared) copy on those pages, never a missing catalogue card</td></tr>
       <tr><td><b>No provider branding</b></td><td>Descriptions must not contain your company name, logo or links. To the player this is a ChartVolt game &mdash; contractual attribution is handled once in our footer and legal pages, not in game copy</td></tr>
       <tr><td><b>Stable asset URLs</b></td><td>HTTPS, with a cache policy. We cache and may re-host. URLs that rotate leave broken game pages behind</td></tr>
     </tbody>
@@ -681,7 +681,8 @@
   "expiresAt":           "2026-08-18T14:00:00Z",
   "resultCallbackUrl":   "https://chartvolt.com/api/games/providers/acme/events",
   "progressCallbackUrl": "https://chartvolt.com/api/games/providers/acme/progress",
-  "returnUrl":           "https://chartvolt.com/contests/774219"
+  "returnUrl":           "https://chartvolt.com/contests/774219",
+  "parentOrigin":        "https://chartvolt.com"   <span class="c">// iframe host origin — postMessage target (1.18)</span>
 }</pre>
 
   <h4>Your response</h4>
@@ -705,6 +706,7 @@
       <tr><td><code>mode</code></td><td><code>ranked</code> counts towards a paid contest and <b>must</b> produce a result callback. <code>practice</code> is free play, is never scored by us, and <b>must not</b> produce a result callback (new clarity in 1.10). Our fetch of the round still works for practice &mdash; we just will not accept a score for it</td></tr>
       <tr><td><code>contentSeed</code></td><td><b>Required on ranked</b> when your title supports seeding. On <code>practice</code> we omit it or send nothing shared with a contest: generate content from a <b>per-round</b> seed of your own. <b>Never reuse a contest seed for practice</b> &mdash; that would let a player rehearse the exact content they are about to be paid to face (1.10)</td></tr>
       <tr><td><code>progressCallbackUrl</code></td><td><b>New in 1.5, and entirely optional.</b> Where you may tell us what the player has done <i>so far</i>, while they are still playing, so a contest board shows more than &ldquo;playing now&rdquo;. We always send the address; ignoring it is fully conformant &mdash; see section 8a</td></tr>
+      <tr><td><code>parentOrigin</code></td><td><b>New in 1.18, always sent.</b> The origin of the page that hosts your iframe (scheme + host + optional port, <b>no path</b>). Use it as the <code>postMessage</code> target origin. It is <b>not</b> <code>returnUrl</code> &mdash; on a white-label those can differ. Deriving a target from <code>returnUrl</code> fails silently: the browser drops the message and we never receive <code>ready</code></td></tr>
     </tbody>
   </table></div>
 
@@ -719,7 +721,7 @@
     <tbody>
       <tr><td>Must work embedded</td><td>No <code>X-Frame-Options: DENY</code>, and a <code>frame-ancestors</code> policy that permits our domain. Tell us the exact play domain so we can allow it in our own security policy</td></tr>
       <tr><td>Responsive</td><td>Must fill a variable-height container and work on mobile portrait. Most of our traffic is mobile</td></tr>
-      <tr><td>Messages to the parent</td><td>You may post <code>ready</code>, <code>finished</code>, <code>exit</code> and <code>resize</code>. We act on those as UI hints only</td></tr>
+      <tr><td>Messages to the parent</td><td>You may post <code>ready</code>, <code>finished</code>, <code>exit</code> and <code>resize</code>. We act on those as UI hints only. <b>Target origin (1.18):</b> use the <code>parentOrigin</code> we sent on create. Do not derive it from <code>returnUrl</code></td></tr>
       <tr><td><b>Never send us a score this way</b></td><td>We will ignore any score arriving from the browser. Scores decide real money and are accepted only from your servers, signed</td></tr>
       <tr><td>Self-contained</td><td>No login screen, no account creation, no external links out. The player is already authenticated by us</td></tr>
     </tbody>
@@ -783,7 +785,7 @@
       <tr><td><code>status</code></td><td><span class="b req">Yes</span></td><td>One of the four terminal states in section 13</td></tr>
       <tr><td><code>score</code></td><td><span class="b req">Yes</span></td><td>A single number, within the declared <code>scoreRange</code>. <b>We rank on this and nothing else</b></td></tr>
       <tr><td><code>startedAt</code>, <code>completedAt</code>, <code>durationMs</code></td><td><span class="b req">Yes</span></td><td><b>New clarity in 1.14.</b> When scores are equal, <b>shorter <code>durationMs</code> wins</b>, then earlier <code>completedAt</code>; remaining ties share the prize. For <code>higher_is_better</code>: report time to achieve the reported score &mdash; <b>not</b> a fixed session length when every player would get the same figure. For <code>lower_is_better</code> titles whose score is itself a duration: set <code>durationMs</code> equal to <code>score</code></td></tr>
-      <tr><td><code>replayUrl</code></td><td><span class="b req">Yes</span></td><td>How we answer a player who disputes their score. Should stay valid for at least 90 days</td></tr>
+      <tr><td><code>replayUrl</code></td><td><span class="b req">Yes</span></td><td><b>New clarity in 1.19.</b> How we answer a player who disputes their score. Must serve the <b>player&rsquo;s own submitted attempt</b> (never the puzzle content of a live contest), be <b>token-scoped</b> to that round, refuse until the round is terminal (and for ranked rounds until <code>expiresAt</code> / the play window has closed), and stay valid for at least 90 days</td></tr>
       <tr><td><code>scoreBreakdown</code></td><td><span class="b rec">Wanted</span></td><td>We never rank on it, but we show it to the player. A visible breakdown is what makes a result feel transparent rather than arbitrary</td></tr>
       <tr><td><code>integrity</code></td><td><span class="b rec">Wanted</span></td><td>You see things we cannot &mdash; impossible reaction times, automation patterns. A flag here holds the payout for review instead of paying blindly</td></tr>
     </tbody>
@@ -1310,6 +1312,9 @@ $headers = [
   <div class="tw"><table>
     <thead><tr><th style="width:90px">Version</th><th style="width:130px">Date</th><th>Change</th></tr></thead>
     <tbody>
+      <tr><td><b>1.19</b></td><td>24 Sep 2026</td><td><b>Defines <code>replayUrl</code>.</b> Must serve the player&rsquo;s own attempt (never live contest puzzle content), be token-scoped, refuse until the round is terminal (ranked: also until <code>expiresAt</code> / play window closed), and stay valid &ge; 90 days. Closes ambiguity A14 / risk R35 for the contract</td></tr>
+      <tr><td><b>1.18</b></td><td>24 Sep 2026</td><td><b>Adds <code>parentOrigin</code> on create-round.</b> Always sent; use as the iframe <code>postMessage</code> target. Not the same fact as <code>returnUrl</code>. Closes ambiguity A13</td></tr>
+      <tr><td><b>1.17</b></td><td>24 Sep 2026</td><td><b>Locale reach.</b> Declaring fewer locales than ChartVolt&rsquo;s site languages is allowed; short lists do not hide titles or fail sync. Closes ambiguity A12</td></tr>
       <tr><td><b>1.16</b></td><td>24 Sep 2026</td><td><b>Removes the locale-map option for catalogue text.</b> Localised fields stay flat strings; honour <code>Accept-Language</code> with fallback to the first declared locale then <code>en</code>. Per-field maps are refused by design &mdash; our sync cannot consume them. No payload shape change for providers who already send flat strings</td></tr>
       <tr><td><b>1.15</b></td><td>24 Sep 2026</td><td><b>Publishes the supported <code>configSchema</code> keyword list.</b> Section 3.1b. Full JSON Schema was never implemented; unsupported keywords already refused the title. From 1.15 a provider can see the safe subset without discovering it by trial. No behaviour change</td></tr>
       <tr><td><b>1.14</b></td><td>24 Sep 2026</td><td><b>Clarifies the duration tie-break.</b> When scores are equal, shorter <code>durationMs</code> wins, then earlier <code>completedAt</code>; remaining ties share. For <code>higher_is_better</code>: report time to achieve the score, not a fixed session clock. For <code>lower_is_better</code> duration titles: <code>durationMs</code> equals <code>score</code>. No payload shape change</td></tr>
@@ -1336,7 +1341,7 @@ $headers = [
 </div>
 
 <div class="foot">
-  <div>ChartVolt &mdash; Game API Requirements &middot; Version 1.16 &middot; Requirements document for prospective game providers</div>
+  <div>ChartVolt &mdash; Game API Requirements &middot; Version 1.19 &middot; Requirements document for prospective game providers</div>
   <div>Questions on this specification: contact your ChartVolt commercial contact</div>
 </div>
 

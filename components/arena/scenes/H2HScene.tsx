@@ -1,5 +1,5 @@
 'use client';
-// ─── H2HScene — Premium Head-to-Head Derby Duel ─────────────────────────────
+// ─── H2HScene — Premium Head-to-Head Derby Challenge ─────────────────────────
 import React, { useMemo } from 'react';
 import type { AEvent, Participant } from '../types';
 import { CV, getTier } from '../constants';

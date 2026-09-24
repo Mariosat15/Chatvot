@@ -239,7 +239,7 @@ Write-Host "The three facts the state carries, and the rules that had two homes"
 # Circuit Perfect is the difference between playing to win and playing to lose.
 $results += Invoke-Probe -Name 'the state stops carrying how the title scores' `
   -Suite $SuitePlayRoutes -File $srcState `
-  -Find '    scoring: title?.rulesSummary ?? "",' `
+  -Find '    scoring: copy.rulesSummary || title?.rulesSummary || "",' `
   -Replace '    scoring: "",' `
   -ExpectRed "the state carries the title's own name, rules and scoring"
 
@@ -247,7 +247,7 @@ $results += Invoke-Probe -Name 'the state stops carrying how the title scores' `
 # the page still renders, the container is still there, and the player is simply told nothing.
 $results += Invoke-Probe -Name 'the state stops carrying the shared rules' `
   -Suite $SuitePlayRoutes -File $srcState `
-  -Find '    boardRules: BOARD_RULES,' `
+  -Find '    boardRules: boardRulesFor(locale),' `
   -Replace '    boardRules: [],' `
   -ExpectRed "the state carries the title's own name, rules and scoring"
 
@@ -265,7 +265,7 @@ $results += Invoke-Probe -Name 'the terminal report carries a score' `
 # see prose.
 $results += Invoke-Probe -Name 'a title hand-writes its how-to-play again' `
   -Suite $SuiteCatalogue -File $srcTitles `
-  -Find '  howToPlay: howToPlayProse("The next board appears as soon as you complete one."),' `
+  -Find '  howToPlay: howToPlayFor(SPRINT_CODE, "en"),' `
   -Replace '  howToPlay: "Connect the circles that share a number. The next board appears as soon as you complete one.",' `
   -ExpectRed "every title's how-to-play carries the shared rules, word for word"
 

@@ -1,7 +1,8 @@
 import { generateForPlayer } from "../engine/generate";
 import { toClientPuzzle, type ClientPuzzle } from "../engine/puzzle";
 import { REFUSAL_MESSAGES, verifyAttempt, type AttemptRefusal } from "../engine/verify";
-import { BOARD_RULES } from "../games/instructions";
+import { boardRulesFor, copyFor } from "../games/content";
+import { resolvePlayerLocale } from "../games/locale";
 import {
   findTitle,
   roundDurationMs,
@@ -97,6 +98,11 @@ export interface PlayState {
   endsAt?: string;
   /** Where to send the player when they leave. */
   returnUrl?: string;
+  /**
+   * Origin of the page hosting this frame — the only safe `postMessage` target.
+   * Absent on rounds created before HTML v1.18; the client then falls back to `*`.
+   */
+  parentOrigin?: string;
   /** Set once terminal, so the frame can show a result without asking for the score. */
   finished?: {
     status: RoundDocument["status"];
@@ -161,18 +167,24 @@ function stateFor(round: RoundDocument, board?: ClientPuzzle): PlayState {
    * cancellation notice that explains their attempt has been returned.
    */
   const title = findTitle(round.gameCode);
+  // Reason: create-round stores player.locale; honour it for in-frame rules and scoring
+  // copy the same way Accept-Language picks catalogue text (A11). Fall back through the
+  // title's declared locales so a missing or exotic tag never blanks the intro panel.
+  const locale = resolvePlayerLocale(round.locale, title?.locales ?? ["en"]);
+  const copy = copyFor(round.gameCode, locale);
 
   const state: PlayState = {
     roundId: round.roundId,
     gameCode: round.gameCode,
     mode: round.mode,
     status: round.status,
-    title: title?.displayName ?? "Circuit",
-    boardRules: BOARD_RULES,
-    scoring: title?.rulesSummary ?? "",
+    title: copy.displayName || title?.displayName || "Circuit",
+    boardRules: boardRulesFor(locale),
+    scoring: copy.rulesSummary || title?.rulesSummary || "",
     boardsSolved: solvedCount(round),
     boardTarget: boardTargetFor(config),
     returnUrl: round.returnUrl,
+    parentOrigin: round.parentOrigin,
   };
 
   /*

@@ -12,6 +12,9 @@ import { toast } from "sonner";
 import { useDeviceFingerprint } from "@/hooks/useDeviceFingerprint";
 import { Check, X } from "lucide-react";
 import CaptchaWidget from "@/components/security/CaptchaWidget";
+import {
+  SIGNUP_INTEREST_OPTIONS,
+} from "@/lib/utils/signup-interest";
 
 // Extended form data with honeypot
 interface ExtendedSignUpFormData extends SignUpFormData {
@@ -80,6 +83,7 @@ const SignUp = () => {
       city: "",
       postalCode: "",
       website: "", // Honeypot - must remain empty
+      signupInterest: undefined,
     },
     mode: "onBlur",
   });
@@ -309,6 +313,48 @@ const SignUp = () => {
             validation={{ required: "Postal code is required" }}
           />
         </div>
+
+        {/*
+          Q16 — what they like. Informational only (stored for later product use).
+          Not a permission and not challenge willingness.
+        */}
+        <fieldset className="space-y-2">
+          <legend className="text-sm font-medium text-gray-200">
+            What are you most interested in?
+          </legend>
+          <p className="text-xs text-gray-400">
+            Helps us show you the right competitions later. You can change your
+            mind anytime.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            {SIGNUP_INTEREST_OPTIONS.map((opt) => (
+              <label
+                key={opt.value}
+                className="flex cursor-pointer flex-col gap-0.5 rounded-lg border border-gray-700 bg-gray-800/40 px-3 py-2.5 has-[:checked]:border-yellow-500/60 has-[:checked]:bg-yellow-500/10"
+              >
+                <span className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    value={opt.value}
+                    className="accent-yellow-500"
+                    {...register("signupInterest", {
+                      required: "Please pick one",
+                    })}
+                  />
+                  <span className="text-sm font-medium text-white">
+                    {opt.label}
+                  </span>
+                </span>
+                <span className="pl-6 text-xs text-gray-400">{opt.hint}</span>
+              </label>
+            ))}
+          </div>
+          {errors.signupInterest && (
+            <p className="text-xs text-red-400">
+              {String(errors.signupInterest.message || "Please pick one")}
+            </p>
+          )}
+        </fieldset>
 
         {/* Bot-challenge (rendered only when enabled in admin Fraud Settings) */}
         <CaptchaWidget

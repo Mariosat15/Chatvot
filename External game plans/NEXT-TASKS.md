@@ -1,7 +1,8 @@
 # Next tasks — ChartVolt external-first programme
 
-> **Updated 24 September 2026.** One bullet per task. Closed items stay listed so an
-> older paste-list is not re-opened by accident. Detail lives in `PROGRESS.md`.
+> **Updated 24 September 2026 (owner P1 decisions).** One bullet per task. Closed
+> items stay listed so an older paste-list is not re-opened by accident. Detail
+> lives in `PROGRESS.md`.
 
 ---
 
@@ -9,11 +10,11 @@
 
 **Preferred eng queue (owner, 24 Sep — start when you say “start”):**
 
-1. **`AMBIGUITY-LOG` A12+** (preferred) — A1–A11 done (HTML v1.6–v1.16); next OPEN entries need `01` + requirements HTML bump.
-2. **X4a localisation / mobile catalogue** — beyond `en`; mobile catalogue support.
-3. **Nine `duel` vocabulary sites** (landing / admin seeds) — seeded defaults need a migration decision, not wording alone.
-4. **Trading create-form monolith** (~2716 lines) + thinner trading editor.
-5. **Verify `ranking-config.service`** before scheduling a full pass (may already be largely done).
+1. **`AMBIGUITY-LOG` A12+** — **CLOSED 24 Sep 2026.** A12–A14 → HTML **v1.17–v1.19**; `parentOrigin` on create; `GET /replay/...` attempt summary.
+2. **X4a localisation / mobile catalogue** — **CLOSED 24 Sep 2026.** `en`+`el` catalogue copy; Accept-Language; mobile hub/tabs.
+3. **Nine `duel` vocabulary sites** — **CLOSED 24 Sep 2026 (source).** Seven paths rewritten; ban test; report-only `tools/vocabulary/rewrite-duel-seeds.ts` (no `--apply` scheduled, P1 #17).
+4. **Trading create-form monolith** (~2716 lines) + thinner trading editor — **SKIPPED / NEVER (owner, 24 Sep).** Do not schedule. Leave `CompetitionCreatorForm.tsx` alone.
+5. **Verify `ranking-config.service`** before scheduling a full pass (may already be largely done). **← NEXT eng.**
 
 **Also still open (schedule after the five above, or when relevant):**
 
@@ -30,15 +31,15 @@
 
 ---
 
-## P1 — Owner / legal (eng waits)
+## P1 — Owner / legal
 
-11. **A5 wiki bodies** — ten Game Administration wiki pages; **LAST OF ALL**.
-12. **R11 — legal ToS / action-terms** — lawyer / counsel with A5.
-13. **R99 — JSON 134 vs constants 128** badge catalogue merge — only if you still want it.
-14. **R93 — credit EUR rate UI** — settings screen was missing; rebuild when you want it.
-15. **R96b — game-specific badge *content*** — code can author badges; you still need real badge text/rows.
-16. **Q16 — registration interest picker** — ask new players which games they like at sign-up.
-17. **Ops backfills (`--apply` when ready)** — X1 game labels; GM earning `gameKey`; phantom scores — only when real production data exists.
+11. **A5 wiki bodies** — ten Game Administration wiki pages. **LAST OF ALL — eng builds only when owner asks at the end.**
+12. **R11 — legal ToS / action-terms** — **owner / lawyers rewrite** (same window as A5). Eng does not draft legal text.
+13. **R99 — JSON 134 vs constants 128** — **optional / owner decide**. Two lists of badges (a JSON file and a TypeScript constants file) disagree on count; merge only if you still want one source of truth. Overwrite-on-seed was already fixed 16 Sep.
+14. **R93 — credit EUR rate UI** — **CLOSED 18 Sep** (and confirmed 24 Sep). Settings → Currency already hosts `CreditConversionSection`; `valueInEUR` is derived from that rate. Do not rebuild.
+15. **R96b — game-specific badge *content*** — **DONE (owner, 24 Sep).** Authoring tools shipped earlier; content is owner’s.
+16. **Q16 — registration interest picker** — **BUILT 24 Sep 2026.** Sign-up asks Trading / Games / Both; stored on `user.signupInterest` (informational only).
+17. **Ops backfills (`--apply`)** — **CLOSED / not needed (owner, 24 Sep).** Scripts stay report-only; no production `--apply` scheduled.
 
 ---
 
@@ -83,11 +84,11 @@
 
 **Wait for owner to say “start”, then:**
 
-1. AMBIGUITY-LOG A12+  
-2. X4a localisation / mobile catalogue  
-3. Nine duel vocabulary sites (seeds)  
-4. Trading create-form monolith  
-5. Verify `ranking-config.service` before scheduling  
+1. ~~AMBIGUITY-LOG A12+~~ **CLOSED**
+2. ~~X4a localisation / mobile catalogue~~ **CLOSED**
+3. ~~Nine duel vocabulary sites (seeds)~~ **CLOSED (source; DB report-only)**
+4. ~~Trading create-form monolith~~ **NEVER — leave alone (owner)**
+5. **Verify `ranking-config.service`** ← next when owner says start
 
 Do **not** schedule X4 until a signed sandbox exists.  
-Keep A5 wiki and R11 for the end.
+Keep A5 wiki for the very end (only when owner asks). R11 is owner/lawyers.

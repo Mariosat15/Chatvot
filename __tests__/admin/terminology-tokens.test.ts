@@ -94,7 +94,8 @@ describe("the catalogue's defaults are the TARGET words, not today's words", () 
   it("says Challenge and never Duel", () => {
     // Reason: a hard programme constraint. There is a `Challenge` model, `/challenges`
     // routes, a `challengesEnabled` flag and `challenge_entry` / `challenge_refund` ledger
-    // values. The nine remaining `duel` strings elsewhere are a separate migration.
+    // values. Source sites from `13` s9.1a were rewritten 24 Sep 2026; seeded DB rows are
+    // report-only (`tools/vocabulary/rewrite-duel-seeds.ts`).
     expect(TERMS.challenge).toBe("Challenge");
     expect(TERMS.challenges).toBe("Challenges");
     for (const value of Object.values(TERMS)) {

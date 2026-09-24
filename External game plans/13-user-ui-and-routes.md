@@ -3451,16 +3451,21 @@ third: **`duel`**, a banned noun, used nine times.
   `Liquidation & disqualification (trading)` are correct and valuable, exactly as the table
   above says of the trading guide; what was wrong was presenting them as the rules of a
   challenge. A document describing this as trading content removed is wrong.
-- **Nine `duel` uses remain OUTSIDE this file and are recorded rather than swept**:
-  `lib/constants/landing-page-templates-4.ts` (5),
-  `apps/admin/components/admin/landing-builder/defaults.ts` (5),
-  `database/models/hero-settings.defaults.ts` (2),
-  `components/landing/sections/LiveChallenges.tsx` (2),
-  `components/landing/sections/challenge-arena-extras.tsx` (2),
-  `components/arena/scenes/H2HScene.tsx` (1), `lib/themes/theme-unique-data.ts` (1). Three of
-  those are **seeded defaults**, so editing the constant does not change rows already written -
-  that sweep is a migration question, not a wording one, which is why the guard is scoped to
-  the help page. **A document implying the vocabulary is clean platform-wide is wrong.**
+- ~~**Nine `duel` uses remain OUTSIDE this file and are recorded rather than swept**~~ —
+  **CLOSED 24 Sep 2026** (source half). The seven paths below were rewritten to
+  "challenge"; `__tests__/vocabulary/duel-vocabulary-sites.test.ts` bans the noun there
+  (comments stripped). Three were **seeded defaults**, so editing the constant does not
+  change rows already written — `tools/vocabulary/rewrite-duel-seeds.ts` is the report-only
+  migration for `landingpagetemplates` / `landingpages` / `herosettings`. **No production
+  `--apply` is scheduled** (NEXT-TASKS P1 #17). Paths (correct as the sweep list; counts
+  were per-occurrence at the time of s9.1a):
+  `lib/constants/landing-page-templates-4.ts`,
+  `apps/admin/components/admin/landing-builder/defaults.ts`,
+  `database/models/hero-settings.defaults.ts`,
+  `components/landing/sections/LiveChallenges.tsx`,
+  `components/landing/sections/challenge-arena-extras.tsx`,
+  `components/arena/scenes/H2HScene.tsx`, `lib/themes/theme-unique-data.ts`.
+  **A document implying seeded DB rows are clean without running the report is wrong.**
 - **Never verified by eye.** The page renders behind no sign-in but was not opened.
 
 **Guarded by `__tests__/challenges/help-page-challenges.test.ts` (14 tests) and

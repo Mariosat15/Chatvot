@@ -99,7 +99,7 @@ export const defaultSettings: LandingSettings = {
     "Every tool, every edge, every advantage — engineered to help you dominate the competition",
   features: [
     { id: "1", icon: "Trophy", title: "Live Trading Competitions", description: "Enter daily, weekly, and monthly tournaments with real-time leaderboards. Compete for cash prizes, exclusive badges, and global bragging rights.", enabled: true },
-    { id: "2", icon: "Swords", title: "1v1 Head-to-Head Duels", description: "Challenge any trader to a direct showdown. Set the stake, choose the timeframe, and prove you're the better trader in intense one-on-one battles.", enabled: true },
+    { id: "2", icon: "Swords", title: "1v1 Head-to-Head Challenges", description: "Challenge any trader to a direct showdown. Set the stake, choose the timeframe, and prove you're the better trader in intense one-on-one battles.", enabled: true },
     { id: "3", icon: "BarChart3", title: "Professional-Grade Charts", description: "Trade on advanced TradingView-powered charts with 50+ technical indicators, drawing tools, and multi-timeframe analysis — all in real-time.", enabled: true },
     { id: "4", icon: "Award", title: "Global Leaderboards & Rankings", description: "Track your rank against thousands of traders. Earn XP, climb seasonal tiers, and showcase your achievements on your public profile.", enabled: true },
     { id: "5", icon: "Shield", title: "Zero Financial Risk", description: "Trade with virtual capital in a risk-free environment. Perfect your strategy, test new approaches, and build confidence — all without risking a single dollar.", enabled: true },
@@ -115,7 +115,7 @@ export const defaultSettings: LandingSettings = {
   howItWorksSubtitle: "Your path to the top of the leaderboard",
   howItWorksSteps: [
     { id: "1", step: 1, icon: "UserPlus", title: "Create Your Free Account", description: "Sign up in under 60 seconds with just your email. No credit card required, no hidden fees — instant access to the full trading arena.", enabled: true },
-    { id: "2", step: 2, icon: "Trophy", title: "Pick Your Battlefield", description: "Choose from daily sprint tournaments, weekly marathons, or intense 1v1 duels. Filter by entry fee, prize pool, or trading pairs to find your perfect match.", enabled: true },
+    { id: "2", step: 2, icon: "Trophy", title: "Pick Your Battlefield", description: "Choose from daily sprint tournaments, weekly marathons, or intense 1v1 challenges. Filter by entry fee, prize pool, or trading pairs to find your perfect match.", enabled: true },
     { id: "3", step: 3, icon: "TrendingUp", title: "Trade Like a Pro", description: "Execute trades on real-time market data using professional charts and tools. Deploy your strategy across 28+ forex pairs with zero financial risk.", enabled: true },
     { id: "4", step: 4, icon: "Award", title: "Claim Your Prizes", description: "Finish at the top of the leaderboard and withdraw your winnings instantly. Earn badges, XP, and seasonal rewards as you build your legacy.", enabled: true },
   ],
@@ -131,10 +131,10 @@ export const defaultSettings: LandingSettings = {
 
   // Challenges
   challengesEnabled: true,
-  challengesTitle: "1v1 Trading Duels",
+  challengesTitle: "1v1 Trading Challenges",
   challengesSubtitle: "⚔️ Settle It Head-to-Head",
   challengesDescription:
-    "Think you're better than another trader? Prove it. Challenge anyone to a direct 1v1 duel — choose the stake, set the rules, and let the market decide the winner. No luck, just pure skill.",
+    "Think you're better than another trader? Prove it. Challenge anyone to a direct 1v1 challenge — choose the stake, set the rules, and let the market decide the winner. No luck, just pure skill.",
   challengesCTAText: "Challenge a Trader",
   challengesCTALink: "/challenges",
 
@@ -312,7 +312,7 @@ export const defaultSettings: LandingSettings = {
   enterpriseAdminFeatures: [
     { id: "1", icon: "BarChart3", title: "Real-Time Analytics Dashboard", description: "Live user metrics, revenue tracking, competition performance, and engagement analytics — all visualized with professional charts and exportable reports.", color: "from-cyan-500 to-blue-600", enabled: true },
     { id: "2", icon: "Users", title: "Advanced User Management", description: "Full user lifecycle control — KYC verification, role-based access, wallet management, activity logs, and automated restriction systems.", color: "from-purple-500 to-pink-600", enabled: true },
-    { id: "3", icon: "Trophy", title: "Competition Engine", description: "Create unlimited competition types — tournaments, leagues, 1v1 duels, and custom formats. Configure entry fees, prize pools, rules, and schedules with granular control.", color: "from-yellow-500 to-orange-600", enabled: true },
+    { id: "3", icon: "Trophy", title: "Competition Engine", description: "Create unlimited competition types — tournaments, leagues, 1v1 challenges, and custom formats. Configure entry fees, prize pools, rules, and schedules with granular control.", color: "from-yellow-500 to-orange-600", enabled: true },
     { id: "4", icon: "Shield", title: "Fraud Detection & Security", description: "AI-powered anomaly detection, IP tracking, multi-account prevention, and real-time risk scoring — protecting your platform and your users around the clock.", color: "from-red-500 to-rose-600", enabled: true },
   ],
 

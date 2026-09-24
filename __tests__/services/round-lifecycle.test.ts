@@ -224,6 +224,7 @@ async function launchRound(
     contestId,
     config,
     returnUrl: "https://chartvolt.test/return",
+    parentOrigin: "https://chartvolt.test",
     resultCallbackUrl: "https://chartvolt.test/api/games/providers/mock/events",
   });
   if (!outcome.success) {
@@ -309,6 +310,7 @@ describe("RoundService - creation and attempts", () => {
       contestId,
       config: contestConfig(),
       returnUrl: "https://chartvolt.test/return",
+    parentOrigin: "https://chartvolt.test",
       resultCallbackUrl: "https://chartvolt.test/cb",
     });
 
@@ -349,6 +351,7 @@ describe("RoundService - creation and attempts", () => {
       contestId,
       config: contestConfig(),
       returnUrl: "https://chartvolt.test/return",
+    parentOrigin: "https://chartvolt.test",
       resultCallbackUrl: "https://chartvolt.test/cb",
     });
 
@@ -377,6 +380,7 @@ describe("RoundService - creation and attempts", () => {
       // 300s game, 60s of window left.
       config: contestConfig({ playWindowEnd: new Date(Date.now() + 60_000) }),
       returnUrl: "https://chartvolt.test/return",
+    parentOrigin: "https://chartvolt.test",
       resultCallbackUrl: "https://chartvolt.test/cb",
     });
 
@@ -413,6 +417,7 @@ describe("RoundService - creation and attempts", () => {
         roundStartPolicy: "until_window_closes",
       }),
       returnUrl: "https://chartvolt.test/return",
+    parentOrigin: "https://chartvolt.test",
       resultCallbackUrl: "https://chartvolt.test/cb",
     });
 
@@ -454,6 +459,7 @@ describe("RoundService - creation and attempts", () => {
           roundStartPolicy,
         }),
         returnUrl: "https://chartvolt.test/return",
+    parentOrigin: "https://chartvolt.test",
         resultCallbackUrl: "https://chartvolt.test/cb",
       });
 
@@ -498,6 +504,7 @@ describe("RoundService - creation and attempts", () => {
       contestId,
       config: { ...config, attemptSeconds: 25 * 60 },
       returnUrl: "https://chartvolt.test/return",
+    parentOrigin: "https://chartvolt.test",
       resultCallbackUrl: "https://chartvolt.test/cb",
     });
     expect(refused.success).toBe(false);
@@ -591,6 +598,7 @@ describe("RoundService - creation and attempts", () => {
       contestId,
       config: contestConfig(),
       returnUrl: "https://chartvolt.test/return",
+    parentOrigin: "https://chartvolt.test",
       resultCallbackUrl: "https://chartvolt.test/cb",
     });
 

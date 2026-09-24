@@ -15,6 +15,7 @@ import {
   getClientIP,
 } from "@/lib/services/registration-security.service";
 import { getFraudSettings } from "@/lib/services/fraud-settings.service";
+import { parseSignupInterest } from "@/lib/utils/signup-interest";
 
 export const signUpWithEmail = async ({
   email,
@@ -28,6 +29,7 @@ export const signUpWithEmail = async ({
   referralCode,
   captchaToken,
   fingerprint,
+  signupInterest,
 }: SignUpFormData & {
   honeypot?: string;
   referralCode?: string;
@@ -154,18 +156,28 @@ export const signUpWithEmail = async ({
         // Admin role can ONLY be assigned through the admin panel
         const role = "trader";
 
+        // Reason: Q16 — store the registration answer as information for later
+        // product use. Invalid / missing values are omitted rather than defaulted,
+        // so a bot that skips the field does not invent "both".
+        const interest = parseSignupInterest(signupInterest);
+        const profileFields: Record<string, unknown> = {
+          country,
+          address,
+          city,
+          postalCode,
+          role, // All signups are traders - admin role assigned via admin panel only
+          emailVerified: false, // Must verify email before login
+          updatedAt: new Date(),
+        };
+        if (interest) {
+          profileFields.signupInterest = interest;
+          profileFields.signupInterestAt = new Date();
+        }
+
         const updateResult = await db.collection("user").updateOne(
           { $or: queries },
           {
-            $set: {
-              country,
-              address,
-              city,
-              postalCode,
-              role, // All signups are traders - admin role assigned via admin panel only
-              emailVerified: false, // Must verify email before login
-              updatedAt: new Date(),
-            },
+            $set: profileFields,
           },
         );
 

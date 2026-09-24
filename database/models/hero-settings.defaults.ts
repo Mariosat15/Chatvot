@@ -123,7 +123,7 @@ export const defaultFeatures: IFeatureCard[] = [
     icon: "Swords",
     title: "1v1 Head-to-Head Challenges",
     description:
-      "Challenge any trader to a high-stakes duel. Pick your ranking method, set your entry fee, and prove who's the superior trader in a direct showdown.",
+      "Challenge any trader to a high-stakes 1v1. Pick your ranking method, set your entry fee, and prove who's the superior trader in a direct showdown.",
     color: "#ef4444",
     order: 2,
     enabled: true,
@@ -260,7 +260,7 @@ export const defaultHowItWorks: IHowItWorksStep[] = [
     step: 2,
     title: "Fund & Choose Your Battle",
     description:
-      "Deposit credits, browse live competitions ranked by P&L, ROI, Win Rate and more — or challenge a specific trader to a 1v1 duel.",
+      "Deposit credits, browse live competitions ranked by P&L, ROI, Win Rate and more — or challenge a specific trader to a 1v1 challenge.",
     icon: "Trophy",
     enabled: true,
   },

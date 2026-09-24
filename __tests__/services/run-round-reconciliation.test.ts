@@ -222,6 +222,7 @@ async function launchCompetitionRound(
     contestId,
     config,
     returnUrl: "https://chartvolt.test/return",
+    parentOrigin: "https://chartvolt.test",
     resultCallbackUrl: "https://chartvolt.test/api/games/providers/mock/events",
   });
   if (!outcome.success) {
@@ -242,6 +243,7 @@ async function launchChallengeRound(contestId: Types.ObjectId) {
       playWindowEnd: new Date(Date.now() + 30 * 60 * 1000),
     }),
     returnUrl: "https://chartvolt.test/return",
+    parentOrigin: "https://chartvolt.test",
     resultCallbackUrl: "https://chartvolt.test/api/games/providers/mock/events",
   });
   if (!outcome.success) {
@@ -332,6 +334,7 @@ describe("runRoundReconciliation - practice rounds skipped", () => {
       contestId: null,
       config: contestConfig(),
       returnUrl: "https://chartvolt.test/return",
+    parentOrigin: "https://chartvolt.test",
       resultCallbackUrl: "https://chartvolt.test/api/games/providers/mock/events",
     });
     if (!outcome.success) {

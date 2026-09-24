@@ -13,6 +13,8 @@ declare global {
     address: string;
     city: string;
     postalCode: string;
+    /** Q16 — trading | games | both. Informational; not a permission. */
+    signupInterest?: "trading" | "games" | "both";
   };
 
   type CountrySelectProps = {
