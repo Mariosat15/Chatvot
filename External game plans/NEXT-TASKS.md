@@ -1,108 +1,93 @@
 # Next tasks — ChartVolt external-first programme
 
-> **Updated 24 September 2026 (evening).** One bullet per task, priority order.
-> Closed / stale-as-open items are listed so a pasted older list is not re-opened by accident.
-> Authoritative phase detail stays in `PROGRESS.md` and the chapter BUILT notes.
+> **Updated 24 September 2026.** One bullet per task. Closed items stay listed so an
+> older paste-list is not re-opened by accident. Detail lives in `PROGRESS.md`.
 
 ---
 
-## P0 — Do next (eng, no owner blockers)
+## P0 — Do next (eng)
 
-1. **games-service `AMBIGUITY-LOG`** — A1–A11 RESOLVED (24 Sep, HTML v1.6–v1.16); remaining OPEN (A12+) need `01` + requirements HTML version bump. Continue from next OPEN entry in the log.
-2. **X4a content + localisation** — catalogue beyond `en`; mobile catalogue support.
-3. **Nine `duel` vocabulary sites** outside help (landing / admin seeds) — migration question for seeded defaults, not a wording-only pass.
-4. **Trading create form monolith** (~2716 lines) + trading editor thinner than create — UI debt, not a games gate.
-5. **Full `ranking-config.service` pass** — verify against recent sweeps before scheduling; may already be largely done.
+**Preferred eng queue (owner, 24 Sep — start when you say “start”):**
+
+1. **`AMBIGUITY-LOG` A12+** (preferred) — A1–A11 done (HTML v1.6–v1.16); next OPEN entries need `01` + requirements HTML bump.
+2. **X4a localisation / mobile catalogue** — beyond `en`; mobile catalogue support.
+3. **Nine `duel` vocabulary sites** (landing / admin seeds) — seeded defaults need a migration decision, not wording alone.
+4. **Trading create-form monolith** (~2716 lines) + thinner trading editor.
+5. **Verify `ranking-config.service`** before scheduling a full pass (may already be largely done).
+
+**Also still open (schedule after the five above, or when relevant):**
+
 6. **Task 17** — remove legacy game — half done; needs catalogue re-sync (ops).
 7. **Task 18** — redesign other screen — not started (needs owner reference if any).
 
----
+**Do not put these back in P0 as open (CLOSED — older lists are stale):**
 
-## P1 — Owner / Legal (eng waits)
-
-8. **A5 wiki bodies** — ten Game Administration skeletons; **LAST OF ALL** (owner 19 Sep).
-9. **R11 — legal ToS / action-terms bodies** — counsel; last with A5.
-10. **R99 — JSON 134 vs constants 128 badge catalogue merge** — owner if still wanted.
-11. **R93 — credit EUR rate UI** — screen was unreachable; owner scope for rebuild.
-12. **R96b — game-specific badge *content*** — authoring machinery built; catalogue still needs owner-authored / generated rows.
-13. **Q16 — registration-time interest picker** — product; X11.5 eng works without it.
-14. **Ops backfills (report-only until `--apply`)** — X1 game-label; GM earning `gameKey`; phantom participant scores — owner decides when production data exists.
+- ~~X10 polish — challenge result page trading metrics~~ → **R92 CLOSED 18 Sep**
+- ~~X10 polish — arena FRIENDS / COUNTRY tabs~~ → **WIRED 22 Sep**
+- ~~Player dashboard twin of R64~~ → **CLOSED 18 Sep**
+- ~~Public unauth arena broadcast leaderboard~~ → **CLOSED 18 Sep**
+- ~~R1 residual under-count prize-pool~~ → **CLOSED** (`prize-pool-integrity.ts`)
 
 ---
 
-## P2 — Blocked (do not schedule)
+## P1 — Owner / legal (eng waits)
 
-15. **X4 — real outside-provider adapter** — blocked on signed sandbox; **X4a does not replace it**.
-16. **Per-round provider cost analytics + CSP `frame-src`** — need real X4 contract / play domain.
-17. **GM net-of-cost economics for paying third parties** (`19` s5) — re-apply when X4 pricing exists; first-party / zero-cost creation already shipped 23 Sep.
-18. **Turn-based / heat contests (task 10.2)**; check-in / lobby / countdown trio — blocked, not deferred by effort.
-19. **Task 22 per-metric performance schema** — deliberate deviation; do not “finish”.
-20. **Paid Hint / invent mid-round SCORE / Combo / XP LEVEL in arena** — fairness / protocol.
-21. **Remaining `ADMIN_SECTIONS` grants** — owner “do later”.
-22. **Sidebar clicks don’t write URL** — ~60 sections; with X6.5 leftovers.
-23. **`closePosition` on completed/finalizing** — needs own evidence before changing.
-24. **Task 8** — large game admin redesign — blocked on reference image.
-25. **Tasks 15–16** — artwork optimize on upload only; do not point existing optimizer at `public/assets`.
-26. **Tasks 25–27, 31–35** — consistency / reviews / final audit — not started.
-27. **Task 28** — settlement server-side guard still useful (four payout paths checked).
-28. **Per-game marketplace** — not scheduled (~2 weeks after catalogue).
-29. **X12** — hardening, staged pilot, public launch — after X4 + polish.
+11. **A5 wiki bodies** — ten Game Administration wiki pages; **LAST OF ALL**.
+12. **R11 — legal ToS / action-terms** — lawyer / counsel with A5.
+13. **R99 — JSON 134 vs constants 128** badge catalogue merge — only if you still want it.
+14. **R93 — credit EUR rate UI** — settings screen was missing; rebuild when you want it.
+15. **R96b — game-specific badge *content*** — code can author badges; you still need real badge text/rows.
+16. **Q16 — registration interest picker** — ask new players which games they like at sign-up.
+17. **Ops backfills (`--apply` when ready)** — X1 game labels; GM earning `gameKey`; phantom scores — only when real production data exists.
 
 ---
 
-## Do not treat as open (closed / stale on older lists)
+## P2 — Blocked / do not schedule
 
-- **P0 challenge result page trading metrics** — **R92 CLOSED 18 Sep**; `/challenges/[id]` early-returns to `ProviderChallengeLobby` before any `myStats.pnl`.
-- **P0 arena FRIENDS / COUNTRY tabs** — **WIRED 22 Sep** (`13` s4.1y amendment).
-- **P0 player dashboard twin of R64** — **CLOSED 18 Sep**.
-- **P0 public unauth arena broadcast leaderboard** — **CLOSED 18 Sep** (`13` s5.1c).
-- **P0 R1 residual under-count prize-pool** — **CLOSED**; `prize-pool-integrity.ts` raises under-count.
-- **Command Alerts ops UI** — **SHIPPED 24 Sep** (`3a84d1ec`): acknowledge → `reviewed`, detail drawer, CSV export, Fraud deep-links. Use Acknowledge (not Delete) so monitors do not recreate the same episode.
-- **Friday catalogue auto-sync + 7-day stale banner** — shipped 24 Sep (`ff2e4b04`).
-- **GM Active comps X/max + min-entrants rule** — shipped 24 Sep.
-- **R114 prize_pool_mismatch counting GM earnings** — fixed 24 Sep (`9514dc36`); dismiss old open rows after deploy.
-- **X11 catalogue + games-first nav** — CODE-COMPLETE 21–22 Sep (eng).
-- **X11.5 interest / matchmaking** — CODE-COMPLETE 23 Sep (eng); Q16 open.
-- **X10 core + X15 abuse controls** — built; Q15 closed 22 Sep.
-- **`/play` ↔ `/trade` dispatcher** — COMPLETE 23 Sep.
-- **Task 9 leftovers** (analytics by category + discovery filter) — CLOSED 23 Sep.
-- **GM provider construction UI** — CODE-COMPLETE 23 Sep; s5 suspended for first-party / zero-cost.
-- **AppSettingsProvider / credit symbol in admin** — R110 (18 Sep).
-- **X9 / re-settle / incident hub** — X9 CODE-COMPLETE 20 Sep; hub BUILT 21 Sep.
-- **X8 player wording** — eng + owner content DONE; only R11 + A5 remain.
-- **X6.5 eng** — CLOSED; A5 bodies = owner last.
-- **X4a** — OWNER CLICK-ACCEPTED 20 Sep; Risk X8 closed.
-- **X0–X3, X5, X7 steps 1–5** — code-complete (ops backfills / R96b content / Q14 as noted).
+18. **X4 outside-provider sandbox** — need a signed real provider; X4a does not replace this.
+19. **Per-round provider cost + CSP `frame-src`** — need X4 contract / play domain.
+20. **GM net-of-cost economics for third parties** (`19` s5) — when X4 pricing exists.
+21. **Turn-based / heat + check-in / lobby / countdown** — blocked, not “later by effort”.
+22. **Task 22 per-metric schema** — deliberate deviation; do not “finish”.
+23. **Paid Hint / invent mid-round SCORE / Combo / XP LEVEL** — fairness / protocol forbid.
+24. **Remaining `ADMIN_SECTIONS` grants** — owner “do later”.
+25. **Sidebar URL sync** (~60 sections).
+26. **`closePosition` on completed/finalizing** — needs own evidence first.
 
 ---
 
-## X-phase snapshot (24 Sep 2026)
+## P3 — 35-task leftovers / later
 
-| Phase | Status |
-|---|---|
-| X0–X3, X5 | CODE-COMPLETE (X1 backfill not `--apply`’d; X3 rehearsals 7–10 need later phases) |
-| X4a | OWNER CLICK-ACCEPTED |
-| X4 | NOT STARTED — blocked on signed outside provider |
-| X6 | PARTIAL — admin destinations + GM create done; per-round cost waits on X4 |
-| X6.5 | Eng CLOSED; A5 wiki bodies owner / last |
-| X7 | Steps 1–5 code-complete; R96b content + backfill ops open; default board still legacy (Q14) |
-| X8 | Eng + owner content DONE; R11 + A5 left |
-| X9 | CODE-COMPLETE |
-| X10 | Core + X15 + result-page/FRIENDS polish done |
-| X11 | CODE-COMPLETE (eng) for catalogue / nav / merchandising |
-| X11.5 | CODE-COMPLETE (eng); Q16 open |
-| X12 | NOT STARTED |
-| Per-game marketplace | NOT SCHEDULED |
+27. **Task 8** — large admin redesign (needs reference).
+28. **Tasks 15–16** — artwork optimize on upload only.
+29. **Task 17** — remove legacy game (needs re-sync) — also under P0 #6.
+30. **Task 18** — redesign other screen — also under P0 #7.
+31. **Tasks 25–27, 31–35** — consistency / audit.
+32. **Task 28** — settlement guard still useful.
+33. **Per-game marketplace** — not scheduled.
+34. **X12** — hardening / pilot / launch.
+
+---
+
+## Also shipped recently (do not re-open)
+
+- **Command Alerts** — acknowledge / drawer / CSV / Fraud links (`3a84d1ec`). Prefer **Acknowledge** over Delete (Delete comes back — monitors recreate the episode).
+- **Friday catalogue auto-sync + 7-day stale banner** (`ff2e4b04`).
+- **GM Active comps `X/max` + min-entrants rule**.
+- **R114** — `prize_pool_mismatch` false alerts from GM earnings counting.
+- X11 / X11.5 / X10 core / X15 / `/play`↔`/trade` / GM provider create / X4a click-accepted / X9 / X8 eng+owner content.
 
 ---
 
 ## Preferred next eng session
 
-**Continue P0 #1 — `AMBIGUITY-LOG` remaining OPEN entries (A12+),** each with `01` + requirements HTML bump.
+**Wait for owner to say “start”, then:**
 
-Alternatives if owner prefers product surface: **P0 #2 X4a localisation / mobile catalogue**, or **P0 #3 duel vocabulary migration**.
+1. AMBIGUITY-LOG A12+  
+2. X4a localisation / mobile catalogue  
+3. Nine duel vocabulary sites (seeds)  
+4. Trading create-form monolith  
+5. Verify `ranking-config.service` before scheduling  
 
-Do **not** re-open X11 / X11.5 / challenge-result / FRIENDS / R64 twin / arena broadcast / Command Alerts ops as greenfield.  
 Do **not** schedule X4 until a signed sandbox exists.  
-Keep A5 wiki and R11 for the end.  
-For Command Alerts: **Acknowledge** open noise; Delete is temporary because monitors recreate the same episode.
+Keep A5 wiki and R11 for the end.
