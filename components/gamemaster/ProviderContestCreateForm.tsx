@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 import { defaultConfigValues } from "@/lib/services/games/config-schema";
 import type { ConfigField } from "@/lib/services/games/config-schema";
 import type { PlayMode } from "@/lib/services/games/play-shape";
+import { utcDraftToIso } from "@/components/gamemaster/UtcScheduleFields";
 import {
   BasicsStep,
   GameSettingsStep,
@@ -105,12 +106,6 @@ export default function ProviderContestCreateForm({
     ? platformFeePercentage
     : 10;
 
-  const startIsoHint = useMemo(() => {
-    const d = new Date(Date.now() + 60 * 60 * 1000);
-    d.setMinutes(0, 0, 0);
-    return d.toISOString().slice(0, 16);
-  }, []);
-
   const prizeTotal = prizes.reduce((s, p) => s + Number(p.percentage || 0), 0);
   const entryNum = Number(entryFee) || 0;
   const maxNum = Number(maxParticipants) || 0;
@@ -127,8 +122,11 @@ export default function ProviderContestCreateForm({
     }
     if (n === 3) {
       if (!startTime || !endTime) return "Set start and end times.";
-      if (new Date(endTime) <= new Date(startTime)) {
-        return "End must be after start.";
+      // Reason: drafts are UTC wall-clock (`YYYY-MM-DDTHH:mm`); bare `new Date(draft)` is local.
+      const startMs = new Date(utcDraftToIso(startTime)).getTime();
+      const endMs = new Date(utcDraftToIso(endTime)).getTime();
+      if (!(endMs > startMs)) {
+        return "End must be after start (UTC).";
       }
       if (entryNum < 0) return "Entry fee cannot be negative.";
       if (maxNum < 2) return "At least 2 players are required.";
@@ -167,8 +165,9 @@ export default function ProviderContestCreateForm({
 
     setSubmitting(true);
     try {
-      const start = new Date(startTime);
-      const end = new Date(endTime);
+      // Reason: append :00Z so the instant matches the UTC clock on the schedule step.
+      const startIso = utcDraftToIso(startTime);
+      const endIso = utcDraftToIso(endTime);
       const res = await fetch("/api/gamemaster/competitions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -182,10 +181,10 @@ export default function ProviderContestCreateForm({
           entryFee: entryNum,
           maxParticipants: maxNum,
           // Fee omitted — server stamps Challenge Settings.
-          startTime: start.toISOString(),
-          endTime: end.toISOString(),
-          playWindowStart: start.toISOString(),
-          playWindowEnd: end.toISOString(),
+          startTime: startIso,
+          endTime: endIso,
+          playWindowStart: startIso,
+          playWindowEnd: endIso,
           playMode: canPickMode ? playMode : undefined,
           attemptsPolicy: "single",
           unresolvedRoundPolicy: "score_zero",
@@ -336,7 +335,6 @@ export default function ProviderContestCreateForm({
                   <ScheduleStep
                     startTime={startTime}
                     endTime={endTime}
-                    startIsoHint={startIsoHint}
                     entryFee={entryFee}
                     maxParticipants={maxParticipants}
                     maxUsersPerCompetition={maxUsersPerCompetition}
@@ -346,6 +344,7 @@ export default function ProviderContestCreateForm({
                     onEnd={setEndTime}
                     onEntryFee={setEntryFee}
                     onMaxParticipants={setMaxParticipants}
+                    disabled={submitting}
                   />
                 )}
                 {step === 4 && (

@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { WHITE_DATE_PICKER_CLASS } from "@/components/gamemaster/UtcScheduleFields";
 import type { TitleLevel } from "@/lib/constants/levels";
 
 interface GMSubscription {
@@ -1570,7 +1571,10 @@ export default function GMCreateCompetitionContent({
                               type="date"
                               value={formData.startDate}
                               onChange={handleInputChange}
-                              className="w-full bg-gray-800 border border-gray-600 text-gray-100 h-11 rounded-lg px-4 focus:ring-2 focus:ring-purple-500 focus:border-transparent mt-1"
+                              className={cn(
+                                "w-full bg-gray-800 border border-gray-600 text-gray-100 h-11 rounded-lg px-4 focus:ring-2 focus:ring-purple-500 focus:border-transparent mt-1",
+                                WHITE_DATE_PICKER_CLASS,
+                              )}
                               required
                             />
                           </div>
@@ -1593,7 +1597,10 @@ export default function GMCreateCompetitionContent({
                               type="time"
                               value={formData.startTime}
                               onChange={handleInputChange}
-                              className="w-full bg-gray-800 border border-gray-600 text-gray-100 h-11 rounded-lg px-4 focus:ring-2 focus:ring-purple-500 focus:border-transparent mt-1"
+                              className={cn(
+                                "w-full bg-gray-800 border border-gray-600 text-gray-100 h-11 rounded-lg px-4 focus:ring-2 focus:ring-purple-500 focus:border-transparent mt-1",
+                                WHITE_DATE_PICKER_CLASS,
+                              )}
                               required
                             />
                             {/* Quick Time Presets */}
@@ -1647,7 +1654,10 @@ export default function GMCreateCompetitionContent({
                               value={formData.endDate}
                               onChange={handleInputChange}
                               min={formData.startDate}
-                              className="w-full bg-gray-800 border border-gray-600 text-gray-100 h-11 rounded-lg px-4 focus:ring-2 focus:ring-purple-500 focus:border-transparent mt-1"
+                              className={cn(
+                                "w-full bg-gray-800 border border-gray-600 text-gray-100 h-11 rounded-lg px-4 focus:ring-2 focus:ring-purple-500 focus:border-transparent mt-1",
+                                WHITE_DATE_PICKER_CLASS,
+                              )}
                               required
                             />
                           </div>
@@ -1670,7 +1680,10 @@ export default function GMCreateCompetitionContent({
                               type="time"
                               value={formData.endTime}
                               onChange={handleInputChange}
-                              className="w-full bg-gray-800 border border-gray-600 text-gray-100 h-11 rounded-lg px-4 focus:ring-2 focus:ring-purple-500 focus:border-transparent mt-1"
+                              className={cn(
+                                "w-full bg-gray-800 border border-gray-600 text-gray-100 h-11 rounded-lg px-4 focus:ring-2 focus:ring-purple-500 focus:border-transparent mt-1",
+                                WHITE_DATE_PICKER_CLASS,
+                              )}
                               required
                             />
                             {/* Quick Time Presets */}

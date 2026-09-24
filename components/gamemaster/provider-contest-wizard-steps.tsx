@@ -1,6 +1,7 @@
 "use client";
 
 import ChallengeSettingsFields from "@/components/challenges/ChallengeSettingsFields";
+import { UtcScheduleFields } from "@/components/gamemaster/UtcScheduleFields";
 import type { ConfigField } from "@/lib/services/games/config-schema";
 import type { PlayMode } from "@/lib/services/games/play-shape";
 import { Lock } from "lucide-react";
@@ -162,7 +163,6 @@ export function GameSettingsStep({
 export function ScheduleStep({
   startTime,
   endTime,
-  startIsoHint,
   entryFee,
   maxParticipants,
   maxUsersPerCompetition,
@@ -172,10 +172,10 @@ export function ScheduleStep({
   onEnd,
   onEntryFee,
   onMaxParticipants,
+  disabled,
 }: {
   startTime: string;
   endTime: string;
-  startIsoHint: string;
   entryFee: string;
   maxParticipants: string;
   maxUsersPerCompetition: number;
@@ -185,27 +185,20 @@ export function ScheduleStep({
   onEnd: (v: string) => void;
   onEntryFee: (v: string) => void;
   onMaxParticipants: (v: string) => void;
+  disabled?: boolean;
 }) {
   return (
     <StepPanel title="Schedule & Entry" subtitle="When it runs and what it costs">
+      <UtcScheduleFields
+        startLabel="Starts"
+        endLabel="Ends"
+        startTime={startTime}
+        endTime={endTime}
+        onStartChange={onStart}
+        onEndChange={onEnd}
+        disabled={disabled}
+      />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Starts">
-          <input
-            type="datetime-local"
-            className={inputClass}
-            value={startTime}
-            min={startIsoHint}
-            onChange={(e) => onStart(e.target.value)}
-          />
-        </Field>
-        <Field label="Ends">
-          <input
-            type="datetime-local"
-            className={inputClass}
-            value={endTime}
-            onChange={(e) => onEnd(e.target.value)}
-          />
-        </Field>
         <Field label="Entry fee (credits)">
           <input
             type="number"
@@ -213,6 +206,7 @@ export function ScheduleStep({
             step="1"
             className={inputClass}
             value={entryFee}
+            disabled={disabled}
             onChange={(e) => onEntryFee(e.target.value)}
           />
         </Field>
@@ -223,6 +217,7 @@ export function ScheduleStep({
             max={maxUsersPerCompetition}
             className={inputClass}
             value={maxParticipants}
+            disabled={disabled}
             onChange={(e) => onMaxParticipants(e.target.value)}
           />
         </Field>
@@ -322,10 +317,10 @@ export function ReviewStep({
         <ReviewRow label="Name" value={name} />
         <ReviewRow label="Game" value={displayName} />
         <ReviewRow
-          label="Window"
+          label="Window (UTC)"
           value={
             startTime && endTime
-              ? `${new Date(startTime).toLocaleString()} → ${new Date(endTime).toLocaleString()}`
+              ? `${startTime.replace("T", " ")} → ${endTime.replace("T", " ")} UTC`
               : "—"
           }
         />

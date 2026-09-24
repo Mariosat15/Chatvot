@@ -1,14 +1,17 @@
 import { NextResponse } from "next/server";
+import mongoose from "mongoose";
 import { connectToDatabase } from "@/database/mongoose";
 import GameMasterSubscription from "@/database/models/gamemaster/gamemaster-subscription.model";
 import GameMasterEarning from "@/database/models/gamemaster/gamemaster-earning.model";
 import UserReferral from "@/database/models/user-referral.model";
 import Competition from "@/database/models/trading/competition.model";
-import { MarketplaceItem } from "@/database/models/marketplace/marketplace-item.model";
 import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import { earningsByGameGroupStages } from "@/lib/services/gamemaster/earnings-by-game";
 import { labelForGameKey } from "@/lib/services/games/game-leaderboard.service";
+import { resolveCreationLimits } from "@/lib/services/gamemaster/game-permissions";
+import { loadGameMasterPackageConfig } from "@/lib/services/gamemaster/package-config";
+import { buildSubscriptionLimits } from "@/lib/services/gamemaster/subscription-limits";
 
 /**
  * GET /api/gamemaster/dashboard
@@ -60,6 +63,12 @@ export async function GET() {
         canCreateCompetitions?: boolean;
         canEarnFromChallenges?: boolean;
         challengeReferralFeePercentage?: number;
+        allowedGameTypes?: string[];
+      };
+      competitionCreationOverride?: "enabled" | "disabled" | null;
+      overrideLimits?: {
+        maxCompetitionsPerDay?: number;
+        maxUsersPerCompetition?: number;
       };
       [key: string]: unknown;
     } | null;
@@ -77,53 +86,55 @@ export async function GET() {
       });
     }
 
-    // ── Current package settings (live from MarketplaceItem) ────────
-    let currentPackageLimits: {
-      maxCompetitionsPerDay?: number;
-      maxUsersPerCompetition?: number;
-      referralFeePercentage?: number;
-      canCreateCompetitions?: boolean;
-      canEarnFromChallenges?: boolean;
-      challengeReferralFeePercentage?: number;
-    } = subscription.limits || {};
+    // Reason: same resolver as create / creation-options. A hand-built package overwrite
+    // ignored admin overrides and could leave the UI on a stale cached daily cap when the
+    // package lookup failed while the create gate still read the live package.
+    const db = mongoose.connection.db;
+    const packageConfig = db
+      ? await loadGameMasterPackageConfig(db, subscription.packageId)
+      : null;
+    const effective = resolveCreationLimits({
+      limits: subscription.limits,
+      packageConfig,
+      override: subscription.competitionCreationOverride ?? null,
+      overrideLimits: subscription.overrideLimits ?? null,
+    });
 
-    if (subscription.packageId) {
-      const currentPackage = (await MarketplaceItem.findById(
-        subscription.packageId,
-      ).lean()) as {
-        gameMasterConfig?: {
-          maxCompetitionsPerDay?: number;
-          maxUsersPerCompetition?: number;
-          referralFeePercentage?: number;
-          canCreateCompetitions?: boolean;
-          canEarnFromChallenges?: boolean;
-          challengeReferralFeePercentage?: number;
-        };
-      } | null;
-      if (currentPackage?.gameMasterConfig) {
-        currentPackageLimits = {
-          maxCompetitionsPerDay:
-            currentPackage.gameMasterConfig.maxCompetitionsPerDay,
-          maxUsersPerCompetition:
-            currentPackage.gameMasterConfig.maxUsersPerCompetition,
-          referralFeePercentage:
-            currentPackage.gameMasterConfig.referralFeePercentage,
-          canCreateCompetitions:
-            currentPackage.gameMasterConfig.canCreateCompetitions !== false,
-          canEarnFromChallenges:
-            currentPackage.gameMasterConfig.canEarnFromChallenges === true,
-          challengeReferralFeePercentage:
-            currentPackage.gameMasterConfig.challengeReferralFeePercentage ??
-            currentPackage.gameMasterConfig.referralFeePercentage ??
-            0,
-        };
-      }
+    const displayLimits = {
+      maxCompetitionsPerDay: effective.maxCompetitionsPerDay,
+      maxUsersPerCompetition: effective.maxUsersPerCompetition,
+      referralFeePercentage: effective.referralFeePercentage,
+      canCreateCompetitions: effective.canCreateCompetitions,
+      allowedGameTypes: [...effective.allowedGameTypes],
+      canEarnFromChallenges:
+        packageConfig?.canEarnFromChallenges === true ||
+        subscription.limits?.canEarnFromChallenges === true,
+      challengeReferralFeePercentage:
+        packageConfig?.challengeReferralFeePercentage ??
+        packageConfig?.referralFeePercentage ??
+        subscription.limits?.challengeReferralFeePercentage ??
+        subscription.limits?.referralFeePercentage ??
+        0,
+    };
+
+    // Reason: self-heal the cache when the live package disagrees. Marketplace sync can
+    // miss rows (packageId string vs ObjectId); without this, /api/gamemaster/status and any
+    // reader of subscription.limits keep showing the old comps/day until renewal.
+    if (
+      db &&
+      packageConfig &&
+      subscription.limits?.maxCompetitionsPerDay !==
+        displayLimits.maxCompetitionsPerDay
+    ) {
+      const healed = buildSubscriptionLimits(packageConfig);
+      void db.collection("gamemastersubscriptions").updateOne(
+        { _id: subscription._id },
+        { $set: { limits: healed, updatedAt: new Date() } },
+      );
     }
 
-    const canCreateCompetitions =
-      currentPackageLimits.canCreateCompetitions !== false;
-    const canEarnFromChallenges =
-      currentPackageLimits.canEarnFromChallenges === true;
+    const canCreateCompetitions = displayLimits.canCreateCompetitions;
+    const canEarnFromChallenges = displayLimits.canEarnFromChallenges;
 
     // ── Referred Users ──────────────────────────────────────────────
     const referredUsers = await UserReferral.find({ gameMasterId: userId })
@@ -149,9 +160,9 @@ export async function GET() {
       .sort({ createdAt: -1 })
       .limit(50)
       .lean()
-      .then((comps: any[]) =>
-        comps.map((c: any) => ({
-          id: c._id.toString(),
+      .then((comps) =>
+        comps.map((c) => ({
+          id: String(c._id),
           name: c.name,
           status: c.status,
           participants: c.currentParticipants || 0,
@@ -171,9 +182,9 @@ export async function GET() {
       .sort({ createdAt: -1 })
       .limit(100)
       .lean()
-      .then((earnings: any[]) =>
-        earnings.map((e: any) => ({
-          id: e._id.toString(),
+      .then((earnings) =>
+        earnings.map((e) => ({
+          id: String(e._id),
           sourceType: e.sourceType || "competition",
           sourceName: e.sourceName || "Unknown",
           referredUserName: e.referredUserName || "Unknown",
@@ -242,7 +253,7 @@ export async function GET() {
       data: {
         subscription: {
           ...subscription,
-          limits: currentPackageLimits,
+          limits: displayLimits,
           canCreateCompetitions,
           canEarnFromChallenges,
         },

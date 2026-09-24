@@ -1,13 +1,11 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import mongoose from "mongoose";
-import { ObjectId } from "mongodb";
 import { auth } from "@/lib/better-auth/auth";
 import { connectToDatabase } from "@/database/mongoose";
 import { listContestableTitles } from "@/lib/services/game-providers/provider-contest.service";
-import {
-  resolveCreationLimits,
-} from "@/lib/services/gamemaster/game-permissions";
+import { resolveCreationLimits } from "@/lib/services/gamemaster/game-permissions";
+import { loadGameMasterPackageConfig } from "@/lib/services/gamemaster/package-config";
 import { resolveGameMasterPlatformFeePercentage } from "@/lib/services/gamemaster/platform-fee";
 
 /**
@@ -51,17 +49,10 @@ export async function GET() {
       );
     }
 
-    let packageConfig = null;
-    if (subscription.packageId) {
-      try {
-        const currentPackage = await db.collection("marketplaceitems").findOne({
-          _id: new ObjectId(subscription.packageId),
-        });
-        packageConfig = currentPackage?.gameMasterConfig ?? null;
-      } catch (e) {
-        console.error("Error fetching package:", e);
-      }
-    }
+    const packageConfig = await loadGameMasterPackageConfig(
+      db,
+      subscription.packageId ? String(subscription.packageId) : null,
+    );
 
     const effectiveLimits = resolveCreationLimits({
       limits: subscription.limits,

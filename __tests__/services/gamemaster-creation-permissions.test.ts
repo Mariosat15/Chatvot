@@ -599,3 +599,49 @@ describe("the gate is mirrored and stays model-free", () => {
     expect(source).not.toMatch(/mongoose/i);
   });
 });
+
+describe("GM dashboard and status show live package comps/day", () => {
+  const DASHBOARD = "app/api/gamemaster/dashboard/route.ts";
+  const STATUS = "app/api/gamemaster/status/route.ts";
+  const MARKETPLACE = "apps/admin/app/api/marketplace/route.ts";
+  const PKG = "lib/services/gamemaster/package-config.ts";
+  const PKG_ADMIN = "apps/admin/lib/services/gamemaster/package-config.ts";
+
+  it("package-config is mirrored", () => {
+    expect(read(PKG_ADMIN).replace(/\r\n/g, "\n")).toBe(
+      read(PKG).replace(/\r\n/g, "\n"),
+    );
+  });
+
+  it("dashboard resolves limits through resolveCreationLimits, not cached limits alone", () => {
+    const source = code(DASHBOARD);
+    expect(source).toMatch(/resolveCreationLimits\s*\(/);
+    expect(source).toMatch(/loadGameMasterPackageConfig\s*\(/);
+    // Must not rebuild limits with a hand-rolled package overwrite that ignores overrides.
+    expect(source).not.toMatch(/MarketplaceItem\.findById/);
+  });
+
+  it("status resolves the same way so create-competition sees the new cap", () => {
+    const source = code(STATUS);
+    expect(source).toMatch(/resolveCreationLimits\s*\(/);
+    expect(source).toMatch(/loadGameMasterPackageConfig\s*\(/);
+    // Response must ship the resolved `limits` object, not the raw cached subdocument.
+    expect(source).toMatch(/maxCompetitionsPerDay:\s*effective\.maxCompetitionsPerDay/);
+  });
+
+  it("marketplace sync matches string and ObjectId packageId", () => {
+    expect(code(MARKETPLACE)).toMatch(/packageIdSyncFilter\s*\(/);
+  });
+
+  it("packageIdSyncFilter matches both shapes", async () => {
+    const { packageIdSyncFilter } = await import(
+      "@/lib/services/gamemaster/package-config"
+    );
+    const id = "507f1f77bcf86cd799439011";
+    const filter = packageIdSyncFilter(id) as {
+      $or?: Array<{ packageId: unknown }>;
+    };
+    expect(filter.$or).toHaveLength(2);
+    expect(filter.$or?.[0]).toEqual({ packageId: id });
+  });
+});

@@ -264,4 +264,25 @@ describe("GM create UI reuses schema settings and does not enumerate games", () 
     // Trading path must not use body.platformFeePercentage || 10.
     expect(source).not.toMatch(/platformFeePercentage\s*\|\|\s*10/);
   });
+
+  it("schedule step uses UTC picker with server clock, never datetime-local", () => {
+    const steps = code(STEPS);
+    const form = code(FORM);
+    const utc = code("components/gamemaster/UtcScheduleFields.tsx");
+    expect(steps).toMatch(/UtcScheduleFields/);
+    expect(steps + form).not.toMatch(/type=["']datetime-local["']/);
+    expect(utc).toMatch(/Current Server Time \(UTC\)/);
+    expect(utc).toMatch(/WHITE_DATE_PICKER_CLASS|brightness-0/);
+    expect(utc).toMatch(/type=["']date["']/);
+    // Create must append Z so the POST matches the UTC wall-clock on screen.
+    expect(form).toMatch(/utcDraftToIso/);
+  });
+
+  it("utcDraftToIso treats YYYY-MM-DDTHH:mm as UTC, not local", async () => {
+    const { utcDraftToIso } = await import(
+      "@/components/gamemaster/UtcScheduleFields"
+    );
+    expect(utcDraftToIso("2026-09-20T13:00")).toBe("2026-09-20T13:00:00.000Z");
+    expect(utcDraftToIso("2026-09-20T00:30")).toBe("2026-09-20T00:30:00.000Z");
+  });
 });

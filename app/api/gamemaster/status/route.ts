@@ -1,12 +1,20 @@
 import { NextResponse } from "next/server";
+import mongoose from "mongoose";
 import { connectToDatabase } from "@/database/mongoose";
 import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import GameMasterSubscription from "@/database/models/gamemaster/gamemaster-subscription.model";
+import { resolveCreationLimits } from "@/lib/services/gamemaster/game-permissions";
+import { loadGameMasterPackageConfig } from "@/lib/services/gamemaster/package-config";
+import { buildSubscriptionLimits } from "@/lib/services/gamemaster/subscription-limits";
 
 /**
  * GET /api/gamemaster/status
- * Get current user's game master status
+ * Get current user's game master status.
+ *
+ * Limits are resolved live (package + override), not the cached subscription.limits alone —
+ * otherwise an admin package edit leaves this endpoint (and create-competition) on the old
+ * comps/day until renewal.
  */
 export async function GET() {
   try {
@@ -22,10 +30,9 @@ export async function GET() {
 
     const userId = session.user.id;
 
-    // Find user's subscription (active or expired)
     const subscription = await GameMasterSubscription.findOne({
       userId,
-    }).sort({ createdAt: -1 }); // Get most recent
+    }).sort({ createdAt: -1 });
 
     if (!subscription) {
       return NextResponse.json({
@@ -35,13 +42,50 @@ export async function GET() {
       });
     }
 
-    // Calculate days remaining
     const now = new Date();
     const endDate = new Date(subscription.endDate);
     const daysRemaining = Math.max(
       0,
       Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)),
     );
+
+    const db = mongoose.connection.db;
+    const packageConfig = db
+      ? await loadGameMasterPackageConfig(db, subscription.packageId)
+      : null;
+    const effective = resolveCreationLimits({
+      limits: subscription.limits,
+      packageConfig,
+      override: subscription.competitionCreationOverride ?? null,
+      overrideLimits: subscription.overrideLimits ?? null,
+    });
+
+    const limits = {
+      maxCompetitionsPerDay: effective.maxCompetitionsPerDay,
+      maxUsersPerCompetition: effective.maxUsersPerCompetition,
+      referralFeePercentage: effective.referralFeePercentage,
+      canCreateCompetitions: effective.canCreateCompetitions,
+      allowedGameTypes: [...effective.allowedGameTypes],
+      canEarnFromChallenges:
+        packageConfig?.canEarnFromChallenges === true ||
+        subscription.limits?.canEarnFromChallenges === true,
+      challengeReferralFeePercentage:
+        packageConfig?.challengeReferralFeePercentage ??
+        subscription.limits?.challengeReferralFeePercentage ??
+        effective.referralFeePercentage,
+    };
+
+    if (
+      db &&
+      packageConfig &&
+      subscription.limits?.maxCompetitionsPerDay !== limits.maxCompetitionsPerDay
+    ) {
+      const healed = buildSubscriptionLimits(packageConfig);
+      void GameMasterSubscription.updateOne(
+        { _id: subscription._id },
+        { $set: { limits: healed } },
+      );
+    }
 
     return NextResponse.json({
       success: true,
@@ -58,7 +102,7 @@ export async function GET() {
         autoRenew: subscription.autoRenew,
         renewalPrice: subscription.renewalPrice,
         daysRemaining,
-        limits: subscription.limits,
+        limits,
         stats: {
           totalReferredUsers: subscription.totalReferredUsers,
           activeReferredUsers: subscription.activeReferredUsers,

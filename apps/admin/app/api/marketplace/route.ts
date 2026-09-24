@@ -8,6 +8,7 @@ import {
   seedMarketplaceItems,
   getMarketplaceStats,
 } from "@/lib/services/marketplace-seed.service";
+import { packageIdSyncFilter } from "@/lib/services/gamemaster/package-config";
 
 /**
  * GET /api/admin/marketplace
@@ -266,10 +267,12 @@ export async function PUT(request: NextRequest) {
       if (Object.keys(limitsUpdate).length > 0) {
         limitsUpdate.updatedAt = new Date();
 
-        // Update all subscriptions using this package
+        // Update all subscriptions using this package (string or ObjectId packageId).
         const updateResult = await db
           .collection("gamemastersubscriptions")
-          .updateMany({ packageId: itemId }, { $set: limitsUpdate });
+          .updateMany(packageIdSyncFilter(String(itemId)), {
+            $set: limitsUpdate,
+          });
 
         subscriptionsUpdated = updateResult.modifiedCount;
         console.log(`   ✅ Updated ${subscriptionsUpdated} subscription(s)`);
