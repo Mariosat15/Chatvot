@@ -142,6 +142,8 @@ Owner disliked Submit / Clear / Timer artwork. Files `ui-*.webp` deleted; markup
 
 **Band clipping, second pass (25 Sep)** — the 300px band did not cure it: the real cause was the `shape="fill"` picture being an in-flow `h-full` image in a slot with no definite height, so it took its natural height, grew the card past the band and `overflow-hidden` cut the bottom border. The picture is now `absolute inset-0` inside a `relative` sized slot (40% rules / 36% tips), so it can never add height; rules steps wrap to two lines (`line-clamp-2`, test flipped) instead of cutting mid-sentence. Files: `components/neon/Cards.tsx`, `GameRulesPanel.tsx`, `ArenaHighlights.tsx`. Not verified by eye.
 
+**Duplicate "1" tokens (25 Sep)** — owner saw two different pairs both drawn as "1". The code was right (`token-{pairId+1}`, the pink wire was pair 2's colour); the **artwork** was wrong: commit `ef964ff2` replaced `token-1/2/4/5/6.webp` with new-style art where token-2, 5 and 6 show a painted "1" and token-4 shows "7". Restored those five from `ef964ff2~1` (the original matching set, which the owner had asked to keep); 3, 7-10 were already correct. No test can read a painted numeral, so check each token by eye whenever the set is replaced. games-service: pull + `pm2 restart chartvolt-games` (asset fingerprints change, so no cache purge).
+
 ---
 
 ## 8. Next
