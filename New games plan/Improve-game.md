@@ -140,6 +140,8 @@ Owner disliked Submit / Clear / Timer artwork. Files `ui-*.webp` deleted; markup
 
 **Arena shell (25 Sep, same day)** — stretch standings + stage to fill the prize-column height (`items-stretch`, drop viewport max-h on the rail); raise tips band to `sm:h-[300px]` so How it works / Game tips are not mid-sentence clipped. Platform files: `GameArenaLayout.tsx`.
 
+**Band clipping, second pass (25 Sep)** — the 300px band did not cure it: the real cause was the `shape="fill"` picture being an in-flow `h-full` image in a slot with no definite height, so it took its natural height, grew the card past the band and `overflow-hidden` cut the bottom border. The picture is now `absolute inset-0` inside a `relative` sized slot (40% rules / 36% tips), so it can never add height; rules steps wrap to two lines (`line-clamp-2`, test flipped) instead of cutting mid-sentence. Files: `components/neon/Cards.tsx`, `GameRulesPanel.tsx`, `ArenaHighlights.tsx`. Not verified by eye.
+
 ---
 
 ## 8. Next

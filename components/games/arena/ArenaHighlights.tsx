@@ -118,9 +118,10 @@ export function ArenaHighlights({ highlights, imageUrl }: Props) {
         {/*
           THE EMBLEM IS BESIDE THE LINES. `shape="fill"` takes the body's full height and its
           width from the picture's own proportions, capped at half the card so the tips keep
-          their room (25 September 2026).
+          their room (25 September 2026). The picture is absolute so it can never add height to
+          the card (that is what cut the card's bottom off), so this slot is `relative` and sized.
         */}
-        <div className="hidden max-w-[50%] shrink-0 self-stretch sm:flex sm:justify-end">
+        <div className="relative hidden w-[36%] shrink-0 self-stretch sm:block">
           <NeonIllustration
             src={imageUrl}
             alt="This game's emblem"

@@ -262,7 +262,9 @@ describe("each card draws a capped number of one-line items", () => {
     */
     const rules = readCode(RULES);
     // 15px since 25 Sep 2026; 13px then 10px were both rejected as too small beside the tips.
-    expect(rules).toMatch(/className="truncate text-\[15px\]/);
+    // FLIPPED 25 Sep 2026 from `truncate`: two lines per step, since one line cut the owner's
+    // first step off mid-sentence and the 300px band has room for three two-line steps.
+    expect(rules).toMatch(/className="line-clamp-2 text-\[15px\]/);
     expect(rules).toMatch(/title=\{/);
 
     const tips = readCode(HIGHLIGHTS);

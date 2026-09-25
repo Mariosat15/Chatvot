@@ -154,17 +154,24 @@ export function NeonIllustration({
     shape === "landscape"
       ? "aspect-[4/3]"
       : shape === "fill"
-        ? "aspect-square h-full"
+        ? "absolute inset-0"
         : "aspect-square";
   const classes = accentClasses(accent);
 
+  /*
+    Reason: `fill` is ABSOLUTELY positioned inside the caller's `relative` slot (25 Sep 2026).
+    As an in-flow `h-full` image its parent had no definite height, so the percentage fell back
+    to the picture's natural height, the card grew past the band and `overflow-hidden` cut off
+    its bottom edge. Out of flow, the picture can never add height - it only fills what the
+    text row already measured.
+  */
   if (src && shape === "fill") {
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
         src={src}
         alt={alt}
-        className={`h-full w-auto max-w-full rounded-lg border border-[#161E36] bg-[#080C18]/70 ${
+        className={`absolute inset-0 h-full w-full rounded-lg border border-[#161E36] bg-[#080C18]/70 ${
           fit === "contain" ? "object-contain" : "object-cover"
         }`}
       />

@@ -270,7 +270,7 @@ function RulesStrip({
             */
             <li
               key={index}
-              className="flex h-9 items-center gap-2.5 rounded-lg border border-sky-400/20 bg-sky-400/[0.06] px-2"
+              className="flex min-h-9 items-center gap-2.5 rounded-lg border border-sky-400/20 bg-sky-400/[0.06] px-2 py-1"
             >
               {/*
                 The reference's small blue numbered disc. `aria-hidden` because the ordinal is
@@ -288,9 +288,12 @@ function RulesStrip({
                 that wraps pushes the one below it out of a card that cannot grow, so the
                 clamp is what keeps three steps visible - and the tooltip is what keeps a long
                 one recoverable rather than merely cut. The lobby has it in full either way.
+
+                TWO LINES since 25 Sep 2026: the band is 300px, so three two-line steps fit,
+                and one line cut the owner's first step to "Try to Connect all the numbers by ...".
               */}
               <span
-                className="truncate text-[15px] font-semibold leading-snug text-gray-50"
+                className="line-clamp-2 text-[15px] font-semibold leading-snug text-gray-50"
                 title={step}
               >
                 {step}
@@ -317,7 +320,8 @@ function RulesStrip({
           two cards. The picture now takes the body's full height and its own width from its
           proportions (`shape="fill"`), capped at half the card so the steps keep their room.
         */}
-        <div className="hidden max-w-[50%] shrink-0 self-stretch sm:flex sm:justify-end">
+        {/* `relative` + a width: the `fill` picture is absolute, so this slot must size itself. */}
+        <div className="relative hidden w-[40%] shrink-0 self-stretch sm:block">
           <NeonIllustration
             src={imageUrl}
             alt={`How ${gameName} is played`}
