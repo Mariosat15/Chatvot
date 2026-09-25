@@ -10,17 +10,11 @@ import v8 from "v8";
  */
 export async function GET() {
   try {
+    // Reason: guardSection already enforces server-options (or super admin).
+    // A leftover `auth.isSuperAdmin` check referenced an undeclared `auth` and
+    // threw ReferenceError on every call after R101-style rewrites.
     const guard = await guardSection("server-options");
     if (!guard.ok) return guard.response;
-    const canAccess =
-      auth.isSuperAdmin ||
-      (auth.allowedSections && auth.allowedSections.includes("server-options"));
-    if (!canAccess) {
-      return NextResponse.json(
-        { error: "Access denied. Server Options section required." },
-        { status: 403 }
-      );
-    }
 
     const heap = v8.getHeapStatistics();
     const limitBytes = heap.heap_size_limit;

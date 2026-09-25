@@ -16,17 +16,10 @@ const PM2_APP_NAME = process.env.PM2_ADMIN_APP_NAME || "chartvolt-admin";
  */
 export async function POST() {
   try {
+    // Reason: guardSection already enforces server-options (or super admin).
+    // Same undeclared-`auth` leftover as heap-info — would 500 on every Apply.
     const guard = await guardSection("server-options");
     if (!guard.ok) return guard.response;
-    const canAccess =
-      auth.isSuperAdmin ||
-      (auth.allowedSections && auth.allowedSections.includes("server-options"));
-    if (!canAccess) {
-      return NextResponse.json(
-        { error: "Access denied. Server Options section required." },
-        { status: 403 }
-      );
-    }
 
     const restart = `pm2 restart ${PM2_APP_NAME}`;
 
