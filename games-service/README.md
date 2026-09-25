@@ -183,7 +183,8 @@ the whole surface fetches nothing but the pictures.
 **The artwork is decoration and the vectors underneath are the game.** `board-frame.webp` is the
 bezel and `token-1.webp`..`token-10.webp` are the terminals (one image per numeral; the idle,
 select, connect and error states are CSS on `data-state`, not separate files - tokens 9 and 10
-were added 25 September 2026 so large boards can use up to ten pairs), but every terminal also draws its own
+were added 25 September 2026 so large boards can use up to ten pairs, drawn in the same style as
+1-8; no test can read a painted numeral, so check every token by eye when the set changes), but every terminal also draws its own
 lit ring and its own numeral in SVG, so an image that fails to arrive costs polish and never
 legibility. That is the only reason it is acceptable to depend on a network fetch inside a paid
 round - and it is why a test pins the numeral, since "the artwork covers it anyway" is exactly the

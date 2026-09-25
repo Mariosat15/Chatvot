@@ -46,8 +46,10 @@ const PAIR_COLOURS = [
   "#ff4d6d", // rose
   "#2dd4bf", // teal
   "#ffe14d", // yellow
-  "#60a5fa", // light blue
-  "#f472b6", // light pink
+  // Nine and ten follow their tokens (25 Sep 2026): the light blue and light pink they had
+  // were too close to pairs 1 and 2 to tell apart under time pressure.
+  "#e2e8f0", // ice white
+  "#a3e635", // lime
 ];
 
 /**
@@ -55,8 +57,9 @@ const PAIR_COLOURS = [
  *
  * BACK TO THE ORIGINAL TOKENS (owner, 25 September 2026: "I don't like the new numbers on the
  * board, use the old ones"). The four-state `num-{n}-{state}.webp` pack was wired for one day and
- * is no longer referenced for play. Tokens 9 and 10 were added the same day from that pack's idle
- * frames so large boards can show ten distinct numerals.
+ * is no longer referenced for play. Tokens 9 and 10 were first taken from that pack's idle frames
+ * and did not match; the same day they were redrawn in the old set's own style (dark gunmetal
+ * bezel, one neon ring, white blocky numeral), so all ten now read as one set.
  *
  * The states survive as a `data-state` attribute on the token image (`idle`, `select`, `connect`,
  * `error`) which `app.css` lights, so the refusal flash still shows without a second picture per
