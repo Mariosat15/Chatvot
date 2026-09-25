@@ -161,6 +161,7 @@ interface Board {
   cellCount(): number;
   undo(): boolean;
   canUndo(): boolean;
+  flashError(pairIds?: number[]): void;
   submission(): { pairId: number; cells: Cell[] }[];
 }
 
