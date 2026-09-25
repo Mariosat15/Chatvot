@@ -23,7 +23,6 @@ import {
   XCircle,
   Clock,
   AlertTriangle,
-  ExternalLink,
   Eye,
   EyeOff,
   Loader2,
@@ -32,7 +31,6 @@ import {
   ListOrdered,
   Trash2,
   Wifi,
-  WifiOff,
   Radio,
   TrendingUp,
   Settings2,
@@ -44,6 +42,7 @@ import {
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { PERFORMANCE_INTERVALS } from "@/lib/utils/performance";
+import FleetRedisStatusCard from "@/components/admin/FleetRedisStatusCard";
 
 interface RedisSettings {
   redisHost: string;
@@ -228,7 +227,7 @@ export default function RedisSettingsSection() {
       } else {
         toast.error("Failed to reset WebSocket");
       }
-    } catch (error) {
+    } catch {
       toast.error("Failed to reset WebSocket");
     }
   };
@@ -310,7 +309,7 @@ export default function RedisSettingsSection() {
       } else {
         toast.error("Failed to clear cache");
       }
-    } catch (error) {
+    } catch {
       toast.error("Failed to clear cache");
     }
   };
@@ -364,6 +363,8 @@ export default function RedisSettingsSection() {
           </ul>
         </AlertDescription>
       </Alert>
+
+      <FleetRedisStatusCard />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Configuration Card */}

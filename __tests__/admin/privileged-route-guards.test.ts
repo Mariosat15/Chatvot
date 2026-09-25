@@ -1940,6 +1940,11 @@ describe("R101y - settings cluster helpers are section-granted", () => {
     { rel: "redis-settings/stats/route.ts", section: "redis", handlers: 1 },
     { rel: "redis-settings/test/route.ts", section: "redis", handlers: 1 },
     {
+      rel: "redis-settings/fleet-status/route.ts",
+      section: "redis",
+      handlers: 1,
+    },
+    {
       rel: "redis-settings/websocket-status/route.ts",
       section: "redis",
       handlers: 1,
@@ -1970,9 +1975,9 @@ describe("R101y - settings cluster helpers are section-granted", () => {
     },
   ];
 
-  it("covers seventeen settings-cluster route files", () => {
-    // 13 single-caller + 3 dual-caller + settings/route (asserted separately) = 17
-    expect(singleCaller.length + dualCaller.length + 1).toBe(17);
+  it("covers eighteen settings-cluster route files", () => {
+    // 14 single-caller + 3 dual-caller + settings/route (asserted separately) = 18
+    expect(singleCaller.length + dualCaller.length + 1).toBe(18);
   });
 
   it("every single-caller settings file names its calling-screen grant and no weaker helper", () => {
@@ -1994,8 +1999,8 @@ describe("R101y - settings cluster helpers are section-granted", () => {
 
     expect(weaker).toEqual([]);
     expect(missing).toEqual([]);
-    // Was 20 with settings/route's two handlers; R110 moved that file out of this loop.
-    expect(handlers).toBe(18);
+    // Was 18 before fleet-status; R110 moved settings/route out of this loop.
+    expect(handlers).toBe(19);
     expect(guards).toBeGreaterThanOrEqual(handlers);
   });
 
