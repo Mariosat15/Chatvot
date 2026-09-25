@@ -87,9 +87,13 @@ describe("the rail is as tall as the board beside it", () => {
     expect(shellEnd).toBeGreaterThan(shellAt);
     expect(countOf(panel.slice(shellAt, shellEnd), "flex-1")).toBe(1);
 
-    // The layout's old cap is gone with it.
+    // The layout's old caps are gone with it - including the 25 Sep viewport max that
+    // short-circuited stretch and left the green-marked gap under the CTA.
     const layout = readCode(LAYOUT);
     expect(layout).not.toMatch(/max-h-\[460px\]/);
+    expect(layout).not.toMatch(/max-h-\[calc/);
+    expect(layout).toMatch(/\bitems-stretch\b/);
+    expect(layout).not.toMatch(/\bitems-start\b/);
   });
 
   it("leaves room for about ten rows before it has to scroll", () => {

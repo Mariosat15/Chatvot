@@ -135,14 +135,15 @@ describe("the band is a fixed-height strip", () => {
       turns the strip back into a section at 1440. There is deliberately no `lg:h-` or
       `xl:h-` here, and that absence is asserted.
 
-      200px SINCE 25 SEPTEMBER 2026 (second raise the same day). The owner rejected 104 as
-      "very small fonts and images", then asked for bigger tips with icons after 176 still left
-      empty navy. What survives is the rule: a fixed height the content cannot grow, and the
-      derivation: a ~40px heading leaves ~160px of body for three tip rows with icons + detail.
+      300px SINCE 25 SEPTEMBER 2026 (third raise the same day). 104 → 176 → 200 still clipped
+      How it works / Game tips once tips carried icons + title + detail (owner screenshot:
+      "cutoff"). What survives is the rule: a fixed height the content cannot grow past, and
+      the derivation: a ~40px heading leaves ~260px of body for four tip rows with icons +
+      two-line detail without the overflow-hidden backstop cropping mid-sentence.
     */
     const band = bandMarkup();
 
-    expect(band).toMatch(/\bsm:h-\[200px\]/);
+    expect(band).toMatch(/\bsm:h-\[300px\]/);
     expect(band).not.toMatch(/\b(md|lg|xl|2xl):h-[\d[]/);
   });
 

@@ -605,7 +605,9 @@ button.small-btn {
  * joined, and a red shake for a moment after a refusal.
  */
 .token-face[data-state="select"] {
-  filter: brightness(1.25) drop-shadow(0 0 6px rgba(255, 255, 255, 0.55));
+  /* Brightness only while dragging - a drop-shadow filter on the moving pair was re-rasterised
+     on every paint and added to the "heavy" feel of a drag (25 Sep 2026). */
+  filter: brightness(1.25);
 }
 
 .token-face[data-state="connect"] {
@@ -1061,7 +1063,9 @@ button.rail-btn:disabled {
 
 /*
  * Phase D: soft neon pulse on drawn board skins (Small / Medium / large heroes).
- * Opacity + glow only — never a PNG frame loop (pack variants are different designs, not frames).
+ * Opacity only — animating `filter: drop-shadow` every frame is expensive and made
+ * wire drags feel heavy beside an already busy SVG (owner, 25 Sep 2026). The static
+ * glow stays on `.board-art` above; this only breathes the brightness.
  */
 .board-stage.drawn .board-art {
   animation: board-neon-pulse 2.8s ease-in-out infinite;
@@ -1070,11 +1074,9 @@ button.rail-btn:disabled {
 @keyframes board-neon-pulse {
   0%,
   100% {
-    filter: drop-shadow(0 0 14px rgba(0, 204, 255, 0.42));
     opacity: 1;
   }
   50% {
-    filter: drop-shadow(0 0 22px rgba(0, 204, 255, 0.72));
     opacity: 0.94;
   }
 }

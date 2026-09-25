@@ -245,15 +245,16 @@ export function GameArenaLayout({
         40px back (340 to 300) so the board's column is not narrowed to pay for it.
       */}
       {/*
-        `items-start` FROM `xl` UP so the three columns size to their own content rather than
-        stretching to the tallest one. Stretching the stage to match a long prize sidebar left a
-        tall empty void under Resume / the board, pushed the band below the fold, and produced
-        TWO scrollbars - the page's, and the standings rail's `overflow-y-auto` (owner, 25 Sep
-        2026). The board window still fills its own column via `flex-1` on the frame; the
-        standings rail caps itself to the viewport so it is the only thing that scrolls when
-        the list is long.
+        `items-stretch` FROM `xl` UP so the standings rail and the board window grow to match
+        the prize sidebar's height (owner screenshot, 25 Sep 2026: green arrows marking empty
+        navy under the leaderboard CTA and under Submit). `items-start` left those cells short
+        while the row was still as tall as the sidebar, which is exactly the void he marked.
+
+        The standings list keeps its own `overflow-y-auto` - that is the only scroller when the
+        roster is long. The page still scrolls for the band below; do not reintroduce a
+        viewport max-height on the rail that short-circuits the stretch.
       */}
-      <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[300px_minmax(0,1fr)_340px]">
+      <div className="grid items-stretch gap-3 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[300px_minmax(0,1fr)_340px]">
         {/*
           EVERY BREAKPOINT SETS AN ORDER, and the reason is that grid auto-placement follows
           order-modified document order, so a rule that only fires at `xl` leaves the other two
@@ -266,20 +267,20 @@ export function GameArenaLayout({
           facts, standings full width beneath. Desktop: standings, board, facts.
         */}
         {/*
-          THE RAIL CAPS TO THE VIEWPORT rather than stretching with the prize column. One
-          internal scroll when the list is long; the page itself should not need a second.
+          `[&>*]:h-full` reaches the panel; a bare `h-full` on this wrapper is a no-op on a
+          stretched grid item (s4.1t / s4.1y). No viewport max-height - that was what left the
+          green-marked gap under the CTA while the prize column kept growing.
         */}
-        <div className="order-2 lg:order-3 xl:order-1 xl:max-h-[calc(100dvh-1.5rem)] xl:[&>*]:h-full">
+        <div className="order-2 min-h-0 lg:order-3 xl:order-1 xl:[&>*]:h-full">
           {standings}
         </div>
 
         {/*
-          A COLUMN FROM `xl` UP, so the game window can stretch within THIS column when the
-          frame opts in with `flex-1`. The column itself is `self-stretch` only while short
-          enough - `items-start` on the grid keeps a short Resume screen from matching a tall
-          prize sidebar.
+          A COLUMN FROM `xl` UP, so the game window fills the stretched row via `flex-1` on
+          the frame. `h-full` + `min-h` together: the floor keeps a short Resume usable; the
+          stretch fills the void under Submit when the prize sidebar is taller.
         */}
-        <div className="order-1 min-h-0 lg:order-1 xl:order-2 xl:flex xl:min-h-[min(70dvh,720px)] xl:flex-col">
+        <div className="order-1 min-h-0 lg:order-1 xl:order-2 xl:flex xl:h-full xl:min-h-[min(70dvh,720px)] xl:flex-col">
           {stage}
         </div>
 
@@ -288,9 +289,13 @@ export function GameArenaLayout({
 
       {/*
         THE REFERENCE'S BOTTOM INFORMATION STRIP: two compact cards in one row after Recent
-        players was removed (25 Sep 2026). Height raised again the same day for readable tips.
+        players was removed (25 Sep 2026).
+
+        300px SINCE 25 SEPTEMBER 2026 (third raise the same day). 200 still clipped How it
+        works / Game tips after tips grew icons + title + detail - the owner's "cutoff"
+        screenshot. Fixed height stays; content still cannot turn the strip into a section.
       */}
-      <div className="mt-3 flex flex-wrap items-stretch gap-2.5 overflow-hidden sm:h-[200px]">
+      <div className="mt-3 flex flex-wrap items-stretch gap-2.5 overflow-hidden sm:h-[300px]">
         <div className="min-w-[260px] flex-[1_1_0] empty:hidden [&>*]:h-full">
           {rules}
         </div>

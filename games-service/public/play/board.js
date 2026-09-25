@@ -234,6 +234,26 @@ export function createBoard(svg, onChange) {
   /** @type {Map<number, number>} pairId -> time its error sprite ends. */
   let errorUntil = new Map();
   let errorTimer = null;
+  /**
+   * Wire SVG nodes keyed by pair, so a drag UPDATES `points` instead of destroying every
+   * polyline on the board. Rebuilding three strokes × every pair on each pointer move is what
+   * made drawing feel heavy (owner, 25 Sep 2026).
+   * @type {Map<number, {halo: Element, wire: Element, core: Element}>}
+   */
+  let wireNodes = new Map();
+  /** @type {Map<string, Element>} unused-cell pips, added/removed one at a time. */
+  let pipNodes = new Map();
+  /**
+   * Cached inverse of `getScreenCTM()`. Calling getScreenCTM every pointermove forces a layout
+   * pass; caching until the next `build` keeps cell lookup in arithmetic only.
+   * @type {{a:number,b:number,c:number,d:number,e:number,f:number}|null}
+   */
+  let inverseCtm = null;
+  let paintRaf = 0;
+  /** @type {number[]} */
+  let queuedArrived = [];
+  /** @type {Record<string, unknown>|null} */
+  let queuedChange = null;
 
   /** Which of the four sprites a pair's terminals wear right now. Error outranks everything. */
   function tokenState(pairId, now) {
@@ -450,19 +470,41 @@ export function createBoard(svg, onChange) {
     return null;
   }
 
+  function refreshInverseCtm() {
+    const ctm = svg.getScreenCTM();
+    if (!ctm) {
+      inverseCtm = null;
+      return;
+    }
+    try {
+      const inv = ctm.inverse();
+      inverseCtm = {
+        a: Number(inv.a) || 0,
+        b: Number(inv.b) || 0,
+        c: Number(inv.c) || 0,
+        d: Number(inv.d) || 0,
+        e: Number(inv.e) || 0,
+        f: Number(inv.f) || 0,
+      };
+      // Fake / degenerate CTMs may only expose `a` (uniform scale). Treat missing `d` as `a`.
+      if (!inv.d && inv.a) inverseCtm.d = Number(inv.a) || 0;
+    } catch {
+      inverseCtm = null;
+    }
+  }
+
   function cellAt(event) {
     if (!puzzle || !cellPx) return null;
     // Map through the SVG's own transform. Measuring the element's border box against
     // the grid counted the bezel and the art overhang, so a drag on one side of a token
     // landed on the cell on the other side.
-    const ctm = svg.getScreenCTM();
-    if (!ctm) return null;
-    const point = svg.createSVGPoint();
-    point.x = event.clientX;
-    point.y = event.clientY;
-    const local = point.matrixTransform(ctm.inverse());
-    const x = Math.floor(local.x / cellPx);
-    const y = Math.floor(local.y / cellPx);
+    if (!inverseCtm) refreshInverseCtm();
+    if (!inverseCtm) return null;
+    const m = inverseCtm;
+    const localX = m.a * event.clientX + m.c * event.clientY + m.e;
+    const localY = m.b * event.clientX + m.d * event.clientY + m.f;
+    const x = Math.floor(localX / cellPx);
+    const y = Math.floor(localY / cellPx);
     if (x < 0 || y < 0 || x >= puzzle.width || y >= puzzle.height) return null;
     return [x, y];
   }
@@ -504,8 +546,8 @@ export function createBoard(svg, onChange) {
       }
     }
     event.preventDefault();
-    // `paint`, never `render`: nothing a pointer does can move a cell or a terminal, and rebuilding
-    // them mid-drag is what made the board stutter on a phone. See the note above `build`.
+    // Sync paint on press so the first cell lights immediately; moves coalesce below.
+    flushPaint();
     paint();
     onChange();
   }
@@ -524,8 +566,13 @@ export function createBoard(svg, onChange) {
     const before = joinedIds();
     if (walkTowards(dragging, cell)) {
       const arrived = newlyJoined(before, joinedIds());
-      paint(arrived);
-      onChange({ justJoined: arrived, complete: isComplete() });
+      // Coalesce paint + chrome updates to one animation frame. Without this, a fast finger
+      // rebuilds every wire and every unused pip dozens of times per second and the drag feels
+      // heavy even though the rules work (owner, 25 Sep 2026).
+      schedulePaint(arrived, {
+        justJoined: arrived,
+        complete: isComplete(),
+      });
     }
     event.preventDefault();
   }
@@ -533,11 +580,10 @@ export function createBoard(svg, onChange) {
   function onPointerUp() {
     if (dragging === null) return;
     dragging = null;
-    paint();
-    // `settled` marks one COMPLETED drag, which is what a move count must be. The early return
-    // above means it cannot fire for a tap that grabbed nothing, and `onPointerDown` is the wrong
-    // place for the same reason - a player who touches a cell and lifts has moved nothing.
-    onChange({ settled: true });
+    // Fold `settled` into any pending join so streak / pair notes are not wiped by a second
+    // onChange that only carries settled.
+    queuedChange = { ...(queuedChange || {}), settled: true };
+    flushPaint();
   }
 
   svg.addEventListener("pointerdown", onPointerDown);
@@ -563,6 +609,9 @@ export function createBoard(svg, onChange) {
   function build() {
     clear(svg);
     layers = null;
+    wireNodes = new Map();
+    pipNodes = new Map();
+    inverseCtm = null;
     if (!puzzle) return;
 
     const width = puzzle.width * cellPx;
@@ -670,6 +719,9 @@ export function createBoard(svg, onChange) {
       // drawn from a stale figure would appear beside the terminal instead of on it.
       terminalCentres.set(pair.id, centres);
     }
+
+    // After the SVG has width/height and is in the tree - getScreenCTM needs that.
+    refreshInverseCtm();
   }
 
   /**
@@ -778,95 +830,176 @@ export function createBoard(svg, onChange) {
   }
 
   /**
+   * Ensure the three stroke nodes for one pair exist, then set their `points`.
+   *
+   * WHY UPDATE RATHER THAN RECREATE. The previous `paint` cleared the whole traces layer and
+   * rebuilt every wire on every cell of a drag. On an 8x8 with ten pairs that is thirty polylines
+   * destroyed and recreated per pointer event - cheap on a desktop, heavy on a phone under a
+   * clock. Mutating `points` keeps the same nodes and lets the browser redraw only the path.
+   */
+  function syncWire(pairId, cells, flash) {
+    if (!layers) return;
+    if (cells.length < 2) {
+      const stale = wireNodes.get(pairId);
+      if (!stale) return;
+      layers.traces.removeChild(stale.halo);
+      layers.traces.removeChild(stale.wire);
+      layers.traces.removeChild(stale.core);
+      wireNodes.delete(pairId);
+      return;
+    }
+
+    const points = cells.map((cell) => centre(cell[0]) + "," + centre(cell[1])).join(" ");
+    const colour = colourFor(pairId);
+    let nodes = wireNodes.get(pairId);
+    if (!nodes) {
+      const halo = element("polyline", {
+        points,
+        fill: "none",
+        stroke: colour,
+        "stroke-width": Math.round(cellPx * 0.6),
+        "stroke-linecap": "round",
+        "stroke-linejoin": "round",
+        class: "trace-halo",
+      });
+      const wire = element("polyline", {
+        points,
+        fill: "none",
+        stroke: colour,
+        "stroke-width": Math.round(cellPx * 0.3),
+        "stroke-linecap": "round",
+        "stroke-linejoin": "round",
+        class: "trace",
+      });
+      const core = element("polyline", {
+        points,
+        fill: "none",
+        stroke: "#eaf6ff",
+        "stroke-width": Math.max(1, Math.round(cellPx * 0.07)),
+        "stroke-linecap": "round",
+        "stroke-linejoin": "round",
+        class: "trace-core",
+      });
+      layers.traces.appendChild(halo);
+      layers.traces.appendChild(wire);
+      layers.traces.appendChild(core);
+      nodes = { halo, wire, core };
+      wireNodes.set(pairId, nodes);
+    } else {
+      nodes.halo.setAttribute("points", points);
+      nodes.wire.setAttribute("points", points);
+      nodes.core.setAttribute("points", points);
+    }
+
+    nodes.halo.setAttribute("class", "trace-halo" + (flash ? " arrived" : ""));
+    nodes.core.setAttribute("class", "trace-core" + (flash ? " arrived" : ""));
+  }
+
+  /** Add or remove unused-cell pips without clearing the whole marks layer. */
+  function syncPips() {
+    if (!layers || !puzzle) return;
+    const want = new Set();
+    for (let y = 0; y < puzzle.height; y++) {
+      for (let x = 0; x < puzzle.width; x++) {
+        const cellKey = key([x, y]);
+        if (owner.has(cellKey)) continue;
+        want.add(cellKey);
+        if (pipNodes.has(cellKey)) continue;
+        const pip = element("circle", {
+          cx: centre(x),
+          cy: centre(y),
+          r: Math.max(1.5, Math.round(cellPx * 0.055)),
+          class: "pip",
+        });
+        layers.marks.appendChild(pip);
+        pipNodes.set(cellKey, pip);
+      }
+    }
+    for (const [cellKey, pip] of [...pipNodes]) {
+      if (want.has(cellKey)) continue;
+      layers.marks.removeChild(pip);
+      pipNodes.delete(cellKey);
+    }
+  }
+
+  function flushPaint() {
+    if (paintRaf && typeof cancelAnimationFrame === "function") {
+      cancelAnimationFrame(paintRaf);
+    }
+    paintRaf = 0;
+    const arrived = queuedArrived;
+    const change = queuedChange;
+    queuedArrived = [];
+    queuedChange = null;
+    paint(arrived.length > 0 ? arrived : undefined);
+    if (change) onChange(change);
+  }
+
+  function schedulePaint(arrived, change) {
+    if (Array.isArray(arrived) && arrived.length > 0) {
+      for (const id of arrived) {
+        if (!queuedArrived.includes(id)) queuedArrived.push(id);
+      }
+    }
+    if (change) {
+      const prev = queuedChange || {};
+      const joined = [
+        ...new Set([...((prev.justJoined) || []), ...((change.justJoined) || [])]),
+      ];
+      queuedChange = {
+        ...prev,
+        ...change,
+        justJoined: joined,
+        complete: change.complete === true || prev.complete === true,
+      };
+    }
+    if (paintRaf) return;
+    if (typeof requestAnimationFrame !== "function") {
+      flushPaint();
+      return;
+    }
+    paintRaf = requestAnimationFrame(() => {
+      paintRaf = 0;
+      flushPaint();
+    });
+  }
+
+  /**
    * The two layers that change as the player draws: the wires, and the pips still to be covered.
    *
    * `arrived` is the pairs that landed on THIS repaint, and it decides one thing: whether their
    * wire is drawn carrying the class that makes it surge once. It defaults to empty so that
    * `render` - a resize, or the next board - redraws a finished wire without re-celebrating it.
    *
-   * The surge is deliberately interruptible. A pointer move recreates these nodes, so a player
-   * whose finger is still travelling loses it after a frame and pays nothing for it; the pulse
-   * rings in the layer above are the signal that always plays.
+   * SINCE 25 SEPTEMBER 2026 this UPDATES existing wire/pip nodes rather than clearing the layers.
+   * The surge class is still interruptible on the next frame if the finger keeps moving.
    */
   function paint(arrived) {
-    if (!layers) return;
-    clear(layers.traces);
-    clear(layers.marks);
+    if (!layers || !puzzle) return;
 
     const landed = new Set(Array.isArray(arrived) ? arrived : []);
+    const active = new Set();
 
     for (const pair of puzzle.pairs) {
       const cells = pathOf(pair.id);
-      if (cells.length < 2) continue;
-      const points = cells.map((cell) => centre(cell[0]) + "," + centre(cell[1])).join(" ");
-      const colour = colourFor(pair.id);
-      const flash = landed.has(pair.id) ? " arrived" : "";
-
-      // Three strokes for one wire: a wide translucent bloom, the conductor, and a pale core down
-      // the middle. Two of them read as a lit wire rather than a felt-tip line; the third is what
-      // keeps two paths legible where they run side by side, since the bloom darkens the gap.
-      layers.traces.appendChild(
-        element("polyline", {
-          points,
-          fill: "none",
-          stroke: colour,
-          "stroke-width": Math.round(cellPx * 0.6),
-          "stroke-linecap": "round",
-          "stroke-linejoin": "round",
-          class: "trace-halo" + flash,
-        }),
-      );
-      layers.traces.appendChild(
-        element("polyline", {
-          points,
-          fill: "none",
-          stroke: colour,
-          "stroke-width": Math.round(cellPx * 0.3),
-          "stroke-linecap": "round",
-          "stroke-linejoin": "round",
-          class: "trace",
-        }),
-      );
-      layers.traces.appendChild(
-        element("polyline", {
-          points,
-          fill: "none",
-          stroke: "#eaf6ff",
-          "stroke-width": Math.max(1, Math.round(cellPx * 0.07)),
-          "stroke-linecap": "round",
-          "stroke-linejoin": "round",
-          class: "trace-core" + flash,
-        }),
-      );
+      if (cells.length < 2) {
+        syncWire(pair.id, cells, false);
+        continue;
+      }
+      active.add(pair.id);
+      syncWire(pair.id, cells, landed.has(pair.id));
+    }
+    for (const pairId of [...wireNodes.keys()]) {
+      if (!active.has(pairId)) syncWire(pairId, [], false);
     }
 
     for (const pairId of landed) pulseTerminals(pairId);
     paintTokens();
-
-    /*
-     * A pip in every UNUSED square, and it is functional rather than decorative.
-     *
-     * Coverage is the rule players fail: every pair can be visibly joined with a square left over,
-     * and the hint line then says "use every square: 30 of 36" without saying WHICH. Counting
-     * squares on a 6x6 grid under a clock is not a puzzle anybody meant to set. The pips vanish as
-     * cells are taken, so the remaining work is the remaining dots.
-     */
-    for (let y = 0; y < puzzle.height; y++) {
-      for (let x = 0; x < puzzle.width; x++) {
-        if (owner.has(key([x, y]))) continue;
-        layers.marks.appendChild(
-          element("circle", {
-            cx: centre(x),
-            cy: centre(y),
-            r: Math.max(1.5, Math.round(cellPx * 0.055)),
-            class: "pip",
-          }),
-        );
-      }
-    }
+    syncPips();
   }
 
   function render() {
+    flushPaint();
     build();
     paint();
   }

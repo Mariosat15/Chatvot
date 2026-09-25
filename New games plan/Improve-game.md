@@ -17,6 +17,7 @@ This chapter is the working brief for upgrading the **in-frame** Circuit UI afte
 | Chrome / copy | `index.html`, `app.css`, `presentation.js` | Pre-Phase-B text buttons restored; **no** `ui-*.webp` |
 | Clock | `paintClockDigits` + `digit-0..9.webp` | Sprites are paint; time still from `endsAt` |
 | Sound | `sound.js` sample-then-synth + music bed | OGG map in `SAMPLE_URLS`; mute stops music; **revive on visibility/focus/unlock** after browser pause (25 Sep) |
+| Drag feel | `board.js` paint + `app.css` pulse | **25 Sep:** wires/pips update in place (no full layer clear), CTM cached, paints coalesced to rAF; board glow animates opacity only (not `filter`) |
 | Deploy | directory-derived serve + content fingerprint (`21` s4.1i / s4.1o) | New `.js` / new filenames need pull + **`pm2 restart chartvolt-games`**; `.ts` still needs `npm run build` |
 
 Acceptance after this work stays the same as s4.1e: a human can start, play, submit, and finish a paid round by clicking. Visual / audio sign-off is **owner eye/ear**.
@@ -136,6 +137,8 @@ Owner disliked Submit / Clear / Timer artwork. Files `ui-*.webp` deleted; markup
 
 5. Complete modal / bardi overlay — later if wanted.
 6. `numbers animations/` if the pack gains labelled frames.
+
+**Arena shell (25 Sep, same day)** — stretch standings + stage to fill the prize-column height (`items-stretch`, drop viewport max-h on the rail); raise tips band to `sm:h-[300px]` so How it works / Game tips are not mid-sentence clipped. Platform files: `GameArenaLayout.tsx`.
 
 ---
 
