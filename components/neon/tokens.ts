@@ -273,7 +273,7 @@ export const NEON_HEADING =
  * for the same reason `NEON_STAGE_FRAME` belongs to the board.
  */
 export const NEON_PANEL_LIT =
-  "rounded-xl border border-[#1089DC]/55 bg-gradient-to-b from-[#05142C]/95 to-[#030F23]/95 shadow-[inset_0_0_24px_rgba(0,103,221,0.10)]";
+  "rounded-xl border border-[#1089DC]/55 bg-gradient-to-b from-[#0A1E48]/95 via-[#071433]/95 to-[#160A32]/95 shadow-[inset_0_0_28px_rgba(34,211,238,0.14),0_0_22px_-10px_rgba(168,85,247,0.4)]";
 
 /**
  * The arena page's own background: the reference's near-black navy, a shade off the app's

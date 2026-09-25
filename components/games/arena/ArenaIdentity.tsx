@@ -144,7 +144,7 @@ export async function ArenaIdentity({
             hide them with nothing on screen to say so - and the full name is on the logo's
             alt text and on the lobby.
           */}
-          <h1 className="mt-0.5 truncate text-[21px] font-bold uppercase italic leading-tight tracking-wide text-white sm:text-[25px]">
+          <h1 className="mt-1 truncate bg-gradient-to-r from-white via-sky-100 to-fuchsia-200 bg-clip-text text-[22px] font-black uppercase italic leading-tight tracking-wide text-transparent sm:text-[32px]">
             {title}
           </h1>
 
@@ -166,7 +166,7 @@ export async function ArenaIdentity({
             invisibly. Two is what the 150px budget affords beside the five lines above.
           */}
           {presentation.description && (
-            <p className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-gray-400 sm:text-[11px]">
+            <p className="mt-1 line-clamp-2 text-[11px] leading-snug text-sky-100/80 sm:text-[13px]">
               {presentation.description}
             </p>
           )}
@@ -188,7 +188,7 @@ export async function ArenaIdentity({
                 key={feature.label}
                 className="flex w-[92px] flex-col items-center gap-1.5 text-center"
               >
-                <Icon className="h-6 w-6 text-sky-300" />
+                <Icon className="h-8 w-8 text-cyan-300 drop-shadow-[0_0_8px_rgba(34,211,238,0.85)]" />
                 {/*
                   10px, and NOT the kit's `NEON_LABEL`, which is 11 with wide tracking. The
                   wide tracking is the problem rather than the size: at that spacing "Global

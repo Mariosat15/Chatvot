@@ -617,7 +617,7 @@ async function main(): Promise<number> {
      */
     const css = withoutComments(playFile("app.css"));
     const arenaRules = [...css.matchAll(/(^|[}\s])\.arena\s*\{([^{}]*)\}/g)].map((m) => m[2]);
-    assert.equal(arenaRules.length, 1, "app.css no longer has exactly one bare .arena rule");
+    assert.equal(arenaRules.length, 2, "app.css no longer has the desktop rule and the phone stack");
     assert.ok(
       !/align-items\s*:\s*center/.test(arenaRules[0]),
       ".arena centres its items again - fitBoard will measure the board's own height",
@@ -639,10 +639,20 @@ async function main(): Promise<number> {
       !/\bauto\b/.test(columns[1]),
       `.arena has a content-sized column again (${columns[1].trim()}) - that is a rail beside the board`,
     );
+    /*
+     * 25 September 2026: the owner asked for Undo/Clear and the figures beside the board again.
+     * The tracks are fixed pixels so they cannot grow into the cell size. The middle track is
+     * still the only flexible one.
+     */
+    assert.match(
+      columns[1],
+      /56px\s+minmax\(0,\s*1fr\)\s+108px/,
+      `the side tracks are no longer fixed (${columns[1].trim()})`,
+    );
     assert.equal(
       (columns[1].match(/minmax\(/g) || []).length,
       1,
-      `.arena has more than one column (${columns[1].trim()}) - the board no longer has the width`,
+      `.arena has more than one flexible column (${columns[1].trim()})`,
     );
 
     /*
@@ -662,11 +672,12 @@ async function main(): Promise<number> {
       "the figures come before the board in the arena - on a phone they take the top of the frame",
     );
 
-    const stack = /@media\s*\([^)]*\)\s*\{\s*\.arena\s*\{/.exec(css);
-    assert.equal(
-      stack,
-      null,
-      "a media query re-lays the arena - the rails are beside the board again at some width",
+    const stack = /@media\s*\(max-width:\s*520px\)\s*\{\s*\.arena\s*\{([^}]*)\}/.exec(css);
+    assert.ok(stack, "the phone layout no longer stacks the arena");
+    assert.match(
+      stack[1],
+      /grid-template-columns\s*:\s*minmax\(0,\s*1fr\)/,
+      "the phone layout still puts rails beside the board",
     );
   });
 
@@ -691,10 +702,12 @@ async function main(): Promise<number> {
     const footer = html.slice(footerAt, footerEnd);
     assert.ok(footer.length > 100, "the footer slice found nothing - the assertions below are vacuous");
 
-    assert.match(footer, /class="action-rail"/, "the actions are not in the footer");
-    assert.match(footer, /id="undo"/, "Undo is not in the footer");
-    assert.match(footer, /id="clear"/, "Clear is not in the footer");
+    assert.doesNotMatch(footer, /id="undo"/, "Undo is back in the footer beside Submit");
+    assert.doesNotMatch(footer, /id="clear"/, "Clear is back in the footer beside Submit");
     assert.match(footer, /id="submit"/, "Submit is not in the footer");
+    const arenaOpen = html.indexOf('class="arena"');
+    assert.match(html.slice(arenaOpen, footerAt), /id="undo"/, "Undo is not beside the board");
+    assert.match(html.slice(arenaOpen, footerAt), /id="clear"/, "Clear is not beside the board");
 
     assert.equal(
       (html.match(/class="action-rail"/g) || []).length,

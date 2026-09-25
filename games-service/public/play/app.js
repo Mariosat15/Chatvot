@@ -588,6 +588,8 @@ function renderInstruments() {
 
 /** Drags that changed the board, this round. Reset with the round, not with the board. */
 let moves = 0;
+/** Joins in a row on this board. Display only — it is not part of the score. */
+let streak = 0;
 /** The quickest board solved this round, in milliseconds, or `null`. */
 let bestBoardMs = null;
 /** When the board on screen was first drawn, so a solve can be timed. */
@@ -601,6 +603,7 @@ function renderStatTiles() {
     pairs: board.pairCount(),
     moves,
     bestBoardMs,
+    streak,
   });
 
   // Rebuilt only when the SET of tiles changes - which happens once a round, when the first board
@@ -852,7 +855,10 @@ function onBoardChange(change) {
   renderInstruments();
   renderUndo();
 
-  for (const pairId of (change && change.justJoined) || []) sound.playPair(pairId);
+  const joinedNow = (change && change.justJoined) || [];
+  if (joinedNow.length > 0) streak += joinedNow.length;
+  else if (change && (change.settled || change.broken)) streak = 0;
+  for (const pairId of joinedNow) sound.playPair(pairId);
 }
 
 const board = createBoard(ui.board, onBoardChange);
@@ -863,6 +869,7 @@ function fitBoard() {
 }
 
 function renderPlay() {
+  streak = 0;
   board.setPuzzle(state.board);
   // After `setPuzzle`, because the frame is chosen by the puzzle's shape; before `fitBoard`,
   // because the space the grid may take depends on how deep that frame is.

@@ -117,7 +117,7 @@ export function GameArenaLayout({
   activity,
 }: Props) {
   return (
-    <div className="mx-auto max-w-[1400px] px-4 py-6">
+    <div className="mx-auto max-w-[1480px] px-3 py-4">
       {/*
         THE PAGE'S OWN SURFACE, and the reason it is a fixed backdrop rather than a class on
         the app's body: the reference's arena is a lit navy room and the rest of the
@@ -197,7 +197,7 @@ export function GameArenaLayout({
             alt=""
             className="h-full w-full object-cover opacity-40"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#070C1A] via-[#070C1A]/85 to-[#070C1A]/60" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#06122c] via-[#0a1d45]/80 to-[#2a0a4a]/55" />
         </div>
 
         <div
@@ -219,7 +219,7 @@ export function GameArenaLayout({
           <div className="absolute inset-0 bg-gradient-to-r from-[#070C1A] via-[#070C1A]/40 to-transparent" />
         </div>
 
-        <div className="relative px-4 py-3 sm:h-[150px] sm:px-[18px] sm:py-2">
+        <div className="relative px-4 py-3 sm:h-[196px] sm:px-[18px] sm:py-3">
           <ArenaIdentity
             presentation={presentation}
             minParticipants={minParticipants}
@@ -239,7 +239,7 @@ export function GameArenaLayout({
         quarter, and the width comes out of the middle column, which had more than the
         reference gives it. Count the things in the row, not the columns.
       */}
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[360px_minmax(0,1fr)_320px]">
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[340px_minmax(0,1fr)_300px]">
         {/*
           EVERY BREAKPOINT SETS AN ORDER, and the reason is that grid auto-placement follows
           order-modified document order, so a rule that only fires at `xl` leaves the other two
@@ -270,7 +270,7 @@ export function GameArenaLayout({
 
         <div className="order-1 lg:order-1 xl:order-2">{stage}</div>
 
-        <div className="order-3 space-y-5 lg:order-2 xl:order-3">{sidebar}</div>
+        <div className="order-3 space-y-3 lg:order-2 xl:order-3">{sidebar}</div>
       </div>
 
       {/*

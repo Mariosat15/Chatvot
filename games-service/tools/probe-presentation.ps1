@@ -552,9 +552,9 @@ $results += Invoke-Probe -Name 'the best board time keeps the most recent instea
 $results += Invoke-Probe -Name 'the best-board tile is rendered empty before there is one' `
   -Suite $SuitePresentation -File $srcPresentation `
   -Find '  const best = formatBoardTime(bestBoardTime(null, bestBoardMs));
-  if (best) tiles.push({ key: "best", label: "Best board", value: best });' `
+  if (best) tiles.push({ key: "best", label: "Best time", value: best });' `
   -Replace '  const best = formatBoardTime(bestBoardTime(null, bestBoardMs));
-  tiles.push({ key: "best", label: "Best board", value: best || "-" });' `
+  tiles.push({ key: "best", label: "Best time", value: best || "-" });' `
   -ExpectRed 'the best-board tile is omitted until there is one, never shown empty'
 
 # Locked must be checked FIRST. The other way round, a board still holding paths offers an enabled

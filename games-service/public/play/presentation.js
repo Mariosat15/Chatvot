@@ -777,7 +777,7 @@ export function roundHeaderCells(input) {
  * naming the keys is green the moment somebody adds a fourth one that duplicates something else.
  */
 export function playStatTiles(input) {
-  const { joined, pairs, moves, bestBoardMs } = input ?? {};
+  const { joined, pairs, moves, bestBoardMs, streak } = input ?? {};
   const tiles = [
     {
       key: "paths",
@@ -786,9 +786,13 @@ export function playStatTiles(input) {
     },
     { key: "moves", label: "Moves", value: String(positive(moves) ? Math.round(moves) : 0) },
   ];
+  // A streak of joins on this board. Shown only, never sent, and it does not change the score.
+  if (positive(streak)) {
+    tiles.push({ key: "streak", label: "Combo", value: "x" + String(Math.round(streak)) });
+  }
 
   const best = formatBoardTime(bestBoardTime(null, bestBoardMs));
-  if (best) tiles.push({ key: "best", label: "Best board", value: best });
+  if (best) tiles.push({ key: "best", label: "Best time", value: best });
   return tiles;
 }
 

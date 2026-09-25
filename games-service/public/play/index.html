@@ -179,8 +179,8 @@
               aria-pressed="false"
               aria-expanded="false"
               aria-controls="sound-settings"
-              aria-label="Sound settings"
-              title="Sound settings"
+              aria-label="Mute sound"
+              title="Mute sound"
             >
               &#128266;
             </button>
@@ -226,6 +226,16 @@
           one width leaves every other width arranged by the DOM.
         -->
         <div class="arena">
+          <div class="action-rail">
+            <button id="undo" class="ghost rail-btn" type="button" disabled>
+              <span class="rail-btn-icon" aria-hidden="true">&#8630;</span>
+              <span class="rail-btn-label">Undo</span>
+            </button>
+            <button id="clear" class="ghost rail-btn" type="button">
+              <span class="rail-btn-icon" aria-hidden="true">&#10005;</span>
+              <span class="rail-btn-label">Clear</span>
+            </button>
+          </div>
           <div id="board-wrap" class="board-wrap">
             <!--
               The reactions - the solved sweep and the refusal shake - are classes on this element
@@ -257,7 +267,7 @@
           <aside id="stat-rail" class="stat-rail">
             <div class="board-meter">
               <div class="board-meter-head">
-                <span class="board-meter-label">This board</span>
+                <span class="board-meter-label">Level</span>
                 <span id="board-meter-value" class="board-meter-value">0%</span>
               </div>
               <div
@@ -280,23 +290,11 @@
           <p id="hint" class="hint" aria-live="polite"></p>
           <div class="footer-actions">
             <!--
-              Two actions, and deliberately not the three the reference design shows. Undo removes
-              the path drawn last and is strictly weaker than Clear; a HINT is forbidden outright,
-              because it would improve a score in a paid contest. The reasoning is in `undoState`.
-
-              They sit beside Submit rather than beside the board, so the grid keeps the full
-              width - see the arena's comment above.
+              Undo and Clear sit in the arena, in a fixed-width column, so they do not grow with
+              the board. Submit stays here, wider than either of them, because a destructive
+              control the same size as the confirming one is how a finished grid gets wiped.
+              A hint is still not offered: it would improve a score in a paid contest.
             -->
-            <div class="action-rail">
-              <button id="undo" class="ghost rail-btn" type="button" disabled>
-                <span class="rail-btn-icon" aria-hidden="true">&#8630;</span>
-                <span class="rail-btn-label">Undo</span>
-              </button>
-              <button id="clear" class="ghost rail-btn" type="button">
-                <span class="rail-btn-icon" aria-hidden="true">&#10005;</span>
-                <span class="rail-btn-label">Clear</span>
-              </button>
-            </div>
             <button id="submit" class="primary submit-wide" type="button" disabled>
               Submit solution
             </button>

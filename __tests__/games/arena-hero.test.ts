@@ -126,7 +126,7 @@ describe("the arena hero stays one thin banner", () => {
       padding - rather than a number picked because it looked better. What must never change
       is that it is a ceiling; see the absences below.
     */
-    expect(banner).toMatch(/sm:h-\[150px\]/);
+    expect(banner).toMatch(/sm:h-\[196px\]/);
 
     /*
       THE ABSENCES ARE THE TEST. Each of these is a way to make the banner grow again while
@@ -215,7 +215,7 @@ describe("the arena hero stays one thin banner", () => {
       because "bigger" was about the glyph first and a label alone satisfies the wrong half.
     */
     expect(item).toMatch(/text-\[10px\]/);
-    expect(item).toMatch(/h-6 w-6/);
+    expect(item).toMatch(/h-8 w-8/);
   });
 
   it("gives the logo a track the artwork actually fills", () => {

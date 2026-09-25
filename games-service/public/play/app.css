@@ -33,9 +33,9 @@
      in a lit blue, cyan for anything that glows, a red clock. Every value below is one the owner's
      sheet declares; the names are ours. */
   --surface: #020b1c;
-  --surface-glow: #071b38;
-  --panel: #05142c;
-  --panel-edge: #0b5b99;
+  --surface-glow: #12306a;
+  --panel: #071a3a;
+  --panel-edge: #1a7ad4;
   --cell: #0b274b;
   --cell-edge: #58baff;
   --text: #eaf4ff;
@@ -590,12 +590,6 @@ button.small-btn {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .token-face {
-    animation: none;
-  }
-}
-
 .clock-colon {
   display: inline-block;
   width: 0.28em;
@@ -661,56 +655,45 @@ button.icon-btn {
 }
 
 /*
- * THE ARENA. The board, then the figures under it.
+ * THE ARENA. Undo and Clear in a fixed left track, the board in the only flexible track, the
+ * figures in a fixed right track.
  *
- * IT WAS `auto minmax(0, 1fr) auto` - a rail, the board, a rail - UNTIL 11 SEPTEMBER 2026, and
- * the owner's second report about this board's size is why it is one column now: *"when we choose
- * medium and large the system makes the board smaller"*. The board is WIDTH-BOUND here. This page
- * runs in an iframe that is the middle column of the platform's arena, 450 to 650 pixels, and a
- * cell is square - so `boardCellPx` takes the width's answer on every laptop. Two rails at their
- * own content widths plus two gaps came to about 220 of those pixels, which an 8x8 then divided
- * into cells at their floor while a 4x4, dividing the same remainder four ways, looked perfectly
- * healthy. Nothing errored and nothing logged: the large board was simply drawn small, which is
- * exactly how the owner described it.
+ * THE TRACKS ARE PIXELS, NEVER `auto`. An earlier three-column layout sized the rails to their
+ * content and took about 220 pixels out of a 450–650px frame, so an 8×8 hit the 34px cell floor
+ * while a 4×4 looked fine. Fixed 56px and 108px tracks cannot grow into the cell size. The
+ * middle track is the only `minmax`.
  *
- * So the single column is the fix, and it is a layout change rather than an arithmetic one -
- * `boardCellPx` was right all along and was being handed a third of the room. The actions are in
- * the footer beside Submit and the figures are a strip under the board.
- *
- * `minmax(0, 1fr)` and not `1fr`, on both axes: a bare `fr` track is floored by its content, so a
- * wide stat value or a tall meter would push the grid past its container and the board would be
- * the thing that gave way, with nothing on screen to say why.
- *
- * THE BOARD'S CELL MUST STRETCH TO ITS ROW, AND `align-items: center` HERE IS A DEFECT. `fitBoard`
- * sizes the grid from the space `.board-wrap` actually has, so the wrap has to be the size of the
- * row and never the size of the grid inside it. Centred, the wrap shrinks to the `<svg>`, the next
- * fit measures a wrap the size of the previous grid, takes the bezel's share off it and draws a
- * smaller grid - and the fit after that measures THAT. It converges on the 34-pixel floor while
- * `desiredFrameHeight`, which deliberately never reads the current height, keeps asking the host
- * for a frame tall enough for a full-size board. The result was a tall frame with a postage-stamp
- * board in the middle of it, reported by the owner earlier the same day, also with nothing
- * errored. The wrap centres the board inside itself; the ROW is what must not be centred.
+ * `align-items: stretch` IS LOAD-BEARING. `fitBoard` sizes the grid from `.board-wrap`. Centred,
+ * the wrap shrinks to the SVG and the next fit measures that smaller wrap, converging on the
+ * floor while the height request still asks for a full board.
  */
 .arena {
   flex: 1;
   min-height: 0;
   width: 100%;
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: minmax(0, 1fr) auto;
+  /* Fixed tracks, never `auto`: a content-sized rail is what previously ate the cell size. */
+  grid-template-columns: 56px minmax(0, 1fr) 108px;
+  grid-template-rows: minmax(0, 1fr);
   align-items: stretch;
-  gap: 10px;
+  gap: 8px;
+}
+
+@media (max-width: 520px) {
+  .arena {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
 }
 
 /*
- * The actions, now a row in the footer.
- *
- * `flex-wrap` rather than a fixed direction: on a very narrow frame the two buttons drop under
- * Submit instead of squeezing its label to two characters.
+ * Undo and Clear, stacked in the 56px track. They stay narrower than Submit, which is the
+ * full-width button under the board.
  */
 .action-rail {
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
+  justify-content: center;
   gap: 8px;
 }
 
@@ -718,9 +701,9 @@ button.rail-btn {
   display: grid;
   gap: 2px;
   justify-items: center;
-  min-height: 58px;
-  min-width: 62px;
-  padding: 8px 10px;
+  min-height: 52px;
+  min-width: 48px;
+  padding: 6px 2px;
 }
 
 .rail-btn-icon {
@@ -742,34 +725,21 @@ button.rail-btn:disabled {
 }
 
 /*
- * The figures, now a strip under the board rather than a column beside it.
+ * The figures, stacked in the 108px track beside the board.
  *
- * `flex-wrap` with a basis on each half, so the meter and the tiles sit side by side while there
- * is room for both and the tiles drop to their own line when there is not. A grid of fixed tracks
- * would keep them side by side and shrink the labels instead, and these labels are already at
- * 0.54rem.
- *
- * EVERY BOX IN THIS STRIP IS THE SAME SIZE, and `--tiles` is how - the owner's "they don't
- * align, one bigger than the other" of 11 September 2026.
- *
- * The strip has two flex children, the meter and the tile group, and the group is itself a grid
- * of equal columns. So a fixed share here is only ever right for one tile count: written
- * `1` against `2` it is correct with two tiles and wrong the moment "best board" appears and
- * makes three, which is exactly the state the owner was looking at. `app.js` publishes the count
- * as `--tiles` whenever the set changes, the group claims that many parts against the meter's
- * one, and each box ends up one part of `1 + n` at any count.
- *
- * THE FALLBACK OF 2 IS NOT A GUESS ABOUT THE CONTENT, it is the value that keeps the strip
- * sensible for the one frame before `renderStatTiles` first runs - and it is the count this
- * title starts a round with, so nothing visibly resizes on the first draw.
+ * `--tiles` still shares the column: the meter is one part and the tile group is as many parts
+ * as there are tiles, so adding "best time" or "combo" does not leave one box a different
+ * height from the others. `app.js` publishes the count.
  */
 .stat-rail {
   --tiles: 2;
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   align-items: stretch;
   gap: 8px;
   min-width: 0;
+  min-height: 0;
+  overflow: auto;
 }
 
 /* ------------------------------------------------------------------------------------------
@@ -865,12 +835,12 @@ button.rail-btn:disabled {
  * rendering an empty value, so the count genuinely varies.
  */
 .stat-tiles {
-  /* `--tiles` parts and a basis of the same many boxes, so each column matches the meter. */
-  flex: var(--tiles) 1 calc(var(--tiles) * 7rem);
+  /* `--tiles` parts against the meter's one, stacked because this track is 108px wide. */
+  flex: var(--tiles) 1 auto;
   min-width: 0;
   display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: row;
+  grid-auto-rows: minmax(0, 1fr);
   gap: 8px;
 }
 
@@ -1170,10 +1140,12 @@ svg#board .terminal-art {
 
 .submit-wide {
   flex: 1 1 auto;
-  max-width: 26rem;
-  min-height: 52px;
-  font-size: 1.02rem;
-  letter-spacing: 0.04em;
+  width: 100%;
+  max-width: none;
+  min-height: 56px;
+  font-size: 1.05rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
 /* The lit state is the whole point: the button is disabled until the board is genuinely
@@ -1518,6 +1490,7 @@ button.primary:active:not(:disabled) {
    * is the one part of that reaction carrying the signal rather than decorating it.
    */
   .screen:not([hidden]),
+  .token-face,
   .clock.urgent,
   .board-stage.drawn .board-art,
   svg#board .join-pulse,
