@@ -51,9 +51,9 @@
 21. **Turn-based / heat + check-in / lobby / countdown** — blocked, not “later by effort”.
 22. **Task 22 per-metric schema** — deliberate deviation; do not “finish”.
 23. **Paid Hint / invent mid-round SCORE / Combo / XP LEVEL** — fairness / protocol forbid.
-24. **Remaining `ADMIN_SECTIONS` grants** — owner “do later”.
-25. **Sidebar URL sync** (~60 sections).
-26. **`closePosition` on completed/finalizing** — needs own evidence first.
+24. ~~**Remaining `ADMIN_SECTIONS` grants**~~ → **CLOSED 25 Sep 2026.** Original eight all grantable; tripwire `__tests__/admin/admin-sections-menu-parity.test.ts`.
+25. ~~**Sidebar URL sync** (~60 sections)~~ → **CLOSED 18 Sep 2026** (`navigateToSection` + `__tests__/admin/sidebar-url-sync.test.ts`).
+26. ~~**`closePosition` on completed/finalizing**~~ → **CLOSED 18 Sep 2026** (R77 leftover).
 
 ---
 
@@ -76,6 +76,7 @@
 - **Friday catalogue auto-sync + 7-day stale banner** (`ff2e4b04`).
 - **GM Active comps `X/max` + min-entrants rule**.
 - **P3 Tasks 15–16 / 25–28 / 31–35** — artwork WebP-on-upload + settlement client guard + audits (24 Sep).
+- **P2 #24–#26** — ADMIN_SECTIONS parity tripwire (25 Sep); sidebar URL sync + closePosition (18 Sep). Do not re-open.
 - **R114** — `prize_pool_mismatch` false alerts from GM earnings counting.
 - X11 / X11.5 / X10 core / X15 / `/play`↔`/trade` / GM provider create / X4a click-accepted / X9 / X8 eng+owner content.
 
@@ -92,4 +93,5 @@
 5. ~~Verify `ranking-config.service`~~ **CLOSED 24 Sep — no full pass; trading-only by design**
 
 **Next when ready:** Task 18 (needs owner reference image). Tasks 15–16 / 25–28 / 31–35
-closed 24 Sep. Task 17 closed. Task 8 still needs a reference too.
+closed 24 Sep. Task 17 closed. P2 #24–#26 (ADMIN_SECTIONS / sidebar URL / closePosition)
+closed — do not re-open. Task 8 still needs a reference too.

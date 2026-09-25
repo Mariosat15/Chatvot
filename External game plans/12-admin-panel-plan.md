@@ -170,12 +170,16 @@ actions rather than fixtures.
 permission registry. A section not listed there **cannot be granted to an employee**,
 so a new screen is invisible to everyone but a super-admin.
 
-**Eight existing sections are already missing** and should be fixed in the same pass:
-`journey-map`, `gamification-wizard`, `system-announcements`, `vendors`, `mdb-cluster`,
-`server-fleet`, `data-cleanup`, `data-maintenance`.
+**Eight existing sections were already missing** and were fixed across later slices
+(R101x–ac and earlier X6 work). As of **25 Sep 2026** all eight are in `ADMIN_SECTIONS`
+and `__tests__/admin/admin-sections-menu-parity.test.ts` refuses a ninth menu-only
+screen. The eight were: `journey-map`, `gamification-wizard`, `system-announcements`,
+`vendors`, `mdb-cluster`, `server-fleet`, `data-cleanup`, `data-maintenance`.
 
-**New IDs to add:** `game-catalogue`, `game-types`, `game-providers`,
-`provider-health`, `round-inspector`.
+**New IDs added with the games programme:** `game-providers`,
+`provider-health`, `round-inspector`, `game-performance`, `trading-page`,
+`terminology`, `command-alerts` (and others). `game-catalogue` / `game-types` were
+plan names that were not used — All Games keeps the `game-providers` grant.
 
 This is risk **R22** in `17` - low severity, high likelihood, and trivial to prevent.
 
