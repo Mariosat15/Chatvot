@@ -31,6 +31,10 @@ function readCode(relativePath: string): string {
 }
 
 const ACTION = "lib/actions/comprehensive-dashboard.actions.ts";
+// Reason: R21 extracted the per-contest card build (bulk participant read, live rank,
+// score mapping) into this file. Guards that used to target ACTION for those claims now
+// read PROCESS - the claims are unchanged and only the location moved (25 Sep 2026).
+const PROCESS = "lib/actions/dashboard/process-competitions.ts";
 const SIDEBAR = "components/dashboard/ContestsSidebar.tsx";
 const CARD = "components/dashboard/ActiveCompetitionCard.tsx";
 const TABLE = "components/dashboard/CompetitionsTable.tsx";
@@ -58,11 +62,12 @@ describe("the dashboard action carries the game label and the score", () => {
   });
 
   it("selects score on the bulk participant read used for ranking", () => {
-    const code = readCode(ACTION);
-    // Reason: this is a SECOND, separate select. Fixing only `participantSelect` leaves the
-    // rank computed from rows that have no score, which is the defect in a different place.
+    // Reason: RE-POINTED at PROCESS on 25 Sep 2026 (R21 extract). This is a SECOND, separate
+    // select from the action's `participantSelect`. Fixing only that leaves the rank computed
+    // from rows that have no score, which is the defect in a different place.
+    const code = readCode(PROCESS);
     expect(code).toMatch(
-      /\.select\(\s*"userId competitionId[^"]*\bscore\b[^"]*"\s*\)/,
+      /\.select\(\s*"userId competitionId[^"]*\bscore\b[^"]*"\s*,?\s*\)/,
     );
   });
 
@@ -78,7 +83,8 @@ describe("the dashboard action carries the game label and the score", () => {
     // Reason: undefined means no round has reported yet; zero means the player scored
     // nothing. `score: participation.score || 0` collapses the two and the card then claims
     // a score the player has not been given. The read-side form of the bug behind R37.
-    const code = readCode(ACTION);
+    // RE-POINTED at PROCESS on 25 Sep 2026 (R21 extract) - claim unchanged, location moved.
+    const code = readCode(PROCESS);
     expect(code).toMatch(/score:\s*participation\.score\s*,/);
     expect(code).not.toMatch(/score:\s*participation\.score\s*(\|\||\?\?)/);
   });
@@ -161,26 +167,35 @@ describe("the live rank is sorted in exactly one place", () => {
    * error and nothing in a log.
    */
   it("the action delegates rather than sorting participants itself", () => {
-    const code = readCode(ACTION);
+    // Reason: RE-POINTED at PROCESS on 25 Sep 2026 (R21 extract). The page's card builder
+    // is what must not invent a second ranking answer; the orchestrating action only calls it.
+    const code = readCode(PROCESS);
 
     // The call, with its arguments - an import is not a use.
     expect(code).toMatch(/await\s+resolveRank\(\s*\{/);
     expect(code).toMatch(/createDashboardRankResolver\(\)/);
 
-    // THE LOAD-BEARING HALF. Importing the resolver is trivially satisfied by an action that
+    // THE LOAD-BEARING HALF. Importing the resolver is trivially satisfied by a file that
     // calls it and then sorts anyway, keeping its own answer. So the comparator, the registry
     // dispatch and the direction literal must all be absent from this file.
     expect(code).not.toMatch(/aHasTrades/);
     expect(code).not.toMatch(/getRankingValue\(/);
     expect(code).not.toMatch(/["'](higher|lower)_is_better["']/);
     expect(code).not.toMatch(/getGameModuleOrTrading\(/);
+
+    // And the orchestrating action must not have grown its own sort either.
+    const action = readCode(ACTION);
+    expect(action).toMatch(/processCompetitionParticipations\(/);
+    expect(action).not.toMatch(/aHasTrades/);
+    expect(action).not.toMatch(/getRankingValue\(/);
   });
 
   it("the resolver is created once per request, not once per contest", () => {
     // Reason: the memo is what makes the score direction one database read rather than one
     // per contest. Created inside the per-contest loop it still returns the right answer,
     // which is why no assertion on the rank could catch it.
-    const code = readCode(ACTION);
+    // RE-POINTED at PROCESS on 25 Sep 2026 (R21 extract) - claim unchanged, location moved.
+    const code = readCode(PROCESS);
     const created = code.match(/createDashboardRankResolver\(\)/g) || [];
     expect(created).toHaveLength(1);
 

@@ -20,10 +20,7 @@ import PrizeTable from "@/components/competitions/PrizeTable";
 import { GameArenaLayout } from "@/components/games/arena/GameArenaLayout";
 import { ArenaContestPanel } from "@/components/games/arena/ArenaContestPanel";
 import { ArenaHighlights } from "@/components/games/arena/ArenaHighlights";
-import {
-  ArenaLiveFeed,
-  ArenaLiveProvider,
-} from "@/components/games/arena/ArenaLiveStandings";
+import { ArenaLiveProvider } from "@/components/games/arena/ArenaLiveStandings";
 import ArenaLeaderboardPanel from "@/components/games/arena/ArenaLeaderboardPanel";
 import GameRulesPanel from "@/components/games/GameRulesPanel";
 import { NeonCountPill, NeonHeadedPanel } from "@/components/neon/Cards";
@@ -311,10 +308,9 @@ export default async function PlayPage({ params, searchParams }: PlayPageProps) 
           lobby renders the same two components at their full size, which is where a player
           reads the whole thing before they pay.
 
-          THE FEED MOVED HERE FROM THE SIDEBAR on the owner's instruction. It is still a
-          CONSUMER OF THE SAME FETCH AS THE BOARD, not a second read: two polls of one endpoint
-          is two answers, so the board could name a rival's finished round while the feed beside
-          it had not heard of it.
+          THE RECENT-PLAYERS FEED WAS REMOVED FROM THE BAND on 25 September 2026 (owner: "the
+          last part recent players remove"). The leaderboard rail beside the board still shows
+          every player and what they have done, from the same live fetch.
         */
         rules={<GameRulesPanel presentation={presentation} layout="strip" />}
         highlights={
@@ -323,7 +319,6 @@ export default async function PlayPage({ params, searchParams }: PlayPageProps) 
             imageUrl={presentation.highlightsImageUrl}
           />
         }
-        activity={<ArenaLiveFeed />}
       />
     </ArenaLiveProvider>
   );

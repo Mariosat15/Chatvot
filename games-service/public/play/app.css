@@ -599,6 +599,37 @@ button.small-btn {
   }
 }
 
+/*
+ * The token's state, set by `board.js` as `data-state`. One picture per number, so the state is
+ * shown by light rather than by a second image: brighter while being drawn, a steady glow once
+ * joined, and a red shake for a moment after a refusal.
+ */
+.token-face[data-state="select"] {
+  filter: brightness(1.25) drop-shadow(0 0 6px rgba(255, 255, 255, 0.55));
+}
+
+.token-face[data-state="connect"] {
+  filter: drop-shadow(0 0 7px rgba(56, 232, 255, 0.75));
+}
+
+.token-face[data-state="error"] {
+  animation: token-refused 0.35s ease-in-out 2;
+  filter: drop-shadow(0 0 8px rgba(255, 60, 90, 0.95)) saturate(0.6) brightness(1.15);
+}
+
+@keyframes token-refused {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-6%);
+  }
+  75% {
+    transform: translateX(6%);
+  }
+}
+
 .clock-colon {
   display: inline-block;
   width: 0.28em;
@@ -1601,6 +1632,7 @@ button.primary:active:not(:disabled) {
    */
   .screen:not([hidden]),
   .token-face,
+  .token-face[data-state="error"],
   .clock.urgent,
   .board-stage.drawn .board-art,
   svg#board .join-pulse,

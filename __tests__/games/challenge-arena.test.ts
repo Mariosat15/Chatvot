@@ -193,7 +193,8 @@ describe("the challenge play screen is the competition arena", () => {
 
     expect(challengePage).toMatch(/<GameArenaLayout/);
 
-    for (const slot of ["stage", "standings", "sidebar", "rules", "highlights", "activity"]) {
+    // `activity` left the list on 25 Sep 2026 when the owner removed Recent players.
+    for (const slot of ["stage", "standings", "sidebar", "rules", "highlights"]) {
       // Reason: the rule-scoped disable rather than the blanket one. `slot` comes from the
       // literal list above and never from input, so there is nothing to inject - and the
       // alternative, six hand-written patterns, is the second place to forget a slot that this

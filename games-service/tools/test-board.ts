@@ -645,7 +645,7 @@ async function main(): Promise<void> {
   });
 
   test("a terminal's artwork is chosen by its pair number, never by position", () => {
-    // `num-3-*.webp` has a 3 painted into it, so indexing this list by anything but the pair id
+    // `token-3.webp` has a 3 painted into it, so indexing this list by anything but the pair id
     // puts one number in the artwork and a different one in the label underneath.
     const { client, svg } = boardFor("art-2", "large");
     const images = descendants(svg).filter((node) => node.nodeName === "image");
@@ -654,16 +654,17 @@ async function main(): Promise<void> {
     assert.deepEqual(
       hrefs.sort(),
       client.pairs.flatMap((pair) => [
-        `/play/num-${pair.id + 1}-idle.webp`,
-        `/play/num-${pair.id + 1}-idle.webp`,
+        `/play/token-${pair.id + 1}.webp`,
+        `/play/token-${pair.id + 1}.webp`,
       ]).sort(),
     );
   });
 
   test("a terminal wears select while drawn, connect once joined, and error after a refusal", () => {
     /*
-     * The four sprites are the owner's numbers pack (25 Sep 2026). The state is derived from the
-     * board, never stored beside it, so a pair that is broken again goes back to idle by itself.
+     * One token picture per number since 25 Sep 2026 (the owner preferred the original art), so
+     * the state travels as `data-state` for the stylesheet. It is derived from the board, never
+     * stored beside it, so a pair that is broken again goes back to idle by itself.
      */
     const { generated, client, svg, board } = boardFor("art-3", "medium");
     const path = generated.solution[0];
@@ -675,23 +676,23 @@ async function main(): Promise<void> {
     const faces = () =>
       descendants(svg)
         .filter((node) => node.nodeName === "image")
-        .map((node) => node.attributes.get("href") ?? "")
-        .filter((href) => href.startsWith(`/play/num-${pair.id + 1}-`));
+        .filter((node) => node.attributes.get("href") === `/play/token-${pair.id + 1}.webp`)
+        .map((node) => node.attributes.get("data-state") ?? "");
 
-    assert.deepEqual(faces(), Array(2).fill(`/play/num-${pair.id + 1}-idle.webp`));
+    assert.deepEqual(faces(), ["idle", "idle"]);
 
     svg.handlers.get("pointerdown")!(pointerEvent(path[0]));
-    assert.deepEqual(faces(), Array(2).fill(`/play/num-${pair.id + 1}-select.webp`));
+    assert.deepEqual(faces(), ["select", "select"]);
     for (const cell of path.slice(1)) svg.handlers.get("pointermove")!(pointerEvent(cell));
     svg.handlers.get("pointerup")!({ preventDefault() {} });
-    assert.deepEqual(faces(), Array(2).fill(`/play/num-${pair.id + 1}-connect.webp`));
+    assert.deepEqual(faces(), ["connect", "connect"]);
 
     board.flashError([pair.id]);
-    assert.deepEqual(faces(), Array(2).fill(`/play/num-${pair.id + 1}-error.webp`));
+    assert.deepEqual(faces(), ["error", "error"]);
 
     // A redraw keeps the error it is showing rather than resetting to the board's state early.
     board.resize(client.width * CELL_PX, client.height * CELL_PX);
-    assert.deepEqual(faces(), Array(2).fill(`/play/num-${pair.id + 1}-error.webp`));
+    assert.deepEqual(faces(), ["error", "error"]);
   });
 
   test("a drag repaints the wires and leaves the cells and terminals standing", () => {

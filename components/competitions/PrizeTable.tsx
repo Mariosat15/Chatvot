@@ -33,8 +33,9 @@ import { formatVolts } from "@/lib/utils/format-volts";
  * player who entered and recorded no result: eligibility is settled at finalization by
  * `hasResult` (R45), so a contest with three entrants and one score pays differently from what
  * this table shows. Teaching it that would mean predicting a result before the contest has
- * finished, so the honest fix is to say the figures are a floor - the same caution the admin
- * sidebar carries while it is still projecting.
+ * finished, so the note below says in plain words that empty spots and unfinished entries
+ * are shared among the people who did finish - the same caution the admin sidebar carries
+ * while it is still projecting.
  */
 
 /**
@@ -136,9 +137,8 @@ export default function PrizeTable({
       </div>
 
       <p className="mt-3 text-[11px] leading-relaxed text-gray-500">
-        Unclaimed positions are split equally among the winners. These figures
-        are a floor: a player who records no result holds no rank, so a share
-        left over is spread further.
+        Empty prize spots are shared among the winners. If someone enters but
+        never finishes, their share is split among the people who did.
       </p>
     </>
   );

@@ -2355,7 +2355,8 @@ describe("the arena's bottom band survives a slot that renders nothing", () => {
       band where only the rules slot carries the guard is green on a bare match and renders an
       empty third of the page the moment nobody has played yet.
     */
+    // Reason: two slots since 25 Sep 2026 - the owner removed Recent players from the band.
     const guarded = code.match(/empty:hidden/g) ?? [];
-    expect(guarded).toHaveLength(3);
+    expect(guarded).toHaveLength(2);
   });
 });

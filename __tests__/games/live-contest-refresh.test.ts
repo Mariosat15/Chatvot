@@ -292,7 +292,9 @@ describe("the arena's standings rail is live without the page being", () => {
     const page = readCode(PLAY_PAGE);
 
     expect(page).toMatch(/<ArenaLeaderboardPanel/);
-    expect(page).toMatch(/<ArenaLiveFeed/);
+    // Reason: FLIPPED 25 Sep 2026. The live Recent players feed was removed from the arena at
+    // the owner's request; the leaderboard is now the only live consumer on this page.
+    expect(page).not.toMatch(/<ArenaLiveFeed/);
 
     // Reason: rendering either panel directly here is how half the rail goes back to being a
     // photograph while every other assertion in this file stays green.

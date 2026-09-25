@@ -89,17 +89,12 @@ interface Props {
    */
   rules: ReactNode;
   highlights: ReactNode;
-  /**
-   * What has just happened in this contest - the reference's third bottom panel.
-   *
-   * IT MOVED OUT OF THE SIDEBAR ON THE OWNER'S INSTRUCTION (11 September 2026). It sat there
-   * because the reference's three-panel band was tried and reverted: two of the three render
-   * nothing until the catalogue is re-synced, and a grid column holding a child that returned
-   * `null` is still a column, so the common case was one panel adrift in an empty row. The
-   * owner asked for the band anyway, and the band below now survives an empty slot - see the
-   * comment on it, which is the part that made this safe rather than merely ordered.
-   */
-  activity: ReactNode;
+  /*
+    THERE IS NO `activity` SLOT ANY MORE (owner, 25 September 2026: "the last part recent
+    players remove and adjust the 2 on the left to fill the space"). It was the band's third
+    card from 11 September. Nothing is lost by removing it: the same players, and what each
+    has done, are on the leaderboard rail beside the board, which is where a player looks.
+  */
 }
 
 export function GameArenaLayout({
@@ -114,10 +109,15 @@ export function GameArenaLayout({
   sidebar,
   rules,
   highlights,
-  activity,
 }: Props) {
   return (
-    <div className="mx-auto max-w-[1480px] px-3 py-4">
+    /*
+      1720px, WIDENED FROM 1480 ON 25 SEPTEMBER 2026 ("increase the board size"). The board is
+      width-bound - a taller game window only adds space around it - so the only way to draw a
+      bigger board is a wider middle column, and on a wide monitor the old cap left that width
+      unused at the page's sides. At 1480px and below nothing changes.
+    */
+    <div className="mx-auto max-w-[1720px] px-3 py-4">
       {/*
         THE PAGE'S OWN SURFACE, and the reason it is a fixed backdrop rather than a class on
         the app's body: the reference's arena is a lit navy room and the rest of the
@@ -239,7 +239,12 @@ export function GameArenaLayout({
         quarter, and the width comes out of the middle column, which had more than the
         reference gives it. Count the things in the row, not the columns.
       */}
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[340px_minmax(0,1fr)_300px]">
+      {/*
+        THE FACTS COLUMN IS 340px, WIDENED FROM 300 ON 25 SEPTEMBER 2026: at 300 the stat
+        tiles cut their own labels ("ROUND TI...", "YOUR SCO..."). The standings rail gave
+        40px back (340 to 300) so the board's column is not narrowed to pay for it.
+      */}
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[300px_minmax(0,1fr)_340px]">
         {/*
           EVERY BREAKPOINT SETS AN ORDER, and the reason is that grid auto-placement follows
           order-modified document order, so a rule that only fires at `xl` leaves the other two
@@ -268,7 +273,14 @@ export function GameArenaLayout({
           {standings}
         </div>
 
-        <div className="order-1 lg:order-1 xl:order-2">{stage}</div>
+        {/*
+          A COLUMN FROM `xl` UP, so the game window can stretch to the bottom of the row - the
+          facts column is usually the tallest member, and the band of empty page under the
+          board was the owner's green-marked area (25 September 2026). The window opts in with
+          `flex-1`; a Play button or a result panel does not, so neither is stretched into a
+          tall empty card.
+        */}
+        <div className="order-1 lg:order-1 xl:order-2 xl:flex xl:flex-col">{stage}</div>
 
         <div className="order-3 space-y-3 lg:order-2 xl:order-3">{sidebar}</div>
       </div>
@@ -330,15 +342,17 @@ export function GameArenaLayout({
         are also rendered in the lobby, where a forced full height would stretch one card to
         the length of a whole column.
       */}
+      {/*
+        TWO CARDS SINCE 25 SEPTEMBER 2026, sharing the row equally; the third (recent players)
+        was removed on the owner's instruction. Everything above about `flex-wrap`,
+        `empty:hidden` and `[&>*]:h-full` still holds - an empty slot is still the common case.
+      */}
       <div className="mt-4 flex flex-wrap items-stretch gap-2.5 sm:h-[176px]">
-        <div className="min-w-[260px] flex-[1.15_1_0] empty:hidden [&>*]:h-full">
+        <div className="min-w-[260px] flex-[1_1_0] empty:hidden [&>*]:h-full">
           {rules}
         </div>
-        <div className="min-w-[260px] flex-[1.15_1_0] empty:hidden [&>*]:h-full">
-          {highlights}
-        </div>
         <div className="min-w-[260px] flex-[1_1_0] empty:hidden [&>*]:h-full">
-          {activity}
+          {highlights}
         </div>
       </div>
 

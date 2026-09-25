@@ -49,16 +49,17 @@ const PAIR_COLOURS = [
 ];
 
 /**
- * The terminal artwork: one lit socket per pair number, in four states each.
+ * The terminal artwork: one lit socket per pair number, `token-1.webp` to `token-8.webp`.
  *
- * `num-{n}-{state}.webp` comes from the owner's "numbers animations" pack
- * (`tools/convert-number-tokens.py`): `idle` at rest, `select` while that pair is being drawn,
- * `connect` once its two ends are joined, and `error` for a moment after a refusal. The pack
- * carries ten numbers; `large` tops out at eight pairs today, so nine and ten wait unused.
+ * BACK TO THE ORIGINAL TOKENS (owner, 25 September 2026: "I don't like the new numbers on the
+ * board, use the old ones"). The four-state `num-{n}-{state}.webp` pack was wired for one day and
+ * is no longer referenced. The states survive as a `data-state` attribute on the token image
+ * (`idle`, `select`, `connect`, `error`) which `app.css` lights, so the refusal flash still shows
+ * without a second picture per number.
  *
- * ONE PER PAIR NUMBER, NOT ONE PER COLOUR. The file has the numeral baked into it, so `num-3-*` is
+ * ONE PER PAIR NUMBER, NOT ONE PER COLOUR. The file has the numeral baked into it, so `token-3` is
  * only ever right for pair 3 - which is why this is indexed by `pairId` with no modulo. A modulo
- * here would draw a "1" on pair 11 and look deliberate. Past ten, `terminalArt` returns null and
+ * here would draw a "1" on pair 9 and look deliberate. Past eight, `terminalArt` returns null and
  * the socket drawn underneath carries the numeral.
  *
  * WHY THE SOCKET IS DRAWN UNDERNEATH RATHER THAN THE ARTWORK BEING THE TERMINAL. A numeral in
@@ -70,10 +71,11 @@ const PAIR_COLOURS = [
  * over a board that is already complete and legible without it.
  */
 export const TOKEN_STATES = ["idle", "select", "connect", "error"];
-const TOKEN_NUMBERS = 10;
+const TOKEN_NUMBERS = 8;
 
-const TERMINAL_ART = Array.from({ length: TOKEN_NUMBERS }, (_, index) =>
-  TOKEN_STATES.map((state) => "/play/num-" + (index + 1) + "-" + state + ".webp"),
+const TERMINAL_ART = Array.from(
+  { length: TOKEN_NUMBERS },
+  (_, index) => "/play/token-" + (index + 1) + ".webp",
 );
 
 /** How long a refused terminal wears its error sprite. */
@@ -98,15 +100,12 @@ export const FRAME_ART = "/play/board-frame.webp";
 export const BOARD_ART = [
   FRAME_ART,
   ...DRAWN_BOARD_FRAMES.map((frame) => frame.file),
-  ...TERMINAL_ART.flat(),
+  ...TERMINAL_ART,
 ];
 
-/** The sprite for one pair's terminal in one state, or null past the pack's ten numbers. */
-export function terminalArt(pairId, state = "idle") {
-  const sprites = Number.isInteger(pairId) && pairId >= 0 ? TERMINAL_ART.at(pairId) : undefined;
-  if (!sprites) return null;
-  const index = TOKEN_STATES.indexOf(state);
-  return sprites.at(index < 0 ? 0 : index) ?? null;
+/** The token image for one pair's terminal, or null past the eighth number. */
+export function terminalArt(pairId) {
+  return Number.isInteger(pairId) && pairId >= 0 ? (TERMINAL_ART.at(pairId) ?? null) : null;
 }
 
 /*
@@ -225,7 +224,7 @@ export function createBoard(svg, onChange) {
   let layers = null;
   /** @type {Map<number, number[][]>} pairId -> the two terminal centres, for the join pulse. */
   let terminalCentres = new Map();
-  /** @type {Map<number, {node: Element, href: string}[]>} pairId -> its two token images, rebuilt by `build`. */
+  /** @type {Map<number, {node: Element, state: string}[]>} pairId -> its two token images, rebuilt by `build`. */
   let tokenFaces = new Map();
   /** @type {Map<number, number>} pairId -> time its error sprite ends. */
   let errorUntil = new Map();
@@ -241,18 +240,17 @@ export function createBoard(svg, onChange) {
   }
 
   /**
-   * Swap each token to the sprite for its state. Only an `href` changes, and only when it differs,
-   * so this is cheap enough to run on every pointer move.
+   * Mark each token with its state for `app.css` to light. Only a `data-state` attribute changes,
+   * and only when it differs, so this is cheap enough to run on every pointer move.
    */
   function paintTokens() {
     const now = Date.now();
     for (const [pairId, faces] of tokenFaces) {
-      const href = terminalArt(pairId, tokenState(pairId, now));
-      if (!href) continue;
+      const state = tokenState(pairId, now);
       for (const face of faces) {
-        if (face.href === href) continue;
-        face.href = href;
-        face.node.setAttribute("href", href);
+        if (face.state === state) continue;
+        face.state = state;
+        face.node.setAttribute("data-state", state);
       }
     }
   }
@@ -752,9 +750,10 @@ export function createBoard(svg, onChange) {
     label.textContent = String(pairId + 1);
     group.appendChild(label);
 
-    const art = terminalArt(pairId, tokenState(pairId, Date.now()));
+    const art = terminalArt(pairId);
     if (art) {
       const size = cellPx * 0.94;
+      const state = tokenState(pairId, Date.now());
       const face = element("image", {
         href: art,
         x: cx - size / 2,
@@ -762,10 +761,11 @@ export function createBoard(svg, onChange) {
         width: size,
         height: size,
         class: "terminal-art token-face",
+        "data-state": state,
       });
       group.appendChild(face);
       const faces = tokenFaces.get(pairId) ?? [];
-      faces.push({ node: face, href: art });
+      faces.push({ node: face, state });
       tokenFaces.set(pairId, faces);
     }
 

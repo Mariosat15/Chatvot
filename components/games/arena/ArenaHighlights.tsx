@@ -105,14 +105,18 @@ export function ArenaHighlights({ highlights, imageUrl }: Props) {
           a height is not written anywhere: a hard height beside an aspect ratio is two
           numbers that disagree the moment either moves.
           128px since the band became 176px tall, so 96px of picture in a 136px body.
+
+          SUPERSEDED 25 September 2026 ("make the images auto adjust and fill the space"): the
+          picture now takes the body's full height and its width from its own proportions
+          (`shape="fill"`), capped at half the card so the tips keep their room.
         */}
-        <div className="hidden w-[128px] shrink-0 sm:block">
+        <div className="hidden max-w-[50%] shrink-0 self-stretch sm:flex sm:justify-end">
           <NeonIllustration
             src={imageUrl}
             alt="This game's emblem"
             icon={Crown}
             accent="prize"
-            shape="landscape"
+            shape="fill"
             fit="contain"
           />
         </div>

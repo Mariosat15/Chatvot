@@ -103,7 +103,10 @@ function bandMarkup(): string {
   const band = code.slice(opens, closes);
   expect(band.length).toBeGreaterThan(200);
   expect(band).toContain("{highlights}");
-  expect(band).toContain("{activity}");
+  // Reason: FLIPPED 25 Sep 2026, not deleted. The band held a third slot, Recent players, until
+  // the owner asked for it removed and the two remaining cards to fill the width. A third slot
+  // reappearing is the rejected layout coming back.
+  expect(band).not.toContain("{activity}");
   return band;
 }
 
@@ -185,8 +188,11 @@ describe("the band is a fixed-height strip", () => {
     */
     const band = bandMarkup();
 
-    expect((band.match(/flex-\[1\.15_1_0\]/g) ?? []).length).toBe(2);
-    expect((band.match(/flex-\[1_1_0\]/g) ?? []).length).toBe(1);
+    // Reason: since 25 Sep 2026 the band has two cards sharing the row equally (the owner
+    // removed Recent players and asked the other two to fill the space). The flex-over-grid
+    // rule is unchanged and still load-bearing for the empty case.
+    expect(band).not.toMatch(/flex-\[1\.15_1_0\]/);
+    expect((band.match(/flex-\[1_1_0\]/g) ?? []).length).toBe(2);
     expect(band).not.toMatch(/grid-cols/);
   });
 
@@ -203,10 +209,11 @@ describe("the band is a fixed-height strip", () => {
     const band = bandMarkup();
     const minimums = band.match(/min-w-\[(\d+)px\]/g) ?? [];
 
-    expect(minimums).toHaveLength(3);
+    // Two cards since 25 Sep 2026: two minimums and one gap.
+    expect(minimums).toHaveLength(2);
     for (const minimum of minimums) {
       const px = Number(/(\d+)/.exec(minimum)![1]);
-      expect(px * 3 + 20).toBeLessThan(900);
+      expect(px * 2 + 10).toBeLessThan(900);
       // And wide enough that a name, a phrase and a score are not competing for 120px.
       expect(px).toBeGreaterThanOrEqual(240);
     }
@@ -317,12 +324,14 @@ describe("each card draws a capped number of one-line items", () => {
 
 describe("the pictures are small and beside the text", () => {
   const beside: [string, string, string][] = [
-    // 112 and 128 since the band became 176px on 25 Sep 2026 (were 66 and 88).
-    ["the rules card", RULES, "w-\\[112px\\]"],
-    ["the tips card", HIGHLIGHTS, "w-\\[128px\\]"],
+    // Reason: FLIPPED 25 Sep 2026. The pictures were fixed widths (112 and 128); the owner
+    // asked for them to auto-adjust and fill the card, so each now fills the card's height
+    // and takes its width from the picture's own aspect, capped at half the card.
+    ["the rules card", RULES, 'shape="fill"'],
+    ["the tips card", HIGHLIGHTS, 'shape="fill"'],
   ];
 
-  it.each(beside)("%s draws it at a fixed size", (_label, file, size) => {
+  it.each(beside)("%s draws it to fill the card height", (_label, file, size) => {
     /*
       FIXED PIXELS, NEVER A PROPORTION, and that is the correction rather than a preference: a
       percentage of a flexible column is exactly how the rules diagram became a full-width

@@ -190,7 +190,13 @@ export function ProviderGameFrame({
       the eye lands on. `NEON_STAGE_FRAME` carries a small pad, which is what makes the glow
       read as a bezel around the game rather than as an outline drawn on it.
     */
-    <div className={`relative overflow-hidden ${NEON_STAGE_FRAME}`}>
+    /*
+      `flex-1` + a column so the window fills the arena's row down to the bottom band rather
+      than stopping at the height the game asked for (owner, 25 September 2026). The game's
+      requested height becomes the MINIMUM below; the game derives that request from its
+      width only, so a taller frame cannot feed back into a taller request.
+    */
+    <div className={`relative flex flex-1 flex-col overflow-hidden ${NEON_STAGE_FRAME}`}>
       {/*
         Reason the overlay stops at `stalled` rather than waiting for `ready`: it is opaque and
         covers the whole frame, so a game that has rendered its own explanation underneath is
@@ -265,8 +271,8 @@ export function ProviderGameFrame({
         // Reason: the launch URL is single-use and short-lived, but our own contest URL is
         // still ours. No need to hand a third party the page the player came from.
         referrerPolicy="no-referrer"
-        className="w-full rounded-xl border-0 bg-[#060C1A]"
-        style={{ height: `${height}px` }}
+        className="w-full flex-1 rounded-xl border-0 bg-[#060C1A]"
+        style={{ minHeight: `${height}px` }}
       />
     </div>
   );

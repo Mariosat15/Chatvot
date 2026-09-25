@@ -137,7 +137,8 @@ describe("the arena's bottom band holds its three panels level", () => {
     const band = code.slice(bandAt);
     const matches = band.match(/\[&>\*\]:h-full/g) ?? [];
 
-    expect(matches).toHaveLength(3);
+    // Two since 25 Sep 2026, when the owner removed Recent players from the band.
+    expect(matches).toHaveLength(2);
   });
 
   it("still lets a panel with nothing in it leave the row", () => {
@@ -152,7 +153,8 @@ describe("the arena's bottom band holds its three panels level", () => {
     */
     const code = readCode(LAYOUT);
 
-    expect((code.match(/empty:hidden/g) ?? []).length).toBe(3);
+    // Two slots since 25 Sep 2026 (Recent players removed at the owner's request).
+    expect((code.match(/empty:hidden/g) ?? []).length).toBe(2);
     expect(code).toMatch(/flex flex-wrap/);
     expect(code).not.toMatch(/grid-cols-3/);
   });
@@ -175,7 +177,10 @@ describe("the illustration beside a panel", () => {
     const body = code.slice(start, code.indexOf("export function", start + 10));
     expect(body.length).toBeGreaterThan(200);
 
-    const guard = body.indexOf("if (src)");
+    // Reason: `if (src` rather than `if (src)` since 25 Sep 2026 - the `fill` shape has its own
+    // `if (src && shape === "fill")` branch ahead of the plain one. Both are guarded by `src`,
+    // and the first guard is the one every `<img>` must sit behind.
+    const guard = body.indexOf("if (src");
     expect(guard).toBeGreaterThan(-1);
     // The `<img>` is INSIDE the guard and the emblem is after it. Written the other way round
     // - an emblem always drawn with the picture over it - a broken URL shows both.

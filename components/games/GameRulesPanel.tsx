@@ -311,13 +311,19 @@ function RulesStrip({
           from its width - which is why this is `w-[66px]` and not a height, and why the band
           had to be 104px rather than 96 for the number the owner asked for to fit at all.
           112px since the band became 176px tall: a 136px body less its 16px of padding.
+
+          SUPERSEDED 25 September 2026 ("make the images auto adjust and fill the space"): a
+          fixed width left the picture a small square in a wide card once the band dropped to
+          two cards. The picture now takes the body's full height and its own width from its
+          proportions (`shape="fill"`), capped at half the card so the steps keep their room.
         */}
-        <div className="hidden w-[112px] shrink-0 sm:block">
+        <div className="hidden max-w-[50%] shrink-0 self-stretch sm:flex sm:justify-end">
           <NeonIllustration
             src={imageUrl}
             alt={`How ${gameName} is played`}
             icon={BookOpen}
             accent="players"
+            shape="fill"
             fit="contain"
           />
         </div>

@@ -15,7 +15,6 @@ import { ChallengeRoundHost } from "@/components/games/ChallengeRoundHost";
 import { GameArenaLayout } from "@/components/games/arena/GameArenaLayout";
 import { ArenaContestPanel } from "@/components/games/arena/ArenaContestPanel";
 import { ArenaHighlights } from "@/components/games/arena/ArenaHighlights";
-import { ArenaActivityFeed } from "@/components/games/arena/ArenaActivityFeed";
 import ChallengeStandingsPanel, {
   type ChallengeArenaSeat,
 } from "@/components/games/arena/ChallengeStandingsPanel";
@@ -44,7 +43,7 @@ import ChallengeTradingWorkspace from "@/components/trading/ChallengeTradingWork
  * around a rank - a plate, a crown, tie markers, and a poll of the competition standings route -
  * and a challenge has no rank until it settles. `ChallengeStandingsPanel` reports the two seats
  * without ordering them, for the reasoning on that file. Everything else in the layout is reused
- * unchanged: the hero, the contest facts, the rules strip, the highlights and the activity feed.
+ * unchanged: the hero, the contest facts, the rules strip, the highlights (the activity feed was removed from the band on 25 September 2026).
  *
  * THE FEED IS THE COMPETITION'S OWN PRODUCER. `getContestActivity` is queried by contest id and
  * a list of players and knows nothing about which kind of contest it is holding, so a challenge
@@ -280,23 +279,6 @@ export default async function ChallengePlayPage({
         <ArenaHighlights
           highlights={presentation.highlights}
           imageUrl={presentation.highlightsImageUrl}
-        />
-      }
-      /*
-        THE SAME FEED THE COMPETITION ARENA DRAWS, from the same producer, capped by the
-        component. It renders nothing when neither player has taken a round, which is the
-        ordinary state of a freshly accepted challenge - and the band survives an empty slot.
-      */
-      activity={
-        <ArenaActivityFeed
-          entries={activity.recent.map((entry) => ({
-            userId: entry.userId,
-            // The names come from the two seats already built, never from a second user
-            // lookup: every player in a challenge's feed is one of its two participants.
-            username: seats.find((seat) => seat.userId === entry.userId)?.name,
-            activity: entry,
-          }))}
-          currentUserId={session.user.id}
         />
       }
     />

@@ -34,7 +34,9 @@ function readCode(relativePath: string): string {
 }
 
 const ROUTE = "app/api/competitions/dashboard-live/route.ts";
-const ACTION = "lib/actions/comprehensive-dashboard.actions.ts";
+// Reason: R21 extracted the bulk participant select into PROCESS. The agreement guard
+// below compares the route against that file (25 Sep 2026) - same fields, new home.
+const PROCESS = "lib/actions/dashboard/process-competitions.ts";
 const SIDEBAR = "components/dashboard/ContestsSidebar.tsx";
 const INTERVALS = "lib/utils/performance.ts";
 
@@ -59,15 +61,19 @@ describe("the refresh endpoint agrees with the page it refreshes", () => {
      * here and every provider rank is computed from rows that have none - no error, no log
      * line, and a perfectly plausible rank on the card that simply disagrees with the one
      * the page rendered a moment ago.
+     *
+     * RE-POINTED at PROCESS on 25 Sep 2026 (R21 extract). The page's bulk select lives there
+     * now; comparing against ACTION finds nothing and went red while the production path was
+     * still correct.
      */
     const routeSelect = readCode(ROUTE).match(/"userId competitionId[^"]*"/);
-    const actionSelect = readCode(ACTION).match(/"userId competitionId[^"]*"/);
+    const pageSelect = readCode(PROCESS).match(/"userId competitionId[^"]*"/);
 
     expect(routeSelect).not.toBeNull();
-    expect(actionSelect).not.toBeNull();
+    expect(pageSelect).not.toBeNull();
 
     const tokens = (s: string) => s.replace(/"/g, "").trim().split(/\s+/).sort();
-    expect(tokens(routeSelect![0])).toEqual(tokens(actionSelect![0]));
+    expect(tokens(routeSelect![0])).toEqual(tokens(pageSelect![0]));
     expect(tokens(routeSelect![0])).toContain("score");
   });
 

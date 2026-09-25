@@ -132,7 +132,13 @@ export function NeonIllustration({
   alt: string;
   icon: LucideIcon;
   accent: NeonAccent;
-  shape?: "square" | "landscape";
+  /**
+   * `fill` takes its HEIGHT from the parent and its width from the picture itself, so the
+   * upload keeps its own proportions and grows with the card instead of sitting at a fixed
+   * size in a gap (owner, 25 September 2026: "make the images auto adjust and fill the
+   * space"). The parent must have a definite height - the arena band's cards do.
+   */
+  shape?: "square" | "landscape" | "fill";
   /**
    * `contain` keeps the whole picture visible; `cover` fills the box and crops.
    *
@@ -144,8 +150,26 @@ export function NeonIllustration({
    */
   fit?: "cover" | "contain";
 }) {
-  const box = shape === "landscape" ? "aspect-[4/3]" : "aspect-square";
+  const box =
+    shape === "landscape"
+      ? "aspect-[4/3]"
+      : shape === "fill"
+        ? "aspect-square h-full"
+        : "aspect-square";
   const classes = accentClasses(accent);
+
+  if (src && shape === "fill") {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={src}
+        alt={alt}
+        className={`h-full w-auto max-w-full rounded-lg border border-[#161E36] bg-[#080C18]/70 ${
+          fit === "contain" ? "object-contain" : "object-cover"
+        }`}
+      />
+    );
+  }
 
   if (src) {
     return (
@@ -359,9 +383,15 @@ export function NeonHeadedPanel({
       copies to drift. The quiet `NEON_PANEL` remains the default everywhere else, so no
       trading screen moves; that was checked by grep rather than assumed.
     */
-    <div className={`${className || NEON_PANEL_LIT} overflow-hidden`}>
+    /*
+      A COLUMN, with the body taking whatever height is left under the heading. For a panel
+      sized by its content that changes nothing; for one given a fixed height (the arena's
+      bottom band) it is what lets the body - and a `shape="fill"` picture inside it - reach
+      the card's bottom edge instead of stopping at its own text.
+    */
+    <div className={`${className || NEON_PANEL_LIT} flex flex-col overflow-hidden`}>
       <div
-        className={`flex items-center justify-between gap-2 ${
+        className={`flex shrink-0 items-center justify-between gap-2 ${
           dense ? "px-3 py-1.5" : "px-4 py-2.5"
         } ${NEON_HEAD_STRIP}`}
       >
@@ -386,7 +416,7 @@ export function NeonHeadedPanel({
         </div>
         {action}
       </div>
-      <div className={bodyClassName}>{children}</div>
+      <div className={`min-h-0 flex-1 ${bodyClassName}`}>{children}</div>
     </div>
   );
 }
