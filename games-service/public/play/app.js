@@ -39,6 +39,7 @@ import {
   CLOCK_DIGIT_ART,
   COUNT_UP_STEP_MS,
   bestBoardTime,
+  boardFrameFor,
   boardProgress,
   countUpSteps,
   desiredFrameHeight,
@@ -290,6 +291,7 @@ function requestHeight() {
     // and below the board. Reading the width is safe where reading the height is the defect -
     // `widthBoundCellPx` explains why at length.
     availableWidth: playing ? boardSpace().width : undefined,
+    skin: state && state.board ? state.board.skin : undefined,
   });
 
   if (Math.abs(height - lastHeight) < HEIGHT_REPORT_THRESHOLD_PX) return;
@@ -525,9 +527,16 @@ function paintClockDigits(display) {
 function dressBoard() {
   const art = ui.boardStage ? ui.boardStage.querySelector(".board-art") : null;
   if (!art || !ui.boardStage) return;
-  const frame = board.frame();
   const skin = state && state.board && state.board.skin;
   const skinOk = typeof skin === "string" && skin.length > 0 && !failedArt.has(skin);
+  // Reason: each skin draws its grid at its own place, so it is pinned by its own measured
+  // geometry (`board.frame()`); a skin that failed to load falls back to the per-size board,
+  // whose insets belong to that file and not to the skin.
+  const frame = skinOk
+    ? board.frame()
+    : state && state.board
+      ? boardFrameFor(state.board.width, state.board.height)
+      : null;
   const usable = frame && (skinOk || !failedArt.has(frame.file)) ? frame : null;
   const file = skinOk ? skin : usable ? usable.file : FRAME_ART;
   art.style.backgroundImage = "url('" + file + "')";
@@ -610,20 +619,8 @@ function renderStatTiles() {
   // is solved and "best board" appears. Rewriting the nodes on every drag would discard the
   // browser's own text layout sixty times a second for values that mostly have not moved.
   if (ui.statTiles.childElementCount !== tiles.length) {
-    /*
-     * THE COUNT IS PUBLISHED TO THE STYLESHEET, and it is what makes every box in this strip the
-     * same size - the owner's "they don't align, one bigger than the other" of 11 September 2026.
-     *
-     * The meter and the tiles are two flex children of one strip, so a fixed share gives the
-     * meter a third and then divides the rest by however many tiles there are: correct at two,
-     * and visibly wrong the moment "best board" appears and makes it three. `--tiles` lets the
-     * tile group claim exactly its own share, so each box is one part of `1 + n` whatever `n`
-     * turns out to be. Set here rather than in the stylesheet because only this function knows
-     * the count, and set beside the rebuild because that is the one moment it can change.
-     */
-    ui.statRail.style.setProperty("--tiles", String(tiles.length));
     ui.statTiles.replaceChildren(
-      ...tiles.map((tile) => {
+      ...tiles.map(() => {
         const node = document.createElement("div");
         node.className = "stat-tile";
         const label = document.createElement("span");
@@ -640,6 +637,7 @@ function renderStatTiles() {
   tiles.forEach((tile, at) => {
     const node = nodes.at(at);
     if (!node) return;
+    if (node.dataset.key !== tile.key) node.dataset.key = tile.key;
     node.firstElementChild.textContent = tile.label;
     node.lastElementChild.textContent = tile.value;
   });
@@ -947,7 +945,7 @@ async function submit() {
     });
 
     state = outcome.state;
-    ui.submit.textContent = "Submit";
+    ui.submit.textContent = "Submit solution";
 
     if (outcome.accepted) {
       /*
@@ -974,11 +972,12 @@ async function submit() {
     if (screens.play && !screens.play.hidden) {
       sound.play("refused");
       flashBoard("refused", REFUSAL_SHAKE_MS);
+      board.flashError();
       renderHint(outcome.message || "That board was not accepted.");
       refusalTimer = window.setTimeout(() => renderHint(null), REFUSAL_HOLD_MS);
     }
   } catch (error) {
-    ui.submit.textContent = "Submit";
+    ui.submit.textContent = "Submit solution";
     ui.submit.disabled = false;
     fail(error.message);
   }
@@ -1032,10 +1031,28 @@ if (ui.mute) {
   ui.mute.addEventListener("click", () => {
     sound.unlock();
     if (!ui.soundSettings) return;
-    const open = ui.soundSettings.hidden;
-    ui.soundSettings.hidden = !open;
-    ui.mute.setAttribute("aria-expanded", open ? "true" : "false");
+    setSoundSettingsOpen(ui.soundSettings.hidden);
   });
+  // A settings popover that only its own button can close is one a player on a phone cannot get
+  // off the board, so a tap anywhere else and Escape close it too.
+  document.addEventListener("pointerdown", (event) => {
+    if (!ui.soundSettings || ui.soundSettings.hidden) return;
+    const target = event.target;
+    if (ui.soundSettings.contains(target) || ui.mute.contains(target)) return;
+    setSoundSettingsOpen(false);
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && ui.soundSettings && !ui.soundSettings.hidden) {
+      setSoundSettingsOpen(false);
+      ui.mute.focus();
+    }
+  });
+}
+
+function setSoundSettingsOpen(open) {
+  if (!ui.soundSettings || !ui.mute) return;
+  ui.soundSettings.hidden = !open;
+  ui.mute.setAttribute("aria-expanded", open ? "true" : "false");
 }
 
 if (ui.musicLevel) {

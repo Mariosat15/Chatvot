@@ -559,6 +559,15 @@ button.small-btn {
   box-shadow: inset 0 0 0 1px rgba(255, 62, 117, 0.55);
 }
 
+/*
+ * Reason: `display: flex` above outranks the user-agent `[hidden] { display: none }`, so the
+ * panel sat open over the board for every player whatever `hidden` said (25 Sep 2026). Same
+ * trap `.screen[hidden]` answers for the screens.
+ */
+.sound-settings[hidden] {
+  display: none;
+}
+
 .round-controls {
   position: relative;
 }
@@ -673,73 +682,140 @@ button.icon-btn {
   width: 100%;
   display: grid;
   /* Fixed tracks, never `auto`: a content-sized rail is what previously ate the cell size. */
-  grid-template-columns: 56px minmax(0, 1fr) 108px;
+  grid-template-columns: 96px minmax(0, 1fr) 116px;
   grid-template-rows: minmax(0, 1fr);
   align-items: stretch;
-  gap: 8px;
+  gap: 10px;
 }
 
+/*
+ * A PHONE-WIDTH FRAME. The board takes the whole width and the two rails become short rows under
+ * it: the buttons as a row of two, the figures as one card whose rows sit side by side. Neither
+ * row stretches - a single-column grid stretches its items to the full width by default, which is
+ * what turned Undo and Clear into two full-width slabs (25 September 2026).
+ */
 @media (max-width: 520px) {
   .arena {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-rows: minmax(0, 1fr) auto auto;
+  }
+
+  .arena > .action-rail {
+    grid-row: 2;
+    flex-direction: row;
+    justify-content: center;
+  }
+
+  .arena > .board-wrap {
+    grid-row: 1;
+  }
+
+  .arena > .stat-rail {
+    grid-row: 3;
+    align-self: auto;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  /* The Level bar across the top, then the figures side by side under it. Written with the
+     `.stat-rail >` prefix because the base rules below this query would otherwise win. */
+  .stat-rail > .board-meter {
+    flex: 1 1 100%;
+  }
+
+  .stat-rail > .stat-tiles {
+    flex: 1 1 100%;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    border-top: 1px solid rgba(64, 150, 240, 0.28);
+  }
+
+  .stat-rail > .stat-tiles > .stat-tile {
+    border-top: 0;
+  }
+
+  .stat-rail > .stat-tiles > .stat-tile + .stat-tile {
+    border-left: 1px solid rgba(64, 150, 240, 0.28);
   }
 }
 
 /*
- * Undo and Clear, stacked in the 56px track. They stay narrower than Submit, which is the
- * full-width button under the board.
+ * Undo and Clear: the reference's tool cards. Icon and word on one line, a glass face with a blue
+ * rim, sized to their content and centred beside the board - never stretched to its height. They
+ * stay smaller than Submit, the full-width button under the board.
  */
 .action-rail {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 button.rail-btn {
-  display: grid;
-  gap: 2px;
-  justify-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
   min-height: 52px;
-  min-width: 48px;
-  padding: 6px 2px;
+  min-width: 88px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(22, 60, 112, 0.72) 0%, rgba(9, 27, 58, 0.86) 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(64, 150, 240, 0.55),
+    inset 0 1px 0 rgba(160, 215, 255, 0.18),
+    0 6px 18px -10px rgba(0, 0, 0, 0.9);
+  color: #eaf6ff;
+}
+
+button.rail-btn:hover:not(:disabled) {
+  box-shadow:
+    inset 0 0 0 1px var(--accent),
+    inset 0 1px 0 rgba(160, 215, 255, 0.22),
+    0 0 14px -4px rgba(8, 223, 255, 0.55);
 }
 
 .rail-btn-icon {
-  font-size: 1.1rem;
+  flex: 0 0 auto;
+  font-size: 1.35rem;
   line-height: 1;
+  color: #cfeaff;
 }
 
 .rail-btn-label {
-  font-size: 0.66rem;
+  font-size: 0.95rem;
   font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
 }
 
 button.rail-btn:disabled {
   color: var(--muted);
   box-shadow: inset 0 0 0 1px var(--panel-edge);
+  opacity: 0.7;
   cursor: default;
 }
 
 /*
- * The figures, stacked in the 108px track beside the board.
+ * The figures: ONE card beside the board, its rows split by hairlines - the reference's panel.
  *
- * `--tiles` still shares the column: the meter is one part and the tile group is as many parts
- * as there are tiles, so adding "best time" or "combo" does not leave one box a different
- * height from the others. `app.js` publishes the count.
+ * The card is sized to its content and centred, never stretched to the board's height. The
+ * earlier version gave every figure its own box and shared the column's height out between them,
+ * so a tall board meant three tall boxes each holding one short number in an empty field.
  */
 .stat-rail {
-  --tiles: 2;
+  align-self: center;
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 8px;
   min-width: 0;
   min-height: 0;
   overflow: auto;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(18, 48, 94, 0.78) 0%, rgba(7, 22, 48, 0.9) 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(64, 150, 240, 0.55),
+    inset 0 1px 0 rgba(160, 215, 255, 0.16),
+    0 8px 22px -12px rgba(0, 0, 0, 0.9);
 }
 
 /* ------------------------------------------------------------------------------------------
@@ -747,8 +823,8 @@ button.rail-btn:disabled {
  * ---------------------------------------------------------------------------------------- */
 
 .board-meter {
-  /* One part against the tile group's `--tiles`, so the meter is exactly one box wide. */
-  flex: 1 1 7rem;
+  /* Sized to its content: a growing meter row is an empty band inside the card. */
+  flex: 0 0 auto;
   min-width: 0;
   display: grid;
   /*
@@ -757,20 +833,13 @@ button.rail-btn:disabled {
    * which is the misalignment the owner drew a circle around.
    */
   align-content: start;
-  gap: 6px;
-  padding: 6px 10px 7px;
+  gap: 8px;
+  padding: 12px 12px 12px;
   /*
-   * `.screen` centres its text, so a box that does not say otherwise sits its caption in the
-   * middle while every tile beside it - which does say otherwise - starts at the left edge. The
-   * boxes were already the same size when the owner's screenshot was taken and this was the
-   * remaining half of "align": one caption in the middle of a row of four that begin at the left.
+   * `.screen` centres its text, so a row that does not say otherwise sits its caption in the
+   * middle while every row under it starts at the left edge - the owner's "align" of 11 Sep 2026.
    */
   text-align: left;
-  border-radius: var(--radius-sm);
-  background: var(--face-stat);
-  box-shadow:
-    inset 0 0 0 1px var(--panel-edge),
-    inset 0 1px 0 rgba(120, 190, 255, 0.14);
 }
 
 /*
@@ -787,22 +856,22 @@ button.rail-btn:disabled {
 
 /* The tiles' own label and value type, so four boxes in a row read as four of the same thing. */
 .board-meter-label {
-  font-size: 0.54rem;
-  font-weight: 700;
-  letter-spacing: 0.16em;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: #eaf6ff;
 }
 
 .board-meter-value {
-  font-size: 0.94rem;
-  font-weight: 800;
+  font-size: 0.78rem;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: var(--accent-bright);
 }
 
 .board-meter-track {
-  height: 7px;
+  height: 8px;
   border-radius: 99px;
   overflow: hidden;
   background: #041127;
@@ -830,43 +899,50 @@ button.rail-btn:disabled {
 }
 
 /*
- * `grid-auto-flow: column` with `minmax(0, 1fr)` columns: however many tiles `playStatTiles`
- * returns, they share the strip equally and none of them widens it. It omits a tile rather than
- * rendering an empty value, so the count genuinely varies.
+ * The rows under the meter. `auto` rows, NEVER `minmax(0, 1fr)`: a fractional row shares out the
+ * card's height, and a card stretched beside a tall board then draws each figure in the middle of
+ * an empty box - the "mess" of 25 September 2026. `playStatTiles` omits a tile rather than
+ * rendering an empty value, so the count varies and the card simply grows by a row.
  */
 .stat-tiles {
-  /* `--tiles` parts against the meter's one, stacked because this track is 108px wide. */
-  flex: var(--tiles) 1 auto;
+  flex: 0 0 auto;
   min-width: 0;
   display: grid;
   grid-auto-flow: row;
-  grid-auto-rows: minmax(0, 1fr);
-  gap: 8px;
+  grid-auto-rows: auto;
 }
 
 .stat-tile {
   display: grid;
-  gap: 1px;
-  padding: 6px 10px 7px;
-  border-radius: var(--radius-sm);
-  background: var(--face-stat);
-  box-shadow: inset 0 0 0 1px var(--panel-edge);
+  gap: 3px;
+  padding: 10px 12px;
+  border-top: 1px solid rgba(64, 150, 240, 0.28);
   text-align: left;
 }
 
 .stat-tile-label {
-  font-size: 0.54rem;
-  font-weight: 700;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #b9d3f0;
 }
 
 .stat-tile-value {
-  font-size: 0.94rem;
-  font-weight: 750;
+  font-size: 1.2rem;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
-  color: var(--text);
+  color: #f2f9ff;
+}
+
+/* The reference's accents: the best time in gold, the combo in red. Keyed by `data-key`, which
+   `renderStatTiles` sets from the tile's own key, so a label rewording cannot drop the colour. */
+.stat-tile[data-key="best"] .stat-tile-value {
+  color: #ffd23f;
+  text-shadow: 0 0 10px rgba(255, 210, 63, 0.45);
+}
+
+.stat-tile[data-key="streak"] .stat-tile-value {
+  color: #ff4d6d;
+  text-shadow: 0 0 10px rgba(255, 77, 109, 0.45);
 }
 
 /*
@@ -1142,10 +1218,44 @@ svg#board .terminal-art {
   flex: 1 1 auto;
   width: 100%;
   max-width: none;
-  min-height: 56px;
-  font-size: 1.05rem;
-  letter-spacing: 0.14em;
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  border-radius: 14px;
+  font-size: 1.15rem;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
+}
+
+/*
+ * The reference's paper plane. Drawn as a mask on a pseudo-element rather than as markup, because
+ * `app.js` rewrites the button's text while a board is being checked, and a child icon would be
+ * wiped by that `textContent` assignment.
+ */
+.submit-wide::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M22 2 2 10.5l7.6 2.9L22 2zM9.6 13.4 12.5 22 22 2z'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M22 2 2 10.5l7.6 2.9L22 2zM9.6 13.4 12.5 22 22 2z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+.submit-wide:not(:disabled)::before {
+  background: var(--accent);
+  filter: drop-shadow(0 0 6px rgba(8, 223, 255, 0.8));
+}
+
+/* Disabled still reads as the same bar, just unlit - a grey slab looks like a missing control. */
+button.submit-wide:disabled {
+  background: linear-gradient(180deg, rgba(10, 44, 92, 0.9) 0%, rgba(6, 22, 50, 0.95) 100%);
+  color: #7fa6cf;
+  box-shadow:
+    inset 0 0 0 1px rgba(64, 150, 240, 0.6),
+    0 0 10px -4px rgba(8, 223, 255, 0.35);
 }
 
 /* The lit state is the whole point: the button is disabled until the board is genuinely

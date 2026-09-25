@@ -646,7 +646,7 @@ async function main(): Promise<number> {
      */
     assert.match(
       columns[1],
-      /56px\s+minmax\(0,\s*1fr\)\s+108px/,
+      /96px\s+minmax\(0,\s*1fr\)\s+116px/,
       `the side tracks are no longer fixed (${columns[1].trim()})`,
     );
     assert.equal(
@@ -769,43 +769,34 @@ async function main(): Promise<number> {
     );
   });
 
-  await test("every box in the figures strip is one part of the same whole", async () => {
+  await test("the figures card is sized to its rows, never stretched to the board", async () => {
     /*
-     * THE OWNER'S "THEY DON'T ALIGN, ONE BIGGER THAN THE OTHER" OF 11 SEPTEMBER 2026, pinned
-     * where it can actually be got wrong.
-     *
-     * The strip has two flex children - the meter and the tile group - and the group divides its
-     * own share between however many tiles `playStatTiles` returns. So any FIXED pair of shares
-     * is right for exactly one tile count and silently wrong for every other: written `1` against
-     * `2` the boxes match while there are two tiles and stop matching the moment "best board"
-     * appears. That is a stylesheet that looks correct in a diff and is wrong on the screen, which
-     * is why the count travels from the one place that knows it.
-     *
-     * Both halves are asserted. The stylesheet reading `--tiles` proves nothing if nobody ever
-     * sets it, and setting it proves nothing if the stylesheet divides by something else.
+     * THE OWNER'S "THE INFO PATHS MOVES ETC ARE TERRIBLE" OF 25 SEPTEMBER 2026. The figures used
+     * to be separate boxes sharing the column's height out with `grid-auto-rows: minmax(0, 1fr)`
+     * and a growing meter, so beside a tall board each figure sat in the middle of an empty box.
+     * They are now rows of one card, and every half of that stretch is asserted absent: the card
+     * centred rather than stretched, the rows `auto`, the meter not growing.
      */
     const css = withoutComments(playFile("app.css"));
 
-    const tiles = /\.stat-tiles\s*\{([^{}]*)\}/.exec(css);
+    // Anchored to a line start: the phone query's `.arena > .stat-rail` comes first in the file.
+    const rail = /(?:^|\n)\.stat-rail\s*\{([^{}]*)\}/.exec(css);
+    assert.ok(rail, "app.css has no .stat-rail rule");
+    assert.match(rail[1], /align-self\s*:\s*center/, "the figures card stretches to the board's height again");
+
+    const tiles = /(?:^|\n)\.stat-tiles\s*\{([^{}]*)\}/.exec(css);
     assert.ok(tiles, "app.css has no .stat-tiles rule");
-    assert.match(
-      tiles[1],
-      /flex\s*:\s*var\(--tiles\)/,
-      "the tile group takes a fixed share again - it matches the meter at one tile count only",
-    );
+    assert.doesNotMatch(tiles[1], /1fr/, "the figure rows share out the card's height again");
 
-    const meter = /\.board-meter\s*\{([^{}]*)\}/.exec(css);
+    const meter = /(?:^|\n)\.board-meter\s*\{([^{}]*)\}/.exec(css);
     assert.ok(meter, "app.css has no .board-meter rule");
-    assert.match(meter[1], /flex\s*:\s*1\s/, "the meter is no longer exactly one box wide");
+    assert.match(meter[1], /flex\s*:\s*0\s+0\s+auto/, "the meter row grows into an empty band again");
 
+    // The accent colours key off the tile's own key, so they need `data-key` on every render.
     const js = withoutComments(playFile("app.js"));
     const render = /function renderStatTiles\(\)\s*\{([\s\S]*?)\n\}/.exec(js);
     assert.ok(render, "app.js has no renderStatTiles()");
-    assert.match(
-      render[1],
-      /setProperty\("--tiles",\s*String\(tiles\.length\)\)/,
-      "the tile count is never published, so the stylesheet divides by a stale number",
-    );
+    assert.match(render[1], /dataset\.key\s*=\s*tile\.key/, "the tiles no longer carry their key");
   });
 
   /*
@@ -992,6 +983,18 @@ async function main(): Promise<number> {
       button[0].includes(`aria-pressed="${initial.pressed}"`),
       `the markup's aria-pressed disagrees with soundControlCopy: ${button[0]}`,
     );
+  });
+
+  await test("the sound settings panel ships closed and its hidden attribute actually hides it", async () => {
+    // Reason: `.sound-settings { display: flex }` outranks the user-agent `[hidden]` rule, so the
+    // panel sat open over the board with `hidden` set (owner report, 25 Sep 2026). The markup
+    // alone passes on that bug; the stylesheet has to restore the rule.
+    const page = await fetchRaw("/play");
+    const panel = /<div\b[^>]*id="sound-settings"[^>]*>/.exec(page.text);
+    assert.ok(panel, "the play screen has no sound settings panel");
+    assert.match(panel[0], /\shidden[\s>]/, "the panel must ship hidden");
+    const css = playFile("app.css");
+    assert.match(css, /\.sound-settings\[hidden\]\s*\{\s*display:\s*none;?\s*\}/);
   });
 
   /*

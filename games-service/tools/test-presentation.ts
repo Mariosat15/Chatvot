@@ -55,6 +55,7 @@ interface Presentation {
   BOARD_ART_OVERHANG: number;
   DRAWN_BOARD_FRAMES: DrawnFrame[];
   boardFrameFor(gridWidth: number, gridHeight: number): DrawnFrame | null;
+  skinFrameFor(skin: unknown, gridWidth: number, gridHeight: number): DrawnFrame | null;
   frameOverhang(frame: DrawnFrame | null): { horizontal: number; vertical: number };
   frameInsetCss(frame: DrawnFrame | null): string;
   spaceForGrid(available: number, overhang?: number): number;
@@ -357,6 +358,23 @@ async function main(): Promise<void> {
     const four = p.boardFrameFor(4, 4)!;
     const eight = p.boardFrameFor(8, 8)!;
     assert.ok(four.top > eight.top && four.left > eight.left);
+  });
+
+  test("a deck skin is pinned by its OWN measured grid, never by the per-size board's", () => {
+    /*
+     * Each skin draws its cells at its own place inside its own frame. Positioned with the
+     * board-4/6/8 figures, the numbers sat visibly off the drawn cells on most skins (owner,
+     * 25 Sep 2026). The measured table must win for the skin it describes, and only for it.
+     */
+    const measured = p.skinFrameFor("/play/board-s-15.webp", 4, 4)!;
+    const base = p.boardFrameFor(4, 4)!;
+    assert.equal(measured.file, "/play/board-s-15.webp");
+    assert.notEqual(measured.top, base.top, "the skin reused the per-size inset");
+    // Unmeasured, absent, or measured for another size: the per-size frame, never a guess.
+    assert.deepEqual(p.skinFrameFor("/play/board-s-99.webp", 4, 4), base);
+    assert.deepEqual(p.skinFrameFor(undefined, 4, 4), base);
+    assert.deepEqual(p.skinFrameFor("/play/board-l-01.webp", 4, 4), base);
+    assert.equal(p.skinFrameFor("/play/board-s-15.webp", 5, 5), null);
   });
 
   test("the artwork's inset is written per side, negative, as percentages", () => {

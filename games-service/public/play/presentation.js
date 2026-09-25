@@ -8,8 +8,8 @@
  * exactly the two that were wrong: how big the board gets, and what the player is told at the end.
  * Keeping them here is what makes them provable rather than merely looked at.
  *
- * It has no imports, touches no globals, and returns plain values. `test-presentation.ts` runs it
- * in Node with no stub of any kind.
+ * It touches no globals and returns plain values. Its one import is `skin-geometry.js`, a generated
+ * data table that is itself pure, so `test-presentation.ts` still runs it in Node with no stub.
  *
  * AND WHAT IT MUST NEVER LEARN
  * ---------------------------
@@ -19,6 +19,8 @@
  * signed callback; the browser is not a link in that chain, and a number on this screen would be
  * one the player could argue with that nothing authoritative had agreed to.
  */
+
+import { SKIN_GEOMETRY } from "./skin-geometry.js";
 
 /* ------------------------------------------------------------------------------------------
  * How big the board gets
@@ -134,6 +136,22 @@ export function boardFrameFor(gridWidth, gridHeight) {
   return DRAWN_BOARD_FRAMES.find((frame) => frame.cells === gridWidth) ?? null;
 }
 
+/**
+ * The frame for the skin this board is actually wearing.
+ *
+ * Every deck skin draws its grid at its own place inside its own frame, so positioning a skin with
+ * the per-size figures above put the numbers visibly off the drawn cells on most boards. The
+ * measured figures come from `skin-geometry.js`. A skin that is unmeasured, or measured for a
+ * different grid size, falls back to the per-size frame rather than to a guess.
+ */
+export function skinFrameFor(skin, gridWidth, gridHeight) {
+  const base = boardFrameFor(gridWidth, gridHeight);
+  if (!base || typeof skin !== "string") return base;
+  const measured = SKIN_GEOMETRY.get(skin);
+  if (!measured || measured.cells !== gridWidth) return base;
+  return { ...measured, file: skin };
+}
+
 /** How far the artwork reaches past the grid on each axis, as a total fraction of the grid. */
 export function frameOverhang(frame) {
   if (!frame) return { horizontal: 2 * BOARD_ART_OVERHANG, vertical: 2 * BOARD_ART_OVERHANG };
@@ -230,7 +248,7 @@ export function boardCellPx(availableWidth, availableHeight, gridWidth, gridHeig
  * field. A width that moves because the host gained a scrollbar moves the answer by a pixel or
  * two of cell, which `HEIGHT_REPORT_THRESHOLD_PX` swallows rather than reporting.
  */
-export function widthBoundCellPx(availableWidth, gridWidth, gridHeight) {
+export function widthBoundCellPx(availableWidth, gridWidth, gridHeight, skin) {
   const cols = positive(gridWidth) ? Math.round(gridWidth) : 0;
   /*
    * THE `cols` HALF DECIDES SOMETHING AND THE WIDTH HALF IS CLARITY, and saying so is the honest
@@ -245,7 +263,7 @@ export function widthBoundCellPx(availableWidth, gridWidth, gridHeight) {
   if (!cols || !positive(availableWidth)) return TARGET_CELL_PX;
 
   const rows = positive(gridHeight) ? Math.round(gridHeight) : cols;
-  const { horizontal } = frameOverhang(boardFrameFor(cols, rows));
+  const { horizontal } = frameOverhang(skinFrameFor(skin, cols, rows));
   const grid = spaceForGrid(availableWidth, horizontal);
   if (!positive(grid)) return TARGET_CELL_PX;
 
@@ -269,7 +287,8 @@ function clampFrame(height) {
  * `widthBoundCellPx` explains at length why one is safe and the other is not.
  */
 export function desiredFrameHeight(input) {
-  const { screen, gridWidth, gridHeight, chromeHeight, contentHeight, availableWidth } = input ?? {};
+  const { screen, gridWidth, gridHeight, chromeHeight, contentHeight, availableWidth, skin } =
+    input ?? {};
 
   if (screen === "play") {
     const rows = positive(gridHeight) ? Math.round(gridHeight) : 6;
@@ -281,14 +300,14 @@ export function desiredFrameHeight(input) {
     // in a new disguise, so the height asked for is the height the framed board needs - and it
     // is THIS board's frame, because the drawn 4x4 bezel is nearly three times as deep as the
     // generic one.
-    const frame = boardFrameFor(cols, rows);
+    const frame = skinFrameFor(skin, cols, rows);
     const { vertical } = frameOverhang(frame);
     // The cell the width permits when the width is known, and the target otherwise. Asking for
     // the target's height on a narrow frame is what left the empty band above and below the
     // board: the grid can only ever be as big as the narrower axis allows, so a request based on
     // the other one is a request for space the board cannot use.
     const cell = positive(availableWidth)
-      ? widthBoundCellPx(availableWidth, cols, rows)
+      ? widthBoundCellPx(availableWidth, cols, rows, skin)
       : TARGET_CELL_PX;
     return clampFrame(chrome + framedGridPx(rows * cell, vertical) + BOARD_FRAME_PX);
   }
@@ -529,10 +548,9 @@ export function soundControlCopy(enabled) {
  * Major pentatonic degrees over A3: any combination of them is consonant, so the board stays
  * musical whatever order the player joins the pairs in and however many a grid size produces.
  *
- * EIGHT DEGREES, WHICH IS THE MOST PAIRS ANY GRID PRODUCES (`large`: 5-8), for the same reason
- * `TERMINAL_ART` has eight entries. The modulo is the fallback if a ninth ever appears - and
- * unlike the artwork, where a modulo would paint a "1" on pair 9 and look deliberate, a repeated
- * note costs nothing.
+ * EIGHT DEGREES, WHICH IS THE MOST PAIRS ANY GRID PRODUCES (`large`: 5-8). The modulo is the
+ * fallback if a ninth ever appears - and unlike the numeral sprites in `board.js`, where a modulo
+ * would paint a "1" on pair 11 and look deliberate, a repeated note costs nothing.
  */
 const PENTATONIC_SEMITONES = [0, 2, 4, 7, 9, 12, 14, 16];
 const NOTE_BASE_HZ = 220;

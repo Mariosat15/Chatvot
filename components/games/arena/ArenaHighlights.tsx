@@ -63,18 +63,18 @@ export function ArenaHighlights({ highlights, imageUrl }: Props) {
   if (highlights.length === 0) return null;
 
   return (
-    <NeonHeadedPanel icon={Lightbulb} title="Game tips" dense>
-      <div className="flex h-full items-center gap-2.5 px-2.5 py-1">
-        <ul className="min-w-0 flex-1 space-y-1">
+    <NeonHeadedPanel icon={Lightbulb} title="Game tips">
+      <div className="flex h-full items-center gap-3 px-3 py-2">
+        <ul className="min-w-0 flex-1 space-y-2">
           {highlights.slice(0, STRIP_TIP_LIMIT).map((highlight) => (
-            <li key={highlight.title} className="flex items-center gap-1.5">
+            <li key={highlight.title} className="flex items-center gap-2">
               {/*
                 The reference's tick, in its gold rather than a green one. `aria-hidden` with
                 the text carrying the meaning - a checklist glyph beside a sentence says
                 nothing a screen reader needs, and read aloud it would imply the player has
                 done something.
               */}
-              <Check className="h-3 w-3 shrink-0 text-amber-300" aria-hidden />
+              <Check className="h-4 w-4 shrink-0 text-amber-300" aria-hidden />
               {/*
                 THE TITLE ALONE, WITH THE DETAIL ON THE TOOLTIP. Two lines per tip is what
                 made this card 300px tall: four tips of two lines each is eight rows in a
@@ -82,7 +82,7 @@ export function ArenaHighlights({ highlights, imageUrl }: Props) {
                 the sentence that used to sit underneath it.
               */}
               <span
-                className="truncate text-[10px] leading-tight text-gray-300"
+                className="truncate text-[13px] leading-tight text-gray-100"
                 title={highlight.detail || highlight.title}
               >
                 {highlight.title}
@@ -104,8 +104,9 @@ export function ArenaHighlights({ highlights, imageUrl }: Props) {
           85-105 by 65-80 met at the largest the band's 74px body has room for, and it is why
           a height is not written anywhere: a hard height beside an aspect ratio is two
           numbers that disagree the moment either moves.
+          128px since the band became 176px tall, so 96px of picture in a 136px body.
         */}
-        <div className="hidden w-[88px] shrink-0 sm:block">
+        <div className="hidden w-[128px] shrink-0 sm:block">
           <NeonIllustration
             src={imageUrl}
             alt="This game's emblem"

@@ -77,7 +77,9 @@ const SAMPLE_GAIN = new Map([
   ["connected", 0.34],
   ["board-complete", 0.62],
   ["win", 0.68],
-  ["music", 0.22],
+  // Reason: at 0.22 x the 0.7 default slider the loop played at ~15% and was reported as
+  // inaudible under the effects (25 Sep 2026). The slider still scales it down from here.
+  ["music", 0.55],
 ]);
 
 /**
@@ -120,7 +122,7 @@ export function createSound() {
   let musicGain = null;
   let musicWanted = false;
   /** 0–1. Music and effects are separate so muting one does not silence the other. */
-  let musicLevel = 0.7;
+  let musicLevel = 0.85;
   let sfxLevel = 0.8;
   let musicMuted = false;
   let sfxMuted = false;
@@ -133,7 +135,7 @@ export function createSound() {
 
   function applyMusicLevel() {
     if (!musicGain || !context) return;
-    const level = musicMuted ? 0 : (SAMPLE_GAIN.get("music") || 0.22) * musicLevel;
+    const level = musicMuted ? 0 : (SAMPLE_GAIN.get("music") || 0.55) * musicLevel;
     try {
       musicGain.gain.setValueAtTime(level, context.currentTime);
     } catch {

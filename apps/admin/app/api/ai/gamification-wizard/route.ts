@@ -637,12 +637,12 @@ async function resolveBadgeXp(): Promise<BadgeXpByRarity> {
 
 async function computeCoverage() {
   const [badges, milestones, catalogue, badgeXp, xpConfig] = await Promise.all([
-    dbTools.readAllBadges(),
-    dbTools.readAllMilestones(),
+        dbTools.readAllBadges(),
+        dbTools.readAllMilestones(),
     loadCatalogueGameRefs(),
     resolveBadgeXp(),
-    dbTools.readXPConfig(),
-  ]);
+        dbTools.readXPConfig(),
+      ]);
 
   const games = coverageGames(catalogue);
   const coverageBadges = badges as CoverageBadge[];
@@ -1402,7 +1402,7 @@ export async function POST(request: NextRequest) {
           // Reason: refuse the WHOLE run. Falling through to the add-only build
           // after a refused wipe is the one outcome an operator who typed the
           // phrase wrongly would not expect, and it reads as success.
-          return NextResponse.json(
+    return NextResponse.json(
             { success: false, action: "run_full", error: reset.error },
             { status: 400 },
           );

@@ -93,6 +93,8 @@ interface FakeSvg extends FakeNode {
   addEventListener(type: string, handler: (event: unknown) => void): void;
   getBoundingClientRect(): { left: number; top: number; width: number; height: number };
   setPointerCapture(id: number): void;
+  createSVGPoint(): unknown;
+  getScreenCTM(): { a: number; inverse(): { a: number } } | null;
   handlers: Map<string, (event: unknown) => void>;
   grid: { width: number; height: number };
 }
@@ -112,6 +114,25 @@ function fakeSvg(): FakeSvg {
     height: node.grid.height * CELL_PX,
   });
   node.setPointerCapture = () => {};
+  // `cellAt` maps a pointer through the SVG's own transform, because the border box includes
+  // the bezel and the art overhang. `centre` speaks in CELL_PX screen cells while `resize` draws
+  // smaller cells once the frame's overhang is reserved, so the fake CTM scales screen pixels to
+  // the drawn size - exactly what a browser's CTM does when the grid is displayed at CELL_PX.
+  type Matrix = { a: number };
+  type Point = { x: number; y: number; matrixTransform(m: Matrix): Point };
+  const point = (x: number, y: number): Point => ({
+    x,
+    y,
+    matrixTransform(m) {
+      return point(this.x * m.a, this.y * m.a);
+    },
+  });
+  const drawnCellPx = () => Number(node.attributes.get("width")) / node.grid.width;
+  node.createSVGPoint = () => point(0, 0);
+  node.getScreenCTM = () => ({
+    a: CELL_PX / drawnCellPx(),
+    inverse: () => ({ a: drawnCellPx() / CELL_PX }),
+  });
 
   return node;
 }
@@ -623,7 +644,7 @@ async function main(): Promise<void> {
   });
 
   test("a terminal's artwork is chosen by its pair number, never by position", () => {
-    // `token-3.webp` has a 3 painted into it, so indexing this list by anything but the pair id
+    // `num-3-*.webp` has a 3 painted into it, so indexing this list by anything but the pair id
     // puts one number in the artwork and a different one in the label underneath.
     const { client, svg } = boardFor("art-2", "large");
     const images = descendants(svg).filter((node) => node.nodeName === "image");
@@ -632,10 +653,44 @@ async function main(): Promise<void> {
     assert.deepEqual(
       hrefs.sort(),
       client.pairs.flatMap((pair) => [
-        `/play/token-${pair.id + 1}.webp`,
-        `/play/token-${pair.id + 1}.webp`,
+        `/play/num-${pair.id + 1}-idle.webp`,
+        `/play/num-${pair.id + 1}-idle.webp`,
       ]).sort(),
     );
+  });
+
+  test("a terminal wears select while drawn, connect once joined, and error after a refusal", () => {
+    /*
+     * The four sprites are the owner's numbers pack (25 Sep 2026). The state is derived from the
+     * board, never stored beside it, so a pair that is broken again goes back to idle by itself.
+     */
+    const { generated, client, svg, board } = boardFor("art-3", "medium");
+    const path = generated.solution[0];
+    const pair = client.pairs.find(
+      (entry) =>
+        (entry.a[0] === path[0][0] && entry.a[1] === path[0][1]) ||
+        (entry.b[0] === path[0][0] && entry.b[1] === path[0][1]),
+    )!;
+    const faces = () =>
+      descendants(svg)
+        .filter((node) => node.nodeName === "image")
+        .map((node) => node.attributes.get("href") ?? "")
+        .filter((href) => href.startsWith(`/play/num-${pair.id + 1}-`));
+
+    assert.deepEqual(faces(), Array(2).fill(`/play/num-${pair.id + 1}-idle.webp`));
+
+    svg.handlers.get("pointerdown")!(pointerEvent(path[0]));
+    assert.deepEqual(faces(), Array(2).fill(`/play/num-${pair.id + 1}-select.webp`));
+    for (const cell of path.slice(1)) svg.handlers.get("pointermove")!(pointerEvent(cell));
+    svg.handlers.get("pointerup")!({ preventDefault() {} });
+    assert.deepEqual(faces(), Array(2).fill(`/play/num-${pair.id + 1}-connect.webp`));
+
+    board.flashError([pair.id]);
+    assert.deepEqual(faces(), Array(2).fill(`/play/num-${pair.id + 1}-error.webp`));
+
+    // A redraw keeps the error it is showing rather than resetting to the board's state early.
+    board.resize(client.width * CELL_PX, client.height * CELL_PX);
+    assert.deepEqual(faces(), Array(2).fill(`/play/num-${pair.id + 1}-error.webp`));
   });
 
   test("a drag repaints the wires and leaves the cells and terminals standing", () => {

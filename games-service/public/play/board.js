@@ -22,10 +22,10 @@
 
 import {
   boardCellPx,
-  boardFrameFor,
   DRAWN_BOARD_FRAMES,
   frameOverhang,
   newlyJoined,
+  skinFrameFor,
   spaceForGrid,
 } from "./presentation.js";
 
@@ -49,13 +49,17 @@ const PAIR_COLOURS = [
 ];
 
 /**
- * The terminal artwork: one lit socket per pair number, `token-1.webp` to `token-8.webp`.
+ * The terminal artwork: one lit socket per pair number, in four states each.
  *
- * ONE PER PAIR NUMBER, NOT ONE PER COLOUR, and the two lists must stay the same length. The file
- * has the numeral baked into it, so `token-3.webp` is only ever right for pair 3 - which is why
- * this is indexed by `pairId` with no modulo. A modulo here would draw a "1" on pair 9 and look
- * deliberate. There is no pair 9 today (`large` tops out at eight), and if a grid size ever
- * produces more, `terminalArt` returns null and the socket drawn underneath carries the numeral.
+ * `num-{n}-{state}.webp` comes from the owner's "numbers animations" pack
+ * (`tools/convert-number-tokens.py`): `idle` at rest, `select` while that pair is being drawn,
+ * `connect` once its two ends are joined, and `error` for a moment after a refusal. The pack
+ * carries ten numbers; `large` tops out at eight pairs today, so nine and ten wait unused.
+ *
+ * ONE PER PAIR NUMBER, NOT ONE PER COLOUR. The file has the numeral baked into it, so `num-3-*` is
+ * only ever right for pair 3 - which is why this is indexed by `pairId` with no modulo. A modulo
+ * here would draw a "1" on pair 11 and look deliberate. Past ten, `terminalArt` returns null and
+ * the socket drawn underneath carries the numeral.
  *
  * WHY THE SOCKET IS DRAWN UNDERNEATH RATHER THAN THE ARTWORK BEING THE TERMINAL. A numeral in
  * every terminal is functional here rather than decorative - see the note on `colourFor`, it is
@@ -65,16 +69,15 @@ const PAIR_COLOURS = [
  * the vector socket, with its own numeral, is always drawn: the artwork is an enhancement laid
  * over a board that is already complete and legible without it.
  */
-const TERMINAL_ART = [
-  "/play/token-1.webp",
-  "/play/token-2.webp",
-  "/play/token-3.webp",
-  "/play/token-4.webp",
-  "/play/token-5.webp",
-  "/play/token-6.webp",
-  "/play/token-7.webp",
-  "/play/token-8.webp",
-];
+export const TOKEN_STATES = ["idle", "select", "connect", "error"];
+const TOKEN_NUMBERS = 10;
+
+const TERMINAL_ART = Array.from({ length: TOKEN_NUMBERS }, (_, index) =>
+  TOKEN_STATES.map((state) => "/play/num-" + (index + 1) + "-" + state + ".webp"),
+);
+
+/** How long a refused terminal wears its error sprite. */
+export const TOKEN_ERROR_MS = 700;
 
 /**
  * The generic bezel around the grid, for any shape without a drawn board of its own. Set by
@@ -92,10 +95,18 @@ export const FRAME_ART = "/play/board-frame.webp";
  * The three drawn boards are read from `presentation.js` rather than listed again, so a fourth
  * size gets warmed and served-tested by existing.
  */
-export const BOARD_ART = [FRAME_ART, ...DRAWN_BOARD_FRAMES.map((frame) => frame.file), ...TERMINAL_ART];
+export const BOARD_ART = [
+  FRAME_ART,
+  ...DRAWN_BOARD_FRAMES.map((frame) => frame.file),
+  ...TERMINAL_ART.flat(),
+];
 
-function terminalArt(pairId) {
-  return TERMINAL_ART[pairId] ?? null;
+/** The sprite for one pair's terminal in one state, or null past the pack's ten numbers. */
+export function terminalArt(pairId, state = "idle") {
+  const sprites = Number.isInteger(pairId) && pairId >= 0 ? TERMINAL_ART.at(pairId) : undefined;
+  if (!sprites) return null;
+  const index = TOKEN_STATES.indexOf(state);
+  return sprites.at(index < 0 ? 0 : index) ?? null;
 }
 
 /*
@@ -214,6 +225,52 @@ export function createBoard(svg, onChange) {
   let layers = null;
   /** @type {Map<number, number[][]>} pairId -> the two terminal centres, for the join pulse. */
   let terminalCentres = new Map();
+  /** @type {Map<number, {node: Element, href: string}[]>} pairId -> its two token images, rebuilt by `build`. */
+  let tokenFaces = new Map();
+  /** @type {Map<number, number>} pairId -> time its error sprite ends. */
+  let errorUntil = new Map();
+  let errorTimer = null;
+
+  /** Which of the four sprites a pair's terminals wear right now. Error outranks everything. */
+  function tokenState(pairId, now) {
+    const until = errorUntil.get(pairId);
+    if (until !== undefined && until > now) return "error";
+    if (dragging === pairId) return "select";
+    const pair = puzzle ? puzzle.pairs.find((entry) => entry.id === pairId) : null;
+    return pair && isJoined(pair) ? "connect" : "idle";
+  }
+
+  /**
+   * Swap each token to the sprite for its state. Only an `href` changes, and only when it differs,
+   * so this is cheap enough to run on every pointer move.
+   */
+  function paintTokens() {
+    const now = Date.now();
+    for (const [pairId, faces] of tokenFaces) {
+      const href = terminalArt(pairId, tokenState(pairId, now));
+      if (!href) continue;
+      for (const face of faces) {
+        if (face.href === href) continue;
+        face.href = href;
+        face.node.setAttribute("href", href);
+      }
+    }
+  }
+
+  /** Show the error sprite on these pairs for a moment, then settle back. */
+  function flashError(pairIds) {
+    if (!puzzle) return;
+    const ids = pairIds ?? puzzle.pairs.map((pair) => pair.id);
+    const until = Date.now() + TOKEN_ERROR_MS;
+    for (const id of ids) errorUntil.set(id, until);
+    paintTokens();
+    if (errorTimer !== null) clearTimeout(errorTimer);
+    errorTimer = setTimeout(() => {
+      errorTimer = null;
+      errorUntil = new Map();
+      paintTokens();
+    }, TOKEN_ERROR_MS);
+  }
 
   function rebuildOwnership() {
     owner = new Map();
@@ -306,7 +363,10 @@ export function createBoard(svg, onChange) {
   function canEnter(pairId, cell) {
     const cellKey = key(cell);
     const terminalOwner = terminals.get(cellKey);
-    if (terminalOwner !== undefined && terminalOwner !== pairId) return false;
+    if (terminalOwner !== undefined && terminalOwner !== pairId) {
+      flashError([pairId, terminalOwner]);
+      return false;
+    }
     return true;
   }
 
@@ -594,6 +654,7 @@ export function createBoard(svg, onChange) {
     if (stars) cells.appendChild(element("path", { d: stars, class: "junction" }));
 
     terminalCentres = new Map();
+    tokenFaces = new Map();
     for (const pair of puzzle.pairs) {
       const centres = [];
       for (const cell of [pair.a, pair.b]) {
@@ -691,20 +752,21 @@ export function createBoard(svg, onChange) {
     label.textContent = String(pairId + 1);
     group.appendChild(label);
 
-    const art = terminalArt(pairId);
+    const art = terminalArt(pairId, tokenState(pairId, Date.now()));
     if (art) {
       const size = cellPx * 0.94;
-      group.appendChild(
-        element("image", {
-          class: "token-face",
-          href: art,
-          x: cx - size / 2,
-          y: cy - size / 2,
-          width: size,
-          height: size,
-          class: "terminal-art",
-        }),
-      );
+      const face = element("image", {
+        href: art,
+        x: cx - size / 2,
+        y: cy - size / 2,
+        width: size,
+        height: size,
+        class: "terminal-art token-face",
+      });
+      group.appendChild(face);
+      const faces = tokenFaces.get(pairId) ?? [];
+      faces.push({ node: face, href: art });
+      tokenFaces.set(pairId, faces);
     }
 
     return group;
@@ -774,6 +836,7 @@ export function createBoard(svg, onChange) {
     }
 
     for (const pairId of landed) pulseTerminals(pairId);
+    paintTokens();
 
     /*
      * A pip in every UNUSED square, and it is functional rather than decorative.
@@ -830,9 +893,15 @@ export function createBoard(svg, onChange) {
     render();
   }
 
-  /** The drawn board for the current puzzle's shape, or null for the generic bezel. */
+  /**
+   * The drawn board for the current puzzle, or null for the generic bezel.
+   *
+   * The skin's own measured geometry when it has one, so the space reserved around the grid and
+   * the place the artwork is pinned are the same numbers - otherwise a skin with a deep frame is
+   * clipped and the numbers sit off its drawn cells.
+   */
   function frame() {
-    return puzzle ? boardFrameFor(puzzle.width, puzzle.height) : null;
+    return puzzle ? skinFrameFor(puzzle.skin, puzzle.width, puzzle.height) : null;
   }
 
   return {
@@ -845,6 +914,7 @@ export function createBoard(svg, onChange) {
       dragging = null;
       locked = false;
       drawOrder = [];
+      errorUntil = new Map();
       for (const pair of next.pairs) {
         terminals.set(key(pair.a), pair.id);
         terminals.set(key(pair.b), pair.id);
@@ -886,6 +956,7 @@ export function createBoard(svg, onChange) {
       dragging = null;
     },
     resize,
+    flashError,
     isComplete,
     joinedCount,
     pairCount() {

@@ -124,10 +124,15 @@ describe("the band is a fixed-height strip", () => {
       the reference measures 986 wide, so a proportional height reads correctly there and
       turns the strip back into a section at 1440. There is deliberately no `lg:h-` or
       `xl:h-` here, and that absence is asserted.
+
+      176px SINCE 25 SEPTEMBER 2026. The owner rejected 104 as "very small fonts and images",
+      and he was right: the arithmetic held and 9-10px text did not. What survives is the
+      rule, a fixed height the content cannot grow, and the derivation: a 40px heading leaves
+      136px of body, which is three 36px rows plus gaps and padding, or a 112px picture.
     */
     const band = bandMarkup();
 
-    expect(band).toMatch(/\bsm:h-\[104px\]/);
+    expect(band).toMatch(/\bsm:h-\[176px\]/);
     expect(band).not.toMatch(/\b(md|lg|xl|2xl):h-[\d[]/);
   });
 
@@ -244,7 +249,8 @@ describe("each card draws a capped number of one-line items", () => {
     */
     for (const file of [RULES, HIGHLIGHTS]) {
       const code = readCode(file);
-      expect(code).toMatch(/className="truncate text-\[10px\]/);
+      // 13px since 25 Sep 2026; 10px was rejected as unreadable.
+      expect(code).toMatch(/className="truncate text-\[13px\]/);
       expect(code).toMatch(/title=\{/);
     }
 
@@ -265,9 +271,9 @@ describe("each card draws a capped number of one-line items", () => {
     */
     const code = readCode(FEED);
 
-    expect(code).toMatch(/size="xs"/);
+    expect(code).toMatch(/size="sm"/);
     expect(code).not.toMatch(/phrase\.metrics/);
-    expect(code).toMatch(/text-\[10px\] font-semibold/);
+    expect(code).toMatch(/text-\[13px\] font-semibold/);
   });
 
   it("draws the avatar at the size the compact row has room for", () => {
@@ -279,7 +285,9 @@ describe("each card draws a capped number of one-line items", () => {
       Both halves or neither, which is the same reason the picture sizes are asserted in the
       card rather than trusted to the illustration component.
     */
-    expect(readCode(AVATAR)).toMatch(/size === "xs"\s*\?\s*"h-5 w-5/);
+    // Reason: the feed asks for `sm` since 25 Sep 2026 (a 28px chip in a 36px row), after the
+    // owner rejected the 20px `xs` chip as too small to recognise anybody by.
+    expect(readCode(AVATAR)).toMatch(/size === "sm"\s*\?\s*"h-7 w-7/);
   });
 
   it("gives each row only the padding three of them fit into", () => {
@@ -300,14 +308,18 @@ describe("each card draws a capped number of one-line items", () => {
     expect(rowAt).toBeGreaterThan(-1);
     const row = code.slice(code.lastIndexOf('className="flex', rowAt), rowAt);
     expect(row.length).toBeGreaterThan(20);
-    expect(row).toMatch(/py-0\.5/);
+    // `h-9` since 25 Sep 2026: three 36px rows, two 6px gaps and 16px of padding are the
+    // 136px body of the 176px band. Taller and the third row goes under `overflow-hidden`.
+    expect(row).toMatch(/\bh-9\b/);
+    expect(row).not.toMatch(/\bpy-/);
   });
 });
 
 describe("the pictures are small and beside the text", () => {
   const beside: [string, string, string][] = [
-    ["the rules card", RULES, "w-\\[66px\\]"],
-    ["the tips card", HIGHLIGHTS, "w-\\[88px\\]"],
+    // 112 and 128 since the band became 176px on 25 Sep 2026 (were 66 and 88).
+    ["the rules card", RULES, "w-\\[112px\\]"],
+    ["the tips card", HIGHLIGHTS, "w-\\[128px\\]"],
   ];
 
   it.each(beside)("%s draws it at a fixed size", (_label, file, size) => {
@@ -392,14 +404,19 @@ describe("the heading strip is compact, and defined once", () => {
     expect(code).toMatch(/dense \? "truncate" : ""/);
   });
 
-  it("is asked for by all three cards", () => {
+  it("is asked for by none of the three cards, all alike", () => {
     /*
-      COUNTED ACROSS THE THREE, because one card keeping the tall strip is not a wrong
-      heading - it is a card with one fewer line of content than its neighbours, which reads
+      COUNTED ACROSS THE THREE, because one card with a different strip from its neighbours
+      is not a wrong heading - it is a card with a different amount of content, which reads
       as the operator having written less.
+
+      FLIPPED ON 25 SEPTEMBER 2026, not deleted. The three cards asked for `dense` while the
+      band was 104px, because a 34px heading was a third of a 96px card. At 176px the full
+      heading fits and is what the reference draws, so all three now use it - and the rule
+      that they AGREE is the part worth keeping.
     */
     for (const file of [RULES, HIGHLIGHTS, FEED]) {
-      expect(readCode(file)).toMatch(/<NeonHeadedPanel[\s\S]{0,200}?\sdense\b/);
+      expect(readCode(file)).not.toMatch(/<NeonHeadedPanel[\s\S]{0,200}?\sdense\b/);
     }
   });
 

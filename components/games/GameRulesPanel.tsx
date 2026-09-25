@@ -258,18 +258,27 @@ function RulesStrip({
   const steps = paragraphs(text).slice(0, STRIP_STEP_LIMIT);
 
   return (
-    <NeonHeadedPanel icon={BookOpen} title="How it works" dense>
-      <div className="flex h-full items-center gap-2.5 px-2.5 py-1">
-        <ol className="min-w-0 flex-1 space-y-1">
+    <NeonHeadedPanel icon={BookOpen} title="How it works">
+      <div className="flex h-full items-center gap-3 px-3 py-2">
+        <ol className="min-w-0 flex-1 space-y-1.5">
           {steps.map((step, index) => (
-            <li key={index} className="flex items-center gap-2">
+            /*
+              A BOXED ROW PER STEP, as the reference draws them: the tinted rounded box is
+              what makes three short sentences read as a sequence rather than as a paragraph
+              that happens to have line breaks. 36px tall, which is the arithmetic the band's
+              176px was derived from - see `GameArenaLayout`.
+            */
+            <li
+              key={index}
+              className="flex h-9 items-center gap-2.5 rounded-lg border border-sky-400/20 bg-sky-400/[0.06] px-2"
+            >
               {/*
                 The reference's small blue numbered disc. `aria-hidden` because the ordinal is
                 already carried by the `<ol>`, and read aloud it would announce every step
                 twice.
               */}
               <span
-                className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border border-cyan-400/40 bg-cyan-400/10 text-[9px] font-bold text-cyan-300"
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-cyan-400/60 bg-cyan-400/10 text-[12px] font-bold text-cyan-200 shadow-[0_0_8px_rgba(34,211,238,0.35)]"
                 aria-hidden
               >
                 {index + 1}
@@ -281,7 +290,7 @@ function RulesStrip({
                 one recoverable rather than merely cut. The lobby has it in full either way.
               */}
               <span
-                className="truncate text-[10px] leading-tight text-gray-300"
+                className="truncate text-[13px] leading-tight text-gray-100"
                 title={step}
               >
                 {step}
@@ -301,8 +310,9 @@ function RulesStrip({
           THE WIDTH IS THE SIZE. `NeonIllustration` is `aspect-square`, so it takes its height
           from its width - which is why this is `w-[66px]` and not a height, and why the band
           had to be 104px rather than 96 for the number the owner asked for to fit at all.
+          112px since the band became 176px tall: a 136px body less its 16px of padding.
         */}
-        <div className="hidden w-[66px] shrink-0 sm:block">
+        <div className="hidden w-[112px] shrink-0 sm:block">
           <NeonIllustration
             src={imageUrl}
             alt={`How ${gameName} is played`}

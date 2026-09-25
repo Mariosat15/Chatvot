@@ -1,7 +1,6 @@
 import { Activity } from "lucide-react";
 import { NeonHeadedPanel } from "@/components/neon/Cards";
 import { NeonAvatar } from "@/components/neon/LeaderboardRow";
-import { NEON_DIVIDER } from "@/components/neon/tokens";
 import {
   describeRoundActivity,
   roundActivityToneClass,
@@ -66,18 +65,17 @@ export function ArenaActivityFeed({ entries, currentUserId }: Props) {
     <NeonHeadedPanel
       icon={Activity}
       title="Recent players"
-      dense
       action={
-        <span className="flex shrink-0 items-center gap-1 text-[9px] font-medium uppercase tracking-wide text-emerald-300">
+        <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-300">
           <span
-            className="h-1.5 w-1.5 rounded-full bg-emerald-400"
+            className="h-2 w-2 rounded-full bg-emerald-400"
             aria-hidden
           />
           Live
         </span>
       }
     >
-      <div className={`divide-y ${NEON_DIVIDER}`}>
+      <div className="space-y-1.5 p-2">
         {entries.slice(0, FEED_LIMIT).map((entry) => {
           const phrase = describeRoundActivity(entry.activity);
           const isYou = entry.userId === currentUserId;
@@ -97,31 +95,32 @@ export function ArenaActivityFeed({ entries, currentUserId }: Props) {
             <div
               key={`${entry.userId}-${entry.activity.attemptNumber}`}
               /*
-                `py-0.5` IS THE ROW HEIGHT AND IT IS ARITHMETIC. A 20px avatar plus 2px above
-                and below is 24, so three rows and their two hairlines are 74 - exactly the
-                band's body once its 30px heading is taken off its 104. At `py-1` the third
-                row is pushed under the card's `overflow-hidden` and disappears with nothing
-                on screen to say so, which is the owner's "3 compact rows" silently becoming 2.
+                `h-9` IS THE ROW HEIGHT AND IT IS ARITHMETIC. Three 36px boxed rows, two 6px
+                gaps and 8px of padding above and below are 136 - exactly the band's body once
+                its 40px heading is taken off its 176. Any taller and the third row is pushed
+                under the card's `overflow-hidden` and disappears with nothing on screen to
+                say so, which is the owner's "3 rows" silently becoming 2. It was `py-0.5`
+                beside a 20px chip in the 104px band, rejected as unreadably small.
               */
-              className="flex items-center gap-2 px-2.5 py-0.5"
+              className="flex h-9 items-center gap-2.5 rounded-lg border border-sky-400/20 bg-sky-400/[0.06] px-2.5"
             >
-              <NeonAvatar name={name} size="xs" />
+              <NeonAvatar name={name} size="sm" />
 
               <span
-                className={`shrink-0 max-w-[42%] truncate text-[10px] font-semibold ${
+                className={`shrink-0 max-w-[42%] truncate text-[13px] font-semibold ${
                   isYou ? "text-sky-200" : "text-gray-100"
                 }`}
               >
                 {name}
               </span>
               {isYou && (
-                <span className="shrink-0 text-[8px] font-semibold uppercase tracking-wide text-sky-400">
+                <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-sky-400">
                   you
                 </span>
               )}
 
               <span
-                className={`min-w-0 flex-1 truncate text-[9px] leading-tight ${roundActivityToneClass(
+                className={`min-w-0 flex-1 truncate text-[12px] leading-tight ${roundActivityToneClass(
                   phrase.tone,
                 )}`}
               >
@@ -135,7 +134,7 @@ export function ArenaActivityFeed({ entries, currentUserId }: Props) {
                 noise where the row already says what is going on.
               */}
               {typeof entry.activity.score === "number" && (
-                <span className="shrink-0 text-[11px] font-bold tabular-nums text-amber-300">
+                <span className="shrink-0 text-[15px] font-bold tabular-nums text-amber-300 drop-shadow-[0_0_6px_rgba(252,211,77,0.45)]">
                   {entry.activity.score.toLocaleString()}
                 </span>
               )}

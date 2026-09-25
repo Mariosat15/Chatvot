@@ -293,6 +293,14 @@ export function GameArenaLayout({
         acceptance points that ask whether the pictures are there. 104 gives 74px of body,
         which fits a 66px picture, three 24px feed rows, and the owner's own 95-115 range.
 
+        RAISED TO 176px ON 25 SEPTEMBER 2026, on the owner's "very small fonts and images, it's
+        terrible". 104 was right about the arithmetic and wrong about what a person can read:
+        9-10px text and a 66px picture at desktop distance. The height is still FIXED - the
+        rule that mattered was "a band that cannot grow", never the number - and it is
+        arrived at the same way: a full 40px heading leaves 136px of body, which holds three
+        36px step rows, four 13px tips beside a 96px emblem, or three 40px player rows. Still
+        inside the reference's own card proportion of about 2.4:1 at a third of the page.
+
         WHICH MEANS THE CARDS CANNOT GROW, so what goes in them is capped rather than
         wrapped. Each panel takes the reference's own count - three steps, four tips, three
         players - and clamps every line to one, with the full text on a tooltip and the
@@ -322,7 +330,7 @@ export function GameArenaLayout({
         are also rendered in the lobby, where a forced full height would stretch one card to
         the length of a whole column.
       */}
-      <div className="mt-4 flex flex-wrap items-stretch gap-2.5 sm:h-[104px]">
+      <div className="mt-4 flex flex-wrap items-stretch gap-2.5 sm:h-[176px]">
         <div className="min-w-[260px] flex-[1.15_1_0] empty:hidden [&>*]:h-full">
           {rules}
         </div>
