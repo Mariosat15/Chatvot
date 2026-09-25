@@ -822,7 +822,19 @@ async function main(): Promise<void> {
      * possibly in public. A recipe that creeps past it is not a visible defect - it is a game
      * somebody mutes once and never unmutes, which shows up as nothing at all.
      */
-    for (const name of ["press", "start", "refused", "clear", "tick"]) {
+    for (const name of [
+      "press",
+      "start",
+      "refused",
+      "clear",
+      "break",
+      "tick",
+      "tick-final",
+      "warning",
+      "time-up",
+      "submit",
+      "win",
+    ]) {
       const recipe = p.toneRecipe(name);
       assert.ok(recipe, `no recipe for ${name}`);
       assert.ok(recipe.ms > 0 && recipe.ms <= p.SOUND_MAX_MS, `${name} lasts ${recipe.ms}ms`);

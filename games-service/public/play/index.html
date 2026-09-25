@@ -155,13 +155,8 @@
               <span id="cell-board-label" class="readout-label"></span>
               <span id="cell-board-value" class="readout-value"></span>
             </div>
-            <!--
-              Timer chrome: `ui-timer.webp` is the shell; `#clock` still paints the remaining
-              seconds as text until Phase C swaps in digit sprites. The label stays in the DOM
-              for screen readers and is visually covered by the art's own "TIME LEFT".
-            -->
-            <div class="readout readout-clock chrome-timer">
-              <span id="cell-clock-label" class="readout-label chrome-timer-label"></span>
+            <div class="readout readout-clock">
+              <span id="cell-clock-label" class="readout-label"></span>
               <span id="clock" class="readout-value clock" aria-live="off"></span>
             </div>
             <div class="readout">
@@ -283,25 +278,13 @@
                 <span class="rail-btn-icon" aria-hidden="true">&#8630;</span>
                 <span class="rail-btn-label">Undo</span>
               </button>
-              <!--
-                Clear stays SECONDARY WIDTH on purpose (s4.1r / Improve-game constraint 8): the
-                red art ships as a wide banner, so CSS caps this control and object-fits the face.
-                Equalising Clear with Submit reinstates the wipe-instead-of-send hazard.
-              -->
-              <button id="clear" class="ghost rail-btn chrome-clear" type="button" aria-label="Clear">
-                <!--
-                  Face is a CSS background, not an image element with an absolute play-path.
-                  The document fingerprint rewrite only covers the JS/CSS entry points; a bare
-                  play-path on src or href fails the R55 document guard. board-frame.webp already
-                  uses this CSS-background pattern.
-                -->
-                <span class="chrome-face" aria-hidden="true"></span>
-                <span class="rail-btn-label chrome-fallback">Clear</span>
+              <button id="clear" class="ghost rail-btn" type="button">
+                <span class="rail-btn-icon" aria-hidden="true">&#10005;</span>
+                <span class="rail-btn-label">Clear</span>
               </button>
             </div>
-            <button id="submit" class="primary submit-wide chrome-submit" type="button" disabled>
-              <span class="chrome-face" aria-hidden="true"></span>
-              <span class="chrome-label">Submit solution</span>
+            <button id="submit" class="primary submit-wide" type="button" disabled>
+              Submit solution
             </button>
           </div>
         </footer>

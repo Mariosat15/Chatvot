@@ -110,10 +110,23 @@ export const BOARD_ART_OVERHANG = 0.072;
  * plainer until it has artwork. `boardFrameFor` returns null for that case on purpose.
  */
 export const DRAWN_BOARD_FRAMES = [
+  // Reason: Phase D overwrote board-4/6/8.webp with Small-1 / Medium-1 / Large-1 heroes in place
+  // so paths and inset measurements stay put; board-skin-* copies remain on disk as the pack source.
   { cells: 4, file: "/play/board-4.webp", top: 0.2166, right: 0.1737, bottom: 0.2236, left: 0.1737 },
   { cells: 6, file: "/play/board-6.webp", top: 0.1438, right: 0.1323, bottom: 0.1363, left: 0.1335 },
   { cells: 8, file: "/play/board-8.webp", top: 0.1184, right: 0.1258, bottom: 0.1319, left: 0.1245 },
 ];
+
+/**
+ * Neon digit sprites for the countdown clock (Improve-game Phase C).
+ *
+ * Paint only — `renderClock` in `app.js` still derives the remaining time from `endsAt`. Warming
+ * these at boot keeps a digit change from flashing an empty slot on a paid attempt.
+ */
+export const CLOCK_DIGIT_ART = Array.from(
+  { length: 10 },
+  (_, digit) => "/play/digit-" + digit + ".webp",
+);
 
 /** The drawn frame for a square grid of this size, or null when it has to make do with the bezel. */
 export function boardFrameFor(gridWidth, gridHeight) {
@@ -553,7 +566,13 @@ const TONE_RECIPES = new Map([
   ["start", { type: "triangle", fromHz: 330, toHz: 660, ms: 180, gain: 0.07 }],
   ["refused", { type: "sawtooth", fromHz: 150, toHz: 90, ms: 190, gain: 0.05 }],
   ["clear", { type: "triangle", fromHz: 220, toHz: 130, ms: 130, gain: 0.045 }],
+  ["break", { type: "triangle", fromHz: 280, toHz: 140, ms: 110, gain: 0.045 }],
   ["tick", { type: "square", fromHz: 760, toHz: 700, ms: 45, gain: 0.035 }],
+  ["tick-final", { type: "square", fromHz: 920, toHz: 820, ms: 55, gain: 0.045 }],
+  ["warning", { type: "sawtooth", fromHz: 420, toHz: 280, ms: 160, gain: 0.05 }],
+  ["time-up", { type: "sawtooth", fromHz: 200, toHz: 80, ms: 220, gain: 0.055 }],
+  ["submit", { type: "triangle", fromHz: 360, toHz: 520, ms: 90, gain: 0.05 }],
+  ["win", { type: "triangle", fromHz: 440, toHz: 880, ms: 240, gain: 0.06 }],
 ]);
 
 /**

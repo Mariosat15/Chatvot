@@ -36,6 +36,7 @@
 import { BOARD_ART, FRAME_ART, createBoard } from "./board.js";
 import {
   BOARD_COMPLETE_MS,
+  CLOCK_DIGIT_ART,
   COUNT_UP_STEP_MS,
   bestBoardTime,
   boardProgress,
@@ -131,22 +132,6 @@ const ui = {
   retry: document.getElementById("retry"),
 };
 
-/**
- * Reason: Phase B chrome paints Submit via a CSS background on `.chrome-face`. Assigning
- * `textContent` on the button would wipe that face on the first check. The label span is the
- * only writable child; when it is absent (older markup) fall back to textContent so a partial
- * deploy still works.
- */
-function setSubmitLabel(text) {
-  const label = ui.submit.querySelector(".chrome-label");
-  if (label) {
-    label.textContent = text;
-    ui.submit.classList.toggle("is-busy", text !== "Submit solution");
-    return;
-  }
-  ui.submit.textContent = text;
-}
-
 let state = null;
 let clockTimer = null;
 let refusalTimer = null;
@@ -154,6 +139,10 @@ let announcedFinished = false;
 let countUpTimer = null;
 /** The whole second the tick last sounded for, so a four-times-a-second repaint ticks once. */
 let tickedSecond = -1;
+/** Whether the one-shot low-time warning has already fired this urgent stretch. */
+let warnedUrgent = false;
+/** Last painted clock string, so digit sprites are not rebuilt every 250ms for the same second. */
+let lastClockDisplay = "";
 
 /*
  * Constructing this reads the stored preference and nothing else - no `AudioContext` exists until
@@ -480,7 +469,9 @@ const failedArt = new Set();
 function warmBoardArt() {
   if (artWarmed) return;
   artWarmed = true;
-  for (const url of BOARD_ART) {
+  // Board bezels plus countdown digit sprites. Digits are decoration; a miss falls back to text
+  // in `paintClockDigits`. Board misses still go through `failedArt` / `dressBoard`.
+  for (const url of [...BOARD_ART, ...CLOCK_DIGIT_ART]) {
     const image = new Image();
     image.decoding = "async";
     /*
@@ -489,11 +480,51 @@ function warmBoardArt() {
      * transparent under a drawn frame. Recording the failure lets `dressBoard` put them back.
      * A background image has no error event of its own, which is why it is caught here.
      */
-    image.onerror = () => {
-      failedArt.add(url);
-      if (state && state.board && screens.play && !screens.play.hidden) dressBoard();
-    };
+    if (BOARD_ART.includes(url)) {
+      image.onerror = () => {
+        failedArt.add(url);
+        if (state && state.board && screens.play && !screens.play.hidden) dressBoard();
+      };
+    }
     image.src = url;
+  }
+}
+
+/**
+ * Paint the countdown with digit sprites, or fall back to text if a sprite is missing.
+ *
+ * Still driven by the same `endsAt` arithmetic as before — sprites are paint, never a second clock.
+ */
+function paintClockDigits(display) {
+  if (!ui.clock) return;
+  if (display === lastClockDisplay) return;
+  lastClockDisplay = display;
+  ui.clock.replaceChildren();
+  ui.clock.setAttribute("aria-label", display || "time remaining");
+  if (!display) return;
+
+  let usedSprites = true;
+  for (const ch of display) {
+    if (ch === ":") {
+      const colon = document.createElement("span");
+      colon.className = "clock-colon";
+      colon.textContent = ":";
+      colon.setAttribute("aria-hidden", "true");
+      ui.clock.appendChild(colon);
+      continue;
+    }
+    if (ch < "0" || ch > "9") {
+      usedSprites = false;
+      break;
+    }
+    const digit = document.createElement("span");
+    digit.className = "clock-digit";
+    digit.style.backgroundImage = 'url("/play/digit-' + ch + '.webp")';
+    digit.setAttribute("aria-hidden", "true");
+    ui.clock.appendChild(digit);
+  }
+  if (!usedSprites) {
+    ui.clock.textContent = display;
   }
 }
 
@@ -645,16 +676,23 @@ function renderUndo() {
 
 function renderClock() {
   if (!state || !state.endsAt) {
-    ui.clock.textContent = "";
+    paintClockDigits("");
     return;
   }
   const remaining = Math.max(0, new Date(state.endsAt).getTime() - Date.now());
   const seconds = Math.ceil(remaining / 1000);
   const minutes = Math.floor(seconds / 60);
   const rest = seconds % 60;
-  ui.clock.textContent = minutes + ":" + String(rest).padStart(2, "0");
+  paintClockDigits(minutes + ":" + String(rest).padStart(2, "0"));
   const urgent = remaining <= 10_000;
   ui.clock.classList.toggle("urgent", urgent);
+
+  // One warning when the urgent stretch begins — not every 250ms while the rim stays red.
+  if (urgent && !warnedUrgent) {
+    warnedUrgent = true;
+    sound.play("warning");
+  }
+  if (!urgent) warnedUrgent = false;
 
   /*
    * The tick is keyed on the SECOND changing, not on this function running. It runs four times a
@@ -662,10 +700,11 @@ function renderClock() {
    * player could stop it would be to mute the whole game in the last ten seconds of a round.
    *
    * Not awaited, like every other sound: the clock's job is to be accurate.
+   * Last three seconds use the sharper final tick from the SFX pack.
    */
   if (urgent && seconds > 0 && seconds !== tickedSecond) {
     tickedSecond = seconds;
-    sound.play("tick");
+    sound.play(seconds <= 3 ? "tick-final" : "tick");
   }
 
   /*
@@ -675,6 +714,7 @@ function renderClock() {
    * completes, it does not expire, and those read very differently to a player.
    */
   if (remaining === 0) {
+    sound.play("time-up");
     stopClock();
     refresh().catch((error) => fail(error.message));
   }
@@ -685,6 +725,8 @@ function startClock() {
   // A fresh board inside the same round restarts this. Without the reset, a round that reaches
   // the last ten seconds, solves a board and carries on would never tick again for that second.
   tickedSecond = -1;
+  // Do NOT reset warnedUrgent here: a board solve inside the last ten seconds must not re-blare
+  // the warning. It resets when the clock leaves the urgent band, or when the round ends.
   renderClock();
   clockTimer = window.setInterval(renderClock, 250);
 }
@@ -734,6 +776,7 @@ function countUpStat(statValue) {
 
 function renderResult() {
   stopClock();
+  sound.stopMusic();
   board.lock();
 
   const finished = state.finished || { status: state.status, boardsSolved: state.boardsSolved };
@@ -763,6 +806,7 @@ function renderResult() {
   // Which of the two pieces of artwork is shown. A trophy over a round that solved nothing reads
   // as sarcasm, so the neutral mark is not a fallback - it is the honest one for that ending.
   ui.resultArt.classList.toggle("won", copy.triumphant);
+  if (copy.triumphant) sound.play("win");
 
   ui.done.textContent = state.returnUrl || window.parent !== window ? "Back to contest" : "Close";
   show("result");
@@ -873,6 +917,9 @@ async function start() {
    */
   sound.unlock();
   sound.play("start");
+  // Music starts with the paid attempt, never on the intro — a bed under the rules screen would
+  // run before the player has agreed to play, and mute is the only way to stop it.
+  sound.startMusic();
 
   ui.start.disabled = true;
   ui.start.textContent = "Starting...";
@@ -880,15 +927,16 @@ async function start() {
     state = await call("/play/api/session", { t: token });
     render();
   } catch (error) {
+    sound.stopMusic();
     fail(error.message);
   }
 }
 
 async function submit() {
   if (!board.isComplete()) return;
-  sound.play("press");
+  sound.play("submit");
   ui.submit.disabled = true;
-  setSubmitLabel("Checking...");
+  ui.submit.textContent = "Checking...";
 
   try {
     const outcome = await call("/play/api/submit", {
@@ -898,7 +946,7 @@ async function submit() {
     });
 
     state = outcome.state;
-    setSubmitLabel("Submit solution");
+    ui.submit.textContent = "Submit";
 
     if (outcome.accepted) {
       /*
@@ -929,7 +977,7 @@ async function submit() {
       refusalTimer = window.setTimeout(() => renderHint(null), REFUSAL_HOLD_MS);
     }
   } catch (error) {
-    setSubmitLabel("Submit solution");
+    ui.submit.textContent = "Submit";
     ui.submit.disabled = false;
     fail(error.message);
   }
@@ -937,6 +985,7 @@ async function submit() {
 
 async function leave() {
   if (!window.confirm("Leave the round? Boards you have already finished still count.")) return;
+  sound.stopMusic();
   try {
     state = await call("/play/api/leave", { t: token });
     render();
@@ -973,7 +1022,7 @@ ui.clear.addEventListener("click", () => {
 // A disabled button can still be reached by keyboard on some browsers, and a click that clears
 // nothing while making the noise of clearing something is the game lying about what it did.
 ui.undo.addEventListener("click", () => {
-  if (board.undo()) sound.play("clear");
+  if (board.undo()) sound.play("break");
 });
 ui.leave.addEventListener("click", leave);
 ui.done.addEventListener("click", done);
@@ -1007,7 +1056,15 @@ renderSoundControl();
  * property and returns. `pointerdown` only - never `pointermove` - and passive, so it cannot
  * delay or cancel the drag `board.js` starts on the same event.
  */
-ui.board.addEventListener("pointerdown", () => sound.unlock(), { passive: true });
+ui.board.addEventListener(
+  "pointerdown",
+  () => {
+    sound.unlock();
+    // A resumed round never hits Start, so the bed begins on the first grid touch instead.
+    if (state && state.board && !state.finished) sound.startMusic();
+  },
+  { passive: true },
+);
 
 ui.retry.addEventListener("click", () => {
   show("loading");

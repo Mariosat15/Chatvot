@@ -3,25 +3,23 @@
  *
  * WHAT IS HERE AND WHAT IS IN `presentation.js`
  * --------------------------------------------
- * Every number about a sound - its pitch, its shape, how long it lasts, how loud it is, which
- * note a pair gets - is in `presentation.js`, where a test can read it without a browser. This
- * file holds only the Web Audio calls, which is the part no test in this service can drive. The
- * split is the same one that made the board's size and the result screen's wording provable, and
- * it is the reason there is not a single frequency literal below.
+ * Every number about a *synthesised* sound - its pitch, its shape, how long it lasts, how loud it
+ * is, which note a pair gets - is in `presentation.js`, where a test can read it without a
+ * browser. This file holds the Web Audio calls and, since Improve-game Phase E, the OGG sample
+ * playback. The synthesised recipes stay as the fallback when a file fails to load.
  *
  * THREE RULES THIS FILE EXISTS TO KEEP, IN ORDER OF HOW BADLY EACH ONE FAILS
  * ------------------------------------------------------------------------
  * 1. NOTHING HERE IS EVER AWAITED. There is no `async` and no `await` in this file, and every
  *    entry point returns `undefined`, so there is nothing on the gameplay path a caller could
- *    wait for even by accident. `AudioContext.resume()` returns a promise and the tempting thing
- *    is to await it before playing the Start sound - which would put an audio device between the
- *    player's tap and the POST that starts their clock. On a timed title the clock IS the score.
+ *    wait for even by accident. `AudioContext.resume()`, `fetch`, and `decodeAudioData` all return
+ *    promises and are started-and-forgotten - putting any of them between a tap and the POST that
+ *    starts the clock would make the player's score pay for audio hardware.
  *
  * 2. A BROKEN AUDIO STACK IS A SILENT GAME, NEVER A BROKEN ONE. Every call is inside a try/catch
- *    and the first failure sets `broken`, after which this object does nothing at all. Safari
- *    refuses a context in some embedded configurations, a locked-down browser removes the
- *    constructor, and a phone that has run out of audio contexts throws on construction. In all
- *    three the player must get a game that plays perfectly and makes no noise.
+ *    and the first hard failure sets `broken`, after which this object does nothing at all. A
+ *    missing OGG falls back to the synthesised recipe for that name; only a dead AudioContext
+ *    silences everything.
  *
  * 3. THE CONTEXT IS CREATED FROM A USER GESTURE. Browsers start an `AudioContext` suspended until
  *    one, and a context created at page load is one that never produces a sound however many
@@ -38,18 +36,56 @@ import {
   toneRecipe,
 } from "./presentation.js";
 
-/** A 6ms fade in and out of every note. See `playRecipe` - without it each one is a click. */
+/** A 6ms fade in and out of every synthesised note. See `playRecipe` - without it each one is a click. */
 const EDGE_S = 0.006;
 
 /**
- * Read the player's mute choice.
+ * Packed OGG files → logical sound names used by `app.js`.
  *
- * The read is wrapped because `localStorage` THROWS rather than returning null when a browser
- * refuses it - Safari in private browsing, and any host page loaded with third-party storage
- * blocked, which an iframe on somebody else's domain very much is. An unhandled throw here would
- * happen at module scope and take the whole module graph down with it, which is the failure that
- * shows the player a loading spinner for ever.
+ * `sfx-combo-bonus` is deliberately NOT mapped: it must not imply a scoring bonus the server does
+ * not award (Improve-game constraint). Synthesised `toneRecipe` covers any name without a sample.
  */
+const SAMPLE_URLS = new Map([
+  ["press", "/play/sfx-dot-select.ogg"],
+  ["start", "/play/sfx-new-board.ogg"],
+  ["refused", "/play/sfx-connection-invalid.ogg"],
+  ["clear", "/play/sfx-clear-reset.ogg"],
+  ["break", "/play/sfx-connection-break.ogg"],
+  ["tick", "/play/sfx-countdown-tick.ogg"],
+  ["tick-final", "/play/sfx-countdown-final.ogg"],
+  ["warning", "/play/sfx-timer-warning.ogg"],
+  ["time-up", "/play/sfx-time-up.ogg"],
+  ["submit", "/play/sfx-submit-move.ogg"],
+  ["connected", "/play/sfx-dot-connected.ogg"],
+  ["board-complete", "/play/sfx-board-complete.ogg"],
+  ["win", "/play/sfx-win.ogg"],
+  ["music", "/play/music-neon-circuit.ogg"],
+]);
+
+/** Relative gains under the music bed (SFX_MAP recommendation: SFX ~25–40%, complete/win higher). */
+const SAMPLE_GAIN = new Map([
+  ["press", 0.32],
+  ["start", 0.38],
+  ["refused", 0.34],
+  ["clear", 0.34],
+  ["break", 0.32],
+  ["tick", 0.28],
+  ["tick-final", 0.4],
+  ["warning", 0.42],
+  ["time-up", 0.5],
+  ["submit", 0.36],
+  ["connected", 0.34],
+  ["board-complete", 0.62],
+  ["win", 0.68],
+  ["music", 0.22],
+]);
+
+/**
+ * Every sample URL the page may need, for `app.js` to warm while the player reads the rules.
+ * Music is included: a 2.5 MB fetch during intro is better than paying for it after Start.
+ */
+export const SAMPLE_ART = [...SAMPLE_URLS.values()];
+
 function readPreference() {
   try {
     return soundEnabledFrom(window.localStorage.getItem(SOUND_PREFERENCE_KEY));
@@ -76,14 +112,14 @@ export function createSound() {
   let enabled = readPreference();
   let context = null;
   let broken = false;
+  /** @type {Map<string, AudioBuffer>} */
+  const buffers = new Map();
+  /** @type {Set<string>} */
+  const loading = new Set();
+  let musicSource = null;
+  let musicGain = null;
+  let musicWanted = false;
 
-  /**
-   * Bring the context up, without waiting for it.
-   *
-   * `resume()` returns a promise and it is deliberately not awaited - see rule 1 in the header.
-   * The rejection is swallowed because an unhandled one is a red line in the player's console
-   * that says nothing useful and looks, to anybody they report it to, like the game failing.
-   */
   function resume() {
     if (!context || context.state !== "suspended") return;
     try {
@@ -94,10 +130,40 @@ export function createSound() {
     }
   }
 
+  function loadSample(name, url) {
+    if (!context || broken || buffers.has(name) || loading.has(name)) return;
+    loading.add(name);
+    fetch(url)
+      .then((response) => {
+        if (!response.ok) throw new Error(String(response.status));
+        return response.arrayBuffer();
+      })
+      .then((bytes) => {
+        if (!context) return null;
+        // Older WebKit still wants a callback form; the promise form is preferred where it exists.
+        return context.decodeAudioData(bytes.slice(0));
+      })
+      .then((buffer) => {
+        if (buffer) buffers.set(name, buffer);
+        loading.delete(name);
+        if (name === "music" && musicWanted) startMusicInternal();
+      })
+      .catch(() => {
+        loading.delete(name);
+        /* Missing or undecodable file → synthesised fallback on play. */
+      });
+  }
+
+  function warmAllSamples() {
+    if (!context || broken) return;
+    for (const [name, url] of SAMPLE_URLS) loadSample(name, url);
+  }
+
   function unlock() {
     if (broken) return;
     if (context) {
       resume();
+      warmAllSamples();
       return;
     }
     try {
@@ -108,22 +174,14 @@ export function createSound() {
       }
       context = new Ctor();
     } catch {
-      // A phone that has run out of contexts, or a browser that refuses one in a frame.
       broken = true;
       context = null;
       return;
     }
     resume();
+    warmAllSamples();
   }
 
-  /**
-   * One note: an oscillator through a gain envelope, scheduled and forgotten.
-   *
-   * The envelope is the part that is not obvious. A gain stepping straight from 0 to full and back
-   * produces a click at each end, and on a phone speaker the click is louder than the note - so a
-   * quiet game ends up sounding like a fault. `EDGE_S` of ramp at each end removes it, and the
-   * tail is exponential because a linear fade to zero still clicks.
-   */
   function playRecipe(recipe) {
     if (!enabled || broken || !context || !recipe) return;
     try {
@@ -137,8 +195,6 @@ export function createSound() {
       osc.type = recipe.type;
       osc.frequency.setValueAtTime(recipe.fromHz, at);
       if (recipe.toHz !== recipe.fromHz) {
-        // Exponential rather than linear because pitch is heard logarithmically: a linear slide
-        // between two notes spends most of its time near the top one and reads as a chirp.
         osc.frequency.exponentialRampToValueAtTime(recipe.toHz, ends);
       }
 
@@ -152,12 +208,6 @@ export function createSound() {
       osc.start(at);
       osc.stop(ends + EDGE_S);
 
-      /*
-       * An `OscillatorNode` is single-use, and a stopped one that is still connected keeps its
-       * gain node alive with it. A Sprint round is minutes of joining pairs, so without this the
-       * graph grows one pair of nodes per wire for the whole round - which is not a leak anybody
-       * would see in a demo and is audible as crackle on a phone by the end of a long round.
-       */
       osc.onended = () => {
         try {
           osc.disconnect();
@@ -171,40 +221,121 @@ export function createSound() {
     }
   }
 
+  function playBuffer(name, opts) {
+    if (!enabled || broken || !context) return false;
+    const buffer = buffers.get(name);
+    if (!buffer) return false;
+    try {
+      const source = context.createBufferSource();
+      const gain = context.createGain();
+      const level = (opts && opts.gain) || SAMPLE_GAIN.get(name) || 0.35;
+      source.buffer = buffer;
+      source.loop = Boolean(opts && opts.loop);
+      gain.gain.setValueAtTime(level, context.currentTime);
+      source.connect(gain);
+      gain.connect(context.destination);
+      source.start(context.currentTime + Math.max(0, ((opts && opts.delayMs) || 0) / 1000));
+      if (!source.loop) {
+        source.onended = () => {
+          try {
+            source.disconnect();
+            gain.disconnect();
+          } catch {
+            /* already gone */
+          }
+        };
+      }
+      if (opts && opts.loop) {
+        musicSource = source;
+        musicGain = gain;
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  function playNamed(name) {
+    if (playBuffer(name)) return;
+    const url = SAMPLE_URLS.get(name);
+    if (url) loadSample(name, url);
+    playRecipe(toneRecipe(name));
+  }
+
+  function stopMusicInternal() {
+    if (musicSource) {
+      try {
+        musicSource.stop();
+      } catch {
+        /* already stopped */
+      }
+      try {
+        musicSource.disconnect();
+        if (musicGain) musicGain.disconnect();
+      } catch {
+        /* already gone */
+      }
+    }
+    musicSource = null;
+    musicGain = null;
+  }
+
+  function startMusicInternal() {
+    if (!enabled || broken || !context || !musicWanted) return;
+    if (musicSource) return;
+    if (!playBuffer("music", { loop: true, gain: SAMPLE_GAIN.get("music") })) {
+      loadSample("music", SAMPLE_URLS.get("music"));
+    }
+  }
+
   return {
-    /** Whether sound is on. Read by `app.js` only to label the control. */
     isEnabled() {
       return enabled;
     },
 
-    /**
-     * Turn sound on or off and remember it.
-     *
-     * Unlocking on the way ON matters: the control is the second gesture a player might make, and
-     * somebody who starts a round muted and unmutes mid-board would otherwise have a context
-     * that was never created from a gesture and stays silent for the rest of the round.
-     */
     setEnabled(next) {
       enabled = next === true;
       writePreference(enabled);
-      if (enabled) unlock();
+      if (enabled) {
+        unlock();
+        if (musicWanted) startMusicInternal();
+      } else {
+        stopMusicInternal();
+      }
     },
 
     unlock,
 
-    /** One of the fixed sounds by name. An unknown name is silence - see `toneRecipe`. */
+    /** One of the fixed sounds by name. Sample first, synthesised fallback. */
     play(name) {
-      playRecipe(toneRecipe(name));
+      playNamed(name);
     },
 
     /** The note belonging to a pair, played as its wire lands. */
     playPair(pairId) {
+      if (playBuffer("connected")) return;
+      loadSample("connected", SAMPLE_URLS.get("connected"));
       playRecipe(pairNoteRecipe(pairId));
     },
 
-    /** The board-complete flourish. Its notes carry their own offsets; see `boardCompleteNotes`. */
+    /** Board solved (server-confirmed). Sample first; arpeggio fallback. */
     playBoardComplete() {
+      if (playBuffer("board-complete")) return;
+      loadSample("board-complete", SAMPLE_URLS.get("board-complete"));
       for (const note of boardCompleteNotes()) playRecipe(note);
+    },
+
+    /** Start the looping bed after Start. Safe to call repeatedly. */
+    startMusic() {
+      musicWanted = true;
+      unlock();
+      startMusicInternal();
+    },
+
+    /** Stop the bed (leave / result / mute). */
+    stopMusic() {
+      musicWanted = false;
+      stopMusicInternal();
     },
   };
 }
