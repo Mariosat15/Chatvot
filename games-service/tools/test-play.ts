@@ -1501,6 +1501,23 @@ async function main(): Promise<number> {
     assert.deepEqual([...assets.keys()], ["app.js"]);
   });
 
+  await test("ogg audio is a served type so packed music and SFX are reachable", async () => {
+    /*
+     * Improve-game Phase A drops real OGG files into public/play/. PLAUSIBLE_ASSET already named
+     * `.ogg`, so without a CONTENT_TYPES entry the boot audit would list every loop as `unserved`
+     * and the browser would 404 on decode. Synthesised tones stay the fallback when a file fails.
+     */
+    const assets = readServableAssets([
+      { name: "music-neon-circuit.ogg", isFile: () => true },
+      { name: "sfx-win.ogg", isFile: () => true },
+      { name: "notes.txt", isFile: () => true },
+    ]);
+
+    assert.equal(assets.get("music-neon-circuit.ogg")?.type, "audio/ogg");
+    assert.equal(assets.get("sfx-win.ogg")?.type, "audio/ogg");
+    assert.equal(assets.has("notes.txt"), false);
+  });
+
   await test("index.html is not in the served set, because it has its own route", async () => {
     /*
      * It would otherwise be reachable as `/play/index.html` as well as `/play`, by a route that

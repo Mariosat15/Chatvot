@@ -131,6 +131,22 @@ const ui = {
   retry: document.getElementById("retry"),
 };
 
+/**
+ * Reason: Phase B chrome paints Submit via a CSS background on `.chrome-face`. Assigning
+ * `textContent` on the button would wipe that face on the first check. The label span is the
+ * only writable child; when it is absent (older markup) fall back to textContent so a partial
+ * deploy still works.
+ */
+function setSubmitLabel(text) {
+  const label = ui.submit.querySelector(".chrome-label");
+  if (label) {
+    label.textContent = text;
+    ui.submit.classList.toggle("is-busy", text !== "Submit solution");
+    return;
+  }
+  ui.submit.textContent = text;
+}
+
 let state = null;
 let clockTimer = null;
 let refusalTimer = null;
@@ -872,7 +888,7 @@ async function submit() {
   if (!board.isComplete()) return;
   sound.play("press");
   ui.submit.disabled = true;
-  ui.submit.textContent = "Checking...";
+  setSubmitLabel("Checking...");
 
   try {
     const outcome = await call("/play/api/submit", {
@@ -882,7 +898,7 @@ async function submit() {
     });
 
     state = outcome.state;
-    ui.submit.textContent = "Submit";
+    setSubmitLabel("Submit solution");
 
     if (outcome.accepted) {
       /*
@@ -913,7 +929,7 @@ async function submit() {
       refusalTimer = window.setTimeout(() => renderHint(null), REFUSAL_HOLD_MS);
     }
   } catch (error) {
-    ui.submit.textContent = "Submit";
+    setSubmitLabel("Submit solution");
     ui.submit.disabled = false;
     fail(error.message);
   }

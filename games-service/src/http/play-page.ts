@@ -105,6 +105,10 @@ const CONTENT_TYPES = new Map<string, string>([
   [".png", "image/png"],
   [".webp", "image/webp"],
   [".woff2", "font/woff2"],
+  // Reason: Phase A of Improve-game packs real OGG music/SFX into public/play/. Without this
+  // entry the boot audit would report them as `unserved` (PLAUSIBLE_ASSET already names .ogg)
+  // and the browser would 404 every decode. Synth tones in presentation.js stay the fallback.
+  [".ogg", "audio/ogg"],
 ]);
 
 export function readServableAssets(
