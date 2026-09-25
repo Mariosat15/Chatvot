@@ -139,6 +139,19 @@ function partition(
  * than continuing the same stream, so attempt 7 is reproducible without replaying attempts 1
  * to 6 - which is what support needs when a player disputes one specific puzzle.
  */
+/** How many pairs have their two numbers on neighbouring cells (Chebyshev distance 1). */
+function endpointTouches(paths: Cell[][]): number {
+  let touches = 0;
+  for (const path of paths) {
+    const start = path[0];
+    const end = path[path.length - 1];
+    if (!start || !end) continue;
+    const apart = Math.max(Math.abs(start[0] - end[0]), Math.abs(start[1] - end[1]));
+    if (apart < 2) touches += 1;
+  }
+  return touches;
+}
+
 export function generatePuzzle(seed: string, shape: PuzzleShape): GeneratedPuzzle {
   const { width, height, minPairs, maxPairs } = shape;
   const total = width * height;
@@ -148,22 +161,34 @@ export function generatePuzzle(seed: string, shape: PuzzleShape): GeneratedPuzzl
   const idealLength = Math.max(2, Math.floor(total / idealPaths));
 
   let fallback: Cell[][] | null = null;
+  let bestSpaced: Cell[][] | null = null;
+  let bestTouches = Number.POSITIVE_INFINITY;
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     const rng = new SeededRandom(derive(seed, "partition", attempt));
     const spread = 1 + (attempt % 3);
+    // Prefer paths long enough that the two numbers are not neighbours. A length of 2 is
+    // always adjacent, so the floor rises with the attempt only after a spaced board has
+    // already been kept — a paid round must still get a solvable board.
+    const floor = bestSpaced ? 2 : Math.max(3, idealLength - spread);
     const paths = partition(rng, width, height, {
-      min: Math.max(2, idealLength - spread),
-      max: idealLength + spread,
+      min: Math.max(2, Math.min(floor, idealLength)),
+      max: idealLength + spread + 1,
     });
 
     if (!paths) continue;
     if (!fallback) fallback = paths;
 
-    if (paths.length >= minPairs && paths.length <= maxPairs) {
-      return finish(seed, width, height, paths);
+    const touches = endpointTouches(paths);
+    const inBand = paths.length >= minPairs && paths.length <= maxPairs;
+    if (inBand && touches < bestTouches) {
+      bestSpaced = paths;
+      bestTouches = touches;
+      if (touches === 0) break;
     }
   }
+
+  if (bestSpaced) return finish(seed, width, height, bestSpaced);
 
   // Every attempt produced a valid partition of the wrong size. Using the first valid one is
   // correct and is NOT silent: a puzzle slightly outside the requested pair band is still a

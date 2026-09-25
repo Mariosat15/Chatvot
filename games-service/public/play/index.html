@@ -177,11 +177,25 @@
               class="ghost icon-btn sound-btn"
               type="button"
               aria-pressed="false"
-              aria-label="Mute sound"
-              title="Mute sound"
+              aria-expanded="false"
+              aria-controls="sound-settings"
+              aria-label="Sound settings"
+              title="Sound settings"
             >
               &#128266;
             </button>
+            <div id="sound-settings" class="sound-settings" hidden>
+              <label class="sound-row">
+                Music
+                <input id="music-level" type="range" min="0" max="100" value="70" />
+              </label>
+              <label class="sound-row">
+                Effects
+                <input id="sfx-level" type="range" min="0" max="100" value="80" />
+              </label>
+              <button id="music-mute" class="ghost small-btn" type="button">Mute music</button>
+              <button id="sfx-mute" class="ghost small-btn" type="button">Mute effects</button>
+            </div>
             <!-- Leave keeps its word. An unlabelled exit icon on a paid attempt is the one control
                  a player must not have to guess at. -->
             <button id="leave" class="ghost small-btn" type="button">Leave</button>

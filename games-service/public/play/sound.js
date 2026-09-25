@@ -119,6 +119,27 @@ export function createSound() {
   let musicSource = null;
   let musicGain = null;
   let musicWanted = false;
+  /** 0–1. Music and effects are separate so muting one does not silence the other. */
+  let musicLevel = 0.7;
+  let sfxLevel = 0.8;
+  let musicMuted = false;
+  let sfxMuted = false;
+
+  function clampLevel(value) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return 0;
+    return Math.min(1, Math.max(0, number));
+  }
+
+  function applyMusicLevel() {
+    if (!musicGain || !context) return;
+    const level = musicMuted ? 0 : (SAMPLE_GAIN.get("music") || 0.22) * musicLevel;
+    try {
+      musicGain.gain.setValueAtTime(level, context.currentTime);
+    } catch {
+      /* A closed context must not throw into the drag handler. */
+    }
+  }
 
   function resume() {
     if (!context || context.state !== "suspended") return;
@@ -183,7 +204,7 @@ export function createSound() {
   }
 
   function playRecipe(recipe) {
-    if (!enabled || broken || !context || !recipe) return;
+    if (!enabled || sfxMuted || sfxLevel <= 0 || broken || !context || !recipe) return;
     try {
       const seconds = Math.max(0.02, recipe.ms / 1000);
       const at = context.currentTime + Math.max(0, (recipe.delayMs || 0) / 1000);
@@ -199,8 +220,9 @@ export function createSound() {
       }
 
       gain.gain.setValueAtTime(0, at);
-      gain.gain.linearRampToValueAtTime(recipe.gain, at + EDGE_S);
-      gain.gain.setValueAtTime(recipe.gain, Math.max(at + EDGE_S, ends - EDGE_S));
+      const heard = recipe.gain * sfxLevel;
+      gain.gain.linearRampToValueAtTime(heard, at + EDGE_S);
+      gain.gain.setValueAtTime(heard, Math.max(at + EDGE_S, ends - EDGE_S));
       gain.gain.exponentialRampToValueAtTime(0.0001, ends);
 
       osc.connect(gain);
@@ -223,12 +245,15 @@ export function createSound() {
 
   function playBuffer(name, opts) {
     if (!enabled || broken || !context) return false;
+    if (name !== "music" && (sfxMuted || sfxLevel <= 0)) return false;
+    if (name === "music" && musicMuted) return false;
     const buffer = buffers.get(name);
     if (!buffer) return false;
     try {
       const source = context.createBufferSource();
       const gain = context.createGain();
-      const level = (opts && opts.gain) || SAMPLE_GAIN.get(name) || 0.35;
+      const base = (opts && opts.gain) || SAMPLE_GAIN.get(name) || 0.35;
+      const level = base * (name === "music" ? musicLevel : sfxLevel);
       source.buffer = buffer;
       source.loop = Boolean(opts && opts.loop);
       gain.gain.setValueAtTime(level, context.currentTime);
@@ -302,6 +327,41 @@ export function createSound() {
       } else {
         stopMusicInternal();
       }
+    },
+
+    musicLevel() {
+      return musicLevel;
+    },
+
+    sfxLevel() {
+      return sfxLevel;
+    },
+
+    isMusicMuted() {
+      return musicMuted;
+    },
+
+    isSfxMuted() {
+      return sfxMuted;
+    },
+
+    setMusicLevel(value) {
+      musicLevel = clampLevel(value);
+      applyMusicLevel();
+    },
+
+    setSfxLevel(value) {
+      sfxLevel = clampLevel(value);
+    },
+
+    setMusicMuted(next) {
+      musicMuted = next === true;
+      if (musicMuted) stopMusicInternal();
+      else if (musicWanted) startMusicInternal();
+    },
+
+    setSfxMuted(next) {
+      sfxMuted = next === true;
     },
 
     unlock,

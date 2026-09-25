@@ -119,6 +119,11 @@ const ui = {
   boardWrap: document.getElementById("board-wrap"),
   boardStage: document.getElementById("board-stage"),
   mute: document.getElementById("mute"),
+  soundSettings: document.getElementById("sound-settings"),
+  musicLevel: document.getElementById("music-level"),
+  sfxLevel: document.getElementById("sfx-level"),
+  musicMute: document.getElementById("music-mute"),
+  sfxMute: document.getElementById("sfx-mute"),
   hint: document.getElementById("hint"),
   submit: document.getElementById("submit"),
   clear: document.getElementById("clear"),
@@ -491,41 +496,17 @@ function warmBoardArt() {
 }
 
 /**
- * Paint the countdown with digit sprites, or fall back to text if a sprite is missing.
+ * One digital readout, `MM:SS`, matching the red TIME LEFT bar.
  *
- * Still driven by the same `endsAt` arithmetic as before — sprites are paint, never a second clock.
+ * Digit sprites were tried and they split "9:45" into separate pictures that read as "9 : 4 5".
+ * The string is still computed from `endsAt` — paint only, never a second clock.
  */
 function paintClockDigits(display) {
   if (!ui.clock) return;
   if (display === lastClockDisplay) return;
   lastClockDisplay = display;
-  ui.clock.replaceChildren();
+  ui.clock.textContent = display;
   ui.clock.setAttribute("aria-label", display || "time remaining");
-  if (!display) return;
-
-  let usedSprites = true;
-  for (const ch of display) {
-    if (ch === ":") {
-      const colon = document.createElement("span");
-      colon.className = "clock-colon";
-      colon.textContent = ":";
-      colon.setAttribute("aria-hidden", "true");
-      ui.clock.appendChild(colon);
-      continue;
-    }
-    if (ch < "0" || ch > "9") {
-      usedSprites = false;
-      break;
-    }
-    const digit = document.createElement("span");
-    digit.className = "clock-digit";
-    digit.style.backgroundImage = 'url("/play/digit-' + ch + '.webp")';
-    digit.setAttribute("aria-hidden", "true");
-    ui.clock.appendChild(digit);
-  }
-  if (!usedSprites) {
-    ui.clock.textContent = display;
-  }
 }
 
 /**
@@ -545,10 +526,23 @@ function dressBoard() {
   const art = ui.boardStage ? ui.boardStage.querySelector(".board-art") : null;
   if (!art || !ui.boardStage) return;
   const frame = board.frame();
-  const usable = frame && !failedArt.has(frame.file) ? frame : null;
-  art.style.backgroundImage = "url('" + (usable ? usable.file : FRAME_ART) + "')";
+  const skin = state && state.board && state.board.skin;
+  const skinOk = typeof skin === "string" && skin.length > 0 && !failedArt.has(skin);
+  const usable = frame && (skinOk || !failedArt.has(frame.file)) ? frame : null;
+  const file = skinOk ? skin : usable ? usable.file : FRAME_ART;
+  art.style.backgroundImage = "url('" + file + "')";
   art.style.inset = frameInsetCss(usable);
   ui.boardStage.classList.toggle("drawn", usable !== null);
+  preloadSkin(state && state.nextSkin);
+}
+
+/** Fetch the next size-locked picture before this board ends. A miss is decoration only. */
+function preloadSkin(url) {
+  if (!url || failedArt.has(url)) return;
+  const image = new Image();
+  image.decoding = "async";
+  image.onerror = () => failedArt.add(url);
+  image.src = url;
 }
 
 /**
@@ -683,7 +677,7 @@ function renderClock() {
   const seconds = Math.ceil(remaining / 1000);
   const minutes = Math.floor(seconds / 60);
   const rest = seconds % 60;
-  paintClockDigits(minutes + ":" + String(rest).padStart(2, "0"));
+  paintClockDigits(String(minutes).padStart(2, "0") + ":" + String(rest).padStart(2, "0"));
   const urgent = remaining <= 10_000;
   ui.clock.classList.toggle("urgent", urgent);
 
@@ -1029,19 +1023,45 @@ ui.done.addEventListener("click", done);
 
 if (ui.mute) {
   ui.mute.addEventListener("click", () => {
-    /*
-     * Unlocked here as well as on Start, because this is the other gesture that reaches the play
-     * screen. A player who muted a previous round arrives with sound off, never presses anything
-     * that opens a context, and then unmutes - so without this the button would report itself on
-     * and produce nothing until the round after next.
-     */
     sound.unlock();
-    sound.setEnabled(!sound.isEnabled());
-    renderSoundControl();
-    // After the toggle, so unmuting is confirmed by a noise and muting is confirmed by silence.
-    sound.play("press");
+    if (!ui.soundSettings) return;
+    const open = ui.soundSettings.hidden;
+    ui.soundSettings.hidden = !open;
+    ui.mute.setAttribute("aria-expanded", open ? "true" : "false");
   });
 }
+
+if (ui.musicLevel) {
+  ui.musicLevel.addEventListener("input", () => {
+    sound.unlock();
+    sound.setMusicLevel(Number(ui.musicLevel.value) / 100);
+  });
+}
+
+if (ui.sfxLevel) {
+  ui.sfxLevel.addEventListener("input", () => {
+    sound.unlock();
+    sound.setSfxLevel(Number(ui.sfxLevel.value) / 100);
+  });
+}
+
+if (ui.musicMute) {
+  ui.musicMute.addEventListener("click", () => {
+    sound.unlock();
+    sound.setMusicMuted(!sound.isMusicMuted());
+    ui.musicMute.textContent = sound.isMusicMuted() ? "Music off" : "Mute music";
+  });
+}
+
+if (ui.sfxMute) {
+  ui.sfxMute.addEventListener("click", () => {
+    sound.unlock();
+    sound.setSfxMuted(!sound.isSfxMuted());
+    ui.sfxMute.textContent = sound.isSfxMuted() ? "Effects off" : "Mute effects";
+    if (!sound.isSfxMuted()) sound.play("press");
+  });
+}
+
 renderSoundControl();
 
 /*

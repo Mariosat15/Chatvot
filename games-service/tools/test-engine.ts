@@ -36,6 +36,7 @@ import {
   transformedDimensions,
 } from "../src/engine/puzzle";
 import { verifyAttempt } from "../src/engine/verify";
+import { skinFile, poolFor, cycleOrder } from "../src/engine/board-deck";
 
 let passed = 0;
 let failed = 0;
@@ -514,6 +515,32 @@ test("a submission carrying a score field cannot influence the outcome", () => {
   const result = verifyAttempt(PUZZLE, tampered);
   assert.ok(result.solved, "a correct solution with extra fields is still correct");
   assert.deepEqual(Object.keys(result).sort(), ["cellsUsed", "solved"]);
+});
+
+test("board art stays inside one size and does not repeat until the pool is used", () => {
+  const seed = "cv_ctst_deck";
+  for (const size of ["small", "medium", "large"] as const) {
+    const pool = poolFor(size);
+    const dealt = Array.from({ length: pool.length }, (_, index) => skinFile(seed, size, index));
+    assert.equal(new Set(dealt).size, pool.length, `${size} repeated inside one cycle`);
+    for (const file of dealt) {
+      assert.ok(pool.includes(file), `${file} is not in the ${size} pool`);
+    }
+    const other = size === "small" ? "m" : "s";
+    assert.ok(dealt.every((file) => !file.includes(`board-${other}-`)), `${size} mixed sizes`);
+  }
+});
+
+test("the same seed deals the same art, and a cycle does not reopen on its own last picture", () => {
+  const seed = "cv_ctst_deck_fair";
+  const first = Array.from({ length: 40 }, (_, index) => skinFile(seed, "small", index));
+  const again = Array.from({ length: 40 }, (_, index) => skinFile(seed, "small", index));
+  assert.deepEqual(first, again);
+  const poolLength = poolFor("small").length;
+  assert.notEqual(first.at(poolLength - 1), first.at(poolLength));
+  assert.notEqual(skinFile(seed, "small", 0), skinFile("cv_ctst_other", "small", 0));
+  const swapped = cycleOrder(seed, "small", 1, poolLength, 0);
+  if (swapped.at(0) === 0) assert.fail("cycle opened on the previous last index");
 });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);

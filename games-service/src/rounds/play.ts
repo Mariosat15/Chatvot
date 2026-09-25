@@ -1,3 +1,4 @@
+import { skinFile } from "../engine/board-deck";
 import { generateForPlayer } from "../engine/generate";
 import { toClientPuzzle, type ClientPuzzle } from "../engine/puzzle";
 import { REFUSAL_MESSAGES, verifyAttempt, type AttemptRefusal } from "../engine/verify";
@@ -66,6 +67,11 @@ export interface PlayState {
   scoring: string;
   /** Absent once the round is terminal. */
   board?: ClientPuzzle;
+  /**
+   * Art for the board after this one, so the frame can fetch it before the player finishes.
+   * Same size pool as `board.skin`. Never a score.
+   */
+  nextSkin?: string;
   boardsSolved: number;
   /** Present for Circuit Perfect, which has a fixed set. Absent for Sprint, which has no limit. */
   boardTarget?: number;
@@ -132,7 +138,11 @@ function puzzleFor(round: RoundDocument, index: number): ClientPuzzle {
     index,
     shapeFor(config.gridSize),
   );
-  return toClientPuzzle(generated, index);
+  const puzzle = toClientPuzzle(generated, index);
+  // Art follows the contest seed, so every player in one competition sees the same pictures
+  // in the same order. The puzzle pairs above already do; this must not drift from them.
+  puzzle.skin = skinFile(contentSeedFor(round), config.gridSize, index);
+  return puzzle;
 }
 
 function solvedCount(round: RoundDocument): number {
@@ -196,7 +206,16 @@ function stateFor(round: RoundDocument, board?: ClientPuzzle): PlayState {
    */
   state.durationSeconds = Math.floor(roundDurationMs(config) / 1000);
   state.playableSeconds = playableSeconds(round);
-  if (board) state.board = board;
+  if (board) {
+    state.board = board;
+    // The next picture, so the frame can fetch it before this board is finished.
+    // Sprint always has a next board. Perfect stops at the last one.
+    const nextIndex = board.index + 1;
+    const target = boardTargetFor(config);
+    if (target === undefined || nextIndex < target) {
+      state.nextSkin = skinFile(contentSeedFor(round), config.gridSize, nextIndex);
+    }
+  }
   if (endsAt) state.endsAt = endsAt.toISOString();
 
   /*

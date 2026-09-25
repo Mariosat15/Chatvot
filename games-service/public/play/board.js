@@ -317,6 +317,12 @@ export function createBoard(svg, onChange) {
     const last = cells[cells.length - 1];
     if (same(last, cell)) return false;
 
+    // Once the wire has reached the other number, do not grow past it. A finger that
+    // overshoots the token used to draw the line out the far side of the pair.
+    const goal = oppositeTerminal(pairId, cells);
+    const retracting = cells.length >= 2 && same(cells[cells.length - 2], cell);
+    if (goal && same(last, goal) && !retracting) return false;
+
     // Dragging back over the cell before last retracts, which is how a mistake is undone without
     // starting the path again. Checked before the reuse rule below, or a retraction would be
     // refused as revisiting a cell.
@@ -359,7 +365,12 @@ export function createBoard(svg, onChange) {
 
       const dx = Math.sign(cell[0] - last[0]);
       const dy = Math.sign(cell[1] - last[1]);
-      const step = dx !== 0 ? [last[0] + dx, last[1]] : [last[0], last[1] + dy];
+      // Step on the axis the finger has moved further along. Always stepping sideways
+      // first sent the wire onto the neighbouring column when the drag was mostly vertical.
+      const step =
+        Math.abs(cell[0] - last[0]) >= Math.abs(cell[1] - last[1]) && dx !== 0
+          ? [last[0] + dx, last[1]]
+          : [last[0], last[1] + dy];
 
       if (!extendTo(pairId, step)) return moved;
       moved = true;
@@ -367,11 +378,28 @@ export function createBoard(svg, onChange) {
     return moved;
   }
 
+  function oppositeTerminal(pairId, cells) {
+    if (!puzzle || cells.length === 0) return null;
+    const pair = puzzle.pairs.find((entry) => entry.id === pairId);
+    if (!pair) return null;
+    if (same(cells[0], pair.a)) return pair.b;
+    if (same(cells[0], pair.b)) return pair.a;
+    return null;
+  }
+
   function cellAt(event) {
-    if (!puzzle) return null;
-    const box = svg.getBoundingClientRect();
-    const x = Math.floor(((event.clientX - box.left) / box.width) * puzzle.width);
-    const y = Math.floor(((event.clientY - box.top) / box.height) * puzzle.height);
+    if (!puzzle || !cellPx) return null;
+    // Map through the SVG's own transform. Measuring the element's border box against
+    // the grid counted the bezel and the art overhang, so a drag on one side of a token
+    // landed on the cell on the other side.
+    const ctm = svg.getScreenCTM();
+    if (!ctm) return null;
+    const point = svg.createSVGPoint();
+    point.x = event.clientX;
+    point.y = event.clientY;
+    const local = point.matrixTransform(ctm.inverse());
+    const x = Math.floor(local.x / cellPx);
+    const y = Math.floor(local.y / cellPx);
     if (x < 0 || y < 0 || x >= puzzle.width || y >= puzzle.height) return null;
     return [x, y];
   }
@@ -668,6 +696,7 @@ export function createBoard(svg, onChange) {
       const size = cellPx * 0.94;
       group.appendChild(
         element("image", {
+          class: "token-face",
           href: art,
           x: cx - size / 2,
           y: cy - size / 2,

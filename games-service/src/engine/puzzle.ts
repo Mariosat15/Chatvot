@@ -204,6 +204,11 @@ export interface ClientPuzzle {
   width: number;
   height: number;
   pairs: TerminalPair[];
+  /**
+   * Size-locked art for this board. Presentation only — the pairs above are the puzzle.
+   * Absent on older responses; the client then keeps the static frame for that size.
+   */
+  skin?: string;
 }
 
 export function toClientPuzzle(
