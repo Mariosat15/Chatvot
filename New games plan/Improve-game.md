@@ -13,10 +13,10 @@ This chapter is the working brief for upgrading the **in-frame** Circuit UI afte
 
 | Piece | Live code | Notes |
 |---|---|---|
-| Board + terminals | `board.js`, `board-4/6/8.webp`, `token-1..8.webp`, `board-frame.webp` | Heroes replaced in place from Small/Medium/large; CSS neon pulse on drawn boards |
+| Board + terminals | `board.js`, `board-4/6/8.webp`, `token-1..10.webp`, `board-frame.webp` | Heroes replaced in place from Small/Medium/large; CSS neon pulse on drawn boards; tokens 9–10 added 25 Sep so large can use up to 10 pairs |
 | Chrome / copy | `index.html`, `app.css`, `presentation.js` | Pre-Phase-B text buttons restored; **no** `ui-*.webp` |
 | Clock | `paintClockDigits` + `digit-0..9.webp` | Sprites are paint; time still from `endsAt` |
-| Sound | `sound.js` sample-then-synth + music bed | OGG map in `SAMPLE_URLS`; mute stops music |
+| Sound | `sound.js` sample-then-synth + music bed | OGG map in `SAMPLE_URLS`; mute stops music; **revive on visibility/focus/unlock** after browser pause (25 Sep) |
 | Deploy | directory-derived serve + content fingerprint (`21` s4.1i / s4.1o) | New `.js` / new filenames need pull + **`pm2 restart chartvolt-games`**; `.ts` still needs `npm run build` |
 
 Acceptance after this work stays the same as s4.1e: a human can start, play, submit, and finish a paid round by clicking. Visual / audio sign-off is **owner eye/ear**.

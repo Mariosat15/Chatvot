@@ -1,4 +1,14 @@
-import { Check, Crown, Lightbulb } from "lucide-react";
+import {
+  Check,
+  Crown,
+  Flame,
+  Lightbulb,
+  Target,
+  Timer,
+  Trophy,
+  Zap,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { NeonHeadedPanel, NeonIllustration } from "@/components/neon/Cards";
 
 /**
@@ -47,7 +57,7 @@ interface Props {
  * How many ticked lines the card draws.
  *
  * FOUR, BECAUSE FOUR IS WHAT FITS - the same arithmetic as the rules card's three steps, one
- * row cheaper because a tip has no numbered disc to set its height. The band is a fixed 96px
+ * row cheaper because a tip has no numbered disc to set its height. The band is a fixed-height
  * row (see `GameArenaLayout`), so a fifth line does not shrink the type; it falls off the
  * bottom of a card that cannot grow.
  *
@@ -59,56 +69,56 @@ interface Props {
  */
 const STRIP_TIP_LIMIT = 4;
 
+/**
+ * One distinct icon per tip slot so the list reads as four different points rather than four
+ * identical checkmarks. Indexed by position, never by title text - titles are operator free
+ * text and matching nouns would be per-game code in the layer built to avoid it.
+ */
+const TIP_ICONS: LucideIcon[] = [Zap, Trophy, Timer, Target, Flame, Check];
+
 export function ArenaHighlights({ highlights, imageUrl }: Props) {
   if (highlights.length === 0) return null;
 
   return (
     <NeonHeadedPanel icon={Lightbulb} title="Game tips">
-      <div className="flex h-full items-center gap-3 px-3 py-2">
-        <ul className="min-w-0 flex-1 space-y-2">
-          {highlights.slice(0, STRIP_TIP_LIMIT).map((highlight) => (
-            <li key={highlight.title} className="flex items-center gap-2">
-              {/*
-                The reference's tick, in its gold rather than a green one. `aria-hidden` with
-                the text carrying the meaning - a checklist glyph beside a sentence says
-                nothing a screen reader needs, and read aloud it would imply the player has
-                done something.
-              */}
-              <Check className="h-4 w-4 shrink-0 text-amber-300" aria-hidden />
-              {/*
-                THE TITLE ALONE, WITH THE DETAIL ON THE TOOLTIP. Two lines per tip is what
-                made this card 300px tall: four tips of two lines each is eight rows in a
-                panel with room for four. The operator's headline IS the tip; the detail is
-                the sentence that used to sit underneath it.
-              */}
-              <span
-                className="truncate text-[13px] leading-tight text-gray-100"
-                title={highlight.detail || highlight.title}
-              >
-                {highlight.title}
-              </span>
-            </li>
-          ))}
+      <div className="flex h-full items-center gap-3 px-3 py-2.5">
+        <ul className="min-w-0 flex-1 space-y-3">
+          {highlights.slice(0, STRIP_TIP_LIMIT).map((highlight, index) => {
+            // Reason: `index` is from a capped slice, never from input.
+             
+            const Icon = TIP_ICONS[index % TIP_ICONS.length] ?? Check;
+            return (
+              <li key={highlight.title} className="flex items-start gap-3">
+                <span
+                  className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-amber-300/45 bg-amber-300/15 text-amber-200"
+                  aria-hidden
+                >
+                  <Icon className="h-5 w-5" />
+                </span>
+                {/*
+                  BIGGER TYPE SINCE 25 SEPTEMBER 2026 (owner: "the game tips wording must be
+                  more big to take more space and also have icons"). Title + detail both show
+                  so the card fills its height instead of leaving empty navy beside the emblem.
+                */}
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[16px] font-semibold leading-snug text-gray-50">
+                    {highlight.title}
+                  </span>
+                  {highlight.detail ? (
+                    <span className="mt-0.5 block text-[13px] leading-snug text-gray-300 line-clamp-2">
+                      {highlight.detail}
+                    </span>
+                  ) : null}
+                </span>
+              </li>
+            );
+          })}
         </ul>
 
         {/*
-          THE EMBLEM IS BESIDE THE LINES AND SMALL, which is the correction the owner asked
-          for: it was centred ABOVE them at 96px, so the card spent its whole height on a
-          badge before the first tip. Landscape rather than square because the graphic this
-          slot holds is wider than it is tall, and 82px fixed rather than a proportion of a
-          flexible column - a percentage is how it grew the first time.
-        */}
-        {/*
-          THE WIDTH IS THE SIZE, because `NeonIllustration` takes its height from its width -
-          here through `aspect-[4/3]`, so 88px wide is 66px tall. That is the owner's
-          85-105 by 65-80 met at the largest the band's 74px body has room for, and it is why
-          a height is not written anywhere: a hard height beside an aspect ratio is two
-          numbers that disagree the moment either moves.
-          128px since the band became 176px tall, so 96px of picture in a 136px body.
-
-          SUPERSEDED 25 September 2026 ("make the images auto adjust and fill the space"): the
-          picture now takes the body's full height and its width from its own proportions
-          (`shape="fill"`), capped at half the card so the tips keep their room.
+          THE EMBLEM IS BESIDE THE LINES. `shape="fill"` takes the body's full height and its
+          width from the picture's own proportions, capped at half the card so the tips keep
+          their room (25 September 2026).
         */}
         <div className="hidden max-w-[50%] shrink-0 self-stretch sm:flex sm:justify-end">
           <NeonIllustration

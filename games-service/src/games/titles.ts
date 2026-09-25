@@ -115,9 +115,12 @@ export type GridSize = (typeof GRID_SIZES)[number];
  * The pair bands widen with the cell count, as before.
  */
 const GRID_SHAPES: Record<GridSize, PuzzleShape> = {
+  // Reason: pair bands raised 25 Sep 2026 so medium and large actually use more numbers.
+  // Medium's ideal used to be (4+6)/2 = 5, which is why boards almost always showed five.
+  // Large tops out at 10 now that token-9/10 exist - still under an 8x8 cell budget.
   small: { width: 4, height: 4, minPairs: 3, maxPairs: 5 },
-  medium: { width: 6, height: 6, minPairs: 4, maxPairs: 6 },
-  large: { width: 8, height: 8, minPairs: 5, maxPairs: 8 },
+  medium: { width: 6, height: 6, minPairs: 5, maxPairs: 8 },
+  large: { width: 8, height: 8, minPairs: 6, maxPairs: 10 },
 };
 
 export function shapeFor(size: GridSize): PuzzleShape {

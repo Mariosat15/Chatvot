@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { NEON_LABEL, NEON_PANEL_LIT } from "@/components/neon/tokens";
+import { NEON_PANEL_LIT } from "@/components/neon/tokens";
 import { NeonGridBackdrop } from "@/components/neon/Cards";
 import type { NeonHeroBanner } from "@/components/neon/Hero";
 import type { GamePresentation } from "@/lib/services/games/game-presentation.service";
@@ -244,7 +244,16 @@ export function GameArenaLayout({
         tiles cut their own labels ("ROUND TI...", "YOUR SCO..."). The standings rail gave
         40px back (340 to 300) so the board's column is not narrowed to pay for it.
       */}
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[300px_minmax(0,1fr)_340px]">
+      {/*
+        `items-start` FROM `xl` UP so the three columns size to their own content rather than
+        stretching to the tallest one. Stretching the stage to match a long prize sidebar left a
+        tall empty void under Resume / the board, pushed the band below the fold, and produced
+        TWO scrollbars - the page's, and the standings rail's `overflow-y-auto` (owner, 25 Sep
+        2026). The board window still fills its own column via `flex-1` on the frame; the
+        standings rail caps itself to the viewport so it is the only thing that scrolls when
+        the list is long.
+      */}
+      <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[300px_minmax(0,1fr)_340px]">
         {/*
           EVERY BREAKPOINT SETS AN ORDER, and the reason is that grid auto-placement follows
           order-modified document order, so a rule that only fires at `xl` leaves the other two
@@ -257,97 +266,31 @@ export function GameArenaLayout({
           facts, standings full width beneath. Desktop: standings, board, facts.
         */}
         {/*
-          THE RAIL IS FULL HEIGHT FROM `xl` UP, AND THIS IS THE TWO-PART RULE THE OWNER ASKED
-          FOR ("make the whole sidebar extend to the same bottom edge as the gameplay board").
-
-          A grid item already stretches to the row's height, so this wrapper is as tall as the
-          board without being told to - which is exactly why the panel inside it ended early and
-          nobody could see the cause. `[&>*]:h-full` is the half that reaches the panel; `h-full`
-          on the wrapper alone is a no-op that reviews as correct, which is the mistake made once
-          already on the bottom band (`13` s4.1t).
-
-          `xl:` only. At `lg` and below the rail is full width beneath the board, and a stretch
-          there means one grid row as tall as its tallest member for no reason.
+          THE RAIL CAPS TO THE VIEWPORT rather than stretching with the prize column. One
+          internal scroll when the list is long; the page itself should not need a second.
         */}
-        <div className="order-2 lg:order-3 xl:order-1 xl:[&>*]:h-full">
+        <div className="order-2 lg:order-3 xl:order-1 xl:max-h-[calc(100dvh-1.5rem)] xl:[&>*]:h-full">
           {standings}
         </div>
 
         {/*
-          A COLUMN FROM `xl` UP, so the game window can stretch to the bottom of the row - the
-          facts column is usually the tallest member, and the band of empty page under the
-          board was the owner's green-marked area (25 September 2026). The window opts in with
-          `flex-1`; a Play button or a result panel does not, so neither is stretched into a
-          tall empty card.
+          A COLUMN FROM `xl` UP, so the game window can stretch within THIS column when the
+          frame opts in with `flex-1`. The column itself is `self-stretch` only while short
+          enough - `items-start` on the grid keeps a short Resume screen from matching a tall
+          prize sidebar.
         */}
-        <div className="order-1 lg:order-1 xl:order-2 xl:flex xl:flex-col">{stage}</div>
+        <div className="order-1 min-h-0 lg:order-1 xl:order-2 xl:flex xl:min-h-[min(70dvh,720px)] xl:flex-col">
+          {stage}
+        </div>
 
         <div className="order-3 space-y-3 lg:order-2 xl:order-3">{sidebar}</div>
       </div>
 
       {/*
-        THE REFERENCE'S BOTTOM INFORMATION STRIP: three compact cards in one row, the whole
-        band about 100px tall.
-
-        THE MEASUREMENT IS THE SPECIFICATION, and it is the only reason this comment is long.
-        The owner supplied the reference at 986 x 103 and rejected the first build for
-        stretching to 600-plus - "three large dashboard cards" instead of a thin bar - so the
-        height here is fixed rather than derived. It does NOT scale with the viewport: a wider
-        screen makes the cards wider and must not make them taller, or the strip becomes a
-        section again at 1440px while measuring correctly at 986.
-
-        104px IS ARRIVED AT, NOT CHOSEN, and the working is worth keeping because the first
-        attempt at 96 was wrong in a way nothing would have reported. A card is the band less
-        its 30px heading strip, so 96 left 66px of body - and the owner also specified the
-        pictures at 65-75px. `NeonIllustration` derives its height from its WIDTH through an
-        aspect ratio, so a 66px-wide square is 66px tall in a body that, after padding, had
-        49: it would have been silently cropped by the `overflow-hidden` backstop, on the two
-        acceptance points that ask whether the pictures are there. 104 gives 74px of body,
-        which fits a 66px picture, three 24px feed rows, and the owner's own 95-115 range.
-
-        RAISED TO 176px ON 25 SEPTEMBER 2026, on the owner's "very small fonts and images, it's
-        terrible". 104 was right about the arithmetic and wrong about what a person can read:
-        9-10px text and a 66px picture at desktop distance. The height is still FIXED - the
-        rule that mattered was "a band that cannot grow", never the number - and it is
-        arrived at the same way: a full 40px heading leaves 136px of body, which holds three
-        36px step rows, four 13px tips beside a 96px emblem, or three 40px player rows. Still
-        inside the reference's own card proportion of about 2.4:1 at a third of the page.
-
-        WHICH MEANS THE CARDS CANNOT GROW, so what goes in them is capped rather than
-        wrapped. Each panel takes the reference's own count - three steps, four tips, three
-        players - and clamps every line to one, with the full text on a tooltip and the
-        uncapped version on the lobby. `overflow-hidden` is a backstop, not the mechanism;
-        relying on it alone is how content disappears with nothing on screen to say so.
-
-        STILL `flex-wrap`, NOT `grid-cols-3`, AND THAT IS A DELIBERATE DEVIATION FROM THE
-        OWNER'S CSS - which asked for `grid-template-columns: 1.15fr 1.15fr 1fr`. The
-        proportions are identical: `flex-[1.15_1_0]` twice and `flex-[1_1_0]` once divides the
-        row 34/34/32 exactly as those tracks do. What differs is the empty case, and it is the
-        common one. All three slots render NOTHING when their content is absent - a title with
-        no rules text, no feature cards written, or a contest nobody has played yet - and a
-        layout cannot see that its child returned `null`. A hidden GRID item leaves its track
-        behind, so the first attempt at this band put one panel adrift in an empty row; a
-        hidden FLEX item leaves the line, and `:empty` is how CSS sees what React cannot. The
-        one or two cards that do have content then grow to fill the row.
-
-        `min-w-[260px]` IS WHAT STACKS IT ON A PHONE AND NOT ON A DESKTOP. Three cards at
-        260 plus two 10px gaps needs 800px, so the row survives every width the owner called
-        desktop and wraps below it - which is the responsive rule stated as a measurement
-        instead of a breakpoint that has to agree with one.
-
-        `[&>*]:h-full` IS WHAT MAKES THEM LEVEL. The wrappers already stretch - that is the
-        flex default - so they were the same height all along; what differs is the PANEL
-        inside each one, which sizes to its own text and leaves the rest of its stretched
-        wrapper empty. It belongs here rather than in the three panels because two of them
-        are also rendered in the lobby, where a forced full height would stretch one card to
-        the length of a whole column.
+        THE REFERENCE'S BOTTOM INFORMATION STRIP: two compact cards in one row after Recent
+        players was removed (25 Sep 2026). Height raised again the same day for readable tips.
       */}
-      {/*
-        TWO CARDS SINCE 25 SEPTEMBER 2026, sharing the row equally; the third (recent players)
-        was removed on the owner's instruction. Everything above about `flex-wrap`,
-        `empty:hidden` and `[&>*]:h-full` still holds - an empty slot is still the common case.
-      */}
-      <div className="mt-4 flex flex-wrap items-stretch gap-2.5 sm:h-[176px]">
+      <div className="mt-3 flex flex-wrap items-stretch gap-2.5 overflow-hidden sm:h-[200px]">
         <div className="min-w-[260px] flex-[1_1_0] empty:hidden [&>*]:h-full">
           {rules}
         </div>
@@ -355,10 +298,6 @@ export function GameArenaLayout({
           {highlights}
         </div>
       </div>
-
-      <p className={`mt-5 text-center ${NEON_LABEL}`}>
-        Scores are reported by the game and settled by ChartVolt.
-      </p>
     </div>
   );
 }

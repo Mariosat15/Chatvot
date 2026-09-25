@@ -548,9 +548,10 @@ export function soundControlCopy(enabled) {
  * Major pentatonic degrees over A3: any combination of them is consonant, so the board stays
  * musical whatever order the player joins the pairs in and however many a grid size produces.
  *
- * EIGHT DEGREES, WHICH IS THE MOST PAIRS ANY GRID PRODUCES (`large`: 5-8). The modulo is the
- * fallback if a ninth ever appears - and unlike the numeral sprites in `board.js`, where a modulo
- * would paint a "1" on pair 11 and look deliberate, a repeated note costs nothing.
+ * EIGHT DEGREES, WHICH IS ENOUGH FOR ANY GRID (large tops out at ten pairs; the modulo
+ * wraps). The modulo is the fallback if an eleventh ever appears - and unlike the numeral
+ * sprites in `board.js`, where a modulo would paint a "1" on pair 11 and look deliberate, a
+ * repeated note costs nothing.
  */
 const PENTATONIC_SEMITONES = [0, 2, 4, 7, 9, 12, 14, 16];
 const NOTE_BASE_HZ = 220;

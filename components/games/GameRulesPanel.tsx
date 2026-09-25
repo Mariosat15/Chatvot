@@ -290,7 +290,7 @@ function RulesStrip({
                 one recoverable rather than merely cut. The lobby has it in full either way.
               */}
               <span
-                className="truncate text-[13px] leading-tight text-gray-100"
+                className="truncate text-[15px] font-semibold leading-snug text-gray-50"
                 title={step}
               >
                 {step}

@@ -1199,9 +1199,13 @@ describe("the two lobbies are built from one design kit", () => {
       cannot see a player who entered and recorded no result - that is settled at finalization
       by `hasResult` (R45) - so the figures can be exceeded. Saying so is the honest fix;
       teaching the table to predict a result is not possible before the contest ends.
+
+      FLIPPED 25 Sep 2026: the owner asked for plain English instead of "no result" jargon.
+      The claim is unchanged - only the wording players read.
     */
     const table = readCode("components/competitions/PrizeTable.tsx");
-    expect(table).toContain("no result");
+    expect(table).toContain("never finishes");
+    expect(table).not.toContain("no result");
   });
 
   it("moves no money computation while restyling or relocating the prize table", () => {

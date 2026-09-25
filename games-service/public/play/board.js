@@ -30,10 +30,10 @@ import {
 } from "./presentation.js";
 
 /**
- * Eight pairs is the most any grid size produces (`large`: 5-8).
+ * Ten pairs is the most any grid size produces (`large`: 6-10 since 25 Sep 2026).
  *
- * The first five are the reference sheet's orb colours (11 Sep 2026), in its order; the last
- * three are ours, chosen to stay apart from those five on a lit navy board. Every hue here is
+ * The first five are the reference sheet's orb colours (11 Sep 2026), in its order; the next
+ * three are ours; nine and ten were added when large boards grew to ten pairs. Every hue here is
  * paired with a numeral on the terminal, so the palette is decoration and never the only way to
  * tell two wires apart.
  */
@@ -46,20 +46,25 @@ const PAIR_COLOURS = [
   "#ff4d6d", // rose
   "#2dd4bf", // teal
   "#ffe14d", // yellow
+  "#60a5fa", // light blue
+  "#f472b6", // light pink
 ];
 
 /**
- * The terminal artwork: one lit socket per pair number, `token-1.webp` to `token-8.webp`.
+ * The terminal artwork: one lit socket per pair number, `token-1.webp` to `token-10.webp`.
  *
  * BACK TO THE ORIGINAL TOKENS (owner, 25 September 2026: "I don't like the new numbers on the
  * board, use the old ones"). The four-state `num-{n}-{state}.webp` pack was wired for one day and
- * is no longer referenced. The states survive as a `data-state` attribute on the token image
- * (`idle`, `select`, `connect`, `error`) which `app.css` lights, so the refusal flash still shows
- * without a second picture per number.
+ * is no longer referenced for play. Tokens 9 and 10 were added the same day from that pack's idle
+ * frames so large boards can show ten distinct numerals.
+ *
+ * The states survive as a `data-state` attribute on the token image (`idle`, `select`, `connect`,
+ * `error`) which `app.css` lights, so the refusal flash still shows without a second picture per
+ * number.
  *
  * ONE PER PAIR NUMBER, NOT ONE PER COLOUR. The file has the numeral baked into it, so `token-3` is
  * only ever right for pair 3 - which is why this is indexed by `pairId` with no modulo. A modulo
- * here would draw a "1" on pair 9 and look deliberate. Past eight, `terminalArt` returns null and
+ * here would draw a "1" on pair 11 and look deliberate. Past ten, `terminalArt` returns null and
  * the socket drawn underneath carries the numeral.
  *
  * WHY THE SOCKET IS DRAWN UNDERNEATH RATHER THAN THE ARTWORK BEING THE TERMINAL. A numeral in
@@ -71,7 +76,7 @@ const PAIR_COLOURS = [
  * over a board that is already complete and legible without it.
  */
 export const TOKEN_STATES = ["idle", "select", "connect", "error"];
-const TOKEN_NUMBERS = 8;
+const TOKEN_NUMBERS = 10;
 
 const TERMINAL_ART = Array.from(
   { length: TOKEN_NUMBERS },
@@ -103,7 +108,7 @@ export const BOARD_ART = [
   ...TERMINAL_ART,
 ];
 
-/** The token image for one pair's terminal, or null past the eighth number. */
+/** The token image for one pair's terminal, or null past the tenth number. */
 export function terminalArt(pairId) {
   return Number.isInteger(pairId) && pairId >= 0 ? (TERMINAL_ART.at(pairId) ?? null) : null;
 }

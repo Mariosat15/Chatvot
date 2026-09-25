@@ -94,11 +94,17 @@ function bandMarkup(): string {
   const from = code.indexOf("{rules}");
   expect(from).toBeGreaterThan(-1);
 
-  // Back up to the wrapper that opens the band, then run to the sentence that closes it.
+  // Back up to the wrapper that opens the band, then run to the end of that wrapper.
+  // Reason: FLIPPED 25 Sep 2026. The band used to close on a "Scores are reported..."
+  // disclaimer under the cards; that line floated over the HOW IT WORKS / GAME TIPS boxes
+  // (owner screenshot) and was removed. Closing on the band's own `</div>` keeps the slice
+  // honest without depending on deleted copy.
   const opens = code.lastIndexOf("<div", code.lastIndexOf("<div", from - 1) - 1);
-  const closes = code.indexOf("Scores are reported by the game", from);
   expect(opens).toBeGreaterThan(-1);
-  expect(closes).toBeGreaterThan(from);
+  const afterHighlights = code.indexOf("{highlights}", from);
+  expect(afterHighlights).toBeGreaterThan(from);
+  const closes = code.indexOf("</div>", code.indexOf("</div>", afterHighlights) + 1);
+  expect(closes).toBeGreaterThan(afterHighlights);
 
   const band = code.slice(opens, closes);
   expect(band.length).toBeGreaterThan(200);
@@ -107,6 +113,7 @@ function bandMarkup(): string {
   // the owner asked for it removed and the two remaining cards to fill the width. A third slot
   // reappearing is the rejected layout coming back.
   expect(band).not.toContain("{activity}");
+  expect(code).not.toMatch(/Scores are reported by the game/i);
   return band;
 }
 
@@ -128,14 +135,14 @@ describe("the band is a fixed-height strip", () => {
       turns the strip back into a section at 1440. There is deliberately no `lg:h-` or
       `xl:h-` here, and that absence is asserted.
 
-      176px SINCE 25 SEPTEMBER 2026. The owner rejected 104 as "very small fonts and images",
-      and he was right: the arithmetic held and 9-10px text did not. What survives is the
-      rule, a fixed height the content cannot grow, and the derivation: a 40px heading leaves
-      136px of body, which is three 36px rows plus gaps and padding, or a 112px picture.
+      200px SINCE 25 SEPTEMBER 2026 (second raise the same day). The owner rejected 104 as
+      "very small fonts and images", then asked for bigger tips with icons after 176 still left
+      empty navy. What survives is the rule: a fixed height the content cannot grow, and the
+      derivation: a ~40px heading leaves ~160px of body for three tip rows with icons + detail.
     */
     const band = bandMarkup();
 
-    expect(band).toMatch(/\bsm:h-\[176px\]/);
+    expect(band).toMatch(/\bsm:h-\[200px\]/);
     expect(band).not.toMatch(/\b(md|lg|xl|2xl):h-[\d[]/);
   });
 
@@ -244,22 +251,26 @@ describe("each card draws a capped number of one-line items", () => {
     /* eslint-enable security/detect-non-literal-regexp */
   });
 
-  it("clamps every line and keeps the full text reachable", () => {
+  it("clamps every tip line and keeps the full text reachable", () => {
     /*
-      TWO HALVES AND THE SECOND IS THE ONE THAT GETS DROPPED. `truncate` is what stops a long
-      sentence wrapping and pushing the line below it out of a card that cannot grow. `title`
-      is what stops the clamp being a deletion - a cut sentence with no way to read the rest
-      is the same failure as an uncapped list, one step quieter.
-
-      Asserted per file, because one card covering for another is indistinguishable from the
-      guard working - the same reason the contest-control copy is asserted per list.
+      TWO HALVES AND THE SECOND IS THE ONE THAT GETS DROPPED. Rules still use `truncate` +
+      `title` so a long step does not push the next off a fixed-height card. Tips since
+      25 Sep 2026 show title + detail with `line-clamp-2` on the detail so the card fills
+      its height without overflowing - FLIPPED from title-only truncate (owner: bigger
+      wording that takes more space).
     */
-    for (const file of [RULES, HIGHLIGHTS]) {
-      const code = readCode(file);
-      // 13px since 25 Sep 2026; 10px was rejected as unreadable.
-      expect(code).toMatch(/className="truncate text-\[13px\]/);
-      expect(code).toMatch(/title=\{/);
-    }
+    const rules = readCode(RULES);
+    // 15px since 25 Sep 2026; 13px then 10px were both rejected as too small beside the tips.
+    expect(rules).toMatch(/className="truncate text-\[15px\]/);
+    expect(rules).toMatch(/title=\{/);
+
+    const tips = readCode(HIGHLIGHTS);
+    expect(tips).toMatch(/text-\[16px\] font-semibold/);
+    expect(tips).toMatch(/line-clamp-2/);
+    expect(tips).toMatch(/TIP_ICONS/);
+    // Identical Checkmarks were the rejected look; each tip slot gets its own icon.
+    expect(tips).toMatch(/Zap/);
+    expect(tips).toMatch(/Trophy/);
 
     // The feed clamps too, but has no tooltip: its phrase is generated from the round's own
     // status by `describeRoundActivity`, so there is no longer text to reveal.

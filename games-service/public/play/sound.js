@@ -153,6 +153,22 @@ export function createSound() {
     }
   }
 
+  /**
+   * Bring the bed back after the browser paused audio.
+   *
+   * WHY THIS EXISTS (owner, 25 Sep 2026: music gone after pause/unpause). Browsers suspend an
+   * AudioContext when the tab is hidden, the phone locks, or the iframe loses focus - and a
+   * BufferSource that was playing under a suspended context is often dead when the context
+   * resumes. Calling `resume()` alone leaves silence with `musicWanted` still true. Restarting
+   * the source is the only reliable recovery; it must never await on the gameplay path.
+   */
+  function reviveMusic() {
+    if (!enabled || broken || !musicWanted || musicMuted) return;
+    resume();
+    stopMusicInternal();
+    startMusicInternal();
+  }
+
   function loadSample(name, url) {
     if (!context || broken || buffers.has(name) || loading.has(name)) return;
     loading.add(name);
@@ -184,24 +200,24 @@ export function createSound() {
 
   function unlock() {
     if (broken) return;
-    if (context) {
-      resume();
-      warmAllSamples();
-      return;
-    }
-    try {
-      const Ctor = window.AudioContext || window.webkitAudioContext;
-      if (!Ctor) {
+    if (!context) {
+      try {
+        const Ctor = window.AudioContext || window.webkitAudioContext;
+        if (!Ctor) {
+          broken = true;
+          return;
+        }
+        context = new Ctor();
+      } catch {
         broken = true;
+        context = null;
         return;
       }
-      context = new Ctor();
-    } catch {
-      broken = true;
-      context = null;
-      return;
     }
-    resume();
+    // Reason: after a contest/browser pause the context may be running again while the bed's
+    // BufferSource is dead. Unlock is the gesture path, so restart music here when wanted.
+    if (musicWanted && !musicMuted) reviveMusic();
+    else resume();
     warmAllSamples();
   }
 
@@ -308,11 +324,42 @@ export function createSound() {
   }
 
   function startMusicInternal() {
-    if (!enabled || broken || !context || !musicWanted) return;
+    if (!enabled || broken || !context || !musicWanted || musicMuted) return;
     if (musicSource) return;
-    if (!playBuffer("music", { loop: true, gain: SAMPLE_GAIN.get("music") })) {
-      loadSample("music", SAMPLE_URLS.get("music"));
+
+    const go = () => {
+      if (musicSource || !musicWanted || musicMuted) return;
+      if (!playBuffer("music", { loop: true, gain: SAMPLE_GAIN.get("music") })) {
+        loadSample("music", SAMPLE_URLS.get("music"));
+      }
+    };
+
+    // Reason: playBuffer against a still-suspended context is a silent no-op on several
+    // browsers. Resume first, then start - and never await this from a drag handler.
+    if (context.state === "suspended") {
+      try {
+        const pending = context.resume();
+        if (pending && typeof pending.then === "function") {
+          pending.then(go).catch(() => {});
+          return;
+        }
+      } catch {
+        broken = true;
+        return;
+      }
     }
+    go();
+  }
+
+  // Visibility / focus: the browser paused us; revive when the player comes back.
+  if (typeof document !== "undefined") {
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) reviveMusic();
+    });
+  }
+  if (typeof window !== "undefined") {
+    window.addEventListener("focus", reviveMusic);
+    window.addEventListener("pageshow", reviveMusic);
   }
 
   return {
