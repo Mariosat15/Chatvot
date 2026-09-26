@@ -57,6 +57,8 @@ const SAMPLE_URLS = new Map([
   ["time-up", "/play/sfx-time-up.ogg"],
   ["submit", "/play/sfx-submit-move.ogg"],
   ["connected", "/play/sfx-dot-connected.ogg"],
+  // Feel-only: second+ join in a row on the same board. Never implies a score multiplier.
+  ["chain", "/play/sfx-chain-extended.ogg"],
   ["board-complete", "/play/sfx-board-complete.ogg"],
   ["win", "/play/sfx-win.ogg"],
   ["music", "/play/music-neon-circuit.ogg"],
@@ -75,6 +77,7 @@ const SAMPLE_GAIN = new Map([
   ["time-up", 0.5],
   ["submit", 0.36],
   ["connected", 0.34],
+  ["chain", 0.38],
   ["board-complete", 0.62],
   ["win", 0.68],
   // Reason: at 0.22 x the 0.7 default slider the loop played at ~15% and was reported as
@@ -422,6 +425,18 @@ export function createSound() {
 
     /** The note belonging to a pair, played as its wire lands. */
     playPair(pairId) {
+      if (playBuffer("connected")) return;
+      loadSample("connected", SAMPLE_URLS.get("connected"));
+      playRecipe(pairNoteRecipe(pairId));
+    },
+
+    /**
+     * Second+ consecutive join on the same board (feel only). Falls back to the pair note so a
+     * missing sample never leaves a silent join.
+     */
+    playChain(pairId) {
+      if (playBuffer("chain")) return;
+      loadSample("chain", SAMPLE_URLS.get("chain"));
       if (playBuffer("connected")) return;
       loadSample("connected", SAMPLE_URLS.get("connected"));
       playRecipe(pairNoteRecipe(pairId));

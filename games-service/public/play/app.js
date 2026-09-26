@@ -104,6 +104,7 @@ const ui = {
   introTitle: document.getElementById("intro-title"),
   introRules: document.getElementById("intro-rules"),
   introLimit: document.getElementById("intro-limit"),
+  introHowto: document.getElementById("intro-howto"),
   introScoring: document.getElementById("intro-scoring"),
   introScoringPanel: document.getElementById("intro-scoring-panel"),
   introNote: document.getElementById("intro-note"),
@@ -135,6 +136,7 @@ const ui = {
   sfxLevel: document.getElementById("sfx-level"),
   musicMute: document.getElementById("music-mute"),
   sfxMute: document.getElementById("sfx-mute"),
+  liteFx: document.getElementById("lite-fx"),
   hint: document.getElementById("hint"),
   submit: document.getElementById("submit"),
   clear: document.getElementById("clear"),
@@ -379,6 +381,11 @@ function flashBoard(name, ms) {
   const stage = ui.boardStage;
   if (!stage || prefersReducedMotion() || stage.classList.contains(name)) return;
   stage.classList.add(name);
+  // Soft sealed wash on an accepted board (Phase F). Quieter than the rejected complete burst.
+  if (name === "solved") {
+    stage.classList.add("board-complete-soft");
+    window.setTimeout(() => stage.classList.remove("board-complete-soft"), ms);
+  }
   window.setTimeout(() => stage.classList.remove(name), ms);
 }
 
@@ -431,6 +438,7 @@ function renderIntro() {
 
   ui.introTitle.textContent = copy.name;
   ui.introLimit.textContent = copy.limit;
+  if (ui.introHowto) ui.introHowto.textContent = copy.howto || "";
   ui.introNote.textContent = copy.note;
 
   /*
@@ -897,7 +905,11 @@ function onBoardChange(change) {
   const joinedNow = (change && change.justJoined) || [];
   if (joinedNow.length > 0) streak += joinedNow.length;
   else if (change && (change.settled || change.broken)) streak = 0;
-  for (const pairId of joinedNow) sound.playPair(pairId);
+  // Second+ join in a row uses the chain sample (feel only — never a score combo).
+  for (const pairId of joinedNow) {
+    if (streak > 1) sound.playChain(pairId);
+    else sound.playPair(pairId);
+  }
 }
 
 const board = createBoard(ui.board, onBoardChange);
@@ -997,6 +1009,8 @@ async function submit() {
        */
       if (!localWinPlayed) sound.playBoardComplete();
       flashBoard("solved", BOARD_COMPLETE_MS);
+      // Cue the platform standings poll — type only, never a board count or score (s4.1p rule).
+      tellPlatform("progress");
       // Circuit-sealed beat when this acceptance ends the round — freeze + glow, then result.
       if (state.finished && !prefersReducedMotion()) {
         await sealCircuitBeat();
@@ -1148,6 +1162,45 @@ if (ui.sfxMute) {
     sound.unlock();
     sound.setSfxMuted(!sound.isSfxMuted());
     ui.sfxMute.textContent = sound.isSfxMuted() ? "Effects off" : "Mute effects";
+    if (!sound.isSfxMuted()) sound.play("press");
+  });
+}
+
+/**
+ * Lite FX: local preference for weaker machines. Off = no trail / wake / spark / ripple.
+ * Reduced-motion still strips those even when Lite is off. Default is full FX.
+ */
+const LITE_FX_KEY = "circuit-lite-fx";
+function readLiteFx() {
+  try {
+    return window.localStorage.getItem(LITE_FX_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+function applyLiteFx(on) {
+  document.documentElement.classList.toggle("lite-fx", on);
+  board.setMotionFx(!on);
+  if (ui.liteFx) {
+    ui.liteFx.textContent = on ? "Lite FX: on" : "Lite FX: off";
+    ui.liteFx.setAttribute("aria-pressed", on ? "true" : "false");
+    ui.liteFx.setAttribute(
+      "title",
+      on ? "Motion effects are off for a lighter board" : "Turn on Lite FX for a lighter board",
+    );
+  }
+}
+applyLiteFx(readLiteFx());
+if (ui.liteFx) {
+  ui.liteFx.addEventListener("click", () => {
+    const next = !readLiteFx();
+    try {
+      window.localStorage.setItem(LITE_FX_KEY, next ? "1" : "0");
+    } catch {
+      /* private mode — preference lasts for this session only */
+    }
+    applyLiteFx(next);
+    sound.unlock();
     if (!sound.isSfxMuted()) sound.play("press");
   });
 }

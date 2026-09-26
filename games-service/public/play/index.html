@@ -47,6 +47,8 @@
       <section id="screen-intro" class="screen" hidden>
         <h1 id="intro-title">Circuit</h1>
         <p id="intro-limit" class="lead"></p>
+        <!-- One short rule line (26 Sep 2026). No howto graphic — that caused scroll + bad art. -->
+        <p id="intro-howto" class="intro-howto-line"></p>
 
         <div class="panels">
           <section class="panel">
@@ -130,6 +132,10 @@
               </label>
               <button id="music-mute" class="ghost small-btn" type="button">Mute music</button>
               <button id="sfx-mute" class="ghost small-btn" type="button">Mute effects</button>
+              <!-- Lite FX: skips trail / wake / spark / ripple. Gameplay unchanged. -->
+              <button id="lite-fx" class="ghost small-btn" type="button" aria-pressed="false">
+                Lite FX: off
+              </button>
             </div>
             <!-- Leave keeps its word. An unlabelled exit icon on a paid attempt is the one control
                  a player must not have to guess at. -->
@@ -189,6 +195,7 @@
               <div class="board-art" aria-hidden="true"></div>
               <!-- Local complete / sealed overlays — CSS backgrounds, not hit targets. -->
               <div class="board-fx board-fx-flash" aria-hidden="true"></div>
+              <div class="board-fx board-fx-complete" aria-hidden="true"></div>
               <div class="board-fx board-fx-sealed" aria-hidden="true"></div>
               <!-- `touch-action: none` lives in the stylesheet: a drag must not scroll the page. -->
               <svg id="board" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Puzzle grid">

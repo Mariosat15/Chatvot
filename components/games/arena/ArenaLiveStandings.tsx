@@ -207,10 +207,18 @@ export function ArenaLiveProvider({
     if (document.visibilityState === "visible") start();
     document.addEventListener("visibilitychange", handleVisibility);
 
+    // Mid-round board accept (frame `progress` cue) — refresh now so "boards done" moves
+    // without waiting for the 15s tick. Payload carries no score; we re-read the server.
+    const handleProgressCue = () => {
+      void read();
+    };
+    window.addEventListener("chartvolt:arena-standings-refresh", handleProgressCue);
+
     return () => {
       mounted = false;
       clearTimer();
       document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("chartvolt:arena-standings-refresh", handleProgressCue);
     };
   }, [active, competitionId, intervalMs, clearTimer]);
 

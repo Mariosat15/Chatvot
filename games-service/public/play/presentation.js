@@ -373,6 +373,11 @@ export function introCopy(input) {
   return {
     name,
     limit,
+    /*
+     * One short glance rule (26 Sep 2026). Kept free of graphics — the old howto image caused a
+     * scrollbar and painted error-X art. Rules list below still carries the full text.
+     */
+    howto: "Connect matching numbers with one continuous path. Paths cannot cross or share a cell.",
     startLabel: practice ? "Start practice" : "Start",
     /*
      * Reason practice says something different: a practice round is free, unranked and prize-less,

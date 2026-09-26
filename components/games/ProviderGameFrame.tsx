@@ -21,7 +21,7 @@ import {
  *   2. `event.origin === expectedOrigin` - the frame is still on the provider's origin. A frame
  *      that has navigated itself elsewhere stops being trusted, which matters because the
  *      launch URL carries a single-use token and a redirect chain can end anywhere.
- *   3. The payload narrows to one of exactly four agreed types.
+ *   3. The payload narrows to one of exactly five agreed types.
  *
  * AND THE THING THAT IS NOT CHECKED, BECAUSE IT IS NOT ACCEPTED AT ALL: a score. See
  * `provider-frame-messages.ts` - the message type has no score field, so there is nothing to
@@ -62,6 +62,11 @@ interface ProviderGameFrameProps {
   onFinished: () => void;
   /** Called when the player asks to leave the game. */
   onExit: () => void;
+  /**
+   * Called when a board was accepted mid-round. Cue to refresh standings — never carries a
+   * score. Optional: the frame also broadcasts `chartvolt:arena-standings-refresh`.
+   */
+  onProgress?: () => void;
   /** Called when the frame reports an origin we did not expect - a real integration fault. */
   onUntrustedOrigin?: (origin: string) => void;
 }
@@ -71,6 +76,7 @@ export function ProviderGameFrame({
   gameName,
   onFinished,
   onExit,
+  onProgress,
   onUntrustedOrigin,
 }: ProviderGameFrameProps) {
   const frameRef = useRef<HTMLIFrameElement>(null);
@@ -154,6 +160,13 @@ export function ProviderGameFrame({
         case "exit":
           onExit();
           break;
+        case "progress":
+          // Cue only — no score on the wire. Standings poll asks the server.
+          onProgress?.();
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new Event("chartvolt:arena-standings-refresh"));
+          }
+          break;
         case "resize":
           if (typeof message.height === "number") {
             setHeight(clampFrameHeight(message.height));
@@ -164,7 +177,7 @@ export function ProviderGameFrame({
 
     window.addEventListener("message", handle);
     return () => window.removeEventListener("message", handle);
-  }, [expectedOrigin, onFinished, onExit, onUntrustedOrigin]);
+  }, [expectedOrigin, onFinished, onExit, onProgress, onUntrustedOrigin]);
 
   // Reason this refuses rather than rendering anyway: a launch URL we cannot parse into an
   // http(s) origin is one we cannot verify messages against, so the frame would be

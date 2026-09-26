@@ -320,6 +320,23 @@ h1 {
  * the screen reads perfectly well, it just has a hairline where the illustration should be.
  */
 /*
+ * One short intro rule line (26 Sep 2026). The howto graphic that used this area was removed —
+ * it caused a scrollbar and painted error-X art. Keep the old `.intro-howto` class inert.
+ */
+.intro-howto-line {
+  margin: 0.35rem auto 0.85rem;
+  max-width: 36rem;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  color: #b9d8f5;
+  text-align: center;
+}
+
+.intro-howto-line:empty {
+  display: none;
+}
+
+/*
  * One-glance teach diagram on the intro. Above the motion SVG so a new player sees the rule
  * ("tap matching numbers, don't cross") before they press Start on a paid attempt.
  */
@@ -774,12 +791,14 @@ button.icon-btn {
   .arena {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr) auto auto;
+    gap: 10px;
   }
 
   .arena > .action-rail {
     grid-row: 2;
     flex-direction: row;
     justify-content: center;
+    gap: 12px;
   }
 
   .arena > .board-wrap {
@@ -812,6 +831,23 @@ button.icon-btn {
 
   .stat-rail > .stat-tiles > .stat-tile + .stat-tile {
     border-left: 1px solid rgba(64, 150, 240, 0.28);
+  }
+
+  /* Phone: larger tap targets after the board took the full width (owner, 26 Sep 2026). */
+  button.rail-btn {
+    min-height: 56px;
+    min-width: 96px;
+    padding: 10px 14px;
+  }
+
+  .footer-actions {
+    gap: 10px;
+    margin-top: 4px;
+  }
+
+  .submit-wide {
+    min-height: 62px;
+    font-size: 1.05rem;
   }
 }
 
@@ -1041,15 +1077,22 @@ button.rail-btn:disabled {
   /* Submit takes its own line; two icon buttons beside it leave it about five characters. */
   .footer-actions {
     flex-wrap: wrap;
+    gap: 10px;
   }
 
   .action-rail {
     flex: 1 1 100%;
+    gap: 10px;
   }
 
   button.rail-btn {
     flex: 1;
-    min-height: 48px;
+    min-height: 54px;
+    justify-content: center;
+  }
+
+  .submit-wide {
+    min-height: 64px;
   }
 }
 
@@ -1097,6 +1140,12 @@ button.rail-btn:disabled {
   background-image: url("/play/fx-board-flash.webp");
 }
 
+/* Soft Phase F wash — quieter than fx-board-complete.webp / the rejected burst. */
+.board-fx-complete {
+  background-image: url("/play/fx-board-complete-soft.svg");
+  background-size: cover;
+}
+
 .board-fx-sealed {
   background-image: url("/play/fx-circuit-sealed.webp");
 }
@@ -1104,6 +1153,10 @@ button.rail-btn:disabled {
 .board-stage.fx-flash .board-fx-flash,
 .board-stage.solved-local .board-fx-flash {
   animation: board-fx-wash 850ms ease-out 1 both;
+}
+
+.board-stage.board-complete-soft .board-fx-complete {
+  animation: board-fx-soft 520ms ease-out 1 both;
 }
 
 .board-stage.circuit-sealed .board-fx-sealed {
@@ -1133,15 +1186,27 @@ button.rail-btn:disabled {
   }
 }
 
+@keyframes board-fx-soft {
+  0% {
+    opacity: 0;
+  }
+  22% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
 @keyframes board-fx-seal {
   0% {
     opacity: 0;
   }
   30% {
-    opacity: 0.85;
+    opacity: 0.48;
   }
   100% {
-    opacity: 0.35;
+    opacity: 0.18;
   }
 }
 
@@ -1912,6 +1977,7 @@ button.primary:active:not(:disabled) {
   .board-stage.solved::after,
   .board-stage.solved-local .board-fx-flash,
   .board-stage.fx-flash .board-fx-flash,
+  .board-stage.board-complete-soft .board-fx-complete,
   .board-stage.circuit-sealed .board-fx-sealed,
   .board-stage.refused,
   #screen-result.result-power {
@@ -1944,4 +2010,17 @@ button.primary:active:not(:disabled) {
   .board-meter-fill {
     transition: none;
   }
+}
+
+/*
+ * Lite FX (manual toggle). Same Phase J strip as reduced-motion, but the player chose it —
+ * lock-on and the soft board-complete wash stay so feedback is not silent.
+ */
+html.lite-fx svg#board .fx-trail-tip,
+html.lite-fx svg#board .fx-board-wake,
+html.lite-fx svg#board .fx-cell-ripple,
+html.lite-fx svg#board .fx-join-spark,
+html.lite-fx svg#board .fx-undo-rewind {
+  display: none !important;
+  animation: none !important;
 }

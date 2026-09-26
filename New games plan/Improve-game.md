@@ -120,6 +120,21 @@ mid-round SCORE, no Phase B menu faces.
 Six effects live as cheap SVG/CSS (trail tip, undo rewind, board-enter wake, result corona +
 count-up, coverage ripple, join spark). Heavy Phase J WebPs stay on disk but are not warmed.
 
+### Phase F — Soft board-complete — **WIRED (26 Sep 2026)**
+
+Quiet vignette (`fx-board-complete-soft.svg`) on each accepted board; round-end seal opacity
+lowered. Not the rejected complete burst.
+
+### Same-day polish (26 Sep 2026)
+
+- Chain SFX mapped to second+ consecutive join (feel only).
+- Reduced-motion + **Lite FX** toggle strip Phase J wake/spark/ripple/trail.
+- Phone tap targets enlarged; intro one-line howto (no graphic).
+- Arena: thin neon scrollbar, mid-round `progress` standings refresh, Contest Info rhythm,
+  empty rules/tips band hidden when both slots empty.
+- Alt skins already dealt by `board-deck.ts` (Small/Medium/Large pools). Token set eye-checked
+  under large (1–10 present). Richer Phase J rasters still optional.
+
 ---
 
 ## 6. Effort (remaining)
@@ -131,11 +146,11 @@ count-up, coverage ripple, join spark). Heavy Phase J WebPs stay on disk but are
 | C Digits + timer SFX | **done** |
 | D Board skins + pulse | **done** |
 | E Audio files | **done** |
-| F Complete overlay | deferred with menu skip — **assets ready** (`fx-board-complete*.webp`, burst) |
+| F Complete overlay | **wired soft** — `fx-board-complete-soft.svg`, not the burst |
 | G Number anim | deferred |
 | H Owner eye/ear + deploy | ongoing |
 | I Feedback / polish graphics | **wired + amended** — messy FX stripped; see ASSET-MAP Phase I |
-| J Arcade motion FX | **wired light** — SVG/CSS; see ASSET-MAP Phase J |
+| J Arcade motion FX | **wired light** — SVG/CSS; Lite FX + reduced-motion strip |
 
 ---
 
@@ -165,8 +180,8 @@ count-up, coverage ripple, join spark). Heavy Phase J WebPs stay on disk but are
 
 ## 8. Next
 
-Owner eye/ear on the lighter board + Phase J motion. Deploy play assets with
-`git pull` + `pm2 restart chartvolt-games` (no `npm run build` for `public/play` only).
+Deploy play with `git pull` + `pm2 restart chartvolt-games`. Platform arena changes need the
+usual Next deploy. Owner eye/ear on soft complete, chain SFX, Lite FX, and phone footer.
 Still: no Hint, no mid-round SCORE, no Phase B menu faces.
 
 ---

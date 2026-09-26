@@ -511,18 +511,21 @@ export function NeonStatTiles({
         return (
           <div
             key={item.label}
-            className="rounded-lg border border-[#161E36] bg-[#080C18]/70 p-3 text-center"
+            className="rounded-lg border border-[#161E36] bg-[#080C18]/70 px-2.5 py-2.5 text-center"
           >
             {/*
               Centered 26 Sep 2026 (owner): left-aligned tiles left empty space beside the
               figure. Icon + label stay on one row so the accent chip still reads with the caption.
+              Padding/type matched to the in-frame readout cells (26 Sep rhythm pass).
             */}
-            <div className="flex items-center justify-center gap-2">
+            <div className="flex items-center justify-center gap-1.5">
               <IconTile icon={item.icon} accent={item.accent} size="sm" />
-              <span className={`truncate ${NEON_LABEL}`}>{item.label}</span>
+              <span className={`truncate text-[0.62rem] tracking-[0.14em] ${NEON_LABEL}`}>
+                {item.label}
+              </span>
             </div>
             <div
-              className={`mt-2 truncate text-xl font-bold leading-none ${classes.text}`}
+              className={`mt-1.5 truncate text-lg font-bold leading-none ${classes.text}`}
             >
               {item.value}
             </div>

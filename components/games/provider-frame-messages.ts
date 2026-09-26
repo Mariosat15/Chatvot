@@ -1,5 +1,5 @@
 /**
- * The only four things a provider's game may tell the browser, and what we do about them.
+ * The only five things a provider's game may tell the browser, and what we do about them.
  *
  * THE WHOLE FILE EXISTS TO MAKE ONE RULE UNMISSABLE: **a score never arrives this way.**
  * `ChartVolt-Game-API-Requirements.html` section 7 states it to providers as "we will ignore
@@ -29,6 +29,11 @@ export const PROVIDER_FRAME_MESSAGE_TYPES = [
   "exit",
   /** The game wants a different height. Advisory, and clamped. */
   "resize",
+  /**
+   * A board was accepted mid-round. Cue to refresh standings / activity — never carries a
+   * score, board count, or prize. The server remains the only source of those figures.
+   */
+  "progress",
 ] as const;
 
 export type ProviderFrameMessageType =

@@ -299,7 +299,7 @@ export function GameArenaLayout({
         Rules / tips sit quieter than the board stage (26 Sep 2026 hierarchy pass). Opacity on
         the wrappers, not inside the panels — lobby callers of the same panels stay full-bright.
       */}
-      <div className="mt-3 flex flex-wrap items-stretch gap-2.5 overflow-hidden opacity-85 sm:h-[300px]">
+      <div className="mt-3 flex flex-wrap items-stretch gap-2.5 overflow-hidden opacity-85 has-[>:not(:empty)]:sm:h-[300px] [:not(:has(>:not(:empty)))]:hidden">
         <div className="min-w-[260px] flex-[1_1_0] empty:hidden [&>*]:h-full">
           {rules}
         </div>

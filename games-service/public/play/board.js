@@ -124,6 +124,7 @@ export const FX_ART = [
   "/play/fx-lock-on-hit.webp",
   "/play/fx-board-flash.webp",
   "/play/fx-board-complete.webp",
+  "/play/fx-board-complete-soft.svg",
   "/play/fx-timer-urgent.webp",
   "/play/fx-circuit-sealed.webp",
 ];
@@ -383,7 +384,7 @@ export function createBoard(svg, onChange) {
   let trailTip = null;
 
   function showTrailAt(cell) {
-    if (!layers || !cellPx || !cell) return;
+    if (!motionFxOn() || !layers || !cellPx || !cell) return;
     const cx = centre(cell[0]);
     const cy = centre(cell[1]);
     const r = Math.max(2.5, cellPx * 0.12);
@@ -436,9 +437,24 @@ export function createBoard(svg, onChange) {
     }, 300);
   }
 
+  /**
+   * Lite FX / reduced-motion: skip wake, spark, ripple, trail tip. Lock-on stays — it is the
+   * only cue that says "this terminal is armed". Gameplay paths never branch on this flag.
+   */
+  let fxMotion = true;
+  function motionFxOn() {
+    if (!fxMotion) return false;
+    try {
+      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return false;
+    } catch {
+      /* browsers without matchMedia keep motion */
+    }
+    return true;
+  }
+
   /** Soft wake rings when a new board enters (Phase J charge — CSS circles, not a WebP wash). */
   function playBoardEnter() {
-    if (!layers || !puzzle || !cellPx) return;
+    if (!motionFxOn() || !layers || !puzzle || !cellPx) return;
     for (const pair of puzzle.pairs) {
       for (const [cx, cy] of terminalCentres.get(pair.id) || []) {
         const wake = element("circle", {
@@ -462,7 +478,7 @@ export function createBoard(svg, onChange) {
 
   /** One-frame pip pop when a cell fills (Phase J coverage ripple). */
   function spawnCoverageRipple(x, y) {
-    if (!layers || !cellPx) return;
+    if (!motionFxOn() || !layers || !cellPx) return;
     const ripple = element("circle", {
       cx: centre(x),
       cy: centre(y),
@@ -482,7 +498,7 @@ export function createBoard(svg, onChange) {
 
   /** Sparks travel both terminals → midpoint when a pair locks (Phase J, on top of join pulse). */
   function spawnJoinSparks(pairId) {
-    if (!layers || !cellPx) return;
+    if (!motionFxOn() || !layers || !cellPx) return;
     const centres = terminalCentres.get(pairId);
     if (!centres || centres.length < 2) return;
     const [a, b] = centres;
@@ -1345,6 +1361,14 @@ export function createBoard(svg, onChange) {
     lock() {
       locked = true;
       dragging = null;
+    },
+    /**
+     * Owner Lite FX toggle (26 Sep 2026). When false, Phase J wake/spark/ripple/trail are skipped.
+     * Reduced-motion is still read live inside `motionFxOn` — this flag is the manual override.
+     */
+    setMotionFx(enabled) {
+      fxMotion = enabled !== false;
+      if (!fxMotion) hideTrail();
     },
     resize,
     flashError,

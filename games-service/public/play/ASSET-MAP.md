@@ -16,7 +16,7 @@ and removed**. Continue with music, boards, and digit numbers only.
 | `music-neon-circuit.ogg` | Default bed | **E** — `sound.startMusic()` after Start / first grid touch |
 | `sfx-dot-select.ogg` | Terminal / UI press | **E** — `press` |
 | `sfx-dot-connected.ogg` | Valid pair join | **E** — `playPair` |
-| `sfx-chain-extended.ogg` | Packed; not mapped (no distinct chain event yet) | Available |
+| `sfx-chain-extended.ogg` | Second+ consecutive join on the same board (feel only) | **Wired 26 Sep** — `sound.playChain` |
 | `sfx-connection-invalid.ogg` | Illegal drag | **E** — `refused` |
 | `sfx-connection-break.ogg` | Undo | **E** — `break` |
 | `sfx-clear-reset.ogg` | Clear | **E** — `clear` |
@@ -30,8 +30,11 @@ and removed**. Continue with music, boards, and digit numbers only.
 | `sfx-win.ogg` | Triumphant result | **E** — `win` |
 | `sfx-combo-bonus.ogg` | Packed only — **never** mapped (no fake score multiplier) | Not wired |
 
-Existing tokens (`token-1..10.webp`) and `board-frame.webp` unchanged.
+Existing tokens (`token-1..10.webp`) and `board-frame.webp` unchanged — **eye-checked 26 Sep**
+(1–10 at 224²): distinct rim hues, white digits, readable under large-grid scale; no redraw needed.
 `numbers animations/` in the owner pack was empty / unlabelled — skipped (Phase G later if filled).
+Richer Phase J rasters remain **optional** — soft SVG + CSS stay the live path until a live play
+pass says they still feel thin.
 
 ---
 
@@ -79,3 +82,20 @@ Submit inset rim; drop board `drop-shadow` + neon pulse for perf.
 
 **Conversion:** `games-service/tools/keyout-phase-j.cjs` (black plate → alpha WebP).
 Raster assets kept for a later richer pass if wanted.
+
+---
+
+## Phase F + polish pack (26 Sep 2026) — **WIRED**
+
+| File / control | Role | Wired in |
+|---|---|---|
+| `fx-board-complete-soft.svg` | Quiet cyan vignette on board accept | **F** — `.board-fx-complete` + `.board-complete-soft` |
+| `fx-lite-badge.svg` | Settings glyph (optional chrome) | On disk; toggle is text in sound panel |
+| Lite FX toggle | Skips trail / wake / spark / ripple | **app.js** `circuit-lite-fx` + `board.setMotionFx` |
+| `prefers-reduced-motion` | Same Phase J strip as Lite | **app.css** + `motionFxOn()` in `board.js` |
+| Chain SFX | `sfx-chain-extended.ogg` on streak > 1 | **sound.playChain** |
+| Intro howto line | One sentence, no graphic | **introCopy.howto** |
+| Alt board skins | `board-s/m/l-##.webp` shuffled deck | **Already live** via `board-deck.ts` (18/12/15) |
+| Frame `progress` cue | Refresh arena standings mid-round | **provider-frame-messages** + `ArenaLiveStandings` |
+
+Still **no** Hint, mid-round SCORE, Phase B menu faces, or combo-bonus SFX.

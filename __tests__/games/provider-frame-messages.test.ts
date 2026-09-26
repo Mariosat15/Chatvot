@@ -18,12 +18,13 @@ import {
  */
 
 describe("what a provider's game frame is allowed to tell us", () => {
-  it("accepts exactly the four agreed message types and nothing else", () => {
+  it("accepts exactly the five agreed message types and nothing else", () => {
     expect(PROVIDER_FRAME_MESSAGE_TYPES).toEqual([
       "ready",
       "finished",
       "exit",
       "resize",
+      "progress",
     ]);
 
     for (const type of PROVIDER_FRAME_MESSAGE_TYPES) {
@@ -34,6 +35,18 @@ describe("what a provider's game frame is allowed to tell us", () => {
     expect(parseProviderFrameMessage({ type: "score" })).toBeNull();
     expect(parseProviderFrameMessage({ type: "award_prize" })).toBeNull();
     expect(parseProviderFrameMessage({ type: "round.completed" })).toBeNull();
+  });
+
+  it("strips every figure off a progress cue the same way as finished", () => {
+    const parsed = parseProviderFrameMessage({
+      type: "progress",
+      boardsCompleted: 7,
+      score: 999,
+      rawScore: 999,
+    });
+    expect(parsed).not.toBeNull();
+    expect(parsed?.type).toBe("progress");
+    expect(Object.keys(parsed as object).sort()).toEqual(["height", "type"]);
   });
 
   /**

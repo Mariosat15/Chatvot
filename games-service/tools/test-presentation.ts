@@ -65,6 +65,7 @@ interface Presentation {
     limit: string;
     startLabel: string;
     note: string;
+    howto: string;
   };
   formatDuration(seconds: number): string;
   resultCopy(input: Record<string, unknown>): {
@@ -630,6 +631,12 @@ async function main(): Promise<void> {
     for (const missing of [undefined, "", "   "]) {
       assert.equal(p.introCopy({ title: missing }).name, "Circuit");
     }
+  });
+
+  test("the intro carries one short howto line with no graphic dependency", () => {
+    const copy = p.introCopy({ title: "Circuit Sprint", durationSeconds: 120 });
+    assert.match(copy.howto, /matching numbers/i);
+    assert.match(copy.howto, /cannot cross/i);
   });
 
   test("a fixed set of boards is described as a race, and a clock as a count", () => {
