@@ -2078,14 +2078,23 @@ describe("the standings board fits the column it is given", () => {
 
   it("spends the rail on the name rather than on the numeric columns", () => {
     /*
-      Every fixed width here is space the name cannot have, and the name is the only column
+      Every fixed floor here is space the name cannot have, and the name is the only column
       whose content has no upper bound. Counted rather than found, because the template is
       written twice - once for the heading and once for the rows - and a widening applied to
       one of them silently misaligns the two.
+
+      Floors rather than fixed `w-12`/`w-10` since 26 Sep 2026: a five-figure score in a
+      48px cell overflowed the lobby column and `overflow-x-hidden` clipped the row's right
+      border (owner screenshot). `minmax` grows when needed and still counts twice.
     */
-    expect(board.match(/\bw-12\b/g) ?? []).toHaveLength(2);
-    expect(board.match(/\bw-10\b/g) ?? []).toHaveLength(2);
+    expect(
+      board.match(
+        /grid-cols-\[1\.75rem_minmax\(0,1fr\)_minmax\(3\.25rem,auto\)_minmax\(2\.75rem,auto\)\]/g,
+      ) ?? [],
+    ).toHaveLength(2);
     expect(board.match(/gap-x-1\.5/g) ?? []).toHaveLength(2);
+    // Inset so gold rims survive overflow-clipping parents (lobby page + arena rail).
+    expect(board).toMatch(/flex min-w-0 flex-col gap-1\.5 px-1/);
   });
 });
 

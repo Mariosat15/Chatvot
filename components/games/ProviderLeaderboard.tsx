@@ -166,36 +166,35 @@ export default function ProviderLeaderboard({
     takes what is left and truncates, and the row never wraps - a wrapping row is what turned
     the rail into a stack of three-line entries with the avatar on its own line.
 
-    THE ROW IS A TABLE ROW, NOT A CARD, and that was the owner's complaint about this board.
-    Each entry used to be a padded, bordered, rounded tile with a gap beneath it, so twenty
-    players filled a screen and a half and every one of them was mostly empty space and border.
-    The reference draws them flush and close: one hairline between rows, a tint only on the
-    podium and on your own row, and the vertical rhythm tight enough that the shape of the
-    contest is visible without scrolling.
+    ROW BOXES MUST SIT INSET FROM ANY CLIPPING ANCESTOR. The lobby page (and several parents)
+    set `overflow-x-hidden`, which also forces the y-axis to clip - so a full border or gold
+    glow drawn flush against the content edge loses its right side. Owner screenshots on both
+    the arena rail and the contest lobby circled that cutoff. Horizontal padding here, and
+    `min-w-0` so a wide score cannot blow the grid past the column, are the fix in both hosts.
   */
   return (
-    <div>
+    <div className="min-w-0 w-full">
       {/*
         THE COLUMNS ARE MEASURED AGAINST THE 360px RAIL, NOT AGAINST THE LOBBY. Every fixed
         width here is space the name cannot have, and the name is the only column whose content
-        has no upper bound. The plate is exactly the plate's own size, the two numeric columns
-        are as wide as a five-figure score and a `12:34` clock and no wider, and the gaps are
-        6px rather than 8px - which together is about 40px handed back to the name.
+        has no upper bound. Score/time floors are wide enough for `21,911` and `48:22` so those
+        figures cannot force the row past its container (and take the right border with them).
       */}
       <div
-        className={`grid grid-cols-[1.75rem_minmax(0,1fr)_auto_auto] items-center gap-x-1.5 px-1.5 pb-1.5 ${NEON_TABLE_HEAD}`}
+        className={`grid grid-cols-[1.75rem_minmax(0,1fr)_minmax(3.25rem,auto)_minmax(2.75rem,auto)] items-center gap-x-1.5 px-2.5 pb-1.5 ${NEON_TABLE_HEAD}`}
       >
         <div>#</div>
         <div className="min-w-0">Player</div>
-        <div className="w-12 text-right">{scoreLabel}</div>
-        <div className="w-10 text-right">Time</div>
+        <div className="text-right">{scoreLabel}</div>
+        <div className="text-right">Time</div>
       </div>
 
       {/*
         Gapped cards, not divide-y hairlines. Since 26 Sep 2026 every flush row is its own
         bordered box; a divide seam between them double-draws the edge and fights the gap.
+        `px-1` keeps the gold rim and shadow inside overflow-clipping parents (lobby + arena).
       */}
-      <div className="flex flex-col gap-1">
+      <div className="flex min-w-0 flex-col gap-1.5 px-1">
         {rows.map((row) => {
           const isYou = row.userId === currentUserId;
           /*
@@ -211,7 +210,7 @@ export default function ProviderLeaderboard({
           return (
             <div
               key={row.userId}
-              className={`grid grid-cols-[1.75rem_minmax(0,1fr)_auto_auto] items-center gap-x-1.5 px-1.5 py-1.5 ${neonRowClasses(
+              className={`grid min-w-0 grid-cols-[1.75rem_minmax(0,1fr)_minmax(3.25rem,auto)_minmax(2.75rem,auto)] items-center gap-x-1.5 px-2.5 py-2 ${neonRowClasses(
                 { rank: row.currentRank, isCurrentUser: isYou, variant: "flush" },
               )}`}
             >
@@ -291,7 +290,7 @@ export default function ProviderLeaderboard({
                 the read-side form of the `score ?? 0` that made every provider participant
                 tie in R37.
               */}
-              <div className="w-12 self-center text-right tabular-nums">
+              <div className="min-w-[3.25rem] self-center text-right tabular-nums">
                 {row.score === undefined || row.score === null ? (
                   <span className="text-sm text-gray-600">-</span>
                 ) : (
@@ -327,7 +326,7 @@ export default function ProviderLeaderboard({
 
                 A dash for an unknown clock, never `0:00` - see `formatRoundClock`.
               */}
-              <div className="w-10 self-center text-right text-xs tabular-nums text-gray-400">
+              <div className="min-w-[2.75rem] self-center text-right text-xs tabular-nums text-gray-400">
                 {clock ?? <span className="text-gray-600">-</span>}
               </div>
             </div>

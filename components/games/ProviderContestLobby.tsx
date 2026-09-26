@@ -505,7 +505,7 @@ export default async function ProviderContestLobby({
       </NeonHero>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-2">
+        <div className="min-w-0 space-y-6 lg:col-span-2">
           {/*
             ABOVE THE LEADERBOARD, DELIBERATELY. This is the screen a player reads before
             paying an entry fee, and the rules are what make that decision informed - the
@@ -532,6 +532,7 @@ export default async function ProviderContestLobby({
               */
               <NeonCountPill>{leaderboard.length} players</NeonCountPill>
             }
+            className="min-w-0"
           >
             <ProviderLeaderboard
               rows={leaderboard}
