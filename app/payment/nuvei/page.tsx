@@ -1,0 +1,863 @@
+ 
+"use client";
+
+import { useState, useEffect, useRef, useCallback, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+import Script from "next/script";
+
+// ── SafeCharge SDK type declarations ────────────────────────────────────────
+declare global {
+  interface Window {
+    SafeCharge?: (config: {
+      env: string;
+      merchantId: string;
+      merchantSiteId: string;
+    }) => {
+      fields: (options?: { fonts?: Array<{ cssUrl: string }> }) => {
+        create: (
+          type: string,
+          options?: {
+            style?: Record<string, unknown>;
+            classes?: Record<string, string>;
+          },
+        ) => {
+          attach: (element: string | HTMLElement | null) => void;
+          on: (event: string, callback: (evt: unknown) => void) => void;
+        };
+      };
+      createPayment: (
+        options: {
+          sessionToken: string;
+          clientUniqueId?: string;
+          cardHolderName?: string;
+          paymentOption: unknown;
+          userTokenId?: string;
+          savePM?: boolean;
+          userDetails?: {
+            firstName?: string;
+            lastName?: string;
+            email?: string;
+            country?: string;
+            phone?: string;
+            address?: string;
+            city?: string;
+            zip?: string;
+          };
+          billingAddress?: {
+            firstName?: string;
+            lastName?: string;
+            email?: string;
+            country?: string;
+            address?: string;
+            city?: string;
+            zip?: string;
+            phone?: string;
+          };
+        },
+        callback: (result: {
+          result: string;
+          errCode: string;
+          errorDescription?: string;
+          reason?: string;
+          transactionId?: string;
+        }) => void,
+      ) => void;
+    };
+  }
+}
+
+// ── Payment data structure passed via URL ───────────────────────────────────
+interface PaymentData {
+  sessionToken: string;
+  clientUniqueId: string;
+  merchantId: string;
+  siteId: string;
+  testMode: boolean;
+  sdkUrl: string;
+  amount: number;
+  totalAmount: number;
+  vatAmount: number;
+  vatPercentage: number;
+  platformFeeAmount: number;
+  platformFeePercentage: number;
+  userEmail: string;
+  userTokenId: string;
+  currencySymbol: string;
+  creditsName: string;
+  creditsSymbol: string;
+  creditsDecimals: number;
+  creditsReceived: number;
+  vatEnabled: boolean;
+  // Reason: On mobile, popups don't work well. Instead we do a full-page redirect.
+  // returnUrl tells us where to navigate back after payment completes.
+  returnUrl?: string;
+}
+
+// ── Scroll indicator arrow (shows when content overflows) ────────────────────
+function ScrollIndicator({ containerRef }: { containerRef: React.RefObject<HTMLDivElement | null> }) {
+  const [showArrow, setShowArrow] = useState(false);
+
+  const checkScroll = useCallback(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    // Reason: Show arrow only when there's more content below the visible area
+    const hasMore = el.scrollHeight - el.scrollTop - el.clientHeight > 20;
+    setShowArrow(hasMore);
+  }, [containerRef]);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    checkScroll();
+    el.addEventListener("scroll", checkScroll, { passive: true });
+    // Re-check on resize (mobile orientation change, etc.)
+    window.addEventListener("resize", checkScroll);
+    // Also observe content changes (e.g., error messages appearing)
+    const observer = new ResizeObserver(checkScroll);
+    observer.observe(el);
+    return () => {
+      el.removeEventListener("scroll", checkScroll);
+      window.removeEventListener("resize", checkScroll);
+      observer.disconnect();
+    };
+  }, [containerRef, checkScroll]);
+
+  if (!showArrow) return null;
+
+  return (
+    <div className="fixed bottom-0 left-0 right-0 flex justify-center pointer-events-none z-50 pb-2">
+      <div className="flex flex-col items-center animate-bounce">
+        <svg
+          className="h-6 w-6 text-yellow-500/80 drop-shadow-lg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+// ── Icons (inline SVGs to avoid heavy imports) ──────────────────────────────
+function LoaderIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={`animate-spin ${className || ""}`}
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+    >
+      <circle
+        className="opacity-25"
+        cx="12"
+        cy="12"
+        r="10"
+        stroke="currentColor"
+        strokeWidth="4"
+      />
+      <path
+        className="opacity-75"
+        fill="currentColor"
+        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+      />
+    </svg>
+  );
+}
+
+function CheckIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+      <polyline points="22 4 12 14.01 9 11.01" />
+    </svg>
+  );
+}
+
+function XIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="12" cy="12" r="10" />
+      <line x1="15" y1="9" x2="9" y2="15" />
+      <line x1="9" y1="9" x2="15" y2="15" />
+    </svg>
+  );
+}
+
+// ── Main payment content ────────────────────────────────────────────────────
+function NuveiPaymentContent() {
+  const searchParams = useSearchParams();
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Parse payment data from URL
+  const [paymentData, setPaymentData] = useState<PaymentData | null>(null);
+  const [parseError, setParseError] = useState("");
+
+  useEffect(() => {
+    try {
+      const encoded = searchParams.get("d");
+      if (!encoded) {
+        setParseError("No payment data found. Please close this window and try again.");
+        return;
+      }
+      // Reason: Decode UTF-8 safe base64 — reverse of TextEncoder + btoa in DepositModal
+      const binaryStr = atob(decodeURIComponent(encoded));
+      const bytes = Uint8Array.from(binaryStr, (c) => c.charCodeAt(0));
+      const decoded = JSON.parse(new TextDecoder().decode(bytes)) as PaymentData;
+      if (!decoded.sessionToken || !decoded.merchantId || !decoded.siteId) {
+        setParseError("Invalid payment data. Please close this window and try again.");
+        return;
+      }
+      setPaymentData(decoded);
+    } catch {
+      setParseError("Failed to load payment data. Please close this window and try again.");
+    }
+  }, [searchParams]);
+
+  if (parseError) {
+    return (
+      <div className="h-screen bg-gray-900 flex items-center justify-center p-6">
+        <div className="text-center space-y-4 max-w-md">
+          <XIcon className="h-12 w-12 text-red-500 mx-auto" />
+          <h2 className="text-xl font-semibold text-gray-100">Payment Error</h2>
+          <p className="text-gray-400">{parseError}</p>
+          <button
+            onClick={() => {
+              if (window.opener && !window.opener.closed) {
+                window.close();
+              } else {
+                window.location.href = "/dashboard";
+              }
+            }}
+            className="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-gray-100 rounded-lg transition-colors"
+          >
+            {window.opener && !window.opener.closed ? "Close Window" : "Return to App"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!paymentData) {
+    return (
+      <div className="h-screen bg-gray-900 flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <LoaderIcon className="h-8 w-8 text-yellow-500 mx-auto" />
+          <p className="text-gray-400">Loading payment data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {/* Reason: Hide native scrollbar but keep scroll functionality.
+          The scroll indicator arrow guides the user instead. */}
+      <style>{`
+        .nuvei-scroll-container {
+          overflow-y: auto;
+          scrollbar-width: none; /* Firefox */
+          -ms-overflow-style: none; /* IE/Edge */
+        }
+        .nuvei-scroll-container::-webkit-scrollbar {
+          display: none; /* Chrome/Safari/Opera */
+        }
+      `}</style>
+      <div ref={scrollContainerRef} className="nuvei-scroll-container h-screen bg-gray-900">
+        <NuveiPaymentForm data={paymentData} />
+      </div>
+      <ScrollIndicator containerRef={scrollContainerRef} />
+    </>
+  );
+}
+
+// ── Nuvei Payment Form ──────────────────────────────────────────────────────
+function NuveiPaymentForm({ data }: { data: PaymentData }) {
+  const cardFieldRef = useRef<HTMLDivElement>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sfcRef = useRef<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [scard, setScard] = useState<any>(null);
+  const [sfcInitialized, setSfcInitialized] = useState(false);
+  const [sdkLoaded, setSdkLoaded] = useState(false);
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
+  // Reason: On any failed charge attempt we lock the form behind a terminal
+  // "Declined" screen (Close only). This makes it impossible to submit a second
+  // card on the SAME Nuvei order — the root cause of charged-but-uncredited
+  // deposits. A retry must start a brand-new order from the app.
+  const [declined, setDeclined] = useState(false);
+  const [cardHolderName, setCardHolderName] = useState("");
+  const [email, setEmail] = useState(data.userEmail || "");
+  const [cardFieldReady, setCardFieldReady] = useState(false);
+
+  // Ref to prevent double-clicks
+  const isSubmittingRef = useRef(false);
+
+  // Reason: On mobile browsers, window.open() opens a new tab (not a popup)
+  // and window.opener is unreliable. We detect this to use sessionStorage + redirect instead.
+  const isPopupMode = typeof window !== "undefined" && !!window.opener && !window.opener.closed;
+  const returnUrl = data.returnUrl || "/dashboard";
+
+  // ── Send result back to parent window (popup) or sessionStorage (redirect) ─
+  const sendResult = (result: {
+    success: boolean;
+    error?: string;
+    transactionId?: string;
+  }) => {
+    if (isPopupMode) {
+      // Desktop popup: postMessage to opener
+      try {
+        window.opener.postMessage(
+          { type: "nuvei-payment-result", ...result },
+          window.location.origin,
+        );
+      } catch (e) {
+        console.error("Failed to send result to parent:", e);
+      }
+    } else {
+      // Mobile redirect: store in sessionStorage for the main app to pick up
+      try {
+        sessionStorage.setItem(
+          "nuvei-payment-result",
+          JSON.stringify(result),
+        );
+      } catch {
+        // sessionStorage may be unavailable in some contexts
+      }
+    }
+  };
+
+  // ── Close the payment window without re-notifying the server ───────────
+  // Reason: On a decline we already reported the failure (cancel-order +
+  // sendResult). Closing must NOT re-send a "cancelled" result or re-hit
+  // cancel-order, otherwise the parent would stop treating this as a decline.
+  const closeWindow = () => {
+    if (isPopupMode) {
+      window.close();
+    } else {
+      window.location.href = returnUrl;
+    }
+  };
+
+  // ── Initialize Nuvei SDK when loaded ──────────────────────────────────
+  useEffect(() => {
+    if (!sdkLoaded || !window.SafeCharge || sfcInitialized || !cardFieldRef.current) {
+      return;
+    }
+
+    try {
+      const sfc = window.SafeCharge({
+        env: data.testMode ? "int" : "prod",
+        merchantId: data.merchantId,
+        merchantSiteId: data.siteId,
+      });
+
+      sfcRef.current = sfc;
+
+      const ScFields = sfc.fields({
+        fonts: [{ cssUrl: "https://fonts.googleapis.com/css?family=Inter" }],
+      });
+
+      const style = {
+        base: {
+          color: "#F3F4F6",
+          fontWeight: "500",
+          fontFamily: "Inter, sans-serif",
+          fontSize: "16px",
+          fontSmoothing: "antialiased",
+          "::placeholder": { color: "#9CA3AF" },
+        },
+        invalid: {
+          color: "#EF4444",
+          "::placeholder": { color: "#FCA5A5" },
+        },
+      };
+
+      const cardField = ScFields.create("card", { style });
+      cardField.attach(cardFieldRef.current);
+      cardField.on("ready", () => setCardFieldReady(true));
+      cardField.on("error", (evt: unknown) => console.error("Card field error:", evt));
+
+      setScard(cardField);
+      setSfcInitialized(true);
+    } catch (err) {
+      console.error("Failed to initialize Nuvei:", err);
+      setError("Failed to initialize payment form. Please close and try again.");
+    }
+  }, [sdkLoaded, data.merchantId, data.siteId, data.testMode, sfcInitialized]);
+
+  // ── Cleanup on unmount ────────────────────────────────────────────────
+  useEffect(() => {
+    const cardEl = cardFieldRef.current;
+    return () => {
+      if (cardEl) cardEl.innerHTML = "";
+      sfcRef.current = null;
+    };
+  }, []);
+
+  // ── Handle payment submission ─────────────────────────────────────────
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (isSubmittingRef.current || loading) return;
+
+    if (!scard || !window.SafeCharge) {
+      setError("Payment form not ready. Please wait or refresh.");
+      return;
+    }
+
+    // Validate cardholder name
+    const sanitizedName = cardHolderName.trim().replace(/[<>]/g, "");
+    if (!sanitizedName || sanitizedName.length < 2 || sanitizedName.length > 100) {
+      setError("Please enter a valid cardholder name (2-100 characters)");
+      return;
+    }
+
+    // Validate email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email.trim() || !emailRegex.test(email.trim())) {
+      setError("Please enter a valid email address");
+      return;
+    }
+
+    isSubmittingRef.current = true;
+    setLoading(true);
+    setError("");
+
+    try {
+      const sfc = sfcRef.current;
+      if (!sfc) {
+        throw new Error("Payment system not initialized");
+      }
+
+      const nameParts = cardHolderName.trim().split(" ");
+      const firstName = nameParts[0] || "Customer";
+      const lastName = nameParts.slice(1).join(" ") || "Customer";
+
+      // Reason: In this popup window, the 3DS challenge renders naturally
+      // without any Radix Dialog overlay blocking it.
+      sfc.createPayment(
+        {
+          sessionToken: data.sessionToken,
+          clientUniqueId: data.clientUniqueId,
+          cardHolderName: cardHolderName.trim(),
+          paymentOption: scard,
+          userTokenId: data.userTokenId || undefined,
+          savePM: true,
+          userDetails: {
+            firstName,
+            lastName,
+            email: email.trim(),
+            phone: "",
+            country: "CY",
+          },
+          billingAddress: {
+            firstName,
+            lastName,
+            email: email.trim(),
+            phone: "",
+            country: "CY",
+            address: "N/A",
+            city: "Nicosia",
+            zip: "1000",
+          },
+        },
+        async (result: {
+          result: string;
+          errCode: string;
+          errorDescription?: string;
+          reason?: string;
+          transactionId?: string;
+        }) => {
+          if (result.result === "APPROVED" && result.errCode === "0") {
+            // Reason: APPROVED means the card was charged. This screen must become
+            // terminal and NEVER re-enable the card form — otherwise the user
+            // could submit a second card on the same order (charged, not
+            // credited). The Nuvei DMN webhook is the source of truth for
+            // crediting; the status check below is best-effort confirmation only.
+            isSubmittingRef.current = false;
+            try {
+              await fetch("/api/nuvei/payment-status", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  sessionToken: data.sessionToken,
+                  clientUniqueId: data.clientUniqueId,
+                }),
+              });
+            } catch {
+              // Best-effort — the webhook still credits the approved charge.
+            }
+            setSuccess(true);
+            sendResult({
+              success: true,
+              transactionId: result.transactionId,
+            });
+            // Auto-close popup (desktop) or redirect back (mobile) after 3s
+            setTimeout(() => {
+              if (isPopupMode) {
+                window.close();
+              } else {
+                window.location.href = returnUrl;
+              }
+            }, 3000);
+          } else {
+            // Payment failed
+            const failReason =
+              result.errorDescription || result.reason || result.result || "Payment failed";
+
+            // Notify server
+            try {
+              await fetch("/api/nuvei/cancel-order", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  clientUniqueId: data.clientUniqueId,
+                  status: "failed",
+                  reason: failReason,
+                  errorCode: result.errCode,
+                  errorDescription: result.errorDescription,
+                }),
+              });
+            } catch (cancelErr) {
+              console.error("Failed to notify server:", cancelErr);
+            }
+
+            // User-friendly error messages
+            let userError = failReason;
+            if (failReason.toLowerCase().includes("3d") || failReason.toLowerCase().includes("authentication")) {
+              userError = "3D Secure authentication failed. Please try a different card.";
+            } else if (failReason.toLowerCase().includes("declined")) {
+              userError = "Your card was declined. Please try a different card.";
+            } else if (failReason.toLowerCase().includes("system error")) {
+              userError = "Payment system temporarily unavailable. Please try again.";
+            }
+
+            setError(userError);
+            setLoading(false);
+            isSubmittingRef.current = false;
+            sendResult({ success: false, error: userError });
+            // Reason: Lock the form behind a terminal "Declined" screen so this
+            // same order can't be re-submitted with another card. Retrying must
+            // create a brand-new order from the app.
+            setDeclined(true);
+          }
+        },
+      );
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "Payment failed";
+
+      try {
+        await fetch("/api/nuvei/cancel-order", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            clientUniqueId: data.clientUniqueId,
+            status: "failed",
+            reason: errorMsg,
+          }),
+        });
+      } catch (cancelErr) {
+        console.error("Failed to notify server:", cancelErr);
+      }
+
+      setError(errorMsg);
+      setLoading(false);
+      isSubmittingRef.current = false;
+      sendResult({ success: false, error: errorMsg });
+      setDeclined(true);
+    }
+  };
+
+  // ── Handle cancel / close ─────────────────────────────────────────────
+  const handleCancel = async () => {
+    if (data.clientUniqueId && !success) {
+      try {
+        await fetch("/api/nuvei/cancel-order", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            clientUniqueId: data.clientUniqueId,
+            status: "cancelled",
+            reason: "User closed payment window",
+          }),
+        });
+      } catch {
+        // Ignore cancel errors
+      }
+    }
+    sendResult({ success: false, error: "cancelled" });
+    if (isPopupMode) {
+      window.close();
+    } else {
+      window.location.href = returnUrl;
+    }
+  };
+
+  // ── Success screen ────────────────────────────────────────────────────
+  if (success) {
+    return (
+      <div className="h-full flex items-center justify-center p-6">
+        <div className="text-center space-y-4 max-w-md">
+          <div className="mx-auto w-20 h-20 bg-green-500/10 rounded-full flex items-center justify-center">
+            <CheckIcon className="h-10 w-10 text-green-500" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-100">Payment Successful!</h2>
+          <p className="text-gray-400">
+            {data.creditsReceived.toFixed(data.creditsDecimals)} {data.creditsSymbol} added
+            to your wallet
+          </p>
+          {isPopupMode ? (
+            <p className="text-sm text-gray-500">This window will close automatically...</p>
+          ) : (
+            <button
+              onClick={() => { window.location.href = returnUrl; }}
+              className="mt-4 px-8 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors"
+            >
+              Return to App
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Declined / failed screen (terminal — Close only) ──────────────────
+  // Reason: After a failed charge the card form is gone. The only action is to
+  // close this window; the user then starts a brand-new deposit in the app.
+  if (declined) {
+    return (
+      <div className="h-full flex items-center justify-center p-6">
+        <div className="text-center space-y-4 max-w-md">
+          <div className="mx-auto w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center">
+            <XIcon className="h-10 w-10 text-red-500" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-100">Payment Declined</h2>
+          <p className="text-gray-400">
+            {error || "Your payment could not be completed."}
+          </p>
+          <p className="text-sm text-gray-500">
+            No charge was applied. To try again, close this window and start a
+            new payment.
+          </p>
+          <button
+            onClick={closeWindow}
+            className="mt-4 px-8 py-3 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-lg transition-colors"
+          >
+            {isPopupMode ? "Close" : "Return to App"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Payment form ──────────────────────────────────────────────────────
+  return (
+    <div className="flex items-start justify-center py-6 px-4 min-h-full">
+      {/* Load Nuvei SDK */}
+      <Script
+        src={data.sdkUrl}
+        onLoad={() => setSdkLoaded(true)}
+        onReady={() => {
+          if (window.SafeCharge && !sdkLoaded) setSdkLoaded(true);
+        }}
+        onError={() => setError("Failed to load payment SDK. Please close and try again.")}
+        strategy="afterInteractive"
+      />
+
+      <div className="w-full max-w-md space-y-6">
+        {/* Header */}
+        <div className="text-center space-y-2">
+          <div className="mx-auto w-12 h-12 bg-yellow-500/10 rounded-full flex items-center justify-center">
+            <svg className="h-6 w-6 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <rect x="1" y="4" width="22" height="16" rx="2" ry="2" />
+              <line x1="1" y1="10" x2="23" y2="10" />
+            </svg>
+          </div>
+          <h1 className="text-xl font-bold text-gray-100">Secure Payment</h1>
+          <p className="text-sm text-gray-400">Complete your purchase securely</p>
+        </div>
+
+        {/* Order Summary */}
+        <div className="rounded-xl bg-gray-800/60 border border-gray-700 p-4 space-y-2">
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-gray-400">Credits Value</span>
+            <span className="text-lg font-bold text-gray-100">
+              {data.currencySymbol}{data.amount.toFixed(2)}
+            </span>
+          </div>
+
+          {data.vatEnabled && data.vatAmount > 0 && (
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-gray-500">VAT ({data.vatPercentage}%)</span>
+              <span className="text-orange-400">
+                +{data.currencySymbol}{data.vatAmount.toFixed(2)}
+              </span>
+            </div>
+          )}
+
+          {data.platformFeePercentage > 0 && data.platformFeeAmount > 0 && (
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-gray-500">
+                Platform Fee ({data.platformFeePercentage}%)
+              </span>
+              <span className="text-orange-400">
+                +{data.currencySymbol}{data.platformFeeAmount.toFixed(2)}
+              </span>
+            </div>
+          )}
+
+          {(data.vatEnabled || data.platformFeePercentage > 0) && (
+            <div className="flex justify-between items-center pt-2 border-t border-gray-600">
+              <span className="text-sm font-semibold text-gray-300">Total</span>
+              <span className="text-lg font-bold text-white">
+                {data.currencySymbol}{data.totalAmount.toFixed(2)}
+              </span>
+            </div>
+          )}
+
+          <div className="flex justify-between items-center pt-2 border-t border-gray-700">
+            <span className="text-sm font-semibold text-gray-300">You Receive</span>
+            <span className="text-yellow-400 font-bold">
+              ⚡ {data.creditsReceived.toFixed(data.creditsDecimals)} {data.creditsSymbol}
+            </span>
+          </div>
+        </div>
+
+        {/* Card Form */}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Cardholder Name */}
+          <div className="space-y-1.5">
+            <label htmlFor="cardHolderName" className="text-sm font-medium text-gray-300">
+              Cardholder Name
+            </label>
+            <input
+              id="cardHolderName"
+              type="text"
+              value={cardHolderName}
+              onChange={(e) => setCardHolderName(e.target.value)}
+              className="w-full px-3 py-2.5 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-yellow-500/50 focus:border-yellow-500"
+              placeholder="John Smith"
+              required
+              disabled={loading}
+            />
+          </div>
+
+          {/* Email */}
+          <div className="space-y-1.5">
+            <label htmlFor="email" className="text-sm font-medium text-gray-300">
+              Email Address
+            </label>
+            <input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full px-3 py-2.5 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-yellow-500/50 focus:border-yellow-500"
+              placeholder="john@example.com"
+              required
+              disabled={loading}
+            />
+          </div>
+
+          {/* Nuvei Card Field */}
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-gray-300">Card Details</label>
+            <div
+              ref={cardFieldRef}
+              className="bg-gray-800 border border-gray-700 rounded-lg p-4 min-h-[50px] relative"
+            >
+              {!cardFieldReady && (
+                <div className="absolute inset-0 flex items-center justify-center bg-gray-800 rounded-lg">
+                  <LoaderIcon className="h-5 w-5 text-gray-400" />
+                  <span className="ml-2 text-sm text-gray-400">Loading card form...</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Error */}
+          {error && (
+            <div className="rounded-lg bg-red-500/10 border border-red-500/20 p-3 flex items-start gap-2">
+              <XIcon className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+              <p className="text-xs text-red-400">{error}</p>
+            </div>
+          )}
+
+          {/* Buttons */}
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={handleCancel}
+              disabled={loading}
+              className="flex-1 px-4 py-2.5 bg-gray-800 border border-gray-700 hover:bg-gray-700 text-gray-100 rounded-lg transition-colors disabled:opacity-50"
+            >
+              {isPopupMode ? "Cancel" : "Back"}
+            </button>
+            <button
+              type="submit"
+              disabled={loading || !sfcInitialized}
+              className="flex-1 px-4 py-2.5 bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-semibold rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <>
+                  <LoaderIcon className="h-4 w-4" />
+                  Processing...
+                </>
+              ) : (
+                `Pay ${data.currencySymbol}${data.totalAmount.toFixed(2)}`
+              )}
+            </button>
+          </div>
+
+          <p className="text-xs text-center text-gray-500 pt-1">
+            🔒 Secured by Nuvei • Your payment information is encrypted
+          </p>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ── Page component with Suspense boundary for useSearchParams ───────────────
+export default function NuveiPaymentPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="h-screen bg-gray-900 flex items-center justify-center">
+          <div className="text-center space-y-4">
+            <LoaderIcon className="h-8 w-8 text-yellow-500 mx-auto" />
+            <p className="text-gray-400">Preparing secure payment...</p>
+          </div>
+        </div>
+      }
+    >
+      <NuveiPaymentContent />
+    </Suspense>
+  );
+}

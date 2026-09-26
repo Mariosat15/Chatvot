@@ -1,0 +1,274 @@
+"use client";
+
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { type ProviderLeaderboardRow } from "@/components/games/ProviderLeaderboard";
+import {
+  ArenaActivityFeed,
+  type ArenaActivityEntry,
+} from "./ArenaActivityFeed";
+import type { RoundActivitySummary } from "@/lib/utils/round-activity";
+
+/**
+ * Pot / seats / prize shares from the standings poll.
+ *
+ * Declared HERE rather than imported from `arena-standings.service.ts` because that module
+ * reaches Mongoose and a `"use client"` file that names it would pull the driver into the
+ * browser (R58). The shapes must stay in sync by hand - a test pins both field lists.
+ */
+export interface ArenaContestSnapshot {
+  currentParticipants: number;
+  maxParticipants?: number;
+  prizePool?: number;
+  prizePoolCredits?: number;
+  entryFee?: number;
+  platformFeePercentage?: number;
+  prizeDistribution?: { percentage: number; rank?: number }[];
+}
+
+/**
+ * Keeps the arena's standings rail true after the page has been drawn.
+ *
+ * THE DEFECT THIS CLOSES IS NOT THAT THE BOARD WAS WRONG - it was right when it was rendered,
+ * and then stayed exactly as it was for as long as the player sat at the game. A player who
+ * finished four boards, watched a rival pass them and came back to a screen reporting "Playing
+ * now" for both of them has been shown a photograph of a moment that has gone.
+ *
+ * -------------------------------------------------------------------------------------------
+ * WHY A CONTEXT PROVIDER AROUND THE WHOLE ARENA, WHICH LOOKS LIKE MORE MACHINERY THAN THE JOB
+ * NEEDS. Two panels in two different columns show the same facts: the standings and the recent
+ * players. Fetching in each of them is two polls of one endpoint, and worse, two answers - so
+ * the board could name a rival's finished round while the feed beside it had not heard of it.
+ * One fetch, two consumers.
+ *
+ * AND WHY THAT IS SAFE BESIDE A LIVE IFRAME, WHICH IS THE PROPERTY THE WHOLE FILE TURNS ON.
+ * The arena hosts a round somebody has PAID for. `LiveContestRefresher` is forbidden on this
+ * page by a test, because `router.refresh()` re-renders the page under the frame. This does
+ * not: the provider receives the rest of the arena as its `children` prop, and a `children`
+ * element passed down from a server component is the SAME OBJECT on every re-render, so React
+ * reconciles it by identity and never descends into it. Only the context consumers
+ * re-render. The frame is not in their subtree and cannot remount.
+ *
+ * That is a real guarantee rather than a hopeful one, but it is also easy to destroy - so do
+ * not make `ProviderRoundHost` a consumer of this context, and do not compute anything from
+ * the live state above the provider. Either turns a board refresh into a reloaded game.
+ * -------------------------------------------------------------------------------------------
+ *
+ * 26 SEP 2026 — THE POLL ALSO CARRIES CONTEST FACTS. Joins and prize redistribution used to
+ * sit on server props and go stale until a full reload. The standings payload now includes a
+ * contest snapshot so the players tile and prize table move with the board. Ranking uses the
+ * provider's optional `provisionalScore` (same number as the eventual result score) so the
+ * board reorders while rounds are still open - game-agnostic, never from a breakdown key.
+ */
+
+export interface ArenaLiveState {
+  rows: ProviderLeaderboardRow[];
+  activity: Record<string, RoundActivitySummary>;
+  feed: ArenaActivityEntry[];
+  /**
+   * Normalised country codes keyed by user id. Travels with every poll so a
+   * joiner mid-contest can appear under Country. Never printed as a column —
+   * the panel only filters with it.
+   */
+  countries: Record<string, string>;
+  currentUserId: string;
+  /**
+   * Friend user ids for the Friends scope filter. Loaded once on the server —
+   * not re-fetched with the poll, because friendship changes mid-round are rare
+   * and a second reader of friendships beside the standings poll is two clocks.
+   */
+  friendIds: readonly string[];
+  /** Pot / seats / prize shares as of the last successful poll. */
+  contest: ArenaContestSnapshot;
+  /** Caller's rank on the live board; absent until they have a displayable score. */
+  yourRank?: number;
+}
+
+const ArenaLiveContext = createContext<ArenaLiveState | null>(null);
+
+/**
+ * Exported so the leaderboard panel can be its own file.
+ *
+ * The panel is ~200 lines of tabs, filters and a table; leaving it in here would put this
+ * file over the 500-line limit and mix the polling contract - which is the delicate part,
+ * because of the iframe - with a screen's chrome.
+ */
+export function useArenaLive(): ArenaLiveState {
+  const value = useContext(ArenaLiveContext);
+  if (!value) {
+    // Reason: a consumer rendered outside the provider would silently render an empty board,
+    // which on this screen reads as "nobody has played" - a false statement rather than a
+    // missing one. Failing loudly in development is the lesser harm.
+    throw new Error("Arena standings consumer used outside ArenaLiveProvider");
+  }
+  return value;
+}
+
+/**
+ * Five seconds rather than fifteen: joins and mid-round provisional ranks should feel
+ * near-instant. Still slow enough that a busy contest does not hammer the standings route.
+ */
+const DEFAULT_INTERVAL_MS = 5_000;
+
+interface ProviderProps {
+  competitionId: string;
+  currentUserId: string;
+  /** Friend ids for the Friends board scope. Empty array = no friends, not "unknown". */
+  friendIds?: readonly string[];
+  /** The server's first answer, so the rail is correct before any fetch has happened. */
+  initial: {
+    rows: ProviderLeaderboardRow[];
+    activity: Record<string, RoundActivitySummary>;
+    feed: ArenaActivityEntry[];
+    countries?: Record<string, string>;
+    contest: ArenaContestSnapshot;
+    yourRank?: number;
+  };
+  /**
+   * Whether the contest is running, derived on the server from the STORED status.
+   *
+   * Never from a clock in the browser: a contest whose end time has passed is still `active`
+   * until a cron finalizes it, so a client deciding for itself would freeze the board exactly
+   * while the last rounds are being scored. Same rule as `LiveContestRefresher`.
+   */
+  active: boolean;
+  intervalMs?: number;
+  children: ReactNode;
+}
+
+export function ArenaLiveProvider({
+  competitionId,
+  currentUserId,
+  friendIds = [],
+  initial,
+  active,
+  intervalMs = DEFAULT_INTERVAL_MS,
+  children,
+}: ProviderProps) {
+  const [live, setLive] = useState({
+    rows: initial.rows,
+    activity: initial.activity,
+    feed: initial.feed,
+    countries: initial.countries ?? {},
+    contest: initial.contest,
+    yourRank: initial.yourRank,
+  });
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const clearTimer = useCallback(() => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!active) return;
+
+    // Reason: its OWN flag, never one shared with another effect. The round poll in
+    // `ProviderRoundHost` has one of its own, and sharing it lets that effect's cleanup
+    // silence this one with no error and nothing in a log.
+    let mounted = true;
+
+    const read = async () => {
+      try {
+        const response = await fetch(
+          `/api/competitions/${competitionId}/standings`,
+          { cache: "no-store" },
+        );
+        if (!response.ok) return;
+        const data = await response.json();
+        if (!mounted) return;
+
+        // Reason: a response that is not a well-formed board is ignored rather than rendered.
+        // An error payload spread into state empties the rail, and an empty rail on this screen
+        // says "nobody has played", which is a false statement about a contest in progress.
+        if (!Array.isArray(data?.rows)) return;
+
+        setLive((prev) => ({
+          rows: data.rows,
+          activity:
+            data.activity && typeof data.activity === "object"
+              ? data.activity
+              : {},
+          feed: Array.isArray(data.feed) ? data.feed : [],
+          // Reason: absent countries means an older payload — keep the last good
+          // map rather than wiping Country mid-contest.
+          countries:
+            data.countries && typeof data.countries === "object"
+              ? data.countries
+              : prev.countries,
+          contest:
+            data.contest && typeof data.contest === "object"
+              ? data.contest
+              : prev.contest,
+          yourRank:
+            typeof data.yourRank === "number" ? data.yourRank : prev.yourRank,
+        }));
+      } catch {
+        // Reason: a failed poll leaves the last good answer on screen. There is nothing useful
+        // to tell a player about one missed refresh, and a banner would be on screen more often
+        // than the network is down.
+      }
+    };
+
+    const start = () => {
+      clearTimer();
+      timerRef.current = setInterval(read, intervalMs);
+    };
+
+    // Reason: polling a tab nobody is reading is work for no reader - and a player returning to
+    // the tab wants the board now rather than up to `intervalMs` later.
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        void read();
+        start();
+      } else {
+        clearTimer();
+      }
+    };
+
+    if (document.visibilityState === "visible") {
+      // Immediate read so a join that happened during navigation is visible without waiting
+      // for the first interval tick (owner: "updates are instant without refresh").
+      void read();
+      start();
+    }
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    // Mid-round board accept (frame `progress` cue) — refresh now so ranks move without
+    // waiting for the interval. Payload carries no score; we re-read the server.
+    const handleProgressCue = () => {
+      void read();
+    };
+    window.addEventListener("chartvolt:arena-standings-refresh", handleProgressCue);
+
+    return () => {
+      mounted = false;
+      clearTimer();
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("chartvolt:arena-standings-refresh", handleProgressCue);
+    };
+  }, [active, competitionId, intervalMs, clearTimer]);
+
+  return (
+    <ArenaLiveContext.Provider
+      value={{ ...live, currentUserId, friendIds }}
+    >
+      {children}
+    </ArenaLiveContext.Provider>
+  );
+}
+
+/** The recent-players feed, from the same fetch as the board above it. */
+export function ArenaLiveFeed() {
+  const { feed, currentUserId } = useArenaLive();
+  return <ArenaActivityFeed entries={feed} currentUserId={currentUserId} />;
+}

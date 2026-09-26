@@ -1,7 +1,16 @@
-'use client';
+"use client";
 
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { Activity } from 'lucide-react';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from "recharts";
+import { Activity } from "lucide-react";
 
 interface TradingActivityChartProps {
   data: Array<{
@@ -11,20 +20,29 @@ interface TradingActivityChartProps {
   }>;
 }
 
-export default function TradingActivityChart({ data }: TradingActivityChartProps) {
-  const hasData = data && data.length > 0 && data.some(d => d.trades > 0 || d.volume > 0);
-  
+export default function TradingActivityChart({
+  data,
+}: TradingActivityChartProps) {
+  const hasData =
+    data && data.length > 0 && data.some((d) => d.trades > 0 || d.volume > 0);
+
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       return (
         <div className="bg-gray-900 border border-gray-700 rounded-lg p-3 shadow-xl">
-          <p className="text-xs text-gray-400 mb-2">{payload[0].payload.date}</p>
+          <p className="text-xs text-gray-400 mb-2">
+            {payload[0].payload.date}
+          </p>
           <div className="space-y-1">
             <p className="text-sm font-semibold text-gray-200">
-              Trades: <span className="text-purple-400">{payload[0].value}</span>
+              Trades:{" "}
+              <span className="text-purple-400">{payload[0].value}</span>
             </p>
             <p className="text-sm font-semibold text-gray-200">
-              Volume: <span className="text-blue-400">${payload[1].value.toFixed(2)}</span>
+              Volume:{" "}
+              <span className="text-blue-400">
+                ${payload[1].value.toFixed(2)}
+              </span>
             </p>
           </div>
         </div>
@@ -44,16 +62,19 @@ export default function TradingActivityChart({ data }: TradingActivityChartProps
           <p className="text-xs text-gray-400">Daily Trades & Volume</p>
         </div>
       </div>
-      
+
       {!hasData ? (
         /* Empty State */
         <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
           <div className="w-20 h-20 bg-gray-700/30 rounded-full flex items-center justify-center mb-4">
             <Activity className="h-10 w-10 text-gray-500" />
           </div>
-          <h4 className="text-lg font-semibold text-gray-300 mb-2">No Trading Activity</h4>
+          <h4 className="text-lg font-semibold text-gray-300 mb-2">
+            No Trading Activity
+          </h4>
           <p className="text-sm text-gray-500 mb-6 max-w-md">
-            Your daily trading activity and volume will appear here once you start placing trades.
+            Your daily trading activity and volume will appear here once you
+            start placing trades.
           </p>
           <div className="grid grid-cols-2 gap-4 w-full max-w-sm">
             <div className="bg-purple-500/10 p-4 rounded-lg border border-purple-500/30">
@@ -69,43 +90,44 @@ export default function TradingActivityChart({ data }: TradingActivityChartProps
       ) : (
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
-            <XAxis 
-              dataKey="date" 
-              stroke="#9ca3af" 
-              style={{ fontSize: '12px' }}
+            <CartesianGrid
+              strokeDasharray="3 3"
+              stroke="#374151"
+              opacity={0.3}
+            />
+            <XAxis
+              dataKey="date"
+              stroke="#9ca3af"
+              style={{ fontSize: "12px" }}
               tickLine={false}
             />
-            <YAxis 
+            <YAxis
               yAxisId="left"
-              stroke="#9ca3af" 
-              style={{ fontSize: '12px' }}
+              stroke="#9ca3af"
+              style={{ fontSize: "12px" }}
               tickLine={false}
             />
-            <YAxis 
+            <YAxis
               yAxisId="right"
               orientation="right"
-              stroke="#9ca3af" 
-              style={{ fontSize: '12px' }}
+              stroke="#9ca3af"
+              style={{ fontSize: "12px" }}
               tickLine={false}
               tickFormatter={(value) => `$${value.toFixed(0)}`}
             />
             <Tooltip content={<CustomTooltip />} />
-            <Legend 
-              wrapperStyle={{ fontSize: '12px' }}
-              iconType="circle"
-            />
-            <Bar 
+            <Legend wrapperStyle={{ fontSize: "12px" }} iconType="circle" />
+            <Bar
               yAxisId="left"
-              dataKey="trades" 
-              fill="#a855f7" 
+              dataKey="trades"
+              fill="#a855f7"
               name="Trades"
               radius={[8, 8, 0, 0]}
             />
-            <Bar 
+            <Bar
               yAxisId="right"
-              dataKey="volume" 
-              fill="#3b82f6" 
+              dataKey="volume"
+              fill="#3b82f6"
               name="Volume ($)"
               radius={[8, 8, 0, 0]}
             />
@@ -115,4 +137,3 @@ export default function TradingActivityChart({ data }: TradingActivityChartProps
     </div>
   );
 }
-

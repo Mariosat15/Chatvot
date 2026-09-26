@@ -1,0 +1,218 @@
+---
+description: Project-specific code patterns and conventions for ChartVolt
+globs:
+  - "**/*.ts"
+  - "**/*.tsx"
+---
+
+# Code Patterns — ChartVolt
+
+## 📦 Server Action Pattern
+
+Every server action MUST follow this exact structure:
+
+```typescript
+"use server";
+
+import { headers } from "next/headers";
+import { getAuth } from "@/lib/better-auth/auth";
+import { connectToDatabase } from "@/database/mongoose";
+
+export async function myAction(input: MyInput) {
+  try {
+    // 1. Auth
+    const auth = getAuth();
+    const session = await auth.api.getSession({ headers: await headers() });
+    if (!session?.user?.id) {
+      return { success: false, error: "Please sign in to continue." };
+    }
+
+    // 2. Validate input
+    if (!input.field || typeof input.field !== "string") {
+      return { success: false, error: "Invalid input." };
+    }
+
+    // 3. Connect to DB
+    await connectToDatabase();
+
+    // 4. Business logic
+    const result = await doSomething(session.user.id, input);
+
+    // 5. Return success
+    return { success: true, data: result };
+  } catch (error) {
+    console.error("❌ myAction failed:", error);
+    return { success: false, error: "Something went wrong. Please contact support." };
+  }
+}
+```
+
+**Key rules:**
+- NEVER throw — always return `{ success: boolean; error?: string; data?: T }`.
+- ALWAYS include a generic catch-all error message.
+- Auth is always step 1. Input validation is step 2.
+
+---
+
+## 🎨 Component Pattern
+
+```tsx
+"use client";
+
+import { useState } from "react";
+
+interface MyComponentProps {
+  data: MyData;
+  onAction?: (id: string) => void;
+}
+
+export default function MyComponent({ data, onAction }: MyComponentProps) {
+  const [loading, setLoading] = useState(false);
+
+  // 1. Always handle loading, error, and empty states
+  if (!data) return <EmptySkeleton />;
+
+  return (
+    <div className="rounded-xl border border-white/10 bg-black/40 p-4 backdrop-blur">
+      {/* Content */}
+    </div>
+  );
+}
+```
+
+**Key rules:**
+- Props interface defined above the component.
+- Default exports for page components, named exports for shared components.
+- Always handle loading/error/empty states.
+- Use the standard card styling: `rounded-xl border border-white/10 bg-black/40 backdrop-blur`.
+
+---
+
+## 🗄️ Database Query Pattern
+
+```typescript
+// GOOD — use safeDbOperation for any risky DB call
+import { safeDbOperation } from "@/database/mongoose";
+
+const result = await safeDbOperation(
+  () => MyModel.findOne({ userId }).lean(),
+  null, // default value on failure
+  "MyService.myQuery"
+);
+
+// GOOD — use transactions for multi-document operations
+const mongoSession = await mongoose.startSession();
+try {
+  mongoSession.startTransaction();
+  await Model1.updateOne({ ... }, { ... }, { session: mongoSession });
+  await Model2.create([{ ... }], { session: mongoSession });
+  await mongoSession.commitTransaction();
+} catch (error) {
+  await mongoSession.abortTransaction();
+  throw error;
+} finally {
+  mongoSession.endSession();
+}
+```
+
+---
+
+## 📊 Price & Symbol Conventions
+
+- **Internal format**: `"EUR/USD"` (with slash) — used in DB, server actions, UI.
+- **Massive.com format**: `"EURUSD"` (no slash) — used in WebSocket subscriptions.
+- **Conversion**: `symbol.replace("/", "")` for outgoing, add slash at position 3 for incoming.
+- **Always normalize** before comparing: `key.replace("/", "").toUpperCase()`.
+
+---
+
+## 💬 Toast Notifications
+
+```typescript
+import { toast } from "sonner";
+
+// Success
+toast.success("Order placed successfully!");
+
+// Error (from server action result)
+if (!result.success) {
+  toast.error(result.error || "Something went wrong.");
+  return;
+}
+
+// Loading
+const toastId = toast.loading("Placing order...");
+// ... after completion
+toast.dismiss(toastId);
+toast.success("Done!");
+```
+
+---
+
+## 📐 Naming Conventions
+
+| Type | Convention | Example |
+|---|---|---|
+| Files (components) | PascalCase | `PlayerProfileCard.tsx` |
+| Files (services) | kebab-case | `pnl-calculator.service.ts` |
+| Files (actions) | kebab-case | `order.actions.ts` |
+| Files (models) | kebab-case | `user-restriction.model.ts` |
+| Functions | camelCase | `calculatePnL()` |
+| Interfaces | PascalCase with I prefix (models) | `IPosition`, `ICompetition` |
+| Types (non-model) | PascalCase | `DashboardData`, `TradeResult` |
+| Constants | UPPER_SNAKE_CASE | `MAX_TRADE_AMOUNT`, `FOREX_PAIRS` |
+| CSS classes | Tailwind utility classes | No custom CSS unless animation |
+| CSS animations | camelCase keyframes | `glowPulse`, `xpShimmer` |
+
+---
+
+## 🔄 Import Order
+
+```typescript
+// 1. React/Next.js
+import { useState, useEffect } from "react";
+import { headers } from "next/headers";
+import Link from "next/link";
+
+// 2. External packages
+import { toast } from "sonner";
+import mongoose from "mongoose";
+
+// 3. Internal — database
+import { connectToDatabase } from "@/database/mongoose";
+import { Position } from "@/database/models/position.model";
+
+// 4. Internal — services/actions
+import { calculatePnL } from "@/lib/services/pnl-calculator.service";
+import { getAuth } from "@/lib/better-auth/auth";
+
+// 5. Internal — components
+import { Button } from "@/components/ui/button";
+import PlayerProfileCard from "@/components/dashboard/PlayerProfileCard";
+
+// 6. Internal — types/constants
+import type { ComprehensiveDashboardData } from "@/lib/actions/comprehensive-dashboard.actions";
+```
+
+---
+
+## 🎮 Gamification Styling Standards
+
+- **Glow effects**: Use `shadow-[0_0_Npx_color]` with animation for emphasis.
+- **Card backgrounds**: `bg-black/40 backdrop-blur border border-white/10`.
+- **Accent colors**: Purple (`#a855f7`) for XP, Amber (`#f59e0b`) for journey, Green for profit, Red for loss.
+- **Animations**: Define in `globals.css` as `@keyframes`, apply via Tailwind `animate-[]`.
+- **Fonts**: `var(--font-geist-mono)` for numbers/stats, `var(--font-geist-sans)` for text.
+- **Responsive**: Always mobile-first. Use `sm:`, `md:`, `lg:` breakpoints.
+
+---
+
+## ⚠️ Common Mistakes to Avoid
+
+1. **Using `toLocaleDateString()` for chart data** — Lightweight Charts requires `YYYY-MM-DD`.
+2. **Throwing errors in server actions** — Next.js strips them in production.
+3. **Using `font-bold` with `font-[var(--font-geist-mono)]`** — Tailwind CSS conflict. Use inline `style` for fontFamily.
+4. **Forgetting to mirror admin changes** — When editing `lib/actions/`, also update `apps/admin/lib/actions/`.
+5. **Using stale DB values for ranks** — Always compute ranks dynamically by sorting participants.
+6. **Missing `"use client"` directive** — Any component using hooks, state, or browser APIs needs it.
+7. **Duplicate MongoDB `$or` keys** — Object keys must be unique; use `$and: [{ $or: [...] }, { $or: [...] }]`.

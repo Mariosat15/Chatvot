@@ -1,0 +1,444 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "ChartVolt API Server",
+    "description": "Standalone Express API for bcrypt-offloaded authentication (register, login, batch register) and health checks. Default port: 4000 (`API_PORT`). User JWTs are issued by `POST /api/auth/login` but this service does not validate Bearer tokens on other routes.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:4000",
+      "description": "Local (override host/port when deployed)"
+    }
+  ],
+  "tags": [
+    { "name": "Health", "description": "Load balancer and Kubernetes probes" },
+    { "name": "Auth", "description": "Registration and login (bcrypt via worker threads)" },
+    { "name": "Documentation", "description": "OpenAPI spec and Swagger UI" }
+  ],
+  "paths": {
+    "/api/health": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Basic health",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HealthBasic" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/health/detailed": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Detailed health",
+        "responses": {
+          "200": {
+            "description": "OK (status may be healthy or degraded)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HealthDetailed" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/health/ready": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Readiness probe",
+        "responses": {
+          "200": {
+            "description": "Ready",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ReadyOk" }
+              }
+            }
+          },
+          "503": {
+            "description": "Not ready",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ReadyFail" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/health/live": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Liveness probe",
+        "responses": {
+          "200": {
+            "description": "Alive",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/LiveOk" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/register": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Register user",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RegisterRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/RegisterSuccess" }
+              }
+            }
+          },
+          "400": { "description": "Validation error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorBody" } } } },
+          "409": { "description": "Conflict (user exists or concurrent registration)", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorBody" } } } },
+          "500": { "description": "Server error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorBody" } } } }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Login",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/LoginRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success (JWT in body)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/LoginSuccess" }
+              }
+            }
+          },
+          "400": { "description": "Validation error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorBody" } } } },
+          "401": { "description": "Invalid credentials", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorBody" } } } },
+          "403": { "description": "Email not verified", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EmailNotVerified" } } } },
+          "500": { "description": "Server error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorBody" } } } }
+        }
+      }
+    },
+    "/api/auth/register-batch": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Batch register (internal / simulator)",
+        "description": "Requires `INTERNAL_API_KEY` in environment. Send the key via `X-Internal-API-Key` or `Authorization: Bearer <key>`. Disabled (403) if `INTERNAL_API_KEY` is unset.",
+        "security": [
+          { "InternalApiKeyHeader": [] },
+          { "InternalApiKeyBearer": [] }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RegisterBatchRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Batch result",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/RegisterBatchSuccess" }
+              }
+            }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorBody" } } } },
+          "401": { "description": "Invalid or missing internal key", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorBody" } } } },
+          "403": { "description": "Batch disabled or key not configured", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorBody" } } } },
+          "500": { "description": "Server error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorBody" } } } }
+        }
+      }
+    },
+    "/api/auth/benchmark": {
+      "get": {
+        "tags": ["Auth"],
+        "summary": "Bcrypt benchmark",
+        "description": "Development only; returns 403 when `NODE_ENV=production`.",
+        "responses": {
+          "200": {
+            "description": "Benchmark stats",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/BenchmarkResponse" }
+              }
+            }
+          },
+          "403": { "description": "Disabled in production", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorBody" } } } },
+          "500": { "description": "Server error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorBody" } } } }
+        }
+      }
+    },
+    "/api/docs": {
+      "get": {
+        "tags": ["Documentation"],
+        "summary": "Swagger UI",
+        "description": "Interactive API documentation (HTML).",
+        "responses": {
+          "200": { "description": "Swagger UI HTML" }
+        }
+      }
+    },
+    "/api/docs/openapi.json": {
+      "get": {
+        "tags": ["Documentation"],
+        "summary": "OpenAPI document",
+        "responses": {
+          "200": {
+            "description": "OpenAPI 3.0 JSON",
+            "content": {
+              "application/json": {
+                "schema": { "type": "object" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "JWT returned by `POST /api/auth/login` (issuer `chartvolt-api`, 7d expiry). Not validated by this API server on other routes."
+      },
+      "InternalApiKeyHeader": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Internal-API-Key",
+        "description": "`INTERNAL_API_KEY` value for batch registration."
+      },
+      "InternalApiKeyBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "INTERNAL_API_KEY",
+        "description": "Same as header: use `INTERNAL_API_KEY` as the raw bearer token (without a `Bearer ` prefix in the token value; the header is `Authorization: Bearer <INTERNAL_API_KEY>`)."
+      }
+    },
+    "schemas": {
+      "HealthBasic": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "example": "healthy" },
+          "server": { "type": "string", "example": "chartvolt-api" },
+          "timestamp": { "type": "string", "format": "date-time" }
+        }
+      },
+      "HealthDetailed": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "enum": ["healthy", "degraded"] },
+          "server": { "type": "string" },
+          "timestamp": { "type": "string", "format": "date-time" },
+          "uptime": { "type": "number" },
+          "memory": {
+            "type": "object",
+            "properties": {
+              "used": { "type": "integer" },
+              "total": { "type": "integer" },
+              "unit": { "type": "string", "example": "MB" }
+            }
+          },
+          "dependencies": { "type": "object", "additionalProperties": true }
+        }
+      },
+      "ReadyOk": {
+        "type": "object",
+        "properties": { "ready": { "type": "boolean", "example": true } }
+      },
+      "ReadyFail": {
+        "type": "object",
+        "properties": {
+          "ready": { "type": "boolean", "example": false },
+          "database": { "type": "boolean" },
+          "workers": { "type": "boolean" },
+          "workersInitialized": { "type": "boolean" },
+          "totalWorkers": { "type": "integer" }
+        }
+      },
+      "LiveOk": {
+        "type": "object",
+        "properties": { "alive": { "type": "boolean", "example": true } }
+      },
+      "RegisterRequest": {
+        "type": "object",
+        "required": ["email", "password"],
+        "properties": {
+          "email": { "type": "string", "format": "email" },
+          "password": { "type": "string", "minLength": 6 },
+          "name": { "type": "string" }
+        }
+      },
+      "RegisterSuccess": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean" },
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "email": { "type": "string" },
+              "name": { "type": "string" }
+            }
+          },
+          "message": { "type": "string" },
+          "emailVerificationRequired": { "type": "boolean" },
+          "timing": {
+            "type": "object",
+            "properties": {
+              "total": { "type": "integer" },
+              "bcrypt": { "type": "integer" },
+              "blocked": { "type": "integer" }
+            }
+          }
+        }
+      },
+      "LoginRequest": {
+        "type": "object",
+        "required": ["email", "password"],
+        "properties": {
+          "email": { "type": "string" },
+          "password": { "type": "string" }
+        }
+      },
+      "LoginSuccess": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean" },
+          "token": { "type": "string", "description": "JWT for use with `Authorization: Bearer` against services that accept it." },
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "email": { "type": "string" },
+              "name": { "type": "string" }
+            }
+          },
+          "timing": {
+            "type": "object",
+            "properties": {
+              "total": { "type": "integer" },
+              "bcrypt": { "type": "integer" },
+              "blocked": { "type": "integer" }
+            }
+          }
+        }
+      },
+      "EmailNotVerified": {
+        "type": "object",
+        "properties": {
+          "error": { "type": "string" },
+          "message": { "type": "string" },
+          "code": { "type": "string", "example": "EMAIL_NOT_VERIFIED" }
+        }
+      },
+      "RegisterBatchRequest": {
+        "type": "object",
+        "required": ["users"],
+        "properties": {
+          "users": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "type": "object",
+              "required": ["email", "password"],
+              "properties": {
+                "email": { "type": "string" },
+                "password": { "type": "string", "minLength": 6 },
+                "name": { "type": "string" }
+              }
+            }
+          }
+        }
+      },
+      "RegisterBatchSuccess": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean" },
+          "users": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "success": { "type": "boolean" },
+                "email": { "type": "string" },
+                "userId": { "type": "string" },
+                "error": { "type": "string" }
+              }
+            }
+          },
+          "stats": {
+            "type": "object",
+            "properties": {
+              "total": { "type": "integer" },
+              "success": { "type": "integer" },
+              "failed": { "type": "integer" }
+            }
+          },
+          "timing": {
+            "type": "object",
+            "properties": {
+              "total": { "type": "integer" },
+              "bcrypt": { "type": "integer" },
+              "avgPerUser": { "type": "integer" },
+              "blocked": { "type": "integer" }
+            }
+          }
+        }
+      },
+      "BenchmarkResponse": {
+        "type": "object",
+        "properties": {
+          "message": { "type": "string" },
+          "iterations": { "type": "integer" },
+          "times": { "type": "array", "items": { "type": "integer" } },
+          "stats": {
+            "type": "object",
+            "properties": {
+              "average": { "type": "string" },
+              "min": { "type": "string" },
+              "max": { "type": "string" }
+            }
+          },
+          "note": { "type": "string" }
+        }
+      },
+      "ErrorBody": {
+        "type": "object",
+        "properties": {
+          "error": { "type": "string" },
+          "message": { "type": "string" }
+        }
+      }
+    }
+  }
+}

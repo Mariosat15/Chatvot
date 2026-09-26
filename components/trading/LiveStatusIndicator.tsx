@@ -1,17 +1,17 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import { RefreshCw, Circle } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useState, useEffect, useCallback } from "react";
+import { RefreshCw, Circle } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface LiveStatusIndicatorProps {
   onRefresh?: () => Promise<void>;
   refreshInterval?: number; // in milliseconds
 }
 
-export default function LiveStatusIndicator({ 
-  onRefresh, 
-  refreshInterval = 10000 // 10 seconds default
+export default function LiveStatusIndicator({
+  onRefresh,
+  refreshInterval = 10000, // 10 seconds default
 }: LiveStatusIndicatorProps) {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastRefresh, setLastRefresh] = useState(new Date());
@@ -27,28 +27,31 @@ export default function LiveStatusIndicator({
     updateOnlineStatus();
 
     // Listen for online/offline events
-    window.addEventListener('online', updateOnlineStatus);
-    window.addEventListener('offline', updateOnlineStatus);
+    window.addEventListener("online", updateOnlineStatus);
+    window.addEventListener("offline", updateOnlineStatus);
 
     return () => {
-      window.removeEventListener('online', updateOnlineStatus);
-      window.removeEventListener('offline', updateOnlineStatus);
+      window.removeEventListener("online", updateOnlineStatus);
+      window.removeEventListener("offline", updateOnlineStatus);
     };
   }, []);
 
-  const handleRefresh = useCallback(async (showSpinner = true) => {
-    if (showSpinner) setIsRefreshing(true);
-    try {
-      if (onRefresh) {
-        await onRefresh();
+  const handleRefresh = useCallback(
+    async (showSpinner = true) => {
+      if (showSpinner) setIsRefreshing(true);
+      try {
+        if (onRefresh) {
+          await onRefresh();
+        }
+        setLastRefresh(new Date());
+      } catch (error) {
+        console.error("Refresh failed:", error);
+      } finally {
+        setIsRefreshing(false);
       }
-      setLastRefresh(new Date());
-    } catch (error) {
-      console.error('Refresh failed:', error);
-    } finally {
-      setIsRefreshing(false);
-    }
-  }, [onRefresh]);
+    },
+    [onRefresh],
+  );
 
   // Auto-refresh interval
   useEffect(() => {
@@ -64,14 +67,14 @@ export default function LiveStatusIndicator({
   // Refresh when tab becomes visible
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && isOnline) {
+      if (document.visibilityState === "visible" && isOnline) {
         handleRefresh(false);
       }
     };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [handleRefresh, isOnline]);
 
@@ -83,16 +86,18 @@ export default function LiveStatusIndicator({
       }
     };
 
-    window.addEventListener('focus', handleFocus);
+    window.addEventListener("focus", handleFocus);
     return () => {
-      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener("focus", handleFocus);
     };
   }, [handleRefresh, isOnline]);
 
   return (
-    <div className={`flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gray-800/50 border h-[72px] ${
-      isOnline ? 'border-green-500/30' : 'border-red-500/30'
-    }`}>
+    <div
+      className={`flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gray-800/50 border h-[72px] ${
+        isOnline ? "border-green-500/30" : "border-red-500/30"
+      }`}
+    >
       {/* Status indicator */}
       <div className="relative">
         {isOnline ? (
@@ -114,13 +119,17 @@ export default function LiveStatusIndicator({
         className="h-8 w-8 p-0 hover:bg-gray-700"
         title="Refresh"
       >
-        <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin text-yellow-500' : 'text-gray-400'}`} />
+        <RefreshCw
+          className={`h-4 w-4 ${isRefreshing ? "animate-spin text-yellow-500" : "text-gray-400"}`}
+        />
       </Button>
 
       {/* Status text */}
       <div className="flex flex-col">
-        <span className={`text-[10px] leading-tight font-semibold ${isOnline ? 'text-green-400' : 'text-red-400'}`}>
-          ● {isOnline ? 'LIVE' : 'OFFLINE'}
+        <span
+          className={`text-[10px] leading-tight font-semibold ${isOnline ? "text-green-400" : "text-red-400"}`}
+        >
+          ● {isOnline ? "LIVE" : "OFFLINE"}
         </span>
         <span className="text-[10px] text-gray-500 leading-tight">
           Auto-updates • {lastRefresh.toLocaleTimeString()}
@@ -129,4 +138,3 @@ export default function LiveStatusIndicator({
     </div>
   );
 }
-

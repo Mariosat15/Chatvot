@@ -1360,3 +1360,260 @@ export const INVOICE_EMAIL_TEMPLATE = `<!DOCTYPE html>
     </table>
 </body>
 </html>`;
+
+export const DEPOSIT_COMPLETED_EMAIL_TEMPLATE = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deposit Confirmed - {{platformName}}</title>
+    <style type="text/css">
+        @media only screen and (max-width: 600px) {
+            .email-container { width: 100% !important; margin: 0 !important; }
+            .mobile-padding { padding: 24px !important; }
+        }
+    </style>
+</head>
+<body style="margin: 0; padding: 0; background-color: #050505; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #050505;">
+        <tr>
+            <td align="center" style="padding: 40px 20px;">
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" class="email-container" style="max-width: 600px; background-color: #141414; border-radius: 8px; border: 1px solid #30333A;">
+                    
+                    <!-- Header with Logo -->
+                    <tr>
+                        <td align="left" style="padding: 40px 40px 20px 40px;">
+                            <img src="{{logoUrl}}" alt="{{platformName}}" width="150" style="max-width: 100%; height: auto;">
+                        </td>
+                    </tr>
+                    
+                    <!-- Main Content -->
+                    <tr>
+                        <td class="mobile-padding" style="padding: 20px 40px 40px 40px;">
+                            
+                            <!-- Success Banner -->
+                            <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 8px; padding: 24px; margin-bottom: 24px; text-align: center;">
+                                <h1 style="margin: 0 0 8px 0; font-size: 24px; font-weight: 600; color: #ffffff;">
+                                    ✓ Deposit Successful!
+                                </h1>
+                                <p style="margin: 0; font-size: 14px; color: rgba(255,255,255,0.9);">
+                                    Your credits are now available
+                                </p>
+                            </div>
+                            
+                            <!-- Greeting -->
+                            <p style="margin: 0 0 24px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">
+                                Hi {{name}},
+                            </p>
+                            
+                            <p style="margin: 0 0 24px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">
+                                Great news! Your deposit has been processed successfully and your credits are ready to use.
+                            </p>
+                            
+                            <!-- Transaction Details -->
+                            <div style="background-color: #1E1E1E; border-radius: 8px; padding: 24px; margin-bottom: 24px;">
+                                <h2 style="margin: 0 0 16px 0; font-size: 18px; font-weight: 600; color: #ffffff;">
+                                    Transaction Details
+                                </h2>
+                                
+                                <table style="width: 100%; border-collapse: collapse;">
+                                    <tr>
+                                        <td style="padding: 12px 0; color: #9ca3af; border-bottom: 1px solid #30333A;">Credits Purchased</td>
+                                        <td style="padding: 12px 0; text-align: right; color: #10b981; font-weight: 700; font-size: 18px; border-bottom: 1px solid #30333A;">{{credits}} ⚡</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 12px 0; color: #9ca3af; border-bottom: 1px solid #30333A;">Amount Charged</td>
+                                        <td style="padding: 12px 0; text-align: right; color: #ffffff; border-bottom: 1px solid #30333A;">€{{amount}}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 12px 0; color: #9ca3af; border-bottom: 1px solid #30333A;">Payment Method</td>
+                                        <td style="padding: 12px 0; text-align: right; color: #ffffff; border-bottom: 1px solid #30333A;">{{paymentMethod}}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 12px 0; color: #9ca3af;">Transaction ID</td>
+                                        <td style="padding: 12px 0; text-align: right; color: #9ca3af; font-family: monospace; font-size: 12px;">{{transactionId}}</td>
+                                    </tr>
+                                </table>
+                            </div>
+                            
+                            <!-- New Balance -->
+                            <div style="background-color: #1E1E1E; border-radius: 8px; padding: 24px; margin-bottom: 24px; text-align: center; border: 1px solid #FDD458;">
+                                <p style="margin: 0 0 8px 0; font-size: 14px; color: #9ca3af; text-transform: uppercase;">Your New Balance</p>
+                                <p style="margin: 0; font-size: 32px; font-weight: 700; color: #FDD458;">{{newBalance}} ⚡</p>
+                            </div>
+                            
+                            <!-- What's Next -->
+                            <div style="background-color: #050505; border-radius: 8px; padding: 20px; margin-bottom: 24px; border: 1px solid #30333A;">
+                                <h3 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600; color: #FDD458;">
+                                    What's Next?
+                                </h3>
+                                <ul style="margin: 0; padding-left: 20px; color: #CCDADC; font-size: 14px; line-height: 1.8;">
+                                    <li>Browse active competitions and join one that matches your style</li>
+                                    <li>Challenge other traders in head-to-head matches</li>
+                                    <li>Climb the leaderboard and win real prizes!</li>
+                                </ul>
+                            </div>
+                            
+                            <!-- CTA Button -->
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                <tr>
+                                    <td align="center">
+                                        <a href="{{competitionsUrl}}" style="display: inline-block; background: linear-gradient(135deg, #FDD458 0%, #E8BA40 100%); color: #000000; text-decoration: none; padding: 16px 32px; border-radius: 8px; font-size: 16px; font-weight: 500; line-height: 1;">
+                                            Start Competing Now
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+                            
+                        </td>
+                    </tr>
+                    
+                    <!-- Footer -->
+                    <tr>
+                        <td style="padding: 20px 40px 40px 40px; border-top: 1px solid #30333A;">
+                            <p style="margin: 0 0 10px 0; font-size: 12px; color: #6b7280; text-align: center;">
+                                {{companyAddress}}
+                            </p>
+                            <p style="margin: 0; font-size: 12px; color: #6b7280; text-align: center;">
+                                © {{year}} {{platformName}} | <a href="{{websiteUrl}}" style="color: #CCDADC !important; text-decoration: underline;">Visit Website</a>
+                            </p>
+                        </td>
+                    </tr>
+                    
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>`;
+
+export const WITHDRAWAL_COMPLETED_EMAIL_TEMPLATE = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Withdrawal Processed - {{platformName}}</title>
+    <style type="text/css">
+        @media only screen and (max-width: 600px) {
+            .email-container { width: 100% !important; margin: 0 !important; }
+            .mobile-padding { padding: 24px !important; }
+        }
+    </style>
+</head>
+<body style="margin: 0; padding: 0; background-color: #050505; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #050505;">
+        <tr>
+            <td align="center" style="padding: 40px 20px;">
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" class="email-container" style="max-width: 600px; background-color: #141414; border-radius: 8px; border: 1px solid #30333A;">
+                    
+                    <!-- Header with Logo -->
+                    <tr>
+                        <td align="left" style="padding: 40px 40px 20px 40px;">
+                            <img src="{{logoUrl}}" alt="{{platformName}}" width="150" style="max-width: 100%; height: auto;">
+                        </td>
+                    </tr>
+                    
+                    <!-- Main Content -->
+                    <tr>
+                        <td class="mobile-padding" style="padding: 20px 40px 40px 40px;">
+                            
+                            <!-- Success Banner -->
+                            <div style="background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); border-radius: 8px; padding: 24px; margin-bottom: 24px; text-align: center;">
+                                <h1 style="margin: 0 0 8px 0; font-size: 24px; font-weight: 600; color: #ffffff;">
+                                    💸 Withdrawal Processed
+                                </h1>
+                                <p style="margin: 0; font-size: 14px; color: rgba(255,255,255,0.9);">
+                                    Your funds are on the way
+                                </p>
+                            </div>
+                            
+                            <!-- Greeting -->
+                            <p style="margin: 0 0 24px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">
+                                Hi {{name}},
+                            </p>
+                            
+                            <p style="margin: 0 0 24px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">
+                                Your withdrawal request has been processed successfully. Here are the details of your transaction:
+                            </p>
+                            
+                            <!-- Transaction Details -->
+                            <div style="background-color: #1E1E1E; border-radius: 8px; padding: 24px; margin-bottom: 24px;">
+                                <h2 style="margin: 0 0 16px 0; font-size: 18px; font-weight: 600; color: #ffffff;">
+                                    Withdrawal Details
+                                </h2>
+                                
+                                <table style="width: 100%; border-collapse: collapse;">
+                                    <tr>
+                                        <td style="padding: 12px 0; color: #9ca3af; border-bottom: 1px solid #30333A;">Credits Withdrawn</td>
+                                        <td style="padding: 12px 0; text-align: right; color: #ef4444; font-weight: 700; font-size: 18px; border-bottom: 1px solid #30333A;">-{{credits}} ⚡</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 12px 0; color: #9ca3af; border-bottom: 1px solid #30333A;">Amount You'll Receive</td>
+                                        <td style="padding: 12px 0; text-align: right; color: #10b981; font-weight: 700; font-size: 18px; border-bottom: 1px solid #30333A;">€{{netAmount}}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 12px 0; color: #9ca3af; border-bottom: 1px solid #30333A;">Withdrawal Fee</td>
+                                        <td style="padding: 12px 0; text-align: right; color: #9ca3af; border-bottom: 1px solid #30333A;">€{{fee}}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 12px 0; color: #9ca3af; border-bottom: 1px solid #30333A;">Payment Method</td>
+                                        <td style="padding: 12px 0; text-align: right; color: #ffffff; border-bottom: 1px solid #30333A;">{{paymentMethod}}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 12px 0; color: #9ca3af;">Reference ID</td>
+                                        <td style="padding: 12px 0; text-align: right; color: #9ca3af; font-family: monospace; font-size: 12px;">{{withdrawalId}}</td>
+                                    </tr>
+                                </table>
+                            </div>
+                            
+                            <!-- Timeline Info -->
+                            <div style="background-color: #050505; border-radius: 8px; padding: 20px; margin-bottom: 24px; border: 1px solid #30333A;">
+                                <h3 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600; color: #FDD458;">
+                                    ⏱️ When will I receive my funds?
+                                </h3>
+                                <p style="margin: 0; color: #CCDADC; font-size: 14px; line-height: 1.6;">
+                                    {{timelineMessage}}
+                                </p>
+                            </div>
+                            
+                            <!-- Remaining Balance -->
+                            <div style="background-color: #1E1E1E; border-radius: 8px; padding: 20px; margin-bottom: 24px; text-align: center;">
+                                <p style="margin: 0 0 8px 0; font-size: 14px; color: #9ca3af; text-transform: uppercase;">Remaining Balance</p>
+                                <p style="margin: 0; font-size: 28px; font-weight: 700; color: #ffffff;">{{remainingBalance}} ⚡</p>
+                            </div>
+                            
+                            <!-- CTA Button -->
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                <tr>
+                                    <td align="center">
+                                        <a href="{{walletUrl}}" style="display: inline-block; background: linear-gradient(135deg, #FDD458 0%, #E8BA40 100%); color: #000000; text-decoration: none; padding: 16px 32px; border-radius: 8px; font-size: 16px; font-weight: 500; line-height: 1;">
+                                            View Transaction History
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+                            
+                        </td>
+                    </tr>
+                    
+                    <!-- Footer -->
+                    <tr>
+                        <td style="padding: 20px 40px 40px 40px; border-top: 1px solid #30333A;">
+                            <p style="margin: 0 0 10px 0; font-size: 12px; color: #6b7280; text-align: center;">
+                                Questions about your withdrawal? Contact us at {{supportEmail}}
+                            </p>
+                            <p style="margin: 0 0 10px 0; font-size: 12px; color: #6b7280; text-align: center;">
+                                {{companyAddress}}
+                            </p>
+                            <p style="margin: 0; font-size: 12px; color: #6b7280; text-align: center;">
+                                © {{year}} {{platformName}} | <a href="{{websiteUrl}}" style="color: #CCDADC !important; text-decoration: underline;">Visit Website</a>
+                            </p>
+                        </td>
+                    </tr>
+                    
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>`;

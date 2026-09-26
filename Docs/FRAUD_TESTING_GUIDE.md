@@ -290,23 +290,50 @@ Action: Critical alert + Entry blocked
 
 ---
 
-### **Phase 3: Entry Blocking (2 minutes)**
+### **Phase 3: Entry Blocking (2 minutes)** — ⚠️ REWRITTEN 2 September 2026
+
+> **The old version of this phase tested behaviour that has been deliberately removed.**
+> A suspicion score no longer blocks entry on its own. Crossing the threshold (now called
+> **Review Threshold**) escalates the account for investigation and blocks nothing.
+>
+> Why: the old block created no `UserRestriction`, so it showed on no admin screen,
+> notified nobody, could not be lifted, and fired even with Auto-Suspend switched off. It
+> locked a real player out. See **Prerequisite B** in
+> `New games plan/00a-STAGE-0-prerequisite-fixes-DO-FIRST.md`.
+>
+> **If the old test passes, that is a regression.** The automated version of this is
+> `__tests__/services/fraud-entry-block.test.ts`.
 
 ```bash
-# Test Setup
+# Test A - a high score must NOT block
 1. Go to Admin Panel → Fraud → Settings
-2. Set "Entry Block Threshold" to 40
+2. Set "Review Threshold" to 40, and confirm Auto-Suspend is OFF
 3. Save Changes
-
-# Test Execution
-4. Log in as Account with risk score > 40
-5. Try to enter a competition
-6. Should see: "Entry blocked due to security concerns" ⛔
+4. Log in as an account with risk score > 40
+5. Enter a competition
 
 # Expected Result
-✅ High-risk accounts blocked from entering
-✅ Error message shown to user
-✅ Admin can see block in logs
+✅ Entry SUCCEEDS - the score alone blocks nothing
+✅ The account is escalated for review, and an alert appears for the admin
+✅ The player has a notification saying their account is under review
+
+# Test B - a restriction MUST block, and must be liftable
+6. As admin, suspend that account (Fraud → alert → Suspend), ticking competitions
+   and 1v1 challenges
+7. As the player, try to enter a competition, then a challenge
+
+# Expected Result
+✅ Both refused, with a reason the player can read at /account/review
+✅ The account appears on Restricted Users
+✅ "Lift" releases them, and entry works again immediately
+
+# Test C - Auto-Suspend is the only automatic block
+8. Turn Auto-Suspend ON, threshold 90. Drive an account above 90.
+
+# Expected Result
+✅ A restriction is created automatically - not a bare refusal
+✅ It expires after 7 days (check expiresAt is set, NOT empty)
+✅ The player is notified and an admin can lift it
 ```
 
 ---
@@ -462,7 +489,7 @@ Run this to verify everything is working:
 Admin Panel → Fraud → Settings
 - Max Accounts Per Device: 1
 - Alert Threshold: 20
-- Entry Block Threshold: 60
+- Review Threshold: 60
 - Enable Device Fingerprinting: ON
 - Enable Multi-Account Detection: ON
 - Enable VPN Detection: ON
@@ -542,7 +569,7 @@ Alert #2
 Lower all thresholds:
 - Max Accounts Per Device: 1
 - Alert Threshold: 20
-- Entry Block Threshold: 50
+- Review Threshold: 50
 
 This makes testing faster and easier!
 ```
@@ -552,7 +579,7 @@ This makes testing faster and easier!
 Use recommended defaults:
 - Max Accounts Per Device: 3
 - Alert Threshold: 40
-- Entry Block Threshold: 70
+- Review Threshold: 70
 
 This balances security with user experience!
 ```
@@ -608,7 +635,8 @@ Use this to confirm your fraud detection is working:
 ✅ **Fraud Alerts** appear when thresholds are exceeded
 ✅ **Risk Scores** are calculated and displayed
 ✅ **VPN Detection** flags VPN/Proxy users
-✅ **Entry Blocking** prevents high-risk users from entering
+✅ **Review Threshold** escalates high-risk users for investigation — it does **not** block
+✅ **Suspensions and bans** are what block entry, and they are visible, notified and liftable
 ✅ **Settings Changes** apply immediately
 
 ---

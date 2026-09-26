@@ -1,32 +1,73 @@
-import { Schema, model, models, Document } from 'mongoose';
+import { Schema, model, models, Document } from "mongoose";
 
 // Track all credit wallet transactions
 export interface IWalletTransaction extends Document {
   userId: string; // Reference to Better Auth user ID
   transactionType:
-    | 'deposit' // User deposits EUR → gets credits
-    | 'withdrawal' // User withdraws credits → gets EUR
-    | 'withdrawal_fee' // Fee charged on withdrawal
-    | 'competition_entry' // User enters competition (deduct credits)
-    | 'competition_win' // User wins competition (add credits)
-    | 'competition_refund' // Competition cancelled (refund entry fee)
-    | 'challenge_entry' // User enters 1v1 challenge (deduct credits)
-    | 'challenge_win' // User wins 1v1 challenge (add credits)
-    | 'challenge_refund' // Challenge cancelled/declined (refund entry fee)
-    | 'platform_fee' // Platform fee deducted from winnings
-    | 'admin_adjustment' // Manual adjustment by admin
-    | 'marketplace_purchase'; // User purchases item from marketplace
+    | "deposit" // User deposits EUR → gets credits
+    | "withdrawal" // User withdraws credits → gets EUR
+    | "withdrawal_fee" // Fee charged on withdrawal
+    | "withdrawal_refund" // Withdrawal failed/cancelled (refund credits)
+    | "manual_deposit_credit" // Admin manually credits user for failed deposit
+    | "competition_entry" // User enters competition (deduct credits)
+    | "competition_win" // User wins competition (add credits)
+    | "competition_refund" // Competition cancelled (refund entry fee)
+    | "challenge_entry" // User enters 1v1 challenge (deduct credits)
+    | "challenge_win" // User wins 1v1 challenge (add credits)
+    | "challenge_refund" // Challenge cancelled/declined (refund entry fee)
+    | "challenge_declined" // Challenge was declined by opponent (informational, €0)
+    | "challenge_expired" // Challenge expired without response (informational, €0)
+    | "platform_fee" // Platform fee deducted from winnings
+    | "admin_adjustment" // Manual adjustment by admin
+    | "marketplace_purchase" // User purchases item from marketplace
+    | "gamemaster_subscription" // Game master monthly subscription fee
+    | "gamemaster_subscription_refund" // Refund if subscription cancelled
+    | "gamemaster_earning" // Game master earnings from referred users
+    | "gamemaster_challenge_referral" // Game master challenge referral earnings
+    | "incident_compensation" // Compensation issued for incident resolution
+    | "chargeback_clawback" // Credits reversed from user wallet after a lost chargeback
+    /*
+      The three rows `adjust-results` writes when an operator corrects a finalised result.
+
+      Declared 14 Sep 2026. All three were being written already and NONE of them was declared,
+      so Mongoose rejected the whole write - a missing enum value fails the document, it does
+      not drop the field. The throw landed in that route's per-adjustment `catch`, which
+      reported the row as an error and carried on, and the route then COMMITTED: the wallet
+      `$inc` immediately above had already run inside the same transaction. So every prize
+      clawback and every prize adjustment ever performed moved credits with no ledger row at
+      all, and left `prizeWon` on the participant at its old value because the throw happened
+      before `participant.save()`.
+
+      Kept as three values rather than folded into `admin_adjustment`, which would have needed
+      no model change: these are the only rows that reverse or amend a SETTLED prize, and
+      telling them apart is the whole of a payout reconciliation. Historical rows cannot be
+      recovered - nothing was stored - so the credits that moved are visible only as a balance
+      that disagrees with the sum of the ledger.
+    */
+    | "prize_reclaim" // Settled prize taken back after a disqualification
+    | "prize_adjustment_add" // Settled prize increased by an operator
+    | "prize_adjustment_deduct"; // Settled prize reduced by an operator
   amount: number; // Amount of credits (+/-)
   balanceBefore: number; // Balance before transaction
   balanceAfter: number; // Balance after transaction
   currency: string; // EUR, USD, etc.
   exchangeRate: number; // Exchange rate (1 credit = X EUR)
-  status: 'pending' | 'completed' | 'failed' | 'cancelled';
-  paymentMethod?: string; // stripe, paypal, bank_transfer
-  paymentId?: string; // Stripe payment ID, etc.
+  status: "pending" | "completed" | "failed" | "cancelled" | "disputed";
+  provider?: string; // Payment provider: stripe, nuvei, paddle, etc.
+  providerTransactionId?: string; // Provider's own transaction/payment ID
+  paymentMethod?: string; // card, bank_transfer, paypal, etc.
+  paymentId?: string; // Stripe payment ID, etc. (deprecated - use providerTransactionId)
   paymentIntentId?: string; // Stripe Payment Intent ID (for fraud detection)
   competitionId?: string; // If related to competition
+  // Reason: nine writers already pass this - challenge entry (x2), the refund on decline,
+  // and six finalization payout rows across both apps - but it was never declared, so
+  // strict mode discarded every one of them and the whole challenge money trail was
+  // unattributable to its challenge. Same defect as `referenceId` on the competition side,
+  // and likewise invisible because no balance is computed from it. Declared 1 Sep 2026;
+  // historical rows cannot be recovered, since the value was never stored.
+  challengeId?: string; // If related to a 1v1 challenge
   description: string; // Transaction description
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- free-form PSP metadata blob
   metadata?: Record<string, any>; // Additional data
   failureReason?: string; // If failed
   processedAt?: Date; // When transaction was processed
@@ -44,18 +85,33 @@ const WalletTransactionSchema = new Schema<IWalletTransaction>(
       type: String,
       required: true,
       enum: [
-        'deposit',
-        'withdrawal',
-        'withdrawal_fee',
-        'competition_entry',
-        'competition_win',
-        'competition_refund',
-        'challenge_entry',
-        'challenge_win',
-        'challenge_refund',
-        'platform_fee',
-        'admin_adjustment',
-        'marketplace_purchase',
+        "deposit",
+        "withdrawal",
+        "withdrawal_fee",
+        "withdrawal_refund",
+        "manual_deposit_credit",
+        "competition_entry",
+        "competition_win",
+        "competition_refund",
+        "challenge_entry",
+        "challenge_win",
+        "challenge_refund",
+        "challenge_declined",
+        "challenge_expired",
+        "platform_fee",
+        "admin_adjustment",
+        "marketplace_purchase",
+        "gamemaster_subscription",
+        "gamemaster_subscription_refund",
+        "gamemaster_earning",
+        "gamemaster_challenge_referral",
+        "incident_compensation",
+        "chargeback_clawback",
+        // Written by `adjust-results` since it was created and declared nowhere until
+        // 14 Sep 2026. See the interface above for what that cost.
+        "prize_reclaim",
+        "prize_adjustment_add",
+        "prize_adjustment_deduct",
       ],
     },
     amount: {
@@ -75,7 +131,7 @@ const WalletTransactionSchema = new Schema<IWalletTransaction>(
     currency: {
       type: String,
       required: true,
-      default: 'EUR',
+      default: "EUR",
     },
     exchangeRate: {
       type: Number,
@@ -85,8 +141,14 @@ const WalletTransactionSchema = new Schema<IWalletTransaction>(
     status: {
       type: String,
       required: true,
-      enum: ['pending', 'completed', 'failed', 'cancelled'],
-      default: 'pending',
+      enum: ["pending", "completed", "failed", "cancelled", "disputed"],
+      default: "pending",
+    },
+    provider: {
+      type: String, // stripe, nuvei, paddle, etc.
+    },
+    providerTransactionId: {
+      type: String, // Provider's own transaction ID
     },
     paymentMethod: {
       type: String,
@@ -98,6 +160,9 @@ const WalletTransactionSchema = new Schema<IWalletTransaction>(
       type: String,
     },
     competitionId: {
+      type: String,
+    },
+    challengeId: {
       type: String,
     },
     description: {
@@ -116,18 +181,21 @@ const WalletTransactionSchema = new Schema<IWalletTransaction>(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Indexes for fast queries
 WalletTransactionSchema.index({ userId: 1, createdAt: -1 });
 WalletTransactionSchema.index({ competitionId: 1 });
+WalletTransactionSchema.index({ challengeId: 1 });
 WalletTransactionSchema.index({ status: 1, createdAt: -1 });
 WalletTransactionSchema.index({ transactionType: 1, createdAt: -1 });
+WalletTransactionSchema.index({ provider: 1, createdAt: -1 });
+WalletTransactionSchema.index({ providerTransactionId: 1 }); // For webhook lookups
+WalletTransactionSchema.index({ paymentIntentId: 1 }); // For Stripe lookups
 
 const WalletTransaction =
   models?.WalletTransaction ||
-  model<IWalletTransaction>('WalletTransaction', WalletTransactionSchema);
+  model<IWalletTransaction>("WalletTransaction", WalletTransactionSchema);
 
 export default WalletTransaction;
-

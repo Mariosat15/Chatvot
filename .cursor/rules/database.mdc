@@ -1,0 +1,65 @@
+---
+globs: database/**,lib/actions/**,lib/services/**,worker/**
+description: Database and MongoDB/Mongoose rules for ChartVolt
+---
+
+# Database — ChartVolt
+
+## 🏗️ Architecture Overview
+
+- **ORM:** Mongoose 8+ with TypeScript interfaces.
+- **Database:** MongoDB Atlas (configurable cluster settings via `mdbclustersettings` collection).
+- **Connection:** Singleton pattern in `database/mongoose.ts` — **never** create a new `mongoose.connect()` call elsewhere.
+- **Cache layers:** Redis (optional, via `lib/services/redis.service.ts`) + in-memory caches.
+
+## 📁 File Structure
+
+- `database/mongoose.ts` — Connection singleton, pool config, slow query profiler, retry logic.
+- `database/models/*.model.ts` — All Mongoose schemas and models.
+- `lib/actions/**/*.actions.ts` — Server actions that read/write DB (use `"use server"` directive).
+- `lib/services/*.service.ts` — Business logic services that interact with DB.
+- `worker/jobs/*.job.ts` — Background jobs (Agenda) that interact with DB.
+
+## 📐 Model Rules
+
+1. **Every model file** exports both a **TypeScript interface** (`XDocument extends Document`) and the **Mongoose model**.
+2. **Naming convention:** `kebab-case.model.ts` → `PascalCase` model name.
+   - Example: `market-settings.model.ts` → `MarketSettings`
+3. **Always define indexes** in the schema for fields used in queries — especially compound indexes for frequent filter combinations.
+4. **Use `select()`** to avoid fetching unnecessary fields on large documents.
+5. **Default values** go in the schema definition, not in application code.
+6. **WhiteLabel model** (`whitelabel.model.ts`) is the central config document — treat it as the single source of truth for app-wide settings. It exists in **both** `database/models/` and `apps/admin/database/models/` — **keep them in sync**.
+
+## 🔒 Transactions
+
+- Use MongoDB transactions (`session.startTransaction()`) for any operation that modifies **multiple documents** atomically (e.g., placing a trade: update position + account balance + trade history).
+- Transactions require **primary reads** — never set `readPreference: "secondaryPreferred"` globally. Set it per-query on read-heavy, non-transactional queries only.
+- Always call `session.endSession()` in a `finally` block.
+
+## ⚡ Performance
+
+- **Slow query profiler** is enabled globally in `database/mongoose.ts` (threshold: 500ms). Check logs for `🐢 SLOW QUERY` warnings.
+- **Pool sizes** are loaded dynamically from the `mdbclustersettings` collection before connecting — configured in Admin → MDB Cluster.
+- Use `safeDbOperation()` from `database/mongoose.ts` for any DB call that might timeout (wraps with retry + timeout).
+- Use `.lean()` on read-only queries for ~5x faster deserialization.
+- Use `.read("secondaryPreferred")` on heavy read queries that don't need transactions (leaderboards, stats, dashboards).
+- Avoid `find({})` without limits — always paginate or limit.
+
+## 🔄 Key Models Reference
+
+| Model | File | Purpose |
+|---|---|---|
+| `WhiteLabel` | `whitelabel.model.ts` | Central app config (branding, API keys, SEO, spreads) |
+| `Candle1m` | `candle-1m.model.ts` | 1-minute OHLCV candles (TTL-indexed) |
+| `CandleHistorical` | `candle-historical.model.ts` | Higher-timeframe candles (5m, 15m, 1h, 4h, 1d, 1w, 1M) |
+| `PriceCache` | `price-cache.model.ts` | Latest prices for worker process fallback |
+| `MarketSettings` | `market-settings.model.ts` | Per-symbol trading config (spreads, leverage, hours) |
+| `MarketDataSettings` | `market-data-settings.model.ts` | Market data and price feed configuration |
+| Trading models | `database/models/trading/` | Positions, orders, accounts, competitions, challenges |
+
+## ⚠️ Common Pitfalls
+
+- **Do NOT** import `MONGODB_URI` at module load time — the worker loads `.env` after imports. Always read `process.env.MONGODB_URI` inside functions.
+- **Do NOT** create new Mongoose connections — use `connectToDatabase()` from `database/mongoose.ts`.
+- **When adding fields** to `WhiteLabel`, update the model in **both** `database/models/whitelabel.model.ts` AND `apps/admin/database/models/whitelabel.model.ts`.
+- **Schema changes** should include sensible defaults so existing documents still work.
