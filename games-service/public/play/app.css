@@ -980,26 +980,28 @@ button.rail-btn:disabled {
 
 /* The tiles' own label and value type, so four boxes in a row read as four of the same thing. */
 .board-meter-label {
-  font-size: 0.82rem;
+  font-size: 0.9rem;
   font-weight: 800;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #eaf6ff;
+  color: #f2f9ff;
 }
 
 .board-meter-value {
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: var(--accent-bright);
 }
 
 .board-meter-track {
-  height: 8px;
+  height: 10px;
   border-radius: 99px;
   overflow: hidden;
   background: #041127;
-  box-shadow: inset 0 0 0 1px var(--panel-edge);
+  box-shadow:
+    inset 0 0 0 1px rgba(64, 150, 240, 0.45),
+    0 0 10px -4px rgba(8, 223, 255, 0.35);
 }
 
 /*
@@ -1058,16 +1060,51 @@ button.rail-btn:disabled {
   color: #f2f9ff;
 }
 
-/* The reference's accents: the best time in gold, the combo in red. Keyed by `data-key`, which
-   `renderStatTiles` sets from the tile's own key, so a label rewording cannot drop the colour. */
+/* The reference's accents: the best time in gold with a crown, the combo in red + KEEP GOING. */
 .stat-tile[data-key="best"] .stat-tile-value {
   color: #ffd23f;
   text-shadow: 0 0 10px rgba(255, 210, 63, 0.45);
 }
 
+.stat-tile[data-key="best"] .stat-tile-value::after {
+  content: " ♛";
+  font-size: 0.85em;
+  color: #ffd23f;
+}
+
+.stat-tile[data-key="streak"] {
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(115deg, transparent 40%, rgba(255, 60, 140, 0.22) 52%, rgba(8, 200, 255, 0.18) 62%, transparent 74%),
+    linear-gradient(180deg, rgba(40, 12, 48, 0.55) 0%, rgba(8, 16, 40, 0.2) 100%);
+}
+
 .stat-tile[data-key="streak"] .stat-tile-value {
   color: #ff4d6d;
   text-shadow: 0 0 10px rgba(255, 77, 109, 0.45);
+}
+
+.stat-tile[data-key="streak"] .stat-tile-value::after {
+  content: " ⚡";
+  font-size: 0.9em;
+}
+
+.stat-tile[data-key="streak"] .stat-tile-go {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  font-style: italic;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #5ef0ff;
+  text-shadow: 0 0 8px rgba(8, 223, 255, 0.55);
+}
+
+.stat-tile[data-key="paths"] .stat-tile-value {
+  color: #8ef0ff;
+  text-shadow: 0 0 8px rgba(8, 223, 255, 0.35);
 }
 
 /*
@@ -1350,6 +1387,11 @@ svg#board .fx-lock-on {
   pointer-events: none;
 }
 
+svg#board .fx-lock-on-hit {
+  animation: fx-lock-hit 320ms ease-out 1 both;
+  pointer-events: none;
+}
+
 /* Phase J — light SVG/CSS only (no full-board WebP washes). */
 svg#board .fx-trail-tip {
   pointer-events: none;
@@ -1403,6 +1445,19 @@ svg#board .fx-join-spark {
   100% {
     opacity: 0;
     transform: scale(1.2);
+  }
+}
+
+@keyframes fx-lock-hit {
+  0% {
+    opacity: 0.95;
+    transform-box: fill-box;
+    transform-origin: center;
+    transform: scale(0.55);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.35);
   }
 }
 
@@ -1461,27 +1516,87 @@ svg#board .junction {
 }
 
 /* The unused-square marker. See `board.js` - it is how the coverage rule becomes visible instead
-   of being a number in the hint line. */
+   of being a number in the hint line. Cyan guide dots from the owner wire reference (26 Sep). */
 svg#board .pip {
-  fill: rgba(125, 216, 255, 0.4);
+  fill: #7dd8ff;
+  opacity: 0.72;
+  filter: drop-shadow(0 0 3px rgba(125, 216, 255, 0.85));
+  pointer-events: none;
+}
+
+/* Soft wash under a path — pair colour, low alpha so wires stay the read. */
+svg#board .path-glow {
+  opacity: 0.18;
   pointer-events: none;
 }
 
 svg#board .trace,
 svg#board .trace-halo,
-svg#board .trace-core {
+svg#board .trace-core,
+svg#board .trace-segments {
   pointer-events: none;
 }
 
+/* Outer bloom of the neon tube — brighter than the old 0.2 so it matches the reference. */
 svg#board .trace-halo {
-  opacity: 0.2;
+  opacity: 0.38;
 }
 
-/* A pale line down the middle of the conductor, which is what makes a wire read as lit from the
-   inside rather than as a coloured stripe. Kept faint: at full strength it washes the pair's own
-   colour out, and the colour is what tells two crossing paths apart. */
+/* Coloured casing between halo and filament. */
+svg#board .trace {
+  opacity: 0.92;
+}
+
+/* Bright filament — the white core that makes a wire read as lit glass. */
 svg#board .trace-core {
-  opacity: 0.42;
+  opacity: 0.88;
+}
+
+/* Short pill highlights along the tube (owner ref image 3). */
+svg#board .trace-segments {
+  opacity: 0.55;
+}
+
+/* Completed pair: gentle energy pulse along the tube (feel only — not a score). */
+svg#board .trace-halo.complete {
+  animation: tube-halo-breathe 1.6s ease-in-out infinite;
+}
+
+svg#board .trace-core.complete {
+  animation: tube-core-breathe 1.6s ease-in-out infinite;
+}
+
+svg#board .trace-segments.complete {
+  animation: tube-seg-flow 1.1s linear infinite;
+}
+
+@keyframes tube-halo-breathe {
+  0%,
+  100% {
+    opacity: 0.32;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@keyframes tube-core-breathe {
+  0%,
+  100% {
+    opacity: 0.75;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes tube-seg-flow {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: -36;
+  }
 }
 
 svg#board .terminal {
@@ -1608,17 +1723,32 @@ button.submit-wide:disabled {
     0 10px 26px -16px rgba(0, 0, 0, 0.9);
 }
 
-/* Every pair done: brighter cyan “ready” — still TEXT, no Phase B menu face. */
+/* Every pair done: brighter cyan “ready” with a soft pulse — still TEXT, no Phase B menu face. */
 .submit-wide.ready:not(:disabled) {
   color: #e8fcff;
   background: linear-gradient(180deg, rgba(12, 92, 140, 0.95) 0%, rgba(4, 48, 88, 0.98) 100%);
   box-shadow:
     0 0 20px rgba(0, 230, 255, 0.7),
     0 10px 28px -14px rgba(0, 0, 0, 0.95);
+  animation: submit-ready-pulse 1.4s ease-in-out infinite;
 }
 
 .submit-wide.ready:not(:disabled)::before {
   filter: none;
+}
+
+@keyframes submit-ready-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 16px rgba(0, 230, 255, 0.55),
+      0 10px 28px -14px rgba(0, 0, 0, 0.95);
+  }
+  50% {
+    box-shadow:
+      0 0 28px rgba(0, 240, 255, 0.9),
+      0 10px 28px -14px rgba(0, 0, 0, 0.95);
+  }
 }
 
 /* Clear matches Undo: same ghost rail-btn chrome. Secondary gold frame removed 26 Sep 2026. */
@@ -1824,10 +1954,10 @@ svg#board .trace-core.arrived {
 
 @keyframes halo-surge {
   from {
-    opacity: 0.7;
+    opacity: 0.85;
   }
   to {
-    opacity: 0.2;
+    opacity: 0.38;
   }
 }
 
@@ -1836,7 +1966,7 @@ svg#board .trace-core.arrived {
     opacity: 1;
   }
   to {
-    opacity: 0.42;
+    opacity: 0.88;
   }
 }
 
@@ -1985,7 +2115,11 @@ button.primary:active:not(:disabled) {
   svg#board .join-pulse,
   svg#board .trace-halo.arrived,
   svg#board .trace-core.arrived,
+  svg#board .trace-halo.complete,
+  svg#board .trace-core.complete,
+  svg#board .trace-segments.complete,
   svg#board .fx-lock-on,
+  svg#board .fx-lock-on-hit,
   svg#board .fx-trail-tip,
   svg#board .fx-undo-rewind,
   svg#board .fx-board-wake,
@@ -1997,8 +2131,9 @@ button.primary:active:not(:disabled) {
   .board-stage.board-complete-soft .board-fx-complete,
   .board-stage.circuit-sealed .board-fx-sealed,
   .board-stage.refused,
+  .submit-wide.ready:not(:disabled),
   #screen-result.result-power {
-    animation: none;
+    animation: none !important;
   }
 
   .board-stage.circuit-sealed {

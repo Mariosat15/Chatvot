@@ -891,6 +891,24 @@ async function main(): Promise<number> {
     assert.match(sound, /if\s*\(!document\.hidden\)\s*reviveMusic\(\)/);
   });
 
+  await test("wires are neon tubes with segments and completed pairs can pulse", async () => {
+    /*
+     * OWNER 26 Sep 2026: recreate the reference neon lines — four strokes (halo / casing /
+     * filament / pill segments) and a `.complete` flourish gated by motionFxOn so Lite FX does
+     * not hide the wire.
+     */
+    const board = withoutComments(playFile("board.js"));
+    assert.match(board, /class:\s*"trace-segments"/);
+    assert.match(board, /motionFxOn\(\)/);
+    assert.match(board, /syncPathGlows/);
+    const css = withoutComments(playFile("app.css"));
+    assert.match(css, /\.trace-segments\b/);
+    assert.match(css, /\.path-glow\b/);
+    assert.match(css, /tube-seg-flow|tube-halo-breathe/);
+    assert.match(css, /stat-tile-go/);
+    assert.match(css, /submit-ready-pulse/);
+  });
+
   await test("every animation the stylesheet adds is switched off under reduced motion", async () => {
     /*
      * The accessibility requirement, held by comparing two lists rather than by remembering.

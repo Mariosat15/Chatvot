@@ -95,15 +95,33 @@ export function NeonRankBadge({
     if (rank === 1) {
       return (
         <span
-          className={`flex ${plate} items-center justify-center rounded-lg border border-[#FFC01B]/70 bg-[#FFB300]/20`}
+          className={`flex ${plate} items-center justify-center rounded-lg border border-[#FFC01B]/70 bg-[#FFB300]/20 shadow-[0_0_10px_rgba(255,192,27,0.4)]`}
         >
           <Crown className={`${glyph} text-[#FFD72D]`} />
         </span>
       );
     }
+    if (rank === 2) {
+      return (
+        <span
+          className={`flex ${plate} items-center justify-center rounded-lg border border-[#2BB0FF]/60 bg-[#1B7DFF]/25 text-xs font-bold text-sky-100 shadow-[0_0_8px_rgba(43,176,255,0.35)]`}
+        >
+          {rank}
+        </span>
+      );
+    }
+    if (rank === 3) {
+      return (
+        <span
+          className={`flex ${plate} items-center justify-center rounded-lg border border-[#E07A3A]/65 bg-[#C45A20]/25 text-xs font-bold text-orange-200 shadow-[0_0_8px_rgba(224,122,58,0.35)]`}
+        >
+          {rank}
+        </span>
+      );
+    }
     return (
       <span
-        className={`flex ${plate} items-center justify-center rounded-lg border border-[#1B7DFF]/50 bg-[#1B7DFF]/15 text-xs font-bold text-sky-200`}
+        className={`flex ${plate} items-center justify-center rounded-lg border border-[#1B7DFF]/40 bg-[#1B7DFF]/10 text-xs font-bold text-sky-200`}
       >
         {rank > 0 ? rank : "-"}
       </span>

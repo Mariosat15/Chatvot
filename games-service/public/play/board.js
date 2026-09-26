@@ -283,13 +283,15 @@ export function createBoard(svg, onChange) {
   let errorTimer = null;
   /**
    * Wire SVG nodes keyed by pair, so a drag UPDATES `points` instead of destroying every
-   * polyline on the board. Rebuilding three strokes × every pair on each pointer move is what
-   * made drawing feel heavy (owner, 25 Sep 2026).
-   * @type {Map<number, {halo: Element, wire: Element, core: Element}>}
+   * polyline on the board. Four strokes: halo / casing / filament / pill segments (neon tube).
+   * @type {Map<number, {halo: Element, wire: Element, core: Element, segments: Element}>}
    */
   let wireNodes = new Map();
   /** @type {Map<string, Element>} unused-cell pips, added/removed one at a time. */
   let pipNodes = new Map();
+  /** Soft coloured wash under a path cell (shows over drawn board art). */
+  /** @type {Map<string, Element>} */
+  let pathGlowNodes = new Map();
   /**
    * Cached inverse of `getScreenCTM()`. Calling getScreenCTM every pointermove forces a layout
    * pass; caching until the next `build` keeps cell lookup in arithmetic only.
@@ -358,7 +360,8 @@ export function createBoard(svg, onChange) {
     if (!layers || !cellPx) return;
     const cx = centre(cell[0]);
     const cy = centre(cell[1]);
-    const size = cellPx * 1.35;
+    // Reason: reference lock-on is larger than the cell; 1.35 sat under the token art.
+    const size = cellPx * 1.65;
     const pulse = element("image", {
       href: "/play/fx-lock-on-pulse.webp",
       x: cx - size / 2,
@@ -368,10 +371,21 @@ export function createBoard(svg, onChange) {
       class: "fx-lock-on",
       "pointer-events": "none",
     });
+    const hit = element("image", {
+      href: "/play/fx-lock-on-hit.webp",
+      x: cx - size * 0.42,
+      y: cy - size * 0.42,
+      width: size * 0.84,
+      height: size * 0.84,
+      class: "fx-lock-on-hit",
+      "pointer-events": "none",
+    });
     layers.flashes.appendChild(pulse);
+    layers.flashes.appendChild(hit);
     setTimeout(() => {
       try {
         layers.flashes.removeChild(pulse);
+        layers.flashes.removeChild(hit);
       } catch {
         /* board rebuilt */
       }
@@ -846,6 +860,7 @@ export function createBoard(svg, onChange) {
     layers = null;
     wireNodes = new Map();
     pipNodes = new Map();
+    pathGlowNodes = new Map();
     inverseCtm = null;
     if (!puzzle) return;
 
@@ -1083,6 +1098,7 @@ export function createBoard(svg, onChange) {
       layers.traces.removeChild(stale.halo);
       layers.traces.removeChild(stale.wire);
       layers.traces.removeChild(stale.core);
+      layers.traces.removeChild(stale.segments);
       wireNodes.delete(pairId);
       return;
     }
@@ -1090,10 +1106,20 @@ export function createBoard(svg, onChange) {
     const points = cells.map((cell) => centre(cell[0]) + "," + centre(cell[1])).join(" ");
     const colour = colourFor(pairId);
     const thick = denseGrid(puzzle);
-    const haloW = Math.round(cellPx * (thick ? 0.72 : 0.6));
-    const wireW = Math.round(cellPx * (thick ? 0.38 : 0.3));
-    const coreW = Math.max(1, Math.round(cellPx * (thick ? 0.09 : 0.07)));
+    // Reason: owner ref (26 Sep) — neon tubes with a wide glow, thick casing, bright filament,
+    // and short pill segments along the wire. Wider than the prior 0.6/0.3/0.07 set.
+    const haloW = Math.round(cellPx * (thick ? 0.92 : 0.8));
+    const wireW = Math.round(cellPx * (thick ? 0.5 : 0.42));
+    const coreW = Math.max(2, Math.round(cellPx * (thick ? 0.16 : 0.13)));
+    const segW = Math.max(1, Math.round(cellPx * (thick ? 0.07 : 0.055)));
+    const segDash =
+      Math.round(cellPx * 0.2) + " " + Math.round(cellPx * 0.16);
+    // Colour-blind dash stays on the coloured casing only — segments keep their own rhythm.
     const dash = dashFor(pairId);
+    const pair = puzzle && puzzle.pairs ? puzzle.pairs.find((entry) => entry.id === pairId) : null;
+    // Reason: complete pulse is flourish only — Lite FX / reduced-motion skip the class so the
+    // wire stays visible without animating (display:none on .complete would hide the tube).
+    const complete = Boolean(pair && isJoined(pair) && motionFxOn());
     let nodes = wireNodes.get(pairId);
     if (!nodes) {
       const halo = element("polyline", {
@@ -1119,30 +1145,50 @@ export function createBoard(svg, onChange) {
       const core = element("polyline", {
         points,
         fill: "none",
-        stroke: "#eaf6ff",
+        stroke: "#f4fbff",
         "stroke-width": coreW,
         "stroke-linecap": "round",
         "stroke-linejoin": "round",
         class: "trace-core",
       });
+      const segments = element("polyline", {
+        points,
+        fill: "none",
+        stroke: "#ffffff",
+        "stroke-width": segW,
+        "stroke-linecap": "round",
+        "stroke-linejoin": "round",
+        "stroke-dasharray": segDash,
+        class: "trace-segments",
+      });
       layers.traces.appendChild(halo);
       layers.traces.appendChild(wire);
       layers.traces.appendChild(core);
-      nodes = { halo, wire, core };
+      layers.traces.appendChild(segments);
+      nodes = { halo, wire, core, segments };
       wireNodes.set(pairId, nodes);
     } else {
       nodes.halo.setAttribute("points", points);
+      nodes.halo.setAttribute("stroke", colour);
       nodes.halo.setAttribute("stroke-width", String(haloW));
       nodes.wire.setAttribute("points", points);
+      nodes.wire.setAttribute("stroke", colour);
       nodes.wire.setAttribute("stroke-width", String(wireW));
       if (dash) nodes.wire.setAttribute("stroke-dasharray", dash);
       else nodes.wire.removeAttribute("stroke-dasharray");
       nodes.core.setAttribute("points", points);
       nodes.core.setAttribute("stroke-width", String(coreW));
+      nodes.segments.setAttribute("points", points);
+      nodes.segments.setAttribute("stroke-width", String(segW));
+      nodes.segments.setAttribute("stroke-dasharray", segDash);
     }
 
-    nodes.halo.setAttribute("class", "trace-halo" + (flash ? " arrived" : ""));
-    nodes.core.setAttribute("class", "trace-core" + (flash ? " arrived" : ""));
+    const surge = flash ? " arrived" : "";
+    const done = complete ? " complete" : "";
+    nodes.halo.setAttribute("class", "trace-halo" + surge + done);
+    nodes.wire.setAttribute("class", "trace" + done);
+    nodes.core.setAttribute("class", "trace-core" + surge + done);
+    nodes.segments.setAttribute("class", "trace-segments" + done);
   }
 
   /** Add or remove unused-cell pips without clearing the whole marks layer. */
@@ -1155,10 +1201,11 @@ export function createBoard(svg, onChange) {
         if (owner.has(cellKey)) continue;
         want.add(cellKey);
         if (pipNodes.has(cellKey)) continue;
+        // Reason: owner ref cyan guide dots — slightly larger + brighter than 0.055.
         const pip = element("circle", {
           cx: centre(x),
           cy: centre(y),
-          r: Math.max(1.5, Math.round(cellPx * 0.055)),
+          r: Math.max(2, Math.round(cellPx * 0.07)),
           class: "pip",
         });
         layers.marks.appendChild(pip);
@@ -1171,6 +1218,45 @@ export function createBoard(svg, onChange) {
       if (Number.isFinite(px) && Number.isFinite(py)) spawnCoverageRipple(px, py);
       layers.marks.removeChild(pip);
       pipNodes.delete(cellKey);
+    }
+  }
+
+  /**
+   * Coloured wash on cells the wire occupies — shows over drawn board art (vector cells are
+   * transparent there). Soft only: the wire itself is the read, this is the tile glow from the ref.
+   */
+  function syncPathGlows() {
+    if (!layers || !puzzle) return;
+    const want = new Set();
+    const inset = Math.max(1, cellPx * 0.08);
+    const radius = Math.round(cellPx * 0.18);
+    for (const [cellKey, pairId] of owner) {
+      want.add(cellKey);
+      const colour = colourFor(pairId);
+      let glow = pathGlowNodes.get(cellKey);
+      if (!glow) {
+        const [x, y] = cellKey.split(",").map(Number);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+        glow = element("rect", {
+          x: x * cellPx + inset,
+          y: y * cellPx + inset,
+          width: cellPx - inset * 2,
+          height: cellPx - inset * 2,
+          rx: radius,
+          fill: colour,
+          class: "path-glow",
+          "pointer-events": "none",
+        });
+        layers.marks.insertBefore(glow, layers.marks.firstChild);
+        pathGlowNodes.set(cellKey, glow);
+      } else {
+        glow.setAttribute("fill", colour);
+      }
+    }
+    for (const [cellKey, glow] of [...pathGlowNodes]) {
+      if (want.has(cellKey)) continue;
+      layers.marks.removeChild(glow);
+      pathGlowNodes.delete(cellKey);
     }
   }
 
@@ -1258,6 +1344,7 @@ export function createBoard(svg, onChange) {
     for (const pairId of landed) pulseTerminals(pairId);
     paintTokens();
     syncPips();
+    syncPathGlows();
   }
 
   function render() {

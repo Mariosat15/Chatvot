@@ -96,6 +96,12 @@ Raster assets kept for a later richer pass if wanted.
 | Chain SFX | `sfx-chain-extended.ogg` on streak > 1 | **sound.playChain** |
 | Music vs SFX | Bed must not rewind on unlock/focus | **ensureMusic** (26 Sep fix) — revive only on tab return |
 | Arena rail width | `56px / 108px` (not 96/116) | **app.css** — wider rails shrank the board |
+| Neon tube wires | Halo + casing + filament + pill segments | **board.js** `syncWire` + `.trace-*` CSS (26 Sep) |
+| Path cell glow | Soft pair-colour wash under wire | **syncPathGlows** — shows over drawn art |
+| Complete-wire pulse | Breathe / segment flow on joined pairs | `.complete` class — Lite FX & reduced-motion off |
+| Stats rail chrome | LEVEL bar, crown best, KEEP GOING combo | **app.css** + `stat-tile-go` in **app.js** |
+| Submit ready pulse | Soft cyan breathe when board complete | `.submit-wide.ready` |
+| Arena LB chrome | Stronger GLOBAL tab + gold #1 + rank 2/3 plates | **neon/tokens** + **LeaderboardRow** plates |
 | Intro howto line | One sentence, no graphic | **introCopy.howto** |
 | Alt board skins | `board-s/m/l-##.webp` shuffled deck | **Already live** via `board-deck.ts` (18/12/15) |
 | Frame `progress` cue | Refresh arena standings mid-round | **provider-frame-messages** + `ArenaLiveStandings` |

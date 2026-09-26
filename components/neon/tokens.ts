@@ -190,7 +190,7 @@ export const NEON_ROW_FLUSH_PODIUM =
  * a shared token would be the invisible change the note above warns about.
  */
 export const NEON_ROW_FLUSH_LEADER =
-  "rounded-lg border border-l-2 border-[#FFC01B]/80 bg-gradient-to-r from-[#FFB300]/20 to-[#FFB300]/5";
+  "rounded-xl border border-l-2 border-[#FFC01B]/80 bg-gradient-to-r from-[#FFB300]/28 via-[#FFB300]/12 to-transparent shadow-[0_0_16px_rgba(255,192,27,0.35)]";
 
 /**
  * The gold a score is written in on the reference board - every score, not only the podium's,
@@ -340,11 +340,11 @@ export const NEON_INSET = `rounded-lg border ${NEON_DIVIDER} bg-[#070C1A]/70`;
  */
 export const NEON_TABS_STRIP = `flex items-stretch gap-1.5 border-b p-1.5 ${NEON_DIVIDER}`;
 export const NEON_TAB_ACTIVE =
-  "border-[#1089DC]/55 bg-[#1B7DFF]/15 text-sky-100 shadow-[0_0_12px_rgba(27,125,255,0.25)]";
+  "border-[#1089DC]/55 bg-[#1B7DFF]/35 text-white shadow-[0_0_18px_rgba(43,176,255,0.55)]";
 export const NEON_TAB_IDLE =
-  "border-[#16203C] bg-[#080C18] text-gray-400 hover:border-[#1B2540] hover:text-gray-200";
+  "border-[#1A3A6A] bg-[#080C18]/90 text-sky-200/70 hover:border-[#2A5A9A] hover:text-sky-100";
 export const NEON_TAB_DEAD =
   "border-[#16203C] bg-[#050A14] text-gray-600 cursor-not-allowed";
 /** The shape both tab sizes share: the border, the radius and the centring. */
 export const NEON_TAB_SHAPE =
-  "flex flex-1 items-center justify-center gap-1.5 rounded-lg border text-center transition-colors";
+  "flex flex-1 items-center justify-center gap-1.5 rounded-lg border text-center font-bold uppercase tracking-wide transition-colors";

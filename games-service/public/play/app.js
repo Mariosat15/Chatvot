@@ -656,8 +656,22 @@ function renderStatTiles() {
     const node = nodes.at(at);
     if (!node) return;
     if (node.dataset.key !== tile.key) node.dataset.key = tile.key;
-    node.firstElementChild.textContent = tile.label;
-    node.lastElementChild.textContent = tile.value;
+    const label = node.querySelector(".stat-tile-label");
+    const value = node.querySelector(".stat-tile-value");
+    if (label) label.textContent = tile.label;
+    if (value) value.textContent = tile.value;
+    // KEEP GOING under Combo (image 1) — display only, never a score multiplier.
+    let go = node.querySelector(".stat-tile-go");
+    if (tile.key === "streak") {
+      if (!go) {
+        go = document.createElement("span");
+        go.className = "stat-tile-go";
+        go.textContent = "Keep going!";
+        node.append(go);
+      }
+    } else if (go) {
+      go.remove();
+    }
   });
 }
 
