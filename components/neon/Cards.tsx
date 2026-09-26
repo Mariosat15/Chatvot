@@ -511,9 +511,13 @@ export function NeonStatTiles({
         return (
           <div
             key={item.label}
-            className="rounded-lg border border-[#161E36] bg-[#080C18]/70 p-3"
+            className="rounded-lg border border-[#161E36] bg-[#080C18]/70 p-3 text-center"
           >
-            <div className="flex items-center gap-2">
+            {/*
+              Centered 26 Sep 2026 (owner): left-aligned tiles left empty space beside the
+              figure. Icon + label stay on one row so the accent chip still reads with the caption.
+            */}
+            <div className="flex items-center justify-center gap-2">
               <IconTile icon={item.icon} accent={item.accent} size="sm" />
               <span className={`truncate ${NEON_LABEL}`}>{item.label}</span>
             </div>
