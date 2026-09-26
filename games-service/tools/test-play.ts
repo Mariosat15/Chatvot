@@ -895,18 +895,25 @@ async function main(): Promise<number> {
     /*
      * OWNER 26 Sep 2026: recreate the reference neon lines — four strokes (halo / casing /
      * filament / pill segments) and a `.complete` flourish gated by motionFxOn so Lite FX does
-     * not hide the wire.
+     * not hide the wire. Second pass the same day: thinner ratios (image 3 light tubes) so a
+     * probe restoring 0.5 casing fails this assertion.
      */
     const board = withoutComments(playFile("board.js"));
     assert.match(board, /class:\s*"trace-segments"/);
     assert.match(board, /motionFxOn\(\)/);
     assert.match(board, /syncPathGlows/);
+    assert.match(board, /cellPx \* \(thick \? 0\.2 : 0\.16\)/);
+    assert.match(board, /cellPx \* \(thick \? 0\.52 : 0\.44\)/);
     const css = withoutComments(playFile("app.css"));
     assert.match(css, /\.trace-segments\b/);
     assert.match(css, /\.path-glow\b/);
     assert.match(css, /tube-seg-flow|tube-halo-breathe/);
     assert.match(css, /stat-tile-go/);
     assert.match(css, /submit-ready-pulse/);
+    // HUD values match Paths: same size/weight (owner image 2 green lines).
+    assert.match(css, /\.readout-value\s*\{[^}]*font-size:\s*1\.2rem/);
+    assert.match(css, /\.stat-tile-value\s*\{[^}]*font-size:\s*1\.2rem/);
+    assert.match(css, /--panel-circuit:/);
   });
 
   await test("every animation the stylesheet adds is switched off under reduced motion", async () => {

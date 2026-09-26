@@ -96,7 +96,11 @@ Raster assets kept for a later richer pass if wanted.
 | Chain SFX | `sfx-chain-extended.ogg` on streak > 1 | **sound.playChain** |
 | Music vs SFX | Bed must not rewind on unlock/focus | **ensureMusic** (26 Sep fix) — revive only on tab return |
 | Arena rail width | `56px / 108px` (not 96/116) | **app.css** — wider rails shrank the board |
-| Neon tube wires | Halo + casing + filament + pill segments | **board.js** `syncWire` + `.trace-*` CSS (26 Sep) |
+| Neon tube wires | Soft bloom + thin casing + filament (image 3 light pass) | **board.js** `syncWire` ~0.44/0.16/0.055 + `.trace-*` CSS |
+| HUD / Paths type | Same 1.2rem / 800 on readout + Paths | **app.css** `.readout-value` ≡ `.stat-tile-value` |
+| Panel circuit wash | Faint SVG circuit under stat boxes | **app.css** `--panel-circuit` on `--face-stat` / `.stat-tile` |
+| Arena LB row boxes | Full bordered cards + scroll padding (no right clip) | **neon/tokens** `NEON_ROW_FLUSH*` + **ArenaLeaderboardPanel** `px-2.5` |
+| Brighter palette | Stronger blues / cell edges (image 4) | **app.css** `:root` + **NEON_PANEL_SIDE** |
 | Path cell glow | Soft pair-colour wash under wire | **syncPathGlows** — shows over drawn art |
 | Complete-wire pulse | Breathe / segment flow on joined pairs | `.complete` class — Lite FX & reduced-motion off |
 | Stats rail chrome | LEVEL bar, crown best, KEEP GOING combo | **app.css** + `stat-tile-go` in **app.js** |

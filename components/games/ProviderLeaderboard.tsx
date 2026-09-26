@@ -6,7 +6,6 @@ import {
   neonRowClasses,
 } from "@/components/neon/LeaderboardRow";
 import {
-  NEON_DIVIDE,
   NEON_SCORE_GOLD,
   NEON_TABLE_HEAD,
 } from "@/components/neon/tokens";
@@ -192,7 +191,11 @@ export default function ProviderLeaderboard({
         <div className="w-10 text-right">Time</div>
       </div>
 
-      <div className={NEON_DIVIDE}>
+      {/*
+        Gapped cards, not divide-y hairlines. Since 26 Sep 2026 every flush row is its own
+        bordered box; a divide seam between them double-draws the edge and fights the gap.
+      */}
+      <div className="flex flex-col gap-1">
         {rows.map((row) => {
           const isYou = row.userId === currentUserId;
           /*

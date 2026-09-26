@@ -197,6 +197,26 @@ describe("the leader's gold row", () => {
     expect(NEON_ROW_FLUSH_LEADER).toMatch(/border-\[#FFC01B\]/);
     expect(NEON_ROW_FLUSH_LEADER).toMatch(/from-\[#FFB300\]/);
   });
+
+  it("every flush row is a full bordered box, not a left bar (owner cutoff fix)", async () => {
+    const {
+      NEON_ROW_FLUSH,
+      NEON_ROW_FLUSH_YOU,
+      NEON_ROW_FLUSH_PODIUM,
+      NEON_ROW_FLUSH_LEADER,
+    } = await import("@/components/neon/tokens");
+    // Reason: left-only bars made ordinary rows look cutoff on the right (owner screenshot).
+    for (const value of [
+      NEON_ROW_FLUSH,
+      NEON_ROW_FLUSH_YOU,
+      NEON_ROW_FLUSH_PODIUM,
+      NEON_ROW_FLUSH_LEADER,
+    ]) {
+      expect(value).toMatch(/(^|\s)border(\s|$)/);
+      expect(value).toMatch(/rounded-/);
+      expect(value).not.toMatch(/border-l-2/);
+    }
+  });
 });
 
 describe("the rank marker and the score colour", () => {

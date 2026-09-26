@@ -1106,14 +1106,14 @@ export function createBoard(svg, onChange) {
     const points = cells.map((cell) => centre(cell[0]) + "," + centre(cell[1])).join(" ");
     const colour = colourFor(pairId);
     const thick = denseGrid(puzzle);
-    // Reason: owner ref (26 Sep) — neon tubes with a wide glow, thick casing, bright filament,
-    // and short pill segments along the wire. Wider than the prior 0.6/0.3/0.07 set.
-    const haloW = Math.round(cellPx * (thick ? 0.92 : 0.8));
-    const wireW = Math.round(cellPx * (thick ? 0.5 : 0.42));
-    const coreW = Math.max(2, Math.round(cellPx * (thick ? 0.16 : 0.13)));
-    const segW = Math.max(1, Math.round(cellPx * (thick ? 0.07 : 0.055)));
+    // Reason: owner ref image 3 (26 Sep, second pass) — light neon tube: soft wide bloom,
+    // thin coloured casing, bright filament. The prior 0.92/0.5 set read as chunky cables.
+    const haloW = Math.round(cellPx * (thick ? 0.52 : 0.44));
+    const wireW = Math.round(cellPx * (thick ? 0.2 : 0.16));
+    const coreW = Math.max(1, Math.round(cellPx * (thick ? 0.07 : 0.055)));
+    const segW = Math.max(1, Math.round(cellPx * (thick ? 0.035 : 0.028)));
     const segDash =
-      Math.round(cellPx * 0.2) + " " + Math.round(cellPx * 0.16);
+      Math.round(cellPx * 0.28) + " " + Math.round(cellPx * 0.22);
     // Colour-blind dash stays on the coloured casing only — segments keep their own rhythm.
     const dash = dashFor(pairId);
     const pair = puzzle && puzzle.pairs ? puzzle.pairs.find((entry) => entry.id === pairId) : null;

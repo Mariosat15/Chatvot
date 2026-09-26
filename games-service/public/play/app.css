@@ -33,15 +33,15 @@
      in a lit blue, cyan for anything that glows, a red clock. Every value below is one the owner's
      sheet declares; the names are ours. */
   --surface: #020b1c;
-  --surface-glow: #12306a;
-  --panel: #071a3a;
-  --panel-edge: #1a7ad4;
-  --cell: #0b274b;
-  --cell-edge: #58baff;
-  --text: #eaf4ff;
-  --muted: #7fa6d6;
-  --accent: #08dfff;
-  --accent-deep: #0b76d7;
+  --surface-glow: #15408a;
+  --panel: #08224a;
+  --panel-edge: #2a9cff;
+  --cell: #0c2f5c;
+  --cell-edge: #6ec8ff;
+  --text: #f0f7ff;
+  --muted: #8fb6e0;
+  --accent: #1ae8ff;
+  --accent-deep: #0d8af0;
   --accent-ink: #020b1c;
   --danger: #ff3c67;
   --ready: #1ee58f;
@@ -56,23 +56,24 @@
    * browsers we would never see. A literal cannot fail. They are kept next to the colours they
    * are derived from so a palette change is one edit in one place.
    */
-  --panel-soft: rgba(11, 40, 80, 0.82);
-  --accent-soft: rgba(8, 223, 255, 0.18);
-  --accent-faint: rgba(8, 223, 255, 0.1);
-  --accent-line: rgba(8, 223, 255, 0.35);
-  --accent-bright: #16dfff;
+  --panel-soft: rgba(12, 48, 96, 0.88);
+  --accent-soft: rgba(26, 232, 255, 0.22);
+  --accent-faint: rgba(26, 232, 255, 0.12);
+  --accent-line: rgba(26, 232, 255, 0.42);
+  --accent-bright: #3ef0ff;
 
   /* The lit edge the reference draws round every control: a mid blue on top fading to the
      panel's own navy. Used on the readouts and the buttons so the chrome around the board belongs
      to the same machine as the board. */
-  --bezel-top: #1b7dff;
-  --bezel-bottom: #061e3c;
-  /* The reference's three control faces, copied as declared: a stat box, a tool button and the
-     dark glass of the board frame. */
-  --face-stat: linear-gradient(180deg, #0b2850 0%, #071b39 100%);
-  --face-tool: linear-gradient(180deg, #102a4e 0%, #071936 100%);
-  --face-tool-edge: #164f8a;
-  --face-frame: linear-gradient(135deg, #081226 0%, #03315b 46%, #081226 100%);
+  --bezel-top: #2a9cff;
+  --bezel-bottom: #072650;
+  /* Owner image 4 (26 Sep): brighter faces + a faint circuit wash under the gradient. */
+  --panel-circuit: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='80' viewBox='0 0 120 80'%3E%3Cpath d='M8 12h28M36 12v20M36 32h24M8 40h18M26 40v18M26 58h40M70 20h34M104 20v28M70 48h18' fill='none' stroke='%232a9cff' stroke-opacity='0.18' stroke-width='1'/%3E%3Ccircle cx='36' cy='12' r='1.6' fill='%231ae8ff' fill-opacity='0.35'/%3E%3Ccircle cx='36' cy='32' r='1.6' fill='%231ae8ff' fill-opacity='0.3'/%3E%3Ccircle cx='26' cy='40' r='1.6' fill='%231ae8ff' fill-opacity='0.3'/%3E%3Ccircle cx='104' cy='20' r='1.6' fill='%231ae8ff' fill-opacity='0.28'/%3E%3C/svg%3E");
+  --face-stat: linear-gradient(180deg, rgba(14, 56, 110, 0.92) 0%, rgba(8, 32, 72, 0.95) 100%),
+    var(--panel-circuit);
+  --face-tool: linear-gradient(180deg, #143866 0%, #0a2548 100%), var(--panel-circuit);
+  --face-tool-edge: #1f6bb8;
+  --face-frame: linear-gradient(135deg, #0a1830 0%, #044878 46%, #0a1830 100%);
 
   /*
    * How far the bezel artwork reaches outside the grid, as a fraction of the grid's size.
@@ -527,11 +528,13 @@ button.small-btn {
   gap: 1px;
   padding: 5px 12px 6px;
   border-radius: var(--radius-sm);
-  /* The reference's stat box: a blue-edged deep-navy face. */
+  /* The reference's stat box: a blue-edged deep-navy face + faint circuit wash (image 4). */
   background: var(--face-stat);
+  background-size: auto, 120px 80px;
   box-shadow:
     inset 0 0 0 1px var(--panel-edge),
-    inset 0 1px 0 rgba(120, 190, 255, 0.14);
+    inset 0 1px 0 rgba(120, 190, 255, 0.22),
+    0 0 14px -6px rgba(42, 156, 255, 0.35);
   /* Owner 26 Sep 2026: values were left-aligned with empty space to the right. */
   text-align: center;
 }
@@ -545,8 +548,9 @@ button.small-btn {
 }
 
 .readout-value {
-  font-size: 0.98rem;
-  font-weight: 700;
+  /* Owner 26 Sep: match Paths / stat-tile-value (same size, weight, colour family). */
+  font-size: 1.2rem;
+  font-weight: 800;
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
   color: var(--text);
@@ -1042,7 +1046,9 @@ button.rail-btn:disabled {
   display: grid;
   gap: 3px;
   padding: 10px 12px;
-  border-top: 1px solid rgba(64, 150, 240, 0.28);
+  border-top: 1px solid rgba(64, 150, 240, 0.35);
+  background-image: var(--panel-circuit);
+  background-size: 120px 80px;
   text-align: center;
   justify-items: center;
 }
@@ -1057,7 +1063,7 @@ button.rail-btn:disabled {
   font-size: 1.2rem;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
-  color: #f2f9ff;
+  color: var(--text);
 }
 
 /* The reference's accents: the best time in gold with a crown, the combo in red + KEEP GOING. */
@@ -1103,8 +1109,9 @@ button.rail-btn:disabled {
 }
 
 .stat-tile[data-key="paths"] .stat-tile-value {
-  color: #8ef0ff;
-  text-shadow: 0 0 8px rgba(8, 223, 255, 0.35);
+  /* Same face as BOARDS DONE / FILLED — accent was a second type look (owner 26 Sep). */
+  color: var(--text);
+  text-shadow: none;
 }
 
 /*
@@ -1355,13 +1362,13 @@ svg#board {
 /* The soft outer half of a cell's edge. Wide and faint: this is the bloom. */
 svg#board .cell {
   fill: url(#cell-face);
-  stroke: rgba(88, 186, 255, 0.2);
+  stroke: rgba(110, 200, 255, 0.32);
 }
 
 /* The crisp inner half, which is what actually reads as an edge - the reference's cell border. */
 svg#board .cell-lip {
   fill: none;
-  stroke: rgba(88, 186, 255, 0.65);
+  stroke: rgba(140, 220, 255, 0.78);
 }
 
 /*
@@ -1524,9 +1531,9 @@ svg#board .pip {
   pointer-events: none;
 }
 
-/* Soft wash under a path — pair colour, low alpha so wires stay the read. */
+/* Soft wash under a path — pair colour, low alpha so thin tubes stay the read. */
 svg#board .path-glow {
-  opacity: 0.18;
+  opacity: 0.12;
   pointer-events: none;
 }
 
@@ -1537,24 +1544,24 @@ svg#board .trace-segments {
   pointer-events: none;
 }
 
-/* Outer bloom of the neon tube — brighter than the old 0.2 so it matches the reference. */
+/*
+ * Light neon tube (owner image 3, 26 Sep second pass). Soft bloom + thin casing + bright
+ * filament — opacity stays low so the wire reads as light, not a solid cable.
+ */
 svg#board .trace-halo {
-  opacity: 0.38;
+  opacity: 0.22;
 }
 
-/* Coloured casing between halo and filament. */
 svg#board .trace {
-  opacity: 0.92;
+  opacity: 0.72;
 }
 
-/* Bright filament — the white core that makes a wire read as lit glass. */
 svg#board .trace-core {
-  opacity: 0.88;
+  opacity: 0.95;
 }
 
-/* Short pill highlights along the tube (owner ref image 3). */
 svg#board .trace-segments {
-  opacity: 0.55;
+  opacity: 0.28;
 }
 
 /* Completed pair: gentle energy pulse along the tube (feel only — not a score). */
@@ -1573,17 +1580,17 @@ svg#board .trace-segments.complete {
 @keyframes tube-halo-breathe {
   0%,
   100% {
-    opacity: 0.32;
+    opacity: 0.18;
   }
   50% {
-    opacity: 0.55;
+    opacity: 0.34;
   }
 }
 
 @keyframes tube-core-breathe {
   0%,
   100% {
-    opacity: 0.75;
+    opacity: 0.88;
   }
   50% {
     opacity: 1;

@@ -153,8 +153,11 @@ export default function ArenaLeaderboardPanel({
       {/*
         THE ONLY `flex-1`, and the only scroller. `min-h` is room for about ten rows at the
         reference's height; the panel grows past it to fill the row and the overflow scrolls.
+
+        Horizontal padding must leave room for each row's full border + gold glow (owner
+        26 Sep: right edge was clipped when this was only `px-1.5`).
       */}
-      <div className="min-h-[400px] flex-1 overflow-y-auto px-1.5 py-2 [scrollbar-width:thin] [scrollbar-color:rgba(64,150,240,0.45)_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[rgba(64,150,240,0.4)]">
+      <div className="min-h-[400px] flex-1 overflow-y-auto px-2.5 py-2 [scrollbar-width:thin] [scrollbar-color:rgba(64,150,240,0.45)_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[rgba(64,150,240,0.4)]">
         {tab === "ranking" ? (
           <BoardTab scoreLabel={scoreLabel} rows={visibleRows} scope={scope} />
         ) : (

@@ -41,9 +41,9 @@ export function neonRowClasses({
   rank: number;
   isCurrentUser: boolean;
   /**
-   * `card` is the sheet's tile - bordered, rounded, with a gap beneath it. `flush` is the same
-   * three states drawn as a table row, for a board long enough that the tiles are most of the
-   * panel. See the tokens for why both exist rather than one replacing the other.
+ * `card` is the sheet's tile - bordered, rounded, with a gap beneath it. `flush` is the
+ * arena board's compact card set (full borders, small gap) — named flush for history; since
+ * 26 Sep 2026 it is no longer a left-bar-only table row. See the tokens for why both exist.
    */
   variant?: "card" | "flush";
 }): string {

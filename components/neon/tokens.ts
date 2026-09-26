@@ -148,49 +148,42 @@ export const NEON_ROW_PODIUM =
   "rounded-xl border border-amber-500/25 bg-amber-500/[0.06] transition-colors hover:border-amber-500/40";
 
 /**
- * THE SAME THREE STATES DRAWN FLUSH, for a board long enough that the cards become the problem.
+ * Compact gapped cards for the arena board (owner 26 Sep 2026).
  *
- * Added 11 September 2026 on the owner's reference. A bordered, rounded, gapped tile per player
- * reads well for five rows and badly for twenty: at that length the borders and the gaps are
- * most of the panel, every row is mostly empty space, and the shape of the contest - who is
- * close to whom - is below the fold. The reference draws a table: rows flush against each
- * other, one hairline between them, and a state shown by a left accent bar and a wash rather
- * than by an outline.
+ * WAS a flush table with left accent bars only. The owner's screenshot showed every row's
+ * right edge missing — partly because `overflow-y-auto` clips a gold full-border on #1, and
+ * partly because ordinary rows never had a right border at all. Image 4 draws each player as
+ * its own rounded box; this set now does the same, with a small vertical gap so borders do
+ * not collide. Padding on the scroll parent (`ArenaLeaderboardPanel`) must leave room for the
+ * rim and glow, or the cutoff returns.
  *
- * BOTH SETS EXIST AND NEITHER REPLACES THE OTHER. The card form is right for a short board in a
- * wide column and it is what the trading lobby renders today; changing it here would be an
- * unasked-for change to a trading screen, made invisibly, through a shared token.
- *
- * The left bar is `border-l-2` on every state INCLUDING the ordinary one, where it is
- * transparent. Applied only to the highlighted states, the two pixels appear and disappear with
- * the state and every ordinary row's content sits two pixels to the left of the podium's.
+ * BOTH SETS EXIST AND NEITHER REPLACES THE OTHER. The card form (`NEON_ROW*`) is what the
+ * trading lobby renders; changing that would be an unasked-for trading change through a
+ * shared token. These `FLUSH` names stay for call-site compatibility.
  */
 export const NEON_ROW_FLUSH =
-  "border-l-2 border-transparent transition-colors hover:bg-[#0D1428]/60";
-export const NEON_ROW_FLUSH_YOU = "border-l-2 border-sky-400 bg-sky-500/10";
+  "my-0.5 rounded-lg border border-[#1A4A7A]/65 bg-[#080C18]/80 shadow-[inset_0_0_0_1px_rgba(16,137,220,0.08)] transition-colors hover:border-[#2A6AB0]/70 hover:bg-[#0D1428]/70";
+export const NEON_ROW_FLUSH_YOU =
+  "my-0.5 rounded-lg border border-sky-400/70 bg-sky-500/10 shadow-[0_0_12px_rgba(56,189,248,0.22)]";
 export const NEON_ROW_FLUSH_PODIUM =
-  "border-l-2 border-amber-400/70 bg-amber-500/[0.05] transition-colors hover:bg-amber-500/[0.08]";
+  "my-0.5 rounded-lg border border-amber-400/45 bg-amber-500/[0.07] shadow-[inset_0_0_0_1px_rgba(255,192,27,0.08)] transition-colors hover:border-amber-400/60";
 
 /**
  * THE LEADER'S ROW, framed in gold on every side, from the owner's leaderboard reference
- * (`arena-target-leaderboard.png`, 11 September 2026).
+ * (`arena-target-leaderboard.png`, 11 September 2026), kept as a full box after the 26 Sep
+ * cutoff fix so the gold rim is never clipped on the right.
  *
  * The reference singles out ONE row - the top of the board - with a full gold outline and a
  * warm wash fading to the right, and leaves second and third as plain numbered rows. That is
  * a fourth state rather than a restyle of the podium tint: the podium wash still marks the
  * three paying positions on the trading board, and this is drawn on top of it for the first.
  *
- * The frame is rounded on a flush board even though its neighbours are not, deliberately: a
- * square gold outline between two hairlines reads as a table cell that happens to be yellow,
- * and the rounded one reads as the medal it is. The row keeps `border-l-2` so its content sits
- * exactly where every other row's does - see the note on the flush set above.
- *
  * FLUSH ONLY. There is no card-form twin, because the card form is what the trading lobby
  * renders and the trading board was not part of the request; a gold #1 arriving there through
  * a shared token would be the invisible change the note above warns about.
  */
 export const NEON_ROW_FLUSH_LEADER =
-  "rounded-xl border border-l-2 border-[#FFC01B]/80 bg-gradient-to-r from-[#FFB300]/28 via-[#FFB300]/12 to-transparent shadow-[0_0_16px_rgba(255,192,27,0.35)]";
+  "my-0.5 rounded-xl border border-[#FFC01B]/80 bg-gradient-to-r from-[#FFB300]/28 via-[#FFB300]/12 to-transparent shadow-[0_0_16px_rgba(255,192,27,0.35)]";
 
 /**
  * The gold a score is written in on the reference board - every score, not only the podium's,
@@ -251,7 +244,7 @@ export const NEON_STAGE_FRAME =
  * to match the stage; that undoes the hierarchy.
  */
 export const NEON_PANEL_SIDE =
-  "rounded-xl border border-[#1089DC]/28 bg-gradient-to-b from-[#081428]/88 via-[#060e20]/90 to-[#0a0818]/92 shadow-[inset_0_0_14px_rgba(34,211,238,0.05)]";
+  "rounded-xl border border-[#1089DC]/50 bg-gradient-to-b from-[#0A1E48]/92 via-[#071433]/94 to-[#0C1028]/96 shadow-[inset_0_0_22px_rgba(34,211,238,0.12),0_0_18px_-8px_rgba(16,137,220,0.35)]";
 
 /**
  * A panel that is part of the action rather than context - the pre-flight, the result. Lit,

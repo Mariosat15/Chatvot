@@ -60,6 +60,8 @@ describe("the rail is as tall as the board beside it", () => {
     // And the panel takes the height it is offered.
     const panel = readCode(PANEL);
     expect(panel).toMatch(/\$\{NEON_PANEL_SIDE\} flex h-full flex-col/);
+    // Reason: owner 26 Sep — row gold rims were clipped at `px-1.5`; keep breathing room.
+    expect(panel).toMatch(/overflow-y-auto px-2\.5 /);
   });
 
   it("caps nothing, and grows in exactly one place", () => {

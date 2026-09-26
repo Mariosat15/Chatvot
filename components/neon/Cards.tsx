@@ -60,9 +60,9 @@ export function NeonGridBackdrop() {
       aria-hidden
       style={{
         backgroundImage: [
-          "linear-gradient(rgba(0,169,255,0.028) 1px, transparent 1px)",
-          "linear-gradient(90deg, rgba(0,169,255,0.028) 1px, transparent 1px)",
-          "radial-gradient(90% 55% at 50% -10%, #071B38 0%, transparent 70%)",
+          "linear-gradient(rgba(42,156,255,0.055) 1px, transparent 1px)",
+          "linear-gradient(90deg, rgba(42,156,255,0.055) 1px, transparent 1px)",
+          "radial-gradient(90% 55% at 50% -10%, #0A2858 0%, transparent 70%)",
         ].join(", "),
         backgroundSize: "34px 34px, 34px 34px, auto",
       }}
