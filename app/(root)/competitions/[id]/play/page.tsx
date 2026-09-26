@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, Gift } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { unstable_noStore as noStore } from "next/cache";
@@ -15,15 +15,14 @@ import { getPlayState } from "@/lib/services/games/round-status.service";
 import { getGamePresentation } from "@/lib/services/games/game-presentation.service";
 import { getArenaStandings } from "@/lib/services/games/arena-standings.service";
 import { listFriendUserIds } from "@/lib/services/messaging/friend-ids.service";
+import { getTerms } from "@/lib/services/terminology.service";
 import { ProviderRoundHost } from "@/components/games/ProviderRoundHost";
-import PrizeTable from "@/components/competitions/PrizeTable";
 import { GameArenaLayout } from "@/components/games/arena/GameArenaLayout";
-import { ArenaContestPanel } from "@/components/games/arena/ArenaContestPanel";
 import { ArenaHighlights } from "@/components/games/arena/ArenaHighlights";
 import { ArenaLiveProvider } from "@/components/games/arena/ArenaLiveStandings";
+import { ArenaLiveSidebar } from "@/components/games/arena/ArenaLiveSidebar";
 import ArenaLeaderboardPanel from "@/components/games/arena/ArenaLeaderboardPanel";
 import GameRulesPanel from "@/components/games/GameRulesPanel";
-import { NeonCountPill, NeonHeadedPanel } from "@/components/neon/Cards";
 import { resolveProviderBanner } from "@/components/neon/banners";
 import { Button } from "@/components/ui/button";
 import CompetitionTradingWorkspace from "@/components/trading/CompetitionTradingWorkspace";
@@ -153,38 +152,23 @@ export default async function PlayPage({ params, searchParams }: PlayPageProps) 
   // content layer an operator owns - never from the provider key, and never from `gameKey`,
   // which is an internal join key that happens to be human-readable and would leak our own
   // naming into a player screen.
-  const [presentation, standings, settings, friendIds] = await Promise.all([
+  const [presentation, standings, settings, friendIds, terms] = await Promise.all([
     getGamePresentation(contest?.gameConfig?.providerKey, contest?.gameConfig?.gameCode),
     /*
-      THE BOARD, WHAT EACH PLAYER HAS BEEN DOING, AND THE CALLER'S OWN RANK, from one shared
-      producer. `GET /api/competitions/[id]/standings` calls the same function, so the figure a
-      player sees fifteen seconds after this render was produced by this code rather than by a
-      second reader that can drift from it.
-
-      This used to be a bare `getCompetitionLeaderboard` with a note saying the rail was
-      deliberately not polled "because a live ticker needs an endpoint that does not exist
-      yet". The endpoint exists now. The reasoning that mattered survives and is recorded on
-      `ArenaLiveProvider`: the rail refreshes through a fetch and never through
-      `router.refresh()`, because this page hosts a round a player has paid for.
+      THE BOARD, WHAT EACH PLAYER HAS BEEN DOING, THE CALLER'S OWN RANK, AND THE CONTEST
+      SNAPSHOT (seats / pot / prize shares), from one shared producer. The standings poll
+      calls the same function, so joins and live ranks stay in agreement with the first paint
+      without `router.refresh()` under a paid iframe.
     */
     getArenaStandings(competitionId, session.user.id, {
       limit: 25,
       recentLimit: 6,
     }),
-    // `credits.symbol`, not `currency.symbol`. A prize pool is a credit amount, so the fiat
-    // symbol was the wrong field - and its fallback here was `$`, which is not even the
-    // configured fiat currency.
-    //
-    // Reason: the projection must name the same field the read below does. A `.select()` that
-    // still named `credits.name` returned a document with no `symbol`, so every amount on this
-    // screen silently fell back to the default rather than the operator's configured emoji.
     AppSettingsModel.findOne()
       .select("credits.symbol")
       .lean<{ credits?: { symbol?: string } } | null>(),
-    // Friends scope on the standings rail. Loaded once with the page, not with the poll —
-    // friendship changes mid-round are rare and a second clock beside the standings fetch is
-    // how two answers disagree. Empty array means no friends, never "unknown".
     listFriendUserIds(session.user.id),
+    getTerms(),
   ]);
 
   const competitionName = contest?.name ?? "this competition";
@@ -208,16 +192,12 @@ export default async function PlayPage({ params, searchParams }: PlayPageProps) 
     gameCode: contest?.gameConfig?.gameCode,
   });
 
-  const prizePositions = Array.isArray(contest?.prizeDistribution)
-    ? contest.prizeDistribution.length
-    : 0;
-
   return (
     /*
       THE RAIL REFRESHES; THE GAME DOES NOT. The provider takes the rest of the arena as its
       `children`, and a `children` element handed down from a server component is the same
       object on every re-render - so React reconciles it by identity and never descends into
-      it. Only the two consumers below re-draw, and the iframe is in neither of their subtrees.
+      it. Only the context consumers re-draw, and the iframe is in none of their subtrees.
 
       Which is why `ProviderRoundHost` must stay a child rather than become a consumer: making
       it read this context would turn a board refresh into a reloaded game, under a player who
@@ -232,6 +212,8 @@ export default async function PlayPage({ params, searchParams }: PlayPageProps) 
         activity: standings.activity,
         feed: standings.feed,
         countries: standings.countries,
+        contest: standings.contest,
+        yourRank: standings.yourRank,
       }}
       // The STORED status, never a clock here: a contest whose end time has passed is still
       // `active` until a cron finalizes it, so deciding in the browser would stop the refresh
@@ -260,43 +242,21 @@ export default async function PlayPage({ params, searchParams }: PlayPageProps) 
           />
         }
         sidebar={
-          <>
-            <ArenaContestPanel
-              facts={{
-                prizePool: contest?.prizePool,
-                entryFee: contest?.entryFee,
-                currentParticipants: contest?.currentParticipants,
-                maxParticipants: contest?.maxParticipants,
-                creditSymbol,
-              }}
-              state={outcome.state}
-              presentation={presentation}
-              rank={standings.yourRank}
-            />
-            {/*
-              The ONE implementation of what each place is paid, shared with both lobbies. It is
-              not reimplemented here, and it must not be: the four expressions inside it have
-              survived two moves character for character, which is the only evidence that no
-              payout figure has changed.
-
-              THE HEADING IS THE CALLER'S, and it was missing entirely until 11 Sep 2026 - the
-              prize rows sat under the contest panel with nothing saying what they were, so the
-              amounts read as a continuation of the facts above them. `PrizeTable` deliberately
-              renders no heading of its own, because the lobby puts it inside an accordion that
-              already has one; two headings is worse than none.
-            */}
-            {prizePositions > 0 && (
-              <NeonHeadedPanel
-                icon={Gift}
-                title="Prize breakdown"
-                action={<NeonCountPill>Top {prizePositions} win</NeonCountPill>}
-                bodyClassName="flex h-full flex-col p-4"
-              >
-                <PrizeTable competition={contest} creditSymbol={creditSymbol} />
-              </NeonHeadedPanel>
-            )}
-
-          </>
+          <ArenaLiveSidebar
+            initialFacts={{
+              prizePool: contest?.prizePool,
+              entryFee: contest?.entryFee,
+              currentParticipants: contest?.currentParticipants,
+              maxParticipants: contest?.maxParticipants,
+              creditSymbol,
+            }}
+            initialCompetition={contest}
+            state={outcome.state}
+            presentation={presentation}
+            terms={terms}
+            initialRank={standings.yourRank}
+            creditSymbol={creditSymbol}
+          />
         }
         /*
           THE BAND, CARD BY CARD, in the reference's order: how it works, game tips, who has

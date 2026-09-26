@@ -56,6 +56,21 @@ export interface IGameRound extends Document {
    * gone quiet.
    */
   progressAt?: Date;
+  /**
+   * Mid-round RUNNING SCORE for live boards only (26 Sep 2026).
+   *
+   * OPTIONAL on the progress callback. The SAME number the provider will eventually send as
+   * `score` on the result - computed with their scoring function, not invented from
+   * `scoreBreakdown`. Settlement never reads this field: `applyResult` writes `rawScore` and
+   * that alone reaches `participant.score`. Without it, a contest board can only rank on
+   * finished rounds, so a player solving boards mid-round stays frozen until they finish.
+   *
+   * Absent means "no provisional yet" (provider does not send progress scores, or nothing
+   * scored yet). Never treat absence as zero - that is R50's phantom seat again.
+   */
+  provisionalScore?: number;
+  /** Tie-break companion for `provisionalScore`. Same rules as result `durationMs`. */
+  provisionalDurationMs?: number;
   startedAt?: Date;
   completedAt?: Date;
   durationMs?: number;
@@ -197,6 +212,9 @@ const GameRoundSchema = new Schema<IGameRound>(
     rawScore: { type: Number },
     scoreBreakdown: { type: Schema.Types.Mixed },
     progressAt: { type: Date },
+    // Live-board only. See interface comment — settlement never reads these.
+    provisionalScore: { type: Number },
+    provisionalDurationMs: { type: Number },
     startedAt: { type: Date },
     completedAt: { type: Date },
     durationMs: { type: Number },

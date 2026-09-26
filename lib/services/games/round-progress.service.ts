@@ -24,25 +24,27 @@ import {
  * ─────────────────────────────────────────────────────────────────────────────────────────
  *
  * Chapter 02 section 10 rule 3: scores enter the system through exactly one function, which is
- * `applyResult`. This file writes **`scoreBreakdown` and nothing else** - the display-only,
- * provider-ordered figures `01` section 3.2 already defines - and in particular it never
- * writes:
+ * `applyResult`. This file writes **`scoreBreakdown`, optional `provisionalScore` /
+ * `provisionalDurationMs`, and `progressAt`** - and in particular it never writes:
  *
- *   * `rawScore`, which is the only field that may influence ranking;
+ *   * `rawScore`, which is the only field that may influence SETTLEMENT ranking;
  *   * `status`, so it can neither finish a round nor revive a finished one;
- *   * anything at all on `CompetitionParticipant`, so it cannot move a leaderboard position.
+ *   * anything at all on `CompetitionParticipant`, so it cannot move a stored seat score.
  *
- * A test asserts each of those by inspecting the update this service builds, because a comment
- * saying "we only write the breakdown" is the shape of claim this codebase has found false five
- * times. The update is therefore constructed as an explicit `$set` of two named paths rather
- * than by spreading anything the provider sent: a spread is how the next field arrives, and the
- * field after that is `rawScore`.
+ * `provisionalScore` (26 Sep 2026) is the provider's RUNNING total for LIVE BOARDS ONLY. It is
+ * the same number they will later send as `score` on the result, computed with their scoring
+ * function - never derived by us from `scoreBreakdown` (that would be per-game code). The arena
+ * ranks on it while the round is open; settlement still ignores it entirely. A test asserts the
+ * update names only these paths, because a comment saying "we only write the breakdown" is the
+ * shape of claim this codebase has found false five times. The update is therefore constructed
+ * as an explicit `$set` of named paths rather than by spreading anything the provider sent: a
+ * spread is how the next field arrives, and the field after that is `rawScore` on the seat.
  *
  * WHY IT IS SAFE TO TAKE THIS FROM THE PROVIDER AT ALL. The breakdown is already theirs - the
- * final callback carries it and we store it verbatim. Nothing ranks on it, nothing is paid from
- * it, and the worst a hostile provider achieves by lying here is a wrong sentence on a board
- * that their own final result will overwrite. The gates below exist because an UNAUTHENTICATED
- * writer of any field is the Prerequisite A shape, not because the field is dangerous.
+ * final callback carries it and we store it verbatim. A provisional that lies is overwritten
+ * by the result the moment the round ends, and nothing is paid from it. The gates below exist
+ * because an UNAUTHENTICATED writer of any field is the Prerequisite A shape, not because the
+ * field is dangerous.
  *
  * ─────────────────────────────────────────────────────────────────────────────────────────
  *
@@ -65,6 +67,16 @@ export interface RoundProgressPayload {
    * claim false for the next title.
    */
   breakdown?: Record<string, unknown>;
+  /**
+ * Optional RUNNING SCORE for live boards (requirements HTML v1.20).
+ *
+ * Must be the same number the result callback will eventually send as `score`, computed by
+ * the provider. We store it on the round for arena ranking only and never copy it onto
+ * `CompetitionParticipant`. Absent is fine - pre-1.20 providers and titles with nothing
+ * scored yet simply leave the board ordered on finished rounds alone.
+ */
+  provisionalScore?: unknown;
+  provisionalDurationMs?: unknown;
 }
 
 export type ProgressResult =
@@ -143,6 +155,15 @@ export function sanitiseBreakdown(
   }
 
   return count > 0 ? kept : null;
+}
+
+/**
+ * A finite number the provider meant as a score or duration, or undefined when absent /
+ * unusable. `NaN` and non-numbers are refused rather than coerced - the R31 rule.
+ */
+export function sanitiseProvisionalNumber(value: unknown): number | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
+  return value;
 }
 
 /**
@@ -257,17 +278,34 @@ export async function recordRoundProgress(input: {
     );
   }
 
+  const provisionalScore = sanitiseProvisionalNumber(payload.provisionalScore);
+  const provisionalDurationMs = sanitiseProvisionalNumber(
+    payload.provisionalDurationMs,
+  );
+
   /*
-   * TWO NAMED PATHS. Not a spread, not `Object.assign`, not the parsed body.
+   * NAMED PATHS ONLY. Not a spread, not `Object.assign`, not the parsed body.
    *
    * `progressAt` is here so a screen can tell a report that arrived ten seconds ago from one
    * that arrived at the start of a round the player then walked away from - without it, a
    * stalled game and an active one are indistinguishable on the board.
+   *
+   * `provisionalScore` is optional: a provider that only sends breakdown (pre-1.16) still
+   * updates the activity line and leaves the last provisional untouched. When they DO send
+   * one, both score and duration travel together so a tie-break cannot drift from the figure.
    */
-  await GameRound.updateOne(
-    { _id: round._id },
-    { $set: { scoreBreakdown: breakdown, progressAt: new Date() } },
-  );
+  const $set: Record<string, unknown> = {
+    scoreBreakdown: breakdown,
+    progressAt: new Date(),
+  };
+  if (provisionalScore !== undefined) {
+    $set.provisionalScore = provisionalScore;
+    if (provisionalDurationMs !== undefined) {
+      $set.provisionalDurationMs = provisionalDurationMs;
+    }
+  }
+
+  await GameRound.updateOne({ _id: round._id }, { $set });
 
   return {
     accepted: true,

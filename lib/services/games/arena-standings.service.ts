@@ -1,5 +1,11 @@
-import { getCompetitionLeaderboard } from "@/lib/actions/trading/competition.actions";
+import Competition from "@/database/models/trading/competition.model";
+import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
+import { calculateRankings } from "@/lib/services/competition-ranking.service";
+import { getUsersWithTitles } from "@/lib/services/xp-level.service";
+import { getTitleLevels } from "@/lib/services/xp-config.service";
+import { resolveLevelTitle } from "@/lib/utils/level-title";
 import { getContestActivity } from "./contest-activity.service";
+import { resolveLiveDisplayScores } from "./live-display-score.service";
 import {
   attachArenaBoardExtras,
   type WithProfileImage,
@@ -7,25 +13,22 @@ import {
 import type { RoundActivitySummary } from "@/lib/utils/round-activity";
 
 /**
- * Everything the arena's standings rail renders: who is ahead, what each of them has been
- * doing, and where the caller stands.
+ * Everything the arena's standings rail AND its contest sidebar need after the page loads.
  *
- * WHY IT IS A SERVICE RATHER THAN TWO READS IN THE PAGE. The arena renders its standings once,
- * on the server, and then hosts a live round in an iframe - so making the board live means a
- * second reader, and a second reader is where two screens start disagreeing. The page and the
- * polling route call THIS, so there is one composition and the figure a player sees fifteen
- * seconds after the page loaded is produced by the same code that drew the first one.
+ * WHY IT IS A SERVICE RATHER THAN TWO READS IN THE PAGE. The arena renders once on the server,
+ * then hosts a live round in an iframe - so making the board live means a second reader, and a
+ * second reader is where two screens start disagreeing. The page and the polling route call
+ * THIS, so there is one composition and the figure a player sees five seconds later is produced
+ * by the same code that drew the first one.
  *
- * That is the `dashboard-live` lesson in a new place, and it is worth restating because the
- * instinct is to make the refresh cleverer: THE PROPERTY ENGINEERED FOR IS AGREEMENT WITH THE
- * FIRST RENDER, never maximal liveness. Any field where the poll and the server render differ
- * reads to the player as the value having changed.
+ * 26 SEP 2026 — THREE FACTS TRAVEL TOGETHER. The poll used to refresh only the ranked rows.
+ * Joins and prize redistribution sat on server props and went stale until a full reload. The
+ * contest snapshot below is the same document both of those panels already read, so one fetch
+ * keeps the players count, the prize floor and the board in agreement.
  *
- * THE TWO READS ARE ORDERED, NOT PARALLEL, AND THAT IS DELIBERATE. The activity query is scoped
- * to the user ids the board returned, so it is bounded by the players on screen rather than by
- * everybody who has ever entered - which means it cannot start until the board has answered.
- * One extra round trip is the price of that bound, and it is the right way round: an unscoped
- * read grows with the contest for ever.
+ * LIVE RANKING uses `resolveLiveDisplayScores`: finished rounds via `rawScore`, open rounds via
+ * optional `provisionalScore` from progress. Never from `scoreBreakdown` keys - that would be
+ * per-game code. Settlement still ignores provisional entirely.
  */
 
 export interface ArenaFeedEntry {
@@ -34,30 +37,43 @@ export interface ArenaFeedEntry {
   activity: RoundActivitySummary;
 }
 
-type RankedRow = Awaited<ReturnType<typeof getCompetitionLeaderboard>>[number];
+export interface ArenaContestSnapshot {
+  currentParticipants: number;
+  maxParticipants?: number;
+  prizePool?: number;
+  prizePoolCredits?: number;
+  entryFee?: number;
+  platformFeePercentage?: number;
+  prizeDistribution?: { percentage: number; rank?: number }[];
+}
+
+export interface ArenaStandingsRow {
+  userId: string;
+  username: string;
+  score?: number;
+  currentRank: number;
+  isTied?: boolean;
+  tiedWith?: string[];
+  qualificationStatus?: string;
+  disqualificationReason?: string;
+  userTitle?: string;
+  userTitleIcon?: string;
+  userTitleColor?: string;
+  enteredAt?: Date | string;
+  status?: string;
+}
 
 export interface ArenaStandings {
-  /** The ranked rows, each with the player's picture attached - see `leaderboard-avatars.ts`. */
-  rows: (RankedRow & WithProfileImage)[];
-  /** What each player on the board has been doing, keyed by user id. */
+  rows: (ArenaStandingsRow & WithProfileImage)[];
   activity: Record<string, RoundActivitySummary>;
-  /** The most recent rounds across the contest, newest first, with names attached. */
   feed: ArenaFeedEntry[];
-  /**
-   * Normalised country codes keyed by user id, for the Country board scope.
-   *
-   * Absent when the player has no country set. Never rendered as a column — the panel only
-   * filters with it. Travels with every poll so a joiner mid-contest can appear under Country.
-   */
   countries: Record<string, string>;
-  /**
-   * The caller's own position, READ off the row the server already ranked.
-   *
-   * Never worked out here. `calculateRankings` resolves the contest's score direction once from
-   * the catalogue; a second place deciding a position is the shape of R37, where the board and
-   * the payout disagreed because each had computed it separately. Absent when they hold none.
-   */
   yourRank?: number;
+  /**
+   * Pot / seats / prize shares as stored right now. The prize table and contest-info tiles
+   * consume this so a join mid-contest redistributes without a page reload.
+   */
+  contest: ArenaContestSnapshot;
 }
 
 export async function getArenaStandings(
@@ -68,18 +84,150 @@ export async function getArenaStandings(
   const limit = options?.limit ?? 25;
   const recentLimit = options?.recentLimit ?? 6;
 
-  /*
-    The id goes in as the string from the URL because this is a Mongoose query underneath and
-    Mongoose casts it when the query executes. The raw driver does NOT, which is the boundary
-    that has now produced three separate defects, so the distinction is worth keeping in view
-    rather than relying on.
-  */
-  const leaderboard = await getCompetitionLeaderboard(competitionId, limit);
-  const ranked: RankedRow[] = Array.isArray(leaderboard) ? leaderboard : [];
+  const competition = (await Competition.findById(competitionId)
+    .select(
+      "rules status gameType gameKey currentParticipants maxParticipants prizePool prizePoolCredits entryFee platformFeePercentage prizeDistribution",
+    )
+    .lean()) as {
+    rules?: Record<string, unknown>;
+    status: string;
+    gameType?: string;
+    gameKey?: string;
+    currentParticipants?: number;
+    maxParticipants?: number;
+    prizePool?: number;
+    prizePoolCredits?: number;
+    entryFee?: number;
+    platformFeePercentage?: number;
+    prizeDistribution?: { percentage: number; rank?: number }[];
+  } | null;
 
-  // Picture + country map AFTER ranking: one user lookup, two display concerns. Done here rather
-  // than in the page so the polling route produces the same extras.
-  const { rows, countries } = await attachArenaBoardExtras(ranked);
+  const emptyContest: ArenaContestSnapshot = { currentParticipants: 0 };
+
+  if (!competition) {
+    return {
+      rows: [],
+      activity: {},
+      feed: [],
+      countries: {},
+      contest: emptyContest,
+    };
+  }
+
+  const contest: ArenaContestSnapshot = {
+    currentParticipants: competition.currentParticipants ?? 0,
+    maxParticipants: competition.maxParticipants,
+    prizePool: competition.prizePool,
+    prizePoolCredits: competition.prizePoolCredits,
+    entryFee: competition.entryFee,
+    platformFeePercentage: competition.platformFeePercentage,
+    prizeDistribution: competition.prizeDistribution,
+  };
+
+  const participants = await CompetitionParticipant.find({
+    competitionId,
+  })
+    .select(
+      "userId username currentCapital pnl pnlPercentage totalTrades winningTrades losingTrades status enteredAt startingCapital score",
+    )
+    .lean();
+
+  const { byUser: liveScores, scoreDirection } =
+    await resolveLiveDisplayScores(competitionId);
+
+  const participantData = participants.map((p) => {
+    const live = liveScores.get(p.userId);
+    // Prefer the live effective score when anything has been scored (finished or provisional).
+    // Fall back to the stored seat score so a title that never sends progress still ranks
+    // after rounds complete. Absent stays absent - never coerce to 0 (R50).
+    const score =
+      live?.score !== undefined
+        ? live.score
+        : typeof p.score === "number" && Number.isFinite(p.score)
+          ? p.score
+          : undefined;
+
+    return {
+      userId: p.userId,
+      username: p.username || "Anonymous",
+      currentCapital: p.currentCapital,
+      pnl: p.pnl,
+      pnlPercentage: p.pnlPercentage,
+      totalTrades: p.totalTrades,
+      winningTrades: p.winningTrades,
+      losingTrades: p.losingTrades,
+      winRate:
+        p.totalTrades > 0 ? (p.winningTrades / p.totalTrades) * 100 : 0,
+      status: p.status,
+      enteredAt: p.enteredAt,
+      startingCapital: p.startingCapital,
+      score,
+      scoreDirection:
+        competition.gameType === "provider" ? scoreDirection : undefined,
+    };
+  });
+
+  const rules = (competition.rules as Record<string, unknown>) || {
+    rankingMethod: "pnl" as const,
+    tieBreaker1: "trades_count" as const,
+    minimumTrades: 0,
+    tiePrizeDistribution: "split_equally" as const,
+    disqualifyOnLiquidation: true,
+  };
+
+  const rankedParticipants = calculateRankings(participantData, rules as never, {
+    competitionStatus: competition.status as
+      | "upcoming"
+      | "active"
+      | "completed"
+      | "cancelled",
+    gameType: competition.gameType,
+  });
+
+  const limited = rankedParticipants.slice(0, limit);
+  const userIds = limited.map((p) => p.userId);
+  const userLevels = await getUsersWithTitles(userIds);
+  const ladder = await getTitleLevels();
+
+  const participantMap = new Map(participants.map((p) => [p.userId, p]));
+
+  // Caller's rank from the FULL board, not the truncated list - otherwise anyone outside
+  // the top `limit` silently loses their rank tile while still appearing in activity.
+  const yourRank = rankedParticipants.find((p) => p.userId === userId)?.rank;
+
+  const ranked: ArenaStandingsRow[] = limited.map((p) => {
+    const original = participantMap.get(p.userId);
+    const titleLevel = resolveLevelTitle(userLevels.get(p.userId), ladder);
+    const live = liveScores.get(p.userId);
+    const score =
+      live?.score !== undefined
+        ? live.score
+        : typeof original?.score === "number"
+          ? original.score
+          : p.score;
+
+    return {
+      userId: p.userId,
+      username: p.username,
+      score,
+      currentRank: p.rank,
+      isTied: p.isTied,
+      tiedWith: p.tiedWith,
+      qualificationStatus: p.qualificationStatus,
+      disqualificationReason: p.disqualificationReason,
+      userTitle: titleLevel.title,
+      userTitleIcon: titleLevel.icon,
+      userTitleColor: titleLevel.color,
+      enteredAt: original?.enteredAt,
+      status: original?.status,
+    };
+  });
+
+  // JSON round-trip matches getCompetitionLeaderboard's serialisation so Date fields stay
+  // strings on both the first render and every poll - disagreement there reads as flicker.
+  const serialised = JSON.parse(JSON.stringify(ranked)) as ArenaStandingsRow[];
+
+  const { rows, countries } = await attachArenaBoardExtras(serialised);
 
   const activity = await getContestActivity(
     competitionId,
@@ -87,8 +235,6 @@ export async function getArenaStandings(
     { recentLimit },
   );
 
-  // The feed's names come from the board that has already been read, not from a second user
-  // lookup: every player in the feed is by construction a player in the standings.
   const nameByUser = new Map(rows.map((row) => [row.userId, row.username]));
 
   return {
@@ -100,6 +246,7 @@ export async function getArenaStandings(
       activity: entry,
     })),
     countries,
-    yourRank: rows.find((row) => row.userId === userId)?.currentRank,
+    yourRank,
+    contest,
   };
 }

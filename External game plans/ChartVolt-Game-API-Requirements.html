@@ -208,7 +208,7 @@
     <p class="lede">ChartVolt runs paid skill competitions. We handle the money, the ranking and the rewards. We are looking for partners who can supply the games and tell us what each player scored. This document specifies exactly what your API must do so that we can operate on top of it &mdash; three calls to you, one call back to us.</p>
     <div class="hero-meta">
       <div><b>Document</b><span>Integration requirements</span></div>
-      <div><b>Version</b><span>1.19</span></div>
+      <div><b>Version</b><span>1.20</span></div>
       <div><b>Audience</b><span>Your engineering team</span></div>
       <div><b>Required calls</b><span>3 out, 1 in</span></div>
       <div><b>Money handled by you</b><span>None, ever</span></div>
@@ -813,17 +813,19 @@
     "questionsAnswered": 6,
     "correct": 5,
     "streak": 3
-  }
+  },
+  "provisionalScore": 5,                  <span class="c">// optional from 1.20 — same number as the eventual result score</span>
+  "provisionalDurationMs": 42000          <span class="c">// optional companion for ties</span>
 }</pre>
 
   <p><b>Authentication is exactly the result callback's</b> &mdash; the same bearer token, the same HMAC over the raw bytes, the same five-minute timestamp window from section 4. There is no second credential to manage.</p>
 
   <div class="cal bad">
-    <div class="t">There is no score field, and we would ignore one</div>
-    <p>Scores reach us through the result callback and nowhere else. That is not a formality: a number arriving mid-round, with no terminal status beside it, would be shown to players and then contradicted by your own final result. Send figures a spectator can read; send the score when the round ends.</p>
+    <div class="t">Do not send a result <code>score</code> field here</div>
+    <p>Settlement scores reach us through the result callback and nowhere else. A field named <code>score</code> on this payload is ignored. From <b>1.20</b> you <b>may</b> send <code>provisionalScore</code> &mdash; the same number your scoring function will later send as the result score &mdash; so a live contest board can reorder while the round is still open. We never pay from it, and the result overwrites whatever was shown. Omit it and you remain fully conformant.</p>
   </div>
 
-  <p><code>breakdown</code> is the same free-form structure as <code>scoreBreakdown</code> in section 8, and the same promise holds &mdash; <b>we never rank on it</b>. We keep string, boolean and numeric values, up to 24 of them, in the order you send them. Anything nested we drop rather than flatten, because how to present your structure is your decision and not ours.</p>
+  <p><code>breakdown</code> is the same free-form structure as <code>scoreBreakdown</code> in section 8, and the same promise holds &mdash; <b>we never rank on breakdown keys</b>. We keep string, boolean and numeric values, up to 24 of them, in the order you send them. Anything nested we drop rather than flatten, because how to present your structure is your decision and not ours.</p>
 
   <div class="tw"><table>
     <thead><tr><th style="width:90px">We reply</th><th>What it means</th><th style="width:150px">Retry?</th></tr></thead>
@@ -1312,6 +1314,7 @@ $headers = [
   <div class="tw"><table>
     <thead><tr><th style="width:90px">Version</th><th style="width:130px">Date</th><th>Change</th></tr></thead>
     <tbody>
+      <tr><td><b>1.20</b></td><td>26 Sep 2026</td><td><b>Optional <code>provisionalScore</code> on the progress callback.</b> Section 8a. Same number as the eventual result <code>score</code>, for live board ranking only; settlement still ignores it. Omit it and you remain fully conformant. A field named <code>score</code> on progress stays ignored</td></tr>
       <tr><td><b>1.19</b></td><td>24 Sep 2026</td><td><b>Defines <code>replayUrl</code>.</b> Must serve the player&rsquo;s own attempt (never live contest puzzle content), be token-scoped, refuse until the round is terminal (ranked: also until <code>expiresAt</code> / play window closed), and stay valid &ge; 90 days. Closes ambiguity A14 / risk R35 for the contract</td></tr>
       <tr><td><b>1.18</b></td><td>24 Sep 2026</td><td><b>Adds <code>parentOrigin</code> on create-round.</b> Always sent; use as the iframe <code>postMessage</code> target. Not the same fact as <code>returnUrl</code>. Closes ambiguity A13</td></tr>
       <tr><td><b>1.17</b></td><td>24 Sep 2026</td><td><b>Locale reach.</b> Declaring fewer locales than ChartVolt&rsquo;s site languages is allowed; short lists do not hide titles or fail sync. Closes ambiguity A12</td></tr>
@@ -1334,14 +1337,14 @@ $headers = [
       <tr><td><b>1.0</b></td><td>Initial</td><td>First issue &mdash; the four calls, authentication and signing, idempotency, content seeding, round states, error handling, sandbox, service levels</td></tr>
     </tbody>
   </table></div>
-  <p style="margin-bottom:0">If you have already begun work against an earlier version, almost nothing you have built is invalidated. The 1.1 additions are content fields on the catalogue response. The 1.2 changes are <b>two field renames on the same response</b> &mdash; tell us if you have already shipped the old names and we will accept both during your integration. The 1.3 change is <b>one keyword on one property</b> of a schema you are already sending, and only for titles whose length of play is configurable. The 1.4 change is <b>an optional field with a default</b> &mdash; omit it and your catalogue behaves exactly as it did. The 1.5 change is <b>an entirely optional extra callback</b> &mdash; build it if your game has something to say mid-round, and otherwise do nothing at all. The 1.6 change is <b>a comment fix on the create-round example</b> &mdash; if you already key idempotency on <code>roundId</code> (as section 11 requires), you are done. The 1.7 change is <b>how you verify our signatures on GET (and POST) calls</b> &mdash; your callbacks to us stay body-signed; only the inbound check from ChartVolt changes. The 1.8 change is <b>wording on what &ldquo;same round&rdquo; means after a launch URL expires</b> &mdash; if you already re-mint the URL for a live round without creating a second one, you are done. The 1.9 change is <b>one naming rule on a field you already send</b> &mdash; if <code>eventType</code> already mirrors <code>status</code> as <code>round.{status}</code>, you are done. The 1.10 change is <b>practice behaviour</b> &mdash; if you already skip the result callback for practice and never reuse a contest <code>contentSeed</code> for it, you are done. The 1.11 change is <b>wording on attempt accounting</b> &mdash; no payload change; <code>expired</code> already consumed an attempt on our side. The 1.12 change is <b>enforcement detail on a field you already send</b> &mdash; if every catalogue title already declares <code>scoreRange.min</code> and <code>scoreRange.max</code>, you are done. The 1.13 change is <b>one documented response field</b> &mdash; if you already return <code>status: &quot;created&quot;</code> on create, you are done. The 1.14 change is <b>wording on what <code>durationMs</code> means</b> &mdash; if you already report time-to-score (not a fixed session length) and shorter-wins ties, you are done. The 1.15 change is <b>a published keyword list</b> &mdash; if your <code>configSchema</code> already stays inside section 3.1b, you are done.</p>
+  <p style="margin-bottom:0">If you have already begun work against an earlier version, almost nothing you have built is invalidated. The 1.1 additions are content fields on the catalogue response. The 1.2 changes are <b>two field renames on the same response</b> &mdash; tell us if you have already shipped the old names and we will accept both during your integration. The 1.3 change is <b>one keyword on one property</b> of a schema you are already sending, and only for titles whose length of play is configurable. The 1.4 change is <b>an optional field with a default</b> &mdash; omit it and your catalogue behaves exactly as it did. The 1.5 change is <b>an entirely optional extra callback</b> &mdash; build it if your game has something to say mid-round, and otherwise do nothing at all. The 1.6 change is <b>a comment fix on the create-round example</b> &mdash; if you already key idempotency on <code>roundId</code> (as section 11 requires), you are done. The 1.7 change is <b>how you verify our signatures on GET (and POST) calls</b> &mdash; your callbacks to us stay body-signed; only the inbound check from ChartVolt changes. The 1.8 change is <b>wording on what &ldquo;same round&rdquo; means after a launch URL expires</b> &mdash; if you already re-mint the URL for a live round without creating a second one, you are done. The 1.9 change is <b>one naming rule on a field you already send</b> &mdash; if <code>eventType</code> already mirrors <code>status</code> as <code>round.{status}</code>, you are done. The 1.10 change is <b>practice behaviour</b> &mdash; if you already skip the result callback for practice and never reuse a contest <code>contentSeed</code> for it, you are done. The 1.11 change is <b>wording on attempt accounting</b> &mdash; no payload change; <code>expired</code> already consumed an attempt on our side. The 1.12 change is <b>enforcement detail on a field you already send</b> &mdash; if every catalogue title already declares <code>scoreRange.min</code> and <code>scoreRange.max</code>, you are done. The 1.13 change is <b>one documented response field</b> &mdash; if you already return <code>status: &quot;created&quot;</code> on create, you are done. The 1.14 change is <b>wording on what <code>durationMs</code> means</b> &mdash; if you already report time-to-score (not a fixed session length) and shorter-wins ties, you are done. The 1.15 change is <b>a published keyword list</b> &mdash; if your <code>configSchema</code> already stays inside section 3.1b, you are done. The 1.20 change is <b>an optional field on the progress callback you may already send</b> &mdash; omit <code>provisionalScore</code> and nothing changes; send it only if you want live boards to reorder before the round ends.</p>
 </section>
 
 </main>
 </div>
 
 <div class="foot">
-  <div>ChartVolt &mdash; Game API Requirements &middot; Version 1.19 &middot; Requirements document for prospective game providers</div>
+  <div>ChartVolt &mdash; Game API Requirements &middot; Version 1.20 &middot; Requirements document for prospective game providers</div>
   <div>Questions on this specification: contact your ChartVolt commercial contact</div>
 </div>
 

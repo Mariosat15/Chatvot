@@ -30,11 +30,13 @@ import type { RoundDoc } from "../store/round.model";
  * for. The caller therefore starts this and does not wait for it, and the promise cannot
  * reject.
  *
- * NO SCORE IS SENT. `scoreRound` computes one alongside the breakdown and it is discarded
- * here, deliberately: the platform's progress endpoint stores display figures and nothing
- * else, so sending a number it must ignore invites somebody on either side to start using it,
- * and a score arriving outside the one result callback is the second scoring door that
- * chapter 02 section 10 forbids.
+ * PROVISIONAL SCORE (platform requirements HTML v1.20). `scoreRound` already computes the
+ * running total alongside the breakdown. Until 26 Sep 2026 that number was discarded here so
+ * the progress endpoint could not become a second scoring door for SETTLEMENT. The platform
+ * still settles only on the result callback; it now also accepts an optional
+ * `provisionalScore` on progress so a LIVE board can rank while a round is open - the same
+ * number, from the same function, never invented from `boardsCompleted` or any other
+ * breakdown key. Sending it is optional for other providers; we send it because we have it.
  */
 
 /**
@@ -54,6 +56,12 @@ function boardOutcomes(round: RoundDoc): BoardOutcome[] {
   }));
 }
 
+export interface ProgressPayloadBody {
+  breakdown: Record<string, unknown>;
+  provisionalScore: number;
+  provisionalDurationMs: number;
+}
+
 /**
  * The figures for a round in flight, computed exactly as the final ones are.
  *
@@ -66,9 +74,7 @@ function boardOutcomes(round: RoundDoc): BoardOutcome[] {
  * is the state every round is in before anybody has done anything, and reporting it puts a
  * line of zeroes under a player who has just pressed Play.
  */
-export function progressBreakdownFor(
-  round: RoundDoc,
-): Record<string, unknown> | null {
+export function progressPayloadFor(round: RoundDoc): ProgressPayloadBody | null {
   const title = findTitle(round.gameCode);
   if (!title) return null;
 
@@ -76,12 +82,28 @@ export function progressBreakdownFor(
   if (!boards.some((board) => board.solvedAt)) return null;
 
   try {
-    return scoreRound(title, round.config as unknown as RoundConfig, boards).breakdown ?? null;
+    const scored = scoreRound(
+      title,
+      round.config as unknown as RoundConfig,
+      boards,
+    );
+    return {
+      breakdown: scored.breakdown ?? {},
+      provisionalScore: scored.score,
+      provisionalDurationMs: scored.durationMs,
+    };
   } catch {
     // A scoring function that throws mid-round must not take the player's board down with it.
     // The result path will surface the same fault where it is actually consequential.
     return null;
   }
+}
+
+/** @deprecated Prefer `progressPayloadFor` — kept so older tests naming the breakdown alone still resolve. */
+export function progressBreakdownFor(
+  round: RoundDoc,
+): Record<string, unknown> | null {
+  return progressPayloadFor(round)?.breakdown ?? null;
 }
 
 /**
@@ -100,13 +122,15 @@ export async function sendProgress(
     return { sent: false, reason: "skipped" };
   }
 
-  const breakdown = progressBreakdownFor(round);
-  if (!breakdown) return { sent: false, reason: "skipped" };
+  const payload = progressPayloadFor(round);
+  if (!payload) return { sent: false, reason: "skipped" };
 
   const { body, headers } = signOutbound({
     roundId: round.roundId,
     providerRoundId: round.providerRoundId,
-    breakdown,
+    breakdown: payload.breakdown,
+    provisionalScore: payload.provisionalScore,
+    provisionalDurationMs: payload.provisionalDurationMs,
   });
 
   const controller = new AbortController();
@@ -118,22 +142,18 @@ export async function sendProgress(
       headers,
       // The SAME string that was signed. Re-serialising here is the single most common way a
       // signed webhook fails - key order and number formatting shift and the signature stops
-      // matching the bytes.
+      // matching. `signOutbound` already stringified; pass that buffer through unchanged.
       body,
       signal: controller.signal,
     });
-
     if (!response.ok) {
       // Warn rather than error: a refused progress report is recoverable by definition,
-      // because the next board sends another one and the result is delivered separately with
-      // its own retry. The status is included because a persistent 401 means a rotated secret
-      // and a persistent 404 means the wrong environment, and those need different actions.
+      // and flooding error logs once per board would bury the result failures that matter.
       console.warn(
         `⚠️ [progress] ${round.roundId}: platform returned HTTP ${response.status}`,
       );
       return { sent: false, reason: `HTTP ${response.status}` };
     }
-
     return { sent: true };
   } catch (error) {
     console.warn(

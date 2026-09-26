@@ -50,13 +50,17 @@ describe("a progress report is not a second scoring door", () => {
     is the realistic way this goes wrong: `$set: { ...payload.breakdown }` mentions no
     forbidden name and writes whatever the provider sends.
   */
-  it("writes two named paths and builds them from nothing the provider chose", () => {
+  it("writes named paths and builds them from nothing the provider chose", () => {
     const code = readCode(SERVICE);
 
     expect(countOf(code, "$set:")).toBe(1);
-    expect(code).toMatch(/\$set:\s*\{\s*scoreBreakdown:\s*breakdown,\s*progressAt:\s*new Date\(\)\s*\}/);
+    // Typed Record so provisional can be attached on named paths after — the two base paths
+    // must still be literal keys, never a spread of the provider body.
+    expect(code).toMatch(
+      /\$set:\s*Record<string,\s*unknown>\s*=\s*\{\s*scoreBreakdown:\s*breakdown,\s*progressAt:\s*new Date\(\)\s*,?\s*\}/,
+    );
+    expect(code).toMatch(/\$set\.provisionalScore\s*=\s*provisionalScore/);
 
-    // No spread anywhere near the update, and no second update verb.
     expect(code).not.toMatch(/\$set:\s*\{\s*\.\.\./);
     expect(code).not.toMatch(/\$inc:/);
     expect(code).not.toMatch(/\$push:/);
@@ -330,12 +334,22 @@ describe("the game's half never slows the player down", () => {
   it("computes the figures with the same function the result uses", () => {
     const code = readCode(GS_PROGRESS);
     expect(code).toMatch(/scoreRound\(/);
-    expect(code).not.toMatch(/boardsCompleted/);
+    // Must not invent a running total from a breakdown key (per-game code).
+    expect(code).not.toMatch(/breakdown\.boardsCompleted/);
   });
 
-  it("sends no score, only the display figures", () => {
+  /*
+    FLIPPED 26 Sep 2026. Progress now carries `provisionalScore` — the SAME number
+    `scoreRound` will later send as the result `score` — so a live board can rank while the
+    round is open. It must still never send a field named `score` / `rawScore` on this
+    payload: those names are the result callback's, and reusing them here is how a progress
+    report becomes a second scoring door by accident.
+  */
+  it("sends provisionalScore from scoreRound, never a result score field", () => {
     const code = readCode(GS_PROGRESS);
-    expect(code).toMatch(/signOutbound\(\{\s*\n\s*roundId[\s\S]{0,160}breakdown,\s*\n\s*\}\)/);
-    expect(code).not.toMatch(/score:/);
+    expect(code).toMatch(/provisionalScore:\s*payload\.provisionalScore/);
+    expect(code).toMatch(/provisionalScore:\s*scored\.score/);
+    expect(code).not.toMatch(/signOutbound\(\{[^}]*\bscore:/);
+    expect(code).not.toMatch(/rawScore:/);
   });
 });

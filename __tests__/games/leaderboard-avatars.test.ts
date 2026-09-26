@@ -116,9 +116,12 @@ describe("attachProfileImages", () => {
     const service = readCode(ARENA_SERVICE);
     // Arena uses the extras helper (picture + country map) so one lookup serves both.
     expect(service).toMatch(/await attachArenaBoardExtras\(/);
+    // FLIPPED 26 Sep 2026: standings rank through resolveLiveDisplayScores + calculateRankings
+    // (provisional mid-round scores), not getCompetitionLeaderboard.
     expect(service.indexOf("attachArenaBoardExtras(")).toBeGreaterThan(
-      service.indexOf("getCompetitionLeaderboard("),
+      service.indexOf("calculateRankings("),
     );
+    expect(service).toMatch(/resolveLiveDisplayScores\(/);
 
     const page = readCode(LOBBY_PAGE);
     const branchAt = page.indexOf("hasProviderGameLabel(competition)) {");

@@ -17,6 +17,23 @@ import {
 import type { RoundActivitySummary } from "@/lib/utils/round-activity";
 
 /**
+ * Pot / seats / prize shares from the standings poll.
+ *
+ * Declared HERE rather than imported from `arena-standings.service.ts` because that module
+ * reaches Mongoose and a `"use client"` file that names it would pull the driver into the
+ * browser (R58). The shapes must stay in sync by hand - a test pins both field lists.
+ */
+export interface ArenaContestSnapshot {
+  currentParticipants: number;
+  maxParticipants?: number;
+  prizePool?: number;
+  prizePoolCredits?: number;
+  entryFee?: number;
+  platformFeePercentage?: number;
+  prizeDistribution?: { percentage: number; rank?: number }[];
+}
+
+/**
  * Keeps the arena's standings rail true after the page has been drawn.
  *
  * THE DEFECT THIS CLOSES IS NOT THAT THE BOARD WAS WRONG - it was right when it was rendered,
@@ -36,7 +53,7 @@ import type { RoundActivitySummary } from "@/lib/utils/round-activity";
  * page by a test, because `router.refresh()` re-renders the page under the frame. This does
  * not: the provider receives the rest of the arena as its `children` prop, and a `children`
  * element passed down from a server component is the SAME OBJECT on every re-render, so React
- * reconciles it by identity and never descends into it. Only the two context consumers
+ * reconciles it by identity and never descends into it. Only the context consumers
  * re-render. The frame is not in their subtree and cannot remount.
  *
  * That is a real guarantee rather than a hopeful one, but it is also easy to destroy - so do
@@ -44,10 +61,11 @@ import type { RoundActivitySummary } from "@/lib/utils/round-activity";
  * the live state above the provider. Either turns a board refresh into a reloaded game.
  * -------------------------------------------------------------------------------------------
  *
- * WHAT IT DOES NOT DO. It does not make a round in flight report its progress: nothing on
- * either side of the provider seam sends anything mid-round, so a live row says "Playing now"
- * until the round is reported and no amount of polling changes that. What this fixes is the
- * moment AFTER a round lands, which used to require a reload.
+ * 26 SEP 2026 — THE POLL ALSO CARRIES CONTEST FACTS. Joins and prize redistribution used to
+ * sit on server props and go stale until a full reload. The standings payload now includes a
+ * contest snapshot so the players tile and prize table move with the board. Ranking uses the
+ * provider's optional `provisionalScore` (same number as the eventual result score) so the
+ * board reorders while rounds are still open - game-agnostic, never from a breakdown key.
  */
 
 export interface ArenaLiveState {
@@ -67,6 +85,10 @@ export interface ArenaLiveState {
    * and a second reader of friendships beside the standings poll is two clocks.
    */
   friendIds: readonly string[];
+  /** Pot / seats / prize shares as of the last successful poll. */
+  contest: ArenaContestSnapshot;
+  /** Caller's rank on the live board; absent until they have a displayable score. */
+  yourRank?: number;
 }
 
 const ArenaLiveContext = createContext<ArenaLiveState | null>(null);
@@ -89,7 +111,11 @@ export function useArenaLive(): ArenaLiveState {
   return value;
 }
 
-const DEFAULT_INTERVAL_MS = 15_000;
+/**
+ * Five seconds rather than fifteen: joins and mid-round provisional ranks should feel
+ * near-instant. Still slow enough that a busy contest does not hammer the standings route.
+ */
+const DEFAULT_INTERVAL_MS = 5_000;
 
 interface ProviderProps {
   competitionId: string;
@@ -102,6 +128,8 @@ interface ProviderProps {
     activity: Record<string, RoundActivitySummary>;
     feed: ArenaActivityEntry[];
     countries?: Record<string, string>;
+    contest: ArenaContestSnapshot;
+    yourRank?: number;
   };
   /**
    * Whether the contest is running, derived on the server from the STORED status.
@@ -111,11 +139,6 @@ interface ProviderProps {
    * while the last rounds are being scored. Same rule as `LiveContestRefresher`.
    */
   active: boolean;
-  /**
-   * Matches the lobby's cadence deliberately. A game score changes when somebody finishes a
-   * round, so a faster poll buys nothing, and a slower one makes this board visibly behind the
-   * one a player just came from.
-   */
   intervalMs?: number;
   children: ReactNode;
 }
@@ -134,6 +157,8 @@ export function ArenaLiveProvider({
     activity: initial.activity,
     feed: initial.feed,
     countries: initial.countries ?? {},
+    contest: initial.contest,
+    yourRank: initial.yourRank,
   });
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -180,6 +205,12 @@ export function ArenaLiveProvider({
             data.countries && typeof data.countries === "object"
               ? data.countries
               : prev.countries,
+          contest:
+            data.contest && typeof data.contest === "object"
+              ? data.contest
+              : prev.contest,
+          yourRank:
+            typeof data.yourRank === "number" ? data.yourRank : prev.yourRank,
         }));
       } catch {
         // Reason: a failed poll leaves the last good answer on screen. There is nothing useful
@@ -204,11 +235,16 @@ export function ArenaLiveProvider({
       }
     };
 
-    if (document.visibilityState === "visible") start();
+    if (document.visibilityState === "visible") {
+      // Immediate read so a join that happened during navigation is visible without waiting
+      // for the first interval tick (owner: "updates are instant without refresh").
+      void read();
+      start();
+    }
     document.addEventListener("visibilitychange", handleVisibility);
 
-    // Mid-round board accept (frame `progress` cue) — refresh now so "boards done" moves
-    // without waiting for the 15s tick. Payload carries no score; we re-read the server.
+    // Mid-round board accept (frame `progress` cue) — refresh now so ranks move without
+    // waiting for the interval. Payload carries no score; we re-read the server.
     const handleProgressCue = () => {
       void read();
     };

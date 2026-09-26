@@ -56,6 +56,14 @@ export interface IGameRound extends Document {
    * gone quiet.
    */
   progressAt?: Date;
+  /**
+   * Mid-round RUNNING SCORE for live boards only (26 Sep 2026).
+   *
+   * OPTIONAL on the progress callback. Settlement never reads this — only `rawScore` via
+   * `applyResult` reaches `participant.score`. See the main-app copy for the full reason.
+   */
+  provisionalScore?: number;
+  provisionalDurationMs?: number;
   startedAt?: Date;
   completedAt?: Date;
   durationMs?: number;
@@ -197,6 +205,8 @@ const GameRoundSchema = new Schema<IGameRound>(
     rawScore: { type: Number },
     scoreBreakdown: { type: Schema.Types.Mixed },
     progressAt: { type: Date },
+    provisionalScore: { type: Number },
+    provisionalDurationMs: { type: Number },
     startedAt: { type: Date },
     completedAt: { type: Date },
     durationMs: { type: Number },

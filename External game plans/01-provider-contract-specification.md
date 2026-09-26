@@ -608,7 +608,9 @@ so a contest board can say something more useful than "playing now".
 {
   "roundId": "cv_rnd_01JAV3M7Q2XK8T",
   "providerRoundId": "acme_r_9f2ab41",
-  "breakdown": { "questionsAnswered": 6, "correct": 5, "streak": 3 }
+  "breakdown": { "questionsAnswered": 6, "correct": 5, "streak": 3 },
+  "provisionalScore": 5,
+  "provisionalDurationMs": 42000
 }
 ```
 
@@ -617,14 +619,23 @@ same HMAC over the raw bytes, the same five-minute timestamp window (section 2.2
 second credential for a lower-value endpoint is a second thing to rotate and the first
 thing somebody leaves behind.
 
-**There is deliberately no `score` field, and sending one is not an error - it is
-ignored.** Scores enter ChartVolt through the result callback and nowhere else. That
-is not a formality: a number arriving mid-round with no terminal status attached would
-be displayed beside figures the final result then contradicts.
+**There is deliberately no result `score` field on this payload, and sending one under
+that name is ignored.** Scores enter ChartVolt for **settlement** through the result
+callback and nowhere else. That is not a formality: a number arriving mid-round under
+the result field name would be one branch away from becoming a second scoring door.
+
+**Optional from requirements HTML v1.20: `provisionalScore` (and optional
+`provisionalDurationMs`).** This MUST be the same number your scoring function will later
+send as the result `score` — computed the same way, never invented by counting keys in
+`breakdown` (that would be per-game code on our side). ChartVolt stores it on the live
+round only and ranks the **contest board** on it while the round is open. Settlement
+still ignores it entirely and overwrites whatever was shown the moment the result lands.
+Omit it and you remain fully conformant: the board keeps showing activity from
+`breakdown` and only reorders when rounds finish.
 
 `breakdown` is the same free-form, provider-ordered structure as `scoreBreakdown`
-(section 5.4), and the same rule applies - **ChartVolt never ranks on it.** Only
-string, boolean and finite-number values are stored; anything nested is dropped rather
+(section 5.4), and the same rule applies - **ChartVolt never ranks on breakdown keys.**
+Only string, boolean and finite-number values are stored; anything nested is dropped rather
 than flattened, because how to flatten a provider's structure is the provider's
 decision and not ours. At most 24 entries are kept per report.
 
