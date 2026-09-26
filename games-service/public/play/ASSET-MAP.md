@@ -94,6 +94,8 @@ Raster assets kept for a later richer pass if wanted.
 | Lite FX toggle | Skips trail / wake / spark / ripple | **app.js** `circuit-lite-fx` + `board.setMotionFx` |
 | `prefers-reduced-motion` | Same Phase J strip as Lite | **app.css** + `motionFxOn()` in `board.js` |
 | Chain SFX | `sfx-chain-extended.ogg` on streak > 1 | **sound.playChain** |
+| Music vs SFX | Bed must not rewind on unlock/focus | **ensureMusic** (26 Sep fix) — revive only on tab return |
+| Arena rail width | `56px / 108px` (not 96/116) | **app.css** — wider rails shrank the board |
 | Intro howto line | One sentence, no graphic | **introCopy.howto** |
 | Alt board skins | `board-s/m/l-##.webp` shuffled deck | **Already live** via `board-deck.ts` (18/12/15) |
 | Frame `progress` cue | Refresh arena standings mid-round | **provider-frame-messages** + `ArenaLiveStandings` |

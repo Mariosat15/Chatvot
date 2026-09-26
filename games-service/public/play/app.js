@@ -1222,8 +1222,8 @@ renderSoundControl();
 ui.board.addEventListener(
   "pointerdown",
   () => {
+    // Unlock only — startMusic is idempotent and must not rewind a live bed (26 Sep 2026).
     sound.unlock();
-    // A resumed round never hits Start, so the bed begins on the first grid touch instead.
     if (state && state.board && !state.finished) sound.startMusic();
   },
   { passive: true },

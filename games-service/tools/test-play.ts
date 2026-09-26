@@ -643,10 +643,14 @@ async function main(): Promise<number> {
      * 25 September 2026: the owner asked for Undo/Clear and the figures beside the board again.
      * The tracks are fixed pixels so they cannot grow into the cell size. The middle track is
      * still the only flexible one.
+     *
+     * 26 September 2026: tracks had grown to 96/116 for labelled Undo/Clear and the board
+     * shrank (owner: image-1 vs earlier image-2). Slim 56/108 again; phone keeps large targets
+     * under the board.
      */
     assert.match(
       columns[1],
-      /96px\s+minmax\(0,\s*1fr\)\s+116px/,
+      /56px\s+minmax\(0,\s*1fr\)\s+108px/,
       `the side tracks are no longer fixed (${columns[1].trim()})`,
     );
     assert.equal(
@@ -722,14 +726,16 @@ async function main(): Promise<number> {
      * is asserted - Submit takes the leftover space, Clear is sized to an icon.
      */
     const css = withoutComments(playFile("app.css"));
-    const submit = /\.submit-wide\s*\{([^{}]*)\}/.exec(css);
+    // Reason: media overrides use `.footer-actions > .submit-wide` — a bare `\.submit-wide\s*\{`
+    // match finds those first and misses the base flex:1 rule (owner board-size suite, 26 Sep).
+    const submit = /(?:^|\n)\s*\.submit-wide\s*\{([^{}]*)\}/.exec(css);
     assert.ok(submit, "app.css has no .submit-wide rule");
     assert.match(
       submit[1],
       /flex\s*:\s*1/,
       "Submit no longer takes the row's leftover width - it may now match Clear's",
     );
-    const railBtn = /button\.rail-btn\s*\{([^{}]*)\}/.exec(css);
+    const railBtn = /(?:^|\n)\s*button\.rail-btn\s*\{([^{}]*)\}/.exec(css);
     assert.ok(railBtn, "app.css has no button.rail-btn rule");
     assert.match(railBtn[1], /min-width\s*:\s*\d/, "the rail buttons are no longer sized to an icon");
   });
@@ -867,6 +873,22 @@ async function main(): Promise<number> {
     const awaitAt = body.indexOf("await ");
     assert.ok(unlockAt >= 0, "start() no longer opens the audio context");
     assert.ok(awaitAt < 0 || unlockAt < awaitAt, "the audio context is opened after an await");
+
+    /*
+     * OWNER 26 Sep 2026: music restarted from zero on every SFX / line connect. `unlock` ran on
+     * every board pointerdown and called `reviveMusic`, which stops and restarts the bed. Unlock
+     * and focus must ENSURE the bed, never revive it; only visibilitychange / bfcache may rewind.
+     */
+    const [unlockBody] = blockBodies(sound, /function unlock\(\)\s*\{/g);
+    assert.ok(unlockBody, "unlock() is no longer a function this test can find");
+    assert.match(unlockBody, /ensureMusic\(\)/, "unlock() must ensure the bed rather than revive it");
+    assert.doesNotMatch(
+      unlockBody,
+      /reviveMusic\(\)/,
+      "unlock() must not call reviveMusic (rewinds under every drag)",
+    );
+    assert.match(sound, /addEventListener\("focus",\s*ensureMusic\)/);
+    assert.match(sound, /if\s*\(!document\.hidden\)\s*reviveMusic\(\)/);
   });
 
   await test("every animation the stylesheet adds is switched off under reduced motion", async () => {

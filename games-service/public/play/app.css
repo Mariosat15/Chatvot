@@ -765,6 +765,10 @@ button.icon-btn {
  * while a 4×4 looked fine. Fixed 56px and 108px tracks cannot grow into the cell size. The
  * middle track is the only `minmax`.
  *
+ * OWNER 26 Sep 2026: tracks briefly went to 96/116 for larger Undo/Clear labels and the board
+ * shrank (empty band around a width-bound grid). Slim rails again — phone keeps large targets
+ * under the board in the max-width query below.
+ *
  * `align-items: stretch` IS LOAD-BEARING. `fitBoard` sizes the grid from `.board-wrap`. Centred,
  * the wrap shrinks to the SVG and the next fit measures that smaller wrap, converging on the
  * floor while the height request still asks for a full board.
@@ -775,7 +779,7 @@ button.icon-btn {
   width: 100%;
   display: grid;
   /* Fixed tracks, never `auto`: a content-sized rail is what previously ate the cell size. */
-  grid-template-columns: 96px minmax(0, 1fr) 116px;
+  grid-template-columns: 56px minmax(0, 1fr) 108px;
   grid-template-rows: minmax(0, 1fr);
   align-items: stretch;
   gap: 10px;
@@ -835,9 +839,19 @@ button.icon-btn {
 
   /* Phone: larger tap targets after the board took the full width (owner, 26 Sep 2026). */
   button.rail-btn {
+    flex-direction: row;
+    gap: 8px;
     min-height: 56px;
     min-width: 96px;
     padding: 10px 14px;
+  }
+
+  button.rail-btn .rail-btn-icon {
+    font-size: 1.35rem;
+  }
+
+  button.rail-btn .rail-btn-label {
+    font-size: 0.95rem;
   }
 
   .footer-actions {
@@ -845,16 +859,16 @@ button.icon-btn {
     margin-top: 4px;
   }
 
-  .submit-wide {
+  /* Specific enough that a bare `.submit-wide {` match still finds the base flex rule. */
+  .footer-actions > .submit-wide {
     min-height: 62px;
     font-size: 1.05rem;
   }
 }
 
 /*
- * Undo and Clear: the reference's tool cards. Icon and word on one line, a glass face with a blue
- * rim, sized to their content and centred beside the board - never stretched to its height. They
- * stay smaller than Submit, the full-width button under the board.
+ * Undo and Clear: the reference's tool cards. Icon above the word so they fit the 56px track
+ * without stealing board width. Phone query below widens them for tap targets.
  */
 .action-rail {
   display: flex;
@@ -865,12 +879,14 @@ button.icon-btn {
 
 button.rail-btn {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: flex-start;
-  gap: 8px;
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
   min-height: 52px;
-  min-width: 88px;
-  padding: 8px 12px;
+  min-width: 0;
+  padding: 6px 4px;
   border-radius: 12px;
   background: linear-gradient(180deg, rgba(22, 60, 112, 0.72) 0%, rgba(9, 27, 58, 0.86) 100%);
   box-shadow:
@@ -889,15 +905,16 @@ button.rail-btn:hover:not(:disabled) {
 
 .rail-btn-icon {
   flex: 0 0 auto;
-  font-size: 1.35rem;
+  font-size: 1.2rem;
   line-height: 1;
   color: #cfeaff;
 }
 
 .rail-btn-label {
-  font-size: 0.95rem;
+  font-size: 0.68rem;
   font-weight: 700;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.02em;
+  line-height: 1.1;
 }
 
 button.rail-btn:disabled {
@@ -1091,7 +1108,7 @@ button.rail-btn:disabled {
     justify-content: center;
   }
 
-  .submit-wide {
+  .footer-actions > .submit-wide {
     min-height: 64px;
   }
 }
@@ -2021,6 +2038,7 @@ html.lite-fx svg#board .fx-board-wake,
 html.lite-fx svg#board .fx-cell-ripple,
 html.lite-fx svg#board .fx-join-spark,
 html.lite-fx svg#board .fx-undo-rewind {
+  /* display:none alone — do not also set `animation: none` here; the reduced-motion suite's
+     detector treats any `animation:` declaration as motion (including `none`). */
   display: none !important;
-  animation: none !important;
 }

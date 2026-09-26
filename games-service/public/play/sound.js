@@ -164,12 +164,26 @@ export function createSound() {
    * BufferSource that was playing under a suspended context is often dead when the context
    * resumes. Calling `resume()` alone leaves silence with `musicWanted` still true. Restarting
    * the source is the only reliable recovery; it must never await on the gameplay path.
+   *
+   * ONLY CALL THIS when the player actually left (tab hidden / bfcache). Never from `unlock` or
+   * `focus` during a drag — those fire on every board touch and were restarting the bed from
+   * zero under every SFX (owner, 26 Sep 2026).
    */
   function reviveMusic() {
     if (!enabled || broken || !musicWanted || musicMuted) return;
     resume();
     stopMusicInternal();
     startMusicInternal();
+  }
+
+  /**
+   * Keep a wanted bed alive without rewinding it. Resumes a suspended context; starts only when
+   * there is no live `musicSource`. Safe on every pointerdown / focus / SFX path.
+   */
+  function ensureMusic() {
+    if (!enabled || broken || !musicWanted || musicMuted) return;
+    resume();
+    if (!musicSource) startMusicInternal();
   }
 
   function loadSample(name, url) {
@@ -217,10 +231,10 @@ export function createSound() {
         return;
       }
     }
-    // Reason: after a contest/browser pause the context may be running again while the bed's
-    // BufferSource is dead. Unlock is the gesture path, so restart music here when wanted.
-    if (musicWanted && !musicMuted) reviveMusic();
-    else resume();
+    // Reason: unlock runs on Start and on every board pointerdown (gesture unlock for SFX).
+    // Restarting the bed here made music rewind under every connect — ensure, never revive.
+    resume();
+    ensureMusic();
     warmAllSamples();
   }
 
@@ -354,15 +368,20 @@ export function createSound() {
     go();
   }
 
-  // Visibility / focus: the browser paused us; revive when the player comes back.
+  // Tab was hidden: BufferSource is often dead after resume — full revive once.
   if (typeof document !== "undefined") {
     document.addEventListener("visibilitychange", () => {
       if (!document.hidden) reviveMusic();
     });
   }
   if (typeof window !== "undefined") {
-    window.addEventListener("focus", reviveMusic);
-    window.addEventListener("pageshow", reviveMusic);
+    // Focus fires when clicking the iframe mid-drag — ensure only, never rewind.
+    window.addEventListener("focus", ensureMusic);
+    // bfcache restore can leave a dead source; revive is correct here.
+    window.addEventListener("pageshow", (event) => {
+      if (event && event.persisted) reviveMusic();
+      else ensureMusic();
+    });
   }
 
   return {
@@ -449,11 +468,11 @@ export function createSound() {
       for (const note of boardCompleteNotes()) playRecipe(note);
     },
 
-    /** Start the looping bed after Start. Safe to call repeatedly. */
+    /** Start the looping bed after Start. Safe to call repeatedly — never rewinds a live bed. */
     startMusic() {
       musicWanted = true;
       unlock();
-      startMusicInternal();
+      ensureMusic();
     },
 
     /** Stop the bed (leave / result / mute). */
