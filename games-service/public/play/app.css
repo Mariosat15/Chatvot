@@ -94,6 +94,7 @@ html,
 body {
   margin: 0;
   height: 100%;
+  overflow: hidden;
   color: var(--text);
   background: var(--surface);
   /* A single soft light behind the board, so the surface is not a flat rectangle. Two radial
@@ -160,6 +161,15 @@ body {
 .screen.scroll {
   justify-content: flex-start;
   overflow-y: auto;
+  /* Owner 26 Sep 2026: visible scrollbars cut the neon frame. Keep scroll if needed, hide chrome. */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.screen.scroll::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
 }
 
 .screen.scroll > :first-child {
@@ -605,7 +615,7 @@ button.small-btn {
 .token-face {
   transform-box: fill-box;
   transform-origin: center;
-  animation: token-glow 2.4s ease-in-out infinite;
+  /* No infinite glow — it re-composites every token every frame and made mid-tier machines struggle. */
 }
 
 @keyframes token-glow {
@@ -630,12 +640,13 @@ button.small-btn {
 }
 
 .token-face[data-state="connect"] {
-  filter: drop-shadow(0 0 7px rgba(56, 232, 255, 0.75));
+  /* Brightness only — drop-shadow on every joined token was a major perf cost on 6×6 / 8×8. */
+  filter: brightness(1.12);
 }
 
 .token-face[data-state="error"] {
   animation: token-refused 0.35s ease-in-out 2;
-  filter: drop-shadow(0 0 8px rgba(255, 60, 90, 0.95)) saturate(0.6) brightness(1.15);
+  filter: brightness(1.1) saturate(0.7);
 }
 
 @keyframes token-refused {
@@ -873,7 +884,7 @@ button.rail-btn:disabled {
   align-items: stretch;
   min-width: 0;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
   border-radius: 12px;
   background: linear-gradient(180deg, rgba(18, 48, 94, 0.78) 0%, rgba(7, 22, 48, 0.9) 100%);
   box-shadow:
@@ -1146,25 +1157,25 @@ button.rail-btn:disabled {
   background-image: url("/play/board-frame.webp");
   background-size: 100% 100%;
   background-repeat: no-repeat;
-  /* The reference's frame glows cyan at its outer edge. A drop-shadow rather than a box-shadow,
-     because the pictures have a transparent margin (their black surround was keyed out on 11 Sep
-     2026 so the page shows through), and a box-shadow would draw a rectangle detached from the
-     bezel. The filter follows the artwork's own alpha. It costs a compositing layer and nothing
-     more: the art never moves while a wire is being drawn. */
-  filter: drop-shadow(0 0 14px rgba(0, 204, 255, 0.45));
+  /* Soft cyan edge via box-shadow on the stage — NOT filter:drop-shadow on the art.
+     Drop-shadow follows keyed alpha and forced a full-layer re-raster when anything
+     nearby animated; that is what made the board feel heavy on ordinary machines. */
   /* The artwork is decoration over a board that is already complete without it, so it must never
      intercept a drag - the grid underneath is the hit area, and the bezel overhangs it. */
   pointer-events: none;
+  filter: none;
+}
+
+.board-stage.drawn {
+  box-shadow: 0 0 18px -4px rgba(0, 204, 255, 0.35);
 }
 
 /*
- * Phase D: soft neon pulse on drawn board skins (Small / Medium / large heroes).
- * Opacity only — animating `filter: drop-shadow` every frame is expensive and made
- * wire drags feel heavy beside an already busy SVG (owner, 25 Sep 2026). The static
- * glow stays on `.board-art` above; this only breathes the brightness.
+ * Neon pulse removed 26 Sep 2026 (owner: board feels heavy). Static stage glow above is enough.
  */
 .board-stage.drawn .board-art {
-  animation: board-neon-pulse 2.8s ease-in-out infinite;
+  animation: none;
+  opacity: 1;
 }
 
 @keyframes board-neon-pulse {
@@ -1254,25 +1265,49 @@ svg#board .layer-cells.dense .pip {
   fill: rgba(170, 235, 255, 0.55);
 }
 
-/* Lock-on / invalid / complete overlays painted into `.layer-flashes`. */
+/* Lock-on overlays only — invalid tip / complete burst removed 26 Sep 2026 (owner: messy). */
 svg#board .fx-lock-on {
   animation: fx-lock-pulse 520ms ease-out 1 both;
   pointer-events: none;
 }
 
-svg#board .fx-invalid {
-  animation: fx-invalid-flash 420ms ease-out 1 both;
+/* Phase J — light SVG/CSS only (no full-board WebP washes). */
+svg#board .fx-trail-tip {
   pointer-events: none;
+  opacity: 0.85;
+  fill: #7ef7ff;
 }
 
-svg#board .fx-invalid-tip {
-  animation: fx-invalid-tip 420ms ease-out 1 both;
+svg#board .fx-undo-rewind {
   pointer-events: none;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.55;
+  animation: fx-undo-rewind 300ms ease-in 1 both;
 }
 
-svg#board .fx-complete-burst {
-  animation: fx-burst 900ms ease-out 1 both;
+svg#board .fx-board-wake {
   pointer-events: none;
+  fill: none;
+  stroke: rgba(126, 247, 255, 0.7);
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: fx-board-wake 420ms ease-out 1 both;
+}
+
+svg#board .fx-cell-ripple {
+  pointer-events: none;
+  fill: rgba(126, 247, 255, 0.55);
+  animation: fx-cell-ripple 220ms ease-out 1 both;
+}
+
+svg#board .fx-join-spark {
+  pointer-events: none;
+  fill: #eafcff;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: fx-join-spark 340ms ease-out 1 both;
 }
 
 @keyframes fx-lock-pulse {
@@ -1292,41 +1327,49 @@ svg#board .fx-complete-burst {
   }
 }
 
-@keyframes fx-invalid-flash {
+@keyframes fx-undo-rewind {
   0% {
-    opacity: 0;
-  }
-  20% {
-    opacity: 1;
+    stroke-dashoffset: 0;
+    opacity: 0.6;
   }
   100% {
+    stroke-dashoffset: 120;
     opacity: 0;
   }
 }
 
-@keyframes fx-invalid-tip {
+@keyframes fx-board-wake {
   0% {
-    stroke-opacity: 1;
+    opacity: 0.8;
+    transform: scale(0.35);
   }
   100% {
-    stroke-opacity: 0;
+    opacity: 0;
+    transform: scale(2.2);
   }
 }
 
-@keyframes fx-burst {
+@keyframes fx-cell-ripple {
   0% {
-    opacity: 0;
+    opacity: 0.9;
     transform-box: fill-box;
     transform-origin: center;
-    transform: scale(0.55);
-  }
-  25% {
-    opacity: 1;
-    transform: scale(1.05);
+    transform: scale(0.4);
   }
   100% {
     opacity: 0;
-    transform: scale(1.25);
+    transform: scale(1.8);
+  }
+}
+
+@keyframes fx-join-spark {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--spark-dx, 0px), var(--spark-dy, 0px)) scale(0.4);
   }
 }
 
@@ -1468,62 +1511,60 @@ svg#board .terminal-art {
 
 .submit-wide:not(:disabled)::before {
   background: var(--accent);
-  filter: drop-shadow(0 0 6px rgba(8, 223, 255, 0.8));
 }
 
 /* Disabled still reads as the same bar, just unlit - a grey slab looks like a missing control. */
 button.submit-wide:disabled {
   background: linear-gradient(180deg, rgba(10, 44, 92, 0.9) 0%, rgba(6, 22, 50, 0.95) 100%);
   color: #7fa6cf;
-  box-shadow:
-    inset 0 0 0 1px rgba(64, 150, 240, 0.6),
-    0 0 10px -4px rgba(8, 223, 255, 0.35);
+  box-shadow: 0 0 10px -4px rgba(8, 223, 255, 0.35);
 }
 
 /* The lit state is the whole point: the button is disabled until the board is genuinely
-   submittable, so its turning on is the game telling the player they are finished. */
+   submittable, so its turning on is the game telling the player they are finished.
+   Outer glow only — inset “border inside” removed 26 Sep 2026 (owner). */
 .submit-wide:not(:disabled) {
   box-shadow:
-    inset 0 0 0 1px var(--accent),
-    inset 0 0 20px rgba(0, 221, 255, 0.35),
-    0 0 15px rgba(0, 222, 255, 0.65),
+    0 0 15px rgba(0, 222, 255, 0.55),
     0 10px 26px -16px rgba(0, 0, 0, 0.9);
 }
 
 /* Every pair done: brighter cyan “ready” — still TEXT, no Phase B menu face. */
 .submit-wide.ready:not(:disabled) {
   color: #e8fcff;
-  background:
-    linear-gradient(180deg, rgba(12, 92, 140, 0.95) 0%, rgba(4, 48, 88, 0.98) 100%);
+  background: linear-gradient(180deg, rgba(12, 92, 140, 0.95) 0%, rgba(4, 48, 88, 0.98) 100%);
   box-shadow:
-    inset 0 0 0 1px #5ef0ff,
-    inset 0 0 28px rgba(0, 240, 255, 0.45),
-    0 0 22px rgba(0, 230, 255, 0.85),
+    0 0 20px rgba(0, 230, 255, 0.7),
     0 10px 28px -14px rgba(0, 0, 0, 0.95);
-  background-image: url("/play/fx-submit-ready.svg"),
-    linear-gradient(180deg, rgba(12, 92, 140, 0.95) 0%, rgba(4, 48, 88, 0.98) 100%);
-  background-size: 100% 100%, auto;
-  background-repeat: no-repeat, no-repeat;
 }
 
 .submit-wide.ready:not(:disabled)::before {
-  filter: drop-shadow(0 0 10px rgba(8, 255, 255, 1));
+  filter: none;
 }
 
-/*
- * Clear as a stronger secondary: amber-muted rim so it never competes with Submit's cyan.
- * TEXT only — `fx-clear-secondary.svg` is a rim wash, not a button face (Phase B rejected).
- */
-#clear.secondary-strong,
-#clear.ghost.secondary-strong {
-  color: #f0d9a8;
-  border-color: rgba(232, 176, 72, 0.55);
-  box-shadow:
-    inset 0 0 0 1px rgba(232, 176, 72, 0.35),
-    0 0 14px -6px rgba(232, 150, 40, 0.45);
-  background-image: url("/play/fx-clear-secondary.svg");
-  background-size: 100% 100%;
-  background-repeat: no-repeat;
+/* Clear matches Undo: same ghost rail-btn chrome. Secondary gold frame removed 26 Sep 2026. */
+
+/* Result power-up: brief corona while the stat counts up (after sealed beat). */
+#screen-result.result-power {
+  animation: result-corona 880ms ease-out 1 both;
+}
+
+#screen-result.result-power .stat-value {
+  text-shadow:
+    0 0 12px rgba(8, 223, 255, 0.85),
+    0 0 28px rgba(8, 223, 255, 0.45);
+}
+
+@keyframes result-corona {
+  0% {
+    box-shadow: inset 0 0 0 0 transparent;
+  }
+  35% {
+    box-shadow: inset 0 0 48px rgba(8, 223, 255, 0.28);
+  }
+  100% {
+    box-shadow: inset 0 0 0 0 transparent;
+  }
 }
 
 /* ------------------------------------------------------------------------------------------
@@ -1866,14 +1907,17 @@ button.primary:active:not(:disabled) {
   svg#board .trace-halo.arrived,
   svg#board .trace-core.arrived,
   svg#board .fx-lock-on,
-  svg#board .fx-invalid,
-  svg#board .fx-invalid-tip,
-  svg#board .fx-complete-burst,
+  svg#board .fx-trail-tip,
+  svg#board .fx-undo-rewind,
+  svg#board .fx-board-wake,
+  svg#board .fx-cell-ripple,
+  svg#board .fx-join-spark,
   .board-stage.solved::after,
   .board-stage.solved-local .board-fx-flash,
   .board-stage.fx-flash .board-fx-flash,
   .board-stage.circuit-sealed .board-fx-sealed,
-  .board-stage.refused {
+  .board-stage.refused,
+  #screen-result.result-power {
     animation: none;
   }
 

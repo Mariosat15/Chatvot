@@ -820,6 +820,14 @@ function renderResult() {
   if (copy.triumphant && !localWinPlayed) sound.play("win");
   localWinPlayed = false;
 
+  // Phase J result power-up: brief frame corona while the stat counts up.
+  if (ui.result) {
+    ui.result.classList.toggle("result-power", Boolean(copy.triumphant) && !prefersReducedMotion());
+    if (ui.result.classList.contains("result-power")) {
+      window.setTimeout(() => ui.result && ui.result.classList.remove("result-power"), 900);
+    }
+  }
+
   ui.done.textContent = state.returnUrl || window.parent !== window ? "Back to contest" : "Close";
   show("result");
 
@@ -868,7 +876,6 @@ function onBoardChange(change) {
   const ready = board.isComplete();
   ui.submit.disabled = !ready;
   ui.submit.classList.toggle("ready", ready);
-  if (ui.clear) ui.clear.classList.toggle("secondary-strong", true);
   if (change && change.settled) moves += 1;
   renderInstruments();
   renderUndo();
@@ -881,15 +888,10 @@ function onBoardChange(change) {
     }
   }
 
+  // Quiet cue only — no board wash / complete burst (owner, 26 Sep 2026).
   if (change && change.completeCelebration) {
     localWinPlayed = true;
     sound.playBoardComplete();
-    sound.play("win");
-    flashBoard("solved-local", LOCAL_COMPLETE_MS);
-    if (ui.boardStage) {
-      ui.boardStage.classList.add("fx-flash");
-      window.setTimeout(() => ui.boardStage && ui.boardStage.classList.remove("fx-flash"), LOCAL_COMPLETE_MS);
-    }
   }
 
   const joinedNow = (change && change.justJoined) || [];

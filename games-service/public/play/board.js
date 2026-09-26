@@ -114,19 +114,18 @@ export const BOARD_ART = [
 /**
  * Feedback overlays warmed with the board. Kept OUT of `BOARD_ART` so the serve/warm tests that
  * assert one entry per grid size stay about bezels and tokens, not celebration chrome.
+ *
+ * Trimmed 26 Sep 2026: invalid flash, complete burst, and intro howto are unused (owner removed
+ * the messy error/complete overlays). Warm only what paint still references.
  */
 export const FX_ART = [
   "/play/fx-lock-on.webp",
   "/play/fx-lock-on-pulse.webp",
   "/play/fx-lock-on-hit.webp",
-  "/play/fx-invalid-flash.webp",
-  "/play/fx-complete-burst.webp",
   "/play/fx-board-flash.webp",
   "/play/fx-board-complete.webp",
-  "/play/fx-particle-spill.webp",
   "/play/fx-timer-urgent.webp",
   "/play/fx-circuit-sealed.webp",
-  "/play/intro-howto-clean.webp",
 ];
 
 /** The token image for one pair's terminal, or null past the tenth number. */
@@ -345,52 +344,11 @@ export function createBoard(svg, onChange) {
   }
 
   /**
-   * Red HUD flash at a cell (and a short red tip on the wire) when a drag is refused.
-   * Emits `invalid` so `app.js` can play the sharper fail sample once.
+   * Soft token shake when a drag is refused — no red tip polyline, no HUD flash image.
+   * Those read as “messy error lines” on screen (owner, 26 Sep 2026). Sound still fires via
+   * `onChange({ invalid: true })`.
    */
-  function flashInvalidAt(pairId, cell) {
-    if (!layers || !cellPx) return;
-    const cx = centre(cell[0]);
-    const cy = centre(cell[1]);
-    const size = cellPx * 1.15;
-    const stamp = element("image", {
-      href: "/play/fx-invalid-flash.webp",
-      x: cx - size / 2,
-      y: cy - size / 2,
-      width: size,
-      height: size,
-      class: "fx-invalid",
-      "pointer-events": "none",
-    });
-    layers.flashes.appendChild(stamp);
-    const cells = pathOf(pairId);
-    if (cells.length > 0) {
-      const last = cells[cells.length - 1];
-      const tip = element("polyline", {
-        points: centre(last[0]) + "," + centre(last[1]) + " " + cx + "," + cy,
-        fill: "none",
-        stroke: "#ef4444",
-        "stroke-width": Math.max(3, Math.round(cellPx * 0.22)),
-        "stroke-linecap": "round",
-        class: "fx-invalid-tip",
-        "pointer-events": "none",
-      });
-      layers.flashes.appendChild(tip);
-      setTimeout(() => {
-        try {
-          layers.flashes.removeChild(tip);
-        } catch {
-          /* board rebuilt */
-        }
-      }, TOKEN_ERROR_MS);
-    }
-    setTimeout(() => {
-      try {
-        layers.flashes.removeChild(stamp);
-      } catch {
-        /* board rebuilt */
-      }
-    }, TOKEN_ERROR_MS);
+  function flashInvalidAt(_pairId, _cell) {
     onChange({ invalid: true });
   }
 
@@ -419,29 +377,137 @@ export function createBoard(svg, onChange) {
     }, JOIN_PULSE_MS + 80);
   }
 
-  /** Full-board burst when the last pair lands and coverage is full (before Submit). */
-  function celebrateLocalComplete() {
-    if (!layers || !puzzle || !cellPx) return;
-    const cx = (puzzle.width * cellPx) / 2;
-    const cy = (puzzle.height * cellPx) / 2;
-    const size = Math.min(puzzle.width, puzzle.height) * cellPx * 0.85;
-    const burst = element("image", {
-      href: "/play/fx-complete-burst.webp",
-      x: cx - size / 2,
-      y: cy - size / 2,
-      width: size,
-      height: size,
-      class: "fx-complete-burst",
+  /** Local board-complete burst removed 26 Sep 2026 — owner disliked the checkmark wash. */
+
+  /** Tiny tip that follows the finger while a wire is being drawn (Phase J trail). */
+  let trailTip = null;
+
+  function showTrailAt(cell) {
+    if (!layers || !cellPx || !cell) return;
+    const cx = centre(cell[0]);
+    const cy = centre(cell[1]);
+    const r = Math.max(2.5, cellPx * 0.12);
+    if (!trailTip || !trailTip.parentNode) {
+      trailTip = element("circle", {
+        cx,
+        cy,
+        r,
+        class: "fx-trail-tip",
+        "pointer-events": "none",
+      });
+      layers.flashes.appendChild(trailTip);
+    } else {
+      trailTip.setAttribute("cx", String(cx));
+      trailTip.setAttribute("cy", String(cy));
+      trailTip.setAttribute("r", String(r));
+    }
+  }
+
+  function hideTrail() {
+    if (!trailTip || !layers) return;
+    try {
+      layers.flashes.removeChild(trailTip);
+    } catch {
+      /* already gone */
+    }
+    trailTip = null;
+  }
+
+  /** Ghost polyline that rewinds when Undo fires (Phase J). */
+  function spawnUndoRewind(pairId, cells) {
+    if (!layers || !cellPx || cells.length < 2) return;
+    const points = cells.map((cell) => centre(cell[0]) + "," + centre(cell[1])).join(" ");
+    const ghost = element("polyline", {
+      points,
+      fill: "none",
+      stroke: colourFor(pairId),
+      "stroke-width": Math.max(3, Math.round(cellPx * 0.28)),
+      "stroke-dasharray": "8 6",
+      class: "fx-undo-rewind",
       "pointer-events": "none",
     });
-    layers.flashes.appendChild(burst);
+    layers.flashes.appendChild(ghost);
     setTimeout(() => {
       try {
-        layers.flashes.removeChild(burst);
+        layers.flashes.removeChild(ghost);
       } catch {
         /* board rebuilt */
       }
-    }, 900);
+    }, 300);
+  }
+
+  /** Soft wake rings when a new board enters (Phase J charge — CSS circles, not a WebP wash). */
+  function playBoardEnter() {
+    if (!layers || !puzzle || !cellPx) return;
+    for (const pair of puzzle.pairs) {
+      for (const [cx, cy] of terminalCentres.get(pair.id) || []) {
+        const wake = element("circle", {
+          cx,
+          cy,
+          r: cellPx * 0.2,
+          class: "fx-board-wake",
+          "pointer-events": "none",
+        });
+        layers.flashes.appendChild(wake);
+        setTimeout(() => {
+          try {
+            layers.flashes.removeChild(wake);
+          } catch {
+            /* board rebuilt */
+          }
+        }, 420);
+      }
+    }
+  }
+
+  /** One-frame pip pop when a cell fills (Phase J coverage ripple). */
+  function spawnCoverageRipple(x, y) {
+    if (!layers || !cellPx) return;
+    const ripple = element("circle", {
+      cx: centre(x),
+      cy: centre(y),
+      r: Math.max(3, cellPx * 0.16),
+      class: "fx-cell-ripple",
+      "pointer-events": "none",
+    });
+    layers.flashes.appendChild(ripple);
+    setTimeout(() => {
+      try {
+        layers.flashes.removeChild(ripple);
+      } catch {
+        /* board rebuilt */
+      }
+    }, 220);
+  }
+
+  /** Sparks travel both terminals → midpoint when a pair locks (Phase J, on top of join pulse). */
+  function spawnJoinSparks(pairId) {
+    if (!layers || !cellPx) return;
+    const centres = terminalCentres.get(pairId);
+    if (!centres || centres.length < 2) return;
+    const [a, b] = centres;
+    const midX = (a[0] + b[0]) / 2;
+    const midY = (a[1] + b[1]) / 2;
+    for (const [sx, sy] of [a, b]) {
+      const spark = element("circle", {
+        cx: sx,
+        cy: sy,
+        r: Math.max(2.5, cellPx * 0.1),
+        class: "fx-join-spark",
+        "pointer-events": "none",
+        // Reason: setAttribute, not `.style.setProperty` — the board test harness builds
+        // minimal SVG nodes without a CSSStyleDeclaration, and setProperty would throw mid-join.
+        style: `--spark-dx: ${midX - sx}px; --spark-dy: ${midY - sy}px`,
+      });
+      layers.flashes.appendChild(spark);
+      setTimeout(() => {
+        try {
+          layers.flashes.removeChild(spark);
+        } catch {
+          /* board rebuilt */
+        }
+      }, 340);
+    }
   }
 
   function rebuildOwnership() {
@@ -717,6 +783,7 @@ export function createBoard(svg, onChange) {
     const before = joinedIds();
     if (walkTowards(dragging, cell)) {
       const arrived = newlyJoined(before, joinedIds());
+      showTrailAt(cell);
       // Coalesce paint + chrome updates to one animation frame. Without this, a fast finger
       // rebuilds every wire and every unused pip dozens of times per second and the drag feels
       // heavy even though the rules work (owner, 25 Sep 2026).
@@ -731,6 +798,7 @@ export function createBoard(svg, onChange) {
   function onPointerUp() {
     if (dragging === null) return;
     dragging = null;
+    hideTrail();
     // Fold `settled` into any pending join so streak / pair notes are not wiped by a second
     // onChange that only carries settled.
     queuedChange = { ...(queuedChange || {}), settled: true };
@@ -916,6 +984,7 @@ export function createBoard(svg, onChange) {
         }
       }, JOIN_PULSE_MS);
     }
+    spawnJoinSparks(pairId);
   }
 
   /** One terminal: a lit socket, its numeral, and the artwork laid over both. */
@@ -1082,6 +1151,8 @@ export function createBoard(svg, onChange) {
     }
     for (const [cellKey, pip] of [...pipNodes]) {
       if (want.has(cellKey)) continue;
+      const [px, py] = cellKey.split(",").map(Number);
+      if (Number.isFinite(px) && Number.isFinite(py)) spawnCoverageRipple(px, py);
       layers.marks.removeChild(pip);
       pipNodes.delete(cellKey);
     }
@@ -1101,7 +1172,7 @@ export function createBoard(svg, onChange) {
       const done = Boolean(change.complete);
       if (done && !celebratedComplete) {
         celebratedComplete = true;
-        celebrateLocalComplete();
+        // Burst overlay removed — keep the flag so app.js can play a quiet win cue if wanted.
         change.completeCelebration = true;
       } else if (!done) {
         celebratedComplete = false;
@@ -1229,11 +1300,13 @@ export function createBoard(svg, onChange) {
       drawOrder = [];
       errorUntil = new Map();
       celebratedComplete = false;
+      hideTrail();
       for (const pair of next.pairs) {
         terminals.set(key(pair.a), pair.id);
         terminals.set(key(pair.b), pair.id);
       }
       render();
+      playBoardEnter();
     },
     clear() {
       if (!puzzle) return;
@@ -1242,6 +1315,7 @@ export function createBoard(svg, onChange) {
       dragging = null;
       drawOrder = [];
       celebratedComplete = false;
+      hideTrail();
       paint();
       onChange();
     },
@@ -1255,10 +1329,12 @@ export function createBoard(svg, onChange) {
       if (locked || !puzzle) return false;
       const pairId = lastDrawn();
       if (pairId === null) return false;
+      spawnUndoRewind(pairId, pathOf(pairId));
       paths.delete(pairId);
       drawOrder = drawOrder.filter((entry) => entry !== pairId);
       rebuildOwnership();
       dragging = null;
+      hideTrail();
       paint();
       onChange();
       return true;

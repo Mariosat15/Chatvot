@@ -39,88 +39,12 @@
         <p class="muted">Loading your round...</p>
       </section>
 
-      <section id="screen-intro" class="screen scroll" hidden>
-        <img
-          id="intro-howto"
-          class="intro-howto"
-          src="/play/intro-howto-clean.webp"
-          width="768"
-          height="768"
-          alt="Tap matching numbers and connect them without crossing other wires"
-        />
-        <!--
-          The rules, drawn. A player who has never seen a flow puzzle does not learn it from three
-          sentences, and this is a paid contest, so the seconds spent working out the interaction
-          come out of their score. The path animates itself along the route a finger would take.
-
-          Inline rather than an image file: it is the only way to have artwork that costs no extra
-          request, needs no entry in the asset allowlist, and inherits the palette. The animation
-          is switched off under `prefers-reduced-motion` in the stylesheet.
-
-          Since 26 Sep 2026 the teach diagram above (`intro-howto-clean.webp`) is the primary glance
-          lesson; this SVG stays as the motion demo beneath it.
-        -->
-        <svg
-          class="diagram diagram-motion"
-          viewBox="0 0 180 100"
-          role="img"
-          aria-label="A path drawn between two terminals numbered one, filling every square"
-        >
-          <!--
-            Built out of the same parts as the real board - cell face and lip, wire halo and core,
-            socket bloom, rim and ring - so a player recognises the thing they are about to be
-            handed. It is drawn by hand here rather than by `board.js`, because the illustration
-            wants a chosen shape and a chosen route, and reusing the renderer would mean
-            introducing a fake puzzle for it to draw.
-          -->
-          <!--
-            Its own gradient, with its own id. The board's `#cell-face` is created by `board.js`
-            when the grid is built, which is after Start - so pointing at it here would resolve to
-            nothing on the one screen this artwork appears on, and an unresolved paint server is
-            not an error, it is a transparent fill. The illustration would simply lose its cells.
-          -->
-          <defs>
-            <linearGradient id="cell-face-flat" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stop-color="#183053" />
-              <stop offset="0.55" stop-color="#102340" />
-              <stop offset="1" stop-color="#0b1a31" />
-            </linearGradient>
-          </defs>
-          <g class="diagram-grid">
-            <rect x="10" y="10" width="38" height="38" rx="8" />
-            <rect x="52" y="10" width="38" height="38" rx="8" />
-            <rect x="94" y="10" width="38" height="38" rx="8" />
-            <rect x="10" y="52" width="38" height="38" rx="8" />
-            <rect x="52" y="52" width="38" height="38" rx="8" />
-            <rect x="94" y="52" width="38" height="38" rx="8" />
-          </g>
-          <polyline
-            class="diagram-trace diagram-trace-halo"
-            points="29,29 71,29 113,29 113,71 71,71 29,71"
-            fill="none"
-          />
-          <polyline
-            class="diagram-trace"
-            points="29,29 71,29 113,29 113,71 71,71 29,71"
-            fill="none"
-          />
-          <polyline
-            class="diagram-trace diagram-trace-core"
-            points="29,29 71,29 113,29 113,71 71,71 29,71"
-            fill="none"
-          />
-          <g class="diagram-terminals">
-            <circle class="diagram-bloom" cx="29" cy="29" r="18" />
-            <circle class="diagram-rim" cx="29" cy="29" r="14" />
-            <circle class="diagram-ring" cx="29" cy="29" r="10" />
-            <text x="29" y="29">1</text>
-            <circle class="diagram-bloom" cx="29" cy="71" r="18" />
-            <circle class="diagram-rim" cx="29" cy="71" r="14" />
-            <circle class="diagram-ring" cx="29" cy="71" r="10" />
-            <text x="29" y="71">1</text>
-          </g>
-        </svg>
-
+      <!--
+        Intro teach graphics (error-X howto + motion completion SVG) removed 26 Sep 2026 — they
+        scrolled the Start screen, showed messy “wrong wire” art, and duplicated the rules panels.
+        HOW TO PLAY / HOW YOU SCORE text is the glance lesson now.
+      -->
+      <section id="screen-intro" class="screen" hidden>
         <h1 id="intro-title">Circuit</h1>
         <p id="intro-limit" class="lead"></p>
 
@@ -242,7 +166,7 @@
               <span class="rail-btn-icon" aria-hidden="true">&#8630;</span>
               <span class="rail-btn-label">Undo</span>
             </button>
-            <button id="clear" class="ghost rail-btn secondary-strong" type="button">
+            <button id="clear" class="ghost rail-btn" type="button">
               <span class="rail-btn-icon" aria-hidden="true">&#8635;</span>
               <span class="rail-btn-label">Clear</span>
             </button>
@@ -316,11 +240,12 @@
         </footer>
       </section>
 
-      <section id="screen-result" class="screen scroll" hidden>
+      <section id="screen-result" class="screen" hidden>
         <!--
           Two pieces of artwork, one shown at a time, chosen by `resultCopy().triumphant`. A round
           that ran its clock out having solved nothing gets the neutral one: a trophy over an empty
-          result reads as sarcasm.
+          result reads as sarcasm. `.result-power` (app.js) adds a brief corona while the stat
+          counts up — CSS only, no heavy overlay image.
         -->
         <div class="result-art" aria-hidden="true">
           <svg class="art art-win" viewBox="0 0 120 120">

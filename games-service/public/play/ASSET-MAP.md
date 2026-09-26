@@ -44,16 +44,38 @@ Still **no** Phase B menu faces (Submit/Clear stay text).
 | File | Role | Wired in |
 |---|---|---|
 | `fx-lock-on*.webp` | Soft pulse on first terminal tap | **I** — `showLockOn` in `board.js` |
-| `fx-invalid-flash.webp` | Red HUD flash on refused drag | **I** — `flashInvalidAt` + sharper `refused` gain |
-| `fx-complete-burst.webp` / `fx-board-flash.webp` | Local board-complete before Submit | **I** — `celebrateLocalComplete` + `.fx-flash` |
-| `fx-submit-ready.svg` | Cyan ready rim (not button art) | **I** — `.submit-wide.ready` |
-| `fx-clear-secondary.svg` | Muted secondary rim | **I** — `#clear.secondary-strong` |
+| `fx-invalid-flash.webp` | ~~Red HUD flash~~ | **REMOVED from UI 26 Sep** — assets on disk only; refuse = token shake + SFX |
+| `fx-complete-burst.webp` / `fx-board-flash.webp` | ~~Local complete burst~~ | **Burst removed 26 Sep**; `fx-board-flash` may still dress sealed/solved CSS |
+| `fx-submit-ready.svg` | ~~Cyan ready rim~~ | **Unused 26 Sep** — Submit uses outer glow only (no inset / SVG rim) |
+| `fx-clear-secondary.svg` | ~~Muted secondary rim~~ | **Unused 26 Sep** — Clear matches Undo ghost chrome |
 | `fx-timer-urgent-rim.svg` | Soft red clock rim ≤10s | **I** — `.readout-clock.urgent-rim` + half-second ticks |
 | `wire-pattern-0..9.svg` | Colour-blind cue references | **I** — live cue is `stroke-dasharray` via `WIRE_DASH` (same 10 patterns) |
 | `fx-cell-contrast.svg` | Dense-grid cell lift (reference) | **I** — CSS `.layer-cells.dense` contrast |
-| `intro-howto-clean.webp` | Teach diagram on Start | **I** — `#intro-howto` on intro screen |
+| `intro-howto-clean.webp` | ~~Teach diagram on Start~~ | **Removed 26 Sep** — intro is rules panels only (no scroll / no error-X art) |
 | `fx-stage-glow.svg` | Stage hierarchy reference | **I** — brighter `NEON_STAGE_FRAME`, quieter `NEON_PANEL_SIDE` |
 | `fx-circuit-sealed.webp` | Freeze/glow before result | **I** — `sealCircuitBeat()` on round end |
 
 **Sources:** owner `improved/Effects/` (sliced), `bardi complete*.png`, plus generated overlays.
 SVG rims/patterns are hand-authored. Keep Phase B rule: no Submit/Clear/Timer *menu faces*.
+
+---
+
+## Phase J — Arcade motion FX (26 Sep 2026) — **WIRED (light)**
+
+Six effects live as **cheap SVG/CSS**, not the heavy WebP washes (owner: board felt heavy).
+Raster Phase J files remain on disk as optional art; live code does not warm them.
+
+| Effect | Live implementation |
+|---|---|
+| Wire trail | `.fx-trail-tip` circle follows drag cell |
+| Undo rewind | `.fx-undo-rewind` ghost polyline on Undo |
+| Board-enter charge | `.fx-board-wake` rings on terminals in `setPuzzle` |
+| Result power-up | Existing `countUpStat` + `#screen-result.result-power` corona |
+| Coverage ripple | `.fx-cell-ripple` when a pip is removed |
+| Pair join spark | `.fx-join-spark` beads terminal → midpoint (on top of join pulse) |
+
+Also same day: hide scrollbars; Clear = Undo chrome; strip invalid tip / complete burst /
+Submit inset rim; drop board `drop-shadow` + neon pulse for perf.
+
+**Conversion:** `games-service/tools/keyout-phase-j.cjs` (black plate → alpha WebP).
+Raster assets kept for a later richer pass if wanted.

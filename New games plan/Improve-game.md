@@ -107,13 +107,18 @@ Owner disliked Submit / Clear / Timer artwork. Files `ui-*.webp` deleted; markup
 - `External game plans/21` BUILT block when owner signs off the full slice.
 - Deploy: `git pull` + `pm2 restart chartvolt-games` (and `npm run build` if `.ts` changed).
 
-### Phase I — Feedback & polish graphics — **WIRED (26 Sep 2026)**
+### Phase I — Feedback & polish graphics — **WIRED (26 Sep 2026, amended same day)**
 
-Ten improvements live: lock-on pulse, invalid red flash + louder refuse SFX, local board-complete
-burst before Submit, Submit `.ready` / Clear secondary rims (text only), timer urgent rim + faster
-tick, pair wire dash patterns, denser-grid cell contrast, intro howto image, arena stage brightest
-(`NEON_STAGE_FRAME` / `NEON_PANEL_SIDE`), circuit-sealed beat before the result panel. Still: no
-Hint, no mid-round SCORE, no Phase B menu faces.
+Lock-on pulse, timer urgent rim, wire dashes, dense-cell contrast, arena stage hierarchy,
+circuit-sealed beat remain. **Amended 26 Sep (owner screenshots):** invalid tip + complete burst
+removed; Clear matches Undo (no gold frame); Submit inset/ready rim removed; intro howto + motion
+diagram removed (no scrollbar); board lightened (no drop-shadow / neon pulse). Still: no Hint, no
+mid-round SCORE, no Phase B menu faces.
+
+### Phase J — Arcade motion FX — **WIRED LIGHT (26 Sep 2026)**
+
+Six effects live as cheap SVG/CSS (trail tip, undo rewind, board-enter wake, result corona +
+count-up, coverage ripple, join spark). Heavy Phase J WebPs stay on disk but are not warmed.
 
 ---
 
@@ -129,7 +134,8 @@ Hint, no mid-round SCORE, no Phase B menu faces.
 | F Complete overlay | deferred with menu skip — **assets ready** (`fx-board-complete*.webp`, burst) |
 | G Number anim | deferred |
 | H Owner eye/ear + deploy | ongoing |
-| I Feedback / polish graphics | **wired** — see ASSET-MAP Phase I; owner eye/ear still owed |
+| I Feedback / polish graphics | **wired + amended** — messy FX stripped; see ASSET-MAP Phase I |
+| J Arcade motion FX | **wired light** — SVG/CSS; see ASSET-MAP Phase J |
 
 ---
 
@@ -159,10 +165,9 @@ Hint, no mid-round SCORE, no Phase B menu faces.
 
 ## 8. Next
 
-**Owner eye/ear** on the Phase I wiring (lock-on, invalid flash, local complete, Submit ready,
-timer rim, intro howto, quieter standings, sealed beat). Deploy play assets with pull +
-`pm2 restart chartvolt-games`. Platform arena token change needs the usual Next deploy for the
-host app. Still: no Hint, no mid-round SCORE, no Phase B menu faces.
+Owner eye/ear on the lighter board + Phase J motion. Deploy play assets with
+`git pull` + `pm2 restart chartvolt-games` (no `npm run build` for `public/play` only).
+Still: no Hint, no mid-round SCORE, no Phase B menu faces.
 
 ---
 
