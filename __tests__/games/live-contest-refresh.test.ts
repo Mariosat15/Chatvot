@@ -92,14 +92,35 @@ describe("both lobbies notice that the contest has started", () => {
 });
 
 describe("both lobbies refresh while the contest is running", () => {
-  it("the refresher is mounted on both branches", () => {
+  /**
+   * Trading still uses `LiveContestRefresher` (page re-read). The provider lobby polls the
+   * same `/standings` endpoint as the arena — `getCompetitionLeaderboard` cannot see
+   * mid-round provisional ranks, so a refresher there was a photograph of the wrong source.
+   */
+  it("the trading branch mounts the page refresher", () => {
     const code = readCode(LOBBY_PAGE);
-    expect(countOf(code, "<LiveContestRefresher")).toBe(2);
+    expect(countOf(code, "<LiveContestRefresher")).toBe(1);
+    expect(code).toMatch(
+      /<LiveContestRefresher\s+active=\{competition\.status === "active"\}/,
+    );
   });
 
-  it("the game branch mounts it before the lobby", () => {
+  it("the game branch does not mount the page refresher — it polls standings instead", () => {
     const branch = providerBranch(readCode(LOBBY_PAGE));
-    expect(branch).toMatch(/<LiveContestRefresher/);
+    expect(branch).not.toMatch(/LiveContestRefresher/);
+    expect(branch).toMatch(/getArenaStandings\(/);
+  });
+
+  it("the provider lobby wraps itself in ArenaLiveProvider like the arena", () => {
+    const lobby = readCode("components/games/ProviderContestLobby.tsx");
+    expect(lobby).toMatch(/<ArenaLiveProvider/);
+    expect(lobby).toMatch(/LobbyLiveLeaderboard/);
+    expect(lobby).toMatch(/LobbyLivePrizePanel/);
+    expect(lobby).toMatch(/LobbyLivePlayersValue/);
+    expect(lobby).toMatch(/LobbyLivePrizePoolValue/);
+    expect(lobby).toMatch(/LobbyLiveEntryButton/);
+    // Frozen page-refresh entry control would leave Join offered after the last seat fills.
+    expect(lobby).not.toMatch(/<CompetitionEntryButton/);
   });
 
   /**
@@ -109,14 +130,21 @@ describe("both lobbies refresh while the contest is running", () => {
    * deciding for itself would stop refreshing exactly while the last rounds are being scored -
    * and the board would freeze at the moment it matters most, with nothing in a log.
    */
-  it("running is read from the stored status and never computed from a date", () => {
+  it("trading running is read from the stored status and never computed from a date", () => {
     const code = readCode(LOBBY_PAGE);
-    expect(countOf(code, 'active={competition.status === "active"}')).toBe(2);
+    expect(countOf(code, 'active={competition.status === "active"}')).toBe(1);
 
     for (const mount of code.split("<LiveContestRefresher").slice(1)) {
       const props = mount.slice(0, mount.indexOf("/>") + 2);
       expect(props).not.toMatch(/Date\.now\(\)|new Date\(/);
     }
+  });
+
+  it("the provider lobby polls for upcoming as well as active so joins before start appear", () => {
+    const lobby = readCode("components/games/ProviderContestLobby.tsx");
+    expect(lobby).toMatch(
+      /status === "active" \|\| status === "upcoming"/,
+    );
   });
 });
 

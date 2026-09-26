@@ -112,7 +112,7 @@ describe("attachProfileImages", () => {
     expect(lookup).not.toHaveBeenCalled();
   });
 
-  it("is the one producer, called by the arena service and by the lobby's provider branch", () => {
+  it("is the one producer, called by the arena service and by the lobby via getArenaStandings", () => {
     const service = readCode(ARENA_SERVICE);
     // Arena uses the extras helper (picture + country map) so one lookup serves both.
     expect(service).toMatch(/await attachArenaBoardExtras\(/);
@@ -125,13 +125,17 @@ describe("attachProfileImages", () => {
 
     const page = readCode(LOBBY_PAGE);
     const branchAt = page.indexOf("hasProviderGameLabel(competition)) {");
-    const attachAt = page.indexOf("await attachProfileImages(leaderboard)");
+    const standingsAt = page.indexOf("await getArenaStandings(", branchAt);
     const difficultyAt = page.indexOf("getDifficultyData(");
     expect(branchAt).toBeGreaterThan(0);
-    expect(attachAt).toBeGreaterThan(branchAt);
-    expect(difficultyAt).toBeGreaterThan(attachAt);
-    // And the lobby is handed the rows WITH pictures, not the ones it read.
-    expect(page).toMatch(/<ProviderContestLobby[\s\S]*?leaderboard=\{gameLeaderboard\}/);
+    expect(standingsAt).toBeGreaterThan(branchAt);
+    expect(difficultyAt).toBeGreaterThan(standingsAt);
+    // Lobby is handed the standings payload (rows already carry pictures from the producer).
+    expect(page).toMatch(
+      /<ProviderContestLobby[\s\S]*?standings=\{standings\}/,
+    );
+    // No second attach on the lobby page — pictures travel inside getArenaStandings.
+    expect(page).not.toMatch(/attachProfileImages/);
   });
 
   it("the board draws the picture off the row and never looks a player up itself", () => {

@@ -2,7 +2,6 @@ import {
   ArrowLeft,
   Clock,
   Gamepad2,
-  Gift,
   Info,
   Link2,
   LifeBuoy,
@@ -12,18 +11,24 @@ import {
   Users,
 } from "lucide-react";
 import { connectToDatabase } from "@/database/mongoose";
-import CompetitionEntryButton from "@/components/trading/CompetitionEntryButton";
 import UTCClock from "@/components/trading/UTCClock";
 import InlineCountdown from "@/components/trading/InlineCountdown";
-import ProviderLeaderboard from "@/components/games/ProviderLeaderboard";
 import ContestCountdown from "@/components/games/ContestCountdown";
 import GameRulesPanel from "@/components/games/GameRulesPanel";
-import PrizeTable from "@/components/competitions/PrizeTable";
+import {
+  LobbyLiveEntryButton,
+  LobbyLiveLeaderboard,
+  LobbyLivePlayersMinNote,
+  LobbyLivePlayersValue,
+  LobbyLivePrizePanel,
+  LobbyLivePrizePoolValue,
+  LobbyLiveYourScoreValue,
+} from "@/components/games/LobbyLiveParts";
+import { ArenaLiveProvider } from "@/components/games/arena/ArenaLiveStandings";
 import { NeonHero, NeonStatusBadge } from "@/components/neon/Hero";
 import { resolveProviderBanner } from "@/components/neon/banners";
 import { NeonPill } from "@/components/neon/Buttons";
 import {
-  NeonCountPill,
   NeonNote,
   NeonPanel,
   NeonRow,
@@ -39,7 +44,7 @@ import {
   UNKNOWN_GAME_NAME,
 } from "@/lib/services/games/game-presentation.service";
 import { isProviderContest } from "@/lib/services/games/contest-config";
-import { getContestActivity } from "@/lib/services/games/contest-activity.service";
+import type { ArenaStandings } from "@/lib/services/games/arena-standings.service";
 import { getTitleLevels } from "@/lib/services/xp-config.service";
 import {
   contestReservesFullRound,
@@ -94,8 +99,12 @@ interface ProviderContestLobbyProps {
   */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   competition: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  leaderboard: any[];
+  /**
+   * First paint from `getArenaStandings` — same producer the lobby's poll and the arena use.
+   * Never `getCompetitionLeaderboard`: that path ranks settled seat scores only, so mid-round
+   * provisional ranks stay frozen until a full reload.
+   */
+  standings: ArenaStandings;
   isUserIn: boolean;
   isFull: boolean;
   userId: string;
@@ -130,7 +139,7 @@ function formatUTC(value: Date | string | undefined): string | null {
 
 export default async function ProviderContestLobby({
   competition,
-  leaderboard,
+  standings,
   isUserIn,
   isFull,
   userId,
@@ -185,17 +194,9 @@ export default async function ProviderContestLobby({
   const state = playState?.success ? playState.state : null;
 
   /*
-    WHAT EACH PLAYER HAS DONE, so the lobby board says the same thing the arena board says. The
-    two are the same component and the same read; a board that describes progress on one screen
-    and not the other teaches a player that one of them is out of date.
-
-    Scoped to the user ids already on the board, so the query is bounded by the players being
-    rendered rather than by everyone who has ever entered.
+    WHAT EACH PLAYER HAS DONE arrives on `standings.activity` from the same producer the arena
+    polls. A second `getContestActivity` here would be a second clock beside that poll.
   */
-  const activity = await getContestActivity(
-    competition._id,
-    leaderboard.map((row) => String(row.userId)),
-  );
 
   /*
     The operator's level ladder, for the entry button's level-requirement line (R88/R90).
@@ -376,7 +377,45 @@ export default async function ProviderContestLobby({
 
   const showCountdown = Boolean(countdownTarget) && !isCompleted && !isCancelled;
 
+  /*
+    Poll while seats can still join OR rounds can still score — same endpoint as the arena.
+    Completed / cancelled contests keep the first paint only; nothing mid-flight to watch.
+  */
+  const pollStandings =
+    status === "active" || status === "upcoming";
+
+  const initialContest = {
+    currentParticipants: standings.contest.currentParticipants,
+    maxParticipants:
+      standings.contest.maxParticipants ?? competition.maxParticipants,
+    prizePool: standings.contest.prizePool ?? competition.prizePool,
+    prizePoolCredits:
+      standings.contest.prizePoolCredits ?? competition.prizePoolCredits,
+    entryFee: standings.contest.entryFee ?? competition.entryFee,
+    platformFeePercentage:
+      standings.contest.platformFeePercentage ??
+      competition.platformFeePercentage,
+    prizeDistribution:
+      standings.contest.prizeDistribution ?? competition.prizeDistribution,
+  };
+
+  const myInitialScore = standings.rows.find((row) => row.userId === userId)
+    ?.score;
+
   return (
+    <ArenaLiveProvider
+      competitionId={String(competition._id)}
+      currentUserId={userId}
+      active={pollStandings}
+      initial={{
+        rows: standings.rows,
+        activity: standings.activity,
+        feed: standings.feed,
+        countries: standings.countries,
+        contest: initialContest,
+        yourRank: standings.yourRank,
+      }}
+    >
     <div className="flex min-h-screen flex-col gap-4 overflow-x-hidden p-3 sm:gap-6 sm:p-4 md:p-8">
       <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4">
         <NeonPill
@@ -410,7 +449,12 @@ export default async function ProviderContestLobby({
             icon={Trophy}
             accent="prize"
             label={terms.prizePool}
-            value={formatVolts(competition.prizePool ?? 0, { symbol: creditSymbol })}
+            value={
+              <LobbyLivePrizePoolValue
+                initialPool={competition.prizePool ?? 0}
+                creditSymbol={creditSymbol}
+              />
+            }
           />
           <StatCard
             icon={Link2}
@@ -426,23 +470,19 @@ export default async function ProviderContestLobby({
             icon={Users}
             accent="players"
             label={terms.players}
-            value={`${competition.currentParticipants ?? 0} / ${competition.maxParticipants ?? 0}`}
+            value={
+              <LobbyLivePlayersValue
+                initialCurrent={competition.currentParticipants ?? 0}
+                initialMax={competition.maxParticipants ?? 0}
+              />
+            }
             note={
               status === "upcoming" && competition.minParticipants > 0 ? (
-                <p
-                  className={`mt-2 text-xs ${
-                    (competition.currentParticipants ?? 0) <
-                    competition.minParticipants
-                      ? "text-orange-400"
-                      : "text-emerald-400"
-                  }`}
-                >
-                  Minimum {competition.minParticipants}
-                  {(competition.currentParticipants ?? 0) <
-                  competition.minParticipants
-                    ? ` - needs more ${terms.players.toLowerCase()}`
-                    : " - reached"}
-                </p>
+                <LobbyLivePlayersMinNote
+                  minParticipants={competition.minParticipants}
+                  playersLabel={terms.players}
+                  initialCurrent={competition.currentParticipants ?? 0}
+                />
               ) : undefined
             }
           />
@@ -462,17 +502,16 @@ export default async function ProviderContestLobby({
             nought before the payload left it, so this tile showed `0` to a player who had not
             played and the dash was unreachable. Fixed with the seat and the schema in R50 -
             all three had to change, since any one of them supplying a zero is enough.
+
+            26 SEP 2026 — value comes from the live standings poll (finished + provisional),
+            not only `getPlayState`'s seat score, so a mid-round total matches the board below.
           */}
           {isUserIn ? (
             <StatCard
               icon={Gamepad2}
               accent="score"
               label="Your score"
-              value={
-                typeof state?.participantScore === "number"
-                  ? state.participantScore.toLocaleString()
-                  : "-"
-              }
+              value={<LobbyLiveYourScoreValue initialScore={myInitialScore} />}
             />
           ) : (
             <StatCard
@@ -520,31 +559,18 @@ export default async function ProviderContestLobby({
           */}
           <GameRulesPanel presentation={presentation} layout="wide" />
 
-          <NeonPanel
-            icon={Trophy}
-            accent="prize"
+          {/*
+            Same standings poll as the arena — live ranks via provisionalScore, not a page
+            refresh of settled seat scores. "players", never "traders".
+          */}
+          <LobbyLiveLeaderboard
             title={terms.leaderboard}
-            action={
-              /*
-                "players", never "traders". The trading lobby's equivalent pill says traders, and
-                copying it wholesale would put a trading label in the one place a player is
-                certain to read.
-              */
-              <NeonCountPill>{leaderboard.length} players</NeonCountPill>
-            }
-            className="min-w-0"
-          >
-            <ProviderLeaderboard
-              rows={leaderboard}
-              currentUserId={userId}
-              scoreLabel={scoreLabel}
-              activity={activity.latestByUser}
-            />
-          </NeonPanel>
+            scoreLabel={scoreLabel}
+          />
         </div>
 
         <div className="space-y-6">
-          <CompetitionEntryButton
+          <LobbyLiveEntryButton
             competition={competition}
             userBalance={walletBalance}
             isUserIn={isUserIn}
@@ -622,9 +648,10 @@ export default async function ProviderContestLobby({
             that failed to load.
           */}
           {(competition.prizeDistribution?.length ?? 0) > 0 && (
-            <NeonPanel icon={Gift} accent="prize" title="Prize distribution">
-              <PrizeTable competition={competition} creditSymbol={creditSymbol} />
-            </NeonPanel>
+            <LobbyLivePrizePanel
+              initialCompetition={competition}
+              creditSymbol={creditSymbol}
+            />
           )}
 
           {/*
@@ -691,5 +718,6 @@ export default async function ProviderContestLobby({
         <NeonPill href="/help/competitions" icon={LifeBuoy} label="Help centre" />
       </div>
     </div>
+    </ArenaLiveProvider>
   );
 }

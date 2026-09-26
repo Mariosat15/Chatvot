@@ -22,7 +22,7 @@ import { NeonCountPill, NeonPanel } from "@/components/neon/Cards";
 import { NeonPill } from "@/components/neon/Buttons";
 import ProviderContestLobby from "@/components/games/ProviderContestLobby";
 import { hasProviderGameLabel } from "@/lib/services/games/contest-config";
-import { attachProfileImages } from "@/lib/services/games/leaderboard-avatars";
+import { getArenaStandings } from "@/lib/services/games/arena-standings.service";
 import { isRegistrationClosed } from "@/lib/utils/registration-deadline";
 import {
   isCompetitionIdShaped,
@@ -203,12 +203,12 @@ const CompetitionDetailsPage = async ({
     */
     if (hasProviderGameLabel(competition)) {
       /*
-        The players' pictures, attached to the ranked rows here and never by the ranking read
-        itself - `getCompetitionLeaderboard` is mirrored into the admin app, which draws no
-        board. The arena attaches them through the same module, so a player's face is the same
-        on both game screens. See `lib/services/games/leaderboard-avatars.ts`.
+        Same producer as the arena standings poll: live display scores (finished + optional
+        provisional), contest snapshot for seats/prize, activity lines. `LiveContestRefresher`
+        is deliberately NOT mounted here — a page refresh of `getCompetitionLeaderboard` cannot
+        see mid-round provisional ranks, and the lobby now polls `/standings` like the play page.
       */
-      const gameLeaderboard = await attachProfileImages(leaderboard);
+      const standings = await getArenaStandings(id, userId, { limit: 50 });
 
       return (
         <>
@@ -232,16 +232,9 @@ const CompetitionDetailsPage = async ({
             startTime={competition.startTime}
             userId={userId}
           />
-          {/*
-            And the monitor alone is not enough, which is the second half of the same report.
-            It refreshes on a status CHANGE, so during a running contest - when the status stays
-            `active` for its whole duration - it never fires, and the standings a player is
-            watching are the ones that existed when they opened the page.
-          */}
-          <LiveContestRefresher active={competition.status === "active"} />
           <ProviderContestLobby
             competition={competition}
-            leaderboard={gameLeaderboard}
+            standings={standings}
             isUserIn={isUserIn}
             isFull={isFull}
             userId={userId}

@@ -634,6 +634,7 @@ describe("a provider contest gets its own lobby, not the trading one", () => {
 describe("the provider leaderboard shows a score and nothing it does not have", () => {
   it("is not the trading leaderboard", () => {
     const lobby = readCode(PROVIDER_LOBBY);
+    const liveParts = readCode("components/games/LobbyLiveParts.tsx");
 
     // `CompetitionLeaderboard`'s row type declares currentCapital, pnl, pnlPercentage and the
     // trade counts, and its props demand a prizeDistribution and a minimumTrades. Rendering it
@@ -641,7 +642,10 @@ describe("the provider leaderboard shows a score and nothing it does not have", 
     // of a player who has never traded - `05` s10's binding rule broken in the most visible
     // place available.
     expect(lobby).not.toMatch(/CompetitionLeaderboard/);
-    expect(lobby).toMatch(/<ProviderLeaderboard/);
+    expect(liveParts).not.toMatch(/CompetitionLeaderboard/);
+    // Board mounts via LobbyLiveParts (standings poll), not inline in the server lobby.
+    expect(lobby).toMatch(/LobbyLiveLeaderboard/);
+    expect(liveParts).toMatch(/<ProviderLeaderboard/);
   });
 
   it("renders no trading figure at all", () => {
@@ -887,12 +891,14 @@ describe("the two lobbies are built from one design kit", () => {
   });
 
   it("says players, never traders", () => {
-    const code = readCode(PROVIDER_LOBBY);
+    const lobby = readCode(PROVIDER_LOBBY);
+    const liveParts = readCode("components/games/LobbyLiveParts.tsx");
 
-    // The trading lobby's equivalent count pill says "traders". Copying it wholesale is the
-    // trading-shaped-label problem in the one place on the page a player is certain to read.
-    expect(code).toMatch(/leaderboard\.length\}\s*players/);
-    expect(code).not.toMatch(/traders/);
+    // Count pill lives in LobbyLiveParts (live standings). Trading-shaped "traders" stays banned
+    // on both the lobby shell and the live board consumer.
+    expect(liveParts).toMatch(/rows\.length\}\s*players/);
+    expect(lobby).not.toMatch(/traders/);
+    expect(liveParts).not.toMatch(/traders/);
   });
 
   it("builds no Tailwind class by interpolation", () => {
@@ -1171,26 +1177,33 @@ describe("the two lobbies are built from one design kit", () => {
       of the move is that a change to the redistribution reaches both screens - a second copy
       is the shape behind `referenceId`, `failedReason`, `challengeId` and the Game Master `||`.
 
-      The trailing character class matters: written `/<PrizeTable/` this passes against
-      `<PrizeTableOld`, which is the prefix-match trap that has now defeated a structural test
-      here five times.
+      Provider lobby mounts PrizeTable through LobbyLiveParts (live standings poll); trading
+      sidebar still mounts it directly. The trailing character class matters: written
+      `/<PrizeTable/` this passes against `<PrizeTableOld`.
     */
-    for (const lobby of [PROVIDER_LOBBY, TRADING_SIDEBAR]) {
-      const code = readCode(lobby);
-      expect(code).toMatch(/<PrizeTable[\s>]/);
-      expect(code).toContain('from "@/components/competitions/PrizeTable"');
-    }
+    const trading = readCode(TRADING_SIDEBAR);
+    expect(trading).toMatch(/<PrizeTable[\s>]/);
+    expect(trading).toContain('from "@/components/competitions/PrizeTable"');
+
+    const liveParts = readCode("components/games/LobbyLiveParts.tsx");
+    expect(liveParts).toMatch(/<PrizeTable[\s>]/);
+    expect(liveParts).toContain('from "@/components/competitions/PrizeTable"');
+    expect(readCode(PROVIDER_LOBBY)).toMatch(/LobbyLivePrizePanel/);
   });
 
   it("hides the prize panel on a contest with no configured shares", () => {
     // A free or practice contest has no distribution, and an empty panel headed "Prize
     // distribution" reads as data that failed to load rather than as a contest without prizes.
+    // Guard stays on the server lobby; the live panel itself also no-ops at prizePositions === 0.
     const code = readCode(PROVIDER_LOBBY);
     const guard = code.indexOf("competition.prizeDistribution?.length");
-    const panel = code.indexOf('title="Prize distribution"');
+    const panel = code.indexOf("<LobbyLivePrizePanel");
 
     expect(guard).toBeGreaterThan(-1);
     expect(panel).toBeGreaterThan(guard);
+
+    const liveParts = readCode("components/games/LobbyLiveParts.tsx");
+    expect(liveParts).toMatch(/if \(prizePositions === 0\) return null/);
   });
 
   it("tells the player the configured shares are a floor", () => {
@@ -1957,6 +1970,9 @@ describe("a player is told how long they have left to join", () => {
 
 const ARENA_LAYOUT = "components/games/arena/GameArenaLayout.tsx";
 const ARENA_CONTEST_PANEL = "components/games/arena/ArenaContestPanel.tsx";
+const ARENA_CONTEST_PANEL_VIEW =
+  "components/games/arena/ArenaContestPanelView.tsx";
+const ARENA_LIVE_SIDEBAR = "components/games/arena/ArenaLiveSidebar.tsx";
 
 describe("the arena puts the board first at every width", () => {
   /*
@@ -2186,24 +2202,19 @@ describe("the arena states what the prize figures are", () => {
       component would read as two headings there and be removed again, at which point the arena
       loses it. The heading is the caller's, and the negative assertion is what keeps it that
       way.
-    */
-    const page = readCode(PLAY_PAGE);
 
-    /*
-      THE PANEL MUST CONTAIN THE TABLE, not merely precede it - and the difference is not
-      academic. A first version sliced back from `<PrizeTable` to the nearest preceding
-      `<NeonHeadedPanel`, which is satisfied by a panel that has already CLOSED: a probe moving
-      the table out to sit below the panel came back green, with the heading captioning an empty
-      box and the amounts bare underneath it. So the assertion is containment: opening tag,
-      then the table, then the closing tag, in that order.
+      FLIPPED 26 Sep 2026: the arena mounts the table from ArenaLiveSidebar (live contest
+      snapshot), not from the play page JSX. Containment is asserted there.
     */
-    const openAt = page.indexOf('title="Prize breakdown"');
+    const sidebar = readCode(ARENA_LIVE_SIDEBAR);
+
+    const openAt = sidebar.indexOf('title="Prize breakdown"');
     expect(openAt).toBeGreaterThan(0);
 
-    const closeAt = page.indexOf("</NeonHeadedPanel>", openAt);
+    const closeAt = sidebar.indexOf("</NeonHeadedPanel>", openAt);
     expect(closeAt).toBeGreaterThan(openAt);
 
-    const inside = page.slice(openAt, closeAt);
+    const inside = sidebar.slice(openAt, closeAt);
     expect(inside).toContain("<PrizeTable");
 
     expect(readCode(PRIZE_TABLE)).not.toContain("Prize breakdown");
@@ -2215,9 +2226,9 @@ describe("the arena states what the prize figures are", () => {
       can configure any number of positions, so a literal here is a caption that is wrong for
       every contest but one - and it reads perfectly correctly in a diff.
     */
-    const page = readCode(PLAY_PAGE);
-    expect(page).toMatch(/Top \{prizePositions\} win/);
-    expect(page).not.toMatch(/Top 3 win/);
+    const sidebar = readCode(ARENA_LIVE_SIDEBAR);
+    expect(sidebar).toMatch(/Top \{prizePositions\} win/);
+    expect(sidebar).not.toMatch(/Top 3 win/);
   });
 });
 
@@ -2242,16 +2253,22 @@ describe("the player's own position is read, never worked out", () => {
   */
   it("takes currentRank off the matching row", () => {
     const service = readCode(ARENA_STANDINGS_SERVICE);
-    expect(service).toMatch(/rows\.find\([\s\S]{0,120}currentRank/);
+    // Rank comes from calculateRankings' `.rank`, then is stored as currentRank on each row.
+    // yourRank is looked up on the full ranked list before the board is sliced.
+    expect(service).toMatch(
+      /rankedParticipants\.find\([\s\S]{0,80}userId[\s\S]{0,40}\?\.rank/,
+    );
+    expect(service).toMatch(/currentRank:\s*p\.rank/);
 
     // The page is handed the answer. `standings.yourRank` is a read of it, not a computation.
+    // FLIPPED 26 Sep 2026: prop is `initialRank` — live rank then comes from ArenaLiveProvider.
     const page = readCode(PLAY_PAGE);
     expect(page).not.toMatch(/rows\.find\(/);
-    expect(page).toMatch(/rank=\{standings\.yourRank\}/);
+    expect(page).toMatch(/initialRank=\{standings\.yourRank\}/);
   });
 
   it("orders nothing itself", () => {
-    for (const file of [PLAY_PAGE, ARENA_CONTEST_PANEL]) {
+    for (const file of [PLAY_PAGE, ARENA_CONTEST_PANEL, ARENA_CONTEST_PANEL_VIEW]) {
       expect(readCode(file)).not.toMatch(/\.sort\(/);
     }
   });
@@ -2263,18 +2280,18 @@ describe("the player's own position is read, never worked out", () => {
       the narrowing is recorded rather than quietly applied (the same lesson as `13` s4.1g's
       `GameIcon` ban).
 
-      The panel legitimately reads the direction: `scoringSummary` turns it into the sentence
-      that tells a player whether a high score or a low one wins, which is a thing the screen
-      MUST say and cannot say without it. What it may not do is compare two scores with it -
-      that is `calculateRankings`' single decision, and a second one is R37.
+      The panel view legitimately reads the direction: `scoringSummary` turns it into the
+      sentence that tells a player whether a high score or a low one wins. What it may not do is
+      compare two scores with it - that is `calculateRankings`' single decision, and a second
+      one is R37.
 
-      So: the panel's only use of it is as an argument, and the page - which holds the ranked
-      rows and could therefore actually reorder them - never sees it at all.
+      FLIPPED 26 Sep 2026: the markup lives in ArenaContestPanelView; the server panel only
+      loads terms and forwards props.
     */
-    const panel = readCode(ARENA_CONTEST_PANEL);
-    const uses = panel.match(/scoreDirection/g) ?? [];
+    const view = readCode(ARENA_CONTEST_PANEL_VIEW);
+    const uses = view.match(/scoreDirection/g) ?? [];
     expect(uses).toHaveLength(1);
-    expect(panel).toMatch(/scoringSummary\([^)]*scoreDirection/);
+    expect(view).toMatch(/scoringSummary\([^)]*scoreDirection/);
 
     expect(readCode(PLAY_PAGE)).not.toMatch(/scoreDirection/);
   });
@@ -2285,15 +2302,11 @@ describe("the player's own position is read, never worked out", () => {
       phantom `score: 0` that R50 removed - a screen telling somebody they lead a contest they
       have not played. The `typeof` check is the load-bearing part: a truthiness test would
       show a dash for a genuine rank of zero if the ranking ever became zero-based.
-    */
-    const code = readCode(ARENA_CONTEST_PANEL);
 
-    /*
-      NOTHING BETWEEN THE TEST AND THE `?`, which is what makes this stronger than it looks. A
-      first version allowed sixty characters of slack between the `typeof` check and the dash,
-      and a probe widening the condition to `typeof rank === "number" || true` came back green:
-      the operator was still there, the dash was still there, and the branch was dead.
+      FLIPPED 26 Sep 2026: assertion aimed at ArenaContestPanelView, where the rank tile lives.
     */
+    const code = readCode(ARENA_CONTEST_PANEL_VIEW);
+
     expect(code).toMatch(/typeof rank === "number"\s*\?/);
     expect(code).toMatch(/typeof rank === "number"[\s\S]{0,40}:\s*"—"/);
   });

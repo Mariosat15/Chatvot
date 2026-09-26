@@ -654,19 +654,28 @@ because a rank there moves with the price rather than only when somebody finishe
 
 | Piece | What it does |
 |---|---|
-| `components/competitions/LiveContestRefresher.tsx` | Calls `router.refresh()` on a 15-second cadence while the contest is running. Visibility-gated, and refreshes immediately on the way back to the tab |
-| The game branch of `app/(root)/competitions/[id]/page.tsx` | Now mounts `CompetitionStatusMonitor` **and** the refresher, above the lobby |
+| `components/competitions/LiveContestRefresher.tsx` | Calls `router.refresh()` on a 15-second cadence while the contest is running. Visibility-gated, and refreshes immediately on the way back to the tab. **Trading only from 26 Sep 2026** — see amendment below |
+| The game branch of `app/(root)/competitions/[id]/page.tsx` | Mounts `CompetitionStatusMonitor`; from 26 Sep seeds `getArenaStandings` and does **not** mount the refresher |
 | The trading branch of the same file | Gains the refresher beside the monitor it already had |
 
-**It re-reads the page rather than polling an endpoint, and that is a decision.** There is no
-player-facing JSON API that returns a competition's ranking: `getCompetitionLeaderboard` is a
-**server action**, and it is where the whole rule lives - the score direction resolved from the
-catalogue, the R45 eligibility gate, the tie handling. An endpoint would be a second reader that
+**It re-reads the page rather than polling an endpoint, and that is a decision — for
+trading.** There the ranking rule lives in `getCompetitionLeaderboard` (server action): score
+direction, the R45 eligibility gate, tie handling. An endpoint would be a second reader that
 can drift from it, the shape behind `referenceId`, `failedReason`, `challengeId` and the Game
 Master `||`, **none of which `check:mirrors` can see**. A refresh re-runs the page that already
 calls the action, so there is one answer to "who is winning". The cost is a whole server render
 rather than one query, taken knowingly: a lobby is not a hot path, and React preserves client
 state across a refresh, so an open dialog stays open and a half-typed field keeps its text.
+
+> **AMENDED 26 September 2026 — provider lobby uses the arena standings poll, not the
+> refresher.** `LiveContestRefresher` + `getCompetitionLeaderboard` only ever see settled seat
+> scores, so after the arena gained `provisionalScore` and a contest snapshot the details page
+> still needed a reload for joins, prize seats and mid-round ranks. The provider branch now
+> seeds `getArenaStandings`, wraps `ProviderContestLobby` in `ArenaLiveProvider` (poll while
+> `active` or `upcoming`), and swaps players / your score / board / prize via
+> `components/games/LobbyLiveParts.tsx`. **One producer with the play page** — a document saying
+> both lobbies use `LiveContestRefresher` is correct as history and stale as a present fact;
+> **say which**. Trading is unchanged.
 
 **It must not be mounted on the play screen, and that negative is the load-bearing guard.** That
 page hosts the game in an iframe and owns a 20-second poll of `/rounds` which updates the player's
@@ -3040,14 +3049,16 @@ stages while a known one-character defect was preserved verbatim.
   **CLOSED 18 Sep 2026** (`13` **s5.1c**) — correct as history that it was outstanding, stale
   as a present fact, so **say which**.
 - **The cards could not use the lobbies' answer, and that is a measurement rather than a
-  preference.** Both lobbies re-read their own page on a timer (`LiveContestRefresher`, s1.1j)
-  because a server action holds the direction, the R45 eligibility gate and the tie handling, so
-  an endpoint would be a second reader that can drift. `getComprehensiveDashboardData` cannot be
-  polled at all: upwards of twenty database round trips, unbounded `TradeHistory` and
+  preference.** The **trading** lobby still re-reads its page on a timer (`LiveContestRefresher`,
+  s1.1j) because a server action holds the direction, the R45 eligibility gate and the tie
+  handling. The **provider** lobby polls `/standings` from 26 Sep 2026 (same producer as the
+  arena) — a document saying both lobbies use the refresher is stale as a present fact; **say
+  which**. `getComprehensiveDashboardData` cannot be polled at all: upwards of twenty database round trips, unbounded `TradeHistory` and
   `WalletTransaction` reads, a ten-thousand-row participant fetch, and
   `getUserGlobalRank` calling `getGlobalLeaderboard(999999)`, which takes seconds cold. **A
-  cheap page is refreshed; an expensive one needs a narrow endpoint** - and a narrow endpoint is
-  exactly the second reader the lobbies avoided, which is why the rank came out first.
+  cheap page is refreshed; an expensive one needs a narrow endpoint** - and for trading that
+  narrow endpoint would have been a second reader of the ranking action, which is why the rank
+  came out first (provider later got `/standings` as its own producer).
 - **The property that matters is AGREEMENT with the action, not liveness, and the strongest
   guard is a text comparison of the two select strings token for token.** The player sees a
   figure on load and this endpoint's figure in the same place fifteen seconds later, so any
