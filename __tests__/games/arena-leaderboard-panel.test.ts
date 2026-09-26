@@ -59,7 +59,7 @@ describe("the rail is as tall as the board beside it", () => {
 
     // And the panel takes the height it is offered.
     const panel = readCode(PANEL);
-    expect(panel).toMatch(/\$\{NEON_PANEL_LIT\} flex h-full flex-col/);
+    expect(panel).toMatch(/\$\{NEON_PANEL_SIDE\} flex h-full flex-col/);
   });
 
   it("caps nothing, and grows in exactly one place", () => {

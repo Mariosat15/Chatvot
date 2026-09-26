@@ -107,6 +107,14 @@ Owner disliked Submit / Clear / Timer artwork. Files `ui-*.webp` deleted; markup
 - `External game plans/21` BUILT block when owner signs off the full slice.
 - Deploy: `git pull` + `pm2 restart chartvolt-games` (and `npm run build` if `.ts` changed).
 
+### Phase I — Feedback & polish graphics — **WIRED (26 Sep 2026)**
+
+Ten improvements live: lock-on pulse, invalid red flash + louder refuse SFX, local board-complete
+burst before Submit, Submit `.ready` / Clear secondary rims (text only), timer urgent rim + faster
+tick, pair wire dash patterns, denser-grid cell contrast, intro howto image, arena stage brightest
+(`NEON_STAGE_FRAME` / `NEON_PANEL_SIDE`), circuit-sealed beat before the result panel. Still: no
+Hint, no mid-round SCORE, no Phase B menu faces.
+
 ---
 
 ## 6. Effort (remaining)
@@ -118,9 +126,10 @@ Owner disliked Submit / Clear / Timer artwork. Files `ui-*.webp` deleted; markup
 | C Digits + timer SFX | **done** |
 | D Board skins + pulse | **done** |
 | E Audio files | **done** |
-| F Complete overlay | deferred with menu skip |
+| F Complete overlay | deferred with menu skip — **assets ready** (`fx-board-complete*.webp`, burst) |
 | G Number anim | deferred |
-| H Owner eye/ear + deploy | **next** |
+| H Owner eye/ear + deploy | ongoing |
+| I Feedback / polish graphics | **wired** — see ASSET-MAP Phase I; owner eye/ear still owed |
 
 ---
 
@@ -150,13 +159,19 @@ Owner disliked Submit / Clear / Timer artwork. Files `ui-*.webp` deleted; markup
 
 ## 8. Next
 
-Owner eye/ear on digits, board skins + pulse, and music/SFX on a real play session. Then deploy restart of `chartvolt-games`.
+**Owner eye/ear** on the Phase I wiring (lock-on, invalid flash, local complete, Submit ready,
+timer rim, intro howto, quieter standings, sealed beat). Deploy play assets with pull +
+`pm2 restart chartvolt-games`. Platform arena token change needs the usual Next deploy for the
+host app. Still: no Hint, no mid-round SCORE, no Phase B menu faces.
 
 ---
 
 ## 9. Explicitly out of scope
 
-- Platform arena chrome (`components/games/arena/*`).
 - Hint, invented SCORE, Combo as a scored metric, XP LEVEL bar.
 - Protocol / callback / settlement changes.
 - Re-adding Phase B menu chrome without a new owner request.
+
+**Note (26 Sep):** Phase I *did* touch arena hierarchy (`NEON_STAGE_FRAME` brighter,
+`NEON_PANEL_SIDE` for standings, dimmed rules band) because that was one of the ten requested
+improvements — not a general arena restyle.

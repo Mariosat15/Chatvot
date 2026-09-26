@@ -66,7 +66,7 @@ const SAMPLE_URLS = new Map([
 const SAMPLE_GAIN = new Map([
   ["press", 0.32],
   ["start", 0.38],
-  ["refused", 0.34],
+  ["refused", 0.48],
   ["clear", 0.34],
   ["break", 0.32],
   ["tick", 0.28],

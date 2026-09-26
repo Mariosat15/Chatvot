@@ -1,5 +1,5 @@
 import { Swords } from "lucide-react";
-import { NEON_LABEL, NEON_PANEL_LIT } from "@/components/neon/tokens";
+import { NEON_LABEL, NEON_PANEL_SIDE } from "@/components/neon/tokens";
 import { NeonCountPill } from "@/components/neon/Cards";
 import {
   describeRoundActivity,
@@ -48,7 +48,7 @@ interface Props {
 
 export default function ChallengeStandingsPanel({ seats, scoreLabel }: Props) {
   return (
-    <div className={`${NEON_PANEL_LIT} flex h-full min-h-[400px] flex-col`}>
+    <div className={`${NEON_PANEL_SIDE} flex h-full min-h-[400px] flex-col`}>
       <div className="flex items-center justify-between gap-2 border-b border-[#161E36] px-4 py-2.5">
         <span className="flex items-center gap-2 text-sm font-semibold text-gray-100">
           <Swords className="h-4 w-4 text-orange-300" />

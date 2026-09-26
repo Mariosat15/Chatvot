@@ -295,7 +295,11 @@ export function GameArenaLayout({
         works / Game tips after tips grew icons + title + detail - the owner's "cutoff"
         screenshot. Fixed height stays; content still cannot turn the strip into a section.
       */}
-      <div className="mt-3 flex flex-wrap items-stretch gap-2.5 overflow-hidden sm:h-[300px]">
+      {/*
+        Rules / tips sit quieter than the board stage (26 Sep 2026 hierarchy pass). Opacity on
+        the wrappers, not inside the panels — lobby callers of the same panels stay full-bright.
+      */}
+      <div className="mt-3 flex flex-wrap items-stretch gap-2.5 overflow-hidden opacity-85 sm:h-[300px]">
         <div className="min-w-[260px] flex-[1_1_0] empty:hidden [&>*]:h-full">
           {rules}
         </div>

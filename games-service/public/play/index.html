@@ -40,6 +40,14 @@
       </section>
 
       <section id="screen-intro" class="screen scroll" hidden>
+        <img
+          id="intro-howto"
+          class="intro-howto"
+          src="/play/intro-howto-clean.webp"
+          width="768"
+          height="768"
+          alt="Tap matching numbers and connect them without crossing other wires"
+        />
         <!--
           The rules, drawn. A player who has never seen a flow puzzle does not learn it from three
           sentences, and this is a paid contest, so the seconds spent working out the interaction
@@ -48,9 +56,12 @@
           Inline rather than an image file: it is the only way to have artwork that costs no extra
           request, needs no entry in the asset allowlist, and inherits the palette. The animation
           is switched off under `prefers-reduced-motion` in the stylesheet.
+
+          Since 26 Sep 2026 the teach diagram above (`intro-howto-clean.webp`) is the primary glance
+          lesson; this SVG stays as the motion demo beneath it.
         -->
         <svg
-          class="diagram"
+          class="diagram diagram-motion"
           viewBox="0 0 180 100"
           role="img"
           aria-label="A path drawn between two terminals numbered one, filling every square"
@@ -231,7 +242,7 @@
               <span class="rail-btn-icon" aria-hidden="true">&#8630;</span>
               <span class="rail-btn-label">Undo</span>
             </button>
-            <button id="clear" class="ghost rail-btn" type="button">
+            <button id="clear" class="ghost rail-btn secondary-strong" type="button">
               <span class="rail-btn-icon" aria-hidden="true">&#8635;</span>
               <span class="rail-btn-label">Clear</span>
             </button>
@@ -252,6 +263,9 @@
                 nothing on screen to suggest why. See `BOARD_ART_OVERHANG` in `presentation.js`.
               -->
               <div class="board-art" aria-hidden="true"></div>
+              <!-- Local complete / sealed overlays — CSS backgrounds, not hit targets. -->
+              <div class="board-fx board-fx-flash" aria-hidden="true"></div>
+              <div class="board-fx board-fx-sealed" aria-hidden="true"></div>
               <!-- `touch-action: none` lives in the stylesheet: a drag must not scroll the page. -->
               <svg id="board" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Puzzle grid">
               </svg>

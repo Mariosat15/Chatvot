@@ -52,6 +52,7 @@ interface FakeNode {
   textContent: string;
   firstChild: FakeNode | null;
   setAttribute(name: string, value: string): void;
+  removeAttribute(name: string): void;
   appendChild(node: FakeNode): void;
   removeChild(node: FakeNode): void;
 }
@@ -65,6 +66,9 @@ function fakeNode(nodeName: string): FakeNode {
     firstChild: null,
     setAttribute(name: string, value: string) {
       this.attributes.set(name, value);
+    },
+    removeAttribute(name: string) {
+      this.attributes.delete(name);
     },
     appendChild(child: FakeNode) {
       node.children.push(child);
@@ -704,14 +708,24 @@ async function main(): Promise<void> {
      * 36 cells and up to 16 terminals, eight of which carry an `<image>` the browser must resolve
      * again, to move one line by one square. That is invisible on a desktop and is stutter on a
      * phone, which is where this game is played and where the clock is the score.
+     *
+     * Scoped to `.token-face` since 26 Sep 2026: a drag also stamps a short-lived lock-on
+     * `<image>` into `.layer-flashes`, which is feedback chrome, not furniture. Counting every
+     * image would fail the identity check the moment that pulse exists.
      */
     const { generated, svg, board } = boardFor("layers-1");
-    const before = descendants(svg).filter((node) => node.nodeName === "image");
+    const facesOf = (root: FakeNode) =>
+      descendants(root).filter(
+        (node) =>
+          node.nodeName === "image" &&
+          (node.attributes.get("class") || "").includes("token-face"),
+      );
+    const before = facesOf(svg);
     assert.ok(before.length > 0, "the fixture needs terminals with artwork");
 
     drag(svg, generated.solution[0]);
 
-    const after = descendants(svg).filter((node) => node.nodeName === "image");
+    const after = facesOf(svg);
     assert.equal(after.length, before.length);
     // Identity, not equality: a rebuilt terminal would be an indistinguishable new node.
     for (const [node, was] of after.map((node, at) => [node, before.at(at)] as const)) {

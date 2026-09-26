@@ -309,11 +309,30 @@ h1 {
  * inside pushes back. The symptom is not a broken layout, which is what makes it easy to ship:
  * the screen reads perfectly well, it just has a hairline where the illustration should be.
  */
+/*
+ * One-glance teach diagram on the intro. Above the motion SVG so a new player sees the rule
+ * ("tap matching numbers, don't cross") before they press Start on a paid attempt.
+ */
+.intro-howto {
+  width: min(18rem, 78vw);
+  height: auto;
+  aspect-ratio: 1;
+  flex: 0 0 auto;
+  border-radius: 12px;
+  box-shadow:
+    0 0 0 1px rgba(8, 223, 255, 0.35),
+    0 18px 40px -24px rgba(0, 0, 0, 0.9);
+}
+
 .diagram {
   width: min(16rem, 72vw);
   aspect-ratio: 180 / 100;
   height: auto;
   flex: 0 0 auto;
+}
+
+.diagram-motion {
+  margin-top: 0.35rem;
 }
 
 .diagram-grid rect {
@@ -655,6 +674,18 @@ button.small-btn {
     inset 0 0 0 1px #ff5c82,
     inset 0 0 22px rgba(255, 34, 103, 0.22),
     0 0 26px -8px var(--danger);
+}
+
+/* Soft red rim on the clock box in the last 10s — felt, not shouted. Class toggled from app.js
+   so a browser that does not support `:has` still gets the signal. */
+.readout-clock.urgent-rim {
+  box-shadow:
+    inset 0 0 0 1px #ff5c82,
+    inset 0 0 22px rgba(255, 34, 103, 0.22),
+    0 0 26px -8px var(--danger);
+  background-image: url("/play/fx-timer-urgent-rim.svg");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
 }
 
 /* ------------------------------------------------------------------------------------------
@@ -1041,6 +1072,71 @@ button.rail-btn:disabled {
   line-height: 0;
 }
 
+/* Full-board flash / sealed vignettes — siblings of the SVG so they survive a grid rebuild. */
+.board-fx {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  opacity: 0;
+  border-radius: 6px;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.board-fx-flash {
+  background-image: url("/play/fx-board-flash.webp");
+}
+
+.board-fx-sealed {
+  background-image: url("/play/fx-circuit-sealed.webp");
+}
+
+.board-stage.fx-flash .board-fx-flash,
+.board-stage.solved-local .board-fx-flash {
+  animation: board-fx-wash 850ms ease-out 1 both;
+}
+
+.board-stage.circuit-sealed .board-fx-sealed {
+  animation: board-fx-seal 720ms ease-out 1 both;
+}
+
+.board-stage.circuit-sealed {
+  filter: brightness(1.12) saturate(1.15);
+}
+
+.board-stage.circuit-sealed svg#board {
+  box-shadow:
+    0 30px 60px -34px #000,
+    0 0 0 2px rgba(8, 223, 255, 0.85),
+    0 0 28px rgba(8, 223, 255, 0.45);
+}
+
+@keyframes board-fx-wash {
+  0% {
+    opacity: 0;
+  }
+  18% {
+    opacity: 0.92;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes board-fx-seal {
+  0% {
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.85;
+  }
+  100% {
+    opacity: 0.35;
+  }
+}
+
 .board-art {
   position: absolute;
   /* The generic bezel's inset and picture. `dressBoard` in `app.js` overrides BOTH inline for the
@@ -1139,6 +1235,99 @@ svg#board .cell {
 svg#board .cell-lip {
   fill: none;
   stroke: rgba(88, 186, 255, 0.65);
+}
+
+/*
+ * Medium / large grids: empty cells need more edge so dense routes stay readable. Drawn boards
+ * still transparentise `.cell` under `.board-stage.drawn`; this only lifts the vector fallback
+ * and any board that has not dressed yet.
+ */
+svg#board .layer-cells.dense .cell {
+  stroke: rgba(125, 216, 255, 0.38);
+}
+
+svg#board .layer-cells.dense .cell-lip {
+  stroke: rgba(170, 235, 255, 0.82);
+}
+
+svg#board .layer-cells.dense .pip {
+  fill: rgba(170, 235, 255, 0.55);
+}
+
+/* Lock-on / invalid / complete overlays painted into `.layer-flashes`. */
+svg#board .fx-lock-on {
+  animation: fx-lock-pulse 520ms ease-out 1 both;
+  pointer-events: none;
+}
+
+svg#board .fx-invalid {
+  animation: fx-invalid-flash 420ms ease-out 1 both;
+  pointer-events: none;
+}
+
+svg#board .fx-invalid-tip {
+  animation: fx-invalid-tip 420ms ease-out 1 both;
+  pointer-events: none;
+}
+
+svg#board .fx-complete-burst {
+  animation: fx-burst 900ms ease-out 1 both;
+  pointer-events: none;
+}
+
+@keyframes fx-lock-pulse {
+  0% {
+    opacity: 0;
+    transform-box: fill-box;
+    transform-origin: center;
+    transform: scale(0.72);
+  }
+  35% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.2);
+  }
+}
+
+@keyframes fx-invalid-flash {
+  0% {
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes fx-invalid-tip {
+  0% {
+    stroke-opacity: 1;
+  }
+  100% {
+    stroke-opacity: 0;
+  }
+}
+
+@keyframes fx-burst {
+  0% {
+    opacity: 0;
+    transform-box: fill-box;
+    transform-origin: center;
+    transform: scale(0.55);
+  }
+  25% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.25);
+  }
 }
 
 /* The four-point stars where the grid lines cross. One path node for all of them - see `build`
@@ -1299,6 +1488,42 @@ button.submit-wide:disabled {
     inset 0 0 20px rgba(0, 221, 255, 0.35),
     0 0 15px rgba(0, 222, 255, 0.65),
     0 10px 26px -16px rgba(0, 0, 0, 0.9);
+}
+
+/* Every pair done: brighter cyan “ready” — still TEXT, no Phase B menu face. */
+.submit-wide.ready:not(:disabled) {
+  color: #e8fcff;
+  background:
+    linear-gradient(180deg, rgba(12, 92, 140, 0.95) 0%, rgba(4, 48, 88, 0.98) 100%);
+  box-shadow:
+    inset 0 0 0 1px #5ef0ff,
+    inset 0 0 28px rgba(0, 240, 255, 0.45),
+    0 0 22px rgba(0, 230, 255, 0.85),
+    0 10px 28px -14px rgba(0, 0, 0, 0.95);
+  background-image: url("/play/fx-submit-ready.svg"),
+    linear-gradient(180deg, rgba(12, 92, 140, 0.95) 0%, rgba(4, 48, 88, 0.98) 100%);
+  background-size: 100% 100%, auto;
+  background-repeat: no-repeat, no-repeat;
+}
+
+.submit-wide.ready:not(:disabled)::before {
+  filter: drop-shadow(0 0 10px rgba(8, 255, 255, 1));
+}
+
+/*
+ * Clear as a stronger secondary: amber-muted rim so it never competes with Submit's cyan.
+ * TEXT only — `fx-clear-secondary.svg` is a rim wash, not a button face (Phase B rejected).
+ */
+#clear.secondary-strong,
+#clear.ghost.secondary-strong {
+  color: #f0d9a8;
+  border-color: rgba(232, 176, 72, 0.55);
+  box-shadow:
+    inset 0 0 0 1px rgba(232, 176, 72, 0.35),
+    0 0 14px -6px rgba(232, 150, 40, 0.45);
+  background-image: url("/play/fx-clear-secondary.svg");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
 }
 
 /* ------------------------------------------------------------------------------------------
@@ -1640,9 +1865,20 @@ button.primary:active:not(:disabled) {
   svg#board .join-pulse,
   svg#board .trace-halo.arrived,
   svg#board .trace-core.arrived,
+  svg#board .fx-lock-on,
+  svg#board .fx-invalid,
+  svg#board .fx-invalid-tip,
+  svg#board .fx-complete-burst,
   .board-stage.solved::after,
+  .board-stage.solved-local .board-fx-flash,
+  .board-stage.fx-flash .board-fx-flash,
+  .board-stage.circuit-sealed .board-fx-sealed,
   .board-stage.refused {
     animation: none;
+  }
+
+  .board-stage.circuit-sealed {
+    filter: none;
   }
 
   /*

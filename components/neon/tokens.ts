@@ -240,7 +240,18 @@ export const NEON_TILE_SHAPE =
  * thing with a lit edge. Nothing else on the arena may use this.
  */
 export const NEON_STAGE_FRAME =
-  "rounded-2xl border-2 border-sky-500/35 bg-[#060C1A] p-1.5 shadow-[0_0_45px_-15px_rgba(56,189,248,0.7)]";
+  "rounded-2xl border-2 border-cyan-400/55 bg-[#060C1A] p-1.5 shadow-[0_0_55px_-10px_rgba(34,211,238,0.9),0_0_28px_-6px_rgba(56,189,248,0.55)]";
+
+/**
+ * Quieter arena chrome for standings and the bottom rules strip.
+ *
+ * WHY IT EXISTS (26 Sep 2026). The board stage must be the brightest lit panel so the eye
+ * lands on play first. Standings and rules stay readable but deliberately dimmer than
+ * `NEON_PANEL_LIT` / `NEON_STAGE_FRAME` — same family, one step quieter. Do not brighten this
+ * to match the stage; that undoes the hierarchy.
+ */
+export const NEON_PANEL_SIDE =
+  "rounded-xl border border-[#1089DC]/28 bg-gradient-to-b from-[#081428]/88 via-[#060e20]/90 to-[#0a0818]/92 shadow-[inset_0_0_14px_rgba(34,211,238,0.05)]";
 
 /**
  * A panel that is part of the action rather than context - the pre-flight, the result. Lit,

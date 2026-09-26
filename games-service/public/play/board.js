@@ -111,9 +111,53 @@ export const BOARD_ART = [
   ...TERMINAL_ART,
 ];
 
+/**
+ * Feedback overlays warmed with the board. Kept OUT of `BOARD_ART` so the serve/warm tests that
+ * assert one entry per grid size stay about bezels and tokens, not celebration chrome.
+ */
+export const FX_ART = [
+  "/play/fx-lock-on.webp",
+  "/play/fx-lock-on-pulse.webp",
+  "/play/fx-lock-on-hit.webp",
+  "/play/fx-invalid-flash.webp",
+  "/play/fx-complete-burst.webp",
+  "/play/fx-board-flash.webp",
+  "/play/fx-board-complete.webp",
+  "/play/fx-particle-spill.webp",
+  "/play/fx-timer-urgent.webp",
+  "/play/fx-circuit-sealed.webp",
+  "/play/intro-howto-clean.webp",
+];
+
 /** The token image for one pair's terminal, or null past the tenth number. */
 export function terminalArt(pairId) {
   return Number.isInteger(pairId) && pairId >= 0 ? (TERMINAL_ART.at(pairId) ?? null) : null;
+}
+
+/**
+ * Colour-blind second cue on the wire: dash/hatch patterns indexed by pair.
+ * Colour stays the primary read; the dash is a backup under time pressure on 8×8.
+ */
+const WIRE_DASH = [
+  null, // solid
+  "10 7",
+  "3 6",
+  "14 4 3 4",
+  "7 4 2 4",
+  "4 3 1 3 1 3",
+  "18 5",
+  "5 3 5 8",
+  "12 3 2 3",
+  "2 4 2 4 8 4",
+];
+
+function dashFor(pairId) {
+  return WIRE_DASH[pairId % WIRE_DASH.length];
+}
+
+/** Medium (6) and large (8) get thicker conductors so dense routes stay readable. */
+function denseGrid(puzzle) {
+  return Boolean(puzzle && puzzle.width >= 6);
 }
 
 /*
@@ -257,6 +301,8 @@ export function createBoard(svg, onChange) {
   let queuedArrived = [];
   /** @type {Record<string, unknown>|null} */
   let queuedChange = null;
+  /** Local board-complete burst fires once per puzzle, until clear/undo breaks completeness. */
+  let celebratedComplete = false;
 
   /** Which of the four sprites a pair's terminals wear right now. Error outranks everything. */
   function tokenState(pairId, now) {
@@ -296,6 +342,106 @@ export function createBoard(svg, onChange) {
       errorUntil = new Map();
       paintTokens();
     }, TOKEN_ERROR_MS);
+  }
+
+  /**
+   * Red HUD flash at a cell (and a short red tip on the wire) when a drag is refused.
+   * Emits `invalid` so `app.js` can play the sharper fail sample once.
+   */
+  function flashInvalidAt(pairId, cell) {
+    if (!layers || !cellPx) return;
+    const cx = centre(cell[0]);
+    const cy = centre(cell[1]);
+    const size = cellPx * 1.15;
+    const stamp = element("image", {
+      href: "/play/fx-invalid-flash.webp",
+      x: cx - size / 2,
+      y: cy - size / 2,
+      width: size,
+      height: size,
+      class: "fx-invalid",
+      "pointer-events": "none",
+    });
+    layers.flashes.appendChild(stamp);
+    const cells = pathOf(pairId);
+    if (cells.length > 0) {
+      const last = cells[cells.length - 1];
+      const tip = element("polyline", {
+        points: centre(last[0]) + "," + centre(last[1]) + " " + cx + "," + cy,
+        fill: "none",
+        stroke: "#ef4444",
+        "stroke-width": Math.max(3, Math.round(cellPx * 0.22)),
+        "stroke-linecap": "round",
+        class: "fx-invalid-tip",
+        "pointer-events": "none",
+      });
+      layers.flashes.appendChild(tip);
+      setTimeout(() => {
+        try {
+          layers.flashes.removeChild(tip);
+        } catch {
+          /* board rebuilt */
+        }
+      }, TOKEN_ERROR_MS);
+    }
+    setTimeout(() => {
+      try {
+        layers.flashes.removeChild(stamp);
+      } catch {
+        /* board rebuilt */
+      }
+    }, TOKEN_ERROR_MS);
+    onChange({ invalid: true });
+  }
+
+  /** Soft lock-on pulse on the terminal the player just pressed to start a route. */
+  function showLockOn(pairId, cell) {
+    if (!layers || !cellPx) return;
+    const cx = centre(cell[0]);
+    const cy = centre(cell[1]);
+    const size = cellPx * 1.35;
+    const pulse = element("image", {
+      href: "/play/fx-lock-on-pulse.webp",
+      x: cx - size / 2,
+      y: cy - size / 2,
+      width: size,
+      height: size,
+      class: "fx-lock-on",
+      "pointer-events": "none",
+    });
+    layers.flashes.appendChild(pulse);
+    setTimeout(() => {
+      try {
+        layers.flashes.removeChild(pulse);
+      } catch {
+        /* board rebuilt */
+      }
+    }, JOIN_PULSE_MS + 80);
+  }
+
+  /** Full-board burst when the last pair lands and coverage is full (before Submit). */
+  function celebrateLocalComplete() {
+    if (!layers || !puzzle || !cellPx) return;
+    const cx = (puzzle.width * cellPx) / 2;
+    const cy = (puzzle.height * cellPx) / 2;
+    const size = Math.min(puzzle.width, puzzle.height) * cellPx * 0.85;
+    const burst = element("image", {
+      href: "/play/fx-complete-burst.webp",
+      x: cx - size / 2,
+      y: cy - size / 2,
+      width: size,
+      height: size,
+      class: "fx-complete-burst",
+      "pointer-events": "none",
+    });
+    layers.flashes.appendChild(burst);
+    setTimeout(() => {
+      try {
+        layers.flashes.removeChild(burst);
+      } catch {
+        /* board rebuilt */
+      }
+    }, 900);
   }
 
   function rebuildOwnership() {
@@ -391,6 +537,7 @@ export function createBoard(svg, onChange) {
     const terminalOwner = terminals.get(cellKey);
     if (terminalOwner !== undefined && terminalOwner !== pairId) {
       flashError([pairId, terminalOwner]);
+      flashInvalidAt(pairId, cell);
       return false;
     }
     return true;
@@ -527,6 +674,7 @@ export function createBoard(svg, onChange) {
       paths.set(terminalOwner, [cell]);
       rebuildOwnership();
       dragging = terminalOwner;
+      showLockOn(terminalOwner, cell);
     } else {
       const pathOwner = owner.get(cellKey);
       if (pathOwner === undefined) return;
@@ -625,7 +773,9 @@ export function createBoard(svg, onChange) {
 
     svg.appendChild(defs());
 
-    const cells = element("g", { class: "layer-cells" });
+    const cells = element("g", {
+      class: "layer-cells" + (denseGrid(puzzle) ? " dense" : ""),
+    });
     const traces = element("g", { class: "layer-traces" });
     const marks = element("g", { class: "layer-marks" });
     const sockets = element("g", { class: "layer-terminals" });
@@ -854,31 +1004,38 @@ export function createBoard(svg, onChange) {
 
     const points = cells.map((cell) => centre(cell[0]) + "," + centre(cell[1])).join(" ");
     const colour = colourFor(pairId);
+    const thick = denseGrid(puzzle);
+    const haloW = Math.round(cellPx * (thick ? 0.72 : 0.6));
+    const wireW = Math.round(cellPx * (thick ? 0.38 : 0.3));
+    const coreW = Math.max(1, Math.round(cellPx * (thick ? 0.09 : 0.07)));
+    const dash = dashFor(pairId);
     let nodes = wireNodes.get(pairId);
     if (!nodes) {
       const halo = element("polyline", {
         points,
         fill: "none",
         stroke: colour,
-        "stroke-width": Math.round(cellPx * 0.6),
+        "stroke-width": haloW,
         "stroke-linecap": "round",
         "stroke-linejoin": "round",
         class: "trace-halo",
       });
-      const wire = element("polyline", {
+      const wireAttrs = {
         points,
         fill: "none",
         stroke: colour,
-        "stroke-width": Math.round(cellPx * 0.3),
+        "stroke-width": wireW,
         "stroke-linecap": "round",
         "stroke-linejoin": "round",
         class: "trace",
-      });
+      };
+      if (dash) wireAttrs["stroke-dasharray"] = dash;
+      const wire = element("polyline", wireAttrs);
       const core = element("polyline", {
         points,
         fill: "none",
         stroke: "#eaf6ff",
-        "stroke-width": Math.max(1, Math.round(cellPx * 0.07)),
+        "stroke-width": coreW,
         "stroke-linecap": "round",
         "stroke-linejoin": "round",
         class: "trace-core",
@@ -890,8 +1047,13 @@ export function createBoard(svg, onChange) {
       wireNodes.set(pairId, nodes);
     } else {
       nodes.halo.setAttribute("points", points);
+      nodes.halo.setAttribute("stroke-width", String(haloW));
       nodes.wire.setAttribute("points", points);
+      nodes.wire.setAttribute("stroke-width", String(wireW));
+      if (dash) nodes.wire.setAttribute("stroke-dasharray", dash);
+      else nodes.wire.removeAttribute("stroke-dasharray");
       nodes.core.setAttribute("points", points);
+      nodes.core.setAttribute("stroke-width", String(coreW));
     }
 
     nodes.halo.setAttribute("class", "trace-halo" + (flash ? " arrived" : ""));
@@ -935,7 +1097,17 @@ export function createBoard(svg, onChange) {
     queuedArrived = [];
     queuedChange = null;
     paint(arrived.length > 0 ? arrived : undefined);
-    if (change) onChange(change);
+    if (change) {
+      const done = Boolean(change.complete);
+      if (done && !celebratedComplete) {
+        celebratedComplete = true;
+        celebrateLocalComplete();
+        change.completeCelebration = true;
+      } else if (!done) {
+        celebratedComplete = false;
+      }
+      onChange(change);
+    }
   }
 
   function schedulePaint(arrived, change) {
@@ -1056,6 +1228,7 @@ export function createBoard(svg, onChange) {
       locked = false;
       drawOrder = [];
       errorUntil = new Map();
+      celebratedComplete = false;
       for (const pair of next.pairs) {
         terminals.set(key(pair.a), pair.id);
         terminals.set(key(pair.b), pair.id);
@@ -1068,6 +1241,7 @@ export function createBoard(svg, onChange) {
       rebuildOwnership();
       dragging = null;
       drawOrder = [];
+      celebratedComplete = false;
       paint();
       onChange();
     },

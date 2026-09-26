@@ -9,7 +9,7 @@ import { NeonAvatar, NeonPlayerName } from "@/components/neon/LeaderboardRow";
 import {
   NEON_DIVIDE,
   NEON_DIVIDER,
-  NEON_PANEL_LIT,
+  NEON_PANEL_SIDE,
   NEON_TABS_STRIP,
   NEON_TAB_ACTIVE,
   NEON_TAB_IDLE,
@@ -109,7 +109,7 @@ export default function ArenaLeaderboardPanel({
   );
 
   return (
-    <div className={`${NEON_PANEL_LIT} flex h-full flex-col overflow-hidden`}>
+    <div className={`${NEON_PANEL_SIDE} flex h-full flex-col overflow-hidden`}>
       <div className={NEON_TABS_STRIP}>
         {/*
           A real pair of tabs, not a title and a pill. `aria-pressed` rather than a tablist

@@ -30,5 +30,30 @@ and removed**. Continue with music, boards, and digit numbers only.
 | `sfx-win.ogg` | Triumphant result | **E** — `win` |
 | `sfx-combo-bonus.ogg` | Packed only — **never** mapped (no fake score multiplier) | Not wired |
 
-Existing tokens (`token-1..8.webp`) and `board-frame.webp` unchanged.
+Existing tokens (`token-1..10.webp`) and `board-frame.webp` unchanged.
 `numbers animations/` in the owner pack was empty / unlabelled — skipped (Phase G later if filled).
+
+---
+
+## Phase I — Feedback & polish graphics (26 Sep 2026) — **WIRED**
+
+Created for the ten gameplay/graphics improvements, then wired into `board.js` / `app.js` /
+`app.css` / `index.html`, with arena hierarchy in `NEON_STAGE_FRAME` + `NEON_PANEL_SIDE`.
+Still **no** Phase B menu faces (Submit/Clear stay text).
+
+| File | Role | Wired in |
+|---|---|---|
+| `fx-lock-on*.webp` | Soft pulse on first terminal tap | **I** — `showLockOn` in `board.js` |
+| `fx-invalid-flash.webp` | Red HUD flash on refused drag | **I** — `flashInvalidAt` + sharper `refused` gain |
+| `fx-complete-burst.webp` / `fx-board-flash.webp` | Local board-complete before Submit | **I** — `celebrateLocalComplete` + `.fx-flash` |
+| `fx-submit-ready.svg` | Cyan ready rim (not button art) | **I** — `.submit-wide.ready` |
+| `fx-clear-secondary.svg` | Muted secondary rim | **I** — `#clear.secondary-strong` |
+| `fx-timer-urgent-rim.svg` | Soft red clock rim ≤10s | **I** — `.readout-clock.urgent-rim` + half-second ticks |
+| `wire-pattern-0..9.svg` | Colour-blind cue references | **I** — live cue is `stroke-dasharray` via `WIRE_DASH` (same 10 patterns) |
+| `fx-cell-contrast.svg` | Dense-grid cell lift (reference) | **I** — CSS `.layer-cells.dense` contrast |
+| `intro-howto-clean.webp` | Teach diagram on Start | **I** — `#intro-howto` on intro screen |
+| `fx-stage-glow.svg` | Stage hierarchy reference | **I** — brighter `NEON_STAGE_FRAME`, quieter `NEON_PANEL_SIDE` |
+| `fx-circuit-sealed.webp` | Freeze/glow before result | **I** — `sealCircuitBeat()` on round end |
+
+**Sources:** owner `improved/Effects/` (sliced), `bardi complete*.png`, plus generated overlays.
+SVG rims/patterns are hand-authored. Keep Phase B rule: no Submit/Clear/Timer *menu faces*.

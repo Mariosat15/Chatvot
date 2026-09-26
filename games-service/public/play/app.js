@@ -33,7 +33,7 @@
  * is no attempt left to protect and a dropped mobile connection must not cost one.
  */
 
-import { BOARD_ART, FRAME_ART, createBoard } from "./board.js";
+import { BOARD_ART, FX_ART, FRAME_ART, createBoard } from "./board.js";
 import {
   BOARD_COMPLETE_MS,
   CLOCK_DIGIT_ART,
@@ -72,6 +72,15 @@ const REFUSAL_HOLD_MS = 2600;
 /** How long the board's refusal shake runs. Must match `board-refused` in `app.css`. */
 const REFUSAL_SHAKE_MS = 420;
 
+/** Local board-complete burst / sealed beat. Keep under a second so Submit stays the next act. */
+const LOCAL_COMPLETE_MS = 850;
+const CIRCUIT_SEALED_MS = 720;
+
+/** Throttle invalid-path SFX so a drag against a wall does not machine-gun the sample. */
+let lastInvalidAt = 0;
+/** Win SFX already played for this board's local complete — skip a second play on the result. */
+let localWinPlayed = false;
+
 /**
  * The token from the launch URL.
  *
@@ -100,6 +109,7 @@ const ui = {
   introNote: document.getElementById("intro-note"),
   start: document.getElementById("start"),
   clock: document.getElementById("clock"),
+  clockReadout: document.querySelector(".readout-clock"),
   cellLabels: {
     board: document.getElementById("cell-board-label"),
     clock: document.getElementById("cell-clock-label"),
@@ -478,7 +488,7 @@ function warmBoardArt() {
   artWarmed = true;
   // Board bezels plus countdown digit sprites. Digits are decoration; a miss falls back to text
   // in `paintClockDigits`. Board misses still go through `failedArt` / `dressBoard`.
-  for (const url of [...BOARD_ART, ...CLOCK_DIGIT_ART]) {
+  for (const url of [...BOARD_ART, ...FX_ART, ...CLOCK_DIGIT_ART]) {
     const image = new Image();
     image.decoding = "async";
     /*
@@ -659,6 +669,7 @@ function noteBoardBoundary() {
   if (lastBoardsSolved !== solved) {
     boardStartedAt = Date.now();
     moves = 0;
+    localWinPlayed = false;
   }
   lastBoardsSolved = solved;
 }
@@ -681,6 +692,7 @@ function renderClock() {
   paintClockDigits(String(minutes).padStart(2, "0") + ":" + String(rest).padStart(2, "0"));
   const urgent = remaining <= 10_000;
   ui.clock.classList.toggle("urgent", urgent);
+  if (ui.clockReadout) ui.clockReadout.classList.toggle("urgent-rim", urgent);
 
   // One warning when the urgent stretch begins — not every 250ms while the rim stays red.
   if (urgent && !warnedUrgent) {
@@ -696,10 +708,14 @@ function renderClock() {
    *
    * Not awaited, like every other sound: the clock's job is to be accurate.
    * Last three seconds use the sharper final tick from the SFX pack.
+   * Under urgency, tick twice per second (half-second bucket) so pressure rises without shouting.
    */
-  if (urgent && seconds > 0 && seconds !== tickedSecond) {
-    tickedSecond = seconds;
-    sound.play(seconds <= 3 ? "tick-final" : "tick");
+  if (urgent && seconds > 0) {
+    const tickBucket = seconds <= 3 ? seconds : remaining <= 10_000 ? Math.floor(remaining / 500) : seconds;
+    if (tickBucket !== tickedSecond) {
+      tickedSecond = tickBucket;
+      sound.play(seconds <= 3 ? "tick-final" : "tick");
+    }
   }
 
   /*
@@ -801,7 +817,8 @@ function renderResult() {
   // Which of the two pieces of artwork is shown. A trophy over a round that solved nothing reads
   // as sarcasm, so the neutral mark is not a fallback - it is the honest one for that ending.
   ui.resultArt.classList.toggle("won", copy.triumphant);
-  if (copy.triumphant) sound.play("win");
+  if (copy.triumphant && !localWinPlayed) sound.play("win");
+  localWinPlayed = false;
 
   ui.done.textContent = state.returnUrl || window.parent !== window ? "Back to contest" : "Close";
   show("result");
@@ -848,10 +865,32 @@ function onBoardChange(change) {
     refusalTimer = null;
   }
   renderHint(null);
-  ui.submit.disabled = !board.isComplete();
+  const ready = board.isComplete();
+  ui.submit.disabled = !ready;
+  ui.submit.classList.toggle("ready", ready);
+  if (ui.clear) ui.clear.classList.toggle("secondary-strong", true);
   if (change && change.settled) moves += 1;
   renderInstruments();
   renderUndo();
+
+  if (change && change.invalid) {
+    const now = Date.now();
+    if (now - lastInvalidAt > 280) {
+      lastInvalidAt = now;
+      sound.play("refused");
+    }
+  }
+
+  if (change && change.completeCelebration) {
+    localWinPlayed = true;
+    sound.playBoardComplete();
+    sound.play("win");
+    flashBoard("solved-local", LOCAL_COMPLETE_MS);
+    if (ui.boardStage) {
+      ui.boardStage.classList.add("fx-flash");
+      window.setTimeout(() => ui.boardStage && ui.boardStage.classList.remove("fx-flash"), LOCAL_COMPLETE_MS);
+    }
+  }
 
   const joinedNow = (change && change.justJoined) || [];
   if (joinedNow.length > 0) streak += joinedNow.length;
@@ -954,8 +993,12 @@ async function submit() {
        * result screen - so a sweep started on the SVG would be thrown away in the same tick and
        * the player would never see the one moment in the round worth marking.
        */
-      sound.playBoardComplete();
+      if (!localWinPlayed) sound.playBoardComplete();
       flashBoard("solved", BOARD_COMPLETE_MS);
+      // Circuit-sealed beat when this acceptance ends the round — freeze + glow, then result.
+      if (state.finished && !prefersReducedMotion()) {
+        await sealCircuitBeat();
+      }
       render();
       return;
     }
@@ -981,6 +1024,27 @@ async function submit() {
     ui.submit.disabled = false;
     fail(error.message);
   }
+}
+
+/**
+ * Short “circuit sealed” pause: board freeze + glow overlay, then the result screen.
+ * Reasons it is awaited: the result panel must not appear in the same frame as Submit, or the
+ * finish reads as a page swap rather than a sealed board. Cap is under a second.
+ */
+function sealCircuitBeat() {
+  return new Promise((resolve) => {
+    const stage = ui.boardStage;
+    if (!stage) {
+      resolve();
+      return;
+    }
+    board.lock();
+    stage.classList.add("circuit-sealed");
+    window.setTimeout(() => {
+      stage.classList.remove("circuit-sealed");
+      resolve();
+    }, CIRCUIT_SEALED_MS);
+  });
 }
 
 async function leave() {
