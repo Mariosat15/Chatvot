@@ -1,5 +1,5 @@
 import { Swords } from "lucide-react";
-import { NEON_LABEL, NEON_PANEL_SIDE } from "@/components/neon/tokens";
+import { NEON_FACE_TILE, NEON_LABEL, NEON_PANEL_SIDE } from "@/components/neon/tokens";
 import { NeonCountPill } from "@/components/neon/Cards";
 import {
   describeRoundActivity,
@@ -70,11 +70,11 @@ export default function ChallengeStandingsPanel({ seats, scoreLabel }: Props) {
           return (
             <div
               key={seat.userId}
-              className={`rounded-lg border px-3 py-2.5 ${
+              className={
                 seat.isViewer
-                  ? "border-cyan-500/30 bg-cyan-500/5"
-                  : "border-[#161E36] bg-[#080C18]/60"
-              }`}
+                  ? "rounded-lg border border-cyan-500/30 bg-cyan-500/5 px-3 py-2.5"
+                  : `${NEON_FACE_TILE} px-3 py-2.5`
+              }
             >
               <div className="flex items-baseline justify-between gap-2">
                 <span

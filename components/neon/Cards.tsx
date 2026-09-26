@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   NEON_ARENA_SURFACE,
+  NEON_FACE_TILE,
   NEON_HEADING,
   NEON_HEAD_STRIP,
   NEON_LABEL,
@@ -47,11 +48,11 @@ import {
  * FIXED, NOT ABSOLUTE. The arena is taller than the viewport, and an absolutely-positioned
  * backdrop inside a scrolling page paints the grid once at the top and leaves the foot bare.
  *
- * THE SAME 34px PITCH AND THE SAME TONE AS THE GAME'S OWN PAGE, which is drawn by
- * `games-service` and shares no code with this repository. The value is copied deliberately -
- * copying a number across that boundary is allowed and importing across it is not - and it
- * matters because the board sits in an iframe in the middle of this page: two grids a few
- * pixels apart in pitch reads as a rendering fault rather than as one screen.
+ * QUIETER THAN THE IN-FRAME PATHS PAGE (26 Sep polish). Panels no longer wear their own
+ * circuit wash, so this page grid alone sets the room — a larger pitch and lighter stroke
+ * so it stays atmosphere rather than competing with every card. Matching the game's 34px
+ * pitch exactly was correct while panels also carried the wash; once they do not, matching
+ * it made the whole arena read as one busy wallpaper.
  */
 export function NeonGridBackdrop() {
   return (
@@ -59,12 +60,15 @@ export function NeonGridBackdrop() {
       className={`pointer-events-none fixed inset-0 -z-10 ${NEON_ARENA_SURFACE}`}
       aria-hidden
       style={{
+        // Quieter page grid (26 Sep polish): panels no longer share a circuit wash, so the
+        // page alone carries atmosphere — but at ~half the previous line weight so it reads
+        // as a room, not as busy wallpaper competing with every card.
         backgroundImage: [
-          "linear-gradient(rgba(42,156,255,0.055) 1px, transparent 1px)",
-          "linear-gradient(90deg, rgba(42,156,255,0.055) 1px, transparent 1px)",
-          "radial-gradient(90% 55% at 50% -10%, #0A2858 0%, transparent 70%)",
+          "linear-gradient(rgba(42,156,255,0.022) 1px, transparent 1px)",
+          "linear-gradient(90deg, rgba(42,156,255,0.022) 1px, transparent 1px)",
+          "radial-gradient(80% 50% at 50% -8%, #0A2048 0%, transparent 65%)",
         ].join(", "),
-        backgroundSize: "34px 34px, 34px 34px, auto",
+        backgroundSize: "48px 48px, 48px 48px, auto",
       }}
     />
   );
@@ -171,7 +175,7 @@ export function NeonIllustration({
       <img
         src={src}
         alt={alt}
-        className={`absolute inset-0 h-full w-full rounded-lg border border-[#161E36] bg-[#080C18]/70 ${
+        className={`absolute inset-0 h-full w-full ${NEON_FACE_TILE} ${
           fit === "contain" ? "object-contain" : "object-cover"
         }`}
       />
@@ -180,9 +184,7 @@ export function NeonIllustration({
 
   if (src) {
     return (
-      <div
-        className={`overflow-hidden rounded-lg border border-[#161E36] bg-[#080C18]/70 ${box}`}
-      >
+      <div className={`overflow-hidden ${NEON_FACE_TILE} ${box}`}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={src}
@@ -195,7 +197,7 @@ export function NeonIllustration({
 
   return (
     <div
-      className={`flex items-center justify-center rounded-lg border border-[#161E36] bg-[#080C18]/70 ${box}`}
+      className={`flex items-center justify-center ${NEON_FACE_TILE} ${box}`}
       aria-hidden
     >
       {/*
@@ -511,7 +513,7 @@ export function NeonStatTiles({
         return (
           <div
             key={item.label}
-            className="rounded-lg border border-[#161E36] bg-[#080C18]/70 px-2.5 py-2.5 text-center"
+            className={`${NEON_FACE_TILE} px-2.5 py-2.5 text-center`}
           >
             {/*
               Centered 26 Sep 2026 (owner): left-aligned tiles left empty space beside the
@@ -547,7 +549,9 @@ export function NeonRow({
   accent?: NeonAccent;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-[#161E36] bg-[#080C18]/60 px-3 py-2.5">
+    <div
+      className={`flex items-center justify-between gap-2.5 ${NEON_FACE_TILE} px-3 py-2.5`}
+    >
       <span className="text-xs text-gray-400">{label}</span>
       <span
         className={`text-sm font-semibold ${
@@ -579,7 +583,7 @@ export function NeonCountPill({
   const shell =
     tone === "warn"
       ? "border-orange-500/25 bg-orange-500/10 text-orange-300"
-      : "border-[#1B2540] bg-[#080C18] text-gray-400";
+      : "border-[#2A5080]/40 bg-[#153566]/35 text-gray-300";
 
   return (
     <span

@@ -32,7 +32,7 @@ import {
   StatusCard,
 } from "@/components/neon/Cards";
 import { NeonRankBadge } from "@/components/neon/LeaderboardRow";
-import { NEON_LABEL, NEON_PANEL, NEON_TABLE_HEAD, accentClasses } from "@/components/neon/tokens";
+import { NEON_FACE_TILE, NEON_LABEL, NEON_PANEL, NEON_TABLE_HEAD, accentClasses } from "@/components/neon/tokens";
 import { formatVolts } from "@/lib/utils/format-volts";
 import { getTerms } from "@/lib/services/terminology.service";
 import { getChallengePlayState } from "@/lib/services/games/challenge-round-status.service";
@@ -614,7 +614,9 @@ export default async function ProviderChallengeLobby({
             <div className="mb-3 flex items-center justify-between gap-2">
               <NeonCountPill>Winner takes all</NeonCountPill>
             </div>
-            <div className="mb-3 flex items-center justify-between gap-2 rounded-lg border border-[#1B2540] bg-[#080C18]/80 px-3 py-2.5">
+            <div
+              className={`mb-3 flex items-center justify-between gap-2 px-3 py-2.5 ${NEON_FACE_TILE}`}
+            >
               <div className="flex min-w-0 items-center gap-2.5">
                 <NeonRankBadge rank={1} />
                 <div className="min-w-0">

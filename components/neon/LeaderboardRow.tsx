@@ -160,7 +160,7 @@ export function NeonRankBadge({
 
   return (
     <span
-      className={`flex ${plate} items-center justify-center rounded-lg border border-[#1B2540] bg-[#080C18] text-xs font-bold text-gray-400`}
+      className={`flex ${plate} items-center justify-center rounded-lg border border-[#2A5080]/45 bg-[#153566]/50 text-xs font-bold text-gray-300`}
     >
       {rank > 0 ? rank : "-"}
     </span>

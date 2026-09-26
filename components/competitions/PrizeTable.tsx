@@ -1,5 +1,9 @@
 import { Gift } from "lucide-react";
 import { NeonRankBadge } from "@/components/neon/LeaderboardRow";
+import {
+  NEON_FACE_TILE,
+  NEON_FACE_TILE_MUTED,
+} from "@/components/neon/tokens";
 import { projectPrizeDistribution } from "@/lib/utils/prize-projection";
 import { formatVolts } from "@/lib/utils/format-volts";
 
@@ -92,10 +96,8 @@ export default function PrizeTable({
         {rows.map((row, index) => (
           <div
             key={index}
-            className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2.5 ${
-              row.filled
-                ? "border-[#1B2540] bg-[#080C18]/80"
-                : "border-[#161E36] bg-[#080C18]/40 opacity-50"
+            className={`flex items-center justify-between gap-2 px-3 py-2.5 ${
+              row.filled ? NEON_FACE_TILE : NEON_FACE_TILE_MUTED
             }`}
           >
             <div className="flex min-w-0 items-center gap-2.5">

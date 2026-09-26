@@ -6,6 +6,7 @@ import {
   neonRowClasses,
 } from "@/components/neon/LeaderboardRow";
 import {
+  NEON_FACE_TILE,
   NEON_SCORE_GOLD,
   NEON_TABLE_HEAD,
 } from "@/components/neon/tokens";
@@ -142,7 +143,7 @@ export default function ProviderLeaderboard({
   const ranking = variant === "ranking";
   if (rows.length === 0) {
     return (
-      <div className="rounded-xl border border-[#161E36] bg-[#080C18]/60 p-8 text-center">
+      <div className={`${NEON_FACE_TILE} p-8 text-center`}>
         <Gamepad2 className="mx-auto mb-3 h-8 w-8 text-gray-600" />
         <p className="text-sm font-medium text-gray-300">
           No one has played yet.

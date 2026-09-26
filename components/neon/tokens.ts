@@ -162,7 +162,7 @@ export const NEON_ROW_PODIUM =
  * shared token. These `FLUSH` names stay for call-site compatibility.
  */
 export const NEON_ROW_FLUSH =
-  "my-0.5 rounded-lg border border-[#1A4A7A]/65 bg-[#080C18]/80 shadow-[inset_0_0_0_1px_rgba(16,137,220,0.08)] transition-colors hover:border-[#2A6AB0]/70 hover:bg-[#0D1428]/70";
+  "my-0.5 rounded-lg border border-[#1A4A7A]/55 bg-[#0E2448]/55 shadow-[inset_0_0_0_1px_rgba(16,137,220,0.06)] transition-colors hover:border-[#2A6AB0]/70 hover:bg-[#143258]/60";
 export const NEON_ROW_FLUSH_YOU =
   "my-0.5 rounded-lg border border-sky-400/70 bg-sky-500/10 shadow-[0_0_12px_rgba(56,189,248,0.22)]";
 export const NEON_ROW_FLUSH_PODIUM =
@@ -231,9 +231,13 @@ export const NEON_TILE_SHAPE =
  *
  * The board is the one thing on the screen the player is actually doing, so it is the one
  * thing with a lit edge. Nothing else on the arena may use this.
+ *
+ * NO CIRCUIT WASH (26 Sep 2026, second pass). The same SVG on the page, every panel AND the
+ * board made the arena read as wallpaper; the board keeps a clean deep face so the game art
+ * is what lights up, not a second pattern behind the iframe.
  */
 export const NEON_STAGE_FRAME =
-  "neon-circuit-face rounded-2xl border-2 border-cyan-400/55 bg-[#060C1A] p-1.5 shadow-[0_0_55px_-10px_rgba(34,211,238,0.9),0_0_28px_-6px_rgba(56,189,248,0.55)]";
+  "rounded-2xl border-2 border-cyan-400/55 bg-[#050E1C] p-1.5 shadow-[0_0_55px_-10px_rgba(34,211,238,0.9),0_0_28px_-6px_rgba(56,189,248,0.55)]";
 
 /**
  * Quieter arena chrome for standings and the bottom rules strip.
@@ -242,9 +246,14 @@ export const NEON_STAGE_FRAME =
  * lands on play first. Standings and rules stay readable but deliberately dimmer than
  * `NEON_PANEL_LIT` / `NEON_STAGE_FRAME` — same family, one step quieter. Do not brighten this
  * to match the stage; that undoes the hierarchy.
+ *
+ * COOL FLAT NAVY, not the shared circuit wash and not the near-black `#080C18` the owner
+ * rejected on contest info (26 Sep polish). A cool face marks "context / standings"; the
+ * facts column uses the warmer `NEON_PANEL_LIT` so the two sidebars are not the same card
+ * repeated three times.
  */
 export const NEON_PANEL_SIDE =
-  "neon-circuit-face rounded-xl border border-[#1089DC]/50 bg-gradient-to-b from-[#0A1E48]/92 via-[#071433]/94 to-[#0C1028]/96 shadow-[inset_0_0_22px_rgba(34,211,238,0.12),0_0_18px_-8px_rgba(16,137,220,0.35)]";
+  "rounded-xl border border-[#1A4A7A]/55 bg-gradient-to-b from-[#0B1A36] via-[#091528] to-[#070F1C] shadow-[inset_0_1px_0_rgba(120,190,255,0.08),0_0_18px_-10px_rgba(16,137,220,0.28)]";
 
 /**
  * A panel that is part of the action rather than context - the pre-flight, the result. Lit,
@@ -255,29 +264,34 @@ export const NEON_STAGE_PANEL =
 
 /** The tinted heading strip every panel in the reference wears. */
 export const NEON_HEAD_STRIP =
-  "border-b border-[#1089DC]/40 bg-gradient-to-r from-[#0B9FE8]/15 via-[#0B9FE8]/[0.04] to-transparent";
+  "border-b border-[#1089DC]/35 bg-gradient-to-r from-[#0B9FE8]/12 via-[#0B9FE8]/[0.03] to-transparent";
 
 /** The heading text inside that strip: small, heavily tracked, cyan. */
 export const NEON_HEADING =
   "text-[11px] font-bold uppercase tracking-[0.18em] text-[#16DFFF]";
 
 /**
- * THE ARENA'S OWN CHROME, brightened 11 September 2026 on the owner's third reference
- * (`arena-target-full.png`), whose words were "the graphics are not like image 2 - the
- * background, the icons, the colours, more glow blue".
+ * THE ARENA'S OWN CHROME for hero + contest facts + prize (the "action" column).
  *
- * WHY A SECOND PANEL SHELL RATHER THAN A BRIGHTER `NEON_PANEL`. The base shell is what the
- * TRADING lobby renders, and the trading lobby was not part of the request; turning it up would
- * be an unasked-for change to a trading screen made invisibly through a shared token. So the
- * arena gets its own, and it is the reference's own values - a `#1089DC` rim on a deep-navy
- * face, lit faintly from inside - rather than a guess at "more blue".
- *
- * The two are deliberately close enough to be the same product and far enough apart to tell
- * which screen you are on. `NEON_PANEL_LIT` belongs to the arena; nothing else may use it,
- * for the same reason `NEON_STAGE_FRAME` belongs to the board.
+ * Distinct from `NEON_PANEL_SIDE` on purpose (26 Sep 2026 polish): a slightly warmer mid-navy
+ * so contest info / prize do not share one wallpaper with the leaderboard. No circuit SVG —
+ * that wash on every section made the page busy; the page backdrop alone carries the grid.
  */
 export const NEON_PANEL_LIT =
-  "neon-circuit-face rounded-xl border border-[#1089DC]/55 bg-gradient-to-b from-[#0A1E48]/95 via-[#071433]/95 to-[#160A32]/95 shadow-[inset_0_0_28px_rgba(34,211,238,0.14),0_0_22px_-10px_rgba(168,85,247,0.4)]";
+  "rounded-xl border border-[#2A6AB0]/45 bg-gradient-to-b from-[#122A52] via-[#0C1C3E] to-[#0A142C] shadow-[inset_0_1px_0_rgba(150,210,255,0.12),inset_0_0_24px_rgba(34,211,238,0.08),0_0_22px_-12px_rgba(56,189,248,0.35)]";
+
+/**
+ * Soft navy glass for tiles INSIDE a lit panel (stat cards, prize rows, label/value rows).
+ *
+ * Replaces the flat `#080C18` black the owner called out (26 Sep 2026) — near-black on mid-navy
+ * read as a hole punched in the panel. This sits a shade lighter than the panel face so the
+ * tile is a surface, not a void.
+ */
+export const NEON_FACE_TILE =
+  "rounded-lg border border-[#2A5080]/45 bg-[#153566]/40 shadow-[inset_0_1px_0_rgba(160,210,255,0.08)]";
+
+export const NEON_FACE_TILE_MUTED =
+  "rounded-lg border border-[#1A3558]/40 bg-[#0E2240]/35 opacity-55";
 
 /**
  * The arena page's own background: the reference's near-black navy, a shade off the app's
@@ -312,7 +326,7 @@ export const NEON_DIVIDER = "border-[#16203C]";
  * the app's neutral shell, for exactly this job. On a navy panel a neutral grey inset reads
  * as a piece of a different website, which is what the owner was seeing.
  */
-export const NEON_INSET = `rounded-lg border ${NEON_DIVIDER} bg-[#070C1A]/70`;
+export const NEON_INSET = `rounded-lg border border-[#2A5080]/40 bg-[#122848]/45`;
 
 /**
  * The reference's segmented tabs, in the two sizes it draws: a heading pair across the top of a
@@ -335,7 +349,7 @@ export const NEON_TABS_STRIP = `flex items-stretch gap-1.5 border-b p-1.5 ${NEON
 export const NEON_TAB_ACTIVE =
   "border-[#1089DC]/55 bg-[#1B7DFF]/35 text-white shadow-[0_0_18px_rgba(43,176,255,0.55)]";
 export const NEON_TAB_IDLE =
-  "border-[#1A3A6A] bg-[#080C18]/90 text-sky-200/70 hover:border-[#2A5A9A] hover:text-sky-100";
+  "border-[#2A5080]/40 bg-[#153566]/35 text-sky-200/70 hover:border-[#2A5A9A] hover:text-sky-100";
 export const NEON_TAB_DEAD =
   "border-[#16203C] bg-[#050A14] text-gray-600 cursor-not-allowed";
 /** The shape both tab sizes share: the border, the radius and the centring. */
