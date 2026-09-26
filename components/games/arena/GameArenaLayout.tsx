@@ -200,26 +200,31 @@ export function GameArenaLayout({
           <div className="absolute inset-0 bg-gradient-to-r from-[#06122c] via-[#0a1d45]/80 to-[#2a0a4a]/55" />
         </div>
 
+        {/*
+          RIGHT-HAND ART FILLS THE WINDOW, never an oversized free-floating bitmap.
+          Owner 26 Sep 2026: the previous `h-[300px]` piece was clipped mid-trophy by the
+          panel's `overflow-hidden`, which read as "the banner is cutoff". `object-cover` +
+          `object-right` keeps the trophy side inside the box; a light left feather still
+          joins copy to picture without eating the right edge.
+        */}
         <div
-          className="pointer-events-none absolute inset-y-0 right-0 hidden w-[330px] overflow-hidden xl:block"
+          className="pointer-events-none absolute inset-y-0 right-0 hidden w-[360px] overflow-hidden xl:block"
           aria-hidden
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={banner.src}
             alt=""
-            className="absolute right-0 top-[52%] h-[300px] w-auto max-w-none -translate-y-1/2"
+            className="absolute inset-0 h-full w-full object-cover object-right"
           />
-          {/*
-            Feathered from the left, because the copy stops at this window's edge and a hard
-            seam between panel and picture is the thing that makes artwork look pasted on. It
-            is opaque where it meets the text and clear at the outer edge, so nothing is
-            written over paint and nothing hides the trophy.
-          */}
-          <div className="absolute inset-0 bg-gradient-to-r from-[#070C1A] via-[#070C1A]/40 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#070C1A] via-[#070C1A]/35 to-transparent to-55%" />
         </div>
 
-        <div className="relative px-4 py-3 sm:h-[196px] sm:px-[18px] sm:py-3">
+        {/*
+          220px since 26 Sep 2026 — bigger logo track (owner green mark) needs the ceiling
+          raised; still fixed, never min-height (arena-hero.test.ts).
+        */}
+        <div className="relative px-4 py-3 sm:h-[220px] sm:px-[18px] sm:py-3">
           <ArenaIdentity
             presentation={presentation}
             minParticipants={minParticipants}
@@ -284,7 +289,15 @@ export function GameArenaLayout({
           {stage}
         </div>
 
-        <div className="order-3 space-y-3 lg:order-2 xl:order-3">{sidebar}</div>
+        {/*
+          PRIZE COLUMN STRETCHES TO THE BOARD'S BOTTOM (owner green arrow, 26 Sep 2026).
+          `xl:h-full` matches the standings/stage stretch; the last sidebar child (prize
+          breakdown) is the only `flex-1` so contest facts stay their natural height and the
+          prize panel's foot lines up with Submit / the board frame.
+        */}
+        <div className="order-3 flex flex-col gap-3 lg:order-2 xl:order-3 xl:h-full xl:min-h-0 [&>*:last-child]:xl:flex-1 [&>*:last-child]:xl:min-h-0">
+          {sidebar}
+        </div>
       </div>
 
       {/*

@@ -126,7 +126,7 @@ describe("the arena hero stays one thin banner", () => {
       padding - rather than a number picked because it looked better. What must never change
       is that it is a ceiling; see the absences below.
     */
-    expect(banner).toMatch(/sm:h-\[196px\]/);
+    expect(banner).toMatch(/sm:h-\[220px\]/);
 
     /*
       THE ABSENCES ARE THE TEST. Each of these is a way to make the banner grow again while
@@ -234,12 +234,12 @@ describe("the arena hero stays one thin banner", () => {
     const track = /sm:grid-cols-\[(\d+)px_/.exec(code);
     expect(track).not.toBeNull();
 
-    const box = /sm:h-\[120px\] sm:w-\[(\d+)px\]/.exec(code);
+    const box = /sm:h-\[152px\] sm:w-\[(\d+)px\]/.exec(code);
     expect(box).not.toBeNull();
 
     expect(Number(box![1])).toBe(Number(track![1]));
-    expect(Number(track![1])).toBeGreaterThan(132);
-    expect(code).toMatch(/sm:h-\[112px\] sm:w-\[112px\]/);
+    expect(Number(track![1])).toBeGreaterThan(168);
+    expect(code).toMatch(/sm:h-\[148px\] sm:w-\[148px\]/);
   });
 
   it("reserves the right-hand track so the copy stops before the artwork", () => {
@@ -248,7 +248,7 @@ describe("the arena hero stays one thin banner", () => {
       runs underneath, so a player reads a tagline over a trophy - and the alternative fix,
       shortening the copy, is a guess that is wrong at the next viewport width.
     */
-    expect(readCode(IDENTITY)).toMatch(/xl:grid-cols-\[[^\]]*_330px\]/);
+    expect(readCode(IDENTITY)).toMatch(/xl:grid-cols-\[[^\]]*_360px\]/);
   });
 
   it("paints the full-width wash before the right-hand piece", () => {
@@ -262,7 +262,8 @@ describe("the arena hero stays one thin banner", () => {
     const banner = bannerMarkup();
 
     const washAt = banner.indexOf("opacity-40");
-    const pieceAt = banner.indexOf("h-[300px]");
+    // Right-hand piece: full-window cover (not the old free-floating h-[300px] crop).
+    const pieceAt = banner.indexOf("object-cover object-right");
 
     expect(washAt).toBeGreaterThan(-1);
     expect(pieceAt).toBeGreaterThan(-1);

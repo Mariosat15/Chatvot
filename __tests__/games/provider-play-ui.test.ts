@@ -2041,7 +2041,9 @@ describe("the standings board fits the column it is given", () => {
       one and it is still `minmax(0,1fr)`.
     */
     const template =
-      board.match(/grid-cols-\[[\w.]+_minmax\(0,1fr\)_auto_auto\]/g) ?? [];
+      board.match(
+        /grid-cols-\[[\w.]+_minmax\(0,1fr\)_minmax\([\d.]+rem,auto\)_minmax\([\d.]+rem,auto\)\]/g,
+      ) ?? [];
     expect(template).toHaveLength(2);
     expect(board).not.toMatch(/grid-cols-\[[\w.]+_1fr_/);
     expect(board).not.toMatch(/\bflex-wrap\b/);

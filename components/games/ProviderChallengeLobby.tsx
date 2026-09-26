@@ -10,6 +10,7 @@ import {
   Swords,
   TriangleAlert,
   Trophy,
+  Gift,
   Users,
   XCircle,
 } from "lucide-react";
@@ -30,6 +31,7 @@ import {
   StatCard,
   StatusCard,
 } from "@/components/neon/Cards";
+import { NeonRankBadge } from "@/components/neon/LeaderboardRow";
 import { NEON_LABEL, NEON_PANEL, NEON_TABLE_HEAD, accentClasses } from "@/components/neon/tokens";
 import { formatVolts } from "@/lib/utils/format-volts";
 import { getTerms } from "@/lib/services/terminology.service";
@@ -604,16 +606,34 @@ export default async function ProviderChallengeLobby({
             </NeonPanel>
           )}
 
-          <NeonPanel icon={Trophy} accent="prize" title="Prize breakdown">
+          {/*
+            Same visual language as the competition PrizeTable shell (owner 26 Sep 2026).
+            Amounts stay the stored challenge fields — never a second prize-projection copy.
+          */}
+          <NeonPanel icon={Gift} accent="prize" title="Prize breakdown">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <NeonCountPill>Winner takes all</NeonCountPill>
+            </div>
+            <div className="mb-3 flex items-center justify-between gap-2 rounded-lg border border-[#1B2540] bg-[#080C18]/80 px-3 py-2.5">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <NeonRankBadge rank={1} />
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold text-gray-100">Winner</div>
+                  <span className="mt-1 inline-block rounded bg-amber-500/15 px-1.5 py-0.5 text-[11px] font-medium text-amber-300">
+                    {challenge.platformFeePercentage != null
+                      ? `${100 - (challenge.platformFeePercentage || 0)}%`
+                      : "Net"}
+                  </span>
+                </div>
+              </div>
+              <span className="shrink-0 text-base font-bold text-amber-300">
+                {formatVolts(challenge.winnerPrize ?? 0)}
+              </span>
+            </div>
             <NeonRow label="Total pool" value={formatVolts(challenge.prizePool ?? 0)} />
             <NeonRow
               label={`Platform fee (${challenge.platformFeePercentage ?? 0}%)`}
               value={`-${formatVolts(challenge.platformFeeAmount ?? 0)}`}
-            />
-            <NeonRow
-              label="Winner takes"
-              accent="prize"
-              value={formatVolts(challenge.winnerPrize ?? 0)}
             />
           </NeonPanel>
         </div>

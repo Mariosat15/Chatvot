@@ -233,7 +233,7 @@ export const NEON_TILE_SHAPE =
  * thing with a lit edge. Nothing else on the arena may use this.
  */
 export const NEON_STAGE_FRAME =
-  "rounded-2xl border-2 border-cyan-400/55 bg-[#060C1A] p-1.5 shadow-[0_0_55px_-10px_rgba(34,211,238,0.9),0_0_28px_-6px_rgba(56,189,248,0.55)]";
+  "neon-circuit-face rounded-2xl border-2 border-cyan-400/55 bg-[#060C1A] p-1.5 shadow-[0_0_55px_-10px_rgba(34,211,238,0.9),0_0_28px_-6px_rgba(56,189,248,0.55)]";
 
 /**
  * Quieter arena chrome for standings and the bottom rules strip.
@@ -244,7 +244,7 @@ export const NEON_STAGE_FRAME =
  * to match the stage; that undoes the hierarchy.
  */
 export const NEON_PANEL_SIDE =
-  "rounded-xl border border-[#1089DC]/50 bg-gradient-to-b from-[#0A1E48]/92 via-[#071433]/94 to-[#0C1028]/96 shadow-[inset_0_0_22px_rgba(34,211,238,0.12),0_0_18px_-8px_rgba(16,137,220,0.35)]";
+  "neon-circuit-face rounded-xl border border-[#1089DC]/50 bg-gradient-to-b from-[#0A1E48]/92 via-[#071433]/94 to-[#0C1028]/96 shadow-[inset_0_0_22px_rgba(34,211,238,0.12),0_0_18px_-8px_rgba(16,137,220,0.35)]";
 
 /**
  * A panel that is part of the action rather than context - the pre-flight, the result. Lit,
@@ -277,7 +277,7 @@ export const NEON_HEADING =
  * for the same reason `NEON_STAGE_FRAME` belongs to the board.
  */
 export const NEON_PANEL_LIT =
-  "rounded-xl border border-[#1089DC]/55 bg-gradient-to-b from-[#0A1E48]/95 via-[#071433]/95 to-[#160A32]/95 shadow-[inset_0_0_28px_rgba(34,211,238,0.14),0_0_22px_-10px_rgba(168,85,247,0.4)]";
+  "neon-circuit-face rounded-xl border border-[#1089DC]/55 bg-gradient-to-b from-[#0A1E48]/95 via-[#071433]/95 to-[#160A32]/95 shadow-[inset_0_0_28px_rgba(34,211,238,0.14),0_0_22px_-10px_rgba(168,85,247,0.4)]";
 
 /**
  * The arena page's own background: the reference's near-black navy, a shade off the app's

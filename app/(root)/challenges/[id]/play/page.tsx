@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, Trophy } from "lucide-react";
+import { ArrowLeft, Gift } from "lucide-react";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { unstable_noStore as noStore } from "next/cache";
@@ -19,7 +19,8 @@ import ChallengeStandingsPanel, {
   type ChallengeArenaSeat,
 } from "@/components/games/arena/ChallengeStandingsPanel";
 import GameRulesPanel from "@/components/games/GameRulesPanel";
-import { NeonHeadedPanel, NeonRow } from "@/components/neon/Cards";
+import { NeonCountPill, NeonHeadedPanel, NeonRow } from "@/components/neon/Cards";
+import { NeonRankBadge } from "@/components/neon/LeaderboardRow";
 import { resolveProviderBanner } from "@/components/neon/banners";
 import { formatVolts } from "@/lib/utils/format-volts";
 import { Button } from "@/components/ui/button";
@@ -253,24 +254,59 @@ export default async function ChallengePlayPage({
           />
 
           {/*
-            The three figures as STORED on the challenge. A 1v1 has no prize distribution to
-            project - one seat takes the pot less the platform fee - so there is nothing here for
-            `PrizeTable` to calculate and nothing to disagree with settlement about.
+            SAME CHROME AS THE COMPETITION PRIZE PANEL (owner 26 Sep 2026: "all the graphics
+            that are in competition must also be in challenges"). A 1v1 has one paying place —
+            the arithmetic is still the stored `winnerPrize`, never a second copy of
+            `projectPrizeDistribution` — but the shell, gift heading, count pill and medal row
+            match `PrizeTable` so the two arenas do not look like different products.
           */}
-          <NeonHeadedPanel icon={Trophy} title="Prize breakdown" bodyClassName="space-y-2 p-4">
-            <NeonRow
-              label="Total pool"
-              value={formatVolts(challenge?.prizePool, { symbol: creditSymbol })}
-            />
-            <NeonRow
-              label={`Platform fee (${challenge?.platformFeePercentage ?? 0}%)`}
-              value={`-${formatVolts(challenge?.platformFeeAmount, { symbol: creditSymbol })}`}
-            />
-            <NeonRow
-              label="Winner takes"
-              accent="prize"
-              value={formatVolts(challenge?.winnerPrize, { symbol: creditSymbol })}
-            />
+          <NeonHeadedPanel
+            icon={Gift}
+            title="Prize breakdown"
+            action={<NeonCountPill>Winner takes all</NeonCountPill>}
+            bodyClassName="flex h-full flex-col p-4"
+          >
+            <div className="mb-3 flex items-center gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300">
+              <Gift className="h-3.5 w-3.5 shrink-0" />
+              <span>1 of 1 paid positions — winner takes the pool less the platform fee</span>
+            </div>
+
+            <div className="flex items-center justify-between gap-2 rounded-lg border border-[#1B2540] bg-[#080C18]/80 px-3 py-2.5">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <NeonRankBadge rank={1} />
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold leading-tight text-gray-100">
+                    Winner
+                  </div>
+                  <div className="mt-1 flex items-center gap-1.5">
+                    <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[11px] font-medium text-amber-300">
+                      {challenge?.platformFeePercentage != null
+                        ? `${100 - (challenge.platformFeePercentage || 0)}%`
+                        : "Net"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <span className="shrink-0 text-base font-bold text-amber-300">
+                {formatVolts(challenge?.winnerPrize, { symbol: creditSymbol })}
+              </span>
+            </div>
+
+            <div className="mt-3 space-y-1.5">
+              <NeonRow
+                label="Total pool"
+                value={formatVolts(challenge?.prizePool, { symbol: creditSymbol })}
+              />
+              <NeonRow
+                label={`Platform fee (${challenge?.platformFeePercentage ?? 0}%)`}
+                value={`-${formatVolts(challenge?.platformFeeAmount, { symbol: creditSymbol })}`}
+              />
+            </div>
+
+            <p className="mt-auto pt-3 text-[11px] leading-relaxed text-gray-500">
+              The winner is decided when both players have finished. The amount above is what
+              settles into their wallet — the pool less the platform fee.
+            </p>
           </NeonHeadedPanel>
         </>
       }

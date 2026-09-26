@@ -996,3 +996,28 @@
   0%, 100% { transform: scale(1); opacity: 1; }
   50% { transform: scale(1.4); opacity: 0.6; }
 }
+
+/*
+ * Arena panel circuit wash — same Paths-tile pattern as games-service `--panel-circuit`
+ * (owner 26 Sep 2026: apply behind leaderboard, contest info, prize, board frame).
+ * Stroke is slightly heavier than the in-frame tile so it reads on the quieter platform panels.
+ * INLINE / ::before rather than a Tailwind arbitrary bg: commas in data-URLs are the trap in
+ * `components/neon/tokens.ts` — a class the compiler never emits.
+ */
+.neon-circuit-face {
+  position: relative;
+  isolation: isolate;
+}
+.neon-circuit-face::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  opacity: 0.85;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='80' viewBox='0 0 120 80'%3E%3Cpath d='M8 12h28M36 12v20M36 32h24M8 40h18M26 40v18M26 58h40M70 20h34M104 20v28M70 48h18' fill='none' stroke='%232a9cff' stroke-opacity='0.28' stroke-width='1.6'/%3E%3Ccircle cx='36' cy='12' r='2' fill='%231ae8ff' fill-opacity='0.4'/%3E%3Ccircle cx='36' cy='32' r='2' fill='%231ae8ff' fill-opacity='0.35'/%3E%3Ccircle cx='26' cy='40' r='2' fill='%231ae8ff' fill-opacity='0.35'/%3E%3Ccircle cx='104' cy='20' r='2' fill='%231ae8ff' fill-opacity='0.32'/%3E%3C/svg%3E");
+  background-size: 120px 80px;
+}
+/* Do NOT force `position` on children — the board frame's absolute overlays (loader, stall)
+   must stay absolute. Isolation + a z-0 ::before is enough for the wash to sit under content. */

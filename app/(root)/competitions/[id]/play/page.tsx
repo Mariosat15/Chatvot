@@ -290,7 +290,7 @@ export default async function PlayPage({ params, searchParams }: PlayPageProps) 
                 icon={Gift}
                 title="Prize breakdown"
                 action={<NeonCountPill>Top {prizePositions} win</NeonCountPill>}
-                bodyClassName="p-4"
+                bodyClassName="flex h-full flex-col p-4"
               >
                 <PrizeTable competition={contest} creditSymbol={creditSymbol} />
               </NeonHeadedPanel>

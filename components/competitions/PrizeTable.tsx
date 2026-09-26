@@ -136,7 +136,7 @@ export default function PrizeTable({
         ))}
       </div>
 
-      <p className="mt-3 text-[11px] leading-relaxed text-gray-500">
+      <p className="mt-auto pt-3 text-[11px] leading-relaxed text-gray-500">
         Empty prize spots are shared among the winners. If someone enters but
         never finishes, their share is split among the people who did.
       </p>

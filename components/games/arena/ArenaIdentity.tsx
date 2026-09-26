@@ -121,8 +121,11 @@ export async function ArenaIdentity({
       the right edge, and the alternative to reserving space for it is text sitting on top of
       a trophy. It only appears at `xl`: below that there is not enough width for both, so the
       scrim covers the art and the copy takes the whole banner.
+
+      Logo track 200px / reserve 360px for right art (owner 26 Sep: bigger logo + end banner
+      was cutoff). Numbers stay locked together in arena-hero.test.ts.
     */
-    <div className="grid h-full items-center gap-3 grid-cols-[64px_minmax(0,1fr)] sm:gap-5 sm:grid-cols-[168px_minmax(0,1fr)] xl:grid-cols-[168px_minmax(0,1fr)_330px]">
+    <div className="grid h-full items-center gap-3 grid-cols-[64px_minmax(0,1fr)] sm:gap-5 sm:grid-cols-[200px_minmax(0,1fr)] xl:grid-cols-[200px_minmax(0,1fr)_360px]">
       <GameLogo url={presentation.logoUrl} name={presentation.gameName} />
 
       <div className="flex min-w-0 items-center gap-6">
@@ -225,7 +228,7 @@ function GameLogo({ url, name }: { url?: string; name: string }) {
   if (!url) {
     return (
       <div
-        className={`flex h-[60px] w-[60px] shrink-0 items-center justify-center rounded-xl border text-2xl font-bold sm:h-[112px] sm:w-[112px] sm:text-4xl ${accent.tile}`}
+        className={`flex h-[60px] w-[60px] shrink-0 items-center justify-center rounded-xl border text-2xl font-bold sm:h-[148px] sm:w-[148px] sm:text-5xl ${accent.tile}`}
         aria-hidden
       >
         {name.slice(0, 1).toUpperCase()}
@@ -234,7 +237,7 @@ function GameLogo({ url, name }: { url?: string; name: string }) {
   }
 
   return (
-    <div className="flex h-[60px] w-[64px] shrink-0 items-center justify-center overflow-hidden sm:h-[120px] sm:w-[168px]">
+    <div className="flex h-[60px] w-[64px] shrink-0 items-center justify-center overflow-hidden sm:h-[152px] sm:w-[200px]">
       {/* eslint-disable-next-line @next/next/no-img-element -- see the note above */}
       <img
         src={url}
