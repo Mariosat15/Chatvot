@@ -48,7 +48,8 @@ export async function createRaceServer({secret=raceEnvironment(process.env,root)
    if(action==='join'&&req.method==='POST'){json(200,room.snapshot(id,now));return;}
    if(action==='events'&&req.method==='GET'){
     if(room.status!=='lobby'&&!p.active){json(409,{error:'Race entry has closed'});return;}
-    res.writeHead(200,{'Content-Type':'text/event-stream','Connection':'keep-alive','X-Accel-Buffering':'no'});res.flushHeaders();
+    // Reason: `no-transform` stops every gzip layer on the path (Next.js's rewrite proxy compresses all responses, Cloudflare too) from holding snapshots back until a chunk fills.
+    res.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-cache, no-transform','Connection':'keep-alive','X-Accel-Buffering':'no'});res.flushHeaders();
     const old=p.connection;p.connection={res,exp:claims.exp};if(old)old.res.end();room.join(id,now);
     res.write('data: '+JSON.stringify(room.snapshot(id,now))+'\n\n');
     res.on('close',()=>{if(p.connection?.res===res){p.connection=null;room.disconnect(id,Date.now());}});return;

@@ -374,3 +374,6 @@ race server** (that is VV5). Nothing is player-visible until the owner enables t
 | VV-4 | Latency: SSE through Cloudflare/nginx buffering | `proxy_buffering off`; verify Cloudflare does not buffer `text/event-stream` |
 | VV-5 | Protocol change (`scheduledStartAt`) | Additive field, version bump of `ChartVolt-Game-API-Requirements.html` |
 | VV-6 | Node 22 required by the race server | **Resolved in VV1**: no engine declared by the vendor; Node >= 20.6 for `--env-file` |
+
+> **27 Sep 2026 - the race stream froze on the machine that forwards to the race server.** On a server that does not host `chartvolt-velocity`, `/race` goes through the Next.js rewrite, and Next.js gzips every response it sends, including forwarded ones (`router-server.js`). Gzip holds the 10 Hz `events` snapshots back until a chunk fills, so the client saw no updates and showed RECONNECTING. The fix is `Cache-Control: no-cache, no-transform` on the stream in `velocity-server/server/index.mjs`, which the compressor (and Cloudflare) honour. No nginx change is needed. A one-shot `curl` cannot show this, because a single reply is not held back.
+
