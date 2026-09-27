@@ -468,7 +468,9 @@ and delivery, 11 progress, 21 board client, 61 presentation, 7 Volt Velocity. `t
 spawns the real race server from `../velocity-server` and **skips loudly** if that folder's
 `node_modules` is missing (`npm install` there once). Volt Velocity needs `VELOCITY_ADMIN_KEY`,
 `VELOCITY_TICKET_SECRET` and `VELOCITY_CLIENT_FILE` (see `env.example` and chapter `23` s8.2);
-without them the title is published as `maintenance`. (Counted from the suite's own output. Any figure of
+without them the title is published as `maintenance`. **The race server reads this same `.env`**
+(PM2 passes `--env-file=../games-service/.env`) and has none of its own; it listens on
+`VELOCITY_RACE_URL`, never on `PORT`, which in this file is ours. (Counted from the suite's own output. Any figure of
 305 predates Volt Stack and Volt Velocity. Any figure of
 299 predates the ten-minute cap - `hardDeadline` was reading one particular title's maximum for
 every round, so a sixty-minute contest showed a ten-minute clock and then did not end at all

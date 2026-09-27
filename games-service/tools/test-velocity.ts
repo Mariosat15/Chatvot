@@ -68,12 +68,13 @@ async function startRaceServer(dataDir: string): Promise<void> {
     cwd: RACE_ROOT,
     env: {
       ...process.env,
-      RACE_TICKET_SECRET: TICKET_SECRET,
-      RACE_ADMIN_KEY: ADMIN_KEY,
-      RACE_DATA_DIR: dataDir,
-      RACE_ALLOWED_ORIGINS: "",
-      PORT: String(port),
-      HOST: "127.0.0.1",
+      // The same names games-service reads: the race server shares its .env.
+      VELOCITY_TICKET_SECRET: TICKET_SECRET,
+      VELOCITY_ADMIN_KEY: ADMIN_KEY,
+      VELOCITY_DATA_DIR: dataDir,
+      VELOCITY_RACE_URL: `http://127.0.0.1:${port}`,
+      // A PORT that is not the race port proves the shared file's PORT is ignored.
+      PORT: "1",
     },
     stdio: ["ignore", "ignore", "inherit"],
   });

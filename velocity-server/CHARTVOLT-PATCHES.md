@@ -19,6 +19,8 @@ that starts when everybody is Ready. The 21 vendor tests pin that and still pass
 | `scheduledStartAt` bounded to 6 hours ahead | constructor | Bounds how long an idle room holds memory |
 | `scheduledStartAt`, `status`, `cancelReason`, `registered` added to the snapshot / receipt | `snapshot()`, `result()` | Client countdown; the sweeper tells a DNF from a no-show |
 | Vendor `GET /` (served `dist/Volt-Velocity-3D.html`) removed | `index.mjs` | The client is served by games-service behind a play token |
+| Settings read from **`games-service/.env`** under the `VELOCITY_*` names (`env.mjs`); the vendor's `RACE_*` names, `PORT` and `HOST` are not read, and there is no `.env` of its own | `env.mjs`, `index.mjs`, PM2 `node_args: --env-file=../games-service/.env` | One file means the two secrets cannot drift apart between the two processes. The shared file's `PORT` is the games service's, so the listen address comes from `VELOCITY_RACE_URL`; allowed origins default to the origin of `GAMES_PUBLIC_URL` |
 
-Tests: `npm test` (35 = 21 vendor + 14 in `tests/chartvolt-scheduled.test.mjs`). Deploy: PM2
-`chartvolt-velocity`, `env.example`, nginx `/race/` (player endpoints only).
+Tests: `npm test` (40 = 21 vendor + 14 in `tests/chartvolt-scheduled.test.mjs` + 5 in
+`tests/chartvolt-env.test.mjs`). Deploy: PM2 `chartvolt-velocity` (reads `games-service/.env`),
+nginx `/race/` (player endpoints only).

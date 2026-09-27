@@ -207,9 +207,9 @@ export interface ServiceConfig {
 export interface VelocityConfig {
   /** Loopback base URL of the race server's admin API. Never reaches a browser. */
   raceUrl: string;
-  /** `RACE_ADMIN_KEY` on the race server. Creates rooms and reads receipts. */
+  /** Creates rooms and reads receipts. The race server reads the same line from this `.env`. */
   adminKey: string;
-  /** `RACE_TICKET_SECRET` on the race server. Signs player tickets and result receipts. */
+  /** Signs player tickets and result receipts. The race server reads the same line from this `.env`. */
   ticketSecret: string;
   /**
    * The race URL a player's browser connects to, when it is NOT `{origin}/race`.

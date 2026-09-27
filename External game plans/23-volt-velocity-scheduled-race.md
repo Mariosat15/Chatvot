@@ -70,7 +70,7 @@ admin key or the ticket secret; the race server never touches money (hard constr
 
 | # | Piece | Side | Notes |
 |---|---|---|---|
-| A | **Race server as a PM2 process** `chartvolt-velocity` | infra | Copy `server/` into `games-service/velocity-server/` (own `package.json`, Node 22). `HOST=127.0.0.1`, `PORT=3080`, `RACE_DATA_DIR`, two separate 32+ char secrets |
+| A | **Race server as a PM2 process** `chartvolt-velocity` | infra | Copy `server/` into `games-service/velocity-server/` (own `package.json`, Node 22). `HOST=127.0.0.1`, `PORT=3080`, `RACE_DATA_DIR`, two separate 32+ char secrets. **As built it has no env file of its own**: it reads `games-service/.env` under the `VELOCITY_*` names and takes its address from `VELOCITY_RACE_URL` (s8.1 amendment) |
 | B | **Server patch 1: open lobby roster** - admin `POST /v1/races/:id/players` adds a player while `status === "lobby"`, max 16 | race server | Closes gap 2 without making entry close early. Small and testable |
 | C | **Server patch 2: `startAt` in the room spec** - `ready()` never auto-starts before `startAt`; at `startAt` the loop starts the connected players (auto-readying anyone connected with their chosen or default ship); fewer than 2 connected -> room `cancelled` | race server | Closes gap 1 inside the authoritative process, so a cron delay can never make the gun late. The admin `/start` stays as a manual override |
 | D | **Title `volt-velocity`** in `games-service/src/games/titles.ts`: `playMode: "scheduled"`, `scoreDirection: lower_is_better`, `scoreType: duration_ms`, `maxDurationSeconds: 305`, `supportsContentSeed: true`, `supportsOneVsOne: true` (s9 decision 4), `supportsPractice: true`, `configSchema` = `trackId` enum (15 tracks) + `laps` fixed | games-service | Copy in `content.ts` (en + el - both locales are declared, so both are required) |
@@ -114,10 +114,10 @@ work for a provider contest with `lower_is_better` scores.
 
 ## 7. Security
 
-- Admin key and ticket secret live only in `games-service` and race-server env; the platform never sees them.
+- Admin key and ticket secret live only in `games-service/.env`, which both processes read (s8.1 amendment); the platform never sees them.
 - Tickets are issued per round, 1 hour lifetime (covers lobby + race), delivered in a POST body.
 - nginx exposes only the six player endpoints; room creation and results are loopback-only.
-- `RACE_ALLOWED_ORIGINS` = the platform origin only.
+- Allowed origins = the platform origin only (built as `VELOCITY_ALLOWED_ORIGINS`, defaulting to the origin of `GAMES_PUBLIC_URL`).
 - Browser `competition-result` is display only; money moves only from the verified receipt via the single ingestion door.
 
 ## 8. Phases
@@ -157,7 +157,7 @@ authoritative list of every change. **It is not built and not deployed**; nothin
 - The vendor `GET /` that served the 107 MB client is removed; games-service serves the client
   (VV2).
 - Deploy pieces: PM2 `chartvolt-velocity` (**fork, one instance** - rooms are in memory, so two
-  processes would each hold half of them), `velocity-server/env.example`, and an nginx location
+  processes would each hold half of them), and an nginx location
   that admits **only the six ticket-authenticated player actions** under `/race/`, with
   `proxy_buffering off` because `events` is a server-sent-event stream. The admin endpoints are
   reached by games-service over loopback only.
@@ -166,6 +166,22 @@ authoritative list of every change. **It is not built and not deployed**; nothin
   at the gun - each turned the suite red.
 - **VV-6 is resolved**: the vendor declares no Node engine; `--env-file` needs Node 20.6, which is
   what `package.json` now states.
+- **Amended 27 September 2026 (owner): there is no `.env` for the race server.** It was first
+  built with its own `velocity-server/env.example` under the vendor's `RACE_*` names; the owner
+  asked for one file, and that is also the safer design, because the two secrets must be equal
+  in both processes and two files are two places for them to disagree - with every result then
+  failing its signature check. PM2 now starts it with `--env-file=../games-service/.env`, and
+  `server/env.mjs` reads `VELOCITY_TICKET_SECRET`, `VELOCITY_ADMIN_KEY`, and optionally
+  `VELOCITY_DATA_DIR` and `VELOCITY_ALLOWED_ORIGINS`. **It must not read `PORT` or `HOST`**:
+  in that file they belong to the games service, so a race server reading them would try to
+  bind the games service's port. Its listen address comes from `VELOCITY_RACE_URL` (default
+  `http://127.0.0.1:3080`), the same line games-service uses to reach it, so the two cannot
+  disagree about that either. Allowed origins default to the origin of `GAMES_PUBLIC_URL`, and
+  with neither set **no** browser origin is admitted rather than all of them. `npm run
+  setup:env` does not yet write the two Velocity secrets; add them by hand. The race-server
+  suite is now **40** (5 new in `tests/chartvolt-env.test.mjs`, one of which passes a
+  conflicting `PORT` and asserts it is ignored), and the games-service race test spawns the
+  server with the shared names and a decoy `PORT`.
 
 ### 8.2 VV2 - what was built (27 September 2026)
 

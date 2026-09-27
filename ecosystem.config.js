@@ -210,13 +210,15 @@ module.exports = {
     // A provider-side process, like chartvolt-games: it holds each race in MEMORY and runs the
     // physics authoritatively, so it must be exactly ONE process. Two copies would each hold half
     // the rooms and a player's ticket would land on the one that does not know their race.
-    // Secrets (RACE_TICKET_SECRET, RACE_ADMIN_KEY) come from velocity-server/.env via --env-file,
-    // never from this committed file and never from the platform's .env.
+    // It reads games-service/.env - the file that already holds VELOCITY_ADMIN_KEY and
+    // VELOCITY_TICKET_SECRET - so the two secrets exist once. It takes its address from
+    // VELOCITY_RACE_URL and ignores that file's PORT, which is the games service's own port.
+    // Never from this committed file and never from the platform's .env.
     {
       name: 'chartvolt-velocity',
       script: 'server/index.mjs',
       cwd: __dirname + '/velocity-server',
-      node_args: '--env-file=.env',
+      node_args: '--env-file=../games-service/.env',
       env: {
         NODE_ENV: 'production',
       },

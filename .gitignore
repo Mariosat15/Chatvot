@@ -154,5 +154,5 @@ probe-err.txt
 .probe-*.err
 .scratch-*
 
-# Volt Velocity race server default result archive (production uses RACE_DATA_DIR)
+# Volt Velocity race server default result archive (production sets VELOCITY_DATA_DIR in games-service/.env)
 /velocity-server/race-data/

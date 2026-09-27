@@ -1047,6 +1047,18 @@ no build. The main app needs a rebuild and restart. Then hard refresh. **Never v
   server, 2 probes red) is part of `npm test`, now **344** green; two stale tests fixed (v1.20
   progress keys, fake `insertBefore`). **Not deployed; no contest can use it until VV4** (lobby
   window, `scheduledStartAt` in the protocol with a version bump, the 16-player pre-flight cap).
+- **Later again, 27 Sep 2026 - the race server has NO `.env` of its own (owner)** (`23` s8.1
+  amendment). `velocity-server/env.example` is deleted; PM2 starts `chartvolt-velocity` with
+  `--env-file=../games-service/.env`, and the new `velocity-server/server/env.mjs` reads the
+  same `VELOCITY_TICKET_SECRET` / `VELOCITY_ADMIN_KEY` games-service reads, plus optional
+  `VELOCITY_DATA_DIR` and `VELOCITY_ALLOWED_ORIGINS` (default: the origin of
+  `GAMES_PUBLIC_URL`; neither set admits **no** origin, not every one). One file also removes
+  the failure where the two processes hold different secrets and every receipt fails its
+  signature. **It must not read `PORT`/`HOST`** - in that file they are the games service's -
+  so it listens on `VELOCITY_RACE_URL` (default `http://127.0.0.1:3080`), the line games-service
+  already uses to reach it. Race server 40 tests (5 new, one passing a decoy `PORT`), games-service
+  344 green with the race test spawning the server on the shared names. `npm run setup:env` does
+  not write the Velocity secrets yet - add the two lines by hand.
 
 
 ### 27 Sep 2026 - Per-game How it works & tips (Guides) tab
