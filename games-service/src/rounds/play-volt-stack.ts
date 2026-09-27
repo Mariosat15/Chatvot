@@ -31,12 +31,30 @@ function isVoltStack(round: RoundDocument): boolean {
   return round.gameCode === VOLT_STACK_CODE;
 }
 
+function clientLocks(
+  round: RoundDocument,
+): NonNullable<PlayState["stackLocks"]> {
+  const locks = round.stackLocks ?? [];
+  if (locks.length === 0) return [];
+  return locks.map((lock) => ({
+    piece: lock.piece,
+    rotation: lock.rotation,
+    x: lock.x,
+    y: lock.y,
+    hardDropCells: lock.hardDropCells ?? 0,
+    ...(lock.claimedSpin
+      ? { claimedSpin: { tspin: Boolean(lock.claimedSpin.tspin), mini: Boolean(lock.claimedSpin.mini) } }
+      : {}),
+  }));
+}
+
 export function voltStackStateFor(round: RoundDocument): PlayState {
   const config = round.config as unknown as RoundConfig;
   const endsAt = round.startedAt ? hardDeadline(round) : null;
   const title = findTitle(round.gameCode);
   const locale = resolvePlayerLocale(round.locale, title?.locales ?? ["en"]);
   const copy = copyFor(round.gameCode, locale);
+  const locks = clientLocks(round);
 
   const state: PlayState = {
     roundId: round.roundId,
@@ -46,14 +64,19 @@ export function voltStackStateFor(round: RoundDocument): PlayState {
     title: copy.displayName || title?.displayName || "Volt Stack",
     boardRules: stackRulesFor(locale),
     scoring: copy.rulesSummary || title?.rulesSummary || "",
-    boardsSolved: round.stackLocks?.length ?? 0,
+    boardsSolved: locks.length,
     returnUrl: round.returnUrl,
     parentOrigin: round.parentOrigin,
     pieceSeed: pieceSeedFor(round),
     // Ranked rounds share one bag; hold would reorder pieces between entrants.
     holdDisabled: round.mode === "ranked",
-    locksAccepted: round.stackLocks?.length ?? 0,
+    locksAccepted: locks.length,
+    stackLocks: locks,
   };
+  // Already in progress: the client rebuilds from locks and skips the fresh-start countdown.
+  if (round.status === "in_progress") {
+    state.resuming = true;
+  }
 
   if (config.kind === "volt-stack") {
     state.durationSeconds = Math.floor(roundDurationMs(config) / 1000);

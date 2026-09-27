@@ -62,16 +62,21 @@
   }
 
   function sessionFromState(state) {
-    const endsAt = state.endsAt
-      ? Date.parse(state.endsAt)
+    const endsAtMs = state.endsAt ? Date.parse(state.endsAt) : NaN;
+    const endsAt = Number.isFinite(endsAtMs)
+      ? endsAtMs
       : Date.now() + (state.playableSeconds || state.durationSeconds || 120) * 1000;
+    // On resume, prefer remaining wall-clock time so the timer does not restart at full length.
+    const remainingMs = Number.isFinite(endsAtMs) ? Math.max(1000, endsAtMs - Date.now()) : null;
     const durationMs = Math.max(
       1000,
-      typeof state.playableSeconds === "number"
-        ? state.playableSeconds * 1000
-        : typeof state.durationSeconds === "number"
-          ? state.durationSeconds * 1000
-          : endsAt - Date.now(),
+      remainingMs != null
+        ? remainingMs
+        : typeof state.playableSeconds === "number"
+          ? state.playableSeconds * 1000
+          : typeof state.durationSeconds === "number"
+            ? state.durationSeconds * 1000
+            : endsAt - Date.now(),
     );
     return {
       sessionId: state.roundId,
@@ -81,6 +86,10 @@
       durationMs,
       holdDisabled: Boolean(state.holdDisabled),
       mode: state.mode,
+      resuming: Boolean(state.resuming),
+      locksAccepted: state.locksAccepted || 0,
+      // Verified placements — the client replays these to restore the board.
+      stackLocks: Array.isArray(state.stackLocks) ? state.stackLocks : [],
     };
   }
 
@@ -171,6 +180,17 @@
 
       if (hostState.finished) {
         tellPlatform("finished");
+      } else if (hostState.status === "in_progress" && ranked) {
+        // Same attempt: Circuit resumes straight into the board; Volt Stack must too.
+        // Defer one frame so ChartvoltTetris listeners are wired.
+        requestAnimationFrame(() => {
+          try {
+            window.ChartvoltTetris?.start?.();
+          } catch (error) {
+            const err = document.getElementById("startError");
+            if (err) err.textContent = error.message || "Could not resume round.";
+          }
+        });
       }
     } catch (error) {
       const err = document.getElementById("startError");

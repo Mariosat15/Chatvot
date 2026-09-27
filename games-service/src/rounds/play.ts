@@ -128,6 +128,23 @@ export interface PlayState {
   holdDisabled?: boolean;
   /** How many verified locks the server has accepted so far. */
   locksAccepted?: number;
+  /**
+   * Volt Stack only. Verified placements so far so a returning player can rebuild the board.
+   * Display progress only — settlement still recomputes the score from this same list.
+   */
+  stackLocks?: Array<{
+    piece: string;
+    rotation: number;
+    x: number;
+    y: number;
+    hardDropCells?: number;
+    claimedSpin?: { tspin: boolean; mini: boolean };
+  }>;
+  /**
+   * Volt Stack only. True when the round was already `in_progress` (navigate-away resume),
+   * so the client skips the intro countdown and continues the same attempt.
+   */
+  resuming?: boolean;
 }
 
 /** Loads a round by its launch token, which is the only credential the browser holds. */

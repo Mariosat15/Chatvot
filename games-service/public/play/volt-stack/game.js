@@ -132,6 +132,12 @@
 
   const safeStorage={getItem(key){try{return localStorage.getItem(key)}catch{return null}},setItem(key,value){try{localStorage.setItem(key,value)}catch{}}};
   let starting=false, finishing=false, matchEndsAt=0;
+  let holdEnabled=true;
+  /** Cells hard-dropped on the piece about to lock — reported to the host for verification. */
+  let pendingHardDropCells=0;
+  /** Locks to rebuild after a navigate-away resume (from the host session). */
+  let resumeLocks=null;
+  let resumeSkipCountdown=false;
   let board = makeEmptyBoard();
   let active = null;
   let bag = [];
@@ -525,13 +531,14 @@ function processReplayAction(action, phase) {
   }
 
   function hardDrop(shouldRecord=true) {
-    if (!canPlay()) return;
+    if (!canPlay() || !active) return;
     telemetry.inputCount++;
     if (shouldRecord) recordReplayInput("hardDrop");
     runStats.hardDrops++;
     const target=ghostY();
     const distance=Math.max(0,target-active.y);
     runStats.hardDropCells+=distance;
+    pendingHardDropCells=distance;
     if (distance>0) {
       addDropTrail(active.y,target);
       active.y=target;
@@ -552,7 +559,7 @@ function processReplayAction(action, phase) {
   }
 
   function hold(shouldRecord=true) {
-    if (!canPlay() || holdLocked) return;
+    if (!holdEnabled || !canPlay() || holdLocked) return;
     // Hold creates a new active tetromino, so soft drop must require a new press.
     disarmSoftDropCarryover();
     telemetry.inputCount++;
@@ -607,6 +614,11 @@ function lockPiece(hard=false) {
   disarmSoftDropCarryover();
 
   const pieceType = active.type;
+  const lockX = active.x;
+  const lockY = active.y;
+  const lockRotation = active.rotation;
+  const hardCells = hard ? Math.max(0, pendingHardDropCells) : 0;
+  pendingHardDropCells = 0;
   const scoringLevel = level;
   const spin = detectTSpin();
   const lockedCells=[];
@@ -706,13 +718,23 @@ function lockPiece(hard=false) {
   playClearSfx(clearCount,spin,perfectClear,backToBackBonus,combo);
   updateRanking();
   syncUi();
+  // Reason: the host only forwards `event.lock` to POST /play/api/lock. Without x/y/rotation
+  // the server stores nothing, settlement scores zero, and a return always looks like a fresh start.
   emitGameEvent("piece_lock", {
     piece:pieceType,
     clearCount,
     spin,
     scoreGain:gained,
     scoreBreakdown:{base:basePoints,backToBack:backToBackBonus,combo:comboBonus,perfectClear:perfectClearBonus,milestone:milestoneBonus,level:scoringLevel},
-    score,lines,level,combo,backToBack,perfectClear
+    score,lines,level,combo,backToBack,perfectClear,
+    lock:{
+      piece:pieceType,
+      rotation:lockRotation,
+      x:lockX,
+      y:lockY,
+      hardDropCells:hardCells,
+      claimedSpin:spin.tspin?{tspin:true,mini:Boolean(spin.mini)}:undefined
+    }
   });
 
   // Lock-out: the entire locked tetromino remained inside the hidden spawn buffer.
@@ -841,6 +863,8 @@ function canPlay() { return state==="playing" && active; }
       if (!cfg) {
         telemetry.serverToken=null;
         telemetry.serverSessionId=null;
+        resumeLocks=null;
+        resumeSkipCountdown=false;
         ui.integrityStatus.textContent="Practice · local score";
         return;
       }
@@ -863,17 +887,119 @@ function canPlay() { return state==="playing" && active; }
       matchEndsAt=cfg.endsAt || 0;
       if (cfg.durationMs && Number(cfg.durationMs) > 0) competitionDurationMs = Number(cfg.durationMs);
       if (cfg.pieceSeed) setPieceSeed(cfg.pieceSeed);
+      if (cfg.holdDisabled) holdEnabled = false;
+      // Resume mid-round: rebuild from verified locks the server already accepted.
+      resumeLocks = Array.isArray(cfg.stackLocks) ? cfg.stackLocks : [];
+      resumeSkipCountdown = Boolean(cfg.resuming);
       telemetry.serverToken = cfg.token || null;
       telemetry.serverSessionId = cfg.sessionId || null;
-      ui.integrityStatus.textContent = cfg.token ? "Host session connected" : "Local telemetry · unverified";if(ui.integrityStatusMobile)ui.integrityStatusMobile.textContent=ui.integrityStatus.textContent;
+      ui.integrityStatus.textContent = cfg.token
+        ? (resumeSkipCountdown ? "Resuming host session" : "Host session connected")
+        : "Local telemetry · unverified";
+      if(ui.integrityStatusMobile)ui.integrityStatusMobile.textContent=ui.integrityStatus.textContent;
       syncRoomMeta();
     } catch (_) {
       telemetry.serverToken = null;
       telemetry.serverSessionId = null;
+      resumeLocks=null;
+      resumeSkipCountdown=false;
       ui.integrityStatus.textContent = "Connection required";if(ui.integrityStatusMobile)ui.integrityStatusMobile.textContent=ui.integrityStatus.textContent;
       syncRoomMeta();
       throw _;
     }
+  }
+
+  /**
+   * Rebuild board + bag from server locks so a returning player continues the same attempt.
+   * Advances the seven-bag exactly as each lock did on the server — score display is secondary
+   * (settlement recomputes from the same list).
+   */
+  function replayServerLocks(locks) {
+    if (!Array.isArray(locks) || locks.length === 0) return;
+    for (const lock of locks) {
+      if (!lock || !SHAPES[lock.piece]) throw new Error("Corrupt resume lock.");
+      refillQueue();
+      if (queue[0] !== lock.piece) throw new Error("Resume bag mismatch.");
+      queue.shift();
+      refillQueue();
+
+      const rotation = ((Math.trunc(lock.rotation) % 4) + 4) % 4;
+      let matrix = cloneMatrix(SHAPES[lock.piece]);
+      for (let i = 0; i < rotation; i++) matrix = rotateMatrix(matrix, 1);
+      const px = Math.trunc(lock.x);
+      const py = Math.trunc(lock.y);
+      let anyVisible = false;
+      for (let my = 0; my < matrix.length; my++) {
+        for (let mx = 0; mx < matrix[my].length; mx++) {
+          if (!matrix[my][mx]) continue;
+          const by = py + my;
+          const bx = px + mx;
+          if (by < 0) throw new Error("Resume lock-out.");
+          if (by < ROWS && bx >= 0 && bx < COLS) {
+            board[by][bx] = lock.piece;
+            if (by >= HIDDEN_ROWS) anyVisible = true;
+          }
+        }
+      }
+
+      const spin = lock.claimedSpin && lock.claimedSpin.tspin
+        ? { tspin: true, mini: Boolean(lock.claimedSpin.mini) }
+        : { tspin: false, mini: false };
+      const clearedRows = findFullRows();
+      const clearCount = clearedRows.length;
+      if (clearCount === 0 && !anyVisible) throw new Error("Resume lock-out.");
+
+      const scoringLevel = level;
+      const scoring = scoreClear(clearCount, spin);
+      const previousBackToBack = backToBack;
+      const qualifiesB2B = Boolean(scoring.difficult && clearCount > 0);
+      if (clearCount > 0) combo++;
+      else combo = -1;
+
+      const basePoints = scoring.base * scoringLevel;
+      const backToBackBonus = qualifiesB2B && previousBackToBack ? Math.round(basePoints * 0.5) : 0;
+      const comboBonus = clearCount > 0 && combo > 0 ? 50 * combo * scoringLevel : 0;
+      const perfectClear = clearCount > 0 && isPerfectClearAfter(clearedRows);
+      let perfectClearBonus = 0;
+      if (perfectClear) {
+        if (clearCount === 1) perfectClearBonus = SCORE.perfectClearSingle * scoringLevel;
+        else if (clearCount === 2) perfectClearBonus = SCORE.perfectClearDouble * scoringLevel;
+        else if (clearCount === 3) perfectClearBonus = SCORE.perfectClearTriple * scoringLevel;
+        else if (clearCount === 4) {
+          perfectClearBonus =
+            (previousBackToBack ? SCORE.perfectClearB2BTetris : SCORE.perfectClearTetris) * scoringLevel;
+        }
+      }
+      const hardDropPoints =
+        Math.max(0, Math.min(40, Math.trunc(lock.hardDropCells || 0))) * HARD_DROP_POINTS_PER_CELL;
+
+      if (clearCount > 0) {
+        removeRows(clearedRows);
+        backToBack = qualifiesB2B;
+        lines += clearCount;
+        level = Math.floor(lines / 10) + 1;
+        if (combo > 0) maxCombo = Math.max(maxCombo, combo + 1);
+      }
+      runStats.pieces++;
+      score += basePoints + backToBackBonus + comboBonus + perfectClearBonus + hardDropPoints;
+      const milestoneBonus = checkMilestoneBonusesQuiet();
+      if (milestoneBonus) score += milestoneBonus;
+    }
+    displayScore = score;
+  }
+
+  function checkMilestoneBonusesQuiet() {
+    let bonus = 0;
+    for (const rule of MILESTONE_RULES) {
+      if (awardedMilestones.has(rule.key)) continue;
+      const reached = rule.type === "lines" ? lines >= rule.value : level >= rule.value;
+      if (!reached) continue;
+      awardedMilestones.add(rule.key);
+      const award = rule.bonus * Math.max(1, Math.floor(level / 3));
+      bonus += award;
+      runStats.milestoneBonus += award;
+    }
+    return bonus;
   }
 
 
@@ -887,6 +1013,9 @@ async function resetGame(options={}) {
   document.getElementById('startError').textContent='';
   await telemetry.pending;
   matchEndsAt=0;
+  resumeLocks=null;
+  resumeSkipCountdown=false;
+  holdEnabled=true;
   releaseHeldInputs();
   const replayData=options.replayData || null;
   replay.playing=Boolean(replayData);
@@ -916,16 +1045,28 @@ async function resetGame(options={}) {
   clearState=null;collapseState=null;countdownState=null;bufferedRotation=0;bufferedHold=false;
   score=0;displayScore=0;lines=0;level=1;combo=-1;backToBack=false;ranking=null;maxCombo=0;comboChainsRegistered=0;comboHeat=0;runStats=makeRunStats();awardedMilestones=new Set();awardedAchievements=new Set();achievementQueue=[];achievementBusy=false;
   gravityAccumulator=0;lockAccumulator=0;lockStarted=false;grounded=false;lastMoveWasRotation=false;lastKickIndex=0;
+  pendingHardDropCells=0;
   simulationAccumulator=0;simulationTimeMs=0;gameStep=0;
   elapsedCompetition=0;competitionEndsAt=0;levelTimerStartStep=0;
   particles=[];sparks=[];lineFlashes=[];trails=[];shockwaves.length=0;energyArcs.length=0;
   boardPulse=0;flashPulse=0;coachAdvice="Create a clean stack";dangerLevel=0;dangerSoundState=0;boardShaderTime=0;
   finalTenTriggered=false;newPersonalBest=false;
   applyLevelTheme(true);
+
+  try {
+    if (!replay.playing && resumeLocks && resumeLocks.length) {
+      replayServerLocks(resumeLocks);
+    }
+  } catch (error) {
+    starting=false;ui.startBtn.disabled=false;ui.restartBtn.disabled=false;
+    document.getElementById('startError').textContent=error.message||"Could not resume board.";
+    return;
+  }
+
   refillQueue(); spawn();
 
   telemetry.sessionId=telemetry.serverSessionId || crypto.randomUUID?.() || `cv-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  telemetry.sequence=0; telemetry.chain="GENESIS"; telemetry.startTime=0; telemetry.inputCount=0; telemetry.impossibleFlags=0; telemetry.lastScore=0;
+  telemetry.sequence=0; telemetry.chain="GENESIS"; telemetry.startTime=0; telemetry.inputCount=0; telemetry.impossibleFlags=0; telemetry.lastScore=score;
   initialiseOfflineStandings();
   ui.sessionShort.textContent=telemetry.sessionId.slice(0,8).toUpperCase();if(ui.sessionShortMobile)ui.sessionShortMobile.textContent=telemetry.sessionId.slice(0,8).toUpperCase();
   ui.startOverlay.classList.remove("show");ui.pauseOverlay.classList.remove("show");ui.gameOverOverlay.classList.remove("show");
@@ -933,7 +1074,11 @@ async function resetGame(options={}) {
   syncRoomMeta();syncUi();renderLeaderboard();renderSideCanvases();
   starting=false;ui.startBtn.disabled=false;ui.restartBtn.disabled=false;
   window.VoltAudio?.reset();
-  startCountdown();
+  if (resumeSkipCountdown) {
+    beginPlay();
+  } else {
+    startCountdown();
+  }
   refreshLiveStandings(true);
 }
 
@@ -1951,6 +2096,8 @@ window.ChartvoltTetris={
   pause:()=>togglePause(true),
   resume:()=>togglePause(false),
   getState:competitionSnapshot,
+  setHoldEnabled(enabled){holdEnabled=Boolean(enabled);},
+  isHoldEnabled:()=>holdEnabled,
   exportReplay,
   async playReplay(data){
     if(!data||!Array.isArray(data.inputs))throw new Error("Invalid replay data");

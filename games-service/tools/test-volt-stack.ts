@@ -186,5 +186,45 @@ test("zeroScore for volt-stack is 0 with an empty lock breakdown", () => {
   assert.equal(zero.breakdown.locks, 0);
 });
 
+test("replaying the same locks restores the same score (mid-round resume)", () => {
+  // Reason: navigate-away resume rebuilds from stored locks. If replaying N locks did not
+  // match a continuous run of N locks, a returning player would see the wrong board and the
+  // next placement would fail piece_mismatch.
+  const seed = derivePieceSeed("resume-seed");
+  const continuous = createStackEngine(seed);
+  const locks: StackLockInput[] = [];
+  for (let i = 0; i < 7; i++) locks.push(dropNext(continuous, i % 3));
+
+  const resumed = createStackEngine(seed);
+  for (const lock of locks) {
+    const step = applyLock(resumed, lock);
+    assert.equal(step.ok, true, `resume step failed: ${!step.ok ? step.reason : ""}`);
+  }
+  assert.equal(resumed.score, continuous.score);
+  assert.equal(resumed.lines, continuous.lines);
+  assert.equal(resumed.level, continuous.level);
+  assert.equal(resumed.locks, continuous.locks);
+  assert.deepEqual(resumed.board, continuous.board);
+  assert.deepEqual(resumed.queue, continuous.queue);
+});
+
+test("parseStackLockInput keeps placement fields the host must forward", () => {
+  const parsed = parseStackLockInput({
+    piece: "J",
+    rotation: 2,
+    x: 4,
+    y: 17,
+    hardDropCells: 12,
+    claimedSpin: { tspin: true, mini: false },
+  });
+  assert.ok(parsed);
+  assert.equal(parsed!.piece, "J");
+  assert.equal(parsed!.rotation, 2);
+  assert.equal(parsed!.x, 4);
+  assert.equal(parsed!.y, 17);
+  assert.equal(parsed!.hardDropCells, 12);
+  assert.deepEqual(parsed!.claimedSpin, { tspin: true, mini: false });
+});
+
 console.log(`\n${passed} passed, ${failed} failed\n`);
 if (failed > 0) process.exit(1);
