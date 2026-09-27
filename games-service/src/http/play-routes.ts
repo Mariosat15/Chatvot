@@ -1,6 +1,12 @@
 import type { Request, Response } from "express";
 
-import { currentState, leaveRound, startOrResume, submitBoard } from "../rounds/play";
+import {
+  completeRound,
+  currentState,
+  leaveRound,
+  startOrResume,
+  submitBoard,
+} from "../rounds/play";
 import { recordStackLock } from "../rounds/play-volt-stack";
 import { badRequest } from "./errors";
 
@@ -60,6 +66,15 @@ export async function postSubmit(req: Request, res: Response): Promise<void> {
 
 export async function postLeave(req: Request, res: Response): Promise<void> {
   const state = await leaveRound(readToken(req.body));
+  res.json(state);
+}
+
+/**
+ * Natural end of a run (Volt Stack top-out / timer). Scores from stored locks as `completed`.
+ * Leave mid-run still uses `postLeave` → `abandoned`.
+ */
+export async function postComplete(req: Request, res: Response): Promise<void> {
+  const state = await completeRound(readToken(req.body));
   res.json(state);
 }
 

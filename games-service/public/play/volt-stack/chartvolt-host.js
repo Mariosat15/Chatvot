@@ -145,8 +145,9 @@
       return outcome;
     },
     async finalize() {
-      // Server recomputes the score from stored locks. Client total is ignored.
-      hostState = await api("POST", "/play/api/leave", { t: token });
+      // Top-out / time-up is a finished Tetris run. Server recomputes from locks as completed
+      // — never abandoned — so earned points count and the higher score wins.
+      hostState = await api("POST", "/play/api/complete", { t: token });
       tellPlatform("finished");
       return { accepted: true, verified: true };
     },
@@ -199,15 +200,21 @@
   }
 
   // Leave from the shell → Circuit `exit` (ProviderGameFrame has no `leave` type).
+  // Mid-run Leave is abandoned (partial score); game_over finalize uses /complete instead.
   window.addEventListener("chartvolt:host", (event) => {
     const detail = event.detail;
     if (!detail || detail.type !== "leave" || leaving) return;
     leaving = true;
     tellPlatform("exit");
     if (hostState && hostState.mode === "ranked") {
-      adapter.finalize().catch(() => {
-        tellPlatform("finished");
-      });
+      api("POST", "/play/api/leave", { t: token })
+        .then((state) => {
+          hostState = state;
+          tellPlatform("finished");
+        })
+        .catch(() => {
+          tellPlatform("finished");
+        });
     } else {
       tellPlatform("finished");
     }

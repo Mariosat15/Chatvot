@@ -13,6 +13,7 @@ import { requirePlatformAuth, type SignedRequest } from "./http/inbound-auth";
 import { servePlayAsset, servePlayPage } from "./http/play-page";
 import {
   getState,
+  postComplete,
   postLeave,
   postSession,
   postStackLock,
@@ -156,6 +157,7 @@ export function createApp() {
   app.get("/play/api/state", wrap(getState));
   app.post("/play/api/submit", wrap(postSubmit));
   app.post("/play/api/leave", wrap(postLeave));
+  app.post("/play/api/complete", wrap(postComplete));
   app.post("/play/api/lock", wrap(postStackLock));
 
   // Ambiguity A14 / R35 — token-scoped attempt summary, never puzzle content.

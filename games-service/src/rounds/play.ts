@@ -448,10 +448,32 @@ export async function submitBoard(
  * "please send a partial score if you can compute one" - and note the round still counts as an
  * attempt. A player who quits has used their entry; what they have not done is forfeited the
  * boards they already solved.
+ *
+ * NOT for Volt Stack top-out / time-up — those are a natural end of the run and use
+ * `completeRound` so the status is `completed` and the challenge UI does not call them unfinished.
  */
 export async function leaveRound(token: string): Promise<PlayState> {
   const round = await roundForToken(token);
   await finishRound(round.roundId, { status: "abandoned" });
+  const settled = await Round.findOne({ roundId: round.roundId });
+  if ((settled ?? round).gameCode === VOLT_STACK_CODE) {
+    return voltStackStateFor(settled ?? round);
+  }
+  return stateFor(settled ?? round);
+}
+
+/**
+ * The player finished the run the game recognises as over (Volt Stack: block-out, lock-out,
+ * or the contest timer). Server recomputes the score from stored locks — never from a client total.
+ *
+ * Reason status is `completed`, not `abandoned`: topping out in Tetris is how you lose the
+ * board, not how you forfeit the attempt. An abandoned status made the challenge screen say
+ * "Round not finished / scores nothing" even when locks had earned points, so the higher score
+ * never won.
+ */
+export async function completeRound(token: string): Promise<PlayState> {
+  const round = await roundForToken(token);
+  await finishRound(round.roundId, { status: "completed" });
   const settled = await Round.findOne({ roundId: round.roundId });
   if ((settled ?? round).gameCode === VOLT_STACK_CODE) {
     return voltStackStateFor(settled ?? round);

@@ -336,6 +336,80 @@ async function main(): Promise<number> {
     assert.doesNotMatch(response.body.launchUrl, /\/play\?t=/);
   });
 
+  await test("Volt Stack top-out completes with earned points, not abandoned zero", async () => {
+    /*
+     * Owner 27 Sep 2026: topping out is how you lose the Tetris board, not how you forfeit.
+     * Finalize used to POST /leave → abandoned → challenge UI "scores nothing" even after
+     * verified locks. Completing recomputes from locks as `completed` so the higher score wins.
+     */
+    await clearRounds();
+    const { VOLT_STACK_DURATION } = await import("../src/games/titles");
+    const {
+      applyLock,
+      createStackEngine,
+      derivePieceSeed,
+    } = await import("../src/games/volt-stack/engine");
+    const { matrixFor, COLS, ROWS } = await import("../src/games/volt-stack/shapes");
+    const { callPlay, tokenFromLaunchUrl } = await import("./api-harness");
+
+    const created = await callApi<{ launchUrl: string }>("/v1/rounds", {
+      method: "POST",
+      body: createBody({
+        resultCallbackUrl: callbackUrl,
+        gameCode: "volt-stack",
+        config: { durationSeconds: VOLT_STACK_DURATION.default },
+      }),
+    });
+    const token = tokenFromLaunchUrl(created.body.launchUrl);
+    const session = await callPlay<{ pieceSeed: string; status: string }>("/play/api/session", {
+      t: token,
+    });
+    assert.equal(session.body.status, "in_progress");
+
+    const engine = createStackEngine(session.body.pieceSeed || derivePieceSeed("fallback"));
+    const piece = engine.queue[0]!;
+    const rotation = 0;
+    const matrix = matrixFor(piece, rotation);
+    const x = piece === "O" ? 4 : Math.floor((COLS - matrix[0]!.length) / 2);
+    let y = 3;
+    const collides = (py: number): boolean => {
+      for (let my = 0; my < matrix.length; my++) {
+        // eslint-disable-next-line security/detect-object-injection -- loop index into matrix rows
+        const row = matrix[my]!;
+        for (let mx = 0; mx < row.length; mx++) {
+          // eslint-disable-next-line security/detect-object-injection -- loop index into matrix cells
+          if (!row[mx]) continue;
+          const by = py + my;
+          const bx = x + mx;
+          if (bx < 0 || bx >= COLS || by >= ROWS) return true;
+          // eslint-disable-next-line security/detect-object-injection -- loop indices into the board
+          if (by >= 0 && engine.board[by]![bx]) return true;
+        }
+      }
+      return false;
+    };
+    while (!collides(y + 1)) y++;
+    const lock = { piece, rotation, x, y, hardDropCells: 8 };
+    assert.equal(applyLock(engine, lock).ok, true);
+
+    const locked = await callPlay<{ accepted: boolean }>("/play/api/lock", { t: token, lock });
+    assert.equal(locked.body.accepted, true);
+
+    const finished = await callPlay<{
+      status: string;
+      finished?: { status: string };
+    }>("/play/api/complete", { t: token });
+    assert.equal(finished.body.status, "completed");
+    assert.equal(finished.body.finished?.status, "completed");
+
+    const { Round } = await import("../src/store/round.model");
+    const row = await Round.findOne({}).lean();
+    assert.ok(row);
+    assert.equal(row!.status, "completed");
+    assert.ok(typeof row!.score === "number" && row!.score > 0, "top-out must keep earned points");
+    assert.notEqual(row!.status, "abandoned");
+  });
+
   await test("the launch URL does not leak the content seed", async () => {
     // Section 12: the seed is "never exposed to the player, in the page, the URL or any
     // client-visible response". A launch URL that carried it would let a player generate every

@@ -87,6 +87,17 @@ function describe(round: PlayerRoundView): {
           "This round was cancelled and does not count against your attempts. You can play again.",
       };
     case "abandoned":
+      // Reason: leaveRound still scores from locks / boards. Saying "scores nothing" was a lie
+      // whenever the provider sent a partial result — Volt Stack top-out used to land here too.
+      if (typeof round.score === "number" && Number.isFinite(round.score) && round.score !== 0) {
+        return {
+          icon: Trophy,
+          tone: "text-emerald-400",
+          heading: "Round ended early",
+          detail:
+            "You left before the run finished. The points you earned still count toward this competition.",
+        };
+      }
       return {
         icon: XCircle,
         tone: "text-amber-400",
@@ -94,6 +105,14 @@ function describe(round: PlayerRoundView): {
         detail: "This round was not completed, so it scores nothing. The attempt has been used.",
       };
     case "expired":
+      if (typeof round.score === "number" && Number.isFinite(round.score) && round.score !== 0) {
+        return {
+          icon: Trophy,
+          tone: "text-emerald-400",
+          heading: "Round ran out of time",
+          detail: "Time ran out. The points you earned still count toward this competition.",
+        };
+      }
       return {
         icon: Clock3,
         tone: "text-amber-400",
