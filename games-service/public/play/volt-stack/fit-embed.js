@@ -37,7 +37,9 @@
   // target made a squat well and left HOLD/NEXT taller than the board.
   // 590 is the MINIMUM the frame is asked for; the well then GROWS to fill
   // whatever height the arena gives it (owner, 27 Sep: "fill the bottom").
-  const TARGET_BOARD_H = 590;
+  // Owner, 27 Sep 2026 (second pass): "stretch it more vertically down" -
+  // 590 left the frame ending well above the fold, so the request is now 720.
+  const TARGET_BOARD_H = 720;
   const BOARD_ASPECT = 2;
   const MAX_BOARD_H = 900;
   const MAX_BOARD_W = MAX_BOARD_H / BOARD_ASPECT;

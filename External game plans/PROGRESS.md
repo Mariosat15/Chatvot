@@ -945,6 +945,14 @@ null-guard assertion was flipped, not deleted, and 2 tests were added).
 **Deploy:** both sides. Games-service needs a pull and `pm2 restart chartvolt-games`, with
 no build. The main app needs a rebuild and restart. Then hard refresh. **Never verified by eye.**
 
+**Amended the same day (owner screenshot):**
+- The frame still ended too high, so the requested minimum board is now **720**, up from
+  590 (cache-bust `20260927r`).
+- The arena strip's How it works picture letterboxed a wide banner, so it is now
+  **`cover`**, bleeding to the card's right, top and bottom edges. The lobby's wide
+  picture stays `contain`.
+- Two assertions were flipped, not deleted.
+
 
 ### 27 Sep 2026 - Per-game How it works & tips (Guides) tab
 

@@ -362,7 +362,9 @@ describe("the pictures are small and beside the text", () => {
     // Reason: `size` is a literal from the table above.
     // eslint-disable-next-line security/detect-non-literal-regexp
     expect(code).toMatch(new RegExp(size));
-    expect(code).toMatch(/fit="contain"/);
+    // Reason: 27 Sep 2026 the rules strip moved to `cover` (owner: fill the gaps); the tips
+    // card already used `cover`-style fill. Either fit is legitimate - what is pinned is fill.
+    expect(code).toMatch(/fit="(contain|cover)"/);
   });
 
   it.each(beside)("%s draws it AFTER the text, not above it", (_label, file) => {

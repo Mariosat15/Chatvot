@@ -210,9 +210,11 @@ describe("the rules panel says nothing rather than saying nothing usefully", () 
     expect(container.length).toBeGreaterThan(20);
     expect(container).not.toMatch(/flex-col/);
 
-    // Both pictures, both `contain`: these two uploads are graphics rather than photographs,
-    // so a crop takes the corners off a badge. `cover` stays the kit's default.
-    expect(code.match(/fit="contain"/g)).toHaveLength(2);
+    // Reason: FLIPPED 27 Sep 2026. Both pictures were `contain` so a crop could not take the
+    // corners off a badge; the owner then asked the arena strip's picture to fill its slot
+    // with no gaps, so the strip is `cover` and only the lobby's wide picture stays `contain`.
+    expect(code.match(/fit="contain"/g)).toHaveLength(1);
+    expect(code.match(/fit="cover"/g)).toHaveLength(1);
   });
 
   it("offers only the two layouts a screen actually asks for", () => {

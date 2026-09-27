@@ -365,15 +365,19 @@ function RulesStrip({
           two cards. The picture now takes the body's full height and its own width from its
           proportions (`shape="fill"`), capped at half the card so the steps keep their room.
         */}
-        {/* `relative` + a width: the `fill` picture is absolute, so this slot must size itself. */}
-        <div className="relative hidden w-[40%] shrink-0 self-stretch sm:block">
+        {/* `relative` + a width: the `fill` picture is absolute, so this slot must size itself.
+            Owner, 27 Sep 2026: "the area must auto fill any size of the image to fill the gaps" -
+            `contain` letterboxed a wide banner with empty bands either side, so the arena strip
+            now uses `cover` and bleeds to the card's right, top and bottom edges (the negative
+            margins cancel the body padding). The lobby's wide picture keeps `contain`. */}
+        <div className="relative -my-2 -mr-3 hidden w-[42%] shrink-0 self-stretch overflow-hidden rounded-r-xl sm:block">
           <NeonIllustration
             src={imageUrl}
             alt={`How ${gameName} is played`}
             icon={BookOpen}
             accent="players"
             shape="fill"
-            fit="contain"
+            fit="cover"
           />
         </div>
       </div>
