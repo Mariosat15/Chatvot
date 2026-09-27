@@ -1019,6 +1019,18 @@ no build. The main app needs a rebuild and restart. Then hard refresh. **Never v
   is set by the admin per title in the Games section (copied onto the contest at write time);
   a connected but not-Ready player races with their selected ship; the vendor server may be
   patched; 1v1 challenges are ON (challenge rooms carry no `startAt` and start on both-Ready).
+- **Later again, 27 Sep 2026 - VV1 BUILT: the race server is in the repository** (`23` s8.1).
+  `velocity-server/` holds the vendor server, the ten simulation modules it imports and its three
+  tests, patched for **open-roster lobbies** (`POST /v1/races/:id/players`, idempotent, max 16,
+  lobby only) and a **scheduled start** (green at `scheduledStartAt` with every connected player,
+  Ready or not; fewer than two connected -> a signed `cancelled` receipt, because the vendor
+  archived only finished races and the result would otherwise answer 202 for ever). Vendor
+  behaviour is unchanged without the new fields, which is what 1v1 rooms use. The vendor
+  `GET /` client route is removed. PM2 `chartvolt-velocity` (one fork - rooms are in memory),
+  `env.example`, nginx `/race/` admitting only the six player actions, `proxy_buffering off`.
+  35 tests (21 vendor + 14), three probes red. **Nothing calls it yet and it is not deployed**;
+  a race cannot be played until VV2 (title, bootstrap page, client serving) and VV3 (result
+  sweeper). Every patch is listed in `velocity-server/CHARTVOLT-PATCHES.md`.
 
 
 ### 27 Sep 2026 - Per-game How it works & tips (Guides) tab

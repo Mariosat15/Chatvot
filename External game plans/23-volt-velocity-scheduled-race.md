@@ -124,7 +124,7 @@ work for a provider contest with `lower_is_better` scores.
 
 | Phase | Content | Estimate |
 |---|---|---|
-| **VV1** | Race server in repo + PM2 + nginx + the two server patches (B, C) with tests | 2-3 days |
+| **VV1** | Race server in repo + PM2 + nginx + the two server patches (B, C) with tests | 2-3 days - **BUILT 27 Sep 2026**, see 8.1 |
 | **VV2** | Title, round-create branch, bootstrap page, session endpoint, static client (D, E, F, L) | 2-3 days |
 | **VV3** | Result sweeper + receipt verification + per-player callbacks (G) | 1-2 days |
 | **VV4** | Platform lobby window, `scheduledStartAt`, player-cap pre-flight, spec version bump (H, I, J) | 2 days |
@@ -132,6 +132,40 @@ work for a provider contest with `lower_is_better` scores.
 
 **Total ~10-13 working days** including the 1v1 decision and the admin lobby control. Behind `externalGamesEnabled` and the title's `chartvoltEnabled`
 switch throughout, so nothing reaches players until the owner enables the title.
+
+### 8.1 VV1 - what was built (27 September 2026)
+
+`velocity-server/` at the repository root: the vendor `server/` (four files), the ten `src/`
+modules it imports, the three vendor multiplayer tests, and `CHARTVOLT-PATCHES.md`, which is the
+authoritative list of every change. **It is not built and not deployed**; nothing calls it yet.
+
+- **Without the two new spec fields the vendor behaviour is unchanged** - a frozen 2-16 roster
+  that starts when everybody is Ready. That is what a 1v1 challenge room uses (s9 decision 4), and
+  the 21 vendor tests pinning it still pass.
+- `openRoster: true` lets a room start empty and grow to 16 through `POST /v1/races/:id/players`
+  (admin key). `addPlayer()` is **idempotent for a known id** so a retried launch never errors,
+  refuses once the room has left the lobby, and refuses the 17th.
+- `scheduledStartAt` disables the all-ready start. The countdown begins 5 seconds early so the
+  race goes **green at** the scheduled moment with every **connected** player, Ready or not
+  (s9 decision 2). A registered player who never connected does not race.
+- **Fewer than two connected at the start cancels the race**, and a cancelled race is archived
+  with a signed, final receipt (`status: "cancelled"`, empty `results`, the `registered` list).
+  Without this the result endpoint answers 202 for ever and nothing can settle the round - the
+  vendor archived `finished` rooms only.
+- A scheduled lobby lives until its start plus 5 minutes (the vendor evicted every lobby at 30
+  minutes), and a start may be booked at most 6 hours ahead, which bounds idle memory.
+- The vendor `GET /` that served the 107 MB client is removed; games-service serves the client
+  (VV2).
+- Deploy pieces: PM2 `chartvolt-velocity` (**fork, one instance** - rooms are in memory, so two
+  processes would each hold half of them), `velocity-server/env.example`, and an nginx location
+  that admits **only the six ticket-authenticated player actions** under `/race/`, with
+  `proxy_buffering off` because `events` is a server-sent-event stream. The admin endpoints are
+  reached by games-service over loopback only.
+- Tests: `npm test` in `velocity-server/`, **35** (21 vendor + 14 new). Three probes - restoring
+  the all-ready start on a scheduled room, archiving `finished` only, and dropping the auto-Ready
+  at the gun - each turned the suite red.
+- **VV-6 is resolved**: the vendor declares no Node engine; `--env-file` needs Node 20.6, which is
+  what `package.json` now states.
 
 ## 9. Owner decisions (answered 27 September 2026)
 
@@ -162,4 +196,4 @@ switch throughout, so nothing reaches players until the owner enables the title.
 | VV-3 | **Client is ~107 MB** (inlined assets) - slow on mobile, and it must load inside the lobby window | Serve the modular build with long cache + compression; lobby opens 10 min early; ask the vendor for a split-asset build |
 | VV-4 | Latency: SSE through Cloudflare/nginx buffering | `proxy_buffering off`; verify Cloudflare does not buffer `text/event-stream` |
 | VV-5 | Protocol change (`scheduledStartAt`) | Additive field, version bump of `ChartVolt-Game-API-Requirements.html` |
-| VV-6 | Node 22 required by the race server | Check the VPS Node version before VV1 |
+| VV-6 | Node 22 required by the race server | **Resolved in VV1**: no engine declared by the vendor; Node >= 20.6 for `--env-file` |

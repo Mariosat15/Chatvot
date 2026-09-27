@@ -201,6 +201,35 @@ module.exports = {
       // killing it mid-write is how a round exists on one side and not the other.
       kill_timeout: 12000,
     },
+
+    // ============================================
+    // VOLT VELOCITY RACE SERVER (16-player scheduled races)
+    // External game plans/23-volt-velocity-scheduled-race.md
+    // ============================================
+    //
+    // A provider-side process, like chartvolt-games: it holds each race in MEMORY and runs the
+    // physics authoritatively, so it must be exactly ONE process. Two copies would each hold half
+    // the rooms and a player's ticket would land on the one that does not know their race.
+    // Secrets (RACE_TICKET_SECRET, RACE_ADMIN_KEY) come from velocity-server/.env via --env-file,
+    // never from this committed file and never from the platform's .env.
+    {
+      name: 'chartvolt-velocity',
+      script: 'server/index.mjs',
+      cwd: __dirname + '/velocity-server',
+      node_args: '--env-file=.env',
+      env: {
+        NODE_ENV: 'production',
+      },
+      instances: 1,
+      exec_mode: 'fork',
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '768M',
+      error_file: __dirname + '/logs/velocity-error.log',
+      out_file: __dirname + '/logs/velocity-out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      kill_timeout: 5000,
+    },
   ],
 
   // ============================================
@@ -223,6 +252,7 @@ module.exports = {
         cd api-server && npm install && cd .. &&
         cd websocket-server && npm install && npm run build && cd .. &&
         cd games-service && npm install && npm run build && cd .. &&
+        cd velocity-server && npm install --omit=dev && cd .. &&
         npm run build &&
         npm run build:admin &&
         npm run build:api &&
