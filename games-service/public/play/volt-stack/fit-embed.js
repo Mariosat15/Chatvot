@@ -4,9 +4,10 @@
  * Owner (27 Sep 2026): board + HOLD/NEXT rails + the mobile touch row
  * must all sit inside the neon stage. Prefer a shorter board over clipping.
  *
- * Owner (27 Sep 2026, board enlarge): grow the Tetris playfield itself —
- * widen the center column / raise cell size from available width+height.
- * Do NOT transform:scale() the whole UI. Side rails stay visible but secondary.
+ * Owner (27 Sep 2026, board enlarge): grow ONLY the center Tetris board to
+ * ~510×590. Shrink HOLD/COMBO and NEXT/SPEED rails to make room.
+ * Do NOT transform:scale() the whole UI — set --board-width / --board-height
+ * and the parent grid column widths.
  *
  * Standalone offline play (no parent) is untouched.
  */
@@ -34,13 +35,13 @@
   // Floor for the touch strip when the first measure runs before layout settles.
   const TOUCH_RESERVE = 54;
   const MIN_BOARD_W = 160;
-  // Hard ceiling — beyond this cells stop looking like a Tetris grid in the arena.
-  const MAX_BOARD_W = 420;
-  // Reason: owner asked for the board as the dominant ~40–45% of the playable
-  // center section. Size the playfield from that fraction first, then clamp to
-  // height / rail leftovers so HOLD and NEXT stay readable.
-  const TARGET_BOARD_FRAC = 0.44;
-  const LAYOUT_GAP = 12; // both gutters between rails and cabinet
+  // Reason: owner asked for ~510×590 center board (was ~250×500). Cap at that
+  // size so the playfield does not outgrow the design box.
+  const TARGET_BOARD_W = 510;
+  const TARGET_BOARD_H = 590;
+  const MAX_BOARD_W = TARGET_BOARD_W;
+  const BOARD_ASPECT = TARGET_BOARD_H / TARGET_BOARD_W; // ~1.157, not classic 1:2
+  const LAYOUT_GAP = 10; // both gutters between rails and cabinet
 
   function tellResize(height) {
     try {
@@ -76,18 +77,18 @@
   }
 
   function railBudgetFor(viewW) {
-    // Reason: rails are secondary. Leave enough for HOLD/NEXT labels, but give
-    // the leftover width to --board-width so cells grow (not the whole shell).
-    if (viewW < 520) return 96;
-    if (viewW < 720) return 140;
-    if (viewW < 960) return 168;
-    return 200;
+    // Reason: rails are secondary — shrink HOLD/NEXT so the center board can
+    // reach ~510px. Leave just enough for labels and mini canvases.
+    if (viewW < 520) return 88;
+    if (viewW < 720) return 112;
+    if (viewW < 960) return 128;
+    return 148;
   }
 
   function framePadFor(boardW) {
     if (boardW < 220) return 6;
     if (boardW < 300) return 8;
-    if (boardW < 360) return 10;
+    if (boardW < 400) return 10;
     return 12;
   }
 
@@ -102,39 +103,49 @@
     // Frame pad is part of --arena-h, so leave room for it inside the budget
     // or the rails+board block pushes the touch row off the bottom.
     const FRAME_EXTRA = 4;
-    let framePad = 10;
+    let framePad = 12;
     const budget = Math.max(
       220,
       viewH - chrome - SAFETY - framePad * 2 - FRAME_EXTRA,
     );
 
-    // Height-first candidate (square cells → height = 2 × width).
-    let boardH = budget;
-    let boardW = Math.floor(boardH / 2);
+    // Height-first candidate at the design aspect (~510×590).
+    let boardH = Math.min(TARGET_BOARD_H, budget);
+    let boardW = Math.floor(boardH / BOARD_ASPECT);
 
-    const targetFromFrac = Math.floor(viewW * TARGET_BOARD_FRAC);
     const maxWFromWidth = Math.max(
       MIN_BOARD_W,
       Math.floor(viewW - railBudgetFor(viewW) - LAYOUT_GAP),
     );
-    boardW = Math.min(MAX_BOARD_W, targetFromFrac, maxWFromWidth, boardW);
+    boardW = Math.min(MAX_BOARD_W, maxWFromWidth, boardW);
     boardW = Math.max(MIN_BOARD_W, boardW);
-    boardH = boardW * 2;
+    boardH = Math.round(boardW * BOARD_ASPECT);
     framePad = framePadFor(boardW);
 
-    // Re-check with the real frame pad — square cells + pad can still overshoot.
+    // Re-check with the real frame pad — pad + board can still overshoot.
     const maxArena = viewH - chrome - SAFETY;
     if (boardH + framePad * 2 + FRAME_EXTRA > maxArena) {
       boardH = Math.max(
-        MIN_BOARD_W * 2,
+        Math.round(MIN_BOARD_W * BOARD_ASPECT),
         maxArena - framePad * 2 - FRAME_EXTRA,
       );
-      boardW = Math.max(MIN_BOARD_W, Math.floor(boardH / 2));
-      boardH = boardW * 2;
+      boardW = Math.max(MIN_BOARD_W, Math.floor(boardH / BOARD_ASPECT));
+      boardH = Math.round(boardW * BOARD_ASPECT);
+      framePad = framePadFor(boardW);
+    }
+
+    // Prefer the design target when the viewport has room.
+    if (
+      viewW - railBudgetFor(viewW) - LAYOUT_GAP >= TARGET_BOARD_W &&
+      budget >= TARGET_BOARD_H
+    ) {
+      boardW = TARGET_BOARD_W;
+      boardH = TARGET_BOARD_H;
       framePad = framePadFor(boardW);
     }
 
     shell.style.setProperty("--board-width", `${boardW}px`);
+    shell.style.setProperty("--board-height", `${boardH}px`);
     shell.style.setProperty("--frame-pad", `${framePad}px`);
     shell.style.setProperty(
       "--arena-h",

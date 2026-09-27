@@ -1302,13 +1302,17 @@ function updateCoachAdvice() {
 
   // ---------- Visual rendering ----------
 
-  function resizeCanvas(c, context, aspect=2) {
+  function resizeCanvas(c, context, aspect) {
     const dpr=Math.min(window.devicePixelRatio||1,qualityTier===2?2:qualityTier===1?1.5:1);
-    const cssW=Math.max(100,Math.round(c.clientWidth||420));
-    const cssH=Math.round(cssW*aspect);
+    // Reason: owner 27 Sep — board CSS is ~510×590 (not classic 1:2). Read the
+    // laid-out box so the bitmap matches; fall back to design aspect ~1.157.
+    const cssW=Math.max(100,Math.round(c.clientWidth||510));
+    const fallbackAspect=typeof aspect==="number"?aspect:590/510;
+    const cssH=Math.max(100,Math.round(c.clientHeight||Math.round(cssW*fallbackAspect)));
     const w=Math.round(cssW*dpr),h=Math.round(cssH*dpr);
     if(c.width!==w||c.height!==h){c.width=w;c.height=h;}
-    return {w:c.width,h:c.height,cell:c.width/COLS,dpr};
+    // cell = horizontal step; cellY = vertical step (rectangular cells fill the box).
+    return {w:c.width,h:c.height,cell:c.width/COLS,cellY:c.height/VISIBLE_ROWS,dpr};
   }
   function resizeFxToGame() {
     if(fxCanvas.width!==canvas.width||fxCanvas.height!==canvas.height){fxCanvas.width=canvas.width;fxCanvas.height=canvas.height;}
@@ -1323,20 +1327,21 @@ function updateCoachAdvice() {
   function easeInOutCubic(t){t=Math.max(0,Math.min(1,t));return t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;}
 
 
-  function drawCell(g,px,py,size,color,alpha=1,ghost=false,hot=false,pieceType=null) {
-    const pad=Math.max(1.4,size*.065),x=px+pad,y=py+pad,w=size-2*pad,r=Math.max(2,size*.065);
+  function drawCell(g,px,py,size,color,alpha=1,ghost=false,hot=false,pieceType=null,sizeY) {
+    const sy=sizeY??size;
+    const pad=Math.max(1.4,Math.min(size,sy)*.065),x=px+pad,y=py+pad,w=size-2*pad,hh=sy-2*pad,r=Math.max(2,Math.min(size,sy)*.065);
     g.save();g.globalAlpha=alpha;
     if(ghost){
-      g.fillStyle=rgba(color,.08);g.strokeStyle=rgba(color,.85);g.lineWidth=Math.max(1,size*.035);
-      g.shadowColor=color;g.shadowBlur=size*.32;roundRect(g,x,y,w,w,r);g.fill();g.stroke();g.restore();return;
+      g.fillStyle=rgba(color,.08);g.strokeStyle=rgba(color,.85);g.lineWidth=Math.max(1,Math.min(size,sy)*.035);
+      g.shadowColor=color;g.shadowBlur=Math.min(size,sy)*.32;roundRect(g,x,y,w,hh,r);g.fill();g.stroke();g.restore();return;
     }
-    g.shadowColor=color;g.shadowBlur=size*(hot?.65:.42);
-    const fill=g.createLinearGradient(x,y,x+w,y+w);fill.addColorStop(0,shade(color,.22));fill.addColorStop(.32,color);fill.addColorStop(1,shade(color,-.38));
-    g.fillStyle=fill;roundRect(g,x,y,w,w,r);g.fill();
-    g.lineWidth=Math.max(1.4,size*.043);g.strokeStyle=shade(color,.72);g.stroke();
+    g.shadowColor=color;g.shadowBlur=Math.min(size,sy)*(hot?.65:.42);
+    const fill=g.createLinearGradient(x,y,x+w,y+hh);fill.addColorStop(0,shade(color,.22));fill.addColorStop(.32,color);fill.addColorStop(1,shade(color,-.38));
+    g.fillStyle=fill;roundRect(g,x,y,w,hh,r);g.fill();
+    g.lineWidth=Math.max(1.4,Math.min(size,sy)*.043);g.strokeStyle=shade(color,.72);g.stroke();
     g.shadowBlur=0;
-    const inner=g.createLinearGradient(0,y,0,y+w);inner.addColorStop(0,'rgba(255,255,255,.55)');inner.addColorStop(.2,'rgba(255,255,255,.04)');inner.addColorStop(1,'rgba(0,0,0,.12)');g.fillStyle=inner;roundRect(g,x+2,y+2,w-4,w-4,r);g.fill();
-    g.strokeStyle='rgba(255,255,255,.7)';g.lineWidth=Math.max(1,size*.025);g.beginPath();g.moveTo(x+r,y+1);g.lineTo(x+w-r,y+1);g.stroke();g.restore();
+    const inner=g.createLinearGradient(0,y,0,y+hh);inner.addColorStop(0,'rgba(255,255,255,.55)');inner.addColorStop(.2,'rgba(255,255,255,.04)');inner.addColorStop(1,'rgba(0,0,0,.12)');g.fillStyle=inner;roundRect(g,x+2,y+2,w-4,hh-4,r);g.fill();
+    g.strokeStyle='rgba(255,255,255,.7)';g.lineWidth=Math.max(1,Math.min(size,sy)*.025);g.beginPath();g.moveTo(x+r,y+1);g.lineTo(x+w-r,y+1);g.stroke();g.restore();
   }
 
   function getBlockSprite(size,type,hot=false) {
@@ -1354,27 +1359,32 @@ function updateCoachAdvice() {
     return item;
   }
 
-  function drawCachedBlock(g,px,py,size,type,alpha=1,hot=false) {
-    const sprite=getBlockSprite(size,type,hot);
-    const scale=size/sprite.px;
-    const margin=sprite.margin*scale;
+  // Reason: board box is ~510×590 so cells are rectangular. Stretch the square
+  // sprite into size×sizeY so the grid fills the design box without letterboxing.
+  function drawCachedBlock(g,px,py,size,type,alpha=1,hot=false,sizeY) {
+    const sy=sizeY??size;
+    const sprite=getBlockSprite(Math.max(size,sy),type,hot);
+    const scaleX=size/sprite.px,scaleY=sy/sprite.px;
+    const marginX=sprite.margin*scaleX,marginY=sprite.margin*scaleY;
     g.save();
     g.globalAlpha=alpha;
-    g.drawImage(sprite.canvas,px-margin,py-margin,size+margin*2,size+margin*2);
+    g.drawImage(sprite.canvas,px-marginX,py-marginY,size+marginX*2,sy+marginY*2);
     g.restore();
   }
 
-  function drawScaledCachedBlock(g,px,py,baseSize,type,scale=1,alpha=1,hot=false){
-    const sprite=getBlockSprite(baseSize,type,hot);
-    const margin=sprite.margin*(baseSize/sprite.px);
-    const full=baseSize+margin*2;
-    const dest=full*scale;
-    const cx=px+baseSize/2,cy=py+baseSize/2;
-    g.save();g.globalAlpha=alpha;g.drawImage(sprite.canvas,cx-dest/2,cy-dest/2,dest,dest);g.restore();
+  function drawScaledCachedBlock(g,px,py,baseSize,type,scale=1,alpha=1,hot=false,baseSizeY){
+    const sy=baseSizeY??baseSize;
+    const sprite=getBlockSprite(Math.max(baseSize,sy),type,hot);
+    const marginX=sprite.margin*(baseSize/sprite.px);
+    const marginY=sprite.margin*(sy/sprite.px);
+    const fullX=baseSize+marginX*2,fullY=sy+marginY*2;
+    const destX=fullX*scale,destY=fullY*scale;
+    const cx=px+baseSize/2,cy=py+sy/2;
+    g.save();g.globalAlpha=alpha;g.drawImage(sprite.canvas,cx-destX/2,cy-destY/2,destX,destY);g.restore();
   }
 
 function drawBackground(m) {
-  const {w,h,cell}=m,t=document.body.classList.contains('reduced-motion')?0:boardShaderTime;
+  const {w,h,cell,cellY}=m,cy=cellY||cell,t=document.body.classList.contains('reduced-motion')?0:boardShaderTime;
   ctx.clearRect(0,0,w,h);
   const bg=ctx.createLinearGradient(0,0,w,h);bg.addColorStop(0,'#031745');bg.addColorStop(.48,'#010a27');bg.addColorStop(1,'#041333');ctx.fillStyle=bg;ctx.fillRect(0,0,w,h);
   for(let i=0;i<5;i++){
@@ -1392,7 +1402,7 @@ function drawBackground(m) {
   // Bright, legible full-width grid — ten columns by twenty rows.
   ctx.lineWidth=Math.max(.65,m.dpr*.55);
   for(let x=0;x<=COLS;x++){ctx.strokeStyle=x%5===0?'rgba(29,166,255,.58)':'rgba(25,132,225,.34)';ctx.beginPath();ctx.moveTo(x*cell,0);ctx.lineTo(x*cell,h);ctx.stroke();}
-  for(let y=0;y<=VISIBLE_ROWS;y++){ctx.strokeStyle=y%5===0?'rgba(50,152,248,.55)':'rgba(25,122,218,.32)';ctx.beginPath();ctx.moveTo(0,y*cell);ctx.lineTo(w,y*cell);ctx.stroke();}
+  for(let y=0;y<=VISIBLE_ROWS;y++){ctx.strokeStyle=y%5===0?'rgba(50,152,248,.55)':'rgba(25,122,218,.32)';ctx.beginPath();ctx.moveTo(0,y*cy);ctx.lineTo(w,y*cy);ctx.stroke();}
   const sweepY=(t*28)%(h+100)-100,scan=ctx.createLinearGradient(0,sweepY,0,sweepY+100);scan.addColorStop(0,'rgba(0,100,255,0)');scan.addColorStop(.8,'rgba(0,130,255,.045)');scan.addColorStop(1,'rgba(0,150,255,0)');ctx.fillStyle=scan;ctx.fillRect(0,sweepY,w,100);
   if(boardPulse>0||flashPulse>0){ctx.fillStyle=`rgba(84,209,255,${boardPulse*.10+flashPulse*.18})`;ctx.fillRect(0,0,w,h);}
   if(dangerLevel>0){const warn=ctx.createLinearGradient(0,0,0,h*.6);warn.addColorStop(0,`rgba(255,25,103,${(.08+.035*Math.sin(t*8))*dangerLevel})`);warn.addColorStop(1,'transparent');ctx.fillStyle=warn;ctx.fillRect(0,0,w,h*.6);}
@@ -1412,28 +1422,29 @@ function updateVisualPose(dt){
   visualPose.scaleY+=(targetScale-visualPose.scaleY)*(1-Math.exp(-18*dt));
 }
 
-function drawVisualActive(piece,cell){
+function drawVisualActive(piece,cell,cellY){
+  const cy=cellY||cell;
   const n=piece.matrix.length;
-  const cx=visualPose.x+n/2,cy=visualPose.y+n/2;
+  const cx=visualPose.x+n/2,cvy=visualPose.y+n/2;
   const a=visualPose.rotationOffset,ca=Math.cos(a),sa=Math.sin(a);
   for(let y=0;y<n;y++)for(let x=0;x<n;x++){
     if(!piece.matrix[y][x])continue;
     const lx=x+.5-n/2,ly=(y+.5-n/2)*visualPose.scaleY;
     const rx=lx*ca-ly*sa,ry=lx*sa+ly*ca;
-    const bx=cx+rx-.5,by=cy+ry-.5-HIDDEN_ROWS;
+    const bx=cx+rx-.5,by=cvy+ry-.5-HIDDEN_ROWS;
     if(by<-1)continue;
     if(!document.body.classList.contains('reduced-motion')){
-      const tail=cell*(4.0+.35*Math.sin(boardShaderTime*3+x)),bottom=by*cell+cell*.3;
+      const tail=cy*(4.0+.35*Math.sin(boardShaderTime*3+x)),bottom=by*cy+cy*.3;
       const beam=ctx.createLinearGradient(0,bottom-tail,0,bottom);beam.addColorStop(0,rgba(COLORS[piece.type],0));beam.addColorStop(1,rgba(COLORS[piece.type],.42));ctx.fillStyle=beam;ctx.fillRect(bx*cell+cell*.14,bottom-tail,cell*.72,tail);
     }
-    drawCachedBlock(ctx,bx*cell,by*cell,cell,piece.type,1,grounded);
+    drawCachedBlock(ctx,bx*cell,by*cy,cell,piece.type,1,grounded,cy);
   }
 }
 
 
 function renderGame() {
-  const m=resizeCanvas(canvas,ctx,2);resizeFxToGame();drawBackground(m);
-  const {cell}=m;
+  const m=resizeCanvas(canvas,ctx);resizeFxToGame();drawBackground(m);
+  const {cell,cellY}=m;const cy=cellY||cell;
   const collapseProgress=collapseState?easeOutBack(collapseState.elapsedMs/collapseState.duration):1;
 
   for(let y=HIDDEN_ROWS;y<ROWS;y++) for(let x=0;x<COLS;x++){
@@ -1457,40 +1468,41 @@ function renderGame() {
       renderY-=fall*(1-collapseProgress);
     }
 
-    if(scale!==1)drawScaledCachedBlock(ctx,x*cell,renderY*cell,cell,type,scale,alpha,hot);
-    else drawCachedBlock(ctx,x*cell,renderY*cell,cell,type,alpha,hot);
+    if(scale!==1)drawScaledCachedBlock(ctx,x*cell,renderY*cy,cell,type,scale,alpha,hot,cy);
+    else drawCachedBlock(ctx,x*cell,renderY*cy,cell,type,alpha,hot,cy);
   }
 
   if(active && state!=="over"){
     if(qualityTier>0){
-      const ax=(visualPose.x+active.matrix.length/2)*cell,ay=(visualPose.y-HIDDEN_ROWS+active.matrix.length/2)*cell;
+      const ax=(visualPose.x+active.matrix.length/2)*cell,ay=(visualPose.y-HIDDEN_ROWS+active.matrix.length/2)*cy;
       ctx.save();ctx.globalCompositeOperation="screen";
       const cast=ctx.createRadialGradient(ax,ay,0,ax,ay,cell*3.2);cast.addColorStop(0,rgba(COLORS[active.type],.10));cast.addColorStop(.55,rgba(COLORS[active.type],.025));cast.addColorStop(1,rgba(COLORS[active.type],0));ctx.fillStyle=cast;ctx.fillRect(0,0,m.w,m.h);ctx.restore();
     }
-    const gy=ghostY();drawPiece(active,gy,cell,.45,true);drawVisualActive(active,cell);
+    const gy=ghostY();drawPiece(active,gy,cell,.45,true,cy);drawVisualActive(active,cell,cy);
   }
   renderFx(m);
 }
 
-function drawPiece(piece,yPos,cell,alpha,ghost){
+function drawPiece(piece,yPos,cell,alpha,ghost,cellY){
+  const cy=cellY||cell;
   for(let y=0;y<piece.matrix.length;y++)for(let x=0;x<piece.matrix[y].length;x++){
     if(!piece.matrix[y][x])continue;
     const vy=yPos+y-HIDDEN_ROWS;if(vy<0)continue;
-    if(ghost)drawCell(ctx,(piece.x+x)*cell,vy*cell,cell,COLORS[piece.type],alpha,true,false,piece.type);
-    else drawCachedBlock(ctx,(piece.x+x)*cell,vy*cell,cell,piece.type,alpha,false);
+    if(ghost)drawCell(ctx,(piece.x+x)*cell,vy*cy,cell,COLORS[piece.type],alpha,true,false,piece.type,cy);
+    else drawCachedBlock(ctx,(piece.x+x)*cell,vy*cy,cell,piece.type,alpha,false,cy);
   }
 }
 
 
 function renderFx(m){
-  const {w,h,cell}=m;fx.clearRect(0,0,w,h);
-  for(const t of trails){fx.save();fx.globalAlpha=Math.max(0,t.life/t.max);fx.strokeStyle=t.color;fx.shadowColor=t.color;fx.shadowBlur=cell*(qualityTier===2?.38:.22);fx.lineWidth=Math.max(2,cell*.075);fx.beginPath();fx.moveTo(t.x1*cell,t.y1*cell);fx.lineTo(t.x2*cell,t.y2*cell);fx.stroke();fx.restore();}
+  const {w,h,cell,cellY}=m;const cy=cellY||cell;fx.clearRect(0,0,w,h);
+  for(const t of trails){fx.save();fx.globalAlpha=Math.max(0,t.life/t.max);fx.strokeStyle=t.color;fx.shadowColor=t.color;fx.shadowBlur=cell*(qualityTier===2?.38:.22);fx.lineWidth=Math.max(2,cell*.075);fx.beginPath();fx.moveTo(t.x1*cell,t.y1*cy);fx.lineTo(t.x2*cell,t.y2*cy);fx.stroke();fx.restore();}
   if(comboHeat>0){fx.save();fx.globalCompositeOperation="screen";const aura=fx.createRadialGradient(w*.5,h*.64,0,w*.5,h*.64,Math.max(cell*2.5, h*.28));aura.addColorStop(0,`rgba(255,114,245,${comboHeat*.16})`);aura.addColorStop(.38,`rgba(255,207,82,${comboHeat*.10})`);aura.addColorStop(1,"rgba(0,0,0,0)");fx.fillStyle=aura;fx.fillRect(0,0,w,h);fx.restore();}
-  for(const f of lineFlashes){const vy=f.y-HIDDEN_ROWS;if(vy<0||vy>=VISIBLE_ROWS)continue;fx.save();fx.globalCompositeOperation="screen";fx.globalAlpha=Math.max(0,f.life/f.max);const grad=fx.createLinearGradient(0,0,w,0);grad.addColorStop(0,"rgba(255,255,255,0)");grad.addColorStop(.16,"rgba(81,236,255,.54)");grad.addColorStop(.5,"rgba(255,255,255,1)");grad.addColorStop(.84,"rgba(81,236,255,.54)");grad.addColorStop(1,"rgba(255,255,255,0)");fx.fillStyle=grad;fx.fillRect(0,vy*cell,w,cell);fx.restore();}
-  for(const sw of shockwaves){fx.save();fx.globalAlpha=Math.max(0,sw.life/sw.max)*.72;fx.strokeStyle=sw.color;fx.shadowColor=sw.color;fx.shadowBlur=cell*.35;fx.lineWidth=Math.max(1.5,cell*.045);fx.beginPath();fx.ellipse(sw.x*cell,sw.y*cell,sw.r*cell,sw.r*cell*.38,0,0,Math.PI*2);fx.stroke();fx.restore();}
-  for(const a of energyArcs){fx.save();fx.globalAlpha=Math.max(0,a.life/a.max)*.8;fx.strokeStyle=a.color;fx.shadowColor=a.color;fx.shadowBlur=cell*.25;fx.lineWidth=Math.max(1,cell*.025);fx.beginPath();fx.moveTo(a.x1*cell,a.y1*cell);const mx=(a.x1+a.x2)/2+(Math.random()-.5)*.18,my=(a.y1+a.y2)/2+(Math.random()-.5)*.18;fx.lineTo(mx*cell,my*cell);fx.lineTo(a.x2*cell,a.y2*cell);fx.stroke();fx.restore();}
-  for(const p of particles){fx.save();fx.globalAlpha=Math.max(0,p.life/p.max);fx.fillStyle=p.color;fx.shadowColor=p.color;fx.shadowBlur=cell*(qualityTier===2?.26:.14);const s=p.size*cell;fx.translate(p.x*cell,p.y*cell);fx.rotate(p.rot);roundRect(fx,-s/2,-s/2,s,s,Math.max(1,s*.25));fx.fill();fx.restore();}
-  for(const s of sparks){fx.save();fx.globalAlpha=Math.max(0,s.life/s.max);fx.strokeStyle=s.color;fx.shadowColor=s.color;fx.shadowBlur=cell*.18;fx.lineWidth=Math.max(1,cell*.035);fx.beginPath();fx.moveTo(s.x*cell,s.y*cell);fx.lineTo((s.x-s.vx*.035)*cell,(s.y-s.vy*.035)*cell);fx.stroke();fx.restore();}
+  for(const f of lineFlashes){const vy=f.y-HIDDEN_ROWS;if(vy<0||vy>=VISIBLE_ROWS)continue;fx.save();fx.globalCompositeOperation="screen";fx.globalAlpha=Math.max(0,f.life/f.max);const grad=fx.createLinearGradient(0,0,w,0);grad.addColorStop(0,"rgba(255,255,255,0)");grad.addColorStop(.16,"rgba(81,236,255,.54)");grad.addColorStop(.5,"rgba(255,255,255,1)");grad.addColorStop(.84,"rgba(81,236,255,.54)");grad.addColorStop(1,"rgba(255,255,255,0)");fx.fillStyle=grad;fx.fillRect(0,vy*cy,w,cy);fx.restore();}
+  for(const sw of shockwaves){fx.save();fx.globalAlpha=Math.max(0,sw.life/sw.max)*.72;fx.strokeStyle=sw.color;fx.shadowColor=sw.color;fx.shadowBlur=cell*.35;fx.lineWidth=Math.max(1.5,cell*.045);fx.beginPath();fx.ellipse(sw.x*cell,sw.y*cy,sw.r*cell,sw.r*cy*.38,0,0,Math.PI*2);fx.stroke();fx.restore();}
+  for(const a of energyArcs){fx.save();fx.globalAlpha=Math.max(0,a.life/a.max)*.8;fx.strokeStyle=a.color;fx.shadowColor=a.color;fx.shadowBlur=cell*.25;fx.lineWidth=Math.max(1,cell*.025);fx.beginPath();fx.moveTo(a.x1*cell,a.y1*cy);const mx=(a.x1+a.x2)/2+(Math.random()-.5)*.18,my=(a.y1+a.y2)/2+(Math.random()-.5)*.18;fx.lineTo(mx*cell,my*cy);fx.lineTo(a.x2*cell,a.y2*cy);fx.stroke();fx.restore();}
+  for(const p of particles){fx.save();fx.globalAlpha=Math.max(0,p.life/p.max);fx.fillStyle=p.color;fx.shadowColor=p.color;fx.shadowBlur=cell*(qualityTier===2?.26:.14);const s=p.size*cell;fx.translate(p.x*cell,p.y*cy);fx.rotate(p.rot);roundRect(fx,-s/2,-s/2,s,s,Math.max(1,s*.25));fx.fill();fx.restore();}
+  for(const s of sparks){fx.save();fx.globalAlpha=Math.max(0,s.life/s.max);fx.strokeStyle=s.color;fx.shadowColor=s.color;fx.shadowBlur=cell*.18;fx.lineWidth=Math.max(1,cell*.035);fx.beginPath();fx.moveTo(s.x*cell,s.y*cy);fx.lineTo((s.x-s.vx*.035)*cell,(s.y-s.vy*.035)*cy);fx.stroke();fx.restore();}
   if(qualityTier>0)for(const d of ambientDust){fx.save();fx.globalAlpha=d.alpha*(qualityTier===2?1:.55);fx.fillStyle="#8eefff";fx.shadowColor="#5eefff";fx.shadowBlur=qualityTier===2?6*m.dpr:2*m.dpr;fx.fillRect(d.x*w,d.y*h,Math.max(1,d.size*m.dpr),Math.max(1,d.size*m.dpr));fx.restore();}
 }
 
