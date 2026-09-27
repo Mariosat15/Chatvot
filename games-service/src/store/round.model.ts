@@ -104,6 +104,17 @@ export interface RoundDelivery {
   gaveUpAt?: Date;
 }
 
+/** One lock placement stored for Volt Stack rounds. */
+export interface StackLockRecord {
+  piece: string;
+  rotation: number;
+  x: number;
+  y: number;
+  hardDropCells: number;
+  claimedSpin?: { tspin: boolean; mini: boolean };
+  at: Date;
+}
+
 export interface RoundDoc {
   /* ---- identity ---- */
   /** The platform's identifier. We generate nothing here and echo it everywhere. */
@@ -178,6 +189,13 @@ export interface RoundDoc {
   /* ---- play ---- */
   status: RoundStatus;
   boards: RoundBoard[];
+  /**
+   * Volt Stack lock events, verified and scored server-side.
+   *
+   * Absent for Circuit titles. Never stores a client-supplied total — only placement facts
+   * the engine re-scores.
+   */
+  stackLocks?: StackLockRecord[];
   /** Set when a terminal state is reached, and never recomputed afterwards. */
   score?: number;
   durationMs?: number;
@@ -198,6 +216,24 @@ const BoardSchema = new Schema<RoundBoard>(
     issuedAt: { type: Date, required: true },
     solvedAt: { type: Date },
     attempts: { type: Number, required: true, default: 0 },
+  },
+  { _id: false },
+);
+
+const StackLockSchema = new Schema<StackLockRecord>(
+  {
+    piece: { type: String, required: true },
+    rotation: { type: Number, required: true },
+    x: { type: Number, required: true },
+    y: { type: Number, required: true },
+    hardDropCells: { type: Number, required: true, default: 0 },
+    claimedSpin: {
+      type: new Schema(
+        { tspin: { type: Boolean }, mini: { type: Boolean } },
+        { _id: false },
+      ),
+    },
+    at: { type: Date, required: true },
   },
   { _id: false },
 );
@@ -263,6 +299,7 @@ const RoundSchema = new Schema<RoundDoc>(
       default: "created",
     },
     boards: { type: [BoardSchema], default: [] },
+    stackLocks: { type: [StackLockSchema], default: undefined },
     score: { type: Number },
     durationMs: { type: Number },
     scoreBreakdown: { type: Schema.Types.Mixed },

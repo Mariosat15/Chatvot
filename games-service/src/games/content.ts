@@ -14,7 +14,7 @@
  */
 
 import { DEFAULT_LOCALE, type SupportedLocale } from "./locale";
-import { PERFECT_CODE } from "./titles-codes";
+import { PERFECT_CODE, VOLT_STACK_CODE } from "./titles-codes";
 
 /**
  * One title's player-facing text in one language.
@@ -123,6 +123,55 @@ const PERFECT_COPY: Record<SupportedLocale, TitleCopy> = {
   },
 };
 
+const VOLT_STACK_COPY: Record<SupportedLocale, TitleCopy> = {
+  en: {
+    displayName: "Volt Stack",
+    tagline: "Stack higher. Clear brighter. Soft drop never farms score.",
+    description:
+      "A skill-based stacking contest. Every player in a ranked round gets the same seeded " +
+      "piece bag. Clear lines, chain combos and land T-spins before the clock runs out. Soft " +
+      "drop awards zero points so holding Down cannot inflate a paid score; hard drop awards " +
+      "two points per cell. The server recomputes every lock — the browser's score is ignored.",
+    rulesSummary:
+      "Highest score wins. Singles 100, doubles 300, triples 500, tetrises 800, multiplied by " +
+      "level, plus combo, back-to-back and perfect-clear bonuses. Soft drop is worth nothing. " +
+      "Ties follow the platform's usual ranking rules.",
+    pacingNote:
+      "One continuous run against the contest clock. Hold is disabled in ranked rounds so " +
+      "every entrant shares the same piece order.",
+  },
+  el: {
+    displayName: "Volt Stack",
+    tagline: "Στοίβαξε ψηλότερα. Καθάρισε φωτεινότερα. Το soft drop δεν δίνει πόντους.",
+    description:
+      "Ένας διαγωνισμός στοίβαξης βασισμένος στην ικανότητα. Κάθε παίκτης σε ranked γύρο " +
+      "παίρνει την ίδια σειρά κομματιών από seed. Καθάρισε γραμμές, κάνε combo και T-spin " +
+      "πριν τελειώσει ο χρόνος. Το soft drop δίνει μηδέν πόντους· το hard drop δίνει δύο ανά " +
+      "κελί. Ο διακομιστής υπολογίζει ξανά κάθε κλείδωμα — το σκορ του browser αγνοείται.",
+    rulesSummary:
+      "Κερδίζει το υψηλότερο σκορ. Single 100, double 300, triple 500, tetris 800, επί το " +
+      "επίπεδο, συν combo, back-to-back και perfect clear. Το soft drop δεν αξίζει τίποτα.",
+    pacingNote:
+      "Ένα συνεχές run στον χρόνο του διαγωνισμού. Το Hold είναι απενεργοποιημένο στα " +
+      "ranked ώστε όλοι να έχουν την ίδια σειρά κομματιών.",
+  },
+};
+
+const VOLT_STACK_RULES_BY_LOCALE: Record<SupportedLocale, readonly string[]> = {
+  en: [
+    "Move with the arrow keys or the on-screen pads; rotate with R or Up.",
+    "Clear full horizontal rows. Every ten lines raises the level and speeds the gravity.",
+    "Soft drop awards zero points. Hard drop awards two points per cell fallen.",
+    "In ranked rounds Hold is off so everybody shares one piece bag.",
+  ],
+  el: [
+    "Κινήσου με τα βέλη ή τα κουμπιά οθόνης· περιστροφή με R ή επάνω.",
+    "Καθάρισε πλήρεις οριζόντιες γραμμές. Κάθε δέκα γραμμές ανεβάζει επίπεδο.",
+    "Το soft drop δίνει μηδέν πόντους. Το hard drop δίνει δύο ανά κελί.",
+    "Στα ranked το Hold είναι κλειστό ώστε όλοι να μοιράζονται την ίδια σειρά.",
+  ],
+};
+
 function asSupported(locale: string): SupportedLocale {
   return locale === "el" ? "el" : DEFAULT_LOCALE;
 }
@@ -136,6 +185,11 @@ export function boardRulesFor(locale: string): readonly string[] {
   return supported === "el" ? BOARD_RULES_BY_LOCALE.el : BOARD_RULES_BY_LOCALE.en;
 }
 
+export function stackRulesFor(locale: string): readonly string[] {
+  const supported = asSupported(locale);
+  return supported === "el" ? VOLT_STACK_RULES_BY_LOCALE.el : VOLT_STACK_RULES_BY_LOCALE.en;
+}
+
 /**
  * Catalogue / intro copy for a title in a locale.
  *
@@ -144,8 +198,13 @@ export function boardRulesFor(locale: string): readonly string[] {
  */
 export function copyFor(gameCode: string, locale: string): TitleCopy {
   // Reason: branch on known codes rather than indexing a Record — the security
-  // linter treats any dynamic key as an injection sink, and we only have two titles.
-  const table = gameCode === PERFECT_CODE ? PERFECT_COPY : SPRINT_COPY;
+  // linter treats any dynamic key as an injection sink.
+  const table =
+    gameCode === PERFECT_CODE
+      ? PERFECT_COPY
+      : gameCode === VOLT_STACK_CODE
+        ? VOLT_STACK_COPY
+        : SPRINT_COPY;
   const supported = asSupported(locale);
   return supported === "el" ? table.el : table.en;
 }
@@ -156,7 +215,9 @@ export function howToPlayProse(rules: readonly string[], pacingNote: string): st
 
 export function howToPlayFor(gameCode: string, locale: string): string {
   const copy = copyFor(gameCode, locale);
-  return howToPlayProse(boardRulesFor(locale), copy.pacingNote);
+  const rules =
+    gameCode === VOLT_STACK_CODE ? stackRulesFor(locale) : boardRulesFor(locale);
+  return howToPlayProse(rules, copy.pacingNote);
 }
 
 /** Locales every ChartVolt Games title declares once Greek copy exists. */

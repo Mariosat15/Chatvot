@@ -121,10 +121,16 @@ async function main(): Promise<number> {
   console.log("");
   console.log("Catalogue (section 6)");
 
-  await test("publishes both titles with every required field", async () => {
+  await test("publishes every title with every required field", async () => {
     const response = await callApi<{ games: Record<string, unknown>[] }>("/v1/games");
     const games = response.body.games;
-    assert.equal(games.length, 2);
+    // Sprint + deprecated Perfect + Volt Stack. Deprecated stays published so history
+    // keys resolve; the platform pre-flight refuses non-active titles for new contests.
+    assert.equal(games.length, 3);
+    const codes = new Set(games.map((g) => String(g.gameCode)));
+    assert.ok(codes.has("circuit-sprint"));
+    assert.ok(codes.has("circuit-perfect"));
+    assert.ok(codes.has("volt-stack"));
 
     const required = [
       "gameCode",
@@ -165,57 +171,46 @@ async function main(): Promise<number> {
     }
   });
 
-  await test("the two titles rank in opposite directions", async () => {
-    // The reason both titles exist. Section 6's warning is that a wrong `scoreDirection` means the
-    // platform "ranks the entire field backwards and pays the worst player first", and a provider
-    // offering only one direction never exercises the other side of that.
+  await test("catalogue directions cover upward Circuit, downward Perfect, and upward Volt Stack", async () => {
+    // Section 6's warning: a wrong `scoreDirection` ranks the field backwards. Perfect remains
+    // the only lower_is_better title (deprecated but still published). Volt Stack is upward.
     const response = await callApi<{ games: { gameCode: string; scoreDirection: string }[] }>(
       "/v1/games",
     );
     const byCode = new Map(response.body.games.map((g) => [g.gameCode, g.scoreDirection]));
     assert.equal(byCode.get("circuit-sprint"), "higher_is_better");
     assert.equal(byCode.get("circuit-perfect"), "lower_is_better");
+    assert.equal(byCode.get("volt-stack"), "higher_is_better");
   });
 
-  await test("every title's how-to-play carries the shared rules, word for word", async () => {
+  await test("every title's how-to-play carries its own shared rules, word for word", async () => {
     /*
      * The rules of the puzzle had two homes - list items in `public/play/index.html` and prose
-     * inside each title's `howToPlay` - and they had already drifted: the page said "the two
-     * circles that share a number" where the catalogue said "one terminal to its matching pair",
-     * and the page never mentioned that a path can be redrawn at all. A player learned one set of
-     * rules on the game page and a different set inside the game.
-     *
-     * They now live in `content.ts` (re-exported from `instructions.ts`) and both consumers
-     * compose from it. This is what holds that: the catalogue's own strings are compared against
-     * the shared list, so a title that reverts to a hand-written paragraph fails here rather
-     * than at a support desk.
-     *
-     * The play surface's half of the same property is asserted in `test-play.ts` - the state
-     * carries `boardRules`, and the page has no rules of its own to disagree with.
+     * inside each title's `howToPlay` - and they had already drifted. They now live in
+     * `content.ts`. Circuit titles compose from BOARD_RULES; Volt Stack from stackRulesFor.
+     * Asserting BOARD_RULES against every catalogue row would fail on Volt Stack for the
+     * wrong reason - different game, different rules - so each family is checked separately.
      */
-    const { BOARD_RULES } = await import("../src/games/instructions");
+    const { BOARD_RULES, stackRulesFor } = await import("../src/games/content");
     const response = await callApi<{ games: { gameCode: string; howToPlay: string }[] }>(
       "/v1/games",
     );
 
     for (const game of response.body.games) {
-      for (const rule of BOARD_RULES) {
+      const rules =
+        game.gameCode === "volt-stack" ? stackRulesFor("en") : BOARD_RULES;
+      for (const rule of rules) {
         assert.ok(
           game.howToPlay.includes(rule),
           `${game.gameCode}'s howToPlay does not contain "${rule}"`,
         );
       }
-      // The pacing sentence is the part a title genuinely owns, so the prose must be longer than
-      // the shared list alone - otherwise composing it would be indistinguishable from ignoring
-      // the argument.
       assert.ok(
-        game.howToPlay.length > BOARD_RULES.join(" ").length,
+        game.howToPlay.length > rules.join(" ").length,
         `${game.gameCode}'s howToPlay is only the shared rules with no pacing note`,
       );
     }
 
-    // And the two titles must not end up with the same paragraph, which is what a shared list
-    // plus a dropped pacing note would produce.
     const prose = new Set(response.body.games.map((game) => game.howToPlay));
     assert.equal(prose.size, response.body.games.length, "two titles share one how-to-play");
   });
@@ -320,6 +315,25 @@ async function main(): Promise<number> {
     assert.match(response.body.launchUrl, /\/play\?t=/);
     assert.ok(new Date(response.body.launchUrlExpiresAt).getTime() > Date.now());
     assert.equal(response.body.status, "created");
+  });
+
+  await test("a Volt Stack round launches under /play/volt-stack/", async () => {
+    // Reason: Circuit's fingerprinted asset set and Volt Stack's modules must not share one
+    // document URL — a wrong path here either 404s the board or serves Circuit chrome for a
+    // stacking round.
+    await clearRounds();
+    const { VOLT_STACK_DURATION } = await import("../src/games/titles");
+    const response = await callApi<{ launchUrl: string; status: string }>("/v1/rounds", {
+      method: "POST",
+      body: createBody({
+        resultCallbackUrl: callbackUrl,
+        gameCode: "volt-stack",
+        config: { durationSeconds: VOLT_STACK_DURATION.default },
+      }),
+    });
+    assert.equal(response.status, 201);
+    assert.match(response.body.launchUrl, /\/play\/volt-stack\/\?t=/);
+    assert.doesNotMatch(response.body.launchUrl, /\/play\?t=/);
   });
 
   await test("the launch URL does not leak the content seed", async () => {

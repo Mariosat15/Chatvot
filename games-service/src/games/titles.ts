@@ -47,9 +47,9 @@
 
 import { PuzzleShape } from "../engine/generate";
 import { copyFor, howToPlayFor, TITLE_LOCALES } from "./content";
-import { PERFECT_CODE, SPRINT_CODE } from "./titles-codes";
+import { PERFECT_CODE, SPRINT_CODE, VOLT_STACK_CODE } from "./titles-codes";
 
-export { PERFECT_CODE, SPRINT_CODE } from "./titles-codes";
+export { PERFECT_CODE, SPRINT_CODE, VOLT_STACK_CODE } from "./titles-codes";
 
 export type ScoreDirection = "higher_is_better" | "lower_is_better";
 export type ScoreType = "integer" | "decimal" | "duration_ms";
@@ -299,7 +299,52 @@ export const PERFECT: TitleDefinition = {
   status: "deprecated",
 };
 
-export const TITLES: TitleDefinition[] = [SPRINT, PERFECT];
+/** Same clock bounds as Sprint — one shared playing-time language for timed titles. */
+export const VOLT_STACK_DURATION = SPRINT_DURATION;
+
+const voltEn = copyFor(VOLT_STACK_CODE, "en");
+
+export const VOLT_STACK: TitleDefinition = {
+  gameCode: VOLT_STACK_CODE,
+  displayName: voltEn.displayName,
+  tagline: voltEn.tagline,
+  description: voltEn.description,
+  rulesSummary: voltEn.rulesSummary,
+  howToPlay: howToPlayFor(VOLT_STACK_CODE, "en"),
+  category: "arcade",
+  tags: ["stacking", "skill", "fast", "mobile-friendly"],
+  family: "independent",
+  playMode: "anytime",
+  supportsCompetition: true,
+  supportsOneVsOne: true,
+  supportsPractice: true,
+  supportsContentSeed: true,
+  scoreDirection: "higher_is_better",
+  scoreType: "integer",
+  // Generous ceiling: hard-drop farming is capped server-side; an hour of expert play
+  // still sits well under this without clamping two different runs into a tie.
+  scoreRange: { min: 0, max: 5_000_000 },
+  typicalDurationSeconds: VOLT_STACK_DURATION.default,
+  maxDurationSeconds: VOLT_STACK_DURATION.max,
+  configSchema: {
+    type: "object",
+    properties: {
+      durationSeconds: {
+        type: "integer",
+        minimum: VOLT_STACK_DURATION.min,
+        maximum: VOLT_STACK_DURATION.max,
+        default: VOLT_STACK_DURATION.default,
+        format: "duration-seconds",
+      },
+    },
+    required: ["durationSeconds"],
+  },
+  locales: [...TITLE_LOCALES],
+  platforms: ["desktop", "mobile"],
+  status: "active",
+};
+
+export const TITLES: TitleDefinition[] = [SPRINT, PERFECT, VOLT_STACK];
 
 export function findTitle(gameCode: string): TitleDefinition | undefined {
   return TITLES.find((title) => title.gameCode === gameCode);
@@ -322,7 +367,12 @@ export interface PerfectConfig {
   unfinishedPenaltyMs: number;
 }
 
-export type RoundConfig = SprintConfig | PerfectConfig;
+export interface VoltStackConfig {
+  kind: "volt-stack";
+  durationSeconds: number;
+}
+
+export type RoundConfig = SprintConfig | PerfectConfig | VoltStackConfig;
 
 function asGridSize(value: unknown, fallback: GridSize): GridSize {
   return GRID_SIZES.includes(value as GridSize) ? (value as GridSize) : fallback;
@@ -387,6 +437,20 @@ export function resolveConfig(
     };
   }
 
+  if (title.gameCode === VOLT_STACK_CODE) {
+    const duration = clampInteger(
+      raw.durationSeconds,
+      VOLT_STACK_DURATION.min,
+      VOLT_STACK_DURATION.max,
+      VOLT_STACK_DURATION.default,
+    );
+    if (duration.clamped) corrected.push("durationSeconds");
+    return {
+      corrected,
+      config: { kind: "volt-stack", durationSeconds: duration.value },
+    };
+  }
+
   const boardCount = clampInteger(raw.boardCount, 3, 10, 5);
   if (boardCount.clamped) corrected.push("boardCount");
   const penalty = clampInteger(raw.unfinishedPenaltyMs, 30_000, 300_000, 120_000);
@@ -413,7 +477,8 @@ export function resolveConfig(
  * in the rules, so the title's declared maximum is the hard stop.
  */
 export function roundDurationMs(config: RoundConfig): number {
-  return config.kind === "sprint"
-    ? config.durationSeconds * 1000
-    : PERFECT.maxDurationSeconds * 1000;
+  if (config.kind === "sprint" || config.kind === "volt-stack") {
+    return config.durationSeconds * 1000;
+  }
+  return PERFECT.maxDurationSeconds * 1000;
 }

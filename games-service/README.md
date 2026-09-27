@@ -71,17 +71,22 @@ from the spec or the plan rather than taste:
 | **Skill, not chance** | No randomness during play. The puzzle is fixed before the first move, and every player gets the same one |
 | **Mobile-native** | Drag to draw a path. Most players are on a phone |
 
-### The title, and the one that was retired
+### The titles
 
-| | `circuit-sprint` |
-|---|---|
-| Score | Points, **higher is better** |
-| Format | Solve as many puzzles as you can inside the contest's playing time - **1 to 60 minutes**, chosen per contest, 10 by default |
-| Play clock | `durationSeconds`, declared `format: "duration-seconds"` so the platform can reserve the right amount of time. `01` section 3.2 |
+| | `circuit-sprint` | `volt-stack` |
+|---|---|---|
+| Score | Points, **higher is better** | Points, **higher is better** |
+| Format | Solve as many puzzles as you can inside the contest's playing time - **1 to 60 minutes**, chosen per contest, 10 by default | One continuous stacking run for the same duration range; same seeded piece bag for every entrant |
+| Play clock | `durationSeconds`, `format: "duration-seconds"` | Same |
+| Play URL | `/play?t=` | `/play/volt-stack/?t=` |
+| Authority | Server verifies paths | Server recomputes every lock; soft drop = 0 |
 
-**Scoring is count and speed**, which is the whole point of the format: more boards is
+**Scoring for Circuit is count and speed**, which is the whole point of the format: more boards is
 worth more, and solving each one faster is worth more. A player is never required to finish
 anything - the clock ends the round, and whatever they achieved is their score.
+
+**Volt Stack** (27 Sep 2026) is the second active title: line clears, combos and T-spins,
+server-scored, Hold off in ranked rounds. Soft drop never farms a paid score.
 
 **`circuit-perfect` was retired on 8 September 2026**, on the owner's instruction that there
 be no fixed board count and no per-round restriction. It solved a fixed set of five puzzles
@@ -96,10 +101,10 @@ applies to a provider it stops using. The platform's contest pre-flight refuses 
 non-`active` title, so the deprecation *is* the enforcement: no new contest can be created
 on it, and rounds already played still read and score correctly.
 
-**Retiring it has a real cost, recorded rather than glossed:** there is now no
-`lower_is_better` title anywhere, so that direction is covered by unit tests and the golden
-ranking regression rather than by an end-to-end round. `External game plans/21` section 4.1g
-carries the options for restoring it.
+**Retiring Perfect had a real cost:** there was then no live `lower_is_better` title, so that
+direction rested on unit tests and the golden ranking regression. Volt Stack does **not**
+restore that direction (it is upward). `External game plans/21` section 4.1g carries the
+options for restoring Perfect; **s4.1u** is the Volt Stack account.
 
 ### Presentation is varied per player, and the spec asks for this
 

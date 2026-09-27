@@ -1,6 +1,9 @@
 import { signOutbound } from "../http/inbound-auth";
-import { findTitle, type RoundConfig } from "../games/titles";
-import { scoreRound, type BoardOutcome } from "../games/scoring";
+import { findTitle, VOLT_STACK_CODE, type RoundConfig } from "../games/titles";
+import { scoreRound, scoreVoltStackRound, type BoardOutcome } from "../games/scoring";
+import { derivePieceSeed } from "../games/volt-stack/engine";
+import { isPieceType } from "../games/volt-stack/shapes";
+import type { StackLockInput } from "../games/volt-stack/scoring";
 import type { RoundDoc } from "../store/round.model";
 
 /**
@@ -78,10 +81,35 @@ export function progressPayloadFor(round: RoundDoc): ProgressPayloadBody | null 
   const title = findTitle(round.gameCode);
   if (!title) return null;
 
-  const boards = boardOutcomes(round);
-  if (!boards.some((board) => board.solvedAt)) return null;
-
   try {
+    if (title.gameCode === VOLT_STACK_CODE) {
+      const locks = (round.stackLocks ?? [])
+        .map((lock): StackLockInput | null => {
+          if (!isPieceType(lock.piece)) return null;
+          return {
+            piece: lock.piece,
+            rotation: lock.rotation,
+            x: lock.x,
+            y: lock.y,
+            hardDropCells: lock.hardDropCells,
+            claimedSpin: lock.claimedSpin,
+          };
+        })
+        .filter((lock): lock is StackLockInput => lock !== null);
+      if (locks.length === 0) return null;
+      const pieceSeed = derivePieceSeed(round.contentSeed ?? round.providerRoundId);
+      const started = round.startedAt?.getTime() ?? Date.now();
+      const scored = scoreVoltStackRound(title, pieceSeed, locks, Date.now() - started);
+      return {
+        breakdown: scored.breakdown ?? {},
+        provisionalScore: scored.score,
+        provisionalDurationMs: scored.durationMs,
+      };
+    }
+
+    const boards = boardOutcomes(round);
+    if (!boards.some((board) => board.solvedAt)) return null;
+
     const scored = scoreRound(
       title,
       round.config as unknown as RoundConfig,

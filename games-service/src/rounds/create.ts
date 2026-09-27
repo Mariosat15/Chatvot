@@ -1,7 +1,7 @@
 import crypto from "crypto";
 
 import { loadConfig } from "../config";
-import { findTitle, resolveConfig, type RoundConfig } from "../games/titles";
+import { findTitle, resolveConfig, VOLT_STACK_CODE, type RoundConfig } from "../games/titles";
 import { Round, type RoundDoc, type RoundDocument } from "../store/round.model";
 import { ApiError, badRequest, roundConflict, unknownGame } from "../http/errors";
 
@@ -165,15 +165,21 @@ function fingerprint(parts: {
   return crypto.createHash("sha256").update(canonical, "utf8").digest("hex");
 }
 
-function launchUrlFor(token: string): string {
-  return `${loadConfig().publicUrl}/play?t=${token}`;
+function launchUrlFor(token: string, gameCode: string): string {
+  const base = loadConfig().publicUrl.replace(/\/$/, "");
+  // Reason: Circuit lives at `/play`; Volt Stack is a separate surface under `/play/volt-stack/`
+  // so its modules never collide with Circuit's fingerprinted asset set.
+  if (gameCode === VOLT_STACK_CODE) {
+    return `${base}/play/volt-stack/?t=${token}`;
+  }
+  return `${base}/play?t=${token}`;
 }
 
 function respond(round: RoundDoc): CreateRoundOutput {
   return {
     roundId: round.roundId,
     providerRoundId: round.providerRoundId,
-    launchUrl: launchUrlFor(round.launchToken),
+    launchUrl: launchUrlFor(round.launchToken, round.gameCode),
     launchUrlExpiresAt: round.launchUrlExpiresAt.toISOString(),
     // Always the literal "created" on a successful create or idempotent reuse (A8 RESOLVED,
     // requirements HTML v1.13). Live progress belongs on the fetch endpoint, not here.

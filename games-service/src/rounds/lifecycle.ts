@@ -3,10 +3,14 @@ import crypto from "crypto";
 import {
   findTitle,
   roundDurationMs,
+  VOLT_STACK_CODE,
   type RoundConfig,
   type TitleDefinition,
 } from "../games/titles";
-import { scoreRound, zeroScore, type BoardOutcome } from "../games/scoring";
+import { scoreRound, scoreVoltStackRound, zeroScore, type BoardOutcome } from "../games/scoring";
+import { derivePieceSeed } from "../games/volt-stack/engine";
+import type { StackLockInput } from "../games/volt-stack/scoring";
+import { isPieceType } from "../games/volt-stack/shapes";
 import {
   Round,
   TERMINAL_STATUSES,
@@ -73,6 +77,57 @@ function scoreFor(
   status: FinishOptions["status"],
 ): { score?: number; durationMs?: number; breakdown?: Record<string, unknown> } {
   if (status === "voided") return {};
+
+  if (title.gameCode === VOLT_STACK_CODE && config.kind === "volt-stack") {
+    const locks = (round.stackLocks ?? [])
+      .map((lock): StackLockInput | null => {
+        if (!isPieceType(lock.piece)) return null;
+        return {
+          piece: lock.piece,
+          rotation: lock.rotation,
+          x: lock.x,
+          y: lock.y,
+          hardDropCells: lock.hardDropCells,
+          claimedSpin: lock.claimedSpin,
+        };
+      })
+      .filter((lock): lock is StackLockInput => lock !== null);
+
+    const seedSource = round.contentSeed ?? round.providerRoundId;
+    const pieceSeed = derivePieceSeed(seedSource);
+    const started = round.startedAt?.getTime() ?? Date.now();
+    const ended = round.completedAt?.getTime() ?? Date.now();
+    const durationMs = Math.max(0, ended - started);
+
+    if (locks.length === 0) {
+      return zeroScore(title, config);
+    }
+
+    try {
+      const result = scoreVoltStackRound(title, pieceSeed, locks, durationMs);
+      return {
+        score: result.score,
+        durationMs: result.durationMs,
+        breakdown: result.breakdown,
+      };
+    } catch (error) {
+      // A lock stream that fails re-validation at settle time is our bug or a corrupted row.
+      // Voiding would return the attempt; scoring zero would pay the pot wrongly. Prefer zero
+      // with an explicit breakdown so settlement still completes and support can see why.
+      console.error(
+        `❌ [lifecycle] ${round.roundId}: Volt Stack re-score failed:`,
+        error instanceof Error ? error.message : error,
+      );
+      return {
+        score: 0,
+        durationMs,
+        breakdown: {
+          rescoreFailed: true,
+          reason: error instanceof Error ? error.message : "unknown",
+        },
+      };
+    }
+  }
 
   const boards = boardOutcomes(round);
   const solvedAny = boards.some((board) => board.solvedAt);

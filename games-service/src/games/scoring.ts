@@ -29,7 +29,12 @@ import {
   SPRINT,
   SPRINT_CODE,
   TitleDefinition,
+  VOLT_STACK,
+  VOLT_STACK_CODE,
 } from "./titles";
+import { scoreFromLocks } from "./volt-stack/engine";
+import { isPieceType } from "./volt-stack/shapes";
+import type { StackLockInput } from "./volt-stack/scoring";
 
 /** One board the player was issued, and what became of it. */
 export interface BoardOutcome {
@@ -212,6 +217,66 @@ export function scoreRound(
 }
 
 /**
+ * Score a Volt Stack round from verified lock placements.
+ *
+ * Deliberately a separate entry from `scoreRound`: Circuit takes boards, Volt Stack takes
+ * locks, and folding them into one signature would invite a caller to pass the wrong input
+ * silently. Soft-drop points are structurally zero inside the engine.
+ */
+export function scoreVoltStackRound(
+  title: TitleDefinition,
+  pieceSeed: string,
+  locks: StackLockInput[],
+  durationMs: number,
+): ScoreResult {
+  if (title.gameCode !== VOLT_STACK_CODE) {
+    throw new Error(`Volt Stack scorer refused title '${title.gameCode}'`);
+  }
+  const result = scoreFromLocks(pieceSeed, locks, durationMs);
+  const score = Math.min(
+    VOLT_STACK.scoreRange.max,
+    Math.max(VOLT_STACK.scoreRange.min, result.score),
+  );
+  return {
+    score,
+    durationMs: result.durationMs,
+    breakdown:
+      score === result.score
+        ? result.breakdown
+        : { ...result.breakdown, clamped: { raw: result.score, reported: score } },
+  };
+}
+
+export function parseStackLockInput(raw: unknown): StackLockInput | null {
+  if (!raw || typeof raw !== "object") return null;
+  const body = raw as Record<string, unknown>;
+  if (!isPieceType(body.piece)) return null;
+  if (typeof body.rotation !== "number" || !Number.isFinite(body.rotation)) return null;
+  if (typeof body.x !== "number" || !Number.isFinite(body.x)) return null;
+  if (typeof body.y !== "number" || !Number.isFinite(body.y)) return null;
+  const hardDropCells =
+    typeof body.hardDropCells === "number" && Number.isFinite(body.hardDropCells)
+      ? Math.max(0, Math.min(40, Math.trunc(body.hardDropCells)))
+      : 0;
+  let claimedSpin: StackLockInput["claimedSpin"];
+  if (body.claimedSpin && typeof body.claimedSpin === "object") {
+    const spin = body.claimedSpin as Record<string, unknown>;
+    claimedSpin = {
+      tspin: Boolean(spin.tspin),
+      mini: Boolean(spin.mini),
+    };
+  }
+  return {
+    piece: body.piece,
+    rotation: Math.trunc(body.rotation),
+    x: Math.trunc(body.x),
+    y: Math.trunc(body.y),
+    hardDropCells,
+    claimedSpin,
+  };
+}
+
+/**
  * The score for a round that produced nothing at all.
  *
  * Used for `expired` and for `abandoned` where the player never completed a board. The
@@ -232,6 +297,13 @@ export function zeroScore(title: TitleDefinition, config: RoundConfig): ScoreRes
       })),
       config.unfinishedPenaltyMs,
     );
+  }
+  if (title.gameCode === VOLT_STACK_CODE && config.kind === "volt-stack") {
+    return {
+      score: 0,
+      durationMs: 0,
+      breakdown: { locks: 0, lines: 0, level: 1 },
+    };
   }
   return scoreRound(title, config, boards);
 }

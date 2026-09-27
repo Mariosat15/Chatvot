@@ -8,3 +8,4 @@
 
 export const SPRINT_CODE = "circuit-sprint";
 export const PERFECT_CODE = "circuit-perfect";
+export const VOLT_STACK_CODE = "volt-stack";

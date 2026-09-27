@@ -11,7 +11,14 @@ import { serveAsset } from "./http/assets";
 import { ApiError, sendError } from "./http/errors";
 import { requirePlatformAuth, type SignedRequest } from "./http/inbound-auth";
 import { servePlayAsset, servePlayPage } from "./http/play-page";
-import { getState, postLeave, postSession, postSubmit } from "./http/play-routes";
+import {
+  getState,
+  postLeave,
+  postSession,
+  postStackLock,
+  postSubmit,
+} from "./http/play-routes";
+import { serveVoltStackAsset, serveVoltStackPage } from "./http/volt-stack-page";
 import { serveReplay } from "./http/replay";
 import { getRound, postRound, postVoidRound } from "./http/rounds";
 import { armRound, finishRoundForTesting, redeliver, requireSandbox } from "./http/sandbox";
@@ -128,12 +135,20 @@ export function createApp() {
   // The page and its assets first, then the client-facing API. The two are separate concerns that
   // happen to share a prefix: `/play` is served to an unauthenticated browser, and `/play/api/*`
   // authenticates with the launch token from the URL that browser was given.
+  //
+  // Volt Stack MUST be registered before `/play/:asset`, or the literal segment `volt-stack`
+  // is treated as a Circuit filename and 404s.
   app.get("/play", servePlayPage);
+  app.get("/play/volt-stack", serveVoltStackPage);
+  app.get("/play/volt-stack/", serveVoltStackPage);
+  app.get("/play/volt-stack/*", serveVoltStackAsset);
   app.get("/play/:asset", servePlayAsset);
   /*
    * The fingerprinted form. Two segments, so it has the same shape as `GET /play/api/state` - the
    * handler hands back anything that is not one of our fingerprints, which is what makes this
    * safe to register here rather than depending on it being listed after the API routes.
+   * Unrecognised version segments call next(), so `/play/volt-stack/game.js` still reaches the
+   * Volt Stack splat above only if that splat is registered first — which it is.
    */
   app.get("/play/:version/:asset", servePlayAsset);
 
@@ -141,6 +156,7 @@ export function createApp() {
   app.get("/play/api/state", wrap(getState));
   app.post("/play/api/submit", wrap(postSubmit));
   app.post("/play/api/leave", wrap(postLeave));
+  app.post("/play/api/lock", wrap(postStackLock));
 
   // Ambiguity A14 / R35 — token-scoped attempt summary, never puzzle content.
   app.get("/replay/:providerRoundId", wrap(serveReplay));

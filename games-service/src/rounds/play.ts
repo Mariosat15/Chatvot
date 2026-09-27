@@ -8,6 +8,7 @@ import {
   findTitle,
   roundDurationMs,
   shapeFor,
+  VOLT_STACK_CODE,
   type PerfectConfig,
   type RoundConfig,
 } from "../games/titles";
@@ -15,6 +16,10 @@ import { Round, isTerminal, type RoundDocument } from "../store/round.model";
 import { ApiError, unknownRound } from "../http/errors";
 import { finishRound, hardDeadline, playability, playableSeconds } from "./lifecycle";
 import { sendProgress } from "../callback/progress";
+import {
+  startOrResumeVoltStack,
+  voltStackStateFor,
+} from "./play-volt-stack";
 
 /**
  * The play surface, used by the game in the iframe rather than by the platform.
@@ -114,6 +119,15 @@ export interface PlayState {
     status: RoundDocument["status"];
     boardsSolved: number;
   };
+  /**
+   * Volt Stack only. Derived from `contentSeed` so the raw contest seed never reaches the
+   * browser. Drives the seven-bag; the same seed means the same piece order for every entrant.
+   */
+  pieceSeed?: string;
+  /** Ranked Volt Stack disables Hold so the bag stays sequential and server-verifiable. */
+  holdDisabled?: boolean;
+  /** How many verified locks the server has accepted so far. */
+  locksAccepted?: number;
 }
 
 /** Loads a round by its launch token, which is the only credential the browser holds. */
@@ -132,6 +146,9 @@ function boardTargetFor(config: RoundConfig): number | undefined {
 
 function puzzleFor(round: RoundDocument, index: number): ClientPuzzle {
   const config = round.config as unknown as RoundConfig;
+  if (config.kind === "volt-stack") {
+    throw new ApiError(400, "INVALID_REQUEST", "Volt Stack rounds do not use circuit boards.");
+  }
   const generated = generateForPlayer(
     contentSeedFor(round),
     round.presentationSeed,
@@ -213,7 +230,9 @@ function stateFor(round: RoundDocument, board?: ClientPuzzle): PlayState {
     const nextIndex = board.index + 1;
     const target = boardTargetFor(config);
     if (target === undefined || nextIndex < target) {
-      state.nextSkin = skinFile(contentSeedFor(round), config.gridSize, nextIndex);
+      if (config.kind !== "volt-stack") {
+        state.nextSkin = skinFile(contentSeedFor(round), config.gridSize, nextIndex);
+      }
     }
   }
   if (endsAt) state.endsAt = endsAt.toISOString();
@@ -263,6 +282,10 @@ function stateFor(round: RoundDocument, board?: ClientPuzzle): PlayState {
 export async function startOrResume(token: string): Promise<PlayState> {
   const round = await roundForToken(token);
   const now = new Date();
+
+  if (round.gameCode === VOLT_STACK_CODE) {
+    return startOrResumeVoltStack(round, now);
+  }
 
   const status = playability(round, now);
   if (!status.playable) {
@@ -346,6 +369,9 @@ export async function submitBoard(
   board.attempts += 1;
 
   const config = round.config as unknown as RoundConfig;
+  if (config.kind === "volt-stack") {
+    throw new ApiError(400, "INVALID_REQUEST", "Volt Stack rounds do not accept circuit board submissions.");
+  }
   const generated = generateForPlayer(
     contentSeedFor(round),
     round.presentationSeed,
@@ -410,11 +436,17 @@ export async function leaveRound(token: string): Promise<PlayState> {
   const round = await roundForToken(token);
   await finishRound(round.roundId, { status: "abandoned" });
   const settled = await Round.findOne({ roundId: round.roundId });
+  if ((settled ?? round).gameCode === VOLT_STACK_CODE) {
+    return voltStackStateFor(settled ?? round);
+  }
   return stateFor(settled ?? round);
 }
 
 export async function currentState(token: string): Promise<PlayState> {
   const round = await roundForToken(token);
+  if (round.gameCode === VOLT_STACK_CODE) {
+    return voltStackStateFor(round);
+  }
   const now = new Date();
 
   const status = playability(round, now);

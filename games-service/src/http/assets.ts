@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 
-import { findTitle, shapeFor, type TitleDefinition } from "../games/titles";
+import { findTitle, shapeFor, VOLT_STACK_CODE, type TitleDefinition } from "../games/titles";
 import { generatePuzzle } from "../engine/generate";
 import { SeededRandom } from "../engine/rng";
 
@@ -40,6 +40,32 @@ function colourFor(index: number): string {
 }
 
 /**
+ * A decorative stack for Volt Stack catalogue cards — not a real board, and not scored.
+ */
+function stackBoardSvg(seed: string, cell: number): string {
+  const rng = new SeededRandom(`${seed}:stack-art`);
+  const cols = 10;
+  const rows = 8;
+  const width = cols * cell;
+  const height = rows * cell;
+  const parts: string[] = [];
+  parts.push(`<rect width="${width}" height="${height}" rx="10" fill="#050c19"/>`);
+  for (let y = rows - 1; y >= 2; y--) {
+    for (let x = 0; x < cols; x++) {
+      if (rng.int(100) < 35 + (rows - y) * 4) continue;
+      const colour = colourFor(rng.int(WIRE_COLOURS.length));
+      parts.push(
+        `<rect x="${x * cell + 2}" y="${y * cell + 2}" width="${cell - 4}" height="${cell - 4}" rx="4" fill="${colour}" opacity="0.9"/>`,
+      );
+    }
+  }
+  parts.push(
+    `<rect width="${width}" height="${height}" rx="10" fill="none" stroke="#00d5ff" stroke-width="2" opacity="0.35"/>`,
+  );
+  return `<g>${parts.join("")}</g>`;
+}
+
+/**
  * Draws one board as SVG, at a fixed seed.
  *
  * The solved paths are shown, which is safe precisely because the seed is a constant chosen here
@@ -48,6 +74,11 @@ function colourFor(index: number): string {
  * issued is neither.
  */
 function boardSvg(title: TitleDefinition, seed: string, cell: number): string {
+  // Volt Stack is not a circuit puzzle — draw stacked blocks instead of wire paths.
+  if (title.gameCode === VOLT_STACK_CODE) {
+    return stackBoardSvg(seed, cell);
+  }
+
   const shape = shapeFor("medium");
   const puzzle = generatePuzzle(seed, shape);
   const rng = new SeededRandom(`${seed}:paint`);

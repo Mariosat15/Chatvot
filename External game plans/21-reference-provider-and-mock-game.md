@@ -183,7 +183,7 @@ service's own smoke tool, never yet launched from a ChartVolt contest.
 |---|---|
 | The standalone service | **Built.** `games-service/` - own process, own port (4010 by default), own database, own `node_modules`, **zero imports from this repository**, enforced by `tools/check-isolation.ts` |
 | The engine | **Built.** A deterministic seeded non-crossing-path puzzle: `engine/{rng,puzzle,generate,verify}.ts`. Generation is reproducible from a `contentSeed` indefinitely, and the verifier validates a submission **against the rules**, not against the generator's own stored solution, because a board has several valid solutions |
-| Two titles | **Built, then ONE.** `circuit-sprint` (higher-is-better, integer) and `circuit-perfect` (lower-is-better, `duration_ms`), from one engine; the second existed so a ranking sign error could not pass every test. **`circuit-perfect` was retired on 8 September 2026** per the owner - see **s4.1g**, including what the retirement costs. A document describing two titles is correct as history and stale as a present fact |
+| Two titles | **Built, then ONE active Circuit title, then TWO active.** `circuit-sprint` (higher-is-better) and `circuit-perfect` (lower-is-better, retired **s4.1g**). **`volt-stack` added 27 Sep 2026** — second active title, higher-is-better stacking, same ChartVolt Games provider; see **s4.1u**. A document saying only Circuit Sprint is playable is correct as history and stale as a present fact — **say which** |
 | The four spec endpoints | **Built.** Catalogue, create round, fetch round, void round, plus signed inbound auth with a rotation window, a retrying result callback, and a four-stage reconciliation sweeper |
 | Spec-ambiguity log | **Built and open.** `games-service/AMBIGUITY-LOG.md`. **Not yet resolved back into `01` and the requirements HTML** |
 | The platform adapter | **Built.** `chartvolt-games` registered in both registry copies, four files under `lib/services/game-providers/adapters/`, mirrored into `apps/admin` and verified byte-identical. 49 tests, 24 probes |
@@ -1639,6 +1639,40 @@ probes, **all red, none failing to apply**.
 so `git pull` alone changes nothing on the server - `npm run build` between the pull and
 `pm2 restart chartvolt-games`. **R66 was reported twice for exactly this reason**, which is why it
 is repeated here rather than assumed known.
+
+### 4.1u Volt Stack — second ChartVolt Games title - 27 September 2026
+
+**Additive second title** under the same first-party provider. Source UI is the modular
+`Volt-Stack-v9.4/neon-stack/` package (not the ~17MB standalone HTML). Contests and 1v1
+challenges use the existing ranked-round protocol; **no second money writer**.
+
+| | Decision / state |
+|---|---|
+| `gameCode` | `volt-stack` |
+| Shape | `family: independent`, `playMode: anytime`, `supportsCompetition` / `OneVsOne` / `Practice` / `ContentSeed`: true |
+| Scoring | **Server-authoritative.** Seeded seven-bag from `contentSeed` (`sha256("volt-stack-bag:"+seed)`); soft drop = 0; hard drop 2/cell; client `score` on lock is refused |
+| Play URL | `/play/volt-stack/?t={token}` (Circuit stays at `/play?t=`) |
+| Host bridge | `public/play/volt-stack/chartvolt-host.js` — Circuit-compatible `ready` / `finished` / leave; **no score in postMessage** |
+| Hold | Disabled in ranked rounds so every entrant shares one bag |
+| Locales | `en` and `el` (same as Circuit) |
+| Engine tests | `npm run test:volt-stack` — same seed + same locks → same score; tampered client score ignored |
+
+**What was deliberately not done:** embedding the standalone HTML as the paid surface;
+accepting browser `finalize` scores as settlement truth; a separate Tetris money path on
+the platform; deleting or renaming Circuit.
+
+**Operator enablement (platform already game-agnostic):** deploy games-service
+(`npm run build` + `pm2 restart chartvolt-games`), Admin → Game Providers → Sync catalogue,
+enable `volt-stack` (`chartvoltEnabled`), optional artwork/rules edit, then create a
+competition or challenge as for Circuit Sprint. Two accounts: join / accept → Play →
+standings → settle.
+
+**Never verified by eye on a live money contest.** Engine and API suites cover fairness and
+launch URL; click acceptance is the same runbook shape as **s4.1e**.
+
+**Deploy:** TypeScript + new `public/play/volt-stack/` modules — build, then pull + restart
+in one movement (R52 / s4.1i). Platform `/play/:path*` rewrite already covers the subpath;
+no `next.config` change required.
 
 ---
 

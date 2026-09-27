@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 
 import { currentState, leaveRound, startOrResume, submitBoard } from "../rounds/play";
+import { recordStackLock } from "../rounds/play-volt-stack";
 import { badRequest } from "./errors";
 
 /**
@@ -60,4 +61,16 @@ export async function postSubmit(req: Request, res: Response): Promise<void> {
 export async function postLeave(req: Request, res: Response): Promise<void> {
   const state = await leaveRound(readToken(req.body));
   res.json(state);
+}
+
+/**
+ * Volt Stack: one verified piece lock. Never a score.
+ *
+ * The body may carry a `score` field from older clients; `recordStackLock` refuses the whole
+ * request if it does, so a tampered client cannot smuggle a total past the engine.
+ */
+export async function postStackLock(req: Request, res: Response): Promise<void> {
+  const token = readToken(req.body);
+  const outcome = await recordStackLock(token, req.body?.lock ?? req.body);
+  res.json(outcome);
 }
