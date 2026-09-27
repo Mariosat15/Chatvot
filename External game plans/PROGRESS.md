@@ -1077,6 +1077,16 @@ no build. The main app needs a rebuild and restart. Then hard refresh. **Never v
   willingness, arena band, countdown, credit value, wallet-writer inventory and others). Typecheck
   baselines unchanged (220 main, 244 admin, none in VV4 files); `check:mirrors` OK.
   **Not deployed; not rehearsed against the real race server - that is VV5.**
+- **Later again, 27 Sep 2026 - the admin panel generates the Volt Velocity secrets** (`23` s8.1
+  amendment; owner chose option 1 of three after being told it breaks s7's "platform never sees
+  them" and only works on one server). Games -> Volt Velocity -> Race server secrets ->
+  **Generate secrets** writes two different 32-byte hex values into `games-service/.env` via
+  `POST /api/games/velocity-secrets` (`game-providers` grant). Never returned, logged or stored;
+  refuses a missing file (no stray `.env`); replacing an existing value needs the typed word
+  `ROTATE` (it ends live races); atomic write; path overridable with `GAMES_SERVICE_ENV_FILE`.
+  Then `pm2 restart chartvolt-games chartvolt-velocity`. `__tests__/admin/velocity-secrets.test.ts`
+  (18); admin route audit 341 section-granted, 0 unguarded; `check:mirrors` OK; lint clean; no new
+  type errors. **Not verified by eye**, and not yet run against the real server file.
 
 
 ### 27 Sep 2026 - Per-game How it works & tips (Guides) tab

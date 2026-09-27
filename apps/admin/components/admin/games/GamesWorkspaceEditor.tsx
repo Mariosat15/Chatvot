@@ -28,6 +28,7 @@ import { useTerms } from "@/contexts/TerminologyContext";
 import type { ProviderTitleRow } from "./provider-types";
 import type { WorkspaceTab, WorkspaceTitle } from "./GamesWorkspaceSection";
 import GamePlayStyleControl from "./GamePlayStyleControl";
+import VelocitySecretsControl from "./VelocitySecretsControl";
 import GameScoringDialog from "./GameScoringDialog";
 import GameChallengeDefaultsDialog from "./GameChallengeDefaultsDialog";
 import GameContentDialog from "./GameContentDialog";
@@ -435,6 +436,7 @@ function GeneralTab({
             }
           />
         </dl>
+        <VelocitySecretsControl title={title} />
       </PanelCard>
 
       <PanelCard>

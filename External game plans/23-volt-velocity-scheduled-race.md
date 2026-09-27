@@ -178,10 +178,30 @@ authoritative list of every change. **It is not built and not deployed**; nothin
   `http://127.0.0.1:3080`), the same line games-service uses to reach it, so the two cannot
   disagree about that either. Allowed origins default to the origin of `GAMES_PUBLIC_URL`, and
   with neither set **no** browser origin is admitted rather than all of them. `npm run
-  setup:env` does not yet write the two Velocity secrets; add them by hand. The race-server
+  setup:env` does not yet write the two Velocity secrets; add them by hand, or - since 27 Sep
+  2026 - generate them from the admin panel (see the amendment below). The race-server
   suite is now **40** (5 new in `tests/chartvolt-env.test.mjs`, one of which passes a
   conflicting `PORT` and asserts it is ignored), and the games-service race test spawns the
   server with the shared names and a decoy `PORT`.
+- **Amended 27 September 2026 (owner, option 1 of three): the admin panel can generate the two
+  secrets.** This is a deliberate exception to s7's "the platform never sees them", and it is
+  written down rather than absorbed. Games -> Volt Velocity -> Race server secrets calls
+  `POST /api/games/velocity-secrets` (`guardSection("game-providers")`), which makes two
+  different 32-byte hex values and writes only those two lines into `games-service/.env`
+  (`apps/admin/lib/services/games/velocity-secrets.service.ts`). What keeps it narrow: the values
+  are **never returned, logged or stored in MongoDB** - the screen shows "set" / "not set" and the
+  file path, and the audit line says "values not recorded"; the write **refuses when the file does
+  not exist**, rather than creating a stray `.env` nothing reads (the failure that retired the
+  payment-provider `.env` writer); replacing secrets that are already set - even one - needs the
+  typed word `ROTATE`, because it ends every race in progress; the file is replaced atomically
+  with its permissions kept, and the placeholder lines `env.example` ships are replaced in place.
+  **It only works when the admin app runs on the same server as games-service.** The default path
+  is `../../games-service/.env` from `apps/admin` (the PM2 layout); `GAMES_SERVICE_ENV_FILE`
+  overrides it. Both processes read the secrets at boot, so the screen then says to run
+  `pm2 restart chartvolt-games chartvolt-velocity`. The control names no game - the route reports
+  which title it belongs to - and the fs-using service never reaches the browser (R58); the shared
+  phrase and restart command live in `apps/admin/lib/admin/velocity-secrets-copy.ts`. Tests:
+  `__tests__/admin/velocity-secrets.test.ts` (18).
 
 ### 8.2 VV2 - what was built (27 September 2026)
 
