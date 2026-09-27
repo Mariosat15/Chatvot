@@ -68,8 +68,8 @@ export function voltStackStateFor(round: RoundDocument): PlayState {
     returnUrl: round.returnUrl,
     parentOrigin: round.parentOrigin,
     pieceSeed: pieceSeedFor(round),
-    // Ranked rounds share one bag; hold would reorder pieces between entrants.
-    holdDisabled: round.mode === "ranked",
+    // Hold never changes the shared bag; the engine accepts the next or the held piece.
+    holdDisabled: false,
     locksAccepted: locks.length,
     stackLocks: locks,
   };

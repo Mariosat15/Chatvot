@@ -970,6 +970,33 @@ no build. The main app needs a rebuild and restart. Then hard refresh. **Never v
   of the HOLD panel (it used to listen only for coarse/touch pointers), and the frame
   takes focus on any press so the C key reaches the game inside the arena iframe
   (cache-bust `20260927w`). Deploy: `git pull`, then `pm2 restart chartvolt-games`, no build.
+- Later again ("Hold still does nothing; the logo must be the whole art, not cropped, not
+  small"): **Hold was switched off in every ranked round** - the round state sent
+  `holdDisabled: true` whenever `mode === "ranked"`, the host called `setHoldEnabled(false)`,
+  and the server engine refused any lock that was not the next bag piece. So the click and
+  the C key were working and the game discarded them. That is why the previous fix (mouse
+  click and frame focus) looked correct in practice and did nothing in a contest. Fixed at
+  the rule: `consumeLockedPiece` in `src/games/volt-stack/engine.ts` accepts the next piece,
+  the held piece (a swap), or, with hold empty, the piece after next (first hold). **The bag
+  is never altered, so every entrant still draws the same order**, which is the fairness
+  property the old refusal protected. The client resume replay (`replayServerLocks`) mirrors
+  the same rule. `holdDisabled` is now always `false`, and the rules text (en and el) says
+  Hold is for everyone. If a round ever sends hold off again, the panel now says
+  "HOLD OFF" and greys out rather than silently ignoring presses. 4 new engine tests (first
+  hold, swap, bag unchanged, replay equals score), 16/16, with a probe that removed the
+  first-hold branch turning all 4 red. The header now shows the **full owner logo**
+  (`assets/volt-stack-logo.png` 989x833 and `-200.png`, black keyed to transparent, not
+  cropped) at 104px tall standalone, 84px embedded and 78/62/52/46px at smaller widths,
+  vertically centred with the buttons. It needed `.game-identity .brand-logo`, because a
+  legacy `.game-identity img` rule outranked `.brand-logo` and pinned it to 26x30.
+  Separately, the fixed 76/68/56/48px HOLD/NEXT columns meant for the arena were never
+  scoped, so **standalone play clipped every rail label** ("HOL", "NEX") at every width.
+  Standalone rails are now flexible (`html:not(.cv-embedded)`). Measured with no overflow
+  at 1440, 1045, 820 and 390, and Hold was checked by C and by the button in a live
+  practice run (cache-bust `20260927x`). **Deploy needs a build this time**, because the
+  engine is TypeScript: `git pull`, `npm run build` in games-service, `pm2 restart
+  chartvolt-games`, then a hard refresh. `tools/test-progress.ts` "carries no score"
+  fails **with and without this change** - pre-existing, not investigated here.
 
 
 ### 27 Sep 2026 - Per-game How it works & tips (Guides) tab

@@ -151,8 +151,10 @@ test("hard-drop cells add 2 points each and soft path adds none", () => {
 test("a piece out of bag order is refused", () => {
   const seed = derivePieceSeed("tamper-seed");
   const engine = createStackEngine(seed);
-  const expected = engine.queue[0]!;
-  const wrong = expected === "I" ? "O" : "I";
+  // Reason: with hold empty, the piece after next is a legal first-hold placement,
+  // so the tampered piece must be neither of the first two.
+  const legal = new Set([engine.queue[0], engine.queue[1]]);
+  const wrong = (["I", "O", "T", "S", "Z", "J", "L"] as const).find((p) => !legal.has(p))!;
   const result = applyLock(engine, {
     piece: wrong,
     rotation: 0,
@@ -206,6 +208,75 @@ test("replaying the same locks restores the same score (mid-round resume)", () =
   assert.equal(resumed.locks, continuous.locks);
   assert.deepEqual(resumed.board, continuous.board);
   assert.deepEqual(resumed.queue, continuous.queue);
+});
+
+console.log("\nVolt Stack - hold");
+
+/** Drop a given piece straight down at its spawn column (used after a hold). */
+function dropPiece(
+  engine: ReturnType<typeof createStackEngine>,
+  piece: StackLockInput["piece"],
+): StackLockInput {
+  const matrix = matrixFor(piece, 0);
+  const x = piece === "O" ? 4 : Math.floor((COLS - matrix[0]!.length) / 2);
+  let y = 3;
+  const rests = (py: number): boolean =>
+    matrix.some((row, my) =>
+      row.some((cell, mx) => {
+        if (!cell) return false;
+        const by = py + my;
+        const bx = x + mx;
+        // eslint-disable-next-line security/detect-object-injection -- loop indices into the board
+        return bx < 0 || bx >= COLS || by >= ROWS || (by >= 0 && Boolean(engine.board[by]![bx]));
+      }),
+    );
+  while (!rests(y + 1)) y++;
+  const input: StackLockInput = { piece, rotation: 0, x, y, hardDropCells: 0 };
+  const result = applyLock(engine, input);
+  assert.equal(result.ok, true, `drop of ${piece} failed: ${!result.ok ? result.reason : ""}`);
+  return input;
+}
+
+test("first hold: the piece after next may be placed and the next goes into hold", () => {
+  const seed = derivePieceSeed("hold-first-seed");
+  const engine = createStackEngine(seed);
+  const [first, second] = [engine.queue[0]!, engine.queue[1]!];
+  dropPiece(engine, second);
+  assert.equal(engine.held, first === second ? null : first);
+});
+
+test("swap: the held piece may be placed and the next bag piece takes its place", () => {
+  const seed = derivePieceSeed("hold-swap-seed");
+  const engine = createStackEngine(seed);
+  const [a, b] = [engine.queue[0]!, engine.queue[1]!];
+  dropPiece(engine, b); // hold a, place b
+  if (a === b) return; // identical types: plain placement, nothing to swap
+  const next = engine.queue[0]!;
+  dropPiece(engine, a); // swap: place held a, next goes into hold
+  assert.equal(engine.held, next);
+});
+
+test("the bag is unchanged by hold - every entrant draws the same sequence", () => {
+  const seed = derivePieceSeed("hold-fair-seed");
+  const withHold = createStackEngine(seed);
+  const plain = createStackEngine(seed);
+  dropPiece(withHold, withHold.queue[1]!);
+  dropNext(plain);
+  dropNext(plain);
+  // Hold consumed two bag pieces (one placed, one held) - the queue front agrees.
+  assert.deepEqual(withHold.queue.slice(0, 4), plain.queue.slice(0, 4));
+});
+
+test("locks that used hold replay to the same score (settlement and resume)", () => {
+  const seed = derivePieceSeed("hold-replay-seed");
+  const live = createStackEngine(seed);
+  const locks: StackLockInput[] = [];
+  locks.push(dropPiece(live, live.queue[1]!));
+  for (let i = 0; i < 4; i++) locks.push(dropNext(live));
+  if (live.held) locks.push(dropPiece(live, live.held));
+  const replayed = scoreFromLocks(seed, locks, 10_000);
+  assert.equal(replayed.score, live.score);
+  assert.equal(replayed.locks, locks.length);
 });
 
 test("parseStackLockInput keeps placement fields the host must forward", () => {

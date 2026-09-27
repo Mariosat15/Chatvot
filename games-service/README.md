@@ -86,7 +86,7 @@ worth more, and solving each one faster is worth more. A player is never require
 anything - the clock ends the round, and whatever they achieved is their score.
 
 **Volt Stack** (27 Sep 2026) is the second active title: line clears, combos and T-spins,
-server-scored, Hold off in ranked rounds. Soft drop never farms a paid score.
+server-scored, Hold allowed (the engine accepts the next or the held piece, so the bag stays shared). Soft drop never farms a paid score.
 
 **`circuit-perfect` was retired on 8 September 2026**, on the owner's instruction that there
 be no fixed board count and no per-round restriction. It solved a fixed set of five puzzles

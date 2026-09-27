@@ -918,9 +918,13 @@ function canPlay() { return state==="playing" && active; }
     if (!Array.isArray(locks) || locks.length === 0) return;
     for (const lock of locks) {
       if (!lock || !SHAPES[lock.piece]) throw new Error("Corrupt resume lock.");
+      // Reason: mirrors consumeLockedPiece in the server engine - a lock is the next bag
+      // piece, the held piece, or (hold empty) the piece after next.
       refillQueue();
-      if (queue[0] !== lock.piece) throw new Error("Resume bag mismatch.");
-      queue.shift();
+      if (queue[0] === lock.piece) queue.shift();
+      else if (holdType && holdType === lock.piece) holdType = queue.shift();
+      else if (!holdType && queue[1] === lock.piece) { holdType = queue.shift(); queue.shift(); }
+      else throw new Error("Resume bag mismatch.");
       refillQueue();
 
       const rotation = ((Math.trunc(lock.rotation) % 4) + 4) % 4;
@@ -1512,9 +1516,12 @@ function renderFx(m){
   function drawMini(g,type,ax,ay,aw,ah,scale=.9){if(!type)return;const m=SHAPES[type],cells=[];for(let y=0;y<m.length;y++)for(let x=0;x<m[y].length;x++)if(m[y][x])cells.push({x,y});const minX=Math.min(...cells.map(c=>c.x)),maxX=Math.max(...cells.map(c=>c.x)),minY=Math.min(...cells.map(c=>c.y)),maxY=Math.max(...cells.map(c=>c.y)),pw=maxX-minX+1,ph=maxY-minY+1,cs=Math.min(aw/(pw+.8),ah/(ph+.8))*scale,sx=ax+(aw-pw*cs)/2-minX*cs,sy=ay+(ah-ph*cs)/2-minY*cs;for(const c of cells)drawCell(g,sx+c.x*cs,sy+c.y*cs,cs,COLORS[type],1,false,false,type);}
   function renderSideCanvases(){
     let m=miniMetrics(holdCanvas);miniBg(holdCtx,m.w,m.h);
-    if(holdType)drawMini(holdCtx,holdType,0,0,m.w,m.h,.88);else{holdCtx.fillStyle="rgba(94,162,255,.8)";holdCtx.font=`700 ${Math.max(10,Math.min(m.h*.16,m.w*.11))}px "Volt Sans", sans-serif`;holdCtx.textAlign="center";holdCtx.fillText("EMPTY",m.w/2,m.h/2+4);}
+    if(holdType)drawMini(holdCtx,holdType,0,0,m.w,m.h,.88);else{holdCtx.fillStyle="rgba(94,162,255,.8)";holdCtx.font=`700 ${Math.max(10,Math.min(m.h*.16,m.w*.11))}px "Volt Sans", sans-serif`;holdCtx.textAlign="center";holdCtx.fillText(holdEnabled?"EMPTY":"HOLD OFF",m.w/2,m.h/2+4);}
     if(holdLocked&&holdType){holdCtx.fillStyle="rgba(1,7,13,.38)";holdCtx.fillRect(0,0,m.w,m.h);holdCtx.fillStyle="rgba(181,242,250,.72)";holdCtx.font=`800 ${Math.max(9,m.h*.085)}px "Volt Sans", sans-serif`;holdCtx.textAlign="center";holdCtx.fillText("HOLD USED",m.w/2,m.h*.87);}
-    const holdTouchButton=document.querySelector('.touch-controls [data-action="hold"]');if(holdTouchButton){holdTouchButton.classList.toggle("disabled-touch",holdLocked);holdTouchButton.setAttribute("aria-disabled",holdLocked?"true":"false");}
+    // Reason: a switched-off hold must look off, not broken.
+    const holdBlocked=holdLocked||!holdEnabled;
+    const holdCardEl=document.getElementById("holdCard");if(holdCardEl)holdCardEl.classList.toggle("hold-off",!holdEnabled);
+    const holdTouchButton=document.querySelector('.touch-controls [data-action="hold"]');if(holdTouchButton){holdTouchButton.classList.toggle("disabled-touch",holdBlocked);holdTouchButton.setAttribute("aria-disabled",holdBlocked?"true":"false");}
     m=miniMetrics(nextCanvas);miniBg(nextCtx,m.w,m.h);const count=Math.min(5,queue.length),ih=m.h/count;for(let i=0;i<count;i++){if(i){nextCtx.strokeStyle="rgba(20,152,255,.40)";nextCtx.beginPath();nextCtx.moveTo(m.w*.12,i*ih);nextCtx.lineTo(m.w*.88,i*ih);nextCtx.stroke();}drawMini(nextCtx,queue[i],0,i*ih,m.w,ih,.95);}
   }
 
@@ -2108,7 +2115,7 @@ window.ChartvoltTetris={
   pause:()=>togglePause(true),
   resume:()=>togglePause(false),
   getState:competitionSnapshot,
-  setHoldEnabled(enabled){holdEnabled=Boolean(enabled);},
+  setHoldEnabled(enabled){holdEnabled=Boolean(enabled);renderSideCanvases();},
   isHoldEnabled:()=>holdEnabled,
   exportReplay,
   async playReplay(data){

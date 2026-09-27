@@ -137,8 +137,8 @@ const VOLT_STACK_COPY: Record<SupportedLocale, TitleCopy> = {
       "level, plus combo, back-to-back and perfect-clear bonuses. Soft drop is worth nothing. " +
       "Ties follow the platform's usual ranking rules.",
     pacingNote:
-      "One continuous run against the contest clock. Hold is disabled in ranked rounds so " +
-      "every entrant shares the same piece order.",
+      "One continuous run against the contest clock. Hold (C) is available to everyone and " +
+      "never changes the shared piece order.",
   },
   el: {
     displayName: "Volt Stack",
@@ -152,8 +152,8 @@ const VOLT_STACK_COPY: Record<SupportedLocale, TitleCopy> = {
       "Κερδίζει το υψηλότερο σκορ. Single 100, double 300, triple 500, tetris 800, επί το " +
       "επίπεδο, συν combo, back-to-back και perfect clear. Το soft drop δεν αξίζει τίποτα.",
     pacingNote:
-      "Ένα συνεχές run στον χρόνο του διαγωνισμού. Το Hold είναι απενεργοποιημένο στα " +
-      "ranked ώστε όλοι να έχουν την ίδια σειρά κομματιών.",
+      "Ένα συνεχές run στον χρόνο του διαγωνισμού. Το Hold (C) είναι διαθέσιμο σε όλους " +
+      "και δεν αλλάζει την κοινή σειρά κομματιών.",
   },
 };
 
@@ -162,13 +162,13 @@ const VOLT_STACK_RULES_BY_LOCALE: Record<SupportedLocale, readonly string[]> = {
     "Move with the arrow keys or the on-screen pads; rotate with R or Up.",
     "Clear full horizontal rows. Every ten lines raises the level and speeds the gravity.",
     "Soft drop awards zero points. Hard drop awards two points per cell fallen.",
-    "In ranked rounds Hold is off so everybody shares one piece bag.",
+    "Press C or tap Hold to keep a piece for later - once per piece. Everyone still gets the same piece bag.",
   ],
   el: [
     "Κινήσου με τα βέλη ή τα κουμπιά οθόνης· περιστροφή με R ή επάνω.",
     "Καθάρισε πλήρεις οριζόντιες γραμμές. Κάθε δέκα γραμμές ανεβάζει επίπεδο.",
     "Το soft drop δίνει μηδέν πόντους. Το hard drop δίνει δύο ανά κελί.",
-    "Στα ranked το Hold είναι κλειστό ώστε όλοι να μοιράζονται την ίδια σειρά.",
+    "Πάτα C ή Hold για να κρατήσεις ένα κομμάτι - μία φορά ανά κομμάτι. Όλοι παίρνουν την ίδια σειρά."
   ],
 };
 

@@ -1,8 +1,10 @@
 /**
  * Authoritative Volt Stack board: place locks from the seeded bag, clear lines, score.
  *
- * Hold is disabled in ranked rounds (see play host) so the bag order is sequential and
- * enforceable. Soft-drop points are never awarded. A client `score` field is never read.
+ * Hold is allowed in every round. It never changes the bag - every entrant still draws the
+ * same seeded sequence - it only changes which of two known pieces is placed next, so a
+ * lock must be the next bag piece or the piece in hold (see `consumeLockedPiece`).
+ * Soft-drop points are never awarded. A client `score` field is never read.
  */
 
 /* eslint-disable security/detect-object-injection --
@@ -39,6 +41,8 @@ export interface StackEngineState {
   bag: PieceType[];
   rng: () => number;
   queue: PieceType[];
+  /** The piece in hold, as far as the locks so far prove it. */
+  held: PieceType | null;
   score: number;
   lines: number;
   level: number;
@@ -69,6 +73,7 @@ export function createStackEngine(pieceSeed: string): StackEngineState {
     bag: [],
     rng,
     queue: [],
+    held: null,
     score: 0,
     lines: 0,
     level: 1,
@@ -167,6 +172,32 @@ function milestoneBonus(state: StackEngineState): number {
   return bonus;
 }
 
+/**
+ * Advance the bag for one locked piece. Legal placements, in order of preference:
+ * the next bag piece (no hold, or a swap with a same-type held piece); the held piece
+ * (a swap - the next bag piece goes into hold); or, with hold empty, the piece after
+ * next (first hold - the next bag piece goes into hold).
+ *
+ * Reason: preferring the plain match when types coincide can leave the server's hold
+ * empty while the client's holds an identical piece at the queue front. The two states
+ * accept exactly the same future locks, so the greedy choice never refuses a real game.
+ */
+export function consumeLockedPiece(state: StackEngineState, piece: PieceType): boolean {
+  refillQueue(state);
+  if (piece === state.queue[0]) {
+    state.queue.shift();
+  } else if (state.held !== null && piece === state.held) {
+    state.held = state.queue.shift()!;
+  } else if (state.held === null && piece === state.queue[1]) {
+    state.held = state.queue.shift()!;
+    state.queue.shift();
+  } else {
+    return false;
+  }
+  refillQueue(state);
+  return true;
+}
+
 export type ApplyLockResult =
   | { ok: true; gained: number; clearCount: number; state: StackEngineState }
   | { ok: false; reason: string };
@@ -179,13 +210,9 @@ export function applyLock(
     return { ok: false, reason: "invalid_piece" };
   }
 
-  refillQueue(state);
-  const expected = state.queue[0];
-  if (input.piece !== expected) {
+  if (!consumeLockedPiece(state, input.piece)) {
     return { ok: false, reason: "piece_mismatch" };
   }
-  state.queue.shift();
-  refillQueue(state);
 
   const rotation = ((Math.trunc(input.rotation) % 4) + 4) % 4;
   const matrix = matrixFor(input.piece, rotation);

@@ -75,7 +75,7 @@ html.cv-embedded .game-shell{min-height:0!important;height:100%;max-height:100%;
 html.cv-embedded .topbar{height:auto;min-height:58px;padding:2px 2px 8px;gap:14px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between}
 html.cv-embedded .brand-motto{display:none}
 html.cv-embedded .game-identity{display:flex;align-items:center;font-size:clamp(20px,2.4vw,28px);gap:12px;line-height:1}
-html.cv-embedded .brand-logo{width:48px;height:48px;object-fit:contain;flex-shrink:0;display:block;filter:drop-shadow(0 0 8px #00d5ff88)}
+html.cv-embedded .game-identity .brand-logo{height:84px;width:auto;flex-shrink:0;display:block;filter:drop-shadow(0 0 8px #00d5ff66)}
 html.cv-embedded .board-title[hidden]{display:none!important;height:0;margin:0;padding:0}
 html.cv-embedded .game-identity>span{display:block;white-space:nowrap;line-height:1}
 html.cv-embedded .game-identity small{display:block;font-size:10px;letter-spacing:2.4px;margin-top:6px;line-height:1}
@@ -123,12 +123,20 @@ html.cv-embedded .game-shell footer,html.cv-embedded .integrity-note{display:non
 /* Reason: owner 27 Sep 2026 — replace CSS cube brand-blocks with the real Volt Stack
    icon (cubes + lightning), hide the board-title "VOLT STACK" chip, and make HOLD
    clickable on mouse as well as touch. */
-.brand-logo{width:64px;height:64px;object-fit:contain;flex-shrink:0;display:block;filter:drop-shadow(0 0 10px #00d5ff66)}
+.game-identity .brand-logo{height:104px;width:auto;max-width:none;flex-shrink:0;display:block;filter:drop-shadow(0 0 10px #00d5ff55)}.topbar{height:auto;min-height:76px}
 .brand-blocks{display:none!important}
 .board-title[hidden]{display:none!important}
 .hold-card{cursor:pointer;user-select:none;-webkit-user-select:none}
 .hold-card:focus-visible{outline:2px solid #77edff;outline-offset:2px}
 .hold-card.hold-flash{box-shadow:0 0 0 1px #55f6ff,0 0 18px #00d5ff66}
-@media(max-width:700px){.brand-logo{width:42px;height:42px}}
-@media(max-width:400px){.brand-logo{width:36px;height:36px}}
-@media(max-width:350px){.brand-logo{width:32px;height:32px}}
+@media(max-width:1100px){.game-identity .brand-logo,html.cv-embedded .game-identity .brand-logo{height:78px}}@media(max-width:700px){.game-identity .brand-logo,html.cv-embedded .game-identity .brand-logo{height:62px}.topbar{min-height:52px}}
+@media(max-width:400px){.game-identity .brand-logo,html.cv-embedded .game-identity .brand-logo{height:52px}}
+@media(max-width:350px){.game-identity .brand-logo,html.cv-embedded .game-identity .brand-logo{height:46px}}
+.hold-card.hold-off{opacity:.55;cursor:not-allowed}
+/* Reason: the fixed 76/68/56/48px HOLD/NEXT columns were meant for the arena
+   iframe but were never scoped, so standalone play clipped every rail label
+   ("HOL", "NEX"). Standalone rails take the width left beside the well. */
+html:not(.cv-embedded) .play-layout{grid-template-columns:minmax(150px,1fr) var(--cabinet-width) minmax(150px,1fr);justify-content:stretch}
+html:not(.cv-embedded) .mini-rail{width:100%;max-width:none;min-width:0}
+@media(max-width:1100px){html:not(.cv-embedded) .play-layout{grid-template-columns:minmax(120px,1fr) var(--cabinet-width) minmax(120px,1fr)}}
+@media(max-width:700px){html:not(.cv-embedded) .play-layout{grid-template-columns:minmax(64px,1fr) var(--cabinet-width) minmax(64px,1fr)}}
