@@ -23,6 +23,7 @@ import {
 import { serveVoltStackAsset, serveVoltStackPage } from "./http/volt-stack-page";
 import {
   serveClientWarmup,
+  serveVelocityAsset,
   serveVelocityClient,
   serveVelocityHost,
 } from "./http/volt-velocity-client";
@@ -149,9 +150,10 @@ export function createApp() {
   app.get("/play/volt-stack", serveVoltStackPage);
   app.get("/play/volt-stack/", serveVoltStackPage);
   app.get("/play/volt-stack/*", serveVoltStackAsset);
-  // Volt Velocity, same reason. The race client itself is streamed from VELOCITY_CLIENT_FILE.
+  // Volt Velocity, same reason. The race client is the packed `vendor/volt-velocity/` build.
   app.get("/play/volt-velocity", serveVelocityHost);
   app.get("/play/volt-velocity/", serveVelocityHost);
+  app.get("/play/volt-velocity/client/assets/:file", serveVelocityAsset);
   app.get("/play/volt-velocity/client/:fingerprint", serveVelocityClient);
   app.get("/play/volt-velocity/:file", serveVelocityHost);
   // Before `/play/:version/:asset`, whose two-segment shape it shares.

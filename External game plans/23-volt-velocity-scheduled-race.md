@@ -247,6 +247,15 @@ and shares no code with the platform (`check:isolation`).
   gzipped (~76 MB) as `games-service/vendor/volt-velocity-client.html.gz` and unpacked beside
   itself on first use, keeping the archive's mtime so the fingerprint survives restarts;
   `VELOCITY_CLIENT_FILE` still overrides it. Each new client build adds ~76 MB to git history.
+  **Amended again 27 Sep 2026 (owner: players re-downloaded 100 MB every visit):** the .gz is no
+  longer served. `tools/games/pack-velocity-client.ts` splits every inlined `data:` asset into
+  `games-service/vendor/volt-velocity/assets/<content-hash>.<ext>`, resizes the six 4096² stone
+  maps to 2048² and the two 8192×4096 skies to 4096×2048 (webp q90), and writes a ~1 MB
+  `client.html` whose literals point at the files, plus `manifest.json`. ~48 MB in 36 files, the
+  largest 5 MB, all `immutable`; the page's fingerprint is now its content hash, not size+mtime.
+  The client itself is still not edited - only its literals are rewritten, which is safe because
+  every one is a whole quoted `data:` URI handed to a URL-taking three.js loader. Verified by
+  loading the packed page in Chromium: every model, texture and HDR requested and 200, menu drawn.
   Originally the operator pointed `VELOCITY_CLIENT_FILE` at it and games-service streams it at a
   size-and-mtime fingerprinted URL with an immutable cache. The host page loads it in a frame and
   drives its public `ChartvoltVelocity3D.connectCompetition` API, so the ticket is handed over as a

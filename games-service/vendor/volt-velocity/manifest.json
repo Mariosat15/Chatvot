@@ -1,0 +1,257 @@
+{
+  "source": "volt-velocity-client.html.gz",
+  "assets": [
+    {
+      "file": "028584ec004c0b38.webp",
+      "type": "image/webp",
+      "bytes": 555468,
+      "originalBytes": 555468,
+      "note": "1536x1024 kept"
+    },
+    {
+      "file": "f68e7d82f61129da.png",
+      "type": "image/png",
+      "bytes": 1546435,
+      "originalBytes": 1546435,
+      "note": "1254x1254 kept"
+    },
+    {
+      "file": "6787ac65e78b28af.glb",
+      "type": "application/octet-stream",
+      "bytes": 4850496,
+      "originalBytes": 4850496,
+      "note": "copied"
+    },
+    {
+      "file": "4bf0edc0b750ca4e.glb",
+      "type": "application/octet-stream",
+      "bytes": 5313100,
+      "originalBytes": 5313100,
+      "note": "copied"
+    },
+    {
+      "file": "9182ca0ac5e7a26a.webp",
+      "type": "image/webp",
+      "bytes": 920428,
+      "originalBytes": 3945888,
+      "note": "4096x4096 -> 2048x2048"
+    },
+    {
+      "file": "94b4564763cd5507.webp",
+      "type": "image/webp",
+      "bytes": 1645930,
+      "originalBytes": 6739728,
+      "note": "4096x4096 -> 2048x2048"
+    },
+    {
+      "file": "2653b19c9084a912.webp",
+      "type": "image/webp",
+      "bytes": 1936258,
+      "originalBytes": 8853200,
+      "note": "4096x4096 -> 2048x2048"
+    },
+    {
+      "file": "6eca34af9ee2c21e.webp",
+      "type": "image/webp",
+      "bytes": 41392,
+      "originalBytes": 653728,
+      "note": "4096x4096 -> 2048x2048"
+    },
+    {
+      "file": "7ccfc49ddbc1f279.webp",
+      "type": "image/webp",
+      "bytes": 1419396,
+      "originalBytes": 6558736,
+      "note": "4096x4096 -> 2048x2048"
+    },
+    {
+      "file": "c7fc8de7e2a082b9.webp",
+      "type": "image/webp",
+      "bytes": 834262,
+      "originalBytes": 4874138,
+      "note": "4096x4096 -> 2048x2048"
+    },
+    {
+      "file": "80bd6e75fa77cec7.webp",
+      "type": "image/webp",
+      "bytes": 651720,
+      "originalBytes": 651720,
+      "note": "1536x1024 kept"
+    },
+    {
+      "file": "2b986fedf86b3cb8.webp",
+      "type": "image/webp",
+      "bytes": 113390,
+      "originalBytes": 1123142,
+      "note": "8192x4096 -> 4096x2048"
+    },
+    {
+      "file": "0389fb2a92a21382.webp",
+      "type": "image/webp",
+      "bytes": 244916,
+      "originalBytes": 1692340,
+      "note": "8192x4096 -> 4096x2048"
+    },
+    {
+      "file": "13fe4e60d928a3a8.webp",
+      "type": "image/webp",
+      "bytes": 245254,
+      "originalBytes": 427734,
+      "note": "4096x2048 re-encoded"
+    },
+    {
+      "file": "b270cc19dd50eb79.webp",
+      "type": "image/webp",
+      "bytes": 118230,
+      "originalBytes": 280070,
+      "note": "4096x2048 re-encoded"
+    },
+    {
+      "file": "ed5354385939e611.webp",
+      "type": "image/webp",
+      "bytes": 1696676,
+      "originalBytes": 2605970,
+      "note": "4096x2048 re-encoded"
+    },
+    {
+      "file": "f2a160b0d142107e.webp",
+      "type": "image/webp",
+      "bytes": 2480064,
+      "originalBytes": 2480064,
+      "note": "2048x2048 kept"
+    },
+    {
+      "file": "35b916a7d1bf9034.webp",
+      "type": "image/webp",
+      "bytes": 2496974,
+      "originalBytes": 2496974,
+      "note": "2048x2048 kept"
+    },
+    {
+      "file": "bcc8079c2296c1a5.webp",
+      "type": "image/webp",
+      "bytes": 1900090,
+      "originalBytes": 1900090,
+      "note": "2048x2048 kept"
+    },
+    {
+      "file": "9980a957daf5b157.webp",
+      "type": "image/webp",
+      "bytes": 1025170,
+      "originalBytes": 1449962,
+      "note": "2048x2048 re-encoded"
+    },
+    {
+      "file": "5dd23c6e10ad5cc5.webp",
+      "type": "image/webp",
+      "bytes": 483130,
+      "originalBytes": 727030,
+      "note": "2048x2048 re-encoded"
+    },
+    {
+      "file": "de95f6914329760f.webp",
+      "type": "image/webp",
+      "bytes": 761236,
+      "originalBytes": 1089586,
+      "note": "2048x2048 re-encoded"
+    },
+    {
+      "file": "206c67e3a1b99228.hdr",
+      "type": "application/octet-stream",
+      "bytes": 1173154,
+      "originalBytes": 1173154,
+      "note": "copied"
+    },
+    {
+      "file": "b3314ffdf23d0e45.webp",
+      "type": "image/webp",
+      "bytes": 482202,
+      "originalBytes": 482202,
+      "note": "1942x809 kept"
+    },
+    {
+      "file": "d66e08231e9c09ca.hdr",
+      "type": "application/octet-stream",
+      "bytes": 4171959,
+      "originalBytes": 4171959,
+      "note": "copied"
+    },
+    {
+      "file": "019b65b1ac11436f.webp",
+      "type": "image/webp",
+      "bytes": 367722,
+      "originalBytes": 367722,
+      "note": "1024x1024 kept"
+    },
+    {
+      "file": "fc2cc03135f0d329.webp",
+      "type": "image/webp",
+      "bytes": 240256,
+      "originalBytes": 240256,
+      "note": "1024x1024 kept"
+    },
+    {
+      "file": "7573da2ce574b9fc.webp",
+      "type": "image/webp",
+      "bytes": 18304,
+      "originalBytes": 26040,
+      "note": "256x256 re-encoded"
+    },
+    {
+      "file": "44cb57be726ed8f4.ogg",
+      "type": "application/ogg",
+      "bytes": 1397741,
+      "originalBytes": 1397741,
+      "note": "copied"
+    },
+    {
+      "file": "5dd329c148e2b81c.ogg",
+      "type": "application/ogg",
+      "bytes": 1489371,
+      "originalBytes": 1489371,
+      "note": "copied"
+    },
+    {
+      "file": "3584fe88b938f70c.ogg",
+      "type": "application/ogg",
+      "bytes": 1258353,
+      "originalBytes": 1258353,
+      "note": "copied"
+    },
+    {
+      "file": "ff7beabda4532bc5.ogg",
+      "type": "application/ogg",
+      "bytes": 1480421,
+      "originalBytes": 1480421,
+      "note": "copied"
+    },
+    {
+      "file": "aaa63379ea0a9bba.mp3",
+      "type": "audio/mpeg",
+      "bytes": 1746592,
+      "originalBytes": 1746592,
+      "note": "copied"
+    },
+    {
+      "file": "0eb6fe2e093f337f.mp3",
+      "type": "audio/mpeg",
+      "bytes": 1829661,
+      "originalBytes": 1829661,
+      "note": "copied"
+    },
+    {
+      "file": "f5230581ece7cb45.mp3",
+      "type": "audio/mpeg",
+      "bytes": 1601351,
+      "originalBytes": 1601351,
+      "note": "copied"
+    },
+    {
+      "file": "561b315574118caa.mp3",
+      "type": "audio/mpeg",
+      "bytes": 1801449,
+      "originalBytes": 1801449,
+      "note": "copied"
+    }
+  ]
+}

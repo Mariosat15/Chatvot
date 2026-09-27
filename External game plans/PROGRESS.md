@@ -1133,6 +1133,26 @@ no build. The main app needs a rebuild and restart. Then hard refresh. **Never v
   preload nor by a second visit. Shrinking the file (not chosen this round) is what fixes that.
   The three failing `__tests__/games` tests (`arena-band` x2, `contest-countdown` x1) fail
   identically with this change stashed - pre-existing, not caused here.
+- **Later still, 27 Sep 2026 - (5) the race client split into cacheable files.** Owner chose
+  option 1 of three (split and shrink; Cloudflare routing dropped because DNS override is
+  Enterprise-only, Redis not pursued). Closes (4)'s Firefox gap. New
+  `tools/games/pack-velocity-client.ts` (root, because `sharp` is a root dependency) turns the
+  75.5 MB .gz / 107 MB single file into `games-service/vendor/volt-velocity/`: a 1.0 MB
+  `client.html`, 36 content-hashed assets and `manifest.json`. Base64 removed (a third of the
+  size), six 4096² stone maps -> 2048², two 8192×4096 skies -> 4096×2048, near-lossless 2K webps
+  re-encoded at q90 only where that saves a quarter. **~48 MB total, ~41 MB actually downloaded**
+  (the four `.mp3` are fallbacks for browsers without Ogg), largest file 5.1 MB - so every file is
+  now cacheable in every browser. Honest note: the estimate was 15-25 MB; models (9.7 MB), HDRs
+  (5.1 MB) and music were left untouched because they are already compressed. games-service
+  serves `/play/volt-velocity/client/assets/:file` (name must match `^[a-f0-9]{16}\.(webp|png|glb|hdr|ogg|mp3)$`,
+  joined to a fixed directory, `immutable`, `nosniff`); the page fingerprint is its content hash.
+  `/play/warmup/:gameCode` now answers `{ urls }` (page + assets, no mp3) rather than a 302, and
+  `ProviderClientWarmup` fetches them **one at a time** with `fetch` - the hidden frame's reason
+  (a 100 MB framed document cached twice) is gone at 1 MB. `vendor/.gitattributes` marks the packed
+  files `-text` so `core.autocrlf` cannot rewrite bytes the fingerprint is taken from. Verified by
+  loading the packed page in Chromium: all models, textures and HDRs 200, the race menu drawn.
+  `test:velocity` 9 passed (warmup list equals `[clientUrl]` under the override; asset route
+  serves a real `.glb` immutable and 404s five bad names). **Not verified on the live servers.**
 
 
 ### 27 Sep 2026 - Per-game How it works & tips (Guides) tab

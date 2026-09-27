@@ -225,10 +225,40 @@ async function main(): Promise<number> {
 
     // The lobby's background download must fetch EXACTLY the URL the session hands out, or the
     // warmed copy sits in the cache under a name the race never asks for.
-    const warm = await fetch(`${callApiBase()}/play/warmup/volt-velocity`, { redirect: "manual" });
-    assert(warm.status === 302, `warmup returned ${warm.status}`);
-    assert(warm.headers.get("location") === clientUrl, `warmup points at ${warm.headers.get("location")}`);
-    assert(warm.headers.get("cache-control") === "no-store", "warmup redirect is cacheable");
+    // An overriding single-file build has its assets inline, so the list is the page alone.
+    const warm = await fetch(`${callApiBase()}/play/warmup/volt-velocity`);
+    assert(warm.status === 200, `warmup returned ${warm.status}`);
+    assert(warm.headers.get("cache-control") === "no-store", "warmup list is cacheable");
+    const { urls } = (await warm.json()) as { urls?: string[] };
+    assert(
+      JSON.stringify(urls) === JSON.stringify([clientUrl]),
+      `warmup lists ${JSON.stringify(urls)}, expected only ${clientUrl}`,
+    );
+  });
+
+  await test("packed client assets are served immutable, and nothing else is", async () => {
+    const manifest = JSON.parse(
+      fs.readFileSync(path.join(__dirname, "..", "vendor", "volt-velocity", "manifest.json"), "utf8"),
+    ) as { assets: Array<{ file: string }> };
+    const glb = manifest.assets.find((entry) => entry.file.endsWith(".glb"));
+    assert(glb, "the packed manifest lists no model");
+    const asset = await fetch(`${callApiBase()}/play/volt-velocity/client/assets/${glb.file}`);
+    assert(asset.status === 200, `asset returned ${asset.status}`);
+    assert(asset.headers.get("content-type") === "model/gltf-binary", `type ${asset.headers.get("content-type")}`);
+    assert(/immutable/.test(asset.headers.get("cache-control") ?? ""), "asset is not immutable");
+    assert(asset.headers.get("x-content-type-options") === "nosniff", "asset is sniffable");
+    await asset.arrayBuffer();
+
+    for (const bad of [
+      "0000000000000000.glb",
+      glb.file.toUpperCase(),
+      glb.file.replace(".glb", ".js"),
+      "..%2Fmanifest.json",
+      "manifest.json",
+    ]) {
+      const refused = await fetch(`${callApiBase()}/play/volt-velocity/client/assets/${bad}`);
+      assert(refused.status === 404, `${bad} returned ${refused.status}`);
+    }
   });
 
   await test("warmup answers 204 for a game with no client to download", async () => {
