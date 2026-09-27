@@ -1,5 +1,5 @@
 /**
- * Volt Stack scoring tables — mirrored from Neon Stack 9.4.
+ * Volt Stack scoring tables — mirrored from Neon Stack 9.6.
  *
  * Soft drop is always zero. Hard drop is 2 per cell. Line clears, T-spins, B2B,
  * combo and milestones are recomputed here; a client-supplied total is never stored.

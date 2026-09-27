@@ -259,7 +259,14 @@ export function GameArenaLayout({
         roster is long. The page still scrolls for the band below; do not reintroduce a
         viewport max-height on the rail that short-circuits the stretch.
       */}
-      <div className="grid items-stretch gap-3 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[300px_minmax(0,1fr)_340px]">
+      {/*
+        VIEWPORT-BOUNDED ROW (27 Sep 2026). The hero is fixed at 220px and the rules strip
+        below is another ~300px, so an unbounded grid pushed the board's touch controls under
+        the fold and forced the player to scroll the page mid-match. Cap the play row to the
+        remaining viewport; the rules/tips band stays underneath (pushed down), which is what
+        the owner asked for — game on screen first, secondary copy below.
+      */}
+      <div className="grid items-stretch gap-3 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[300px_minmax(0,1fr)_340px] xl:h-[calc(100dvh-17.5rem)] xl:min-h-[min(52dvh,560px)]">
         {/*
           EVERY BREAKPOINT SETS AN ORDER, and the reason is that grid auto-placement follows
           order-modified document order, so a rule that only fires at `xl` leaves the other two
@@ -285,7 +292,7 @@ export function GameArenaLayout({
           the frame. `h-full` + `min-h` together: the floor keeps a short Resume usable; the
           stretch fills the void under Submit when the prize sidebar is taller.
         */}
-        <div className="order-1 min-h-0 lg:order-1 xl:order-2 xl:flex xl:h-full xl:min-h-[min(70dvh,720px)] xl:flex-col">
+        <div className="order-1 min-h-0 lg:order-1 xl:order-2 xl:flex xl:h-full xl:min-h-0 xl:flex-col">
           {stage}
         </div>
 

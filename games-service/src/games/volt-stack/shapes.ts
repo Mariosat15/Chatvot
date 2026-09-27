@@ -17,7 +17,7 @@ export type PieceType = (typeof PIECE_TYPES)[number];
 
 export type Matrix = readonly (readonly number[])[];
 
-/** Guideline spawn orientations — identical to Neon Stack 9.4. */
+/** Guideline spawn orientations — identical to Neon Stack 9.6. */
 export const SHAPES: Record<PieceType, Matrix> = {
   I: [
     [0, 0, 0, 0],

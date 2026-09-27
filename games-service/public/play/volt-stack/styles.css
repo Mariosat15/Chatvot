@@ -61,3 +61,36 @@ html,body{overflow-x:clip}
 @media(max-height:720px) and (max-width:700px){#gameOverOverlay{padding:10px}.result-panel{padding:16px}.result-emblem{width:42px;height:42px;margin-bottom:10px}.result-emblem svg{width:27px;height:27px}.result-panel h2{font-size:27px;margin-bottom:12px}.result-score{padding:12px 6px}.result-score>strong{font-size:40px;margin:3px 0 8px}.result-panel .result-stats-grid>div{padding:9px 2px}.result-panel .result-achievements{padding:9px;margin-bottom:8px}.result-panel #submissionStatus{margin:9px 0 12px}}
 @media(prefers-reduced-motion:reduce){#gameOverOverlay.show .result-panel,#gameOverOverlay.show .result-score{animation:none}}.reduced-motion #gameOverOverlay.show .result-panel,.reduced-motion #gameOverOverlay.show .result-score{animation:none}
 @media(max-width:700px){.game-shell:has(#gameOverOverlay.show) .touch-controls,.game-shell:has(#gameOverOverlay.show) footer,.game-shell:has(#gameOverOverlay.show)>.integrity-note{visibility:hidden;pointer-events:none}}
+
+/* --- ChartVolt embedded fit (arena iframe) — no inner scroll --- */
+html.cv-embedded,html.cv-embedded body{height:100%;max-height:100%;margin:0;overflow:hidden!important}
+html.cv-embedded body{min-height:0;background-attachment:scroll}
+html.cv-embedded #ambientCanvas{display:none}
+html.cv-embedded .game-shell{min-height:0!important;height:100%;max-height:100%;width:100%!important;max-width:100%;margin:0;padding:6px 8px 4px;display:flex;flex-direction:column;overflow:hidden;box-sizing:border-box}
+html.cv-embedded .topbar{height:44px;padding:0 2px 6px;gap:10px;flex-shrink:0}
+html.cv-embedded .brand-motto{display:none}
+html.cv-embedded .brand-blocks{transform:scale(.55);transform-origin:left center;width:34px;height:40px}
+html.cv-embedded .game-identity{font-size:22px;gap:10px}
+html.cv-embedded .game-identity small{font-size:9px;letter-spacing:2px;margin-top:4px}
+html.cv-embedded .header-actions{gap:6px}
+html.cv-embedded .header-actions button{height:36px;min-width:36px;font-size:16px;padding:4px;border-radius:8px}
+html.cv-embedded #leaveBtn{font-size:12px;padding-inline:12px}
+html.cv-embedded .scoreboard{gap:6px;margin:2px 0 8px;flex-shrink:0}
+html.cv-embedded .scoreboard>.stat-card{min-height:48px;padding:4px 10px;gap:8px}
+html.cv-embedded .scoreboard strong{font-size:22px;margin-top:2px}
+html.cv-embedded .scoreboard span{font-size:9px}
+html.cv-embedded .stat-card>.ui-icon{width:22px;height:22px}
+html.cv-embedded .timer-ring{width:28px;height:28px;border-width:4px}
+html.cv-embedded .play-layout{flex:1 1 auto;min-height:0;gap:10px;margin:0}
+html.cv-embedded .board-wrap{padding-top:10px}
+html.cv-embedded .board-title{font-size:10px;gap:12px;height:20px}
+html.cv-embedded .rail-tip{display:none}
+html.cv-embedded .combo-card{min-height:0}
+html.cv-embedded .mini-rail{padding:6px;gap:8px}
+html.cv-embedded .touch-controls{flex-shrink:0;margin:8px 0 0!important;gap:6px}
+html.cv-embedded .touch-controls button{min-height:44px!important;border-radius:10px;padding:4px 2px}
+html.cv-embedded .touch-controls button b{font-size:20px}
+html.cv-embedded .touch-controls button span{font-size:9px;margin-top:1px}
+html.cv-embedded .touch-controls button kbd{display:none}
+html.cv-embedded .game-shell footer,html.cv-embedded .integrity-note{display:none}
+@media(max-height:700px){html.cv-embedded .scoreboard>.stat-card{min-height:40px;padding:3px 8px}html.cv-embedded .scoreboard strong{font-size:18px}html.cv-embedded .touch-controls button{min-height:40px!important}html.cv-embedded .topbar{height:40px}}

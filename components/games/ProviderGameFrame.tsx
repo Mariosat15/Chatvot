@@ -284,7 +284,7 @@ export function ProviderGameFrame({
         // Reason: the launch URL is single-use and short-lived, but our own contest URL is
         // still ours. No need to hand a third party the page the player came from.
         referrerPolicy="no-referrer"
-        className="w-full flex-1 rounded-xl border-0 bg-[#060C1A]"
+        className="h-full min-h-0 w-full flex-1 rounded-xl border-0 bg-[#060C1A]"
         style={{ minHeight: `${height}px` }}
       />
     </div>

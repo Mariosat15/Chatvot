@@ -1,3 +1,4 @@
+
 (() => {
   "use strict";
 
@@ -93,7 +94,7 @@
 
 
   const LEVEL_THEMES = [
-    {min:1,max:3,name:"NEON CIRCUIT",primary:"#55F6FF",secondary:"#3974FF",accent:"#B36BFF",warm:"#FF69CE",root:130.81},
+    {min:1,max:3,name:"VOLT STACK",primary:"#55F6FF",secondary:"#3974FF",accent:"#B36BFF",warm:"#FF69CE",root:130.81},
     {min:4,max:6,name:"PRISM PULSE",primary:"#B86DFF",secondary:"#FF62D7",accent:"#55E7FF",warm:"#FFB14A",root:146.83},
     {min:7,max:9,name:"SOLAR RUSH",primary:"#FFD454",secondary:"#FF7A45",accent:"#FF4F87",warm:"#7CFF65",root:164.81},
     {min:10,max:14,name:"HYPER SPECTRUM",primary:"#65FFB7",secondary:"#5DE8FF",accent:"#C76CFF",warm:"#FFE45C",root:174.61},
@@ -174,10 +175,6 @@
   let gravityAccumulator = 0;
   let lockAccumulator = 0;
   let lockStarted = false;
-  /** Cells fallen on the hard-drop that is about to lock; zero for gravity locks. */
-  let pendingHardDropCells = 0;
-  /** Ranked contests disable Hold so the bag order stays server-verifiable. */
-  let holdEnabled = true;
   let grounded = false;
   let lastMoveWasRotation = false;
   let lastKickIndex = 0;
@@ -361,7 +358,7 @@ function recordReplayInput(action, phase = "tap") {
 function exportReplay() {
   return {
     version: 1,
-    engine: "CV-GAME 9.4",
+    engine: "CV-GAME 9.6",
     seed: replayInitialSeed,
     controls: { ...controlConfig },
     durationMs: competitionDurationMs,
@@ -534,7 +531,6 @@ function processReplayAction(action, phase) {
     runStats.hardDrops++;
     const target=ghostY();
     const distance=Math.max(0,target-active.y);
-    pendingHardDropCells = distance;
     runStats.hardDropCells+=distance;
     if (distance>0) {
       addDropTrail(active.y,target);
@@ -556,7 +552,7 @@ function processReplayAction(action, phase) {
   }
 
   function hold(shouldRecord=true) {
-    if (!holdEnabled || !canPlay() || holdLocked) return;
+    if (!canPlay() || holdLocked) return;
     // Hold creates a new active tetromino, so soft drop must require a new press.
     disarmSoftDropCarryover();
     telemetry.inputCount++;
@@ -611,12 +607,6 @@ function lockPiece(hard=false) {
   disarmSoftDropCarryover();
 
   const pieceType = active.type;
-  const lockX = active.x;
-  const lockY = active.y;
-  const lockRotation = active.rotation;
-  // Hard-drop distance is recorded before this call; soft/gravity locks earn zero drop points.
-  const lockHardDropCells = hard ? Math.max(0, pendingHardDropCells | 0) : 0;
-  pendingHardDropCells = 0;
   const scoringLevel = level;
   const spin = detectTSpin();
   const lockedCells=[];
@@ -722,16 +712,7 @@ function lockPiece(hard=false) {
     spin,
     scoreGain:gained,
     scoreBreakdown:{base:basePoints,backToBack:backToBackBonus,combo:comboBonus,perfectClear:perfectClearBonus,milestone:milestoneBonus,level:scoringLevel},
-    score,lines,level,combo,backToBack,perfectClear,
-    // Authoritative placement fields — the only values the server scores from.
-    lock:{
-      piece:pieceType,
-      rotation:lockRotation,
-      x:lockX,
-      y:lockY,
-      hardDropCells:lockHardDropCells,
-      claimedSpin:{tspin:Boolean(spin.tspin),mini:Boolean(spin.mini)}
-    }
+    score,lines,level,combo,backToBack,perfectClear
   });
 
   // Lock-out: the entire locked tetromino remained inside the hidden spawn buffer.
@@ -882,13 +863,6 @@ function canPlay() { return state==="playing" && active; }
       matchEndsAt=cfg.endsAt || 0;
       if (cfg.durationMs && Number(cfg.durationMs) > 0) competitionDurationMs = Number(cfg.durationMs);
       if (cfg.pieceSeed) setPieceSeed(cfg.pieceSeed);
-      if (cfg.holdDisabled) {
-        holdEnabled = false;
-        const card=document.querySelector(".hold-card");
-        if(card)card.classList.add("hold-disabled");
-        const holdTouchButton=document.querySelector('.touch-controls [data-action="hold"]');
-        if(holdTouchButton){holdTouchButton.classList.add("disabled-touch");holdTouchButton.setAttribute("aria-disabled","true");holdTouchButton.hidden=true;}
-      }
       telemetry.serverToken = cfg.token || null;
       telemetry.serverSessionId = cfg.sessionId || null;
       ui.integrityStatus.textContent = cfg.token ? "Host session connected" : "Local telemetry · unverified";if(ui.integrityStatusMobile)ui.integrityStatusMobile.textContent=ui.integrityStatus.textContent;
@@ -907,6 +881,8 @@ async function resetGame(options={}) {
   if (!options || (typeof Event!=="undefined" && options instanceof Event)) options={};
   if(starting || finishing || !['ready','over'].includes(state))return;
   if(window.ChartvoltCompetition?.hasPendingResult()){document.getElementById('submissionStatus').textContent='Submit this result before starting another run.';return;}
+  // Unlock within the original user gesture, before any async session work.
+  initAudio();
   starting=true;ui.startBtn.disabled=true;ui.restartBtn.disabled=true;
   document.getElementById('startError').textContent='';
   await telemetry.pending;
@@ -1682,44 +1658,53 @@ function action(name){
 function bindTouchButton(btn){
   const name=btn.dataset.action;
   const isDirectional=["left","right","down"].includes(name);
-  let activePointer=null;
+  let contact=null,lastPhysicalPress=-Infinity;
 
-  const press=e=>{
-    e.preventDefault();
-    if(activePointer!==null)return;
-    activePointer=e.pointerId ?? 1;
-    try{if(e.pointerId!=null)btn.setPointerCapture(e.pointerId);}catch(_){}
+  function press(id,e){
+    if(e.cancelable)e.preventDefault();
+    if(contact!==null)return;
+    lastPhysicalPress=performance.now();
+    contact=id;
     btn.classList.add("pressed-touch");
     initAudio();
-    if(isDirectional){
-      directionDown(name);
-    }else if(name==="rotate"){
-      if(!bufferOrAct("rotateCW")&&canPlay())rotate(1);
-    }else if(name==="hold"){
-      // Touch HOLD is edge-triggered exactly like keyboard C: one tap = one hold/swap.
-      if(!bufferOrAct("hold")&&canPlay())hold();
-    }else if(name==="drop"&&canPlay()){
-      hardDrop();
-    }
-  };
-
-  const release=e=>{
-    if(activePointer!==null && e?.pointerId!=null && e.pointerId!==activePointer)return;
+    if(!["playing","clearing","collapsing"].includes(state))return;
+    action(name);
+  }
+  function release(id){
+    if(contact===null || (id!=null && contact!==id))return;
     btn.classList.remove("pressed-touch");
     if(isDirectional)directionUp(name);
-    activePointer=null;
-  };
-
-  btn.addEventListener("pointerdown",press,{passive:false});
-  btn.addEventListener("pointerup",release,{passive:false});
-  btn.addEventListener("pointercancel",release,{passive:false});
-  btn.addEventListener("lostpointercapture",release,{passive:false});
-
-  // Fallback for older touch browsers without Pointer Events.
-  if(!window.PointerEvent){
-    btn.addEventListener("touchstart",e=>{e.preventDefault();press({preventDefault(){},pointerId:1});},{passive:false});
-    btn.addEventListener("touchend",e=>{e.preventDefault();release({pointerId:1});},{passive:false});
+    contact=null;
   }
+  // Handle native touches even when the browser advertises Pointer Events.
+  // Mouse and pen use Pointer Events; touch has one owner, avoiding double taps.
+  btn.addEventListener("touchstart",e=>{
+    const t=e.changedTouches[0];if(t)press(`touch:${t.identifier}`,e);
+  },{passive:false});
+  const endTouch=e=>{
+    for(const t of e.changedTouches){if(contact===`touch:${t.identifier}`){if(e.cancelable)e.preventDefault();release(contact);}}
+  };
+  window.addEventListener("touchend",endTouch,{passive:false});
+  window.addEventListener("touchcancel",endTouch,{passive:false});
+  btn.addEventListener("pointerdown",e=>{
+    if(e.pointerType==="touch"||e.button!==0)return;
+    press(`pointer:${e.pointerId}`,e);
+    try{btn.setPointerCapture(e.pointerId);}catch(_){}
+  },{passive:false});
+  const endPointer=e=>{if(e.pointerType!=="touch")release(`pointer:${e.pointerId}`);};
+  window.addEventListener("pointerup",endPointer);
+  window.addEventListener("pointercancel",endPointer);
+  btn.addEventListener("lostpointercapture",endPointer);
+  // Accessibility activation and webviews that deliver click-only taps.
+  btn.addEventListener("click",e=>{
+    e.preventDefault();
+    if(contact!==null||performance.now()-lastPhysicalPress<700)return;
+    action(name);
+    if(isDirectional)directionUp(name);
+  });
+  btn.addEventListener("contextmenu",e=>e.preventDefault());
+  window.addEventListener("blur",()=>release());
+  document.addEventListener("visibilitychange",()=>{if(document.hidden)release();});
 }
 
 function pollGamepad(){
@@ -1770,7 +1755,7 @@ function updateAdaptiveMusic(){window.VoltAudio?.update({state,hidden:document.h
       const event={
         channel:"chartvolt-game",
         game:"neon-stack",
-        version:"9.4",
+        version:"9.6",
         competitionId:document.getElementById("competitionId")?.textContent||"CV-TTR-2048",
         roomId,
         sessionId:telemetry.sessionId,
@@ -1998,18 +1983,6 @@ window.ChartvoltTetris={
   },
   setEffectsVolume:value=>window.VoltAudio?.setEffectsVolume(value),
   setMusicTrack:index=>window.VoltAudio?.setTrack(index),
-  setHoldEnabled(enabled){
-    holdEnabled=Boolean(enabled);
-    const card=document.querySelector(".hold-card");
-    if(card)card.classList.toggle("hold-disabled",!holdEnabled);
-    const holdTouchButton=document.querySelector('.touch-controls [data-action="hold"]');
-    if(holdTouchButton){
-      holdTouchButton.classList.toggle("disabled-touch",!holdEnabled);
-      holdTouchButton.setAttribute("aria-disabled",holdEnabled?"false":"true");
-      holdTouchButton.hidden=!holdEnabled;
-    }
-    return holdEnabled;
-  },
   configureCompetition({competitionId,prizePool,durationMs,serverToken,sessionId,pieceSeed:configuredPieceSeed,roomId:configuredRoomId,playersLive}={}){
     if(!["ready","over"].includes(state))throw new Error("Configure before play");
     if(competitionId)document.getElementById("competitionId").textContent=String(competitionId);
@@ -2026,7 +1999,7 @@ window.ChartvoltTetris={
   attachServerToken(token){telemetry.serverToken=token;},
   getIntegrity(){return{sessionId:telemetry.sessionId,sequence:telemetry.sequence,chain:telemetry.chain,flags:telemetry.impossibleFlags};},
   runSelfTest:runEngineSelfTest,
-  getEngineInfo(){return{version:"9.4",fixedStepHz:60,qualityTier,autoQuality,controls:{...controlConfig},softDropScoring:0,hardDropPointsPerCell:HARD_DROP_POINTS_PER_CELL};}
+  getEngineInfo(){return{version:"9.6",fixedStepHz:60,qualityTier,autoQuality,controls:{...controlConfig},softDropScoring:0,hardDropPointsPerCell:HARD_DROP_POINTS_PER_CELL};}
 };
 
   // ---------- Wiring ----------
@@ -2042,3 +2015,4 @@ window.ChartvoltTetris={
 
   initAmbientDust();refillQueue();initialiseOfflineStandings();syncRoomMeta();syncUi();renderLeaderboard();renderSideCanvases();setStatus("READY");renderGame();requestAnimationFrame(tick);
 })();
+

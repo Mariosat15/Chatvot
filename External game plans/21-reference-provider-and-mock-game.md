@@ -1642,9 +1642,13 @@ is repeated here rather than assumed known.
 
 ### 4.1u Volt Stack — second ChartVolt Games title - 27 September 2026
 
-**Additive second title** under the same first-party provider. Source UI is the modular
-`Volt-Stack-v9.4/neon-stack/` package (not the ~17MB standalone HTML). Contests and 1v1
-challenges use the existing ranked-round protocol; **no second money writer**.
+**Additive second title** under the same first-party provider. **Authoritative UI source is
+`Docs/Volt-Stack-Standalone.html` (engine `CV-GAME 9.6`)** — the earlier modular
+`Volt-Stack-v9.4/neon-stack/` package was the wrong hand-off (owner correction, same day).
+The live surface stays modular (absolute `/play/volt-stack/` assets + Circuit host); the
+engine script was replaced from the Standalone extract. The ~17MB Standalone file is **not**
+served as the paid page (fonts/artwork inlined). Contests and 1v1 challenges use the existing
+ranked-round protocol; **no second money writer**.
 
 | | Decision / state |
 |---|---|
@@ -1653,11 +1657,12 @@ challenges use the existing ranked-round protocol; **no second money writer**.
 | Scoring | **Server-authoritative.** Seeded seven-bag from `contentSeed` (`sha256("volt-stack-bag:"+seed)`); soft drop = 0; hard drop 2/cell; client `score` on lock is refused |
 | Play URL | `/play/volt-stack/?t={token}` (Circuit stays at `/play?t=`). **Asset hrefs are root-absolute** `/play/volt-stack/…` — Next strips the trailing slash and relative URLs would otherwise load Circuit's `/play/styles.css` and leave a blank board |
 | Host bridge | `public/play/volt-stack/chartvolt-host.js` — Circuit-compatible `ready` / `finished` / `exit`; **no score in postMessage**. `competition-bridge` notify is **local only** (must not postMessage the neon-stack channel to the parent). Classic watchdog **re-posts** `ready` so a race with the parent's listener cannot stall the arena |
+| Fit | **`fit-embed.js` + `html.cv-embedded` CSS** size the board from iframe height so topbar + cabinet + touch controls fit without an inner scrollbar; arena play row is `xl:h-[calc(100dvh-17.5rem)]` so the rules strip stays below the fold (`GameArenaLayout`) |
 | Hold | Disabled in ranked rounds so every entrant shares one bag |
 | Locales | `en` and `el` (same as Circuit) |
 | Engine tests | `npm run test:volt-stack` — same seed + same locks → same score; tampered client score ignored |
 
-**What was deliberately not done:** embedding the standalone HTML as the paid surface;
+**What was deliberately not done:** embedding the 17MB Standalone HTML as the paid surface;
 accepting browser `finalize` scores as settlement truth; a separate Tetris money path on
 the platform; deleting or renaming Circuit.
 
@@ -1665,13 +1670,14 @@ the platform; deleting or renaming Circuit.
 (`npm run build` + `pm2 restart chartvolt-games`), Admin → Game Providers → Sync catalogue,
 enable `volt-stack` (`chartvoltEnabled`), optional artwork/rules edit, then create a
 competition or challenge as for Circuit Sprint. Two accounts: join / accept → Play →
-standings → settle.
+standings → settle. **Public-play fit/assets:** pull + hard refresh is enough for
+`public/play/volt-stack/` (`?v=20260927e`); restart only if TypeScript changed.
 
 **Never verified by eye on a live money contest.** Engine and API suites cover fairness and
 launch URL; click acceptance is the same runbook shape as **s4.1e**.
 
-**Deploy:** TypeScript + new `public/play/volt-stack/` modules — build, then pull + restart
-in one movement (R52 / s4.1i). Platform `/play/:path*` rewrite already covers the subpath;
+**Deploy:** TypeScript + `public/play/volt-stack/` modules — build, then pull + restart
+in one movement when server code changed (R52 / s4.1i). Platform `/play/:path*` rewrite already covers the subpath;
 no `next.config` change required.
 
 ---
