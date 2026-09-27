@@ -62,31 +62,37 @@ html,body{overflow-x:clip}
 @media(prefers-reduced-motion:reduce){#gameOverOverlay.show .result-panel,#gameOverOverlay.show .result-score{animation:none}}.reduced-motion #gameOverOverlay.show .result-panel,.reduced-motion #gameOverOverlay.show .result-score{animation:none}
 @media(max-width:700px){.game-shell:has(#gameOverOverlay.show) .touch-controls,.game-shell:has(#gameOverOverlay.show) footer,.game-shell:has(#gameOverOverlay.show)>.integrity-note{visibility:hidden;pointer-events:none}}
 
-/* --- ChartVolt embedded fit (arena iframe) — fill a TALL stage, do not crush --- */
+/* --- ChartVolt embedded fit (arena iframe) — shrink to fit, leave bottom air --- */
 html.cv-embedded,html.cv-embedded body{height:100%;max-height:100%;margin:0;overflow:hidden!important}
 html.cv-embedded body{min-height:0;background-attachment:scroll}
 html.cv-embedded #ambientCanvas{display:none}
-html.cv-embedded .game-shell{min-height:0!important;height:100%;max-height:100%;width:100%!important;max-width:100%;margin:0;padding:10px 12px 6px;display:flex;flex-direction:column;overflow:hidden;box-sizing:border-box}
-html.cv-embedded .topbar{height:56px;padding:0 4px 10px;gap:16px;flex-shrink:0}
+html.cv-embedded .game-shell{min-height:0!important;height:100%;max-height:100%;width:100%!important;max-width:100%;margin:0;padding:6px 10px 4px;display:flex;flex-direction:column;overflow:hidden;box-sizing:border-box}
+html.cv-embedded .topbar{height:44px;padding:0 2px 6px;gap:12px;flex-shrink:0}
 html.cv-embedded .brand-motto{display:none}
-html.cv-embedded .brand-blocks{transform:scale(.7);transform-origin:left center;width:42px;height:48px}
-html.cv-embedded .game-identity{font-size:clamp(22px,2.4vw,32px);gap:14px}
-html.cv-embedded .game-identity small{font-size:11px;letter-spacing:3px;margin-top:6px}
-html.cv-embedded .header-actions{gap:8px}
-html.cv-embedded .header-actions button{height:46px;min-width:46px;font-size:22px;padding:6px;border-radius:10px}
-html.cv-embedded #leaveBtn{font-size:15px;padding-inline:18px}
-html.cv-embedded .scoreboard{gap:10px;margin:4px 0 12px;flex-shrink:0}
-html.cv-embedded .scoreboard>.stat-card{min-height:64px;padding:8px 16px;gap:12px}
-html.cv-embedded .scoreboard strong{font-size:30px;margin-top:4px}
-html.cv-embedded .scoreboard span{font-size:11px}
-html.cv-embedded .stat-card>.ui-icon{width:28px;height:28px}
-html.cv-embedded .timer-ring{width:36px;height:36px;border-width:5px}
-html.cv-embedded .play-layout{flex:1 1 auto;min-height:0;gap:14px;margin:0}
-html.cv-embedded .board-wrap{padding-top:12px}
+html.cv-embedded .brand-blocks{transform:scale(.55);transform-origin:left center;width:34px;height:40px}
+html.cv-embedded .game-identity{font-size:clamp(18px,2vw,26px);gap:10px}
+html.cv-embedded .game-identity small{font-size:9px;letter-spacing:2px;margin-top:4px}
+html.cv-embedded .header-actions{gap:6px}
+html.cv-embedded .header-actions button{height:36px;min-width:36px;font-size:18px;padding:4px;border-radius:8px}
+html.cv-embedded .header-actions .ui-icon{width:20px;height:20px}
+html.cv-embedded #leaveBtn{font-size:12px;padding-inline:12px}
+html.cv-embedded .scoreboard{gap:8px;margin:2px 0 8px;flex-shrink:0}
+html.cv-embedded .scoreboard>.stat-card{min-height:48px;padding:6px 12px;gap:10px}
+html.cv-embedded .scoreboard strong{font-size:24px;margin-top:2px}
+html.cv-embedded .scoreboard span{font-size:9px}
+html.cv-embedded .stat-card>.ui-icon{width:22px;height:22px}
+html.cv-embedded .timer-ring{width:28px;height:28px;border-width:4px}
+html.cv-embedded .play-layout{flex:1 1 auto;min-height:0;gap:10px;margin:0}
+html.cv-embedded .board-wrap{padding-top:8px}
+html.cv-embedded .board-title{height:20px;font-size:10px;gap:14px;top:-2px}
 html.cv-embedded .rail-tip{display:none}
-html.cv-embedded .mini-rail{padding:8px;gap:10px}
-html.cv-embedded .touch-controls{flex-shrink:0;margin:12px 0 0!important;gap:10px}
-html.cv-embedded .touch-controls button{min-height:64px!important;border-radius:12px;padding:6px 4px}
-html.cv-embedded .touch-controls button b{font-size:28px}
-html.cv-embedded .touch-controls button span{font-size:11px;margin-top:2px}
+html.cv-embedded .mini-rail{padding:6px;gap:8px}
+html.cv-embedded .combo-card{min-height:0}
+html.cv-embedded .speed-card{min-height:52px}
+html.cv-embedded .touch-controls{flex-shrink:0;margin:8px 0 0!important;gap:8px}
+html.cv-embedded .touch-controls button{min-height:48px!important;border-radius:10px;padding:4px 3px}
+html.cv-embedded .touch-controls button b{font-size:22px}
+html.cv-embedded .touch-controls button span{font-size:9px;margin-top:1px}
+/* Pointer devices: hide the touch row so the board keeps the height. */
+html.cv-embedded body:not(.force-touch) .touch-controls{display:none!important}
 html.cv-embedded .game-shell footer,html.cv-embedded .integrity-note{display:none}

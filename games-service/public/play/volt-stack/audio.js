@@ -1,7 +1,9 @@
 /* Volt Stack Audio 1.1 — original synthesis, local music assets, no external service. */
 (() => {
   'use strict';
-  const TRACKS=[{name:'Neon Drive',url:'assets/audio/01_neon_drive.flac',bpm:128},{name:'Voltage Rush',url:'assets/audio/02_voltage_rush.flac',bpm:144}];
+  // Absolute under /play/volt-stack/ so a redirected document URL cannot break fetch
+  // (same rule as the rest of the play surface). Files extracted from Standalone 9.6.
+  const TRACKS=[{name:'Neon Drive',url:'/play/volt-stack/assets/audio/01_neon_drive.flac',bpm:128},{name:'Voltage Rush',url:'/play/volt-stack/assets/audio/02_voltage_rush.flac',bpm:144}];
   const EFFECTS=['move','rotate','wallKick','hold','lock','hardDrop','single','double','triple','tetris','tspinMini','tspin','b2b','combo','perfect','levelUp','achievement','countdown','go','warning','danger','dangerCritical','pause','resume','personalBest','gameover'];
   // Reason: stock defaults (.65 / .8 into a soft compressor) read as almost muted in the
   // arena iframe. OUTPUT multipliers sit after the 0–1 sliders so settings stay familiar while

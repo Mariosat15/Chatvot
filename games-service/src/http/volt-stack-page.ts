@@ -39,6 +39,11 @@ const CONTENT_TYPES = new Map<string, string>([
   [".woff", "font/woff"],
   [".woff2", "font/woff2"],
   [".ogg", "audio/ogg"],
+  // Reason: soundtrack FLACs live under assets/audio/. Without this entry the
+  // extension allow-list 404s a present file and music never loads (owner, 27 Sep 2026).
+  [".flac", "audio/flac"],
+  [".mp3", "audio/mpeg"],
+  [".wav", "audio/wav"],
 ]);
 
 function commonHeaders(res: Response): void {
