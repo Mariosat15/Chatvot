@@ -68,21 +68,29 @@ html.cv-embedded,html.cv-embedded body{height:100%;max-height:100%;margin:0;over
 html.cv-embedded body{min-height:0;background-attachment:scroll}
 html.cv-embedded #ambientCanvas{display:none}
 html.cv-embedded .game-shell{min-height:0!important;height:100%;max-height:100%;width:100%!important;max-width:100%;margin:0;padding:6px 10px 4px;display:flex;flex-direction:column;overflow:hidden;box-sizing:border-box}
-html.cv-embedded .topbar{height:44px;padding:0 2px 6px;gap:12px;flex-shrink:0}
+/* Reason: owner 27 Sep 2026 ("these look squeezed and not inline"): the 44px bar and
+   40px stat cards crushed the logo, labels and values. Everything in the header now
+   sits on one centred line, the buttons share one size, and each stat card is an
+   icon + (label over value) row with the icon centred against both lines. */
+html.cv-embedded .topbar{height:auto;min-height:58px;padding:2px 2px 8px;gap:14px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between}
 html.cv-embedded .brand-motto{display:none}
-html.cv-embedded .brand-blocks{transform:scale(.55);transform-origin:left center;width:34px;height:40px}
-html.cv-embedded .game-identity{font-size:clamp(18px,2vw,26px);gap:10px}
-html.cv-embedded .game-identity small{font-size:9px;letter-spacing:2px;margin-top:4px}
-html.cv-embedded .header-actions{gap:6px}
-html.cv-embedded .header-actions button{height:36px;min-width:36px;font-size:18px;padding:4px;border-radius:8px}
-html.cv-embedded .header-actions .ui-icon{width:20px;height:20px}
-html.cv-embedded #leaveBtn{font-size:12px;padding-inline:12px}
-html.cv-embedded .scoreboard{gap:8px;margin:2px 0 4px;flex-shrink:0}
-html.cv-embedded .scoreboard>.stat-card{min-height:48px;padding:6px 12px;gap:10px}
-html.cv-embedded .scoreboard strong{font-size:24px;margin-top:2px}
-html.cv-embedded .scoreboard span{font-size:9px}
-html.cv-embedded .stat-card>.ui-icon{width:22px;height:22px}
-html.cv-embedded .timer-ring{width:28px;height:28px;border-width:4px}
+html.cv-embedded .game-identity{display:flex;align-items:center;font-size:clamp(20px,2.4vw,28px);gap:12px;line-height:1}
+html.cv-embedded .brand-blocks{transform:scale(.72);transform-origin:center;width:44px;height:48px;flex-shrink:0;margin:0 -4px}
+html.cv-embedded .game-identity>span{display:block;white-space:nowrap;line-height:1}
+html.cv-embedded .game-identity small{display:block;font-size:10px;letter-spacing:2.4px;margin-top:6px;line-height:1}
+html.cv-embedded .header-actions{display:flex;align-items:center;gap:8px}
+html.cv-embedded .header-actions button{height:40px;min-width:40px;min-height:40px;padding:0 9px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;gap:7px;line-height:1}
+html.cv-embedded .header-actions .ui-icon{width:20px;height:20px;flex-shrink:0;display:block}
+html.cv-embedded #soundIcon{display:inline-flex}
+html.cv-embedded #leaveBtn{font-size:13px;font-weight:700;padding-inline:14px}
+html.cv-embedded #leaveBtn .ui-icon{width:17px;height:17px}
+html.cv-embedded .scoreboard{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:0 0 10px;flex-shrink:0}
+html.cv-embedded .scoreboard>.stat-card{min-height:60px;padding:8px 14px;gap:12px;display:flex;align-items:center}
+html.cv-embedded .scoreboard>.stat-card>div{display:flex;flex-direction:column;justify-content:center;gap:4px;min-width:0;flex:1 1 auto}
+html.cv-embedded .scoreboard span{font-size:10px;letter-spacing:1.8px;line-height:1;white-space:nowrap}
+html.cv-embedded .scoreboard strong{font-size:26px;line-height:1;margin:0}
+html.cv-embedded .stat-card>.ui-icon{width:24px;height:24px;flex-shrink:0;display:block}
+html.cv-embedded .timer-ring{width:32px;height:32px;border-width:4px;flex-shrink:0;margin-left:auto;position:static}
 /* Reason: owner 27 Sep — tall 1:2 well sized from the HEIGHT by fit-embed;
    HOLD/NEXT take whatever width is left (minmax 96px/1fr) so the cabinet
    fills the stage left and right instead of floating in a narrow strip.
@@ -97,9 +105,6 @@ html.cv-embedded .rail-tip{display:none}
 html.cv-embedded .mini-rail{padding:6px;gap:6px;width:100%!important;max-width:none!important;min-width:0;height:var(--arena-h)!important;box-sizing:border-box}
 html.cv-embedded .combo-card{min-height:0}
 html.cv-embedded .speed-card{min-height:40px}
-html.cv-embedded .scoreboard{margin:0 0 2px}
-html.cv-embedded .scoreboard>.stat-card{min-height:40px;padding:4px 10px}
-html.cv-embedded .scoreboard strong{font-size:20px}
 /* Reason: touch row stays visible. Parent iframe grows from fit-embed resize — that is
    what pushes this row down. Owner, 27 Sep 2026: the 42px row looked squeezed, so the
    buttons are taller with room beneath; fit-embed's TOUCH_RESERVE (incl. these margins)
@@ -108,5 +113,8 @@ html.cv-embedded .touch-controls{display:grid!important;grid-template-columns:re
 html.cv-embedded .touch-controls button{min-height:64px!important;border-radius:12px;padding:6px 3px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
 html.cv-embedded .touch-controls button b{font-size:22px;line-height:1}
 html.cv-embedded .touch-controls button span{font-size:9px;margin-top:0;line-height:1.15}
-html.cv-embedded .touch-controls button kbd{font-size:7px}
+html.cv-embedded .touch-controls button kbd{font-size:8px;line-height:1;padding:2px 4px;margin-left:4px;vertical-align:middle}
 html.cv-embedded .game-shell footer,html.cv-embedded .integrity-note{display:none}
+/* Reason: 27 Sep 2026 - Leave and Pause now carry SVG icons instead of text glyphs; keep the label and icon on one centred line everywhere. */
+.header-actions button{display:inline-flex;align-items:center;justify-content:center;gap:8px;line-height:1}
+#leaveBtn .ui-icon{width:.9em;height:.9em;flex-shrink:0}

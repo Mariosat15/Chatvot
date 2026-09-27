@@ -956,6 +956,14 @@ no build. The main app needs a rebuild and restart. Then hard refresh. **Never v
   touch buttons are now 64px, up from 42, with 8px above and 14px below. `TOUCH_RESERVE`
   is now 86 and `chromeHeight` counts the row's margins, so the frame grows to fit
   (cache-bust `20260927s`).
+- Later again ("the header and stat cards look squeezed and not inline"): the embedded
+  header is now one centred row, at least 58px tall, with 40px buttons. The stat cards
+  are 60px, with 26px figures and their icons centred. A later override that had shrunk
+  them back to 40px was removed. Pause and Leave now use SVG icons instead of text
+  characters, so they match the other icons. The touch-button key hints are now 8px. The
+  header is a measured part of `chromeHeight`, so the frame grows to fit it. Checked in a
+  local iframe harness and on the standalone page (cache-bust `20260927v`). Deploy:
+  `git pull`, then `pm2 restart chartvolt-games`, with no build needed.
 
 
 ### 27 Sep 2026 - Per-game How it works & tips (Guides) tab
