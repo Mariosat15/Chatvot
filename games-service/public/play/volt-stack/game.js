@@ -1304,10 +1304,10 @@ function updateCoachAdvice() {
 
   function resizeCanvas(c, context, aspect) {
     const dpr=Math.min(window.devicePixelRatio||1,qualityTier===2?2:qualityTier===1?1.5:1);
-    // Reason: owner 27 Sep — board CSS is ~510×590 (not classic 1:2). Read the
-    // laid-out box so the bitmap matches; fall back to design aspect ~1.157.
-    const cssW=Math.max(100,Math.round(c.clientWidth||510));
-    const fallbackAspect=typeof aspect==="number"?aspect:590/510;
+    // Reason: owner 27 Sep — classic 1:2 Tetris well (~295×590). Read the
+    // laid-out box so the bitmap matches; cellY equals cell when aspect is 2.
+    const cssW=Math.max(100,Math.round(c.clientWidth||295));
+    const fallbackAspect=typeof aspect==="number"?aspect:2;
     const cssH=Math.max(100,Math.round(c.clientHeight||Math.round(cssW*fallbackAspect)));
     const w=Math.round(cssW*dpr),h=Math.round(cssH*dpr);
     if(c.width!==w||c.height!==h){c.width=w;c.height=h;}

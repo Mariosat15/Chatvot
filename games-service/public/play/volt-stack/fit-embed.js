@@ -2,12 +2,12 @@
  * Fit Volt Stack inside the arena iframe WITHOUT overflowing.
  *
  * Owner (27 Sep 2026): board + HOLD/NEXT rails + the mobile touch row
- * must all sit inside the neon stage. Prefer a shorter board over clipping.
+ * must all sit inside the neon stage.
  *
- * Owner (27 Sep 2026, board enlarge): grow ONLY the center Tetris board to
- * ~510×590. Shrink HOLD/COMBO and NEXT/SPEED rails to make room.
- * Do NOT transform:scale() the whole UI — set --board-width / --board-height
- * and the parent grid column widths.
+ * Owner (27 Sep 2026, board enlarge — corrected): grow the CENTER Tetris
+ * well vertically (classic 1:2 playfield). Shrink HOLD/NEXT to fixed narrow
+ * columns. Ask the parent iframe to grow so the touch row is pushed down
+ * and the board can be taller — do NOT transform:scale() the shell.
  *
  * Standalone offline play (no parent) is untouched.
  */
@@ -29,19 +29,20 @@
     document.addEventListener("DOMContentLoaded", markForceTouch, { once: true });
   }
 
-  const SHELL_PAD = 12;
-  // Air under the touch row so the last button is never flush with the clip edge.
-  const SAFETY = 10;
-  // Floor for the touch strip when the first measure runs before layout settles.
-  const TOUCH_RESERVE = 54;
+  const SHELL_PAD = 10;
+  const SAFETY = 6;
+  const TOUCH_RESERVE = 48;
   const MIN_BOARD_W = 160;
-  // Reason: owner asked for ~510×590 center board (was ~250×500). Cap at that
-  // size so the playfield does not outgrow the design box.
-  const TARGET_BOARD_W = 510;
+  // Reason: Tetris is 10×20 — height must be 2× width. The earlier 510×590
+  // target made a squat well and left HOLD/NEXT taller than the board.
+  // Prefer a tall well (~295×590); grow the host iframe to make room.
   const TARGET_BOARD_H = 590;
-  const MAX_BOARD_W = TARGET_BOARD_W;
-  const BOARD_ASPECT = TARGET_BOARD_H / TARGET_BOARD_W; // ~1.157, not classic 1:2
-  const LAYOUT_GAP = 10; // both gutters between rails and cabinet
+  const BOARD_ASPECT = 2;
+  const TARGET_BOARD_W = Math.round(TARGET_BOARD_H / BOARD_ASPECT); // 295
+  const MAX_BOARD_W = 340;
+  const MAX_BOARD_H = 680;
+  // Both rails + both gutters. Rails are fixed-width in CSS — budget matches.
+  const RAIL_TOTAL = 76 * 2 + 12;
 
   function tellResize(height) {
     try {
@@ -65,31 +66,20 @@
       if (!el || getComputedStyle(el).display === "none") continue;
       h += el.getBoundingClientRect().height;
     }
-    // Always reserve the touch row — it is visible in the arena (force-touch).
     if (touch && getComputedStyle(touch).display !== "none") {
       h += Math.max(TOUCH_RESERVE, touch.getBoundingClientRect().height);
     } else {
       h += TOUCH_RESERVE;
     }
-    // Board title sits above the cabinet; keep a slim reserve after padding cut.
-    h += 12;
+    // Slim reserve for the board title strip above the cabinet.
+    h += 8;
     return h;
-  }
-
-  function railBudgetFor(viewW) {
-    // Reason: rails are secondary — shrink HOLD/NEXT so the center board can
-    // reach ~510px. Leave just enough for labels and mini canvases.
-    if (viewW < 520) return 88;
-    if (viewW < 720) return 112;
-    if (viewW < 960) return 128;
-    return 148;
   }
 
   function framePadFor(boardW) {
     if (boardW < 220) return 6;
     if (boardW < 300) return 8;
-    if (boardW < 400) return 10;
-    return 12;
+    return 10;
   }
 
   function fit() {
@@ -99,50 +89,47 @@
     const viewH = window.innerHeight;
     const viewW = window.innerWidth;
     const chrome = chromeHeight(shell);
-
-    // Frame pad is part of --arena-h, so leave room for it inside the budget
-    // or the rails+board block pushes the touch row off the bottom.
     const FRAME_EXTRA = 4;
-    let framePad = 12;
-    const budget = Math.max(
-      220,
-      viewH - chrome - SAFETY - framePad * 2 - FRAME_EXTRA,
-    );
 
-    // Height-first candidate at the design aspect (~510×590).
-    let boardH = Math.min(TARGET_BOARD_H, budget);
-    let boardW = Math.floor(boardH / BOARD_ASPECT);
+    // Ideal size first — then ask the parent to grow so it can fit.
+    let boardH = TARGET_BOARD_H;
+    let boardW = TARGET_BOARD_W;
+    let framePad = framePadFor(boardW);
 
     const maxWFromWidth = Math.max(
       MIN_BOARD_W,
-      Math.floor(viewW - railBudgetFor(viewW) - LAYOUT_GAP),
+      Math.floor(viewW - RAIL_TOTAL),
     );
-    boardW = Math.min(MAX_BOARD_W, maxWFromWidth, boardW);
-    boardW = Math.max(MIN_BOARD_W, boardW);
-    boardH = Math.round(boardW * BOARD_ASPECT);
-    framePad = framePadFor(boardW);
-
-    // Re-check with the real frame pad — pad + board can still overshoot.
-    const maxArena = viewH - chrome - SAFETY;
-    if (boardH + framePad * 2 + FRAME_EXTRA > maxArena) {
-      boardH = Math.max(
-        Math.round(MIN_BOARD_W * BOARD_ASPECT),
-        maxArena - framePad * 2 - FRAME_EXTRA,
-      );
-      boardW = Math.max(MIN_BOARD_W, Math.floor(boardH / BOARD_ASPECT));
+    if (boardW > maxWFromWidth) {
+      boardW = Math.min(MAX_BOARD_W, maxWFromWidth);
+      boardW = Math.max(MIN_BOARD_W, boardW);
       boardH = Math.round(boardW * BOARD_ASPECT);
       framePad = framePadFor(boardW);
     }
 
-    // Prefer the design target when the viewport has room.
-    if (
-      viewW - railBudgetFor(viewW) - LAYOUT_GAP >= TARGET_BOARD_W &&
-      budget >= TARGET_BOARD_H
-    ) {
-      boardW = TARGET_BOARD_W;
-      boardH = TARGET_BOARD_H;
+    const needed =
+      chrome + boardH + framePad * 2 + FRAME_EXTRA + SAFETY;
+    // Reason: capping to viewH trapped the board at the opening iframe
+    // height forever. The host honours resize up to MAX_FRAME_HEIGHT (2000).
+    tellResize(Math.max(needed, 420));
+
+    // While the parent is still short, use every vertical pixel we have.
+    const budget = Math.max(
+      220,
+      viewH - chrome - SAFETY - framePad * 2 - FRAME_EXTRA,
+    );
+    if (boardH > budget) {
+      boardH = Math.min(MAX_BOARD_H, budget);
+      boardW = Math.max(MIN_BOARD_W, Math.floor(boardH / BOARD_ASPECT));
+      if (boardW > maxWFromWidth) {
+        boardW = maxWFromWidth;
+        boardH = Math.round(boardW * BOARD_ASPECT);
+      }
       framePad = framePadFor(boardW);
     }
+
+    boardW = Math.min(MAX_BOARD_W, Math.max(MIN_BOARD_W, boardW));
+    boardH = Math.round(boardW * BOARD_ASPECT);
 
     shell.style.setProperty("--board-width", `${boardW}px`);
     shell.style.setProperty("--board-height", `${boardH}px`);
@@ -151,11 +138,10 @@
       "--arena-h",
       `calc(var(--board-height) + var(--frame-pad) * 2 + ${FRAME_EXTRA}px)`,
     );
-
-    // Never ask the parent to grow past the current iframe — that is how the
-    // bottom got clipped while the host thought it was "fitting".
-    const needed = Math.ceil(chrome + boardH + framePad * 2 + FRAME_EXTRA);
-    tellResize(Math.min(viewH, Math.max(needed, 360)));
+    shell.style.setProperty(
+      "--cabinet-width",
+      `calc(var(--board-width) + var(--frame-pad) * 2 + 4px)`,
+    );
 
     window.dispatchEvent(new Event("resize"));
   }
