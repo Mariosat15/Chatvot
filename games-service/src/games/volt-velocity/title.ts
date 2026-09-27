@@ -62,6 +62,7 @@ export const VOLT_VELOCITY: TitleDefinition = {
   scoreRange: { min: 0, max: VELOCITY_RACE_SECONDS * 1000 },
   typicalDurationSeconds: 180,
   maxDurationSeconds: VELOCITY_RACE_SECONDS + VELOCITY_COUNTDOWN_SECONDS,
+  maxPlayers: VELOCITY_MAX_PILOTS,
   configSchema: {
     type: "object",
     properties: {

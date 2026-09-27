@@ -16,9 +16,11 @@ import { resolveContestEntryDeadline } from "@/lib/services/games/entry-deadline
 import {
   isPlayModeSupported,
   PLAY_MODE_COPY,
+  playModeHasLobby,
   playShapeRules,
   resolveContestPlayMode,
   resolvePlayMode,
+  resolveLobbySeconds,
   resolveSupportedPlayModes,
   type PlayMode,
 } from "@/lib/services/games/play-shape";
@@ -143,6 +145,8 @@ export interface ProviderContestOption {
   scoreDirection: string;
   scoreType: string;
   maxDurationSeconds?: number;
+  /** Provider's cap on players in one round; the wizard caps "Max participants" to it. */
+  maxPlayers?: number;
   supportsCompetition: boolean;
   supportsOneVsOne: boolean;
   supportsContentSeed: boolean;
@@ -208,6 +212,7 @@ export async function listContestableTitles(): Promise<ProviderContestOption[]> 
         scoreDirection: title.scoreDirection,
         scoreType: title.scoreType,
         maxDurationSeconds: title.maxDurationSeconds,
+        maxPlayers: title.maxPlayers,
         supportsCompetition: Boolean(title.supportsCompetition),
         supportsOneVsOne: Boolean(title.supportsOneVsOne),
         supportsContentSeed: Boolean(title.supportsContentSeed),
@@ -226,6 +231,7 @@ export async function preflightProviderContest(
     | "gameCode"
     | "settings"
     | "minParticipants"
+    | "maxParticipants"
     | "playWindowStart"
     | "playWindowEnd"
     | "attemptsPolicy"
@@ -273,6 +279,7 @@ export async function preflightProviderContest(
   return runPreflight({
     format: "competition",
     minParticipants: input.minParticipants,
+    maxParticipants: input.maxParticipants,
     title: {
       displayName: title.displayName,
       providerStatus: title.providerStatus,
@@ -280,6 +287,7 @@ export async function preflightProviderContest(
       supportsOneVsOne: Boolean(title.supportsOneVsOne),
       supportsContentSeed: Boolean(title.supportsContentSeed),
       maxDurationSeconds: title.maxDurationSeconds,
+      maxPlayers: title.maxPlayers,
     },
     provider: {
       enabled: Boolean(provider?.enabled),
@@ -429,6 +437,12 @@ export async function createProviderContest(
       // set is edited later. Storing it is what stops an edit re-forcing the attempts policy
       // and the entry deadline under people who have already paid.
       playMode,
+      // The lobby length is copied at creation (`23` s9 decision 1), so an operator changing
+      // the title's lobby later cannot move the door under players already seated. Only a
+      // scheduled contest has a lobby; an `anytime` one stores nothing.
+      ...(playModeHasLobby(playMode)
+        ? { lobbySeconds: resolveLobbySeconds(title.lobbySeconds) }
+        : {}),
       playWindowStart: input.playWindowStart,
       playWindowEnd: input.playWindowEnd,
       resultGracePeriodSeconds: input.resultGracePeriodSeconds,

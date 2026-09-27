@@ -2,6 +2,9 @@ import { connectToDatabase } from "@/database/mongoose";
 import ProviderGame from "@/database/models/games/provider-game.model";
 import {
   canOverridePlayMode,
+  isValidLobbySeconds,
+  MAX_LOBBY_SECONDS,
+  MIN_LOBBY_SECONDS,
   PLAY_MODE_COPY,
   PLAY_MODES,
   resolvePlayMode,
@@ -261,4 +264,74 @@ export async function setGameSupportedPlayModes(
       supportedPlayModes: modes,
     }),
   };
+}
+
+// ---------------------------------------------------------------------------
+// The LOBBY - how long before the gun a seated player may open a scheduled race
+// ---------------------------------------------------------------------------
+
+/**
+ * What the route may be handed for the lobby length (`23` s9 decision 1).
+ *
+ * `null` clears it, so the title goes back to the platform default. An absent key is refused
+ * by the route for the same reason as the two decisions above. A number outside
+ * 60-1800 whole seconds is refused rather than clamped: a clamped value is a lobby nobody
+ * chose, and the operator would be told it saved.
+ */
+export function parseLobbySecondsInput(
+  value: unknown,
+): { ok: true; seconds: number | null } | { ok: false; error: string } {
+  if (value === null) return { ok: true, seconds: null };
+  if (!isValidLobbySeconds(value)) {
+    return {
+      ok: false,
+      error: `The lobby must be a whole number of seconds from ${MIN_LOBBY_SECONDS} to ${MAX_LOBBY_SECONDS}, or null for the default.`,
+    };
+  }
+  return { ok: true, seconds: value };
+}
+
+export type LobbySecondsResult =
+  | { success: true; lobbySeconds: number | null }
+  | { success: false; error: string };
+
+/**
+ * Set - or clear - the lobby length for one title.
+ *
+ * OPERATOR-OWNED, in no sync list, for the same reason as `playModeOverride`: it is our
+ * decision about how long players wait in our product, not the provider's statement about
+ * their game. Copied onto each contest at creation, so changing it here never moves the door
+ * on a contest players have already entered.
+ *
+ * Refused for a title that can never be scheduled: a lobby there would be written and read
+ * by nothing, the declared-written-dead shape.
+ */
+export async function setGameLobbySeconds(
+  providerKey: string,
+  gameCode: string,
+  seconds: number | null,
+): Promise<LobbySecondsResult> {
+  await connectToDatabase();
+
+  const title = await ProviderGame.findOne({ providerKey, gameCode }).lean();
+  if (!title) {
+    return { success: false, error: "That game is not in this provider's catalogue." };
+  }
+
+  if (!resolveSupportedPlayModes(title).includes("scheduled")) {
+    return {
+      success: false,
+      error:
+        "This game is never run with everyone starting together, so it has no lobby. Allow the Everyone at once style first.",
+    };
+  }
+
+  await ProviderGame.updateOne(
+    { providerKey, gameCode },
+    seconds === null
+      ? { $unset: { lobbySeconds: "" } }
+      : { $set: { lobbySeconds: seconds } },
+  );
+
+  return { success: true, lobbySeconds: seconds };
 }

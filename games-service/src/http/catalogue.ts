@@ -98,6 +98,7 @@ export function catalogueEntry(
 
     typicalDurationSeconds: title.typicalDurationSeconds,
     maxDurationSeconds: title.maxDurationSeconds,
+    ...(title.maxPlayers !== undefined ? { maxPlayers: title.maxPlayers } : {}),
 
     configSchema: title.configSchema,
 

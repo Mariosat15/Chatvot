@@ -228,6 +228,8 @@ export async function editProviderContest(
       gameCode,
       settings: coercedSettings ?? competition.gameConfig?.settings ?? {},
       minParticipants: input.minParticipants ?? competition.minParticipants,
+      // So raising the cap on a scheduled race cannot take it past the provider's room size.
+      maxParticipants: input.maxParticipants ?? competition.maxParticipants,
       playWindowStart:
         input.playWindowStart ?? competition.playWindowStart ?? competition.startTime,
       playWindowEnd:

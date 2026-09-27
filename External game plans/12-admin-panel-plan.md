@@ -2265,6 +2265,17 @@ creation** - deliberately, and not for effort. It decides when entry closes and 
 attempts a paying entrant gets, so a contest that should be the other shape is a new contest.
 Same answer as refusing a game-type change on a zero-participant draft (s2.2).
 
+**Amended 27 September 2026 (VV4, `23` s8.4): the same card now carries a lobby length.**
+`GameLobbyLengthControl.tsx` sets `provider_game.lobbySeconds` (minutes on screen, 1-30, blank
+clears it back to the 10-minute default) through the same `PATCH .../play-style` route, which
+still takes **one decision per request** - `lobbySeconds` together with `playMode` or
+`supportedPlayModes` is refused. It is shown only for a title that can be run `scheduled`,
+since an `anytime` contest has no lobby, and the value is copied onto each contest at creation.
+Beside it, picking a title with a provider-owned `maxPlayers` lowers the wizard's default
+`maxParticipants` (100) to that cap, and the pre-flight - not the input box - refuses anything
+typed above it, on create and again on publish, so a 17th seat can never be sold for a
+16-player race.
+
 ---
 
 ### 2.13 The Custom playing time could not be entered - BUILT 12 September 2026

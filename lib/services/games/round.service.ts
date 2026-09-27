@@ -183,9 +183,12 @@ const ROUND_EXPIRY_HEADROOM_SECONDS = 120;
 function resolveExpiry(config: RoundContestConfig, now: Date): Date {
   const maxDuration =
     ((config.maxDurationSeconds ?? 300) + ROUND_EXPIRY_HEADROOM_SECONDS) * 1000;
-  return new Date(
-    Math.min(now.getTime() + maxDuration, config.playWindowEnd.getTime()),
-  );
+  // Reason: a round opened in a scheduled contest's lobby does not start playing until the
+  // gun, so measuring from creation would expire it up to half an hour early - and the
+  // provider refuses a round whose start is not before its expiry. After the gun `now` is
+  // later, so this changes nothing for a late opener or for any other contest.
+  const base = Math.max(now.getTime(), config.scheduledStartAt?.getTime() ?? 0);
+  return new Date(Math.min(base + maxDuration, config.playWindowEnd.getTime()));
 }
 
 export async function createRound(
@@ -235,6 +238,7 @@ export async function createRound(
       player: { playerId: live.userId, displayName: input.displayName },
       config: input.config.settings,
       contentSeed: live.contentSeed,
+      scheduledStartAt: input.config.scheduledStartAt,
       expiresAt: live.expiresAt,
       resultCallbackUrl: input.resultCallbackUrl,
       progressCallbackUrl: input.progressCallbackUrl,
@@ -332,6 +336,10 @@ export async function createRound(
     },
     config: input.config.settings,
     contentSeed: input.config.contentSeed,
+    // Sent on every round of a scheduled contest, including one opened after the gun: the
+    // provider uses it to put all players in the SAME race, so omitting it for a late
+    // opener would seat them in a race of their own.
+    scheduledStartAt: input.config.scheduledStartAt,
     expiresAt,
     resultCallbackUrl: input.resultCallbackUrl,
     progressCallbackUrl: input.progressCallbackUrl,

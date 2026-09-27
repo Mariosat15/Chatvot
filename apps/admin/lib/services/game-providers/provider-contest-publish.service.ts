@@ -41,6 +41,7 @@ type StoredProviderContest = ProviderContestFields & {
   name: string;
   status: string;
   minParticipants?: number;
+  maxParticipants?: number;
 };
 
 export async function publishProviderContest(
@@ -146,6 +147,7 @@ export async function publishProviderContest(
     const preflight = runPreflight({
       format: "competition",
       minParticipants: contest.minParticipants ?? 2,
+      maxParticipants: contest.maxParticipants,
       title: {
         displayName: title.displayName,
         providerStatus: title.providerStatus,
@@ -153,6 +155,7 @@ export async function publishProviderContest(
         supportsOneVsOne: Boolean(title.supportsOneVsOne),
         supportsContentSeed: Boolean(title.supportsContentSeed),
         maxDurationSeconds: title.maxDurationSeconds,
+        maxPlayers: title.maxPlayers,
       },
       provider: {
         enabled: Boolean(provider?.enabled),

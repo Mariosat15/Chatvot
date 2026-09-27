@@ -59,6 +59,10 @@ export interface IProviderGame extends Document {
   playModeOverride?: "anytime" | "scheduled";
   /** Task 11. Read through `resolveSupportedPlayModes`, which unions the default in. */
   supportedPlayModes?: ("anytime" | "scheduled")[];
+  /** Provider's. Most players one contest can seat. Absent means no declared limit. */
+  maxPlayers?: number;
+  /** Ours. Lobby length for a scheduled contest. Read through `resolveLobbySeconds`. */
+  lobbySeconds?: number;
   supportsCompetition: boolean;
   supportsOneVsOne: boolean;
   supportsPractice: boolean;
@@ -351,6 +355,20 @@ const ProviderGameSchema = new Schema<IProviderGame>(
       type: [String],
       enum: ["anytime", "scheduled"],
     },
+    // The most players one contest of this title can seat - requirements HTML 1.21 / `01` s3.
+    // PROVIDER-OWNED: it is a fact about their game server (a race room holds 16), so it is in
+    // `providerOwnedFields` and a sync rewrites it. NO DEFAULT: absent means "the provider
+    // declares no limit", and a default would invent a cap nobody stated. Read by the contest
+    // pre-flight, which refuses a `maxParticipants` above it - otherwise the 17th payer is
+    // turned away at the game's door with their entry fee already taken.
+    maxPlayers: { type: Number, min: 2 },
+    // How long before a SCHEDULED contest's start a seated player may open the game - `23` s9
+    // decision 1. OURS, in no sync list, and read through `resolveLobbySeconds` in
+    // `play-shape.ts`, never directly. NO DEFAULT on the `playModeOverride` precedent: absent
+    // means "use the platform default", and a stored default is a decision nobody took. The
+    // value is COPIED onto the contest at creation, so changing it here never moves the lobby
+    // of a contest already sold.
+    lobbySeconds: { type: Number },
     supportsCompetition: { type: Boolean, default: false },
     supportsOneVsOne: { type: Boolean, default: false },
     supportsPractice: { type: Boolean, default: false },

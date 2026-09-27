@@ -308,10 +308,19 @@ describe("the game's half never slows the player down", () => {
     // `lastIndexOf`, because the same finishing call appears in `resumeRound` earlier in the
     // file: measured from the first one, the send is after it either way and the assertion
     // proves nothing.
-    const finishAt = code.lastIndexOf(
+    //
+    // Sliced to `submitBoard` since 27 Sep 2026: `completeRound` (Volt Stack) now sits below
+    // it with its own finishing call, so a file-wide `lastIndexOf` found that one and failed
+    // on correct code. Both ends of the slice are asserted, or a moved marker slices nothing.
+    const bodyAt = code.indexOf("export async function submitBoard");
+    const endAt = code.indexOf("export async function leaveRound");
+    expect(bodyAt).toBeGreaterThan(-1);
+    expect(endAt).toBeGreaterThan(bodyAt);
+    const body = code.slice(bodyAt, endAt);
+    const finishAt = body.lastIndexOf(
       'finishRound(round.roundId, { status: "completed"',
     );
-    const sendAt = code.lastIndexOf("void sendProgress(round);");
+    const sendAt = body.lastIndexOf("void sendProgress(round);");
     expect(finishAt).toBeGreaterThan(-1);
     expect(sendAt).toBeGreaterThan(finishAt);
   });

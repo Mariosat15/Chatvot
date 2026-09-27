@@ -7,6 +7,7 @@ import { createRound } from "./round.service";
 import { contestRoundConfig, isProviderContest } from "./contest-config";
 import { resolveAttemptSecondsFromSchema } from "./config-schema";
 import { publicBaseUrl } from "./public-base-url";
+import { lobbyOpensAt } from "./play-shape";
 import type { ProviderContestFields } from "./contest-config";
 import type { CreateRoundOutcome, CreateRoundRefusal } from "./round-types";
 
@@ -127,6 +128,7 @@ export async function launchContestRound(
           gameKey?: string;
           isPaused?: boolean;
           pauseReason?: string;
+          lobbySeconds?: number;
         })
       | null
     >();
@@ -145,11 +147,32 @@ export async function launchContestRound(
       );
     }
 
-    if (!PLAYABLE_STATUSES.has(contest.status)) {
+    // THE LOBBY, `23` s9 decision 1. A SCHEDULED contest lets a seated player open the game
+    // up to `lobbySeconds` before the gun, so they can choose a ship and press Ready. The
+    // contest is still `upcoming` then, and it stays `upcoming` for up to a minute after the
+    // gun until the status cron runs - so the lobby admits `upcoming` from the moment it opens
+    // onwards, not only until the start, or a player pressing Play in the first minute of the
+    // race is told it has not started. Nothing else changes: an `anytime` contest has no lobby,
+    // and every other status is refused exactly as before.
+    const lobbyOpens = contest.playWindowStart
+      ? lobbyOpensAt({
+          playMode: contest.playMode,
+          playWindowStart: new Date(contest.playWindowStart),
+          lobbySeconds: contest.lobbySeconds,
+        })
+      : null;
+    const lobbyAdmits =
+      lobbyOpens !== null &&
+      contest.status === "upcoming" &&
+      Date.now() >= lobbyOpens.getTime();
+
+    if (!PLAYABLE_STATUSES.has(contest.status) && !lobbyAdmits) {
       return refuse(
         "contest_not_open",
         contest.status === "upcoming"
-          ? "This competition has not started yet."
+          ? lobbyOpens
+            ? "The lobby for this race has not opened yet."
+            : "This competition has not started yet."
           : "This competition is no longer accepting rounds.",
       );
     }
@@ -183,7 +206,14 @@ export async function launchContestRound(
     // The play window is narrower than the contest, so a contest can be active while play
     // has not opened. `createRound` enforces the END of the window; only the contest knows
     // about the start.
-    if (contest.playWindowStart && new Date() < new Date(contest.playWindowStart)) {
+    // A scheduled contest's lobby is the one legitimate early entry: the provider holds the
+    // player until `scheduledStartAt`, so the window start is enforced by the game's clock.
+    const inLobby = lobbyOpens !== null && Date.now() >= lobbyOpens.getTime();
+    if (
+      contest.playWindowStart &&
+      !inLobby &&
+      new Date() < new Date(contest.playWindowStart)
+    ) {
       return refuse(
         "play_window_not_started",
         "Play has not opened for this competition yet.",

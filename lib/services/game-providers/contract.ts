@@ -137,6 +137,12 @@ export interface ProviderCatalogueGame {
   scoreRange: { min: number; max: number };
   typicalDurationSeconds?: number;
   maxDurationSeconds?: number;
+  /**
+   * The most players one contest of this title can seat - requirements HTML 1.21. Optional:
+   * absent means the provider declares no limit. A race room of 16 declares 16, and the contest
+   * pre-flight then refuses a contest selling a 17th seat.
+   */
+  maxPlayers?: number;
   configSchema?: Record<string, unknown>;
   status: ProviderGameStatus;
 }
@@ -164,6 +170,16 @@ export interface CreateRoundRequest {
    * position depends on. Required for competitions, chapter 01 section 3.
    */
   contentSeed?: string;
+  /**
+   * The moment play begins, for a round opened BEFORE it - requirements HTML 1.21.
+   *
+   * Sent only for a scheduled contest's round, which a seated player may open during the
+   * lobby (`23` s9). The provider must hold the player in a waiting state until this instant
+   * and start every player's clock from it, not from when they opened the game. Absent means
+   * play starts on launch, exactly as before, so a provider ignoring it is conformant for every
+   * contest that is not scheduled.
+   */
+  scheduledStartAt?: Date;
   expiresAt: Date;
   resultCallbackUrl: string;
   /**

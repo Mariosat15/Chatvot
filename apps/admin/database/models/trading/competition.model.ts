@@ -168,6 +168,8 @@ export interface ICompetition extends Document {
    * fallback to the title is a correct answer rather than a guess.
    */
   playMode?: "anytime" | "scheduled";
+  /** Scheduled contests only. Copied from the title at creation. */
+  lobbySeconds?: number;
 
   // Competition Rules & Ranking
   rules: {
@@ -537,6 +539,12 @@ const CompetitionSchema = new Schema<ICompetition>(
       type: String,
       enum: ["anytime", "scheduled"],
     },
+    // How many seconds before `startTime` a seated player may open the game - `23` s9 decision
+    // 1. Written only on a `scheduled` contest, COPIED from the title at creation so a later
+    // change on the title never moves the lobby of a contest people already paid into. NO
+    // DEFAULT: absent on an anytime contest is the true answer (there is no lobby), and a
+    // scheduled contest predating the field reads the platform default via `resolveLobbySeconds`.
+    lobbySeconds: { type: Number },
     rules: {
       rankingMethod: {
         type: String,

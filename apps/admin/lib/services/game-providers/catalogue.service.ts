@@ -85,6 +85,10 @@ function providerOwnedFields(game: ProviderCatalogueGame) {
     scoreRange: game.scoreRange,
     typicalDurationSeconds: game.typicalDurationSeconds,
     maxDurationSeconds: game.maxDurationSeconds,
+    // Reason: provider-owned - it is a fact about their game server's capacity, and only they
+    // can raise it. An operator selling more seats than the room holds is what the pre-flight
+    // refuses, so this must track the provider rather than an operator edit.
+    maxPlayers: game.maxPlayers,
     configSchema: game.configSchema,
     providerStatus: game.status,
   };

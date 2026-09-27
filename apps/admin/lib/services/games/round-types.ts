@@ -274,6 +274,14 @@ export interface RoundContestConfig {
   attemptsAllowed?: number;
   /** No round may be startable that could outlive this. */
   playWindowEnd: Date;
+  /**
+   * When everybody's clock starts, on a SCHEDULED contest only - `23` s9, requirements 1.21.
+   *
+   * A round opened in the lobby is created before play begins, so its expiry is measured from
+   * this moment rather than from creation, and the provider is told to hold the player until
+   * it. Absent on every other contest, which keeps their rounds exactly as they were.
+   */
+  scheduledStartAt?: Date;
   /** Shared by every round in the contest, so all players face identical content. */
   contentSeed?: string;
   /**

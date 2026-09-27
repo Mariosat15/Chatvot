@@ -96,6 +96,11 @@ export interface TitleDefinition {
   scoreRange: { min: number; max: number };
   typicalDurationSeconds: number;
   maxDurationSeconds: number;
+  /**
+   * Most players one round can hold. Omitted for a title where every player plays alone - the
+   * platform reads an absent value as "no cap" (`01` s3.1, v1.21).
+   */
+  maxPlayers?: number;
   configSchema: Record<string, unknown>;
   locales: string[];
   platforms: string[];

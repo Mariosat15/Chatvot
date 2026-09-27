@@ -30,6 +30,8 @@ export interface ProviderContestFields {
   attemptsAllowed?: number;
   unresolvedRoundPolicy?: string;
   roundStartPolicy?: string;
+  /** The shape the contest was created as. Only `scheduled` has a start everyone shares. */
+  playMode?: string;
 }
 
 /**
@@ -119,6 +121,11 @@ export function contestRoundConfig(
       attemptsAllowed:
         attemptsPolicy === "single" ? undefined : contest.attemptsAllowed,
       playWindowEnd: contest.playWindowEnd,
+      // Only the STORED shape decides, never the title's: a title supporting both shapes
+      // (task 11) must not turn a staggered time trial into a held start.
+      ...(contest.playMode === "scheduled" && contest.playWindowStart
+        ? { scheduledStartAt: contest.playWindowStart }
+        : {}),
       contentSeed: contest.contentSeed,
       // Reason for the explicit comparison rather than a cast: an unrecognised stored value
       // must fall back to the reserving branch, which is the safe one. A cast would carry a

@@ -29,6 +29,8 @@ import type {
 export interface PreflightInput {
   format: "competition" | "challenge";
   minParticipants: number;
+  /** The contest's seat limit. Only consulted when the title declares `maxPlayers`. */
+  maxParticipants?: number;
 
   /** From the `provider_game` row. */
   title: {
@@ -46,6 +48,8 @@ export interface PreflightInput {
      */
     supportsContentSeed: boolean;
     maxDurationSeconds?: number;
+    /** Provider-declared cap on players in one round. Absent applies no cap. */
+    maxPlayers?: number;
   };
 
   /** From the `game_provider` row and platform settings. */
@@ -210,6 +214,32 @@ export function runPreflight(input: PreflightInput): PreflightResult {
   }
   if (input.format === "challenge" && input.minParticipants !== 2) {
     errors.push("A challenge is exactly 2 participants.");
+  }
+
+  // The provider's own limit on how many players one round can hold (`01` s3.1, a race room
+  // of 16 for Volt Velocity). Checked against the contest's maximum rather than trusted to
+  // the provider at play time: a 17th paid seat would be refused a round with its entry fee
+  // already taken. An undeclared limit applies no cap, and "no maximum" on the contest is
+  // refused because nothing would then stop the 17th entry.
+  const maxPlayers = input.title.maxPlayers;
+  if (typeof maxPlayers === "number") {
+    // A challenge carries no seat field because it is exactly two by rule.
+    const maxParticipants =
+      input.format === "challenge" ? 2 : input.maxParticipants;
+    if (typeof maxParticipants !== "number" || maxParticipants <= 0) {
+      errors.push(
+        `"${input.title.displayName}" holds at most ${maxPlayers} players, so the contest must set a maximum of ${maxPlayers} or fewer.`,
+      );
+    } else if (maxParticipants > maxPlayers) {
+      errors.push(
+        `"${input.title.displayName}" holds at most ${maxPlayers} players, but this contest allows ${maxParticipants}.`,
+      );
+    }
+    if (input.minParticipants > maxPlayers) {
+      errors.push(
+        `The minimum of ${input.minParticipants} players is more than "${input.title.displayName}" can hold (${maxPlayers}).`,
+      );
+    }
   }
 
   // --- settings -------------------------------------------------------------------------

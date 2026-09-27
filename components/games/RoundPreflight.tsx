@@ -144,10 +144,29 @@ export function RoundPreflight({
     ended cannot be reopened however harmless it looks. Letting the button through would put the
     refusal back on the server and the red box back in front of the player.
   */
+  /*
+    THE LOBBY of a scheduled race (`23` s9 decision 1). The server sends `lobbyOpensAt` only for
+    a contest stored as `scheduled`, and admits an `upcoming` contest from that moment - the same
+    rule as the launch service, never a second one. `draft` is excluded because the launch
+    service admits only `upcoming` and `active`.
+  */
+  const lobbyOpensMs = state.lobbyOpensAt
+    ? new Date(state.lobbyOpensAt).getTime()
+    : null;
+  const lobbyOpen =
+    lobbyOpensMs !== null &&
+    now >= lobbyOpensMs &&
+    (state.contestStatus === "upcoming" || state.contestStatus === "active");
+  const beforeTheGun =
+    lobbyOpen && windowStartMs !== null && windowStartMs > now;
+
   const notStartedYet =
-    state.contestStatus === "upcoming" || state.contestStatus === "draft";
-  const noLongerOpen = !notStartedYet && state.contestStatus !== "active";
-  const windowNotOpen = windowStartMs !== null ? windowStartMs > now : false;
+    (state.contestStatus === "upcoming" || state.contestStatus === "draft") &&
+    !lobbyOpen;
+  const noLongerOpen =
+    !notStartedYet && !lobbyOpen && state.contestStatus !== "active";
+  const windowNotOpen =
+    windowStartMs !== null ? windowStartMs > now && !lobbyOpen : false;
 
   /*
     A PAUSE IS NOT A STATUS, which is the whole reason it needs its own line here. A paused
@@ -173,7 +192,9 @@ export function RoundPreflight({
   // Reason the order matters: a contest that has not started AND has a closed window should say
   // it has not started, because that is the fact the player can act on - they can come back.
   const blockedReason = notStartedYet
-    ? "This competition has not started yet. Your seat is reserved - come back when it opens."
+    ? lobbyOpensMs !== null
+      ? "The lobby for this race has not opened yet. Your seat is reserved - come back when it opens."
+      : "This competition has not started yet. Your seat is reserved - come back when it opens."
     : noLongerOpen
       ? "This competition is no longer accepting rounds."
       : paused
@@ -211,7 +232,11 @@ export function RoundPreflight({
                 : exhausted
                   ? "No attempts left"
                   : resuming
-                    ? "Resume your round"
+                    ? beforeTheGun
+                      ? "Back to the lobby"
+                      : "Resume your round"
+                    : beforeTheGun
+                      ? "Enter the lobby"
                     : // Reason the shortening reaches the button and not only the panel above:
                       // the button is the thing being pressed, and a player who has skimmed
                       // the panel should still not be able to spend an attempt without having

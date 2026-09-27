@@ -21,6 +21,7 @@ import {
 } from "@/lib/services/games/play-shape";
 import { useTerms } from "@/contexts/TerminologyContext";
 import type { ProviderTitleRow } from "./provider-types";
+import GameLobbyLengthControl from "./GameLobbyLengthControl";
 
 /**
  * Whether everybody plays this title at once, set per title.
@@ -53,6 +54,7 @@ interface Props {
   onChanged: (next: {
     playModeOverride?: string;
     supportedPlayModes?: string[];
+    lobbySeconds?: number;
   }) => void;
 }
 
@@ -92,6 +94,11 @@ export default function GamePlayStyleControl({
             against each other live. There is nothing to choose.
           </span>
         </div>
+        <GameLobbyLengthControl
+          providerKey={providerKey}
+          title={title}
+          onChanged={onChanged}
+        />
       </div>
     );
   }
@@ -168,6 +175,11 @@ export default function GamePlayStyleControl({
         providerKey={providerKey}
         title={title}
         effective={effective}
+        onChanged={onChanged}
+      />
+      <GameLobbyLengthControl
+        providerKey={providerKey}
+        title={title}
         onChanged={onChanged}
       />
     </div>

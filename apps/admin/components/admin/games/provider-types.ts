@@ -75,6 +75,10 @@ export interface ProviderTitleRow {
    * the same reason as the two fields above.
    */
   supportedPlayModes?: string[];
+  /** OUR lobby length for a scheduled race, in seconds. Absent means the platform default. */
+  lobbySeconds?: number;
+  /** The provider's cap on players in one round. Absent means no cap. */
+  maxPlayers?: number;
   providerStatus: "active" | "deprecated" | "maintenance";
   chartvoltEnabled: boolean;
   supportsCompetition?: boolean;

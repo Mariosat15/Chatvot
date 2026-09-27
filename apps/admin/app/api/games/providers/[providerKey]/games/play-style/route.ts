@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { guardSection } from "@/lib/admin/section-route-guard";
 import { auditLogService } from "@/lib/services/audit-log.service";
 import {
+  parseLobbySecondsInput,
   parsePlayStyleInput,
   parseSupportedPlayModesInput,
+  setGameLobbySeconds,
   setGamePlayStyle,
   setGameSupportedPlayModes,
 } from "@/lib/services/game-providers/game-play-style.service";
@@ -42,6 +44,7 @@ export async function PATCH(
       gameCode?: string;
       playMode?: unknown;
       supportedPlayModes?: unknown;
+      lobbySeconds?: unknown;
     };
 
     if (!body.gameCode || typeof body.gameCode !== "string") {
@@ -59,25 +62,53 @@ export async function PATCH(
     // choosing an order and being wrong for somebody.
     const setsStyle = "playMode" in body;
     const setsSupported = "supportedPlayModes" in body;
+    const setsLobby = "lobbySeconds" in body;
+    const decisions = [setsStyle, setsSupported, setsLobby].filter(Boolean).length;
 
-    if (setsStyle && setsSupported) {
+    if (decisions > 1) {
       return NextResponse.json(
         {
           error:
-            "Change the play style or the supported styles, not both at once - each is recorded separately.",
+            "Change the play style, the supported styles or the lobby length one at a time - each is recorded separately.",
         },
         { status: 400 },
       );
     }
 
-    // The key must be PRESENT, because `null` means "clear it" for both fields and an absent
+    // The key must be PRESENT, because `null` means "clear it" for every field and an absent
     // field would have to mean the same thing - at which point a malformed body of
     // `{ gameCode }` silently undoes an operator's decision.
-    if (!setsStyle && !setsSupported) {
+    if (decisions === 0) {
       return NextResponse.json(
         { error: "A play style is required, or null to follow the provider." },
         { status: 400 },
       );
+    }
+
+    if (setsLobby) {
+      const parsed = parseLobbySecondsInput(body.lobbySeconds);
+      if (!parsed.ok) {
+        return NextResponse.json({ error: parsed.error }, { status: 400 });
+      }
+
+      const result = await setGameLobbySeconds(providerKey, body.gameCode, parsed.seconds);
+      if (!result.success) {
+        return NextResponse.json({ error: result.error }, { status: 400 });
+      }
+
+      await auditLogService.log({
+        admin: guard.admin,
+        action: "settings_updated",
+        category: "settings",
+        description: `Lobby for "${providerKey}/${body.gameCode}" is now ${
+          result.lobbySeconds === null ? "the default" : `${result.lobbySeconds} seconds`
+        } (applies to contests created from now on)`,
+        targetType: "settings",
+        targetId: `${providerKey}/${body.gameCode}`,
+        newValue: result.lobbySeconds,
+      });
+
+      return NextResponse.json({ success: true, lobbySeconds: result.lobbySeconds });
     }
 
     if (setsSupported) {

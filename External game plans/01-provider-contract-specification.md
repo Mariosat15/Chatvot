@@ -109,6 +109,7 @@ ChartVolt decide what contest formats each game can support.
 
       "typicalDurationSeconds": 600,
       "maxDurationSeconds": 3600,
+      "maxPlayers": 16,
 
       "configSchema": {
         "type": "object",
@@ -144,6 +145,7 @@ ChartVolt decide what contest formats each game can support.
 | `scoreRange` | Yes | Both `min` and `max` required (finite numbers). A result whose `score` falls outside is **rejected** at ingestion — callback refused, score not stored — never clamped. A catalogue title omitting either bound is refused at parse. (Requirements HTML version 1.12.) |
 | `configSchema` | Yes | JSON Schema **subset** — see **3.1b**. The admin panel renders its settings form directly from this, so a new game needs no ChartVolt release. If the title's length is configurable, one property must carry `format: "duration-seconds"` - see 3.2 |
 | `typicalDurationSeconds` / `maxDurationSeconds` | Yes | Drives contest scheduling and the result grace period |
+| `maxPlayers` | No | **New in requirements HTML v1.21.** The most players one round can hold at once - for a live race, the size of one race room. A positive whole number; **omit it if there is no limit**. When set, contest creation and publishing **refuse** a contest whose maximum is absent or above it, or whose minimum is above it, so a room is never over-filled after people have paid. A 1v1 challenge counts as two. Provider-owned and re-synced |
 | `status` | Yes | `active`, `deprecated` or `maintenance` |
 
 > **`configSchema` is doing a lot of work here.** Because the admin settings form is
@@ -387,6 +389,7 @@ producing one score.
 
   "contentSeed": "cv_ctst_774219",
 
+  "scheduledStartAt": "2026-08-18T12:00:00Z",
   "expiresAt": "2026-08-18T14:00:00Z",
   "resultCallbackUrl": "https://chartvolt.com/api/games/providers/acme/events",
   "progressCallbackUrl": "https://chartvolt.com/api/games/providers/acme/progress",
@@ -405,6 +408,16 @@ Use it as the `postMessage` target origin. It is **not** the same fact as `retur
 (where the player goes afterwards); on a white-label those can differ. Deriving a target
 from `returnUrl` fails silently — the browser drops the message and ChartVolt never
 receives `ready`.
+
+`scheduledStartAt` is **sent only for a contest run with `playMode: "scheduled"`**
+(requirements HTML **v1.21**). It is the moment the race starts for everyone, and every
+round of one contest carries the same value. ChartVolt opens a **lobby** before it - by
+default 10 minutes, set per title by the operator between 1 and 30 - during which an
+entrant may press Play, so the round is created and the launch URL loaded **before the
+start**. The game must accept that player early and hold them until `scheduledStartAt`
+rather than starting their clock on arrival. `expiresAt` is measured from
+`max(now, scheduledStartAt)`, so an early arrival does not lose playing time. Absent on
+every `anytime` round.
 
 ### Response
 

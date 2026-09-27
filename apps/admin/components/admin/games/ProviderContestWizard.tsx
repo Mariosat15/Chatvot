@@ -216,6 +216,12 @@ export function ProviderContestWizard({ titles }: ProviderContestWizardProps) {
       ...(shape.forcedRoundStartPolicy
         ? { roundStartPolicy: shape.forcedRoundStartPolicy }
         : {}),
+      // A title with a room size (Volt Velocity: 16) caps the seat limit, so the default of
+      // 100 does not arrive at review as a refusal the operator never caused.
+      ...(typeof title.maxPlayers === "number" &&
+      draft.maxParticipants > title.maxPlayers
+        ? { maxParticipants: title.maxPlayers }
+        : {}),
     });
     setErrors([]);
     setWarnings([]);

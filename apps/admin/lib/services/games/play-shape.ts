@@ -411,3 +411,80 @@ export function resolvePlayShape(
 ): PlayShapeRules {
   return playShapeRules(resolvePlayMode(title));
 }
+
+// --- the pre-start lobby, `23` s9 decision 1 --------------------------------------------------
+//
+// A scheduled contest lets a seated player open the game BEFORE the gun, so they can pick a
+// ship and press Ready. How early is the operator's choice per title, copied onto each contest.
+// It lives here, beside the shape, because the launch gate, the player's pre-flight screen and
+// the admin control must agree to the second: a screen that offers Play one minute before the
+// server admits it is a button that refuses, and one that withholds it while the server would
+// admit it strands a player outside a lobby they paid for.
+
+export const DEFAULT_LOBBY_SECONDS = 600;
+export const MIN_LOBBY_SECONDS = 60;
+export const MAX_LOBBY_SECONDS = 1800;
+
+/** A whole number of seconds inside the permitted range. Anything else is not a lobby length. */
+export function isValidLobbySeconds(value: unknown): value is number {
+  return (
+    typeof value === "number" &&
+    Number.isInteger(value) &&
+    value >= MIN_LOBBY_SECONDS &&
+    value <= MAX_LOBBY_SECONDS
+  );
+}
+
+/**
+ * The lobby length to use for a stored value.
+ *
+ * An unusable value reads as the default rather than as zero - `NaN` from a `parseFloat` on an
+ * admin form would otherwise make the lobby-open comparison false for ever and the game could
+ * never be entered early. Same rule as R31: when replacing a missing value, enumerate
+ * everything the fallback must catch.
+ */
+export function resolveLobbySeconds(stored: unknown): number {
+  return isValidLobbySeconds(stored) ? stored : DEFAULT_LOBBY_SECONDS;
+}
+
+/**
+ * Whether a contest run as `mode` has a pre-start lobby. The one definition, so the create
+ * service that stores `lobbySeconds` and the gate that opens the door cannot disagree.
+ */
+export function playModeHasLobby(mode: string | null | undefined): boolean {
+  return mode === "scheduled";
+}
+
+/**
+ * When a seated player may first open the game, or `null` when the contest has no lobby.
+ *
+ * Only a contest STORED as `scheduled` has one. The title is deliberately not consulted - the
+ * contest's own `playMode` is what it was sold as (task 11) - and an absent stored mode means
+ * no lobby, so no contest created before this field existed changes behaviour.
+ */
+export function lobbyOpensAt(contest: {
+  playMode?: string | null;
+  playWindowStart: Date;
+  lobbySeconds?: unknown;
+}): Date | null {
+  if (!playModeHasLobby(contest.playMode)) return null;
+  const start = contest.playWindowStart.getTime();
+  if (!Number.isFinite(start)) return null;
+  return new Date(start - resolveLobbySeconds(contest.lobbySeconds) * 1000);
+}
+
+/**
+ * Whether a seated player may open the game at `now` although play has not started.
+ *
+ * True only inside the lobby: after it opens and before the start. From the start onwards the
+ * ordinary gates answer, so this never widens anything once the race is running.
+ */
+export function isInLobby(
+  contest: { playMode?: string | null; playWindowStart: Date; lobbySeconds?: unknown },
+  now: Date,
+): boolean {
+  const opens = lobbyOpensAt(contest);
+  if (!opens) return false;
+  const t = now.getTime();
+  return t >= opens.getTime() && t < contest.playWindowStart.getTime();
+}

@@ -1059,6 +1059,24 @@ no build. The main app needs a rebuild and restart. Then hard refresh. **Never v
   already uses to reach it. Race server 40 tests (5 new, one passing a decoy `PORT`), games-service
   344 green with the race test spawning the server on the shared names. `npm run setup:env` does
   not write the Velocity secrets yet - add the two lines by hand.
+- **Later again, 27 Sep 2026 - VV4 CODE-COMPLETE: the platform half of the race** (`23` s8.4).
+  **Lobby:** an operator sets `lobbySeconds` per title (Games -> Providers -> catalogue, default
+  10 min, 1-30), copied onto `Competition.lobbySeconds` at write time; the launch service admits a
+  seated player to an `upcoming` **scheduled** contest from `playWindowStart - lobbySeconds`
+  onwards, and the play screen says **Enter the lobby**. One definition, `playModeHasLobby` /
+  `lobbyOpensAt` in `play-shape.ts` (mirrored). Round expiry is measured from
+  `max(now, scheduledStartAt)` so an early opener's round outlives the race. **Protocol:**
+  `scheduledStartAt` on `POST /v1/rounds` and `maxPlayers` on the catalogue, both optional, in
+  `01` and the requirements HTML at **v1.21**. **Cap:** the pre-flight refuses a contest above the
+  title's `maxPlayers` (16 for `volt-velocity`, none for the others), or with no maximum set;
+  a challenge counts as 2. New `__tests__/services/volt-velocity-lobby.test.ts` (19), two probes
+  red; games-service API test pins the 16. A pre-existing `round-progress.test.ts` guard that
+  had failed on correct code since `d664a85e` now slices `submitBoard`. **Recorded, not caused by
+  VV4:** a full parallel vitest run crashes the in-memory MongoDB on this machine (`fassert`,
+  low disk); serially, 12 unrelated pre-existing files still fail (terminology, reset coverage,
+  willingness, arena band, countdown, credit value, wallet-writer inventory and others). Typecheck
+  baselines unchanged (220 main, 244 admin, none in VV4 files); `check:mirrors` OK.
+  **Not deployed; not rehearsed against the real race server - that is VV5.**
 
 
 ### 27 Sep 2026 - Per-game How it works & tips (Guides) tab

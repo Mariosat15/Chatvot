@@ -90,6 +90,10 @@ export const NEVER_EDITABLE_CONTENT_FIELDS: ReadonlyMap<string, string> = new Ma
   // 11), so writing it here would widen what a future contest may be run as from a screen
   // labelled "title and description".
   ["supportedPlayModes", "changed with the Play style control, which has its own audit line"],
+  // Ours, and barred for the same reason: it decides how long before the gun a paid entrant
+  // may open a scheduled race (`23` s9).
+  ["lobbySeconds", "changed with the Play style control, which has its own audit line"],
+  ["maxPlayers", "declared by the provider and rewritten by every catalogue sync"],
   ["scoreDirection", "declared by the provider and rewritten by every catalogue sync"],
   ["scoreType", "declared by the provider and rewritten by every catalogue sync"],
   // Ours, like `chartvoltEnabled` and `playModeOverride` above, and barred for the same

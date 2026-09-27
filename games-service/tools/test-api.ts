@@ -188,6 +188,18 @@ async function main(): Promise<number> {
     assert.equal(byCode.get("volt-velocity"), "lower_is_better");
   });
 
+  await test("only the race declares a room size, and it is sixteen", async () => {
+    // `maxPlayers` (spec 1.21) is what the platform's pre-flight caps a contest by. Absent means
+    // no cap, so a puzzle that sent one by accident would silently shrink every contest on it.
+    const response = await callApi<{ games: { gameCode: string; maxPlayers?: number }[] }>(
+      "/v1/games",
+    );
+    for (const game of response.body.games) {
+      if (game.gameCode === "volt-velocity") assert.equal(game.maxPlayers, 16);
+      else assert.equal("maxPlayers" in game, false, `${game.gameCode} declares maxPlayers`);
+    }
+  });
+
   await test("every title's how-to-play carries its own shared rules, word for word", async () => {
     /*
      * The rules of the puzzle had two homes - list items in `public/play/index.html` and prose

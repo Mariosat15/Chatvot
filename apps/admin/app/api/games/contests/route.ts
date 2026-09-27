@@ -92,6 +92,8 @@ export async function POST(request: NextRequest) {
       gameCode: body.gameCode,
       settings: body.settings ?? {},
       minParticipants: body.minParticipants ?? 2,
+      // In `shared` so the review step refuses a race larger than the provider's room.
+      maxParticipants: body.maxParticipants ?? 0,
       playWindowStart: dates.playWindowStart,
       playWindowEnd: dates.playWindowEnd,
       attemptsPolicy: body.attemptsPolicy ?? "single",
@@ -130,7 +132,6 @@ export async function POST(request: NextRequest) {
       name: body.name ?? "",
       description: body.description ?? "",
       entryFee: body.entryFee ?? 0,
-      maxParticipants: body.maxParticipants ?? 0,
       platformFeePercentage: body.platformFeePercentage ?? 0,
       prizeDistribution: body.prizeDistribution ?? [],
       startTime: dates.startTime,

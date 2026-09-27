@@ -10,6 +10,7 @@ import ProviderGame from "@/database/models/games/provider-game.model";
 import { attemptsPermitted } from "./round.service";
 import { contestRoundConfig, isProviderContest } from "./contest-config";
 import { resolveAttemptSecondsFromSchema } from "./config-schema";
+import { lobbyOpensAt } from "./play-shape";
 import type { ProviderContestFields } from "./contest-config";
 
 /**
@@ -132,6 +133,11 @@ export interface PlayState {
   playWindowStart?: string;
   playWindowEnd?: string;
   /**
+   * Scheduled races only: when a seated player may first open the game. From `lobbyOpensAt`
+   * in `play-shape.ts`, the same helper the launch service gates on.
+   */
+  lobbyOpensAt?: string;
+  /**
    * The caller's own contest score, as ranking will read it.
    *
    * OPTIONAL, AND IT WAS `number` WITH A `?? 0` BEHIND IT UNTIL R50. The lobby's hero tile
@@ -213,6 +219,7 @@ export async function getPlayState(
           gameKey?: string;
           isPaused?: boolean;
           pauseReason?: string;
+          lobbySeconds?: number;
         })
       | null
     >();
@@ -333,6 +340,13 @@ export async function getPlayState(
           : undefined,
         playWindowEnd: contest.playWindowEnd
           ? new Date(contest.playWindowEnd).toISOString()
+          : undefined,
+        lobbyOpensAt: contest.playWindowStart
+          ? lobbyOpensAt({
+              playMode: contest.playMode,
+              playWindowStart: new Date(contest.playWindowStart),
+              lobbySeconds: contest.lobbySeconds,
+            })?.toISOString()
           : undefined,
         // Passed through, never defaulted. See the field's declaration.
         participantScore: participant.score,

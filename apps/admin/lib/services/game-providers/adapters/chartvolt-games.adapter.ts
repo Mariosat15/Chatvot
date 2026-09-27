@@ -78,6 +78,7 @@ interface CatalogueEntryPayload {
   scoreRange?: { min?: unknown; max?: unknown };
   typicalDurationSeconds?: unknown;
   maxDurationSeconds?: unknown;
+  maxPlayers?: unknown;
   configSchema?: unknown;
   status?: unknown;
 }
@@ -209,6 +210,11 @@ function normaliseCatalogueEntry(
   if (typical !== undefined) game.typicalDurationSeconds = typical;
   const maximum = count(entry.maxDurationSeconds);
   if (maximum !== undefined) game.maxDurationSeconds = maximum;
+  // A seat limit must be a whole number of at least two - no paid contest is single-player.
+  // Anything else is dropped rather than rounded: a guessed cap either refuses legitimate
+  // contests or admits seats the provider's server cannot hold.
+  const seats = count(entry.maxPlayers);
+  if (seats !== undefined && Number.isInteger(seats) && seats >= 2) game.maxPlayers = seats;
 
   if (
     typeof entry.configSchema === "object" &&
@@ -353,6 +359,11 @@ export class ChartVoltGamesAdapter implements GameProviderAdapter {
         // same string, but relying on it means a plain object with a string date silently
         // serialises differently from a real Date.
         expiresAt: request.expiresAt.toISOString(),
+        // Omitted rather than sent as null when the contest is not scheduled, so a non-scheduled
+        // round's body is byte-for-byte what it was before 1.21.
+        ...(request.scheduledStartAt
+          ? { scheduledStartAt: request.scheduledStartAt.toISOString() }
+          : {}),
         resultCallbackUrl: request.resultCallbackUrl,
         progressCallbackUrl: request.progressCallbackUrl,
         returnUrl: request.returnUrl,

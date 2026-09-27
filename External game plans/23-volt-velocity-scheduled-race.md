@@ -127,7 +127,7 @@ work for a provider contest with `lower_is_better` scores.
 | **VV1** | Race server in repo + PM2 + nginx + the two server patches (B, C) with tests | 2-3 days - **BUILT 27 Sep 2026**, see 8.1 |
 | **VV2** | Title, round-create branch, bootstrap page, session endpoint, static client (D, E, F, L) | 2-3 days - **CODE-COMPLETE 27 Sep 2026**, see 8.2 |
 | **VV3** | Result sweeper + receipt verification + per-player callbacks (G) | 1-2 days - **CODE-COMPLETE 27 Sep 2026**, see 8.3 |
-| **VV4** | Platform lobby window, `scheduledStartAt`, player-cap pre-flight, spec version bump (H, I, J) | 2 days |
+| **VV4** | Platform lobby window, `scheduledStartAt`, player-cap pre-flight, spec version bump (H, I, J) | 2 days - **CODE-COMPLETE 27 Sep 2026**, see 8.4 |
 | **VV5** | End-to-end rehearsal: 2 then 16 simulated players (headless clients), restart drill, deploy runbook, docs | 2 days |
 
 **Total ~10-13 working days** including the 1v1 decision and the admin lobby control. Behind `externalGamesEnabled` and the title's `chartvoltEnabled`
@@ -262,6 +262,50 @@ and shares no code with the platform (`check:isolation`).
 - Two **pre-existing** failures were fixed on the way, both flipped rather than deleted: the progress
   test still expected the pre-v1.20 body without `provisionalScore` / `provisionalDurationMs`, and
   the board test's fake DOM lacked `insertBefore`, which `board.js` has called since `ade774ef`.
+
+### 8.4 VV4 - what was built (27 September 2026)
+
+The platform half: pieces H, I and J. **Code-complete, not deployed, never run against the real
+race server** (that is VV5). Nothing is player-visible until the owner enables the title.
+
+- **The lobby (H).** `lobbySeconds` is an operator-owned field on `provider_game` (both model
+  copies), set per title in Games -> Providers -> catalogue by `GameLobbyLengthControl.tsx`
+  (default **10 minutes, 1-30**, whole seconds; `parseLobbySecondsInput` refuses anything else and
+  `null` clears it). It is **copied onto `Competition.lobbySeconds` at write time**, like
+  `playMode`, so an operator changing the title later does not move the lobby of a contest people
+  have already paid for. It is barred from the content editor (`NEVER_EDITABLE_CONTENT_FIELDS`)
+  and the play-style route refuses a request carrying it together with another decision, so one
+  audit line covers one decision.
+- **One definition of "has a lobby".** `playModeHasLobby` and `lobbyOpensAt` in `play-shape.ts`
+  (mirrored, byte-identical) are read by the create service, the launch service and the play
+  state. `play-shape.test.ts`'s single-resolver guard forbids a literal `=== "scheduled"` in the
+  services; the first cut had one and the guard caught it.
+- **The launch service admits an `upcoming` contest from the moment the lobby opens onwards**, not
+  only until the gun - the status cron flips `upcoming` to `active` up to a minute late, and a
+  player pressing Play in that minute would otherwise be told the race has not started. An
+  `anytime` contest has no lobby and every other status is refused exactly as before.
+- **Round expiry is measured from `max(now, scheduledStartAt)`.** Measured from creation, a round
+  opened 30 minutes early would expire before the race ended, and games-service refuses a round
+  whose start is not before its expiry.
+- **The protocol (I).** `scheduledStartAt` on `POST /v1/rounds` and `maxPlayers` on the catalogue,
+  in `01` and `ChartVolt-Game-API-Requirements.html`, now at **version 1.21**. Both are optional,
+  so a provider ignoring them is conformant. `scheduledStartAt` is sent on **every** round of a
+  scheduled contest, including one opened after the gun, because it is what puts every entrant in
+  the same room; `contestRoundConfig` sets it only for a contest *stored* as scheduled.
+- **The seat cap (J).** `maxPlayers` is provider-owned (games-service publishes 16 for
+  `volt-velocity` and nothing for the other titles, pinned by a games-service API test). The
+  pre-flight refuses a contest whose `maxParticipants` is absent, zero, or above the cap, and a
+  minimum above it, naming both numbers; a challenge counts as 2. Publishing re-runs it against
+  the stored record. A title with no cap is unchanged.
+- **The player screen.** `PlayState.lobbyOpensAt` drives `RoundPreflight`: before the lobby it says
+  the lobby has not opened; inside it the button reads **Enter the lobby** / **Back to the
+  lobby**. It uses the same rule as the launch service rather than a second one.
+- **Tests:** `__tests__/services/volt-velocity-lobby.test.ts` (19), plus the existing play-shape,
+  provider-round-launch and create suites; two probes (a lobby on `anytime`, a seventeenth seat)
+  each turned exactly their own test red. games-service `npm test` green and `check:isolation`
+  clean. One **pre-existing** guard was repaired on the way: `round-progress.test.ts` measured
+  the progress call against a file-wide `lastIndexOf`, which `completeRound` (Volt Stack,
+  `d664a85e`) had made fail on correct code; it now slices `submitBoard` with both ends asserted.
 
 ## 9. Owner decisions (answered 27 September 2026)
 
