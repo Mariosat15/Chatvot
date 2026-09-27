@@ -1098,6 +1098,17 @@ no build. The main app needs a rebuild and restart. Then hard refresh. **Never v
   and unpacked on first use with the archive's mtime (fingerprint stable across restarts);
   `VELOCITY_CLIENT_FILE` still overrides (`23` s8.2 amendment). Cost: ~76 MB of git history per
   client build. Still owed: nginx must carry the `/race/` block from `deploy/nginx.conf`.
+- **Later still, 27 Sep 2026 - (3) the race joined a Next.js 404 page.** Owner: a challenge
+  loaded the client, then `Unexpected token '<', "<!DOCTYPE "... is not valid JSON`. The client
+  calls `<origin>/race/v1/races/<id>/<action>`; the live nginx lacks the `/race/` block, so the
+  request reached Next.js and got its HTML 404. **The "still owed" above is closed without an
+  nginx edit**: `next.config.ts` now rewrites exactly the six ticket-authenticated player actions
+  (`join|events|input|ship|ready|leave`, raceId `[A-Za-z0-9_-]{1,80}`) to
+  `VELOCITY_RACE_INTERNAL_URL` (default `http://127.0.0.1:3080`), the same no-nginx reasoning as
+  `/play`. Matcher checked with Next's own `path-to-regexp`: `players`, `result`, `start`, bare
+  `/race/*` and nested ids do **not** match, so the admin endpoints stay loopback-only. If the
+  nginx block is later installed it wins, being in front. **Never verified live** - in
+  particular that the SSE `events` stream is not buffered through the Next proxy.
 
 
 ### 27 Sep 2026 - Per-game How it works & tips (Guides) tab

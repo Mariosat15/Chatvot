@@ -8,6 +8,9 @@ import type { NextConfig } from "next";
  */
 const GAMES_UPSTREAM = process.env.GAMES_INTERNAL_URL ?? "http://127.0.0.1:4010";
 
+/** Where the Volt Velocity race server (chartvolt-velocity) listens. Same default reasoning. */
+const VELOCITY_RACE_UPSTREAM = process.env.VELOCITY_RACE_INTERNAL_URL ?? "http://127.0.0.1:3080";
+
 /**
  * Serve the first-party game provider's play surface through this app.
  *
@@ -64,6 +67,16 @@ async function rewrites() {
     { source: "/play", destination: `${GAMES_UPSTREAM}/play` },
     // Its stylesheet, its two scripts, and the four /play/api/* calls the board makes.
     { source: "/play/:path*", destination: `${GAMES_UPSTREAM}/play/:path*` },
+    // Volt Velocity's race server, for the same no-nginx-edit reason. PLAYER actions only: the
+    // admin endpoints (create race, add players, result, start) are reached by games-service over
+    // loopback and must never be exposed, so the action is an explicit list of the six
+    // ticket-authenticated ones and every other /race path falls through to this app's 404.
+    // Without this the client's join hits a Next.js HTML page and fails with
+    // `Unexpected token '<', "<!DOCTYPE "... is not valid JSON`.
+    {
+      source: "/race/v1/races/:raceId([A-Za-z0-9_-]{1,80})/:action(join|events|input|ship|ready|leave)",
+      destination: `${VELOCITY_RACE_UPSTREAM}/v1/races/:raceId/:action`,
+    },
   ];
 }
 
