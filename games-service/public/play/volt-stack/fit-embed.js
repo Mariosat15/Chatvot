@@ -30,19 +30,25 @@
   }
 
   const SHELL_PAD = 10;
-  const SAFETY = 6;
+  const SAFETY = 4;
   const TOUCH_RESERVE = 48;
   const MIN_BOARD_W = 160;
   // Reason: Tetris is 10×20 — height must be 2× width. The earlier 510×590
   // target made a squat well and left HOLD/NEXT taller than the board.
-  // Prefer a tall well (~295×590); grow the host iframe to make room.
+  // 590 is the MINIMUM the frame is asked for; the well then GROWS to fill
+  // whatever height the arena gives it (owner, 27 Sep: "fill the bottom").
   const TARGET_BOARD_H = 590;
   const BOARD_ASPECT = 2;
-  const TARGET_BOARD_W = Math.round(TARGET_BOARD_H / BOARD_ASPECT); // 295
-  const MAX_BOARD_W = 340;
-  const MAX_BOARD_H = 680;
-  // Both rails + both gutters. Rails are fixed-width in CSS — budget matches.
-  const RAIL_TOTAL = 76 * 2 + 12;
+  const MAX_BOARD_H = 900;
+  const MAX_BOARD_W = MAX_BOARD_H / BOARD_ASPECT;
+  // Minimum rail width + both gutters + shell side padding. Rails are
+  // minmax(MIN_RAIL, 1fr) in CSS, so they take all leftover width.
+  const MIN_RAIL = 96;
+  const RAIL_TOTAL = MIN_RAIL * 2 + 8 * 2 + 20;
+  const FRAME_EXTRA = 4;
+
+  let lastApplied = "";
+  let lastRequested = 0;
 
   function tellResize(height) {
     try {
@@ -89,47 +95,43 @@
     const viewH = window.innerHeight;
     const viewW = window.innerWidth;
     const chrome = chromeHeight(shell);
-    const FRAME_EXTRA = 4;
-
-    // Ideal size first — then ask the parent to grow so it can fit.
-    let boardH = TARGET_BOARD_H;
-    let boardW = TARGET_BOARD_W;
-    let framePad = framePadFor(boardW);
 
     const maxWFromWidth = Math.max(
       MIN_BOARD_W,
-      Math.floor(viewW - RAIL_TOTAL),
+      Math.min(MAX_BOARD_W, Math.floor(viewW - RAIL_TOTAL)),
     );
-    if (boardW > maxWFromWidth) {
-      boardW = Math.min(MAX_BOARD_W, maxWFromWidth);
-      boardW = Math.max(MIN_BOARD_W, boardW);
-      boardH = Math.round(boardW * BOARD_ASPECT);
-      framePad = framePadFor(boardW);
+
+    // Reason: the request is the 590 MINIMUM, never a figure derived from
+    // viewH. Asking for "whatever I have now" is a fixed point that can grow
+    // the frame on every pass. The arena row already stretches the frame to
+    // the window bottom; the board fills that below.
+    const minW = Math.min(maxWFromWidth, Math.round(TARGET_BOARD_H / BOARD_ASPECT));
+    const minPad = framePadFor(minW);
+    const needed = Math.round(
+      chrome + minW * BOARD_ASPECT + minPad * 2 + FRAME_EXTRA + SAFETY,
+    );
+    if (Math.abs(needed - lastRequested) > 2) {
+      lastRequested = needed;
+      tellResize(Math.max(needed, 420));
     }
 
-    const needed =
-      chrome + boardH + framePad * 2 + FRAME_EXTRA + SAFETY;
-    // Reason: capping to viewH trapped the board at the opening iframe
-    // height forever. The host honours resize up to MAX_FRAME_HEIGHT (2000).
-    tellResize(Math.max(needed, 420));
-
-    // While the parent is still short, use every vertical pixel we have.
-    const budget = Math.max(
-      220,
-      viewH - chrome - SAFETY - framePad * 2 - FRAME_EXTRA,
+    // Fill every vertical pixel the frame actually has, capped by width.
+    let framePad = 10;
+    let boardH = Math.max(
+      MIN_BOARD_W * BOARD_ASPECT,
+      Math.min(MAX_BOARD_H, viewH - chrome - SAFETY - framePad * 2 - FRAME_EXTRA),
     );
-    if (boardH > budget) {
-      boardH = Math.min(MAX_BOARD_H, budget);
-      boardW = Math.max(MIN_BOARD_W, Math.floor(boardH / BOARD_ASPECT));
-      if (boardW > maxWFromWidth) {
-        boardW = maxWFromWidth;
-        boardH = Math.round(boardW * BOARD_ASPECT);
-      }
-      framePad = framePadFor(boardW);
-    }
-
-    boardW = Math.min(MAX_BOARD_W, Math.max(MIN_BOARD_W, boardW));
+    let boardW = Math.floor(boardH / BOARD_ASPECT);
+    if (boardW > maxWFromWidth) boardW = maxWFromWidth;
+    boardW = Math.max(MIN_BOARD_W, boardW);
+    framePad = framePadFor(boardW);
     boardH = Math.round(boardW * BOARD_ASPECT);
+
+    // Reason: fit() dispatches "resize", which schedules fit() again. Only
+    // re-apply and re-announce when the numbers changed, or it never stops.
+    const key = `${boardW}|${boardH}|${framePad}`;
+    if (key === lastApplied) return;
+    lastApplied = key;
 
     shell.style.setProperty("--board-width", `${boardW}px`);
     shell.style.setProperty("--board-height", `${boardH}px`);

@@ -94,7 +94,26 @@ describe("the rules panel says nothing rather than saying nothing usefully", () 
       and so does every provider registered and not yet re-synced. A panel with a heading and
       an empty body tells a player the game has no rules.
     */
-    expect(code).toMatch(/if \(!scoring && !playing\) return null;/);
+    // Amended 27 Sep 2026: authored Guides steps count as content too, so the
+    // panel renders when an operator wrote steps but the provider sent no howToPlay.
+    expect(code).toMatch(
+      /if \(!scoring && !playing && authored\.length === 0\) return null;/,
+    );
+  });
+
+  it("prefers the admin Guides steps over the provider's howToPlay paragraph", () => {
+    const code = readCode(PANEL);
+    // Owner, 27 Sep 2026: steps added in admin Guides did not show in the game.
+    expect(code).toMatch(/const authored = presentation\.howItWorksSteps \?\? \[\]/);
+    expect(code).toMatch(/authored\.length > 0 \?\s*\(\s*<AuthoredSteps/);
+    expect(code).toMatch(/authored\.length > 0 \?\s*\(\s*<ol/);
+  });
+
+  it("the shared presentation read selects the Guides steps", () => {
+    const service = readCode(
+      join(ROOT, "lib", "services", "games", "game-presentation.service.ts"),
+    );
+    expect(service).toMatch(/\.select\(\s*"[^"]*\bhowItWorksSteps\b[^"]*"/);
   });
 
   it("trims before deciding, so whitespace is not content", () => {

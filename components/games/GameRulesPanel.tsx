@@ -1,6 +1,9 @@
 import { BookOpen, Target } from "lucide-react";
 import { NeonHeadedPanel, NeonIllustration } from "@/components/neon/Cards";
+import { resolveFeatureLucideIcon } from "@/components/games/resolve-feature-icon";
 import type { GamePresentation } from "@/lib/services/games/game-presentation.service";
+
+type AuthoredStep = GamePresentation["howItWorksSteps"][number];
 
 /**
  * The operator's rules for a game title, on the two screens a player reads before and while
@@ -41,7 +44,8 @@ interface Props {
   presentation: Pick<
     GamePresentation,
     "rulesSummary" | "howToPlay" | "gameName" | "howToPlayImageUrl"
-  >;
+  > &
+    Partial<Pick<GamePresentation, "howItWorksSteps">>;
   /**
    * Which of the two screens this is.
    *
@@ -99,6 +103,9 @@ function paragraphs(text: string): string[] {
 export default function GameRulesPanel({ presentation, layout }: Props) {
   const scoring = presentation.rulesSummary?.trim();
   const playing = presentation.howToPlay?.trim();
+  // Reason: the admin Guides tab's steps are the operator's deliberate choice for this
+  // screen, so they win over the provider's `howToPlay` paragraph when any exist.
+  const authored = presentation.howItWorksSteps ?? [];
 
   /*
    * Both absent renders NOTHING, never an empty panel with a heading.
@@ -108,11 +115,12 @@ export default function GameRulesPanel({ presentation, layout }: Props) {
    * that says less. It is also the live state of every title synced before R63 and of every
    * provider registered but not yet re-synced, so it is the common case rather than an edge.
    */
-  if (!scoring && !playing) return null;
+  if (!scoring && !playing && authored.length === 0) return null;
 
   if (layout === "strip") {
     return (
       <RulesStrip
+        authored={authored}
         text={playing || scoring || ""}
         imageUrl={presentation.howToPlayImageUrl}
         gameName={presentation.gameName}
@@ -171,10 +179,14 @@ export default function GameRulesPanel({ presentation, layout }: Props) {
           </div>
         )}
 
-        {playing && (
+        {(playing || authored.length > 0) && (
           <div className="flex min-w-0 items-start gap-4 md:flex-1">
             <div className="min-w-0 flex-1">
-              <HowToPlay text={playing} />
+              {authored.length > 0 ? (
+                <AuthoredSteps steps={authored} />
+              ) : (
+                <HowToPlay text={playing ?? ""} />
+              )}
             </div>
 
             {/*
@@ -247,10 +259,12 @@ export default function GameRulesPanel({ presentation, layout }: Props) {
  * not silent when a title has a scoring rule and no instructions.
  */
 function RulesStrip({
+  authored,
   text,
   imageUrl,
   gameName,
 }: {
+  authored: AuthoredStep[];
   text: string;
   imageUrl?: string;
   gameName: string;
@@ -260,6 +274,36 @@ function RulesStrip({
   return (
     <NeonHeadedPanel icon={BookOpen} title="How it works">
       <div className="flex h-full items-center gap-3 px-3 py-2">
+        {authored.length > 0 ? (
+          <ol className="min-w-0 flex-1 space-y-1.5">
+            {authored.slice(0, STRIP_STEP_LIMIT).map((step, index) => {
+              const Icon = resolveFeatureLucideIcon(step.icon, index);
+              return (
+                <li
+                  key={index}
+                  className="flex min-h-9 items-center gap-2.5 rounded-lg border border-sky-400/20 bg-sky-400/[0.06] px-2 py-1"
+                >
+                  <span
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 border-cyan-400/60 bg-cyan-400/10 text-cyan-200 shadow-[0_0_8px_rgba(34,211,238,0.35)]"
+                    aria-hidden
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                  </span>
+                  <span className="min-w-0" title={`${step.title} — ${step.detail}`}>
+                    <span className="block truncate text-[14px] font-semibold leading-snug text-gray-50">
+                      {index + 1}. {step.title}
+                    </span>
+                    {step.detail && (
+                      <span className="block truncate text-[12px] leading-snug text-gray-400">
+                        {step.detail}
+                      </span>
+                    )}
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+        ) : (
         <ol className="min-w-0 flex-1 space-y-1.5">
           {steps.map((step, index) => (
             /*
@@ -301,6 +345,7 @@ function RulesStrip({
             </li>
           ))}
         </ol>
+        )}
 
         {/*
           THE DIAGRAM IS BESIDE THE STEPS AND SMALL, which is the correction the owner asked
@@ -333,6 +378,38 @@ function RulesStrip({
         </div>
       </div>
     </NeonHeadedPanel>
+  );
+}
+
+/** The admin Guides tab's steps on the lobby: title, then detail, in the order saved. */
+function AuthoredSteps({ steps }: { steps: AuthoredStep[] }) {
+  return (
+    <div>
+      <h3 className="mb-2.5 text-sm font-semibold text-gray-200">How to play</h3>
+      <ol className="space-y-2.5">
+        {steps.map((step, index) => {
+          const Icon = resolveFeatureLucideIcon(step.icon, index);
+          return (
+            <li key={index} className="flex gap-2.5">
+              <span
+                className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-cyan-400/40 bg-cyan-400/10 text-cyan-300"
+                aria-hidden
+              >
+                <Icon className="h-3.5 w-3.5" />
+              </span>
+              <span className="text-sm leading-relaxed">
+                <span className="font-semibold text-gray-100">
+                  {index + 1}. {step.title}
+                </span>
+                {step.detail && (
+                  <span className="block text-gray-400">{step.detail}</span>
+                )}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
   );
 }
 

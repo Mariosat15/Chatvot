@@ -61,6 +61,15 @@ export interface GamePresentation {
   highlightsImageUrl?: string;
   highlights: { title: string; detail: string }[];
   /**
+   * The operator's numbered "How it works" steps from the admin Guides tab.
+   *
+   * WINS OVER `howToPlay` ON THE LOBBY AND ARENA when any are authored (owner, 27 Sep
+   * 2026: "I added the how to play but it doesn't show in the game"). The Guides tab wrote
+   * them to `provider_game.howItWorksSteps` and only `/games/[slug]` read them, so the arena
+   * kept rendering the provider's one-paragraph `howToPlay`. Empty means "not authored".
+   */
+  howItWorksSteps: { title: string; detail: string; icon?: string }[];
+  /**
    * The hero banner's four small claims, when an operator has written them.
    *
    * AN EMPTY LIST IS THE NORMAL CASE AND MEANS "WORK THEM OUT", never "show none". Every
@@ -106,14 +115,19 @@ export async function getGamePresentation(
   gameCode: string | undefined,
 ): Promise<GamePresentation> {
   if (!providerKey || !gameCode) {
-    return { gameName: UNKNOWN_GAME_NAME, highlights: [], heroFeatures: [] };
+    return {
+      gameName: UNKNOWN_GAME_NAME,
+      highlights: [],
+      howItWorksSteps: [],
+      heroFeatures: [],
+    };
   }
 
   await connectToDatabase();
 
   const title = await ProviderGame.findOne({ providerKey, gameCode })
     .select(
-      "displayName tagline description rulesSummary howToPlay category thumbnailUrl bannerUrl howToPlayImageUrl highlightsImageUrl highlights heroFeatures family scoreType scoreDirection maxDurationSeconds",
+      "displayName tagline description rulesSummary howToPlay category thumbnailUrl bannerUrl howToPlayImageUrl highlightsImageUrl highlights howItWorksSteps heroFeatures family scoreType scoreDirection maxDurationSeconds",
     )
     .lean<{
       displayName?: string;
@@ -127,6 +141,7 @@ export async function getGamePresentation(
       howToPlayImageUrl?: string;
       highlightsImageUrl?: string;
       highlights?: { title: string; detail: string }[];
+      howItWorksSteps?: { title?: string; detail?: string; icon?: string }[];
       heroFeatures?: { icon: string; label: string }[];
       family?: string;
       scoreType?: string;
@@ -135,7 +150,12 @@ export async function getGamePresentation(
     } | null>();
 
   if (!title) {
-    return { gameName: UNKNOWN_GAME_NAME, highlights: [], heroFeatures: [] };
+    return {
+      gameName: UNKNOWN_GAME_NAME,
+      highlights: [],
+      howItWorksSteps: [],
+      heroFeatures: [],
+    };
   }
 
   return {
@@ -158,6 +178,15 @@ export async function getGamePresentation(
     howToPlayImageUrl: title.howToPlayImageUrl || undefined,
     highlightsImageUrl: title.highlightsImageUrl || undefined,
     highlights: Array.isArray(title.highlights) ? title.highlights : [],
+    howItWorksSteps: Array.isArray(title.howItWorksSteps)
+      ? title.howItWorksSteps
+          .map((s) => ({
+            title: (s?.title ?? "").trim(),
+            detail: (s?.detail ?? "").trim(),
+            ...(s?.icon ? { icon: s.icon } : {}),
+          }))
+          .filter((s) => s.title.length > 0 || s.detail.length > 0)
+      : [],
     heroFeatures: Array.isArray(title.heroFeatures) ? title.heroFeatures : [],
     family: title.family || undefined,
     scoreType: title.scoreType || undefined,

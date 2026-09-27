@@ -913,6 +913,39 @@ remains outstanding is the **opponent** half listed above, not the game half.
 Newest at the top.
 
 
+### 27 Sep 2026 - Guides steps reach the arena and lobby; Volt Stack fills its frame
+
+**Owner:** "in how to play I added the how to play but it doesn't show in the game", and
+the Volt Stack cabinet sat in a narrow strip with wasted space left, right and below.
+
+**Cause (steps):** the Guides tab saves `provider_game.howItWorksSteps`, but only
+`/games/[slug]` read it. `getGamePresentation` never selected the field, and
+`GameRulesPanel` only rendered the provider's one-paragraph `howToPlay`. Nothing was
+computed wrongly, there is no risk number, and nothing was backfilled.
+
+**Shipped (platform):** `GamePresentation.howItWorksSteps` (selected, trimmed, empty
+entries dropped). `GameRulesPanel` prefers authored steps in both layouts (arena strip:
+the first 3, with icon, title and detail; lobby: all of them) and falls back to
+`howToPlay`. The null guard also counts steps. The same component serves both
+competition and challenge arenas and lobbies. Pinned in `game-rules-panel.test.ts` (the
+null-guard assertion was flipped, not deleted, and 2 tests were added).
+
+**Shipped (games-service, `public/play/volt-stack`):**
+- The board is sized from the frame's real height, with a 900px maximum at 1:2. The
+  width is capped by `viewW - 2x96px rails`.
+- HOLD/NEXT rails are `minmax(96px,1fr)`, so they fill the sides.
+- The resize request is the stable 590-board minimum, never a figure derived from
+  `innerHeight`.
+- A change guard stops `fit()`'s own `resize` dispatch from rescheduling it for ever.
+- Cache-bust bumped to `20260927q`.
+
+**Not fixed and pre-existing:** two `arena-band.test.ts` assertions (`TIP_ICONS`,
+`{ARENA_HIGHLIGHT_LIMIT}`) already fail on HEAD after the Guides move.
+
+**Deploy:** both sides. Games-service needs a pull and `pm2 restart chartvolt-games`, with
+no build. The main app needs a rebuild and restart. Then hard refresh. **Never verified by eye.**
+
+
 ### 27 Sep 2026 - Per-game How it works & tips (Guides) tab
 
 **Owner:** How it works on Page theme did nothing useful for Volt Stack, and Game tips
