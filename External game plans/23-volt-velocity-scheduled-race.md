@@ -176,7 +176,11 @@ authoritative list of every change. **It is not built and not deployed**; nothin
   in that file they belong to the games service, so a race server reading them would try to
   bind the games service's port. Its listen address comes from `VELOCITY_RACE_URL` (default
   `http://127.0.0.1:3080`), the same line games-service uses to reach it, so the two cannot
-  disagree about that either. Allowed origins default to the origin of `GAMES_PUBLIC_URL`, and
+  disagree about that either. **Amended 27 Sep 2026 (two servers):** optional
+  `VELOCITY_RACE_LISTEN` overrides the bind address only; a machine whose `VELOCITY_RACE_URL`
+  names another server runs no race process (`ecosystem.config.js`) and forwards `/race` there
+  (`next.config.ts`). Seated players also pre-download the client from the lobby via
+  `/play/warmup/:gameCode` - see PROGRESS.md's 27 Sep entry (4). Allowed origins default to the origin of `GAMES_PUBLIC_URL`, and
   with neither set **no** browser origin is admitted rather than all of them. `npm run
   setup:env` does not yet write the two Velocity secrets; add them by hand, or - since 27 Sep
   2026 - generate them from the admin panel (see the amendment below). The race-server

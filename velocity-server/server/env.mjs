@@ -20,12 +20,27 @@ export function raceEnvironment(env = process.env, root = process.cwd()) {
   // The race client runs inside the play surface, so the browser origin is the games service's
   // public origin. An explicit list replaces it rather than adding to it.
   const derived = originOf(env.GAMES_PUBLIC_URL || '');
+  // VELOCITY_RACE_LISTEN ("host:port") overrides only where this process binds. Reason: the race
+  // server is one process for both machines, so on the machine that hosts it the local games
+  // service still calls 127.0.0.1 while the second machine's platform forwards to this one over
+  // the network - one address cannot be both loopback-only and reachable from the other server.
+  const listen = listenAddress(env.VELOCITY_RACE_LISTEN);
   return {
     secret: env.VELOCITY_TICKET_SECRET,
     adminKey: env.VELOCITY_ADMIN_KEY,
     origins: explicit.length ? explicit : derived ? [derived] : [],
     dataDir: env.VELOCITY_DATA_DIR || resolve(root, 'race-data'),
-    host: raceUrl.hostname.replace(/^\[|\]$/g, ''),
-    port: Number(raceUrl.port || (raceUrl.protocol === 'https:' ? 443 : 80)),
+    host: listen ? listen.host : raceUrl.hostname.replace(/^\[|\]$/g, ''),
+    port: listen ? listen.port : Number(raceUrl.port || (raceUrl.protocol === 'https:' ? 443 : 80)),
   };
+}
+
+// Refuses a malformed value (returns null, falling back to VELOCITY_RACE_URL) rather than
+// binding somewhere nobody chose.
+function listenAddress(value) {
+  const match = /^\s*(\[[^\]]+\]|[^:\s]+):(\d{1,5})\s*$/.exec(value || '');
+  if (!match) return null;
+  const port = Number(match[2]);
+  if (port < 1 || port > 65535) return null;
+  return {host: match[1].replace(/^\[|\]$/g, ''), port};
 }

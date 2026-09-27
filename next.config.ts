@@ -1,4 +1,6 @@
 import type { NextConfig } from "next";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 /**
  * Where the ChartVolt Games provider service listens, on the loopback interface.
@@ -8,8 +10,25 @@ import type { NextConfig } from "next";
  */
 const GAMES_UPSTREAM = process.env.GAMES_INTERNAL_URL ?? "http://127.0.0.1:4010";
 
-/** Where the Volt Velocity race server (chartvolt-velocity) listens. Same default reasoning. */
-const VELOCITY_RACE_UPSTREAM = process.env.VELOCITY_RACE_INTERNAL_URL ?? "http://127.0.0.1:3080";
+/**
+ * Where the Volt Velocity race server (chartvolt-velocity) listens. There is ONE across all
+ * machines (it holds races in memory), so a machine that does not host it forwards to the one
+ * that does. The address comes from games-service/.env's VELOCITY_RACE_URL - the same value that
+ * machine's games service already calls for race admin - so the two cannot point at different
+ * race servers. Read at build time; the deploy block rebuilds on every deploy.
+ */
+function sharedRaceUrl(): string | undefined {
+  try {
+    const text = readFileSync(join(process.cwd(), "games-service", ".env"), "utf8");
+    const line = text.split(/\r?\n/).find((l) => /^\s*VELOCITY_RACE_URL\s*=/.test(l));
+    const value = line?.split("=").slice(1).join("=").trim().replace(/^["']|["']$/g, "");
+    return value ? value.replace(/\/+$/, "") : undefined;
+  } catch {
+    return undefined;
+  }
+}
+const VELOCITY_RACE_UPSTREAM =
+  process.env.VELOCITY_RACE_INTERNAL_URL ?? sharedRaceUrl() ?? "http://127.0.0.1:3080";
 
 /**
  * Serve the first-party game provider's play surface through this app.

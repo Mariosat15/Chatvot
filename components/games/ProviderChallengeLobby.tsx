@@ -20,6 +20,7 @@ import InlineCountdown from "@/components/trading/InlineCountdown";
 import ChallengeEntryActions from "@/components/trading/ChallengeEntryActions";
 import ContestCountdown from "@/components/games/ContestCountdown";
 import GameRulesPanel from "@/components/games/GameRulesPanel";
+import ProviderClientWarmup from "@/components/games/ProviderClientWarmup";
 import { NeonHero, NeonStatusBadge } from "@/components/neon/Hero";
 import { resolveProviderBanner } from "@/components/neon/banners";
 import { NeonPill } from "@/components/neon/Buttons";
@@ -268,6 +269,9 @@ export default async function ProviderChallengeLobby({
 
   return (
     <div className="flex min-h-screen flex-col gap-4 overflow-x-hidden p-3 sm:gap-6 sm:p-4 md:p-8">
+      {isChallenger || isChallenged ? (
+        <ProviderClientWarmup gameCode={challenge?.gameConfig?.gameCode} />
+      ) : null}
       <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4">
         <NeonPill
           href="/challenges"

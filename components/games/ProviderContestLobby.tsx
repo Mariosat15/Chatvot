@@ -15,6 +15,7 @@ import UTCClock from "@/components/trading/UTCClock";
 import InlineCountdown from "@/components/trading/InlineCountdown";
 import ContestCountdown from "@/components/games/ContestCountdown";
 import GameRulesPanel from "@/components/games/GameRulesPanel";
+import ProviderClientWarmup from "@/components/games/ProviderClientWarmup";
 import {
   LobbyLiveEntryButton,
   LobbyLiveLeaderboard,
@@ -416,6 +417,7 @@ export default async function ProviderContestLobby({
         yourRank: standings.yourRank,
       }}
     >
+    {isUserIn ? <ProviderClientWarmup gameCode={competition?.gameConfig?.gameCode} /> : null}
     <div className="flex min-h-screen flex-col gap-4 overflow-x-hidden p-3 sm:gap-6 sm:p-4 md:p-8">
       <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4">
         <NeonPill

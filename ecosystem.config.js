@@ -25,6 +25,31 @@ const IS_PRIMARY = process.env.IS_PRIMARY !== 'false';
 // PM2 cluster mode: set WEB_INSTANCES in .env to scale the web app (default 1)
 const WEB_INSTANCES = Math.max(1, parseInt(process.env.WEB_INSTANCES || '1', 10) || 1);
 
+// Volt Velocity race server: exactly ONE across all machines, because it holds races in memory.
+// A machine hosts it when games-service/.env points VELOCITY_RACE_URL at this machine (loopback,
+// or unset, which defaults to loopback) or sets VELOCITY_RACE_LISTEN. A machine whose
+// VELOCITY_RACE_URL names ANOTHER server forwards /race to it (next.config.ts) and runs none.
+// Reason it reads that file rather than a flag here: the deploy block is identical on every
+// server, so the per-machine fact has to live in the one per-machine file that already exists.
+function hostsVelocityRace() {
+  let shared = {};
+  try {
+    shared = require('dotenv').parse(require('fs').readFileSync(__dirname + '/games-service/.env'));
+  } catch {
+    return true;
+  }
+  if ((shared.VELOCITY_RACE_LISTEN || '').trim()) return true;
+  const raw = (shared.VELOCITY_RACE_URL || '').trim();
+  if (!raw) return true;
+  try {
+    const host = new URL(raw).hostname.replace(/^\[|\]$/g, '');
+    return host === '127.0.0.1' || host === 'localhost' || host === '::1';
+  } catch {
+    return true;
+  }
+}
+const HOSTS_VELOCITY_RACE = hostsVelocityRace();
+
 // Worker config (only included on primary servers)
 const workerApp = {
   name: 'chartvolt-worker',
@@ -214,7 +239,8 @@ module.exports = {
     // VELOCITY_TICKET_SECRET - so the two secrets exist once. It takes its address from
     // VELOCITY_RACE_URL and ignores that file's PORT, which is the games service's own port.
     // Never from this committed file and never from the platform's .env.
-    {
+    // Omitted entirely on a machine that forwards to another server's race process.
+    ...(HOSTS_VELOCITY_RACE ? [{
       name: 'chartvolt-velocity',
       // start.mjs, never index.mjs: under PM2 argv[1] is PM2's container, so index.mjs's
       // "was I run directly?" guard is false and the server loads without ever listening.
@@ -233,7 +259,7 @@ module.exports = {
       out_file: __dirname + '/logs/velocity-out.log',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       kill_timeout: 5000,
-    },
+    }] : []),
   ],
 
   // ============================================

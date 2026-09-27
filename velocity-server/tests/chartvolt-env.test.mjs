@@ -31,6 +31,20 @@ test('defaults to loopback 3080 when VELOCITY_RACE_URL is unset', () => {
   assert.equal(env.host, '127.0.0.1');
 });
 
+test('VELOCITY_RACE_LISTEN overrides only the bind address', () => {
+  const env = raceEnvironment({...SHARED, VELOCITY_RACE_LISTEN: '0.0.0.0:3080'}, '/x');
+  assert.equal(env.host, '0.0.0.0');
+  assert.equal(env.port, 3080);
+});
+
+test('a malformed VELOCITY_RACE_LISTEN falls back to VELOCITY_RACE_URL', () => {
+  for (const bad of ['0.0.0.0', ':3080', '0.0.0.0:99999', 'nonsense']) {
+    const env = raceEnvironment({...SHARED, VELOCITY_RACE_LISTEN: bad}, '/x');
+    assert.equal(env.host, '127.0.0.1', bad);
+    assert.equal(env.port, 3080, bad);
+  }
+});
+
 test('allows the origin of GAMES_PUBLIC_URL unless an explicit list is given', () => {
   assert.deepEqual(raceEnvironment(SHARED, '/x').origins, ['https://chartvolt.com']);
   const explicit = raceEnvironment({...SHARED, VELOCITY_ALLOWED_ORIGINS: 'https://a.test, https://b.test'}, '/x');

@@ -222,6 +222,18 @@ async function main(): Promise<number> {
 
     const client = await fetch(`${callApiBase()}${clientUrl}`);
     assert(client.status === 200, `client not served (HTTP ${client.status})`);
+
+    // The lobby's background download must fetch EXACTLY the URL the session hands out, or the
+    // warmed copy sits in the cache under a name the race never asks for.
+    const warm = await fetch(`${callApiBase()}/play/warmup/volt-velocity`, { redirect: "manual" });
+    assert(warm.status === 302, `warmup returned ${warm.status}`);
+    assert(warm.headers.get("location") === clientUrl, `warmup points at ${warm.headers.get("location")}`);
+    assert(warm.headers.get("cache-control") === "no-store", "warmup redirect is cacheable");
+  });
+
+  await test("warmup answers 204 for a game with no client to download", async () => {
+    const other = await fetch(`${callApiBase()}/play/warmup/circuit-sprint`, { redirect: "manual" });
+    assert(other.status === 204, `expected 204, got ${other.status}`);
   });
 
   await test("a scheduled race nobody joins is cancelled, and the round is voided with no score", async () => {

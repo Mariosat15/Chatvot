@@ -1109,6 +1109,30 @@ no build. The main app needs a rebuild and restart. Then hard refresh. **Never v
   `/race/*` and nested ids do **not** match, so the admin endpoints stay loopback-only. If the
   nginx block is later installed it wins, being in front. **Never verified live** - in
   particular that the SSE `events` stream is not buffered through the Next proxy.
+- **Later still, 27 Sep 2026 - (4) both servers, and the 100 MB first load.** Owner rejected
+  two limitations as unacceptable: a player landing on ChartVoltVPs2 could not race (only
+  srv944875 runs the race server), and the first Play sat on "Loading the race client…".
+  Owner chose **forwarding** and **background download**. Forwarding: the race server must stay
+  ONE process (rooms are in memory), so the second machine forwards rather than runs a copy.
+  `velocity-server/server/env.mjs` gained `VELOCITY_RACE_LISTEN` (bind address only, 2 new
+  tests); `ecosystem.config.js` includes `chartvolt-velocity` only when `games-service/.env`'s
+  `VELOCITY_RACE_URL` is loopback/unset or `VELOCITY_RACE_LISTEN` is set; `next.config.ts`'s
+  `/race` upstream falls back to that same `VELOCITY_RACE_URL`, so a machine's forwarding and
+  its games service's admin calls cannot name different race servers. The deploy block is
+  unchanged; the per-machine fact lives in the per-machine `.env`. Preload: games-service
+  `GET /play/warmup/:gameCode` (302 to the current fingerprinted client, `no-store`; 204 for a
+  title with nothing heavy), and `components/games/ProviderClientWarmup.tsx`, mounted on both
+  provider lobbies for seated players only. **A hidden sandboxed frame, not `fetch()`**: the
+  client is loaded as a frame and Chrome keys a frame's document separately from a script
+  fetch of the same URL, so a fetch would download it twice. `sandbox` without `allow-scripts`
+  means none of the game runs; appended to `document.body` so moving to the play screen does
+  not cancel it; skipped under data-saver; game code passed as data (agnostic guard holds).
+  Suite: `test:velocity` 8 passed (warmup redirect equals the session's `clientUrl`; 204 for
+  another title). **Not verified live, and one known gap:** Firefox's default per-entry disk
+  cache limit is 50 MB, so there the 107 MB client is not cached at all - neither by the
+  preload nor by a second visit. Shrinking the file (not chosen this round) is what fixes that.
+  The three failing `__tests__/games` tests (`arena-band` x2, `contest-countdown` x1) fail
+  identically with this change stashed - pre-existing, not caused here.
 
 
 ### 27 Sep 2026 - Per-game How it works & tips (Guides) tab

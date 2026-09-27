@@ -21,7 +21,11 @@ import {
   postVelocitySession,
 } from "./http/play-routes";
 import { serveVoltStackAsset, serveVoltStackPage } from "./http/volt-stack-page";
-import { serveVelocityClient, serveVelocityHost } from "./http/volt-velocity-client";
+import {
+  serveClientWarmup,
+  serveVelocityClient,
+  serveVelocityHost,
+} from "./http/volt-velocity-client";
 import { serveReplay } from "./http/replay";
 import { getRound, postRound, postVoidRound } from "./http/rounds";
 import { armRound, finishRoundForTesting, redeliver, requireSandbox } from "./http/sandbox";
@@ -150,6 +154,8 @@ export function createApp() {
   app.get("/play/volt-velocity/", serveVelocityHost);
   app.get("/play/volt-velocity/client/:fingerprint", serveVelocityClient);
   app.get("/play/volt-velocity/:file", serveVelocityHost);
+  // Before `/play/:version/:asset`, whose two-segment shape it shares.
+  app.get("/play/warmup/:gameCode", serveClientWarmup);
   app.get("/play/:asset", servePlayAsset);
   /*
    * The fingerprinted form. Two segments, so it has the same shape as `GET /play/api/state` - the

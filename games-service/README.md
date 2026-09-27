@@ -474,7 +474,10 @@ without them the title is published as `maintenance`. The two secrets can be gen
 admin panel (Games -> Volt Velocity -> Race server secrets) when admin runs on the same server;
 restart `chartvolt-games` and `chartvolt-velocity` afterwards. **The race server reads this same `.env`**
 (PM2 passes `--env-file=../games-service/.env`) and has none of its own; it listens on
-`VELOCITY_RACE_URL`, never on `PORT`, which in this file is ours. (Counted from the suite's own output. Any figure of
+`VELOCITY_RACE_URL`, never on `PORT`, which in this file is ours. With two servers there is still
+ONE race server: the other machine sets `VELOCITY_RACE_URL` to the race machine's address (see
+`env.example`), runs no race process, and forwards `/race` there. `GET /play/warmup/:gameCode`
+redirects to the current client so a lobby can pre-download it (204 for other titles). (Counted from the suite's own output. Any figure of
 305 predates Volt Stack and Volt Velocity. Any figure of
 299 predates the ten-minute cap - `hardDeadline` was reading one particular title's maximum for
 every round, so a sixty-minute contest showed a ten-minute clock and then did not end at all

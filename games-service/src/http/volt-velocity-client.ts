@@ -6,6 +6,7 @@ import zlib from "zlib";
 import type { Request, Response } from "express";
 
 import { loadConfig, type VelocityConfig } from "../config";
+import { VOLT_VELOCITY_CODE } from "../games/titles-codes";
 import { sendError } from "./errors";
 
 /**
@@ -142,6 +143,27 @@ export function serveVelocityHost(req: Request, res: Response): void {
   hostHeaders(res);
   res.setHeader("Content-Type", type);
   res.sendFile(path.join(HOST_ROOT, raw));
+}
+
+/**
+ * `GET /play/warmup/:gameCode` - lets the platform start the heavy download while a seated
+ * player is still on the lobby, so pressing Play does not sit on "Loading the race client…".
+ *
+ * Game-agnostic from the platform's side: it sends whatever game code the contest carries, and a
+ * title with nothing heavy to fetch answers 204. For Volt Velocity it redirects to the CURRENT
+ * fingerprinted client, which is `immutable`, so the browser's cache then answers the frame.
+ * The redirect itself is `no-store`, or a cached redirect would point at last deploy's build.
+ */
+export function serveClientWarmup(req: Request, res: Response): void {
+  res.setHeader("Cache-Control", "no-store");
+  const velocity = loadConfig().velocity;
+  const url =
+    req.params.gameCode === VOLT_VELOCITY_CODE && velocity ? clientUrlFor(velocity) : null;
+  if (!url) {
+    res.status(204).end();
+    return;
+  }
+  res.redirect(302, url);
 }
 
 export function serveVelocityClient(req: Request, res: Response): void {
