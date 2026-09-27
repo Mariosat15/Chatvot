@@ -952,6 +952,10 @@ no build. The main app needs a rebuild and restart. Then hard refresh. **Never v
   **`cover`**, bleeding to the card's right, top and bottom edges. The lobby's wide
   picture stays `contain`.
 - Two assertions were flipped, not deleted.
+- Later the same day ("the mobile buttons look squeezed, more room below"): the embedded
+  touch buttons are now 64px, up from 42, with 8px above and 14px below. `TOUCH_RESERVE`
+  is now 86 and `chromeHeight` counts the row's margins, so the frame grows to fit
+  (cache-bust `20260927s`).
 
 
 ### 27 Sep 2026 - Per-game How it works & tips (Guides) tab

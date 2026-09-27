@@ -31,7 +31,7 @@
 
   const SHELL_PAD = 10;
   const SAFETY = 4;
-  const TOUCH_RESERVE = 48;
+  const TOUCH_RESERVE = 86; // 64px buttons + 8px + 14px margins (styles.css embedded rule)
   const MIN_BOARD_W = 160;
   // Reason: Tetris is 10×20 — height must be 2× width. The earlier 510×590
   // target made a squat well and left HOLD/NEXT taller than the board.
@@ -75,7 +75,11 @@
       h += el.getBoundingClientRect().height;
     }
     if (touch && getComputedStyle(touch).display !== "none") {
-      h += Math.max(TOUCH_RESERVE, touch.getBoundingClientRect().height);
+      // Reason: getBoundingClientRect excludes margins, and the row's top/bottom
+      // margins are the breathing room below the buttons — count them too.
+      const cs = getComputedStyle(touch);
+      const margins = (parseFloat(cs.marginTop) || 0) + (parseFloat(cs.marginBottom) || 0);
+      h += Math.max(TOUCH_RESERVE, touch.getBoundingClientRect().height + margins);
     } else {
       h += TOUCH_RESERVE;
     }

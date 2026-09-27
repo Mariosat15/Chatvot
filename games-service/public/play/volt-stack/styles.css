@@ -100,11 +100,13 @@ html.cv-embedded .speed-card{min-height:40px}
 html.cv-embedded .scoreboard{margin:0 0 2px}
 html.cv-embedded .scoreboard>.stat-card{min-height:40px;padding:4px 10px}
 html.cv-embedded .scoreboard strong{font-size:20px}
-/* Reason: touch row stays visible; compact so the well can claim more height.
-   Parent iframe grows from fit-embed resize — that is what pushes this row down. */
-html.cv-embedded .touch-controls{display:grid!important;grid-template-columns:repeat(5,1fr) 1.2fr;flex-shrink:0;margin:2px 0 0!important;gap:4px;width:100%}
-html.cv-embedded .touch-controls button{min-height:42px!important;border-radius:10px;padding:3px 2px}
-html.cv-embedded .touch-controls button b{font-size:18px}
-html.cv-embedded .touch-controls button span{font-size:7px;margin-top:1px}
-html.cv-embedded .touch-controls button kbd{font-size:6px}
+/* Reason: touch row stays visible. Parent iframe grows from fit-embed resize — that is
+   what pushes this row down. Owner, 27 Sep 2026: the 42px row looked squeezed, so the
+   buttons are taller with room beneath; fit-embed's TOUCH_RESERVE (incl. these margins)
+   must move with this height or the row is clipped at the frame's bottom edge. */
+html.cv-embedded .touch-controls{display:grid!important;grid-template-columns:repeat(5,1fr) 1.2fr;flex-shrink:0;margin:8px 0 14px!important;gap:6px;width:100%}
+html.cv-embedded .touch-controls button{min-height:64px!important;border-radius:12px;padding:6px 3px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
+html.cv-embedded .touch-controls button b{font-size:22px;line-height:1}
+html.cv-embedded .touch-controls button span{font-size:9px;margin-top:0;line-height:1.15}
+html.cv-embedded .touch-controls button kbd{font-size:7px}
 html.cv-embedded .game-shell footer,html.cv-embedded .integrity-note{display:none}
