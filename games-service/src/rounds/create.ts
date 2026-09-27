@@ -170,6 +170,9 @@ function launchUrlFor(token: string, gameCode: string): string {
   // Reason: Circuit lives at `/play`; Volt Stack is a separate surface under `/play/volt-stack/`
   // so its modules never collide with Circuit's fingerprinted asset set.
   if (gameCode === VOLT_STACK_CODE) {
+    // Trailing slash is intentional for relative resolution, but Next.js often strips it and
+    // the document then sits at `/play/volt-stack?t=…`. The play HTML therefore uses
+    // root-absolute `/play/volt-stack/…` asset URLs so that redirect cannot break the board.
     return `${base}/play/volt-stack/?t=${token}`;
   }
   return `${base}/play?t=${token}`;

@@ -933,6 +933,17 @@ refresh (restart optional).
 **Next:** owner Leave the stuck round, hard-refresh, Play again; click **JOIN COMPETITION**
 once the overlay clears.
 
+### 27 Sep 2026 - Volt Stack blank board (relative assets → `/play/…`)
+
+**Owner:** arena stall gone, but the frame stayed dark — only VOLT STACK / Leave / Pause
+visible; CSS and every script 404'd.
+
+**Cause:** document URL became `/play/volt-stack?t=…` after the trailing slash was stripped.
+Relative `styles.css` resolved to `/play/styles.css` (Circuit), MIME `application/json`.
+
+**Fix:** root-absolute `/play/volt-stack/…` hrefs in `index.html` (`?v=20260927d`). Pull +
+hard refresh; no games-service rebuild required for the HTML.
+
 **Plan:** add `volt-stack` under the existing ChartVolt Games provider so competitions
 and 1v1 challenges work like Circuit Sprint, without trusting client scores.
 

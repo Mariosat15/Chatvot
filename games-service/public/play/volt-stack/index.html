@@ -1,4 +1,12 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#050c19"><title>ChartVolt • Volt Stack</title><meta name="referrer" content="no-referrer"><link rel="stylesheet" href="styles.css">
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#050c19"><title>ChartVolt • Volt Stack</title><meta name="referrer" content="no-referrer">
+<!--
+  ABSOLUTE /play/volt-stack/ paths are load-bearing.
+  Next.js (and many proxies) strip the trailing slash from `/play/volt-stack/?t=…`, so the
+  document URL becomes `/play/volt-stack?t=…`. Relative `styles.css` then resolves to
+  `/play/styles.css` (Circuit's tree) and every asset 404s as JSON — the arena shows a dark
+  unstyled shell with Leave/Pause only. Root-absolute hrefs survive that redirect.
+-->
+<link rel="stylesheet" href="/play/volt-stack/styles.css?v=20260927d">
 <script>
 /* Classic watchdog — Circuit-shaped `{ type: "ready" }` so ProviderGameFrame clears its overlay.
    Reason we post MORE THAN ONCE: a single early ready can fire before the parent attaches its
@@ -76,4 +84,4 @@
 <dialog id="helpDialog"><form method="dialog"><button class="close" aria-label="Close help">×</button><div class="eyebrow">THE PERFECT CLEAR</div><h2>Stack. Clear. Repeat.</h2><p>Complete horizontal rows. Every 10 lines increases the level, speeds up the pieces, and resets your level timer.</p><dl><dt>Move / soft drop</dt><dd>← → / ↓</dd><dt>Rotate clockwise / back</dt><dd>R, ↑ or X / Z</dd><dt>Hard drop / hold</dt><dd>Space / C or Shift</dd><dt>Pause</dt><dd>P or Esc</dd></dl><p>Singles 100 · doubles 300 · triples 500 · four lines 800, multiplied by level. Consecutive clears earn combo bonuses. Soft drop earns zero; hard drop earns 2 points per cell.</p><p>On touchscreens use the buttons below the board. HOLD swaps once per piece. Release soft drop before using it on the next piece.</p><button class="primary-button">GOT IT</button></form></dialog>
 <dialog id="leaveDialog"><form method="dialog"><div class="eyebrow">LEAVE ARENA</div><h2>Finish this run?</h2><p>Your current run will end. Competition eligibility is decided by ChartVolt.</p><button value="cancel">Keep playing</button><button value="leave" class="primary-button">END RUN & LEAVE</button></form></dialog>
 <div hidden aria-hidden="true"><span id="mobileCompetitionTimer"></span><span id="rankChip"></span><span id="mobileRank"></span><span id="resultRank"></span><span id="sessionShort"></span><span id="sessionShortMobile"></span><span id="integrityStatusMobile"></span><span id="integrityDot"></span><span id="integrityDotMobile"></span><span id="roomId"></span><span id="roomIdMeta"></span><span id="playersLive"></span><span id="comboSub"></span><span id="menuThemeName"></span><span id="competitionId"></span><span id="prizePool"></span><span id="mobilePrizePool"></span></div>
-<script src="competition-bridge.js?v=20260927c"></script><script src="audio.js?v=20260927c"></script><script src="game.js?v=20260927c"></script><script src="shell.js?v=20260927c"></script><script src="presentation.js?v=20260927c"></script><script src="chartvolt-host.js?v=20260927c"></script></body></html>
+<script src="/play/volt-stack/competition-bridge.js?v=20260927d"></script><script src="/play/volt-stack/audio.js?v=20260927d"></script><script src="/play/volt-stack/game.js?v=20260927d"></script><script src="/play/volt-stack/shell.js?v=20260927d"></script><script src="/play/volt-stack/presentation.js?v=20260927d"></script><script src="/play/volt-stack/chartvolt-host.js?v=20260927d"></script></body></html>
