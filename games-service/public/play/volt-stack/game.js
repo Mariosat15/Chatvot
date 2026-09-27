@@ -1359,8 +1359,8 @@ function updateCoachAdvice() {
     return item;
   }
 
-  // Reason: board box is ~510×590 so cells are rectangular. Stretch the square
-  // sprite into size×sizeY so the grid fills the design box without letterboxing.
+  // Reason: cellY may differ from cell when the well is not classic 1:2.
+  // Stretch the square sprite into size×sizeY so the grid fills the box.
   function drawCachedBlock(g,px,py,size,type,alpha=1,hot=false,sizeY) {
     const sy=sizeY??size;
     const sprite=getBlockSprite(Math.max(size,sy),type,hot);
