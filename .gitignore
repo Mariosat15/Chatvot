@@ -156,3 +156,4 @@ probe-err.txt
 
 # Volt Velocity race server default result archive (production sets VELOCITY_DATA_DIR in games-service/.env)
 /velocity-server/race-data/
+/velocity-server/.client-test-*/

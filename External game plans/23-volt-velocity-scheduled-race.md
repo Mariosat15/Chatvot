@@ -344,6 +344,54 @@ race server** (that is VV5). Nothing is player-visible until the owner enables t
   the progress call against a file-wide `lastIndexOf`, which `completeRound` (Volt Stack,
   `d664a85e`) had made fail on correct code; it now slices `submitBoard` with both ends asserted.
 
+### 8.5 Smooth driving over the network - what was built (27 September 2026)
+
+**The report:** once connected, the ship felt "very clunky... stuck back and forth". **Nothing
+was computed wrongly and there is no risk number.** The race stayed fair, but what the player saw
+kept being corrected. Three causes, all in the vendor netcode:
+
+- **The server did not simulate the drive the player made.** It applied whatever input had
+  arrived last and treated it as released after 250 ms. It also allowed only one input request on
+  the wire at a time, so a single slow round trip froze every later control.
+- **The client predicted without replaying.** Each snapshot put the ship back where the server
+  had it, about one round trip in the past, and prediction then started again from there. That
+  is the back-and-forth.
+- **Other ships were only eased towards their last known spot**, so they always ran behind.
+
+**What changed** (details and file list in `velocity-server/CHARTVOLT-PATCHES.md`):
+
+- Inputs are **step-numbered frames**, and the server applies exactly one per 1/60 s physics
+  step, reporting `ackStep` and `inputStep`.
+- The client predicts every step. On each snapshot it restores the server's state and replays
+  the frames the server has not applied yet.
+- Any remaining difference is eased out on screen only.
+- Up to four input requests may be in flight at once.
+- Opponents are drawn ahead by their speed × (age of snapshot + half the round trip), capped at
+  0.35 s.
+
+**Fairness is unchanged.** Missiles, mines and collisions are still decided by the server on its
+own positions, and drawing a rival slightly ahead affects the picture and nothing else.
+
+**No protocol change for providers.** This is the race client talking to our own race server,
+so `01` and the requirements HTML are untouched and no version is bumped. Both directions are
+backward compatible: a patched client drives an unpatched server the vendor way, and vice versa.
+The two machines can therefore be updated in either order.
+
+**Tests.** `velocity-server` has 50 tests.
+
+- `chartvolt-input-frames` (7) proves that a client replaying the same frames lands on exactly
+  the server's position.
+- `chartvolt-client-prediction` (1) drives the real patched client against the real server over
+  HTTP and asserts a median gap of under 5 cm. It was probed red at 0.54 m by a client sending
+  only every other step.
+- The vendor client's own 84 tests pass on the rebuilt game, and games-service `npm test` is green.
+
+The client sources live in `velocity-server/client-patches/`. The packed page changed only
+`client.html` (1 MB); every asset kept its hash, so a returning player downloads 1 MB and nothing
+else.
+
+**Not verified live.** The benefit shows only over a real connection with 16 players.
+
 ## 9. Owner decisions (answered 27 September 2026)
 
 1. **Lobby length is set by the admin in the Games section**, not fixed in code. It becomes an

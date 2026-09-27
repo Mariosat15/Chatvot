@@ -54,7 +54,7 @@ export async function createRaceServer({secret=raceEnvironment(process.env,root)
     res.write('data: '+JSON.stringify(room.snapshot(id,now))+'\n\n');
     res.on('close',()=>{if(p.connection?.res===res){p.connection=null;room.disconnect(id,Date.now());}});return;
    }
-   if(req.method==='POST'&&action==='input'){if(!p.connected||p.dnf||p.finishTimeMs!=null||room.isClosed()){await body();json(200,{accepted:false,ack:p.lastSeq,reason:'inactive'});return;}const ok=room.input(id,await body(),now);json(ok?200:409,{accepted:ok,ack:p.lastSeq,serverTime:now});return;}
+   if(req.method==='POST'&&action==='input'){if(!p.connected||p.dnf||p.finishTimeMs!=null||room.isClosed()){await body();json(200,{accepted:false,ack:p.lastSeq,reason:'inactive'});return;}const ok=room.input(id,await body(),now);json(ok?200:409,{accepted:ok,ack:p.lastSeq,ackStep:p.ackStep,inputStep:p.queuedStep,serverTime:now});return;}
    if(req.method==='POST'&&action==='ship'){const b=await body();room.select(id,b.shipId);json(200,{shipId:p.sim.shipId});return;}
    if(req.method==='POST'&&action==='ready'){const b=await body();if(typeof b.ready!=='boolean')throw Error('ready must be boolean');room.ready(id,b.ready,now);json(200,{ready:p.ready,status:room.status,startAt:room.startAt});return;}
    if(req.method==='POST'&&action==='leave'){p.dnf=room.status!=='lobby';p.connection?.res.end();room.disconnect(id,now);json(200,{left:true});return;}

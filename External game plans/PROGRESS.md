@@ -1153,6 +1153,25 @@ no build. The main app needs a rebuild and restart. Then hard refresh. **Never v
   loading the packed page in Chromium: all models, textures and HDRs 200, the race menu drawn.
   `test:velocity` 9 passed (warmup list equals `[clientUrl]` under the override; asset route
   serves a real `.glb` immutable and 404s five bad names). **Not verified on the live servers.**
+- **Later still, 27 Sep 2026 - (6) smooth driving over the network** (`23` s8.5). The owner
+  reported the connected ship as "stuck back and forth".
+  - **Cause:** the vendor server applied the last input it had received and dropped it after
+    250 ms, with only one input request on the wire at a time. The client predicted without
+    replaying, and rivals were only eased towards their last known spot.
+  - **What changed:** inputs are now step-numbered frames, and the server applies one per
+    physics step and reports `ackStep` / `inputStep`. The client predicts each step and replays
+    the unacknowledged frames on every snapshot. Any leftover difference is eased on screen only,
+    up to 4 input requests may be in flight, and rivals are drawn ahead by speed × (snapshot age
+    + half the round trip), capped at 0.35 s.
+  - **Fairness:** hits are still decided by the server.
+  - **No provider protocol change**, so there is no version bump. Both directions are backward
+    compatible, so the two machines can be deployed in either order.
+  - **Tests:** `velocity-server` 50 passed, including a new HTTP test that drives the real
+    patched client and asserts a median prediction gap under 5 cm. It was probed red at 0.54 m.
+    The vendor client's 84 tests pass and games-service `npm test` is green.
+  - **Files:** client sources are in `velocity-server/client-patches/`. The repacked page changed
+    `client.html` only, and every asset kept its hash.
+  - **Not verified live with 16 players.**
 
 
 ### 27 Sep 2026 - Per-game How it works & tips (Guides) tab

@@ -22,6 +22,38 @@ that starts when everybody is Ready. The 21 vendor tests pin that and still pass
 | Settings read from **`games-service/.env`** under the `VELOCITY_*` names (`env.mjs`); the vendor's `RACE_*` names, `PORT` and `HOST` are not read, and there is no `.env` of its own | `env.mjs`, `index.mjs`, PM2 `node_args: --env-file=../games-service/.env` | One file means the two secrets cannot drift apart between the two processes. The shared file's `PORT` is the games service's, so the listen address comes from `VELOCITY_RACE_URL`; allowed origins default to the origin of `GAMES_PUBLIC_URL`. Optional `VELOCITY_RACE_LISTEN` (`host:port`) overrides only the bind address, so the one race server can accept the second machine's forwarded traffic while its own games service still calls loopback; malformed values fall back to `VELOCITY_RACE_URL` |
 | `server/start.mjs` is the process entry point (PM2 and `npm start`); it listens unconditionally | `start.mjs`, PM2 `script`, `package.json` | `index.mjs` listens only when `process.argv[1]` is itself, and under PM2 fork mode `argv[1]` is PM2's container - so the server loaded, never listened, and PM2 still showed it **online with empty logs** (found live 27 Sep 2026). `index.mjs` keeps its guard so tests can import it without binding a port |
 
-Tests: `npm test` (40 = 21 vendor + 14 in `tests/chartvolt-scheduled.test.mjs` + 5 in
-`tests/chartvolt-env.test.mjs`). Deploy: PM2 `chartvolt-velocity` (reads `games-service/.env`),
+| **Step-numbered input frames** (`src/input-frames.js`): an input message may carry `frames: [[step, steer×1000, bits], …]` (≤30). The server queues them per player (`frameQueue`, ≤10, oldest dropped with its fire carried forward) and applies **exactly one per physics step**, reporting `ackStep` (last applied) and `inputStep` (newest queued) in every snapshot and input response. A message without `frames` is the vendor path, unchanged | `race-room.mjs` `input()` / `step()` / `snapshot()`, `index.mjs` | The owner reported the ship "stuck back and forth". The vendor applied whatever input was last received, dropped it after 250 ms, and allowed one input request on the wire at a time, so the server simulated a different drive from the one the player saw and every snapshot snapped the ship back. With one frame per step, the client can replay exactly what the server has not yet applied and land on the same position (proven exactly equal in `chartvolt-input-frames.test.mjs`) |
+| Malformed `frames` refuse the whole message and consume no `seq` | `race-room.mjs` `input()` | A half-applied batch would desynchronise the replay silently |
+
+## The client half (`client-patches/`)
+
+The race client is built from the vendor tree, not from this repository, so the patched client
+sources live in `client-patches/` (`multiplayer-client.js`, `main.js`, `scene.js`; the frame codec
+is `src/input-frames.js`, shared with the server byte for byte). What they do:
+
+- **Prediction with replay.** Each 1/60 s step is recorded as a quantised frame and simulated
+  locally at once. On each snapshot the server state is restored and every frame after `ackStep`
+  is replayed, so the ship stays where the player steered it.
+- **Visual smoothing only.** Any remaining difference is eased out over ~0.1 s on the rendered
+  position; the simulation itself is never nudged. No easing across a respawn or a large jump.
+- **Pipelined inputs.** Up to 4 input requests in flight; a 409 (overtaken by a newer request) is harmless.
+- **Other ships drawn ahead** by their speed × (time since snapshot + half the round trip), capped
+  at 0.35 s. **Hits stay fair**: missiles, mines and collisions are decided by the server on its
+  own positions; the lead is drawing only.
+- **Both directions are backward compatible.** The client turns framing on only when `join`
+  returns `inputStep`, so it still drives an unpatched server the vendor way, and an unpatched
+  client still drives this server. Deploy order therefore does not matter.
+
+Rebuilding the client after changing a file in `client-patches/`:
+
+1. Copy `client-patches/*.js` and `src/input-frames.js` into the vendor tree's `src/`.
+2. In the vendor tree: `npm i --no-save three@0.186.1 esbuild@0.25.12`, `node tools/build.mjs`
+   and `node --test tests/` (84 vendor tests).
+3. Gzip `dist/Volt-Velocity-3D.html` to `games-service/vendor/volt-velocity-client.html.gz`,
+   then run `npx tsx tools/games/pack-velocity-client.ts` and commit `games-service/vendor/`.
+
+Tests: `npm test` (50 = 21 vendor + 14 in `tests/chartvolt-scheduled.test.mjs` + 7 in
+`tests/chartvolt-env.test.mjs` + 7 in `tests/chartvolt-input-frames.test.mjs` + 1 in
+`tests/chartvolt-client-prediction.test.mjs`, which drives the **real patched client** against the
+real server over HTTP and asserts the prediction agrees with the server to within 5 cm). Deploy: PM2 `chartvolt-velocity` (reads `games-service/.env`),
 nginx `/race/` (player endpoints only).
