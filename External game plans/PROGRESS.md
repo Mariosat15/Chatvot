@@ -997,6 +997,13 @@ no build. The main app needs a rebuild and restart. Then hard refresh. **Never v
   engine is TypeScript: `git pull`, `npm run build` in games-service, `pm2 restart
   chartvolt-games`, then a hard refresh. `tools/test-progress.ts` "carries no score"
   fails **with and without this change** - pre-existing, not investigated here.
+- **Later again, 27 Sep 2026 - the rail status bar said "NEON CIRCUIT"** (owner: "remove
+  the wording is wrong"). It was a hard-coded `<span>` in `volt-stack/index.html`, left
+  over from an earlier theme and naming no part of this game. Removed; the bar now shows
+  only the READY / PLAYING / PAUSED indicator. Markup only, so deploy is `git pull`,
+  `pm2 restart chartvolt-games` and a hard refresh - **no build**. Nothing else in the
+  surface referenced the text (`music-neon-circuit.ogg` in `tools/test-play.ts` is an
+  unrelated asset name).
 
 
 ### 27 Sep 2026 - Per-game How it works & tips (Guides) tab
