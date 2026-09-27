@@ -5,7 +5,7 @@
  * -------------------------------------------------
  * Every contract here is between two programs written by two teams: the room id, the seat
  * registration, the ticket format and the receipt signature. A stubbed race server proves only
- * that this service agrees with the stub. Spawning `velocity-server/server/index.mjs` proves the
+ * that this service agrees with the stub. Spawning `velocity-server/server/start.mjs` (the PM2 entry point) proves the
  * two halves agree with each other, which is the only claim worth making.
  *
  * It is spawned as a PROCESS and its track list is read as TEXT, never imported:
@@ -64,7 +64,7 @@ let raceUrl = "";
 async function startRaceServer(dataDir: string): Promise<void> {
   const port = await freePort();
   raceUrl = `http://127.0.0.1:${port}`;
-  race = spawn(process.execPath, ["server/index.mjs"], {
+  race = spawn(process.execPath, ["server/start.mjs"], {
     cwd: RACE_ROOT,
     env: {
       ...process.env,

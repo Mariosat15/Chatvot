@@ -216,7 +216,9 @@ module.exports = {
     // Never from this committed file and never from the platform's .env.
     {
       name: 'chartvolt-velocity',
-      script: 'server/index.mjs',
+      // start.mjs, never index.mjs: under PM2 argv[1] is PM2's container, so index.mjs's
+      // "was I run directly?" guard is false and the server loads without ever listening.
+      script: 'server/start.mjs',
       cwd: __dirname + '/velocity-server',
       node_args: '--env-file=../games-service/.env',
       env: {
