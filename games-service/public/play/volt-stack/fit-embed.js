@@ -2,8 +2,11 @@
  * Fit Volt Stack inside the arena iframe WITHOUT overflowing.
  *
  * Owner (27 Sep 2026): board + HOLD/NEXT rails + the mobile touch row
- * (MOVE / SOFT DROP / ROTATE / HOLD / HARD DROP) must all sit inside the
- * neon stage. Prefer a shorter board over clipping the buttons.
+ * must all sit inside the neon stage. Prefer a shorter board over clipping.
+ *
+ * Owner (27 Sep 2026, board enlarge): grow the Tetris playfield itself —
+ * widen the center column / raise cell size from available width+height.
+ * Do NOT transform:scale() the whole UI. Side rails stay visible but secondary.
  *
  * Standalone offline play (no parent) is untouched.
  */
@@ -25,14 +28,19 @@
     document.addEventListener("DOMContentLoaded", markForceTouch, { once: true });
   }
 
-  const SHELL_PAD = 16;
+  const SHELL_PAD = 12;
   // Air under the touch row so the last button is never flush with the clip edge.
-  const SAFETY = 20;
+  const SAFETY = 10;
   // Floor for the touch strip when the first measure runs before layout settles.
-  const TOUCH_RESERVE = 58;
-  const MIN_BOARD_W = 140;
-  // Cap below the old 340 so chrome + touch row always fit in typical arena heights.
-  const MAX_BOARD_W = 280;
+  const TOUCH_RESERVE = 54;
+  const MIN_BOARD_W = 160;
+  // Hard ceiling — beyond this cells stop looking like a Tetris grid in the arena.
+  const MAX_BOARD_W = 420;
+  // Reason: owner asked for the board as the dominant ~40–45% of the playable
+  // center section. Size the playfield from that fraction first, then clamp to
+  // height / rail leftovers so HOLD and NEXT stay readable.
+  const TARGET_BOARD_FRAC = 0.44;
+  const LAYOUT_GAP = 12; // both gutters between rails and cabinet
 
   function tellResize(height) {
     try {
@@ -62,9 +70,25 @@
     } else {
       h += TOUCH_RESERVE;
     }
-    // Board title sits above the cabinet and is not in the chrome list.
-    h += 18;
+    // Board title sits above the cabinet; keep a slim reserve after padding cut.
+    h += 12;
     return h;
+  }
+
+  function railBudgetFor(viewW) {
+    // Reason: rails are secondary. Leave enough for HOLD/NEXT labels, but give
+    // the leftover width to --board-width so cells grow (not the whole shell).
+    if (viewW < 520) return 96;
+    if (viewW < 720) return 140;
+    if (viewW < 960) return 168;
+    return 200;
+  }
+
+  function framePadFor(boardW) {
+    if (boardW < 220) return 6;
+    if (boardW < 300) return 8;
+    if (boardW < 360) return 10;
+    return 12;
   }
 
   function fit() {
@@ -77,22 +101,26 @@
 
     // Frame pad is part of --arena-h, so leave room for it inside the budget
     // or the rails+board block pushes the touch row off the bottom.
-    const FRAME_EXTRA = 12;
-    const framePadGuess = 14;
+    const FRAME_EXTRA = 4;
+    let framePad = 10;
     const budget = Math.max(
-      200,
-      viewH - chrome - SAFETY - framePadGuess * 2 - FRAME_EXTRA,
+      220,
+      viewH - chrome - SAFETY - framePad * 2 - FRAME_EXTRA,
     );
+
+    // Height-first candidate (square cells → height = 2 × width).
     let boardH = budget;
     let boardW = Math.floor(boardH / 2);
 
-    const railBudget = viewW < 520 ? 110 : viewW < 900 ? 200 : 260;
-    const maxWFromWidth = Math.max(MIN_BOARD_W, Math.floor(viewW - railBudget));
-    boardW = Math.min(MAX_BOARD_W, maxWFromWidth, boardW);
+    const targetFromFrac = Math.floor(viewW * TARGET_BOARD_FRAC);
+    const maxWFromWidth = Math.max(
+      MIN_BOARD_W,
+      Math.floor(viewW - railBudgetFor(viewW) - LAYOUT_GAP),
+    );
+    boardW = Math.min(MAX_BOARD_W, targetFromFrac, maxWFromWidth, boardW);
     boardW = Math.max(MIN_BOARD_W, boardW);
     boardH = boardW * 2;
-
-    let framePad = boardW < 240 ? 10 : boardW < 300 ? 14 : 16;
+    framePad = framePadFor(boardW);
 
     // Re-check with the real frame pad — square cells + pad can still overshoot.
     const maxArena = viewH - chrome - SAFETY;
@@ -103,7 +131,7 @@
       );
       boardW = Math.max(MIN_BOARD_W, Math.floor(boardH / 2));
       boardH = boardW * 2;
-      framePad = boardW < 240 ? 10 : boardW < 300 ? 14 : 16;
+      framePad = framePadFor(boardW);
     }
 
     shell.style.setProperty("--board-width", `${boardW}px`);
