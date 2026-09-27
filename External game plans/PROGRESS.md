@@ -913,6 +913,16 @@ remains outstanding is the **opponent** half listed above, not the game half.
 Newest at the top.
 
 
+### 27 Sep 2026 - Volt Stack grow the board (do not squeeze)
+
+**Owner:** the previous fit *capped* the play row and crushed the board, rails and
+prize column. The green arrow under Soft Drop asked to push "How it works" **down**
+so the game takes that space and looks bigger.
+
+**Fix:** arena row is `xl:min-h-[calc(100dvh-14rem)]` (no fixed `h-` / no `max-h-[calc]`);
+`fit-embed.js` grows the board into the tall iframe; embedded CSS chrome restored to
+readable sizes. Cache `?v=20260927f`.
+
 ### 27 Sep 2026 - Volt Stack Standalone 9.6 + fit without scrolling
 
 **Owner:** (1) the modular neon-stack 9.4 package was the wrong hand-off — authoritative

@@ -3,7 +3,11 @@
   'use strict';
   const TRACKS=[{name:'Neon Drive',url:'assets/audio/01_neon_drive.flac',bpm:128},{name:'Voltage Rush',url:'assets/audio/02_voltage_rush.flac',bpm:144}];
   const EFFECTS=['move','rotate','wallKick','hold','lock','hardDrop','single','double','triple','tetris','tspinMini','tspin','b2b','combo','perfect','levelUp','achievement','countdown','go','warning','danger','dangerCritical','pause','resume','personalBest','gameover'];
-  let context,master,compressor,enabled=true,musicVolume=.65,effectsVolume=.8,track=0,gameState='ready',duckUntil=0,lastMove=-Infinity,disposed=false;
+  // Reason: stock defaults (.65 / .8 into a soft compressor) read as almost muted in the
+  // arena iframe. OUTPUT multipliers sit after the 0–1 sliders so settings stay familiar while
+  // playback is clearly louder (owner, 27 Sep 2026).
+  const MUSIC_OUTPUT=2.4,EFFECTS_OUTPUT=2.5;
+  let context,master,compressor,enabled=true,musicVolume=1,effectsVolume=1,track=0,gameState='ready',duckUntil=0,lastMove=-Infinity,disposed=false;
   let musicBus,source=null,offset=0,startedAt=0,musicError=null;
   const buffers=new Map(),loads=new Map();
   const activeMusic=()=>enabled&&!disposed&&!document.hidden&&musicVolume>0&&['playing','clearing','collapsing'].includes(gameState);
@@ -48,10 +52,10 @@
     offset%=buffer.duration;startedAt=context.currentTime;source.start(startedAt,offset);
   }
   const clamp=n=>Math.max(0,Math.min(1,Number(n)||0));
-  function graph(c){const bus=c.createGain(),comp=c.createDynamicsCompressor();comp.threshold.value=-12;comp.knee.value=15;comp.ratio.value=5;comp.attack.value=.003;comp.release.value=.15;bus.connect(comp);comp.connect(c.destination);return {bus,comp};}
+  function graph(c){const bus=c.createGain(),comp=c.createDynamicsCompressor();comp.threshold.value=-18;comp.knee.value=18;comp.ratio.value=3.5;comp.attack.value=.003;comp.release.value=.2;bus.connect(comp);comp.connect(c.destination);return {bus,comp};}
   function unlock(){
     if(disposed)return;
-    if(!context){const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;context=new AC();const x=graph(context);master=x.bus;compressor=x.comp;master.gain.value=enabled?effectsVolume:0;musicBus=context.createGain();musicBus.gain.value=0;musicBus.connect(context.destination);}
+    if(!context){const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;context=new AC();const x=graph(context);master=x.bus;compressor=x.comp;master.gain.value=enabled?effectsVolume*EFFECTS_OUTPUT:0;musicBus=context.createGain();musicBus.gain.value=0;musicBus.connect(context.destination);}
     prepareTrack();
     if(context.state==='suspended')context.resume().then(()=>update()).catch(()=>{});
   }
@@ -59,11 +63,14 @@
     const start=c.currentTime+.006;
     function note(f,d=.1,amp=.15,type='sine',offset=0,to=null){
       const t=start+offset,o=c.createOscillator(),env=c.createGain(),filter=c.createBiquadFilter();o.type=type;o.frequency.setValueAtTime(f,t);if(to)o.frequency.exponentialRampToValueAtTime(to,t+d);filter.type='lowpass';filter.frequency.value=type==='sawtooth'?2400:7000;
+      // ~1.7× louder synth voices — paired with EFFECTS_OUTPUT on the master bus.
+      amp=Math.min(.95,amp*1.7);
       env.gain.setValueAtTime(0,t);env.gain.linearRampToValueAtTime(amp,t+.004);env.gain.exponentialRampToValueAtTime(.0001,t+d);o.connect(filter);filter.connect(env);env.connect(bus);o.start(t);o.stop(t+d+.015);o.onended=()=>{o.disconnect();filter.disconnect();env.disconnect()};
     }
     function hiss(d=.1,amp=.1,offset=0,cutoff=2200){
       const t=start+offset,len=Math.ceil(c.sampleRate*d),buffer=c.createBuffer(1,len,c.sampleRate),data=buffer.getChannelData(0);let seed=837;
       for(let i=0;i<len;i++){seed=(Math.imul(seed,1664525)+1013904223)>>>0;data[i]=(seed/2147483648-1);}
+      amp=Math.min(.85,amp*1.7);
       const source=c.createBufferSource(),filter=c.createBiquadFilter(),env=c.createGain();source.buffer=buffer;filter.type='highpass';filter.frequency.value=cutoff;env.gain.setValueAtTime(amp,t);env.gain.exponentialRampToValueAtTime(.0001,t+d);source.connect(filter);filter.connect(env);env.connect(bus);source.start(t);source.onended=()=>{source.disconnect();filter.disconnect();env.disconnect()};
     }
     function fanfare(notes,step=.055,amp=.13){notes.forEach((f,i)=>{note(f,.22,amp,'triangle',i*step);note(f,.32,amp*.17,'sine',i*step+.14)});}
@@ -106,13 +113,13 @@
     gameState=state||gameState;
     if(!context)return;
     const active=activeMusic();
-    const desired=active?musicVolume*(performance.now()<duckUntil?.65:1):0;
+    const desired=active?musicVolume*MUSIC_OUTPUT*(performance.now()<duckUntil?.65:1):0;
     musicBus.gain.setTargetAtTime(desired,context.currentTime,.025);
     if(active)startMusic();else stopMusic();
   }
-  function setEnabled(v){enabled=Boolean(v);if(context)master.gain.setTargetAtTime(enabled?effectsVolume:0,context.currentTime,.012);if(enabled)unlock();update();}
+  function setEnabled(v){enabled=Boolean(v);if(context)master.gain.setTargetAtTime(enabled?effectsVolume*EFFECTS_OUTPUT:0,context.currentTime,.012);if(enabled)unlock();update();}
   function setMusicVolume(v){musicVolume=clamp(v);update();return musicVolume;}
-  function setEffectsVolume(v){effectsVolume=clamp(v);if(context)master.gain.setTargetAtTime(enabled?effectsVolume:0,context.currentTime,.015);return effectsVolume;}
+  function setEffectsVolume(v){effectsVolume=clamp(v);if(context)master.gain.setTargetAtTime(enabled?effectsVolume*EFFECTS_OUTPUT:0,context.currentTime,.015);return effectsVolume;}
   function setTrack(v){const index=Math.max(0,Math.min(TRACKS.length-1,Math.trunc(Number(v)||0)));if(index===track&&!musicError)return;stopMusic();if(musicError)loads.delete(index);musicError=null;track=index;offset=0;prepareTrack();update();}
   function reset(){stopMusic();offset=0;gameState='ready';update();}
   function dispose(){stopMusic();disposed=true;buffers.clear();context?.close().catch(()=>{});}

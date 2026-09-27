@@ -20,7 +20,7 @@
   $('quality').onchange=e=>api.setQuality(e.target.value);
   $('motion').checked=matchMedia('(prefers-reduced-motion: reduce)').matches;
   function motion(){document.body.classList.toggle('reduced-motion',$('motion').checked);if($('motion').checked)api.setQuality('low');else api.setQuality($('quality').value);}
-  $('motion').onchange=motion;motion();api.setMusicVolume(.65);
+  $('motion').onchange=motion;motion();api.setMusicVolume(1);api.setEffectsVolume?.(1);
   $('retryResult').onclick=async()=>{try{await bridge.retryFinalize()}catch{}};
   new ResizeObserver(()=>window.dispatchEvent(new Event('resize'))).observe(document.querySelector('.board-wrap'));
   bridge.notify('ready',{game:'neon-stack',engineVersion:'9.4'});

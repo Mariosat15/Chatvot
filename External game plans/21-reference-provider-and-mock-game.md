@@ -1657,7 +1657,7 @@ ranked-round protocol; **no second money writer**.
 | Scoring | **Server-authoritative.** Seeded seven-bag from `contentSeed` (`sha256("volt-stack-bag:"+seed)`); soft drop = 0; hard drop 2/cell; client `score` on lock is refused |
 | Play URL | `/play/volt-stack/?t={token}` (Circuit stays at `/play?t=`). **Asset hrefs are root-absolute** `/play/volt-stack/…` — Next strips the trailing slash and relative URLs would otherwise load Circuit's `/play/styles.css` and leave a blank board |
 | Host bridge | `public/play/volt-stack/chartvolt-host.js` — Circuit-compatible `ready` / `finished` / `exit`; **no score in postMessage**. `competition-bridge` notify is **local only** (must not postMessage the neon-stack channel to the parent). Classic watchdog **re-posts** `ready` so a race with the parent's listener cannot stall the arena |
-| Fit | **`fit-embed.js` + `html.cv-embedded` CSS** size the board from iframe height so topbar + cabinet + touch controls fit without an inner scrollbar; arena play row is `xl:h-[calc(100dvh-17.5rem)]` so the rules strip stays below the fold (`GameArenaLayout`) |
+| Fit | Arena play row uses **`xl:min-h-[calc(100dvh-14rem)]`** so "How it works" starts below the fold and the stage / prize column grow tall (owner correction 27 Sep — a fixed `h-` squeezed the board). `fit-embed.js` then fills that tall iframe with as large a board as fits without an inner scrollbar |
 | Hold | Disabled in ranked rounds so every entrant shares one bag |
 | Locales | `en` and `el` (same as Circuit) |
 | Engine tests | `npm run test:volt-stack` — same seed + same locks → same score; tampered client score ignored |
