@@ -292,18 +292,24 @@ describe("the operator's upload reaches the title", () => {
     /* eslint-enable security/detect-non-literal-regexp */
   });
 
-  it("offers both as their own slots in the content dialog", () => {
-    const code = readCode(CONTENT_DIALOG);
+  it("offers both illustration slots on the Guides editor, not Assets", () => {
+    // Reason: owner 27 Sep 2026 — How it works / Game tips pictures moved out of
+    // Page theme and Assets into the dedicated Guides tab so Volt Stack and every
+    // title get the same editor. Assert Guides has them and Assets does not.
+    const guides = readCode(
+      "apps/admin/components/admin/games/GameGuidesEditor.tsx",
+    );
+    const assets = readCode(CONTENT_DIALOG);
 
-    expect(code).toMatch(/slot="how-to-play"/);
-    expect(code).toMatch(/slot="highlight"/);
-    // Saved AND handed back to the parent row. Omitting the second leaves the row holding the
-    // old value, so reopening shows the picture the operator just replaced.
-    // Reason: workspace artwork tab builds a partial `content` object with assignments, not
-    // a shorthand object literal — assert the assignment so a rewrite that drops the field
-    // still fails.
-    expect(code).toMatch(/content\.howToPlayImageUrl\s*=\s*draft\.howToPlayImageUrl/);
-    expect(code).toMatch(/content\.highlightsImageUrl\s*=\s*draft\.highlightsImageUrl/);
+    expect(guides).toMatch(/slot="how-to-play"/);
+    expect(guides).toMatch(/slot="highlight"/);
+    expect(guides).toMatch(/howToPlayImageUrl/);
+    expect(guides).toMatch(/highlightsImageUrl/);
+    expect(assets).not.toMatch(/slot="how-to-play"/);
+    expect(assets).not.toMatch(/slot="highlight"/);
+    // Saved via the Guides PATCH body (object shorthand), not the Assets tab.
+    expect(guides).toMatch(/howToPlayImageUrl,/);
+    expect(guides).toMatch(/highlightsImageUrl,/);
   });
 
   it("validates both by the same clause as every other image address", () => {

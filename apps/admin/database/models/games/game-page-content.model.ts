@@ -24,7 +24,7 @@ export interface IGamePageContent extends Document {
   bannerUrl?: string;
   howToPlayImageUrl?: string;
   highlightsImageUrl?: string;
-  highlights?: { title: string; detail: string }[];
+  highlights?: { title: string; detail: string; icon?: string }[];
   heroFeatures?: { icon: string; label: string }[];
   pageThemeId?: string;
   stylizedQuote?: string;
@@ -43,6 +43,7 @@ const HighlightSchema = new Schema(
   {
     title: { type: String, required: true, trim: true },
     detail: { type: String, required: true, trim: true },
+    icon: { type: String, trim: true },
   },
   { _id: false },
 );

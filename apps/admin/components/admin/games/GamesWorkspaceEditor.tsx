@@ -31,6 +31,7 @@ import GamePlayStyleControl from "./GamePlayStyleControl";
 import GameScoringDialog from "./GameScoringDialog";
 import GameChallengeDefaultsDialog from "./GameChallengeDefaultsDialog";
 import GameContentDialog from "./GameContentDialog";
+import GameGuidesEditor from "./GameGuidesEditor";
 import GamePageThemeEditor from "./GamePageThemeEditor";
 import CatalogueMerchandisingPanel from "./CatalogueMerchandisingPanel";
 import {
@@ -132,6 +133,18 @@ export default function GamesWorkspaceEditor({
             inline
             sections="copy"
             onOpenChange={() => undefined}
+            onSaved={onTitlePatch}
+          />
+        </PanelCard>
+      );
+    case "guides":
+      return (
+        <PanelCard>
+          {/* Reason: remount on title switch so unsaved guide edits cannot
+              bleed onto the next game (same class as Page theme). */}
+          <GameGuidesEditor
+            key={title.gameKey}
+            title={title}
             onSaved={onTitlePatch}
           />
         </PanelCard>
@@ -365,9 +378,10 @@ function GeneralTab({
             Save basic information
           </Button>
           <p className="text-xs text-white/40">
-            Rules, how-to-play and highlights are on the{" "}
-            <strong className="font-medium text-white/60">Page content</strong> tab —
-            that is what players see on /games/{title.gameCode}.
+            Rules and how-to-play text are on{" "}
+            <strong className="font-medium text-white/60">Page content</strong>;
+            how-it-works steps, tips and their pictures are on{" "}
+            <strong className="font-medium text-white/60">How it works & tips</strong>.
           </p>
         </div>
       </PanelCard>

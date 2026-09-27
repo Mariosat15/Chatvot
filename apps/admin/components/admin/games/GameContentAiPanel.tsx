@@ -101,7 +101,11 @@ export default function GameContentAiPanel({
               size="sm"
               variant="outline"
               onClick={() => {
-                onApply(suggestion);
+                // Reason: tips live on Guides now — Use all must not write highlights
+                // into the Page content draft (that field was removed from this form).
+                const { highlights: _tips, ...copy } = suggestion;
+                void _tips;
+                onApply(copy);
                 toast.success("Applied. Nothing is saved until you press Save content.");
               }}
             >
@@ -125,9 +129,13 @@ export default function GameContentAiPanel({
             onUse={() => onApply({ description: suggestion.description })}
           />
           <Suggested
-            label="Highlights"
+            label="Game tips (edit on How it works & tips)"
             value={suggestion.highlights.map((row) => `${row.title} — ${row.detail}`).join(" · ")}
-            onUse={() => onApply({ highlights: suggestion.highlights })}
+            onUse={() => {
+              toast.message(
+                "Copy these tips into the How it works & tips tab — Page content no longer stores them.",
+              );
+            }}
           />
         </div>
       )}

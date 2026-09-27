@@ -104,7 +104,9 @@ describe("trading page editor", () => {
     expect(source).toContain('"/api/games/trading/page-content"');
     expect(source).toContain('"/api/games/trading/artwork"');
     expect(source).toContain("GameContentDialog");
+    expect(source).toContain("GameGuidesEditor");
     expect(source).toContain("GamePageThemeEditor");
+    expect(source).toContain("How it works & tips");
     // Reason: no Settings tab — trading settings live on the other Trading sections.
     expect(source).not.toMatch(/sections\s*=\s*"settings"/);
     expect(source).not.toContain("GameScoringDialog");

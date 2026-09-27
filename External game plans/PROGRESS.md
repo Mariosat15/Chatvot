@@ -913,6 +913,27 @@ remains outstanding is the **opponent** half listed above, not the game half.
 Newest at the top.
 
 
+### 27 Sep 2026 - Per-game How it works & tips (Guides) tab
+
+**Owner:** How it works on Page theme did nothing useful for Volt Stack, and Game tips
+(with icons + picture) only existed half-scattered across Assets / Page content — Circuit
+had them, Stack did not. Need one place per game for image, titles, bullet points and icons.
+
+**Shipped:**
+- New workspace tab **How it works & tips** (`GameGuidesEditor`) on All Games and Trading
+  page: how-it-works picture + steps (optional icon), tips picture + tip cards (optional
+  icon from `HERO_FEATURE_ICONS`).
+- Steps removed from **Page theme**; arena tip/how-it-works pictures removed from **Assets**;
+  tip text list removed from **Page content**.
+- `highlights.icon` on both `provider_game` copies and both `game-page-content` copies;
+  validator refuses unknown icon slugs; player `GamePageTips` / `ArenaHighlights` /
+  `GamePageHowItWorks` resolve icons via `resolve-feature-icon.ts`.
+- Tests: `__tests__/admin/games-workspace.test.ts`, `trading-page-editor.test.ts`,
+  `arena-illustrations.test.ts` (slots asserted on Guides, not Assets).
+
+**Not built:** AI still *suggests* tip lines on Page content but only as a toast pointer to
+the Guides tab (does not write tips into the content draft).
+
 ### 27 Sep 2026 - Volt Stack grow the board (do not squeeze)
 
 **Owner:** the previous fit *capped* the play row and crushed the board, rails and

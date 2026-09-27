@@ -8,6 +8,7 @@
 import { readFileSync } from "fs";
 import { join } from "path";
 import { describe, expect, it } from "vitest";
+import { validateGameContent } from "../../apps/admin/lib/admin/game-content-fields";
 
 const ROOT = join(__dirname, "../..");
 
@@ -29,13 +30,14 @@ describe("Games workspace structure", () => {
     "apps/admin/components/admin/games/ProviderCatalogueDialog.tsx",
   );
 
-  it("exposes the planned tabs including page theme and no more", () => {
+  it("exposes the planned tabs including guides and page theme", () => {
     for (const id of [
       "general",
       "settings",
       "scoring",
       "challenge",
       "content",
+      "guides",
       "assets",
       "theme",
       "live",
@@ -46,8 +48,8 @@ describe("Games workspace structure", () => {
       section.indexOf("const TAB_IDS"),
       section.indexOf("export type WorkspaceTab"),
     );
-    // Eight tab ids → sixteen quote characters.
-    expect((tabIdsBlock.match(/"/g) ?? []).length).toBe(16);
+    // Nine tab ids → eighteen quote characters.
+    expect((tabIdsBlock.match(/"/g) ?? []).length).toBe(18);
   });
 
   it("keeps providers reachable without a second section id", () => {
@@ -60,6 +62,7 @@ describe("Games workspace structure", () => {
     expect(editor).toContain("<GameScoringDialog");
     expect(editor).toContain("<GameChallengeDefaultsDialog");
     expect(editor).toContain("<GameContentDialog");
+    expect(editor).toContain("<GameGuidesEditor");
     expect(editor).toContain("<GamePageThemeEditor");
     expect(editor).toContain("inline");
     expect(editor).toContain('sections="copy"');
@@ -67,17 +70,44 @@ describe("Games workspace structure", () => {
     expect((editor.match(/<GameContentDialog/g) ?? []).length).toBe(2);
   });
 
-  it("remounts the page theme editor when the selected title changes", () => {
-    // Reason: without key={gameKey}, local theme state from game A is Saved onto
+  it("remounts guides and page theme editors when the selected title changes", () => {
+    // Reason: without key={gameKey}, local state from game A is Saved onto
     // game B when the operator switches titles (21 Sep 2026).
     expect(editor).toMatch(
       /<GamePageThemeEditor[\s\S]*?key=\{title\.gameKey\}/,
     );
+    expect(editor).toMatch(/<GameGuidesEditor[\s\S]*?key=\{title\.gameKey\}/);
     const themeEditor = readCode(
       "apps/admin/components/admin/games/GamePageThemeEditor.tsx",
     );
     expect(themeEditor).toContain("hydrateFromTitle");
     expect(themeEditor).toMatch(/useEffect\([\s\S]*\[title\]/);
+    expect(themeEditor).not.toContain("howItWorksSteps");
+    const guidesEditor = readCode(
+      "apps/admin/components/admin/games/GameGuidesEditor.tsx",
+    );
+    expect(guidesEditor).toContain("howItWorksSteps");
+    expect(guidesEditor).toContain("highlights");
+    expect(guidesEditor).toMatch(/slot="how-to-play"/);
+    expect(guidesEditor).toMatch(/slot="highlight"/);
+  });
+
+  it("accepts tip icons from the shared hero vocabulary and refuses unknowns", () => {
+    const ok = validateGameContent({
+      highlights: [
+        { title: "Fast", detail: "Quick rounds", icon: "speed" },
+      ],
+    });
+    expect(ok.ok).toBe(true);
+    if (ok.ok) {
+      expect(ok.content.highlights?.[0]?.icon).toBe("speed");
+    }
+    const bad = validateGameContent({
+      highlights: [
+        { title: "Fast", detail: "Quick rounds", icon: "not-a-real-icon" },
+      ],
+    });
+    expect(bad.ok).toBe(false);
   });
 
   it("withholds Duplicate and Delete by name", () => {

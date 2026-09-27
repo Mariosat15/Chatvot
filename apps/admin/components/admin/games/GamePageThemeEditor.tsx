@@ -8,7 +8,6 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
 import { CONTENT_LIMITS } from "@/lib/admin/game-content-fields";
 import {
   listGamePageThemes,
@@ -43,11 +42,6 @@ function hydrateFromTitle(title: ProviderTitleRow) {
     tablet: title.supportedDevices?.tablet !== false,
     mobile: title.supportedDevices?.mobile !== false,
     tags: (title.descriptionTags ?? []).join(", "),
-    steps:
-      title.howItWorksSteps?.map((s) => ({
-        title: s.title,
-        detail: s.detail,
-      })) ?? [],
   };
 }
 
@@ -64,7 +58,6 @@ export default function GamePageThemeEditor({
   const [tablet, setTablet] = useState(initial.tablet);
   const [mobile, setMobile] = useState(initial.mobile);
   const [tags, setTags] = useState(initial.tags);
-  const [steps, setSteps] = useState(initial.steps);
   const [saving, setSaving] = useState(false);
 
   // Reason: without this, switching titles in All Games keeps the previous
@@ -81,7 +74,6 @@ export default function GamePageThemeEditor({
     setTablet(next.tablet);
     setMobile(next.mobile);
     setTags(next.tags);
-    setSteps(next.steps);
   }, [title]);
 
   async function save() {
@@ -99,7 +91,6 @@ export default function GamePageThemeEditor({
         skillLevelLabel: skill.trim(),
         supportedDevices: { desktop, tablet, mobile },
         descriptionTags,
-        howItWorksSteps: steps.filter((s) => s.title.trim() && s.detail.trim()),
       };
 
       const endpoint =
@@ -125,7 +116,6 @@ export default function GamePageThemeEditor({
         skillLevelLabel: content.skillLevelLabel || undefined,
         supportedDevices: content.supportedDevices,
         descriptionTags: content.descriptionTags,
-        howItWorksSteps: content.howItWorksSteps,
       });
       toast.success("Page theme saved.");
     } catch {
@@ -232,70 +222,11 @@ export default function GamePageThemeEditor({
         </div>
       </Card>
 
-      <Card className="border-gray-700 bg-gray-800/50 p-5 shadow-none">
-        <div className="flex items-center justify-between gap-2">
-          <h3 className="text-sm font-semibold text-white">How it works steps</h3>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="border-gray-600"
-            disabled={steps.length >= CONTENT_LIMITS.howItWorksSteps}
-            onClick={() =>
-              setSteps((prev) => [...prev, { title: "", detail: "" }])
-            }
-          >
-            Add step
-          </Button>
-        </div>
-        <p className="mt-1 text-xs text-white/50">
-          Leave empty to derive steps from How to play line breaks on the player
-          page.
-        </p>
-        <div className="mt-3 space-y-3">
-          {steps.map((step, index) => (
-            <div key={index} className="grid gap-2 rounded-lg border border-gray-700 p-3">
-              <Input
-                value={step.title}
-                placeholder="Title"
-                maxLength={CONTENT_LIMITS.howItWorksTitle}
-                className="border-gray-700 bg-gray-900 text-white"
-                onChange={(e) =>
-                  setSteps((prev) =>
-                    prev.map((s, i) =>
-                      i === index ? { ...s, title: e.target.value } : s,
-                    ),
-                  )
-                }
-              />
-              <Textarea
-                value={step.detail}
-                placeholder="Detail"
-                maxLength={CONTENT_LIMITS.howItWorksDetail}
-                className="min-h-[60px] border-gray-700 bg-gray-900 text-white"
-                onChange={(e) =>
-                  setSteps((prev) =>
-                    prev.map((s, i) =>
-                      i === index ? { ...s, detail: e.target.value } : s,
-                    ),
-                  )
-                }
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="justify-self-start text-red-300"
-                onClick={() =>
-                  setSteps((prev) => prev.filter((_, i) => i !== index))
-                }
-              >
-                Remove
-              </Button>
-            </div>
-          ))}
-        </div>
-      </Card>
+      <p className="text-xs text-white/45">
+        How it works steps, game tips and their pictures live on the{" "}
+        <strong className="font-medium text-white/65">How it works & tips</strong>{" "}
+        tab — not here.
+      </p>
 
       <Button
         type="button"

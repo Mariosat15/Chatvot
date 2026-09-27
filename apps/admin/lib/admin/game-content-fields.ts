@@ -231,6 +231,8 @@ export const ARENA_STEP_LIMIT = 3;
 export interface GameHighlight {
   title: string;
   detail: string;
+  /** Optional slug from `HERO_FEATURE_ICONS` — tips/arena icons. */
+  icon?: string;
 }
 
 export interface GameHeroFeature {
@@ -443,7 +445,19 @@ export function validateGameContent(body: unknown): ContentValidation {
       if (detail.length > CONTENT_LIMITS.highlightDetail) {
         return { ok: false, error: `A highlight detail must be ${CONTENT_LIMITS.highlightDetail} characters or fewer.` };
       }
-      highlights.push({ title, detail });
+      // Reason: same vocabulary as heroFeatures. Unknown slugs are refused so a typo
+      // cannot land a glyph that the player screen silently falls back on.
+      let icon: string | undefined;
+      if ("icon" in row && row.icon !== undefined && row.icon !== null && row.icon !== "") {
+        if (!isHeroFeatureIcon(row.icon)) {
+          return {
+            ok: false,
+            error: "Each tip icon must be one of the offered icons.",
+          };
+        }
+        icon = row.icon;
+      }
+      highlights.push(icon ? { title, detail, icon } : { title, detail });
     }
     content.highlights = highlights;
   }
@@ -648,8 +662,17 @@ export function validateGameContent(body: unknown): ContentValidation {
           error: `A step detail must be ${CONTENT_LIMITS.howItWorksDetail} characters or fewer.`,
         };
       }
-      const icon = trimmedString(row.icon) ?? "";
-      steps.push({ title, detail, ...(icon ? { icon } : {}) });
+      let icon: string | undefined;
+      if ("icon" in row && row.icon !== undefined && row.icon !== null && row.icon !== "") {
+        if (!isHeroFeatureIcon(row.icon)) {
+          return {
+            ok: false,
+            error: "Each how-it-works step icon must be one of the offered icons.",
+          };
+        }
+        icon = row.icon;
+      }
+      steps.push(icon ? { title, detail, icon } : { title, detail });
     }
     content.howItWorksSteps = steps;
   }

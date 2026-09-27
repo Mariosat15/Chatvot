@@ -10,6 +10,7 @@ import type { GamePageTheme } from "./game-page-themes";
 export interface GamePageHighlight {
   title: string;
   description: string;
+  icon?: string;
 }
 
 export interface GamePageBannerFeature {

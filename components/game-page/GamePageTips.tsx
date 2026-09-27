@@ -1,27 +1,26 @@
 "use client";
 
-import { CheckCircle2, Lightbulb } from "lucide-react";
+import { Lightbulb } from "lucide-react";
 import type { GamePageData } from "@/lib/services/games/game-page.types";
+import { resolveFeatureLucideIcon } from "@/components/games/resolve-feature-icon";
 import { GamePagePanel } from "./GamePageChrome";
 
 const TRADING_DEFAULT_TIPS = [
-  "Plan your entries",
-  "Manage risk",
-  "Watch momentum",
-  "Stay disciplined",
+  { title: "Plan your entries", description: "", icon: "target" },
+  { title: "Manage risk", description: "", icon: "skill" },
+  { title: "Watch momentum", description: "", icon: "speed" },
+  { title: "Stay disciplined", description: "", icon: "spark" },
 ];
 
-function tipLines(game: GamePageData): string[] {
-  const fromHighlights = (game.highlights ?? [])
-    .map((h) => h.title.trim())
-    .filter(Boolean);
+function tipRows(game: GamePageData) {
+  const fromHighlights = (game.highlights ?? []).filter((h) => h.title.trim());
   if (fromHighlights.length > 0) return fromHighlights.slice(0, 6);
   if (game.kind === "trading") return TRADING_DEFAULT_TIPS;
   return [];
 }
 
 export function GamePageTips({ game }: { game: GamePageData }) {
-  const tips = tipLines(game);
+  const tips = tipRows(game);
   if (tips.length === 0 && !game.gameTipsImageUrl) return null;
 
   return (
@@ -47,15 +46,27 @@ export function GamePageTips({ game }: { game: GamePageData }) {
           </div>
           {tips.length > 0 ? (
             <ul className="space-y-4">
-              {tips.map((tip) => (
-                <li
-                  key={tip}
-                  className="flex items-start gap-3 text-[17px] font-medium text-[var(--gp-text)] md:text-[19px]"
-                >
-                  <CheckCircle2 className="mt-0.5 h-6 w-6 shrink-0 text-[var(--gp-green,#15e89d)]" />
-                  {tip}
-                </li>
-              ))}
+              {tips.map((tip, index) => {
+                const Icon = resolveFeatureLucideIcon(tip.icon, index);
+                return (
+                  <li
+                    key={`${tip.title}-${index}`}
+                    className="flex items-start gap-3 text-[17px] font-medium text-[var(--gp-text)] md:text-[19px]"
+                  >
+                    <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--gp-gold,#ffd33d)]/45 bg-[var(--gp-gold,#ffd33d)]/15 text-[var(--gp-gold,#ffd33d)]">
+                      <Icon className="h-5 w-5" />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block">{tip.title}</span>
+                      {tip.description ? (
+                        <span className="mt-0.5 block text-[14px] font-normal leading-snug text-[var(--gp-muted)]">
+                          {tip.description}
+                        </span>
+                      ) : null}
+                    </span>
+                  </li>
+                );
+              })}
             </ul>
           ) : null}
         </div>

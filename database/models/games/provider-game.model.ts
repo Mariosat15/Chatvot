@@ -26,7 +26,7 @@ export interface IProviderGame extends Document {
   rulesSummary?: string;
   howToPlay?: string;
   bannerUrl?: string;
-  highlights?: { title: string; detail: string }[];
+  highlights?: { title: string; detail: string; icon?: string }[];
   /** Ours, not the provider's - the arena's two illustrations. See the schema note below. */
   howToPlayImageUrl?: string;
   highlightsImageUrl?: string;
@@ -175,6 +175,8 @@ const ProviderGameSchema = new Schema<IProviderGame>(
           _id: false,
           title: { type: String, required: true, trim: true },
           detail: { type: String, required: true, trim: true },
+          // Reason: optional Lucide slug from HERO_FEATURE_ICONS (Guides tab, 27 Sep 2026).
+          icon: { type: String, trim: true },
         },
       ],
       default: undefined,

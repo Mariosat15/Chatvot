@@ -1,36 +1,30 @@
 "use client";
 
-import { ChevronRight, FileText, LineChart, Trophy } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import type {
   GamePageData,
   GamePageHowItWorksStep,
 } from "@/lib/services/games/game-page.types";
+import { resolveFeatureLucideIcon } from "@/components/games/resolve-feature-icon";
 import { GamePagePanel } from "./GamePageChrome";
 
 const TRADING_DEFAULT_STEPS: GamePageHowItWorksStep[] = [
   {
     title: "JOIN",
     detail: "Choose a trading competition and enter with Volts.",
-    icon: "join",
+    icon: "players",
   },
   {
     title: "TRADE",
     detail: "Trade live markets using virtual competition capital.",
-    icon: "trade",
+    icon: "target",
   },
   {
     title: "WIN",
     detail: "Finish high on the leaderboard and earn rewards.",
-    icon: "win",
+    icon: "reward",
   },
 ];
-
-function stepIcon(index: number, icon?: string) {
-  const key = (icon || "").toLowerCase();
-  if (key.includes("win") || index === 2) return Trophy;
-  if (key.includes("trade") || index === 1) return LineChart;
-  return FileText;
-}
 
 export function resolveHowItWorksSteps(
   game: GamePageData,
@@ -54,7 +48,7 @@ export function HowItWorksSteps({ game }: { game: GamePageData }) {
   return (
     <ol className="grid gap-4 lg:grid-cols-3">
       {steps.map((step, i) => {
-        const Icon = stepIcon(i, step.icon);
+        const Icon = resolveFeatureLucideIcon(step.icon, i);
         const num = String(i + 1).padStart(2, "0");
         return (
           <li key={`${step.title}-${i}`} className="relative">

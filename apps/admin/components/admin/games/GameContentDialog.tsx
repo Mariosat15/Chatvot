@@ -23,7 +23,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  ARENA_HIGHLIGHT_LIMIT,
   ARENA_STEP_LIMIT,
   CONTENT_LIMITS,
 } from "@/lib/admin/game-content-fields";
@@ -92,12 +91,9 @@ interface Draft {
   category: string;
   thumbnailUrl: string;
   bannerUrl: string;
-  howToPlayImageUrl: string;
-  highlightsImageUrl: string;
   gameplayPreviewUrl: string;
   gameplayVideoUrl: string;
   gallery: { url: string; title: string }[];
-  highlights: { title: string; detail: string }[];
   heroFeatures: { icon: string; label: string }[];
 }
 
@@ -114,8 +110,6 @@ function draftFrom(title: ProviderTitleRow): Draft {
     category: title.category ?? "",
     thumbnailUrl: title.thumbnailUrl ?? "",
     bannerUrl: title.bannerUrl ?? "",
-    howToPlayImageUrl: title.howToPlayImageUrl ?? "",
-    highlightsImageUrl: title.highlightsImageUrl ?? "",
     gameplayPreviewUrl: title.gameplayPreviewUrl ?? "",
     gameplayVideoUrl: title.gameplayVideoUrl ?? "",
     gallery: title.gallery
@@ -124,7 +118,6 @@ function draftFrom(title: ProviderTitleRow): Draft {
           title: row.title ?? "",
         }))
       : [],
-    highlights: title.highlights ? title.highlights.map((row) => ({ ...row })) : [],
     heroFeatures: title.heroFeatures ? title.heroFeatures.map((row) => ({ ...row })) : [],
   };
 }
@@ -158,18 +151,6 @@ export default function GameContentDialog({
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
     setDraft((current) => (current ? { ...current, [key]: value } : current));
 
-  const setHighlight = (at: number, key: "title" | "detail", value: string) =>
-    setDraft((current) =>
-      current
-        ? {
-            ...current,
-            highlights: current.highlights.map((row, index) =>
-              index === at ? { ...row, [key]: value } : row,
-            ),
-          }
-        : current,
-    );
-
   const setFeature = (at: number, key: "icon" | "label", value: string) =>
     setDraft((current) =>
       current
@@ -187,14 +168,6 @@ export default function GameContentDialog({
     // operator leaving something out, so it is caught here with a message naming the row
     // instead of arriving as the server's generic refusal.
     if (showCopy) {
-      const incomplete = draft.highlights.findIndex(
-        (row) => row.title.trim() === "" || row.detail.trim() === "",
-      );
-      if (incomplete >= 0) {
-        toast.error(`Highlight ${incomplete + 1} needs both a title and a detail.`);
-        return;
-      }
-
       // Same reason, one field along. An empty label on the banner is a floating glyph with no
       // words under it, in a fixed-height column beside three that have them.
       const blank = draft.heroFeatures.findIndex((row) => row.label.trim() === "");
@@ -215,14 +188,11 @@ export default function GameContentDialog({
       content.rulesSummary = draft.rulesSummary;
       content.howToPlay = draft.howToPlay;
       content.category = draft.category;
-      content.highlights = draft.highlights;
       content.heroFeatures = draft.heroFeatures;
     }
     if (showArtwork) {
       content.thumbnailUrl = draft.thumbnailUrl;
       content.bannerUrl = draft.bannerUrl;
-      content.howToPlayImageUrl = draft.howToPlayImageUrl;
-      content.highlightsImageUrl = draft.highlightsImageUrl;
       content.gameplayPreviewUrl = draft.gameplayPreviewUrl;
       content.gameplayVideoUrl = draft.gameplayVideoUrl;
       content.gallery = draft.gallery
@@ -315,7 +285,18 @@ export default function GameContentDialog({
           <GameContentAiPanel
             gameKey={title.gameKey}
             onApply={(patch) =>
-              setDraft((current) => (current ? { ...current, ...patch } : current))
+              setDraft((current) => {
+                if (!current) return current;
+                // Reason: tips/highlights moved to Guides — ignore if the model still
+                // suggests them so Save cannot silently drop or resurrect a stale field
+                // on this draft shape.
+                const {
+                  highlights: _ignoredHighlights,
+                  ...copyFields
+                } = patch as Partial<Draft> & { highlights?: unknown };
+                void _ignoredHighlights;
+                return { ...current, ...copyFields };
+              })
             }
           />
           )}
@@ -438,56 +419,9 @@ export default function GameContentDialog({
           </div>
 
           {/*
-            THE ARENA'S TWO ILLUSTRATIONS, owner's instruction of 11 September 2026. Kept in
-            their own row under their own heading rather than added to the logo/banner pair
-            above, because those two identify the TITLE everywhere it appears and these two
-            decorate two named panels on one screen - an operator choosing artwork needs to
-            know which is which, and four unlabelled boxes in a row does not tell them.
-
-            BOTH ARE OPTIONAL AND SAYING SO IS THE POINT OF THE HINTS. Leaving one blank is
-            not an unfinished job: the panel draws a recreated emblem instead, which is a
-            deliberate look rather than a gap, and an operator who believes otherwise
-            uploads a stock image to fill a hole that was never there.
+            How it works / Game tips pictures moved to the dedicated Guides tab
+            (owner, 27 Sep 2026). Assets keeps logo, banner, preview and gallery.
           */}
-          <div className="space-y-3">
-            <div>
-              <Label>Arena illustrations</Label>
-              <p className="text-xs text-white/50">
-                The pictures beside the two text panels under the board. Optional - each one
-                falls back to a drawn emblem.
-              </p>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <GameArtworkField
-                providerKey={providerKey}
-                gameCode={title.gameCode}
-                slot="how-to-play"
-                label="How it works picture"
-                /*
-                  THE HINT NAMES THE PANEL THE PLAYER SEES, and it was renamed with the band.
-                  These two slots are the only place an operator learns which picture lands
-                  where, and the reason that matters is that the two are easy to swap: the
-                  first build of the band had the emblem in the rules card and the diagram
-                  beside the tips, because the labels said "rules" and "highlights" while the
-                  screen says "How it works" and "Game tips".
-                */
-                hint={`Small square, beside the numbered steps. A diagram of the ${terms.game}, not a logo.`}
-                value={draft.howToPlayImageUrl}
-                onChange={(url) => set("howToPlayImageUrl", url)}
-                uploadEndpoint={artworkEndpoint}
-              />
-              <GameArtworkField
-                providerKey={providerKey}
-                gameCode={title.gameCode}
-                slot="highlight"
-                label={`${terms.game} tips picture`}
-                hint="Small landscape, beside the ticked tips. A badge or a slogan graphic."
-                value={draft.highlightsImageUrl}
-                onChange={(url) => set("highlightsImageUrl", url)}
-                uploadEndpoint={artworkEndpoint}
-              />
-            </div>
-          </div>
 
           <div className="space-y-3">
             <div>
@@ -705,83 +639,10 @@ export default function GameContentDialog({
             )}
           </div>
 
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <Label>Highlights</Label>
-                {/*
-                  IT SAYS WHICH ONES GET DRAWN, because the two numbers disagree and only the
-                  operator can act on it. The player's card is a fixed-height strip with room
-                  for four lines, so a fifth and sixth are stored and never shown - and the
-                  only place that is visible is here, beside the button that offers them.
-
-                  The TITLE alone is what the card draws, with the detail on its tooltip, so
-                  the title has to stand on its own. That is worth saying next to a field
-                  labelled "detail" that an operator would otherwise write the substance into.
-                */}
-                <p className="text-xs text-white/50">
-                  Ticked lines on the {terms.contest} screen. The first{" "}
-                  {ARENA_HIGHLIGHT_LIMIT} titles are shown, so write each title so it
-                  reads on its own; the detail appears on hover. Up to{" "}
-                  {CONTENT_LIMITS.highlights} can be stored; none is fine.
-                </p>
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={draft.highlights.length >= CONTENT_LIMITS.highlights}
-                onClick={() =>
-                  set("highlights", [...draft.highlights, { title: "", detail: "" }])
-                }
-              >
-                <Plus className="mr-1.5 h-3.5 w-3.5" />
-                Add
-              </Button>
-            </div>
-
-            {draft.highlights.length === 0 ? (
-              <p className="rounded-lg border border-dashed border-white/10 px-3 py-4 text-center text-xs text-white/40">
-                No highlights. The row is left out of the {terms.player}&apos;s screen entirely.
-              </p>
-            ) : (
-              draft.highlights.map((row, at) => (
-                <div
-                  key={at}
-                  className="flex items-start gap-2 rounded-lg border border-white/10 bg-white/5 p-3"
-                >
-                  <div className="grid flex-1 gap-2 sm:grid-cols-[1fr_2fr]">
-                    <Input
-                      value={row.title}
-                      maxLength={CONTENT_LIMITS.highlightTitle}
-                      placeholder="Fast-Paced Fun"
-                      onChange={(event) => setHighlight(at, "title", event.target.value)}
-                    />
-                    <Input
-                      value={row.detail}
-                      maxLength={CONTENT_LIMITS.highlightDetail}
-                      placeholder={`Short ${terms.rounds}. Big thrills.`}
-                      onChange={(event) => setHighlight(at, "detail", event.target.value)}
-                    />
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="text-white/40 hover:text-red-300"
-                    onClick={() =>
-                      set(
-                        "highlights",
-                        draft.highlights.filter((_, index) => index !== at),
-                      )
-                    }
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))
-            )}
-          </div>
+          <p className="rounded-lg border border-dashed border-white/10 px-3 py-3 text-xs text-white/50">
+            How it works steps, game tips and their pictures are edited on the
+            <strong className="font-medium text-white/70">How it works &amp; tips</strong> tab.
+          </p>
             </>
           )}
         </div>

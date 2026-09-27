@@ -113,7 +113,7 @@ export interface ProviderTitleRow {
   // own panels, so no sync writes them and only the content dialog does.
   howToPlayImageUrl?: string;
   highlightsImageUrl?: string;
-  highlights?: { title: string; detail: string }[];
+  highlights?: { title: string; detail: string; icon?: string }[];
   // Ours as well, and absent is an instruction rather than a gap: the banner works four
   // features out from the title's declared settings when this is unset.
   heroFeatures?: { icon: string; label: string }[];

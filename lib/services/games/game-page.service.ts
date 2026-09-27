@@ -87,7 +87,7 @@ type ProviderPageLean = {
   bannerUrl?: string;
   rulesSummary?: string;
   howToPlay?: string;
-  highlights?: { title: string; detail: string }[];
+  highlights?: { title: string; detail: string; icon?: string }[];
   howToPlayImageUrl?: string;
   highlightsImageUrl?: string;
   heroFeatures?: { icon: string; label: string }[];
@@ -146,12 +146,13 @@ function mapHeroFeatures(
 }
 
 function mapHighlights(
-  rows?: { title: string; detail: string }[] | null,
+  rows?: { title: string; detail: string; icon?: string }[] | null,
 ): GamePageData["highlights"] {
   if (!Array.isArray(rows) || rows.length === 0) return undefined;
   return rows.map((row) => ({
     title: row.title,
     description: row.detail,
+    icon: row.icon || undefined,
   }));
 }
 
