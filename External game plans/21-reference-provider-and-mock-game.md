@@ -1652,7 +1652,7 @@ challenges use the existing ranked-round protocol; **no second money writer**.
 | Shape | `family: independent`, `playMode: anytime`, `supportsCompetition` / `OneVsOne` / `Practice` / `ContentSeed`: true |
 | Scoring | **Server-authoritative.** Seeded seven-bag from `contentSeed` (`sha256("volt-stack-bag:"+seed)`); soft drop = 0; hard drop 2/cell; client `score` on lock is refused |
 | Play URL | `/play/volt-stack/?t={token}` (Circuit stays at `/play?t=`) |
-| Host bridge | `public/play/volt-stack/chartvolt-host.js` — Circuit-compatible `ready` / `finished` / leave; **no score in postMessage** |
+| Host bridge | `public/play/volt-stack/chartvolt-host.js` — Circuit-compatible `ready` / `finished` / `exit`; **no score in postMessage**. `competition-bridge` notify is **local only** (must not postMessage the neon-stack channel to the parent). Classic watchdog **re-posts** `ready` so a race with the parent's listener cannot stall the arena |
 | Hold | Disabled in ranked rounds so every entrant shares one bag |
 | Locales | `en` and `el` (same as Circuit) |
 | Engine tests | `npm run test:volt-stack` — same seed + same locks → same score; tampered client score ignored |

@@ -2,8 +2,17 @@
  * ChartVolt Games host for Volt Stack.
  *
  * Boots from the launch token (same credential Circuit uses), talks to `/play/api/*`,
- * and posts Circuit-compatible `{ type: 'ready' | 'finished' | 'leave' }` messages so
+ * and posts Circuit-compatible `{ type: 'ready' | 'finished' | 'exit' }` messages so
  * ProviderGameFrame works unchanged. Never puts a score in postMessage.
+ *
+ * WHY READY FIRES FIRST, BEFORE THE NETWORK
+ * ----------------------------------------
+ * ProviderGameFrame clears its loading overlay only on `ready`, and stalls at 12s. The
+ * Neon Stack shell used to post a different channel (`chartvolt:neon-stack`) aimed at the
+ * iframe's own origin, which the parent never accepts when the game is embedded. Waiting
+ * for GET /play/api/state before the Circuit-shaped `ready` then made a hung or throwing
+ * configure leave the player staring at "taking longer than expected" forever. Matching
+ * Circuit: announce ready as soon as this script can talk to the parent, then finish boot.
  */
 (() => {
   "use strict";
@@ -11,16 +20,25 @@
   const params = new URLSearchParams(location.search);
   const token = (params.get("t") || "").trim();
   let hostState = null;
+  /** Platform origin from the round, once known. Until then "*" so ready still delivers. */
   let parentOrigin = "*";
   let leaving = false;
 
   function tellPlatform(type, extra) {
     if (window.parent === window) return;
+    // Reason ready always uses "*": parentOrigin may still be unset, and a missed early ready
+    // is exactly the arena stall. event.origin on the parent is still this frame's origin.
+    const target =
+      type === "ready" ? "*" : parentOrigin === "*" ? "*" : parentOrigin;
     try {
-      window.parent.postMessage(Object.assign({ type }, extra || {}), parentOrigin);
+      window.parent.postMessage(Object.assign({ type }, extra || {}), target);
     } catch {
       /* A frame that cannot post is still a playable game. */
     }
+  }
+
+  function announceReady() {
+    tellPlatform("ready");
   }
 
   async function api(method, path, body) {
@@ -44,7 +62,9 @@
   }
 
   function sessionFromState(state) {
-    const endsAt = state.endsAt ? Date.parse(state.endsAt) : Date.now() + (state.playableSeconds || state.durationSeconds || 120) * 1000;
+    const endsAt = state.endsAt
+      ? Date.parse(state.endsAt)
+      : Date.now() + (state.playableSeconds || state.durationSeconds || 120) * 1000;
     const durationMs = Math.max(
       1000,
       typeof state.playableSeconds === "number"
@@ -64,10 +84,35 @@
     };
   }
 
+  function applyHostHints(state) {
+    if (!state) return;
+    if (state.parentOrigin && /^https?:\/\/[^/]+$/.test(state.parentOrigin)) {
+      parentOrigin = state.parentOrigin;
+    }
+    if (state.pieceSeed && typeof window.ChartvoltTetris?.configureCompetition === "function") {
+      try {
+        window.ChartvoltTetris.configureCompetition({
+          pieceSeed: state.pieceSeed,
+          durationMs:
+            typeof state.playableSeconds === "number"
+              ? state.playableSeconds * 1000
+              : undefined,
+          sessionId: state.roundId,
+          serverToken: token,
+        });
+      } catch {
+        /* Configure only while idle; ignore if a run already started. */
+      }
+    }
+    if (state.holdDisabled && typeof window.ChartvoltTetris?.setHoldEnabled === "function") {
+      window.ChartvoltTetris.setHoldEnabled(false);
+    }
+  }
+
   const adapter = {
     async createSession() {
       hostState = await api("POST", "/play/api/session", { t: token });
-      if (hostState.parentOrigin) parentOrigin = hostState.parentOrigin;
+      applyHostHints(hostState);
       return sessionFromState(hostState);
     },
     async reportEvent(event) {
@@ -86,6 +131,8 @@
         throw new Error(outcome.reason || "Lock refused");
       }
       hostState = outcome.state || hostState;
+      // Cue only — no score on the wire (ProviderGameFrame progress handler).
+      tellPlatform("progress");
       return outcome;
     },
     async finalize() {
@@ -97,50 +144,46 @@
   };
 
   async function boot() {
+    // Announce before any await so a slow or failing network cannot stall the arena.
+    announceReady();
+
     if (!token) {
-      document.getElementById("startError").textContent = "Missing launch token.";
-      tellPlatform("ready");
+      const err = document.getElementById("startError");
+      if (err) err.textContent = "Missing launch token.";
       return;
     }
 
     try {
       hostState = await api("GET", `/play/api/state?t=${encodeURIComponent(token)}`);
+      applyHostHints(hostState);
+
+      const ranked = hostState.mode === "ranked";
+      if (typeof window.ChartvoltCompetition?.configure === "function") {
+        window.ChartvoltCompetition.configure(
+          {
+            mode: ranked ? "competition" : "practice",
+            // Exact origin for the bridge's own checks; parent delivery is owned by tellPlatform.
+            parentOrigin: parentOrigin === "*" ? location.origin : parentOrigin,
+          },
+          ranked ? adapter : null,
+        );
+      }
+
+      if (hostState.finished) {
+        tellPlatform("finished");
+      }
     } catch (error) {
-      document.getElementById("startError").textContent = error.message || "Could not load round.";
-      tellPlatform("ready");
-      return;
+      const err = document.getElementById("startError");
+      if (err) err.textContent = error.message || "Could not load round.";
     }
-
-    if (hostState.parentOrigin) parentOrigin = hostState.parentOrigin;
-
-    const ranked = hostState.mode === "ranked";
-    window.ChartvoltCompetition.configure(
-      {
-        mode: ranked ? "competition" : "practice",
-        parentOrigin: parentOrigin === "*" ? location.origin : parentOrigin,
-      },
-      ranked ? adapter : null,
-    );
-
-    if (hostState.holdDisabled && typeof window.ChartvoltTetris?.setHoldEnabled === "function") {
-      window.ChartvoltTetris.setHoldEnabled(false);
-    }
-
-    if (hostState.finished) {
-      tellPlatform("ready");
-      tellPlatform("finished");
-      return;
-    }
-
-    tellPlatform("ready");
   }
 
-  // Leave button → Circuit leave message after ending the run.
+  // Leave from the shell → Circuit `exit` (ProviderGameFrame has no `leave` type).
   window.addEventListener("chartvolt:host", (event) => {
     const detail = event.detail;
     if (!detail || detail.type !== "leave" || leaving) return;
     leaving = true;
-    tellPlatform("leave");
+    tellPlatform("exit");
     if (hostState && hostState.mode === "ranked") {
       adapter.finalize().catch(() => {
         tellPlatform("finished");
@@ -149,6 +192,10 @@
       tellPlatform("finished");
     }
   });
+
+  // Mark the watchdog's subject as present so a future stall panel can tell "host ran".
+  window.__voltStackLoaded = true;
+  announceReady();
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", boot);

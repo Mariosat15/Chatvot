@@ -913,7 +913,25 @@ remains outstanding is the **opponent** half listed above, not the game half.
 Newest at the top.
 
 
-### 27 Sep 2026 - Volt Stack as a second ChartVolt Games title
+### 27 Sep 2026 - Volt Stack arena stall (ready never reached the parent)
+
+**Owner:** 1v1 Volt Stack showed "taking longer than expected to start" while the
+frame chrome (STACK HIGHER / Leave) was visible.
+
+**Cause:** Neon Stack's `competition-bridge` posted `{ channel: 'chartvolt:neon-stack',
+type: 'ready' }` at the *iframe's* origin. ProviderGameFrame only accepts Circuit-shaped
+`{ type: 'ready' }` from the launch URL origin, so ready never cleared the overlay. Leave
+was also typed `leave` instead of `exit`. Host boot could throw after the state fetch and
+never announce ready.
+
+**Fix:** `chartvolt-host.js` owns parent postMessage (`ready` early, `exit`, `finished`,
+`progress`); bridge notify is local CustomEvent only; classic watchdog **re-posts** `ready`
+(0 / 400 / 1500 / 4000 ms) so an early message lost before the parent's listener cannot
+stall forever; `?v=20260927c` on scripts for cache bust. Public assets only — pull + hard
+refresh (restart optional).
+
+**Next:** owner Leave the stuck round, hard-refresh, Play again; click **JOIN COMPETITION**
+once the overlay clears.
 
 **Plan:** add `volt-stack` under the existing ChartVolt Games provider so competitions
 and 1v1 challenges work like Circuit Sprint, without trusting client scores.

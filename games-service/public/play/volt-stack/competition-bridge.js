@@ -8,9 +8,15 @@
     Promise.resolve(promise).then(v=>{clearTimeout(timer);resolve(v)},e=>{clearTimeout(timer);reject(e)});
   });
   function notify(type, data={}) {
+    /*
+     * LOCAL ONLY. Parent traffic is owned by chartvolt-host.js, which speaks the Circuit
+     * `{ type }` shape ProviderGameFrame accepts. Posting `{ channel: 'chartvolt:neon-stack' }`
+     * at the iframe's own origin never reaches a cross-origin (or even same-origin) parent
+     * that filters on event.origin + Circuit types — and a premature `ready` on that channel
+     * was the stall the arena shows as "taking longer than expected".
+     */
     const message={channel:'chartvolt:neon-stack',version:8,type,...data};
     window.dispatchEvent(new CustomEvent('chartvolt:host',{detail:message}));
-    if(parent!==window && /^https?:\/\//.test(config.parentOrigin)) parent.postMessage(message,config.parentOrigin);
   }
   function status(text,retry=false){
     const el=document.getElementById('submissionStatus'); if(el)el.textContent=text;
