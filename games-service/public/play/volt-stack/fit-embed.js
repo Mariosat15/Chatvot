@@ -83,8 +83,7 @@
     } else {
       h += TOUCH_RESERVE;
     }
-    // Slim reserve for the board title strip above the cabinet.
-    h += 8;
+    // Reason: board-title ("VOLT STACK" chip) was removed 27 Sep 2026 — no reserve.
     return h;
   }
 

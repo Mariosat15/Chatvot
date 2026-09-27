@@ -964,6 +964,12 @@ no build. The main app needs a rebuild and restart. Then hard refresh. **Never v
   header is a measured part of `chromeHeight`, so the frame grows to fit it. Checked in a
   local iframe harness and on the standalone page (cache-bust `20260927v`). Deploy:
   `git pull`, then `pm2 restart chartvolt-games`, with no build needed.
+- Later again (remove board "VOLT STACK" chip, new logo icon, Hold broken): the board-title
+  chip above the cabinet is hidden. The CSS cube brand-blocks are replaced by the real
+  Volt Stack icon (cubes + lightning) from the owner art. Hold now works on mouse click
+  of the HOLD panel (it used to listen only for coarse/touch pointers), and the frame
+  takes focus on any press so the C key reaches the game inside the arena iframe
+  (cache-bust `20260927w`). Deploy: `git pull`, then `pm2 restart chartvolt-games`, no build.
 
 
 ### 27 Sep 2026 - Per-game How it works & tips (Guides) tab

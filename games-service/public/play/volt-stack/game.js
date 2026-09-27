@@ -2167,7 +2167,31 @@ window.ChartvoltTetris={
   ui.startBtn.addEventListener("click",resetGame);ui.restartBtn.addEventListener("click",resetGame);ui.resumeBtn.addEventListener("click",()=>togglePause(false));ui.pauseBtn.addEventListener("click",()=>togglePause());
   ui.soundBtn.addEventListener("click",()=>{soundEnabled=!soundEnabled;ui.soundBtn.classList.toggle("active",soundEnabled);ui.soundBtn.setAttribute("aria-pressed",String(soundEnabled));ui.soundBtn.classList.toggle("muted",!soundEnabled);window.VoltAudio?.setEnabled(soundEnabled);if(soundEnabled)sfx("resume")});
   document.querySelectorAll(".touch-controls button[data-action]").forEach(bindTouchButton);
-  holdCanvas.addEventListener("pointerdown",e=>{if(matchMedia("(pointer: coarse)").matches){e.preventDefault();initAudio();if(!bufferOrAct("hold")&&canPlay())hold();}},{passive:false});
+  // Reason: owner 27 Sep 2026 — Hold did nothing on click. The old handler only ran for
+  // coarse (touch) pointers, so desktop mouse clicks on the HOLD panel were ignored, and
+  // the C key only reaches this frame when the iframe has focus. Make the whole card a
+  // hold control on every pointer, accept Enter/Space while focused, and steal focus on
+  // any press inside the shell so keyboard hold works after the player clicks the board.
+  function triggerHoldFromUi(e){
+    if(e){ if(e.cancelable) e.preventDefault(); e.stopPropagation?.(); }
+    initAudio();
+    if(state==="paused") return;
+    if(!bufferOrAct("hold")&&canPlay()) hold();
+  }
+  const holdCard=document.getElementById("holdCard")||holdCanvas.closest(".hold-card")||holdCanvas;
+  holdCard.addEventListener("pointerdown",e=>{
+    // Ignore the small keyboard-hint kbd so a mis-click still holds rather than focusing nothing.
+    triggerHoldFromUi(e);
+    try{ document.body.focus({preventScroll:true}); }catch(_){ /* ignore */ }
+  },{passive:false});
+  holdCard.addEventListener("keydown",e=>{
+    if(e.key==="Enter"||e.key===" "||e.code==="KeyC"){ triggerHoldFromUi(e); }
+  });
+  const shellEl=document.querySelector(".game-shell")||document.body;
+  if(!document.body.hasAttribute("tabindex")) document.body.setAttribute("tabindex","-1");
+  shellEl.addEventListener("pointerdown",()=>{
+    try{ document.body.focus({preventScroll:true}); }catch(_){ /* ignore */ }
+  },{capture:true});
   window.addEventListener("resize",()=>{blockSpriteCache.clear();renderSideCanvases();renderGame();});
   document.addEventListener("visibilitychange",()=>{if(document.hidden){releaseHeldInputs();togglePause(true);}else updateCompetitionClock();});
   window.addEventListener("blur",()=>{releaseHeldInputs();if(["playing","clearing","collapsing"].includes(state))togglePause(true)});
