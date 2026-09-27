@@ -190,9 +190,65 @@ export interface ServiceConfig {
 
   /** Where catalogue artwork is served from. */
   assetBaseUrl: string;
+
+  /**
+   * The Volt Velocity race server, or `undefined` when this deployment does not run it.
+   *
+   * Optional as a whole, unlike every other secret here, because the three puzzle titles do not
+   * need it and a deployment without the race server is legitimate. What is NOT legitimate is
+   * half of it: one secret without the other creates rooms whose tickets or receipts can never
+   * verify, so `velocityConfig` refuses to boot on that - the same "absent configuration is
+   * never permission" rule as the rest of this file. When absent, the title reports itself as
+   * `maintenance` so the platform's pre-flight refuses new contests on it.
+   */
+  velocity?: VelocityConfig;
+}
+
+export interface VelocityConfig {
+  /** Loopback base URL of the race server's admin API. Never reaches a browser. */
+  raceUrl: string;
+  /** `RACE_ADMIN_KEY` on the race server. Creates rooms and reads receipts. */
+  adminKey: string;
+  /** `RACE_TICKET_SECRET` on the race server. Signs player tickets and result receipts. */
+  ticketSecret: string;
+  /**
+   * The race URL a player's browser connects to, when it is NOT `{origin}/race`.
+   *
+   * Unset in production, where nginx exposes the player endpoints under `/race/` on the same
+   * origin the game is served from. Set locally, where the race server listens on its own port.
+   */
+  publicRaceUrl?: string;
+  /** Absolute path to the Volt Velocity single-file browser client (the 0.21 HTML build). */
+  clientFile?: string;
 }
 
 let cached: ServiceConfig | null = null;
+
+function velocityConfig(): VelocityConfig | undefined {
+  const adminKey = rotating("VELOCITY_ADMIN_KEY");
+  const ticketSecret = rotating("VELOCITY_TICKET_SECRET");
+  if (!adminKey && !ticketSecret) return undefined;
+  if (!adminKey || !ticketSecret) {
+    throw new Error(
+      "ChartVolt Games cannot start: set BOTH VELOCITY_ADMIN_KEY and VELOCITY_TICKET_SECRET, or " +
+        "neither. One without the other creates race rooms whose tickets or result receipts " +
+        "can never be verified.",
+    );
+  }
+  if (adminKey === ticketSecret) {
+    throw new Error(
+      "ChartVolt Games cannot start: VELOCITY_ADMIN_KEY and VELOCITY_TICKET_SECRET must differ " +
+        "(the race server refuses to boot when they are equal).",
+    );
+  }
+  return {
+    raceUrl: optional("VELOCITY_RACE_URL", "http://127.0.0.1:3080").replace(/\/+$/, ""),
+    adminKey,
+    ticketSecret,
+    publicRaceUrl: rotating("VELOCITY_PUBLIC_RACE_URL")?.replace(/\/+$/, ""),
+    clientFile: rotating("VELOCITY_CLIENT_FILE"),
+  };
+}
 
 /** The origin launch URLs are built from. See `assertPlayableOrigin`. */
 function playOrigin(): string {
@@ -245,6 +301,8 @@ export function loadConfig(): ServiceConfig {
       /\/+$/,
       "",
     ),
+
+    velocity: velocityConfig(),
   };
 
   return cached;

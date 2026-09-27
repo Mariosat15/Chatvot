@@ -54,6 +54,7 @@ interface FakeNode {
   setAttribute(name: string, value: string): void;
   removeAttribute(name: string): void;
   appendChild(node: FakeNode): void;
+  insertBefore(node: FakeNode, reference: FakeNode | null): void;
   removeChild(node: FakeNode): void;
 }
 
@@ -72,6 +73,14 @@ function fakeNode(nodeName: string): FakeNode {
     },
     appendChild(child: FakeNode) {
       node.children.push(child);
+    },
+    // Reason: the neon wires (26 Sep 2026) put each glow UNDER the marks with
+    // `insertBefore(glow, firstChild)`; a stub without it failed every board test at once.
+    // DOM semantics: a null reference appends.
+    insertBefore(child: FakeNode, reference: FakeNode | null) {
+      const at = reference ? node.children.indexOf(reference) : -1;
+      if (at < 0) node.children.push(child);
+      else node.children.splice(at, 0, child);
     },
     removeChild(child: FakeNode) {
       const at = node.children.indexOf(child);

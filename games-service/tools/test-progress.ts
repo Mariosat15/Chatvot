@@ -166,7 +166,7 @@ async function main(): Promise<void> {
 
   console.log("\nWhat crosses the seam\n");
 
-  await test("carries no score, and the whole body is asserted", async () => {
+  await test("carries no settlement score, and the whole body is asserted", async () => {
     const sent = await withFetch(
       () => new Response("{}", { status: 200 }),
       () => sendProgress(round()),
@@ -177,9 +177,18 @@ async function main(): Promise<void> {
     // THE WHOLE OBJECT, not the three fields we care about. A field nobody asserted is the
     // only way to notice one nobody expected - which is how the admin credential-rotation bug
     // surfaced - and here the field that must not appear is precisely an unexpected one.
+    //
+    // Reason for the two provisional keys (flipped 27 Sep 2026, not rewritten): this test first
+    // pinned a three-key body with NO number at all. Requirements v1.20 (26 Sep) deliberately
+    // added an optional `provisionalScore` so a live board can rank an open round; the platform
+    // stores it on `game_round` for display and settlement never reads it. The test was not
+    // updated with that change and had been failing since. What still holds is the point of it:
+    // `score` and `rawScore` - the settlement fields - must never ride on a progress report.
     assert.deepEqual(Object.keys(body).sort(), [
       "breakdown",
       "providerRoundId",
+      "provisionalDurationMs",
+      "provisionalScore",
       "roundId",
     ]);
     assert.equal(body.score, undefined);

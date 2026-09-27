@@ -125,8 +125,8 @@ work for a provider contest with `lower_is_better` scores.
 | Phase | Content | Estimate |
 |---|---|---|
 | **VV1** | Race server in repo + PM2 + nginx + the two server patches (B, C) with tests | 2-3 days - **BUILT 27 Sep 2026**, see 8.1 |
-| **VV2** | Title, round-create branch, bootstrap page, session endpoint, static client (D, E, F, L) | 2-3 days |
-| **VV3** | Result sweeper + receipt verification + per-player callbacks (G) | 1-2 days |
+| **VV2** | Title, round-create branch, bootstrap page, session endpoint, static client (D, E, F, L) | 2-3 days - **CODE-COMPLETE 27 Sep 2026**, see 8.2 |
+| **VV3** | Result sweeper + receipt verification + per-player callbacks (G) | 1-2 days - **CODE-COMPLETE 27 Sep 2026**, see 8.3 |
 | **VV4** | Platform lobby window, `scheduledStartAt`, player-cap pre-flight, spec version bump (H, I, J) | 2 days |
 | **VV5** | End-to-end rehearsal: 2 then 16 simulated players (headless clients), restart drill, deploy runbook, docs | 2 days |
 
@@ -166,6 +166,86 @@ authoritative list of every change. **It is not built and not deployed**; nothin
   at the gun - each turned the suite red.
 - **VV-6 is resolved**: the vendor declares no Node engine; `--env-file` needs Node 20.6, which is
   what `package.json` now states.
+
+### 8.2 VV2 - what was built (27 September 2026)
+
+A fourth ChartVolt Games title, `volt-velocity`, in `games-service/src/games/volt-velocity/`
+(`title.ts`, `tracks.ts`, `copy.ts`, `race-server.ts`, `launch.ts`), plus
+`rounds/play-volt-velocity.ts`, `http/volt-velocity-client.ts` and a host page in
+`public/play/volt-velocity/`. **Code-complete, not deployed, and the platform half (VV4) is not
+built**, so no contest can be created on it yet. Everything in this list is `games-service` only
+and shares no code with the platform (`check:isolation`).
+
+- **The title is `playMode: "scheduled"`, `lower_is_better`, `duration_ms`, `maxDurationSeconds:
+  305`, `supportsOneVsOne: true`, desktop only**, config = `trackId` (`auto` or one of the 15
+  tracks, resolved per race from the seed). Copy in `en` and `el`.
+- **Deviation: `supportsPractice: false`**, where 4.1 D said `true`. A practice round would need a
+  race room of its own with nobody else in it, and a one-player scheduled room is cancelled by the
+  server at the gun (VV1). A ranked-only title is honest; `mode: "practice"` is refused with a 400
+  that names the reason.
+- **An unconfigured deployment publishes the title as `maintenance`**, so the platform's pre-flight
+  refuses contests on it rather than selling seats in a race nobody can host. Configuration is
+  all-or-nothing: `VELOCITY_ADMIN_KEY` and `VELOCITY_TICKET_SECRET` both or neither, and they must
+  differ (the race server refuses to boot when they are equal), or games-service refuses to start.
+- **Seating happens at round creation, before the round is written**: the room id is derived from
+  `(gameCode, contentSeed, track, scheduledStartAt)`, so every entrant of one contest lands in one
+  room, and the racer's id on the race server is the **`providerRoundId`**, never the platform's
+  user id - the receipt is keyed by it and it keeps a user id out of a second process's archive.
+- **Deviation: no new error codes.** 4.1 E sketched `RACE_FULL` / `RACE_CLOSED`; the provider
+  error table is a closed set the platform branches on, so a new code is a protocol change. Full or
+  closed -> 400 `INVALID_REQUEST` (permanent, and a failed creation consumes no attempt); race
+  server unreachable -> 503 `GAME_UNAVAILABLE`, retryable; any other refusal -> 500 `INTERNAL`.
+- **`scheduledStartAt` is accepted on `POST /v1/rounds`** (must be before `expiresAt` and at most
+  six hours ahead). Absent means a challenge room, which starts when both players are Ready. **The
+  requirements document is not yet amended** - that is VV4 piece I, with its version bump.
+- **The session endpoint is `POST /play/api/velocity/session`**, token in the body: it marks the
+  round `in_progress` and returns the room id, a freshly minted ticket (never stored), the client
+  URL and, locally only, the race URL. **No score comes back through it.**
+- **Deviation from 4.1 F/L: the client is a nested same-origin frame, not static assets in the
+  repository.** The vendor client is one ~107 MB self-contained HTML file; it is not committed and
+  not edited. The operator points `VELOCITY_CLIENT_FILE` at it and games-service streams it at a
+  size-and-mtime fingerprinted URL with an immutable cache. The host page loads it in a frame and
+  drives its public `ChartvoltVelocity3D.connectCompetition` API, so the ticket is handed over as a
+  JavaScript value and never reaches a `src`, a `Referer` or an access log. The host only ever
+  posts `ready` and `finished` to the platform - never a time, position or lap.
+- **Known and accepted: a duplicate concurrent create can leave an orphan seat.** Two requests with
+  the same `roundId` arriving together each seat a player before the unique index refuses one of
+  them. The loser's seat is a registered racer who never connects, and a registered racer who
+  never connects does not race (VV1). Harmless, so it is recorded rather than locked.
+
+### 8.3 VV3 - what was built (27 September 2026)
+
+`games-service/src/callback/race-results.ts`, called at the start of every `sweepOnce`.
+
+- **A race round is closed ONLY by a verified receipt.** The sweeper groups open velocity rounds by
+  room, polls each room at most every 10 s (20 rooms per tick), verifies the HMAC over
+  `signedPayload` and reads only the signed payload. Finished without DNF -> `completed` with
+  `score = timeMs`; DNF, unfinished or absent from the results -> `completed` with **no score**
+  (never zero, which on a lower-is-better title would be the best time on the board). A
+  **cancelled** race -> every round `voided` with the reason, so the attempt is handed back.
+- **A grace window keeps the ordinary expiry from beating the receipt.** `hardDeadline` for a race
+  round is `expiresAt + 10 minutes` (`VELOCITY_RESULT_GRACE_MS`), and the overdue sweep and the
+  finished-clock sweep both skip race rounds until then - otherwise a race ending at the contest
+  window's close is expired a second before its result is read.
+- **A room the race server has lost** (404, e.g. a restart mid-race) is voided once the oldest round
+  in it is at least 60 s old, so a round created a moment ago is not mistaken for a lost one.
+- **Deviation from section 6: a receipt that fails verification closes nothing.** It is logged as an
+  error on every poll and the round is left open; when the grace window ends it is expired without a
+  score. games-service has no `unresolved` status - that is the platform's reconciliation state -
+  and paying on, or voiding on, a receipt we cannot trust are both wrong.
+- **Tests: `npm run test:velocity`**, 7, part of `npm test` (now **344**). It **spawns the real
+  race server** rather than stubbing it, and reads its track list as text rather than importing it,
+  because `check:isolation` forbids that import. It proves the track lists agree, that two entrants
+  share one room the race server knows, that the ticket we sign is accepted by the race server and a
+  tampered one refused, that no ticket appears in any URL, and that a scheduled race nobody joins is
+  cancelled, receipted, verified and delivered to the platform as `voided` with no score. It
+  **skips loudly** when `velocity-server/node_modules` is missing. Two probes - scoring a DNF, and
+  ignoring a cancellation - each turned exactly one test red.
+- **A finished race is not exercised end to end**: it takes five minutes and two steering clients.
+  That is VV5's headless rehearsal; here scoring is covered on hand-built entries.
+- Two **pre-existing** failures were fixed on the way, both flipped rather than deleted: the progress
+  test still expected the pre-v1.20 body without `provisionalScore` / `provisionalDurationMs`, and
+  the board test's fake DOM lacked `insertBefore`, which `board.js` has called since `ade774ef`.
 
 ## 9. Owner decisions (answered 27 September 2026)
 

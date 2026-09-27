@@ -61,6 +61,16 @@ export interface RoundBoard {
   attempts: number;
 }
 
+export interface RoundRace {
+  raceId: string;
+  /** The resolved track, never "auto" - the race server needs a real one. */
+  trackId: string;
+  /** When the gun fires. Absent on a challenge, which starts when both players are Ready. */
+  scheduledStartAt?: Date;
+  /** When the sweeper last asked the race server for this room's result. */
+  lastPolledAt?: Date;
+}
+
 export interface RoundSandbox {
   /**
    * Overrides the computed score.
@@ -196,6 +206,14 @@ export interface RoundDoc {
    * the engine re-scores.
    */
   stackLocks?: StackLockRecord[];
+  /**
+   * Volt Velocity only: the shared race room this round races in.
+   *
+   * Every round of one contest points at the same `raceId`. The race server, not this service,
+   * decides who finished and in what time; this record is how the result sweeper finds the
+   * rounds a signed race receipt belongs to.
+   */
+  race?: RoundRace;
   /** Set when a terminal state is reached, and never recomputed afterwards. */
   score?: number;
   durationMs?: number;
@@ -234,6 +252,16 @@ const StackLockSchema = new Schema<StackLockRecord>(
       ),
     },
     at: { type: Date, required: true },
+  },
+  { _id: false },
+);
+
+const RaceSchema = new Schema<RoundRace>(
+  {
+    raceId: { type: String, required: true },
+    trackId: { type: String, required: true },
+    scheduledStartAt: { type: Date },
+    lastPolledAt: { type: Date },
   },
   { _id: false },
 );
@@ -300,6 +328,7 @@ const RoundSchema = new Schema<RoundDoc>(
     },
     boards: { type: [BoardSchema], default: [] },
     stackLocks: { type: [StackLockSchema], default: undefined },
+    race: { type: RaceSchema },
     score: { type: Number },
     durationMs: { type: Number },
     scoreBreakdown: { type: Schema.Types.Mixed },
@@ -323,6 +352,9 @@ RoundSchema.index({ "delivery.acknowledgedAt": 1, "delivery.nextAttemptAt": 1 })
 
 /** Used to find a player's live round, which is how a resumed session finds its way back. */
 RoundSchema.index({ playerId: 1, status: 1 });
+
+/** The race-result sweeper: open rounds grouped by the race they belong to. */
+RoundSchema.index({ "race.raceId": 1, status: 1 });
 
 export type RoundDocument = HydratedDocument<RoundDoc>;
 

@@ -1,6 +1,12 @@
 import type { Request, Response } from "express";
 
-import { findTitle, shapeFor, VOLT_STACK_CODE, type TitleDefinition } from "../games/titles";
+import {
+  findTitle,
+  shapeFor,
+  VOLT_STACK_CODE,
+  VOLT_VELOCITY_CODE,
+  type TitleDefinition,
+} from "../games/titles";
 import { generatePuzzle } from "../engine/generate";
 import { SeededRandom } from "../engine/rng";
 
@@ -66,6 +72,23 @@ function stackBoardSvg(seed: string, cell: number): string {
 }
 
 /**
+ * Volt Velocity is a race, so its placeholder is a circuit outline with a start line - not a
+ * board. Deliberately not a picture of any real track: the track is chosen per contest.
+ */
+function trackSvg(cell: number): string {
+  const width = cell * 6;
+  const height = cell * 4;
+  const inset = cell * 0.7;
+  const radius = (height - inset * 2) / 2;
+  return `<g>
+<rect width="${width}" height="${height}" rx="10" fill="#0b1726"/>
+<rect x="${inset}" y="${inset}" width="${width - inset * 2}" height="${height - inset * 2}" rx="${radius}" fill="none" stroke="#1f3a57" stroke-width="${cell * 0.55}"/>
+<rect x="${inset}" y="${inset}" width="${width - inset * 2}" height="${height - inset * 2}" rx="${radius}" fill="none" stroke="#00d5ff" stroke-width="2" stroke-dasharray="${cell * 0.3} ${cell * 0.2}" opacity="0.8"/>
+<line x1="${width / 2}" y1="${inset - cell * 0.28}" x2="${width / 2}" y2="${inset + cell * 0.28}" stroke="#ffffff" stroke-width="4"/>
+</g>`;
+}
+
+/**
  * Draws one board as SVG, at a fixed seed.
  *
  * The solved paths are shown, which is safe precisely because the seed is a constant chosen here
@@ -77,6 +100,9 @@ function boardSvg(title: TitleDefinition, seed: string, cell: number): string {
   // Volt Stack is not a circuit puzzle — draw stacked blocks instead of wire paths.
   if (title.gameCode === VOLT_STACK_CODE) {
     return stackBoardSvg(seed, cell);
+  }
+  if (title.gameCode === VOLT_VELOCITY_CODE) {
+    return trackSvg(cell);
   }
 
   const shape = shapeFor("medium");

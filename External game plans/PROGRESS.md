@@ -1031,6 +1031,22 @@ no build. The main app needs a rebuild and restart. Then hard refresh. **Never v
   35 tests (21 vendor + 14), three probes red. **Nothing calls it yet and it is not deployed**;
   a race cannot be played until VV2 (title, bootstrap page, client serving) and VV3 (result
   sweeper). Every patch is listed in `velocity-server/CHARTVOLT-PATCHES.md`.
+- **Later again, 27 Sep 2026 - VV2 and VV3 CODE-COMPLETE: games-service hosts and settles the
+  race** (`23` s8.2, s8.3). `volt-velocity` is a fourth ChartVolt Games title (scheduled,
+  lower-is-better ms, 1v1 on, desktop only); `POST /v1/rounds` seats the player in the race room
+  derived from the contest seed (race id = `providerRoundId`) and accepts `scheduledStartAt`; a
+  host page fetches a ticket by POST and drives the vendor client in a same-origin frame, so the
+  ticket is never in a URL and no score is ever posted. The sweeper closes a race round **only
+  from a verified receipt** (finisher -> score, DNF -> no score, cancelled -> voided, room lost
+  for 60 s -> voided), with a 10-minute grace so ordinary expiry cannot beat the result.
+  **Four recorded deviations:** `supportsPractice: false` (a solo scheduled room is cancelled at
+  the gun); no new error codes (full/closed -> `INVALID_REQUEST`, down -> `GAME_UNAVAILABLE`);
+  the ~107 MB client stays out of the repository (`VELOCITY_CLIENT_FILE`); an unverifiable receipt
+  closes nothing and the round expires after the grace. A duplicate concurrent create can leave an
+  orphan seat that never races - accepted. New `npm run test:velocity` (7, spawns the real race
+  server, 2 probes red) is part of `npm test`, now **344** green; two stale tests fixed (v1.20
+  progress keys, fake `insertBefore`). **Not deployed; no contest can use it until VV4** (lobby
+  window, `scheduledStartAt` in the protocol with a version bump, the 16-player pre-flight cap).
 
 
 ### 27 Sep 2026 - Per-game How it works & tips (Guides) tab

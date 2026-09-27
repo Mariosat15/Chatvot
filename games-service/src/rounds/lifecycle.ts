@@ -4,6 +4,7 @@ import {
   findTitle,
   roundDurationMs,
   VOLT_STACK_CODE,
+  VOLT_VELOCITY_CODE,
   type RoundConfig,
   type TitleDefinition,
 } from "../games/titles";
@@ -45,6 +46,14 @@ export interface FinishOptions {
   /** Recorded on a void, where the reason is the whole content of the support conversation. */
   reason?: string;
   at?: Date;
+  /**
+   * A result computed OUTSIDE this service, which `scoreFor` uses verbatim.
+   *
+   * Volt Velocity only: the race server simulates the race and signs the finishing times, and
+   * the result sweeper passes them here after verifying that signature. Every other title scores
+   * from what this service recorded, and ignores the field.
+   */
+  result?: { score?: number; durationMs?: number; breakdown?: Record<string, unknown> };
 }
 
 export interface FinishOutcome {
@@ -75,8 +84,13 @@ function scoreFor(
   config: RoundConfig,
   round: RoundDoc,
   status: FinishOptions["status"],
+  external?: FinishOptions["result"],
 ): { score?: number; durationMs?: number; breakdown?: Record<string, unknown> } {
   if (status === "voided") return {};
+
+  // A race is scored by the race server and nowhere else. With no verified result there is NO
+  // score - never `zeroScore`, which on this lower-is-better title would be the winning time.
+  if (title.gameCode === VOLT_VELOCITY_CODE) return external ?? {};
 
   if (title.gameCode === VOLT_STACK_CODE && config.kind === "volt-stack") {
     const locks = (round.stackLocks ?? [])
@@ -211,7 +225,7 @@ export async function finishRound(
   const computed = title
     ? applySandboxScore(
         current,
-        scoreFor(title, current.config as unknown as RoundConfig, current, status),
+        scoreFor(title, current.config as unknown as RoundConfig, current, status, options.result),
       )
     : {};
 
@@ -282,9 +296,24 @@ export function gameplayEndsAt(round: Pick<RoundDoc, "startedAt" | "config">): D
  * round is still bounded by `expiresAt`, which always exists, and `finishRound` voids a round whose
  * title has vanished anyway - so the only thing a borrowed number could add is the mistake above.
  */
+/**
+ * How long past `expiresAt` a Volt Velocity round waits for its race receipt before the sweeper's
+ * fallback closes it as `expired` with no score. The receipt normally arrives seconds after the
+ * finish; this only bounds a race server that has gone quiet.
+ */
+export const VELOCITY_RESULT_GRACE_MS = 10 * 60 * 1000;
+
 export function hardDeadline(
   round: Pick<RoundDoc, "gameCode" | "startedAt" | "config" | "expiresAt">,
 ): Date {
+  // A race's `startedAt` is when the player opened the lobby, not when the race went green, so a
+  // clock measured from it would end the round before the start. The race server owns the race's
+  // own clock; this service's only deadline for it is the contest window - plus a grace, so the
+  // result sweeper can read the signed receipt of a race that ends near the window's close before
+  // this fallback closes the round with no score.
+  if (round.gameCode === VOLT_VELOCITY_CODE) {
+    return new Date(round.expiresAt.getTime() + VELOCITY_RESULT_GRACE_MS);
+  }
   const gameplay = gameplayEndsAt(round);
   const titleMaxSeconds = findTitle(round.gameCode)?.maxDurationSeconds;
   const ceiling =
@@ -387,7 +416,15 @@ export function playability(
 export async function findOverdueRounds(now = new Date(), limit = 50): Promise<RoundDocument[]> {
   return Round.find({
     status: { $nin: TERMINAL_STATUSES },
-    expiresAt: { $lte: now },
+    // Reason for the split: a race round inside its result grace is not overdue, and left in this
+    // query it would sit at the head of the `expiresAt` sort and take the whole batch every tick.
+    $or: [
+      { gameCode: { $ne: VOLT_VELOCITY_CODE }, expiresAt: { $lte: now } },
+      {
+        gameCode: VOLT_VELOCITY_CODE,
+        expiresAt: { $lte: new Date(now.getTime() - VELOCITY_RESULT_GRACE_MS) },
+      },
+    ],
   })
     .sort({ expiresAt: 1 })
     .limit(limit);
@@ -411,6 +448,9 @@ export async function findOverdueRounds(now = new Date(), limit = 50): Promise<R
 export async function findFinishedClocks(now = new Date(), limit = 50): Promise<RoundDocument[]> {
   const candidates = await Round.find({
     status: "in_progress",
+    // A race has no gameplay clock here; its deadline is the window plus grace, which the overdue
+    // query covers. Excluded so open races cannot crowd real clocks out of the batch.
+    gameCode: { $ne: VOLT_VELOCITY_CODE },
     startedAt: { $lte: new Date(now.getTime() - 1000) },
   })
     .sort({ startedAt: 1 })

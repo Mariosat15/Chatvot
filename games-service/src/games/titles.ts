@@ -47,9 +47,20 @@
 
 import { PuzzleShape } from "../engine/generate";
 import { copyFor, howToPlayFor, TITLE_LOCALES } from "./content";
-import { PERFECT_CODE, SPRINT_CODE, VOLT_STACK_CODE } from "./titles-codes";
+import { PERFECT_CODE, SPRINT_CODE, VOLT_STACK_CODE, VOLT_VELOCITY_CODE } from "./titles-codes";
+import {
+  VOLT_VELOCITY,
+  resolveVelocityConfig,
+  type VoltVelocityConfig,
+} from "./volt-velocity/title";
 
-export { PERFECT_CODE, SPRINT_CODE, VOLT_STACK_CODE } from "./titles-codes";
+export {
+  PERFECT_CODE,
+  SPRINT_CODE,
+  VOLT_STACK_CODE,
+  VOLT_VELOCITY_CODE,
+} from "./titles-codes";
+export { VOLT_VELOCITY, type VoltVelocityConfig } from "./volt-velocity/title";
 
 export type ScoreDirection = "higher_is_better" | "lower_is_better";
 export type ScoreType = "integer" | "decimal" | "duration_ms";
@@ -344,7 +355,7 @@ export const VOLT_STACK: TitleDefinition = {
   status: "active",
 };
 
-export const TITLES: TitleDefinition[] = [SPRINT, PERFECT, VOLT_STACK];
+export const TITLES: TitleDefinition[] = [SPRINT, PERFECT, VOLT_STACK, VOLT_VELOCITY];
 
 export function findTitle(gameCode: string): TitleDefinition | undefined {
   return TITLES.find((title) => title.gameCode === gameCode);
@@ -372,7 +383,7 @@ export interface VoltStackConfig {
   durationSeconds: number;
 }
 
-export type RoundConfig = SprintConfig | PerfectConfig | VoltStackConfig;
+export type RoundConfig = SprintConfig | PerfectConfig | VoltStackConfig | VoltVelocityConfig;
 
 function asGridSize(value: unknown, fallback: GridSize): GridSize {
   return GRID_SIZES.includes(value as GridSize) ? (value as GridSize) : fallback;
@@ -451,6 +462,8 @@ export function resolveConfig(
     };
   }
 
+  if (title.gameCode === VOLT_VELOCITY_CODE) return resolveVelocityConfig(raw);
+
   const boardCount = clampInteger(raw.boardCount, 3, 10, 5);
   if (boardCount.clamped) corrected.push("boardCount");
   const penalty = clampInteger(raw.unfinishedPenaltyMs, 30_000, 300_000, 120_000);
@@ -480,5 +493,6 @@ export function roundDurationMs(config: RoundConfig): number {
   if (config.kind === "sprint" || config.kind === "volt-stack") {
     return config.durationSeconds * 1000;
   }
+  if (config.kind === "volt-velocity") return VOLT_VELOCITY.maxDurationSeconds * 1000;
   return PERFECT.maxDurationSeconds * 1000;
 }

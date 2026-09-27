@@ -4,10 +4,13 @@ import {
   completeRound,
   currentState,
   leaveRound,
+  roundForToken,
   startOrResume,
   submitBoard,
 } from "../rounds/play";
 import { recordStackLock } from "../rounds/play-volt-stack";
+import { startVelocitySession } from "../rounds/play-volt-velocity";
+import { VOLT_VELOCITY_CODE } from "../games/titles";
 import { badRequest } from "./errors";
 
 /**
@@ -84,6 +87,18 @@ export async function postComplete(req: Request, res: Response): Promise<void> {
  * The body may carry a `score` field from older clients; `recordStackLock` refuses the whole
  * request if it does, so a tampered client cannot smuggle a total past the engine.
  */
+/**
+ * Volt Velocity: open the round and hand the browser its seat (room id, signed ticket, client URL).
+ * Never a score - the result comes from the race server's signed receipt.
+ */
+export async function postVelocitySession(req: Request, res: Response): Promise<void> {
+  const round = await roundForToken(readToken(req.body));
+  if (round.gameCode !== VOLT_VELOCITY_CODE) {
+    throw badRequest("This round is not a Volt Velocity race.");
+  }
+  res.json(await startVelocitySession(round));
+}
+
 export async function postStackLock(req: Request, res: Response): Promise<void> {
   const token = readToken(req.body);
   const outcome = await recordStackLock(token, req.body?.lock ?? req.body);

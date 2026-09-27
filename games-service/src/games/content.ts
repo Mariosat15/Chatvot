@@ -14,7 +14,8 @@
  */
 
 import { DEFAULT_LOCALE, type SupportedLocale } from "./locale";
-import { PERFECT_CODE, VOLT_STACK_CODE } from "./titles-codes";
+import { PERFECT_CODE, VOLT_STACK_CODE, VOLT_VELOCITY_CODE } from "./titles-codes";
+import { VOLT_VELOCITY_COPY, VOLT_VELOCITY_RULES_BY_LOCALE } from "./volt-velocity/copy";
 
 /**
  * One title's player-facing text in one language.
@@ -190,6 +191,13 @@ export function stackRulesFor(locale: string): readonly string[] {
   return supported === "el" ? VOLT_STACK_RULES_BY_LOCALE.el : VOLT_STACK_RULES_BY_LOCALE.en;
 }
 
+export function velocityRulesFor(locale: string): readonly string[] {
+  const supported = asSupported(locale);
+  return supported === "el"
+    ? VOLT_VELOCITY_RULES_BY_LOCALE.el
+    : VOLT_VELOCITY_RULES_BY_LOCALE.en;
+}
+
 /**
  * Catalogue / intro copy for a title in a locale.
  *
@@ -204,7 +212,9 @@ export function copyFor(gameCode: string, locale: string): TitleCopy {
       ? PERFECT_COPY
       : gameCode === VOLT_STACK_CODE
         ? VOLT_STACK_COPY
-        : SPRINT_COPY;
+        : gameCode === VOLT_VELOCITY_CODE
+          ? VOLT_VELOCITY_COPY
+          : SPRINT_COPY;
   const supported = asSupported(locale);
   return supported === "el" ? table.el : table.en;
 }
@@ -216,7 +226,11 @@ export function howToPlayProse(rules: readonly string[], pacingNote: string): st
 export function howToPlayFor(gameCode: string, locale: string): string {
   const copy = copyFor(gameCode, locale);
   const rules =
-    gameCode === VOLT_STACK_CODE ? stackRulesFor(locale) : boardRulesFor(locale);
+    gameCode === VOLT_STACK_CODE
+      ? stackRulesFor(locale)
+      : gameCode === VOLT_VELOCITY_CODE
+        ? velocityRulesFor(locale)
+        : boardRulesFor(locale);
   return howToPlayProse(rules, copy.pacingNote);
 }
 

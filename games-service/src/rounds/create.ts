@@ -1,7 +1,20 @@
 import crypto from "crypto";
 
 import { loadConfig } from "../config";
-import { findTitle, resolveConfig, VOLT_STACK_CODE, type RoundConfig } from "../games/titles";
+import {
+  findTitle,
+  resolveConfig,
+  VOLT_STACK_CODE,
+  VOLT_VELOCITY_CODE,
+  type RoundConfig,
+  type VoltVelocityConfig,
+} from "../games/titles";
+import {
+  parseScheduledStart,
+  requireVelocityConfig,
+  seatVelocityPlayer,
+  type VelocitySeat,
+} from "../games/volt-velocity/launch";
 import { Round, type RoundDoc, type RoundDocument } from "../store/round.model";
 import { ApiError, badRequest, roundConflict, unknownGame } from "../http/errors";
 
@@ -31,6 +44,8 @@ export interface CreateRoundInput {
   returnUrl?: unknown;
   /** Origin of the hosting page — required (HTML v1.18 / A13). */
   parentOrigin?: unknown;
+  /** Volt Velocity only: when the scheduled race goes green. Absent on a challenge. */
+  scheduledStartAt?: unknown;
 }
 
 export interface CreateRoundOutput {
@@ -175,6 +190,7 @@ function launchUrlFor(token: string, gameCode: string): string {
     // root-absolute `/play/volt-stack/…` asset URLs so that redirect cannot break the board.
     return `${base}/play/volt-stack/?t=${token}`;
   }
+  if (gameCode === VOLT_VELOCITY_CODE) return `${base}/play/volt-velocity/?t=${token}`;
   return `${base}/play?t=${token}`;
 }
 
@@ -244,6 +260,14 @@ export async function createRound(input: CreateRoundInput): Promise<CreateRoundO
   const mode = requireString(input.mode, "mode");
   if (mode !== "ranked" && mode !== "practice") {
     throw badRequest("'mode' must be 'ranked' or 'practice'.");
+  }
+  const isVelocity = gameCode === VOLT_VELOCITY_CODE;
+  if (isVelocity) {
+    // Before any other parsing, so a deployment without the race server refuses with the reason.
+    requireVelocityConfig();
+    if (mode === "practice") {
+      throw badRequest("'volt-velocity' has no practice mode (supportsPractice is false).");
+    }
   }
 
   const player = (input.player ?? {}) as Record<string, unknown>;
@@ -321,6 +345,21 @@ export async function createRound(input: CreateRoundInput): Promise<CreateRoundO
   const providerRoundId = `cvg_r_${crypto.randomBytes(9).toString("hex")}`;
   const launchToken = crypto.randomBytes(24).toString("hex");
 
+  // Seated BEFORE the round is written: a race that is full, closed or unreachable must refuse
+  // creation, which section 11 says consumes no attempt. `scheduledStartAt` is deliberately not
+  // in the fingerprint - it decides which room, not what the player faces inside it.
+  let seat: VelocitySeat | undefined;
+  if (isVelocity) {
+    seat = await seatVelocityPlayer(
+      gameCode,
+      contentSeed as string,
+      config as VoltVelocityConfig,
+      parseScheduledStart(input.scheduledStartAt, expiresAt, now),
+      providerRoundId,
+      typeof player.displayName === "string" ? player.displayName : undefined,
+    );
+  }
+
   try {
     const created = await Round.create({
       roundId,
@@ -351,6 +390,15 @@ export async function createRound(input: CreateRoundInput): Promise<CreateRoundO
       parentOrigin,
       status: "created",
       boards: [],
+      ...(seat
+        ? {
+            race: {
+              raceId: seat.identity.raceId,
+              trackId: seat.identity.trackId,
+              scheduledStartAt: seat.scheduledStartAt,
+            },
+          }
+        : {}),
       sandbox: {},
       delivery: { attempts: 0 },
     });

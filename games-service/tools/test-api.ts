@@ -124,13 +124,16 @@ async function main(): Promise<number> {
   await test("publishes every title with every required field", async () => {
     const response = await callApi<{ games: Record<string, unknown>[] }>("/v1/games");
     const games = response.body.games;
-    // Sprint + deprecated Perfect + Volt Stack. Deprecated stays published so history
-    // keys resolve; the platform pre-flight refuses non-active titles for new contests.
-    assert.equal(games.length, 3);
+    // Sprint + deprecated Perfect + Volt Stack + Volt Velocity. Deprecated stays published so
+    // history keys resolve; the platform pre-flight refuses non-active titles for new contests.
+    // Velocity is published even with no race server configured - as "maintenance", never absent,
+    // since a row joined to contest history must not disappear from the catalogue.
+    assert.equal(games.length, 4);
     const codes = new Set(games.map((g) => String(g.gameCode)));
     assert.ok(codes.has("circuit-sprint"));
     assert.ok(codes.has("circuit-perfect"));
     assert.ok(codes.has("volt-stack"));
+    assert.ok(codes.has("volt-velocity"));
 
     const required = [
       "gameCode",
@@ -181,6 +184,8 @@ async function main(): Promise<number> {
     assert.equal(byCode.get("circuit-sprint"), "higher_is_better");
     assert.equal(byCode.get("circuit-perfect"), "lower_is_better");
     assert.equal(byCode.get("volt-stack"), "higher_is_better");
+    // A race is won by the fastest finishing time, so it is the live lower_is_better title.
+    assert.equal(byCode.get("volt-velocity"), "lower_is_better");
   });
 
   await test("every title's how-to-play carries its own shared rules, word for word", async () => {
@@ -191,14 +196,18 @@ async function main(): Promise<number> {
      * Asserting BOARD_RULES against every catalogue row would fail on Volt Stack for the
      * wrong reason - different game, different rules - so each family is checked separately.
      */
-    const { BOARD_RULES, stackRulesFor } = await import("../src/games/content");
+    const { BOARD_RULES, stackRulesFor, velocityRulesFor } = await import("../src/games/content");
     const response = await callApi<{ games: { gameCode: string; howToPlay: string }[] }>(
       "/v1/games",
     );
 
     for (const game of response.body.games) {
       const rules =
-        game.gameCode === "volt-stack" ? stackRulesFor("en") : BOARD_RULES;
+        game.gameCode === "volt-stack"
+          ? stackRulesFor("en")
+          : game.gameCode === "volt-velocity"
+            ? velocityRulesFor("en")
+            : BOARD_RULES;
       for (const rule of rules) {
         assert.ok(
           game.howToPlay.includes(rule),
@@ -257,6 +266,12 @@ async function main(): Promise<number> {
         game.platforms.includes("desktop"),
         `${game.gameCode} missing desktop`,
       );
+      // The one deliberate exception: Volt Velocity is a 3D racer steered by keyboard or gamepad,
+      // and claiming phones would sell a paid seat to a player who cannot steer.
+      if (game.gameCode === "volt-velocity") {
+        assert.deepEqual(game.platforms, ["desktop"]);
+        continue;
+      }
       assert.ok(
         game.platforms.includes("mobile"),
         `${game.gameCode} missing mobile`,

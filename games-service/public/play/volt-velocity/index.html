@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Volt Velocity</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #050b14;
+        color: #d8e6f5;
+        font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+      #race {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        border: 0;
+        display: block;
+      }
+      #status {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        text-align: center;
+        padding: 24px;
+        background: #050b14;
+      }
+      #status[hidden] {
+        display: none;
+      }
+      #status strong {
+        color: #00d5ff;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+      #error {
+        color: #ff8a8a;
+        max-width: 32rem;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- The race client is a separate same-origin document; this page only boots it. -->
+    <iframe
+      id="race"
+      title="Volt Velocity"
+      allow="fullscreen; autoplay; gamepad"
+      hidden
+    ></iframe>
+    <div id="status" role="status" aria-live="polite">
+      <strong>Volt Velocity</strong>
+      <span id="message">Loading the race&hellip;</span>
+      <span id="error"></span>
+    </div>
+    <script src="/play/volt-velocity/velocity-host.js"></script>
+  </body>
+</html>

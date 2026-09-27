@@ -18,8 +18,10 @@ import {
   postSession,
   postStackLock,
   postSubmit,
+  postVelocitySession,
 } from "./http/play-routes";
 import { serveVoltStackAsset, serveVoltStackPage } from "./http/volt-stack-page";
+import { serveVelocityClient, serveVelocityHost } from "./http/volt-velocity-client";
 import { serveReplay } from "./http/replay";
 import { getRound, postRound, postVoidRound } from "./http/rounds";
 import { armRound, finishRoundForTesting, redeliver, requireSandbox } from "./http/sandbox";
@@ -143,6 +145,11 @@ export function createApp() {
   app.get("/play/volt-stack", serveVoltStackPage);
   app.get("/play/volt-stack/", serveVoltStackPage);
   app.get("/play/volt-stack/*", serveVoltStackAsset);
+  // Volt Velocity, same reason. The race client itself is streamed from VELOCITY_CLIENT_FILE.
+  app.get("/play/volt-velocity", serveVelocityHost);
+  app.get("/play/volt-velocity/", serveVelocityHost);
+  app.get("/play/volt-velocity/client/:fingerprint", serveVelocityClient);
+  app.get("/play/volt-velocity/:file", serveVelocityHost);
   app.get("/play/:asset", servePlayAsset);
   /*
    * The fingerprinted form. Two segments, so it has the same shape as `GET /play/api/state` - the
@@ -159,6 +166,7 @@ export function createApp() {
   app.post("/play/api/leave", wrap(postLeave));
   app.post("/play/api/complete", wrap(postComplete));
   app.post("/play/api/lock", wrap(postStackLock));
+  app.post("/play/api/velocity/session", wrap(postVelocitySession));
 
   // Ambiguity A14 / R35 — token-scoped attempt summary, never puzzle content.
   app.get("/replay/:providerRoundId", wrap(serveReplay));

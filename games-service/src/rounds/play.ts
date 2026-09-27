@@ -9,6 +9,7 @@ import {
   roundDurationMs,
   shapeFor,
   VOLT_STACK_CODE,
+  VOLT_VELOCITY_CODE,
   type PerfectConfig,
   type RoundConfig,
 } from "../games/titles";
@@ -157,14 +158,30 @@ export async function roundForToken(token: string): Promise<RoundDocument> {
   return round;
 }
 
+/**
+ * `roundForToken` for every play endpoint except the race session.
+ *
+ * Reason: a Volt Velocity round is finished only by the race server's signed receipt. Letting
+ * `/play/api/leave` or `/complete` end one from the browser would close it before the sweeper
+ * could record the real result, and a board or state call would try to build a circuit puzzle
+ * for a title that has none. Its only browser endpoint is `/play/api/velocity/session`.
+ */
+async function boardRoundForToken(token: string): Promise<RoundDocument> {
+  const round = await roundForToken(token);
+  if (round.gameCode === VOLT_VELOCITY_CODE) {
+    throw new ApiError(400, "INVALID_REQUEST", "Volt Velocity races use their own session.");
+  }
+  return round;
+}
+
 function boardTargetFor(config: RoundConfig): number | undefined {
   return config.kind === "perfect" ? (config as PerfectConfig).boardCount : undefined;
 }
 
 function puzzleFor(round: RoundDocument, index: number): ClientPuzzle {
   const config = round.config as unknown as RoundConfig;
-  if (config.kind === "volt-stack") {
-    throw new ApiError(400, "INVALID_REQUEST", "Volt Stack rounds do not use circuit boards.");
+  if (config.kind === "volt-stack" || config.kind === "volt-velocity") {
+    throw new ApiError(400, "INVALID_REQUEST", "This round does not use circuit boards.");
   }
   const generated = generateForPlayer(
     contentSeedFor(round),
@@ -247,7 +264,7 @@ function stateFor(round: RoundDocument, board?: ClientPuzzle): PlayState {
     const nextIndex = board.index + 1;
     const target = boardTargetFor(config);
     if (target === undefined || nextIndex < target) {
-      if (config.kind !== "volt-stack") {
+      if (config.kind !== "volt-stack" && config.kind !== "volt-velocity") {
         state.nextSkin = skinFile(contentSeedFor(round), config.gridSize, nextIndex);
       }
     }
@@ -297,13 +314,12 @@ function stateFor(round: RoundDocument, board?: ClientPuzzle): PlayState {
  * not restarted, because it belongs to the round rather than to the session.
  */
 export async function startOrResume(token: string): Promise<PlayState> {
-  const round = await roundForToken(token);
+  const round = await boardRoundForToken(token);
   const now = new Date();
 
   if (round.gameCode === VOLT_STACK_CODE) {
     return startOrResumeVoltStack(round, now);
   }
-
   const status = playability(round, now);
   if (!status.playable) {
     if (status.owes) await finishRound(round.roundId, { status: status.owes, at: now });
@@ -357,7 +373,7 @@ export async function submitBoard(
   boardIndex: unknown,
   paths: unknown,
 ): Promise<SubmitOutcome> {
-  const round = await roundForToken(token);
+  const round = await boardRoundForToken(token);
   const now = new Date();
 
   const status = playability(round, now);
@@ -386,8 +402,8 @@ export async function submitBoard(
   board.attempts += 1;
 
   const config = round.config as unknown as RoundConfig;
-  if (config.kind === "volt-stack") {
-    throw new ApiError(400, "INVALID_REQUEST", "Volt Stack rounds do not accept circuit board submissions.");
+  if (config.kind === "volt-stack" || config.kind === "volt-velocity") {
+    throw new ApiError(400, "INVALID_REQUEST", "This round does not accept circuit board submissions.");
   }
   const generated = generateForPlayer(
     contentSeedFor(round),
@@ -453,7 +469,7 @@ export async function submitBoard(
  * `completeRound` so the status is `completed` and the challenge UI does not call them unfinished.
  */
 export async function leaveRound(token: string): Promise<PlayState> {
-  const round = await roundForToken(token);
+  const round = await boardRoundForToken(token);
   await finishRound(round.roundId, { status: "abandoned" });
   const settled = await Round.findOne({ roundId: round.roundId });
   if ((settled ?? round).gameCode === VOLT_STACK_CODE) {
@@ -472,7 +488,7 @@ export async function leaveRound(token: string): Promise<PlayState> {
  * never won.
  */
 export async function completeRound(token: string): Promise<PlayState> {
-  const round = await roundForToken(token);
+  const round = await boardRoundForToken(token);
   await finishRound(round.roundId, { status: "completed" });
   const settled = await Round.findOne({ roundId: round.roundId });
   if ((settled ?? round).gameCode === VOLT_STACK_CODE) {
@@ -482,7 +498,7 @@ export async function completeRound(token: string): Promise<PlayState> {
 }
 
 export async function currentState(token: string): Promise<PlayState> {
-  const round = await roundForToken(token);
+  const round = await boardRoundForToken(token);
   if (round.gameCode === VOLT_STACK_CODE) {
     return voltStackStateFor(round);
   }

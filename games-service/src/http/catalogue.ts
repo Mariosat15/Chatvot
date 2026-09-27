@@ -6,7 +6,7 @@ import {
   howToPlayFor,
 } from "../games/content";
 import { resolveLocaleFromHeader } from "../games/locale";
-import { TITLES, type TitleDefinition } from "../games/titles";
+import { TITLES, VOLT_VELOCITY_CODE, type TitleDefinition } from "../games/titles";
 
 /**
  * `GET /v1/games` - endpoint 1 of the specification.
@@ -103,8 +103,21 @@ export function catalogueEntry(
 
     locales: title.locales,
     platforms: title.platforms,
-    status: title.status,
+    status: effectiveStatus(title),
   };
+}
+
+/**
+ * A title whose runtime dependency is absent reports `maintenance`, never `active`.
+ *
+ * Volt Velocity is simulated by a separate race server that a deployment may legitimately not
+ * run. Reporting it `active` anyway would let the platform's pre-flight publish a paid contest
+ * whose every launch then fails with a 503 - so the catalogue says what the create endpoint
+ * would say, and the platform refuses the contest before anybody pays.
+ */
+function effectiveStatus(title: TitleDefinition): TitleDefinition["status"] {
+  if (title.gameCode === VOLT_VELOCITY_CODE && !loadConfig().velocity) return "maintenance";
+  return title.status;
 }
 
 export function listGames(req: Request, res: Response): void {

@@ -1,4 +1,5 @@
 import { attemptDelivery, findDueDeliveries } from "./deliver";
+import { sweepRaceResults } from "./race-results";
 import {
   findFinishedClocks,
   findOverdueRounds,
@@ -74,12 +75,16 @@ export interface SweepSummary {
   clocksFinished: number;
   delivered: number;
   deliveryFailures: number;
+  racesSettled: number;
+  raceRoundsClosed: number;
 }
 
 export async function sweepOnce(now = new Date()): Promise<SweepSummary> {
   const summary: SweepSummary = {
     expired: 0,
     clocksFinished: 0,
+    racesSettled: 0,
+    raceRoundsClosed: 0,
     delivered: 0,
     deliveryFailures: 0,
   };
@@ -100,6 +105,12 @@ export async function sweepOnce(now = new Date()): Promise<SweepSummary> {
    * `expired` because `playability` checks the contest window before the gameplay clock, which is
    * the actual reason.
    */
+  // Race receipts first, so a race that finished inside its result grace closes with its real
+  // times rather than being caught by the expiry fallback below.
+  const races = await sweepRaceResults(now);
+  summary.racesSettled = races.racesSettled;
+  summary.raceRoundsClosed = races.roundsClosed;
+
   const candidates = new Map<string, RoundDocument>();
   for (const round of await findOverdueRounds(now)) candidates.set(round.roundId, round);
   for (const round of await findFinishedClocks(now)) candidates.set(round.roundId, round);
