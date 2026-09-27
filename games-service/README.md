@@ -466,8 +466,10 @@ npm run probe:round-clock    # the same, for the clock, the length promised befo
 `npm test` runs **344 tests**: 15 config, 44 engine, 28 scoring, 16 Volt Stack, 48 API, 93 play
 and delivery, 11 progress, 21 board client, 61 presentation, 7 Volt Velocity. `test:velocity`
 spawns the real race server from `../velocity-server` and **skips loudly** if that folder's
-`node_modules` is missing (`npm install` there once). Volt Velocity needs `VELOCITY_ADMIN_KEY`,
-`VELOCITY_TICKET_SECRET` and `VELOCITY_CLIENT_FILE` (see `env.example` and chapter `23` s8.2);
+`node_modules` is missing (`npm install` there once). Volt Velocity needs `VELOCITY_ADMIN_KEY` and
+`VELOCITY_TICKET_SECRET` (see `env.example` and chapter `23` s8.2). The ~103 MB race client ships
+gzipped in `vendor/volt-velocity-client.html.gz` and is unpacked on first use (`VELOCITY_CLIENT_FILE`
+overrides it); the race server must be started from `velocity-server/server/start.mjs`;
 without them the title is published as `maintenance`. The two secrets can be generated from the
 admin panel (Games -> Volt Velocity -> Race server secrets) when admin runs on the same server;
 restart `chartvolt-games` and `chartvolt-velocity` afterwards. **The race server reads this same `.env`**

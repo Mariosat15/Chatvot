@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
+import zlib from "zlib";
 
 import type { Request, Response } from "express";
 
@@ -12,9 +13,11 @@ import { sendError } from "./errors";
  *
  * THE CLIENT IS NOT IN THIS REPOSITORY
  * -----------------------------------
- * It is a single ~100 MB self-contained HTML document built by the game's own toolchain, far too
- * large to commit and not ours to edit. The operator points `VELOCITY_CLIENT_FILE` at it; this
- * module streams it. When the variable is unset or the file is missing, the session refuses with
+ * It is a single ~100 MB self-contained HTML document built by the game's own toolchain, not ours
+ * to edit. It ships gzipped (~76 MB, under GitHub's 100 MB limit) as
+ * `games-service/vendor/volt-velocity-client.html.gz` and is unpacked on first use (owner decision,
+ * 27 Sep 2026: installing it by hand was too many steps). `VELOCITY_CLIENT_FILE` still overrides
+ * it. When neither yields a file, the session refuses with
  * GAME_UNAVAILABLE rather than handing the browser a URL that 404s halfway through a lobby.
  *
  * WHY A FINGERPRINTED PATH SEGMENT
@@ -55,10 +58,59 @@ function hostHeaders(res: Response): void {
   res.setHeader("Cache-Control", "no-cache");
 }
 
-function clientStat(velocity: VelocityConfig): fs.Stats | null {
-  if (!velocity.clientFile) return null;
+const BUNDLED_NAME = "volt-velocity-client.html";
+const BUNDLED_CANDIDATES = [
+  path.resolve(__dirname, "..", "..", "vendor"),
+  path.resolve(__dirname, "..", "..", "..", "vendor"),
+];
+
+function sameMtime(file: string, mtimeMs: number): boolean {
   try {
-    const stat = fs.statSync(velocity.clientFile);
+    return Math.floor(fs.statSync(file).mtimeMs / 1000) === Math.floor(mtimeMs / 1000);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The client shipped in the repository as `vendor/volt-velocity-client.html.gz`, unpacked beside
+ * itself on first use so `git pull` + restart is the whole install. Re-unpacked when the archive
+ * changes. `VELOCITY_CLIENT_FILE`, when set, wins.
+ */
+function bundledClientFile(): string | null {
+  const dir = BUNDLED_CANDIDATES.find((candidate) =>
+    fs.existsSync(path.join(candidate, `${BUNDLED_NAME}.gz`)),
+  );
+  if (!dir) return null;
+  const gz = path.join(dir, `${BUNDLED_NAME}.gz`);
+  const html = path.join(dir, BUNDLED_NAME);
+  try {
+    const { mtime, mtimeMs } = fs.statSync(gz);
+    // Reason: the unpacked copy carries the archive's mtime, so the fingerprint (size + mtime)
+    // survives restarts and players are not made to re-download 100 MB after every deploy.
+    if (sameMtime(html, mtimeMs)) return html;
+    // Write to a temp name and rename, so a request arriving mid-unpack never streams half a
+    // file under a fingerprint that is then cached as immutable for a year.
+    const temp = `${html}.${process.pid}.tmp`;
+    fs.writeFileSync(temp, zlib.gunzipSync(fs.readFileSync(gz)));
+    fs.utimesSync(temp, mtime, mtime);
+    fs.renameSync(temp, html);
+    return html;
+  } catch (error) {
+    console.error("❌ [velocity] could not unpack the bundled race client:", error);
+    return null;
+  }
+}
+
+function resolveClientFile(velocity: VelocityConfig): string | null {
+  return velocity.clientFile ?? bundledClientFile();
+}
+
+function clientStat(velocity: VelocityConfig): fs.Stats | null {
+  const file = resolveClientFile(velocity);
+  if (!file) return null;
+  try {
+    const stat = fs.statSync(file);
     return stat.isFile() ? stat : null;
   } catch {
     return null;
@@ -94,9 +146,10 @@ export function serveVelocityHost(req: Request, res: Response): void {
 
 export function serveVelocityClient(req: Request, res: Response): void {
   const velocity = loadConfig().velocity;
+  const file = velocity ? resolveClientFile(velocity) : null;
   const stat = velocity ? clientStat(velocity) : null;
   const requested = typeof req.params.fingerprint === "string" ? req.params.fingerprint : "";
-  if (!velocity?.clientFile || !stat || !FINGERPRINT.test(requested)) {
+  if (!file || !stat || !FINGERPRINT.test(requested)) {
     sendError(res, 404, "NOT_FOUND", "No such asset.");
     return;
   }
@@ -118,5 +171,5 @@ export function serveVelocityClient(req: Request, res: Response): void {
       ? "public, max-age=31536000, immutable"
       : "no-cache",
   );
-  res.sendFile(path.resolve(velocity.clientFile));
+  res.sendFile(path.resolve(file));
 }

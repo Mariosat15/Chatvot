@@ -1087,6 +1087,17 @@ no build. The main app needs a rebuild and restart. Then hard refresh. **Never v
   Then `pm2 restart chartvolt-games chartvolt-velocity`. `__tests__/admin/velocity-secrets.test.ts`
   (18); admin route audit 341 section-granted, 0 unguarded; `check:mirrors` OK; lint clean; no new
   type errors. **Not verified by eye**, and not yet run against the real server file.
+- **Later still, 27 Sep 2026 - two live deploy faults found enabling Volt Velocity on
+  production.** (1) **PM2 showed the race server "online" with empty logs and nothing on :3080**:
+  `server/index.mjs` listens only when `process.argv[1]` is itself, and under PM2 fork mode it is
+  PM2's container. New `velocity-server/server/start.mjs` listens unconditionally; PM2, `npm start`
+  and `test:velocity` use it (`CHARTVOLT-PATCHES.md`). **The PM2 entry must be deleted and
+  re-started**, since PM2 caches the old script. (2) **"The race client is not installed"**: the
+  ~103 MB client had to be copied by hand plus an `.env` line; owner found that too complicated,
+  so it is now **committed gzipped (75.5 MB)** at `games-service/vendor/volt-velocity-client.html.gz`
+  and unpacked on first use with the archive's mtime (fingerprint stable across restarts);
+  `VELOCITY_CLIENT_FILE` still overrides (`23` s8.2 amendment). Cost: ~76 MB of git history per
+  client build. Still owed: nginx must carry the `/race/` block from `deploy/nginx.conf`.
 
 
 ### 27 Sep 2026 - Per-game How it works & tips (Guides) tab

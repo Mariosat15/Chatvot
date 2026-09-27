@@ -238,8 +238,12 @@ and shares no code with the platform (`check:isolation`).
   round `in_progress` and returns the room id, a freshly minted ticket (never stored), the client
   URL and, locally only, the race URL. **No score comes back through it.**
 - **Deviation from 4.1 F/L: the client is a nested same-origin frame, not static assets in the
-  repository.** The vendor client is one ~107 MB self-contained HTML file; it is not committed and
-  not edited. The operator points `VELOCITY_CLIENT_FILE` at it and games-service streams it at a
+  repository.** The vendor client is one ~107 MB self-contained HTML file and is not edited.
+  **Amended 27 Sep 2026 (owner: the manual install was too many steps):** it is now committed
+  gzipped (~76 MB) as `games-service/vendor/volt-velocity-client.html.gz` and unpacked beside
+  itself on first use, keeping the archive's mtime so the fingerprint survives restarts;
+  `VELOCITY_CLIENT_FILE` still overrides it. Each new client build adds ~76 MB to git history.
+  Originally the operator pointed `VELOCITY_CLIENT_FILE` at it and games-service streams it at a
   size-and-mtime fingerprinted URL with an immutable cache. The host page loads it in a frame and
   drives its public `ChartvoltVelocity3D.connectCompetition` API, so the ticket is handed over as a
   JavaScript value and never reaches a `src`, a `Referer` or an access log. The host only ever

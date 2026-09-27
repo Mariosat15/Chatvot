@@ -1,0 +1,3 @@
+# The unpacked race client is generated from the .gz on first use; never commit it.
+volt-velocity-client.html
+*.tmp
