@@ -1004,6 +1004,21 @@ no build. The main app needs a rebuild and restart. Then hard refresh. **Never v
   `pm2 restart chartvolt-games` and a hard refresh - **no build**. Nothing else in the
   surface referenced the text (`music-neon-circuit.ogg` in `tools/test-play.ts` is an
   unrelated asset name).
+- **Later again, 27 Sep 2026 - PLAN ONLY: Volt Velocity, a scheduled 16-player race**
+  (owner: "16 players must join and start at a specific time ... join, pick a ship and wait").
+  New chapter **`23-volt-velocity-scheduled-race.md`**; **nothing is built**. Read the whole
+  vendor package (`Volt-Velocity-0.21-Complete.zip`): a Node 22 SSE race server, 2-16 player
+  rooms, HMAC tickets, signed result receipts, and a hangar UI that already does ship pick +
+  Ready. **Five gaps found, the load-bearing one being that the game has NO scheduled start**
+  (it starts when all are ready or on an admin call), plus a frozen roster, the platform
+  refusing launches before the play window (`round-launch.service.ts:186`), no start time in
+  the provider protocol, and one receipt for 16 players against a per-player ingestion door.
+  Recommended: games-service owns the race as a fourth title, two small server patches
+  (open-lobby roster, `startAt`), a platform lobby window, one additive protocol field.
+  ~10-13 days in five phases VV1-VV5. **Owner answered `23` s9 the same day:** lobby length
+  is set by the admin per title in the Games section (copied onto the contest at write time);
+  a connected but not-Ready player races with their selected ship; the vendor server may be
+  patched; 1v1 challenges are ON (challenge rooms carry no `startAt` and start on both-Ready).
 
 
 ### 27 Sep 2026 - Per-game How it works & tips (Guides) tab
