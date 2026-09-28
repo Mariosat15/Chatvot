@@ -912,6 +912,48 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 28 Sep 2026 - The games catalogue redesigned to the owner's reference
+
+**Owner instruction:** make the `/games` list match the reference, with artwork filling each card,
+every box the same size, and future games flowing into the grid on their own. Built as `13`
+**s4.1ad**. It adds a hero with arena artwork, pill filters, and one three-column grid in
+catalogue order. Featured is now a badge rather than a separate section, and a lone last card
+keeps its column width. The card artwork is `object-cover` at 16/8.5, reversing the earlier
+`object-contain` rule; that test was flipped with its history kept. The equal-height assertion
+now reads `GamesGrid.tsx`, with its claim unchanged. Two probes were red on exactly one test
+each, then restored. Routing, `?category=` filtering and data are unchanged. The typecheck is at
+the 223 baseline and lint is clean. **Not checked by eye.**
+### 28 Sep 2026 - A practice area on every game page, with no code per game
+
+**Owner instruction:** every game page must have a Practice button leading to an area where the
+player alone plays, for all games, agnostic so every future game gets one. `13` **s4.1ac** is the
+authoritative account.
+
+**Shipped.** A Practice button on the game page hero and info sidebar (withheld on a coming-soon
+title); `/games/[slug]/practice` with `PracticeRoundHost`; POST launch and GET list at
+`/api/games/[slug]/practice/rounds`; `practice-round.service.ts`. A title is practisable from its
+catalogue row (`supportsPractice`, enabled, active), with `configSchema` defaults and the title's
+own ceiling, so nothing names a game. **Trading says plainly that it has no practice yet**; how
+trading practice should work is an owner question.
+
+**Three defects found and fixed on the way. None moved money, and nothing was backfilled.**
+- **All practice shares `contestId: null`**, so `createRound` treated a player's practice across
+  every game as one contest. It would have resumed another game's round, and
+  `attemptsPolicy: "single"` would have refused the second practice round ever played. Scoped by
+  `gameKey`, attempts skipped for practice. Probed red.
+- **A provider never pushes a practice result** (requirements v1.10), and nothing schedules the
+  reconciliation poll. A finished round would stay `launched`, and the next Start would **resume
+  the finished round**. `pullLivePracticeResults` pulls the caller's own live practice rounds
+  through `fetchRound` and `applyResult`, the single door, before listing and before launching.
+  A round still in play is refused at gate 8 without a write. 3 tests, probed red.
+- **Volt Velocity refused practice** (the `23` deviation). It now seats practice in a solo room
+  seeded from the round id, and refuses a practice round with a start time. The refusal test was
+  flipped, not deleted. The test recomputes `raceIdentity` with the solo key, because distinct
+  room ids alone cannot prove the room is solo. Probed red. games-service **356 tests** green.
+
+**Deploy:** platform build; games-service `npm run build` + `pm2 restart chartvolt-games`; then a
+**catalogue re-sync** so Volt Velocity picks up `supportsPractice: true`. **Never verified by eye.**
+
 ### 28 Sep 2026 - Play is open in the lobby, and the race shows its on-screen controls on a computer
 
 **Owner:** the lobby still said "Play will unlock when the competition starts", so a player could not join and wait in the game's lobby; and in the race the analog controls did not show. On a computer too (chosen).

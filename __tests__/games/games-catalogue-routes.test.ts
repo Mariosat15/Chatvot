@@ -20,6 +20,7 @@ function readCode(relativePath: string): string {
 const HUB = "app/(root)/games/page.tsx";
 const GAME_PAGE = "app/(root)/games/[slug]/page.tsx";
 const CARD = "components/games/catalogue/GameCatalogueCard.tsx";
+const GRID = "components/games/catalogue/GamesGrid.tsx";
 const CONTESTS = "components/games/catalogue/GameContestList.tsx";
 const EMPTY = "components/game-page/GamePageContests.tsx";
 
@@ -53,23 +54,31 @@ describe("games catalogue routes", () => {
 
   it("catalogue cards stay equal height regardless of tagline length", () => {
     const card = readCode(CARD);
-    const hub = readCode(HUB);
+    const grid = readCode(GRID);
     // Reason: a one-line tagline beside a two-line neighbour made uneven boxes
-    // (owner). Stretch the grid + card, and reserve two lines for copy.
-    expect(hub).toMatch(/items-stretch/);
+    // (owner). Stretch the grid + card, and reserve two lines for copy. The grid
+    // moved out of the hub into GamesGrid on 28 Sep 2026; the claim is unchanged.
+    expect(grid).toMatch(/items-stretch/);
+    // Reason: fixed tracks, never auto-fit - a lone last card keeps the width of
+    // the cards above it instead of stretching across the row (owner, 28 Sep).
+    expect(grid).toMatch(/repeat\(3,minmax\(0,1fr\)\)/);
+    expect(grid).not.toMatch(/auto-fit|auto-fill|col-span/);
     expect(card).toMatch(/h-full/);
     expect(card).toMatch(/flex-col/);
     expect(card).toMatch(/min-h-\[2\.5rem\]/);
     expect(card).toMatch(/line-clamp-2/);
   });
 
-  it("catalogue card artwork is full-width and not cropped", () => {
+  it("catalogue card artwork fills the whole image area", () => {
     const card = readCode(CARD);
-    // Reason: object-cover sliced ChartVolt / Circuit Sprint banners. Shared
-    // aspect keeps row heights equal; contain shows the full upload.
-    expect(card).toMatch(/aspect-\[16\/10\]/);
-    expect(card).toMatch(/object-contain/);
-    expect(card).not.toMatch(/object-cover/);
+    // Reason (history): until 28 Sep 2026 this asserted aspect-[16/10] with
+    // object-contain, because object-cover sliced the ChartVolt / Circuit Sprint
+    // banners. The owner then asked for the artwork to fill the whole space (the
+    // letterboxed bands read as empty boxes), so the card is 16/8.5 with cover.
+    // The shared aspect still keeps every card the same height.
+    expect(card).toMatch(/aspect-\[16\/8\.5\]/);
+    expect(card).toMatch(/object-cover/);
+    expect(card).not.toMatch(/object-contain/);
   });
 
   it("empty game page is designed, not a blank return", () => {

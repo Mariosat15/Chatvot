@@ -1,8 +1,8 @@
 import { Suspense } from "react";
 import { Gamepad2 } from "lucide-react";
-import { NeonGridBackdrop } from "@/components/neon/Cards";
 import { NEON_HEADING } from "@/components/neon/tokens";
-import { GameCatalogueCard } from "@/components/games/catalogue/GameCatalogueCard";
+import { GamesHero } from "@/components/games/catalogue/GamesHero";
+import { GamesGrid } from "@/components/games/catalogue/GamesGrid";
 import {
   GameCatalogueFilters,
   type CatalogueFilterOption,
@@ -18,7 +18,9 @@ export const dynamic = "force-dynamic";
  * Games catalogue hub (X11 Slice 1 + thin merchandising + task 9 discovery filter).
  *
  * Server component only — listing is a read. Never launches a round.
- * Order / featured / coming-soon come from `game_catalogue_entry`.
+ * Order / featured / coming-soon come from `game_catalogue_entry`. One grid in catalogue order:
+ * featured is a badge on the card, not a separate section, so the order an operator sets is the
+ * order a player sees.
  * Genre filter is `?category=<slug>` — withheld when fewer than two genres are present.
  */
 
@@ -57,67 +59,40 @@ export default async function GamesCataloguePage({
   const filtered = activeSlug
     ? games.filter((g) => g.categorySlug === activeSlug)
     : games;
-  const featured = filtered.filter((g) => g.isFeatured);
-  const rest = filtered.filter((g) => !g.isFeatured);
-
   return (
-    <div className="relative mx-auto max-w-6xl space-y-8 px-4 py-6 sm:px-6 sm:py-8">
-      <NeonGridBackdrop />
-      <header className="space-y-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-400/80">
-          Catalogue
-        </p>
-        <h1 className={`${NEON_HEADING} text-3xl sm:text-4xl`}>Games</h1>
-        <p className="max-w-2xl text-sm text-gray-400">
-          Pick a game, read the rules, and join a contest from its page.
-          Competitions stays available when you want everything starting soon
-          in one list.
-        </p>
-      </header>
+    <div className="relative isolate overflow-hidden rounded-2xl bg-[#020817]">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(60%_40%_at_85%_0%,rgba(0,190,255,.16),transparent_70%),radial-gradient(50%_40%_at_10%_60%,rgba(0,110,255,.10),transparent_70%),radial-gradient(40%_30%_at_60%_100%,rgba(0,216,255,.08),transparent_70%)]"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 -z-10 opacity-[0.06] bg-[linear-gradient(rgba(120,243,255,.6)_1px,transparent_1px),linear-gradient(90deg,rgba(120,243,255,.6)_1px,transparent_1px)] bg-[size:64px_64px] [mask-image:linear-gradient(180deg,#000,transparent_85%)]"
+      />
 
-      <Suspense fallback={null}>
-        <GameCatalogueFilters
-          options={filterOptions}
-          activeSlug={activeSlug}
-        />
-      </Suspense>
+      <GamesHero>
+        <Suspense fallback={null}>
+          <GameCatalogueFilters options={filterOptions} activeSlug={activeSlug} />
+        </Suspense>
+      </GamesHero>
 
-      {filtered.length === 0 ? (
-        <div className="rounded-2xl border border-[#1B2540] bg-[#0A0F1F]/80 p-8 text-center space-y-3">
-          <Gamepad2 className="mx-auto h-8 w-8 text-gray-500" />
-          <p className={`${NEON_HEADING} text-lg`}>
-            {activeSlug ? "No games in this genre" : "No games available yet"}
-          </p>
-          <p className="text-sm text-gray-400">
-            {activeSlug
-              ? "Try another genre, or clear the filter to see every game."
-              : "Check back soon, or open Competitions for contests that are already live."}
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-10">
-          {featured.length > 0 ? (
-            <section className="space-y-4">
-              <h2 className={`${NEON_HEADING} text-xl`}>Featured</h2>
-              <div className="grid items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {featured.map((game) => (
-                  <GameCatalogueCard key={game.gameKey} game={game} />
-                ))}
-              </div>
-            </section>
-          ) : null}
-          <section className="space-y-4">
-            {featured.length > 0 ? (
-              <h2 className={`${NEON_HEADING} text-xl`}>All games</h2>
-            ) : null}
-            <div className="grid items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {(featured.length > 0 ? rest : filtered).map((game) => (
-                <GameCatalogueCard key={game.gameKey} game={game} />
-              ))}
-            </div>
-          </section>
-        </div>
-      )}
+      <div className="mx-auto w-full max-w-[1400px] px-4 pb-10 sm:px-6 lg:px-8">
+        {filtered.length === 0 ? (
+          <div className="space-y-3 rounded-[18px] border border-[rgba(38,171,255,.30)] bg-[rgba(6,16,36,.85)] p-8 text-center">
+            <Gamepad2 className="mx-auto h-8 w-8 text-gray-500" />
+            <p className={`${NEON_HEADING} text-lg`}>
+              {activeSlug ? "No games in this genre" : "No games available yet"}
+            </p>
+            <p className="text-sm text-gray-400">
+              {activeSlug
+                ? "Try another genre, or clear the filter to see every game."
+                : "Check back soon, or open Competitions for contests that are already live."}
+            </p>
+          </div>
+        ) : (
+          <GamesGrid games={filtered} />
+        )}
+      </div>
     </div>
   );
 }

@@ -21,6 +21,12 @@ export interface CatalogueFilterOption {
   label: string;
 }
 
+const PILL =
+  "inline-flex h-[42px] shrink-0 items-center whitespace-nowrap rounded-full border px-[22px] text-[14px] font-semibold tracking-wide transition-[transform,border-color,color,box-shadow] duration-200 hover:-translate-y-px motion-reduce:transition-none motion-reduce:hover:translate-y-0";
+const PILL_ACTIVE =
+  "border-[#00d8ff] bg-[linear-gradient(180deg,rgba(0,216,255,.22),rgba(0,120,255,.12))] text-white shadow-[0_0_18px_rgba(0,216,255,.35)]";
+const PILL_IDLE =
+  "border-[rgba(38,171,255,.30)] bg-[rgba(6,16,36,.85)] text-gray-300 hover:border-[rgba(0,220,255,.6)] hover:text-white";
 interface GameCatalogueFiltersProps {
   options: CatalogueFilterOption[];
   /** Current `?category=` value, or undefined for "all". */
@@ -49,14 +55,15 @@ export function GameCatalogueFilters({
   if (options.length < 2) return null;
 
   return (
-    <div className="flex flex-wrap items-center gap-2" role="navigation" aria-label="Filter by genre">
+    // Reason: one row that scrolls sideways on a phone, rather than wrapping into a stack of pills.
+    <div className="-mx-1 flex items-center gap-3 overflow-x-auto px-1 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="navigation" aria-label="Filter by genre">
       <Link
         href={hrefFor(null)}
         className={cn(
-          "rounded-full border px-3 py-1 text-xs transition-colors",
+          PILL,
           !activeSlug
-            ? "border-sky-500/60 bg-sky-500/20 text-sky-200"
-            : "border-[#1B2540] bg-[#0A0F1F]/80 text-gray-400 hover:text-gray-200",
+            ? PILL_ACTIVE
+            : PILL_IDLE,
         )}
       >
         All
@@ -66,10 +73,10 @@ export function GameCatalogueFilters({
           key={opt.slug}
           href={hrefFor(opt.slug)}
           className={cn(
-            "rounded-full border px-3 py-1 text-xs transition-colors",
+            PILL,
             activeSlug === opt.slug
-              ? "border-sky-500/60 bg-sky-500/20 text-sky-200"
-              : "border-[#1B2540] bg-[#0A0F1F]/80 text-gray-400 hover:text-gray-200",
+              ? PILL_ACTIVE
+              : PILL_IDLE,
           )}
         >
           {opt.label}

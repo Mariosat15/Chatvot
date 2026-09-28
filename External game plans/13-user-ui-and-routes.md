@@ -422,7 +422,8 @@ test with a blast radius of one** (`tools/probe-confirming-exit.ps1`).
   app's `getCompetitionLeaderboard` passed `score` or `scoreDirection` to the ranking engine, so
   every provider participant tied on zero. See `05` section 2.0b; a document implying the
   provider board has always ranked on score is wrong.
-- **No practice mode.** Needs `supportsPractice` and a free, unranked path.
+- ~~**No practice mode.** Needs `supportsPractice` and a free, unranked path.~~ **Built 28
+  September 2026 - see section 4.1ac.** Correct as history, stale as a present fact.
 - ~~**No game-aware dashboard.**~~ **Built 6 September 2026 - see section 5.1a.** The sentence
   this replaced named `ActiveCompetitionCard` and `CompetitionsTable` as the screens at fault,
   and **both are orphaned** - nothing renders either. The live one is `ContestsSidebar`. Correct
@@ -2906,8 +2907,85 @@ Four facts drift easily.
 
 **Never verified by eye** - the dialog is behind sign-in.
 
+### 4.1ac The practice area - one for every game, with no code per game (owner instruction, 28 September 2026)
+
+The owner asked that every game page carry a **Practice** button that opens an area where the
+player alone plays a free round, and that it stay agnostic, so any game added later gets one
+automatically.
+
+**What was built.**
+
+| Piece | Where |
+|---|---|
+| Practice button on the game page hero and in the info sidebar (not on a coming-soon title) | `components/game-page/GamePageHero.tsx`, `GamePageInfoSidebar.tsx`, `practiceHref` in `lib/services/games/game-page-helpers.ts` |
+| The practice area | `app/(root)/games/[slug]/practice/page.tsx`, `components/games/PracticeRoundHost.tsx`, `components/games/practice-state.ts` (model-free, R58) |
+| Launch (POST) and the player's recent practice rounds (GET) | `app/api/games/[slug]/practice/rounds/route.ts` |
+| Availability, launch, list, and the result pull | `lib/services/games/practice-round.service.ts` |
+
+**Nothing names a game.** A title is practisable when its catalogue row says `supportsPractice`
+and it is enabled and active. The settings are the `configSchema` defaults and the length is the
+title's own ceiling. Trading has no practice path yet, and the area says so plainly rather than
+showing a dead button.
+
+**Five facts drift easily.**
+
+- **A practice round has no contest** (`contestType: "practice"`, `contestId: null`). That keeps
+  it out of every money, ranking, stats and XP path, and it is why it cannot improve a paid score.
+- **Two contest rules had to be scoped for practice in `createRound`.** Every practice round
+  shares `contestId: null`, so without scoping the one-live-round lookup would resume *another
+  game's* practice round, and `attemptsPolicy: "single"` would refuse a player's second practice
+  round ever. The live lookup is now scoped by `gameKey` and the attempt count is skipped. Pinned
+  in `__tests__/services/practice-round.test.ts`; both were probed red.
+- **A provider never pushes a practice result.** Requirements v1.10 (`01` s4.2) forbids the
+  callback, and the reconciliation net is unscheduled. Without a pull, a finished practice round
+  stays `launched` on our side, the screen shows no score, and the next Start **resumes the
+  finished round**. The practice service therefore pulls the caller's own live practice rounds
+  through `adapter.fetchRound` and **`applyResult`, the single ingestion door**, before listing
+  and before launching. A round still in play reports a live status, which gate 8 refuses
+  without writing anything. Probed red.
+- **Launching is a POST on a click, never a GET or a render**, for the Next.js prefetch reason in
+  section 1.1a. The pull on a render is safe: it creates nothing and consumes nothing.
+- **Volt Velocity was the one title without practice**, a deviation recorded in `23`. It now
+  seats a practice round in a **solo room** seeded from the round's own id, and refuses a
+  practice round with a start time. See `21`/`23`.
+
+**Deploy:** the platform build; games-service `npm run build` then `pm2 restart chartvolt-games`;
+then a **catalogue re-sync**, so Volt Velocity's row picks up `supportsPractice: true`.
+
+**Never verified by eye** - the practice area is behind sign-in.
+
 ---
 
+### 4.1ad The `/games` catalogue, redesigned to the owner's reference (28 September 2026)
+
+**The owner asked for the catalogue to replicate a reference image**, with artwork that fills
+each card, every card the same size, and a grid that future games flow into without layout code.
+**Nothing was computed wrongly and there is no risk number.** No data, route, filter or
+permission changed, so nothing was backfilled.
+
+| Part | Live code |
+|---|---|
+| Page (server, a read only) | `app/(root)/games/page.tsx` |
+| Hero: label, gradient heading, subtitle, arena artwork | `components/games/catalogue/GamesHero.tsx`, `public/assets/neon/games-hero-arena-r1.webp` |
+| Filter pills (`?category=`, withheld below two genres) | `components/games/catalogue/GameCatalogueFilters.tsx` |
+| Grid | `components/games/catalogue/GamesGrid.tsx` |
+| Card and genre badge | `GameCatalogueCard.tsx` (exports `GameCard`), `GameCategoryBadge.tsx`, `catalogue-types.ts` (`GameCardData`) |
+
+Five facts drift easily:
+
+- **Featured is a badge, not a section.** One grid in catalogue order means the order an
+  operator sets is the order a player sees.
+- **The grid uses three fixed `minmax(0,1fr)` tracks, never `auto-fit`**, with two on a tablet
+  and one on a phone. A lone last card therefore keeps the width of the cards above it rather
+  than stretching across the row. A test forbids `auto-fit`, `auto-fill` and `col-span`.
+- **The artwork is `object-cover` in a 16/8.5 frame.** This reverses the `object-contain` rule
+  recorded when cover sliced the ChartVolt and Circuit Sprint banners. That test was flipped,
+  not deleted, and its history is kept.
+- **The genre badge is keyed by the vocabulary slug, never by a game.** It uses a `Map` with a
+  controller-icon fallback. Puzzle is magenta; every other genre is cyan.
+- **The hero art has an `-r1` suffix** so a replacement never hides behind a cached copy (R54).
+
+**Not checked by eye**, because the page is behind sign-in.
 ## 5. Dashboard
 
 `components/dashboard/` is about **15 components** backed by
