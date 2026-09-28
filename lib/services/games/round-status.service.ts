@@ -138,6 +138,13 @@ export interface PlayState {
    */
   lobbyOpensAt?: string;
   /**
+   * Whether everyone plays together from one start (`scheduled`) or each player whenever they
+   * like (`anytime`). A competition reads its OWN stored mode (absent means `anytime`, as
+   * `lobbyOpensAt` reads it); a challenge reads the title's. Screens use it to state the rule
+   * before a player pays or presses Play, and to withhold a new round once the gun has gone.
+   */
+  playMode?: "anytime" | "scheduled";
+  /**
    * The caller's own contest score, as ranking will read it.
    *
    * OPTIONAL, AND IT WAS `number` WITH A `?? 0` BEHIND IT UNTIL R50. The lobby's hero tile
@@ -348,6 +355,7 @@ export async function getPlayState(
               lobbySeconds: contest.lobbySeconds,
             })?.toISOString()
           : undefined,
+        playMode: contest.playMode === "scheduled" ? "scheduled" : "anytime",
         // Passed through, never defaulted. See the field's declaration.
         participantScore: participant.score,
       },

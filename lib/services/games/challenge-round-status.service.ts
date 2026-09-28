@@ -15,6 +15,7 @@ import {
 } from "./challenge-round-config";
 import { deriveChallengeWindow } from "./challenge-window";
 import { resolveAttemptSecondsFromSchema } from "./config-schema";
+import { resolvePlayMode } from "./play-shape";
 import type { ChallengeContestFields } from "./challenge-round-config";
 
 /**
@@ -75,6 +76,8 @@ export interface ChallengePlayState {
   rounds: ChallengePlayerRoundView[];
   playWindowStart?: string;
   playWindowEnd?: string;
+  /** The title's play shape. See `PlayState.playMode`. */
+  playMode?: "anytime" | "scheduled";
   /** The caller's own challenge score, as ranking will read it. Absent means no result yet. */
   participantScore?: number;
 }
@@ -124,6 +127,9 @@ function toView(round: StoredRound): ChallengePlayerRoundView {
 interface StoredTitle {
   maxDurationSeconds?: number;
   configSchema?: unknown;
+  playMode?: string | null;
+  playModeOverride?: string | null;
+  family?: string | null;
 }
 
 /**
@@ -210,7 +216,7 @@ export async function getChallengePlayState(
       providerKey: config.providerKey,
       gameCode: config.gameCode,
     })
-      .select("maxDurationSeconds configSchema")
+      .select("maxDurationSeconds configSchema playMode playModeOverride family")
       .lean<StoredTitle | null>();
 
     const attemptSeconds = resolveAttemptSecondsFromSchema(
@@ -243,6 +249,9 @@ export async function getChallengePlayState(
         rounds: views,
         playWindowStart: window?.playWindowStart.toISOString(),
         playWindowEnd: window?.playWindowEnd.toISOString(),
+        // The title's shape: both players of a challenge share one room, so a together-game
+        // has no personal clock that a late start could shorten.
+        playMode: resolvePlayMode(title),
         // Passed through, never defaulted - see the field's declaration.
         participantScore: participant.score,
       },

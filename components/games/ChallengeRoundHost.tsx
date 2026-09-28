@@ -204,6 +204,7 @@ export function ChallengeRoundHost({
       launching={phase.name === "launching"}
       refusal={refusal}
       onLaunch={launch}
+      format="challenge"
     />
   );
 }

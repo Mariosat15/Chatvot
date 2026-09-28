@@ -99,6 +99,62 @@ export const PLAY_MODE_COPY: ReadonlyMap<
 ]);
 
 /**
+ * What a PLAYER is told about the shape, before paying and before pressing Play.
+ *
+ * Game-agnostic by construction: it names the rule, never the game, so every title of either
+ * shape gets the same sentence. A challenge reads differently from a competition because a
+ * challenge has no gun - both players share one room and it starts when both are in - so the
+ * competition's "be here at the start" would be a false instruction there.
+ */
+export function playModePlayerRule(
+  mode: PlayMode | null | undefined,
+  format: "competition" | "challenge",
+): { label: string; detail: string } {
+  if (mode === "scheduled") {
+    if (format === "challenge") {
+      return {
+        label: "You play together",
+        detail:
+          "Both players play at the same time. The game starts when you are both in and ready, so open it when your opponent is ready too.",
+      };
+    }
+    return {
+      label: "Everyone starts together",
+      detail:
+        "Everyone plays at the same moment. Open the game before the start time and wait in the lobby - once it starts, nobody else can join, and a player who is not in at the start does not take part.",
+    };
+  }
+  return {
+    label: "Play any time",
+    detail:
+      format === "challenge"
+        ? "You can each play whenever you like before the challenge ends. Your scores are compared when it does."
+        : "You can play whenever you like before the competition ends. Everyone's scores are compared when it does.",
+  };
+}
+
+/**
+ * Whether a competition that starts everyone together has already gone past its start, so no
+ * NEW round may begin. A live round (opened in the lobby) is not affected - it is resumed.
+ *
+ * Only a competition stored as `scheduled` has a gun; the title is not consulted, for the same
+ * reason as `lobbyOpensAt`. The launch service and the pre-flight screen both ask this, so the
+ * button the player sees and the refusal the server gives cannot disagree.
+ */
+export function startHasPassed(
+  contest: { playMode?: string | null; playWindowStart?: Date | null },
+  now: Date,
+): boolean {
+  if (contest.playMode !== "scheduled" || !contest.playWindowStart) return false;
+  const start = contest.playWindowStart.getTime();
+  return Number.isFinite(start) && now.getTime() >= start;
+}
+
+/** The player-facing refusal once `startHasPassed` is true. One sentence, shared. */
+export const START_HAS_PASSED_MESSAGE =
+  "This competition started for everyone at the same moment, so a new game can no longer be started. Only players who were in the game at the start take part.";
+
+/**
  * What the catalogue row has to carry for the shape to be resolvable.
  *
  * `playMode` is optional because a title synced before the field existed has none, and

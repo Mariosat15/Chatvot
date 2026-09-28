@@ -1469,7 +1469,10 @@ describe("the play screen counts down on the server's clock", () => {
     // guard now live. `tooLateToStart` is that AND the contest's start policy, since 7 Sep
     // 2026 - see the test below. Reading `!resuming` off the derived flag instead would go
     // green on a version that dropped it from the arithmetic and reintroduced it later.
-    expect(code).toMatch(/fullRoundNoLongerFits\s*=\s*\n?\s*!resuming/);
+    //
+    // Widened 28 Sep 2026, claim unchanged: `!playsTogether` now leads the conjunction, because a
+    // scheduled game has everyone starting together and no personal clock to shorten.
+    expect(code).toMatch(/fullRoundNoLongerFits\s*=\s*\n?\s*!playsTogether && !resuming/);
     expect(code).toMatch(/tooLateToStart\s*=\s*fullRoundNoLongerFits/);
 
     // An unknown round length applies NO gate rather than guessing. A guess that disables the
@@ -1582,7 +1585,10 @@ describe("the game lobby shows a joined player the clock", () => {
 
     // Replaced rather than deleted: the fact players actually need is what happens to a round
     // still open when the clock runs out, which is the owner's question about the universal cut-off.
-    expect(code).toMatch(/Every player gets the same window/);
+    // Since 28 Sep 2026 the note leads with the game-agnostic play-mode rule from `play-shape.ts`
+    // (together at the start, or any time before the end) instead of the window sentence.
+    expect(code).toMatch(/playModePlayerRule\(playMode, "competition"\)/);
+    expect(code).toMatch(/\{modeRule\.detail\}/);
   });
 });
 
@@ -1839,13 +1845,16 @@ describe("the last moment to start an attempt has one producer", () => {
       start whenever they like. Under `until_window_closes` the opposite is true and is exactly
       what makes a shortened attempt worth taking.
     */
-    const noteStart = lobby.indexOf("Every player gets the same window.");
+    // Re-anchored 28 Sep 2026 on the mode rule that now opens the note; the per-policy half is
+    // unchanged and only shown for an anytime contest (a together-game has no late start).
+    const noteStart = lobby.indexOf("{modeRule.label}");
     expect(noteStart).toBeGreaterThan(-1);
     const note = lobby.slice(noteStart, lobby.indexOf("</NeonNote>", noteStart));
     expect(note.length).toBeGreaterThan(200);
+    expect(note).toMatch(/playMode === "anytime"/);
     expect(note).toMatch(/reservesFullRound/);
-    expect(note).toMatch(/finish inside it/);
-    expect(note).toMatch(/still running then is\s*\n?\s*closed/);
+    expect(note).toMatch(/finish inside the window/);
+    expect(note).toMatch(/still running when the window shuts is\s*\n?\s*closed/);
   });
 });
 

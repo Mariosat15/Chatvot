@@ -197,8 +197,26 @@ export function RoundResultPanel({
     );
   }
 
-  const { icon: Icon, tone, heading, detail } = describe(round);
-  const canPlayAgain = state.attemptsRemaining > 0;
+  /*
+    A TOGETHER-START COMPETITION PAST ITS START HAS NO NEXT ROUND. The launch service refuses one
+    (`startHasPassed`), so offering "play again" here - and telling a player whose race was
+    cancelled that they can - sent them round a loop of refusals. `lobbyOpensAt` is sent only for
+    a competition stored as `scheduled`, which is exactly the set with a start gun; a challenge
+    never carries it.
+  */
+  const startMs = state.playWindowStart ? new Date(state.playWindowStart).getTime() : NaN;
+  const startPassed =
+    state.playMode === "scheduled" &&
+    Boolean(state.lobbyOpensAt) &&
+    Number.isFinite(startMs) &&
+    new Date(state.serverNow).getTime() >= startMs;
+  const described = describe(round);
+  const { icon: Icon, tone, heading } = described;
+  const detail =
+    startPassed && round.status === "voided"
+      ? "This race was cancelled, so it does not use up your attempt. It has already started for everyone, so there is no new race to join in this competition."
+      : described.detail;
+  const canPlayAgain = state.attemptsRemaining > 0 && !startPassed;
 
   return (
     <div className={`space-y-5 p-6 ${NEON_STAGE_PANEL}`}>

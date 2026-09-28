@@ -199,9 +199,11 @@ describe("the game lobby's contest clock", () => {
   it("sits where the trading lobby's sits - under the entry control", () => {
     const code = readCode(GAME_LOBBY);
 
-    const entry = code.indexOf("<CompetitionEntryButton");
+    // Re-pointed, claim unchanged: the live-lobby slice (2a2c0281) wrapped the entry control and
+    // the prize panel in polling consumers, so the markers moved and the order did not.
+    const entry = code.indexOf("<LobbyLiveEntryButton");
     const countdown = code.indexOf("<ContestCountdown");
-    const prizes = code.indexOf('title="Prize distribution"');
+    const prizes = code.indexOf("<LobbyLivePrizePanel");
 
     // Reason each index is checked for -1 separately: a test that slices from a missing marker
     // examines nothing and passes everything asked of it.

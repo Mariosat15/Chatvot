@@ -11,6 +11,7 @@ import {
 import { formatRemaining, useServerClock } from "@/hooks/useServerClock";
 import type { PlayState } from "./play-state";
 import { contestReservesFullRound, fullRoundCutoffMs } from "./round-window";
+import { playModePlayerRule, START_HAS_PASSED_MESSAGE } from "@/lib/services/games/play-shape";
 
 /**
  * What a player is told before they commit an attempt.
@@ -33,6 +34,11 @@ interface RoundPreflightProps {
   launching: boolean;
   refusal: string | null;
   onLaunch: () => void;
+  /**
+   * A challenge has no gun - both players share one room that starts when both are in - so
+   * the start gate below is a competition rule only, and the play-mode sentence differs.
+   */
+  format?: "competition" | "challenge";
 }
 
 function describeAttempts(state: PlayState): string {
@@ -52,6 +58,7 @@ export function RoundPreflight({
   launching,
   refusal,
   onLaunch,
+  format = "competition",
 }: RoundPreflightProps) {
   /*
     THE SERVER'S CLOCK, NOT THE BROWSER'S, and every comparison below uses it.
@@ -110,8 +117,15 @@ export function RoundPreflight({
     readers.
   */
   const cutoffMs = fullRoundCutoffMs(windowEndMs, state.maxRoundSeconds);
+  /*
+    EVERYONE PLAYS TOGETHER: there is no personal round clock to shorten. The game runs one
+    shared race for everybody, so "less than a full round is left" was a false warning shown the
+    moment a competition or challenge began - the owner's report. None of the shortening or
+    reservation arithmetic applies to this shape.
+  */
+  const playsTogether = state.playMode === "scheduled";
   const fullRoundNoLongerFits =
-    !resuming && cutoffMs !== null && !windowClosed && now > cutoffMs;
+    !playsTogether && !resuming && cutoffMs !== null && !windowClosed && now > cutoffMs;
   const reservesFullRound = contestReservesFullRound(state.roundStartPolicy);
   const tooLateToStart = fullRoundNoLongerFits && reservesFullRound;
   /*
@@ -180,10 +194,20 @@ export function RoundPreflight({
   */
   const paused = state.isPaused === true;
 
+  // The same rule as `startHasPassed` in the launch service: once a together-start competition
+  // has begun, only a round already open (from the lobby) may continue.
+  const startPassed =
+    format === "competition" &&
+    playsTogether &&
+    !resuming &&
+    windowStartMs !== null &&
+    now >= windowStartMs;
+
   const blocked =
     notStartedYet ||
     noLongerOpen ||
     paused ||
+    startPassed ||
     windowNotOpen ||
     windowClosed ||
     tooLateToStart ||
@@ -203,7 +227,9 @@ export function RoundPreflight({
           state.pauseReason
           ? `Play is paused: ${state.pauseReason} Your attempts are safe - come back shortly.`
           : "Play is paused while we sort something out. Your attempts are safe - come back shortly."
-        : windowNotOpen
+        : startPassed
+          ? START_HAS_PASSED_MESSAGE
+          : windowNotOpen
           ? "Play has not opened for this competition yet."
           : windowClosed
             ? "The play window for this competition has closed."
@@ -223,7 +249,9 @@ export function RoundPreflight({
         ? "Closed"
         : paused
           ? "Paused"
-          : windowNotOpen
+          : startPassed
+            ? "Already started"
+            : windowNotOpen
             ? "Play has not opened"
             : windowClosed
               ? "Play has closed"
@@ -252,6 +280,14 @@ export function RoundPreflight({
           {gameName}
         </h2>
         <p className="mt-1 text-sm text-gray-400">{describeAttempts(state)}</p>
+        {state.playMode && (
+          <p className="mt-2 text-xs text-gray-300">
+            <span className="font-semibold text-gray-100">
+              {playModePlayerRule(state.playMode, format).label}.
+            </span>{" "}
+            {playModePlayerRule(state.playMode, format).detail}
+          </p>
+        )}
       </div>
 
       {/*
@@ -319,6 +355,7 @@ export function RoundPreflight({
               tone.
             */}
             {roundNeedsMs !== null &&
+              !playsTogether &&
               !tooLateToStart &&
               !resuming &&
               (shortenedMs !== null ? (

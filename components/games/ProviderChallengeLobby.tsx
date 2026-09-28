@@ -47,6 +47,7 @@ import {
   UNKNOWN_GAME_NAME,
 } from "@/lib/services/games/game-presentation.service";
 import { getChallengeRoundHistory } from "@/lib/services/games/challenge-results.service";
+import { playModePlayerRule } from "@/lib/services/games/play-shape";
 import {
   contestReservesFullRound,
   fullRoundCutoffMs,
@@ -234,11 +235,17 @@ export default async function ProviderChallengeLobby({
     ? contestReservesFullRound(state.roundStartPolicy)
     : true;
 
-  const scheduleDetails =
-    playWindowStart || playWindowEnd ? (
+  // A challenge plays in its TITLE's shape - it stores no mode of its own - so the rule is read
+  // from the catalogue and stated even before the challenge is accepted, when there is no play
+  // window yet and a player is deciding whether to pay.
+  const playMode = presentation.titlePlayMode ?? "anytime";
+  const modeRule = playModePlayerRule(playMode, "challenge");
+  const hasWindow = Boolean(playWindowStart || playWindowEnd);
+
+  const scheduleDetails = (
       <>
-        <p className={NEON_LABEL}>Play window</p>
-        <div className="mt-2 space-y-2">
+        {hasWindow && <p className={NEON_LABEL}>Play window</p>}
+        <div className={hasWindow ? "mt-2 space-y-2" : "hidden"}>
           {playWindowStart && <NeonRow label="Opens" value={playWindowStart} />}
           {playWindowEnd && <NeonRow label="Closes" value={playWindowEnd} />}
           {isActive &&
@@ -259,13 +266,19 @@ export default async function ProviderChallengeLobby({
             )}
         </div>
         <NeonNote>
-          Both players get the same window.{" "}
-          {reservesFullRound
-            ? "An attempt has to begin early enough to finish inside it, so the last one starts before the window shuts."
-            : "You can start an attempt at any time until it shuts, and anything still running then is closed with the challenge and scored on what you managed."}
+          <span className="font-semibold text-gray-100">{modeRule.label}.</span>{" "}
+          {modeRule.detail}
+          {hasWindow && playMode === "anytime" && (
+            <>
+              {" "}
+              {reservesFullRound
+                ? "An attempt has to begin early enough to finish inside the window, so the last one starts before it shuts."
+                : "Anything still running when the window shuts is closed with the challenge and scored on what you managed."}
+            </>
+          )}
         </NeonNote>
       </>
-    ) : null;
+    );
 
   return (
     <div className="flex min-h-screen flex-col gap-4 overflow-x-hidden p-3 sm:gap-6 sm:p-4 md:p-8">

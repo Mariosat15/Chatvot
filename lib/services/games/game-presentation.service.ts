@@ -1,6 +1,7 @@
 import { connectToDatabase } from "@/database/mongoose";
 import ProviderGame from "@/database/models/games/provider-game.model";
 import { resolveGameCategory } from "./game-categories";
+import { resolvePlayMode } from "./play-shape";
 
 /**
  * The operator's presentation content for one catalogue title, for player-facing screens.
@@ -84,6 +85,12 @@ export interface GamePresentation {
   scoreType?: string;
   scoreDirection?: string;
   maxDurationSeconds?: number;
+  /**
+   * The TITLE's resolved play mode. A challenge plays in the title's shape (it has no stored
+   * mode of its own), so its lobby reads this to state the rule before anybody pays. A
+   * competition must NOT read it - a competition stores its own mode, chosen per contest.
+   */
+  titlePlayMode?: "anytime" | "scheduled";
 }
 
 /**
@@ -127,7 +134,7 @@ export async function getGamePresentation(
 
   const title = await ProviderGame.findOne({ providerKey, gameCode })
     .select(
-      "displayName tagline description rulesSummary howToPlay category thumbnailUrl bannerUrl howToPlayImageUrl highlightsImageUrl highlights howItWorksSteps heroFeatures family scoreType scoreDirection maxDurationSeconds",
+      "displayName tagline description rulesSummary howToPlay category thumbnailUrl bannerUrl howToPlayImageUrl highlightsImageUrl highlights howItWorksSteps heroFeatures family scoreType scoreDirection maxDurationSeconds playMode playModeOverride",
     )
     .lean<{
       displayName?: string;
@@ -147,6 +154,8 @@ export async function getGamePresentation(
       scoreType?: string;
       scoreDirection?: string;
       maxDurationSeconds?: number;
+      playMode?: string;
+      playModeOverride?: string;
     } | null>();
 
   if (!title) {
@@ -192,5 +201,6 @@ export async function getGamePresentation(
     scoreType: title.scoreType || undefined,
     scoreDirection: title.scoreDirection || undefined,
     maxDurationSeconds: title.maxDurationSeconds,
+    titlePlayMode: resolvePlayMode(title),
   };
 }

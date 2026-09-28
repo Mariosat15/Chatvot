@@ -1172,6 +1172,23 @@ no build. The main app needs a rebuild and restart. Then hard refresh. **Never v
   - **Files:** client sources are in `velocity-server/client-patches/`. The repacked page changed
     `client.html` only, and every asset kept its hash.
   - **Not verified live with 16 players.**
+- **28 Sep 2026 - (9) After the start there is nothing to join, and the lobby says so** (`23` s8.8).
+  - **Owner report:** Play after the gun gave "Round cancelled - does not count / Play another
+    round" in a loop (`refused round creation: Entry to this race has closed`); the lobby never
+    said players must be there at the start; the "shorter round" warning fired the moment a
+    competition or challenge began; after the finish the host offered another race.
+  - **Fix, game-agnostic:** `startHasPassed` + `playModePlayerRule` + `START_HAS_PASSED_MESSAGE`
+    in `play-shape.ts` (mirrored). Launch refuses `start_has_passed` (409) before `createRound`
+    unless a live round exists; pre-flight shows "Already started"; result panel drops Play
+    again; shortened/too-late warnings suppressed for any `scheduled` play (competition and
+    challenge); both lobbies state the rule; `ChallengePlayState` / `GamePresentation` gained
+    `playMode` / `titlePlayMode`. Challenges are exempt from the start gate (no gun).
+  - **Tests:** new `__tests__/games/together-start-gate.test.ts` (16). Four structural
+    assertions re-pointed, claims unchanged - one (`contest-countdown` order) was already red
+    from `2a2c0281` renaming the entry and prize components. games-service `test:velocity` 13,
+    `test:play` 93. **Not verified by eye.** Latent money impact: none (the voided rounds cost
+    nothing; nothing backfilled).
+  - **Still an owner decision:** fewer than two connected players at the gun cancels the race.
 - **28 Sep 2026 - (8) An admin can no longer create a race nobody can finish** (`23` s8.7).
   - **Owner report:** the wizard said "The playing time you have set (1005 seconds) is longer
     than the contest itself (5 minutes)... fine if a partial run still scores". Both halves were

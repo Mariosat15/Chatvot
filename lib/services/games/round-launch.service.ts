@@ -7,7 +7,8 @@ import { createRound } from "./round.service";
 import { contestRoundConfig, isProviderContest } from "./contest-config";
 import { resolveAttemptSecondsFromSchema } from "./config-schema";
 import { publicBaseUrl } from "./public-base-url";
-import { lobbyOpensAt } from "./play-shape";
+import GameRound, { LIVE_ROUND_STATUSES } from "@/database/models/games/game-round.model";
+import { lobbyOpensAt, startHasPassed, START_HAS_PASSED_MESSAGE } from "./play-shape";
 import type { ProviderContestFields } from "./contest-config";
 import type { CreateRoundOutcome, CreateRoundRefusal } from "./round-types";
 
@@ -52,6 +53,9 @@ export type LaunchRefusal =
   // able to play, so the UI must offer "come back shortly" rather than a dead end.
   | "contest_paused"
   | "play_window_not_started"
+  // A contest where everyone starts together, after its start: permanent for this player, so
+  // the UI must NOT offer "try again" - that retry loop is what the owner reported.
+  | "start_has_passed"
   | "title_unavailable"
   | "misconfigured"
   | CreateRoundRefusal
@@ -233,6 +237,22 @@ export async function launchContestRound(
         "not_a_participant",
         "You have not joined this competition, so you cannot play a round in it.",
       );
+    }
+
+    // THE START GATE. In a contest where everyone starts together, the race room closes at the
+    // start, so a round created afterwards is refused by the provider, voided, and shown to the
+    // player as "does not count, play again" - which sends them straight back into the same
+    // refusal. Refusing HERE, before `createRound`, spends no attempt and gives a sentence that
+    // does not invite a retry. A round already live (opened in the lobby) is still resumed.
+    if (startHasPassed(contest, new Date())) {
+      const live = await GameRound.exists({
+        contestId: contest._id,
+        userId: actor.userId,
+        status: { $in: LIVE_ROUND_STATUSES },
+      });
+      if (!live) {
+        return refuse("start_has_passed", START_HAS_PASSED_MESSAGE);
+      }
     }
 
     const config = contestRoundConfig(contest);

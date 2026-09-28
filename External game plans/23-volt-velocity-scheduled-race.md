@@ -461,6 +461,36 @@ platform:
 Found on the way: the admin create route dropped the chosen play style, so every contest was
 stored in the title's default shape. Fixed.
 
+### 8.8 After the start there is nothing to join - and the lobby says so (28 September 2026)
+
+Owner report: pressing Play on a race competition **after** the gun gave "Round cancelled -
+does not count" with a **Play another round** button, and the log said `refused round
+creation: Entry to this race has closed`. The race server was right to refuse. The platform
+then voided the round, handed the attempt back and offered a fresh one that could only meet the
+same refusal - **a loop, with a real provider call on every press.** Nothing was paid wrongly.
+
+One rule, `startHasPassed` in `lib/services/games/play-shape.ts` (mirrored, byte-identical),
+read in three places. None of it names a game; it applies to any `scheduled` competition.
+
+- **The launch service refuses before a round exists** (`start_has_passed`, 409) unless the
+  player already has a live round to resume, so no attempt is spent and no provider is called.
+- **The pre-flight withholds Play** ("Already started") and **the result panel no longer offers
+  another round** once the start has passed.
+- **Challenges are exempt from the gate**: a challenge has no gun, it starts when both players
+  are in. Both formats lose the "this will be a shorter round" warning when everybody plays
+  together, because there is no personal clock for a late start to shorten - that warning fired
+  the instant any together-game began.
+- **The lobby states the rule in words that fit any game**, from `playModePlayerRule`:
+  "Everyone starts together - open the game before the start and wait in the lobby" versus
+  "Play any time - whenever you like before the competition ends". The challenge lobby shows it
+  before acceptance too, read from the title's own shape.
+- **After the finish the player goes back to the lobby**: the host blanks the race, marks the
+  round finished and a together contest has one attempt, so nothing offers a restart.
+
+Unchanged and still an owner decision: a race with **fewer than two connected players** at the
+gun is cancelled by the race server. The attempt is handed back and, with this fix, the screen
+now says there is no new race to join rather than looping.
+
 ## 10. Risks
 
 | ID | Risk | Mitigation |

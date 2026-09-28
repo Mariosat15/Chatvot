@@ -45,6 +45,7 @@ import {
   UNKNOWN_GAME_NAME,
 } from "@/lib/services/games/game-presentation.service";
 import { isProviderContest } from "@/lib/services/games/contest-config";
+import { playModePlayerRule } from "@/lib/services/games/play-shape";
 import type { ArenaStandings } from "@/lib/services/games/arena-standings.service";
 import { getTitleLevels } from "@/lib/services/xp-config.service";
 import {
@@ -286,6 +287,9 @@ export default async function ProviderContestLobby({
   const reservesFullRound = state
     ? contestReservesFullRound(state.roundStartPolicy)
     : true;
+  // The contest's OWN stored mode, as the launch service reads it - never the title's.
+  const playMode = competition.playMode === "scheduled" ? "scheduled" : "anytime";
+  const modeRule = playModePlayerRule(playMode, "competition");
 
   /*
     THE SCHEDULE, BUILT ONCE AND HOSTED IN TWO PLACES (owner instruction, 11 September 2026:
@@ -367,11 +371,23 @@ export default async function ProviderContestLobby({
           It defaults to the reserving wording for a player with no seat, matching the schema
           default rather than the wizard's.
         */}
+        {/*
+          THE PLAY-MODE RULE, stated before a player pays (owner, 28 Sep 2026). It comes from
+          `playModePlayerRule`, which names the rule and never the game, so every title of either
+          shape reads the same sentence. For a together-start contest the window sentences below
+          are false - nobody starts "at any time" - so they are replaced rather than appended.
+        */}
         <NeonNote>
-          Every player gets the same window.{" "}
-          {reservesFullRound
-            ? "An attempt has to begin early enough to finish inside it, so the last one starts before the window shuts."
-            : "You can start an attempt at any time until it shuts, and anything still running then is closed with the competition and scored on what you managed."}
+          <span className="font-semibold text-gray-100">{modeRule.label}.</span>{" "}
+          {modeRule.detail}
+          {playMode === "anytime" && (
+            <>
+              {" "}
+              {reservesFullRound
+                ? "An attempt has to begin early enough to finish inside the window, so the last one starts before it shuts."
+                : "Anything still running when the window shuts is closed with the competition and scored on what you managed."}
+            </>
+          )}
         </NeonNote>
       </>
     ) : null;

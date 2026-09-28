@@ -25,6 +25,7 @@
   const TOKEN_KEY = "chartvolt-velocity-token";
   const CONNECT_TIMEOUT_MS = 60000;
   const CONNECT_POLL_MS = 250;
+  const END_POLL_MS = 500;
 
   const params = new URLSearchParams(location.search);
   let token = (params.get("t") || "").trim();
@@ -145,6 +146,49 @@
     }
   }
 
+  /**
+   * Hand the player back to the platform the moment their race is over for them.
+   *
+   * The vendor result screen offers LEAVE COMPETITION, which drops into SOLO FLIGHT and a
+   * "next random race" - a free-play loop inside a paid contest's frame. So this page watches
+   * the client and, once this pilot has finished (or has left the room), removes the client and
+   * tells the platform, which shows its own result panel and a way back to the lobby.
+   *
+   * `competition-result` alone is not enough: it fires only when the WHOLE race is final, so a
+   * player who crossed the line while others were still racing would be left on the vendor
+   * screen with that button in front of them.
+   */
+  function watchForRaceEnd(api) {
+    let joined = false;
+    const timer = setInterval(() => {
+      let state = null;
+      try {
+        state = api.getState();
+      } catch {
+        return;
+      }
+      if (!state) return;
+      if (state.mode === "multiplayer") joined = true;
+      const done = joined && state.mode === "multiplayer" && state.state === "finished";
+      const left = joined && state.mode === "solo";
+      if (!done && !left) return;
+      clearInterval(timer);
+      frame.hidden = true;
+      try {
+        frame.src = "about:blank";
+      } catch {
+        /* ignore */
+      }
+      if (done) {
+        showStatus("Race complete. Your result is being confirmed.");
+        markFinished();
+      } else if (!finishedSent) {
+        showStatus("You left the race.");
+        tellPlatform("exit");
+      }
+    }, END_POLL_MS);
+  }
+
   function listenForResult() {
     let clientWindow = null;
     try {
@@ -195,6 +239,7 @@
       showStatus("Joining the grid\u2026");
       await connect(api, session);
       hideStatus();
+      watchForRaceEnd(api);
     } catch (error) {
       showStatus("", (error && error.message) || "Could not join the race.");
     }

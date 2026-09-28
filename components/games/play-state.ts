@@ -68,6 +68,8 @@ export interface PlayState {
   playWindowEnd?: string;
   /** Scheduled races only: when a seated player may first open the game. */
   lobbyOpensAt?: string;
+  /** Whether everyone plays together from one start. See the service's copy. */
+  playMode?: "anytime" | "scheduled";
   /**
    * Absent until a round has reported. See the service's copy - a nought here is a claim that
    * the player attempted the game and scored nothing, which decides prize eligibility.
