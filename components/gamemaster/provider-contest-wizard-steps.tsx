@@ -2,7 +2,13 @@
 
 import ChallengeSettingsFields from "@/components/challenges/ChallengeSettingsFields";
 import { UtcScheduleFields } from "@/components/gamemaster/UtcScheduleFields";
+import {
+  ProviderRoundFitNote,
+  ProviderRoundPolicyFields,
+} from "@/components/gamemaster/ProviderRoundControls";
+import type { ProviderContestRules } from "@/components/gamemaster/use-provider-contest-rules";
 import type { ConfigField } from "@/lib/services/games/config-schema";
+import { ROUND_START_POLICY_COPY } from "@/lib/services/games/round-types";
 import {
   PLAY_MODE_COPY,
   type PlayMode,
@@ -179,6 +185,7 @@ export function GameSettingsStep({
           values={settings}
           onChange={onSetting}
           disabled={disabled}
+          context="competition"
         />
       </div>
     </StepPanel>
@@ -197,8 +204,10 @@ export function ScheduleStep({
   onEnd,
   onEntryFee,
   onMaxParticipants,
+  rules,
   disabled,
 }: {
+  rules: ProviderContestRules;
   startTime: string;
   endTime: string;
   entryFee: string;
@@ -214,15 +223,20 @@ export function ScheduleStep({
 }) {
   return (
     <StepPanel title="Schedule & Entry" subtitle="When it runs and what it costs">
+      {/* Labels and hints come from the play shape, as on the admin wizard's schedule step. */}
       <UtcScheduleFields
-        startLabel="Start Time"
-        endLabel="End Time"
+        startLabel={rules.shape.copy.startLabel}
+        endLabel={rules.shape.copy.endLabel}
+        startHint={rules.shape.copy.startHint}
+        endHint={rules.shape.copy.endHint}
         startTime={startTime}
         endTime={endTime}
         onStartChange={onStart}
         onEndChange={onEnd}
         disabled={disabled}
       />
+      <ProviderRoundFitNote rules={rules} startTime={startTime} onFitContest={onEnd} />
+      <ProviderRoundPolicyFields rules={rules} disabled={disabled} />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Entry fee (credits)">
           <input
@@ -322,8 +336,7 @@ export function ReviewStep({
   maxParticipants,
   fee,
   prizes,
-  canPickMode,
-  playMode,
+  rules,
 }: {
   name: string;
   displayName: string;
@@ -333,9 +346,12 @@ export function ReviewStep({
   maxParticipants: string;
   fee: number;
   prizes: { rank: number; percentage: number }[];
-  canPickMode: boolean;
-  playMode: PlayMode;
+  rules: ProviderContestRules;
 }) {
+  const attempts =
+    rules.attemptsPolicy === "single"
+      ? "One each"
+      : `${rules.attemptsPolicy === "best_of_n" ? "Best of" : "Total of"} ${rules.attemptsAllowed ?? "?"}`;
   return (
     <StepPanel title="Review & Launch" subtitle="Confirm before creating">
       <dl className="space-y-3 text-sm">
@@ -356,14 +372,18 @@ export function ReviewStep({
           label="Prizes"
           value={prizes.map((p) => `#${p.rank} ${p.percentage}%`).join(" · ")}
         />
-        {canPickMode && (
-          <ReviewRow
-            label="Play style"
-            value={
-              playMode === "scheduled" ? "Everyone plays at once" : "Play any time"
-            }
-          />
-        )}
+        <ReviewRow
+          label="Play style"
+          value={PLAY_MODE_COPY.get(rules.playMode)?.label ?? rules.playMode}
+        />
+        <ReviewRow label="Attempts" value={attempts} />
+        <ReviewRow
+          label="Last start"
+          value={
+            ROUND_START_POLICY_COPY.get(rules.roundStartPolicy)?.label ??
+            rules.roundStartPolicy
+          }
+        />
       </dl>
     </StepPanel>
   );

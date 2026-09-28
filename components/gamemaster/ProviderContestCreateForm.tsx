@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft,
-  AlertCircle,
   Calendar,
   CheckCircle,
   ChevronLeft,
@@ -32,6 +31,8 @@ import {
   ReviewStep,
   ScheduleStep,
 } from "@/components/gamemaster/provider-contest-wizard-steps";
+import { ProviderContestLimitBanners } from "@/components/gamemaster/ProviderContestLimitBanners";
+import { useProviderContestRules } from "@/components/gamemaster/use-provider-contest-rules";
 
 export interface ContestableTitleOption {
   providerKey: string;
@@ -121,7 +122,14 @@ export default function ProviderContestCreateForm({
     defaultUtcDraft(1, "12:00"),
   );
   const [endTime, setEndTime] = useState(() => defaultUtcDraft(1, "18:00"));
-  const [playMode, setPlayMode] = useState<PlayMode>(title.playMode);
+  const rules = useProviderContestRules({
+    initialPlayMode: title.playMode,
+    fields,
+    settings,
+    maxDurationSeconds: title.maxDurationSeconds,
+    startTime,
+    endTime,
+  });
   const [prizes, setPrizes] = useState<PrizeShare[]>(DEFAULT_PRIZES);
   const [submitting, setSubmitting] = useState(false);
 
@@ -169,6 +177,8 @@ export default function ProviderContestCreateForm({
       if (maxNum > maxUsersPerCompetition) {
         return `Max players cannot exceed ${maxUsersPerCompetition}.`;
       }
+      const roundError = rules.scheduleError();
+      if (roundError) return roundError;
     }
     if (n === 4 && Math.abs(prizeTotal - 100) > 0.01) {
       return "Prize shares must add up to 100%.";
@@ -238,11 +248,11 @@ export default function ProviderContestCreateForm({
           endTime: endIso,
           playWindowStart: startIso,
           playWindowEnd: endIso,
-          playMode,
-          attemptsPolicy: "single",
+          // Play style, attempts, last-start rule and the grace derived from the playing
+          // time, exactly as the schedule step showed them.
+          ...rules.requestFields,
           unresolvedRoundPolicy: "score_zero",
           unscoredContestPolicy: "refund_entry_fees",
-          resultGracePeriodSeconds: 900,
           perRoundCostAcknowledged: true,
           prizeDistribution: prizes,
         }),
@@ -289,36 +299,14 @@ export default function ProviderContestCreateForm({
           </p>
         </div>
 
-        {blockedByActive && (
-          <div className="mb-6 flex items-start gap-3 rounded-2xl border border-red-500/30 bg-red-500/10 p-3 sm:p-4">
-            <AlertCircle className="h-6 w-6 shrink-0 text-red-400" />
-            <div>
-              <h3 className="font-semibold text-red-400">
-                Active Competition Limit Reached
-              </h3>
-              <p className="mt-1 text-sm text-gray-400">
-                You already have {activeCompetitions} active competition(s)
-                (limit {maxActiveCompetitions}). Wait for one to finish (or
-                for an upcoming contest to drop below its minimum entrants)
-                before creating another.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {blockedByDaily && (
-          <div className="mb-6 flex items-start gap-3 rounded-2xl border border-red-500/30 bg-red-500/10 p-3 sm:p-4">
-            <AlertCircle className="h-6 w-6 shrink-0 text-red-400" />
-            <div>
-              <h3 className="font-semibold text-red-400">Daily Limit Reached</h3>
-              <p className="mt-1 text-sm text-gray-400">
-                You&apos;ve created {competitionsCreatedToday} competition(s)
-                today (limit {maxCompetitionsPerDay}). Come back tomorrow to
-                create more!
-              </p>
-            </div>
-          </div>
-        )}
+        <ProviderContestLimitBanners
+          blockedByActive={blockedByActive}
+          blockedByDaily={blockedByDaily}
+          activeCompetitions={activeCompetitions}
+          maxActiveCompetitions={maxActiveCompetitions}
+          competitionsCreatedToday={competitionsCreatedToday}
+          maxCompetitionsPerDay={maxCompetitionsPerDay}
+        />
 
         {!title.schema.ok ? (
           <p className="rounded-lg border border-red-800 bg-red-950/40 p-4 text-sm text-red-200">
@@ -408,9 +396,9 @@ export default function ProviderContestCreateForm({
                 {step === 2 && (
                   <GameSettingsStep
                     canPickMode={canPickMode}
-                    playMode={playMode}
+                    playMode={rules.playMode}
                     supportedPlayModes={title.supportedPlayModes}
-                    onPlayMode={setPlayMode}
+                    onPlayMode={rules.selectPlayMode}
                     fields={fields}
                     settings={settings}
                     onSetting={(fieldName, value) =>
@@ -432,6 +420,7 @@ export default function ProviderContestCreateForm({
                     onEnd={setEndTime}
                     onEntryFee={setEntryFee}
                     onMaxParticipants={setMaxParticipants}
+                    rules={rules}
                     disabled={submitting}
                   />
                 )}
@@ -453,8 +442,7 @@ export default function ProviderContestCreateForm({
                     maxParticipants={maxParticipants}
                     fee={fee}
                     prizes={prizes}
-                    canPickMode={canPickMode}
-                    playMode={playMode}
+                    rules={rules}
                   />
                 )}
 

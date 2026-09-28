@@ -64,22 +64,10 @@ export function joinUtcDraft(date: string, time: string): string {
 
 /**
  * Turn a UTC draft (`YYYY-MM-DDTHH:mm`) into an ISO string the create API can store.
- * A bare `new Date("…T13:00")` is local in every browser — that is the shift this avoids.
+ * Re-exported from the shared `round-fit.ts` rather than kept as a second copy, so the
+ * instant this form POSTs is the one the round-fit note measured.
  */
-export function utcDraftToIso(value: string): string {
-  if (!value) return value;
-  if (/[zZ]|[+-]\d{2}:\d{2}$/.test(value)) {
-    const absolute = new Date(value);
-    return Number.isNaN(absolute.getTime()) ? value : absolute.toISOString();
-  }
-  const match = value.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/);
-  if (!match) {
-    const fallback = new Date(value);
-    return Number.isNaN(fallback.getTime()) ? value : fallback.toISOString();
-  }
-  const instant = new Date(`${match[1]}T${match[2]}:00Z`);
-  return Number.isNaN(instant.getTime()) ? value : instant.toISOString();
-}
+export { utcDraftToIso } from "@/lib/services/games/round-fit";
 
 function pad2(n: number): string {
   return String(n).padStart(2, "0");

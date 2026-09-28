@@ -234,6 +234,16 @@ percentage as trading - section 5.
 > `GET /api/gamemaster/creation-options`.
 > **Admin GM portal create UI is deliberately not built** — API parity only; the product
 > surface is the player `/gamemaster/create-competition` route.
+>
+> **AMENDED 28 September 2026: the wizard offers the same round rules as the admin wizard.**
+> Until then it sent one attempt and a 900-second grace as literals and had no timing check.
+> It now offers the play style (with `playShapeRules`' forced values), the attempts policy, the
+> last-start policy, and the round-fit warning with the one-click "long enough" fix. The grace
+> is derived from the playing time. All of this comes from `lib/services/games/round-fit.ts`
+> (mirrored, byte-identical test) and `components/gamemaster/use-provider-contest-rules.ts`.
+> In a competition a title's `challengeValue` pins nothing (`ChallengeSettingsFields`
+> `context="competition"`). No server change was needed; the construction helper already
+> accepted every field.
 
 Only games in `limits.allowedGameTypes` appear in the picker (and only contestable
 catalogue titles that pass the same enablement as admin).

@@ -281,7 +281,12 @@ describe("GM create UI reuses schema settings and does not enumerate games", () 
 
   it("shows daily limit banner and disables wizard from the start", () => {
     const form = code(FORM);
-    expect(form).toMatch(/Daily Limit Reached/);
+    // Re-pointed 28 Sep 2026: the banner moved into its own file to keep the form under 500
+    // lines. The claim is unchanged; only the location moved.
+    expect(code("components/gamemaster/ProviderContestLimitBanners.tsx")).toMatch(
+      /Daily Limit Reached/,
+    );
+    expect(form).toMatch(/<ProviderContestLimitBanners/);
     expect(form).toMatch(/maxCompetitionsPerDay/);
     expect(form).toMatch(/competitionsCreatedToday/);
     // Next and Create both gate on canCreate — not Launch-only.

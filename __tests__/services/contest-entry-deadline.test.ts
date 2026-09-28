@@ -39,7 +39,7 @@ const EDIT =
 const MAIN_MODULE = "lib/services/games/entry-deadline.ts";
 const ADMIN_MODULE = "apps/admin/lib/services/games/entry-deadline.ts";
 const PLAYER_WINDOW = "components/games/round-window.ts";
-const DRAFT = "apps/admin/components/admin/games/contest-draft.ts";
+const ROUND_FIT = "lib/services/games/round-fit.ts";
 
 /** Comments explain these rules at length, and a structural test that reads prose is useless. */
 function stripComments(source: string): string {
@@ -184,7 +184,9 @@ describe("one producer, and every consumer delegates to it", () => {
   });
 
   it("the wizard's clock note forwards rather than repeating the sum", () => {
-    const src = stripComments(read(DRAFT));
+    // Re-pointed 28 Sep 2026: `describeRoundFit` moved from the admin draft module to the
+    // shared `round-fit.ts` (both wizards use it). Same claim, new location.
+    const src = stripComments(read(ROUND_FIT));
     expect(src).toMatch(/resolveContestEntryDeadline\s*\(/);
     // Scoped to the fit description, because `deriveResultGraceSeconds` legitimately does
     // arithmetic of its own elsewhere in this file.

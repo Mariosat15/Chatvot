@@ -59,6 +59,7 @@ const WIZARD = "apps/admin/components/admin/games/ProviderContestWizard.tsx";
 const WIZARD_STEPS = "apps/admin/components/admin/games/wizard";
 const EDITOR = "apps/admin/components/admin/games/ProviderContestEditor.tsx";
 const DRAFT = "apps/admin/components/admin/games/contest-draft.ts";
+const ROUND_FIT = "apps/admin/lib/services/games/round-fit.ts";
 const PREFLIGHT = "lib/services/games/contest-preflight.ts";
 const ADMIN_PREFLIGHT = "apps/admin/lib/services/games/contest-preflight.ts";
 const CONFIG_FIELDS = "apps/admin/components/admin/games/ConfigSchemaFields.tsx";
@@ -306,7 +307,11 @@ describe("the clock explanation is one definition, on both screens", () => {
       satisfied by a screen that then computes its own deadline beside it, which is exactly
       how the two would drift.
     */
-    expect(readCode(DRAFT)).toMatch(/export function describeRoundFit/);
+    // Re-pointed 28 Sep 2026: the helper moved to the shared, mirrored `round-fit.ts` so the
+    // Game Master wizard can use it too. The claim is unchanged; only the location moved, and
+    // the admin draft module must still hand callers that one definition.
+    expect(readCode(ROUND_FIT)).toMatch(/export function describeRoundFit/);
+    expect(readCode(DRAFT)).toMatch(/describeRoundFit,[\s\S]*from "@\/lib\/services\/games\/round-fit"/);
 
     for (const code of [readWizardScreen(), readCode(EDITOR), readCode(NOTE)]) {
       // The subtraction that produces the cut-off must appear nowhere but the helper.
@@ -721,9 +726,12 @@ describe("the result grace period is derived from the playing time", () => {
       number the server refuses, on a field no screen offers - so the contest simply cannot be
       saved and the message names a setting that is not there.
     */
-    expect(readCode(DRAFT)).toMatch(
-      /import \{ RESULT_GRACE_MARGIN_SECONDS \} from "@\/lib\/services\/games\/contest-preflight"/,
+    // Re-pointed 28 Sep 2026: the derivation moved into the shared round-fit module so the
+    // Game Master wizard uses it too. Same single definition; only the location moved.
+    expect(readCode(ROUND_FIT)).toMatch(
+      /import \{ RESULT_GRACE_MARGIN_SECONDS \} from "\.\/contest-preflight"/,
     );
+    expect(readCode(DRAFT)).not.toMatch(/RESULT_GRACE_MARGIN_SECONDS = /);
     for (const copy of [PREFLIGHT, ADMIN_PREFLIGHT]) {
       expect(readCode(copy)).toMatch(
         /export const RESULT_GRACE_MARGIN_SECONDS = 5 \* 60/,

@@ -43,6 +43,15 @@ interface Props {
    * what the field is.
    */
   lockPlayClock?: boolean;
+  /**
+   * Which kind of contest these settings are for. Absent means `challenge`.
+   *
+   * A `challengeValue` pins a setting for CHALLENGES ONLY - `applyChallengeValues` runs on
+   * the challenge create path and nowhere else. The Game Master competition wizard renders
+   * this same component, and without this prop it showed a race's lap count as "Fixed for
+   * every challenge" on a competition, where the creator may genuinely choose it.
+   */
+  context?: "challenge" | "competition";
 }
 
 /**
@@ -69,7 +78,9 @@ export default function ChallengeSettingsFields({
   onChange,
   disabled,
   lockPlayClock,
+  context = "challenge",
 }: Props) {
+  const honoursChallengeValues = context === "challenge";
   if (fields.length === 0) {
     // Reason: said rather than left blank. A player who saw settings on the previous game
     // otherwise assumes this one is still loading, or that the dialog is broken.
@@ -83,7 +94,7 @@ export default function ChallengeSettingsFields({
   return (
     <div className="space-y-3">
       {fields.map((field) =>
-        field.challengeValue !== undefined ? (
+        honoursChallengeValues && field.challengeValue !== undefined ? (
           // Reason: the server stores the pinned value whatever is sent
           // (`applyChallengeValues`), so an editable control here would appear to work and
           // do nothing. Shown as a fact instead.
