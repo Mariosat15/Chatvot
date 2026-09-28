@@ -47,7 +47,7 @@ export async function createRaceServer({secret=raceEnvironment(process.env,root)
    const id=claims.playerId,p=room.player(id),now=Date.now();
    if(action==='join'&&req.method==='POST'){json(200,room.snapshot(id,now));return;}
    if(action==='events'&&req.method==='GET'){
-    if(room.status!=='lobby'&&!p.active){json(409,{error:'Race entry has closed'});return;}
+    if(!room.mayEnter(p)){json(409,{error:'Race entry has closed'});return;}
     // Reason: `no-transform` stops every gzip layer on the path (Next.js's rewrite proxy compresses all responses, Cloudflare too) from holding snapshots back until a chunk fills.
     res.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-cache, no-transform','Connection':'keep-alive','X-Accel-Buffering':'no'});res.flushHeaders();
     const old=p.connection;p.connection={res,exp:claims.exp};if(old)old.res.end();room.join(id,now);
@@ -57,7 +57,7 @@ export async function createRaceServer({secret=raceEnvironment(process.env,root)
    if(req.method==='POST'&&action==='input'){if(!p.connected||p.dnf||p.finishTimeMs!=null||room.isClosed()){await body();json(200,{accepted:false,ack:p.lastSeq,reason:'inactive'});return;}const ok=room.input(id,await body(),now);json(ok?200:409,{accepted:ok,ack:p.lastSeq,ackStep:p.ackStep,inputStep:p.queuedStep,serverTime:now});return;}
    if(req.method==='POST'&&action==='ship'){const b=await body();room.select(id,b.shipId);json(200,{shipId:p.sim.shipId});return;}
    if(req.method==='POST'&&action==='ready'){const b=await body();if(typeof b.ready!=='boolean')throw Error('ready must be boolean');room.ready(id,b.ready,now);json(200,{ready:p.ready,status:room.status,startAt:room.startAt});return;}
-   if(req.method==='POST'&&action==='leave'){p.dnf=room.status!=='lobby';p.connection?.res.end();room.disconnect(id,now);json(200,{left:true});return;}
+   if(req.method==='POST'&&action==='leave'){p.dnf=p.active&&room.status!=='lobby';p.connection?.res.end();room.disconnect(id,now);json(200,{left:true});return;}
    json(404,{error:'Unknown endpoint'});
   }catch(e){if(!res.headersSent)json(400,{error:e.message});else res.end();}
  });

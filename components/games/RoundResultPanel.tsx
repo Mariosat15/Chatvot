@@ -202,9 +202,11 @@ export function RoundResultPanel({
   }
 
   /*
-    A TOGETHER-START COMPETITION PAST ITS START HAS NO NEXT ROUND. The launch service refuses one
-    (`startHasPassed`), so offering "play again" here - and telling a player whose race was
-    cancelled that they can - sent them round a loop of refusals. `lobbyOpensAt` is sent only for
+    A TOGETHER-START COMPETITION PAST ITS START HAS NO NEXT ROUND. There is one race per contest:
+    a late player may still join it while it runs (28 Sep 2026), but once this player's round has
+    ended - raced, or cancelled because too few players were ready - that race is over, and the
+    game refuses a new seat in it. Offering "play again" here sent players round a loop of
+    refusals. `lobbyOpensAt` is sent only for
     a competition stored as `scheduled`, which is exactly the set with a start gun; a challenge
     never carries it.
   */

@@ -18,7 +18,7 @@
 
 import { loadConfig, type VelocityConfig } from "../../config";
 import { ApiError, badRequest } from "../../http/errors";
-import { lapsOf, type VoltVelocityConfig } from "./title";
+import { lapsOf, VELOCITY_SECONDS_PER_LAP, type VoltVelocityConfig } from "./title";
 import {
   MAX_SCHEDULE_AHEAD_MS,
   raceIdentity,
@@ -49,8 +49,10 @@ export function requireVelocityConfig(): VelocityConfig {
 /**
  * `scheduledStartAt` is optional on the create request.
  *
- * Present on a scheduled competition: every player's round carries the same instant and the race
- * server goes green at it whether or not everybody pressed Ready (owner decision). Absent on a
+ * Present on a scheduled competition: every player's round carries the same instant. From that
+ * instant the race server starts a 10 s countdown as soon as at least two pilots have pressed
+ * Launch, and a pilot who arrives later may still join the running race (owner, 28 Sep 2026;
+ * the earlier "green at the instant whether or not anybody is Ready" rule is gone). Absent on a
  * challenge, which has no clock of its own and starts when both players are Ready.
  *
  * It must fall before the round's `expiresAt` - a race that starts after the round has expired
@@ -75,6 +77,25 @@ export function parseScheduledStart(value: unknown, expiresAt: Date, now: Date):
   return parsed;
 }
 
+/** The race server's 10 s gun countdown on a scheduled race, plus a margin for the result to arrive. */
+const START_COUNTDOWN_AND_MARGIN_MS = 10_000 + 30_000;
+
+/**
+ * The last moment a scheduled room may still go green (owner rule, 28 Sep 2026).
+ *
+ * A scheduled race no longer fires at the start time regardless: it waits until at least two
+ * pilots have picked a ship and pressed Launch. It cannot wait for ever, though - the race must
+ * still END before this round expires, or the round can never be scored. So the room is told
+ * the latest start that leaves a full-length race (laps x 100 s) and the countdown inside the
+ * round. Never before the scheduled start itself, and never past the race server's horizon.
+ */
+export function latestRaceStart(scheduledStartAt: Date, expiresAt: Date, laps: number): Date {
+  const raceMs = laps * VELOCITY_SECONDS_PER_LAP * 1000;
+  const latest = expiresAt.getTime() - raceMs - START_COUNTDOWN_AND_MARGIN_MS;
+  const bounded = Math.min(latest, scheduledStartAt.getTime() + MAX_SCHEDULE_AHEAD_MS);
+  return new Date(Math.max(scheduledStartAt.getTime(), bounded));
+}
+
 /**
  * Register this player with the race room BEFORE the round is written.
  *
@@ -89,10 +110,12 @@ export async function seatVelocityPlayer(
   scheduledStartAt: Date | undefined,
   providerRoundId: string,
   displayName: string | undefined,
+  expiresAt: Date,
   soloRoundId?: string,
 ): Promise<VelocitySeat> {
   const velocity = requireVelocityConfig();
   const laps = lapsOf(config);
+  const latestStartAt = scheduledStartAt ? latestRaceStart(scheduledStartAt, expiresAt, laps) : undefined;
   const identity = raceIdentity(
     gameCode,
     contentSeed,
@@ -106,7 +129,7 @@ export async function seatVelocityPlayer(
     identity,
     { id: providerRoundId, name: racerName(displayName) },
     scheduledStartAt,
-    { laps, solo: soloRoundId !== undefined },
+    { laps, solo: soloRoundId !== undefined, latestStartAt },
   );
   if (outcome.ok) return { identity, scheduledStartAt };
 

@@ -121,7 +121,7 @@ export function playModePlayerRule(
     return {
       label: "Everyone starts together",
       detail:
-        "Everyone plays at the same moment. Open the game before the start time and wait in the lobby - once it starts, nobody else can join, and a player who is not in at the start does not take part.",
+        "Everyone plays at the same moment. Open the game before the start time, get ready and wait. At the start time, once at least two players are ready, a short countdown runs and play begins. You can still join after the start, but the time already played counts against you - so do not be late.",
     };
   }
   return {
@@ -134,12 +134,17 @@ export function playModePlayerRule(
 }
 
 /**
- * Whether a competition that starts everyone together has already gone past its start, so no
- * NEW round may begin. A live round (opened in the lobby) is not affected - it is resumed.
+ * Whether a competition that starts everyone together has already gone past its start time.
+ *
+ * Owner rule, 28 Sep 2026: this is NO LONGER a refusal. A late player may still open the game
+ * and join the race while it is running; the time already raced counts against them. Whether
+ * the race can still be joined is the game's answer, not ours - a race that has finished or
+ * been cancelled refuses the seat before the round is written, so no attempt is spent. What
+ * this predicate still decides is what the screens SAY, so the pre-flight and the result panel
+ * read one definition.
  *
  * Only a competition stored as `scheduled` has a gun; the title is not consulted, for the same
- * reason as `lobbyOpensAt`. The launch service and the pre-flight screen both ask this, so the
- * button the player sees and the refusal the server gives cannot disagree.
+ * reason as `lobbyOpensAt`.
  */
 export function startHasPassed(
   contest: { playMode?: string | null; playWindowStart?: Date | null },
@@ -150,9 +155,9 @@ export function startHasPassed(
   return Number.isFinite(start) && now.getTime() >= start;
 }
 
-/** The player-facing refusal once `startHasPassed` is true. One sentence, shared. */
-export const START_HAS_PASSED_MESSAGE =
-  "This competition started for everyone at the same moment, so a new game can no longer be started. Only players who were in the game at the start take part.";
+/** What a player is told once `startHasPassed` is true. A notice, not a refusal. One sentence, shared. */
+export const LATE_ENTRY_NOTICE =
+  "The start time has passed. You can still join while play is running, but the time already played counts against you.";
 
 /**
  * What the catalogue row has to carry for the shape to be resolvable.

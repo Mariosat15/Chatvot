@@ -7,8 +7,7 @@ import { createRound } from "./round.service";
 import { contestRoundConfig, isProviderContest } from "./contest-config";
 import { resolveAttemptSecondsFromSchema } from "./config-schema";
 import { publicBaseUrl } from "./public-base-url";
-import GameRound, { LIVE_ROUND_STATUSES } from "@/database/models/games/game-round.model";
-import { lobbyOpensAt, startHasPassed, START_HAS_PASSED_MESSAGE } from "./play-shape";
+import { lobbyOpensAt } from "./play-shape";
 import type { ProviderContestFields } from "./contest-config";
 import type { CreateRoundOutcome, CreateRoundRefusal } from "./round-types";
 
@@ -53,9 +52,6 @@ export type LaunchRefusal =
   // able to play, so the UI must offer "come back shortly" rather than a dead end.
   | "contest_paused"
   | "play_window_not_started"
-  // A contest where everyone starts together, after its start: permanent for this player, so
-  // the UI must NOT offer "try again" - that retry loop is what the owner reported.
-  | "start_has_passed"
   | "title_unavailable"
   | "misconfigured"
   | CreateRoundRefusal
@@ -239,21 +235,11 @@ export async function launchContestRound(
       );
     }
 
-    // THE START GATE. In a contest where everyone starts together, the race room closes at the
-    // start, so a round created afterwards is refused by the provider, voided, and shown to the
-    // player as "does not count, play again" - which sends them straight back into the same
-    // refusal. Refusing HERE, before `createRound`, spends no attempt and gives a sentence that
-    // does not invite a retry. A round already live (opened in the lobby) is still resumed.
-    if (startHasPassed(contest, new Date())) {
-      const live = await GameRound.exists({
-        contestId: contest._id,
-        userId: actor.userId,
-        status: { $in: LIVE_ROUND_STATUSES },
-      });
-      if (!live) {
-        return refuse("start_has_passed", START_HAS_PASSED_MESSAGE);
-      }
-    }
+    // NO START GATE, deliberately (owner rule, 28 Sep 2026). A together-start contest used to
+    // refuse a new round after the gun. A late player may now join a race that is still
+    // running, with the time already raced counting against them. Whether the race can still
+    // be joined is the game's decision: a finished or cancelled race refuses the seat, and
+    // `createRound` deletes the pending round on any provider refusal, so no attempt is spent.
 
     const config = contestRoundConfig(contest);
     if (!config.ok) {

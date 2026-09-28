@@ -181,14 +181,15 @@ function roundFitsInWindow(config: RoundContestConfig, now: Date): boolean {
 const ROUND_EXPIRY_HEADROOM_SECONDS = 120;
 
 function resolveExpiry(config: RoundContestConfig, now: Date): Date {
+  // Reason (owner rule, 28 Sep 2026): a together-start race does not begin at the start time
+  // but once at least two players are ready after it, and a late player may still join the
+  // running race. Nobody can say when that race will end, so every round of the contest lives
+  // until the play window closes - one shared expiry, which also lets the game keep the race
+  // waiting for a second player for as long as a full race still fits.
+  if (config.scheduledStartAt) return new Date(config.playWindowEnd.getTime());
   const maxDuration =
     ((config.maxDurationSeconds ?? 300) + ROUND_EXPIRY_HEADROOM_SECONDS) * 1000;
-  // Reason: a round opened in a scheduled contest's lobby does not start playing until the
-  // gun, so measuring from creation would expire it up to half an hour early - and the
-  // provider refuses a round whose start is not before its expiry. After the gun `now` is
-  // later, so this changes nothing for a late opener or for any other contest.
-  const base = Math.max(now.getTime(), config.scheduledStartAt?.getTime() ?? 0);
-  return new Date(Math.min(base + maxDuration, config.playWindowEnd.getTime()));
+  return new Date(Math.min(now.getTime() + maxDuration, config.playWindowEnd.getTime()));
 }
 
 export async function createRound(
@@ -362,6 +363,17 @@ export async function createRound(
     console.warn(
       `⚠️ Provider "${input.providerKey}" refused round creation: ${created.error}`,
     );
+    // Reason: a late player in a together-start race is refused by the game once the race has
+    // finished or been cancelled. That is permanent, so "try again shortly" would send them
+    // round a loop of refusals. INVALID_REQUEST is the game's code for exactly this.
+    if (input.config.scheduledStartAt && created.code === "INVALID_REQUEST") {
+      return {
+        success: false,
+        refusal: "provider_error",
+        error:
+          "This race can no longer be joined - it has already finished or was cancelled. Your attempt was not used.",
+      };
+    }
     return {
       success: false,
       refusal: "provider_error",

@@ -912,6 +912,34 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 28 Sep 2026 - The race waits for two ready players, counts down from 10, and a late player may join
+
+**Owner:** after paying, a player presses Play, picks a ship and waits. The game must start by
+itself only when the start time has come **and** at least two players are ready, count down from
+10 during which nothing moves, and a late player must still be able to join and race.
+
+**This reverses `23` s8.8** ("after the gun there is nothing to join") and the old race-server
+rule that connected players race at the gun even when not Ready. Recorded here, not rewritten.
+
+**Built.**
+- **Race server:** waits past the start for two Ready pilots, then a 10 s countdown. Only Ready pilots race. It cancels (`too-few-ready`) if there are still not two by `latestStartAt`. It admits late pilots while counting down or racing, and a late pilot's time carries the race time already run, so lateness is never an advantage. 67 tests.
+- **games-service:** sends `latestStartAt`, the latest start at which a full race still fits.
+- **Platform:**
+  - The launch service no longer refuses after the start (`start_has_passed` removed).
+  - A game refusal on a together-start round is a plain "can no longer be joined, your attempt was not used", and the pending round is deleted, so no attempt is spent.
+  - Together-start rounds expire at the play window end.
+  - The pre-flight shows **Join late** with a notice.
+  - The wording names no game.
+  - `together-start-gate.test.ts` was flipped, not deleted, and one assertion in `volt-velocity-lobby.test.ts` was flipped too.
+
+Full account in `23` **s8.11**.
+
+**Unchanged:** paying still closes at the start. The lobby opens `lobbySeconds` before the start (10 minutes by default), not from entry.
+
+**Deploy:** restart `chartvolt-velocity`; games-service `npm run build` + `pm2 restart chartvolt-games`; rebuild the platform. **Not verified by eye.**
+
+**Pre-existing, not caused here:** two `__tests__/games/arena-band.test.ts` failures.
+
 ### 28 Sep 2026 - A race cannot go live with its start already behind it
 
 **Owner:** "i created a competition all at once and as soon i press play check the screen fix

@@ -80,10 +80,14 @@ describe("the round is told when the gun is", () => {
     expect(result.ok && "scheduledStartAt" in result.config).toBe(false);
   });
 
-  it("measures expiry from the later of now and the start, so an early arrival loses no time", () => {
+  // Flipped 28 Sep 2026: this used to pin expiry at max(now, start) + one round. A race now
+  // waits for two ready players after the start and admits late players, so nobody can say
+  // when it ends - an early arrival and a late one both keep their round until the window
+  // closes, which is a strictly longer life than the old rule gave either of them.
+  it("lets every together-start round live until the play window closes, so no waiting player expires", () => {
     const code = read("lib/services/games/round.service.ts");
     expect(code).toMatch(
-      /Math\.max\(now\.getTime\(\),\s*config\.scheduledStartAt\?\.getTime\(\)\s*\?\?\s*0\)/,
+      /if \(config\.scheduledStartAt\) return new Date\(config\.playWindowEnd\.getTime\(\)\);/,
     );
   });
 

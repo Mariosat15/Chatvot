@@ -97,7 +97,7 @@ work for a provider contest with `lower_is_better` scores.
 | until 18:00 | Players enter and pay. Entry closes at the gun (existing rule) |
 | 17:50 | Lobby opens. A seated player presses Play: the platform creates their round (single attempt), games-service creates/extends the room, the iframe loads, the hangar appears with "Race starts in 9:58" |
 | 17:50-18:00 | Pick a ship, press Ready. Leaving and returning resumes the **same** round (existing idempotent resume) |
-| 18:00:00 | Race server starts the race for everyone connected (5 s countdown). No-shows are not in the race |
+| 18:00:00 | Race server starts the race for everyone connected (5 s countdown). No-shows are not in the race. **Superseded by s8.11:** from the start time it waits until two players are Ready, then counts down 10 s; a late player may still join |
 | ~18:05 | Race ends (3 laps or 300 s). Sweeper fetches and verifies the receipt, delivers 16 result callbacks |
 | after end + grace | Contest finalizes as any provider contest: fastest time wins, DNF = no score |
 
@@ -502,6 +502,8 @@ stored in the title's default shape. Fixed.
 
 ### 8.8 After the start there is nothing to join - and the lobby says so (28 September 2026)
 
+> **Superseded the same day by s8.11.** The start gate described here was removed: a late player may now join a running race. Kept as history.
+
 Owner report: pressing Play on a race competition **after** the gun gave "Round cancelled -
 does not count" with a **Play another round** button, and the log said `refused round
 creation: Entry to this race has closed`. The race server was right to refuse. The platform
@@ -556,6 +558,8 @@ prize that did not match the published split. None of the fixes names a game.
 
 ### 8.10 A race cannot go live with its start already behind it (28 September 2026)
 
+> **Amended by s8.11.** The two-minute rule below still stands. Where this section says pressing Play after the start is refused, that is no longer true: it now offers **Join late**.
+
 Owner report: a race competition created and published at once, two players entered, and the
 first press of Play said **Already started**, with "Play closes in 6m". **8.8 was working as
 designed**: after the gun there is nothing to join, and only a player already in the lobby races.
@@ -581,6 +585,47 @@ a game, and a play-any-time contest is never refused. It is called in four place
 
 Pinned by `__tests__/services/scheduled-start-lead.test.ts` (13 tests): the behaviour, the mirror,
 and the position of each call before its write.
+
+### 8.11 The race waits for two ready players, counts down from 10, and a late player may join (28 September 2026)
+
+Owner instruction, the same day: a player who has paid opens the game, picks a ship, presses
+Launch and **waits**. The race starts by itself **only when the start time has come AND at least
+two players are ready**, with a **10-second countdown** during which no ship moves. A player who
+is late **can still join and race**, with the time already raced counting against them.
+
+**This reverses two earlier rules, and says so rather than rewriting them.** 8.8's "after the gun
+there is nothing to join" and the entry in the patch table that "connected players race even if
+not Ready" (auto-ready at the gun) are both history now. What was built:
+
+- **Race server** (`velocity-server/server/race-room.mjs`). A scheduled room stays in the lobby
+  past its start until two connected pilots are Ready, then runs `SCHEDULED_COUNTDOWN_MS` (10 s).
+  Only Ready pilots race; a pilot who never connected (a ghost) does not. If two are still not
+  Ready at `latestStartAt` the room is cancelled (`too-few-ready`) and the attempts are handed
+  back. While an open-roster scheduled room is counting down or racing, `lateEntryOpen` admits a
+  new pilot. During the countdown the late pilot takes a grid slot with no penalty. During the race
+  they get a 3 s countdown of their own, and `lateOffsetMs` (race time already run plus those 3 s)
+  is added to their time, so **being late is never an advantage**. The result row carries
+  `lateStartMs`. An unscheduled race keeps the vendor's all-ready 5 s start and refuses late entry.
+  67 tests in `velocity-server/tests/`.
+- **games-service** sends `latestStartAt` = `latestRaceStart(start, expiresAt, laps)`: the latest
+  moment a full race still fits inside the round, capped at 6 hours after the start and never
+  before it. It is sent for scheduled rooms only and is not part of the room identity.
+- **Platform.** The launch service **no longer refuses after the start** (`start_has_passed` is
+  gone). Whether the race can still be joined is the game's answer. A finished or cancelled race
+  refuses the seat, `createRound` deletes the pending round, so **no attempt is spent**, and the
+  player is told "This race can no longer be joined... Your attempt was not used", **not** "try
+  again shortly", which would restart 8.8's loop. A together-start round now **expires at the
+  play window end** (`resolveExpiry`), because nobody can say when a race that waits for players
+  will end. `startHasPassed` survives as the definition screens read: the pre-flight keeps Play
+  enabled after the start (**Join late**) with `LATE_ENTRY_NOTICE`, and the result panel still
+  offers no second round, because a contest has one race. The shared wording in
+  `playModePlayerRule` names no game. Pinned by `__tests__/games/together-start-gate.test.ts`,
+  whose gate tests were flipped rather than deleted.
+
+**Unchanged:** entry (paying) still closes at the start (`entryClosesAtStart`), so a late joiner
+is a player who paid in time and opened the game late. The lobby still opens `lobbySeconds` (60-1800 s,
+default 10 minutes) before the start, so Play is available **before** the start time from then on,
+not from the moment of entry.
 
 ## 10. Risks
 

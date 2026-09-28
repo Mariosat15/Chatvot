@@ -4,12 +4,12 @@ import { playModeHasLobby } from "./play-shape";
  * How far ahead a together-start (`scheduled`) contest's start must still be when it is
  * created, published or re-timed.
  *
- * A scheduled contest closes entry at its start (`entryClosesAtStart`) and refuses every new
- * round once the start has passed (`startHasPassed`) - only a player already in the lobby
- * races. So a contest whose start is already behind it when it goes live can never be played
- * by anyone: players can pay to enter, and the first press of Play says "Already started".
- * That was reachable because nothing compared the start with the clock. Two minutes is the
- * least time in which a player can realistically join and open the lobby before the gun.
+ * A scheduled contest closes entry at its start (`entryClosesAtStart`), so a contest whose start
+ * is already behind it when it goes live can never be entered by anyone. (When this was written
+ * Play also refused every new round after the start; since 28 Sep 2026 a player who entered in
+ * time may still join the running race late.) That was reachable because nothing compared the
+ * start with the clock. Two minutes is the least time in which a player can realistically join
+ * and open the lobby before the gun.
  *
  * Model-free on purpose, like `play-shape.ts`, so the admin wizard can import the same number.
  */

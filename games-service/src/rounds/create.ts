@@ -374,6 +374,7 @@ export async function createRound(input: CreateRoundInput): Promise<CreateRoundO
       scheduledStartAt,
       providerRoundId,
       typeof player.displayName === "string" ? player.displayName : undefined,
+      expiresAt,
       solo ? providerRoundId : undefined,
     );
   }

@@ -11,7 +11,7 @@ import {
 import { formatRemaining, useServerClock } from "@/hooks/useServerClock";
 import type { PlayState } from "./play-state";
 import { contestReservesFullRound, fullRoundCutoffMs } from "./round-window";
-import { playModePlayerRule, START_HAS_PASSED_MESSAGE } from "@/lib/services/games/play-shape";
+import { playModePlayerRule, LATE_ENTRY_NOTICE } from "@/lib/services/games/play-shape";
 
 /**
  * What a player is told before they commit an attempt.
@@ -194,8 +194,9 @@ export function RoundPreflight({
   */
   const paused = state.isPaused === true;
 
-  // The same rule as `startHasPassed` in the launch service: once a together-start competition
-  // has begun, only a round already open (from the lobby) may continue.
+  // The same rule as `startHasPassed`. Since 28 Sep 2026 it does NOT block: a late player may
+  // still join a race that is running. It only changes what the screen says, so the player
+  // knows the time already raced counts against them before they press Play.
   const startPassed =
     format === "competition" &&
     playsTogether &&
@@ -207,7 +208,6 @@ export function RoundPreflight({
     notStartedYet ||
     noLongerOpen ||
     paused ||
-    startPassed ||
     windowNotOpen ||
     windowClosed ||
     tooLateToStart ||
@@ -227,9 +227,7 @@ export function RoundPreflight({
           state.pauseReason
           ? `Play is paused: ${state.pauseReason} Your attempts are safe - come back shortly.`
           : "Play is paused while we sort something out. Your attempts are safe - come back shortly."
-        : startPassed
-          ? START_HAS_PASSED_MESSAGE
-          : windowNotOpen
+        : windowNotOpen
           ? "Play has not opened for this competition yet."
           : windowClosed
             ? "The play window for this competition has closed."
@@ -249,9 +247,7 @@ export function RoundPreflight({
         ? "Closed"
         : paused
           ? "Paused"
-          : startPassed
-            ? "Already started"
-            : windowNotOpen
+          : windowNotOpen
             ? "Play has not opened"
             : windowClosed
               ? "Play has closed"
@@ -265,6 +261,8 @@ export function RoundPreflight({
                       : "Resume your round"
                     : beforeTheGun
                       ? "Enter the lobby"
+                    : startPassed
+                      ? "Join late"
                     : // Reason the shortening reaches the button and not only the panel above:
                       // the button is the thing being pressed, and a player who has skimmed
                       // the panel should still not be able to spend an attempt without having
@@ -300,6 +298,13 @@ export function RoundPreflight({
         <div className={`flex items-start gap-2 p-3 ${NEON_INSET}`}>
           <Clock className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
           <p className="text-xs text-gray-300">{blockedReason}</p>
+        </div>
+      )}
+
+      {startPassed && !blocked && (
+        <div className={`flex items-start gap-2 p-3 ${NEON_INSET}`}>
+          <Clock className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
+          <p className="text-xs text-amber-300/90">{LATE_ENTRY_NOTICE}</p>
         </div>
       )}
 

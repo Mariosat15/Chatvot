@@ -139,6 +139,7 @@ async function main(): Promise<number> {
   const { Round } = await import("../src/store/round.model");
   const { VELOCITY_TRACK_IDS } = await import("../src/games/volt-velocity/tracks");
   const { verifyReceipt, scoreForEntry } = await import("../src/games/volt-velocity/race-server");
+  const { latestRaceStart } = await import("../src/games/volt-velocity/launch");
 
   console.log("Volt Velocity against the real race server");
 
@@ -273,8 +274,11 @@ async function main(): Promise<number> {
       method: "POST",
       body: velocityBody(seed, {
         resultCallbackUrl: callbackUrl,
-        // The race server cancels COUNTDOWN_MS (5 s) before this if fewer than two are connected.
+        // The race server waits past the start for two Ready pilots until `latestStartAt`, then
+        // cancels. A round ending two minutes out leaves no room for a 3-lap race after the
+        // start, so `latestRaceStart` clamps the latest start to the start itself.
         scheduledStartAt: new Date(Date.now() + 7_000).toISOString(),
+        expiresAt: new Date(Date.now() + 120_000).toISOString(),
       }),
     });
     assert(created.status === 201, `create returned ${created.status}: ${created.raw}`);
@@ -307,6 +311,18 @@ async function main(): Promise<number> {
       tamperRefused = true;
     }
     assert(tamperRefused, "a tampered receipt verified");
+  });
+
+  await test("the latest start leaves a full race inside the round, never before the start", () => {
+    const start = new Date("2026-09-28T12:00:00Z");
+    const hourLater = new Date(start.getTime() + 3_600_000);
+    // 3 laps = 300 s of race, plus the 10 s countdown and a 30 s margin.
+    assert(latestRaceStart(start, hourLater, 3).getTime() === hourLater.getTime() - 340_000, "3-lap latest start");
+    assert(latestRaceStart(start, hourLater, 10).getTime() === hourLater.getTime() - 1_040_000, "10-lap latest start");
+    const tight = new Date(start.getTime() + 60_000);
+    assert(latestRaceStart(start, tight, 3).getTime() === start.getTime(), "latest start fell before the start");
+    const far = new Date(start.getTime() + 24 * 3_600_000);
+    assert(latestRaceStart(start, far, 1).getTime() === start.getTime() + 6 * 3_600_000, "past the 6 h horizon");
   });
 
   await test("a room the race server has lost is voided once it is old enough", async () => {

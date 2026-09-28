@@ -6,13 +6,25 @@ import {mkdtemp, rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createHmac} from 'node:crypto';
-import {RaceRoom, COUNTDOWN_MS, MAX_RACERS, MAX_SCHEDULE_AHEAD_MS} from '../server/race-room.mjs';
+import {RaceRoom, MAX_RACERS, MAX_SCHEDULE_AHEAD_MS, SCHEDULED_COUNTDOWN_MS, LATE_JOIN_COUNTDOWN_S, DEFAULT_START_WAIT_MS} from '../server/race-room.mjs';
 import {createRaceServer} from '../server/index.mjs';
 import {issueTicket} from '../server/tickets.mjs';
 
 const T0 = 1_800_000_000_000;
-const spec = (extra = {}) => ({id: 'sched-race', trackId: 'orbital', seed: 91, players: [], openRoster: true, scheduledStartAt: T0 + 60_000, ...extra});
+const GUN = T0 + 60_000;
+const spec = (extra = {}) => ({id: 'sched-race', trackId: 'orbital', seed: 91, players: [], openRoster: true, scheduledStartAt: GUN, ...extra});
 const racer = (id) => ({id, name: 'Racer ' + id});
+/** Register, connect and (optionally) press Launch for each id. */
+function seat(room, ids, {ready = true, at = T0} = {}) {
+  for (const id of ids) { room.addPlayer(racer(id), at); room.join(id, at); if (ready) room.ready(id, true, at); }
+}
+/** Advance the room in 1/60 s ticks, holding throttle for every connected player. */
+function run(room, from, to) {
+  for (let now = from; now <= to; now += 1000 / 60) {
+    for (const p of room.players.values()) if (p.connected) { p.lastInput = {steer: 0, throttle: true, brake: false, boost: false, fire: false}; p.lastInputAt = now; }
+    room.advance(now);
+  }
+}
 
 test('vendor behaviour is unchanged without the ChartVolt fields: roster of 1 refused, roster frozen', () => {
   assert.throws(() => new RaceRoom({id: 'v', trackId: 'orbital', seed: 1, players: [racer('a')]}, T0));
@@ -20,10 +32,11 @@ test('vendor behaviour is unchanged without the ChartVolt fields: roster of 1 re
   assert.throws(() => room.addPlayer(racer('c'), T0), /frozen/);
 });
 
-test('vendor all-ready auto start still fires for an unscheduled room', () => {
+test('vendor all-ready auto start still fires for an unscheduled room, with the vendor 5 s countdown', () => {
   const room = new RaceRoom({id: 'v', trackId: 'orbital', seed: 1, players: [racer('a'), racer('b')]}, T0);
   for (const id of ['a', 'b']) { room.join(id, T0); room.ready(id, true, T0); }
   assert.equal(room.status, 'countdown');
+  assert.equal(room.startAt, T0 + 5000);
 });
 
 test('open roster may start empty and grows to 16, then refuses the 17th', () => {
@@ -40,55 +53,129 @@ test('addPlayer is idempotent for a known id, even when the room is full or star
   assert.equal(room.addPlayer(racer('p3'), T0), first);
 });
 
-test('addPlayer refuses a new player once the race has left the lobby', () => {
+test('a scheduled race stays open to a late pilot after the start, and closes once it has finished', () => {
   const room = new RaceRoom(spec(), T0);
-  ['a', 'b'].forEach((id) => { room.addPlayer(racer(id), T0); room.join(id, T0); });
-  room.advance(T0 + 60_000 - COUNTDOWN_MS);
+  seat(room, ['a', 'b']);
+  room.advance(GUN);
   assert.equal(room.status, 'countdown');
-  assert.throws(() => room.addPlayer(racer('late'), T0 + 60_000), /closed/);
+  assert.ok(room.addPlayer(racer('late'), GUN + 1000));
+  room.status = 'finished';
+  assert.throws(() => room.addPlayer(racer('later'), GUN + 2000), /closed/);
 });
 
-test('a scheduled room does NOT start early when everybody is ready', () => {
+test('an unscheduled open room still refuses a new player once it has left the lobby', () => {
+  const room = new RaceRoom(spec({scheduledStartAt: null}), T0);
+  seat(room, ['a', 'b'], {ready: false});
+  room.ready('a', true, T0); room.ready('b', true, T0);
+  assert.equal(room.status, 'countdown');
+  assert.throws(() => room.addPlayer(racer('late'), T0 + 1000), /closed/);
+});
+
+test('a scheduled room does NOT start before its start time, even when everybody is ready', () => {
   const room = new RaceRoom(spec(), T0);
-  ['a', 'b'].forEach((id) => { room.addPlayer(racer(id), T0); room.join(id, T0); room.ready(id, true, T0); });
-  assert.equal(room.status, 'lobby');
-  room.advance(T0 + 60_000 - COUNTDOWN_MS - 50);
+  seat(room, ['a', 'b']);
+  room.advance(GUN - 1);
   assert.equal(room.status, 'lobby');
 });
 
-test('scheduled start goes green AT scheduledStartAt, and not-Ready connected players race', () => {
+test('at the start time with two Ready pilots a 10 s countdown begins, and only Ready pilots race', () => {
   const room = new RaceRoom(spec(), T0);
-  ['a', 'b', 'c'].forEach((id) => { room.addPlayer(racer(id), T0); room.join(id, T0); });
-  room.ready('a', true, T0); // b and c never press Ready
-  room.advance(T0 + 60_000 - COUNTDOWN_MS);
+  seat(room, ['a', 'b']);
+  seat(room, ['c'], {ready: false}); // connected, never pressed Launch
+  room.advance(GUN);
   assert.equal(room.status, 'countdown');
-  assert.equal(room.startAt, T0 + 60_000);
-  assert.deepEqual(['a', 'b', 'c'].map((id) => room.player(id).active), [true, true, true]);
+  assert.equal(SCHEDULED_COUNTDOWN_MS, 10_000);
+  assert.equal(room.startAt, GUN + SCHEDULED_COUNTDOWN_MS);
+  assert.equal(room.player('a').sim.countdown, 10);
+  assert.deepEqual(['a', 'b', 'c'].map((id) => room.player(id).active), [true, true, false]);
+});
+
+test('connected is not enough: with one Ready pilot the lobby waits past the start time', () => {
+  const room = new RaceRoom(spec(), T0);
+  seat(room, ['a']);
+  seat(room, ['b'], {ready: false});
+  room.advance(GUN + 30_000);
+  assert.equal(room.status, 'lobby');
+  room.ready('b', true, GUN + 31_000);
+  room.advance(GUN + 31_000);
+  assert.equal(room.status, 'countdown');
+  assert.equal(room.startAt, GUN + 31_000 + SCHEDULED_COUNTDOWN_MS);
+});
+
+test('ships cannot move before the countdown reaches zero, and can after', () => {
+  const room = new RaceRoom(spec(), T0);
+  seat(room, ['a', 'b']);
+  room.advance(GUN);
+  const before = room.player('a').sim.distance;
+  run(room, GUN, GUN + SCHEDULED_COUNTDOWN_MS - 100);
+  assert.equal(room.status, 'countdown');
+  assert.equal(room.player('a').sim.distance, before);
+  run(room, GUN + SCHEDULED_COUNTDOWN_MS, GUN + SCHEDULED_COUNTDOWN_MS + 2000);
+  assert.equal(room.status, 'racing');
+  assert.ok(room.player('a').sim.distance > before);
+});
+
+test('a pilot who Launches during the countdown takes a grid slot and goes green with everyone', () => {
+  const room = new RaceRoom(spec(), T0);
+  seat(room, ['a', 'b']);
+  room.advance(GUN);
+  seat(room, ['c'], {at: GUN + 2000});
+  const c = room.player('c');
+  assert.equal(c.active, true);
+  assert.equal(c.lateOffsetMs, 0);
+  run(room, GUN + 2000, GUN + SCHEDULED_COUNTDOWN_MS + 100);
+  assert.equal(c.sim.state, 'racing');
+});
+
+test('a pilot who Launches after the green light races, and the time already run counts against them', () => {
+  const room = new RaceRoom(spec(), T0);
+  seat(room, ['a', 'b']);
+  room.advance(GUN);
+  const green = GUN + SCHEDULED_COUNTDOWN_MS;
+  run(room, GUN, green + 20_000);
+  assert.equal(room.status, 'racing');
+  seat(room, ['late'], {at: green + 20_000});
+  const late = room.player('late');
+  assert.equal(late.active, true);
+  assert.equal(late.sim.state, 'countdown');
+  assert.ok(Math.abs(late.lateOffsetMs - (20_000 + LATE_JOIN_COUNTDOWN_S * 1000)) < 100, String(late.lateOffsetMs));
+  run(room, green + 20_000, green + 30_000);
+  assert.equal(late.sim.state, 'racing');
+  const row = room.result().results.find((r) => r.playerId === 'late');
+  assert.ok(row, 'late pilot is in the results');
+  assert.equal(row.timeMs, late.sim.result().timeMs + late.lateOffsetMs);
+  assert.equal(row.lateStartMs, late.lateOffsetMs);
 });
 
 test('a registered player who never connected does not race', () => {
   const room = new RaceRoom(spec(), T0);
-  ['a', 'b', 'ghost'].forEach((id) => room.addPlayer(racer(id), T0));
-  room.join('a', T0); room.join('b', T0);
-  room.advance(T0 + 60_000 - COUNTDOWN_MS);
+  seat(room, ['a', 'b']);
+  room.addPlayer(racer('ghost'), T0);
+  room.advance(GUN);
   assert.equal(room.player('ghost').active, false);
   assert.equal(room.player('a').active, true);
 });
 
-test('fewer than two connected at the start cancels the race and the result is final', () => {
-  const room = new RaceRoom(spec(), T0);
+test('without two Ready pilots by latestStartAt the race is cancelled and the result is final', () => {
+  const room = new RaceRoom(spec({latestStartAt: GUN + 120_000}), T0);
   ['a', 'b'].forEach((id) => room.addPlayer(racer(id), T0));
-  room.join('a', T0);
-  room.advance(T0 + 60_000 - COUNTDOWN_MS);
+  room.join('a', T0); room.ready('a', true, T0);
+  room.advance(GUN + 119_999);
+  assert.equal(room.status, 'lobby');
+  room.advance(GUN + 120_000);
   assert.equal(room.status, 'cancelled');
   const result = room.result();
   assert.equal(result.final, true);
   assert.equal(result.status, 'cancelled');
-  assert.equal(result.cancelReason, 'too-few-connected');
+  assert.equal(result.cancelReason, 'too-few-ready');
   assert.deepEqual(result.results, []);
   assert.deepEqual(result.registered, ['a', 'b']);
-  room.advance(T0 + 70_000);
-  assert.equal(room.status, 'cancelled');
+});
+
+test('latestStartAt defaults to five minutes after the start and must not precede it', () => {
+  assert.equal(new RaceRoom(spec(), T0).latestStartAt, GUN + DEFAULT_START_WAIT_MS);
+  assert.throws(() => new RaceRoom(spec({latestStartAt: GUN - 1}), T0), /latestStartAt/);
+  assert.throws(() => new RaceRoom(spec({scheduledStartAt: null, latestStartAt: GUN}), T0), /latestStartAt/);
 });
 
 test('scheduledStartAt beyond the allowed horizon is refused', () => {
@@ -96,9 +183,9 @@ test('scheduledStartAt beyond the allowed horizon is refused', () => {
   assert.throws(() => new RaceRoom(spec({scheduledStartAt: 'soon'}), T0), /scheduledStartAt/);
 });
 
-test('a scheduled lobby outlives the vendor 30-minute eviction until its start', () => {
-  const room = new RaceRoom(spec({scheduledStartAt: T0 + 3 * 3600_000}), T0);
-  assert.ok(room.lobbyExpiresAt() > T0 + 3 * 3600_000);
+test('a scheduled lobby outlives the vendor 30-minute eviction until its latest start', () => {
+  const room = new RaceRoom(spec({scheduledStartAt: T0 + 3 * 3600_000, latestStartAt: T0 + 4 * 3600_000}), T0);
+  assert.ok(room.lobbyExpiresAt() > T0 + 4 * 3600_000);
   const plain = new RaceRoom(spec({scheduledStartAt: null}), T0);
   assert.equal(plain.lobbyExpiresAt(), T0 + 1_800_000);
 });
@@ -106,7 +193,7 @@ test('a scheduled lobby outlives the vendor 30-minute eviction until its start',
 test('snapshot carries scheduledStartAt so the client can show the countdown to the gun', () => {
   const room = new RaceRoom(spec(), T0);
   room.addPlayer(racer('a'), T0);
-  assert.equal(room.snapshot('a', T0).scheduledStartAt, T0 + 60_000);
+  assert.equal(room.snapshot('a', T0).scheduledStartAt, GUN);
 });
 
 test('HTTP: admin adds players, a late ticket joins, a cancelled race archives a signed final receipt', async () => {
@@ -131,7 +218,7 @@ test('HTTP: admin adds players, a late ticket joins, a cancelled race archives a
     assert.equal((await call('/v1/races/http-sched/result', adminKey, undefined, 'GET')).status, 202);
 
     const room = app.rooms.get('http-sched');
-    room.advance(startAt - COUNTDOWN_MS); // nobody connected over events -> cancelled
+    room.advance(room.latestStartAt); // nobody Ready -> cancelled at the latest start
     assert.equal(room.status, 'cancelled');
     const res = await call('/v1/races/http-sched/result', adminKey, undefined, 'GET');
     assert.equal(res.status, 200);

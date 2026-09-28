@@ -140,8 +140,9 @@ export async function seatPlayer(
   identity: RaceIdentity,
   player: { id: string; name: string },
   scheduledStartAt: Date | undefined,
-  room: { laps: number; solo: boolean },
+  room: { laps: number; solo: boolean; latestStartAt?: Date },
 ): Promise<SeatOutcome> {
+  const scheduled = scheduledStartAt && !room.solo;
   try {
     // A solo room is frozen at its one pilot and unscheduled; the race server refuses an open
     // roster or a schedule on it, so neither is sent. It starts when that pilot is Ready.
@@ -152,7 +153,10 @@ export async function seatPlayer(
       players: [player],
       laps: room.laps,
       ...(room.solo ? { solo: true } : { openRoster: true }),
-      ...(scheduledStartAt && !room.solo ? { scheduledStartAt: scheduledStartAt.getTime() } : {}),
+      ...(scheduled ? { scheduledStartAt: scheduledStartAt.getTime() } : {}),
+      // Reason: only the player who CREATES the room sets it; it is not part of the room id, so
+      // every round of one contest (same play window) computes the same value anyway.
+      ...(scheduled && room.latestStartAt ? { latestStartAt: room.latestStartAt.getTime() } : {}),
     });
     if (created.status === 201) return { ok: true };
     if (created.status !== 409) return refusalFrom(created);

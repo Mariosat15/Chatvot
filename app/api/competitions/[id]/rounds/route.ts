@@ -50,7 +50,6 @@ function statusFor(refusal: LaunchRefusal): number {
     case "play_window_not_started":
     case "play_window_closed":
     case "play_window_too_short":
-    case "start_has_passed":
       return 409;
     case "attempts_exhausted":
     case "round_already_live":
