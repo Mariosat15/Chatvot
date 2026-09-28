@@ -91,13 +91,16 @@ async function nextAttemptNumber(
  * requires the second click to return the SAME launch URL, not a refusal and not a second
  * round.
  */
-async function findLiveRound(
-  contestId: CreateRoundInput["contestId"],
-  userId: string,
-) {
+async function findLiveRound(input: CreateRoundInput) {
+  // Reason: every practice round shares `contestId: null`, so without the game in the filter
+  // a live practice round of one game would be "reopened" when the player asks to practise a
+  // different one - they would be sent into the wrong game.
+  const practiceScope =
+    input.contestType === "practice" ? { gameKey: input.gameKey } : {};
   return GameRound.findOne({
-    contestId: contestId ?? null,
-    userId,
+    contestId: input.contestId ?? null,
+    userId: input.userId,
+    ...practiceScope,
     status: { $in: LIVE_ROUND_STATUSES },
   }).sort({ attemptNumber: -1 });
 }
@@ -227,7 +230,7 @@ export async function createRound(
   const adapter = resolution.adapter;
 
   // A live round is answered with itself. Chapter 07 section 4's double-click case.
-  const live = await findLiveRound(input.contestId, input.userId);
+  const live = await findLiveRound(input);
   if (live) {
     // Reason: re-asking the provider is what makes this genuinely idempotent rather than
     // merely non-duplicating. The contract guarantees the same roundId returns the same
@@ -267,7 +270,13 @@ export async function createRound(
   }
 
   const permitted = attemptsPermitted(input.config);
-  const consumed = await countConsumedAttempts(input.contestId, input.userId);
+  // Reason: practice is free, unranked and prize-less, so it has no allowance to spend. Every
+  // practice round a player has ever played shares `contestId: null`, so counting them would
+  // lock a player out of practice after their first round.
+  const consumed =
+    input.contestType === "practice"
+      ? 0
+      : await countConsumedAttempts(input.contestId, input.userId);
   if (consumed >= permitted) {
     return {
       success: false,

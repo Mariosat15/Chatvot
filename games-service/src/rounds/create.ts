@@ -271,9 +271,6 @@ export async function createRound(input: CreateRoundInput): Promise<CreateRoundO
   if (isVelocity) {
     // Before any other parsing, so a deployment without the race server refuses with the reason.
     requireVelocityConfig();
-    if (mode === "practice") {
-      throw badRequest("'volt-velocity' has no practice mode (supportsPractice is false).");
-    }
   }
 
   const player = (input.player ?? {}) as Record<string, unknown>;
@@ -369,10 +366,17 @@ export async function createRound(input: CreateRoundInput): Promise<CreateRoundO
     // An unscheduled COMPETITION is "each plays alone": this round gets a room of its own.
     // Keyed on the provider round id, so a retry after a failed write gets a fresh room rather
     // than being refused by the frozen one the failed attempt left behind.
-    const solo = contestType === "competition" && !scheduledStartAt;
+    // Practice is the same room with nobody else in it: free, unranked, one pilot. It has no
+    // content seed (only ranked rounds must share content), so the track is seeded from this
+    // round's own id, which also gives each practice run a different track.
+    const practice = mode === "practice";
+    if (practice && scheduledStartAt) {
+      throw badRequest("'scheduledStartAt' must be absent on a practice round.");
+    }
+    const solo = practice || (contestType === "competition" && !scheduledStartAt);
     seat = await seatVelocityPlayer(
       gameCode,
-      contentSeed as string,
+      contentSeed ?? providerRoundId,
       config as VoltVelocityConfig,
       scheduledStartAt,
       providerRoundId,

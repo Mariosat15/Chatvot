@@ -1,11 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Swords, Zap, Target, Trophy, LineChart } from "lucide-react";
+import {
+  ArrowRight,
+  GraduationCap,
+  Swords,
+  Zap,
+  Target,
+  Trophy,
+  LineChart,
+} from "lucide-react";
 import type { GamePageData } from "@/lib/services/games/game-page.types";
 import {
   challengeCreateHref,
   competitionBrowseHref,
+  practiceHref,
   resolvePlayNowHref,
 } from "@/lib/services/games/game-page-helpers";
 import { GP_CTA_PRIMARY, GP_CTA_SECONDARY } from "./GamePageChrome";
@@ -150,6 +159,12 @@ export function GamePageHero({ game }: { game: GamePageData }) {
               <Link href={challengeHref} className={GP_CTA_SECONDARY}>
                 <Swords className="h-4 w-4 text-[var(--gp-accent-2)]" />
                 1v1 Challenge
+              </Link>
+            ) : null}
+            {!comingSoon ? (
+              <Link href={practiceHref(game.slug)} className={GP_CTA_SECONDARY}>
+                <GraduationCap className="h-4 w-4 text-[var(--gp-accent)]" />
+                Practice
               </Link>
             ) : null}
           </div>

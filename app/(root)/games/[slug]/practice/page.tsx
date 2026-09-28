@@ -1,16 +1,24 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { headers } from "next/headers";
+import { notFound, redirect } from "next/navigation";
 import { GraduationCap } from "lucide-react";
-import { getGamePageData } from "@/lib/services/games/game-page.service";
+import { auth } from "@/lib/better-auth/auth";
+import {
+  getPracticeAvailability,
+  listPracticeRounds,
+} from "@/lib/services/games/practice-round.service";
+import { PracticeRoundHost } from "@/components/games/PracticeRoundHost";
+import { NEON_PANEL } from "@/components/neon/tokens";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Practice entry for a catalogue game.
+ * The practice area for every catalogue game: free, unranked, prize-less, and only the player
+ * plays. Whether a game can be practised is the catalogue's answer (`supportsPractice`), never a
+ * branch on game code, so a new title that declares practice gets this area with no code.
  *
- * Practice rounds exist in the round model, but there is no free-play launcher UI yet.
- * This page is the honest destination for Play Now / Practice mode cards so we never
- * invent a paid contest or burn an attempt on GET.
+ * Reason: rendering this page creates nothing. The round is created by the Start button's POST,
+ * because Next.js prefetches `<Link>` targets and a round created on GET would be created on hover.
  */
 export default async function GamePracticePage({
   params,
@@ -18,32 +26,55 @@ export default async function GamePracticePage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const game = await getGamePageData(slug);
-  if (!game || !game.formats.practice) notFound();
+
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session?.user) redirect("/sign-in");
+
+  const availability = await getPracticeAvailability(slug);
+  if (!availability) notFound();
+
+  if (!availability.available) {
+    return (
+      <div className="mx-auto max-w-lg px-4 py-16">
+        <div className={`${NEON_PANEL} space-y-4 p-8 text-center`}>
+          <GraduationCap className="mx-auto h-10 w-10 text-violet-400" aria-hidden />
+          <h1 className="text-2xl font-bold text-white">Practice: {availability.gameName}</h1>
+          <p className="text-sm text-gray-400">{availability.reason}</p>
+          <div className="flex flex-wrap justify-center gap-3 pt-2">
+            <Link
+              href={`/games/${slug}`}
+              className="rounded-lg border border-white/15 px-4 py-2 text-sm text-white hover:bg-white/5"
+            >
+              Back to game page
+            </Link>
+            <Link
+              href={`/competitions?game=${encodeURIComponent(slug)}`}
+              className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white"
+            >
+              Browse contests
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const rounds = (await listPracticeRounds(slug, session.user.id)) ?? [];
 
   return (
-    <div className="mx-auto max-w-lg space-y-4 px-4 py-16 text-center">
-      <GraduationCap className="mx-auto h-10 w-10 text-violet-400" />
-      <h1 className="text-2xl font-bold text-white">Practice — {game.title}</h1>
-      <p className="text-sm text-gray-400">
-        Free practice for this title is not launchable from the game page yet.
-        Join a contest or start a challenge to play for real, or check back when
-        practice sessions are enabled for players.
-      </p>
-      <div className="flex flex-wrap justify-center gap-3 pt-2">
-        <Link
-          href={`/games/${game.slug}`}
-          className="rounded-lg border border-white/15 px-4 py-2 text-sm text-white hover:bg-white/5"
-        >
-          Back to game page
-        </Link>
-        <Link
-          href={`/competitions?game=${encodeURIComponent(game.slug)}`}
-          className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white"
-        >
-          Browse contests
-        </Link>
-      </div>
+    <div className="mx-auto max-w-5xl space-y-6 px-4 py-10">
+      <header className="space-y-1 text-center">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300">
+          Practice area
+        </p>
+        <h1 className="text-3xl font-bold text-white">{availability.gameName}</h1>
+      </header>
+      <PracticeRoundHost
+        slug={slug}
+        gameName={availability.gameName}
+        scoreType={availability.scoreType}
+        initialRounds={rounds}
+      />
     </div>
   );
 }

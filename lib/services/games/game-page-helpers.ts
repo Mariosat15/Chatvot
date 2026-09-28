@@ -54,7 +54,7 @@ export function resolvePlayNowHref(
   const upcoming = contests.find((c) => c.status === "upcoming");
   if (upcoming) return `/competitions/${upcoming.id}`;
 
-  if (game.formats.practice) return `/games/${game.slug}/practice`;
+  if (game.formats.practice) return practiceHref(game.slug);
 
   if (game.formats.challenge) {
     return `/challenges?create=1&game=${encodeURIComponent(game.slug)}`;
@@ -65,6 +65,14 @@ export function resolvePlayNowHref(
 
 export function competitionBrowseHref(slug: string): string {
   return `/competitions?game=${encodeURIComponent(slug)}`;
+}
+
+/**
+ * The practice area. Every game page links here, whether or not the title declares practice:
+ * the practice page says why a game cannot be practised rather than the button vanishing.
+ */
+export function practiceHref(slug: string): string {
+  return `/games/${encodeURIComponent(slug)}/practice`;
 }
 
 export function challengeCreateHref(slug: string): string {

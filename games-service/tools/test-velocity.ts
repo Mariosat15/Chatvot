@@ -140,7 +140,7 @@ async function main(): Promise<number> {
   const { VELOCITY_TRACK_IDS, AUTO_TRACK_POOL, trackForSeed } = await import(
     "../src/games/volt-velocity/tracks"
   );
-  const { verifyReceipt, scoreForEntry } = await import("../src/games/volt-velocity/race-server");
+  const { verifyReceipt, scoreForEntry, raceIdentity } = await import("../src/games/volt-velocity/race-server");
   const { latestRaceStart, parseStartWait } = await import("../src/games/volt-velocity/launch");
 
   console.log("Volt Velocity against the real race server");
@@ -168,10 +168,41 @@ async function main(): Promise<number> {
     assert(!AUTO_TRACK_POOL.includes("nebula"), "a new track leaked into auto");
   });
 
-  await test("practice mode is refused before any seat is taken", async () => {
+  // Reason: this test used to assert practice was REFUSED, because the race server had no room
+  // for one pilot. Anytime competitions later gained a solo room, and practice is that same room
+  // with nothing at stake - so the refusal is inverted, not deleted. No content seed is sent,
+  // exactly as the platform sends none for practice; the track seeds from the round's own id.
+  await test("practice seats one pilot in a room of their own, with no content seed", async () => {
+    await clearRounds();
+    const bodies = [0, 1].map(() =>
+      velocityBody("", { mode: "practice", contestType: "practice", contentSeed: undefined, resultCallbackUrl: callbackUrl }),
+    );
+    for (const body of bodies) {
+      const created = await callApi("/v1/rounds", { method: "POST", body });
+      assert(created.status === 201, `create returned ${created.status}: ${created.raw}`);
+    }
+    const rounds = await Round.find({ mode: "practice" }).lean();
+    const raceIds = new Set(rounds.map((r) => r.race?.raceId));
+    assert(rounds.length === 2 && raceIds.size === 2 && !raceIds.has(undefined), "practice rounds shared a room");
+    // Separate ids alone cannot prove the room is SOLO: the round-id seed already makes every
+    // practice id unique, so an open-roster room would pass the check above. The solo key is
+    // what freezes the roster at one pilot, and it is visible only in the id it produces.
+    for (const round of rounds) {
+      const solo = raceIdentity("volt-velocity", round.providerRoundId, "auto", undefined, 3, round.providerRoundId);
+      assert(round.race?.raceId === solo.raceId, "practice room is not a solo room");
+    }
+  });
+
+  await test("a practice round with a start time is refused", async () => {
     const response = await callApi("/v1/rounds", {
       method: "POST",
-      body: velocityBody("cv_vv_practice", { mode: "practice", resultCallbackUrl: callbackUrl }),
+      body: velocityBody("", {
+        mode: "practice",
+        contestType: "practice",
+        contentSeed: undefined,
+        scheduledStartAt: new Date(Date.now() + 5 * 60_000).toISOString(),
+        resultCallbackUrl: callbackUrl,
+      }),
     });
     assert(response.status === 400, `expected 400, got ${response.status}`);
   });

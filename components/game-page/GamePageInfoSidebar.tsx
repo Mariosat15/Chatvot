@@ -18,6 +18,7 @@ import {
   challengeCreateHref,
   competitionBrowseHref,
   getGameModes,
+  practiceHref,
   resolvePlayNowHref,
 } from "@/lib/services/games/game-page-helpers";
 import type { GamePageData } from "@/lib/services/games/game-page.types";
@@ -149,9 +150,9 @@ export function GamePageInfoSidebar({ game }: { game: GamePageData }) {
             </div>
           </Link>
         ) : null}
-        {game.formats.practice ? (
+        {!game.comingSoon ? (
           <Link
-            href={`/games/${game.slug}/practice`}
+            href={practiceHref(game.slug)}
             className="group flex items-start gap-4 rounded-[12px] border border-[var(--gp-border)] bg-[var(--gp-panel-2,#091b35)]/60 p-4 transition hover:border-[var(--gp-accent)]"
           >
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[10px] border border-[var(--gp-accent)]/40 bg-black/30">
@@ -160,7 +161,9 @@ export function GamePageInfoSidebar({ game }: { game: GamePageData }) {
             <div>
               <p className="text-[17px] font-bold text-white">Practice</p>
               <p className="mt-1 text-[14px] text-[var(--gp-muted)]">
-                Play solo and improve your skills.
+                {game.formats.practice
+                  ? "Play solo for free and improve your skills."
+                  : "See when practice is available for this game."}
               </p>
             </div>
           </Link>

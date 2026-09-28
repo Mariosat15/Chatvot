@@ -223,6 +223,18 @@ and shares no code with the platform (`check:isolation`).
   race room of its own with nobody else in it, and a one-player scheduled room is cancelled by the
   server at the gun (VV1). A ranked-only title is honest; `mode: "practice"` is refused with a 400
   that names the reason.
+  > **Closed 28 September 2026 - the build now matches 4.1 D (`supportsPractice: true`).** The
+  > reason above stopped holding once anytime competitions gained a **solo room** (keyed
+  > `solo:<providerRoundId>`, frozen at one pilot, unscheduled, starts when that pilot is Ready).
+  > Practice is that room with nothing at stake. Three facts drift easily: practice sends **no
+  > content seed**, so the track seeds from the round's own id and each practice run gets a
+  > different track; a practice round carrying `scheduledStartAt` is **refused** (400), because a
+  > scheduled solo room is exactly the VV1 room cancelled at the gun; and separate room ids alone
+  > **cannot** prove the room is solo, since the round-id seed already makes every id unique - the
+  > test in `tools/test-velocity.ts` recomputes the solo identity, and a probe dropping practice
+  > from `solo` turned exactly that test red. The refusal test was **flipped, not deleted**.
+  > Deploy needs `npm run build` + `pm2 restart chartvolt-games` (TypeScript changed), then a
+  > catalogue re-sync so the platform's `provider_game` row picks up `supportsPractice: true`.
 - **An unconfigured deployment publishes the title as `maintenance`**, so the platform's pre-flight
   refuses contests on it rather than selling seats in a race nobody can host. Configuration is
   all-or-nothing: `VELOCITY_ADMIN_KEY` and `VELOCITY_TICKET_SECRET` both or neither, and they must

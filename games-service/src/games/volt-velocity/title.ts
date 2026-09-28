@@ -23,12 +23,13 @@
  * An anytime competition ("each plays alone") gives every round its OWN room with no other ships.
  * A challenge always shares one room between its two players and always races 3 laps.
  *
- * PRACTICE IS OFF, DELIBERATELY (deviation from chapter 23)
- * ---------------------------------------------------------
- * A practice round has no content seed, so it would be a race room of one - and a shared room
- * will not start with fewer than two connected pilots. Offering practice would therefore offer a
- * lobby that never starts. Recorded in `External game plans/23`. (A SOLO room does start with
- * one pilot, but only an "each plays alone" competition asks for one; practice is unchanged.)
+ * PRACTICE IS ON, IN A SOLO ROOM (28 Sep 2026; it was off until then)
+ * -------------------------------------------------------------------
+ * It used to be off because a practice round has no content seed, so it became a shared room of
+ * one, and a shared room will not start with fewer than two connected pilots: a lobby that never
+ * starts. `createRound` now seats practice in a SOLO room (which starts with one pilot), seeded
+ * from the round's own id, and refuses a practice round that carries a start time. Recorded in
+ * `External game plans/23`.
  */
 
 import { copyFor, howToPlayFor, TITLE_LOCALES } from "../content";
@@ -75,7 +76,7 @@ export const VOLT_VELOCITY: TitleDefinition = {
   playMode: "scheduled",
   supportsCompetition: true,
   supportsOneVsOne: true,
-  supportsPractice: false,
+  supportsPractice: true,
   supportsContentSeed: true,
   scoreDirection: "lower_is_better",
   scoreType: "duration_ms",

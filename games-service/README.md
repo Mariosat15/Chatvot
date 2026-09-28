@@ -469,8 +469,12 @@ npm run probe:round-clock    # the same, for the clock, the length promised befo
 > the width is safe only because nothing we report changes it, where a height derived from our own
 > reported height is the postage-stamp defect of `21` s4.1f.
 
-`npm test` runs **344 tests**: 15 config, 44 engine, 28 scoring, 16 Volt Stack, 48 API, 93 play
-and delivery, 11 progress, 21 board client, 61 presentation, 7 Volt Velocity. `test:velocity`
+`npm test` runs **356 tests**: 15 config, 44 engine, 29 scoring, 16 Volt Stack, 49 API, 93 play
+and delivery, 11 progress, 21 board client, 61 presentation, 17 Volt Velocity (any figure of 344
+is stale). **Every title offers practice**, Volt Velocity included since 28 Sep 2026: a practice
+race is a solo room seeded from the round's own id, and one carrying a start time is refused.
+Practice never sends a result callback (requirements v1.10); the platform pulls the result
+through `GET /v1/rounds/:id`. `test:velocity`
 spawns the real race server from `../velocity-server` and **skips loudly** if that folder's
 `node_modules` is missing (`npm install` there once). Volt Velocity needs `VELOCITY_ADMIN_KEY` and
 `VELOCITY_TICKET_SECRET` (see `env.example` and chapter `23` s8.2). The race client is served from
