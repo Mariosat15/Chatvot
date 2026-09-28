@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AlertTriangle, Loader2, RotateCcw } from "lucide-react";
+import { AlertTriangle, Loader2, Maximize2, Minimize2, RotateCcw } from "lucide-react";
 import { NEON_STAGE_FRAME } from "@/components/neon/tokens";
+import { useStageFullscreen } from "./use-stage-fullscreen";
 import {
   clampFrameHeight,
   frameOriginOf,
@@ -80,6 +81,8 @@ export function ProviderGameFrame({
   onUntrustedOrigin,
 }: ProviderGameFrameProps) {
   const frameRef = useRef<HTMLIFrameElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const fullscreen = useStageFullscreen(stageRef);
   const [height, setHeight] = useState(MIN_FRAME_HEIGHT);
   const [ready, setReady] = useState(false);
   const [stalled, setStalled] = useState(false);
@@ -209,7 +212,35 @@ export function ProviderGameFrame({
       requested height becomes the MINIMUM below; the game derives that request from its
       width only, so a taller frame cannot feed back into a taller request.
     */
-    <div className={`relative flex flex-1 flex-col overflow-hidden ${NEON_STAGE_FRAME}`}>
+    <div
+      ref={stageRef}
+      className={`relative flex flex-1 flex-col overflow-hidden ${NEON_STAGE_FRAME} ${
+        fullscreen.pseudo ? "fixed inset-0 z-[200] rounded-none" : ""
+      } [&:fullscreen]:rounded-none [&:fullscreen]:bg-[#060C1A]`}
+    >
+      {/*
+        A bar ABOVE the game, never a button on top of it: every game draws its own controls in
+        its corners, so an overlay would sit on somebody's pause or fire button. The bar names no
+        game-specific control and works for every title.
+      */}
+      <div className="flex items-center justify-between gap-3 px-2 pb-2">
+        <span className="truncate text-xs font-semibold uppercase tracking-wider text-cyan-200/70">
+          {gameName}
+        </span>
+        <button
+          type="button"
+          onClick={fullscreen.toggle}
+          aria-pressed={fullscreen.active}
+          className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-cyan-400/60 bg-cyan-500/15 px-3 py-1.5 text-sm font-bold text-cyan-100 shadow-[0_0_14px_rgba(34,211,238,0.35)] transition-colors hover:bg-cyan-500/30"
+        >
+          {fullscreen.active ? (
+            <Minimize2 className="h-4 w-4" aria-hidden />
+          ) : (
+            <Maximize2 className="h-4 w-4" aria-hidden />
+          )}
+          {fullscreen.active ? "Exit full screen" : "Full screen"}
+        </button>
+      </div>
       {/*
         Reason the overlay stops at `stalled` rather than waiting for `ready`: it is opaque and
         covers the whole frame, so a game that has rendered its own explanation underneath is
@@ -285,7 +316,9 @@ export function ProviderGameFrame({
         // still ours. No need to hand a third party the page the player came from.
         referrerPolicy="no-referrer"
         className="h-full min-h-0 w-full flex-1 rounded-xl border-0 bg-[#060C1A]"
-        style={{ minHeight: `${height}px` }}
+        // In full screen the stage IS the screen, so the game's requested height must not push
+        // the frame past it and make the page scroll.
+        style={{ minHeight: fullscreen.active ? 0 : `${height}px` }}
       />
     </div>
   );

@@ -47,15 +47,32 @@ is `src/input-frames.js`, shared with the server byte for byte). What they do:
   returns `inputStep`, so it still drives an unpatched server the vendor way, and an unpatched
   client still drives this server. Deploy order therefore does not matter.
 
+### Look and feel pass (28 September 2026)
+
+| Change | Where |
+|---|---|
+| **A new weapon replaces the one you hold** (was: ignored while holding one). Repair and energy never touch it. Same rule for every racer, decided by the server | `src/simulation.js` `collect()` (server **and** client, identical); `tests/chartvolt-pickup-replace.test.mjs` |
+| Clearer capsules, a flash and a pop when one is collected | `client-patches/scene.js`, `powerups.js`, `main.js`, `root/index.html` (`#pickupFlash`) |
+| Start screen fits one screen: ship picker, visible Launch button, obsolete text removed | `root/index.html`, `main.js`, `root/chartvolt.css` |
+| Race HUD moved to the edges on PC, tablet and short windows (phones keep the vendor layout) | `root/chartvolt.css`, appended by `root/tools/build.mjs` |
+| Amber turn chevrons painted on the road before each corner | `client-patches/road-arrows.js`, called from `environment.js` |
+| Scene slightly brighter (tone-mapping exposure 1.0 -> 1.16). **Buildings were not redesigned** | `client-patches/scene.js` |
+| Lighter: 2K sky and textures by default, smaller audio | `root/tools/chartvolt-lighten.mjs`, `audio.js`, `environment.js`, `root/landscape-manifest.json` |
+
+`root/tools/chartvolt-shots.mjs` screenshots the start screen and a race at five sizes and fails
+if any HUD panel overlaps another.
+
 Rebuilding the client after changing a file in `client-patches/`:
 
-1. Copy `client-patches/*.js` and `src/input-frames.js` into the vendor tree's `src/`.
+1. Copy `client-patches/*.js` and `src/input-frames.js` into the vendor tree's `src/`, and
+   `client-patches/root/` over the vendor tree's root (`landscape-manifest.json` goes to
+   `assets/landscape/manifest.json`). Run `node tools/chartvolt-lighten.mjs` once on a fresh tree.
 2. In the vendor tree: `npm i --no-save three@0.186.1 esbuild@0.25.12`, `node tools/build.mjs`
    and `node --test tests/` (84 vendor tests).
 3. Gzip `dist/Volt-Velocity-3D.html` to `games-service/vendor/volt-velocity-client.html.gz`,
    then run `npx tsx tools/games/pack-velocity-client.ts` and commit `games-service/vendor/`.
 
-Tests: `npm test` (50 = 21 vendor + 14 in `tests/chartvolt-scheduled.test.mjs` + 7 in
+Tests: `npm test` (61 on 28 Sep 2026, including 4 in `tests/chartvolt-pickup-replace.test.mjs`; the breakdown below is older: 50 = 21 vendor + 14 in `tests/chartvolt-scheduled.test.mjs` + 7 in
 `tests/chartvolt-env.test.mjs` + 7 in `tests/chartvolt-input-frames.test.mjs` + 1 in
 `tests/chartvolt-client-prediction.test.mjs`, which drives the **real patched client** against the
 real server over HTTP and asserts the prediction agrees with the server to within 5 cm). Deploy: PM2 `chartvolt-velocity` (reads `games-service/.env`),

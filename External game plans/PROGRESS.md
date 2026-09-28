@@ -1291,6 +1291,21 @@ no build. The main app needs a rebuild and restart. Then hard refresh. **Never v
     fail on a clean tree (checked by stashing), so they predate this work.
   - **Owner action:** enable both play styles on Volt Velocity and re-sync the catalogue.
   - **Not verified live.**
+- **28 Sep 2026 - (8) Volt Velocity look and feel, power-ups, full screen for every game** (`23` s8.7).
+  - **Platform:** a Full screen button above every game frame (`use-stage-fullscreen.ts`). It
+    enlarges the stage, not the iframe, so it needs nothing from any provider; iPhone Safari gets
+    a window-sized fallback. `__tests__/games/stage-fullscreen.test.ts` (5, probe red x1).
+  - **Power-ups:** a new weapon now replaces the one held, on the server and the client alike;
+    the same rule for everybody, so no score advantage. Race server tests 61/61 (4 new).
+  - **Client:** one-screen start page with a visible Launch button; HUD moved to the edges on
+    PC/tablet; turn chevrons on the road; pickup flash; slightly brighter scene; lighter 2K
+    defaults. **Buildings were not redesigned.** Patched sources in
+    `velocity-server/client-patches/` (now with a `root/` folder); rebuild steps in
+    `CHARTVOLT-PATCHES.md`. Client re-packed into `games-service/vendor/`.
+  - **Tests:** the two `arena-band.test.ts` failures in `__tests__/games` are about the
+    highlights card and content dialog, files this work did not touch.
+  - **Deploy:** platform build, games-service pull + restart, `pm2 restart chartvolt-velocity`.
+    **Not verified live**; headless screenshots only.
 
 
 ### 27 Sep 2026 - Per-game How it works & tips (Guides) tab

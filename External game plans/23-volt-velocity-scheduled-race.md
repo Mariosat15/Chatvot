@@ -422,6 +422,26 @@ Tests: race server 57/57; games-service `npm test` green (Volt Velocity 13, four
 `config-schema-challenge-value.test.ts` (new) and one new resolution test. Three probes went red on
 exactly one test each (solo off, challenge pin off, platform pin off). **Not verified live.**
 
+### 8.7 Start screen, race screen, power-ups and full screen - what was built (28 September 2026)
+
+The owner asked for a start screen that fits without scrolling, a race screen that does not cover
+the road, a full screen button for every game, power-ups that replace each other, clearer power-up
+graphics, turn indicators on the road, better scenery and a lighter game.
+
+| Request | What was built |
+|---|---|
+| **Full screen, for every game** | Platform: a **Full screen** button in a bar above the game frame (`ProviderGameFrame.tsx`, `use-stage-fullscreen.ts`). It enlarges the element *holding* the iframe, so no provider needs code for it. Where the browser has no element Fullscreen API (iPhone Safari) or refuses, the stage is pinned over the window instead, with Escape to leave. It is a bar, not a button over the game, because every game draws its own controls in its corners. Guarded by `__tests__/games/stage-fullscreen.test.ts` (5 tests; removing the iPhone fallback turns exactly 1 red) |
+| **A power-up replaces the one held** | `collect()` in `simulation.js` now sets the new weapon even when one is held. It is the **same rule for every racer and decided by the server**, so it gives nobody an advantage; repair and energy never touch the held weapon. Server and client copies are identical. `velocity-server/tests/chartvolt-pickup-replace.test.mjs` (4 tests) |
+| Clearer capsules and a pickup effect | Brighter capsule graphics, a short screen flash and a burst at the ship on collection (display only) |
+| Start screen | One screen with no scroll: ship picker, the Launch button always visible, obsolete text and empty panels removed |
+| Race screen | HUD panels moved to the edges on PC, tablet and short windows so the road is visible; phones keep the vendor layout, which already fitted. Checked by screenshots and measured panel boxes at five sizes |
+| Road indicators | Amber chevrons painted on the road on the approach to each corner, pointing the way it turns |
+| Scenery | Scene **slightly brighter only** (exposure 1.0 -> 1.16). **The buildings and scenes were not redesigned**; that needs new 3D assets and is still open |
+| Lighter | 2K sky and textures by default, smaller audio. The standalone HTML benefits most; the served copy was already capped by the packer. Served package: page 1.0 MB, 42.2 MB total |
+
+Nothing here changes a score, a time or who wins. **Not verified live**: seen through headless
+screenshots only, not on a real phone or tablet.
+
 ## 9. Owner decisions (answered 27 September 2026)
 
 1. **Lobby length is set by the admin in the Games section**, not fixed in code. It becomes an

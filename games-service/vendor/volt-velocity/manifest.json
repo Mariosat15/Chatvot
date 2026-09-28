@@ -30,46 +30,46 @@
       "note": "copied"
     },
     {
-      "file": "9182ca0ac5e7a26a.webp",
+      "file": "90498ee22532355a.webp",
       "type": "image/webp",
-      "bytes": 920428,
-      "originalBytes": 3945888,
-      "note": "4096x4096 -> 2048x2048"
+      "bytes": 519466,
+      "originalBytes": 519466,
+      "note": "2048x2048 kept"
     },
     {
       "file": "94b4564763cd5507.webp",
       "type": "image/webp",
       "bytes": 1645930,
-      "originalBytes": 6739728,
-      "note": "4096x4096 -> 2048x2048"
+      "originalBytes": 1645930,
+      "note": "2048x2048 kept"
     },
     {
-      "file": "2653b19c9084a912.webp",
+      "file": "c45d004ddc731180.webp",
       "type": "image/webp",
-      "bytes": 1936258,
-      "originalBytes": 8853200,
-      "note": "4096x4096 -> 2048x2048"
+      "bytes": 1368402,
+      "originalBytes": 1368402,
+      "note": "2048x2048 kept"
     },
     {
-      "file": "6eca34af9ee2c21e.webp",
+      "file": "79722ab9df8d1377.webp",
       "type": "image/webp",
-      "bytes": 41392,
-      "originalBytes": 653728,
-      "note": "4096x4096 -> 2048x2048"
+      "bytes": 17446,
+      "originalBytes": 17446,
+      "note": "2048x2048 kept"
     },
     {
       "file": "7ccfc49ddbc1f279.webp",
       "type": "image/webp",
       "bytes": 1419396,
-      "originalBytes": 6558736,
-      "note": "4096x4096 -> 2048x2048"
+      "originalBytes": 1419396,
+      "note": "2048x2048 kept"
     },
     {
-      "file": "c7fc8de7e2a082b9.webp",
+      "file": "e18db9fc9c757e35.webp",
       "type": "image/webp",
-      "bytes": 834262,
-      "originalBytes": 4874138,
-      "note": "4096x4096 -> 2048x2048"
+      "bytes": 389814,
+      "originalBytes": 389814,
+      "note": "2048x2048 kept"
     },
     {
       "file": "80bd6e75fa77cec7.webp",
@@ -196,34 +196,6 @@
       "bytes": 18304,
       "originalBytes": 26040,
       "note": "256x256 re-encoded"
-    },
-    {
-      "file": "44cb57be726ed8f4.ogg",
-      "type": "application/ogg",
-      "bytes": 1397741,
-      "originalBytes": 1397741,
-      "note": "copied"
-    },
-    {
-      "file": "5dd329c148e2b81c.ogg",
-      "type": "application/ogg",
-      "bytes": 1489371,
-      "originalBytes": 1489371,
-      "note": "copied"
-    },
-    {
-      "file": "3584fe88b938f70c.ogg",
-      "type": "application/ogg",
-      "bytes": 1258353,
-      "originalBytes": 1258353,
-      "note": "copied"
-    },
-    {
-      "file": "ff7beabda4532bc5.ogg",
-      "type": "application/ogg",
-      "bytes": 1480421,
-      "originalBytes": 1480421,
-      "note": "copied"
     },
     {
       "file": "aaa63379ea0a9bba.mp3",
