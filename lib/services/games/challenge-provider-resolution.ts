@@ -17,6 +17,7 @@ import {
   type RoundStartPolicy,
 } from "@/lib/services/games/round-types";
 import { resolveChallengeStartPolicy } from "@/lib/services/games/challenge-defaults";
+import { resolvePlayMode } from "@/lib/services/games/play-shape";
 
 /**
  * Resolving and pre-flighting a provider game for a NEW challenge (X10/E8, item 3 of the
@@ -232,6 +233,9 @@ export async function resolveChallengeProviderGame(
     // permitted it, or approves one permissively that play then refuses - one gate answering a
     // question the other has stopped asking.
     roundStartPolicy,
+    // The title's own shape: a race cut short by the challenge ending scores nothing whichever
+    // way the two players start, so a challenge shorter than one race is refused, not warned.
+    playMode: resolvePlayMode(title),
     unresolvedRoundPolicy: "score_zero",
     lastSandboxRoundAt: title.lastSuccessfulRoundAt ?? null,
     now,

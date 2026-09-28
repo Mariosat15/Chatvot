@@ -248,7 +248,8 @@ An absent or empty schema means "this game takes no settings" and is valid.
 | `enum` | Non-empty list of **strings** only (renders as a select). Enum on a numeric field is refused |
 | `default` | Optional |
 | `title`, `description` | Display only |
-| `format` | Only `"duration-seconds"` (see 3.2). Any other value refuses the schema |
+| `format` | Only `"duration-seconds"` or `"duration-units"` (see 3.2). Any other value refuses the schema |
+| `secondsPerUnit`, `secondsExtra` | **New in requirements HTML v1.23.** Only with `format: "duration-units"`, where `secondsPerUnit` (> 0) is required and `secondsExtra` (>= 0) is optional. Anywhere else the schema is refused |
 | `challengeValue` | **New in requirements HTML v1.22.** Optional. The value this setting **always** takes on a 1v1 challenge - for example a racing game that is always three laps in a challenge while an operator picks 1-10 for a competition. It must be the same type as the property and satisfy its own `minimum` / `maximum` / `enum`, or the schema is refused. ChartVolt pins it server-side on every challenge round and shows the setting as fixed; competitions ignore it |
 
 **Not supported** (non-exhaustive — anything not listed above is refused): `oneOf`,
@@ -298,6 +299,26 @@ defect, fixed on 8 September 2026, and it is the reason this keyword exists.
 **Why not just name the field.** Because then it is your field name, in our code, for
 ever - and the next provider's title, whose clock is called something else, needs a
 ChartVolt release. That is precisely the outcome `configSchema` exists to avoid.
+
+**When the length is set in units, not seconds - `format: "duration-units"`** (requirements
+HTML **v1.23**, 28 Sep 2026, backward compatible). A racing title sets *laps*; a quiz sets
+*questions*. Declare how long one unit takes and the platform does the arithmetic:
+attempt length = value × `secondsPerUnit` + `secondsExtra`, rounded up, with the value
+clamped to the property's own `minimum` / `maximum`.
+
+```json
+"laps": {
+  "type": "integer", "minimum": 1, "maximum": 10, "default": 3,
+  "format": "duration-units", "secondsPerUnit": 100, "secondsExtra": 5
+}
+```
+
+Declare `secondsPerUnit` as the **longest** one unit may take (a lap's time limit, not the
+average lap) - it is a reservation, and an under-reservation cuts a real player's attempt
+short. The same rules as `duration-seconds` apply otherwise: a numeric property only, **one
+play clock per schema across both formats**, and an unusable value falls back to
+`maxDurationSeconds`. Why it was added: Volt Velocity declared no clock, so a five-minute
+three-lap race (305 s) was told its playing time was the ten-lap ceiling (1005 s).
 
 | Rule | Behaviour |
 |---|---|

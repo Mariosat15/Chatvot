@@ -1172,6 +1172,30 @@ no build. The main app needs a rebuild and restart. Then hard refresh. **Never v
   - **Files:** client sources are in `velocity-server/client-patches/`. The repacked page changed
     `client.html` only, and every asset kept its hash.
   - **Not verified live with 16 players.**
+- **28 Sep 2026 - (8) An admin can no longer create a race nobody can finish** (`23` s8.7).
+  - **Owner report:** the wizard said "The playing time you have set (1005 seconds) is longer
+    than the contest itself (5 minutes)... fine if a partial run still scores". Both halves were
+    wrong: a 3-lap race is 305 s, not 1005, and a cut-short race scores nothing (DNF).
+  - **Cause:** Volt Velocity sets laps, not seconds, so it declared no play clock and the
+    platform reserved the 10-lap ceiling for every contest.
+  - **Fix, game-agnostic:** a second play-clock format, `duration-units` with
+    `secondsPerUnit` / `secondsExtra`, in both mirrored `config-schema.ts` copies (one clock
+    per schema across both formats, fail closed). Volt Velocity's `laps` declares 100 s/lap
+    + 5 s. **Requirements HTML 1.23**, backward compatible; `01` s3.1b/s3.2 amended.
+  - **Refusal:** both `contest-preflight.ts` copies now REFUSE a `scheduled` contest shorter
+    than one attempt (everybody starts at the gun, so nobody finishes); `anytime` still warns.
+    The play mode reaches the pre-flight on create, publish and challenge paths.
+  - **Auto-fix:** `RoundClockNote` shows the warning red for scheduled/reserving contests and
+    a "Make the contest long enough" button (`endTimeThatFits` in `contest-draft.ts`) that
+    sets the end time to start + attempt + 1 minute, rounded up.
+  - **Live defect found on the way:** `apps/admin/app/api/games/contests/route.ts` dropped
+    the operator's chosen `playMode`, so every contest was created in the title's default
+    shape. Fixed; the service still refuses an unsupported mode. Nothing backfilled -
+    existing contests keep the shape they were stored with.
+  - **Tests:** new `__tests__/services/duration-units-clock.test.ts` (15); the round-clock
+    count guard raised from 2 to 3 branches; targeted suites and `check:mirrors` green.
+  - **Deploy:** platform first (both servers), then games-service `npm run build` +
+    `pm2 restart chartvolt-games`, then press Sync on the catalogue. **Never verified by eye.**
 - **28 Sep 2026 - (7) Volt Velocity race rules: laps, solo races, tie-break** (`23` s8.6).
   - **Rules:** fastest time wins, equal times go to more points; a non-finisher gets no score; a
     competition is 1-10 laps at 100 s per lap; a challenge is always 3 laps; the operator picks

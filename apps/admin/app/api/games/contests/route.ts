@@ -14,6 +14,7 @@ import {
   type UnresolvedRoundPolicy,
   type UnscoredContestPolicy,
 } from "@/lib/services/games/round-types";
+import type { PlayMode } from "@/lib/services/games/play-shape";
 
 /**
  * GET  /api/games/contests - the titles a contest can be created on, with their settings schema
@@ -50,6 +51,7 @@ interface ContestBody {
   roundStartPolicy?: RoundStartPolicy;
   resultGracePeriodSeconds?: number;
   perRoundCostAcknowledged?: boolean;
+  playMode?: PlayMode;
 }
 
 export async function GET() {
@@ -117,6 +119,10 @@ export async function POST(request: NextRequest) {
         : ("until_window_closes" as RoundStartPolicy),
       resultGracePeriodSeconds: body.resultGracePeriodSeconds ?? 600,
       perRoundCostAcknowledged: body.perRoundCostAcknowledged,
+      // Reason: the wizard has always sent the operator's chosen shape and this route used to
+      // drop it, so a title supporting both was always saved as its default. The service
+      // refuses a shape the title does not support, so this is passed through, not trusted.
+      playMode: body.playMode,
     };
 
     if (body.action === "preflight") {

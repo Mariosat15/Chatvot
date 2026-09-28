@@ -240,6 +240,7 @@ export async function preflightProviderContest(
     | "roundStartPolicy"
     | "resultGracePeriodSeconds"
     | "perRoundCostAcknowledged"
+    | "playMode"
   >,
 ): Promise<PreflightResult> {
   await connectToDatabase();
@@ -307,6 +308,9 @@ export async function preflightProviderContest(
     // is a hard refusal under one policy and a warning under the other, so omitting it would
     // refuse exactly the contests the permissive setting exists to allow.
     roundStartPolicy: input.roundStartPolicy,
+    // The shape the contest will be SAVED as, resolved the same way `createProviderContest`
+    // resolves it, so an "everybody together" contest too short for one run is refused here.
+    playMode: resolveContestPlayMode(input.playMode, title),
     perRoundCostAcknowledged: input.perRoundCostAcknowledged,
     // The catalogue already records this, so the sandbox check reads a real fact rather
     // than a placeholder. It is set when a round for this title last completed

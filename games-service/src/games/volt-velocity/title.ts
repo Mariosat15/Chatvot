@@ -101,6 +101,12 @@ export const VOLT_VELOCITY: TitleDefinition = {
         maximum: VELOCITY_MAX_LAPS,
         default: DEFAULT_VELOCITY_LAPS,
         challengeValue: VELOCITY_CHALLENGE_LAPS,
+        // Reason: tells the platform how long ONE race really is (laps x 100 s + the 5 s
+        // countdown), so its contest clock checks use the operator's lap count rather than
+        // the 10-lap ceiling, and it can refuse a contest shorter than a single race.
+        format: "duration-units",
+        secondsPerUnit: VELOCITY_SECONDS_PER_LAP,
+        secondsExtra: VELOCITY_COUNTDOWN_SECONDS,
       },
     },
     required: ["trackId"],

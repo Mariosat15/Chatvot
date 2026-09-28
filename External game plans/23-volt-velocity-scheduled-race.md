@@ -442,6 +442,25 @@ exactly one test each (solo off, challenge pin off, platform pin off). **Not ver
    challenge's own `contentSeed`, so two players are never put into a competition's room.
    Adds about 1 day to VV3/VV5.
 
+### 8.7 A contest too short for the race is refused, and fixed in one click (28 September 2026)
+
+The wizard told an operator a 3-lap race took **1005 s** (the 10-lap ceiling) and that a
+cut-short attempt was fine "if a partial run still scores". A race scores nothing unless it
+finishes, and 3 laps is 305 s. Three changes, none of them Volt-Velocity-specific code on the
+platform:
+
+- **The title says how long a lap is.** `laps` carries `format: "duration-units"`,
+  `secondsPerUnit: 100`, `secondsExtra: 5` (requirements HTML **1.23**, `01` s3.2). The
+  platform reserves `laps x 100 + 5`; a test pins 10 laps to `maxDurationSeconds`.
+- **Scheduled contests shorter than one race are refused**, not warned about, in both
+  pre-flight copies, on create, publish and challenge. A play-any-time contest still only
+  warns, because the player chooses when to start.
+- **One-click fix:** the warning shows a "Make the contest long enough" button that sets the
+  end time to start + one race + 1 minute.
+
+Found on the way: the admin create route dropped the chosen play style, so every contest was
+stored in the title's default shape. Fixed.
+
 ## 10. Risks
 
 | ID | Risk | Mitigation |

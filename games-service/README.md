@@ -81,6 +81,12 @@ from the spec or the plan rather than taste:
 | Play URL | `/play?t=` | `/play/volt-stack/?t=` |
 | Authority | Server verifies paths | Server recomputes every lock; soft drop = 0 |
 
+`volt-velocity` declares its play clock in laps instead: the `laps` setting carries
+`format: "duration-units"` with `secondsPerUnit` 100 (the per-lap time limit) and
+`secondsExtra` 5 (the countdown), so the platform reserves `laps x 100 + 5` seconds per race
+rather than the 10-lap ceiling. `tools/test-scoring.ts` pins that 10 laps equals
+`maxDurationSeconds`.
+
 **Scoring for Circuit is count and speed**, which is the whole point of the format: more boards is
 worth more, and solving each one faster is worth more. A player is never required to finish
 anything - the clock ends the round, and whatever they achieved is their score.

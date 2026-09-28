@@ -28,6 +28,12 @@ import {
   SprintConfig,
   resolveConfig,
 } from "../src/games/titles";
+import {
+  VELOCITY_COUNTDOWN_SECONDS,
+  VELOCITY_MAX_LAPS,
+  VELOCITY_SECONDS_PER_LAP,
+  VOLT_VELOCITY,
+} from "../src/games/volt-velocity/title";
 
 let passed = 0;
 let failed = 0;
@@ -290,6 +296,22 @@ test("the play clock declares its role, so the platform never has to know its na
   const properties = (SPRINT.configSchema as { properties: Record<string, Record<string, unknown>> })
     .properties;
   assert.equal(properties.durationSeconds.format, "duration-seconds");
+});
+
+test("Volt Velocity declares how long one race is, from the lap count", () => {
+  // Without this the platform can only reserve the 10-lap ceiling, so it warned about a
+  // five-minute contest being too short for a 1005-second race nobody had configured, and
+  // could not refuse a contest genuinely shorter than one race.
+  const laps = (VOLT_VELOCITY.configSchema as { properties: Record<string, Record<string, unknown>> })
+    .properties.laps;
+  assert.equal(laps.format, "duration-units");
+  assert.equal(laps.secondsPerUnit, VELOCITY_SECONDS_PER_LAP);
+  assert.equal(laps.secondsExtra, VELOCITY_COUNTDOWN_SECONDS);
+  // The longest lap count must produce exactly the ceiling the title declares.
+  assert.equal(
+    VELOCITY_MAX_LAPS * VELOCITY_SECONDS_PER_LAP + VELOCITY_COUNTDOWN_SECONDS,
+    VOLT_VELOCITY.maxDurationSeconds,
+  );
 });
 
 test("the retired title is deprecated rather than removed from the catalogue", () => {

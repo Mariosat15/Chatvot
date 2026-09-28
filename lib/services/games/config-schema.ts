@@ -52,7 +52,15 @@ export type ConfigFieldType = "integer" | "number" | "string" | "boolean";
  * silently ignored would be worse than none: the provider would believe they had told us
  * something load-bearing.
  */
-export const CONFIG_FIELD_FORMATS = ["duration-seconds"] as const;
+/*
+ * `duration-units` (requirements HTML 1.23) is the same role for a game whose length is a
+ * COUNT rather than a number of seconds - Volt Velocity's laps. The field declares
+ * `secondsPerUnit` (and optionally `secondsExtra`, a fixed countdown), so the platform can
+ * work out "3 laps = 305 seconds" without knowing what a lap is. Before it existed the
+ * platform fell back to the catalogue ceiling, and every race was treated as the longest one
+ * allowed - which is how a 3-lap race was said not to fit in a 10-minute contest.
+ */
+export const CONFIG_FIELD_FORMATS = ["duration-seconds", "duration-units"] as const;
 export type ConfigFieldFormat = (typeof CONFIG_FIELD_FORMATS)[number];
 
 export interface ConfigField {
@@ -68,6 +76,10 @@ export interface ConfigField {
   default?: unknown;
   /** A declared role. See `CONFIG_FIELD_FORMATS`. */
   format?: ConfigFieldFormat;
+  /** `duration-units` only: seconds of play per unit of this setting. Always positive. */
+  secondsPerUnit?: number;
+  /** `duration-units` only: a fixed extra on every attempt, such as a start countdown. */
+  secondsExtra?: number;
   /**
    * The value this setting ALWAYS takes in a 1v1 challenge - requirements HTML 1.22.
    *
@@ -102,6 +114,8 @@ const SUPPORTED_FIELD_KEYS = new Set([
   "description",
   "format",
   "challengeValue",
+  "secondsPerUnit",
+  "secondsExtra",
 ]);
 
 const SUPPORTED_TYPES = new Set<string>([
@@ -236,6 +250,31 @@ export function parseConfigSchema(raw: unknown): ParseResult {
       format = rawField.format as ConfigFieldFormat;
     }
 
+    // Reason: fail closed both ways. A per-unit length on a field that is not a unit clock
+    // would be silently ignored, and a unit clock with no usable length would make the
+    // attempt length `NaN` at the gate deciding when play may start.
+    const secondsPerUnit = numberOrUndefined(rawField.secondsPerUnit);
+    const secondsExtra = numberOrUndefined(rawField.secondsExtra);
+    if (format === "duration-units") {
+      if (secondsPerUnit === undefined || !(secondsPerUnit > 0)) {
+        return {
+          ok: false,
+          error: `Setting "${name}" declares the format "duration-units" without a positive secondsPerUnit.`,
+        };
+      }
+      if (rawField.secondsExtra !== undefined && !(secondsExtra !== undefined && secondsExtra >= 0)) {
+        return {
+          ok: false,
+          error: `Setting "${name}" declares a secondsExtra that is not zero or more.`,
+        };
+      }
+    } else if (rawField.secondsPerUnit !== undefined || rawField.secondsExtra !== undefined) {
+      return {
+        ok: false,
+        error: `Setting "${name}" declares secondsPerUnit or secondsExtra without the format "duration-units".`,
+      };
+    }
+
     const minimum = numberOrUndefined(rawField.minimum);
     const maximum = numberOrUndefined(rawField.maximum);
     if (
@@ -261,6 +300,9 @@ export function parseConfigSchema(raw: unknown): ParseResult {
       options,
       default: rawField.default,
       format,
+      ...(format === "duration-units"
+        ? { secondsPerUnit, ...(secondsExtra !== undefined ? { secondsExtra } : {}) }
+        : {}),
     };
 
     if (rawField.challengeValue !== undefined) {
@@ -287,13 +329,13 @@ export function parseConfigSchema(raw: unknown): ParseResult {
   // happened to enumerate first - a coin flip that reads as working, and that could change
   // between titles from the same provider. Refusing puts the question back where it can be
   // answered.
-  const duplicateFormats = CONFIG_FIELD_FORMATS.filter(
-    (candidate) => fields.filter((field) => field.format === candidate).length > 1,
-  );
-  if (duplicateFormats.length > 0) {
+  // Both formats are the play clock, so the rule is one clock across them, not one per format.
+  const clockFields = fields.filter((field) => field.format !== undefined);
+  if (clockFields.length > 1) {
+    const formats = [...new Set(clockFields.map((field) => field.format))];
     return {
       ok: false,
-      error: `The settings schema declares more than one field with the format: ${duplicateFormats.join(", ")}.`,
+      error: `The settings schema declares more than one field with the format: ${formats.join(", ")}.`,
     };
   }
 
@@ -423,7 +465,7 @@ export function resolvePlayDurationSeconds(
   fields: ConfigField[],
   settings: Record<string, unknown> | undefined,
 ): number | undefined {
-  const field = fields.find((candidate) => candidate.format === "duration-seconds");
+  const field = fields.find((candidate) => candidate.format !== undefined);
   if (!field) return undefined;
 
   const submitted =
@@ -443,7 +485,11 @@ export function resolvePlayDurationSeconds(
     field.maximum ?? numeric,
     Math.max(field.minimum ?? numeric, numeric),
   );
-  return clamped > 0 ? Math.ceil(clamped) : undefined;
+  const seconds =
+    field.format === "duration-units"
+      ? clamped * (field.secondsPerUnit ?? Number.NaN) + (field.secondsExtra ?? 0)
+      : clamped;
+  return Number.isFinite(seconds) && seconds > 0 ? Math.ceil(seconds) : undefined;
 }
 
 /**

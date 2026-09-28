@@ -8,6 +8,7 @@ import { getProviderAdapter } from "@/lib/services/game-providers/registry";
 import { parseConfigSchema } from "@/lib/services/games/config-schema";
 import { runPreflight } from "@/lib/services/games/contest-preflight";
 import { contestRoundConfig } from "@/lib/services/games/contest-config";
+import { resolveContestPlayMode } from "@/lib/services/games/play-shape";
 import type { ProviderContestFields } from "@/lib/services/games/contest-config";
 
 /**
@@ -42,6 +43,7 @@ type StoredProviderContest = ProviderContestFields & {
   status: string;
   minParticipants?: number;
   maxParticipants?: number;
+  playMode?: string;
 };
 
 export async function publishProviderContest(
@@ -176,6 +178,8 @@ export async function publishProviderContest(
       // refuse every round once players had paid to enter it.
       roundStartPolicy: (contest.roundStartPolicy ??
         "reserve_full_round") as never,
+      // The contest's own stored shape, never the title's current default.
+      playMode: resolveContestPlayMode(contest.playMode, title),
       // Reason: acknowledged at creation. Re-asking on publish would make it a click to
       // dismiss rather than a decision, which is how a cost warning stops being read.
       perRoundCostAcknowledged: true,

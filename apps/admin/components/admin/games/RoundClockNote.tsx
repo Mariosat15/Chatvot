@@ -3,8 +3,13 @@
 import { Clock, TriangleAlert } from "lucide-react";
 import { useTerms } from "@/contexts/TerminologyContext";
 import type { ConfigField } from "@/lib/services/games/config-schema";
+import type { PlayMode } from "@/lib/services/games/play-shape";
 import type { RoundStartPolicy } from "@/lib/services/games/round-types";
-import { describeDurationSeconds, describeRoundFit } from "./contest-draft";
+import {
+  describeDurationSeconds,
+  describeRoundFit,
+  endTimeThatFits,
+} from "./contest-draft";
 
 /**
  * Explains, on the screens where an operator sets them, how the playing time relates to the
@@ -47,6 +52,8 @@ export function RoundClockNote({
   maxDurationSeconds,
   roundStartPolicy,
   variant,
+  playMode,
+  onFitContest,
 }: {
   startTime: string;
   endTime: string;
@@ -73,6 +80,17 @@ export function RoundClockNote({
    * place, and a single generic paragraph in both is the kind of copy people learn to skip.
    */
   variant: "settings" | "timing";
+  /**
+   * The contest's shape. Under `scheduled` everybody starts at the gun, so a contest shorter
+   * than one attempt means nobody can finish - the same refusal `contest-preflight.ts` gives,
+   * shown here while the dates are still being edited. Absent reads as `anytime`.
+   */
+  playMode?: PlayMode;
+  /**
+   * When given, a too-short contest offers a one-click fix that moves the end time to fit one
+   * whole attempt. Optional so a screen that cannot safely move the end time offers none.
+   */
+  onFitContest?: (endTime: string) => void;
 }) {
   const terms = useTerms();
   const fit = describeRoundFit({
@@ -186,24 +204,64 @@ export function RoundClockNote({
         than the playing time" without saying how long either one is leaves them to work out
         which of the two numbers to change, on two different steps.
       */}
+      {/*
+        SCHEDULED IS A REFUSAL TOO, not a warning. Everybody starts at the gun, so a contest
+        shorter than one attempt cuts EVERY attempt short, and in a race a cut-short run
+        scores nothing. The old amber "that is fine if a partial run still scores" advice was
+        wrong for exactly the games that run scheduled.
+      */}
       {fit?.windowTooShort && (
-        <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3">
-          <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
-          {fit.reservesFullRound ? (
-            <p className="text-xs text-amber-200/90">
-              Play is set to {reserved} but this {terms.contest} only runs for {contestLength},
-              and every {terms.player} is promised the full {reserved} - so{" "}
-              <strong>nobody could start an {terms.attempt} at all</strong>. Shorten the playing
-              time, lengthen the {terms.contest}, or let {terms.players} start at any time.
-            </p>
-          ) : (
-            <p className="text-xs text-amber-200/90">
-              Play is set to {reserved} but this {terms.contest} only runs for {contestLength},
-              so every {terms.attempt} will be cut short at the end time and scored on what the{" "}
-              {terms.player} managed. {terms.players} are told how long they have before they
-              start.
-            </p>
-          )}
+        <div
+          className={`flex items-start gap-2 rounded-lg border p-3 ${
+            fit.reservesFullRound || playMode === "scheduled"
+              ? "border-red-500/40 bg-red-500/10"
+              : "border-amber-500/40 bg-amber-500/10"
+          }`}
+        >
+          <TriangleAlert
+            className={`mt-0.5 h-4 w-4 shrink-0 ${
+              fit.reservesFullRound || playMode === "scheduled"
+                ? "text-red-400"
+                : "text-amber-400"
+            }`}
+          />
+          <div className="space-y-2">
+            {fit.reservesFullRound ? (
+              <p className="text-xs text-red-200/90">
+                Play is set to {reserved} but this {terms.contest} only runs for {contestLength},
+                and every {terms.player} is promised the full {reserved} - so{" "}
+                <strong>nobody could start an {terms.attempt} at all</strong>. Shorten the
+                playing time, lengthen the {terms.contest}, or let {terms.players} start at any
+                time.
+              </p>
+            ) : playMode === "scheduled" ? (
+              <p className="text-xs text-red-200/90">
+                One {terms.attempt} takes {reserved} but this {terms.contest} only runs for{" "}
+                {contestLength}. Everybody starts together, so{" "}
+                <strong>nobody could finish</strong> and it cannot be created like this.
+                Lengthen the {terms.contest} or shorten the playing time.
+              </p>
+            ) : (
+              <p className="text-xs text-amber-200/90">
+                Play is set to {reserved} but this {terms.contest} only runs for {contestLength},
+                so every {terms.attempt} will be cut short at the end time and scored on what
+                the {terms.player} managed. {terms.players} are told how long they have before
+                they start.
+              </p>
+            )}
+            {onFitContest && endTimeThatFits(startTime, fit.reservedSeconds) && (
+              <button
+                type="button"
+                onClick={() => {
+                  const fitted = endTimeThatFits(startTime, fit.reservedSeconds);
+                  if (fitted) onFitContest(fitted);
+                }}
+                className="rounded-md border border-gray-600 bg-gray-800 px-2.5 py-1 text-xs font-medium text-gray-100 hover:bg-gray-700"
+              >
+                Make the {terms.contest} long enough ({reserved} + 1 min)
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>

@@ -1,5 +1,6 @@
 import type { ConfigField } from "./config-schema";
 import { resolveAttemptSeconds, validateConfigValues } from "./config-schema";
+import type { PlayMode } from "./play-shape";
 import type {
   AttemptsPolicy,
   RoundStartPolicy,
@@ -76,6 +77,12 @@ export interface PreflightInput {
    * created under.
    */
   roundStartPolicy?: RoundStartPolicy;
+  /**
+   * The contest's shape. Absent means `anytime`, the shape of every contest saved before
+   * shapes existed. Under `scheduled` everybody starts at the gun, so a contest shorter than
+   * one attempt cuts EVERY attempt short and is refused rather than warned about.
+   */
+  playMode?: PlayMode;
 
   /**
    * Operator ticked "I accept the per-round cost".
@@ -308,6 +315,13 @@ export function runPreflight(input: PreflightInput): PreflightResult {
       if (reservesFullRound) {
         errors.push(
           `The playing time you have set (${describeSeconds(roundSeconds)}) is longer than the contest itself (${describeSeconds(Math.floor(windowSeconds))}), so nobody could ever start an attempt. Either shorten the playing time or lengthen the contest.`,
+        );
+      } else if (input.playMode === "scheduled") {
+        // Reason: everybody starts together at the gun, so there is no player for whom the
+        // run fits - every attempt is stopped before its natural end, and a race cut short
+        // scores nobody. A warning here was a contest the operator could save and nobody win.
+        errors.push(
+          `The playing time you have set (${describeSeconds(roundSeconds)}) is longer than the contest itself (${describeSeconds(Math.floor(windowSeconds))}). Everybody starts together, so nobody could finish. Make the contest at least ${describeSeconds(roundSeconds)} long, or shorten the playing time.`,
         );
       } else {
         warnings.push(

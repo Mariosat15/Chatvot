@@ -135,6 +135,8 @@ export function StepSchedule({
         settings={draft.settings}
         maxDurationSeconds={title?.maxDurationSeconds}
         roundStartPolicy={draft.roundStartPolicy}
+        playMode={draft.playMode}
+        onFitContest={(endTime) => patch({ endTime })}
       />
 
       {/*

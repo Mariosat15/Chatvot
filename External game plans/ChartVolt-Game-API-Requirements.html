@@ -208,7 +208,7 @@
     <p class="lede">ChartVolt runs paid skill competitions. We handle the money, the ranking and the rewards. We are looking for partners who can supply the games and tell us what each player scored. This document specifies exactly what your API must do so that we can operate on top of it &mdash; three calls to you, one call back to us.</p>
     <div class="hero-meta">
       <div><b>Document</b><span>Integration requirements</span></div>
-      <div><b>Version</b><span>1.22</span></div>
+      <div><b>Version</b><span>1.23</span></div>
       <div><b>Audience</b><span>Your engineering team</span></div>
       <div><b>Required calls</b><span>3 out, 1 in</span></div>
       <div><b>Money handled by you</b><span>None, ever</span></div>
@@ -582,7 +582,8 @@
       <tr><td><code>enum</code></td><td>Non-empty list of <b>strings</b> only (renders as a select). Enum on a numeric field is refused</td></tr>
       <tr><td><code>default</code></td><td>Optional</td></tr>
       <tr><td><code>title</code>, <code>description</code></td><td>Display only</td></tr>
-      <tr><td><code>format</code></td><td>Only <code>"duration-seconds"</code> (see 3.2). Any other value refuses the schema</td></tr>
+      <tr><td><code>format</code></td><td>Only <code>"duration-seconds"</code> or <code>"duration-units"</code> (see 3.2). Any other value refuses the schema</td></tr>
+      <tr><td><code>secondsPerUnit</code>, <code>secondsExtra</code></td><td><b>New in 1.23.</b> Only with <code>format: "duration-units"</code>: <code>secondsPerUnit</code> (&gt; 0) is required, <code>secondsExtra</code> (&ge; 0) optional. Anywhere else the schema is refused</td></tr>
       <tr><td><code>challengeValue</code></td><td><b>New in 1.22.</b> Optional. The value this setting always takes on a 1v1 challenge (for example, always 3 laps). Same type as the property and within its own limits, or the schema is refused. We pin it on every challenge round; competitions ignore it</td></tr>
     </tbody>
   </table></div>
@@ -611,6 +612,8 @@
   </table></div>
 
   <p><b>If your title's length is fixed rather than configurable</b>, declare nothing and set <code>maxDurationSeconds</code> to that fixed length. The fallback is then exactly right.</p>
+
+  <p><b>New in 1.23 &mdash; when the length is set in units, not seconds.</b> A racing game sets <i>laps</i>, a quiz sets <i>questions</i>. Mark that property <code>format: "duration-units"</code> and tell us how long one unit can take: <code>"laps": { "type": "integer", "minimum": 1, "maximum": 10, "default": 3, "format": "duration-units", "secondsPerUnit": 100, "secondsExtra": 5 }</code>. We compute one attempt as value &times; <code>secondsPerUnit</code> + <code>secondsExtra</code>, rounded up. Give the <b>longest</b> a unit may take, not the average &mdash; it is a reservation, and under-reserving cuts a real player short. All the rules above apply, and there is still <b>one play clock per schema across both formats</b>.</p>
 
   <h3 id="playmode">3.2a &nbsp;<code>playMode</code> &mdash; does everybody play at once?</h3>
   <p><b>New in version 1.4, and most providers can skip this section.</b> If your players can pick your game up whenever they like, omit the field. <code>anytime</code> is the default and describes every title in our live catalogue today, so a catalogue written against version 1.3 needs no change at all.</p>
@@ -1321,6 +1324,7 @@ $headers = [
   <div class="tw"><table>
     <thead><tr><th style="width:90px">Version</th><th style="width:130px">Date</th><th>Change</th></tr></thead>
     <tbody>
+      <tr><td><b>1.23</b></td><td>28 Sep 2026</td><td><b>One optional addition, backward compatible.</b> A second play-clock format, <code>duration-units</code>, with <code>secondsPerUnit</code> and <code>secondsExtra</code> (sections 3.1b and 3.2), for titles whose length is set in laps, questions or levels rather than seconds. A title that declares nothing is unaffected</td></tr>
       <tr><td><b>1.22</b></td><td>28 Sep 2026</td><td><b>Two optional additions, both backward compatible.</b> <code>contestType</code> on create-round (section 4) &mdash; <code>competition</code>, <code>challenge</code> or <code>practice</code> &mdash; so a multiplayer game can tell a play-any-time competition (each player alone) from a challenge (the two race each other); ignore it if your game plays the same way everywhere. And a <code>challengeValue</code> keyword in <code>configSchema</code> (section 3.1b): the value a setting always takes on a 1v1 challenge. We pin it on every challenge round and show it as fixed; competitions ignore it</td></tr>
       <tr><td><b>1.21</b></td><td>27 Sep 2026</td><td><b>Two optional fields for live races.</b> <code>maxPlayers</code> on the catalogue (section 3) &mdash; the most players one round can hold; omit it if there is no limit, and we refuse any contest that could seat more. <code>scheduledStartAt</code> on create-round (section 4), sent only for <code>scheduled</code> titles &mdash; the shared start moment. We may create the round and load your launch URL up to 30 minutes before it, so hold an early player in a lobby rather than starting their clock. Titles that play <code>anytime</code> are unaffected</td></tr>
       <tr><td><b>1.20</b></td><td>26 Sep 2026</td><td><b>Optional <code>provisionalScore</code> on the progress callback.</b> Section 8a. Same number as the eventual result <code>score</code>, for live board ranking only; settlement still ignores it. Omit it and you remain fully conformant. A field named <code>score</code> on progress stays ignored</td></tr>
@@ -1353,7 +1357,7 @@ $headers = [
 </div>
 
 <div class="foot">
-  <div>ChartVolt &mdash; Game API Requirements &middot; Version 1.22 &middot; Requirements document for prospective game providers</div>
+  <div>ChartVolt &mdash; Game API Requirements &middot; Version 1.23 &middot; Requirements document for prospective game providers</div>
   <div>Questions on this specification: contact your ChartVolt commercial contact</div>
 </div>
 

@@ -425,15 +425,21 @@ describe("the refusal stops contradicting the operator's own setting", () => {
 
         Same class as the play screen's two `!expectedOrigin` copies and the pause list covering
         for the emergency list: a per-branch claim has to be asserted per branch.
+
+        THREE since 28 September 2026: a SCHEDULED contest shorter than one attempt is now
+        refused too (everybody starts at the gun, so nobody could finish), and that refusal
+        states the same two figures.
       */
-      expect(code.match(/playing time you have set/g)).toHaveLength(2);
-      expect(code.match(/longer than the contest itself/g)).toHaveLength(2);
+      expect(code.match(/playing time you have set/g)).toHaveLength(3);
+      expect(code.match(/longer than the contest itself/g)).toHaveLength(3);
       // Both figures interpolated, and through the humanising helper - "the playing time you
       // have set (300 seconds)" is the old problem in new words.
-      expect(code.match(/describeSeconds\(roundSeconds\)/g)).toHaveLength(2);
+      // Four: the scheduled refusal also names the attempt length in its advice ("make the
+      // contest at least X long").
+      expect(code.match(/describeSeconds\(roundSeconds\)/g)).toHaveLength(4);
       expect(
         code.match(/describeSeconds\(Math\.floor\(windowSeconds\)\)/g),
-      ).toHaveLength(2);
+      ).toHaveLength(3);
       // The phrase that named an invisible ceiling must not come back.
       expect(code).not.toMatch(/longest possible round/);
     }

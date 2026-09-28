@@ -432,6 +432,22 @@ function utcDraftToIso(value: string): string {
 }
 
 /**
+ * The end time that makes the contest long enough for one whole attempt, for the timing
+ * note's one-click fix. Adds a minute of headroom and rounds UP to the minute, because the
+ * schedule inputs hold minutes and rounding down would land back under the attempt length.
+ */
+export function endTimeThatFits(
+  startTime: string,
+  reservedSeconds: number,
+): string | undefined {
+  const start = new Date(utcDraftToIso(startTime));
+  if (Number.isNaN(start.getTime()) || !(reservedSeconds > 0)) return undefined;
+  const minuteMs = 60_000;
+  const endMs = start.getTime() + reservedSeconds * 1000 + minuteMs;
+  return isoToUtcDraft(new Date(Math.ceil(endMs / minuteMs) * minuteMs));
+}
+
+/**
  * The inverse, for populating the edit form from stored dates.
  *
  * Builds the string from UTC getters. The previous LOCAL version (`isoToLocal`) was correct
