@@ -442,6 +442,25 @@ graphics, turn indicators on the road, better scenery and a lighter game.
 Nothing here changes a score, a time or who wins. **Not verified live**: seen through headless
 screenshots only, not on a real phone or tablet.
 
+**Second pass, same day - the HUD cannot overlap.** The owner reported three faults: on a phone the
+touch controls (steer pad and pedals) were missing, so the game could not be played; the equipment
+panel sat on the hull panel, both in the frame and at 1920x1080; and live position sat on the lap
+panel. The "Race screen" row above is therefore **superseded**. Its fixed pixel offsets per
+breakpoint were the cause, because any panel whose size differed from what a breakpoint assumed
+(a long equipment name, the multiplayer standings list) landed on its neighbour.
+
+| Fault | Cause and fix |
+|---|---|
+| Touch controls missing | The vendor showed them only after the first touch, and our desktop rule hid them until then. A device that also reports a fine pointer (tablets, hybrids) could never reveal them. They are now shown from the start on any touch-capable device |
+| Panels overlapping | `hud-layout.js` measures the panels after every layout change and moves any that touch a neighbour vertically clear of it. The touch pads and top buttons are never moved. On a mouse screen panels also scale with the window (down to 62% in a small frame) |
+| Live position on the lap panel | It sits under the map on PC, below the lap panel on phones and tablets, and beside the lap panel on a sideways phone, where both side columns are full |
+| Logo | The text brand is replaced by the supplied Volt Velocity logo, hidden while racing on small screens |
+
+The screenshot check now covers **eight** sizes (1920x1080 to a 390x640 phone frame) with a
+forced 8-row standings list. It fails on any overlap, any panel off the screen, and touch controls
+missing on a touch size or shown on a mouse size; all eight pass. **Still not verified on a real
+phone or tablet.** No server change, so only games-service needs a pull and restart.
+
 ## 9. Owner decisions (answered 27 September 2026)
 
 1. **Lobby length is set by the admin in the Games section**, not fixed in code. It becomes an

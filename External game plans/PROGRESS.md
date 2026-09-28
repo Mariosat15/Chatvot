@@ -1306,6 +1306,20 @@ no build. The main app needs a rebuild and restart. Then hard refresh. **Never v
     highlights card and content dialog, files this work did not touch.
   - **Deploy:** platform build, games-service pull + restart, `pm2 restart chartvolt-velocity`.
     **Not verified live**; headless screenshots only.
+- **28 Sep 2026 - (9) Volt Velocity HUD cannot overlap; touch controls; logo** (`23` s8.7, second pass).
+  - **Owner report:** no touch controls on a phone (unplayable), equipment over hull (frame and
+    1920x1080), live position over the lap panel, and a new logo to use.
+  - **Cause:** the HUD placed panels with fixed pixel offsets per screen size, so any panel of a
+    different size than assumed landed on its neighbour. The touch pad was revealed only after a
+    first touch, which our desktop rule prevented on devices that also report a fine pointer.
+  - **Fix:** `client-patches/hud-layout.js` measures the panels and moves colliding ones clear
+    (touch pads and top buttons never move); touch detected at start; panels scale on small
+    windows; one panel style; the logo replaces the text brand. The entry (8) "HUD moved to the
+    edges" claim is superseded - it did not survive a long equipment name or the standings list.
+  - **Tests:** vendor 84/84; screenshot check at 8 sizes (overlap, off-screen, touch-controls
+    presence) all pass. No server change.
+  - **Deploy:** games-service pull + `pm2 restart chartvolt-games` only. **Not verified on a real
+    phone.**
 
 
 ### 27 Sep 2026 - Per-game How it works & tips (Guides) tab

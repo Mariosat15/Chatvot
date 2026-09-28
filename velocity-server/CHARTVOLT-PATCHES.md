@@ -59,8 +59,22 @@ is `src/input-frames.js`, shared with the server byte for byte). What they do:
 | Scene slightly brighter (tone-mapping exposure 1.0 -> 1.16). **Buildings were not redesigned** | `client-patches/scene.js` |
 | Lighter: 2K sky and textures by default, smaller audio | `root/tools/chartvolt-lighten.mjs`, `audio.js`, `environment.js`, `root/landscape-manifest.json` |
 
-`root/tools/chartvolt-shots.mjs` screenshots the start screen and a race at five sizes and fails
-if any HUD panel overlaps another.
+### HUD that cannot overlap, touch controls, logo (28 September 2026, second pass)
+
+The owner reported three faults: the touch controls missing on a phone, equipment drawn over hull
+(in the frame and at 1920x1080), and live position drawn over the lap panel.
+
+| Change | Where |
+|---|---|
+| **Touch controls shown from the start on any touch device.** The vendor revealed them only after the first touch, and our desktop rule hid them until then, so a device reporting a fine pointer too (tablets, hybrids) could never show them | `client-patches/hud-layout.js` `detectTouch()` |
+| **Panels are measured, not guessed.** After every layout change the HUD panels are measured and any that touch a neighbour are moved vertically clear of it (top half down, bottom half up). The touch pads, top buttons and logo are never moved. Only the CSS `translate` property is written, so it never fights the scaling `transform`. The aux row counts as its two buttons, since its middle lets touches through | `client-patches/hud-layout.js`, called from `main.js` |
+| One panel style, panels scaled to the window (1 on a large monitor, down to .62 in a small frame), live position under the map on PC and beside the lap panel on a sideways phone | `root/chartvolt.css` |
+| The text brand is replaced by the Volt Velocity logo (black keyed to transparent, 84 KB), hidden while racing on small screens | `root/assets/ui/volt-velocity-logo.webp`, `root/index.html`, `hud-layout.js` |
+
+`root/tools/chartvolt-shots.mjs [hangar|race|all] [size,...]` screenshots the start screen and a race
+(with a forced 8-row live position list) at eight sizes, from 1920x1080 down to a 390x640 phone
+frame. It fails if any panel overlaps another, leaves the screen, or if the touch controls are
+missing on a touch size or shown on a mouse size. **Nothing here changes the race server.**
 
 Rebuilding the client after changing a file in `client-patches/`:
 

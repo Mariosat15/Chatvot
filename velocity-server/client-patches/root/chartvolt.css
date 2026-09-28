@@ -127,32 +127,58 @@ html body[data-state=hangar][data-mode] #liveStandings{left:50%;right:auto;top:9
   #hangar .cv-launch #play{animation:none}
 }
 @keyframes cv-pickup-still{0%,85%{opacity:1}100%{opacity:0}}
+/* ---------- Brand: the Volt Velocity logo (keyed PNG-style webp, no panel behind it) ---------- */
+html body[data-state] header .brand{padding:0;border:0;border-radius:0;background:none;box-shadow:none;clip-path:none;backdrop-filter:none;line-height:0}
+html body[data-state] header .brand img{display:block;width:auto;height:clamp(44px,7.2vh,70px);filter:drop-shadow(0 6px 14px #000b)}
+html body[data-state=racing] header .brand img,html body[data-state=countdown] header .brand img{height:clamp(34px,5vh,50px)}
+@media (max-width:600px),(max-height:500px){html body[data-state] header .brand img{height:36px}}
+/* Hidden while driving wherever the top of the screen is needed for the lap and map panels. */
+@media (max-width:900px),(max-height:700px){
+  html body[data-state=racing] header .brand,html body[data-state=countdown] header .brand{opacity:0;pointer-events:none}
+}
 
-/* CHARTVOLT PATCH (28 Sep 2026): race HUD on a mouse-and-keyboard screen. The
-   touch pad is hidden (a keyboard player never uses it and it covered the
-   road), the equipment slot docks beside the hull panel instead of sitting on
-   the road, and the style chain shrinks to a slim ribbon at the top. Touch
-   devices keep the vendor layout, which already reads well on phones. */
+/* ---------- Race HUD look: one consistent glass panel style ---------- */
+html body[data-state][data-mode] #hud :is(.race-stats,.map,.integrity,.speed,.item-slot),
+html body[data-state][data-mode] :is(.skill-panel,#liveStandings){
+  border:1px solid #86dcff30;border-top:2px solid #5fe3f4b0;border-radius:12px;clip-path:none;
+  background:linear-gradient(165deg,#0d2536eb,#050d17f0 72%);box-shadow:inset 0 1px 0 #d4f6ff14,0 12px 32px #0009}
+html body[data-state][data-mode] #hud :is(small,.clock span){letter-spacing:1.6px}
+
+/* CHARTVOLT PATCH (28 Sep 2026): race HUD on a mouse-and-keyboard screen.
+   Every panel is anchored to its corner and scaled by --cv-hud (set by src/hud-layout.js from the
+   window size: 1 on a large monitor, down to .62 in a small embedded frame). Panels start at the
+   screen edge; hud-layout.js then stacks any that collide (equipment above hull, map and live
+   position below the top buttons), so no breakpoint needs to know how tall its neighbours are.
+   The touch pad stays hidden until the device is known to be touch-capable. */
 @media (hover:hover) and (pointer:fine){
   html body:not([data-touch]) #touch{display:none!important}
-  html body[data-state][data-mode] #hud .item-slot{left:22px;right:auto;top:auto;bottom:max(232px,calc(env(safe-area-inset-bottom) + 232px));transform:none;width:260px;padding:9px 14px}
-  html body[data-state][data-mode] .skill-panel{top:18px;padding:6px 14px;height:auto;transform:translateX(-50%) scale(.85);transform-origin:top center}
+  html body[data-state][data-mode] #hud .race-stats{top:18px;left:22px;right:auto;bottom:auto;transform:scale(var(--cv-hud,1));transform-origin:top left}
+  html body[data-state][data-mode] #hud .map{top:18px;right:22px;left:auto;bottom:auto;transform:scale(var(--cv-hud,1));transform-origin:top right}
+  html body[data-state][data-mode] #hud .integrity{left:22px;bottom:22px;top:auto;right:auto;transform:scale(var(--cv-hud,1));transform-origin:bottom left}
+  html body[data-state][data-mode] #hud .speed{right:22px;bottom:22px;top:auto;left:auto;transform:scale(var(--cv-hud,1));transform-origin:bottom right}
+  html body[data-state][data-mode] #hud .item-slot{left:22px;bottom:22px;top:auto;right:auto;width:260px;min-width:0;padding:9px 14px;transform:scale(var(--cv-hud,1));transform-origin:bottom left}
+  html body[data-state][data-mode] .skill-panel{top:14px;padding:6px 14px;height:auto;transform:translateX(-50%) scale(calc(var(--cv-hud,1) * .85));transform-origin:top center}
   html body[data-state][data-mode] .skill-panel .meter{margin:4px 0 0}
+  html body[data-state]:not([data-state=hangar])[data-mode] #liveStandings{left:auto;right:22px;top:18px;bottom:auto;width:230px;min-height:0;max-height:calc((100dvh - 330px) / var(--cv-hud,1));overflow:hidden;transform:scale(var(--cv-hud,1));transform-origin:top right}
 }
-/* Short desktop windows (the embedded frame is typically ~900x560): every
-   panel is scaled down and pinned into its corner so the road stays open. */
+/* Phones held sideways: both side columns are full (lap and hull on the left, map, speed and boost
+   on the right, touch pads below), so live position sits beside the lap panel at the top of the
+   sky, showing only the leading rows. */
+@media (pointer:coarse) and (max-height:500px){
+  html body[data-state]:not([data-state=hangar])[data-mode] #liveStandings{left:208px;right:auto;top:60px;bottom:auto;width:146px;min-height:0;max-height:84px;padding:5px 9px;overflow:hidden}
+  html body[data-state]:not([data-state=hangar])[data-mode] #raceOrder li:nth-child(n+3){display:none}
+}
+/* Short desktop windows: with the logo gone the lap panel takes the very top corner. */
 @media (hover:hover) and (pointer:fine) and (max-height:700px){
-  html body[data-state][data-mode] #hud .race-stats{top:14px;left:14px;transform:scale(.72);transform-origin:top left}
-  html body[data-state][data-mode] #hud .map{top:92px;right:14px;transform:scale(.72);transform-origin:top right}
-  html body[data-state][data-mode] #hud .integrity{left:14px;bottom:14px;transform:scale(.8);transform-origin:bottom left}
-  html body[data-state][data-mode] #hud .speed{right:14px;bottom:14px;transform:scale(.72);transform-origin:bottom right}
-  html body[data-state][data-mode] #hud .item-slot{left:14px;bottom:112px;transform:scale(.8);transform-origin:bottom left}
-  html body[data-state][data-mode] .skill-panel{top:10px;transform:translateX(-50%) scale(.72)}
-  html body[data-state=racing] .brand,html body[data-state=countdown] .brand{opacity:0;pointer-events:none}
+  html body[data-state][data-mode] #hud :is(.race-stats,.map){top:12px}
+  html body[data-state][data-mode] #hud :is(.integrity,.speed,.item-slot){bottom:12px}
+  html body[data-state][data-mode] #hud :is(.race-stats,.integrity,.item-slot){left:12px}
+  html body[data-state][data-mode] #hud :is(.map,.speed){right:12px}
+  html body[data-state][data-mode] .skill-panel{top:8px}
+  html body[data-state]:not([data-state=hangar])[data-mode] #liveStandings{right:12px;top:12px}
 }
-/* Tablets (touch, wider than a phone): the touch pad owns the bottom ~160px,
-   so the hull, equipment and speed panels sit on a row just above it, and the
-   style chain moves into the free gap between the logo and the top buttons. */
+/* Tablets (touch, wider than a phone): the touch pad owns the bottom ~160px, so the hull, equipment
+   and speed panels start on a row just above it (hud-layout.js still separates them if they meet). */
 @media (pointer:coarse) and (min-width:601px) and (min-height:801px){
   html body[data-state][data-mode] #hud .integrity{bottom:178px}
   html body[data-state][data-mode] #hud .item-slot{bottom:178px;width:240px;min-width:0}

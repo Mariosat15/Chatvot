@@ -2,6 +2,13 @@
   "source": "volt-velocity-client.html.gz",
   "assets": [
     {
+      "file": "aaa8e03385172fd2.webp",
+      "type": "image/webp",
+      "bytes": 84498,
+      "originalBytes": 84498,
+      "note": "559x231 kept"
+    },
+    {
       "file": "028584ec004c0b38.webp",
       "type": "image/webp",
       "bytes": 555468,
