@@ -6,6 +6,8 @@ import {
   type PlayMode,
 } from "@/lib/services/games/play-shape";
 import { useTerms } from "@/contexts/TerminologyContext";
+import { scheduledStartTooSoon } from "@/lib/services/games/scheduled-start";
+import { utcDraftToIso } from "@/lib/services/games/round-fit";
 import { ContestPlayModeField } from "../ContestPlayModeField";
 import { RoundClockNote } from "../RoundClockNote";
 import { RoundStartPolicyField } from "../RoundStartPolicyField";
@@ -88,6 +90,14 @@ export function StepSchedule({
   const shape = playShapeRules(draft.playMode ?? "anytime");
   const modeOptions = title?.supportedPlayModes ?? [];
   const terms = useTerms();
+  // The same rule the create and publish services refuse on, shown before the operator gets
+  // there. Evaluated on render, so it is as fresh as the operator's last edit.
+  const startTooSoon = draft.startTime
+    ? scheduledStartTooSoon(
+        { playMode: draft.playMode, playWindowStart: new Date(utcDraftToIso(draft.startTime)) },
+        new Date(),
+      )
+    : null;
 
   return (
     <>
@@ -126,6 +136,12 @@ export function StepSchedule({
         onStartChange={(v) => patch({ startTime: v })}
         onEndChange={(v) => patch({ endTime: v })}
       />
+
+      {startTooSoon ? (
+        <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-200">
+          {startTooSoon}
+        </p>
+      ) : null}
 
       <RoundClockNote
         variant="timing"

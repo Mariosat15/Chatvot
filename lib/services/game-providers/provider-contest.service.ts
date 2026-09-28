@@ -13,6 +13,7 @@ import type { ConfigField } from "@/lib/services/games/config-schema";
 import { resolveGameCategory } from "@/lib/services/games/game-categories";
 import { runPreflight } from "@/lib/services/games/contest-preflight";
 import { resolveContestEntryDeadline } from "@/lib/services/games/entry-deadline";
+import { scheduledStartTooSoon } from "@/lib/services/games/scheduled-start";
 import {
   isPlayModeSupported,
   PLAY_MODE_COPY,
@@ -405,6 +406,11 @@ export async function createProviderContest(
   // changed.
   const playMode = resolveContestPlayMode(input.playMode, title);
   const shape = playShapeRules(playMode);
+  const tooSoon = scheduledStartTooSoon(
+    { playMode, playWindowStart: input.playWindowStart },
+    new Date(),
+  );
+  if (tooSoon) return { success: false, error: tooSoon };
   const roundStartPolicy =
     shape.forcedRoundStartPolicy ?? input.roundStartPolicy ?? "reserve_full_round";
   const attemptsPolicy = shape.forcedAttemptsPolicy ?? input.attemptsPolicy;

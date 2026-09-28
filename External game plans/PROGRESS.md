@@ -912,6 +912,22 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 28 Sep 2026 - A race cannot go live with its start already behind it
+
+**Owner:** "i created a competition all at once and as soon i press play check the screen fix
+it". The screen said **Already started** on a race competition that had just been published.
+
+**What was wrong.** Refusing Play after the gun is correct (`23` s8.8). The defect was that
+**create, publish and edit never checked that a together-start contest's start was still in the
+future**. So the contest went live with its gun behind it, and the lobby had closed before anyone
+could enter it. It was **unplayable by everyone, and no money moved wrongly**. The stuck contest
+must be cancelled with a refund.
+
+**Built.** `scheduledStartTooSoon` in `lib/services/games/scheduled-start.ts` (mirrored and
+byte-identical). It needs a start at least **2 minutes** ahead and applies to together-start
+contests only. It is called by create and publish (both apps), by edit when the start moves, and
+by the wizard as a live warning. 13 tests. Full account in `23` **s8.10**. **Not verified by eye.**
+
 
 ### 28 Sep 2026 - The Game Master wizard offers the admin wizard's round rules
 

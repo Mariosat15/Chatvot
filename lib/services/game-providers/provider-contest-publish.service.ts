@@ -9,6 +9,7 @@ import { parseConfigSchema } from "@/lib/services/games/config-schema";
 import { runPreflight } from "@/lib/services/games/contest-preflight";
 import { contestRoundConfig } from "@/lib/services/games/contest-config";
 import { resolveContestPlayMode } from "@/lib/services/games/play-shape";
+import { scheduledStartTooSoon } from "@/lib/services/games/scheduled-start";
 import type { ProviderContestFields } from "@/lib/services/games/contest-config";
 
 /**
@@ -193,6 +194,20 @@ export async function publishProviderContest(
           "This contest can no longer be published. Fix the problems below and try again.",
         errors: preflight.errors,
       };
+    }
+
+    // Gate 3: a together-start race whose start is already behind it (or about to be) cannot
+    // be played by anyone, because entry and new games close at the start. A draft can sit
+    // past its own start, so this is asked of the stored contest at publish time too.
+    const tooSoon = scheduledStartTooSoon(
+      {
+        playMode: resolveContestPlayMode(contest.playMode, title),
+        playWindowStart: contest.playWindowStart,
+      },
+      new Date(),
+    );
+    if (tooSoon) {
+      return { success: false, error: tooSoon };
     }
 
     // Claim and complete in one instruction, filtered on the status being unchanged.

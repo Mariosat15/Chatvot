@@ -8,6 +8,7 @@ import {
 } from "@/lib/services/games/config-schema";
 import type { ConfigField } from "@/lib/services/games/config-schema";
 import { resolveContestEntryDeadline } from "@/lib/services/games/entry-deadline";
+import { scheduledStartTooSoon } from "@/lib/services/games/scheduled-start";
 import {
   playShapeRules,
   resolveContestPlayMode,
@@ -187,6 +188,13 @@ export async function editProviderContest(
       };
     }
     schemaFields = parsed.fields;
+  }
+  // Only when the start moves: renaming a race already under way must not be refused.
+  if (input.startTime !== undefined || input.playWindowStart !== undefined) {
+    const playMode = title ? resolveContestPlayMode(competition.playMode, title) : competition.playMode;
+    const playWindowStart = input.playWindowStart ?? input.startTime;
+    const tooSoon = scheduledStartTooSoon({ playMode, playWindowStart }, new Date());
+    if (tooSoon) return { success: false, error: tooSoon };
   }
 
   if (input.settings !== undefined) {

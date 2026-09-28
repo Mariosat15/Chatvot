@@ -554,6 +554,34 @@ prize that did not match the published split. None of the fixes names a game.
   stored score stays unset, and ranking treats it as last. See `17` R115 for what this does and
   does not explain about the reported payout.
 
+### 8.10 A race cannot go live with its start already behind it (28 September 2026)
+
+Owner report: a race competition created and published at once, two players entered, and the
+first press of Play said **Already started**, with "Play closes in 6m". **8.8 was working as
+designed**: after the gun there is nothing to join, and only a player already in the lobby races.
+The fault was earlier. **Create, publish and edit never compared the start with the clock**, so
+a `scheduled` contest could go live with its start in the past or seconds away. The lobby
+(`playWindowStart - lobbySeconds`) had then closed before anybody could reach it, and nobody
+could ever play. No money moved wrongly and there is nothing to backfill. The stuck contest has
+to be **cancelled with a refund** and created again.
+
+One rule, `scheduledStartTooSoon` in `lib/services/games/scheduled-start.ts` (mirrored and
+byte-identical, model-free so the wizard can import it). It refuses a together-start contest
+whose start is less than `MIN_SCHEDULED_START_LEAD_SECONDS` (**2 minutes**) away. It never names
+a game, and a play-any-time contest is never refused. It is called in four places:
+
+- **Create** (both `provider-contest.service.ts` copies), before `Competition.create`. This also
+  covers the Game Master route.
+- **Publish** (both `provider-contest-publish.service.ts` copies), before the claim. It judges the
+  contest's **own** stored shape, not the title's default. Auto-publish goes through here too, so a
+  draft created ahead and published late is caught.
+- **Edit** (admin-only), **only when the start moves**. Renaming a race already under way must
+  not be refused.
+- **The wizard's Schedule step** shows the same sentence before the operator presses Create.
+
+Pinned by `__tests__/services/scheduled-start-lead.test.ts` (13 tests): the behaviour, the mirror,
+and the position of each call before its write.
+
 ## 10. Risks
 
 | ID | Risk | Mitigation |
