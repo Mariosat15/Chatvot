@@ -45,7 +45,16 @@ export async function roadTransforms(repo) {
     "tests/simulation.test.mjs": [
       ["Math.abs(a.lateral)<=13.3&&Math.abs(b.lateral)<=13.3", `Math.abs(a.lateral)<=${limit}&&Math.abs(b.lateral)<=${limit}`, 1],
     ],
-    "tests/content.test.mjs": [["Math.abs(p.lane)<=8)", `Math.abs(p.lane)<=${n(8 * S)})`, 1]],
+    "tests/content.test.mjs": [
+      ["Math.abs(p.lane)<=8)", `Math.abs(p.lane)<=${n(8 * S)})`, 1],
+      // Not a width edit: three circuits are appended in velocity-server/src/tracks.js
+      // (28 Sep 2026), so the pinned count moves from fifteen to eighteen, ids still unique.
+      [
+        "test('fifteen unique circuits and a nonrepeating shuffled rotation',()=>{assert.equal(TRACKS.length,15);const a=shuffledTracks(12);assert.equal(new Set(a).size,15);",
+        "test('eighteen unique circuits and a nonrepeating shuffled rotation',()=>{assert.equal(TRACKS.length,18);assert.equal(new Set(TRACKS.map(t=>t.id)).size,18);const a=shuffledTracks(12);assert.equal(new Set(a).size,18);",
+        1,
+      ],
+    ],
     "tests/upgrade21.test.mjs": [["Math.abs(s.lane)+2.5<13.3", `Math.abs(s.lane)+2.5<${limit}`, 1]],
     "tests/circuit-smoothing.test.mjs": [
       ["addScaledVector(f.right,-16)", `addScaledVector(f.right,-${half})`, 1],

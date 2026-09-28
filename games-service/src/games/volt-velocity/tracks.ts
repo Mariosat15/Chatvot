@@ -30,6 +30,9 @@ export const VELOCITY_TRACK_IDS = [
   "coast",
   "desert",
   "grandprix",
+  "aurora",
+  "harbor",
+  "nebula",
 ] as const;
 
 export type VelocityTrackId = (typeof VELOCITY_TRACK_IDS)[number];
@@ -44,6 +47,18 @@ export function isVelocityTrackId(value: unknown): value is VelocityTrackId {
 }
 
 /**
+ * The tracks "auto" chooses between: the original fifteen, frozen and never extended.
+ *
+ * Reason: `trackForSeed` is a modulo over this list's length, and the rounds of one contest are
+ * created by separate requests across its whole life. Growing the list would move an "auto"
+ * contest that is already running onto a different track part-way through, splitting its players
+ * across rooms. Tracks added later are offered by name only.
+ */
+export const AUTO_TRACK_POOL: readonly VelocityTrackId[] = Object.freeze(
+  VELOCITY_TRACK_IDS.slice(0, 15),
+);
+
+/**
  * The track an "auto" contest races on, chosen from the contest's race seed.
  *
  * Derived from the seed rather than drawn at random so every round of one contest - created
@@ -51,8 +66,8 @@ export function isVelocityTrackId(value: unknown): value is VelocityTrackId {
  * of them having to ask the others.
  */
 export function trackForSeed(seed: number): VelocityTrackId {
-  const index = (seed >>> 0) % VELOCITY_TRACK_IDS.length;
+  const index = (seed >>> 0) % AUTO_TRACK_POOL.length;
   // `index` is bounded by the array length on the line above.
   // eslint-disable-next-line security/detect-object-injection
-  return VELOCITY_TRACK_IDS[index];
+  return AUTO_TRACK_POOL[index];
 }

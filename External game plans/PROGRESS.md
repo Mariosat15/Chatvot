@@ -1297,8 +1297,15 @@ no build. The main app needs a rebuild and restart. Then hard refresh. **Never v
     random in a way a purchase could change. Name tags above capsules are readable now.
   - **Tests:** velocity-server 97 pass, 0 fail; the vendor client 83 pass plus its 1 known failure.
     Power-up probes: 9, each red x1.
-  - **Not built yet:** denser and new tracks (step 6) and a lighter download (step 7).
-    **Not verified by eye or live with 16 players.**
+  - **Livelier tracks and three new ones (step 6):** every circuit gains chasing barrier lights,
+    pennants, camera drones and themed weather motes (`client-patches/track-life.js`); Aurora
+    Highway, Neon Harbour and Nebula Drift are appended, so 18 tracks. **"auto" still picks from
+    the original fifteen** (`AUTO_TRACK_POOL`), because it is a modulo over the list and growing it
+    would move a running contest onto another track between rounds. The `trackId` enum grew, so
+    **the catalogue needs a re-sync** after deploy. The vendor smoothness test caught a 56 m
+    hairpin in the first Harbour layout, which was reshaped (shipped radii 124 / 152 / 124 m).
+    Screenshots of all three new tracks rendered with no shader error.
+  - **Step 7, a lighter download:** re-encoded road, wall, night-sky, crowd and cliff textures (all at 35-42 dB PSNR, source files kept, imports redirected). Packed 42.3 -> 32.4 MB; per race aurora 22.2 -> 16.7 MB and canyon 37.0 -> 27.0 MB. **Still open:** the lobby warm-up prefetches every non-music file (24.7 MB now), including cliffs a city track never draws; making it track-aware is a separate decision. **Not verified live with 16 players.**
 - **28 Sep 2026 - (10) End clock, no restart, readable scores, and a non-finisher is not a 0**
   (`23` s8.9, `17` **R115**).
   - **Built:** an "Ends in" countdown on the arena for every game (`ArenaEndsIn.tsx`); the race

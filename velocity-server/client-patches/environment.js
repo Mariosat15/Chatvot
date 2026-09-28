@@ -2,6 +2,7 @@ import understoryURL from '../assets/biome-polish/understory.webp';
 import {grandstandLayouts} from './grandstand-layout.js';
 import {buildMotorsportKit} from './motorsport-kit.js';
 import {buildRoadArrows} from './road-arrows.js';
+import {buildTrackLife} from './track-life.js';
 import {loadScannedCliffs} from './scanned-cliffs.js';
 import limestoneRough from '../assets/landscape/rock_3_rough_2k.webp';
 import limestoneNormal from '../assets/landscape/rock_3_nor_gl_2k.webp';
@@ -58,7 +59,12 @@ export const ENVIRONMENTS={
  canyon:{sky:'dawn',skyTint:0xffd2ab,fog:0xb78b6a,road:0x908071,land:0xbb7250,type:'canyon',label:'RED ROCK · CANYON RUN',sun:2.9},
  foundry:{sky:'night',skyTint:0xb9a1e9,fog:0x201b36,road:0x91849e,land:0x887a9a,type:'foundry',label:'MIDNIGHT FOUNDRY',sun:1.9,tunnel:true},
  eclipse:{sky:'night',skyTint:0x929ff8,fog:0x141a32,road:0x6c7eaa,land:0x69738b,type:'eclipse',label:'LUNAR OBSERVATORY',sun:1.6,planet:true},
- grandprix:{sky:'dawn',skyTint:0xe6f8ff,fog:0x9dadbe,road:0x829caa,land:0xb0c9ce,type:'stadium',label:'CHAMPIONSHIP SKYWAY',sun:2.8}
+ grandprix:{sky:'dawn',skyTint:0xe6f8ff,fog:0x9dadbe,road:0x829caa,land:0xb0c9ce,type:'stadium',label:'CHAMPIONSHIP SKYWAY',sun:2.8},
+ // CHARTVOLT PATCH (28 Sep 2026): the three appended circuits reuse existing scenery types, so
+ // every builder already knows how to dress them; setupEnvironment reads this table by track id.
+ aurora:{sky:'night',skyTint:0x9cffe0,fog:0x0f2433,road:0x7b98a8,land:0xa9d6e8,type:'ice',label:'AURORA HIGHWAY · POLAR NIGHT',sun:1.8,aurora:true},
+ harbor:{sky:'night',skyTint:0xe0a6ff,fog:0x1a1430,road:0x6f7f9c,land:0x5f6f86,type:'city',label:'NEON HARBOUR · MIDNIGHT DOCKS',sun:1.7},
+ nebula:{sky:'night',skyTint:0xd2a8ff,fog:0x170f2e,road:0x80879c,land:0x6e6078,type:'asteroids',label:'NEBULA DRIFT · DEEP SPACE',sun:1.7,planet:true}
 };
 export async function loadEnvironmentAssets(){
  const loader=new T.TextureLoader();await Promise.all([new HDRLoader().loadAsync(sunsetURL).then(t=>{const data=t.image.data;for(let i=0;i<data.length;i+=4){const rgb=[0,1,2].map(k=>T.DataUtils.fromHalfFloat(data[i+k])),peak=Math.max(...rgb),scale=peak>8?8/peak:1;for(let k=0;k<3;k++)data[i+k]=T.DataUtils.toHalfFloat(rgb[k]*scale);}t.needsUpdate=true;sunsetHDR=t;t.mapping=T.EquirectangularReflectionMapping;}),new HDRLoader().loadAsync(hdr).then(t=>{environmentHDR=t;}),...Object.entries({understory:understoryURL,foliage:foliageURL,cloud:cloudURL,rock,rockNormal,dawn,dusk,night,asphalt,asphaltNormal,asphaltRough,concrete,concreteNormal,concreteRough}).map(async([name,url])=>{const t=await loader.loadAsync(url);if(!/Normal|Rough/.test(name))t.colorSpace=T.SRGBColorSpace;textures[name]=t;})]);
@@ -84,7 +90,7 @@ export function setupEnvironment(view){
  float wet=sin(deckUV.x*9.+sin(deckUV.y*2.1))*sin(deckUV.y*5.7);float phase=deckUV.x*720.;float grain=sin(phase)*(1.-smoothstep(.5,3.,fwidth(phase)));roughnessFactor=max(.38,roughnessFactor+grain*.008-wet*.07);`);};
  view.materials.side.map=materialTexture('concrete');view.materials.side.normalMap=materialTexture('concreteNormal');view.materials.side.normalScale.set(.25,.25);view.materials.side.color.setHex(0x516a7e);view.materials.side.metalness=.8;view.materials.side.roughness=.28;
 }
-export function buildEnvironmentProps(view){view.grandstands=grandstandLayouts(view.track);buildArchitecture(view,materialTexture);buildHorizon(view.scene,view.environment.sky==='night',materialTexture);buildCloudCity(view,materialTexture);if(!['jungle','volcano','alpine','coast','desert','canyon'].includes(view.environment.type))buildHeroCity(view,materialTexture);buildLivingWorld(view,materialTexture);buildSkyDetail(view);if(['jungle','alpine'].includes(view.environment.type))buildEcosystem(view,materialTexture);if(view.environment.type==='volcano')buildVolcanicFX(view,materialTexture);buildBiome(view,materialTexture);buildEnvironmentDepth(view,materialTexture);buildReferenceWorld(view,materialTexture);buildImmersiveWorld(view,materialTexture);buildMotorsportKit(view,materialTexture);buildRoadArrows(view);}
+export function buildEnvironmentProps(view){view.grandstands=grandstandLayouts(view.track);buildArchitecture(view,materialTexture);buildHorizon(view.scene,view.environment.sky==='night',materialTexture);buildCloudCity(view,materialTexture);if(!['jungle','volcano','alpine','coast','desert','canyon'].includes(view.environment.type))buildHeroCity(view,materialTexture);buildLivingWorld(view,materialTexture);buildSkyDetail(view);if(['jungle','alpine'].includes(view.environment.type))buildEcosystem(view,materialTexture);if(view.environment.type==='volcano')buildVolcanicFX(view,materialTexture);buildBiome(view,materialTexture);buildEnvironmentDepth(view,materialTexture);buildReferenceWorld(view,materialTexture);buildImmersiveWorld(view,materialTexture);buildMotorsportKit(view,materialTexture);buildRoadArrows(view);buildTrackLife(view);}
 export function createSentinel(){
  const g=new T.Group(),metal=new T.MeshPhysicalMaterial({color:0x9c1234,metalness:.8,roughness:.23,clearcoat:1}),dark=new T.MeshStandardMaterial({color:0x182b3c,metalness:.7,roughness:.32}),glow=new T.MeshBasicMaterial({color:new T.Color(0xff294b).multiplyScalar(2.5)});
  const add=(geo,mat,x=0,y=0,z=0)=>{const m=new T.Mesh(geo,mat);m.position.set(x,y,z);m.castShadow=true;g.add(m);return m;};

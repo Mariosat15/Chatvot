@@ -1,11 +1,13 @@
 // ChartVolt patch (28 Sep 2026): make the single-file build lighter.
 // 1. Six 4K rock textures -> 2K copies (the runtime already caps textures per quality setting).
 // 2. Soundtrack ships MP3 only (every browser decodes it); the OGG copies were a second copy of the same music.
-// The 4K and OGG source files stay on disk untouched - only the imports change - so this is reversible.
+// 3-4. Step 7: lighter copies of the road, wall, night-sky, crowd and cliff textures (see below).
+// The 4K, OGG and other source files stay on disk untouched - only the imports change - so this is reversible.
 import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
+import { reencodeGlbImages } from "./chartvolt-lighten-glb.mjs";
 
 const require = createRequire(path.resolve("C:/Users/cybes/Desktop/TradingApp/Chartvolt/package.json"));
 const sharp = require("sharp");
@@ -43,4 +45,49 @@ audio = audio.replace(
 );
 if (audio.includes(".ogg'") || !audio.includes("sources=fallbacks")) throw new Error("audio.js patch did not apply");
 fs.writeFileSync("src/audio.js", audio, "utf8");
+
+// 3. Step 7 (28 Sep 2026): lighter copies of the heaviest textures. Measured before choosing:
+//    colour/roughness at q80 and normal maps at q88 stay at 35-42 dB PSNR. Same resolution,
+//    so the crowd atlas's pixel boxes in crowd/manifest.json stay valid.
+const mb = (n) => (n / 1048576).toFixed(2);
+const sha = (file) => createHash("sha256").update(fs.readFileSync(file)).digest("hex");
+const qualityFor = (name) => (name.includes("nor") ? 88 : 80);
+function register(dir, name) {
+  const file = path.join(dir, "manifest.json");
+  const m = JSON.parse(fs.readFileSync(file, "utf8"));
+  m.sha256[name] = sha(path.join(dir, name));
+  fs.writeFileSync(file, JSON.stringify(m, null, 2) + "\n");
+}
+const lighter = [
+  ["src/environment.js", "assets/environment", "sky-night.webp", {}],
+  ["src/environment.js", "assets/architecture", "asphalt_02_diff_2k.webp", {}],
+  ["src/environment.js", "assets/architecture", "asphalt_02_nor_gl_2k.webp", {}],
+  ["src/environment.js", "assets/architecture", "asphalt_02_rough_2k.webp", {}],
+  ["src/environment.js", "assets/architecture", "concrete_wall_007_diff_2k.webp", {}],
+  ["src/environment.js", "assets/architecture", "concrete_wall_007_nor_gl_2k.webp", {}],
+  ["src/environment.js", "assets/architecture", "concrete_wall_007_rough_2k.webp", {}],
+  // Reason: the crowd is alpha-tested, so the edge mask is kept lossless-grade (alphaQuality 100).
+  ["src/spectators.js", "assets/crowd", "seated-spectators.png", { quality: 88, alphaQuality: 100 }],
+];
+for (const [src, dir, name, options] of lighter) {
+  const outName = name.replace(/\.(webp|png)$/, "_cv.webp");
+  const from = path.join(dir, name);
+  const to = path.join(dir, outName);
+  await sharp(from).webp({ quality: qualityFor(name), effort: 6, ...options }).toFile(to);
+  register(dir, outName);
+  replaceOnce(src, `${dir.replace("assets/", "")}/${name}'`, `${dir.replace("assets/", "")}/${outName}'`);
+  console.log(`${to}  ${mb(fs.statSync(from).size)} MB -> ${mb(fs.statSync(to).size)} MB`);
+}
+
+// 4. The two scanned cliffs carry three 2K WebP textures each inside the .glb; re-encode those.
+for (const base of ["rock_face_01", "rock_face_02"]) {
+  const dir = "assets/scanned-cliffs";
+  const from = path.join(dir, `${base}.glb`);
+  const to = path.join(dir, `${base}_cv.glb`);
+  await reencodeGlbImages(from, to, (name, bytes) =>
+    sharp(bytes).webp({ quality: qualityFor(name), effort: 6 }).toBuffer());
+  register(dir, `${base}_cv.glb`);
+  replaceOnce("src/scanned-cliffs.js", `scanned-cliffs/${base}.glb'`, `scanned-cliffs/${base}_cv.glb'`);
+  console.log(`${to}  ${mb(fs.statSync(from).size)} MB -> ${mb(fs.statSync(to).size)} MB`);
+}
 console.log("lighten patch applied");

@@ -15,7 +15,13 @@ export const TRACKS=[
  {id:'alpine',name:'ALPINE ASCENT',theme:'alpine',difficulty:3,color:0xc6f5ff,accent:0x83a4ff},
  {id:'coast',name:'AZURE ARCHIPELAGO',theme:'coast',difficulty:2,color:0x4fffe5,accent:0xffcf8a},
  {id:'desert',name:'DUNE SERPENT',theme:'desert',difficulty:3,color:0xffc778,accent:0xee7965},
- {id:'grandprix',name:'VOLT GRAND PRIX',theme:'city',difficulty:3,color:0x62ffce,accent:0x74a4ff}
+ {id:'grandprix',name:'VOLT GRAND PRIX',theme:'city',difficulty:3,color:0x62ffce,accent:0x74a4ff},
+ // CHARTVOLT PATCH (28 Sep 2026, owner: "create more beautiful tracks"). Appended, never inserted:
+ // layouts[] is matched by index, and the ChartVolt "auto" pick draws from a frozen list of the
+ // first fifteen ids (games-service AUTO_TRACK_POOL), so these three are chosen by name only.
+ {id:'aurora',name:'AURORA HIGHWAY',theme:'ice',difficulty:2,color:0x6dffc8,accent:0xb58cff},
+ {id:'harbor',name:'NEON HARBOUR',theme:'city',difficulty:2,color:0xff5fb7,accent:0x49e3ff},
+ {id:'nebula',name:'NEBULA DRIFT',theme:'rock',difficulty:3,color:0xc07bff,accent:0x5dfff0}
 ];
 export function rng(seed){let a=seed>>>0;return ()=>{a+=0x6D2B79F5;let t=a;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return ((t^t>>>14)>>>0)/4294967296;};}
 export function shuffledTracks(seed){const a=TRACKS.map(t=>t.id),r=rng(seed);for(let i=a.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
@@ -40,7 +46,10 @@ const layouts=[
  {scale:88,rise:1.6,label:'Alpine climb · ridge switchbacks · summit descent',p:[[-11,-8,40],[-7,-8,40],[-3,-8,46],[0,-6,70],[1,-3,105],[4,-2,134],[7,-4,160],[11,-2,176],[12,2,173],[9,5,151],[6,4,124],[4,7,98],[5,10,65],[2,13,49],[-2,12,64],[-4,9,94],[-7,8,122],[-10,10,147],[-13,7,144],[-13,3,111],[-11,0,77],[-13,-4,45]]},
  {scale:83,rise:1.25,label:'Seafront straight · island hook · tidal esses',p:[[-10,-6,32],[-6,-6,32],[-2,-6,37],[2,-6,52],[6,-4,82],[8,-1,109],[11,1,119],[11,5,104],[8,8,71],[4,8,43],[2,5,32],[-1,5,40],[-3,8,63],[-6,10,90],[-10,9,106],[-12,6,87],[-11,2,57],[-12,-2,33]]},
  {scale:86,rise:1.25,label:'Dune straight · oasis return · sandstone slalom',p:[[-11,-7,35],[-7,-7,35],[-3,-7,42],[1,-6,63],[3,-3,90],[6,-2,118],[9,-4,125],[12,-1,106],[11,3,78],[8,5,54],[5,4,38],[3,7,48],[4,10,72],[1,13,95],[-3,12,119],[-5,9,116],[-8,8,94],[-11,10,74],[-14,7,53],[-14,3,40],[-12,0,35],[-13,-4,35]]},
- {scale:81,rise:1.2,label:'Grandstand straight · technical infield · stadium climb',p:[[-12,-7,38],[-8,-7,38],[-4,-7,38],[0,-7,47],[3,-6,68],[6,-4,95],[7,-1,112],[6,2,103],[3,3,77],[1,1,54],[0,-2,43],[-3,-3,54],[-5,-1,78],[-4,2,108],[-2,4,132],[0,6,140],[3,7,120],[4,10,91],[1,13,65],[-3,13,45],[-5,10,38],[-6,7,45],[-9,6,70],[-12,8,95],[-15,6,89],[-16,2,65],[-14,-2,40],[-14,-5,38]]}
+ {scale:81,rise:1.2,label:'Grandstand straight · technical infield · stadium climb',p:[[-12,-7,38],[-8,-7,38],[-4,-7,38],[0,-7,47],[3,-6,68],[6,-4,95],[7,-1,112],[6,2,103],[3,3,77],[1,1,54],[0,-2,43],[-3,-3,54],[-5,-1,78],[-4,2,108],[-2,4,132],[0,6,140],[3,7,120],[4,10,91],[1,13,65],[-3,13,45],[-5,10,38],[-6,7,45],[-9,6,70],[-12,8,95],[-15,6,89],[-16,2,65],[-14,-2,40],[-14,-5,38]]},
+ {scale:91,rise:1.3,label:'Polar straight · aurora sweep · glacier crest',p:[[-9,-6,38],[-5,-6,38],[-1,-6,44],[3,-6,60],[7,-5,84],[10,-2,100],[10,2,96],[7,4,78],[4,3,60],[1,4,48],[0,7,52],[2,10,70],[-1,12,92],[-5,11,104],[-8,8,90],[-9,4,66],[-12,2,50],[-12,-3,40]]},
+ {scale:82,rise:1.2,label:'Dockside sprint · crane chicane · harbour-light climb',p:[[-11,-6,34],[-7,-6,34],[-3,-6,34],[1,-6,40],[5,-5,56],[8,-2,74],[8,2,80],[5,4,70],[2,3,54],[-1,4,44],[-2,7,50],[1,9,64],[3,12,78],[1,15,90],[-3,15,84],[-6,11,66],[-9,10,54],[-12,7,44],[-13,2,38],[-12,-3,34]]},
+ {scale:91,rise:1.3,label:'Starfield straight · drifting esses · nebula dive',p:[[-8,-7,40],[-4,-7,40],[0,-7,48],[4,-6,70],[8,-4,96],[10,0,112],[9,4,108],[6,6,90],[6,9,72],[3,11,58],[-1,10,50],[-2,7,62],[-1,4,80],[-4,2,96],[-8,3,100],[-10,6,86],[-13,4,66],[-13,0,50],[-11,-4,40]]}
 ];
 TRACKS.forEach((t,index)=>{const l=layouts[index];
  // One conservative fairing pass broadens only abrupt control corners; it does

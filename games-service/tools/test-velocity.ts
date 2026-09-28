@@ -137,7 +137,9 @@ async function main(): Promise<number> {
   await startService({ sandbox: true });
   const { callbackUrl } = await import("./api-harness");
   const { Round } = await import("../src/store/round.model");
-  const { VELOCITY_TRACK_IDS } = await import("../src/games/volt-velocity/tracks");
+  const { VELOCITY_TRACK_IDS, AUTO_TRACK_POOL, trackForSeed } = await import(
+    "../src/games/volt-velocity/tracks"
+  );
   const { verifyReceipt, scoreForEntry } = await import("../src/games/volt-velocity/race-server");
   const { latestRaceStart, parseStartWait } = await import("../src/games/volt-velocity/launch");
 
@@ -152,6 +154,18 @@ async function main(): Promise<number> {
       JSON.stringify(theirs) === JSON.stringify([...VELOCITY_TRACK_IDS]),
       `track drift: race server ${theirs.join(",")} vs ours ${VELOCITY_TRACK_IDS.join(",")}`,
     );
+  });
+
+  // Reason: "auto" is a modulo over the pool, so a pool that grew with the track list would move
+  // a running contest onto a different track between two of its rounds.
+  await test("auto picks from the original fifteen tracks, whatever is added later", () => {
+    const original = VELOCITY_TRACK_IDS.slice(0, 15);
+    assert(JSON.stringify([...AUTO_TRACK_POOL]) === JSON.stringify(original), "auto pool changed");
+    assert(Object.isFrozen(AUTO_TRACK_POOL), "auto pool is not frozen");
+    for (let seed = 0; seed < 60; seed += 1) {
+      assert(trackForSeed(seed) === original[seed % 15], `seed ${seed} moved to ${trackForSeed(seed)}`);
+    }
+    assert(!AUTO_TRACK_POOL.includes("nebula"), "a new track leaked into auto");
   });
 
   await test("practice mode is refused before any seat is taken", async () => {

@@ -42,7 +42,9 @@ try {
     const page = await browser.newPage({ viewport: { width: size.width, height: size.height }, isMobile: !!size.touch, hasTouch: !!size.touch });
     page.setDefaultTimeout(120000);
     page.on("pageerror", (e) => problems.push(`${size.name}: ${e.message}`));
-    await page.goto("http://127.0.0.1:4189/?qa=1&track=orbital&seed=123");
+    // three.js reports a shader that fails to compile as a console error, not a page error.
+    page.on("console", (m) => { if (m.type() === "error") problems.push(`${size.name}: console ${m.text().slice(0, 300)}`); });
+    await page.goto(`http://127.0.0.1:4189/?qa=1&track=${process.env.QA_TRACK ?? "orbital"}&seed=123`);
     await page.waitForFunction(() => window.__READY__);
     await page.evaluate(() => { document.getElementById("quality").value = ".8"; });
     if (which !== "race") {

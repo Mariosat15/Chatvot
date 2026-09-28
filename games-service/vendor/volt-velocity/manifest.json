@@ -16,24 +16,24 @@
       "note": "1536x1024 kept"
     },
     {
-      "file": "f68e7d82f61129da.png",
-      "type": "image/png",
-      "bytes": 1546435,
-      "originalBytes": 1546435,
+      "file": "3683971b9d292b4a.webp",
+      "type": "image/webp",
+      "bytes": 363010,
+      "originalBytes": 363010,
       "note": "1254x1254 kept"
     },
     {
-      "file": "6787ac65e78b28af.glb",
+      "file": "a7fdc6e39749530d.glb",
       "type": "application/octet-stream",
-      "bytes": 4850496,
-      "originalBytes": 4850496,
+      "bytes": 2579020,
+      "originalBytes": 2579020,
       "note": "copied"
     },
     {
-      "file": "4bf0edc0b750ca4e.glb",
+      "file": "2eb1b83a2d28ad9e.glb",
       "type": "application/octet-stream",
-      "bytes": 5313100,
-      "originalBytes": 5313100,
+      "bytes": 2910128,
+      "originalBytes": 2910128,
       "note": "copied"
     },
     {
@@ -114,53 +114,53 @@
       "note": "4096x2048 re-encoded"
     },
     {
-      "file": "ed5354385939e611.webp",
+      "file": "bdb6d9cbfbaff06f.webp",
       "type": "image/webp",
-      "bytes": 1696676,
-      "originalBytes": 2605970,
-      "note": "4096x2048 re-encoded"
+      "bytes": 780446,
+      "originalBytes": 780446,
+      "note": "4096x2048 kept"
     },
     {
-      "file": "f2a160b0d142107e.webp",
+      "file": "62a17b2f37bef18c.webp",
       "type": "image/webp",
-      "bytes": 2480064,
-      "originalBytes": 2480064,
+      "bytes": 1489474,
+      "originalBytes": 1489474,
       "note": "2048x2048 kept"
     },
     {
-      "file": "35b916a7d1bf9034.webp",
+      "file": "56196ac7e2fd8019.webp",
       "type": "image/webp",
-      "bytes": 2496974,
-      "originalBytes": 2496974,
+      "bytes": 1693028,
+      "originalBytes": 1693028,
       "note": "2048x2048 kept"
     },
     {
-      "file": "bcc8079c2296c1a5.webp",
+      "file": "1fdba8b3899aa911.webp",
       "type": "image/webp",
-      "bytes": 1900090,
-      "originalBytes": 1900090,
+      "bytes": 1077322,
+      "originalBytes": 1077322,
       "note": "2048x2048 kept"
     },
     {
-      "file": "9980a957daf5b157.webp",
+      "file": "b41bf18cd64eb4ef.webp",
       "type": "image/webp",
-      "bytes": 1025170,
-      "originalBytes": 1449962,
-      "note": "2048x2048 re-encoded"
+      "bytes": 521116,
+      "originalBytes": 521116,
+      "note": "2048x2048 kept"
     },
     {
-      "file": "5dd23c6e10ad5cc5.webp",
+      "file": "350ad8093d91b2d3.webp",
       "type": "image/webp",
-      "bytes": 483130,
-      "originalBytes": 727030,
-      "note": "2048x2048 re-encoded"
+      "bytes": 353250,
+      "originalBytes": 353250,
+      "note": "2048x2048 kept"
     },
     {
-      "file": "de95f6914329760f.webp",
+      "file": "d85fc5087221ef1c.webp",
       "type": "image/webp",
-      "bytes": 761236,
-      "originalBytes": 1089586,
-      "note": "2048x2048 re-encoded"
+      "bytes": 304810,
+      "originalBytes": 304810,
+      "note": "2048x2048 kept"
     },
     {
       "file": "206c67e3a1b99228.hdr",
