@@ -88,12 +88,51 @@ const START_COUNTDOWN_AND_MARGIN_MS = 10_000 + 30_000;
  * still END before this round expires, or the round can never be scored. So the room is told
  * the latest start that leaves a full-length race (laps x 100 s) and the countdown inside the
  * round. Never before the scheduled start itself, and never past the race server's horizon.
+ *
+ * `startWaitSeconds` is the platform's waiting limit for the contest (HTML v1.24): past it with
+ * fewer than two pilots Ready, the platform cancels the competition and refunds everyone, so
+ * the room must give up at the same moment rather than keep a lone pilot waiting for a race
+ * that has already been refunded. Absent means no limit beyond the round itself.
  */
-export function latestRaceStart(scheduledStartAt: Date, expiresAt: Date, laps: number): Date {
+export function latestRaceStart(
+  scheduledStartAt: Date,
+  expiresAt: Date,
+  laps: number,
+  startWaitSeconds?: number,
+): Date {
   const raceMs = laps * VELOCITY_SECONDS_PER_LAP * 1000;
   const latest = expiresAt.getTime() - raceMs - START_COUNTDOWN_AND_MARGIN_MS;
-  const bounded = Math.min(latest, scheduledStartAt.getTime() + MAX_SCHEDULE_AHEAD_MS);
+  const waitCap =
+    startWaitSeconds === undefined
+      ? Number.POSITIVE_INFINITY
+      : scheduledStartAt.getTime() + startWaitSeconds * 1000;
+  const bounded = Math.min(latest, scheduledStartAt.getTime() + MAX_SCHEDULE_AHEAD_MS, waitCap);
   return new Date(Math.max(scheduledStartAt.getTime(), bounded));
+}
+
+/** The platform's permitted waiting limits, in seconds (HTML v1.24). */
+export const MIN_START_WAIT_SECONDS = 60;
+export const MAX_START_WAIT_SECONDS = 900;
+
+/**
+ * `startWaitSeconds` is optional, and meaningful only beside `scheduledStartAt`. A value outside
+ * the permitted range is refused rather than clamped: a clamped limit is a deadline the platform
+ * never chose, and the two sides would then cancel at different moments.
+ */
+export function parseStartWait(value: unknown, scheduledStartAt: Date | undefined): number | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (
+    typeof value !== "number" ||
+    !Number.isInteger(value) ||
+    value < MIN_START_WAIT_SECONDS ||
+    value > MAX_START_WAIT_SECONDS
+  ) {
+    throw badRequest("'startWaitSeconds' must be a whole number of seconds from 60 to 900.");
+  }
+  if (!scheduledStartAt) {
+    throw badRequest("'startWaitSeconds' is only valid with 'scheduledStartAt'.");
+  }
+  return value;
 }
 
 /**
@@ -112,10 +151,13 @@ export async function seatVelocityPlayer(
   displayName: string | undefined,
   expiresAt: Date,
   soloRoundId?: string,
+  startWaitSeconds?: number,
 ): Promise<VelocitySeat> {
   const velocity = requireVelocityConfig();
   const laps = lapsOf(config);
-  const latestStartAt = scheduledStartAt ? latestRaceStart(scheduledStartAt, expiresAt, laps) : undefined;
+  const latestStartAt = scheduledStartAt
+    ? latestRaceStart(scheduledStartAt, expiresAt, laps, startWaitSeconds)
+    : undefined;
   const identity = raceIdentity(
     gameCode,
     contentSeed,

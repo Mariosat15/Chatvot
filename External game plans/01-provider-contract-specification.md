@@ -442,6 +442,15 @@ rather than starting their clock on arrival. `expiresAt` is measured from
 `max(now, scheduledStartAt)`, so an early arrival does not lose playing time. Absent on
 every `anytime` round.
 
+`startWaitSeconds` is **optional and new in requirements HTML v1.24**, sent only beside
+`scheduledStartAt`: a whole number of seconds from 60 to 900 (default 300), set per contest
+by the operator. It is how long after `scheduledStartAt` a game that needs **two ready
+players** may keep waiting for them. Past it with play never begun, **ChartVolt cancels the
+competition and refunds every entry fee in full**, from its own round records, whatever the
+game does. The game should give up at the same moment and end every open round (voided, no
+score) rather than hold a lone player in a race that has already been refunded. A game that
+starts at `scheduledStartAt` regardless may ignore it.
+
 `contestType` is **optional and new in requirements HTML v1.22**: one of `"competition"`,
 `"challenge"` or `"practice"`, telling the game which kind of contest the round belongs
 to. A game that plays the same way in every contest ignores it. A multiplayer game uses

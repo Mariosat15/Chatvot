@@ -9,6 +9,7 @@
 import type { ConfigField } from "@/lib/services/games/config-schema";
 import { resolveAttemptSeconds } from "@/lib/services/games/config-schema";
 import type { PlayMode } from "@/lib/services/games/play-shape";
+import { DEFAULT_START_WAIT_SECONDS } from "@/lib/services/games/start-wait";
 import {
   deriveResultGraceSeconds as deriveGraceFromFloor,
   isoToUtcDraft,
@@ -73,6 +74,12 @@ export interface ContestDraft {
   unresolvedRoundPolicy: "score_zero" | "exclude" | "hold_and_alert";
   unscoredContestPolicy: UnscoredContestPolicy;
   roundStartPolicy: RoundStartPolicy;
+  /**
+   * Together-start contests only: how many minutes play may wait for two ready players before
+   * the contest is cancelled and every player refunded in full (owner rule, 28 Sep 2026).
+   * Minutes on screen, seconds on the wire.
+   */
+  startWaitMinutes: number;
   resultGracePeriodSeconds: number;
   perRoundCostAcknowledged: boolean;
 
@@ -124,6 +131,7 @@ export const emptyDraft: ContestDraft = {
   // ceiling that could be five times the configured length; that arithmetic is fixed, so the
   // reservation now costs a player only the time they were actually going to be given.
   roundStartPolicy: "reserve_full_round",
+  startWaitMinutes: DEFAULT_START_WAIT_SECONDS / 60,
   // A floor, not the value sent. `deriveResultGraceSeconds` raises it to cover the playing
   // time the operator chooses; this covers a ten-minute session, which is the default.
   resultGracePeriodSeconds: 900,
@@ -195,6 +203,12 @@ export function toRequestBody(
     unresolvedRoundPolicy: draft.unresolvedRoundPolicy,
     unscoredContestPolicy: draft.unscoredContestPolicy,
     roundStartPolicy: draft.roundStartPolicy,
+    // How long a together-start contest waits for two ready players before it is cancelled
+    // and refunded in full. Scheduled contests only, and create only: an edit must not move
+    // the deadline players entered under.
+    ...(draft.playMode === "scheduled"
+      ? { startWaitSeconds: Math.round(draft.startWaitMinutes * 60) }
+      : {}),
     resultGracePeriodSeconds: deriveResultGraceSeconds(
       draft,
       resolveAttemptSeconds(

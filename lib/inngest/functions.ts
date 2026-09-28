@@ -366,6 +366,18 @@ export const updateCompetitionStatuses = inngest.createFunction(
         }
       }
 
+      // Reason: a together-start contest that never began within its waiting limit is
+      // cancelled and refunded in full. It runs BEFORE finalization so a short contest is
+      // refunded rather than settled as "nobody scored" under its unscored-contest policy.
+      try {
+        const { cancelUnstartedTogetherContests } =
+          await import("@/lib/services/games/together-start-cancel.service");
+        const waitResult = await cancelUnstartedTogetherContests();
+        cancelledCount += waitResult.cancelled;
+      } catch (waitError) {
+        console.error("❌ Error cancelling unstarted together-start contests:", waitError);
+      }
+
       // Finalize active → completed (when endTime has passed)
       // This will close all positions and distribute prizes
       const finalizationResult = await checkAndFinalizeCompetitions();

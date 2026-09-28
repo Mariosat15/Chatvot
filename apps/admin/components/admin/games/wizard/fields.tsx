@@ -63,6 +63,7 @@ export function NumberField({
   iconClassName,
   hint,
   min,
+  max,
 }: {
   label: string;
   value: number | undefined;
@@ -71,6 +72,7 @@ export function NumberField({
   iconClassName?: string;
   hint?: ReactNode;
   min?: number;
+  max?: number;
 }) {
   return (
     <FieldShell
@@ -82,6 +84,7 @@ export function NumberField({
       <Input
         type="number"
         min={min}
+        max={max}
         value={value === undefined ? "" : String(value)}
         onChange={(e) => onChange(Number(e.target.value))}
         className="bg-gray-800 border-gray-600 text-gray-100 h-12"

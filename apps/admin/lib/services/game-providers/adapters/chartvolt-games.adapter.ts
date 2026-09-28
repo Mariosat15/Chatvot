@@ -363,7 +363,12 @@ export class ChartVoltGamesAdapter implements GameProviderAdapter {
         // Omitted rather than sent as null when the contest is not scheduled, so a non-scheduled
         // round's body is byte-for-byte what it was before 1.21.
         ...(request.scheduledStartAt
-          ? { scheduledStartAt: request.scheduledStartAt.toISOString() }
+          ? {
+              scheduledStartAt: request.scheduledStartAt.toISOString(),
+              ...(request.startWaitSeconds !== undefined
+                ? { startWaitSeconds: request.startWaitSeconds }
+                : {}),
+            }
           : {}),
         resultCallbackUrl: request.resultCallbackUrl,
         progressCallbackUrl: request.progressCallbackUrl,

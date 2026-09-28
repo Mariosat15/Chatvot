@@ -1,4 +1,5 @@
 import type { RoundContestConfig } from "./round-types";
+import { resolveStartWaitSeconds } from "./start-wait";
 
 /**
  * Reads a stored contest's round settings, closing the deferral X3 recorded.
@@ -32,6 +33,8 @@ export interface ProviderContestFields {
   roundStartPolicy?: string;
   /** The shape the contest was created as. Only `scheduled` has a start everyone shares. */
   playMode?: string;
+  /** Together-start contests only. See `start-wait.ts`. */
+  startWaitSeconds?: number;
 }
 
 /**
@@ -124,7 +127,12 @@ export function contestRoundConfig(
       // Only the STORED shape decides, never the title's: a title supporting both shapes
       // (task 11) must not turn a staggered time trial into a held start.
       ...(contest.playMode === "scheduled" && contest.playWindowStart
-        ? { scheduledStartAt: contest.playWindowStart }
+        ? {
+            scheduledStartAt: contest.playWindowStart,
+            // The game gives up waiting for ready players at the same limit the platform
+            // cancels and refunds on, so the two cannot disagree about when play is off.
+            startWaitSeconds: resolveStartWaitSeconds(contest.startWaitSeconds),
+          }
         : {}),
       contentSeed: contest.contentSeed,
       // Reason for the explicit comparison rather than a cast: an unrecognised stored value

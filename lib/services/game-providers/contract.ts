@@ -181,6 +181,13 @@ export interface CreateRoundRequest {
    */
   scheduledStartAt?: Date;
   /**
+   * How long after `scheduledStartAt` the provider may keep waiting for enough ready players -
+   * requirements HTML 1.24. Sent only beside `scheduledStartAt`. Past it we cancel the contest
+   * and refund every player in full, so play must not begin later than this. Absent means the
+   * provider's own limit applies, which keeps a provider ignoring it conformant.
+   */
+  startWaitSeconds?: number;
+  /**
    * What kind of contest this round belongs to - requirements HTML 1.22.
    *
    * Optional and informational: nothing about scoring depends on it. It exists because a

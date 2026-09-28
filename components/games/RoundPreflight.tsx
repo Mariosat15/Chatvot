@@ -164,6 +164,10 @@ export function RoundPreflight({
     rule as the launch service, never a second one. `draft` is excluded because the launch
     service admits only `upcoming` and `active`.
   */
+  const startWaitEndsParsed = state.startWaitEndsAt
+    ? new Date(state.startWaitEndsAt).getTime()
+    : NaN;
+  const startWaitEndsMs = Number.isFinite(startWaitEndsParsed) ? startWaitEndsParsed : null;
   const lobbyOpensMs = state.lobbyOpensAt
     ? new Date(state.lobbyOpensAt).getTime()
     : null;
@@ -390,6 +394,21 @@ export function RoundPreflight({
                   closed and scored on what you managed.
                 </p>
               ))}
+            {/*
+              THE WAITING LIMIT (owner rule, 28 Sep 2026). A together-start contest waits for two
+              ready players, but not for ever: past this moment with play never begun, it is
+              cancelled and every entry fee returned in full. Stated only when the server sends
+              the deadline, which it does for a stored `scheduled` contest alone.
+            */}
+            {playsTogether && startWaitEndsMs !== null && (
+              <p className="text-xs text-gray-500">
+                If fewer than two players are ready by{" "}
+                <span className="tabular-nums text-gray-300">
+                  {new Date(startWaitEndsMs).toUTCString()}
+                </span>
+                , the competition is cancelled and everyone gets their full entry fee back.
+              </p>
+            )}
           </div>
         </div>
       )}

@@ -170,6 +170,9 @@ export interface ICompetition extends Document {
   playMode?: "anytime" | "scheduled";
   /** Scheduled contests only. Copied from the title at creation. */
   lobbySeconds?: number;
+  /** Scheduled contests only. How long play may wait for two ready players before the
+   *  contest is cancelled and refunded in full (see `start-wait.ts`). Absent reads the default. */
+  startWaitSeconds?: number;
 
   // Competition Rules & Ranking
   rules: {
@@ -545,6 +548,9 @@ const CompetitionSchema = new Schema<ICompetition>(
     // DEFAULT: absent on an anytime contest is the true answer (there is no lobby), and a
     // scheduled contest predating the field reads the platform default via `resolveLobbySeconds`.
     lobbySeconds: { type: Number },
+    // No default, deliberately: absent on an anytime contest is the true answer, and a scheduled
+    // contest predating the field reads the platform default via `resolveStartWaitSeconds`.
+    startWaitSeconds: { type: Number },
     rules: {
       rankingMethod: {
         type: String,

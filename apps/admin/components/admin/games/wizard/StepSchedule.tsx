@@ -1,6 +1,10 @@
 "use client";
 
-import { Coins, Percent, Users } from "lucide-react";
+import { Coins, Percent, Timer, Users } from "lucide-react";
+import {
+  MAX_START_WAIT_SECONDS,
+  MIN_START_WAIT_SECONDS,
+} from "@/lib/services/games/start-wait";
 import {
   playShapeRules,
   type PlayMode,
@@ -167,6 +171,24 @@ export function StepSchedule({
         codebase keeps finding, after a provider with no adapter and a `rankingMethod` a
         provider game ignores.
       */}
+      {/*
+        Together-start only: play waits for two ready players, and this is how long. Past it
+        the contest is cancelled and every entry fee refunded in full (owner rule, 28 Sep
+        2026). Withheld on any other shape, where nothing waits.
+      */}
+      {draft.playMode === "scheduled" ? (
+        <NumberField
+          label="Waiting limit (minutes)"
+          value={draft.startWaitMinutes}
+          onChange={(v) => patch({ startWaitMinutes: v })}
+          icon={Timer}
+          iconClassName="text-cyan-400"
+          min={MIN_START_WAIT_SECONDS / 60}
+          max={MAX_START_WAIT_SECONDS / 60}
+          hint={`From ${MIN_START_WAIT_SECONDS / 60} to ${MAX_START_WAIT_SECONDS / 60}. If fewer than two ${terms.players} are ready this long after the start, the ${terms.contest} is cancelled and every ${terms.entryFee} is refunded in full, with no platform fee taken.`}
+        />
+      ) : null}
+
       {shape.offersRoundStartPolicy ? (
         <RoundStartPolicyField
           value={draft.roundStartPolicy}

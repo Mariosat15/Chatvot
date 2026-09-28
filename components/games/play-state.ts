@@ -68,6 +68,8 @@ export interface PlayState {
   playWindowEnd?: string;
   /** Scheduled races only: when a seated player may first open the game. */
   lobbyOpensAt?: string;
+  /** Scheduled contests only: cancelled and fully refunded if two players are not ready by then. */
+  startWaitEndsAt?: string;
   /** Whether everyone plays together from one start. See the service's copy. */
   playMode?: "anytime" | "scheduled";
   /**

@@ -282,6 +282,12 @@ export interface RoundContestConfig {
    * it. Absent on every other contest, which keeps their rounds exactly as they were.
    */
   scheduledStartAt?: Date;
+  /**
+   * How long after `scheduledStartAt` play may wait for two ready players, scheduled contests
+   * only (requirements 1.24, owner rule 28 Sep 2026). Past it the platform cancels the contest
+   * and refunds everybody in full, so the game is told to give up at the same moment.
+   */
+  startWaitSeconds?: number;
   /** Shared by every round in the contest, so all players face identical content. */
   contentSeed?: string;
   /**

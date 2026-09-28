@@ -11,6 +11,7 @@ import { attemptsPermitted } from "./round.service";
 import { contestRoundConfig, isProviderContest } from "./contest-config";
 import { resolveAttemptSecondsFromSchema } from "./config-schema";
 import { lobbyOpensAt } from "./play-shape";
+import { startWaitDeadline } from "./start-wait";
 import type { ProviderContestFields } from "./contest-config";
 
 /**
@@ -138,6 +139,11 @@ export interface PlayState {
    */
   lobbyOpensAt?: string;
   /**
+   * A scheduled contest only: if fewer than two players are ready by this moment, the
+   * contest is cancelled and every entry fee refunded in full. Absent for any other shape.
+   */
+  startWaitEndsAt?: string;
+  /**
    * Whether everyone plays together from one start (`scheduled`) or each player whenever they
    * like (`anytime`). A competition reads its OWN stored mode (absent means `anytime`, as
    * `lobbyOpensAt` reads it); a challenge reads the title's. Screens use it to state the rule
@@ -227,6 +233,7 @@ export async function getPlayState(
           isPaused?: boolean;
           pauseReason?: string;
           lobbySeconds?: number;
+          startWaitSeconds?: number;
         })
       | null
     >();
@@ -355,6 +362,7 @@ export async function getPlayState(
               lobbySeconds: contest.lobbySeconds,
             })?.toISOString()
           : undefined,
+        startWaitEndsAt: startWaitDeadline(contest)?.toISOString(),
         playMode: contest.playMode === "scheduled" ? "scheduled" : "anytime",
         // Passed through, never defaulted. See the field's declaration.
         participantScore: participant.score,

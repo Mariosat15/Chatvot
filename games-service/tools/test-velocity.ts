@@ -139,7 +139,7 @@ async function main(): Promise<number> {
   const { Round } = await import("../src/store/round.model");
   const { VELOCITY_TRACK_IDS } = await import("../src/games/volt-velocity/tracks");
   const { verifyReceipt, scoreForEntry } = await import("../src/games/volt-velocity/race-server");
-  const { latestRaceStart } = await import("../src/games/volt-velocity/launch");
+  const { latestRaceStart, parseStartWait } = await import("../src/games/volt-velocity/launch");
 
   console.log("Volt Velocity against the real race server");
 
@@ -323,6 +323,37 @@ async function main(): Promise<number> {
     assert(latestRaceStart(start, tight, 3).getTime() === start.getTime(), "latest start fell before the start");
     const far = new Date(start.getTime() + 24 * 3_600_000);
     assert(latestRaceStart(start, far, 1).getTime() === start.getTime() + 6 * 3_600_000, "past the 6 h horizon");
+  });
+
+  await test("the platform's waiting limit caps the latest start, and a bad limit is refused", () => {
+    const start = new Date("2026-09-28T12:00:00Z");
+    const hourLater = new Date(start.getTime() + 3_600_000);
+    // 300 s of waiting is earlier than the full-race fit (3,260 s), so the wait decides.
+    assert(latestRaceStart(start, hourLater, 3, 300).getTime() === start.getTime() + 300_000, "wait did not cap");
+    // A wait longer than the fit never lets the race overrun the round: 30 laps leave only
+    // 560 s to start in, which is earlier than the 900 s wait, so the fit decides.
+    assert(
+      latestRaceStart(start, hourLater, 30, 900).getTime() === start.getTime() + 560_000,
+      "a long wait let the race overrun the round",
+    );
+    assert(parseStartWait(undefined, start) === undefined, "absent wait was invented");
+    assert(parseStartWait(600, start) === 600, "a valid wait was lost");
+    for (const bad of [59, 901, 300.5, "300", 0]) {
+      let refused = false;
+      try {
+        parseStartWait(bad, start);
+      } catch {
+        refused = true;
+      }
+      assert(refused, `wait ${String(bad)} was accepted`);
+    }
+    let unscheduledRefused = false;
+    try {
+      parseStartWait(300, undefined);
+    } catch {
+      unscheduledRefused = true;
+    }
+    assert(unscheduledRefused, "a wait without a scheduled start was accepted");
   });
 
   await test("a room the race server has lost is voided once it is old enough", async () => {

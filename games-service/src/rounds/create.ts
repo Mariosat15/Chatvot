@@ -11,6 +11,7 @@ import {
 } from "../games/titles";
 import {
   parseScheduledStart,
+  parseStartWait,
   requireVelocityConfig,
   seatVelocityPlayer,
   type VelocitySeat,
@@ -47,6 +48,8 @@ export interface CreateRoundInput {
   parentOrigin?: unknown;
   /** Volt Velocity only: when the scheduled race goes green. Absent on a challenge. */
   scheduledStartAt?: unknown;
+  /** HTML v1.24: how long a scheduled race waits for two Ready pilots. Needs `scheduledStartAt`. */
+  startWaitSeconds?: unknown;
   /** HTML v1.22: "competition" | "challenge" | "practice". Optional; see `contest-type.ts`. */
   contestType?: unknown;
 }
@@ -376,6 +379,7 @@ export async function createRound(input: CreateRoundInput): Promise<CreateRoundO
       typeof player.displayName === "string" ? player.displayName : undefined,
       expiresAt,
       solo ? providerRoundId : undefined,
+      parseStartWait(input.startWaitSeconds, scheduledStartAt),
     );
   }
 

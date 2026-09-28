@@ -49,6 +49,7 @@ interface ContestBody {
   unresolvedRoundPolicy?: UnresolvedRoundPolicy;
   unscoredContestPolicy?: UnscoredContestPolicy;
   roundStartPolicy?: RoundStartPolicy;
+  startWaitSeconds?: number;
   resultGracePeriodSeconds?: number;
   perRoundCostAcknowledged?: boolean;
   playMode?: PlayMode;
@@ -150,6 +151,9 @@ export async function POST(request: NextRequest) {
       )
         ? body.unscoredContestPolicy
         : "refund_entry_fees",
+      // Passed through: the service refuses an out-of-range value by name rather than this
+      // route quietly replacing the operator's choice with the default.
+      startWaitSeconds: body.startWaitSeconds,
       createdBy: guard.admin.id,
     });
 

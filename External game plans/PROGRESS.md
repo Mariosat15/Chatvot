@@ -912,6 +912,20 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 28 Sep 2026 - The race cannot wait for ever: a waiting limit, then a full refund
+
+**Owner:** the race does not start at its start time if fewer than two players are ready, and it keeps waiting. There must be a limit; past it, stop and refund everyone in full. Chosen: **5 minutes by default, operator-set 1-15 per competition**; **full refund, no platform fee, immediately, players notified.**
+
+**Built.**
+- `Competition.startWaitSeconds` (both copies, 60-900 s), set on the wizard's Schedule step for scheduled contests only, stamped at create, never changed by an edit. Absent reads as 300.
+- `cancelUnstartedTogetherContests` (mirrored) runs in both apps' scheduled job **before** finalization. Once the wait has passed and play never started (fewer than two players holding a live round, no score, nothing unresolved), it calls `cancelCompetitionAndRefund` - full refund, no fee, everyone notified. It writes no status itself (R43).
+- The game is sent the same limit (`startWaitSeconds`, requirements **v1.24**), and games-service caps the room's latest start at it, so the race server gives up at the same moment. The platform's records decide the refund, not the game.
+- The pre-flight tells a player the deadline before it happens.
+- 21 platform tests (`start-wait.test.ts`), games-service velocity 15/15. One probe (`< 2` to `< 1`) went red on the expected test.
+
+This narrows s8.11's "cancels if still not two by `latestStartAt`": that moment is now at most `start + wait`, and the cancellation now refunds in full rather than only returning attempts. Full account in `23` **s8.12**.
+
+**Deploy:** games-service `npm run build` + `pm2 restart chartvolt-games`; rebuild the platform and the admin app. **Not verified by eye.**
 ### 28 Sep 2026 - The race waits for two ready players, counts down from 10, and a late player may join
 
 **Owner:** after paying, a player presses Play, picks a ship and waits. The game must start by

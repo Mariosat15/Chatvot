@@ -15,6 +15,12 @@ import { runPreflight } from "@/lib/services/games/contest-preflight";
 import { resolveContestEntryDeadline } from "@/lib/services/games/entry-deadline";
 import { scheduledStartTooSoon } from "@/lib/services/games/scheduled-start";
 import {
+  isValidStartWaitSeconds,
+  MAX_START_WAIT_SECONDS,
+  MIN_START_WAIT_SECONDS,
+  resolveStartWaitSeconds,
+} from "@/lib/services/games/start-wait";
+import {
   isPlayModeSupported,
   PLAY_MODE_COPY,
   playModeHasLobby,
@@ -81,6 +87,8 @@ export interface CreateProviderContestInput {
   unscoredContestPolicy?: UnscoredContestPolicy;
   /** Owner decision, 7 Sep 2026. See `RoundStartPolicy`. */
   roundStartPolicy?: RoundStartPolicy;
+  /** Owner rule, 28 Sep 2026. Together-start contests only; absent means the default. */
+  startWaitSeconds?: number;
   /**
    * The shape THIS contest is run as, picked from the title's supported set (task document 11).
    *
@@ -411,6 +419,15 @@ export async function createProviderContest(
     new Date(),
   );
   if (tooSoon) return { success: false, error: tooSoon };
+  if (
+    input.startWaitSeconds !== undefined &&
+    !isValidStartWaitSeconds(input.startWaitSeconds)
+  ) {
+    return {
+      success: false,
+      error: `The waiting limit must be a whole number of minutes from ${MIN_START_WAIT_SECONDS / 60} to ${MAX_START_WAIT_SECONDS / 60}.`,
+    };
+  }
   const roundStartPolicy =
     shape.forcedRoundStartPolicy ?? input.roundStartPolicy ?? "reserve_full_round";
   const attemptsPolicy = shape.forcedAttemptsPolicy ?? input.attemptsPolicy;
@@ -451,7 +468,12 @@ export async function createProviderContest(
       // the title's lobby later cannot move the door under players already seated. Only a
       // scheduled contest has a lobby; an `anytime` one stores nothing.
       ...(playModeHasLobby(playMode)
-        ? { lobbySeconds: resolveLobbySeconds(title.lobbySeconds) }
+        ? {
+            lobbySeconds: resolveLobbySeconds(title.lobbySeconds),
+            // Copied at creation for the lobby's reason: the limit players were told when
+            // they paid must not move under them.
+            startWaitSeconds: resolveStartWaitSeconds(input.startWaitSeconds),
+          }
         : {}),
       playWindowStart: input.playWindowStart,
       playWindowEnd: input.playWindowEnd,

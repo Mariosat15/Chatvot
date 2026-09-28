@@ -627,6 +627,20 @@ is a player who paid in time and opened the game late. The lobby still opens `lo
 default 10 minutes) before the start, so Play is available **before** the start time from then on,
 not from the moment of entry.
 
+### 8.12 The race cannot wait for ever: a waiting limit, then a full refund (28 September 2026)
+
+**Owner report:** the race does not start at its start time if fewer than two players are ready, and it keeps waiting. **Owner decision:** there must be a limit; past it, stop and refund everybody in full. Chosen through two questions: **5 minutes by default, operator-set 1-15 minutes per competition**, and **full refund, no platform fee, immediately, players notified.**
+
+**What was built.**
+
+- `Competition.startWaitSeconds` (both model copies, whole seconds 60-900). Stamped **at create time, for `scheduled` contests only**, from the wizard's new "Waiting limit (minutes)" field on the Schedule step. The edit path deliberately does not send it, so a limit cannot move under people who have paid. Absent or invalid reads as 300 through `resolveStartWaitSeconds` in `lib/services/games/start-wait.ts` (mirrored, byte-identical test).
+- **The platform decides, not the game.** `cancelUnstartedTogetherContests` (`together-start-cancel.service.ts`, mirrored) runs in both apps' scheduled job **before** `checkAndFinalizeCompetitions`. Once `playWindowStart + startWaitSeconds` has passed on an unpaused scheduled provider contest, it reads the contest's own `game_round` rows. `playNeverStarted` is true when no non-voided round carries a finite score, no round is `unresolved`, and fewer than two distinct players hold a `pending` or `launched` round. The contest is then cancelled through `cancelCompetitionAndRefund`, the existing full-refund, no-fee, notify-everyone path. The sweep **never pre-sets the status**, which is R43's rule: a status written first makes the refund's own lock refuse.
+- **The game is told the same limit** as the optional `startWaitSeconds` on create-round (requirements **v1.24**, `01` s4), and `games-service` caps the room's latest start at `start + wait`, so the race server gives up at the moment the platform refunds and voids its rounds. The game's own decision is not what refunds anybody; if the two disagreed, the platform's records win.
+- **The player is told before it happens.** `PlayState.startWaitEndsAt` feeds one sentence in `RoundPreflight`: if fewer than two players are ready by the stated time, the competition is cancelled and everyone gets their full entry fee back.
+
+**Why it runs before settlement.** An unstarted contest whose end time has also passed would otherwise reach finalization first and be settled as "nobody scored" under its unscored-contest policy, which is not a full refund.
+
+**Not built.** Challenges are untouched - they already have their own accept deadline and expiry. Tests: `__tests__/games/start-wait.test.ts` (21) and games-service `test:velocity` (15).
 ## 10. Risks
 
 | ID | Risk | Mitigation |
