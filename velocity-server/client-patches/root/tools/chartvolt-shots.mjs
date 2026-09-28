@@ -102,7 +102,8 @@ try {
       console.log(size.name, "race", report.boxes.join(" | "));
       if (report.overlaps.length) problems.push(`${size.name}: overlap ${report.overlaps.join(", ")}`);
       if (report.off.length) problems.push(`${size.name}: off screen ${report.off.join(", ")}`);
-      if (!!size.touch !== report.touchShown) problems.push(`${size.name}: touch controls ${report.touchShown ? "shown on a mouse screen" : "missing on a touch screen"}`);
+      // The on-screen controls (analog pad included) are shown at every size, mouse screens too (owner, 28 Sep 2026).
+      if (!report.touchShown) problems.push(`${size.name}: on-screen controls missing`);
       if (size.name === "desktop") {
         const at = await page.evaluate(() => { const d = __QA__.cornerInspect(); __QA__.advance(0.4); return d; });
         await page.waitForTimeout(400);

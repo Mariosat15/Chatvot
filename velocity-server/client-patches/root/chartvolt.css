@@ -149,9 +149,10 @@ html body[data-state][data-mode] #hud :is(small,.clock span){letter-spacing:1.6p
    window size: 1 on a large monitor, down to .62 in a small embedded frame). Panels start at the
    screen edge; hud-layout.js then stacks any that collide (equipment above hull, map and live
    position below the top buttons), so no breakpoint needs to know how tall its neighbours are.
-   The touch pad stays hidden until the device is known to be touch-capable. */
+   CHARTVOLT PATCH (28 Sep 2026, owner): the on-screen controls, analog pad included, are shown on
+   a computer too and work with the mouse; the rule that hid them until a touch was seen is gone.
+   hud-layout.js treats the pads as fixed, so the bottom panels move up clear of them. */
 @media (hover:hover) and (pointer:fine){
-  html body:not([data-touch]) #touch{display:none!important}
   html body[data-state][data-mode] #hud .race-stats{top:18px;left:22px;right:auto;bottom:auto;transform:scale(var(--cv-hud,1));transform-origin:top left}
   html body[data-state][data-mode] #hud .map{top:18px;right:22px;left:auto;bottom:auto;transform:scale(var(--cv-hud,1));transform-origin:top right}
   html body[data-state][data-mode] #hud .integrity{left:22px;bottom:22px;top:auto;right:auto;transform:scale(var(--cv-hud,1));transform-origin:bottom left}

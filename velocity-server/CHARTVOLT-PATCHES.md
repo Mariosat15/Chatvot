@@ -74,8 +74,17 @@ The owner reported three faults: the touch controls missing on a phone, equipmen
 
 `root/tools/chartvolt-shots.mjs [hangar|race|all] [size,...]` screenshots the start screen and a race
 (with a forced 8-row live position list) at eight sizes, from 1920x1080 down to a 390x640 phone
-frame. It fails if any panel overlaps another, leaves the screen, or if the touch controls are
-missing on a touch size or shown on a mouse size. **Nothing here changes the race server.**
+frame. It fails if any panel overlaps another, leaves the screen, or if the on-screen controls are
+missing at any size. **Nothing here changes the race server.**
+
+**On-screen controls on a computer too (owner, 28 Sep 2026, third pass).** The desktop rule that hid
+`#touch` until a touch was seen is removed (`root/chartvolt.css`); the pads use pointer events, so the
+mouse drives them, and `hud-layout.js` already moves the bottom panels clear of them. The analog pad is
+the default on every device (`client-patches/touch-controls.js`, now patched): the mode is stored under
+`cv-touch-mode-2`, because the vendor wrote `buttons` to `cv-touch-mode` on every computer that ever
+loaded the game; a touch device's old value is carried over. That pass was applied to the built
+`.html.gz` directly (the asset-complete vendor tree was not available) and re-packed; these sources
+produce the same output on the next full rebuild.
 
 Rebuilding the client after changing a file in `client-patches/`:
 

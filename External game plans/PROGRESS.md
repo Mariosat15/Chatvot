@@ -912,6 +912,18 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 28 Sep 2026 - Play is open in the lobby, and the race shows its on-screen controls on a computer
+
+**Owner:** the lobby still said "Play will unlock when the competition starts", so a player could not join and wait in the game's lobby; and in the race the analog controls did not show. On a computer too (chosen).
+
+**Built.**
+- `components/trading/CompetitionEntryButton.tsx`: an **upcoming game** contest now shows the Play link ("Open the game now, get ready and wait for the start"). Trading is unchanged. The link spends nothing. The play screen already decides against the server clock whether the lobby is open (`round-launch.service.ts` admits a scheduled contest from `lobbyOpensAt`), and before then it shows when the lobby opens.
+- Volt Velocity: the rule that hid the on-screen controls until a touch was seen is removed (`client-patches/root/chartvolt.css`). The controls work with the mouse (they use pointer events). The **analog pad is now the default on every device**. Because the vendor saved the mode on every load, each computer that had played held a stored "buttons" it never chose, so the setting moved to a new key (`cv-touch-mode-2`, `client-patches/touch-controls.js`, new in client-patches); a touch device keeps its old choice. `chartvolt-shots.mjs` now fails if the controls are missing at **any** size.
+- **Deviation:** the full vendor tree with assets is not on this machine, so the same three edits were applied to the built `volt-velocity-client.html.gz` (each asserted to match exactly once) and re-packed with `pack-velocity-client.ts`. The patch sources match, so the next full rebuild produces the same result.
+- Checked in a browser at 1024x576: pad and pedals shown, no panel overlaps, nothing off screen. The phone and tablet layouts were not re-shot.
+
+**Deploy:** rebuild the platform (the button); games-service `git pull` + `pm2 restart chartvolt-games` (the client is served from `games-service/vendor/`). No race-server change.
+
 ### 28 Sep 2026 - The race cannot wait for ever: a waiting limit, then a full refund
 
 **Owner:** the race does not start at its start time if fewer than two players are ready, and it keeps waiting. There must be a limit; past it, stop and refund everyone in full. Chosen: **5 minutes by default, operator-set 1-15 per competition**; **full refund, no platform fee, immediately, players notified.**

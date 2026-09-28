@@ -387,12 +387,22 @@ export default function CompetitionEntryButton({
                         : "Start trading now"
                       : isCompleted
                         ? "Final results are in - see how you placed"
-                        : "Competition will start soon"}
+                        : isProviderGame
+                          ? "Open the game now, get ready and wait for the start"
+                          : "Competition will start soon"}
                   </p>
                 </div>
               </div>
 
-              {isActive ? (
+              {isActive || (isUpcoming && isProviderGame) ? (
+                /*
+                  Reason a provider contest offers Play before the start: a race that starts
+                  for everyone at once is joined early and waited out in the game's own
+                  lobby, so a locked button is exactly what stops a paid player getting
+                  ready. The play screen decides what is possible yet (lobby not open,
+                  waiting for the start) against the server's clock; a Link here spends
+                  nothing, because a round is only created by a click on that screen.
+                */
                 /*
                   A provider contest is played at /play, never at /trade. Reason this is a
                   branch and not a redirect on the trade page alone: the trade route guards
