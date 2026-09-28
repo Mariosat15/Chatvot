@@ -103,7 +103,7 @@ a lighter game. **There is no newer vendor pack**; everything is built on
 | 5 | New power-ups (EMP, shockwave, slick, homing missile, cloak, magnet), floating name labels, slipstream / perfect start / final lap / position callouts | Done |
 | 6 | Denser, more alive existing tracks; three new tracks | Done |
 | 7 | Lighter build: 62.1 -> 46.4 MB built, 44.7 -> 32.8 MB gzipped, 42.3 -> 32.4 MB packed | Done |
-| 8 | Tests, docs, commit by explicit path, deploy steps | Planned |
+| 8 | Tests, docs, commit by explicit path, deploy steps; the lobby warm-up now fetches the `.mp3` soundtracks too (the client is MP3-only). Deploy steps: `External game plans/PROGRESS.md`, 28 Sep entry, step 8 | Done |
 
 | Change | Where |
 |---|---|

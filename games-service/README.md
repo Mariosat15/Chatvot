@@ -474,8 +474,8 @@ and delivery, 11 progress, 21 board client, 61 presentation, 7 Volt Velocity. `t
 spawns the real race server from `../velocity-server` and **skips loudly** if that folder's
 `node_modules` is missing (`npm install` there once). Volt Velocity needs `VELOCITY_ADMIN_KEY` and
 `VELOCITY_TICKET_SECRET` (see `env.example` and chapter `23` s8.2). The race client is served from
-`vendor/volt-velocity/`: a ~1 MB `client.html` plus 36 content-hashed files under `assets/`
-(~48 MB, about 41 MB of which a player downloads - the `.mp3` soundtracks are fallbacks), all
+`vendor/volt-velocity/`: a ~1 MB `client.html` plus 33 content-hashed files under `assets/`
+(~31 MB, 28 Sep 2026; one race fetches 17-27 MB of it depending on the track), all
 `immutable`. It is produced from the game's own ~103 MB single-file build,
 `vendor/volt-velocity-client.html.gz`, by `npx tsx tools/games/pack-velocity-client.ts` from the
 repository root, which splits the inlined base64 out and resizes the 4K textures to 2K - re-run
@@ -489,7 +489,7 @@ restart `chartvolt-games` and `chartvolt-velocity` afterwards. **The race server
 `VELOCITY_RACE_URL`, never on `PORT`, which in this file is ours. With two servers there is still
 ONE race server: the other machine sets `VELOCITY_RACE_URL` to the race machine's address (see
 `env.example`), runs no race process, and forwards `/race` there. `GET /play/warmup/:gameCode`
-answers `{ urls }` - the current client page and its assets, `.mp3` fallbacks excluded - so a lobby
+answers `{ urls }` - the current client page and every packed asset, soundtracks included (the client is MP3-only since 28 Sep 2026) - so a lobby
 can pre-download them one at a time (204 for other titles). (Counted from the suite's own output. Any figure of
 305 predates Volt Stack and Volt Velocity. Any figure of
 299 predates the ten-minute cap - `hardDeadline` was reading one particular title's maximum for

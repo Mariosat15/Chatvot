@@ -1306,6 +1306,14 @@ no build. The main app needs a rebuild and restart. Then hard refresh. **Never v
     hairpin in the first Harbour layout, which was reshaped (shipped radii 124 / 152 / 124 m).
     Screenshots of all three new tracks rendered with no shader error.
   - **Step 7, a lighter download:** re-encoded road, wall, night-sky, crowd and cliff textures (all at 35-42 dB PSNR, source files kept, imports redirected). Packed 42.3 -> 32.4 MB; per race aurora 22.2 -> 16.7 MB and canyon 37.0 -> 27.0 MB. **Still open:** the lobby warm-up prefetches every non-music file (24.7 MB now), including cliffs a city track never draws; making it track-aware is a separate decision. **Not verified live with 16 players.**
+  - **Step 8, music warm-up, docs and deploy (owner, 28 Sep 2026):** the lobby warm-up now also fetches the four `.mp3` soundtracks. It used to skip them as "fallbacks behind `.ogg`", which stopped being true when the lighten pass made the client MP3-only, so the music a race picks at the gun was the one file still downloading after the start. The warm-up is now every packed asset, about 31.4 MB, once per browser; it is still not track-aware (the owner chose to leave that open). `games-service/src/http/volt-velocity-client.ts`, README corrected. **Deploy, in this order, all reversible:**
+    1. `git pull` on the server running the games.
+    2. `cd games-service && npm run build`. The TypeScript changed (track list, warm-up), and `dist` is not tracked, so a pull alone does nothing here (R52 / R66).
+    3. `pm2 restart chartvolt-games chartvolt-velocity`, **both together**, because `PHYSICS_VERSION` is `velocity-3d-13` in both.
+    4. Admin -> Game Providers -> ChartVolt Games -> sync the catalogue, so the `trackId` setting offers all 18 tracks.
+    5. Check: open a Volt Velocity lobby, and in the browser Network tab the warm-up should list the page plus 33 assets, the `.mp3` files included.
+    - **To undo:** `git revert` the step commits, then do steps 2-4 again. No data migration; stored contests keep their `trackId`, and "auto" still picks from the original fifteen.
+    - The platform app itself needs no rebuild for this pass. `velocity-server` needs no `npm ci` (no dependency changed).
 - **28 Sep 2026 - (10) End clock, no restart, readable scores, and a non-finisher is not a 0**
   (`23` s8.9, `17` **R115**).
   - **Built:** an "Ends in" countdown on the arena for every game (`ArenaEndsIn.tsx`); the race

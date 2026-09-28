@@ -67,11 +67,9 @@ const ASSET_TYPES = new Map<string, string>([
   ["mp3", "audio/mpeg"],
 ]);
 
-/**
- * Fallback soundtracks: the client asks for the `.ogg` and only a browser that cannot play Ogg
- * falls back to these, so the warm-up must not spend 7 MB of everybody's data on them.
- */
-const WARMUP_SKIPPED_EXTENSIONS = new Set(["mp3"]);
+// Reason: the warm-up used to skip `.mp3` as an unused fallback behind `.ogg`. Since the
+// lighten patch (28 Sep 2026) the client ships MP3 only, so the soundtrack is warmed like the
+// rest - the race picks one of four at start and the lobby cannot know which.
 
 const PACKED_DIR =
   [
@@ -138,8 +136,7 @@ function warmupAssetFiles(velocity: VelocityConfig): string[] {
     };
     const files = (parsed.assets ?? [])
       .map((entry) => entry.file)
-      .filter((file): file is string => typeof file === "string" && ASSET_NAME.test(file))
-      .filter((file) => !WARMUP_SKIPPED_EXTENSIONS.has(file.slice(file.lastIndexOf(".") + 1)));
+      .filter((file): file is string => typeof file === "string" && ASSET_NAME.test(file));
     manifestCache = { mtimeMs, files };
     return files;
   } catch (error) {
