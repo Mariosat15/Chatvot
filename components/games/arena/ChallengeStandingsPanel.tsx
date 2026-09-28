@@ -7,6 +7,7 @@ import {
   roundActivityToneClass,
   type RoundActivitySummary,
 } from "@/lib/utils/round-activity";
+import { formatGameScore, type GameScoreType } from "@/lib/utils/format-game-score";
 
 /**
  * The two seats of a 1v1, in the arena's standings rail - the challenge-side answer to
@@ -44,9 +45,11 @@ interface Props {
   seats: ChallengeArenaSeat[];
   /** `Score` or `Time`, resolved from the catalogue by the caller. */
   scoreLabel: string;
+  /** The title's declared score type - display only. */
+  scoreType?: GameScoreType;
 }
 
-export default function ChallengeStandingsPanel({ seats, scoreLabel }: Props) {
+export default function ChallengeStandingsPanel({ seats, scoreLabel, scoreType }: Props) {
   return (
     <div className={`${NEON_PANEL_SIDE} flex h-full min-h-[400px] flex-col`}>
       <div className="flex items-center justify-between gap-2 border-b border-[#161E36] px-4 py-2.5">
@@ -85,7 +88,7 @@ export default function ChallengeStandingsPanel({ seats, scoreLabel }: Props) {
                   {seat.name}
                 </span>
                 <span className="shrink-0 text-base font-bold text-gray-100">
-                  {typeof seat.score === "number" ? seat.score.toLocaleString() : "—"}
+                  {formatGameScore(seat.score, scoreType, "—")}
                 </span>
               </div>
 

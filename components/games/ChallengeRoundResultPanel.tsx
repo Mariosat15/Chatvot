@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { neonButtonClasses } from "@/components/neon/Buttons";
 import { NEON_INSET, NEON_STAGE_PANEL } from "@/components/neon/tokens";
 import { humanizeMetric } from "@/lib/utils/humanize-metric";
+import { formatGameScore, type GameScoreType } from "@/lib/utils/format-game-score";
 import type { PlayState, PlayerRoundView } from "./play-state";
 
 /**
@@ -32,6 +33,8 @@ interface ChallengeRoundResultPanelProps {
   round: PlayerRoundView | null;
   state: PlayState;
   onPlayAgain: () => void;
+  /** The title's declared score type - display only. */
+  scoreType?: GameScoreType;
 }
 
 /** See `RoundResultPanel.tsx`'s `confirmingCopy` - identical copy, deliberately duplicated. */
@@ -135,6 +138,7 @@ export function ChallengeRoundResultPanel({
   round,
   state,
   onPlayAgain,
+  scoreType,
 }: ChallengeRoundResultPanelProps) {
   if (confirming) {
     const { heading, detail } = confirmingCopy(confirmReason);
@@ -193,12 +197,10 @@ export function ChallengeRoundResultPanel({
       {typeof round.score === "number" && (
         <div className={`p-4 ${NEON_INSET}`}>
           <p className="text-xs uppercase tracking-wide text-gray-500">This round</p>
-          <p className="mt-1 text-3xl font-bold text-gray-100">{round.score}</p>
+          <p className="mt-1 text-3xl font-bold text-gray-100">{formatGameScore(round.score, scoreType)}</p>
           <p className="mt-2 text-xs text-gray-400">
             Your challenge score:{" "}
-            {typeof state.participantScore === "number"
-              ? state.participantScore.toLocaleString()
-              : "-"}
+            {formatGameScore(state.participantScore, scoreType)}
           </p>
         </div>
       )}

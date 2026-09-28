@@ -18,6 +18,7 @@ import {
   resolveHeroFeatureIcon,
   type HeroFeatureIcon,
 } from "@/lib/services/games/hero-features";
+import { formatGameScore, type GameScoreType } from "@/lib/utils/format-game-score";
 
 export interface ArenaChip {
   label: string;
@@ -307,6 +308,6 @@ export function attemptProgress(
  * it for a player who has not played yet tells them they scored nothing. Every other screen
  * that renders a provider score follows this rule.
  */
-export function scoreText(score: number | undefined): string {
-  return typeof score === "number" && Number.isFinite(score) ? String(score) : "—";
+export function scoreText(score: number | undefined, scoreType?: GameScoreType): string {
+  return formatGameScore(score, scoreType, "—");
 }

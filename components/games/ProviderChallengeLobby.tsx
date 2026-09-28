@@ -42,6 +42,7 @@ import {
   challengeOpponentLabel,
   isUnclaimedOpenChallenge,
 } from "@/lib/utils/open-challenge";
+import { formatGameScore, type GameScoreType } from "@/lib/utils/format-game-score";
 import {
   getGamePresentation,
   UNKNOWN_GAME_NAME,
@@ -131,8 +132,8 @@ function formatRoundDuration(ms?: number): string {
 }
 
 /** The score, or a dash. Never a zero standing in for an absence - R45's read side. */
-function roundScoreText(score?: number): string {
-  return Number.isFinite(score) ? String(score) : "-";
+function roundScoreText(score?: number, scoreType?: GameScoreType): string {
+  return formatGameScore(score, scoreType);
 }
 
 export default async function ProviderChallengeLobby({
@@ -341,11 +342,7 @@ export default async function ProviderChallengeLobby({
               icon={Gamepad2}
               accent="score"
               label="Your score"
-              value={
-                typeof state?.participantScore === "number"
-                  ? state.participantScore.toLocaleString()
-                  : "-"
-              }
+              value={roundScoreText(state?.participantScore, presentation.scoreType)}
             />
           ) : (
             <StatCard
@@ -456,7 +453,7 @@ export default async function ProviderChallengeLobby({
                       <div className="mt-3">
                         <p className={NEON_LABEL}>{scoreLabel}</p>
                         <p className="text-lg font-bold text-gray-100">
-                          {typeof score === "number" ? score.toLocaleString() : "-"}
+                          {roundScoreText(score, presentation.scoreType)}
                         </p>
                       </div>
                       {disqualificationReason && (
@@ -539,7 +536,7 @@ export default async function ProviderChallengeLobby({
                             </span>
                           </td>
                           <td className="px-3 py-2.5 text-right text-sm font-semibold text-gray-100">
-                            {roundScoreText(round.score)}
+                            {roundScoreText(round.score, presentation.scoreType)}
                           </td>
                           <td className="px-3 py-2.5 text-right text-xs text-gray-400">
                             {formatRoundDuration(round.durationMs)}

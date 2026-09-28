@@ -16,6 +16,7 @@ import {
   roundActivityToneClass,
   type RoundActivitySummary,
 } from "@/lib/utils/round-activity";
+import { formatGameScore, type GameScoreType } from "@/lib/utils/format-game-score";
 
 /**
  * The leaderboard for a contest played through a game provider.
@@ -103,6 +104,8 @@ interface ProviderLeaderboardProps {
   currentUserId: string;
   /** Shown beside the score column, so a time trial does not say "Score". */
   scoreLabel?: string;
+  /** The title's declared score type, so a race time reads as a clock. Absent = a number. */
+  scoreType?: GameScoreType;
   /**
    * What each player has been doing, keyed by user id, from `contest-activity.service.ts`.
    *
@@ -137,6 +140,7 @@ export default function ProviderLeaderboard({
   rows,
   currentUserId,
   scoreLabel = "Score",
+  scoreType,
   activity,
   variant = "detailed",
 }: ProviderLeaderboardProps) {
@@ -313,7 +317,7 @@ export default function ProviderLeaderboard({
                         =
                       </span>
                     )}
-                    {row.score.toLocaleString()}
+                    {formatGameScore(row.score, scoreType)}
                   </span>
                 )}
               </div>

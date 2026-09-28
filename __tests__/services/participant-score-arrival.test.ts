@@ -366,6 +366,37 @@ describe("a provider score reaches the participant row ranking reads", () => {
     expect(storedRound?.status).toBe("completed");
   });
 
+  it("stores NO score when the provider reported none, even though the round completed", async () => {
+    // 28 September 2026: Volt Velocity closes a racer who did not finish as `completed` with no
+    // score. The normaliser used to fill that gap with 0 and ingestion stored it, so on a
+    // lower-is-better title the non-finisher held the fastest time on the board. The 0 still
+    // fills the required contract field; `scoreReported: false` is what keeps it out of storage.
+    await seedTitle("lower_is_better");
+    const contest = await seedContest("single");
+    await seatFor(String(contest._id), USER);
+    const round = await launchedRound(contest._id, USER, 1);
+
+    const outcome = await applyResult({
+      providerKey: PROVIDER_KEY,
+      normalised: { ...resultFor(round.roundId, 0, "lower_is_better"), scoreReported: false },
+      source: "manual",
+    });
+
+    expect(outcome.accepted).toBe(true);
+    const storedRound = await GameRound.findOne({ roundId: round.roundId }).lean<{
+      status?: string;
+      rawScore?: number;
+    }>();
+    expect(storedRound?.status).toBe("completed");
+    expect(storedRound?.rawScore).toBeUndefined();
+
+    const seat = await CompetitionParticipant.findOne({
+      competitionId: contest._id,
+      userId: USER,
+    }).lean<{ score?: number }>();
+    expect(seat?.score).toBeUndefined();
+  });
+
   it("does not touch a participant row for a practice round", async () => {
     // Practice is free, unranked and prize-less. A practice score reaching a paid contest's
     // participant row would be a ranking the player did not earn under contest conditions.

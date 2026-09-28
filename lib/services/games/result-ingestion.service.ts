@@ -341,10 +341,14 @@ export async function applyResult(args: {
 
   // ── GATE 8: round can accept a result ─────────────────────────────────────────────────
   const target = normalised.status as RoundStatus;
+  // Reason: a result with no score stores NO score - never the adapter's placeholder 0, which
+  // on a lower-is-better title is the fastest time on the board and was paid as one.
+  const incomingScore =
+    normalised.scoreReported === false ? undefined : normalised.rawScore;
   if (!canTransitionRound(round.status, target)) {
     // A round that already reported is the interesting case, and it splits in two.
     const alreadyScored = typeof round.rawScore === "number";
-    const differentScore = alreadyScored && round.rawScore !== normalised.rawScore;
+    const differentScore = alreadyScored && round.rawScore !== incomingScore;
 
     if (differentScore) {
       // Chapter 07 section 4: FIRST VALID RESULT WINS. The second is flagged, never
@@ -425,7 +429,10 @@ export async function applyResult(args: {
   }
 
   // ── GATE 10: score inside the declared range ──────────────────────────────────────────
-  const rangeCheck = await scoreWithinRange(round.gameKey, normalised.rawScore);
+  const rangeCheck =
+    incomingScore === undefined
+      ? { ok: true as const }
+      : await scoreWithinRange(round.gameKey, incomingScore);
   if (!rangeCheck.ok) {
     // Chapter 07 section 4: rejected, round marked unresolved, alert raised. Marked
     // unresolved rather than left launched so the reconciliation net stops polling it and
@@ -457,7 +464,7 @@ export async function applyResult(args: {
 
   // ── GATE 11: apply, then mark processed ───────────────────────────────────────────────
   round.status = target;
-  round.rawScore = normalised.rawScore;
+  round.rawScore = incomingScore;
   round.scoreBreakdown = normalised.breakdown;
   round.providerRoundId = normalised.providerRoundId ?? round.providerRoundId;
   round.startedAt = normalised.startedAt ?? round.startedAt;

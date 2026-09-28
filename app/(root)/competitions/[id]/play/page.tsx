@@ -219,6 +219,7 @@ export default async function PlayPage({ params, searchParams }: PlayPageProps) 
       // `active` until a cron finalizes it, so deciding in the browser would stop the refresh
       // exactly while the last rounds are landing.
       active={outcome.state.contestStatus === "active"}
+      scoreType={presentation.scoreType}
     >
       <GameArenaLayout
         backHref={`/competitions/${competitionId}`}
@@ -230,7 +231,7 @@ export default async function PlayPage({ params, searchParams }: PlayPageProps) 
         standings={
           <ArenaLeaderboardPanel
             competitionId={competitionId}
-            scoreLabel="Score"
+            scoreLabel={presentation.scoreType === "duration_ms" ? "Time" : "Score"}
           />
         }
         stage={
@@ -239,6 +240,7 @@ export default async function PlayPage({ params, searchParams }: PlayPageProps) 
             competitionName={competitionName}
             gameName={presentation.gameName}
             initialState={outcome.state}
+            scoreType={presentation.scoreType}
           />
         }
         sidebar={

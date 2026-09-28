@@ -7,6 +7,7 @@ import CompetitionEntryButton from "@/components/trading/CompetitionEntryButton"
 import { NeonCountPill, NeonPanel } from "@/components/neon/Cards";
 import { useArenaLive } from "@/components/games/arena/ArenaLiveStandings";
 import { formatVolts } from "@/lib/utils/format-volts";
+import { formatGameScore } from "@/lib/utils/format-game-score";
 import type { ComponentProps } from "react";
 
 /**
@@ -85,7 +86,7 @@ export function LobbyLiveYourScoreValue({
 }: {
   initialScore?: number;
 }) {
-  const { rows, currentUserId } = useArenaLive();
+  const { rows, currentUserId, scoreType } = useArenaLive();
   const mine = rows.find((row) => row.userId === currentUserId);
   const score =
     typeof mine?.score === "number"
@@ -93,7 +94,7 @@ export function LobbyLiveYourScoreValue({
       : typeof initialScore === "number"
         ? initialScore
         : undefined;
-  return <>{typeof score === "number" ? score.toLocaleString() : "-"}</>;
+  return <>{formatGameScore(score, scoreType)}</>;
 }
 
 export function LobbyLiveLeaderboard({
@@ -103,7 +104,7 @@ export function LobbyLiveLeaderboard({
   scoreLabel: string;
   title: string;
 }) {
-  const { rows, activity, currentUserId } = useArenaLive();
+  const { rows, activity, currentUserId, scoreType } = useArenaLive();
   return (
     <NeonPanel
       icon={Trophy}
@@ -116,6 +117,7 @@ export function LobbyLiveLeaderboard({
         rows={rows}
         currentUserId={currentUserId}
         scoreLabel={scoreLabel}
+        scoreType={scoreType}
         activity={activity}
       />
     </NeonPanel>

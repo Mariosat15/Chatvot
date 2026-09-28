@@ -252,8 +252,10 @@ describe("the challenge play screen is the competition arena", () => {
       defaults. Rendering that as `0` says they played and scored nothing, which on a
       lower-is-better title also reads as the best result on the board.
     */
+    // The claim is unchanged; since 28 Sep 2026 the dash lives in `formatGameScore`, whose own
+    // test pins absent -> dash. Here: the raw seat score reaches it unaltered.
     const code = readCode(STANDINGS);
-    expect(code).toMatch(/typeof seat\.score === "number"[\s\S]{0,80}?:\s*"—"/);
+    expect(code).toMatch(/formatGameScore\(seat\.score,\s*scoreType,\s*"—"\)/);
     expect(code).not.toMatch(/seat\.score\s*\?\?\s*0/);
   });
 

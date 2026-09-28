@@ -250,6 +250,12 @@ export interface NormalisedRoundResult {
   providerRoundId: string;
   status: ProviderRoundStatus;
   rawScore: number;
+  /**
+   * `false` when the provider sent no score, in which case `rawScore` is a placeholder and
+   * must never be stored. Absent means reported. A missing score is not a zero: on a
+   * lower-is-better title a zero is the winning time.
+   */
+  scoreReported?: boolean;
   /** Display only. NEVER used for ranking. */
   breakdown?: Record<string, unknown>;
   startedAt?: Date;

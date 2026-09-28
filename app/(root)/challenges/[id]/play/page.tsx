@@ -225,7 +225,11 @@ export default async function ChallengePlayPage({
       minParticipants={2}
       maxParticipants={2}
       standings={
-        <ChallengeStandingsPanel seats={seats} scoreLabel={scoreLabel} />
+        <ChallengeStandingsPanel
+          seats={seats}
+          scoreLabel={scoreLabel}
+          scoreType={presentation.scoreType}
+        />
       }
       stage={
         <ChallengeRoundHost
@@ -233,6 +237,7 @@ export default async function ChallengePlayPage({
           challengeName={challengeName}
           gameName={presentation.gameName}
           initialState={outcome.state}
+          scoreType={presentation.scoreType}
         />
       }
       sidebar={
@@ -251,6 +256,7 @@ export default async function ChallengePlayPage({
             }}
             state={outcome.state}
             presentation={presentation}
+            format="challenge"
           />
 
           {/*

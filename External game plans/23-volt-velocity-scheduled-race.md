@@ -491,6 +491,30 @@ Unchanged and still an owner decision: a race with **fewer than two connected pl
 gun is cancelled by the race server. The attempt is handed back and, with this fix, the screen
 now says there is no new race to join rather than looping.
 
+### 8.9 The end clock, no restart, readable times, and a non-finisher is not a zero (28 September 2026)
+
+Owner report on the race arena: no clock showing when the competition or challenge actually
+ends, a pause menu that let a player go back and start over, a score of `172,666.998`, and a
+prize that did not match the published split. None of the fixes names a game.
+
+- **An "Ends in" countdown** (`components/games/arena/ArenaEndsIn.tsx`) on the arena for every
+  game, read from the contest's stored end on the server clock.
+- **No way back in**: the race host hides the pause menu's return and race-again controls.
+- **Scores are shown by the title's declared `scoreType`**, through one formatter,
+  `lib/utils/format-game-score.ts`: `duration_ms` reads `2:52.667` (`h:mm:ss.mmm` from one
+  hour), `integer` is rounded, anything else has at most two decimals, and an absent score is a
+  dash. The long fraction was the tie-break (`timeMs - points/1e6`, below one millisecond).
+  **Display only** - ranking and settlement still read the stored number. Wired into every
+  provider score surface: arena board, feed, contest panel, challenge standings, both lobbies,
+  both round result panels and the results screen. `PlayState` carries no `scoreType`, so it is
+  passed as a prop and through `ArenaLiveProvider`'s context. Not wired: the dashboard
+  `ContestsSidebar`, which does not have the title's score type.
+- **A player who did not finish no longer records a 0** (**R115**). The adapter normaliser
+  turned "no score" into `rawScore: 0`, so a non-finisher was stored as a real zero, ranked,
+  and became eligible for a share of the prizes. It now reports `scoreReported: false`, the
+  stored score stays unset, and ranking treats it as last. See `17` R115 for what this does and
+  does not explain about the reported payout.
+
 ## 10. Risks
 
 | ID | Risk | Mitigation |

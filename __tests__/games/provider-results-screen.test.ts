@@ -219,14 +219,12 @@ describe("ProviderResultsScreen", () => {
   it("renders an absent score as a dash and never as zero", () => {
     // R45's read side. `score ?? 0` is the natural spelling and it tells a player who never
     // finished a round that they scored nothing, which is a different claim.
-    const scoreText = screenCode.match(
-      /function scoreText[\s\S]*?\n}/,
-    )?.[0];
-
-    expect(scoreText).toBeDefined();
-    expect(scoreText).toContain("Number.isFinite");
-    expect(scoreText).toContain('"-"');
-    expect(scoreText).not.toMatch(/\?\?\s*0/);
+    // Claim unchanged; since 28 Sep 2026 the dash lives in `formatGameScore` (its own test pins
+    // absent -> "-"), so this asserts the screen hands the raw score straight to it.
+    expect(screenCode).toMatch(
+      /const scoreText = \(score\?: number\) => formatGameScore\(score, scoreType\)/,
+    );
+    expect(screenCode).not.toMatch(/score\s*\?\?\s*0/);
   });
 
   it("reads the prize from the settled leaderboard and computes no money of its own", () => {

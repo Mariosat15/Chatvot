@@ -1172,6 +1172,23 @@ no build. The main app needs a rebuild and restart. Then hard refresh. **Never v
   - **Files:** client sources are in `velocity-server/client-patches/`. The repacked page changed
     `client.html` only, and every asset kept its hash.
   - **Not verified live with 16 players.**
+- **28 Sep 2026 - (10) End clock, no restart, readable scores, and a non-finisher is not a 0**
+  (`23` s8.9, `17` **R115**).
+  - **Built:** an "Ends in" countdown on the arena for every game (`ArenaEndsIn.tsx`); the race
+    host hides its return and race-again controls; one score formatter,
+    `lib/utils/format-game-score.ts`, driven by the title's `scoreType` (`duration_ms` ->
+    `2:52.667`, `integer` rounded, others at most 2 decimals, absent -> dash), wired into every
+    provider score surface. Display only; ranking reads the stored number.
+  - **R115, live:** a racer who did not finish was stored as `0`, and on a lower-is-better title
+    that ranked first. Now `scoreReported: false` -> no stored score -> ranked last. Whether it
+    was also **paid** depends on Volt Velocity's `zeroIsValidResult`; +16.88 = 62.5% of 27 fits
+    two eligible players. **Not confirmed against production, not retroactive, nothing
+    backfilled.**
+  - **Not wired:** the dashboard `ContestsSidebar` score (no score type there).
+  - **Tests:** new `__tests__/utils/format-game-score.test.ts` (5); two structural guards
+    re-pointed at the formatter with their claims unchanged; games + touched service suites
+    green (the two `arena-band` failures are in files this work did not touch); games-service
+    Volt Velocity 13/13. **Never verified by eye.**
 - **28 Sep 2026 - (9) After the start there is nothing to join, and the lobby says so** (`23` s8.8).
   - **Owner report:** Play after the gun gave "Round cancelled - does not count / Play another
     round" in a loop (`refused round creation: Entry to this race has closed`); the lobby never

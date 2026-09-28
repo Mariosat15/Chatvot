@@ -14,6 +14,7 @@ import type { PlayState } from "@/components/games/play-state";
 import type { GamePresentation } from "@/lib/services/games/game-presentation.service";
 import { attemptProgress, clock, scoreText, scoringSummary } from "./arena-facts";
 import { formatVolts } from "@/lib/utils/format-volts";
+import ArenaEndsIn from "./ArenaEndsIn";
 import type { TerminologyPack } from "@/lib/constants/terminology";
 
 /**
@@ -45,6 +46,8 @@ interface Props {
    * IT IS NOT COMPUTED HERE AND MUST NOT BE. Absent renders a dash (R50 read-side).
    */
   rank?: number;
+  /** Only the wording of the end-of-contest clock depends on it. */
+  format?: "competition" | "challenge";
 }
 
 const STATUS_PILL: ReadonlyMap<string, { label: string; classes: string }> = new Map([
@@ -77,6 +80,7 @@ export function ArenaContestPanelView({
   presentation,
   terms,
   rank,
+  format = "competition",
 }: Props) {
   const attempt = attemptProgress(state.attemptsUsed, state.attemptsPermitted);
   const roundClock = clock(state.maxRoundSeconds ?? presentation.maxDurationSeconds);
@@ -94,6 +98,11 @@ export function ArenaContestPanelView({
       }
     >
       <div className="space-y-2.5 px-4 py-3">
+        <ArenaEndsIn
+          endsAt={state.playWindowEnd}
+          serverNow={state.serverNow}
+          noun={format === "challenge" ? "Challenge" : "Competition"}
+        />
         <NeonStatTiles
           items={[
             {
@@ -136,7 +145,7 @@ export function ArenaContestPanelView({
               icon: Gauge,
               accent: "score",
               label: `Your ${terms.score.toLowerCase()}`,
-              value: scoreText(state.participantScore),
+              value: scoreText(state.participantScore, presentation.scoreType),
             },
             {
               icon: Medal,

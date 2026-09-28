@@ -91,6 +91,7 @@ which**. |
 | **R112** | **Remedial actions for a contest lived in five places, and the incident screen was the one that still spoke trading.** The hub listed every contest and then offered pause and emergency-cancel **without** `contestControlCopy`, so pausing a puzzle told the operator that trading was frozen and positions would be closed. `challengeId` was on the model and nothing in the UI could set it, so a challenge incident could not be recorded, and a round had no field at all. "Result adjustment" returned `requiresManualReview` and did nothing, while `adjust-results` and `re-settle` already accepted an `incidentId`. The refund notification said *"You have been credited €X"* | **Medium** | **The wording was LIVE and player-visible; the other three were capability gaps, not wrong payments.** No wallet was debited or credited wrongly and **nothing was backfilled** — the credit moved was correct and only the sentence named euros | **CLOSED 21 Sep 2026.** One catalogue, one `POST /api/incidents/[id]/act` that requires both grants and logs `actionsTaken`, and a board from the stored subjects. Pause and resume stay on the contest as well, recorded in `12` s3.3. The player sentence uses `formatVolts`; the ledger currency was left |
 | **R113** | **`prize_pool_mismatch` alerted every correctly-settled unscored contest that refunded entry fees.** `checkPrizePoolMismatch` summed finalLeaderboard prizes + PlatformTransaction (`platform_fee` / `unclaimed_pool` / `retained_gm_fee`) and never looked at WalletTransaction `competition_refund`. Under `refund_entry_fees`, settlement returns the net pot on the wallet ledger and books only the fee — so prizes 0 + fee 2 against prizePool 20 looked like an 18-credit hole every minute. The contests were correct (fee + refunds = pool). The admin no-winners notice always said the pot went to the unclaimed pool | **Medium** | **LIVE and REPORTING-ONLY.** Alerts were false; no wallet was mis-paid and **nothing was backfilled**. Owner screenshots of Warrior's / Circuit Sniper matched the ledger | **CLOSED 21 Sep 2026.** Monitor counts completed `competition_refund` rows by `competitionId` (String). Notice branches on `unscoredContestPolicy`. See detail section |
 | **R114** | **`prize_pool_mismatch` alerted every correctly-settled contest that paid a Game Master.** Same equation as R113, one money row along: `platform_fee` is booked **net** of GM commission (`fees.service.ts`), and the GM share is credited as WalletTransaction `gamemaster_earning`. The monitor counted only the net fee, so prizes 18 + fee 1.50 = 19.50 against pool 20 looked short by exactly the GM amount on "This is annw". Settlement and the ledger were correct (18 + 1.50 + 0.50 = 20) | **Medium** | **LIVE and REPORTING-ONLY.** False critical alert; **nothing was backfilled**. Owner ledger + screenshot matched | **CLOSED 24 Sep 2026.** Monitor also sums completed `gamemaster_earning` by `competitionId`. `retained_gm_fee` still covers the inactive-GM case in PlatformTransaction. See detail section |
+| **R115** | **A player who did not finish was stored as a score of 0, and on a lower-is-better game that 0 was the best time on the board.** The ChartVolt Games adapter normalised a result with no score to `rawScore: 0`; ingestion stored it; ranking turned it into `-0` for a lower-is-better title, which sorts above every real time. Volt Velocity closes a non-finisher `completed` with no score, so the racer who never finished sat crowned at #1 | **High** | **LIVE for the board, possibly for money** - whether the phantom 0 was paid depends on the title's `zeroIsValidResult`; not confirmed against production. **Not retroactive, nothing backfilled** | **CLOSED 28 Sep 2026.** Adapter reports `scoreReported: false`, ingestion stores no score, ranking sorts no result last in both directions. See detail section |
 | **R107** | **Journey editor selection did not load the selected map; Required Badges showed raw badge ids.** Clicking a sequence card only set `selectedSequenceMap`, so the highlight moved while Current Map / Milestones / Zones kept map 1's data. Separately, `MilestoneDetailModal` resolved badge names only through `lib/constants/badges`, so blueprint ids like `trading_beat_top_trader_flag` rendered as snake_case | **Medium** | **LIVE and DISPLAY / EDITOR only** — no money, no wrong unlocks from the naming half; the editor half blocked editing maps 2–10. **Nothing was backfilled** | **CLOSED 17 Sep 2026.** `selectAndLoadMap` + tab-change reload by mapId; `resolveBadgeDisplayName` + milestones API enrichment from `getBadgesFromDB` |
 | **R108** | **Badge Simulator reported every `game_*` condition as unrecognized; `consecutive_trading_days` could never earn.** Simulator allow-list drifted from the registry; mock omitted `gameStats`/`gameTypes`; evaluator switch missed the registry streak name; vitest JSON blew `maxBuffer` | **Medium** | **LIVE for the simulator report and for streak badges in production**; Games badges were already earnable in production (registry door) — the simulator lied. **Nothing was backfilled** | **CLOSED 17 Sep 2026.** `isSupportedConditionType` + gameStats mocks; evaluator `consecutive_trading_days`; blueprint ladders for season/best score; vitest `--outputFile` |
 | R8 | Bulk find-and-replace on wording | High | Medium | X8 |
@@ -5796,6 +5797,41 @@ the failure count is now read from the **last** `Tests N failed` line rather tha
 **Files:** `lib/services/game-providers/provider-threshold-monitors.service.ts`; `__tests__/services/provider-threshold-monitors.test.ts`.
 
 **Not verified by eye.** Restart the worker after deploy so the next minute's pass uses the new equation.
+
+### R115 - A non-finisher was stored as 0, the winning time on a lower-is-better board - **CLOSED 28 Sep 2026**
+
+**What it is.** Owner report on a Volt Velocity competition: the prize split said one thing and
+the credits paid said another, and the board crowned a player showing `0` above the only racer
+with a real time. Volt Velocity closes a racer who did not finish as `completed` with **no**
+score, deliberately (R50). `normaliseResultBody` filled the missing score with `0` and
+`applyResult` stored it as a real result. `getProviderRankingValue` then negated it for a
+lower-is-better title, and `-0` sorts above every real (negated) time.
+
+**Harm.** **LIVE on the board.** For money it depends on the title: `providerHasResult` refuses a
+zero unless `zeroIsValidResult` is true, so if Volt Velocity's row has that flag set, the phantom
+0 was eligible and could have been paid rank 1. The reported +16.88 is 62.5% of a 27-credit
+pool, which fits two eligible players rather than one. **This was not confirmed against the
+production database**, so the owner should check `zeroIsValidResult` on the title and the
+contest's `finalLeaderboard`. **Not retroactive, nothing backfilled**: which contests to correct
+is an owner decision, and a script that re-pays from inferred history is an unreviewed money
+writer.
+
+**The fix.** Three places, none naming a game. The adapter keeps the placeholder in the required
+field and sets `scoreReported: false`. Ingestion stores no score when it sees that flag and skips
+the range check. Ranking returns `-Number.MAX_VALUE` for absent, non-finite, or an uncounted
+zero, in both directions (not `-Infinity`: the engine compares by subtraction, and
+`-Infinity - -Infinity` is `NaN`). The admin copies of `scoring.ts`, `contract.ts` and
+`normalise.ts` are changed in the same edit.
+
+**Recorded, not fixed.** The live leaderboard does not pass `zeroIsValidResult` into ranking, so
+on a title that genuinely counts a zero the board would show that zero last while settlement
+counts it. No live title counts a zero today.
+
+**Files:** `lib/services/game-providers/adapters/chartvolt-games/normalise.ts`,
+`lib/services/game-providers/contract.ts`, `lib/services/games/result-ingestion.service.ts`,
+`lib/games/provider/scoring.ts` (plus admin copies); tests in
+`__tests__/services/chartvolt-games-adapter.test.ts`, `participant-score-arrival.test.ts`,
+`provider-entry-and-ranking.test.ts`.
 
 ---
 

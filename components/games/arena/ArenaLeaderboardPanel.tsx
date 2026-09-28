@@ -187,7 +187,7 @@ function BoardTab({
   scope: ArenaBoardScope;
 }) {
   const terms = useTerms();
-  const { currentUserId } = useArenaLive();
+  const { currentUserId, scoreType } = useArenaLive();
 
   if (rows.length === 0) {
     return (
@@ -202,6 +202,7 @@ function BoardTab({
       rows={rows}
       currentUserId={currentUserId}
       scoreLabel={scoreLabel}
+      scoreType={scoreType}
       variant="ranking"
     />
   );

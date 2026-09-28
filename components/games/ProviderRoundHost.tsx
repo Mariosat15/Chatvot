@@ -7,6 +7,7 @@ import { ProviderGameFrame } from "./ProviderGameFrame";
 import { RoundPreflight } from "./RoundPreflight";
 import { RoundResultPanel } from "./RoundResultPanel";
 import type { PlayState, PlayerRoundView } from "./play-state";
+import type { GameScoreType } from "@/lib/utils/format-game-score";
 
 /**
  * The player's side of a provider round: decide, launch, play, then find out what happened.
@@ -79,6 +80,8 @@ interface ProviderRoundHostProps {
   competitionName: string;
   gameName: string;
   initialState: PlayState;
+  /** The title's declared score type - display only. */
+  scoreType?: GameScoreType;
 }
 
 export function ProviderRoundHost({
@@ -86,6 +89,7 @@ export function ProviderRoundHost({
   competitionName,
   gameName,
   initialState,
+  scoreType,
 }: ProviderRoundHostProps) {
   const router = useRouter();
   const [state, setState] = useState<PlayState>(initialState);
@@ -274,6 +278,7 @@ export function ProviderRoundHost({
         round={phase.name === "settled" ? phase.round : null}
         state={state}
         onPlayAgain={() => setPhase({ name: "preflight" })}
+        scoreType={scoreType}
       />
     );
   }

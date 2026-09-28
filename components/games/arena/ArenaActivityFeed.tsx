@@ -6,6 +6,7 @@ import {
   roundActivityToneClass,
   type RoundActivitySummary,
 } from "@/lib/utils/round-activity";
+import { formatGameScore, type GameScoreType } from "@/lib/utils/format-game-score";
 
 /**
  * What has just happened in this contest - the owner's `RECENT PLAYERS` panel.
@@ -42,6 +43,8 @@ export interface ArenaActivityEntry {
 interface Props {
   entries: ArenaActivityEntry[];
   currentUserId: string;
+  /** The title's declared score type - display only. */
+  scoreType?: GameScoreType;
 }
 
 /**
@@ -58,7 +61,7 @@ interface Props {
  */
 const FEED_LIMIT = 3;
 
-export function ArenaActivityFeed({ entries, currentUserId }: Props) {
+export function ArenaActivityFeed({ entries, currentUserId, scoreType }: Props) {
   if (entries.length === 0) return null;
 
   return (
@@ -135,7 +138,7 @@ export function ArenaActivityFeed({ entries, currentUserId }: Props) {
               */}
               {typeof entry.activity.score === "number" && (
                 <span className="shrink-0 text-[15px] font-bold tabular-nums text-amber-300 drop-shadow-[0_0_6px_rgba(252,211,77,0.45)]">
-                  {entry.activity.score.toLocaleString()}
+                  {formatGameScore(entry.activity.score, scoreType)}
                 </span>
               )}
             </div>

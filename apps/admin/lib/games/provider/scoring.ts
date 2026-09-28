@@ -40,8 +40,21 @@ export function getProviderRankingValue(
     game" - that was true of the code and is no longer the rule; see `providerHasResult`.
     The half that survives is the one that matters here: **a stored value and an absent one
     are different facts**, and this function still orders them identically.
+
+    CORRECTED 28 September 2026: "`?? 0` places a player with no result LAST" was true only of
+    a higher-is-better game. On a lower-is-better one the 0 was negated to -0 and sorted ABOVE
+    every real time, so a racer who never finished sat crowned at rank 1 on the live board,
+    above the one who did. No result - absent, non-finite, or a zero the title does not count -
+    now sorts last in both directions. `-Number.MAX_VALUE` rather than `-Infinity`, because the
+    engine compares by subtraction and `-Infinity - -Infinity` is `NaN`, which would stop two
+    players with no result reading as tied.
   */
-  const score = participant.score ?? 0;
+  const score = participant.score;
+  const noResult =
+    typeof score !== "number" ||
+    !Number.isFinite(score) ||
+    (score === 0 && participant.zeroIsValidResult !== true);
+  if (noResult) return -Number.MAX_VALUE;
 
   return participant.scoreDirection === "lower_is_better" ? -score : score;
 }

@@ -7,6 +7,7 @@ import { ProviderGameFrame } from "./ProviderGameFrame";
 import { RoundPreflight } from "./RoundPreflight";
 import { ChallengeRoundResultPanel } from "./ChallengeRoundResultPanel";
 import type { PlayState, PlayerRoundView } from "./play-state";
+import type { GameScoreType } from "@/lib/utils/format-game-score";
 
 /**
  * The challenge-side sibling of `ProviderRoundHost.tsx` - see that file's header for why
@@ -39,6 +40,8 @@ interface ChallengeRoundHostProps {
   challengeName: string;
   gameName: string;
   initialState: PlayState;
+  /** The title's declared score type - display only. */
+  scoreType?: GameScoreType;
 }
 
 export function ChallengeRoundHost({
@@ -46,6 +49,7 @@ export function ChallengeRoundHost({
   challengeName,
   gameName,
   initialState,
+  scoreType,
 }: ChallengeRoundHostProps) {
   const router = useRouter();
   const [state, setState] = useState<PlayState>(initialState);
@@ -193,6 +197,7 @@ export function ChallengeRoundHost({
         round={phase.name === "settled" ? phase.round : null}
         state={state}
         onPlayAgain={() => setPhase({ name: "preflight" })}
+        scoreType={scoreType}
       />
     );
   }

@@ -25,6 +25,7 @@ import { NEON_TABLE_HEAD } from "@/components/neon/tokens";
 import { humanizeMetric } from "@/lib/utils/humanize-metric";
 import { competitionDetailsHref } from "@/lib/utils/competition-details-view";
 import { formatVolts } from "@/lib/utils/format-volts";
+import { formatGameScore, type GameScoreType } from "@/lib/utils/format-game-score";
 import type { ProviderContestResults } from "@/lib/services/games/contest-results.service";
 
 /**
@@ -61,11 +62,6 @@ function formatDuration(ms?: number): string {
   return `${minutes}m ${Math.round(seconds % 60)}s`;
 }
 
-/** The score, or a dash. Never a zero standing in for an absence - that is R45's read side. */
-function scoreText(score?: number): string {
-  return Number.isFinite(score) ? String(score) : "-";
-}
-
 const ROUND_STATUS: Record<
   string,
   { label: string; className: string; icon: typeof CheckCircle2 }
@@ -97,6 +93,7 @@ export function ProviderResultsScreen({
   gameCode,
   bannerUrl,
   gameName,
+  scoreType,
   creditSymbol,
   refundedAmount,
 }: {
@@ -110,6 +107,8 @@ export function ProviderResultsScreen({
   /** Catalogue / operator upload from Games & Trading settings. */
   bannerUrl?: string | null;
   gameName?: string | null;
+  /** The title's declared score type - display only (a race time reads as `m:ss.mmm`). */
+  scoreType?: GameScoreType;
   /** `AppSettings.credits.symbol`. Replaced a `currencySymbol` prop handed the fiat symbol. */
   creditSymbol?: string;
   /**
@@ -121,6 +120,7 @@ export function ProviderResultsScreen({
    */
   refundedAmount?: number;
 }) {
+  const scoreText = (score?: number) => formatGameScore(score, scoreType);
   const scoredRounds = results.rounds.filter((r) =>
     Number.isFinite(r.score),
   );

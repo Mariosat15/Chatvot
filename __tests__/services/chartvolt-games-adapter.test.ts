@@ -587,6 +587,21 @@ describe("reading a result", () => {
     expect(result.data.occurredAt).toBeInstanceOf(Date);
   });
 
+  it("marks a completed round with no score as unreported, and a reported one as nothing", async () => {
+    // A racer who did not finish is closed `completed` with no score. The 0 fills the required
+    // field; `scoreReported: false` is the only thing stopping ingestion storing it as a time.
+    ok(resultBody({ score: undefined }));
+    const missing = await adapter.fetchRound("round-1");
+    expect(missing.success).toBe(true);
+    if (!missing.success) return;
+    expect(missing.data.rawScore).toBe(0);
+    expect(missing.data.scoreReported).toBe(false);
+
+    ok(resultBody({ score: 0 }));
+    const zero = await adapter.fetchRound("round-1");
+    expect(zero.success && zero.data).not.toHaveProperty("scoreReported");
+  });
+
   it("refuses a round still in progress with a distinguishable code", async () => {
     /*
      * `NormalisedRoundResult.status` is typed to the four TERMINAL states, because it describes a

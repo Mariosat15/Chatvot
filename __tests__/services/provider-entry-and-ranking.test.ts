@@ -283,13 +283,44 @@ describe("the provider game module", () => {
       and ELIGIBILITY are two questions: `getRankingValue` places a scoreless player last, and
       `hasResult` is what stops last place being a paid position. Last place is paid whenever
       the contest has as many prize ranks as entrants, which is R45.
+
+      FLIPPED 28 September 2026. This asserted `toBe(0)`, and 0 was "last" only for a game
+      scoring upward. On a lower-is-better title the value is negated, so a scoreless player
+      and one scoring 0 both ranked ABOVE every real time: Volt Velocity crowned a racer who
+      never finished. The lowest possible value is last in both directions.
     */
-    expect(
-      providerGameModule.getRankingValue(
-        { userId: "u", status: "active", enteredAt: new Date() },
+    for (const scoreDirection of ["higher_is_better", "lower_is_better"] as const) {
+      const absent = providerGameModule.getRankingValue(
+        { userId: "u", status: "active", enteredAt: new Date(), scoreDirection },
         "pnl",
-      ),
-    ).toBe(0);
+      );
+      const zero = providerGameModule.getRankingValue(
+        { userId: "z", status: "active", enteredAt: new Date(), scoreDirection, score: 0 },
+        "pnl",
+      );
+      const real = providerGameModule.getRankingValue(
+        { userId: "r", status: "active", enteredAt: new Date(), scoreDirection, score: 172_666 },
+        "pnl",
+      );
+      expect(absent).toBe(-Number.MAX_VALUE);
+      expect(zero).toBe(-Number.MAX_VALUE);
+      expect(real).toBeGreaterThan(absent);
+    }
+  });
+
+  it("still ranks a zero as a real score when the title says zero is valid", () => {
+    const value = providerGameModule.getRankingValue(
+      {
+        userId: "z",
+        status: "active",
+        enteredAt: new Date(),
+        scoreDirection: "higher_is_better",
+        score: 0,
+        zeroIsValidResult: true,
+      },
+      "pnl",
+    );
+    expect(value).toBe(0);
   });
 
   it("maps trading-named breakers onto duration then completedAt (A9)", () => {

@@ -15,6 +15,7 @@ import {
   type ArenaActivityEntry,
 } from "./ArenaActivityFeed";
 import type { RoundActivitySummary } from "@/lib/utils/round-activity";
+import type { GameScoreType } from "@/lib/utils/format-game-score";
 
 /**
  * Pot / seats / prize shares from the standings poll.
@@ -89,6 +90,8 @@ export interface ArenaLiveState {
   contest: ArenaContestSnapshot;
   /** Caller's rank on the live board; absent until they have a displayable score. */
   yourRank?: number;
+  /** The title's declared score type, fixed for the page - display only. */
+  scoreType?: GameScoreType;
 }
 
 const ArenaLiveContext = createContext<ArenaLiveState | null>(null);
@@ -140,6 +143,7 @@ interface ProviderProps {
    */
   active: boolean;
   intervalMs?: number;
+  scoreType?: GameScoreType;
   children: ReactNode;
 }
 
@@ -147,6 +151,7 @@ export function ArenaLiveProvider({
   competitionId,
   currentUserId,
   friendIds = [],
+  scoreType,
   initial,
   active,
   intervalMs = DEFAULT_INTERVAL_MS,
@@ -260,7 +265,7 @@ export function ArenaLiveProvider({
 
   return (
     <ArenaLiveContext.Provider
-      value={{ ...live, currentUserId, friendIds }}
+      value={{ ...live, currentUserId, friendIds, scoreType }}
     >
       {children}
     </ArenaLiveContext.Provider>
@@ -269,6 +274,8 @@ export function ArenaLiveProvider({
 
 /** The recent-players feed, from the same fetch as the board above it. */
 export function ArenaLiveFeed() {
-  const { feed, currentUserId } = useArenaLive();
-  return <ArenaActivityFeed entries={feed} currentUserId={currentUserId} />;
+  const { feed, currentUserId, scoreType } = useArenaLive();
+  return (
+    <ArenaActivityFeed entries={feed} currentUserId={currentUserId} scoreType={scoreType} />
+  );
 }

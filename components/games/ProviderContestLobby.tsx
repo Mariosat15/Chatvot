@@ -432,6 +432,7 @@ export default async function ProviderContestLobby({
         contest: initialContest,
         yourRank: standings.yourRank,
       }}
+      scoreType={presentation?.scoreType}
     >
     {isUserIn ? <ProviderClientWarmup gameCode={competition?.gameConfig?.gameCode} /> : null}
     <div className="flex min-h-screen flex-col gap-4 overflow-x-hidden p-3 sm:gap-6 sm:p-4 md:p-8">

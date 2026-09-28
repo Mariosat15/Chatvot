@@ -181,8 +181,16 @@ export function normaliseResultBody(
    * It would NOT be safe as a general default for a lower-is-better title, where zero is the
    * best possible score - which is why the provider itself refuses to report a bare zero for an
    * unplayed Circuit Perfect round and sends the worst time instead.
+   *
+   * CORRECTED 28 September 2026: "a voided round never reaches ranking" was true and the
+   * sentence was read as covering every missing score, which it does not. Volt Velocity closes
+   * a racer who did not finish as `completed` with NO score, deliberately (R50), and that 0 was
+   * stored as a real result - on a lower-is-better title, the fastest time on the board. So the
+   * 0 still fills the required field, and `scoreReported: false` tells ingestion to store no
+   * score at all rather than trusting it.
    */
-  const rawScore = asFiniteNumber(body.score) ?? 0;
+  const reportedScore = asFiniteNumber(body.score);
+  const rawScore = reportedScore ?? 0;
 
   const result: NormalisedRoundResult = {
     roundId,
@@ -190,6 +198,7 @@ export function normaliseResultBody(
     status: status as ProviderRoundStatus,
     rawScore,
   };
+  if (reportedScore === undefined) result.scoreReported = false;
 
   const breakdown = body.scoreBreakdown;
   if (typeof breakdown === "object" && breakdown !== null && !Array.isArray(breakdown)) {

@@ -20,6 +20,7 @@ interface Props {
   state: PlayState;
   presentation: GamePresentation;
   rank?: number;
+  format?: "competition" | "challenge";
 }
 
 export async function ArenaContestPanel({
@@ -27,6 +28,7 @@ export async function ArenaContestPanel({
   state,
   presentation,
   rank,
+  format,
 }: Props) {
   const terms = await getTerms();
   return (
@@ -36,6 +38,7 @@ export async function ArenaContestPanel({
       presentation={presentation}
       terms={terms}
       rank={rank}
+      format={format}
     />
   );
 }

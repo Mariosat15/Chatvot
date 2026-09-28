@@ -160,6 +160,7 @@ const CompetitionResultsPage = async ({
           gameCode={competition.gameCode}
           bannerUrl={presentation?.bannerUrl}
           gameName={presentation?.gameName}
+          scoreType={presentation?.scoreType}
           creditSymbol={appSettings?.credits?.symbol || undefined}
           refundedAmount={refundedAmount}
         />

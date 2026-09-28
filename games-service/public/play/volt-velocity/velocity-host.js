@@ -189,6 +189,29 @@
     }, END_POLL_MS);
   }
 
+  /**
+   * Remove the vendor's two ways back into free play.
+   *
+   * `#quit` ("RETURN TO HANGAR" on the pause menu) drops the pilot into the ship picker, and
+   * `#again` on the result screen starts another race - both a loop inside a paid contest's
+   * frame. The client is not edited, so the buttons are hidden with a stylesheet from here.
+   * LEAVE RACE stays: `watchForRaceEnd` turns it into a proper exit to the lobby.
+   */
+  const VENDOR_EXITS_CSS = "#quit, #again { display: none !important; }";
+
+  function hideVendorExits() {
+    try {
+      const doc = frame.contentDocument;
+      if (!doc || doc.getElementById("chartvolt-host-rules")) return;
+      const style = doc.createElement("style");
+      style.id = "chartvolt-host-rules";
+      style.textContent = VENDOR_EXITS_CSS;
+      (doc.head || doc.documentElement).appendChild(style);
+    } catch {
+      /* Same-origin by construction; a refusal leaves the race playable. */
+    }
+  }
+
   function listenForResult() {
     let clientWindow = null;
     try {
@@ -232,6 +255,7 @@
         });
         frame.src = session.clientUrl;
       });
+      hideVendorExits();
       frame.hidden = false;
 
       const api = await waitForClientApi();
