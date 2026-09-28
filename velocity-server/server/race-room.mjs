@@ -18,6 +18,8 @@ export const MAX_QUEUED_FRAMES=10;
 export const COUNTDOWN_MS=5000;
 /** How far ahead a scheduled start may be booked; bounds how long an idle lobby holds memory. */
 export const MAX_SCHEDULE_AHEAD_MS=6*60*60*1000;
+/** CHARTVOLT PATCH. Laps an operator may choose, and the time allowed per lap (the race limit is laps x this). */
+export const MIN_LAPS=1,MAX_LAPS=10,DEFAULT_LAPS=3,SECONDS_PER_LAP=100;
 const PLAYER_ID=/^[-\w]{1,80}$/;
 function validRosterEntry(p){return p&&PLAYER_ID.test(p.id)&&typeof p.name==='string'&&Boolean(p.name.trim())&&p.name.length<=40;}
 export class RaceRoom {
@@ -27,16 +29,24 @@ export class RaceRoom {
   *  - `scheduledStartAt`  - epoch ms. The all-ready auto start is disabled; the race goes green AT this
   *                          moment with every CONNECTED player (not-Ready players race with their selected
   *                          ship, owner decision 27 Sep 2026). Fewer than two connected -> 'cancelled'.
-  * Without either field the vendor behaviour is byte-for-byte unchanged (2-16 frozen, all-ready start).
+  *  - `laps`            - integer 1-10 (default 3). The race limit is laps x 100 s, so 3 laps keeps the
+  *                          vendor's 300 s exactly.
+  *  - `solo: true`        - exactly one registered pilot, frozen, unscheduled; the race starts when that
+  *                          pilot is Ready. An "each plays alone" competition gives every round its own room.
+  * Without these fields the vendor behaviour is byte-for-byte unchanged (2-16 frozen, all-ready start).
   */
  constructor(spec,now=Date.now()){
-  const open=spec?.openRoster===true,minPlayers=open?0:2;
+  const open=spec?.openRoster===true,solo=spec?.solo===true,minPlayers=open?0:solo?1:2;
+  const laps=spec?.laps===undefined||spec?.laps===null?DEFAULT_LAPS:spec.laps;
+  if(!Number.isInteger(laps)||laps<MIN_LAPS||laps>MAX_LAPS)throw Error('Invalid laps (1-10)');
+  // Reason: a solo room is one pilot's private race - growing it, or scheduling it against a clock, would make it a shared race wearing the wrong label.
+  if(solo&&(open||spec.players?.length!==1||(spec.scheduledStartAt!==undefined&&spec.scheduledStartAt!==null)))throw Error('Invalid solo race (exactly one pilot, frozen, unscheduled)');
   if(!spec||!PLAYER_ID.test(spec.id)||!TRACKS.some(t=>t.id===spec.trackId)||!Number.isInteger(spec.seed)||spec.seed<0||spec.seed>0xffffffff||!Array.isArray(spec.players)||spec.players.length<minPlayers||spec.players.length>MAX_RACERS)throw Error('Invalid race configuration (2–16 registered players required)');
   if(new Set(spec.players.map(p=>p.id)).size!==spec.players.length||!spec.players.every(validRosterEntry))throw Error('Invalid roster');
   if(spec.scheduledStartAt!==undefined&&spec.scheduledStartAt!==null){if(!Number.isSafeInteger(spec.scheduledStartAt)||spec.scheduledStartAt>now+MAX_SCHEDULE_AHEAD_MS)throw Error('Invalid scheduledStartAt');}
   this.id=spec.id;this.createdAt=now;this.status='lobby';this.tick=0;this.accumulator=0;this.startAt=null;this.raceElapsed=0;this.finishedAt=null;this.lastNow=now;
-  this.openRoster=open;this.scheduledStartAt=spec.scheduledStartAt??null;
-  this.config={trackId:spec.trackId,seed:spec.seed,routeVersion:ROUTE_VERSION,physicsVersion:PHYSICS_VERSION,laps:3,maxSeconds:300,format:'combat-race',competitiveCombat:true};
+  this.openRoster=open;this.solo=solo;this.scheduledStartAt=spec.scheduledStartAt??null;
+  this.config={trackId:spec.trackId,seed:spec.seed,routeVersion:ROUTE_VERSION,physicsVersion:PHYSICS_VERSION,laps,maxSeconds:laps*SECONDS_PER_LAP,format:'combat-race',competitiveCombat:true,...(solo?{solo:true}:{})};
   this.track=createTrack(spec.trackId);this.track.content=generateContent(this.track,spec.seed);
   this.combat=new PlayerCombat(this);
   this.players=new Map(spec.players.map(p=>[p.id,this.makePlayer(p,now)]));
@@ -68,7 +78,7 @@ export class RaceRoom {
   for(const p of connected)p.ready=true;
   this.start(now);
  }
- start(now){if(this.status!=='lobby')throw Error('Race already started');const racers=[...this.players.values()].filter(p=>p.connected&&p.ready);if(racers.length<2)throw Error('At least two connected ready players required');const random=rng(this.config.seed);racers.sort((a,b)=>a.id.localeCompare(b.id));for(let i=racers.length-1;i>0;i--){const j=Math.floor(random()*(i+1));[racers[i],racers[j]]=[racers[j],racers[i]];}this.status='countdown';this.startAt=now+5000;this.lastNow=now;for(const [i,p]of racers.entries()){p.active=true;p.sim.start();p.sim.lateral=racers.length<=4?(i-(racers.length-1)/2)*6:((i%4)-1.5)*6;p.sim.distance=0-Math.floor(i/4)*12;p.grid=i+1;p.sim.countdown=5;p.sim.shield=2;}}
+ start(now){if(this.status!=='lobby')throw Error('Race already started');const racers=[...this.players.values()].filter(p=>p.connected&&p.ready);if(racers.length<(this.solo?1:2))throw Error('At least two connected ready players required');const random=rng(this.config.seed);racers.sort((a,b)=>a.id.localeCompare(b.id));for(let i=racers.length-1;i>0;i--){const j=Math.floor(random()*(i+1));[racers[i],racers[j]]=[racers[j],racers[i]];}this.status='countdown';this.startAt=now+5000;this.lastNow=now;for(const [i,p]of racers.entries()){p.active=true;p.sim.start();p.sim.lateral=racers.length<=4?(i-(racers.length-1)/2)*6:((i%4)-1.5)*6;p.sim.distance=0-Math.floor(i/4)*12;p.grid=i+1;p.sim.countdown=5;p.sim.shield=2;}}
  input(id,msg,now){const p=this.player(id);if(!p.connected||p.dnf||p.finishTimeMs!=null)return false;if(now-p.rateAt>=1000){p.rateAt=now;p.rateCount=0;}if(++p.rateCount>45)return false;const input=validateInput(msg.input);if(!Number.isSafeInteger(msg.seq)||msg.seq<0||msg.seq<=p.lastSeq||!input)return false;
   // CHARTVOLT PATCH: optional step-numbered frames. A message without them keeps the vendor behaviour exactly.
   let frames=null;if(msg.frames!==undefined){if(!Array.isArray(msg.frames)||msg.frames.length>MAX_FRAMES_PER_MESSAGE)return false;frames=[];for(const raw of msg.frames){const f=decodeFrame(raw);if(!f)return false;frames.push(f);}}

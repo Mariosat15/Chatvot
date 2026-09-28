@@ -18,7 +18,7 @@
 
 import { loadConfig, type VelocityConfig } from "../../config";
 import { ApiError, badRequest } from "../../http/errors";
-import type { VoltVelocityConfig } from "./title";
+import { lapsOf, type VoltVelocityConfig } from "./title";
 import {
   MAX_SCHEDULE_AHEAD_MS,
   raceIdentity,
@@ -89,14 +89,24 @@ export async function seatVelocityPlayer(
   scheduledStartAt: Date | undefined,
   providerRoundId: string,
   displayName: string | undefined,
+  soloRoundId?: string,
 ): Promise<VelocitySeat> {
   const velocity = requireVelocityConfig();
-  const identity = raceIdentity(gameCode, contentSeed, config.trackId, scheduledStartAt);
+  const laps = lapsOf(config);
+  const identity = raceIdentity(
+    gameCode,
+    contentSeed,
+    config.trackId,
+    scheduledStartAt,
+    laps,
+    soloRoundId,
+  );
   const outcome = await seatPlayer(
     velocity,
     identity,
     { id: providerRoundId, name: racerName(displayName) },
     scheduledStartAt,
+    { laps, solo: soloRoundId !== undefined },
   );
   if (outcome.ok) return { identity, scheduledStartAt };
 

@@ -239,6 +239,7 @@ export async function createRound(
       config: input.config.settings,
       contentSeed: live.contentSeed,
       scheduledStartAt: input.config.scheduledStartAt,
+      contestType: input.contestType,
       expiresAt: live.expiresAt,
       resultCallbackUrl: input.resultCallbackUrl,
       progressCallbackUrl: input.progressCallbackUrl,
@@ -340,6 +341,7 @@ export async function createRound(
     // provider uses it to put all players in the SAME race, so omitting it for a late
     // opener would seat them in a race of their own.
     scheduledStartAt: input.config.scheduledStartAt,
+    contestType: input.contestType,
     expiresAt,
     resultCallbackUrl: input.resultCallbackUrl,
     progressCallbackUrl: input.progressCallbackUrl,

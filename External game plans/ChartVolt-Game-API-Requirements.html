@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
@@ -208,7 +208,7 @@
     <p class="lede">ChartVolt runs paid skill competitions. We handle the money, the ranking and the rewards. We are looking for partners who can supply the games and tell us what each player scored. This document specifies exactly what your API must do so that we can operate on top of it &mdash; three calls to you, one call back to us.</p>
     <div class="hero-meta">
       <div><b>Document</b><span>Integration requirements</span></div>
-      <div><b>Version</b><span>1.21</span></div>
+      <div><b>Version</b><span>1.22</span></div>
       <div><b>Audience</b><span>Your engineering team</span></div>
       <div><b>Required calls</b><span>3 out, 1 in</span></div>
       <div><b>Money handled by you</b><span>None, ever</span></div>
@@ -583,6 +583,7 @@
       <tr><td><code>default</code></td><td>Optional</td></tr>
       <tr><td><code>title</code>, <code>description</code></td><td>Display only</td></tr>
       <tr><td><code>format</code></td><td>Only <code>"duration-seconds"</code> (see 3.2). Any other value refuses the schema</td></tr>
+      <tr><td><code>challengeValue</code></td><td><b>New in 1.22.</b> Optional. The value this setting always takes on a 1v1 challenge (for example, always 3 laps). Same type as the property and within its own limits, or the schema is refused. We pin it on every challenge round; competitions ignore it</td></tr>
     </tbody>
   </table></div>
 
@@ -681,6 +682,7 @@
   "contentSeed": "cv_ctst_774219",        <span class="c">// identical content for everyone</span>
                                           <span class="c">// in this contest - see section 12</span>
   "scheduledStartAt":    "2026-08-18T12:00:00Z",   <span class="c">// scheduled titles only (1.21)</span>
+  "contestType":         "competition",            <span class="c">// optional (1.22)</span>
   "expiresAt":           "2026-08-18T14:00:00Z",
   "resultCallbackUrl":   "https://chartvolt.com/api/games/providers/acme/events",
   "progressCallbackUrl": "https://chartvolt.com/api/games/providers/acme/progress",
@@ -707,6 +709,7 @@
       <tr><td><code>status</code></td><td><b>Required on the response (1.13).</b> Always the literal <code>"created"</code> on a successful create or idempotent reuse that hands us a launchable round. Live progress belongs on the fetch endpoint (section 13), not here</td></tr>
       <tr><td><code>expiresAt</code></td><td>After this moment the round must be <b>unplayable</b> and must report <code>expired</code>. This stops a player finishing long after prizes have been paid</td></tr>
       <tr><td><code>scheduledStartAt</code></td><td><b>New in 1.21.</b> Sent only on a round of a contest run with <code>playMode: "scheduled"</code>: the moment the race starts for everyone. <b>We may create the round and load your launch URL before this moment</b> &mdash; up to 30 minutes before, for a lobby where entrants gather &mdash; so your game must accept a player early and hold them until <code>scheduledStartAt</code>, not start their clock on arrival. Every round of one contest carries the same value. <code>expiresAt</code> is measured from this moment, not from when we created the round. Absent on every <code>anytime</code> round</td></tr>
+      <tr><td><code>contestType</code></td><td><b>New in 1.22.</b> Optional: <code>competition</code>, <code>challenge</code> or <code>practice</code>. Lets a multiplayer game tell a play-any-time competition (each player alone) from a challenge (the two race each other) &mdash; neither carries <code>scheduledStartAt</code>. Ignore it if your game plays the same way everywhere; if it is absent, keep your previous behaviour</td></tr>
       <tr><td><code>mode</code></td><td><code>ranked</code> counts towards a paid contest and <b>must</b> produce a result callback. <code>practice</code> is free play, is never scored by us, and <b>must not</b> produce a result callback (new clarity in 1.10). Our fetch of the round still works for practice &mdash; we just will not accept a score for it</td></tr>
       <tr><td><code>contentSeed</code></td><td><b>Required on ranked</b> when your title supports seeding. On <code>practice</code> we omit it or send nothing shared with a contest: generate content from a <b>per-round</b> seed of your own. <b>Never reuse a contest seed for practice</b> &mdash; that would let a player rehearse the exact content they are about to be paid to face (1.10)</td></tr>
       <tr><td><code>progressCallbackUrl</code></td><td><b>New in 1.5, and entirely optional.</b> Where you may tell us what the player has done <i>so far</i>, while they are still playing, so a contest board shows more than &ldquo;playing now&rdquo;. We always send the address; ignoring it is fully conformant &mdash; see section 8a</td></tr>
@@ -1318,6 +1321,7 @@ $headers = [
   <div class="tw"><table>
     <thead><tr><th style="width:90px">Version</th><th style="width:130px">Date</th><th>Change</th></tr></thead>
     <tbody>
+      <tr><td><b>1.22</b></td><td>28 Sep 2026</td><td><b>Two optional additions, both backward compatible.</b> <code>contestType</code> on create-round (section 4) &mdash; <code>competition</code>, <code>challenge</code> or <code>practice</code> &mdash; so a multiplayer game can tell a play-any-time competition (each player alone) from a challenge (the two race each other); ignore it if your game plays the same way everywhere. And a <code>challengeValue</code> keyword in <code>configSchema</code> (section 3.1b): the value a setting always takes on a 1v1 challenge. We pin it on every challenge round and show it as fixed; competitions ignore it</td></tr>
       <tr><td><b>1.21</b></td><td>27 Sep 2026</td><td><b>Two optional fields for live races.</b> <code>maxPlayers</code> on the catalogue (section 3) &mdash; the most players one round can hold; omit it if there is no limit, and we refuse any contest that could seat more. <code>scheduledStartAt</code> on create-round (section 4), sent only for <code>scheduled</code> titles &mdash; the shared start moment. We may create the round and load your launch URL up to 30 minutes before it, so hold an early player in a lobby rather than starting their clock. Titles that play <code>anytime</code> are unaffected</td></tr>
       <tr><td><b>1.20</b></td><td>26 Sep 2026</td><td><b>Optional <code>provisionalScore</code> on the progress callback.</b> Section 8a. Same number as the eventual result <code>score</code>, for live board ranking only; settlement still ignores it. Omit it and you remain fully conformant. A field named <code>score</code> on progress stays ignored</td></tr>
       <tr><td><b>1.19</b></td><td>24 Sep 2026</td><td><b>Defines <code>replayUrl</code>.</b> Must serve the player&rsquo;s own attempt (never live contest puzzle content), be token-scoped, refuse until the round is terminal (ranked: also until <code>expiresAt</code> / play window closed), and stay valid &ge; 90 days. Closes ambiguity A14 / risk R35 for the contract</td></tr>
@@ -1349,7 +1353,7 @@ $headers = [
 </div>
 
 <div class="foot">
-  <div>ChartVolt &mdash; Game API Requirements &middot; Version 1.21 &middot; Requirements document for prospective game providers</div>
+  <div>ChartVolt &mdash; Game API Requirements &middot; Version 1.22 &middot; Requirements document for prospective game providers</div>
   <div>Questions on this specification: contact your ChartVolt commercial contact</div>
 </div>
 

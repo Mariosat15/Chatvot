@@ -14,6 +14,7 @@
 
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import type { VelocityConfig } from "../../config";
+import { DEFAULT_VELOCITY_LAPS } from "./title";
 import { AUTO_TRACK, trackForSeed, type VelocityTrackChoice } from "./tracks";
 
 /** The race server refuses a room scheduled further ahead than this. */
@@ -43,10 +44,19 @@ export function raceIdentity(
   contentSeed: string,
   trackChoice: VelocityTrackChoice,
   scheduledStartAt: Date | undefined,
+  laps: number,
+  soloRoundId?: string,
 ): RaceIdentity {
   const seed = createHash("sha256").update(`velocity-seed|${contentSeed}`).digest().readUInt32BE(0);
   const trackId = trackChoice === AUTO_TRACK ? trackForSeed(seed) : trackChoice;
+  // Reason: laps are part of what the room IS - two rounds that agree on everything but the lap
+  // count must never share a room, or one of them races a distance its contest did not set.
+  // A solo room is keyed on the platform's round id, so a retried launch reuses it and no
+  // other player's launch can ever land in it. The 3-lap shared key is the pre-laps key
+  // unchanged, so a room created before this release is still found by the same id.
   const key = [gameCode, contentSeed, trackId, scheduledStartAt?.toISOString() ?? "unscheduled"];
+  if (laps !== DEFAULT_VELOCITY_LAPS) key.push(`laps:${laps}`);
+  if (soloRoundId) key.push(`solo:${soloRoundId}`);
   const digest = createHash("sha256").update(key.join("|")).digest("hex").slice(0, 32);
   return { raceId: `vv_${digest}`, trackId, seed };
 }
@@ -130,15 +140,19 @@ export async function seatPlayer(
   identity: RaceIdentity,
   player: { id: string; name: string },
   scheduledStartAt: Date | undefined,
+  room: { laps: number; solo: boolean },
 ): Promise<SeatOutcome> {
   try {
+    // A solo room is frozen at its one pilot and unscheduled; the race server refuses an open
+    // roster or a schedule on it, so neither is sent. It starts when that pilot is Ready.
     const created = await admin(config, "POST", "/v1/races", {
       id: identity.raceId,
       trackId: identity.trackId,
       seed: identity.seed,
       players: [player],
-      openRoster: true,
-      ...(scheduledStartAt ? { scheduledStartAt: scheduledStartAt.getTime() } : {}),
+      laps: room.laps,
+      ...(room.solo ? { solo: true } : { openRoster: true }),
+      ...(scheduledStartAt && !room.solo ? { scheduledStartAt: scheduledStartAt.getTime() } : {}),
     });
     if (created.status === 201) return { ok: true };
     if (created.status !== 409) return refusalFrom(created);
@@ -168,6 +182,8 @@ export interface RaceResultEntry {
   timeMs: number | null;
   bestLapMs: number | null;
   lapsCompleted: number;
+  /** Points earned in the race - the tie-break between equal times. 0 when absent. */
+  skillScore: number;
   shipId?: string;
 }
 
@@ -224,6 +240,7 @@ export function verifyReceipt(secret: string, receipt: Record<string, unknown>):
         timeMs: finiteOrNull(row.timeMs),
         bestLapMs: finiteOrNull(row.bestLapMs),
         lapsCompleted: finiteOrNull(row.lapsCompleted) ?? 0,
+        skillScore: Math.max(0, finiteOrNull(row.skillScore) ?? 0),
         ...(typeof row.shipId === "string" ? { shipId: row.shipId } : {}),
       })),
   };
@@ -247,6 +264,22 @@ export async function pollResult(config: VelocityConfig, raceId: string): Promis
   }
 }
 
+/** Points above this cannot move the score by a whole millisecond. */
+export const MAX_TIE_BREAK_POINTS = 999_999;
+
+/**
+ * Fastest time wins; on an EQUAL time, more points win (owner rule).
+ *
+ * The platform ranks one number, lower-is-better, so the points are folded in below the
+ * millisecond: `timeMs - points / 1e6`. Capped so they can never be worth a whole millisecond -
+ * a slower racer must never beat a faster one on points. Both inputs come from the SIGNED
+ * receipt, so a racer cannot raise their own points.
+ */
+export function tieBrokenScore(timeMs: number, points: number): number {
+  const bonus = Math.min(Math.max(0, points), MAX_TIE_BREAK_POINTS);
+  return timeMs - bonus / 1_000_000;
+}
+
 /**
  * What one racer scored. Chapter 23: the score is the finishing time, and only a racer who
  * crossed the line without a DNF has one. Everybody else records NO score - never zero, which on
@@ -263,9 +296,10 @@ export function scoreForEntry(entry: RaceResultEntry | undefined): {
   };
   if (entry.bestLapMs !== null) breakdown.bestLapMs = entry.bestLapMs;
   if (entry.shipId) breakdown.ship = entry.shipId;
+  breakdown.points = entry.skillScore;
   if (entry.finished && !entry.dnf && entry.timeMs !== null) {
     breakdown.timeMs = entry.timeMs;
-    return { score: entry.timeMs, breakdown };
+    return { score: tieBrokenScore(entry.timeMs, entry.skillScore), breakdown };
   }
   return { breakdown };
 }

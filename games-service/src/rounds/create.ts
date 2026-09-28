@@ -16,6 +16,7 @@ import {
   type VelocitySeat,
 } from "../games/volt-velocity/launch";
 import { Round, type RoundDoc, type RoundDocument } from "../store/round.model";
+import { parseContestType, pinChallengeSettings } from "./contest-type";
 import { ApiError, badRequest, roundConflict, unknownGame } from "../http/errors";
 
 /**
@@ -46,6 +47,8 @@ export interface CreateRoundInput {
   parentOrigin?: unknown;
   /** Volt Velocity only: when the scheduled race goes green. Absent on a challenge. */
   scheduledStartAt?: unknown;
+  /** HTML v1.22: "competition" | "challenge" | "practice". Optional; see `contest-type.ts`. */
+  contestType?: unknown;
 }
 
 export interface CreateRoundOutput {
@@ -277,7 +280,11 @@ export async function createRound(input: CreateRoundInput): Promise<CreateRoundO
     input.config && typeof input.config === "object" && !Array.isArray(input.config)
       ? (input.config as Record<string, unknown>)
       : {};
-  const { config, corrected } = resolveConfig(title, requestedConfig);
+  const contestType = parseContestType(input.contestType);
+  const { config, corrected } = resolveConfig(
+    title,
+    pinChallengeSettings(title, contestType, requestedConfig),
+  );
 
   if (corrected.length > 0) {
     // Not an error, deliberately. `resolveConfig` clamps rather than refusing because the value
@@ -350,13 +357,24 @@ export async function createRound(input: CreateRoundInput): Promise<CreateRoundO
   // in the fingerprint - it decides which room, not what the player faces inside it.
   let seat: VelocitySeat | undefined;
   if (isVelocity) {
+    const scheduledStartAt = parseScheduledStart(input.scheduledStartAt, expiresAt, now);
+    if (contestType === "challenge" && scheduledStartAt) {
+      // A challenge races when both players are Ready; a start time on one means the platform
+      // and this service disagree about what the round is, and guessing picks a room.
+      throw badRequest("'scheduledStartAt' must be absent on a challenge.");
+    }
+    // An unscheduled COMPETITION is "each plays alone": this round gets a room of its own.
+    // Keyed on the provider round id, so a retry after a failed write gets a fresh room rather
+    // than being refused by the frozen one the failed attempt left behind.
+    const solo = contestType === "competition" && !scheduledStartAt;
     seat = await seatVelocityPlayer(
       gameCode,
       contentSeed as string,
       config as VoltVelocityConfig,
-      parseScheduledStart(input.scheduledStartAt, expiresAt, now),
+      scheduledStartAt,
       providerRoundId,
       typeof player.displayName === "string" ? player.displayName : undefined,
+      solo ? providerRoundId : undefined,
     );
   }
 

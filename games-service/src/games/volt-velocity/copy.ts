@@ -5,9 +5,10 @@
  * Volt Stack and has no room left for a fourth set. `content.ts` imports this module; this
  * module imports only types, so there is no cycle.
  *
- * WHAT THE COPY MUST NOT SAY: that a player can race whenever they like. The race has one
- * start time and one field, and a player who arrives after the gun has missed it. Every
- * sentence below that mentions time is about that.
+ * WHAT THE COPY MUST NOT SAY: a lap count or a fixed race length. The operator picks 1-10 laps
+ * per competition (a challenge is always 3), and whether everybody races together or each
+ * player races alone, so a number or a "together" claim in catalogue copy would be false for
+ * some contest. The per-lap limit (100 seconds) is the one timing fact true of every race.
  */
 
 import type { TitleCopy } from "../content";
@@ -16,44 +17,47 @@ import type { SupportedLocale } from "../locale";
 export const VOLT_VELOCITY_COPY: Record<SupportedLocale, TitleCopy> = {
   en: {
     displayName: "Volt Velocity",
-    tagline: "Up to 16 pilots. One start. Three laps.",
+    tagline: "Up to 16 pilots. One track. Fastest time wins.",
     description:
-      "A live anti-gravity race. Join the lobby before the start, pick your ship, and race " +
-      "every other entrant at the same moment on the same track. Fastest three-lap time wins.",
+      "A live anti-gravity race. Pick your ship and race the full distance on the contest's " +
+      "track - against the whole field at once, or on your own against the clock, depending " +
+      "on the contest.",
     rulesSummary:
-      "Lowest finishing time over three laps wins. A pilot who does not finish, or is not " +
-      "connected when the race starts, records no time. The race server times every lap.",
+      "Lowest finishing time wins; if two times are equal, more points wins. A pilot who does " +
+      "not finish, or is not connected when the race starts, records no score. The race " +
+      "server times every lap.",
     pacingNote:
-      "Everyone starts together at the scheduled time after a five-second countdown. The race " +
-      "closes five minutes after the start; anybody still racing then does not finish.",
+      "The race starts after a five-second countdown and allows 100 seconds per lap; anybody " +
+      "still racing when that runs out does not finish.",
   },
   el: {
     displayName: "Volt Velocity",
-    tagline: "Έως 16 πιλότοι. Μία εκκίνηση. Τρεις γύροι.",
+    tagline: "Έως 16 πιλότοι. Μία πίστα. Κερδίζει ο ταχύτερος χρόνος.",
     description:
-      "Ζωντανός αγώνας αντιβαρύτητας. Μπες στο lobby πριν την εκκίνηση, διάλεξε σκάφος και " +
-      "τρέξε μαζί με όλους τους υπόλοιπους την ίδια στιγμή, στην ίδια πίστα. Κερδίζει ο " +
-      "ταχύτερος χρόνος τριών γύρων.",
+      "Ζωντανός αγώνας αντιβαρύτητας. Διάλεξε σκάφος και ολοκλήρωσε την απόσταση στην πίστα " +
+      "του διαγωνισμού - μαζί με όλους τους υπόλοιπους, ή μόνος σου απέναντι στο χρονόμετρο, " +
+      "ανάλογα με τον διαγωνισμό.",
     rulesSummary:
-      "Κερδίζει ο χαμηλότερος χρόνος τριών γύρων. Όποιος δεν τερματίσει, ή δεν είναι " +
-      "συνδεδεμένος στην εκκίνηση, δεν καταγράφει χρόνο. Ο διακομιστής χρονομετρεί κάθε γύρο.",
+      "Κερδίζει ο χαμηλότερος χρόνος τερματισμού· σε ισοπαλία χρόνου κερδίζουν οι περισσότεροι " +
+      "πόντοι. Όποιος δεν τερματίσει, ή δεν είναι συνδεδεμένος στην εκκίνηση, δεν καταγράφει " +
+      "σκορ. Ο διακομιστής χρονομετρεί κάθε γύρο.",
     pacingNote:
-      "Όλοι ξεκινούν μαζί στην προγραμματισμένη ώρα μετά από αντίστροφη μέτρηση πέντε " +
-      "δευτερολέπτων. Ο αγώνας κλείνει πέντε λεπτά μετά την εκκίνηση.",
+      "Ο αγώνας ξεκινά μετά από αντίστροφη μέτρηση πέντε δευτερολέπτων και δίνει 100 " +
+      "δευτερόλεπτα ανά γύρο· όποιος τρέχει ακόμη όταν τελειώσει ο χρόνος δεν τερματίζει.",
   },
 };
 
 export const VOLT_VELOCITY_RULES_BY_LOCALE: Record<SupportedLocale, readonly string[]> = {
   en: [
-    "Join the lobby before the start time and pick one of the eight ships - each trades speed, handling, hull and boost differently.",
+    "Join the lobby and pick one of the eight ships - each trades speed, handling, hull and boost differently.",
     "Press Ready when you are set. You race even if you do not, as long as you are connected when the race starts.",
-    "Steer, accelerate and brake around three laps. Boost drains energy; pickups refill it, repair your hull or give you a shield or a weapon.",
+    "Steer, accelerate and brake around every lap of the race. Boost drains energy; pickups refill it, repair your hull or give you a shield or a weapon.",
     "Leaving the track or losing your hull respawns you and costs time. Every pilot races the same track with the same pickups.",
   ],
   el: [
-    "Μπες στο lobby πριν την ώρα εκκίνησης και διάλεξε ένα από τα οκτώ σκάφη - το καθένα ζυγίζει διαφορετικά ταχύτητα, χειρισμό, θωράκιση και boost.",
+    "Μπες στο lobby και διάλεξε ένα από τα οκτώ σκάφη - το καθένα ζυγίζει διαφορετικά ταχύτητα, χειρισμό, θωράκιση και boost.",
     "Πάτα Ready όταν είσαι έτοιμος. Τρέχεις ακόμη κι αν δεν το πατήσεις, αρκεί να είσαι συνδεδεμένος στην εκκίνηση.",
-    "Στρίψε, επιτάχυνε και φρέναρε για τρεις γύρους. Το boost καταναλώνει ενέργεια· τα pickups την αναπληρώνουν, επισκευάζουν ή δίνουν ασπίδα ή όπλο.",
+    "Στρίψε, επιτάχυνε και φρέναρε σε κάθε γύρο του αγώνα. Το boost καταναλώνει ενέργεια· τα pickups την αναπληρώνουν, επισκευάζουν ή δίνουν ασπίδα ή όπλο.",
     "Αν βγεις από την πίστα ή χάσεις τη θωράκιση, επανεμφανίζεσαι και χάνεις χρόνο. Όλοι τρέχουν την ίδια πίστα με τα ίδια pickups.",
   ],
 };

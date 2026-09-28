@@ -179,6 +179,30 @@ describe("resolveChallengeProviderGame", () => {
     expect(result.displayName).toBe("Mock Puzzle");
   });
 
+  it("pins a setting the title fixes for every challenge (challengeValue), whatever the player sent", async () => {
+    await seedCatalogue({
+      title: {
+        configSchema: {
+          type: "object",
+          properties: {
+            rounds: { type: "integer", minimum: 1, maximum: 20, default: 5, challengeValue: 3 },
+          },
+        },
+      },
+    });
+
+    const result = await resolveChallengeProviderGame({
+      providerKey: MOCK_PROVIDER_KEY,
+      gameCode: GAME_CODE,
+      settings: { rounds: 12 },
+      durationMinutes: 30,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(`unexpected refusal: ${result.error}`);
+    expect(result.settings.rounds).toBe(3);
+  });
+
   it("refuses when the submitted settings fail the schema's own validation", async () => {
     await seedCatalogue();
 

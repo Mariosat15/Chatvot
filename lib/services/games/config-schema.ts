@@ -68,6 +68,15 @@ export interface ConfigField {
   default?: unknown;
   /** A declared role. See `CONFIG_FIELD_FORMATS`. */
   format?: ConfigFieldFormat;
+  /**
+   * The value this setting ALWAYS takes in a 1v1 challenge - requirements HTML 1.22.
+   *
+   * Reason it is a declared keyword rather than something the game quietly enforces: a game
+   * overriding a challenger's choice leaves a control on the challenge form that appears to
+   * work and does nothing. Declared, the form shows it fixed and `applyChallengeValues`
+   * stores it, so what the player reads is what the game plays. Competitions ignore it.
+   */
+  challengeValue?: unknown;
 }
 
 export type ParseResult =
@@ -92,6 +101,7 @@ const SUPPORTED_FIELD_KEYS = new Set([
   "title",
   "description",
   "format",
+  "challengeValue",
 ]);
 
 const SUPPORTED_TYPES = new Set<string>([
@@ -239,7 +249,7 @@ export function parseConfigSchema(raw: unknown): ParseResult {
       };
     }
 
-    fields.push({
+    const field: ConfigField = {
       name,
       type: type as ConfigFieldType,
       required: requiredNames.has(name),
@@ -251,7 +261,25 @@ export function parseConfigSchema(raw: unknown): ParseResult {
       options,
       default: rawField.default,
       format,
-    });
+    };
+
+    if (rawField.challengeValue !== undefined) {
+      // Reason: fail closed, like every other keyword here. A pinned value the field's own
+      // bounds reject would be stored on every challenge and refused by the provider at
+      // launch - and it must already be the declared type, because a coerced "3" would make
+      // the stored settings differ from what the provider declared.
+      const check = validateConfigValues([field], { [name]: rawField.challengeValue });
+      // eslint-disable-next-line security/detect-object-injection -- name is the field just validated
+      if (!check.ok || check.values[name] !== rawField.challengeValue) {
+        return {
+          ok: false,
+          error: `Setting "${name}" declares a challengeValue that is not a valid value for it.`,
+        };
+      }
+      field.challengeValue = rawField.challengeValue;
+    }
+
+    fields.push(field);
   }
 
   // Reason: a declared role has to identify ONE field or it identifies none. Two settings
@@ -494,6 +522,24 @@ export function defaultConfigValues(
     else if (field.type === "boolean") values[field.name] = false;
   }
   return values;
+}
+
+/**
+ * Overwrites every field that declares a `challengeValue` with that value.
+ *
+ * Called on the SERVER after validation, so a challenger (or an API caller) cannot choose a
+ * pinned setting by sending one - the form shows it fixed, and this is what makes that true.
+ * Returns a new object; fields without a `challengeValue` keep whatever was validated.
+ */
+export function applyChallengeValues(
+  fields: ConfigField[],
+  values: Record<string, unknown>,
+): Record<string, unknown> {
+  const pinned: Record<string, unknown> = { ...values };
+  for (const field of fields) {
+    if (field.challengeValue !== undefined) pinned[field.name] = field.challengeValue;
+  }
+  return pinned;
 }
 
 function numberOrUndefined(value: unknown): number | undefined {

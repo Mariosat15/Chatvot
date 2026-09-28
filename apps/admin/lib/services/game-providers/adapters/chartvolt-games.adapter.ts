@@ -359,6 +359,7 @@ export class ChartVoltGamesAdapter implements GameProviderAdapter {
         // same string, but relying on it means a plain object with a string date silently
         // serialises differently from a real Date.
         expiresAt: request.expiresAt.toISOString(),
+        ...(request.contestType ? { contestType: request.contestType } : {}),
         // Omitted rather than sent as null when the contest is not scheduled, so a non-scheduled
         // round's body is byte-for-byte what it was before 1.21.
         ...(request.scheduledStartAt

@@ -180,6 +180,17 @@ export interface CreateRoundRequest {
    * contest that is not scheduled.
    */
   scheduledStartAt?: Date;
+  /**
+   * What kind of contest this round belongs to - requirements HTML 1.22.
+   *
+   * Optional and informational: nothing about scoring depends on it. It exists because a
+   * challenge and a competition played "any time" look identical from the provider's side
+   * (neither has `scheduledStartAt`), yet a game may treat them differently - Volt Velocity
+   * races a challenge's two players together, runs each "any time" competition round as a
+   * private race, and fixes a challenge to its declared `challengeValue` settings. Absent means
+   * the provider must behave exactly as before 1.22.
+   */
+  contestType?: "competition" | "challenge" | "practice";
   expiresAt: Date;
   resultCallbackUrl: string;
   /**

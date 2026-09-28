@@ -83,7 +83,20 @@ export default function ChallengeSettingsFields({
   return (
     <div className="space-y-3">
       {fields.map((field) =>
-        lockPlayClock && field.format === "duration-seconds" ? (
+        field.challengeValue !== undefined ? (
+          // Reason: the server stores the pinned value whatever is sent
+          // (`applyChallengeValues`), so an editable control here would appear to work and
+          // do nothing. Shown as a fact instead.
+          <div key={field.name} className="space-y-1">
+            <p className="text-sm text-gray-300">{fieldLabel(field)}</p>
+            <p className="text-sm font-semibold text-white">
+              {String(field.challengeValue)}
+            </p>
+            <p className="text-[11px] text-gray-500">
+              Fixed for every challenge on this game.
+            </p>
+          </div>
+        ) : lockPlayClock && field.format === "duration-seconds" ? (
           <ChallengeDurationClock
             key={field.name}
             label={fieldLabel(field)}

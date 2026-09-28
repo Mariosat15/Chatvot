@@ -1,5 +1,6 @@
 import type { RoundStartPolicy } from "./round-types";
 import {
+  applyChallengeValues,
   defaultConfigValues,
   resolveAttemptSeconds,
   validateConfigValues,
@@ -244,6 +245,11 @@ export function resolveChallengeDefaults(input: {
     // has since stopped accepting falls back to a usable one rather than leaving the field
     // empty. `validateConfigValues` skips what it cannot accept, so its result carries the
     // survivors and the merge fills the rest.
-    settings: { ...defaultConfigValues(input.fields), ...validated.values },
+    // A pinned challengeValue wins over both, so the form never opens on a value the server
+    // would replace.
+    settings: applyChallengeValues(input.fields, {
+      ...defaultConfigValues(input.fields),
+      ...validated.values,
+    }),
   };
 }

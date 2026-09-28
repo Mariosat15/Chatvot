@@ -3,6 +3,7 @@ import ProviderGame from "@/database/models/games/provider-game.model";
 import { WhiteLabel } from "@/database/models/whitelabel.model";
 import { getProviderAdapter } from "@/lib/services/game-providers/registry";
 import {
+  applyChallengeValues,
   parseConfigSchema,
   resolveAttemptSeconds,
   validateConfigValues,
@@ -179,6 +180,9 @@ export async function resolveChallengeProviderGame(
       errors: validated.errors,
     };
   }
+  // Reason: a setting the title pins for challenges (`challengeValue`) is stored as pinned
+  // whatever was submitted, so the round the game plays is the one the form showed.
+  const settings = applyChallengeValues(parsedSchema.fields, validated.values);
 
   // Resolved BEFORE the pre-flight, so one value governs both the checks below and what the
   // route stores. Read off the stored title, never the request - see the module comment.
@@ -192,7 +196,7 @@ export async function resolveChallengeProviderGame(
   // module comment. Nothing here is stored; `Challenge` has no `resultGracePeriodSeconds`.
   const roundSeconds = resolveAttemptSeconds(
     parsedSchema.fields,
-    validated.values,
+    settings,
     title.maxDurationSeconds,
   );
   const resultGracePeriodSeconds =
@@ -218,7 +222,7 @@ export async function resolveChallengeProviderGame(
     chartvoltEnabled: Boolean(title.chartvoltEnabled),
     externalGamesEnabled,
     schemaFields: parsedSchema.fields,
-    settings: input.settings ?? {},
+    settings,
     playWindowStart,
     playWindowEnd,
     resultGracePeriodSeconds,
@@ -245,7 +249,7 @@ export async function resolveChallengeProviderGame(
     ok: true,
     gameKey: title.gameKey,
     displayName: title.displayName,
-    settings: validated.values,
+    settings,
     roundStartPolicy,
     warnings: preflight.warnings,
   };

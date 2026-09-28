@@ -57,6 +57,7 @@ function readCode(path: string): string {
 }
 
 function countOf(haystack: string, pattern: RegExp): number {
+  // eslint-disable-next-line security/detect-non-literal-regexp -- pattern is a literal in this file
   return haystack.match(new RegExp(pattern, "g"))?.length ?? 0;
 }
 
@@ -164,7 +165,9 @@ describe("how long the game runs", () => {
     const code = readCode(FIELDS);
     expect(code).not.toMatch(/field\.title \?\? field\.name/);
     expect(code).toMatch(/function fieldLabel/);
-    expect(countOf(code, /fieldLabel\(field\)/)).toBe(2);
+    // Three branches since requirements 1.22: a setting pinned by `challengeValue` (shown fixed),
+    // the locked play clock, and the ordinary control. Every one must label through the helper.
+    expect(countOf(code, /fieldLabel\(field\)/)).toBe(3);
   });
 
   it("labels the play clock from its format and restores word boundaries otherwise", () => {

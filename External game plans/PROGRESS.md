@@ -1172,6 +1172,25 @@ no build. The main app needs a rebuild and restart. Then hard refresh. **Never v
   - **Files:** client sources are in `velocity-server/client-patches/`. The repacked page changed
     `client.html` only, and every asset kept its hash.
   - **Not verified live with 16 players.**
+- **28 Sep 2026 - (7) Volt Velocity race rules: laps, solo races, tie-break** (`23` s8.6).
+  - **Rules:** fastest time wins, equal times go to more points; a non-finisher gets no score; a
+    competition is 1-10 laps at 100 s per lap; a challenge is always 3 laps; the operator picks
+    "everyone together" (`scheduled`) or "each plays alone" (`anytime`) per competition; a
+    challenge always races together.
+  - **Provider protocol change, requirements HTML 1.22:** optional `contestType` on create-round,
+    and a new `configSchema` keyword `challengeValue` (the value a setting always takes on a
+    challenge). Both are backward compatible. `01` s3.1b and s4 are amended to match.
+  - **Built:** race server `laps` and `solo` rooms and `skillScore` in the receipt; games-service
+    `contest-type.ts` (parse + pin), solo room per `anytime` competition round keyed on the
+    provider round id, `tieBrokenScore`, lap-neutral copy, `maxDurationSeconds` 1005; platform
+    `challengeValue` parsing (fail-closed) and `applyChallengeValues` in both mirrored
+    `config-schema.ts` copies, the challenge resolver and defaults, and a fixed-value display
+    in `ChallengeSettingsFields.tsx`.
+  - **Tests:** race server 57/57, games-service green, platform targeted suites green; three
+    probes red on exactly one test each. The full platform suite still has failures that also
+    fail on a clean tree (checked by stashing), so they predate this work.
+  - **Owner action:** enable both play styles on Volt Velocity and re-sync the catalogue.
+  - **Not verified live.**
 
 
 ### 27 Sep 2026 - Per-game How it works & tips (Guides) tab

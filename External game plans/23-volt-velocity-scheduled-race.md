@@ -392,6 +392,36 @@ else.
 
 **Not verified live.** The benefit shows only over a real connection with 16 players.
 
+### 8.6 Laps, solo races and the tie-break - what was built (28 September 2026)
+
+The owner's rules, and where each one lives:
+
+| Rule | How it is enforced |
+|---|---|
+| Fastest time wins; equal times go to more points | games-service scores a finisher `timeMs - min(points, 999999) / 1e6` (`tieBrokenScore` in `race-server.ts`), lower is better. The fraction is under one millisecond, so points can never beat a faster time |
+| A player who does not finish gets no score | Unchanged: a DNF finishes the round with no `rawScore`, so `hasResult` excludes them (`05` s9.2) |
+| A competition is 1-10 laps, 100 s per lap | New `laps` setting in the title's `configSchema` (default 3). The race server takes `laps` on create and sets the limit to `laps x 100 s`. `maxDurationSeconds` is now **1005** (10 laps + the 5 s countdown) |
+| A challenge is always 3 laps | New generic `configSchema` keyword **`challengeValue`** (requirements **v1.22**). The platform pins it on every challenge round (`applyChallengeValues` in `config-schema.ts`) and the challenge form shows it as fixed. games-service pins it again (`pinChallengeSettings`), so neither side can be talked out of it |
+| The operator chooses "everyone together" or "each plays alone" | That is the existing play-mode choice (`22` s10): `scheduled` is everyone together; `anytime` is now **each plays alone**. The platform sends the new optional **`contestType`** on create-round (v1.22); an `anytime` competition round (no `scheduledStartAt`) gets its **own solo room** keyed on the provider round id |
+| A challenge always races together | A challenge round keeps the shared room both players join. One carrying `scheduledStartAt` is refused (400); the platform never sends one |
+
+Three facts drift easily:
+
+- **Room identity** now includes `laps:N` only when N is not 3, and `solo:<providerRoundId>` for a
+  solo room. Existing 3-lap rooms keep their old identity. Solo rooms use the **provider** round id,
+  so a retry after a failed write gets a fresh room instead of the frozen one.
+- **An absent `contestType` keeps the old shared behaviour**, so a platform deployed before
+  games-service still works.
+- **Fingerprint:** the resolved config now includes `laps`. A round created before the deploy and
+  retried after it could fail its fingerprint check once. This is negligible, but worth knowing.
+
+**Operator action:** enable **both** play styles on Volt Velocity in the play-style control
+(Games -> Providers -> catalogue), and re-sync the catalogue so the `laps` setting appears.
+
+Tests: race server 57/57; games-service `npm test` green (Volt Velocity 13, four new); platform
+`config-schema-challenge-value.test.ts` (new) and one new resolution test. Three probes went red on
+exactly one test each (solo off, challenge pin off, platform pin off). **Not verified live.**
+
 ## 9. Owner decisions (answered 27 September 2026)
 
 1. **Lobby length is set by the admin in the Games section**, not fixed in code. It becomes an

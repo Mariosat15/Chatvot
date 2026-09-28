@@ -249,6 +249,7 @@ An absent or empty schema means "this game takes no settings" and is valid.
 | `default` | Optional |
 | `title`, `description` | Display only |
 | `format` | Only `"duration-seconds"` (see 3.2). Any other value refuses the schema |
+| `challengeValue` | **New in requirements HTML v1.22.** Optional. The value this setting **always** takes on a 1v1 challenge - for example a racing game that is always three laps in a challenge while an operator picks 1-10 for a competition. It must be the same type as the property and satisfy its own `minimum` / `maximum` / `enum`, or the schema is refused. ChartVolt pins it server-side on every challenge round and shows the setting as fixed; competitions ignore it |
 
 **Not supported** (non-exhaustive — anything not listed above is refused): `oneOf`,
 `anyOf`, `allOf`, `pattern`, `$ref`, nested objects, arrays, `const`, `not`,
@@ -390,6 +391,7 @@ producing one score.
   "contentSeed": "cv_ctst_774219",
 
   "scheduledStartAt": "2026-08-18T12:00:00Z",
+  "contestType": "competition",
   "expiresAt": "2026-08-18T14:00:00Z",
   "resultCallbackUrl": "https://chartvolt.com/api/games/providers/acme/events",
   "progressCallbackUrl": "https://chartvolt.com/api/games/providers/acme/progress",
@@ -418,6 +420,13 @@ start**. The game must accept that player early and hold them until `scheduledSt
 rather than starting their clock on arrival. `expiresAt` is measured from
 `max(now, scheduledStartAt)`, so an early arrival does not lose playing time. Absent on
 every `anytime` round.
+
+`contestType` is **optional and new in requirements HTML v1.22**: one of `"competition"`,
+`"challenge"` or `"practice"`, telling the game which kind of contest the round belongs
+to. A game that plays the same way in every contest ignores it. A multiplayer game uses
+it to tell a **play-any-time competition** (each player races alone) from a **challenge**
+(the two players race each other) - both arrive without `scheduledStartAt`. Absent means
+the game should keep whatever it did before this field existed.
 
 ### Response
 

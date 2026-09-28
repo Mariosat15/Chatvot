@@ -334,8 +334,71 @@ async function main(): Promise<number> {
     );
   });
 
+  await test("an anytime competition gives every player a room of their own", async () => {
+    await clearRounds();
+    const seed = `cv_vv_solo_${crypto.randomBytes(3).toString("hex")}`;
+    const bodies = [0, 1].map(() => velocityBody(seed, { resultCallbackUrl: callbackUrl, contestType: "competition" }));
+    for (const body of bodies) {
+      const created = await callApi("/v1/rounds", { method: "POST", body });
+      assert(created.status === 201, `create returned ${created.status}: ${created.raw}`);
+    }
+    const rounds = await Round.find({ contentSeed: seed }).lean();
+    const raceIds = new Set(rounds.map((r) => r.race?.raceId));
+    assert(rounds.length === 2 && raceIds.size === 2 && !raceIds.has(undefined), "solo rounds shared a room");
+  });
+
+  await test("a challenge shares one room and races 3 laps whatever was asked for", async () => {
+    await clearRounds();
+    const seed = `cv_vv_chal_${crypto.randomBytes(3).toString("hex")}`;
+    for (const laps of [7, 3]) {
+      const created = await callApi("/v1/rounds", {
+        method: "POST",
+        body: velocityBody(seed, {
+          resultCallbackUrl: callbackUrl,
+          contestType: "challenge",
+          config: { trackId: "auto", laps },
+        }),
+      });
+      assert(created.status === 201, `create returned ${created.status}: ${created.raw}`);
+    }
+    const rounds = await Round.find({ contentSeed: seed }).lean();
+    assert(rounds.every((r) => (r.config as { laps?: number }).laps === 3), "a challenge raced other than 3 laps");
+    assert(new Set(rounds.map((r) => r.race?.raceId)).size === 1, "the two challengers were not put in one room");
+  });
+
+  await test("the lap count is part of the room, and a bad contestType is refused", async () => {
+    await clearRounds();
+    const seed = `cv_vv_laps_${crypto.randomBytes(3).toString("hex")}`;
+    for (const laps of [3, 5]) {
+      const created = await callApi("/v1/rounds", {
+        method: "POST",
+        body: velocityBody(seed, { resultCallbackUrl: callbackUrl, config: { trackId: "auto", laps } }),
+      });
+      assert(created.status === 201, `create returned ${created.status}: ${created.raw}`);
+    }
+    const rounds = await Round.find({ contentSeed: seed }).lean();
+    assert(new Set(rounds.map((r) => r.race?.raceId)).size === 2, "a 3-lap and a 5-lap race shared a room");
+    assert(rounds.some((r) => (r.config as { laps?: number }).laps === 5), "5 laps did not resolve to 5");
+
+    const bad = await callApi("/v1/rounds", {
+      method: "POST",
+      body: velocityBody(seed, { resultCallbackUrl: callbackUrl, contestType: "duel" }),
+    });
+    assert(bad.status === 400, `expected 400 for an unknown contestType, got ${bad.status}`);
+  });
+
+  await test("a faster time always wins, and points only break an exact tie", () => {
+    const base = { playerId: "p", bestLapMs: 40_000, lapsCompleted: 3, dnf: false, finished: true };
+    const fastFewPoints = scoreForEntry({ ...base, timeMs: 100_000, skillScore: 0 }).score!;
+    const slowManyPoints = scoreForEntry({ ...base, timeMs: 100_001, skillScore: 999_999 }).score!;
+    const tiedMorePoints = scoreForEntry({ ...base, timeMs: 100_000, skillScore: 500 }).score!;
+    assert(fastFewPoints < slowManyPoints, "points beat a faster time");
+    assert(tiedMorePoints < fastFewPoints, "more points did not win a tied time");
+    assert(scoreForEntry({ ...base, timeMs: 100_000, skillScore: 10 ** 9 }).score! > 99_999, "points uncapped");
+  });
+
   await test("only a finisher without a DNF scores, and a missing entry scores nothing", () => {
-    const base = { playerId: "p", bestLapMs: 40_000, lapsCompleted: 3 };
+    const base = { playerId: "p", bestLapMs: 40_000, lapsCompleted: 3, skillScore: 0 };
     assert(scoreForEntry({ ...base, dnf: false, finished: true, timeMs: 123_456 }).score === 123_456, "finisher");
     assert(scoreForEntry({ ...base, dnf: true, finished: true, timeMs: 123_456 }).score === undefined, "DNF");
     assert(scoreForEntry({ ...base, dnf: false, finished: false, timeMs: null }).score === undefined, "unfinished");
