@@ -1284,6 +1284,21 @@ no build. The main app needs a rebuild and restart. Then hard refresh. **Never v
   - **Files:** client sources are in `velocity-server/client-patches/`. The repacked page changed
     `client.html` only, and every asset kept its hash.
   - **Not verified live with 16 players.**
+- **28 Sep 2026 - (11) Volt Velocity: neon gates, real collisions, a wider road with a 3-abreast grid,
+  five new power-ups.** Built on `Volt-Velocity-0.21-Complete.zip` plus our patches (there is no newer
+  vendor pack); every change is listed in `velocity-server/CHARTVOLT-PATCHES.md`.
+  - **Gates** score again and are drawn as multi-colour neon gates. **Collisions** are physical: a
+    bounce changes heading and yaw, heavier ships move less, and a rammed ship never gains progress.
+  - **Road** is 1.25x wider from one constant (`src/road-width.js`), and the grid is 3 abreast for 16
+    (`src/start-grid.js`). `PHYSICS_VERSION` is `velocity-3d-13`, so the race server and
+    games-service deploy together.
+  - **Power-ups:** shockwave, oil slick, seeker, cloak, magnet, plus slipstream and a perfect start.
+    The server decides every outcome, identically for every player; nothing is paid and nothing is
+    random in a way a purchase could change. Name tags above capsules are readable now.
+  - **Tests:** velocity-server 97 pass, 0 fail; the vendor client 83 pass plus its 1 known failure.
+    Power-up probes: 9, each red x1.
+  - **Not built yet:** denser and new tracks (step 6) and a lighter download (step 7).
+    **Not verified by eye or live with 16 players.**
 - **28 Sep 2026 - (10) End clock, no restart, readable scores, and a non-finisher is not a 0**
   (`23` s8.9, `17` **R115**).
   - **Built:** an "Ends in" countdown on the arena for every game (`ArenaEndsIn.tsx`); the race

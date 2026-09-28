@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import {CircuitCurve} from './circuit-curve.js';
 import {TRACKS} from './tracks.js';
-export const HALF_WIDTH=16;
+import {ROAD_HALF_WIDTH} from './road-width.js';
+export const HALF_WIDTH=ROAD_HALF_WIDTH;
 export function createTrack(id='orbital'){
   const definition=TRACKS.find(t=>t.id===id)||TRACKS[0];
   const points=definition.points.map(p=>new THREE.Vector3(...p));

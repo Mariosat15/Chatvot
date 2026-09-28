@@ -10,6 +10,12 @@ export function powerupModel(kind){const g=new T.Group(),color=ITEMS[kind].color
  if(kind==='emp'){add(new T.SphereGeometry(.4,20,14),glow);for(let i=0;i<3;i++){const m=add(new T.TorusGeometry(.8+i*.16,.065,10,40),i===1?silver:glow);m.rotation.set(i*.8,i*1.3,i*.4);}}
  if(kind==='mine'){add(new T.CylinderGeometry(.75,.9,.5,32),metal);add(new T.SphereGeometry(.37,16,12),glow,0,.38);for(let i=0;i<6;i++){const a=i*Math.PI/3,m=add(new T.ConeGeometry(.15,.6,8),silver,Math.sin(a)*.9,0,Math.cos(a)*.9);m.rotation.z=Math.PI/2;m.rotation.y=a;}ring(.73,-.26);}
  if(kind==='counter'){for(let i=-1;i<=1;i++){const m=add(new T.CylinderGeometry(.2,.2,1.3,12),silver,i*.5,i===0?.25:0);m.rotation.z=-i*.25;add(new T.SphereGeometry(.23,12,8),glow,i*.5,.85+(i===0?.25:0));}ring(1.05,-.6);}
+ /* CHARTVOLT PATCH (28 Sep 2026): the five new capsules, each a distinct silhouette so it reads before its name does. */
+ if(kind==='shockwave'){add(new T.SphereGeometry(.34,20,14),glow);for(const [r,y] of [[.62,0],[.88,.18],[.88,-.18]]){const m=ring(r,y,r<.7?silver:glow);m.scale.z=.6;}}
+ if(kind==='slick'){const drop=add(new T.SphereGeometry(.7,24,16),glow,0,-.2);drop.scale.set(1,.34,1);add(new T.CylinderGeometry(.9,.9,.1,32),metal,0,-.42);for(let i=0;i<3;i++){const a=i*2.1;add(new T.SphereGeometry(.16,12,8),glow,Math.cos(a)*.62,.2,Math.sin(a)*.62);}}
+ if(kind==='seeker'){add(new T.CylinderGeometry(.2,.26,1.3,16),silver);add(new T.ConeGeometry(.22,.55,16),glow,0,.92);for(let i=0;i<4;i++){const a=i*Math.PI/2,m=add(new T.BoxGeometry(.06,.45,.42),metal,Math.cos(a)*.24,-.45,Math.sin(a)*.24);m.rotation.y=-a;}ring(.62,.2);}
+ if(kind==='cloak'){add(new T.IcosahedronGeometry(.62,1),new T.MeshStandardMaterial({color,emissive:color,emissiveIntensity:.9,transparent:true,opacity:.45,roughness:.1}));const shell=add(new T.OctahedronGeometry(1.02,0),new T.MeshBasicMaterial({color,wireframe:true,transparent:true,opacity:.7}));shell.rotation.y=.5;}
+ if(kind==='magnet'){const arc=add(new T.TorusGeometry(.55,.19,12,28,Math.PI),glow,0,.12);for(const x of [-.55,.55])add(new T.BoxGeometry(.4,.42,.4),silver,x,-.14);}
  // Open mechanical pickup cradle with independent rotating energy hoops.
  const accents=[];for(const y of [-1.35,1.35]){const r=ring(1.48,y,silver);accents.push(r);ring(1.36,y+.06,glow);}
  for(let i=0;i<4;i++){const a=i*Math.PI/2,x=Math.cos(a)*1.4,z=Math.sin(a)*1.4;add(new RoundedBoxGeometry(.14,2.55,.2,2,.035),metal,x,0,z);add(new T.BoxGeometry(.07,.7,.22),glow,x,.3,z);}

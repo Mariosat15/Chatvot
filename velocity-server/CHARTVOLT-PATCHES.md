@@ -86,17 +86,50 @@ loaded the game; a touch device's old value is carried over. That pass was appli
 `.html.gz` directly (the asset-complete vendor tree was not available) and re-packed; these sources
 produce the same output on the next full rebuild.
 
-Rebuilding the client after changing a file in `client-patches/`:
+### Gates, collisions, a wider road and an F1 grid (28 September 2026, fourth pass)
 
-1. Copy `client-patches/*.js` and `src/input-frames.js` into the vendor tree's `src/`, and
-   `client-patches/root/` over the vendor tree's root (`landscape-manifest.json` goes to
-   `assets/landscape/manifest.json`). Run `node tools/chartvolt-lighten.mjs` once on a fresh tree.
-2. In the vendor tree: `npm i --no-save three@0.186.1 esbuild@0.25.12`, `node tools/build.mjs`
-   and `node --test tests/` (84 vendor tests).
-3. Gzip `dist/Volt-Velocity-3D.html` to `games-service/vendor/volt-velocity-client.html.gz`,
-   then run `npx tsx tools/games/pack-velocity-client.ts` and commit `games-service/vendor/`.
+The owner's brief: gates that visibly score, real ship-to-ship collisions, more power-ups with
+names above them, a road wide enough for 16, a three-per-row pole grid, denser and new tracks, and
+a lighter game. **There is no newer vendor pack**; everything is built on
+`Volt-Velocity-0.21-Complete.zip` plus these patches. The plan, in the order it is being done:
 
-Tests: `npm test` (61 on 28 Sep 2026, including 4 in `tests/chartvolt-pickup-replace.test.mjs`; the breakdown below is older: 50 = 21 vendor + 14 in `tests/chartvolt-scheduled.test.mjs` + 7 in
+| Step | What | Status |
+|---|---|---|
+| 1 | One-command rebuild (`tools/games/rebuild-velocity-client.mjs`) | Done |
+| 2 | Gates: the drawing now matches the scoring zone, neon pylons in six colours | Done |
+| 3 | Physical collisions: a hit changes where ships are going, not only where they are | Done |
+| 4 | Road 25% wider (half-width 16 -> 20 m, drive limit 13.3 -> 16.625 m) and a 3-abreast grid for 16 | Done |
+| 5 | New power-ups (EMP, shockwave, slick, homing missile, cloak, magnet), floating name labels, slipstream / perfect start / final lap / position callouts | Next |
+| 6 | Denser, more alive existing tracks; new tracks | Planned |
+| 7 | Lighter build, with before/after sizes (today 62.1 MB built, 44.7 MB gzipped) | Planned |
+| 8 | Tests, docs, commit by explicit path, deploy steps | Planned |
+
+| Change | Where |
+|---|---|
+| **Gates.** The vendor drew a 9 m arch and scored only the middle 6.4 m, so the picture lied about where a gate counts. Every gate dimension now comes from `GATE_HALF_WIDTH`, the constant the simulation scores against | `client-patches/skill-gates.js`, `tests/chartvolt-gates.test.mjs` |
+| **Collisions.** The vendor only pushed ships apart sideways, and the simulation rebuilds sideways speed from `heading` every tick, so they slid along each other like ghosts and a rear-end did nothing. A bounce now changes heading and yaw, heavier ships move less, and the rammed ship never gains forward progress. Server-only and authoritative; the client adds sparks, shake and a callout | `server/ship-contact.mjs`, `client-patches/scene.js`, `client-patches/main.js`, `tests/chartvolt-collisions.test.mjs` |
+| **One road width.** `ROAD_SCALE` (1.25) in `src/road-width.js` is the only place the width lives. Content lanes are scaled *after* each random draw, so every seed produces the same race layout as before, just wider | `src/road-width.js`, `track.js`, `race-content.js`, `simulation.js`, `server/ship-contact.mjs`, `server/player-combat.mjs`, `client-patches/scene.js` |
+| **Vendor files we do not own are widened by transform, not forked.** The rebuild re-reads each pristine file out of the zip and applies exact replacements computed from `ROAD_SCALE` (tunnel, bridges, trackside boards and gantries, hover supports, guide boards, and the four vendor tests that pinned the old width). A vendor update that moves a string fails the rebuild instead of leaving a barrier inside the road | `tools/games/velocity-road-transforms.mjs` |
+| **Five new power-ups, server-authoritative.** Shockwave (hits and shoves rivals within 18 m, clears hazards within 40 m), oil slick (dropped behind, spins the first crosser once, 2 per owner, 24 total, shield blocks it), seeker (locks the nearest rival ahead in any lane), cloak (4 s, cannot be locked), magnet (6 s, wider pickup radius). Plus slipstream (drafting a rival 6-32 m ahead) and a perfect start (throttle pressed within 0.5 s before green). The room decides every outcome; specials are placed in addition to, never instead of, vendor capsules. Every value lives in `src/power-tuning.js` | `src/power-tuning.js`, `server/power-effects.mjs`, `server/player-combat.mjs`, `server/race-room.mjs`, `src/simulation.js`, `src/race-content.js`, `src/catalog.js`, `tests/chartvolt-powerups.test.mjs` (15 tests, 9 probes red x1) |
+| **Power-up visuals.** Capsule name tags existed but were washed out by the additive beam; they are now a dark pill with a coloured border, one shared texture per kind (at most 13 instead of one per capsule). Distinct models for the five new kinds, a road decal for slicks, shockwave and spin rings, cloak fades the ship to about 22% opacity (materials cloned once so a shared material never fades another ship), and callouts for slipstream, perfect start, shockwave and spin. Presentation only. **Not yet seen by eye** | `client-patches/power-visuals.js`, `client-patches/powerups.js`, `client-patches/scene.js`, `client-patches/main.js` |
+| **Grid.** Three abreast, rows 14 m apart, a short last row centred, 16 painted boxes. `gridSlot()` is the only definition, used by the server to place ships and by the client to paint the boxes. A per-box F1 stagger was tried and dropped: it gave one pilot a head start within their own row and moved the front row off the line, which the vendor multiplayer tests pin | `src/start-grid.js`, `server/race-room.mjs`, `client-patches/scene.js`, `tests/chartvolt-road-grid.test.mjs` |
+
+**`PHYSICS_VERSION` is now `velocity-3d-13`** (the drive limit moved), so the race server and
+games-service must be deployed together. `ROUTE_VERSION` is unchanged at `circuits-8`.
+
+Rebuilding the client after changing anything in `client-patches/`, `src/` or the transforms:
+
+```
+node tools/games/rebuild-velocity-client.mjs            # rebuild, test, gzip and pack
+node tools/games/rebuild-velocity-client.mjs --no-pack  # everything except the pack step
+```
+
+It unpacks the zip to `%TEMP%\vvfull` only if missing, copies `src/`, then `client-patches/`,
+then applies the road transforms, runs the lighten tool, builds, runs the vendor tests (one known
+vendor failure is expected and named in the script; any other fails the rebuild), gzips to
+`games-service/vendor/volt-velocity-client.html.gz` and packs. Commit `games-service/vendor/`.
+
+Tests: `npm test` (97 on 28 Sep 2026 after the power-ups pass; 82 after the fourth pass; 61 before it, including 4 in `tests/chartvolt-pickup-replace.test.mjs`; the breakdown below is older: 50 = 21 vendor + 14 in `tests/chartvolt-scheduled.test.mjs` + 7 in
 `tests/chartvolt-env.test.mjs` + 7 in `tests/chartvolt-input-frames.test.mjs` + 1 in
 `tests/chartvolt-client-prediction.test.mjs`, which drives the **real patched client** against the
 real server over HTTP and asserts the prediction agrees with the server to within 5 cm). Deploy: PM2 `chartvolt-velocity` (reads `games-service/.env`),

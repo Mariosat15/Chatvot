@@ -1,7 +1,7 @@
 // Shared wire contract. Only the server produces authoritative snapshots.
 export const PROTOCOL_VERSION=2;
 export const EMPTY_INPUT=Object.freeze({steer:0,throttle:false,brake:false,boost:false,fire:false});
-const numbers=['distance','lateral','lateralVelocity','heading','yawRate','speed','time','energy','hull','lap','checkpoints','bestLap','lapStart','shield','overdrive','step','countdown','respawns','respawnRemaining','cooldown','pickupCount','targetsHit','flash','counter','threatCooldown','padBoost','nearMisses','sectorStart','skillScore','chain','maxChain','cleanCorner','cornerRewardAt','serviceSeconds'];
+const numbers=['distance','lateral','lateralVelocity','heading','yawRate','speed','time','energy','hull','lap','checkpoints','bestLap','lapStart','shield','overdrive','step','countdown','respawns','respawnRemaining','cooldown','pickupCount','targetsHit','flash','counter','threatCooldown','padBoost','nearMisses','sectorStart','skillScore','chain','maxChain','cleanCorner','cornerRewardAt','serviceSeconds','cloak','magnet','draft'];
 const flags=['state','shipId','item','boosting','throttle','braking','fireHeld','servicing'];
 const sets=['used','destroyed','fired','padUsed','gatesHit','gatesMissed'];
 const arrays=['projectiles','threats','mines','sectors'];
