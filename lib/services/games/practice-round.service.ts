@@ -1,9 +1,12 @@
 import { connectToDatabase } from "@/database/mongoose";
-import GameRound, { LIVE_ROUND_STATUSES } from "@/database/models/games/game-round.model";
+import GameRound, {
+  canTransitionRound,
+  LIVE_ROUND_STATUSES,
+  type RoundStatus,
+} from "@/database/models/games/game-round.model";
 import ProviderGame from "@/database/models/games/provider-game.model";
 import { getProviderAdapter } from "@/lib/services/game-providers/registry";
 import { createRound } from "./round.service";
-import { applyResult } from "./result-ingestion.service";
 import {
   defaultConfigValues,
   parseConfigSchema,
@@ -130,50 +133,76 @@ async function lookUpPracticeTitle(slug: string): Promise<TitleLookup> {
   return { ok: true, title, gameName };
 }
 
-/** A player has at most one live practice round per game; a few more covers leftovers. */
-const PRACTICE_PULL_LIMIT = 3;
-
 /**
- * Asks the provider how the caller's live practice rounds of one game ended.
+ * Closes the caller's live practice rounds of one game, here and at the provider.
  *
- * A PROVIDER NEVER PUSHES A PRACTICE RESULT. Requirements version 1.10 (`01` s4.2) forbids a
- * result callback for practice, and nothing schedules the reconciliation poll. Without this
- * pull a finished practice round stays `launched` on our side until it expires, the screen
- * shows no score, and pressing Start again RESUMES the finished round instead of opening a
- * new one - `createRound` is idempotent on the live round.
+ * PRACTICE KEEPS NO RESULT (owner, 28 Sep 2026: "no need to calculate any results just exit
+ * ... after leave the practice game close the round"). So a round the player leaves is
+ * `voided` - the status that means "this attempt produced nothing" - rather than scored, and
+ * the provider is asked to void it too so it stops running there.
  *
- * It goes through `applyResult`, the single ingestion door, exactly as the reconciliation poll
- * does. A round still in play reports a live status, which gate 8 refuses without writing.
- * Failures are swallowed: this only refreshes a practice screen.
+ * It writes a STATUS, never a score, so it is not a second ingestion door - the same argument
+ * as `endLiveRoundsForContest`. `resultSource` is left unset: no result came from anywhere.
+ *
+ * Every Start calls this first as well, because `createRound` is idempotent on the live round:
+ * a round left open by a closed tab would otherwise be RESUMED instead of a new one opened.
+ *
+ * Scoped by `userId` (from the session), `gameKey`, `contestType: "practice"` and
+ * `contestId: null`, so it can never touch another player's round or a paid contest's round.
+ * The provider call is not awaited: the platform status is the answer, and a provider that is
+ * slow or down must not hold the player on a spinner.
  */
-export async function pullLivePracticeResults(userId: string, gameKey: string): Promise<void> {
+export async function endLivePracticeRounds(
+  userId: string,
+  gameKey: string,
+  roundId?: string,
+): Promise<number> {
   const live = await GameRound.find({
     contestType: "practice",
     contestId: null,
     userId,
     gameKey,
     status: { $in: LIVE_ROUND_STATUSES },
-  })
-    .sort({ createdAt: -1 })
-    .limit(PRACTICE_PULL_LIMIT)
-    .select("roundId providerKey")
-    .lean<Array<{ roundId: string; providerKey: string }>>();
+    ...(roundId ? { roundId } : {}),
+  });
 
+  let ended = 0;
   for (const round of live) {
-    try {
-      const adapter = getProviderAdapter(round.providerKey);
-      if (!adapter) continue;
-      const pulled = await adapter.fetchRound(round.roundId);
-      if (!pulled.success) continue;
-      await applyResult({
-        providerKey: round.providerKey,
-        normalised: pulled.data,
-        source: "poll",
-      });
-    } catch (error) {
-      console.warn(`⚠️ Could not refresh practice round ${round.roundId}:`, error);
+    if (!canTransitionRound(round.status as RoundStatus, "voided")) continue;
+    round.status = "voided";
+    round.resultReceivedAt = new Date();
+    await round.save();
+    ended += 1;
+
+    const adapter = getProviderAdapter(round.providerKey);
+    if (adapter) {
+      void adapter
+        .voidRound(round.roundId)
+        .then((outcome) => {
+          if (!outcome.success) {
+            console.warn(
+              `⚠️ Provider did not void practice round ${round.roundId}: ${outcome.error}`,
+            );
+          }
+        })
+        .catch((error) =>
+          console.warn(`⚠️ Could not void practice round ${round.roundId}:`, error),
+        );
     }
   }
+  return ended;
+}
+
+/** The player left a practice round. Idempotent: an already-closed round ends nothing. */
+export async function endPracticeRound(
+  slug: string,
+  userId: string,
+  roundId: string,
+): Promise<{ found: boolean; ended: number }> {
+  const card = await getBrowsableGameBySlug(slug);
+  if (!card) return { found: false, ended: 0 };
+  await connectToDatabase();
+  return { found: true, ended: await endLivePracticeRounds(userId, card.gameKey, roundId) };
 }
 
 /** Read-only: whether the practice area can start a round. Safe to call from a page render. */
@@ -207,8 +236,8 @@ export async function launchPracticeRound(
     const lookup = await lookUpPracticeTitle(slug);
     if (!lookup.ok) return { success: false, refusal: lookup.refusal, error: lookup.error };
     const { title } = lookup;
-    // Reason: settle a finished round first, or `createRound` would resume it.
-    await pullLivePracticeResults(actor.userId, title.gameKey);
+    // Reason: close any round left open (a closed tab), or `createRound` would resume it.
+    await endLivePracticeRounds(actor.userId, title.gameKey);
 
     const parsed = parseConfigSchema(title.configSchema);
     const settings = parsed.ok ? defaultConfigValues(parsed.fields) : {};
@@ -304,7 +333,6 @@ export async function listPracticeRounds(
   const card = await getBrowsableGameBySlug(slug);
   if (!card) return null;
   await connectToDatabase();
-  await pullLivePracticeResults(userId, card.gameKey);
   const rounds = await GameRound.find({
     contestType: "practice",
     contestId: null,

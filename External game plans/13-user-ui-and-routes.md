@@ -2920,7 +2920,7 @@ automatically.
 | Practice button on the game page hero and in the info sidebar (not on a coming-soon title) | `components/game-page/GamePageHero.tsx`, `GamePageInfoSidebar.tsx`, `practiceHref` in `lib/services/games/game-page-helpers.ts` |
 | The practice area | `app/(root)/games/[slug]/practice/page.tsx`, `components/games/PracticeRoundHost.tsx`, `components/games/practice-state.ts` (model-free, R58) |
 | Launch (POST) and the player's recent practice rounds (GET) | `app/api/games/[slug]/practice/rounds/route.ts` |
-| Availability, launch, list, and the result pull | `lib/services/games/practice-round.service.ts` |
+| Availability, launch, list, and the result pull (the pull was later replaced by closing the round - see the amendment below) | `lib/services/games/practice-round.service.ts` |
 
 **Nothing names a game.** A title is practisable when its catalogue row says `supportsPractice`
 and it is enabled and active. The settings are the `configSchema` defaults and the length is the
@@ -2953,6 +2953,37 @@ showing a dead button.
 then a **catalogue re-sync**, so Volt Velocity's row picks up `supportsPractice: true`.
 
 **Never verified by eye** - the practice area is behind sign-in.
+
+> **AMENDED later on 28 September 2026 - practice keeps no result, and leaving closes the
+> round.** The owner: *"no need to calculate any results just exit ... after leave the practice
+> game close the round"*. So the **result pull described above is deleted** (`pullLivePracticeResults`
+> no longer exists), and that bullet is correct as history and stale as a present fact - **say
+> which**. What replaced it:
+>
+> - **Leaving or finishing** a practice round sends `DELETE /api/games/[slug]/practice/rounds`
+>   with the round id, and the screen returns **straight to Start** - no "Checking your practice
+>   result…" wait, no score. The request uses `keepalive`, and the same call fires if the player
+>   navigates away mid-round.
+> - `endLivePracticeRounds` marks the round **`voided`** (the status that means "this attempt
+>   produced nothing") and asks the provider to void it too through `adapter.voidRound`, not
+>   awaited, so a slow provider never holds the player. It writes a **status, never a score**,
+>   so it is not a second ingestion door, and `resultSource` stays unset because no result came
+>   from anywhere. It is scoped by the session's `userId`, the `gameKey`, `contestType: "practice"`
+>   **and** `contestId: null`, so it cannot touch another player's round or a paid contest's round.
+> - **Every Start calls it first** as well. The original hazard survives unchanged: a round left
+>   `launched` (a closed tab) would otherwise be **resumed**, because `createRound` is idempotent
+>   on the live round.
+> - **The button looked broken** because `neonButtonClasses` returns the colour only, not the
+>   shape. Every other screen wraps it in the shared `<Button>`; the practice host was the one bare
+>   `<button>`, so the icon stacked above wrapped text. It now uses `<Button>`.
+> - **Volt Velocity still said "does not offer practice rounds"** because its `supportsPractice`
+>   flipped to `true` only today (`5c3de3f3`) and the platform still holds the synced `false`.
+>   The field is provider-owned, so **no code change: rebuild and restart games-service, then
+>   Sync the catalogue** in admin.
+>
+> The "recent practice rounds" list is kept for now, pending the owner's decision on game
+> history. Pinned by `__tests__/services/practice-round.test.ts` (the pull block **flipped, not
+> deleted**), 4 probes red on exactly one failure. **Never verified by eye.**
 
 ---
 

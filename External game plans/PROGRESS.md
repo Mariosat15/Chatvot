@@ -912,6 +912,30 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 28 Sep 2026 - Practice keeps no result: leaving closes the round and returns to Start
+
+**Owner instruction:** *"no need to calculate any results just exit ... after leave the practice
+game close the round"*, plus a fix for the cramped Start button and for Volt Velocity saying it
+offers no practice. `13` **s4.1ac**'s amendment is the authoritative account.
+
+**Shipped.** Leaving or finishing a practice round sends `DELETE /api/games/[slug]/practice/rounds`
+and the screen goes straight back to Start. `endLivePracticeRounds` marks the round `voided` and
+asks the provider to void it (`adapter.voidRound`, not awaited), scoped to the caller, the game,
+`contestType: "practice"` and `contestId: null`. Every Start closes any leftover live round first,
+so a new round always opens. **The result pull is deleted**, so the earlier entry's
+`pullLivePracticeResults` is history. The button now uses the shared `<Button>`, because
+`neonButtonClasses` carries the colour and not the shape.
+
+**Volt Velocity needed no code:** its `supportsPractice` became `true` today and is provider-owned,
+so the platform keeps the old `false` until games-service is rebuilt and restarted and the
+catalogue is re-synced in admin.
+
+**Verified:** `practice-round.test.ts` 7/7 (the pull block flipped, not deleted), 4 probes red on
+exactly one failure, lint clean, typecheck at the 223 baseline. Two failures in
+`arena-band.test.ts` were already there before this change and are unrelated. **Not checked by eye.**
+
+**Open, owner to decide:** trading practice on weekends, and whether the recent-rounds list stays.
+
 ### 28 Sep 2026 - The games catalogue redesigned to the owner's reference
 
 **Owner instruction:** make the `/games` list match the reference, with artwork filling each card,

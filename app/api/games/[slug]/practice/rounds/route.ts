@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { auth } from "@/lib/better-auth/auth";
 import {
+  endPracticeRound,
   launchPracticeRound,
   listPracticeRounds,
   type PracticeRefusal,
@@ -11,7 +12,8 @@ import {
  * /api/games/[slug]/practice/rounds - the practice area for any game.
  *
  * GET reads the caller's own recent practice rounds and NEVER creates one - a prefetch or a
- * poll must not open a round at the provider. POST starts (or reopens) a practice round.
+ * poll must not open a round at the provider. POST starts a practice round; DELETE closes the
+ * one the player just left.
  * The user id always comes from the session, never from the request.
  */
 
@@ -92,6 +94,39 @@ export async function POST(
     });
   } catch (error) {
     console.error("❌ Practice round launch route failed:", error);
+    return NextResponse.json(
+      { success: false, error: "Something went wrong. Please contact support." },
+      { status: 500 },
+    );
+  }
+}
+
+/** DELETE closes the caller's own practice round when they leave it. Idempotent. */
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ slug: string }> },
+) {
+  try {
+    const session = await auth.api.getSession({ headers: await headers() });
+    if (!session?.user) return unauthorized();
+
+    const body = (await request.json().catch(() => null)) as { roundId?: unknown } | null;
+    const roundId = typeof body?.roundId === "string" ? body.roundId.trim() : "";
+    if (!roundId || roundId.length > 100) {
+      return NextResponse.json(
+        { success: false, error: "A round id is required." },
+        { status: 400 },
+      );
+    }
+
+    const { slug } = await params;
+    const outcome = await endPracticeRound(slug, session.user.id, roundId);
+    if (!outcome.found) {
+      return NextResponse.json({ success: false, error: "Game not found." }, { status: 404 });
+    }
+    return NextResponse.json({ success: true, ended: outcome.ended });
+  } catch (error) {
+    console.error("❌ Practice round end route failed:", error);
     return NextResponse.json(
       { success: false, error: "Something went wrong. Please contact support." },
       { status: 500 },

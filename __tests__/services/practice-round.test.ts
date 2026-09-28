@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
 import mongoose, { Types } from "mongoose";
 import {
   startTestMongo,
@@ -15,7 +15,7 @@ import {
 } from "../../lib/services/game-providers/adapters/mock.adapter";
 import { getProviderAdapter } from "../../lib/services/game-providers/registry";
 import { createRound } from "../../lib/services/games/round.service";
-import { pullLivePracticeResults } from "../../lib/services/games/practice-round.service";
+import { endLivePracticeRounds } from "../../lib/services/games/practice-round.service";
 
 /**
  * Practice rounds through `createRound`.
@@ -126,43 +126,52 @@ describe("practice rounds", () => {
 });
 
 /**
- * Reason: a provider never pushes a practice result (requirements v1.10, `01` s4.2), so the
- * practice area pulls it. Without the pull a finished round stays `launched` here and the next
- * Start resumes the finished round instead of opening a new one.
+ * Leaving a practice round closes it, here and at the provider.
+ *
+ * Reason (history kept on purpose): until 28 Sep 2026 this block was "practice results are
+ * pulled, not pushed" - a provider never pushes a practice result (requirements v1.10, `01`
+ * s4.2), so `pullLivePracticeResults` fetched it back through `applyResult` and the screen
+ * showed a score. The owner then decided practice keeps no result ("no need to calculate any
+ * results just exit ... after leave the practice game close the round"), so the pull was
+ * deleted and leaving VOIDS the round instead. The original hazard survives unchanged: a round
+ * left `launched` makes the next Start RESUME it, because `createRound` is idempotent on the
+ * live round - which is why the first test below still asserts a NEW round opens.
  */
-describe("practice results are pulled, not pushed", () => {
-  it("a finished practice round is closed by the pull, so the next Start opens a new one", async () => {
+describe("leaving a practice round closes it", () => {
+  it("voids the round here and asks the provider to void it, so the next Start opens a new one", async () => {
+    const mock = getProviderAdapter(MOCK_PROVIDER_KEY) as MockProviderAdapter;
+    const voided = vi.spyOn(mock, "voidRound");
     const userId = new Types.ObjectId().toString();
     const first = await practice(userId, GAME_A);
     expect(first.success).toBe(true);
     if (!first.success) return;
 
-    await pullLivePracticeResults(userId, keyOf(GAME_A));
+    expect(await endLivePracticeRounds(userId, keyOf(GAME_A), first.roundId)).toBe(1);
     const stored = await GameRound.findOne({ roundId: first.roundId }).lean<{
       status: string;
+      rawScore?: number;
       resultSource?: string;
     }>();
-    expect(stored?.status).toBe("completed");
-    expect(stored?.resultSource).toBe("poll");
+    expect(stored?.status).toBe("voided");
+    expect(stored?.rawScore).toBeUndefined();
+    expect(stored?.resultSource).toBeUndefined();
+    expect(voided).toHaveBeenCalledWith(first.roundId);
 
     const second = await practice(userId, GAME_A);
     expect(second.success).toBe(true);
     if (!second.success) return;
     expect(second.idempotent).toBe(false);
     expect(second.roundId).not.toBe(first.roundId);
+    voided.mockRestore();
   });
 
-  it("a practice round still in play is left live and resumed", async () => {
-    const mock = getProviderAdapter(MOCK_PROVIDER_KEY) as MockProviderAdapter;
-    mock.configure({ failureModes: ["callback_never_arrives"] });
+  it("is idempotent: a round already closed ends nothing", async () => {
     const userId = new Types.ObjectId().toString();
-    const first = await practice(userId, GAME_A);
-    expect(first.success).toBe(true);
-    if (!first.success) return;
-
-    await pullLivePracticeResults(userId, keyOf(GAME_A));
-    const second = await practice(userId, GAME_A);
-    expect(second.success && second.idempotent).toBe(true);
+    const round = await practice(userId, GAME_A);
+    expect(round.success).toBe(true);
+    if (!round.success) return;
+    expect(await endLivePracticeRounds(userId, keyOf(GAME_A), round.roundId)).toBe(1);
+    expect(await endLivePracticeRounds(userId, keyOf(GAME_A), round.roundId)).toBe(0);
   });
 
   it("never touches another player's or another game's round", async () => {
@@ -171,9 +180,28 @@ describe("practice results are pulled, not pushed", () => {
     expect(round.success).toBe(true);
     if (!round.success) return;
 
-    await pullLivePracticeResults(new Types.ObjectId().toString(), keyOf(GAME_A));
-    await pullLivePracticeResults(owner, keyOf(GAME_B));
+    await endLivePracticeRounds(new Types.ObjectId().toString(), keyOf(GAME_A));
+    await endLivePracticeRounds(owner, keyOf(GAME_B));
     const stored = await GameRound.findOne({ roundId: round.roundId }).lean<{ status: string }>();
-    expect(stored?.status).not.toBe("completed");
+    expect(stored?.status).not.toBe("voided");
+  });
+
+  it("never touches a contest round, even the same player's on the same game", async () => {
+    const userId = new Types.ObjectId().toString();
+    const practiceRound = await practice(userId, GAME_A);
+    expect(practiceRound.success).toBe(true);
+    if (!practiceRound.success) return;
+    // Reason: the raw collection, because both fields are immutable on the model and Mongoose
+    // silently drops an update to an immutable path - the fixture would change nothing.
+    await GameRound.collection.updateOne(
+      { roundId: practiceRound.roundId },
+      { $set: { contestType: "competition", contestId: new Types.ObjectId() } },
+    );
+
+    expect(await endLivePracticeRounds(userId, keyOf(GAME_A))).toBe(0);
+    const stored = await GameRound.findOne({ roundId: practiceRound.roundId }).lean<{
+      status: string;
+    }>();
+    expect(stored?.status).not.toBe("voided");
   });
 });

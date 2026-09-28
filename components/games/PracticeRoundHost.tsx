@@ -2,31 +2,27 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { GraduationCap, Loader2, Play, RotateCcw } from "lucide-react";
+import { GraduationCap, Loader2, Play } from "lucide-react";
 import { ProviderGameFrame } from "./ProviderGameFrame";
+import { Button } from "@/components/ui/button";
 import { neonButtonClasses } from "@/components/neon/Buttons";
 import { NEON_PANEL } from "@/components/neon/tokens";
 import { formatGameScore, type GameScoreType } from "@/lib/utils/format-game-score";
-import { humanizeMetric } from "@/lib/utils/humanize-metric";
 import type { PracticeRoundView } from "./practice-state";
 
 /**
- * The practice area for any provider game - the practice sibling of `ChallengeRoundHost`.
+ * The practice area for any provider game.
  *
- * Same three rules as the contest hosts: the round is created by a CLICK (a POST), never by
- * rendering; the result is read back from our own server rather than trusted from the frame's
- * message; and that read is bounded. Nothing here names a game.
+ * The round is created by a CLICK (a POST), never by rendering. Practice keeps no result
+ * (owner, 28 Sep 2026: "no need to calculate any results just exit"), so leaving or finishing
+ * a round closes it (a DELETE) and returns straight to Start - there is nothing to wait for.
+ * Nothing here names a game.
  */
-
-const POLL_INTERVAL_MS = 3000;
-const POLL_ATTEMPTS = 20;
 
 type Phase =
   | { name: "idle" }
   | { name: "launching" }
-  | { name: "playing"; launchUrl: string; roundId: string }
-  | { name: "confirming"; roundId: string }
-  | { name: "done"; round: PracticeRoundView | null };
+  | { name: "playing"; launchUrl: string; roundId: string };
 
 interface PracticeRoundHostProps {
   slug: string;
@@ -34,6 +30,13 @@ interface PracticeRoundHostProps {
   scoreType?: GameScoreType;
   initialRounds: PracticeRoundView[];
 }
+
+const STATUS_LABELS = new Map<string, string>([
+  ["voided", "Ended"],
+  ["completed", "Finished"],
+  ["expired", "Time ran out"],
+  ["abandoned", "Left early"],
+]);
 
 export function PracticeRoundHost({
   slug,
@@ -44,25 +47,28 @@ export function PracticeRoundHost({
   const [phase, setPhase] = useState<Phase>({ name: "idle" });
   const [rounds, setRounds] = useState<PracticeRoundView[]>(initialRounds);
   const [refusal, setRefusal] = useState<string | null>(null);
-  const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const liveRoundId = useRef<string | null>(null);
   const endpoint = `/api/games/${encodeURIComponent(slug)}/practice/rounds`;
+
+  // Reason: `keepalive` lets the request finish when the player navigates away mid-round,
+  // which is the one moment the component cannot wait for a response.
+  const endRound = useCallback(
+    (roundId: string) => {
+      void fetch(endpoint, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roundId }),
+        keepalive: true,
+      }).catch(() => undefined);
+    },
+    [endpoint],
+  );
 
   useEffect(() => {
     return () => {
-      if (pollTimer.current) clearTimeout(pollTimer.current);
+      if (liveRoundId.current) endRound(liveRoundId.current);
     };
-  }, []);
-
-  const readRounds = useCallback(async (): Promise<PracticeRoundView[] | null> => {
-    try {
-      const response = await fetch(endpoint, { cache: "no-store" });
-      const data = await response.json();
-      if (!response.ok || !data.success) return null;
-      return data.rounds as PracticeRoundView[];
-    } catch {
-      return null;
-    }
-  }, [endpoint]);
+  }, [endRound]);
 
   const launch = useCallback(async () => {
     setRefusal(null);
@@ -75,6 +81,7 @@ export function PracticeRoundHost({
         setPhase({ name: "idle" });
         return;
       }
+      liveRoundId.current = data.roundId;
       setPhase({ name: "playing", launchUrl: data.launchUrl, roundId: data.roundId });
     } catch {
       setRefusal("Something went wrong. Please contact support.");
@@ -82,30 +89,18 @@ export function PracticeRoundHost({
     }
   }, [endpoint]);
 
-  const confirm = useCallback(
+  const leave = useCallback(
     (roundId: string) => {
-      setPhase({ name: "confirming", roundId });
-      let polls = 0;
-      const tick = async () => {
-        polls += 1;
-        const latest = await readRounds();
-        if (latest) {
-          setRounds(latest);
-          const round = latest.find((r) => r.roundId === roundId);
-          if (round && !round.isLive) {
-            setPhase({ name: "done", round });
-            return;
-          }
-        }
-        if (polls >= POLL_ATTEMPTS) {
-          setPhase({ name: "done", round: null });
-          return;
-        }
-        pollTimer.current = setTimeout(tick, POLL_INTERVAL_MS);
-      };
-      void tick();
+      liveRoundId.current = null;
+      endRound(roundId);
+      setRounds((previous) =>
+        previous.some((round) => round.roundId === roundId)
+          ? previous
+          : [{ roundId, status: "voided", isLive: false }, ...previous].slice(0, 5),
+      );
+      setPhase({ name: "idle" });
     },
-    [readRounds],
+    [endRound],
   );
 
   const handleUntrustedOrigin = useCallback((origin: string) => {
@@ -117,8 +112,8 @@ export function PracticeRoundHost({
       <ProviderGameFrame
         launchUrl={phase.launchUrl}
         gameName={gameName}
-        onFinished={() => confirm(phase.roundId)}
-        onExit={() => confirm(phase.roundId)}
+        onFinished={() => leave(phase.roundId)}
+        onExit={() => leave(phase.roundId)}
         onUntrustedOrigin={handleUntrustedOrigin}
       />
     );
@@ -130,48 +125,29 @@ export function PracticeRoundHost({
     <div className="space-y-5">
       <div className={`${NEON_PANEL} p-6 text-center`}>
         <GraduationCap className="mx-auto h-10 w-10 text-violet-400" aria-hidden />
-        <h2 className="mt-3 text-lg font-bold text-white">
-          {phase.name === "confirming"
-            ? "Checking your practice result…"
-            : phase.name === "done"
-              ? "Practice round finished"
-              : `Practise ${gameName}`}
-        </h2>
-
-        {phase.name === "confirming" ? (
-          <Loader2 className="mx-auto mt-4 h-6 w-6 animate-spin text-cyan-300" aria-hidden />
+        <h2 className="mt-3 text-lg font-bold text-white">{`Practise ${gameName}`}</h2>
+        <p className="mx-auto mt-2 max-w-md text-sm text-gray-400">
+          Only you play. It is free, it does not count towards any ranking, and there is no
+          prize. Play as many practice rounds as you like.
+        </p>
+        {refusal ? (
+          <p role="alert" className="mx-auto mt-3 max-w-md text-sm text-rose-300">
+            {refusal}
+          </p>
         ) : null}
-
-        {phase.name === "done" ? <PracticeResult round={phase.round} scoreType={scoreType} /> : null}
-
-        {phase.name !== "confirming" ? (
-          <>
-            <p className="mx-auto mt-2 max-w-md text-sm text-gray-400">
-              Only you play. It is free, it does not count towards any ranking, and there is no
-              prize. Play as many practice rounds as you like.
-            </p>
-            {refusal ? (
-              <p role="alert" className="mx-auto mt-3 max-w-md text-sm text-rose-300">
-                {refusal}
-              </p>
-            ) : null}
-            <button
-              type="button"
-              onClick={launch}
-              disabled={launching}
-              className={`mx-auto mt-5 max-w-xs ${neonButtonClasses("action")}`}
-            >
-              {launching ? (
-                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-              ) : phase.name === "done" ? (
-                <RotateCcw className="h-4 w-4" aria-hidden />
-              ) : (
-                <Play className="h-4 w-4" aria-hidden />
-              )}
-              {launching ? "Starting…" : phase.name === "done" ? "Practise again" : "Start practice"}
-            </button>
-          </>
-        ) : null}
+        <Button
+          type="button"
+          onClick={launch}
+          disabled={launching}
+          className={`mx-auto mt-5 h-12 min-w-[14rem] gap-2 whitespace-nowrap rounded-xl px-8 ${neonButtonClasses("action")}`}
+        >
+          {launching ? (
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+          ) : (
+            <Play className="h-4 w-4" aria-hidden />
+          )}
+          {launching ? "Starting…" : "Start practice"}
+        </Button>
       </div>
 
       {rounds.length > 0 ? (
@@ -182,7 +158,9 @@ export function PracticeRoundHost({
           <ul className="mt-3 space-y-2">
             {rounds.map((round) => (
               <li key={round.roundId} className="flex items-center justify-between text-sm">
-                <span className="text-gray-400">{round.isLive ? "In progress" : round.status}</span>
+                <span className="text-gray-400">
+                  {round.isLive ? "In progress" : (STATUS_LABELS.get(round.status) ?? round.status)}
+                </span>
                 <span className="font-mono text-white">
                   {formatGameScore(round.score, scoreType)}
                 </span>
@@ -197,44 +175,6 @@ export function PracticeRoundHost({
           Back to the game page
         </Link>
       </p>
-    </div>
-  );
-}
-
-function PracticeResult({
-  round,
-  scoreType,
-}: {
-  round: PracticeRoundView | null;
-  scoreType?: GameScoreType;
-}) {
-  if (!round) {
-    return (
-      <p className="mx-auto mt-3 max-w-md text-sm text-gray-400">
-        The game has not reported this round yet. It will appear under your recent rounds when
-        it does.
-      </p>
-    );
-  }
-  const breakdown = Object.entries(round.scoreBreakdown ?? {}).filter(
-    ([, value]) => value !== null && value !== undefined,
-  );
-  return (
-    <div className="mt-4 space-y-3">
-      <p className="text-3xl font-bold text-cyan-300">{formatGameScore(round.score, scoreType)}</p>
-      {breakdown.length > 0 ? (
-        <dl className="mx-auto grid max-w-sm grid-cols-2 gap-x-6 gap-y-1 text-left text-sm">
-          {breakdown.map(([key, value]) => {
-            const metric = humanizeMetric(key, value);
-            return (
-              <div key={key} className="contents">
-                <dt className="text-gray-400">{metric.label}</dt>
-                <dd className="text-right text-white">{metric.value}</dd>
-              </div>
-            );
-          })}
-        </dl>
-      ) : null}
     </div>
   );
 }
