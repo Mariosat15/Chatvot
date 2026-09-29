@@ -3096,10 +3096,12 @@ Browse-games empty state as the only zero-play answer is correct as history (mor
 **Card art is catalogue `bannerUrl` then `thumbnailUrl`** (same source as `/games` cards),
 with neon plates only as fallback — a document describing hard-coded per-title Overview art
 as the primary source is wrong. **Global Rank uses per-rank PNGs** under
-`public/assets/neon/overview/ranks/{1..20}.png` (owner `ui/levels` plates) with **no text
-overlay** — the number is baked into the art; outside top 20 uses the dash. A document
-describing one shell + `#n` overlay is correct as history (morning of 29 Sep) and stale as a
-present fact — **say which**. **Header is nav-only** (Overview / Wallet / Performance /
+`public/assets/neon/overview/ranks/{1..20}.png` (owner `ui/Rank` plates that say RANK) with **no
+text overlay** — the number is baked into the art; outside top 20 uses the dash. Level plates
+from `ui/levels` are stored separately under `levels/` for later use and **must not** drive
+Overview Global Rank. A document describing rank art as coming from `ui/levels`, or one shell +
+`#n` overlay, is correct as history (earlier 29 Sep) and stale as a present fact — **say which**.
+**Header is nav-only** (Overview / Wallet / Performance /
 Competitions / Tutorials) — logo, level chip, bell and profile were removed because they
 already live on the sidebar; Games / Challenges / Marketplace stay on `UserSidebar`. **`?tab=`
 is the addressable source** for the active dashboard section; localStorage is fallback only;
@@ -3115,16 +3117,25 @@ service reaches mongoose and Turbopack then fails the browser build on `child_pr
 
 **Polish (same day, owner mark-ups):** hero art is full-bleed with a left fade; Player Progress
 + Recent Activity sit side-by-side like mock image 5 and **stretch to equal height**; KPI cards
-are rebuilt to the premium glass target (large icon tile, tinted gradient glass, week-delta row,
-integrated spark — bare credit amounts, no ⚡); week deltas come from wallet + contest history
-when comparable, otherwise a dash (never invented); Play-by-Game best score falls back through
-`bestScore` → `totalPoints` → max `game_round.rawScore`. **Missions** are the next up to **4**
-incomplete journey milestones on the player's active map (unlocked first, then map order), with
-the **map name** shown and real `calculateMilestoneProgress` bars — View All goes to
-`/profile?tab=journey`, not `/journey`. **Page backdrop** is the owner mountain plate behind the
-Overview tab only, with navy edge/top/bottom fades. **Account Status** is a **collapsed neon
-amber bar** (shield + title + issue count + Details) — badges and support copy appear only
-when expanded (`components/dashboard/AccountStatusCard.tsx`).
+are rebuilt to the premium glass target (large neon icon tile from `ui/items`, tinted gradient
+glass, week-delta row, integrated spark — **credit amounts keep ⚡** via `formatVolts`, never
+`bare: true`); week deltas come from wallet + contest history when comparable, otherwise a dash
+(never invented); Play-by-Game best score falls back through `bestScore` → `totalPoints` → max
+`game_round.rawScore`. **Missions** show the **one** next incomplete journey milestone on the
+player's active map (unlocked first), with the **map name**, a real progress bar, and a rounded
+**% complete** — View All goes to `/profile?tab=journey`, not `/journey`. A **milestones ring**
+(`journeyMilestonesDone` / `journeyMilestonesTotal`) sits beside that single next tile. **Global
+Rank plates are from `ui/Rank`** under `ranks/{1..20}.png` (say RANK); **level plates from
+`ui/levels` live under `levels/` for later screens** and must not be used on Overview. **Hero
+banner** was padded and right-washed (`tools/fix-overview-hero.py`) so baked vertical letters
+are hidden and the standing figure can crop into frame (`object-[72%_28%]`). **Page backdrop** is
+the owner mountain plate behind the Overview tab only, with navy edge/top/bottom fades.
+**Account Status** is a **collapsed neon amber bar** (shield + title + issue count + Details) —
+badges and support copy appear only when expanded (`components/dashboard/AccountStatusCard.tsx`).
+
+A document still saying missions are capped at **4**, or that KPI amounts are **bare**, or that
+rank plates come from `ui/levels`, is correct as history (earlier 29 Sep) and stale as a present
+fact — **say which**.
 
 ### 5.1a The contest cards, made game-aware - BUILT 6 September 2026
 

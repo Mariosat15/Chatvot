@@ -51,8 +51,8 @@ export interface OverviewMission {
   target: number;
 }
 
-/** Cap on Overview mission tiles — next N incomplete, in map order. */
-export const OVERVIEW_MISSION_LIMIT = 4;
+/** Cap on Overview mission tiles — next incomplete only (owner, 29 Sep 2026). */
+export const OVERVIEW_MISSION_LIMIT = 1;
 
 export interface OverviewActivityItem {
   id: string;
@@ -88,6 +88,10 @@ export interface OverviewStanding {
   playCards: OverviewPlayCard[];
   /** Active journey map display name (empty when no progress). */
   journeyMapName: string;
+  /** Completed milestones on the active map (for the ring readout). */
+  journeyMilestonesDone: number;
+  /** Total active milestones on the active map. */
+  journeyMilestonesTotal: number;
   missions: OverviewMission[];
   recentActivity: OverviewActivityItem[];
   streaks: OverviewStreaksFacts;

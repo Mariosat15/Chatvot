@@ -2,8 +2,9 @@
  * Global Rank badge art for the Overview.
  *
  * Ranks 1–20 each have a dedicated PNG under `/assets/neon/overview/ranks/{n}.png`
- * (owner assets from `ui/levels`, 29 Sep 2026). The number is baked into the art —
- * do not overlay text. Rank 21+, 0, or missing use the dash badge.
+ * (owner assets from `ui/Rank`, 29 Sep 2026). The number and the word RANK are
+ * baked into the art — do not overlay text. Level plates live separately under
+ * `levels/` and must not be used here. Rank 21+, 0, or missing use the dash badge.
  */
 
 export const OVERVIEW_RANK_TOP_N = 20;

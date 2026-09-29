@@ -2,11 +2,12 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { BarChart3, ChevronRight, Target, Trophy } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import type {
   OverviewMission,
   OverviewStanding,
 } from "@/lib/services/games/overview-types";
+import { OVERVIEW_ICON_ART } from "@/lib/services/games/overview-assets";
 import {
   NEON_PANEL_LIT,
   NEON_HEADING,
@@ -24,7 +25,67 @@ interface OverviewProgressProps {
   progressPercent: number;
   title: string;
   journeyMapName: string;
+  journeyMilestonesDone: number;
+  journeyMilestonesTotal: number;
   missions: OverviewMission[];
+}
+
+function MilestoneRing({
+  done,
+  total,
+}: {
+  done: number;
+  total: number;
+}) {
+  const safeTotal = Math.max(0, total);
+  const safeDone = Math.min(safeTotal, Math.max(0, done));
+  const pct =
+    safeTotal > 0 ? Math.round((safeDone / safeTotal) * 100) : 0;
+  const radius = 34;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference * (1 - pct / 100);
+
+  return (
+    <div
+      className="flex items-center gap-3 rounded-xl border border-amber-400/25 bg-[#070E1C]/80 px-3 py-2.5"
+      aria-label={`${safeDone} of ${safeTotal} milestones`}
+    >
+      <div className="relative h-[84px] w-[84px] shrink-0">
+        <svg viewBox="0 0 84 84" className="h-full w-full -rotate-90" aria-hidden>
+          <circle
+            cx="42"
+            cy="42"
+            r={radius}
+            fill="none"
+            stroke="rgba(251,191,36,0.15)"
+            strokeWidth="7"
+          />
+          <circle
+            cx="42"
+            cy="42"
+            r={radius}
+            fill="none"
+            stroke="#FBBF24"
+            strokeWidth="7"
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={offset}
+            className="drop-shadow-[0_0_8px_rgba(251,191,36,0.65)]"
+          />
+        </svg>
+        <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-amber-300">
+          {pct}%
+        </span>
+      </div>
+      <div className="min-w-0 leading-tight">
+        <p className="text-2xl font-bold text-emerald-400">{safeDone}</p>
+        <p className="text-xs text-gray-400">of {safeTotal || "—"}</p>
+        <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-wider text-amber-300/90">
+          Milestones
+        </p>
+      </div>
+    </div>
+  );
 }
 
 function MissionCard({
@@ -38,20 +99,26 @@ function MissionCard({
     mission.target > 0
       ? Math.min(100, Math.round((mission.current / mission.target) * 100))
       : 0;
-  const Icon = mission.name.toLowerCase().includes("win") ? Trophy : Target;
   return (
     <div className="flex flex-col gap-2 rounded-xl border border-cyan-400/25 bg-[#070E1C]/80 p-3.5 shadow-[0_0_18px_-8px_rgba(34,211,238,0.35)]">
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 items-start gap-2.5">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-violet-400/35 bg-violet-500/15 text-violet-300 shadow-[0_0_12px_rgba(167,139,250,0.35)]">
-            <Icon className="h-4 w-4" aria-hidden />
+          <span className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-violet-400/35 bg-violet-500/10 shadow-[0_0_12px_rgba(167,139,250,0.35)]">
+            <Image
+              src={OVERVIEW_ICON_ART.target}
+              alt=""
+              width={28}
+              height={28}
+              className="object-contain"
+            />
           </span>
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-gray-100">
               {mission.name}
             </p>
             <p className="truncate text-xs text-gray-500">
-              {mission.description || (mapName ? `On ${mapName}` : "Journey milestone")}
+              {mission.description ||
+                (mapName ? `On ${mapName}` : "Journey milestone")}
             </p>
           </div>
         </div>
@@ -70,12 +137,16 @@ function MissionCard({
           {mission.current} / {mission.target}
         </span>
       </div>
+      <p className="text-right text-[11px] font-semibold text-amber-200/90">
+        {pct}% complete
+      </p>
     </div>
   );
 }
 
 /**
- * Player Progress panel: Global Rank + XP + next journey milestones (max 4).
+ * Player Progress: Global Rank plate + XP + one next journey mission +
+ * map milestone completion ring.
  */
 export default function OverviewProgress({
   globalRank,
@@ -86,10 +157,15 @@ export default function OverviewProgress({
   progressPercent,
   title,
   journeyMapName,
+  journeyMilestonesDone,
+  journeyMilestonesTotal,
   missions,
 }: OverviewProgressProps) {
-  const xpPct = Math.min(100, Math.max(0, progressPercent));
+  // Reason: progressPercent can arrive as a long float from XP math — never
+  // paint that raw into the UI (owner screenshot showed 78.692…%).
+  const xpPct = Math.min(100, Math.max(0, Math.round(progressPercent)));
   const xpCap = currentXP + xpToNextLevel;
+  const nextMission = missions[0] ?? null;
 
   return (
     <section
@@ -98,8 +174,14 @@ export default function OverviewProgress({
     >
       <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
         <div className="flex items-start gap-2.5">
-          <span className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-lg border border-sky-400/40 bg-sky-500/15 text-sky-300 shadow-[0_0_14px_rgba(56,189,248,0.4)]">
-            <BarChart3 className="h-4 w-4" aria-hidden />
+          <span className="relative mt-0.5 flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg border border-amber-400/40 bg-amber-500/10 shadow-[0_0_14px_rgba(251,191,36,0.4)]">
+            <Image
+              src={OVERVIEW_ICON_ART.progress}
+              alt=""
+              width={28}
+              height={28}
+              className="object-contain"
+            />
           </span>
           <div>
             <h2 className={`${NEON_HEADING} text-sm tracking-[0.16em] text-white`}>
@@ -175,20 +257,23 @@ export default function OverviewProgress({
             </p>
           </div>
 
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {missions.length === 0 ? (
-              <div className="col-span-full rounded-xl border border-[#1B2540] bg-[#070E1C]/70 p-4 text-sm text-gray-400">
-                No open missions right now.{" "}
-                <Link href={JOURNEY_HREF} className="font-semibold text-sky-400">
-                  Open journey
-                </Link>
-              </div>
-            ) : (
-              missions.map((m) => (
-                <MissionCard key={m.id} mission={m} mapName={journeyMapName} />
-              ))
-            )}
-          </div>
+          {journeyMilestonesTotal > 0 && (
+            <MilestoneRing
+              done={journeyMilestonesDone}
+              total={journeyMilestonesTotal}
+            />
+          )}
+
+          {nextMission ? (
+            <MissionCard mission={nextMission} mapName={journeyMapName} />
+          ) : (
+            <div className="rounded-xl border border-[#1B2540] bg-[#070E1C]/70 p-4 text-sm text-gray-400">
+              No open missions right now.{" "}
+              <Link href={JOURNEY_HREF} className="font-semibold text-sky-400">
+                Open journey
+              </Link>
+            </div>
+          )}
         </div>
       </div>
     </section>

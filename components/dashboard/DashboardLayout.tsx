@@ -162,6 +162,8 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
                 progressPercent={player.progressPercent}
                 title={player.title}
                 journeyMapName={overviewStanding.journeyMapName}
+                journeyMilestonesDone={overviewStanding.journeyMilestonesDone}
+                journeyMilestonesTotal={overviewStanding.journeyMilestonesTotal}
                 missions={overviewStanding.missions}
               />
             </div>

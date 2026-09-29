@@ -171,6 +171,8 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
       contestWinRate: null,
       playCards: [],
       journeyMapName: "",
+      journeyMilestonesDone: 0,
+      journeyMilestonesTotal: 0,
       missions: [],
       recentActivity: [],
       kpiWeekDelta: { credits: null, winRate: null, roi: null, prizes: null },

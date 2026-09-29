@@ -163,7 +163,7 @@ function WeekDelta({ delta }: { delta: number | null }) {
   return (
     <p className="text-[11px] leading-tight">
       <span className={up ? "font-semibold text-emerald-400" : "font-semibold text-rose-400"}>
-        {up ? "↑" : "↓"} {up ? "+" : "−"}
+        {up ? "+" : "−"}
         {abs}%
       </span>
       <span className="ml-1.5 text-gray-500">vs last week</span>
@@ -244,8 +244,7 @@ function KpiCard({
 
 /**
  * Four Overview KPIs rebuilt to the image-4 premium neon glass system.
- * Data only from props — presentation is not a tweak of the old tall cards.
- * Credit figures use bare amounts (no ⚡) to match the target.
+ * Credit figures keep the platform credit symbol (⚡) — never strip it here.
  */
 export default function OverviewKpiRow({
   creditBalance,
@@ -265,7 +264,7 @@ export default function OverviewKpiRow({
     >
       <KpiCard
         label="Credit Balance"
-        value={formatVolts(creditBalance, { bare: true })}
+        value={formatVolts(creditBalance)}
         artSrc={OVERVIEW_KPI_ART.credits}
         tone="gold"
         sparkId="credits"
@@ -290,7 +289,7 @@ export default function OverviewKpiRow({
       />
       <KpiCard
         label="Prizes Won"
-        value={formatVolts(totalPrizesWon, { bare: true })}
+        value={formatVolts(totalPrizesWon)}
         artSrc={OVERVIEW_KPI_ART.prizes}
         tone="orange"
         sparkId="prizes"

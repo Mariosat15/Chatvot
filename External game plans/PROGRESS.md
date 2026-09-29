@@ -319,7 +319,7 @@ project low risk.
 
 This plan has two tracks. **As of 29 September 2026**:
 
-- **Neon Overview redesign CODE-COMPLETE 29 Sep (eng)** — Header **nav-only** Overview/Wallet/Performance/Competitions/Tutorials (`?tab=` sync); Global Rank **per-rank PNGs 1–20** (else dash); Play by Game = **top 4 most-played**, or **catalogue featured/`sortOrder` discovery** when the player has never entered; Account Status = **thin expandable neon amber bar**; KPI/streak neon plates from `ui/items`; Progress+Activity side-by-side. See `13` **s5.1g**. Tests: `overview-standing.test.ts` + `user-game-stats.test.ts` + updated `games-first-nav.test.ts`. **Never verified by eye.**
+- **Neon Overview redesign CODE-COMPLETE 29 Sep (eng)** — Header **nav-only**; Global Rank from **`ui/Rank`** plates (`ranks/1..20`, word RANK — `levels/` kept for later); Play by Game top 4 / discovery; Account Status thin expandable bar; KPI icons from owner neon tiles with **⚡ restored** on credit amounts; Player Progress = **one** next mission + milestones ring + rounded XP %; hero padded/washed so letters gone and figure crops in. See `13` **s5.1g**. Tests: `overview-standing.test.ts` (22). **Never verified by eye.**
 - **Volt Stack second title CODE-COMPLETE 27 Sep (eng)** — `volt-stack` in games-service catalogue; server-authoritative locks/score; play at `/play/volt-stack/?t=`; Circuit-compatible iframe messages. **Operator:** sync catalogue + enable title, then competition/challenge as for Circuit. See `21` **s4.1u**. Never verified by eye on live money.
 - **Provider contest lobby live updates CODE-COMPLETE 26 Sep (eng)** — same `/standings` poll as the arena (`ArenaLiveProvider` + `LobbyLiveParts`); players / your score / board / prize seats refresh without reload; trading keeps `LiveContestRefresher`. Not verified by eye.
 - **Prioritized task list:** `External game plans/NEXT-TASKS.md` — P0→P3 + closed items so stale paste-lists are not reopened. **Owner P1 decisions 24 Sep:** A5 last-when-asked; R11 owner/lawyers; R93 already closed; R96b content done; Q16 built; ops `--apply` backfills not needed; R99 optional.
@@ -1106,6 +1106,27 @@ days, and stay agnostic when new titles arrive.
 - Docs: `13` s5.1g amendment; tests in `user-game-stats` + `overview-standing`
 
 **Not backfilled:** existing rows keep `bestStreak: 0` until the next podium finish raises it.
+**Owner tested:** not yet.
+**Never verified by eye.**
+
+### 29 Sep 2026 - Overview icons, ranks, ⚡, one mission, hero crop
+
+**Owner:** (1) put ⚡ back beside credit amounts; (2) replace level PNGs from `ui/levels`;
+(3) dashboard Global Rank must use `ui/Rank` (keep levels for later); (4) wire provided
+neon icons into KPI / Progress / Missions; (5) hero — no baked vertical letters, standing
+man not cut off; (6) Player Progress — only one next mission + completion % / milestones ring.
+
+**Shipped:**
+- `formatVolts` without `bare` on Credit Balance / Prizes Won; WeekDelta drops ↑/↓ glyphs
+- `public/assets/neon/overview/ranks/{1..20}.png` from `ui/Rank`; `levels/{1..20}.png` from
+  `ui/levels` (stored, not used on Overview Global Rank)
+- `OVERVIEW_ICON_ART` + KPI map (progress / target / growth / trophy)
+- `OVERVIEW_MISSION_LIMIT = 1`; `journeyMilestonesDone` / `Total` + `MilestoneRing`; rounded
+  XP %; one mission card with % complete
+- Hero: `tools/fix-overview-hero.py` (right wash + top pad → 1280×849) +
+  `object-[72%_28%]`
+- Docs: `13` s5.1g amendment; tests 22 green in `overview-standing.test.ts`
+
 **Owner tested:** not yet.
 **Never verified by eye.**
 

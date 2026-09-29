@@ -26,7 +26,9 @@ export default function OverviewHero({ name, accountActive }: OverviewHeroProps)
         fill
         priority
         sizes="100vw"
-        className="object-cover object-center"
+        // Reason: art is taller than the strip so the standing figure stays in
+        // frame; bias right so the mountain figure is visible, not cropped at the waist.
+        className="object-cover object-[72%_28%]"
       />
       {/* Left wash keeps welcome copy readable over the art. */}
       <div

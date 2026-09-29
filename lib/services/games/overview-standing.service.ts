@@ -234,8 +234,16 @@ export function buildTopPlayCards(
 
 async function loadMissions(userId: string): Promise<{
   journeyMapName: string;
+  journeyMilestonesDone: number;
+  journeyMilestonesTotal: number;
   missions: OverviewMission[];
 }> {
+  const empty = {
+    journeyMapName: "",
+    journeyMilestonesDone: 0,
+    journeyMilestonesTotal: 0,
+    missions: [] as OverviewMission[],
+  };
   try {
     // Reason: one user can have many progress rows (one per map). Prefer the
     // incomplete map with the highest sequence index — that is the live map.
@@ -250,7 +258,7 @@ async function loadMissions(userId: string): Promise<{
         .sort({ currentMapIndex: -1, updatedAt: -1 })
         .lean();
     }
-    if (!progress?.mapId) return { journeyMapName: "", missions: [] };
+    if (!progress?.mapId) return empty;
 
     const mapId = String(progress.mapId);
     const mapConfig = await JourneyMapConfig.findOne({ mapId })
@@ -269,24 +277,31 @@ async function loadMissions(userId: string): Promise<{
       (progress as { unlockedMilestones?: string[] }).unlockedMilestones ?? [],
     );
 
-    const open = await JourneyMilestone.find({
+    const allActive = await JourneyMilestone.find({
       mapId,
       isActive: true,
-      id: { $nin: [...done] },
     })
       .select("id name description icon rewards order")
       .sort({ order: 1 })
       .lean();
 
+    const journeyMilestonesTotal = allActive.length;
+    const journeyMilestonesDone = allActive.filter((m) =>
+      done.has((m as { id: string }).id),
+    ).length;
+
+    const openRows = (
+      allActive as Array<{
+        id: string;
+        name?: string;
+        description?: string;
+        icon?: string;
+        rewards?: { xp?: number };
+      }>
+    ).filter((m) => !done.has(m.id));
+
     // Reason: unlocked incomplete first (what the player can do now), then the
     // next locked steps in map order — still the genuine journey sequence.
-    const openRows = open as Array<{
-      id: string;
-      name?: string;
-      description?: string;
-      icon?: string;
-      rewards?: { xp?: number };
-    }>;
     const unlockedOpen = openRows.filter((m) => unlocked.has(m.id));
     const lockedOpen = openRows.filter((m) => !unlocked.has(m.id));
     const next = [...unlockedOpen, ...lockedOpen].slice(0, OVERVIEW_MISSION_LIMIT);
@@ -298,6 +313,8 @@ async function loadMissions(userId: string): Promise<{
 
     return {
       journeyMapName,
+      journeyMilestonesDone,
+      journeyMilestonesTotal,
       missions: next.map((m) => {
         const p = byId.get(m.id);
         const target = Math.max(1, p?.targetValue ?? 1);
@@ -316,7 +333,7 @@ async function loadMissions(userId: string): Promise<{
       }),
     };
   } catch {
-    return { journeyMapName: "", missions: [] };
+    return empty;
   }
 }
 
@@ -502,6 +519,8 @@ export async function getOverviewStanding(opts: {
     contestWinRate,
     playCards: buildTopPlayCards(gameStanding, catalogue, OVERVIEW_PLAY_CARD_LIMIT, roundBests),
     journeyMapName: missionPack.journeyMapName,
+    journeyMilestonesDone: missionPack.journeyMilestonesDone,
+    journeyMilestonesTotal: missionPack.journeyMilestonesTotal,
     missions: missionPack.missions,
     recentActivity: contestActivity,
     kpiWeekDelta,

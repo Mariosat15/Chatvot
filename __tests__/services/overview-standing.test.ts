@@ -501,13 +501,17 @@ describe("Overview streaks chrome", () => {
     expect(kpi).toMatch(/SparkArea/);
     expect(kpi).toMatch(/vs last week/);
     expect(kpi).toMatch(/WeekDelta/);
-    expect(kpi).toMatch(/bare:\s*true/);
+    // Reason: credit symbol stays on overview amounts — owner asked it restored
+    // after a brief bare experiment (29 Sep 2026).
+    expect(kpi).not.toMatch(/bare:\s*true/);
+    expect(kpi).toMatch(/formatVolts\(creditBalance\)/);
+    expect(kpi).toMatch(/formatVolts\(totalPrizesWon\)/);
     expect(kpi).toMatch(/linear-gradient\(110deg/);
     expect(kpi).toMatch(/h-12 w-12/);
     expect(kpi).not.toMatch(/w-\[48%\]/);
   });
 
-  it("View All Missions links to profile journey tab and missions are capped at 4", () => {
+  it("View All Missions links to profile journey tab and shows one next mission plus completion", () => {
     const progress = readFileSync(
       join(ROOT, "components/dashboard/overview/OverviewProgress.tsx"),
       "utf8",
@@ -524,12 +528,45 @@ describe("Overview streaks chrome", () => {
     )
       .replace(/\/\*[\s\S]*?\*\//g, "")
       .replace(/\/\/.*$/gm, "");
+    const layout = readFileSync(
+      join(ROOT, "components/dashboard/DashboardLayout.tsx"),
+      "utf8",
+    )
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
     expect(progress).toMatch(/\/profile\?tab=journey/);
     expect(progress).not.toMatch(/href=["']\/journey["']/);
-    expect(types).toMatch(/OVERVIEW_MISSION_LIMIT\s*=\s*4/);
+    expect(types).toMatch(/OVERVIEW_MISSION_LIMIT\s*=\s*1/);
     expect(standing).toMatch(/OVERVIEW_MISSION_LIMIT/);
     expect(standing).toMatch(/journeyMapName/);
+    expect(standing).toMatch(/journeyMilestonesDone/);
     expect(standing).toMatch(/calculateMilestoneProgress/);
+    expect(progress).toMatch(/MilestoneRing/);
+    expect(progress).toMatch(/missions\[0\]/);
+    expect(progress).toMatch(/Math\.round\(progressPercent\)/);
+    expect(progress).toMatch(/OVERVIEW_ICON_ART/);
+    expect(layout).toMatch(/journeyMilestonesDone/);
+    expect(layout).toMatch(/journeyMilestonesTotal/);
+  });
+
+  it("Global Rank uses ranks art, not level plates", () => {
+    const badge = readFileSync(
+      join(ROOT, "lib/utils/overview-rank-badge.ts"),
+      "utf8",
+    )
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    const assets = readFileSync(
+      join(ROOT, "lib/services/games/overview-assets.ts"),
+      "utf8",
+    )
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    expect(badge).toMatch(/\/assets\/neon\/overview\/ranks\//);
+    expect(badge).not.toMatch(/\/assets\/neon\/overview\/levels\//);
+    expect(assets).toMatch(/OVERVIEW_ICON_ART/);
+    expect(assets).toMatch(/icon-progress\.png/);
+    expect(assets).toMatch(/icon-target\.png/);
   });
 
   it("Progress and Activity stretch to equal height", () => {
@@ -543,7 +580,7 @@ describe("Overview streaks chrome", () => {
     expect(layout).toMatch(/journeyMapName/);
   });
 
-  it("Welcome hero restores full-bleed banner art", () => {
+  it("Welcome hero restores full-bleed banner art with figure-safe crop", () => {
     const hero = readFileSync(
       join(ROOT, "components/dashboard/overview/OverviewHero.tsx"),
       "utf8",
@@ -552,6 +589,7 @@ describe("Overview streaks chrome", () => {
       .replace(/\/\/.*$/gm, "");
     expect(hero).toMatch(/OVERVIEW_HERO_BANNER/);
     expect(hero).toMatch(/object-cover/);
+    expect(hero).toMatch(/object-\[72%_28%\]/);
   });
 
   it("Play by Game caption distinguishes discovery from most-played", () => {

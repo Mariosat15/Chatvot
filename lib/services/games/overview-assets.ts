@@ -6,7 +6,10 @@
  * cover titles that have no admin artwork yet. Unknown codes fall through to
  * the generic trophy. Do not enumerate games for stats here (R29).
  *
- * KPI / streak icons are owner plates from `ui/items` (29 Sep 2026 polish).
+ * KPI / Progress / Mission icons are owner neon tiles from `ui/items`
+ * (29 Sep 2026). Global Rank plates live under `ranks/` (from `ui/Rank`).
+ * Level plates are stored under `levels/` (from `ui/levels`) for later screens
+ * — Overview must not use them for Global Rank.
  */
 
 import { overviewRankSrc, OVERVIEW_RANK_TOP_N } from "@/lib/utils/overview-rank-badge";
@@ -19,12 +22,20 @@ export const OVERVIEW_KPI_ICONS = "/assets/neon/overview/kpi-icons-strip.png";
 export const OVERVIEW_STREAK_ICONS =
   "/assets/neon/overview/streak-icons-strip.png";
 
-/** KPI plate art matching image 9 (credits / win rate / ROI / prizes). */
+/** Standalone neon tiles used as KPI / Progress / Mission icons. */
+export const OVERVIEW_ICON_ART = {
+  progress: "/assets/neon/overview/items/icon-progress.png",
+  target: "/assets/neon/overview/items/icon-target.png",
+  growth: "/assets/neon/overview/items/icon-growth.png",
+  trophy: "/assets/neon/overview/items/icon-trophy.png",
+} as const;
+
+/** KPI plate art — credits / win rate / ROI / prizes. */
 export const OVERVIEW_KPI_ART = {
-  credits: "/assets/neon/overview/items/kpi-credits.png",
-  winRate: "/assets/neon/overview/items/kpi-winrate.png",
-  roi: "/assets/neon/overview/items/kpi-roi.png",
-  prizes: "/assets/neon/overview/items/kpi-prizes.png",
+  credits: OVERVIEW_ICON_ART.progress,
+  winRate: OVERVIEW_ICON_ART.target,
+  roi: OVERVIEW_ICON_ART.growth,
+  prizes: OVERVIEW_ICON_ART.trophy,
 } as const;
 
 /** Streak tile icons — contest-shaped labels, game art (image 7). */
@@ -61,6 +72,9 @@ export function allOverviewAssets(): string[] {
   const ranks = Array.from({ length: OVERVIEW_RANK_TOP_N }, (_, i) =>
     overviewRankSrc(i + 1),
   );
+  const levels = Array.from({ length: OVERVIEW_RANK_TOP_N }, (_, i) =>
+    `/assets/neon/overview/levels/${i + 1}.png`,
+  );
   return [
     OVERVIEW_HERO_BANNER,
     OVERVIEW_BACKDROP,
@@ -70,8 +84,10 @@ export function allOverviewAssets(): string[] {
     PLAY_GENERIC,
     ...PLAY_BY_CODE.values(),
     "/assets/neon/overview/rank-badge-dash.png",
+    ...Object.values(OVERVIEW_ICON_ART),
     ...Object.values(OVERVIEW_KPI_ART),
     ...Object.values(OVERVIEW_STREAK_ART),
     ...ranks,
+    ...levels,
   ];
 }
