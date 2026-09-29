@@ -52,6 +52,12 @@ interface NavItem {
  */
 const NAV_ICON = "!h-full !w-full";
 
+/** Neon shell tokens — match the owner sidebar mock (cyan frame, glass plates). */
+const SHELL =
+  "bg-[linear-gradient(180deg,#07101f_0%,#050b16_55%,#03070f_100%)]";
+const FRAME_GLOW =
+  "shadow-[0_0_0_1px_rgba(0,242,255,0.55),0_0_24px_rgba(0,180,255,0.28),inset_0_0_40px_rgba(0,120,200,0.08)]";
+
 function buildMainNavItems(terms: TerminologyPack): NavItem[] {
   return [
     {
@@ -59,7 +65,7 @@ function buildMainNavItems(terms: TerminologyPack): NavItem[] {
       label: "Dashboard",
       icon: <GameIcon name="headset" size={40} className={NAV_ICON} />,
       color: "text-blue-400",
-      gradient: "from-blue-500/20 to-blue-600/5",
+      gradient: "from-cyan-500/25 to-blue-600/10",
     },
     {
       href: "/games",
@@ -142,6 +148,43 @@ const accountNavItems: NavItem[] = [
   },
 ];
 
+function SectionHeader({
+  label,
+  collapsed,
+  accent = "cyan",
+}: {
+  label: string;
+  collapsed: boolean;
+  accent?: "cyan" | "amber";
+}) {
+  if (collapsed) return null;
+  const line =
+    accent === "amber"
+      ? "from-amber-400/70 via-amber-300/20 to-transparent"
+      : "from-cyan-400/70 via-cyan-300/20 to-transparent";
+  return (
+    <div className="mb-2 flex items-center gap-2 px-1">
+      <span
+        className={cn(
+          "text-[10px] font-bold uppercase tracking-[0.2em]",
+          accent === "amber" ? "text-amber-300/90" : "text-cyan-300/90",
+        )}
+      >
+        {label}
+      </span>
+      <span className={cn("h-px flex-1 bg-gradient-to-r", line)} />
+      <span
+        className={cn(
+          "h-1.5 w-1.5 rotate-45 border",
+          accent === "amber"
+            ? "border-amber-400/60 bg-amber-400/20"
+            : "border-cyan-400/60 bg-cyan-400/20",
+        )}
+      />
+    </div>
+  );
+}
+
 const UserSidebar = ({ user }: UserSidebarProps) => {
   const pathname = usePathname();
   const router = useRouter();
@@ -154,7 +197,12 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isGameMaster, setIsGameMaster] = useState(false);
   const [arenaEnabled, setArenaEnabled] = useState(true);
-  const [userLevel, setUserLevel] = useState<{ title: string; level: number; color: string; icon: string } | null>(null);
+  const [userLevel, setUserLevel] = useState<{
+    title: string;
+    level: number;
+    color: string;
+    icon: string;
+  } | null>(null);
 
   // Reason: Pulled out so we can re-invoke it from the GM_SUBSCRIPTION_CHANGED
   // event listener below without re-doing all the other fetches.
@@ -204,7 +252,9 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
             icon: data.currentIcon || "⚔️",
           });
         }
-      } catch { /* Silent fail */ }
+      } catch {
+        /* Silent fail */
+      }
     };
     checkGameMasterStatus();
     fetchFeatureFlags();
@@ -266,41 +316,44 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
   const NavLink = ({ item }: { item: NavItem }) => {
     const active = isActive(item.href);
     return (
-      <Link href={item.href}>
+      <Link href={item.href} className="block cursor-pointer">
         <div
           className={cn(
-            "group relative flex items-center rounded-xl transition-all duration-300 cursor-pointer",
+            "group relative flex cursor-pointer items-center rounded-xl transition-all duration-200",
+            "active:scale-[0.98]",
             isCollapsed ? "justify-center px-2 py-2" : "gap-3 px-3 py-2.5",
             active
-              ? `bg-gradient-to-r ${item.gradient} border border-gray-700/50 shadow-lg`
-              : "hover:bg-gray-800/50 border border-transparent hover:border-gray-700/30",
+              ? cn(
+                  `bg-gradient-to-r ${item.gradient}`,
+                  "border border-cyan-400/70",
+                  "shadow-[0_0_18px_rgba(0,200,255,0.35),inset_0_0_20px_rgba(0,160,255,0.12)]",
+                )
+              : cn(
+                  "border border-transparent",
+                  "hover:border-cyan-400/35 hover:bg-cyan-500/5",
+                  "hover:shadow-[0_0_14px_rgba(0,180,255,0.2)]",
+                ),
           )}
         >
-          {/* Active indicator */}
           {active && (
-            <div
-              className={cn(
-                "absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 rounded-r-full",
-                item.color.replace("text-", "bg-"),
-              )}
-            />
+            <div className="absolute left-0 top-1/2 h-8 w-1 -translate-y-1/2 rounded-r-full bg-cyan-400 shadow-[0_0_10px_#22d3ee]" />
           )}
 
-          <div className="relative">
+          <div className="relative shrink-0">
             <div
               className={cn(
-                // Reason: neon nav PNGs are transparent — no black tile behind them.
-                "flex items-center justify-center overflow-hidden rounded-lg transition-all duration-300",
+                // Reason: neon nav PNGs are transparent — glass plate, not a black tile.
+                "flex items-center justify-center overflow-hidden rounded-lg transition-all duration-200",
+                "bg-white/[0.04] ring-1 ring-white/10",
+                "group-hover:ring-cyan-400/40 group-hover:shadow-[0_0_12px_rgba(0,200,255,0.25)]",
                 isCollapsed ? "h-9 w-9" : "h-10 w-10",
-                active
-                  ? `${item.color.replace("text-", "bg-")}/20 ${item.color}`
-                  : "bg-transparent text-gray-400 group-hover:bg-white/5 group-hover:text-gray-200",
+                active && "ring-cyan-400/50 bg-cyan-400/10 shadow-[0_0_14px_rgba(0,200,255,0.3)]",
               )}
             >
               {item.icon}
             </div>
             {item.numericBadge != null && item.numericBadge > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+              <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-orange-500 px-1 text-[10px] font-bold text-white shadow-[0_0_8px_rgba(249,115,22,0.7)]">
                 {item.numericBadge > 9 ? "9+" : item.numericBadge}
               </span>
             )}
@@ -310,27 +363,34 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
             <>
               <span
                 className={cn(
-                  "flex-1 font-medium transition-colors duration-300",
+                  "flex-1 font-medium tracking-wide transition-colors duration-200",
                   active
-                    ? "text-white"
-                    : "text-gray-300 group-hover:text-white",
+                    ? "text-cyan-50"
+                    : "text-slate-200 group-hover:text-white",
                 )}
               >
                 {item.label}
               </span>
 
               {item.badge && (
-                <span className="px-2 py-0.5 text-[11px] font-bold bg-gradient-to-r from-yellow-500 to-orange-500 text-gray-900 rounded-full animate-pulse">
+                <span
+                  className={cn(
+                    "rounded-md px-1.5 py-0.5 text-[10px] font-extrabold tracking-wide",
+                    item.badge === "HOT"
+                      ? "bg-gradient-to-r from-orange-500 to-amber-400 text-black shadow-[0_0_10px_rgba(249,115,22,0.55)]"
+                      : "bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-[0_0_10px_rgba(34,211,238,0.45)]",
+                  )}
+                >
                   {item.badge}
                 </span>
               )}
 
               <ChevronRight
                 className={cn(
-                  "h-4 w-4 transition-all duration-300",
+                  "h-4 w-4 transition-all duration-200",
                   active
-                    ? "text-gray-400 translate-x-0 opacity-100"
-                    : "text-gray-600 -translate-x-2 opacity-0 group-hover:translate-x-0 group-hover:opacity-100",
+                    ? "translate-x-0 text-cyan-300 opacity-100"
+                    : "-translate-x-1 text-slate-500 opacity-0 group-hover:translate-x-0 group-hover:opacity-100",
                 )}
               />
             </>
@@ -341,14 +401,19 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
   };
 
   const SidebarContent = () => (
-    <div className="flex flex-col h-full">
-      {/* Logo */}
-      <div className={cn("border-b border-gray-800/50", isCollapsed ? "p-2" : "px-3 py-4")}>
+    <div className="flex h-full flex-col">
+      {/* Brand mark — kept compact so the profile card can lead like the mock */}
+      <div
+        className={cn(
+          "border-b border-cyan-500/15",
+          isCollapsed ? "p-2" : "px-3 py-3",
+        )}
+      >
         <Link
           href="/dashboard"
           className={cn(
-            "flex w-full items-center justify-center",
-            isCollapsed ? "min-h-12" : "min-h-16",
+            "flex w-full cursor-pointer items-center justify-center",
+            isCollapsed ? "min-h-12" : "min-h-14",
           )}
         >
           {isCollapsed ? (
@@ -356,7 +421,7 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
                (favicon) fits. The wide App Logo wordmark crops into gibberish
                inside a circle. Expanded state below still uses appLogo. */
             <div className="relative flex h-12 w-12 items-center justify-center">
-              <div className="absolute inset-0 rounded-full bg-yellow-500/20 blur-xl" />
+              <div className="absolute inset-0 rounded-full bg-cyan-500/25 blur-xl" />
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={images.favicon}
@@ -375,14 +440,14 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
                sized and left-aligned in a ~256px rail. Fill the rail width and
                centre it so the mark reads as the brand, not a corner icon. */
             <div className="relative flex w-full max-w-[220px] items-center justify-center">
-              <div className="absolute inset-0 bg-yellow-500/15 blur-2xl" />
+              <div className="absolute inset-0 bg-cyan-500/15 blur-2xl" />
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={images.appLogo}
                 alt="logo"
                 width={220}
                 height={64}
-                className="relative z-10 h-14 w-auto max-w-full cursor-pointer object-contain sm:h-16"
+                className="relative z-10 h-12 w-auto max-w-full cursor-pointer object-contain sm:h-14"
                 onError={(e) => {
                   (e.target as HTMLImageElement).src = "/assets/icons/logo.svg";
                 }}
@@ -392,17 +457,23 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
         </Link>
       </div>
 
-      {/* User Profile Card */}
-      <div className={cn("border-b border-gray-800/50", isCollapsed ? "p-2" : "p-4")}>
+      {/* User Profile Card — cyan/purple ring + Lv badge per owner mock */}
+      <div
+        className={cn(
+          "border-b border-cyan-500/15",
+          isCollapsed ? "p-2" : "p-3",
+        )}
+      >
         <div
           className={cn(
-            "relative overflow-hidden rounded-2xl bg-gradient-to-br from-gray-800/80 via-gray-800/50 to-gray-900/80 border border-gray-700/50",
-            isCollapsed ? "p-2" : "p-4",
+            "relative overflow-hidden rounded-2xl border border-cyan-400/25",
+            "bg-gradient-to-br from-[#0c1830]/90 via-[#0a1424]/80 to-[#060d18]/95",
+            "shadow-[inset_0_0_24px_rgba(0,160,255,0.08)]",
+            isCollapsed ? "p-2" : "p-3.5",
           )}
         >
-          {/* Decorative elements */}
-          <div className="absolute top-0 right-0 w-20 h-20 bg-yellow-500/10 rounded-full blur-2xl" />
-          <div className="absolute bottom-0 left-0 w-16 h-16 bg-blue-500/10 rounded-full blur-2xl" />
+          <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-fuchsia-500/15 blur-2xl" />
+          <div className="absolute -bottom-4 -left-4 h-16 w-16 rounded-full bg-cyan-500/15 blur-2xl" />
 
           <div
             className={cn(
@@ -410,42 +481,55 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
               isCollapsed && "justify-center",
             )}
           >
-            <div className="relative group">
-              <div className={cn(
-                "absolute bg-gradient-to-r from-yellow-500 to-orange-500 rounded-full opacity-50 group-hover:opacity-75 blur transition-opacity",
-                isCollapsed ? "-inset-0.5" : "-inset-1",
-              )} />
-              <Avatar className={cn(
-                "relative ring-2 ring-gray-900 transition-all duration-300",
-                isCollapsed ? "h-11 w-11" : "h-14 w-14",
-              )}>
+            <div className="group relative">
+              <div
+                className={cn(
+                  "absolute rounded-full bg-gradient-to-br from-cyan-400 via-blue-500 to-fuchsia-500 opacity-80 blur-[2px] transition-opacity group-hover:opacity-100",
+                  isCollapsed ? "-inset-0.5" : "-inset-[3px]",
+                )}
+              />
+              <Avatar
+                className={cn(
+                  "relative ring-2 ring-[#050b16] transition-all duration-300",
+                  isCollapsed ? "h-11 w-11" : "h-14 w-14",
+                )}
+              >
                 <AvatarImage
                   src={avatarSrc}
                   // Reason: brand icon is square art — contain keeps the mark
                   // intact; a personal photo should cover the circle.
-                  className={hasCustomImage ? "object-cover" : "object-contain bg-black"}
+                  className={
+                    hasCustomImage
+                      ? "object-cover"
+                      : "bg-black object-contain"
+                  }
                 />
-                <AvatarFallback className={cn(
-                  "bg-gradient-to-br from-yellow-500 to-orange-500 text-gray-900 font-bold",
-                  isCollapsed ? "text-sm" : "text-lg",
-                )}>
+                <AvatarFallback
+                  className={cn(
+                    "bg-gradient-to-br from-cyan-500 to-blue-600 font-bold text-white",
+                    isCollapsed ? "text-sm" : "text-lg",
+                  )}
+                >
                   {user?.name?.[0] || user?.email?.[0]?.toUpperCase() || "U"}
                 </AvatarFallback>
               </Avatar>
-              <div className={cn(
-                "absolute bg-green-500 rounded-full border-2 border-gray-900",
-                isCollapsed ? "-bottom-0.5 -right-0.5 w-3 h-3" : "-bottom-0.5 -right-0.5 w-4 h-4",
-              )} />
+              <div
+                className={cn(
+                  "absolute rounded-full border-2 border-[#050b16] bg-emerald-400 shadow-[0_0_8px_#34d399]",
+                  isCollapsed
+                    ? "-bottom-0.5 -right-0.5 h-3 w-3"
+                    : "-bottom-0.5 -right-0.5 h-3.5 w-3.5",
+                )}
+              />
             </div>
 
             {!isCollapsed && (
-              <div className="flex-1 min-w-0">
-                <h3 className="font-bold text-white truncate flex items-center gap-1">
+              <div className="min-w-0 flex-1">
+                <h3 className="truncate font-bold text-white">
                   {user?.name || terms.player}
-                  <GameIcon name="star1" size={14} />
                 </h3>
-                <p className="text-xs text-gray-400 truncate">{user?.email}</p>
-                <div className="flex items-center gap-1 mt-1">
+                <p className="truncate text-xs text-slate-400">{user?.email}</p>
+                <div className="mt-1.5 inline-flex items-center gap-1.5 rounded-md border border-cyan-400/30 bg-cyan-500/10 px-1.5 py-0.5">
                   <GameIcon
                     name={
                       userLevel?.icon && isValidGameIconName(userLevel.icon)
@@ -454,8 +538,10 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
                     }
                     size={12}
                   />
-                  <span className="text-[11px] font-medium" style={{ color: userLevel?.color || "#22c55e" }}>
-                    {userLevel ? `${userLevel.title} • Lv ${userLevel.level}` : "Loading..."}
+                  <span className="text-[11px] font-semibold text-cyan-200">
+                    {userLevel
+                      ? `Lv. ${userLevel.level}`
+                      : "Loading..."}
                   </span>
                 </div>
               </div>
@@ -465,15 +551,17 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
       </div>
 
       {/* Navigation */}
-      <div className={cn("flex-1 overflow-y-auto custom-scrollbar py-4", isCollapsed ? "px-2" : "px-3")}>
-        {/* Main Navigation */}
+      <div
+        className={cn(
+          "custom-scrollbar flex-1 overflow-y-auto py-4",
+          isCollapsed ? "px-2" : "px-3",
+        )}
+      >
         <div className="space-y-1">
-          {!isCollapsed && (
-            <h4 className="px-3 mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-              {/* Reason: chapter 14 s4 — section header was "Trading"; token is `games`. */}
-              {terms.games}
-            </h4>
-          )}
+          <SectionHeader
+            label={terms.games}
+            collapsed={isCollapsed}
+          />
           {mainNavItems
             .filter((item) => item.href !== "/arena" || arenaEnabled)
             .map((item) => (
@@ -488,15 +576,13 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
             ))}
         </div>
 
-        {/* Game Master Section - Only show if user is a Game Master */}
         {isGameMaster && (
           <div className="mt-6 space-y-1">
-            {!isCollapsed && (
-              <h4 className="px-3 mb-2 text-xs font-semibold text-yellow-500/80 uppercase tracking-wider flex items-center gap-1">
-                <GameIcon name="crown" size={14} />
-                Game Master
-              </h4>
-            )}
+            <SectionHeader
+              label="Game Master"
+              collapsed={isCollapsed}
+              accent="amber"
+            />
             <NavLink
               item={{
                 href: "/gamemaster",
@@ -510,48 +596,78 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
           </div>
         )}
 
-        {/* Account Navigation */}
         <div className="mt-6 space-y-1">
-          {!isCollapsed && (
-            <h4 className="px-3 mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-              Account
-            </h4>
-          )}
+          <SectionHeader label="Account" collapsed={isCollapsed} />
           {accountNavItems.map((item) => (
             <NavLink key={item.href} item={item} />
           ))}
         </div>
       </div>
 
-      {/* Footer Actions */}
-      <div className={cn("border-t border-gray-800/50 space-y-2", isCollapsed ? "p-2" : "p-4")}>
-        {/* Notifications - Desktop Only */}
-        <div className={cn(
-          "hidden lg:flex items-center rounded-xl bg-gray-800/30 border border-gray-700/30",
-          isCollapsed ? "justify-center px-1 py-1" : "justify-between px-3 py-2",
-        )}>
+      {/* Footer — Notifications + SignOut as neon rows */}
+      <div
+        className={cn(
+          "space-y-2 border-t border-cyan-500/15",
+          isCollapsed ? "p-2" : "p-3",
+        )}
+      >
+        <div
+          className={cn(
+            "hidden items-center rounded-xl border border-white/10 bg-white/[0.03] lg:flex",
+            "hover:border-cyan-400/35 hover:bg-cyan-500/5 hover:shadow-[0_0_14px_rgba(0,180,255,0.18)]",
+            "transition-all duration-200",
+            isCollapsed ? "justify-center px-1 py-1" : "justify-between gap-2 px-3 py-2",
+          )}
+        >
           {!isCollapsed && (
-            <span className="text-sm text-gray-400">Notifications</span>
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-lg bg-white/[0.04] ring-1 ring-white/10">
+                <GameIcon
+                  name="notifications"
+                  size={36}
+                  className={NAV_ICON}
+                  alt="Notifications"
+                />
+              </div>
+              <span className="text-sm font-medium text-slate-200">
+                Notifications
+              </span>
+            </div>
           )}
           <NotificationDropdown />
         </div>
 
-        {/* Logout Button */}
         <Button
           onClick={handleSignOut}
           variant="ghost"
           className={cn(
-            "w-full group flex items-center rounded-xl text-gray-400 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/30 transition-all duration-300",
+            "group flex w-full cursor-pointer items-center rounded-xl border border-transparent",
+            "text-slate-300 hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-300",
+            "hover:shadow-[0_0_14px_rgba(239,68,68,0.25)]",
+            "active:scale-[0.98] transition-all duration-200",
             isCollapsed ? "justify-center px-2 py-2" : "gap-3 px-3 py-2.5",
           )}
         >
-          <div className={cn(
-            "flex items-center justify-center overflow-hidden rounded-lg bg-transparent group-hover:bg-red-500/20 transition-colors",
-            isCollapsed ? "h-9 w-9" : "h-10 w-10",
-          )}>
-            <GameIcon name="logout" size={40} className={NAV_ICON} alt="Sign out" />
+          <div
+            className={cn(
+              "flex items-center justify-center overflow-hidden rounded-lg bg-white/[0.04] ring-1 ring-white/10",
+              "group-hover:bg-red-500/15 group-hover:ring-red-400/40",
+              isCollapsed ? "h-9 w-9" : "h-10 w-10",
+            )}
+          >
+            <GameIcon
+              name="logout"
+              size={40}
+              className={NAV_ICON}
+              alt="Sign out"
+            />
           </div>
-          {!isCollapsed && <span className="font-medium">Sign Out</span>}
+          {!isCollapsed && (
+            <>
+              <span className="flex-1 text-left font-medium">SignOut</span>
+              <ChevronRight className="h-4 w-4 text-slate-600 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100" />
+            </>
+          )}
         </Button>
       </div>
     </div>
@@ -559,25 +675,29 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
 
   return (
     <>
-      {/* Desktop Sidebar */}
+      {/* Desktop Sidebar — cyan chamfered glow frame */}
       <aside
         className={cn(
-          "hidden lg:flex flex-col fixed left-0 top-0 h-screen bg-gradient-to-b from-gray-900 via-gray-900 to-gray-950 border-r border-gray-800/50 z-40 transition-all duration-300",
+          "fixed left-0 top-0 z-40 hidden h-screen flex-col transition-all duration-300 lg:flex",
+          // Reason: no clip-path — the collapse control sits outside the rail (-right-3)
+          // and would be cut off; cyan border + glow still matches the mock frame.
+          "rounded-r-2xl border-r border-cyan-400/50",
+          SHELL,
+          FRAME_GLOW,
           isCollapsed ? "w-20" : "w-72",
         )}
       >
         <SidebarContent />
 
-        {/* Collapse Toggle */}
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
           aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           aria-expanded={!isCollapsed}
-          className="absolute -right-3 top-20 w-6 h-6 bg-gray-800 border border-gray-700 rounded-full flex items-center justify-center hover:bg-gray-700 transition-colors z-50"
+          className="absolute -right-3 top-20 z-50 flex h-6 w-6 cursor-pointer items-center justify-center rounded-full border border-cyan-400/40 bg-[#0a1424] shadow-[0_0_10px_rgba(0,200,255,0.35)] transition-colors hover:bg-cyan-500/20"
         >
           <ChevronRight
             className={cn(
-              "h-3 w-3 text-gray-400 transition-transform",
+              "h-3 w-3 text-cyan-300 transition-transform",
               isCollapsed ? "" : "rotate-180",
             )}
           />
@@ -585,8 +705,8 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
       </aside>
 
       {/* Mobile Header */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-gray-900/95 backdrop-blur-xl border-b border-gray-800/50 z-50 px-4 flex items-center justify-between">
-        <Link href="/dashboard" className="flex items-center">
+      <header className="fixed left-0 right-0 top-0 z-50 flex h-16 items-center justify-between border-b border-cyan-500/20 bg-[#050b16]/95 px-4 backdrop-blur-xl lg:hidden">
+        <Link href="/dashboard" className="flex cursor-pointer items-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={images.appLogo}
@@ -608,9 +728,9 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
             size="icon"
             onClick={() => setIsMobileMenuOpen(true)}
             aria-label="Open navigation menu"
-            className="h-10 w-10 rounded-xl bg-gray-800/50 border border-gray-700/50 hover:bg-gray-800 hover:border-yellow-500/30"
+            className="h-10 w-10 cursor-pointer rounded-xl border border-cyan-400/30 bg-cyan-500/10 hover:border-cyan-400/60 hover:bg-cyan-500/20"
           >
-            <Menu className="h-5 w-5 text-gray-300" />
+            <Menu className="h-5 w-5 text-cyan-200" />
           </Button>
         </div>
       </header>
@@ -618,31 +738,35 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
       {/* Mobile Menu Overlay */}
       <div
         className={cn(
-          "lg:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 transition-opacity duration-300",
+          "fixed inset-0 z-50 bg-black/60 backdrop-blur-sm transition-opacity duration-300 lg:hidden",
           isMobileMenuOpen
-            ? "opacity-100 pointer-events-auto"
-            : "opacity-0 pointer-events-none",
+            ? "pointer-events-auto opacity-100"
+            : "pointer-events-none opacity-0",
         )}
         onClick={() => setIsMobileMenuOpen(false)}
       />
 
-      {/* Mobile Menu Drawer */}
+      {/* Mobile Menu Drawer — same neon chrome as desktop */}
       <aside
         className={cn(
-          "lg:hidden fixed right-0 top-0 h-full w-80 max-w-[85vw] bg-gradient-to-b from-gray-900 via-gray-900 to-gray-950 border-l border-gray-800/50 z-50 transition-transform duration-300 ease-out",
+          "fixed right-0 top-0 z-50 h-full w-80 max-w-[85vw] transition-transform duration-300 ease-out lg:hidden",
+          "rounded-l-2xl border-l border-cyan-400/50",
+          SHELL,
+          FRAME_GLOW,
           isMobileMenuOpen ? "translate-x-0" : "translate-x-full",
         )}
       >
-        {/* Mobile Menu Header */}
-        <div className="h-16 px-4 flex items-center justify-between border-b border-gray-800/50">
-          <span className="font-semibold text-white">Menu</span>
+        <div className="flex h-16 items-center justify-between border-b border-cyan-500/20 px-4">
+          <span className="font-semibold tracking-wide text-cyan-100">
+            Menu
+          </span>
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setIsMobileMenuOpen(false)}
-            className="h-9 w-9 rounded-xl hover:bg-gray-800"
+            className="h-9 w-9 cursor-pointer rounded-xl hover:bg-cyan-500/15"
           >
-            <X className="h-5 w-5 text-gray-400" />
+            <X className="h-5 w-5 text-slate-300" />
           </Button>
         </div>
 
@@ -654,7 +778,7 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
       {/* Spacer for content - adjusts based on sidebar state */}
       <div
         className={cn(
-          "hidden lg:block transition-all duration-300",
+          "hidden transition-all duration-300 lg:block",
           isCollapsed ? "w-20" : "w-72",
         )}
       />

@@ -3200,6 +3200,13 @@ Matching Cards / Challenge lack loom/press/hand, is correct as history
 > `pb-16 lg:pb-0` clearance for the removed bar. That file carries 20 pre-existing lint warnings, and the
 > pre-commit hook's `--max-warnings=0` blocks any edit to it. **Never verified by eye.**
 
+> **Amendment, 29 Sep 2026 (sidebar chrome):** `UserSidebar` matches the owner's neon menu mock on
+> **desktop and the phone drawer** (same `SidebarContent`). Cyan glow frame, profile ring + online +
+> `Lv. N`, GAMES / ACCOUNT headers, active cyan fill, glass icon plates, hover glow / press scale /
+> `cursor-pointer`, Notifications and SignOut as neon rows. Ten icons under `public/game-icons/nav/`
+> refreshed from `Desktop/games/menu items` (Sep 22) with black keyed out. Routes and HOT-on-Games
+> unchanged. A document describing the old grey rail is correct as history only. **Never verified by eye.**
+
 > **Amended 29 September 2026 (desktop Compete cards):** the owner rejected the "cut-off" borders. The
 > two corner-bracket spans on each card are **deleted**, and the match % plate's notched `clip-path`
 > became a plain `rounded-lg` edge. Each stat tile's icon and text are centred (`justify-center gap-3`)

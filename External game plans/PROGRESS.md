@@ -913,6 +913,19 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 29 Sep 2026 - Player sidebar matches the owner's neon menu (desktop + phone drawer)
+
+**Asked:** restyle the player menu to the owner's neon sidebar screenshot, using art from
+`Desktop/games`, on desktop and on the phone.
+
+**Built:** `components/UserSidebar.tsx` — cyan glow frame, profile ring + online + `Lv. N` badge,
+GAMES / ACCOUNT headers with accent rules, active cyan fill + glass icon plates, hover glow and
+press scale, `cursor-pointer`, Notifications and SignOut as neon rows. Desktop aside and phone
+drawer share `SidebarContent` (no bottom nav — already removed). Ten nav PNGs under
+`public/game-icons/nav/` refreshed from the Sep 22 `menu items` set with black keyed out.
+
+**Tests:** `games-first-nav.test.ts` 4/4. Routes and HOT-on-Games unchanged. **Never verified by eye.**
+
 ### 28 Sep 2026 - Practice keeps no result: leaving closes the round and returns to Start
 
 **Owner instruction:** *"no need to calculate any results just exit ... after leave the practice
