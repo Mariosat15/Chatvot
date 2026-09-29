@@ -8,7 +8,6 @@ import { getTerms } from "@/lib/services/terminology.service";
 import GlobalPresenceTracker from "@/components/GlobalPresenceTracker";
 import ChallengePopup from "@/components/challenges/ChallengePopup";
 import UserSidebar from "@/components/UserSidebar";
-import MobileBottomNav from "@/components/MobileBottomNav";
 import Header from "@/components/Header";
 import { connectToDatabase } from "@/database/mongoose";
 import { ObjectId } from "mongodb";
@@ -74,7 +73,12 @@ const Layout = async ({ children }: { children: React.ReactNode }) => {
           <UserSidebar user={user} />
 
           {/* Main Content Area */}
-          <main className="flex-1 min-h-screen overflow-x-hidden">
+          {/*
+            Reason: below lg the UserSidebar logo bar is `fixed` and 64px tall, so
+            without pt-16 the first 64px of every page sat under it (the owner's
+            "account status hidden under the logo", 29 Sep 2026).
+          */}
+          <main className="flex-1 min-h-screen overflow-x-hidden pt-16 lg:pt-0">
             {/*
               Reason: Overview mock Header — Overview/Wallet/Performance/Competitions/
               Tutorials. Games/Challenges/Marketplace stay on the sidebar (recorded
@@ -83,18 +87,16 @@ const Layout = async ({ children }: { children: React.ReactNode }) => {
             <Header user={user} />
 
             {/* Page Content - Responsive padding */}
-            <div className="px-3 py-3 sm:px-4 sm:py-4 md:px-5 lg:px-6 pb-20 lg:pb-6">
+            {/*
+              Reason: no phone bottom nav (owner, 29 Sep 2026) - the logo bar's
+              menu already carries every route, so no bottom clearance is needed.
+            */}
+            <div className="px-3 py-3 sm:px-4 sm:py-4 md:px-5 lg:px-6 pb-6">
               <AnnouncementBanner />
               {children}
             </div>
-
-            {/* Mobile bottom nav spacing */}
-            <div className="lg:hidden h-16" />
           </main>
         </div>
-
-        {/* Mobile Bottom Navigation */}
-        <MobileBottomNav />
       </TerminologyProvider>
     </FingerprintProvider>
   );

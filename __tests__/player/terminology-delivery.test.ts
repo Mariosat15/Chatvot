@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -41,19 +41,20 @@ describe("the player provider is mounted", () => {
     const code = readCode(LAYOUT);
     const open = code.indexOf("<TerminologyProvider");
     const close = code.indexOf("</TerminologyProvider>");
-    // Reason: UserSidebar / MobileBottomNav must sit INSIDE the provider or useTerms throws
-    // at runtime while the layout still "mentions" TerminologyProvider.
+    // Reason: UserSidebar and Header must sit INSIDE the provider or useTerms throws
+    // at runtime while the layout still "mentions" TerminologyProvider. Header replaced
+    // MobileBottomNav here on 29 Sep 2026, when the phone bottom nav was removed.
     const sidebar = code.indexOf("<UserSidebar");
-    const mobile = code.indexOf("<MobileBottomNav");
+    const header = code.indexOf("<Header");
 
     expect(open).toBeGreaterThan(-1);
     expect(close).toBeGreaterThan(-1);
     expect(sidebar).toBeGreaterThan(-1);
-    expect(mobile).toBeGreaterThan(-1);
+    expect(header).toBeGreaterThan(-1);
     expect(open).toBeLessThan(sidebar);
-    expect(open).toBeLessThan(mobile);
+    expect(open).toBeLessThan(header);
     expect(sidebar).toBeLessThan(close);
-    expect(mobile).toBeLessThan(close);
+    expect(header).toBeLessThan(close);
   });
 
   it("the layout resolves the pack server-side by CALLING getTerms", () => {
@@ -94,10 +95,7 @@ describe("an unmounted player provider REFUSES rather than answering the default
 });
 
 describe("pass 1 nav consumers read tokens, not hard-coded nouns", () => {
-  it.each([
-    ["UserSidebar", SIDEBAR],
-    ["MobileBottomNav", MOBILE_NAV],
-  ])("%s calls useTerms", (_name, file) => {
+  it.each([["UserSidebar", SIDEBAR]])("%s calls useTerms", (_name, file) => {
     const source = readCode(file);
     expect(source).toMatch(/\bconst\s+terms\s*=\s*useTerms\(\)/);
     expect(source).toMatch(
@@ -114,17 +112,16 @@ describe("pass 1 nav consumers read tokens, not hard-coded nouns", () => {
     expect(source).toMatch(/terms\.player/);
   });
 
-  it("MobileBottomNav takes its renameable noun (games) from the pack", () => {
+  it("there is no phone bottom nav left to carry a hard-coded noun", () => {
     /*
-      Reason: flipped 29 Sep 2026, not deleted. The phone nav became five tabs (owner
-      "Mobile Dashboard" spec): Home / Games / Compete / Wallet / Profile. Contests,
-      challenges and the leaderboard left the bar for the UserSidebar drawer, which
-      still reads all three from the pack (test above). The one renameable noun left
-      on the bar is "games", so that is the one that must come from the pack.
+      Reason: flipped twice, not deleted. First (29 Sep 2026) the bar became five tabs
+      whose one renameable noun, "games", had to come from the pack. Later the same day
+      the owner removed the bar outright - the logo bar's menu is the UserSidebar drawer,
+      which reads every noun from the pack (test above). A resurrected bar would be a
+      second nav with its own chance to hard-code "Games", so its absence is pinned.
     */
-    const source = readCode(MOBILE_NAV);
-    expect(source).toMatch(/label:\s*terms\.games/);
-    expect(source).not.toMatch(/label:\s*["']Games["']/);
+    expect(existsSync(join(ROOT, MOBILE_NAV))).toBe(false);
+    expect(readCode(LAYOUT)).not.toMatch(/MobileBottomNav/);
   });
 
   it("UserSidebar no longer hard-codes the section header Trading or the fallback Trader", () => {
@@ -143,10 +140,8 @@ describe("pass 1 nav consumers read tokens, not hard-coded nouns", () => {
     expect(readCode(SIDEBAR)).toMatch(
       /function\s+buildMainNavItems\s*\(\s*terms\s*:\s*TerminologyPack\s*\)/,
     );
-    expect(readCode(MOBILE_NAV)).toMatch(
-      /function\s+buildNavItems\s*\(\s*terms\s*:\s*TerminologyPack\s*\)/,
-    );
+    // Reason: the MobileBottomNav half left with the bar (29 Sep 2026); its absence
+    // is pinned above, so the sidebar is the only builder left to check.
     expect(readCode(SIDEBAR)).not.toMatch(/\bTERMS\b/);
-    expect(readCode(MOBILE_NAV)).not.toMatch(/\bTERMS\b/);
   });
 });

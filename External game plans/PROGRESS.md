@@ -1192,6 +1192,36 @@ fire/ice panoramic if the ChartVolt PNG cannot be fixed; KPI icons must fill the
 **Owner tested:** not yet.
 **Never verified by eye.**
 
+### 29 Sep 2026 - Phone bottom nav removed; Quick access is All Competitions / Profile; one account status
+
+**Asked:** show only "All Competitions" (not trading competitions) and replace "Game Competitions" with
+Profile; remove the bottom menu buttons ("we have the menu on top anyway"); remove the second account
+status hidden under the logo.
+
+**Built:**
+- `components/MobileBottomNav.tsx` is **deleted**, and `app/(root)/layout.tsx` no longer mounts it or keeps its
+  `pb-20` / `h-16` clearance.
+- `MobileQuickAccess` is a fixed `QUICK_ACCESS` list: All Competitions (`/competitions`), Profile (`/profile`),
+  1v1 Challenges, Marketplace. It no longer reads `tradingEnabled`.
+- `MobileWelcome` drops the status pill and renders `AccountStatusCard` exactly as desktop does. The card
+  returns null when there is no issue.
+
+**Finding:** the "account status under the logo" was not a second status. `UserSidebar`'s phone logo bar is
+`fixed top-0 h-16` and nothing reserved that space, so the first 64px of every phone page was drawn
+underneath it. `<main>` is now `pt-16 lg:pt-0`, and the Header is `sticky top-16 lg:top-0`.
+
+**Tests:** three tests were flipped rather than deleted, each with a `// Reason:`:
+- the five-tab nav test (`mobile-dashboard-split`);
+- `/games` in the mobile nav (`games-first-nav`);
+- MobileBottomNav terms (`terminology-delivery`).
+
+Two pins were added, for the Quick access labels and for one account status on the phone. 54 tests pass.
+
+**Recorded, not fixed:** `MessagingClient.tsx` keeps `pb-16 lg:pb-0` for the removed bar. It has 20
+pre-existing lint warnings, which the pre-commit hook refuses.
+
+**Owner tested:** not yet. **Never verified by eye.**
+
 ### 29 Sep 2026 - Desktop Compete rebuilt to the owner's reference; phone Matching Cards is a button
 
 Desktop `OverviewCompete.tsx` now follows the owner's three-card picture. The avatar is 64-72px

@@ -1,59 +1,23 @@
 "use client";
 
-import { ShieldAlert, ShieldCheck } from "lucide-react";
 import { useDashboardOverview } from "@/hooks/useDashboardOverview";
 import AccountStatusCard from "../AccountStatusCard";
 import { OVERVIEW_HERO_BANNER } from "@/lib/services/games/overview-assets";
 
 /**
- * Compact status pill + welcome block. Replaces the desktop hero banner and the
- * full-width Account Status card on phones (spec s5-s6: ~48px pill, ≤140px block).
+ * Welcome block (spec s6: ≤140px). Replaces the desktop hero banner on phones.
  */
 export default function MobileWelcome() {
   const { data } = useDashboardOverview();
   const { accountStatus, player } = data;
-  const issues = [
-    accountStatus.hasActiveRestriction,
-    accountStatus.isLocked,
-    accountStatus.hasOpenAlert,
-    Boolean(accountStatus.openChargebackCaseId),
-  ].filter(Boolean).length;
-  const hasIssue = issues > 0;
-  const ok = !hasIssue;
   const firstName = (data.user.name || "Player").split(" ")[0];
 
   return (
     <div className="space-y-3">
-      <div
-        role="status"
-        className={`flex min-h-[46px] items-center justify-between rounded-full border px-4 text-xs ${
-          ok
-            ? "border-emerald-400/40 bg-emerald-500/10"
-            : "border-amber-400/50 bg-amber-500/10"
-        }`}
-      >
-        <span className="flex items-center gap-2 font-semibold uppercase tracking-wider text-gray-300">
-          {ok ? (
-            <ShieldCheck className="h-4 w-4 text-emerald-300" aria-hidden />
-          ) : (
-            <ShieldAlert className="h-4 w-4 text-amber-300" aria-hidden />
-          )}
-          Account status
-        </span>
-        <span
-          className={`font-bold uppercase tracking-wider ${
-            ok ? "text-emerald-300" : "text-amber-300"
-          }`}
-        >
-          {ok
-            ? "Active"
-            : `${Math.max(issues, 1)} issue${issues > 1 ? "s" : ""}`}
-        </span>
-      </div>
-
-      {/* Reason: a pill alone cannot tell a restricted player what to do — the
-          existing card carries the reason and the appeal path. */}
-      {hasIssue && <AccountStatusCard accountStatus={accountStatus} />}
+      {/* Reason: owner, 29 Sep 2026 - the old status pill duplicated this card
+          (and sat under the fixed logo bar). The card renders only when there
+          is an issue, and decides that itself, exactly as on desktop. */}
+      <AccountStatusCard accountStatus={accountStatus} />
 
       <div className="relative max-h-[140px] overflow-hidden rounded-[18px] border border-cyan-400/30 px-4 py-4">
         {/* Reason: decorative plate, dimmed hard so the copy stays readable at 360px. */}

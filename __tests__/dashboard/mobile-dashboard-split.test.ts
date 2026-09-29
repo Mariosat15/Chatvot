@@ -71,12 +71,38 @@ describe("mobile dashboard split", () => {
     expect([...order].sort((a, b) => a - b)).toEqual(order);
   });
 
-  it("bottom nav has exactly five tabs and clears the safe area", () => {
-    const code = read("components/MobileBottomNav.tsx");
-    const hrefs = [...code.matchAll(/href:\s*"([^"]+)"/g)].map((m) => m[1]);
-    expect(hrefs).toEqual(["/dashboard", "/games", "/competitions", "/wallet", "/profile"]);
-    expect(code).toMatch(/env\(safe-area-inset-bottom\)/);
-    expect(code).toMatch(/min-h-\[44px\]/);
+  it("phones have no bottom nav, and content clears the fixed logo bar", () => {
+    /*
+      Reason: flipped, not deleted. This pinned the five-tab bar; the owner removed it
+      on 29 Sep 2026 ("we have the menu on top anyway"). What must hold now: nothing
+      mounts it, no page keeps bottom clearance for it, and <main> reserves the 64px
+      the fixed UserSidebar logo bar covers - without pt-16 the Overview's first card
+      was drawn under the logo.
+    */
+    const layout = read("app/(root)/layout.tsx");
+    expect(existsSync(join(ROOT, "components/MobileBottomNav.tsx"))).toBe(false);
+    expect(layout).not.toMatch(/MobileBottomNav|pb-20/);
+    expect(layout).toMatch(/<main className="[^"]*\bpt-16 lg:pt-0\b/);
+    expect(read("components/UserSidebar.tsx")).toMatch(/lg:hidden fixed top-0[^"]*\bh-16\b/);
+    expect(read("components/Header.tsx")).toMatch(/sticky top-16 lg:top-0/);
+  });
+
+  it("Quick access is All Competitions / Profile / 1v1 / Marketplace, not split by game", () => {
+    // Reason: owner, 29 Sep 2026 - one competitions tile for every game, Profile in
+    // the slot the removed bottom nav used to carry.
+    const code = read("components/dashboard/mobile/MobileActions.tsx");
+    const block = code.slice(code.indexOf("const QUICK_ACCESS"), code.indexOf("export function MobileQuickAccess"));
+    expect(block.length).toBeGreaterThan(40);
+    const labels = [...block.matchAll(/label:\s*"([^"]+)"/g)].map((m) => m[1]);
+    expect(labels).toEqual(["All Competitions", "Profile", "1v1 Challenges", "Marketplace"]);
+    expect(block).toMatch(/label: "Profile", href: "\/profile"/);
+    expect(code).not.toMatch(/Trading Competitions|Game Competitions|tradingEnabled/);
+  });
+
+  it("the phone shows one account status - the shared card - with no pill beside it", () => {
+    const code = read("components/dashboard/mobile/MobileWelcome.tsx");
+    expect((code.match(/<AccountStatusCard\b/g) ?? []).length).toBe(1);
+    expect(code).not.toMatch(/Account status|role="status"|ShieldCheck/);
   });
 
   it("every mobile overview asset exists on disk", () => {

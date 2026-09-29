@@ -27,8 +27,7 @@ export default function MobileDashboard({
   return (
     <div
       className="mx-auto w-full max-w-[430px] space-y-5"
-      // Reason: the root layout already clears the ~72px bottom nav (pb-20 + h-16);
-      // the nav also grows by the iOS home indicator, so add that inset here.
+      // Reason: keep the last card clear of the iOS home indicator.
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
       <MobileWelcome />

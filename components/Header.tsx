@@ -13,7 +13,7 @@ import NavItems from "@/components/NavItems";
  */
 const Header = ({ user: _user }: { user: User }) => {
   return (
-    <header className="sticky top-0 z-40 border-b border-[#1B2540]/80 bg-[#050B18]/90 backdrop-blur-md">
+    <header className="sticky top-16 lg:top-0 z-40 border-b border-[#1B2540]/80 bg-[#050B18]/90 backdrop-blur-md">
       <div className="mx-auto hidden h-16 max-w-[1400px] items-center justify-center px-3 sm:px-4 md:flex lg:px-6">
         <nav className="hidden min-w-0 w-full justify-center md:flex">
           {/* Reason: useSearchParams requires a Suspense boundary in the App Router. */}
@@ -32,7 +32,7 @@ const Header = ({ user: _user }: { user: User }) => {
 
 /**
  * Phone tab strip. Hidden on the dashboard Overview, whose mobile tree is
- * the owner's phone layout with its own bottom nav (29 Sep 2026); every other
+ * the owner's phone layout (29 Sep 2026); every other
  * dashboard tab keeps it so a player can get back to Overview.
  */
 function MobileTabStrip() {

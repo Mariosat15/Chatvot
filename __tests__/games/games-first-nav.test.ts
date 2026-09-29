@@ -54,17 +54,17 @@ describe("games-first navigation (sidebar)", () => {
     expect(compsBlock).not.toMatch(/badge:\s*"HOT"/);
   });
 
-  it("mobile nav includes /games", () => {
-    const code = readCode("components/MobileBottomNav.tsx");
-    expect(code).toMatch(/href:\s*"\/games"/);
-    expect(code).toMatch(/href:\s*"\/competitions"/);
+  it("phones reach /games, /competitions and /challenges without a bottom nav", () => {
     /*
-      Reason: flipped 29 Sep 2026. The five-tab phone nav (Home/Games/Compete/Wallet/
-      Profile) has no /challenges tab; the Compete tab lights on /challenges instead,
-      and the route stays in the UserSidebar drawer and the Overview's Quick Access.
+      Reason: flipped twice, not deleted. The five-tab phone bar (29 Sep 2026) was
+      removed outright the same day on the owner's instruction - the logo bar's menu
+      opens the UserSidebar drawer, which is now the phone's only nav, so the three
+      routes must be in it. The Overview's Quick Access still links challenges too.
     */
-    expect(code).not.toMatch(/href:\s*"\/challenges"/);
-    expect(code).toMatch(/alsoActive:\s*\[[^\]]*"\/challenges"/);
-    expect(readCode("components/UserSidebar.tsx")).toMatch(/href:\s*"\/challenges"/);
+    const sidebar = readCode("components/UserSidebar.tsx");
+    expect(sidebar).toMatch(/href:\s*"\/games"/);
+    expect(sidebar).toMatch(/href:\s*"\/competitions"/);
+    expect(sidebar).toMatch(/href:\s*"\/challenges"/);
+    expect(readCode("app/(root)/layout.tsx")).not.toMatch(/MobileBottomNav/);
   });
 });

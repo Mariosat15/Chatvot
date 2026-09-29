@@ -3184,6 +3184,22 @@ Matching Cards / Challenge lack loom/press/hand, is correct as history
 > match plate, and a centred Challenge button. On the phone, Compete's **Matching Cards** is a pill button
 > (`linkAsButton`) rather than a bare link. Same data, same routes.
 
+> **Amendment, 29 Sep 2026 (later): the phone has NO bottom nav.** `components/MobileBottomNav.tsx` is
+> **deleted**, not hidden (owner: "we have the menu on top anyway"). The logo bar's menu opens the
+> UserSidebar drawer, which is now the phone's only nav and carries `/games`, `/competitions` and
+> `/challenges`. A document describing the five-tab bar is correct as history and stale as a present
+> fact, so **say which**. Three things changed with it. **Quick access** is `All Competitions`
+> (`/competitions`, every game, always shown) / `Profile` / `1v1 Challenges` / `Marketplace`: the
+> trading-gated "Trading Competitions" tile and the "Game Competitions" tile are gone. **The status pill
+> is gone**, and `MobileWelcome` renders the shared `AccountStatusCard` exactly as desktop does. The card
+> decides for itself whether there is an issue, which also covers the identity-check (KYC) problems the
+> pill's count missed. **The real cause of "an account status hidden under the logo"** was layout, not
+> duplication: `UserSidebar`'s phone logo bar is `fixed` and 64px tall, and `<main>` reserved nothing, so
+> the first 64px of *every* phone page was drawn underneath it. `<main>` is now `pt-16 lg:pt-0`, and the
+> sticky Header sits at `top-16 lg:top-0`. **Recorded, not fixed:** `MessagingClient.tsx` still keeps
+> `pb-16 lg:pb-0` clearance for the removed bar. That file carries 20 pre-existing lint warnings, and the
+> pre-commit hook's `--max-warnings=0` blocks any edit to it. **Never verified by eye.**
+
 #### 5.1g-m The phone Overview is a second tree - BUILT 29 September 2026
 
 Owner spec `External game plans/Mobile Dashboard` (three-phone reference). **The desktop was
