@@ -3153,14 +3153,18 @@ strip — a document describing the ChartVolt PNG as current is correct as histo
 and stale as a present fact — **say which**. The strip stays **height-capped**
 (`h-[120px]` / `sm:h-[136px]` / `lg:h-[148px]`). `object-cover object-[center_38%]`
 keeps the horizon/lightning band in view. Left wash keeps welcome copy readable.
-**KPI icon tiles are `h-16 w-16` with `scale-[1.35] object-cover`** so the neon
-glyphs fill the box (owner mark-up against tiny icons inside empty padding).
+**KPI icon tiles are `h-14 w-14` with `scale-[1.08] object-contain`** so glyphs
+stay crisp (the earlier `h-16`/`scale-1.35`/`object-cover` overscaled soft tiles
+into blur). **Compete** uses owner plates under `compete/` (swords, crown, avatar
+ring, Matching Cards capsule, Challenge gold button) with black keyed to alpha.
+**Recent Activity** header uses the transparent calendar glass tile; contest rows
+use `icon-trophy-glass.png`.
 
 A document still saying missions are capped at **1**, or that KPI amounts are **bare**, or that
 rank plates come from `ui/levels`, or that Activity uses a Lucide clock, or that Overview
 mission cards omit required badges, or that Overview has no recent-badges strip or Compete
 row, or that the hero is still `hero-banner-chartvolt.png`, or that KPI icons are
-`h-12 w-12` without scale, is correct as history
+`h-12 w-12` / `h-16` with `scale-1.35`, or that Compete is Lucide-only chrome, is correct as history
 (earlier 29 Sep) and stale as a present fact — **say which**.
 
 ### 5.1a The contest cards, made game-aware - BUILT 6 September 2026

@@ -29,7 +29,22 @@ export const OVERVIEW_ICON_ART = {
   target: "/assets/neon/overview/items/icon-target.png",
   growth: "/assets/neon/overview/items/icon-growth.png",
   trophy: "/assets/neon/overview/items/icon-trophy.png",
+  /** Calendar glass tile — Recent Activity header (transparent, 29 Sep 2026). */
   activity: "/assets/neon/overview/items/icon-activity.png",
+  /** Neon glass trophy for activity rows (transparent, 29 Sep 2026). */
+  trophyGlass: "/assets/neon/overview/items/icon-trophy-glass.png",
+} as const;
+
+/**
+ * Compete chrome — owner plates with keyed black backgrounds.
+ * Buttons already carry their own label art.
+ */
+export const OVERVIEW_COMPETE_ART = {
+  swords: "/assets/neon/overview/compete/icon-swords.png",
+  crown: "/assets/neon/overview/compete/icon-crown.png",
+  avatarRing: "/assets/neon/overview/compete/avatar-ring.png",
+  matchingCards: "/assets/neon/overview/compete/btn-matching-cards.png",
+  challenge: "/assets/neon/overview/compete/btn-challenge.png",
 } as const;
 
 /** KPI plate art — credits / win rate / ROI / prizes. */
@@ -89,6 +104,7 @@ export function allOverviewAssets(): string[] {
     ...Object.values(OVERVIEW_ICON_ART),
     ...Object.values(OVERVIEW_KPI_ART),
     ...Object.values(OVERVIEW_STREAK_ART),
+    ...Object.values(OVERVIEW_COMPETE_ART),
     ...ranks,
     ...levels,
   ];

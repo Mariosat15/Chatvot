@@ -2,18 +2,10 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import {
-  ChevronRight,
-  Package,
-  TrendingUp,
-  Trophy,
-} from "lucide-react";
+import { ChevronRight, Package, TrendingUp } from "lucide-react";
 import type { OverviewActivityItem } from "@/lib/services/games/overview-types";
 import { OVERVIEW_ICON_ART } from "@/lib/services/games/overview-assets";
-import {
-  NEON_PANEL_LIT,
-  NEON_HEADING,
-} from "@/components/neon/tokens";
+import { NEON_PANEL_LIT, NEON_HEADING } from "@/components/neon/tokens";
 
 interface OverviewActivityProps {
   items: OverviewActivityItem[];
@@ -35,28 +27,34 @@ function relativeTime(iso: string): string {
 function ActivityIcon({ kind }: { kind: OverviewActivityItem["kind"] }) {
   if (kind === "contest") {
     return (
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-emerald-400/40 bg-emerald-500/15 text-emerald-300 shadow-[0_0_12px_rgba(52,211,153,0.35)]">
-        <Trophy className="h-4 w-4" aria-hidden />
+      <span className="relative flex h-10 w-10 shrink-0 overflow-hidden rounded-[10px] drop-shadow-[0_0_10px_rgba(52,211,153,0.45)]">
+        <Image
+          src={OVERVIEW_ICON_ART.trophyGlass}
+          alt=""
+          fill
+          sizes="40px"
+          className="object-contain"
+        />
       </span>
     );
   }
   if (kind === "trade") {
     return (
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-orange-400/40 bg-orange-500/15 text-orange-300 shadow-[0_0_12px_rgba(251,146,60,0.35)]">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-orange-400/40 bg-orange-500/15 text-orange-300 shadow-[0_0_12px_rgba(251,146,60,0.35)]">
         <TrendingUp className="h-4 w-4" aria-hidden />
       </span>
     );
   }
   return (
-    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-sky-400/40 bg-sky-500/15 text-sky-300 shadow-[0_0_12px_rgba(56,189,248,0.35)]">
+    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-sky-400/40 bg-sky-500/15 text-sky-300 shadow-[0_0_12px_rgba(56,189,248,0.35)]">
       <Package className="h-4 w-4" aria-hidden />
     </span>
   );
 }
 
 /**
- * Recent Activity rail (image 5). Contest finishes only — trading trade feed
- * stays on Performance so Overview stays game-agnostic.
+ * Recent Activity rail. Header uses the owner calendar glass tile (transparent
+ * black keyed out). Contest rows use the neon trophy glass plate.
  */
 export default function OverviewActivity({ items }: OverviewActivityProps) {
   return (
@@ -65,14 +63,15 @@ export default function OverviewActivity({ items }: OverviewActivityProps) {
       aria-labelledby="activity-heading"
     >
       <div className="mb-3 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <span className="relative flex h-11 w-11 shrink-0 overflow-hidden rounded-lg border border-sky-400/40 bg-sky-500/15 shadow-[0_0_14px_rgba(56,189,248,0.4)]">
+        <div className="flex items-center gap-2.5">
+          {/* Reason: tile already paints its own neon frame — no black fill behind it. */}
+          <span className="relative flex h-11 w-11 shrink-0 drop-shadow-[0_0_14px_rgba(56,189,248,0.55)]">
             <Image
               src={OVERVIEW_ICON_ART.activity}
               alt=""
               fill
               sizes="44px"
-              className="object-cover"
+              className="object-contain"
             />
           </span>
           <h2

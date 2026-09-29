@@ -319,7 +319,7 @@ project low risk.
 
 This plan has two tracks. **As of 29 September 2026**:
 
-- **Neon Overview redesign CODE-COMPLETE 29 Sep (eng)** — Header **nav-only**; Global Rank from **`ui/Rank`**; Play by Game top 4 / discovery; Account Status thin expandable bar; KPI icons **`h-16` + scale-1.35 fill boxes**; Activity uses neon **clock** tile; Player Progress = **4** next missions (2-col grid) + milestones ring + **6 recent badges** + rounded XP % + **Required badges** under `% complete`; **Compete** (3 best matches + Matching Cards); ⚡ on credits; hero height-capped **`hero-banner-elements.jpg`** (fire/ice, no baked type — ChartVolt PNG was pixelating). See `13` **s5.1g**. Tests: `overview-standing.test.ts`. **Never verified by eye.**
+- **Neon Overview redesign CODE-COMPLETE 29 Sep (eng)** — Header **nav-only**; Global Rank from **`ui/Rank`**; Play by Game top 4 / discovery; Account Status thin expandable bar; KPI icons **`h-14` + scale-1.08 contain (crisp)**; Activity **calendar glass** header + trophy-glass rows; Player Progress = **4** next missions (2-col grid) + milestones ring + **6 recent badges** + rounded XP % + **Required badges** under `% complete`; **Compete** neon plates (swords / Matching Cards / Challenge / avatar ring); ⚡ on credits; hero height-capped **`hero-banner-elements.jpg`**. See `13` **s5.1g**. Tests: `overview-standing.test.ts`. **Never verified by eye.**
 - **Volt Stack second title CODE-COMPLETE 27 Sep (eng)** — `volt-stack` in games-service catalogue; server-authoritative locks/score; play at `/play/volt-stack/?t=`; Circuit-compatible iframe messages. **Operator:** sync catalogue + enable title, then competition/challenge as for Circuit. See `21` **s4.1u**. Never verified by eye on live money.
 - **Provider contest lobby live updates CODE-COMPLETE 26 Sep (eng)** — same `/standings` poll as the arena (`ArenaLiveProvider` + `LobbyLiveParts`); players / your score / board / prize seats refresh without reload; trading keeps `LiveContestRefresher`. Not verified by eye.
 - **Prioritized task list:** `External game plans/NEXT-TASKS.md` — P0→P3 + closed items so stale paste-lists are not reopened. **Owner P1 decisions 24 Sep:** A5 last-when-asked; R11 owner/lawyers; R93 already closed; R96b content done; Q16 built; ops `--apply` backfills not needed; R99 optional.
@@ -1106,6 +1106,21 @@ days, and stay agnostic when new titles arrive.
 - Docs: `13` s5.1g amendment; tests in `user-game-stats` + `overview-standing`
 
 **Not backfilled:** existing rows keep `bestStreak: 0` until the next podium finish raises it.
+**Owner tested:** not yet.
+**Never verified by eye.**
+
+### 29 Sep 2026 - Overview Compete neon plates + Activity calendar + crisp KPIs
+
+**Owner:** Compete must match the neon reference exactly (transparent graphics);
+Recent Activity clock → calendar (no black fill); KPI icons blurry → smaller/crisper.
+
+**Shipped:**
+- `compete/` assets (swords, crown, avatar ring, Matching Cards, Challenge) black-keyed
+- OverviewCompete rebuilt onto those plates
+- `icon-activity.png` replaced with calendar glass; `icon-trophy-glass.png` for rows
+- KPI tiles `h-14` / `scale-1.08` / `object-contain`
+- Docs: `13` s5.1g + this entry; tests updated
+
 **Owner tested:** not yet.
 **Never verified by eye.**
 

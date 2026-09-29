@@ -203,17 +203,17 @@ function KpiCard({
 
       <div className="relative z-10 flex min-w-0 flex-1 items-center gap-3">
         <span
-          className={`relative flex h-16 w-16 shrink-0 overflow-hidden rounded-[14px] ring-1 ${t.iconRing} ${t.iconBg} shadow-[0_0_16px_rgba(255,255,255,0.08)]`}
+          className={`relative flex h-14 w-14 shrink-0 overflow-hidden rounded-[12px] ring-1 ${t.iconRing} ${t.iconBg} shadow-[0_0_14px_rgba(255,255,255,0.08)]`}
         >
           <span className="pointer-events-none absolute inset-0 z-[1] bg-gradient-to-br from-white/10 to-transparent" />
-          {/* Reason: owner neon tiles include transparent padding — scale past
-              cover so the glyph fills the box (owner mark-up, 29 Sep 2026). */}
+          {/* Reason: soft owner tiles look blurry when overscaled — contain at native
+              framing with a light nudge so the glyph fills without mush. */}
           <Image
             src={artSrc}
             alt=""
             fill
-            sizes="64px"
-            className="scale-[1.35] object-cover drop-shadow-[0_0_12px_rgba(255,255,255,0.35)]"
+            sizes="56px"
+            className="scale-[1.08] object-contain drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]"
           />
         </span>
 

@@ -508,10 +508,11 @@ describe("Overview streaks chrome", () => {
     expect(kpi).toMatch(/formatVolts\(totalPrizesWon\)/);
     expect(kpi).toMatch(/linear-gradient\(110deg/);
     expect(kpi).toMatch(/fill/);
-    expect(kpi).toMatch(/object-cover/);
-    expect(kpi).toMatch(/h-16 w-16/);
-    expect(kpi).toMatch(/scale-\[1\.35\]/);
+    expect(kpi).toMatch(/object-contain/);
+    expect(kpi).toMatch(/h-14 w-14/);
+    expect(kpi).toMatch(/scale-\[1\.08\]/);
     expect(kpi).not.toMatch(/h-12 w-12/);
+    expect(kpi).not.toMatch(/scale-\[1\.35\]/);
     expect(kpi).not.toMatch(/w-\[48%\]/);
   });
 
@@ -574,7 +575,11 @@ describe("Overview streaks chrome", () => {
     expect(layout).toMatch(/OVERVIEW_RECENT_BADGE_LIMIT/);
     expect(layout).toMatch(/recentBadges/);
     expect(activity).toMatch(/OVERVIEW_ICON_ART\.activity/);
+    expect(activity).toMatch(/object-contain/);
+    expect(activity).toMatch(/trophyGlass/);
     expect(activity).not.toMatch(/Clock3/);
+    // Reason: header tile is transparent — no black/sky fill behind the calendar.
+    expect(activity).not.toMatch(/overflow-hidden rounded-lg border border-sky-400/);
   });
 
   it("Compete strip fetches ranked matches and links Match Cards", () => {
@@ -590,11 +595,23 @@ describe("Overview streaks chrome", () => {
     )
       .replace(/\/\*[\s\S]*?\*\//g, "")
       .replace(/\/\/.*$/gm, "");
+    const assets = readFileSync(
+      join(ROOT, "lib/services/games/overview-assets.ts"),
+      "utf8",
+    )
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
     expect(compete).toMatch(/\/api\/matchmaking\?action=ranked/);
     expect(compete).toMatch(/OVERVIEW_COMPETE_MATCH_LIMIT/);
     expect(compete).toMatch(/ChallengeCreateDialog/);
     expect(compete).toMatch(/\/leaderboard\?board=trading&view=cards/);
     expect(compete).toMatch(/Matching Cards/);
+    expect(compete).toMatch(/OVERVIEW_COMPETE_ART/);
+    expect(compete).toMatch(/btn-challenge|challenge/);
+    expect(assets).toMatch(/OVERVIEW_COMPETE_ART/);
+    expect(assets).toMatch(/btn-matching-cards\.png/);
+    expect(assets).toMatch(/btn-challenge\.png/);
+    expect(assets).toMatch(/icon-swords\.png/);
     expect(client).toMatch(/get\("view"\)\s*===\s*"cards"/);
     expect(client).toMatch(/initialViewMode/);
   });
