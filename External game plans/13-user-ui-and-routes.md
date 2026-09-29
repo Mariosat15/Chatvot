@@ -3111,11 +3111,13 @@ service reaches mongoose and Turbopack then fails the browser build on `child_pr
 
 **Polish (same day, owner mark-ups):** hero art is full-bleed with a left fade; Player Progress
 + Recent Activity sit side-by-side like mock image 5 (not the three loose cards of image 6);
-KPI and streak tiles use neon glowing borders and owner `ui/items` plates; Play-by-Game best
-score falls back through `bestScore` → `totalPoints` → max `game_round.rawScore` so a dash is
-not the only answer when seats lack a stamped best. **Page backdrop** is the owner mountain
-plate (`overview-backdrop.jpg`) behind the Overview tab only, with navy edge/top/bottom fades
-so cards stay readable — Welcome is glass over the same scene rather than a second image.
+KPI and streak tiles use neon glowing borders and owner `ui/items` plates; KPI cards follow
+the horizontal image-2 layout (icon tile + value left, wide spark area right) and **omit
+fabricated “vs last week” %** until a real week series exists; Play-by-Game best score falls
+back through `bestScore` → `totalPoints` → max `game_round.rawScore` so a dash is not the only
+answer when seats lack a stamped best. **Page backdrop** is the owner mountain plate
+(`overview-backdrop.jpg`) behind the Overview tab only, with navy edge/top/bottom fades so
+cards stay readable — Welcome is glass over the same scene rather than a second image.
 
 ### 5.1a The contest cards, made game-aware - BUILT 6 September 2026
 

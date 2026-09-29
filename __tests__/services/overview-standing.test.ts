@@ -421,6 +421,18 @@ describe("Overview streaks chrome", () => {
     expect(backdrop).toMatch(/bg-gradient-to-b/);
     expect(backdrop).toMatch(/bg-gradient-to-r/);
   });
+
+  it("KPI row uses the horizontal spark layout and never invents week deltas", () => {
+    const kpi = readFileSync(
+      join(ROOT, "components/dashboard/overview/OverviewKpiRow.tsx"),
+      "utf8",
+    )
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    expect(kpi).toMatch(/SparkArea/);
+    expect(kpi).toMatch(/w-\[48%\]/);
+    expect(kpi).not.toMatch(/vs last week/i);
+  });
 });
 
 describe("overview assets on disk", () => {
