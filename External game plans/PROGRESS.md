@@ -1192,6 +1192,16 @@ fire/ice panoramic if the ChartVolt PNG cannot be fixed; KPI icons must fill the
 **Owner tested:** not yet.
 **Never verified by eye.**
 
+### 29 Sep 2026 - Desktop Compete cards: no cut-off borders, centred tiles, sharp larger Challenge button
+
+The owner rejected the corner brackets and the notched match plate as "cut-off" borders. Both are gone:
+the brackets are deleted, and the plate is `rounded-lg`. Stat tiles centre their icon and text. The
+Challenge button is bigger, and its 967px source is served `unoptimized`, so it is always shrunk and
+never enlarged, even at the 1.1 hover scale on a 2x screen. Nothing was blurry at the data level, and
+there is no risk number. The mobile tree is unchanged. The clip-path assertion in
+`mobile-dashboard-split.test.ts` was **flipped, not deleted**, and a new test pins the button's size and
+`unoptimized`. Chapter `13` carries the amendment before 5.1g-m. **Never verified by eye.**
+
 ### 29 Sep 2026 - Phone bottom nav removed; Quick access is All Competitions / Profile; one account status
 
 **Asked:** show only "All Competitions" (not trading competitions) and replace "Game Competitions" with

@@ -16,7 +16,7 @@ import { NEON_HEADING, NEON_LABEL } from "@/components/neon/tokens";
 import { PERFORMANCE_INTERVALS } from "@/lib/utils/performance";
 
 const COMPETE_TILE =
-  "flex min-h-[58px] items-center gap-2.5 rounded-lg border border-cyan-400/30 bg-[#07101f]/90 px-2.5 py-2 shadow-[inset_0_0_12px_rgba(34,211,238,0.06)]";
+  "flex min-h-[58px] items-center justify-center gap-3 rounded-lg border border-cyan-400/30 bg-[#07101f]/90 px-2.5 py-2 shadow-[inset_0_0_12px_rgba(34,211,238,0.06)]";
 
 export interface CompeteMatch {
   userId: string;
@@ -274,15 +274,8 @@ export default function OverviewCompete({
               key={m.userId}
               className="relative flex flex-col gap-3 rounded-[16px] border border-cyan-400/55 bg-[linear-gradient(160deg,rgba(12,28,52,0.95)_0%,rgba(6,12,28,0.98)_100%)] p-3.5 shadow-[0_0_22px_-8px_rgba(34,211,238,0.6),inset_0_0_24px_rgba(34,211,238,0.06)] sm:p-4"
             >
-              {/* Reason: the reference's bright corner brackets — decoration only. */}
-              <span
-                className="pointer-events-none absolute -left-px -top-px h-5 w-5 rounded-tl-[16px] border-l-2 border-t-2 border-cyan-300 shadow-[0_0_10px_rgba(34,211,238,0.8)]"
-                aria-hidden
-              />
-              <span
-                className="pointer-events-none absolute -bottom-px -right-px h-5 w-5 rounded-br-[16px] border-b-2 border-r-2 border-cyan-300 shadow-[0_0_10px_rgba(34,211,238,0.8)]"
-                aria-hidden
-              />
+              {/* Reason: owner, 29 Sep 2026 - no corner brackets or notches; the
+                  cut-off look read as broken borders. One clean rounded edge. */}
               <div className="flex items-center gap-3">
                 <button
                   type="button"
@@ -330,8 +323,7 @@ export default function OverviewCompete({
                   </p>
                 </div>
 
-                {/* Reason: reference frames the match % in a notched glass plate. */}
-                <div className="shrink-0 border border-cyan-400/60 bg-cyan-500/10 px-3 py-1.5 text-center shadow-[0_0_14px_-2px_rgba(34,211,238,0.55),inset_0_0_12px_rgba(34,211,238,0.12)] [clip-path:polygon(12px_0,100%_0,100%_calc(100%-12px),calc(100%-12px)_100%,0_100%,0_12px)]">
+                <div className="shrink-0 rounded-lg border border-cyan-400/60 bg-cyan-500/10 px-3 py-1.5 text-center shadow-[0_0_14px_-2px_rgba(34,211,238,0.55),inset_0_0_12px_rgba(34,211,238,0.12)]">
                   <p className="flex items-center justify-center gap-1 text-2xl font-bold leading-none tabular-nums text-cyan-200 drop-shadow-[0_0_8px_rgba(34,211,238,0.7)]">
                     {m.matchScore}%
                     <TrendingUp
@@ -441,14 +433,18 @@ export default function OverviewCompete({
                     username: m.username,
                   })
                 }
-                className="relative mx-auto mt-auto h-12 w-[82%] max-w-[260px] cursor-pointer drop-shadow-[0_0_18px_rgba(251,146,60,0.55)] transition-transform duration-200 ease-out hover:scale-110 active:scale-95 sm:h-14"
+                className="relative mx-auto mt-auto aspect-[967/172] w-[94%] max-w-[340px] cursor-pointer drop-shadow-[0_0_18px_rgba(251,146,60,0.55)] transition-transform duration-200 ease-out hover:scale-110 active:scale-95"
                 aria-label={`Challenge ${m.username}`}
               >
+                {/* Reason: owner, 29 Sep 2026 - bigger and never blurry. The 967px
+                    source is served as-is (unoptimized), so even at 340px x 2x DPR
+                    x 1.1 hover (~750px) the browser downsamples rather than upscales. */}
                 <Image
                   src={OVERVIEW_COMPETE_ART.challenge}
                   alt=""
                   fill
-                  sizes="320px"
+                  unoptimized
+                  sizes="340px"
                   className="object-contain"
                 />
                 <span className="sr-only">Challenge</span>

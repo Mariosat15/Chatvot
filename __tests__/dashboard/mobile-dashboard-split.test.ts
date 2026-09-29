@@ -126,6 +126,22 @@ describe("mobile dashboard split", () => {
     const compete = read("components/dashboard/overview/OverviewCompete.tsx");
     expect(compete).toMatch(/const COMPETE_TILE =\s*"flex[^"]*items-center/);
     expect((compete.match(/className=\{COMPETE_TILE\}/g) ?? []).length).toBe(4);
-    expect(compete).toMatch(/clip-path:polygon/);
+    // Reason: flipped 29 Sep 2026 - the owner rejected the notched match plate
+    // and the corner brackets as a "cut-off" border. Clean rounded edges only.
+    expect(compete).not.toMatch(/clip-path:polygon/);
+    expect(compete).not.toMatch(/rounded-tl-\[16px\] border-l-2 border-t-2/);
+    expect(compete).not.toMatch(/rounded-br-\[16px\] border-b-2 border-r-2/);
+    expect(compete).toMatch(/const COMPETE_TILE =\s*"[^"]*justify-center/);
+  });
+
+  it("desktop Challenge button is larger and served at source resolution", () => {
+    const compete = read("components/dashboard/overview/OverviewCompete.tsx");
+    const start = compete.indexOf("src={OVERVIEW_COMPETE_ART.challenge}");
+    expect(start).toBeGreaterThan(-1);
+    const img = compete.slice(start, compete.indexOf("/>", start));
+    // Reason: a resized copy upscaled by hover:scale-110 blurs; the 967px
+    // source served unoptimized is always downsampled instead.
+    expect(img).toMatch(/\bunoptimized\b/);
+    expect(compete).toMatch(/aspect-\[967\/172\] w-\[94%\] max-w-\[340px\]/);
   });
 });

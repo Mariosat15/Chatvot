@@ -3200,6 +3200,15 @@ Matching Cards / Challenge lack loom/press/hand, is correct as history
 > `pb-16 lg:pb-0` clearance for the removed bar. That file carries 20 pre-existing lint warnings, and the
 > pre-commit hook's `--max-warnings=0` blocks any edit to it. **Never verified by eye.**
 
+> **Amended 29 September 2026 (desktop Compete cards):** the owner rejected the "cut-off" borders. The
+> two corner-bracket spans on each card are **deleted**, and the match % plate's notched `clip-path`
+> became a plain `rounded-lg` edge. Each stat tile's icon and text are centred (`justify-center gap-3`)
+> rather than packed left. The Challenge button is larger (`aspect-[967/172] w-[94%] max-w-[340px]`) and
+> its image is served **`unoptimized`**. The source is 967px wide, so even at 340px on a 2x screen with
+> the 1.1 hover scale (about 750px) the browser shrinks the picture rather than enlarging it, and it never
+> blurs. A resized copy from the image optimiser would have blurred on hover. The mobile tree is
+> untouched. The flipped test is in `__tests__/dashboard/mobile-dashboard-split.test.ts`. **Never verified by eye.**
+
 #### 5.1g-m The phone Overview is a second tree - BUILT 29 September 2026
 
 Owner spec `External game plans/Mobile Dashboard` (three-phone reference). **The desktop was
