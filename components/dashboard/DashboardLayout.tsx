@@ -17,6 +17,7 @@ import PlayerGamePerformancePanel from "./PlayerGamePerformancePanel";
 import HeroStatsBar from "./HeroStatsBar";
 import MarketHolidaysCard from "./MarketHolidaysCard";
 import OverviewHero from "./overview/OverviewHero";
+import OverviewBackdrop from "./overview/OverviewBackdrop";
 import OverviewKpiRow from "./overview/OverviewKpiRow";
 import OverviewPlayByGame from "./overview/OverviewPlayByGame";
 import OverviewProgress from "./overview/OverviewProgress";
@@ -128,7 +129,8 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
         fact. Tabs still drive content; chrome is hidden.
       */}
       <Tabs value={activeTab} onValueChange={handleTabChange} className="mt-4">
-        <TabsContent value="overview" className="mt-0 space-y-4">
+        <TabsContent value="overview" className="mt-0">
+          <OverviewBackdrop>
           {(accountStatus.hasActiveRestriction ||
             accountStatus.isLocked ||
             accountStatus.hasOpenAlert ||
@@ -167,6 +169,7 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
           <OverviewStreaks streaks={overviewStanding.streaks} />
 
           <GameSuggestionsCard />
+          </OverviewBackdrop>
         </TabsContent>
 
         <TabsContent value="wallet" className="mt-4 space-y-4">

@@ -375,6 +375,7 @@ describe("Overview streaks chrome", () => {
       "OverviewProgress.tsx",
       "OverviewHero.tsx",
       "OverviewKpiRow.tsx",
+      "OverviewBackdrop.tsx",
     ];
     for (const name of files) {
       const code = readFileSync(join(dir, name), "utf8")
@@ -400,6 +401,25 @@ describe("Overview streaks chrome", () => {
     expect(header).not.toMatch(/NotificationDropdown/);
     expect(header).not.toMatch(/\/api\/user\/level/);
     expect(header).not.toMatch(/appLogo/);
+  });
+
+  it("Overview tab mounts the mountain backdrop with faded washes", () => {
+    const layout = readFileSync(
+      join(ROOT, "components/dashboard/DashboardLayout.tsx"),
+      "utf8",
+    )
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    const backdrop = readFileSync(
+      join(ROOT, "components/dashboard/overview/OverviewBackdrop.tsx"),
+      "utf8",
+    )
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    expect(layout).toMatch(/OverviewBackdrop/);
+    expect(backdrop).toMatch(/OVERVIEW_BACKDROP/);
+    expect(backdrop).toMatch(/bg-gradient-to-b/);
+    expect(backdrop).toMatch(/bg-gradient-to-r/);
   });
 });
 

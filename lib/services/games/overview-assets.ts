@@ -12,6 +12,8 @@
 import { overviewRankSrc, OVERVIEW_RANK_TOP_N } from "@/lib/utils/overview-rank-badge";
 
 export const OVERVIEW_HERO_BANNER = "/assets/neon/overview/hero-banner.png";
+/** Page-wide Overview backdrop (owner mountain plate, 29 Sep 2026). */
+export const OVERVIEW_BACKDROP = "/assets/neon/overview/overview-backdrop.jpg";
 export const OVERVIEW_NAV_ICONS = "/assets/neon/overview/nav-icons-strip.png";
 export const OVERVIEW_KPI_ICONS = "/assets/neon/overview/kpi-icons-strip.png";
 export const OVERVIEW_STREAK_ICONS =
@@ -61,6 +63,7 @@ export function allOverviewAssets(): string[] {
   );
   return [
     OVERVIEW_HERO_BANNER,
+    OVERVIEW_BACKDROP,
     OVERVIEW_NAV_ICONS,
     OVERVIEW_KPI_ICONS,
     OVERVIEW_STREAK_ICONS,

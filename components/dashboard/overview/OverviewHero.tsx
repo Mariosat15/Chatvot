@@ -1,8 +1,6 @@
 "use client";
 
-import Image from "next/image";
-import { OVERVIEW_HERO_BANNER } from "@/lib/services/games/overview-assets";
-import { NEON_PANEL, NEON_HEADING, NEON_LABEL } from "@/components/neon/tokens";
+import { NEON_HEADING, NEON_LABEL } from "@/components/neon/tokens";
 
 interface OverviewHeroProps {
   name: string;
@@ -10,37 +8,28 @@ interface OverviewHeroProps {
 }
 
 /**
- * Welcome strip. Hero art is full-bleed behind the copy and fades left so
- * text stays readable (owner mark-up, 29 Sep 2026).
+ * Welcome strip over the Overview page backdrop.
+ *
+ * The mountain art lives only on `OverviewBackdrop` — this panel is glass so
+ * the scene shows through without a second competing image.
  */
 export default function OverviewHero({ name, accountActive }: OverviewHeroProps) {
   const first = name?.trim().split(/\s+/)[0] || "Player";
 
   return (
     <section
-      className={`${NEON_PANEL} relative min-h-[168px] overflow-hidden p-4 sm:min-h-[200px] sm:p-5`}
+      className="relative min-h-[168px] overflow-hidden rounded-xl border border-cyan-400/20 bg-[#070E1C]/40 p-4 shadow-[0_0_48px_-20px_rgba(34,211,238,0.4),inset_0_1px_0_rgba(150,210,255,0.14)] backdrop-blur-md sm:min-h-[200px] sm:p-5"
       aria-label="Welcome"
     >
-      {/* Full-bleed art — cover the whole panel, fade out toward the left. */}
-      <div className="pointer-events-none absolute inset-0">
-        <Image
-          src={OVERVIEW_HERO_BANNER}
-          alt=""
-          fill
-          sizes="100vw"
-          className="object-cover object-right"
-          priority
-        />
-        {/* Reason: left-heavy wash so "Welcome back" stays legible on every width. */}
-        <div
-          className="absolute inset-0 bg-gradient-to-r from-[#050B18] via-[#050B18]/92 to-[#050B18]/15 sm:via-[#050B18]/85 sm:to-transparent"
-          aria-hidden
-        />
-        <div
-          className="absolute inset-0 bg-gradient-to-t from-[#050B18]/80 via-transparent to-[#050B18]/40"
-          aria-hidden
-        />
-      </div>
+      {/* Left wash keeps welcome copy readable over neon peaks. */}
+      <div
+        className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#050B18]/92 via-[#050B18]/55 to-transparent"
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#050B18]/55 via-transparent to-[#050B18]/25"
+        aria-hidden
+      />
 
       <div className="relative z-10 flex max-w-xl flex-col gap-2">
         <p className={NEON_LABEL}>Overview</p>
