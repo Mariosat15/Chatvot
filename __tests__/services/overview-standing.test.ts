@@ -613,6 +613,19 @@ describe("Overview streaks chrome", () => {
     expect(compete).toMatch(/hover:scale-1[01]0/);
     expect(compete).toMatch(/active:scale-95/);
     expect(compete).toMatch(/h-14|sm:h-16/);
+    // Reason: Compete strip must show the same four tiles as Matching Cards, and
+    // names must open ProfileCard like the leaderboard (not only a challenge dialog).
+    expect(compete).toMatch(/overallScore/);
+    expect(compete).toMatch(/Competitions/);
+    expect(compete).toMatch(/won · entered/);
+    expect(compete).toMatch(/competitionsWon/);
+    expect(compete).toMatch(/competitionsEntered/);
+    expect(compete).toMatch(/challengesWon/);
+    expect(compete).toMatch(/challengesEntered/);
+    expect(compete).toMatch(/>\s*1v1\s*</);
+    expect(compete).toMatch(/ProfileCard/);
+    expect(compete).toMatch(/setProfileTarget/);
+    expect(compete).toMatch(/hover:underline/);
     expect(assets).toMatch(/OVERVIEW_COMPETE_ART/);
     expect(assets).toMatch(/btn-matching-cards\.png/);
     expect(assets).toMatch(/btn-challenge\.png/);

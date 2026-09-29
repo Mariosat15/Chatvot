@@ -3,8 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { BarChart3, Loader2, TrendingUp, Trophy } from "lucide-react";
+import { Loader2, Shield, Swords, TrendingUp, Trophy } from "lucide-react";
 import ProfileImage from "@/components/ui/ProfileImage";
+import ProfileCard from "@/components/profile/ProfileCard";
 import ChallengeCreateDialog from "@/components/challenges/ChallengeCreateDialog";
 import { OVERVIEW_COMPETE_MATCH_LIMIT } from "@/lib/services/games/overview-types";
 import { OVERVIEW_COMPETE_ART } from "@/lib/services/games/overview-assets";
@@ -16,9 +17,18 @@ interface CompeteMatch {
   username: string;
   profileImage?: string;
   level: string;
+  overallScore: number;
   winRate: number;
-  challengesWon: number;
+  totalTrades: number;
+  totalPnl: number;
+  competitionsEntered: number;
+  competitionsWon: number;
   challengesEntered: number;
+  challengesWon: number;
+  totalBadges: number;
+  userTitle?: string;
+  userTitleIcon?: string;
+  userTitleColor?: string;
   matchScore: number;
   isOnline: boolean;
 }
@@ -31,9 +41,18 @@ function mapMatches(data: {
       username: string;
       profileImage?: string;
       level: string;
+      overallScore?: number;
       winRate: number;
+      totalTrades?: number;
+      totalPnl?: number;
+      competitionsEntered?: number;
+      competitionsWon?: number;
       challengesWon: number;
       challengesEntered: number;
+      totalBadges?: number;
+      userTitle?: string;
+      userTitleIcon?: string;
+      userTitleColor?: string;
       isOnline: boolean;
     };
   }>;
@@ -43,16 +62,33 @@ function mapMatches(data: {
     username: m.trader.username,
     profileImage: m.trader.profileImage,
     level: m.trader.level,
+    overallScore: Math.round(m.trader.overallScore ?? 0),
     winRate: m.trader.winRate,
+    totalTrades: m.trader.totalTrades ?? 0,
+    totalPnl: m.trader.totalPnl ?? 0,
+    competitionsEntered: m.trader.competitionsEntered ?? 0,
+    competitionsWon: m.trader.competitionsWon ?? 0,
     challengesWon: m.trader.challengesWon,
     challengesEntered: m.trader.challengesEntered,
+    totalBadges: m.trader.totalBadges ?? 0,
+    userTitle: m.trader.userTitle,
+    userTitleIcon: m.trader.userTitleIcon,
+    userTitleColor: m.trader.userTitleColor,
     matchScore: Math.round(m.matchScore ?? 0),
     isOnline: m.trader.isOnline,
   }));
 }
 
+function formatLevel(level: string): string {
+  if (!level) return "—";
+  return level.charAt(0).toUpperCase() + level.slice(1);
+}
+
 /**
  * Overview Compete strip — owner neon reference (29 Sep 2026).
+ *
+ * Stats match Matching Cards: Score, Level, Competitions and 1v1
+ * (won · entered). Names open ProfileCard like the leaderboard.
  *
  * Live online dots poll `/api/user/presence?userIds=` (light). Match list
  * rematches every 60s. Never re-fetches the full dashboard payload.
@@ -68,6 +104,7 @@ export default function OverviewCompete({
     userId: string;
     username: string;
   } | null>(null);
+  const [profileTarget, setProfileTarget] = useState<CompeteMatch | null>(null);
 
   const matchIdsKey = useMemo(
     () => matches.map((m) => m.userId).join(","),
@@ -227,7 +264,12 @@ export default function OverviewCompete({
               className="flex flex-col gap-3 rounded-[16px] border border-cyan-400/50 bg-[linear-gradient(160deg,rgba(12,28,52,0.95)_0%,rgba(6,12,28,0.98)_100%)] p-3.5 shadow-[0_0_22px_-8px_rgba(34,211,238,0.55),inset_0_0_24px_rgba(34,211,238,0.05)]"
             >
               <div className="flex items-center gap-2.5">
-                <div className="relative h-14 w-14 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setProfileTarget(m)}
+                  className="relative h-14 w-14 shrink-0 cursor-pointer rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/70"
+                  aria-label={`Open ${m.username}'s card`}
+                >
                   <div className="absolute inset-[10%] overflow-hidden rounded-full bg-[#0A1528]">
                     <ProfileImage
                       src={m.profileImage}
@@ -250,12 +292,16 @@ export default function OverviewCompete({
                     }`}
                     aria-label={m.isOnline ? "Online" : "Offline"}
                   />
-                </div>
+                </button>
 
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-gray-100">
+                  <button
+                    type="button"
+                    onClick={() => setProfileTarget(m)}
+                    className="block max-w-full truncate text-left text-sm font-semibold text-gray-100 transition-colors hover:text-cyan-300 hover:underline cursor-pointer"
+                  >
                     {m.username}
-                  </p>
+                  </button>
                   <p
                     className={`${NEON_LABEL} flex items-center gap-1 truncate text-[10px] text-cyan-300/90`}
                   >
@@ -266,7 +312,7 @@ export default function OverviewCompete({
                       height={12}
                       className="h-3 w-3 object-contain"
                     />
-                    {m.level}
+                    {formatLevel(m.level)}
                   </p>
                 </div>
 
@@ -286,15 +332,69 @@ export default function OverviewCompete({
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-1.5 text-[10px] font-semibold text-gray-300">
-                <span className="inline-flex items-center gap-1 rounded-md border border-cyan-400/20 bg-[#07101f]/90 px-1.5 py-0.5">
-                  <Trophy className="h-3 w-3 text-amber-300" aria-hidden />
-                  WR {Math.round(m.winRate)}%
-                </span>
-                <span className="inline-flex items-center gap-1 rounded-md border border-cyan-400/20 bg-[#07101f]/90 px-1.5 py-0.5">
-                  <BarChart3 className="h-3 w-3 text-cyan-300" aria-hidden />
-                  {m.challengesWon}/{m.challengesEntered || 0} chal wins
-                </span>
+              {/* Reason: same four tiles as Matching Cards — Score, Level, Competitions, 1v1. */}
+              <div className="grid grid-cols-2 gap-1.5">
+                <div className="rounded-lg border border-cyan-400/20 bg-[#07101f]/90 px-2 py-1.5 text-center">
+                  <Shield
+                    className="mx-auto mb-0.5 h-3 w-3 text-cyan-300/90"
+                    aria-hidden
+                  />
+                  <p className="text-sm font-bold tabular-nums text-cyan-200">
+                    {m.overallScore}
+                  </p>
+                  <span className="text-[9px] font-semibold uppercase tracking-wide text-gray-400">
+                    Score
+                  </span>
+                </div>
+                <div className="rounded-lg border border-cyan-400/20 bg-[#07101f]/90 px-2 py-1.5 text-center">
+                  <Image
+                    src={OVERVIEW_COMPETE_ART.crown}
+                    alt=""
+                    width={12}
+                    height={12}
+                    className="mx-auto mb-0.5 h-3 w-3 object-contain"
+                  />
+                  <p className="truncate text-sm font-bold text-amber-200">
+                    {formatLevel(m.level)}
+                  </p>
+                  <span className="text-[9px] font-semibold uppercase tracking-wide text-gray-400">
+                    Level
+                  </span>
+                </div>
+                <div className="rounded-lg border border-cyan-400/20 bg-[#07101f]/90 px-2 py-1.5 text-center">
+                  <Trophy
+                    className="mx-auto mb-0.5 h-3 w-3 text-amber-300"
+                    aria-hidden
+                  />
+                  <p className="text-sm font-bold tabular-nums text-amber-200">
+                    {m.competitionsWon}
+                    <span className="mx-0.5 font-semibold text-gray-500">/</span>
+                    {m.competitionsEntered}
+                  </p>
+                  <span className="block text-[9px] font-semibold uppercase tracking-wide text-gray-400">
+                    Competitions
+                  </span>
+                  <span className="block text-[8px] text-gray-500">
+                    won · entered
+                  </span>
+                </div>
+                <div className="rounded-lg border border-cyan-400/20 bg-[#07101f]/90 px-2 py-1.5 text-center">
+                  <Swords
+                    className="mx-auto mb-0.5 h-3 w-3 text-violet-300"
+                    aria-hidden
+                  />
+                  <p className="text-sm font-bold tabular-nums text-violet-200">
+                    {m.challengesWon}
+                    <span className="mx-0.5 font-semibold text-gray-500">/</span>
+                    {m.challengesEntered}
+                  </p>
+                  <span className="block text-[9px] font-semibold uppercase tracking-wide text-gray-400">
+                    1v1
+                  </span>
+                  <span className="block text-[8px] text-gray-500">
+                    won · entered
+                  </span>
+                </div>
               </div>
 
               <button
@@ -329,6 +429,37 @@ export default function OverviewCompete({
         }}
         challengedUser={challengeTarget}
       />
+
+      {profileTarget && (
+        <ProfileCard
+          show={!!profileTarget}
+          userId={profileTarget.userId}
+          username={profileTarget.username}
+          stats={{
+            winRate: profileTarget.winRate,
+            totalTrades: profileTarget.totalTrades,
+            totalPnl: profileTarget.totalPnl,
+            competitionsEntered: profileTarget.competitionsEntered,
+            competitionsWon: profileTarget.competitionsWon,
+            challengesEntered: profileTarget.challengesEntered,
+            challengesWon: profileTarget.challengesWon,
+            totalBadges: profileTarget.totalBadges,
+            overallScore: profileTarget.overallScore,
+            userTitle: profileTarget.userTitle,
+            userTitleIcon: profileTarget.userTitleIcon,
+            userTitleColor: profileTarget.userTitleColor,
+          }}
+          showChallengeButton
+          onChallenge={() => {
+            setChallengeTarget({
+              userId: profileTarget.userId,
+              username: profileTarget.username,
+            });
+            setProfileTarget(null);
+          }}
+          onClose={() => setProfileTarget(null)}
+        />
+      )}
     </section>
   );
 }
