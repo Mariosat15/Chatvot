@@ -25,6 +25,7 @@ import {
 import { getMultipleSymbolConfigs } from "@/lib/services/symbol-config.service";
 import { getPlayerGamePerformance } from "@/lib/services/games/player-game-performance.service";
 import { getPlayerGameProfile } from "@/lib/services/games/player-game-stats.service";
+import { getOverviewStanding } from "@/lib/services/games/overview-standing.service";
 import { CROSS_GAME_SCORING_STARTED_CAPTION } from "@/lib/services/games/game-leaderboard.service";
 import { buildChartData, calculateStreaks } from "./dashboard/charts";
 import { processCompetitionParticipations } from "./dashboard/process-competitions";
@@ -43,7 +44,7 @@ import {
   getTitleLevels,
 } from "@/lib/services/xp-config.service";
 import { resolveLevelTitle } from "@/lib/utils/level-title";
-import { getUserGlobalRank } from "@/lib/actions/leaderboard/global-leaderboard.actions";
+import { getGlobalBoard } from "@/lib/services/leaderboard/global-board.service";
 import UserBadge from "@/database/models/user-badge.model";
 import BadgeConfig from "@/database/models/badge-config.model";
 import UserJourneyProgress from "@/database/models/user-journey-progress.model";
@@ -156,6 +157,31 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
       } as Awaited<ReturnType<typeof getPlayerGameProfile>>;
     }),
   ]);
+
+  // Reason: Overview neon standing (Global board badge, contest win rate, play cards).
+  // Depends on gameStanding; fail soft so a catalogue blip cannot blank the dashboard.
+  const overviewStanding = await getOverviewStanding({
+    userId,
+    gameStanding,
+  }).catch((err) => {
+    console.warn("⚠️ overviewStanding fetch failed:", err);
+    return {
+      globalRank: { src: "/assets/neon/overview/rank-badge-dash.png", overlay: null, inTopN: false, rank: 0 },
+      totalUsers: 0,
+      contestWinRate: null,
+      playCards: [],
+      missions: [],
+      recentActivity: [],
+      streaks: {
+        currentPodiumStreak: 0,
+        bestPodiumStreak: 0,
+        podiums: 0,
+        contestsCompleted: 0,
+        topThreeFinishes: 0,
+        weeksActiveHint: 0,
+      },
+    } as Awaited<ReturnType<typeof getOverviewStanding>>;
+  });
 
   // Reason: We need opponent participations for challenge dashboard cards.
   // The query above only fetches the current user's participations, so the opponent's
@@ -476,12 +502,18 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
     sitting beside a live one, which is how the next person to fix a dashboard bug ends up
     reading a colour out of the award-time cache because it was right there.
   */
-  const [userLevelData, rankData, earnedBadges] = await Promise.all([
+  // Reason: Overview Global Rank is the seven-component board, not the legacy
+  // trading-shaped getUserGlobalRank. Badge evaluation still uses the legacy
+  // helper on its own path — left alone until a probe shows it must move.
+  const [userLevelData, globalBoard, earnedBadges] = await Promise.all([
     getUserLevel(userId).catch(() => ({ currentXP: 0, totalBadgesEarned: 0 })),
-    getUserGlobalRank(userId).catch(() => ({ rank: 0, totalUsers: 0, percentile: 0 })),
+    getGlobalBoard({ viewerUserId: userId, limit: 20 }).catch(() => ({
+      myPosition: { rank: 0, totalUsers: 0, percentile: 0 },
+    })),
     // Reason: Fetch ALL earned badges (no limit) so dashboard can show them with expand/collapse
     UserBadge.find({ userId }).sort({ earnedAt: -1 }).lean().catch(() => []),
   ]);
+  const rankData = globalBoard.myPosition;
 
   /*
     Progress against the ladder, computed from the player's actual XP.
@@ -881,6 +913,7 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
       bestRoundBreakdown: row.bestRoundBreakdown,
     })),
     gameStanding,
+    overviewStanding,
     tradingEnabled,
   };
 }

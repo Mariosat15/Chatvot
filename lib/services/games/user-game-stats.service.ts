@@ -54,12 +54,14 @@ async function upsertFinish(
     .select("rating currentStreak")
     .lean<{ rating?: number; currentStreak?: number }>();
 
+  // Reason: podium continues the streak; anything else resets. Cannot express
+  // both with a bare $inc. bestStreak tracks the high-water mark via $max.
+  const nextStreak = isPodium ? (existing?.currentStreak ?? 0) + 1 : 0;
+
   let ratingDelta = 0;
   const setFields: Record<string, unknown> = {
     lastPlayedAt: playedAt,
-    // Reason: podium continues the streak; anything else resets. Cannot express
-    // both with a bare $inc.
-    currentStreak: isPodium ? (existing?.currentStreak ?? 0) + 1 : 0,
+    currentStreak: nextStreak,
   };
 
   if (applyRating && typeof rank === "number" && rank >= 1 && fieldSize > 1) {
@@ -73,6 +75,7 @@ async function upsertFinish(
     gameKey,
     bestRank: 0,
     bestScore: 0,
+    bestStreak: 0,
     extra: {},
   };
 
@@ -103,9 +106,17 @@ async function upsertFinish(
     delete (update.$setOnInsert as Record<string, unknown>).bestRank;
   }
 
+  const maxFields: Record<string, number> = {};
+  if (isPodium) {
+    maxFields.bestStreak = nextStreak;
+    delete (update.$setOnInsert as Record<string, unknown>).bestStreak;
+  }
   if (typeof rawScore === "number" && Number.isFinite(rawScore)) {
-    update.$max = { bestScore: rawScore };
+    maxFields.bestScore = rawScore;
     delete (update.$setOnInsert as Record<string, unknown>).bestScore;
+  }
+  if (Object.keys(maxFields).length > 0) {
+    update.$max = maxFields;
   }
 
   await UserGameStats.findOneAndUpdate({ userId, gameKey }, update, {

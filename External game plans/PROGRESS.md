@@ -317,8 +317,9 @@ project low risk.
 
 ## START HERE NEXT
 
-This plan has two tracks. **As of 27 September 2026**:
+This plan has two tracks. **As of 29 September 2026**:
 
+- **Neon Overview redesign CODE-COMPLETE 29 Sep (eng)** — Header Overview/Wallet/Performance/Competitions/Tutorials (`?tab=` sync); Global Rank from `getGlobalBoard` (top-20 badge / dash); Play by Game = **top 4 most-played** with catalogue banner/thumbnail art; KPI win rate from `_overall`; **Streaks & Consistency from `_overall`** (podium / best streak / contest wins / contests played / top 3 / weeks active — not trading-day wording). `bestStreak` on both `UserGameStats` copies. See `13` **s5.1g**. Tests: `overview-standing.test.ts` + `user-game-stats.test.ts` + updated `games-first-nav.test.ts`. **Never verified by eye.**
 - **Volt Stack second title CODE-COMPLETE 27 Sep (eng)** — `volt-stack` in games-service catalogue; server-authoritative locks/score; play at `/play/volt-stack/?t=`; Circuit-compatible iframe messages. **Operator:** sync catalogue + enable title, then competition/challenge as for Circuit. See `21` **s4.1u**. Never verified by eye on live money.
 - **Provider contest lobby live updates CODE-COMPLETE 26 Sep (eng)** — same `/standings` poll as the arena (`ArenaLiveProvider` + `LobbyLiveParts`); players / your score / board / prize seats refresh without reload; trading keeps `LiveContestRefresher`. Not verified by eye.
 - **Prioritized task list:** `External game plans/NEXT-TASKS.md` — P0→P3 + closed items so stale paste-lists are not reopened. **Owner P1 decisions 24 Sep:** A5 last-when-asked; R11 owner/lawyers; R93 already closed; R96b content done; Q16 built; ops `--apply` backfills not needed; R99 optional.
@@ -1090,6 +1091,41 @@ interestLevel" has failed since `e988eb19` (23 Sep, X11.5), and `mongodb-memory-
 not start on this machine for the Mongo suites. **No game is named** in any new file (asserted).
 **Never verified by eye.**
 
+### 29 Sep 2026 - Overview Streaks & Consistency (cross-game)
+
+**Owner:** Streaks section must show all games + trading, not trading-only days / profitable
+days, and stay agnostic when new titles arrive.
+
+**Shipped:**
+- `bestStreak` on both `UserGameStats` model copies; writer `$max`es it on podium finishes
+  (mirrored service)
+- `getPlayerGameProfile` / `getOverviewStanding` expose `bestStreak` and contest-shaped streak
+  tiles from `_overall`
+- `OverviewStreaks` mock chrome with labels: Podium streak, Best streak, Contest wins,
+  Contests played, Top 3 finishes, Weeks active
+- Docs: `13` s5.1g amendment; tests in `user-game-stats` + `overview-standing`
+
+**Not backfilled:** existing rows keep `bestStreak: 0` until the next podium finish raises it.
+**Owner tested:** not yet.
+**Never verified by eye.**
+
+### 29 Sep 2026 - Neon Overview redesign (Header + top-4 Play by Game)
+
+**Owner:** Overview must match the neon handoff mocks; Play by Game must not list every
+catalogue title as more games arrive — show only the top 4 the player plays most, using
+game-page catalogue art (`bannerUrl` / `thumbnailUrl`).
+
+**Shipped:**
+- `getOverviewStanding` + `buildTopPlayCards` (cap 4, played-only, catalogue art first)
+- Global Rank from `getGlobalBoard` (shell + overlay for 1–20, else dash)
+- Header + `NAV_ITEMS` → `/dashboard?tab=*` with URL sync; in-page TabsList chrome hidden
+- Overview UI under `components/dashboard/overview/*`
+- Docs: `13` **s5.1g**, this file START HERE NEXT
+- Tests: `__tests__/services/overview-standing.test.ts`, updated `games-first-nav.test.ts`
+
+**Deviated:** Games stays on the sidebar (not the Header) — recorded in s5.1g.
+**Owner tested:** not yet (dashboard behind sign-in).
+**Never verified by eye.**
 
 ### 27 Sep 2026 - Guides steps reach the arena and lobby; Volt Stack fills its frame
 

@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { getComprehensiveDashboardData } from "@/lib/actions/comprehensive-dashboard.actions";
 
@@ -5,12 +6,14 @@ import { getComprehensiveDashboardData } from "@/lib/actions/comprehensive-dashb
 export const dynamic = "force-dynamic";
 
 const Dashboard = async () => {
-  // Get comprehensive dashboard data including competitions and challenges
   const dashboardData = await getComprehensiveDashboardData();
 
   return (
     <div>
-      <DashboardLayout data={dashboardData} />
+      {/* Reason: DashboardLayout reads useSearchParams for ?tab= deep links. */}
+      <Suspense fallback={<div className="min-h-[40vh]" aria-hidden />}>
+        <DashboardLayout data={dashboardData} />
+      </Suspense>
     </div>
   );
 };

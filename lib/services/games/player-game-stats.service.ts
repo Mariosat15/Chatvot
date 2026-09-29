@@ -28,6 +28,7 @@ export interface PlayerGameRow {
   bestRank: number;
   bestScore: number;
   currentStreak: number;
+  bestStreak: number;
   lastPlayedAt?: string;
 }
 
@@ -41,6 +42,7 @@ export interface PlayerGameProfile {
     seasonPoints: number;
     bestRank: number;
     currentStreak: number;
+    bestStreak: number;
   } | null;
   perGame: PlayerGameRow[];
   startsFromCaption: string;
@@ -55,6 +57,7 @@ const EMPTY_OVERALL = {
   seasonPoints: 0,
   bestRank: 0,
   currentStreak: 0,
+  bestStreak: 0,
 };
 
 /**
@@ -74,7 +77,7 @@ export async function getPlayerGameProfile(
 
   const rows = await UserGameStats.find({ userId })
     .select(
-      "gameKey contestsEntered contestsCompleted wins podiums totalPoints seasonPoints rating bestRank bestScore currentStreak lastPlayedAt",
+      "gameKey contestsEntered contestsCompleted wins podiums totalPoints seasonPoints rating bestRank bestScore currentStreak bestStreak lastPlayedAt",
     )
     .lean();
 
@@ -93,6 +96,7 @@ export async function getPlayerGameProfile(
         seasonPoints: row.seasonPoints ?? 0,
         bestRank: row.bestRank ?? 0,
         currentStreak: row.currentStreak ?? 0,
+        bestStreak: row.bestStreak ?? 0,
       };
       continue;
     }
@@ -106,7 +110,7 @@ export async function getPlayerGameProfile(
 
   const perGame: PlayerGameRow[] = gameRows.map((row, i) => ({
     gameKey: row.gameKey as string,
-    label: labels[i],
+    label: labels.at(i) ?? row.gameKey,
     isTrading: row.gameKey === TRADING_GAME_TYPE,
     contestsEntered: row.contestsEntered ?? 0,
     contestsCompleted: row.contestsCompleted ?? 0,
@@ -118,6 +122,7 @@ export async function getPlayerGameProfile(
     bestRank: row.bestRank ?? 0,
     bestScore: row.bestScore ?? 0,
     currentStreak: row.currentStreak ?? 0,
+    bestStreak: row.bestStreak ?? 0,
     lastPlayedAt: row.lastPlayedAt
       ? new Date(row.lastPlayedAt).toISOString()
       : undefined,

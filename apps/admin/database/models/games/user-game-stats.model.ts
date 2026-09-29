@@ -27,7 +27,13 @@ export interface IUserGameStats extends Document {
   bestRank: number;
   /** Raw score in that game's units — never negated. */
   bestScore: number;
+  /**
+   * Consecutive top-3 finishes (podium streak). Resets when a finish is outside
+   * the top 3. Same meaning on every gameKey including `"_overall"`.
+   */
   currentStreak: number;
+  /** Longest podium streak ever recorded for this row. Never decreases. */
+  bestStreak: number;
   lastPlayedAt: Date;
   /** Per-game additions (e.g. trading profit factor). Kept out of the shared shape. */
   extra: Record<string, unknown>;
@@ -49,6 +55,7 @@ const UserGameStatsSchema = new Schema<IUserGameStats>(
     bestRank: { type: Number, required: true, default: 0 },
     bestScore: { type: Number, required: true, default: 0 },
     currentStreak: { type: Number, required: true, default: 0 },
+    bestStreak: { type: Number, required: true, default: 0 },
     lastPlayedAt: { type: Date },
     extra: { type: Schema.Types.Mixed, default: {} },
   },

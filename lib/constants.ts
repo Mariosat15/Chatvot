@@ -1,10 +1,20 @@
 export const NAV_ITEMS = [
-  { href: "/", label: "Dashboard" },
-  { href: "/games", label: "Games" },
-  { href: "/competitions", label: "Competitions" },
-  { href: "/challenges", label: "1v1 Challenges" },
-  { href: "/marketplace", label: "Marketplace" },
-  { href: "/leaderboard", label: "Leaderboard" },
+  { href: "/dashboard?tab=overview", label: "Overview", tab: "overview" },
+  { href: "/dashboard?tab=wallet", label: "Wallet", tab: "wallet" },
+  { href: "/dashboard?tab=performance", label: "Performance", tab: "performance" },
+  { href: "/dashboard?tab=contests", label: "Competitions", tab: "contests" },
+  { href: "/dashboard?tab=tutorials", label: "Tutorials", tab: "tutorials" },
+] as const;
+
+export type DashboardNavTab =
+  (typeof NAV_ITEMS)[number]["tab"];
+
+export const DASHBOARD_TABS: DashboardNavTab[] = [
+  "overview",
+  "wallet",
+  "performance",
+  "contests",
+  "tutorials",
 ];
 
 // Sign-up form select options
@@ -77,19 +87,4 @@ export const POPULAR_STOCK_SYMBOLS = [
   "RIVN",
   "LCID",
   "NIO",
-
-  // International Companies
-  "XPEV",
-  "LI",
-  "BABA",
-  "JD",
-  "PDD",
-  "TME",
-  "BILI",
-  "DIDI",
-  "GRAB",
-  "SE",
 ];
-
-export const NO_MARKET_NEWS =
-  '<p class="mobile-text" style="margin:0 0 20px 0;font-size:16px;line-height:1.6;color:#4b5563;">No market news available today. Please check back tomorrow.</p>';

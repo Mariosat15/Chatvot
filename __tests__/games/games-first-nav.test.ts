@@ -1,12 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { NAV_ITEMS } from "@/lib/constants";
+import { NAV_ITEMS, DASHBOARD_TABS } from "@/lib/constants";
 
 /**
- * X11 Slice 1 — games-first navigation.
+ * Overview Header destinations + sidebar games-first rule.
  *
- * HOT lives on Games, not Competitions. `/competitions` and `/challenges` stay.
+ * Header carries Overview/Wallet/Performance/Competitions/Tutorials.
+ * Games stays on the sidebar with HOT (recorded Header deviation).
  */
 
 const ROOT = process.cwd();
@@ -17,16 +18,29 @@ function readCode(relativePath: string): string {
     .replace(/\/\/.*$/gm, "");
 }
 
-describe("games-first navigation", () => {
-  it("NAV_ITEMS lists /games above /competitions", () => {
-    const hrefs = NAV_ITEMS.map((i) => i.href);
-    expect(hrefs).toContain("/games");
-    expect(hrefs.indexOf("/games")).toBeLessThan(hrefs.indexOf("/competitions"));
+describe("dashboard Header NAV_ITEMS", () => {
+  it("lists the five Overview mock destinations with ?tab= deep links", () => {
+    expect(NAV_ITEMS.map((i) => i.tab)).toEqual([
+      "overview",
+      "wallet",
+      "performance",
+      "contests",
+      "tutorials",
+    ]);
+    for (const item of NAV_ITEMS) {
+      expect(item.href).toBe(`/dashboard?tab=${item.tab}`);
+    }
+    expect(DASHBOARD_TABS).toEqual(NAV_ITEMS.map((i) => i.tab));
   });
 
+  it("does not put /games in the Header list", () => {
+    expect(NAV_ITEMS.every((i) => !i.href.startsWith("/games"))).toBe(true);
+  });
+});
+
+describe("games-first navigation (sidebar)", () => {
   it("sidebar puts HOT on Games and not on Competitions", () => {
     const code = readCode("components/UserSidebar.tsx");
-    // Slice from Games entry to Challenges so Competitions' former HOT cannot satisfy.
     const gamesIdx = code.indexOf('href: "/games"');
     const compsIdx = code.indexOf('href: "/competitions"');
     const challengesIdx = code.indexOf('href: "/challenges"');

@@ -9,6 +9,7 @@ import GlobalPresenceTracker from "@/components/GlobalPresenceTracker";
 import ChallengePopup from "@/components/challenges/ChallengePopup";
 import UserSidebar from "@/components/UserSidebar";
 import MobileBottomNav from "@/components/MobileBottomNav";
+import Header from "@/components/Header";
 import { connectToDatabase } from "@/database/mongoose";
 import { ObjectId } from "mongodb";
 import AnnouncementBanner from "@/components/AnnouncementBanner";
@@ -74,8 +75,12 @@ const Layout = async ({ children }: { children: React.ReactNode }) => {
 
           {/* Main Content Area */}
           <main className="flex-1 min-h-screen overflow-x-hidden">
-            {/* Mobile header spacing */}
-            <div className="lg:hidden h-16" />
+            {/*
+              Reason: Overview mock Header — Overview/Wallet/Performance/Competitions/
+              Tutorials. Games/Challenges/Marketplace stay on the sidebar (recorded
+              deviation from games-first Header).
+            */}
+            <Header user={user} />
 
             {/* Page Content - Responsive padding */}
             <div className="px-3 py-3 sm:px-4 sm:py-4 md:px-5 lg:px-6 pb-20 lg:pb-6">

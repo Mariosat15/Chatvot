@@ -4,6 +4,7 @@
  */
 import type { PlayerGamePerformanceRow } from "@/lib/services/games/player-game-performance.service";
 import type { PlayerGameProfile } from "@/lib/services/games/player-game-stats.service";
+import type { OverviewStanding } from "@/lib/services/games/overview-standing.service";
 
 export interface ComprehensiveDashboardData {
   user: {
@@ -231,6 +232,12 @@ export interface ComprehensiveDashboardData {
    * stored rows yet (Q14 aggregates start at zero).
    */
   gameStanding: PlayerGameProfile;
+
+  /**
+   * Neon Overview facts: Global board rank (top-20 badge), contest win rate,
+   * play-by-game cards, missions, activity. Agnostic across games (R29).
+   */
+  overviewStanding: OverviewStanding;
 
   /**
    * Whether trading is in the enabled game set. Drives GettingStartedCard so a

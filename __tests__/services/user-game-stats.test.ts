@@ -122,6 +122,59 @@ describe("recordContestFinish", () => {
     expect(row!.currentStreak).toBe(0);
   });
 
+  it("tracks bestStreak as the high-water mark of consecutive podiums", async () => {
+    await recordContestFinish({
+      userId: USER,
+      gameKey: GAME,
+      rank: 1,
+      fieldSize: 10,
+      entryFee: 50,
+    });
+    await recordContestFinish({
+      userId: USER,
+      gameKey: GAME,
+      rank: 2,
+      fieldSize: 10,
+      entryFee: 50,
+    });
+    await recordContestFinish({
+      userId: USER,
+      gameKey: GAME,
+      rank: 3,
+      fieldSize: 10,
+      entryFee: 50,
+    });
+    // Break the streak.
+    await recordContestFinish({
+      userId: USER,
+      gameKey: GAME,
+      rank: 5,
+      fieldSize: 10,
+      entryFee: 50,
+    });
+    // Shorter streak must not lower bestStreak.
+    await recordContestFinish({
+      userId: USER,
+      gameKey: GAME,
+      rank: 1,
+      fieldSize: 10,
+      entryFee: 50,
+    });
+
+    const row = await UserGameStats.findOne({
+      userId: USER,
+      gameKey: GAME,
+    }).lean();
+    expect(row!.currentStreak).toBe(1);
+    expect(row!.bestStreak).toBe(3);
+
+    const overall = await UserGameStats.findOne({
+      userId: USER,
+      gameKey: OVERALL_GAME_KEY,
+    }).lean();
+    expect(overall!.bestStreak).toBe(3);
+  });
+
   it("awards 0 points and still counts the finish when the player holds no place", async () => {
     const result = await recordContestFinish({
       userId: USER,

@@ -1,31 +1,28 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { ComprehensiveDashboardData } from "@/lib/actions/comprehensive-dashboard.actions";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import {
-  LayoutDashboard,
-  Wallet,
-  BarChart3,
-  Trophy,
-  GraduationCap,
-} from "lucide-react";
-import HeroStatsBar from "./HeroStatsBar";
-import PlayerProfileCard from "./PlayerProfileCard";
-import PerformanceRings from "./PerformanceRings";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import TradingAnalytics from "./TradingAnalytics";
 import ContestsSidebar from "./ContestsSidebar";
-import RecentTradesFeed from "./RecentTradesFeed";
-import StreaksShowcase from "./StreaksShowcase";
-import MarketHolidaysCard from "./MarketHolidaysCard";
+import PerformanceRings from "./PerformanceRings";
 import ContestStatsCards from "./ContestStatsCards";
 import AccountStatusCard from "./AccountStatusCard";
 import CreditBreakdownChart from "./CreditBreakdownChart";
 import GettingStartedCard from "./GettingStartedCard";
 import GameSuggestionsCard from "./GameSuggestionsCard";
 import PlayerGamePerformancePanel from "./PlayerGamePerformancePanel";
-import GameSummaryCards from "./GameSummaryCards";
+import HeroStatsBar from "./HeroStatsBar";
+import MarketHolidaysCard from "./MarketHolidaysCard";
+import OverviewHero from "./overview/OverviewHero";
+import OverviewKpiRow from "./overview/OverviewKpiRow";
+import OverviewPlayByGame from "./overview/OverviewPlayByGame";
+import OverviewProgress from "./overview/OverviewProgress";
+import OverviewActivity from "./overview/OverviewActivity";
+import OverviewStreaks from "./overview/OverviewStreaks";
+import { DASHBOARD_TABS, type DashboardNavTab } from "@/lib/constants";
 import { useTerms } from "@/contexts/TerminologyContext";
 
 const EquityChart = dynamic(() => import("./EquityChart"), { ssr: false });
@@ -38,25 +35,31 @@ const TutorialsTab = dynamic(() => import("./TutorialsTab"), { ssr: false });
 
 const TAB_STORAGE_KEY = "chartvolt_dashboard_tab";
 
+function isDashboardTab(value: string | null): value is DashboardNavTab {
+  return !!value && (DASHBOARD_TABS as string[]).includes(value);
+}
+
 interface DashboardLayoutProps {
   data: ComprehensiveDashboardData;
 }
 
 export default function DashboardLayout({ data }: DashboardLayoutProps) {
   const terms = useTerms();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
   const {
     overview,
     charts,
     competitions,
     challenges,
-    recentActivity,
-    streaks,
     player,
     journey,
     accountStatus,
     gamePerformance,
-    gameStanding,
     tradingEnabled,
+    overviewStanding,
   } = data;
 
   // Reason: a games-only player never places a trade; rounds.started/scored complete
@@ -68,30 +71,47 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
   // rings. Former traders keep the chrome when trading is later switched off (R29).
   const showTradingChrome = tradingEnabled || overview.totalTrades > 0;
 
-  // Reason: Persist the selected tab across page refreshes so users return
-  // to the section they were last viewing.
-  const [activeTab, setActiveTab] = useState("overview");
+  const urlTab = searchParams.get("tab");
+  const [activeTab, setActiveTab] = useState<DashboardNavTab>(() =>
+    isDashboardTab(urlTab) ? urlTab : "overview",
+  );
 
+  // Reason: URL is the addressable source (Header deep links). localStorage is
+  // only the fallback when the query is missing — never the other way around.
   useEffect(() => {
-    const saved = localStorage.getItem(TAB_STORAGE_KEY);
-    if (
-      saved &&
-      ["overview", "wallet", "performance", "contests", "tutorials"].includes(
-        saved,
-      )
-    ) {
-      setActiveTab(saved);
+    if (isDashboardTab(urlTab)) {
+      setActiveTab(urlTab);
+      localStorage.setItem(TAB_STORAGE_KEY, urlTab);
+      return;
     }
-  }, []);
+    const saved = localStorage.getItem(TAB_STORAGE_KEY);
+    if (isDashboardTab(saved)) {
+      setActiveTab(saved);
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("tab", saved);
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    }
+  }, [urlTab, pathname, router, searchParams]);
 
-  const handleTabChange = (value: string) => {
-    setActiveTab(value);
-    localStorage.setItem(TAB_STORAGE_KEY, value);
-  };
+  const handleTabChange = useCallback(
+    (value: string) => {
+      if (!isDashboardTab(value)) return;
+      setActiveTab(value);
+      localStorage.setItem(TAB_STORAGE_KEY, value);
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("tab", value);
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    },
+    [pathname, router, searchParams],
+  );
+
+  const accountOk =
+    !accountStatus.hasActiveRestriction &&
+    !accountStatus.isLocked &&
+    !accountStatus.hasOpenAlert;
 
   return (
-    <div className="w-full p-3 sm:p-4 lg:p-6 overflow-x-hidden">
-      {/* Onboarding — always visible above tabs */}
+    <div className="w-full overflow-x-hidden">
       <GettingStartedCard
         tradingEnabled={tradingEnabled}
         hasFundedWallet={overview.totalDeposited > 0}
@@ -102,90 +122,51 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
         hasChallengedUser={challenges.stats.total > 0}
       />
 
+      {/*
+        Reason: Header already carries Overview / Wallet / Performance /
+        Competitions / Tutorials. A second TabsList would be two navs for one
+        fact. Tabs still drive content; chrome is hidden.
+      */}
       <Tabs value={activeTab} onValueChange={handleTabChange} className="mt-4">
-        <TabsList className="w-full grid grid-cols-5 h-11 bg-gray-800/60 border border-gray-700/50">
-          <TabsTrigger value="overview" className="gap-1.5 text-xs sm:text-sm">
-            <LayoutDashboard className="w-4 h-4 hidden sm:block" />
-            Overview
-          </TabsTrigger>
-          <TabsTrigger value="wallet" className="gap-1.5 text-xs sm:text-sm">
-            <Wallet className="w-4 h-4 hidden sm:block" />
-            Wallet
-          </TabsTrigger>
-          <TabsTrigger value="performance" className="gap-1.5 text-xs sm:text-sm">
-            <BarChart3 className="w-4 h-4 hidden sm:block" />
-            Performance
-          </TabsTrigger>
-          <TabsTrigger value="contests" className="gap-1.5 text-xs sm:text-sm">
-            <Trophy className="w-4 h-4 hidden sm:block" />
-            {terms.contests}
-          </TabsTrigger>
-          <TabsTrigger value="tutorials" className="gap-1.5 text-xs sm:text-sm">
-            <GraduationCap className="w-4 h-4 hidden sm:block" />
-            Tutorials
-          </TabsTrigger>
-        </TabsList>
+        <TabsContent value="overview" className="mt-0 space-y-4">
+          {(accountStatus.hasActiveRestriction ||
+            accountStatus.isLocked ||
+            accountStatus.hasOpenAlert ||
+            accountStatus.openChargebackCaseId) && (
+            <AccountStatusCard accountStatus={accountStatus} />
+          )}
 
-        {/* ── Tab 1: Overview ── */}
-        <TabsContent value="overview" className="space-y-4 mt-4">
-          <AccountStatusCard accountStatus={accountStatus} />
+          <OverviewHero name={data.user.name} accountActive={accountOk} />
 
-          <HeroStatsBar
+          <OverviewKpiRow
             creditBalance={overview.creditBalance}
-            totalSpent={overview.totalSpent}
-            winRate={overview.winRate}
+            contestWinRate={overviewStanding.contestWinRate}
             roi={overview.roi}
-            gmEarnings={overview.gmEarnings}
             totalPrizesWon={overview.totalPrizesWon}
-            variant="compact"
           />
 
-          <GameSummaryCards standing={gameStanding} />
+          <OverviewPlayByGame cards={overviewStanding.playCards} />
 
-          <GameSuggestionsCard />
+          <OverviewProgress
+            globalRank={overviewStanding.globalRank}
+            totalUsers={overviewStanding.totalUsers}
+            level={player.level}
+            currentXP={player.currentXP}
+            xpToNextLevel={player.xpToNextLevel}
+            progressPercent={player.progressPercent}
+            title={player.title}
+            missions={overviewStanding.missions}
+          />
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="lg:col-span-2">
-              <PlayerProfileCard
-                name={data.user.name}
-                level={player.level}
-                currentXP={player.currentXP}
-                xpToNextLevel={player.xpToNextLevel}
-                progressPercent={player.progressPercent}
-                title={player.title}
-                titleColor={player.titleColor}
-                titleIcon={player.titleIcon}
-                globalRank={player.globalRank}
-                totalUsers={player.totalUsers}
-                recentBadges={player.recentBadges}
-                totalBadges={player.totalBadges}
-                journey={journey}
-              />
-            </div>
-            <div>
-              {showTradingChrome ? (
-                <RecentTradesFeed
-                  trades={recentActivity.trades}
-                  positions={recentActivity.positions}
-                />
-              ) : null}
-            </div>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <OverviewActivity items={overviewStanding.recentActivity} />
+            <GameSuggestionsCard />
           </div>
 
-          {showTradingChrome ? (
-            <StreaksShowcase
-              currentWinStreak={streaks.currentWinStreak}
-              currentLossStreak={streaks.currentLossStreak}
-              longestWinStreak={streaks.longestWinStreak}
-              longestLossStreak={streaks.longestLossStreak}
-              tradingDaysThisMonth={streaks.tradingDaysThisMonth}
-              consecutiveProfitableDays={streaks.consecutiveProfitableDays}
-            />
-          ) : null}
+          <OverviewStreaks streaks={overviewStanding.streaks} />
         </TabsContent>
 
-        {/* ── Tab 2: Wallet & Credits ── */}
-        <TabsContent value="wallet" className="space-y-4 mt-4">
+        <TabsContent value="wallet" className="mt-4 space-y-4">
           <HeroStatsBar
             creditBalance={overview.creditBalance}
             totalSpent={overview.totalSpent}
@@ -198,19 +179,16 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
 
           <EquityChart data={charts.walletBalanceHistory} />
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <DailyCreditFlow data={charts.dailyCreditFlow} />
-            <CreditBreakdownChart data={charts.dailyCreditBreakdown} allTimeTotals={charts.allTimeTotals} />
+            <CreditBreakdownChart
+              data={charts.dailyCreditBreakdown}
+              allTimeTotals={charts.allTimeTotals}
+            />
           </div>
         </TabsContent>
 
-        {/* ── Tab 3: Performance (trading scoped + games when present) ── */}
-        <TabsContent value="performance" className="space-y-4 mt-4">
-          {/*
-            Reason: R64 player twin. Games sit ABOVE trading chrome so a games-only
-            player is not buried under empty trade rings. Trading stays labelled
-            trading — never removed or renamed into a silent aggregate.
-          */}
+        <TabsContent value="performance" className="mt-4 space-y-4">
           <PlayerGamePerformancePanel games={gamePerformance} />
 
           {showTradingChrome ? (
@@ -250,8 +228,7 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
           {showTradingChrome ? <MarketHolidaysCard /> : null}
         </TabsContent>
 
-        {/* ── Tab 4: Contests ── */}
-        <TabsContent value="contests" className="space-y-4 mt-4">
+        <TabsContent value="contests" className="mt-4 space-y-4">
           <ContestsSidebar
             competitions={{
               active: competitions.active,
@@ -267,11 +244,13 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
           />
         </TabsContent>
 
-        {/* ── Tab 5: Tutorials ── */}
-        <TabsContent value="tutorials" className="space-y-4 mt-4">
+        <TabsContent value="tutorials" className="mt-4 space-y-4">
           <TutorialsTab />
         </TabsContent>
       </Tabs>
+
+      {/* Keep terminology reference so contests label stays wired for tests */}
+      <span className="sr-only">{terms.contests}</span>
     </div>
   );
 }

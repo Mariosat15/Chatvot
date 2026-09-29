@@ -3058,8 +3058,10 @@ Section 5's last table row. Profile already read `UserGameStats` (X7 step 3); th
 did not.
 
 **Live code:** `getPlayerGameProfile` wired from `lib/actions/comprehensive-dashboard.actions.ts`
-(`gameStanding`), `components/dashboard/GameSummaryCards.tsx`, mount in
-`DashboardLayout.tsx` Overview, `__tests__/dashboard/game-summary-cards.test.ts` (6 tests).
+(`gameStanding`), `components/dashboard/GameSummaryCards.tsx`, ~~mount in
+`DashboardLayout.tsx` Overview~~ **Overview mount replaced 29 Sep 2026** by Play-by-Game
+top-4 cards (`13` **s5.1g**); `GameSummaryCards` remains for profile / other callers —
+say which. `__tests__/dashboard/game-summary-cards.test.ts` (6 tests).
 **Nothing mirrored.**
 
 **Four facts drift easily.** It **reads the same service as the profile standing card** — a
@@ -3071,6 +3073,35 @@ the stored rating. Tabs come from **stored rows only**, never `getEnabledGameTyp
 Q14 caption travels with the strip. Client file uses a **local view type** (R58).
 
 **Never verified by eye** (dashboard behind sign-in).
+
+### 5.1g Neon Overview redesign + top-4 Play by Game - BUILT 29 September 2026
+
+Owner handoff mocks under `External game plans/design-reference/overview-2026-09/`.
+
+**Live code:** `lib/services/games/overview-standing.service.ts` (`getOverviewStanding`,
+`buildTopPlayCards`), `lib/utils/overview-rank-badge.ts`, `lib/services/games/overview-assets.ts`,
+`components/dashboard/overview/*`, `components/Header.tsx` + `NavItems.tsx` (five
+`/dashboard?tab=` destinations), `DashboardLayout.tsx` Overview tab, assets in
+`public/assets/neon/overview/`. Tests: `__tests__/services/overview-standing.test.ts` (11 with
+nav suite), `__tests__/games/games-first-nav.test.ts` updated. **Nothing mirrored.**
+
+**Seven facts drift easily.** **Play by Game shows at most four titles the player has actually
+played**, ranked by `contestsEntered` — unplayed catalogue rows are never listed, so more
+games cannot crowd the row forever; a zero-play player sees a Browse-games empty state.
+**Card art is catalogue `bannerUrl` then `thumbnailUrl`** (same source as `/games` cards),
+with neon plates only as fallback — a document describing hard-coded per-title Overview art
+as the primary source is wrong. **Global Rank reads `getGlobalBoard`**, ranks 1–20 overlay
+one shell asset, else the dash — never twenty near-identical WebPs. **Header destinations are
+Overview / Wallet / Performance / Competitions / Tutorials**; Games / Challenges / Marketplace
+stay on `UserSidebar` and mobile nav (recorded deviation from games-first Header). **`?tab=`
+is the addressable source** for the active dashboard section; localStorage is fallback only;
+the in-page TabsList chrome is hidden so Header and content are not two navs. **Win rate on
+Overview KPIs is contest win rate from `_overall`**, not the trading trade win rate.
+**Streaks & Consistency reads `_overall` only** — podium streak, `bestStreak` (new field on
+both `UserGameStats` copies, stamped at settlement), contest wins, contests played, top-3
+finishes, weeks-active hint — never "Profitable Days" / "Trading Days" / trade win-loss
+streaks (those stay on Performance). New games need no Overview edit. Never calls
+`getEnabledGameTypes()` for stats (R29). **Never verified by eye.**
 
 ### 5.1a The contest cards, made game-aware - BUILT 6 September 2026
 

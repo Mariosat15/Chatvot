@@ -11,6 +11,7 @@ import {
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { LogOut, User, HelpCircle, Wallet, ChevronDown } from "lucide-react";
+import { Suspense } from "react";
 import NavItems from "@/components/NavItems";
 import { signOut } from "@/lib/actions/auth.actions";
 import { useUserProfileImage } from "@/hooks/useUserProfileImage";
@@ -128,7 +129,9 @@ const UserDropdown = ({ user }: { user: User }) => {
         <div className="sm:hidden">
           <DropdownMenuSeparator className="bg-gray-700/50 my-2" />
           <nav className="px-1">
-            <NavItems />
+            <Suspense fallback={null}>
+              <NavItems variant="menu" />
+            </Suspense>
           </nav>
         </div>
       </DropdownMenuContent>
