@@ -608,6 +608,11 @@ describe("Overview streaks chrome", () => {
     expect(compete).toMatch(/Matching Cards/);
     expect(compete).toMatch(/OVERVIEW_COMPETE_ART/);
     expect(compete).toMatch(/btn-challenge|challenge/);
+    // Reason: Matching Cards + Challenge must loom on hover, press in, and show a hand.
+    expect(compete).toMatch(/cursor-pointer/);
+    expect(compete).toMatch(/hover:scale-1[01]0/);
+    expect(compete).toMatch(/active:scale-95/);
+    expect(compete).toMatch(/h-14|sm:h-16/);
     expect(assets).toMatch(/OVERVIEW_COMPETE_ART/);
     expect(assets).toMatch(/btn-matching-cards\.png/);
     expect(assets).toMatch(/btn-challenge\.png/);
@@ -652,7 +657,7 @@ describe("Overview streaks chrome", () => {
     expect(assets).toMatch(/OVERVIEW_ICON_ART/);
     expect(assets).toMatch(/icon-progress\.png/);
     expect(assets).toMatch(/icon-target\.png/);
-    expect(assets).toMatch(/icon-activity\.png/);
+    expect(assets).toMatch(/icon-activity-calendar\.png/);
   });
 
   it("Progress and Activity stretch to equal height", () => {

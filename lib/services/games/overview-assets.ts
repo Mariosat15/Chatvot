@@ -30,7 +30,7 @@ export const OVERVIEW_ICON_ART = {
   growth: "/assets/neon/overview/items/icon-growth.png",
   trophy: "/assets/neon/overview/items/icon-trophy.png",
   /** Calendar glass tile — Recent Activity header (transparent, 29 Sep 2026). */
-  activity: "/assets/neon/overview/items/icon-activity.png",
+  activity: "/assets/neon/overview/items/icon-activity-calendar.png",
   /** Neon glass trophy for activity rows (transparent, 29 Sep 2026). */
   trophyGlass: "/assets/neon/overview/items/icon-trophy-glass.png",
 } as const;

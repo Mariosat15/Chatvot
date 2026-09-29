@@ -1123,6 +1123,20 @@ how many entered and how many won.
 **Owner tested:** not yet.
 **Never verified by eye.**
 
+### 29 Sep 2026 - Overview Compete buttons loom + Activity calendar refresh
+
+**Owner:** Matching Cards + Challenge buttons bigger, hand cursor, loom on hover and
+press-in on click; Recent Activity header clock → new neon calendar (transparent).
+
+**Shipped:**
+- Compete image buttons `h-14`/`sm:h-16`, `cursor-pointer`, `hover:scale-*`, `active:scale-95`
+- `OVERVIEW_ICON_ART.activity` ← `icon-activity-calendar.png` (cache-bust; black keyed)
+- Activity header tile enlarged to `h-14 w-14`
+- Docs: `13` s5.1g + this entry; tests pin loom/press and calendar path
+
+**Owner tested:** not yet.
+**Never verified by eye.**
+
 ### 29 Sep 2026 - Overview Compete neon plates + Activity calendar + crisp KPIs
 
 **Owner:** Compete must match the neon reference exactly (transparent graphics);

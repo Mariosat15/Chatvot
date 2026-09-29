@@ -127,14 +127,14 @@ export default function OverviewCompete() {
 
         <Link
           href="/leaderboard?board=trading&view=cards"
-          className="relative inline-flex h-11 w-[210px] shrink-0 drop-shadow-[0_0_14px_rgba(139,92,246,0.45)] transition hover:brightness-110"
+          className="relative inline-flex h-14 w-[260px] shrink-0 cursor-pointer drop-shadow-[0_0_16px_rgba(139,92,246,0.55)] transition-transform duration-200 ease-out hover:scale-110 active:scale-95 sm:h-16 sm:w-[300px]"
           aria-label="Matching Cards"
         >
           <Image
             src={OVERVIEW_COMPETE_ART.matchingCards}
             alt="Matching Cards"
             fill
-            sizes="210px"
+            sizes="300px"
             className="object-contain"
           />
         </Link>
@@ -236,14 +236,14 @@ export default function OverviewCompete() {
                     username: m.username,
                   })
                 }
-                className="relative mt-auto h-11 w-full drop-shadow-[0_0_14px_rgba(251,146,60,0.45)] transition hover:brightness-110"
+                className="relative mt-auto h-14 w-full cursor-pointer drop-shadow-[0_0_18px_rgba(251,146,60,0.55)] transition-transform duration-200 ease-out hover:scale-105 active:scale-95 sm:h-16"
                 aria-label={`Challenge ${m.username}`}
               >
                 <Image
                   src={OVERVIEW_COMPETE_ART.challenge}
                   alt=""
                   fill
-                  sizes="280px"
+                  sizes="320px"
                   className="object-contain"
                 />
                 <span className="sr-only">Challenge</span>

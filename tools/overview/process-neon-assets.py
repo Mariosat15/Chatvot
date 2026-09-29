@@ -40,8 +40,8 @@ def key_black(src: Path, dest: Path, threshold: int = 28, soft: int = 22) -> Non
 def main() -> None:
     jobs = [
         (
-            "c__Users_cybes_AppData_Roaming_Cursor_User_workspaceStorage_db4b8b4c70f718af795c12995150af5a_images_93ad6cfc-461c-4ca0-914a-c124ee43d7cc-0830b6d4-610a-4bab-b4cd-e07bb9c446bb.png",
-            OUT_DIR / "items" / "icon-activity.png",
+            "c__Users_cybes_AppData_Roaming_Cursor_User_workspaceStorage_db4b8b4c70f718af795c12995150af5a_images_93ad6cfc-461c-4ca0-914a-c124ee43d7cc-866967c5-21ae-46ef-b59b-f55b99e91ce3.png",
+            OUT_DIR / "items" / "icon-activity-calendar.png",
             24,
             20,
         ),

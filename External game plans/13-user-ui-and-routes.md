@@ -3138,8 +3138,10 @@ wins, match %, Challenge dialog) plus a **Matching Cards** deep-link to
 **Level**, **Competitions** (won · entered) and **1v1** (won · entered) as
 the primary four tiles — Win/P&L are not the card headline. **KPI /
 Progress / Activity header icons**
-fill their boxes edge-to-edge (`object-cover`); Recent Activity uses `icon-activity.png`
-(owner neon clock). **Global Rank plates are from `ui/Rank`** under `ranks/{1..20}.png`
+fill their boxes edge-to-edge (`object-cover`); Recent Activity uses
+`icon-activity-calendar.png` (owner neon calendar, black keyed, cache-bust name —
+a document naming `icon-activity.png` or a Lucide clock is correct as history and
+stale as a present fact — **say which**). **Global Rank plates are from `ui/Rank`** under `ranks/{1..20}.png`
 (say RANK); **level plates from `ui/levels` live under `levels/` for later screens** and must
 not be used on Overview. **Hero banner** was padded and right-washed
 (`tools/fix-overview-hero.py`) so baked vertical letters are hidden and the standing figure
@@ -3159,14 +3161,18 @@ keeps the horizon/lightning band in view. Left wash keeps welcome copy readable.
 stay crisp (the earlier `h-16`/`scale-1.35`/`object-cover` overscaled soft tiles
 into blur). **Compete** uses owner plates under `compete/` (swords, crown, avatar
 ring, Matching Cards capsule, Challenge gold button) with black keyed to alpha.
-**Recent Activity** header uses the transparent calendar glass tile; contest rows
-use `icon-trophy-glass.png`.
+**Matching Cards** and **Challenge** are enlarged (`h-14` / `sm:h-16`) with
+`cursor-pointer`, loom on hover (`hover:scale-*`) and press-in (`active:scale-95`).
+**Recent Activity** header uses `icon-activity-calendar.png` (transparent calendar
+glass); contest rows use `icon-trophy-glass.png`.
 
 A document still saying missions are capped at **1**, or that KPI amounts are **bare**, or that
-rank plates come from `ui/levels`, or that Activity uses a Lucide clock, or that Overview
+rank plates come from `ui/levels`, or that Activity uses a Lucide clock or
+`icon-activity.png`, or that Overview
 mission cards omit required badges, or that Overview has no recent-badges strip or Compete
 row, or that the hero is still `hero-banner-chartvolt.png`, or that KPI icons are
-`h-12 w-12` / `h-16` with `scale-1.35`, or that Compete is Lucide-only chrome, is correct as history
+`h-12 w-12` / `h-16` with `scale-1.35`, or that Compete is Lucide-only chrome or that
+Matching Cards / Challenge lack loom/press/hand, is correct as history
 (earlier 29 Sep) and stale as a present fact — **say which**.
 
 ### 5.1a The contest cards, made game-aware - BUILT 6 September 2026

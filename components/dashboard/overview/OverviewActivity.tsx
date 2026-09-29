@@ -65,12 +65,12 @@ export default function OverviewActivity({ items }: OverviewActivityProps) {
       <div className="mb-3 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2.5">
           {/* Reason: tile already paints its own neon frame — no black fill behind it. */}
-          <span className="relative flex h-11 w-11 shrink-0 drop-shadow-[0_0_14px_rgba(56,189,248,0.55)]">
+          <span className="relative flex h-14 w-14 shrink-0 drop-shadow-[0_0_16px_rgba(56,189,248,0.6)]">
             <Image
               src={OVERVIEW_ICON_ART.activity}
               alt=""
               fill
-              sizes="44px"
+              sizes="56px"
               className="object-contain"
             />
           </span>
