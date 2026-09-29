@@ -3147,17 +3147,20 @@ neon amber bar** (shield + title + issue count + Details) — badges and support
 only when expanded (`components/dashboard/AccountStatusCard.tsx`).
 
 **Hero art amended later the same day:** Overview uses
-`hero-banner-chartvolt.png` (panoramic mountains + baked “Bigger traders / Bolder players /
-A brighter you” + ChartVolt neon mark). The strip is **height-capped** (`h-[120px]` /
-`sm:h-[136px]` / `lg:h-[148px]`) to the owner’s red-marked band — a document describing
-`aspect-[1024/341]` (full native frame) is correct as history and stale as a present fact —
-**say which**. `object-cover object-[center_42%]` keeps the centre slogan and right logo in
-view while cropping sky/foreground. Left wash is narrowed so welcome copy stays readable.
+`hero-banner-elements.jpg` (fire/ice panoramic, **no baked type**) after the
+ChartVolt-branded `hero-banner-chartvolt.png` pixelated under the height-capped
+strip — a document describing the ChartVolt PNG as current is correct as history
+and stale as a present fact — **say which**. The strip stays **height-capped**
+(`h-[120px]` / `sm:h-[136px]` / `lg:h-[148px]`). `object-cover object-[center_38%]`
+keeps the horizon/lightning band in view. Left wash keeps welcome copy readable.
+**KPI icon tiles are `h-16 w-16` with `scale-[1.35] object-cover`** so the neon
+glyphs fill the box (owner mark-up against tiny icons inside empty padding).
 
 A document still saying missions are capped at **1**, or that KPI amounts are **bare**, or that
 rank plates come from `ui/levels`, or that Activity uses a Lucide clock, or that Overview
 mission cards omit required badges, or that Overview has no recent-badges strip or Compete
-row, is correct as history
+row, or that the hero is still `hero-banner-chartvolt.png`, or that KPI icons are
+`h-12 w-12` without scale, is correct as history
 (earlier 29 Sep) and stale as a present fact — **say which**.
 
 ### 5.1a The contest cards, made game-aware - BUILT 6 September 2026

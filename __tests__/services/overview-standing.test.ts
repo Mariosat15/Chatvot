@@ -509,7 +509,9 @@ describe("Overview streaks chrome", () => {
     expect(kpi).toMatch(/linear-gradient\(110deg/);
     expect(kpi).toMatch(/fill/);
     expect(kpi).toMatch(/object-cover/);
-    expect(kpi).toMatch(/h-12 w-12/);
+    expect(kpi).toMatch(/h-16 w-16/);
+    expect(kpi).toMatch(/scale-\[1\.35\]/);
+    expect(kpi).not.toMatch(/h-12 w-12/);
     expect(kpi).not.toMatch(/w-\[48%\]/);
   });
 
@@ -646,7 +648,8 @@ describe("Overview streaks chrome", () => {
     expect(hero).toMatch(/sm:h-\[136px\]/);
     expect(hero).toMatch(/lg:h-\[148px\]/);
     expect(hero).not.toMatch(/aspect-\[1024\/341\]/);
-    expect(assets).toMatch(/hero-banner-chartvolt\.png/);
+    expect(assets).toMatch(/hero-banner-elements\.jpg/);
+    expect(assets).not.toMatch(/hero-banner-chartvolt\.png/);
   });
 
   it("Play by Game caption distinguishes discovery from most-played", () => {

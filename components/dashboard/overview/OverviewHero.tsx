@@ -10,10 +10,11 @@ interface OverviewHeroProps {
 }
 
 /**
- * Compact welcome strip over the panoramic ChartVolt hero.
- * Height is capped to the owner-marked band (29 Sep 2026) — shorter than the
- * native 1024×341 frame — with object-cover centred so the baked slogan and
- * ChartVolt mark stay in view.
+ * Compact welcome strip over a high-res scenic panoramic.
+ *
+ * Reason: the previous ChartVolt-branded PNG (baked slogan + logo) pixelated
+ * under the height-capped strip — owner, 29 Sep 2026. The replacement is a
+ * fire/ice landscape with no baked type; welcome copy stays in the overlay.
  */
 export default function OverviewHero({ name, accountActive }: OverviewHeroProps) {
   const first = name?.trim().split(/\s+/)[0] || "Player";
@@ -25,17 +26,17 @@ export default function OverviewHero({ name, accountActive }: OverviewHeroProps)
     >
       <Image
         src={OVERVIEW_HERO_BANNER}
-        alt="Bigger traders, bolder players, a brighter you — ChartVolt"
+        alt=""
         fill
         priority
         sizes="100vw"
-        // Reason: strip is shorter than the PNG; cover + slight vertical bias
-        // keeps the centre slogan and right ChartVolt logo inside the red-marked band.
-        className="object-cover object-[center_42%]"
+        // Reason: scenic 1024×438 plate — cover + slight upward bias keeps the
+        // lightning/horizon band in the short strip without soft upscaling of type.
+        className="object-cover object-[center_38%]"
       />
-      {/* Narrow left wash only — keep centre slogan + right logo readable. */}
+      {/* Left wash for welcome copy only — landscape stays visible on the right. */}
       <div
-        className="pointer-events-none absolute inset-y-0 left-0 w-[40%] max-w-sm bg-gradient-to-r from-[#050B18]/92 via-[#050B18]/55 to-transparent"
+        className="pointer-events-none absolute inset-y-0 left-0 w-[42%] max-w-md bg-gradient-to-r from-[#050B18]/94 via-[#050B18]/6 to-transparent"
         aria-hidden
       />
 
