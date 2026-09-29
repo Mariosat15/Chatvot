@@ -1192,6 +1192,16 @@ fire/ice panoramic if the ChartVolt PNG cannot be fixed; KPI icons must fill the
 **Owner tested:** not yet.
 **Never verified by eye.**
 
+### 29 Sep 2026 - Desktop Play by game: a neon frame for the section, a glow for each card
+
+This follows the owner's screenshot. The strip did not read as one section, and the four artworks ran into
+one another. `OverviewPlayByGame.tsx` now wraps the section in `PLAY_SECTION_FRAME`, a fine `sky-400/35`
+border with a soft outer glow. Each card uses `PLAY_CARD` in place of the shared `NEON_PANEL`: a brighter
+`sky-400/45` edge with its own glow, stronger on hover. The shared panel was deliberately not combined with
+it, because both strings set a border colour and which one wins would depend on CSS order. Desktop only;
+the phone carousel is a separate component. Pinned by a test in `game-summary-cards.test.ts`. **Never
+verified by eye.**
+
 ### 29 Sep 2026 - Desktop Compete: the 1v1 tile uses the owner's swords art
 
 The violet line icon on the desktop `1v1` tile is replaced by the owner's blue swords, stored as
