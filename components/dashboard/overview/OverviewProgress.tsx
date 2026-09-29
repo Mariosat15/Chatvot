@@ -321,7 +321,8 @@ export default function OverviewProgress({
           </p>
           <Link
             href={LEADERBOARD_HREF}
-            className="relative mt-1 inline-flex h-12 w-full max-w-[220px] shrink-0 cursor-pointer drop-shadow-[0_0_16px_rgba(34,211,238,0.55)] transition-transform duration-200 ease-out hover:scale-110 active:scale-95"
+            // Reason: same loom as Matching Cards — brighten + grow on hover, shrink + dim on press.
+            className="relative mt-1 inline-flex h-12 w-full max-w-[220px] shrink-0 cursor-pointer drop-shadow-[0_0_16px_rgba(34,211,238,0.55)] transition-[transform,filter] duration-200 ease-out hover:brightness-125 hover:scale-110 hover:drop-shadow-[0_0_22px_rgba(34,211,238,0.85)] active:scale-95 active:brightness-90 motion-reduce:hover:scale-100 motion-reduce:active:scale-100"
             aria-label="View Leaderboard"
           >
             <Image

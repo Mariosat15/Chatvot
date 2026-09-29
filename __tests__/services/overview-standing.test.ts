@@ -565,8 +565,9 @@ describe("Overview streaks chrome", () => {
     // neon button art (29 Sep 2026); it looms and presses like Matching Cards.
     expect(progress).toMatch(/OVERVIEW_COMPETE_ART\.viewLeaderboard/);
     expect(progress).not.toMatch(/OVERVIEW_COMPETE_ART\.crown/);
+    // Reason: loom/press must match Matching Cards — brightness + scale, not scale alone.
     expect(progress).toMatch(
-      /cursor-pointer[^"]*hover:scale-110[^"]*active:scale-95"\s*aria-label="View Leaderboard"/,
+      /cursor-pointer[^"]*hover:brightness-125[^"]*hover:scale-110[^"]*active:scale-95[^"]*active:brightness-90[^"]*"\s*aria-label="View Leaderboard"/,
     );
     expect(progress).toMatch(/sm:col-span-2/);
     expect(progress).toMatch(/missions\.map/);
