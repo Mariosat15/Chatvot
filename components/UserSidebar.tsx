@@ -55,10 +55,8 @@ const NAV_ICON = "!h-full !w-full";
 /** Neon shell tokens — match the owner sidebar mock (cyan frame, glass plates). */
 const SHELL =
   "bg-[linear-gradient(180deg,#07101f_0%,#050b16_55%,#03070f_100%)]";
-// Reason: crisp box border like a nav row — no soft outer bloom past the right edge
-// (that read as a black extension), and the line runs top + bottom as well as the side.
-const FRAME_BORDER =
-  "border border-cyan-400/65 shadow-[inset_0_0_28px_rgba(0,160,255,0.1)]";
+const FRAME_GLOW =
+  "shadow-[0_0_0_1px_rgba(0,242,255,0.55),0_0_24px_rgba(0,180,255,0.28),inset_0_0_40px_rgba(0,120,200,0.08)]";
 
 function buildMainNavItems(terms: TerminologyPack): NavItem[] {
   return [
@@ -667,14 +665,15 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
 
   return (
     <>
-      {/* Desktop Sidebar — full cyan box border (top, right, bottom, left) */}
+      {/* Desktop Sidebar — cyan chamfered glow frame */}
       <aside
         className={cn(
           "fixed left-0 top-0 z-40 hidden h-screen flex-col transition-all duration-300 lg:flex",
-          // Reason: square corners keep the right edge flush with the cyan line —
-          // rounded-r left a black ear past the border (owner red box).
+          // Reason: no clip-path — the collapse control sits outside the rail (-right-3)
+          // and would be cut off; cyan border + glow still matches the mock frame.
+          "rounded-r-2xl border-r border-cyan-400/50",
           SHELL,
-          FRAME_BORDER,
+          FRAME_GLOW,
           isCollapsed ? "w-20" : "w-72",
         )}
       >
@@ -684,8 +683,7 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
           onClick={() => setIsCollapsed(!isCollapsed)}
           aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           aria-expanded={!isCollapsed}
-          // Reason: sit inside the frame so nothing sticks past the right border.
-          className="absolute right-2 top-20 z-50 flex h-6 w-6 cursor-pointer items-center justify-center rounded-full border border-cyan-400/40 bg-[#0a1424] shadow-[0_0_10px_rgba(0,200,255,0.35)] transition-colors hover:bg-cyan-500/20"
+          className="absolute -right-3 top-20 z-50 flex h-6 w-6 cursor-pointer items-center justify-center rounded-full border border-cyan-400/40 bg-[#0a1424] shadow-[0_0_10px_rgba(0,200,255,0.35)] transition-colors hover:bg-cyan-500/20"
         >
           <ChevronRight
             className={cn(
@@ -738,12 +736,13 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
         onClick={() => setIsMobileMenuOpen(false)}
       />
 
-      {/* Mobile Menu Drawer — same neon box border as desktop */}
+      {/* Mobile Menu Drawer — same neon chrome as desktop */}
       <aside
         className={cn(
           "fixed right-0 top-0 z-50 h-full w-80 max-w-[85vw] transition-transform duration-300 ease-out lg:hidden",
+          "rounded-l-2xl border-l border-cyan-400/50",
           SHELL,
-          FRAME_BORDER,
+          FRAME_GLOW,
           isMobileMenuOpen ? "translate-x-0" : "translate-x-full",
         )}
       >
