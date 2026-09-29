@@ -3,8 +3,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Gamepad2 } from "lucide-react";
-import type { OverviewPlayCard } from "@/lib/services/games/overview-standing.service";
-import { OVERVIEW_PLAY_CARD_LIMIT } from "@/lib/services/games/overview-standing.service";
+import type { OverviewPlayCard } from "@/lib/services/games/overview-types";
+import { OVERVIEW_PLAY_CARD_LIMIT } from "@/lib/services/games/overview-types";
 import { NEON_PANEL, NEON_HEADING, NEON_LABEL } from "@/components/neon/tokens";
 
 interface OverviewPlayByGameProps {

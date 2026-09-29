@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import type { OverviewActivityItem } from "@/lib/services/games/overview-standing.service";
+import type { OverviewActivityItem } from "@/lib/services/games/overview-types";
 import { NEON_PANEL, NEON_HEADING, NEON_LABEL } from "@/components/neon/tokens";
 
 interface OverviewActivityProps {

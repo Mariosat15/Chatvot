@@ -5,7 +5,7 @@ import Link from "next/link";
 import type {
   OverviewMission,
   OverviewStanding,
-} from "@/lib/services/games/overview-standing.service";
+} from "@/lib/services/games/overview-types";
 import { NEON_PANEL, NEON_HEADING, NEON_LABEL } from "@/components/neon/tokens";
 
 interface OverviewProgressProps {

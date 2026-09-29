@@ -15,89 +15,25 @@ import {
 import type { PlayerGameProfile } from "@/lib/services/games/player-game-stats.service";
 import { overviewPlayCardArt } from "@/lib/services/games/overview-assets";
 import {
-  OVERVIEW_RANK_TOP_N,
-  resolveOverviewRankBadge,
-  type OverviewRankBadge,
-} from "@/lib/utils/overview-rank-badge";
+  OVERVIEW_PLAY_CARD_LIMIT,
+  type OverviewActivityItem,
+  type OverviewMission,
+  type OverviewPlayCard,
+  type OverviewStanding,
+} from "@/lib/services/games/overview-types";
+import { resolveOverviewRankBadge, OVERVIEW_RANK_TOP_N } from "@/lib/utils/overview-rank-badge";
 import JourneyMilestone from "@/database/models/journey-milestone.model";
 import UserJourneyProgress from "@/database/models/user-journey-progress.model";
 import JourneyMapConfig from "@/database/models/journey-map-config.model";
 import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
 
-/** Cap on Play-by-Game cards — top N most-played only (owner, 29 Sep 2026). */
-export const OVERVIEW_PLAY_CARD_LIMIT = 4;
-
-export interface OverviewPlayCard {
-  gameKey: string;
-  slug: string;
-  label: string;
-  /** Catalogue tagline when present — shown under the title. */
-  tagline?: string;
-  isTrading: boolean;
-  gameCode?: string;
-  href: string;
-  /**
-   * Artwork from the game page catalogue (banner, then thumbnail), same source
-   * as `/games` cards. Neon fallback only when the title has no admin art yet.
-   */
-  artSrc: string;
-  contestsEntered: number;
-  contestsCompleted: number;
-  wins: number;
-  bestRank: number;
-  /**
-   * Provider games: stored bestScore. Trading: totalPoints (no provider score).
-   * Null only when both are absent/zero — UI shows a dash.
-   */
-  bestScore: number | null;
-  /** Free-text unit for the activity count ("Trades" / "Races" / "Runs"). */
-  activityLabel: string;
-}
-
-export interface OverviewMission {
-  id: string;
-  name: string;
-  icon: string;
-  xp: number;
-  /** 0..target; when target is 0 the bar is empty. */
-  current: number;
-  target: number;
-}
-
-export interface OverviewActivityItem {
-  id: string;
-  title: string;
-  detail: string;
-  at: string;
-  kind: "contest" | "trade" | "milestone";
-}
-
-export interface OverviewStanding {
-  globalRank: OverviewRankBadge;
-  totalUsers: number;
-  /** Contest win rate across every game including trading contests; null if none completed. */
-  contestWinRate: number | null;
-  playCards: OverviewPlayCard[];
-  missions: OverviewMission[];
-  recentActivity: OverviewActivityItem[];
-  streaks: {
-    /** Consecutive top-3 finishes across every game including trading contests. */
-    podiumStreak: number;
-    /** Longest podium streak ever on `_overall`. */
-    bestStreak: number;
-    /** Contest wins (rank 1) across every game. */
-    contestWins: number;
-    /** Contests completed across every game. */
-    contestsPlayed: number;
-    /** Top-3 finishes across every game. */
-    topThreeFinishes: number;
-    /**
-     * Coarse activity weeks hint from completed contests — not calendar weeks.
-     * Agnostic: no trading-day / profitable-day metric.
-     */
-    weeksActive: number;
-  };
-}
+export {
+  OVERVIEW_PLAY_CARD_LIMIT,
+  type OverviewActivityItem,
+  type OverviewMission,
+  type OverviewPlayCard,
+  type OverviewStanding,
+} from "@/lib/services/games/overview-types";
 
 function activityLabelFor(game: {
   isTrading: boolean;

@@ -4,7 +4,7 @@
  */
 import type { PlayerGamePerformanceRow } from "@/lib/services/games/player-game-performance.service";
 import type { PlayerGameProfile } from "@/lib/services/games/player-game-stats.service";
-import type { OverviewStanding } from "@/lib/services/games/overview-standing.service";
+import type { OverviewStanding } from "@/lib/services/games/overview-types";
 
 export interface ComprehensiveDashboardData {
   user: {

@@ -294,6 +294,31 @@ describe("Overview streaks chrome", () => {
     expect(service).not.toMatch(/tradingDaysThisMonth/);
     expect(service).not.toMatch(/calculateStreaks/);
   });
+
+  it("overview client tiles never import the Mongo-backed standing service", () => {
+    // Reason (R58): even `import type` from overview-standing.service pulls
+    // mongoose into the browser graph under Turbopack when a sibling value
+    // import exists — OverviewPlayByGame imported OVERVIEW_PLAY_CARD_LIMIT.
+    const dir = join(ROOT, "components/dashboard/overview");
+    const files = [
+      "OverviewPlayByGame.tsx",
+      "OverviewStreaks.tsx",
+      "OverviewActivity.tsx",
+      "OverviewProgress.tsx",
+      "OverviewHero.tsx",
+      "OverviewKpiRow.tsx",
+    ];
+    for (const name of files) {
+      const code = readFileSync(join(dir, name), "utf8")
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/\/\/.*$/gm, "");
+      expect(code).not.toMatch(/overview-standing\.service/);
+    }
+    // Cap must live in the model-free types module.
+    expect(
+      readFileSync(join(ROOT, "lib/services/games/overview-types.ts"), "utf8"),
+    ).toMatch(/OVERVIEW_PLAY_CARD_LIMIT\s*=\s*4/);
+  });
 });
 
 describe("overview assets on disk", () => {

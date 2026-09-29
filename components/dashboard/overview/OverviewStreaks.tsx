@@ -11,7 +11,7 @@ import {
   ChevronRight,
   type LucideIcon,
 } from "lucide-react";
-import type { OverviewStanding } from "@/lib/services/games/overview-standing.service";
+import type { OverviewStanding } from "@/lib/services/games/overview-types";
 import { NEON_PANEL, NEON_HEADING, NEON_LABEL } from "@/components/neon/tokens";
 
 interface OverviewStreaksProps {
