@@ -3177,6 +3177,10 @@ row, or that the hero is still `hero-banner-chartvolt.png`, or that KPI icons ar
 Matching Cards / Challenge lack loom/press/hand, is correct as history
 (earlier 29 Sep) and stale as a present fact — **say which**.
 
+> **Amendment, 29 Sep 2026:** the desktop Player Progress **View Leaderboard** control is now the
+> owner's neon image (`OVERVIEW_COMPETE_ART.viewLeaderboard`, keyed to a transparent background) and
+> animates like Matching Cards (`hover:scale-110 active:scale-95`, `cursor-pointer`). Same destination.
+
 #### 5.1g-m The phone Overview is a second tree - BUILT 29 September 2026
 
 Owner spec `External game plans/Mobile Dashboard` (three-phone reference). **The desktop was

@@ -321,19 +321,16 @@ export default function OverviewProgress({
           </p>
           <Link
             href={LEADERBOARD_HREF}
-            className="mt-1 inline-flex w-full max-w-[200px] items-center justify-center gap-2 rounded-full border border-cyan-400/60 bg-gradient-to-r from-sky-600/90 to-cyan-500/90 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-white shadow-[0_0_20px_rgba(34,211,238,0.45)] transition hover:brightness-110"
+            className="relative mt-1 inline-flex h-12 w-full max-w-[220px] shrink-0 cursor-pointer drop-shadow-[0_0_16px_rgba(34,211,238,0.55)] transition-transform duration-200 ease-out hover:scale-110 active:scale-95"
+            aria-label="View Leaderboard"
           >
-            <span className="relative h-5 w-5 shrink-0">
-              <Image
-                src={OVERVIEW_COMPETE_ART.crown}
-                alt=""
-                fill
-                sizes="20px"
-                className="object-contain"
-              />
-            </span>
-            View Leaderboard
-            <ChevronRight className="h-3.5 w-3.5" aria-hidden />
+            <Image
+              src={OVERVIEW_COMPETE_ART.viewLeaderboard}
+              alt="View Leaderboard"
+              fill
+              sizes="220px"
+              className="object-contain"
+            />
           </Link>
         </div>
 

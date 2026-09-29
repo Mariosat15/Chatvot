@@ -45,6 +45,7 @@ export const OVERVIEW_COMPETE_ART = {
   avatarRing: "/assets/neon/overview/compete/avatar-ring.png",
   matchingCards: "/assets/neon/overview/compete/btn-matching-cards.png",
   challenge: "/assets/neon/overview/compete/btn-challenge.png",
+  viewLeaderboard: "/assets/neon/overview/compete/btn-view-leaderboard.png",
 } as const;
 
 /** KPI plate art — credits / win rate / ROI / prizes. */

@@ -1192,6 +1192,15 @@ fire/ice panoramic if the ChartVolt PNG cannot be fixed; KPI icons must fill the
 **Owner tested:** not yet.
 **Never verified by eye.**
 
+### 29 Sep 2026 - Player Progress "View Leaderboard" is the owner's neon button art
+
+The solid cyan crown pill on the desktop Player Progress rank column is replaced by the owner-supplied
+button (`public/assets/neon/overview/compete/btn-view-leaderboard.png`, `OVERVIEW_COMPETE_ART.viewLeaderboard`),
+with the same loom / press / hand-cursor classes as Matching Cards. The supplied file was on black; it
+was keyed to alpha on luminance (not by filling the black, which stays opaque) and trimmed. Same link
+(`LEADERBOARD_HREF`), `aria-label` kept. The `overview-standing.test.ts` crown assertion was **flipped,
+not deleted**. Nothing computed changed. **Never verified by eye.**
+
 ### 29 Sep 2026 - Mobile Overview as a second tree (owner "Mobile Dashboard" spec)
 
 **Owner:** build an exact replica of the three-phone reference without touching the desktop;

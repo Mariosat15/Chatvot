@@ -561,7 +561,13 @@ describe("Overview streaks chrome", () => {
     expect(progress).toMatch(/MILESTONE_TILE_CAP/);
     expect(progress).toMatch(/Active Missions/);
     expect(progress).toMatch(/View Leaderboard/);
-    expect(progress).toMatch(/OVERVIEW_COMPETE_ART\.crown/);
+    // Reason: the owner replaced the solid cyan crown pill with the supplied
+    // neon button art (29 Sep 2026); it looms and presses like Matching Cards.
+    expect(progress).toMatch(/OVERVIEW_COMPETE_ART\.viewLeaderboard/);
+    expect(progress).not.toMatch(/OVERVIEW_COMPETE_ART\.crown/);
+    expect(progress).toMatch(
+      /cursor-pointer[^"]*hover:scale-110[^"]*active:scale-95"\s*aria-label="View Leaderboard"/,
+    );
     expect(progress).toMatch(/sm:col-span-2/);
     expect(progress).toMatch(/missions\.map/);
     expect(progress).toMatch(/Math\.round\(progressPercent\)/);
