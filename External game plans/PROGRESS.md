@@ -1474,6 +1474,19 @@ man not cut off; (6) Player Progress — only one next mission + completion % / 
 **Owner tested:** not yet.
 **Never verified by eye.**
 
+### 29 Sep 2026 - Header is ONE shared neon frame (not five floating plates)
+
+**Owner:** the five separate HUD plates were a "complete disaster" — the target is the
+assembled bar (one outer frame, tabs inside, orange active chip).
+
+**Shipped:** `NavItems` desktop mounts only `OVERVIEW_NAV_TAB_ART.frame`; icon+label tabs
+with cyan inactive / orange chamfered active and vertical dividers. Per-tab PNGs stay on
+disk unused by the Header. Phone Lucide pills unchanged. Test flipped in
+`games-first-nav.test.ts`. Docs: `13` s5.1g amendment.
+
+**Owner tested:** not yet.
+**Never verified by eye.**
+
 ### 29 Sep 2026 - Desktop Header neon HUD tabs (phone stays compact)
 
 **Owner:** replace the amber Overview/Wallet/Performance/Competitions/Tutorials pills with
@@ -1482,18 +1495,13 @@ the five `ui/match/uper` neon plates, and ask how to show them on mobile without
 **Answer on mobile:** do **not** mount the neon plates below `md`. Five glowing frames at
 phone width is the "large desktop top navigation" the Mobile Dashboard brief forbids.
 `MobileTabStrip` keeps compact Lucide + label pills; Overview phones still hide the strip
-entirely (existing rule). Empty shared frame asset is keyed and reserved — tabs carry their
-own borders today so stacking a second frame would double the chrome.
+entirely (existing rule).
 
-**Shipped:**
-- `public/assets/neon/overview/nav/tab-{overview,wallet,performance,competitions,tutorials}.png`
-  + `nav-frame.png` (black keyed)
-- `OVERVIEW_NAV_TAB_ART` in `overview-assets.ts`; `NavItems` desktop = art buttons with
-  Matching Cards loom; phone = Lucide pills; `Header` desktop row slightly taller
-- Docs: `13` s5.1g amendment; test in `games-first-nav.test.ts`
+**Shipped (superseded same day — see entry above):** five floating per-tab PNGs were the
+wrong reading; replaced by one shared `nav-frame.png` with tabs inside. Assets and
+`OVERVIEW_NAV_TAB_ART` remain; Header mounts only `.frame`.
 
-**Owner tested:** not yet.
-**Never verified by eye.**
+**Owner tested:** rejected the five-plates screenshot; unified frame not yet verified by eye.
 
 ### 29 Sep 2026 - Overview polish (nav-only Header, full-bleed hero, rank plates, best score)
 

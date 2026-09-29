@@ -3106,10 +3106,13 @@ Competitions / Tutorials) — logo, level chip, bell and profile were removed be
 already live on the sidebar; Games / Challenges / Marketplace stay on `UserSidebar`. **`?tab=`
 is the addressable source** for the active dashboard section; localStorage is fallback only;
 the in-page TabsList chrome is hidden so Header and content are not two navs. **Desktop Header
-tabs are owner neon HUD plates** under `public/assets/neon/overview/nav/` (`OVERVIEW_NAV_TAB_ART`,
-Matching Cards loom) from later 29 Sep 2026 — a document describing amber Lucide pills on
-desktop is correct as history and stale as a present fact — **say which**. **Phones keep the
-compact Lucide strip** (`md:hidden`) and never mount the five neon frames — packing glowing
+tabs are owner neon HUD chrome** under `public/assets/neon/overview/nav/` from later 29 Sep 2026 —
+**one shared `nav-frame.png` shell with the five tabs inside** (orange active chip, cyan
+inactive, vertical dividers). Five floating per-tab plates were the wrong reading and were
+**replaced the same day** after the owner rejected that screenshot — a document describing
+five separate plates on the Header is correct as history and stale as a present fact —
+**say which**. **Phones keep the
+compact Lucide strip** (`md:hidden`) and never mount the neon frame — packing glowing
 plates into ~375px is the "large desktop top navigation" the Mobile Dashboard brief forbids;
 the Overview phone tree still hides the strip entirely (`MobileTabStrip`). **Win rate on
 Overview KPIs is contest win rate from `_overall`**, not the trading trade win rate.

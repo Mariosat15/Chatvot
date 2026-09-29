@@ -22,27 +22,19 @@ const TAB_ICONS = new Map<DashboardNavTab, typeof LayoutDashboard>([
   ["tutorials", GraduationCap],
 ]);
 
-const TAB_ART = new Map<DashboardNavTab, string>([
-  ["overview", OVERVIEW_NAV_TAB_ART.overview],
-  ["wallet", OVERVIEW_NAV_TAB_ART.wallet],
-  ["performance", OVERVIEW_NAV_TAB_ART.performance],
-  ["contests", OVERVIEW_NAV_TAB_ART.contests],
-  ["tutorials", OVERVIEW_NAV_TAB_ART.tutorials],
-]);
-
-// Reason: same loom as Matching Cards / View Leaderboard — brighten + grow on
-// hover, shrink + dim on press. Width stays flexible so five plates fit one row.
-const ART_TAB =
-  "relative block h-11 w-full min-w-0 max-w-[11.5rem] cursor-pointer transition-[transform,filter] duration-200 ease-out hover:brightness-125 hover:scale-[1.04] active:scale-[0.96] active:brightness-90 motion-reduce:hover:scale-100 motion-reduce:active:scale-100 lg:h-12";
+/** Chamfered HUD plate — matches the owner's assembled bar active chip. */
+const ACTIVE_CHIP =
+  "[clip-path:polygon(7px_0,calc(100%-7px)_0,100%_7px,100%_calc(100%-7px),calc(100%-7px)_100%,7px_100%,0_calc(100%-7px),0_7px)]";
 
 /**
  * Dashboard destinations for Overview / Wallet / Performance / Competitions /
  * Tutorials. Active state follows `?tab=` on `/dashboard` so Header deep links
  * and the in-page tabs stay one fact.
  *
- * Desktop Header uses the owner neon HUD plates. Phone keeps compact Lucide
- * pills — five full neon frames at ~375px is the busy chrome the Mobile
- * Dashboard brief forbids (large desktop top navigation).
+ * Desktop Header is ONE shared neon frame (`nav-frame.png`) with the five tabs
+ * inside — owner's assembled mock (29 Sep 2026). Five separate floating plates
+ * were the wrong reading of the individual button assets. Phone keeps compact
+ * Lucide pills (neon frame withheld — too busy at phone width).
  */
 const NavItems = ({
   variant = "header",
@@ -86,44 +78,72 @@ const NavItems = ({
 
   return (
     <>
-      {/* Desktop — neon HUD plates */}
-      <ul
-        className="hidden w-full max-w-5xl flex-row items-center justify-center gap-1 md:flex lg:gap-1.5"
-        role="list"
-      >
-        {NAV_ITEMS.map(({ href, label, tab }) => {
-          const art = TAB_ART.get(tab) ?? OVERVIEW_NAV_TAB_ART.overview;
-          const isActive = onDashboard && activeTab === tab;
-          return (
-            <li key={href} className="min-w-0 flex-1">
-              <Link
-                href={href}
-                aria-current={isActive ? "page" : undefined}
-                aria-label={label}
-                className={cn(
-                  ART_TAB,
-                  "mx-auto",
-                  isActive
-                    ? "drop-shadow-[0_0_14px_rgba(34,211,238,0.55)]"
-                    : "opacity-70 brightness-75 hover:opacity-100",
-                )}
-              >
-                <Image
-                  src={art}
-                  alt=""
-                  fill
-                  sizes="(min-width: 1024px) 184px, 160px"
-                  className="object-contain"
-                  priority={tab === "overview"}
-                />
-                <span className="sr-only">{label}</span>
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
+      {/* Desktop — one shared HUD frame, tabs inside (owner image 2) */}
+      <div className="relative mx-auto hidden h-14 w-full max-w-5xl md:block lg:h-[3.75rem]">
+        <Image
+          src={OVERVIEW_NAV_TAB_ART.frame}
+          alt=""
+          fill
+          sizes="(min-width: 1024px) 1024px, 90vw"
+          className="pointer-events-none object-fill"
+          priority
+        />
+        <ul
+          className="relative z-10 flex h-full items-stretch px-4 sm:px-6 lg:px-9"
+          role="list"
+        >
+          {NAV_ITEMS.map(({ href, label, tab }, index) => {
+            const Icon = TAB_ICONS.get(tab) ?? LayoutDashboard;
+            const isActive = onDashboard && activeTab === tab;
+            return (
+              <li key={href} className="flex min-w-0 flex-1 items-center">
+                {index > 0 ? (
+                  <span
+                    aria-hidden
+                    className="mx-0.5 h-6 w-px shrink-0 bg-gradient-to-b from-transparent via-cyan-400/75 to-transparent shadow-[0_0_8px_rgba(34,211,238,0.85)] lg:h-7"
+                  />
+                ) : null}
+                <Link
+                  href={href}
+                  aria-current={isActive ? "page" : undefined}
+                  className={cn(
+                    "mx-0.5 flex h-[68%] w-full min-w-0 cursor-pointer items-center justify-center gap-1.5 px-1 text-[10px] font-bold uppercase tracking-[0.12em] transition-[transform,filter,color,box-shadow] duration-200 sm:text-[11px] lg:mx-1 lg:gap-2 lg:px-2 lg:text-xs lg:tracking-[0.14em]",
+                    "hover:brightness-125 active:scale-[0.97] active:brightness-90 motion-reduce:hover:brightness-100 motion-reduce:active:scale-100",
+                    isActive
+                      ? cn(
+                          ACTIVE_CHIP,
+                          "bg-orange-500/15 text-orange-300 shadow-[0_0_18px_rgba(251,146,60,0.55),inset_0_0_14px_rgba(251,146,60,0.12)] ring-1 ring-orange-400/90",
+                        )
+                      : "text-cyan-50/90 hover:text-white",
+                  )}
+                >
+                  <Icon
+                    className={cn(
+                      "h-3.5 w-3.5 shrink-0 lg:h-4 lg:w-4",
+                      isActive
+                        ? "text-orange-300 drop-shadow-[0_0_8px_rgba(251,146,60,0.95)]"
+                        : "text-cyan-300 drop-shadow-[0_0_7px_rgba(34,211,238,0.85)]",
+                    )}
+                    aria-hidden
+                  />
+                  <span
+                    className={cn(
+                      "truncate",
+                      isActive
+                        ? "drop-shadow-[0_0_8px_rgba(251,146,60,0.75)]"
+                        : "drop-shadow-[0_0_6px_rgba(34,211,238,0.5)]",
+                    )}
+                  >
+                    {label}
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
 
-      {/* Phone — compact Lucide pills (neon plates withheld on purpose) */}
+      {/* Phone — compact Lucide pills (shared frame withheld on purpose) */}
       <ul className="flex flex-row items-center gap-1 overflow-x-auto sm:gap-1.5 md:hidden">
         {NAV_ITEMS.map(({ href, label, tab }) => {
           const Icon = TAB_ICONS.get(tab) ?? LayoutDashboard;
