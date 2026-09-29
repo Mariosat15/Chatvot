@@ -157,6 +157,11 @@ describe("mobile dashboard split", () => {
     expect((compete.match(/relative h-11 w-11 shrink-0 drop-shadow-\[0_0_8px/g) ?? []).length).toBe(4);
     expect(compete).not.toMatch(/h-10 w-10 shrink-0 text-violet-300/);
     expect(compete).toMatch(/src=\{OVERVIEW_COMPETE_ART\.oneVsOne\}/);
+    // Reason: 29 Sep 2026 - Score and Competitions also switched to the owner's
+    // blue crystal art; the shared KPI target/trophy stay for other screens.
+    expect(compete).toMatch(/src=\{OVERVIEW_COMPETE_ART\.score\}/);
+    expect(compete).toMatch(/src=\{OVERVIEW_COMPETE_ART\.competitions\}/);
+    expect(compete).not.toMatch(/OVERVIEW_ICON_ART\.(target|trophy)/);
     expect((compete.match(/min-w-0 flex-1">\s*<p className="(?:truncate )?text-xl/g) ?? []).length).toBe(4);
   });
 

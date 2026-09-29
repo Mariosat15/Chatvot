@@ -10,7 +10,6 @@ import ChallengeCreateDialog from "@/components/challenges/ChallengeCreateDialog
 import { OVERVIEW_COMPETE_MATCH_LIMIT } from "@/lib/services/games/overview-types";
 import {
   OVERVIEW_COMPETE_ART,
-  OVERVIEW_ICON_ART,
 } from "@/lib/services/games/overview-assets";
 import { NEON_HEADING, NEON_LABEL } from "@/components/neon/tokens";
 import { PERFORMANCE_INTERVALS } from "@/lib/utils/performance";
@@ -345,7 +344,7 @@ export default function OverviewCompete({
                 <div className={COMPETE_TILE}>
                   <span className="relative h-11 w-11 shrink-0 drop-shadow-[0_0_8px_rgba(34,211,238,0.6)]">
                     <Image
-                      src={OVERVIEW_ICON_ART.target}
+                      src={OVERVIEW_COMPETE_ART.score}
                       alt=""
                       fill
                       sizes="88px"
@@ -381,9 +380,9 @@ export default function OverviewCompete({
                   </div>
                 </div>
                 <div className={COMPETE_TILE}>
-                  <span className="relative h-11 w-11 shrink-0 drop-shadow-[0_0_8px_rgba(251,191,36,0.55)]">
+                  <span className="relative h-11 w-11 shrink-0 drop-shadow-[0_0_8px_rgba(34,211,238,0.6)]">
                     <Image
-                      src={OVERVIEW_ICON_ART.trophy}
+                      src={OVERVIEW_COMPETE_ART.competitions}
                       alt=""
                       fill
                       sizes="88px"
