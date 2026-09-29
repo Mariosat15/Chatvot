@@ -1192,6 +1192,14 @@ fire/ice panoramic if the ChartVolt PNG cannot be fixed; KPI icons must fill the
 **Owner tested:** not yet.
 **Never verified by eye.**
 
+### 29 Sep 2026 - Desktop Compete: Matching Cards sits beside Challenge on each card
+
+Same layout as mobile. Matching Cards left the section header and now sits beside Challenge at the
+foot of every opponent card, in a two-column row of equal-height CSS pills (amber Challenge, violet
+Matching Cards). The wide Challenge raster does not fit at half a three-column card, so both
+actions are drawn in CSS — the same reason mobile stopped using the art. The header Matching Cards
+art survives only for the empty state. Tests flipped, not deleted. **Never verified by eye.**
+
 ### 29 Sep 2026 - Desktop Compete: Level and 1v1 tiles use the owner's blue badges
 
 This completes the set. Level now uses `compete/icon-level-crown.png` (`OVERVIEW_COMPETE_ART.level`), and
