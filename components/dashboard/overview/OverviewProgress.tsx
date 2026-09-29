@@ -1,5 +1,6 @@
 "use client";
 
+import { useId } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
@@ -107,50 +108,99 @@ function MilestoneRing({
   done: number;
   total: number;
 }) {
+  const uid = useId().replace(/:/g, "");
+  const gradId = `milestone-grad-${uid}`;
+  const glowId = `milestone-glow-${uid}`;
   const safeTotal = Math.max(0, total);
   const safeDone = Math.min(safeTotal, Math.max(0, done));
   const pct =
     safeTotal > 0 ? Math.round((safeDone / safeTotal) * 100) : 0;
-  const radius = 34;
+  const radius = 36;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference * (1 - pct / 100);
 
   return (
     <div
-      className="flex shrink-0 items-center gap-3 rounded-xl border border-amber-400/25 bg-[#070E1C]/80 px-3 py-2.5"
+      className="relative flex shrink-0 items-center gap-3.5 overflow-hidden rounded-2xl border border-amber-400/55 bg-[linear-gradient(135deg,rgba(251,191,36,0.16)_0%,#07101f_42%,rgba(180,90,20,0.12)_100%)] px-3.5 py-3 shadow-[0_0_28px_-8px_rgba(251,191,36,0.55),inset_0_0_28px_rgba(251,191,36,0.06)]"
       aria-label={`${safeDone} of ${safeTotal} milestones`}
     >
-      <div className="relative h-[84px] w-[84px] shrink-0">
-        <svg viewBox="0 0 84 84" className="h-full w-full -rotate-90" aria-hidden>
+      <div
+        className="pointer-events-none absolute inset-px rounded-[15px] border border-amber-300/20"
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute -left-6 top-1/2 h-20 w-20 -translate-y-1/2 rounded-full bg-amber-400/15 blur-2xl"
+        aria-hidden
+      />
+
+      <div className="relative h-[92px] w-[92px] shrink-0">
+        <svg viewBox="0 0 92 92" className="h-full w-full -rotate-90" aria-hidden>
+          <defs>
+            <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#FDE68A" />
+              <stop offset="45%" stopColor="#FBBF24" />
+              <stop offset="100%" stopColor="#F97316" />
+            </linearGradient>
+            <filter id={glowId} x="-40%" y="-40%" width="180%" height="180%">
+              <feGaussianBlur stdDeviation="2.4" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
           <circle
-            cx="42"
-            cy="42"
+            cx="46"
+            cy="46"
             r={radius}
             fill="none"
-            stroke="rgba(251,191,36,0.15)"
-            strokeWidth="7"
+            stroke="rgba(251,191,36,0.12)"
+            strokeWidth="8"
           />
           <circle
-            cx="42"
-            cy="42"
+            cx="46"
+            cy="46"
             r={radius}
             fill="none"
-            stroke="#FBBF24"
-            strokeWidth="7"
+            stroke={`url(#${gradId})`}
+            strokeWidth="12"
             strokeLinecap="round"
             strokeDasharray={circumference}
             strokeDashoffset={offset}
-            className="drop-shadow-[0_0_8px_rgba(251,191,36,0.65)]"
+            opacity="0.22"
+          />
+          <circle
+            cx="46"
+            cy="46"
+            r={radius}
+            fill="none"
+            stroke={`url(#${gradId})`}
+            strokeWidth="8"
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={offset}
+            filter={`url(#${glowId})`}
           />
         </svg>
-        <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-amber-300">
+        <div className="pointer-events-none absolute inset-[18%] rounded-full bg-[radial-gradient(circle_at_center,rgba(251,191,36,0.22)_0%,rgba(7,16,31,0.92)_68%)]" />
+        <span className="absolute inset-0 flex items-center justify-center text-[15px] font-black tabular-nums tracking-tight text-amber-200 drop-shadow-[0_0_10px_rgba(251,191,36,0.85)]">
           {pct}%
         </span>
       </div>
-      <div className="min-w-0 leading-tight">
-        <p className="text-2xl font-bold text-emerald-400">{safeDone}</p>
-        <p className="text-xs text-gray-400">of {safeTotal || "—"}</p>
-        <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-wider text-amber-300/90">
+
+      <div className="relative z-[1] min-w-0 leading-tight">
+        <p className="text-[28px] font-black leading-none tabular-nums text-cyan-300 drop-shadow-[0_0_12px_rgba(34,211,238,0.7)]">
+          {safeDone}
+        </p>
+        <p className="mt-1 text-xs font-medium text-gray-400">
+          of{" "}
+          <span className="tabular-nums text-gray-200">
+            {safeTotal || "—"}
+          </span>
+        </p>
+        <p
+          className={`${NEON_HEADING} mt-2 text-[10px] tracking-[0.16em] text-amber-300/95`}
+        >
           Milestones
         </p>
       </div>

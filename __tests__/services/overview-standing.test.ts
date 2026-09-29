@@ -553,6 +553,9 @@ describe("Overview streaks chrome", () => {
     expect(standing).toMatch(/journeyMilestonesDone/);
     expect(standing).toMatch(/calculateMilestoneProgress/);
     expect(progress).toMatch(/MilestoneRing/);
+    expect(progress).toMatch(/linearGradient/);
+    expect(progress).toMatch(/border-amber-400\/55/);
+    expect(progress).toMatch(/drop-shadow-\[0_0_12px_rgba\(34,211,238/);
     expect(progress).toMatch(/missions\.map/);
     expect(progress).toMatch(/Math\.round\(progressPercent\)/);
     expect(progress).toMatch(/OVERVIEW_ICON_ART/);
