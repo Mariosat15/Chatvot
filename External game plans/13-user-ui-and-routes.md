@@ -3078,14 +3078,15 @@ Q14 caption travels with the strip. Client file uses a **local view type** (R58)
 
 Owner handoff mocks under `External game plans/design-reference/overview-2026-09/`.
 
-**Live code:** `lib/services/games/overview-standing.service.ts` (`getOverviewStanding`,
+**Live code:** `lib/services/games/overview-types.ts` (client-safe types + play-card cap),
+`lib/services/games/overview-standing.service.ts` (`getOverviewStanding`,
 `buildTopPlayCards`), `lib/utils/overview-rank-badge.ts`, `lib/services/games/overview-assets.ts`,
 `components/dashboard/overview/*`, `components/Header.tsx` + `NavItems.tsx` (five
 `/dashboard?tab=` destinations), `DashboardLayout.tsx` Overview tab, assets in
-`public/assets/neon/overview/`. Tests: `__tests__/services/overview-standing.test.ts` (11 with
-nav suite), `__tests__/games/games-first-nav.test.ts` updated. **Nothing mirrored.**
+`public/assets/neon/overview/`. Tests: `__tests__/services/overview-standing.test.ts`,
+`__tests__/games/games-first-nav.test.ts` updated. **Nothing mirrored.**
 
-**Seven facts drift easily.** **Play by Game shows at most four titles the player has actually
+**Eight facts drift easily.** **Play by Game shows at most four titles the player has actually
 played**, ranked by `contestsEntered` — unplayed catalogue rows are never listed, so more
 games cannot crowd the row forever; a zero-play player sees a Browse-games empty state.
 **Card art is catalogue `bannerUrl` then `thumbnailUrl`** (same source as `/games` cards),
@@ -3100,8 +3101,10 @@ Overview KPIs is contest win rate from `_overall`**, not the trading trade win r
 **Streaks & Consistency reads `_overall` only** — podium streak, `bestStreak` (new field on
 both `UserGameStats` copies, stamped at settlement), contest wins, contests played, top-3
 finishes, weeks-active hint — never "Profitable Days" / "Trading Days" / trade win-loss
-streaks (those stay on Performance). New games need no Overview edit. Never calls
-`getEnabledGameTypes()` for stats (R29). **Never verified by eye.**
+streaks (those stay on Performance). New games need no Overview edit. **Overview `"use client"`
+tiles import `overview-types.ts` only, never `overview-standing.service.ts`** (R58 — that
+service reaches mongoose and Turbopack then fails the browser build on `child_process` /
+`dns` / `fs`). Never calls `getEnabledGameTypes()` for stats (R29). **Never verified by eye.**
 
 ### 5.1a The contest cards, made game-aware - BUILT 6 September 2026
 
