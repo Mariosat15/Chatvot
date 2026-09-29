@@ -10,42 +10,40 @@ interface OverviewHeroProps {
 }
 
 /**
- * Welcome strip with full-bleed hero art and a left readability fade.
+ * Welcome strip over the panoramic ChartVolt hero (slogan + logo baked in).
+ * Aspect matches the art so object-cover never crops the centre line or
+ * ChartVolt mark — owner requirement 29 Sep 2026.
  */
 export default function OverviewHero({ name, accountActive }: OverviewHeroProps) {
   const first = name?.trim().split(/\s+/)[0] || "Player";
 
   return (
     <section
-      className="relative min-h-[168px] overflow-hidden rounded-xl border border-cyan-400/20 shadow-[0_0_48px_-20px_rgba(34,211,238,0.4)] sm:min-h-[200px]"
+      className="relative aspect-[1024/341] w-full overflow-hidden rounded-xl border border-cyan-400/20 shadow-[0_0_48px_-20px_rgba(34,211,238,0.4)]"
       aria-label="Welcome"
     >
       <Image
         src={OVERVIEW_HERO_BANNER}
-        alt=""
+        alt="Bigger traders, bolder players, a brighter you — ChartVolt"
         fill
         priority
         sizes="100vw"
-        // Reason: art is taller than the strip so the standing figure stays in
-        // frame; bias right so the mountain figure is visible, not cropped at the waist.
-        className="object-cover object-[72%_28%]"
+        // Reason: container aspect equals the PNG (1024×341), so cover = full
+        // frame — no crop of the baked slogan or ChartVolt neon logo.
+        className="object-cover object-center"
       />
-      {/* Left wash keeps welcome copy readable over the art. */}
+      {/* Narrow left wash only — keep centre slogan + right logo readable. */}
       <div
-        className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#050B18] via-[#050B18]/75 to-transparent"
-        aria-hidden
-      />
-      <div
-        className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#050B18]/55 via-transparent to-[#050B18]/20"
+        className="pointer-events-none absolute inset-y-0 left-0 w-[42%] max-w-md bg-gradient-to-r from-[#050B18]/90 via-[#050B18]/55 to-transparent"
         aria-hidden
       />
 
-      <div className="relative z-10 flex max-w-xl flex-col gap-2 p-4 sm:p-5">
+      <div className="relative z-10 flex h-full max-w-[min(100%,22rem)] flex-col justify-center gap-1.5 p-3 sm:max-w-sm sm:gap-2 sm:p-5">
         <p className={NEON_LABEL}>Overview</p>
-        <h1 className={`${NEON_HEADING} text-2xl text-cyan-100 sm:text-3xl`}>
+        <h1 className={`${NEON_HEADING} text-xl text-cyan-100 sm:text-2xl lg:text-3xl`}>
           Welcome back, {first}
         </h1>
-        <p className="text-sm text-gray-300">
+        <p className="text-xs text-gray-300 sm:text-sm">
           Higher skills, bigger rewards. Keep climbing the Global board.
         </p>
         <span

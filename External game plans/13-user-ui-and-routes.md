@@ -3121,21 +3121,31 @@ are rebuilt to the premium glass target (large neon icon tile from `ui/items`, t
 glass, week-delta row, integrated spark — **credit amounts keep ⚡** via `formatVolts`, never
 `bare: true`); week deltas come from wallet + contest history when comparable, otherwise a dash
 (never invented); Play-by-Game best score falls back through `bestScore` → `totalPoints` → max
-`game_round.rawScore`. **Missions** show the **one** next incomplete journey milestone on the
-player's active map (unlocked first), with the **map name**, a real progress bar, and a rounded
-**% complete** — View All goes to `/profile?tab=journey`, not `/journey`. A **milestones ring**
-(`journeyMilestonesDone` / `journeyMilestonesTotal`) sits beside that single next tile. **Global
-Rank plates are from `ui/Rank`** under `ranks/{1..20}.png` (say RANK); **level plates from
-`ui/levels` live under `levels/` for later screens** and must not be used on Overview. **Hero
-banner** was padded and right-washed (`tools/fix-overview-hero.py`) so baked vertical letters
-are hidden and the standing figure can crop into frame (`object-[72%_28%]`). **Page backdrop** is
-the owner mountain plate behind the Overview tab only, with navy edge/top/bottom fades.
-**Account Status** is a **collapsed neon amber bar** (shield + title + issue count + Details) —
-badges and support copy appear only when expanded (`components/dashboard/AccountStatusCard.tsx`).
+`game_round.rawScore`. **Missions** show up to **4** next incomplete journey milestones on
+the player's active map (unlocked first), in a **2-column grid** that fills the Progress rail,
+with the **map name**, real progress bars, and rounded **% complete** — View All goes to
+`/profile?tab=journey`, not `/journey`. A **milestones ring** (`journeyMilestonesDone` /
+`journeyMilestonesTotal`) sits above that grid. **KPI / Progress / Activity header icons**
+fill their boxes edge-to-edge (`object-cover`); Recent Activity uses `icon-activity.png`
+(owner neon clock). **Global Rank plates are from `ui/Rank`** under `ranks/{1..20}.png`
+(say RANK); **level plates from `ui/levels` live under `levels/` for later screens** and must
+not be used on Overview. **Hero banner** was padded and right-washed
+(`tools/fix-overview-hero.py`) so baked vertical letters are hidden and the standing figure
+can crop into frame (`object-[72%_28%]`). **Page backdrop** is the owner mountain plate behind
+the Overview tab only, with navy edge/top/bottom fades. **Account Status** is a **collapsed
+neon amber bar** (shield + title + issue count + Details) — badges and support copy appear
+only when expanded (`components/dashboard/AccountStatusCard.tsx`).
 
-A document still saying missions are capped at **4**, or that KPI amounts are **bare**, or that
-rank plates come from `ui/levels`, is correct as history (earlier 29 Sep) and stale as a present
-fact — **say which**.
+**Hero art amended later the same day:** Overview uses
+`hero-banner-chartvolt.png` (panoramic mountains + baked “Bigger traders / Bolder players /
+A brighter you” + ChartVolt neon mark). The strip is `aspect-[1024/341]` matching the file so
+`object-cover` shows the **whole** frame — a document describing the storm-silhouette crop or
+`object-[72%_28%]` is correct as history and stale as a present fact — **say which**. Left wash
+is narrowed so the centre slogan and right logo stay visible beside the welcome copy.
+
+A document still saying missions are capped at **1**, or that KPI amounts are **bare**, or that
+rank plates come from `ui/levels`, or that Activity uses a Lucide clock, is correct as history
+(earlier 29 Sep) and stale as a present fact — **say which**.
 
 ### 5.1a The contest cards, made game-aware - BUILT 6 September 2026
 

@@ -203,15 +203,17 @@ function KpiCard({
 
       <div className="relative z-10 flex min-w-0 flex-1 items-center gap-3">
         <span
-          className={`relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-[12px] ring-1 ${t.iconRing} ${t.iconBg} shadow-[0_0_16px_rgba(255,255,255,0.08)]`}
+          className={`relative flex h-12 w-12 shrink-0 overflow-hidden rounded-[12px] ring-1 ${t.iconRing} ${t.iconBg} shadow-[0_0_16px_rgba(255,255,255,0.08)]`}
         >
-          <span className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/15 to-transparent" />
+          <span className="pointer-events-none absolute inset-0 z-[1] bg-gradient-to-br from-white/10 to-transparent" />
+          {/* Reason: owner neon tiles already carry their own framed bezel — fill the
+              box edge-to-edge so the art is not a tiny glyph inside empty padding. */}
           <Image
             src={artSrc}
             alt=""
-            width={34}
-            height={34}
-            className="relative z-10 object-contain drop-shadow-[0_0_12px_rgba(255,255,255,0.35)]"
+            fill
+            sizes="48px"
+            className="object-cover drop-shadow-[0_0_12px_rgba(255,255,255,0.35)]"
           />
         </span>
 

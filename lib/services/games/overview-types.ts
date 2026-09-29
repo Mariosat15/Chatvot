@@ -51,8 +51,11 @@ export interface OverviewMission {
   target: number;
 }
 
-/** Cap on Overview mission tiles — next incomplete only (owner, 29 Sep 2026). */
-export const OVERVIEW_MISSION_LIMIT = 1;
+/**
+ * Cap on Overview mission tiles — fill the Progress panel with the next
+ * incomplete milestones (owner, 29 Sep 2026; restored to 4 to fill the rail).
+ */
+export const OVERVIEW_MISSION_LIMIT = 4;
 
 export interface OverviewActivityItem {
   id: string;

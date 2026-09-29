@@ -14,7 +14,8 @@
 
 import { overviewRankSrc, OVERVIEW_RANK_TOP_N } from "@/lib/utils/overview-rank-badge";
 
-export const OVERVIEW_HERO_BANNER = "/assets/neon/overview/hero-banner.png";
+export const OVERVIEW_HERO_BANNER =
+  "/assets/neon/overview/hero-banner-chartvolt.png";
 /** Page-wide Overview backdrop (owner mountain plate, 29 Sep 2026). */
 export const OVERVIEW_BACKDROP = "/assets/neon/overview/overview-backdrop.jpg";
 export const OVERVIEW_NAV_ICONS = "/assets/neon/overview/nav-icons-strip.png";
@@ -22,12 +23,13 @@ export const OVERVIEW_KPI_ICONS = "/assets/neon/overview/kpi-icons-strip.png";
 export const OVERVIEW_STREAK_ICONS =
   "/assets/neon/overview/streak-icons-strip.png";
 
-/** Standalone neon tiles used as KPI / Progress / Mission icons. */
+/** Standalone neon tiles used as KPI / Progress / Mission / Activity icons. */
 export const OVERVIEW_ICON_ART = {
   progress: "/assets/neon/overview/items/icon-progress.png",
   target: "/assets/neon/overview/items/icon-target.png",
   growth: "/assets/neon/overview/items/icon-growth.png",
   trophy: "/assets/neon/overview/items/icon-trophy.png",
+  activity: "/assets/neon/overview/items/icon-activity.png",
 } as const;
 
 /** KPI plate art — credits / win rate / ROI / prizes. */

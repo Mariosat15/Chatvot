@@ -100,16 +100,16 @@ function MissionCard({
       ? Math.min(100, Math.round((mission.current / mission.target) * 100))
       : 0;
   return (
-    <div className="flex flex-col gap-2 rounded-xl border border-cyan-400/25 bg-[#070E1C]/80 p-3.5 shadow-[0_0_18px_-8px_rgba(34,211,238,0.35)]">
+    <div className="flex flex-col gap-2 rounded-xl border border-cyan-400/25 bg-[#070E1C]/80 p-3 shadow-[0_0_18px_-8px_rgba(34,211,238,0.35)]">
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 items-start gap-2.5">
-          <span className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-violet-400/35 bg-violet-500/10 shadow-[0_0_12px_rgba(167,139,250,0.35)]">
+          <span className="relative flex h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-violet-400/35 bg-violet-500/10 shadow-[0_0_12px_rgba(167,139,250,0.35)]">
             <Image
               src={OVERVIEW_ICON_ART.target}
               alt=""
-              width={28}
-              height={28}
-              className="object-contain"
+              fill
+              sizes="40px"
+              className="object-cover"
             />
           </span>
           <div className="min-w-0">
@@ -145,8 +145,8 @@ function MissionCard({
 }
 
 /**
- * Player Progress: Global Rank plate + XP + one next journey mission +
- * map milestone completion ring.
+ * Player Progress: Global Rank plate + XP + up to four next journey missions
+ * (fills the Progress rail) + map milestone completion ring.
  */
 export default function OverviewProgress({
   globalRank,
@@ -165,7 +165,6 @@ export default function OverviewProgress({
   // paint that raw into the UI (owner screenshot showed 78.692…%).
   const xpPct = Math.min(100, Math.max(0, Math.round(progressPercent)));
   const xpCap = currentXP + xpToNextLevel;
-  const nextMission = missions[0] ?? null;
 
   return (
     <section
@@ -174,13 +173,13 @@ export default function OverviewProgress({
     >
       <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
         <div className="flex items-start gap-2.5">
-          <span className="relative mt-0.5 flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg border border-amber-400/40 bg-amber-500/10 shadow-[0_0_14px_rgba(251,191,36,0.4)]">
+          <span className="relative mt-0.5 flex h-11 w-11 shrink-0 overflow-hidden rounded-lg border border-amber-400/40 bg-amber-500/10 shadow-[0_0_14px_rgba(251,191,36,0.4)]">
             <Image
               src={OVERVIEW_ICON_ART.progress}
               alt=""
-              width={28}
-              height={28}
-              className="object-contain"
+              fill
+              sizes="44px"
+              className="object-cover"
             />
           </span>
           <div>
@@ -203,9 +202,9 @@ export default function OverviewProgress({
         </Link>
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 sm:grid-cols-[minmax(0,180px)_1fr] sm:items-start lg:grid-cols-[minmax(0,220px)_1fr]">
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 sm:grid-cols-[minmax(0,180px)_1fr] sm:items-start lg:grid-cols-[minmax(0,200px)_1fr]">
         <div className="flex flex-col items-center gap-2">
-          <div className="relative aspect-square w-full max-w-[220px]">
+          <div className="relative aspect-square w-full max-w-[200px]">
             <Image
               src={globalRank.src}
               alt={
@@ -214,7 +213,7 @@ export default function OverviewProgress({
                   : "Unranked"
               }
               fill
-              sizes="220px"
+              sizes="200px"
               className="object-contain drop-shadow-[0_0_28px_rgba(251,191,36,0.45)]"
               priority
             />
@@ -235,7 +234,7 @@ export default function OverviewProgress({
           </Link>
         </div>
 
-        <div className="flex min-w-0 flex-col gap-4">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
           <div>
             <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
               <p className="text-sm font-semibold text-cyan-100">
@@ -264,8 +263,16 @@ export default function OverviewProgress({
             />
           )}
 
-          {nextMission ? (
-            <MissionCard mission={nextMission} mapName={journeyMapName} />
+          {missions.length > 0 ? (
+            <div className="grid min-h-0 flex-1 grid-cols-1 gap-2.5 sm:grid-cols-2">
+              {missions.map((mission) => (
+                <MissionCard
+                  key={mission.id}
+                  mission={mission}
+                  mapName={journeyMapName}
+                />
+              ))}
+            </div>
           ) : (
             <div className="rounded-xl border border-[#1B2540] bg-[#070E1C]/70 p-4 text-sm text-gray-400">
               No open missions right now.{" "}

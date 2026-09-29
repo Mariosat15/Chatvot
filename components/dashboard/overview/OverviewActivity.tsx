@@ -1,14 +1,15 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import {
   ChevronRight,
-  Clock3,
   Package,
   TrendingUp,
   Trophy,
 } from "lucide-react";
 import type { OverviewActivityItem } from "@/lib/services/games/overview-types";
+import { OVERVIEW_ICON_ART } from "@/lib/services/games/overview-assets";
 import {
   NEON_PANEL_LIT,
   NEON_HEADING,
@@ -65,8 +66,14 @@ export default function OverviewActivity({ items }: OverviewActivityProps) {
     >
       <div className="mb-3 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-sky-400/40 bg-sky-500/15 text-sky-300 shadow-[0_0_14px_rgba(56,189,248,0.4)]">
-            <Clock3 className="h-4 w-4" aria-hidden />
+          <span className="relative flex h-11 w-11 shrink-0 overflow-hidden rounded-lg border border-sky-400/40 bg-sky-500/15 shadow-[0_0_14px_rgba(56,189,248,0.4)]">
+            <Image
+              src={OVERVIEW_ICON_ART.activity}
+              alt=""
+              fill
+              sizes="44px"
+              className="object-cover"
+            />
           </span>
           <h2
             id="activity-heading"
