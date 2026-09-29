@@ -152,8 +152,11 @@ describe("mobile dashboard split", () => {
     // Reason: flipped 29 Sep 2026 - centring left a dead gap on the left; the
     // owner wants a larger icon at the edge and the text filling the tile.
     expect(compete).not.toMatch(/const COMPETE_TILE =\s*"[^"]*justify-center/);
-    expect((compete.match(/relative h-11 w-11 shrink-0 drop-shadow-\[0_0_8px/g) ?? []).length).toBe(3);
-    expect(compete).toMatch(/h-10 w-10 shrink-0 text-violet-300/);
+    // Reason: flipped 29 Sep 2026 - the 1v1 tile's violet line icon was replaced
+    // by the owner's supplied blue swords art, so all four tiles carry art.
+    expect((compete.match(/relative h-11 w-11 shrink-0 drop-shadow-\[0_0_8px/g) ?? []).length).toBe(4);
+    expect(compete).not.toMatch(/h-10 w-10 shrink-0 text-violet-300/);
+    expect(compete).toMatch(/src=\{OVERVIEW_COMPETE_ART\.oneVsOne\}/);
     expect((compete.match(/min-w-0 flex-1">\s*<p className="(?:truncate )?text-xl/g) ?? []).length).toBe(4);
   });
 

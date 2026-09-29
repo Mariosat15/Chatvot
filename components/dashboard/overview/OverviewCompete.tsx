@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Loader2, Shield, Swords, TrendingUp } from "lucide-react";
+import { Loader2, Shield, TrendingUp } from "lucide-react";
 import ProfileImage from "@/components/ui/ProfileImage";
 import ProfileCard from "@/components/profile/ProfileCard";
 import ChallengeCreateDialog from "@/components/challenges/ChallengeCreateDialog";
@@ -405,10 +405,15 @@ export default function OverviewCompete({
                   </div>
                 </div>
                 <div className={COMPETE_TILE}>
-                  <Swords
-                    className="h-10 w-10 shrink-0 text-violet-300 drop-shadow-[0_0_8px_rgba(167,139,250,0.7)]"
-                    aria-hidden
-                  />
+                  <span className="relative h-11 w-11 shrink-0 drop-shadow-[0_0_8px_rgba(34,211,238,0.6)]">
+                    <Image
+                      src={OVERVIEW_COMPETE_ART.oneVsOne}
+                      alt=""
+                      fill
+                      sizes="88px"
+                      className="object-contain"
+                    />
+                  </span>
                   <div className="min-w-0 flex-1">
                     <p className="text-xl font-bold leading-tight tabular-nums text-violet-200">
                       {m.challengesWon}
