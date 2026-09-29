@@ -242,7 +242,7 @@ export default function NotificationDropdown() {
           variant="ghost"
           size="icon"
           aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`}
-          className="relative h-10 w-10 overflow-hidden rounded-lg bg-transparent p-0 text-gray-400 hover:bg-white/5 hover:text-white"
+          className="relative z-10 h-10 w-10 overflow-visible rounded-lg bg-transparent p-0 text-gray-400 hover:bg-white/5 hover:text-white"
         >
           <GameIcon
             name="notifications"
@@ -251,9 +251,9 @@ export default function NotificationDropdown() {
             alt="Notifications"
           />
           {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center">
+            <span className="pointer-events-none absolute -right-1 -top-1 z-20 flex h-5 w-5 items-center justify-center">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-yellow-400 opacity-75" />
-              <span className="relative inline-flex h-4 w-4 items-center justify-center rounded-full bg-yellow-500 text-[10px] font-bold text-black">
+              <span className="relative inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-yellow-500 px-0.5 text-[10px] font-bold leading-none text-black">
                 {unreadCount > 9 ? "9+" : unreadCount}
               </span>
             </span>
