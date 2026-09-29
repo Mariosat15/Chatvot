@@ -278,7 +278,9 @@ export const PERFORMANCE_INTERVALS = {
   // Admin/Background
   NOTIFICATION_POLL: 60000, // 60 seconds (was 30 seconds)
   PRESENCE_HEARTBEAT: 30000, // 30 seconds (was 10 seconds)
-  PRESENCE_OFFLINE_THRESHOLD: 120000, // 120 seconds — accommodates browser background-tab throttling
+  // Reason: background tabs often fire timers only every ~60–120s. 180s keeps a
+  // still-open (but hidden) ChartVolt tab online without needing a refresh.
+  PRESENCE_OFFLINE_THRESHOLD: 180000, // 180 seconds
   FRAUD_MONITORING: 60000, // 60 seconds (was 30 seconds)
   REDIS_STATS: 30000, // 30 seconds (was 10 seconds)
   WEBSOCKET_STATUS: 15000, // 15 seconds (was 5 seconds)

@@ -12,7 +12,7 @@ import { PERFORMANCE_INTERVALS } from "@/lib/utils/performance";
 let lastStaleCleanupTime = 0;
 const STALE_CLEANUP_INTERVAL_MS = 60_000; // 60 seconds
 
-// GET - Get current user's presence or list of online users
+// GET - Own presence, batch status for known users, or (capped) online list
 export async function GET(request: NextRequest) {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
@@ -24,29 +24,71 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const listOnline = searchParams.get("online") === "true";
+    const userIdsParam = searchParams.get("userIds");
+
+    const threshold = new Date(
+      Date.now() - PERFORMANCE_INTERVALS.PRESENCE_OFFLINE_THRESHOLD,
+    );
+
+    // Reason: Compete / messaging poll specific ids — never return IP/UA here.
+    if (userIdsParam) {
+      const rawIds = userIdsParam
+        .split(",")
+        .map((id) => id.trim())
+        .filter((id) => id.length > 0 && id.length <= 64);
+      // Cap so a crafted query cannot fan out over the whole collection.
+      const userIds = [...new Set(rawIds)].slice(0, 20);
+      if (userIds.length === 0) {
+        return NextResponse.json({ statuses: [] });
+      }
+
+      const rows = await UserPresence.find({ userId: { $in: userIds } })
+        .select("userId status lastHeartbeat lastSeen")
+        .lean();
+
+      const byId = new Map(rows.map((r) => [r.userId, r]));
+      const statuses = userIds.map((userId) => {
+        const row = byId.get(userId);
+        const heartbeat = row?.lastHeartbeat
+          ? new Date(row.lastHeartbeat).getTime()
+          : 0;
+        const isOnline =
+          !!row &&
+          row.status === "online" &&
+          heartbeat >= threshold.getTime();
+        return {
+          userId,
+          isOnline,
+          status: isOnline ? "online" : "offline",
+          lastSeen: row?.lastSeen ?? null,
+        };
+      });
+
+      return NextResponse.json({ statuses });
+    }
 
     if (listOnline) {
-      const threshold = new Date(
-        Date.now() - PERFORMANCE_INTERVALS.PRESENCE_OFFLINE_THRESHOLD,
-      );
-
       const onlineUsers = await UserPresence.find({
         status: "online",
         lastHeartbeat: { $gte: threshold },
-        userId: { $ne: session.user.id }, // Exclude self
+        userId: { $ne: session.user.id },
       })
         .select(
           "userId username status acceptingChallenges lastSeen isInChallenge isInCompetition",
         )
+        .limit(100)
         .lean();
 
       return NextResponse.json({ users: onlineUsers });
     }
 
-    // Return current user's presence
     const presence = await UserPresence.findOne({
       userId: session.user.id,
-    }).lean();
+    })
+      .select(
+        "userId username status acceptingChallenges lastSeen lastHeartbeat currentPage isInChallenge isInCompetition",
+      )
+      .lean();
     return NextResponse.json({ presence });
   } catch (error) {
     console.error("Error fetching presence:", error);
