@@ -13,6 +13,8 @@ import {
   NEON_LABEL,
 } from "@/components/neon/tokens";
 
+const JOURNEY_HREF = "/profile?tab=journey";
+
 interface OverviewProgressProps {
   globalRank: OverviewStanding["globalRank"];
   totalUsers: number;
@@ -21,19 +23,24 @@ interface OverviewProgressProps {
   xpToNextLevel: number;
   progressPercent: number;
   title: string;
+  journeyMapName: string;
   missions: OverviewMission[];
 }
 
-function MissionCard({ mission }: { mission: OverviewMission }) {
+function MissionCard({
+  mission,
+  mapName,
+}: {
+  mission: OverviewMission;
+  mapName: string;
+}) {
   const pct =
     mission.target > 0
       ? Math.min(100, Math.round((mission.current / mission.target) * 100))
       : 0;
   const Icon = mission.name.toLowerCase().includes("win") ? Trophy : Target;
   return (
-    <div
-      className="flex flex-col gap-2 rounded-xl border border-cyan-400/25 bg-[#070E1C]/80 p-3.5 shadow-[0_0_18px_-8px_rgba(34,211,238,0.35)]"
-    >
+    <div className="flex flex-col gap-2 rounded-xl border border-cyan-400/25 bg-[#070E1C]/80 p-3.5 shadow-[0_0_18px_-8px_rgba(34,211,238,0.35)]">
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 items-start gap-2.5">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-violet-400/35 bg-violet-500/15 text-violet-300 shadow-[0_0_12px_rgba(167,139,250,0.35)]">
@@ -43,8 +50,8 @@ function MissionCard({ mission }: { mission: OverviewMission }) {
             <p className="truncate text-sm font-semibold text-gray-100">
               {mission.name}
             </p>
-            <p className="text-xs text-gray-500">
-              Build your streak and unlock rewards.
+            <p className="truncate text-xs text-gray-500">
+              {mission.description || (mapName ? `On ${mapName}` : "Journey milestone")}
             </p>
           </div>
         </div>
@@ -68,8 +75,7 @@ function MissionCard({ mission }: { mission: OverviewMission }) {
 }
 
 /**
- * Player Progress panel (image 5): large Global Rank badge + XP bar + missions.
- * Activity sits beside this in the layout — not inside this component.
+ * Player Progress panel: Global Rank + XP + next journey milestones (max 4).
  */
 export default function OverviewProgress({
   globalRank,
@@ -79,6 +85,7 @@ export default function OverviewProgress({
   xpToNextLevel,
   progressPercent,
   title,
+  journeyMapName,
   missions,
 }: OverviewProgressProps) {
   const xpPct = Math.min(100, Math.max(0, progressPercent));
@@ -86,7 +93,7 @@ export default function OverviewProgress({
 
   return (
     <section
-      className={`${NEON_PANEL_LIT} relative overflow-hidden p-4 sm:p-5`}
+      className={`${NEON_PANEL_LIT} relative flex h-full min-h-0 flex-col overflow-hidden p-4 sm:p-5`}
       aria-label="Player progress"
     >
       <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
@@ -99,12 +106,14 @@ export default function OverviewProgress({
               Player Progress
             </h2>
             <p className="mt-0.5 text-xs text-gray-400">
-              Complete missions, earn XP and unlock new rewards.
+              {journeyMapName
+                ? `Next on ${journeyMapName}`
+                : "Complete missions, earn XP and unlock new rewards."}
             </p>
           </div>
         </div>
         <Link
-          href="/journey"
+          href={JOURNEY_HREF}
           className="inline-flex items-center gap-1 text-xs font-semibold text-amber-300 hover:text-amber-200"
         >
           View All Missions
@@ -112,8 +121,7 @@ export default function OverviewProgress({
         </Link>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,180px)_1fr] sm:items-start lg:grid-cols-[minmax(0,220px)_1fr]">
-        {/* Global Rank — fills the marked space with the per-rank PNG */}
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 sm:grid-cols-[minmax(0,180px)_1fr] sm:items-start lg:grid-cols-[minmax(0,220px)_1fr]">
         <div className="flex flex-col items-center gap-2">
           <div className="relative aspect-square w-full max-w-[220px]">
             <Image
@@ -171,13 +179,13 @@ export default function OverviewProgress({
             {missions.length === 0 ? (
               <div className="col-span-full rounded-xl border border-[#1B2540] bg-[#070E1C]/70 p-4 text-sm text-gray-400">
                 No open missions right now.{" "}
-                <Link href="/journey" className="font-semibold text-sky-400">
+                <Link href={JOURNEY_HREF} className="font-semibold text-sky-400">
                   Open journey
                 </Link>
               </div>
             ) : (
-              missions.slice(0, 2).map((m) => (
-                <MissionCard key={m.id} mission={m} />
+              missions.map((m) => (
+                <MissionCard key={m.id} mission={m} mapName={journeyMapName} />
               ))
             )}
           </div>

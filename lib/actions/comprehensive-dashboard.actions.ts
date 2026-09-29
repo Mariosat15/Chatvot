@@ -170,15 +170,17 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
       totalUsers: 0,
       contestWinRate: null,
       playCards: [],
+      journeyMapName: "",
       missions: [],
       recentActivity: [],
+      kpiWeekDelta: { credits: null, winRate: null, roi: null, prizes: null },
       streaks: {
-        currentPodiumStreak: 0,
-        bestPodiumStreak: 0,
-        podiums: 0,
-        contestsCompleted: 0,
+        podiumStreak: 0,
+        bestStreak: 0,
+        contestWins: 0,
+        contestsPlayed: 0,
         topThreeFinishes: 0,
-        weeksActiveHint: 0,
+        weeksActive: 0,
       },
     } as Awaited<ReturnType<typeof getOverviewStanding>>;
   });

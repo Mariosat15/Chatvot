@@ -15,6 +15,7 @@ import {
 import type { PlayerGameProfile } from "@/lib/services/games/player-game-stats.service";
 import { overviewPlayCardArt } from "@/lib/services/games/overview-assets";
 import {
+  OVERVIEW_MISSION_LIMIT,
   OVERVIEW_PLAY_CARD_LIMIT,
   type OverviewActivityItem,
   type OverviewMission,
@@ -27,9 +28,12 @@ import UserJourneyProgress from "@/database/models/user-journey-progress.model";
 import JourneyMapConfig from "@/database/models/journey-map-config.model";
 import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
 import GameRound from "@/database/models/games/game-round.model";
+import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import { SCORE_PRODUCING_ROUND_STATUSES } from "@/lib/services/games/round-types";
+import { calculateMilestoneProgress } from "@/lib/services/journey-progress.service";
 
 export {
+  OVERVIEW_MISSION_LIMIT,
   OVERVIEW_PLAY_CARD_LIMIT,
   type OverviewActivityItem,
   type OverviewMission,
@@ -141,11 +145,12 @@ function resolvePlayArt(cat: BrowsableGame | undefined, isTrading: boolean): str
 }
 
 /**
- * Top N games this player has actually played, ranked by contests entered.
+ * Top N games this player has played, ranked by contests entered.
  *
- * Unplayed catalogue titles are NOT listed — more titles would crowd the row
- * forever. Zero-play players see an empty strip (GettingStarted / Games hub
- * cover discovery). Art always comes from the catalogue row when present.
+ * When the player has not played anything yet, fall back to the first N
+ * catalogue titles by featured + sortOrder (discovery order) so the row is
+ * never an empty dead end. Once they have play history, only played titles
+ * appear — new catalogue games do not crowd the strip forever.
  */
 export function buildTopPlayCards(
   standing: PlayerGameProfile,
@@ -154,6 +159,7 @@ export function buildTopPlayCards(
   roundBests: Map<string, number> = new Map(),
 ): OverviewPlayCard[] {
   const byKey = new Map(catalogue.map((g) => [g.gameKey, g]));
+  const cap = Math.max(0, limit);
 
   const ranked = [...standing.perGame]
     .filter((row) => (row.contestsEntered ?? 0) > 0 || (row.contestsCompleted ?? 0) > 0)
@@ -166,46 +172,92 @@ export function buildTopPlayCards(
       const bAt = b.lastPlayedAt ? Date.parse(b.lastPlayedAt) : 0;
       return bAt - aAt;
     })
-    .slice(0, Math.max(0, limit));
+    .slice(0, cap);
 
-  return ranked.map((row) => {
-    const cat = byKey.get(row.gameKey);
-    const isTrading = row.isTrading || row.gameKey === TRADING_GAME_TYPE;
-    const slug = cat?.slug ?? (isTrading ? TRADING_GAME_TYPE : row.gameKey);
-    const gameCode = cat?.gameCode;
+  if (ranked.length > 0) {
+    return ranked.map((row) => {
+      const cat = byKey.get(row.gameKey);
+      const isTrading = row.isTrading || row.gameKey === TRADING_GAME_TYPE;
+      const slug = cat?.slug ?? (isTrading ? TRADING_GAME_TYPE : row.gameKey);
+      const gameCode = cat?.gameCode;
+      return {
+        gameKey: row.gameKey,
+        slug,
+        label: cat?.displayName ?? row.label,
+        tagline: cat?.tagline,
+        isTrading,
+        gameCode,
+        href: `/games/${slug}`,
+        artSrc: resolvePlayArt(cat, isTrading),
+        contestsEntered: row.contestsEntered,
+        contestsCompleted: row.contestsCompleted,
+        wins: row.wins,
+        bestRank: row.bestRank,
+        bestScore: resolvePlayCardBestScore(row, roundBests.get(row.gameKey)),
+        activityLabel: activityLabelFor({ isTrading, gameCode }),
+      };
+    });
+  }
+
+  // Discovery fallback — catalogue order (featured first, then sortOrder).
+  const discovery = [...catalogue]
+    .sort((a, b) => {
+      if (a.isFeatured !== b.isFeatured) return a.isFeatured ? -1 : 1;
+      if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+      return a.slug.localeCompare(b.slug);
+    })
+    .slice(0, cap);
+
+  return discovery.map((cat) => {
+    const isTrading = cat.kind === "trading" || cat.gameKey === TRADING_GAME_TYPE;
     return {
-      gameKey: row.gameKey,
-      slug,
-      label: cat?.displayName ?? row.label,
-      tagline: cat?.tagline,
+      gameKey: cat.gameKey,
+      slug: cat.slug,
+      label: cat.displayName,
+      tagline: cat.tagline,
       isTrading,
-      gameCode,
-      href: `/games/${slug}`,
+      gameCode: cat.gameCode,
+      href: `/games/${cat.slug}`,
       artSrc: resolvePlayArt(cat, isTrading),
-      contestsEntered: row.contestsEntered,
-      contestsCompleted: row.contestsCompleted,
-      wins: row.wins,
-      bestRank: row.bestRank,
-      bestScore: resolvePlayCardBestScore(row, roundBests.get(row.gameKey)),
-      activityLabel: activityLabelFor({ isTrading, gameCode }),
+      contestsEntered: 0,
+      contestsCompleted: 0,
+      wins: 0,
+      bestRank: 0,
+      bestScore: null,
+      activityLabel: activityLabelFor({
+        isTrading,
+        gameCode: cat.gameCode,
+      }),
     };
   });
 }
 
-async function loadMissions(userId: string): Promise<OverviewMission[]> {
+async function loadMissions(userId: string): Promise<{
+  journeyMapName: string;
+  missions: OverviewMission[];
+}> {
   try {
-    const progress = await UserJourneyProgress.findOne({ userId })
-      .select("completedMilestones currentMapIndex")
-      .lean();
-    if (!progress) return [];
-
-    const mapConfig = await JourneyMapConfig.findOne({
-      isActive: true,
-      sequenceOrder: (progress as { currentMapIndex?: number }).currentMapIndex || 1,
+    // Reason: one user can have many progress rows (one per map). Prefer the
+    // incomplete map with the highest sequence index — that is the live map.
+    let progress = await UserJourneyProgress.findOne({
+      userId,
+      isMapComplete: { $ne: true },
     })
-      .select("mapId")
+      .sort({ currentMapIndex: -1, updatedAt: -1 })
       .lean();
-    if (!mapConfig) return [];
+    if (!progress) {
+      progress = await UserJourneyProgress.findOne({ userId })
+        .sort({ currentMapIndex: -1, updatedAt: -1 })
+        .lean();
+    }
+    if (!progress?.mapId) return { journeyMapName: "", missions: [] };
+
+    const mapId = String(progress.mapId);
+    const mapConfig = await JourneyMapConfig.findOne({ mapId })
+      .select("name mapId")
+      .lean();
+    const journeyMapName =
+      (mapConfig as { name?: string } | null)?.name?.trim() || mapId;
 
     const done = new Set(
       (
@@ -213,33 +265,144 @@ async function loadMissions(userId: string): Promise<OverviewMission[]> {
           .completedMilestones ?? []
       ).map((m) => m.milestoneId),
     );
+    const unlocked = new Set(
+      (progress as { unlockedMilestones?: string[] }).unlockedMilestones ?? [],
+    );
 
     const open = await JourneyMilestone.find({
-      mapId: (mapConfig as { mapId: string }).mapId,
+      mapId,
       isActive: true,
       id: { $nin: [...done] },
     })
-      .select("id name icon rewards order")
+      .select("id name description icon rewards order")
       .sort({ order: 1 })
-      .limit(2)
       .lean();
 
-    return (open as Array<{
+    // Reason: unlocked incomplete first (what the player can do now), then the
+    // next locked steps in map order — still the genuine journey sequence.
+    const openRows = open as Array<{
       id: string;
       name?: string;
+      description?: string;
       icon?: string;
       rewards?: { xp?: number };
-    }>).map((m) => ({
-      id: m.id,
-      name: m.name || m.id,
-      icon: m.icon || "🎯",
-      xp: m.rewards?.xp ?? 0,
-      // Journey milestones are binary for Overview — incomplete until claimed.
-      current: 0,
-      target: 1,
-    }));
+    }>;
+    const unlockedOpen = openRows.filter((m) => unlocked.has(m.id));
+    const lockedOpen = openRows.filter((m) => !unlocked.has(m.id));
+    const next = [...unlockedOpen, ...lockedOpen].slice(0, OVERVIEW_MISSION_LIMIT);
+
+    const progressRows = await calculateMilestoneProgress(userId, mapId).catch(
+      () => [] as Array<{ milestoneId: string; currentValue: number; targetValue: number }>,
+    );
+    const byId = new Map(progressRows.map((r) => [r.milestoneId, r]));
+
+    return {
+      journeyMapName,
+      missions: next.map((m) => {
+        const p = byId.get(m.id);
+        const target = Math.max(1, p?.targetValue ?? 1);
+        const current = Math.min(target, Math.max(0, p?.currentValue ?? 0));
+        return {
+          id: m.id,
+          name: m.name || m.id,
+          description:
+            (m.description || "").trim() ||
+            `Next milestone on ${journeyMapName}`,
+          icon: m.icon || "🎯",
+          xp: m.rewards?.xp ?? 0,
+          current,
+          target,
+        };
+      }),
+    };
   } catch {
-    return [];
+    return { journeyMapName: "", missions: [] };
+  }
+}
+
+function weekWindows(now = Date.now()): { thisWeek: Date; lastWeek: Date } {
+  const day = 24 * 60 * 60 * 1000;
+  return {
+    thisWeek: new Date(now - 7 * day),
+    lastWeek: new Date(now - 14 * day),
+  };
+}
+
+function pctDelta(current: number, previous: number): number | null {
+  if (!Number.isFinite(current) || !Number.isFinite(previous)) return null;
+  if (previous === 0) return current === 0 ? 0 : null;
+  return Math.round(((current - previous) / Math.abs(previous)) * 1000) / 10;
+}
+
+async function loadKpiWeekDelta(userId: string): Promise<OverviewStanding["kpiWeekDelta"]> {
+  const empty = { credits: null, winRate: null, roi: null, prizes: null };
+  try {
+    const { thisWeek, lastWeek } = weekWindows();
+
+    const [txThis, txPrev, seats] = await Promise.all([
+      WalletTransaction.aggregate<{ net: number }>([
+        {
+          $match: {
+            userId,
+            createdAt: { $gte: thisWeek },
+          },
+        },
+        { $group: { _id: null, net: { $sum: "$amount" } } },
+      ]).catch(() => [] as { net: number }[]),
+      WalletTransaction.aggregate<{ net: number }>([
+        {
+          $match: {
+            userId,
+            createdAt: { $gte: lastWeek, $lt: thisWeek },
+          },
+        },
+        { $group: { _id: null, net: { $sum: "$amount" } } },
+      ]).catch(() => [] as { net: number }[]),
+      CompetitionParticipant.find({
+        userId,
+        status: "completed",
+        updatedAt: { $gte: lastWeek },
+      })
+        .select("prizeWon isWinner updatedAt")
+        .lean()
+        .catch(() => []),
+    ]);
+
+    const credits = pctDelta(
+      txThis[0]?.net ?? 0,
+      txPrev[0]?.net ?? 0,
+    );
+
+    const seatRows = seats as Array<{
+      prizeWon?: number;
+      isWinner?: boolean;
+      updatedAt?: Date;
+    }>;
+    const inThis = seatRows.filter(
+      (s) => s.updatedAt && s.updatedAt >= thisWeek,
+    );
+    const inPrev = seatRows.filter(
+      (s) => s.updatedAt && s.updatedAt >= lastWeek && s.updatedAt < thisWeek,
+    );
+
+    const prizeThis = inThis.reduce((n, s) => n + (s.prizeWon || 0), 0);
+    const prizePrev = inPrev.reduce((n, s) => n + (s.prizeWon || 0), 0);
+    const prizes = pctDelta(prizeThis, prizePrev);
+
+    const rate = (rows: typeof inThis) => {
+      if (rows.length === 0) return null;
+      const wins = rows.filter((s) => s.isWinner).length;
+      return (wins / rows.length) * 100;
+    };
+    const winThis = rate(inThis);
+    const winPrev = rate(inPrev);
+    const winRate =
+      winThis == null || winPrev == null ? null : pctDelta(winThis, winPrev);
+
+    // ROI has no honest week series on Overview — leave null rather than invent.
+    return { credits, winRate, roi: null, prizes };
+  } catch {
+    return empty;
   }
 }
 
@@ -308,7 +471,7 @@ export async function getOverviewStanding(opts: {
     .filter((row) => (row.contestsEntered ?? 0) > 0 || (row.contestsCompleted ?? 0) > 0)
     .map((row) => row.gameKey);
 
-  const [board, catalogue, missions, contestActivity, roundBests] =
+  const [board, catalogue, missionPack, contestActivity, roundBests, kpiWeekDelta] =
     await Promise.all([
       getGlobalBoard({ viewerUserId: userId, limit: OVERVIEW_RANK_TOP_N }).catch(
         () => ({
@@ -324,6 +487,7 @@ export async function getOverviewStanding(opts: {
       loadMissions(userId),
       loadRecentContestActivity(userId),
       loadRoundBestScores(userId, playedKeys),
+      loadKpiWeekDelta(userId),
     ]);
 
   const overall = gameStanding.overall;
@@ -337,8 +501,10 @@ export async function getOverviewStanding(opts: {
     totalUsers: board.myPosition.totalUsers,
     contestWinRate,
     playCards: buildTopPlayCards(gameStanding, catalogue, OVERVIEW_PLAY_CARD_LIMIT, roundBests),
-    missions,
+    journeyMapName: missionPack.journeyMapName,
+    missions: missionPack.missions,
     recentActivity: contestActivity,
+    kpiWeekDelta,
     streaks: {
       podiumStreak: overall?.currentStreak ?? 0,
       bestStreak: overall?.bestStreak ?? 0,

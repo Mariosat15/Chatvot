@@ -3086,9 +3086,13 @@ Owner handoff mocks under `External game plans/design-reference/overview-2026-09
 `public/assets/neon/overview/`. Tests: `__tests__/services/overview-standing.test.ts`,
 `__tests__/games/games-first-nav.test.ts` updated. **Nothing mirrored.**
 
-**Eight facts drift easily.** **Play by Game shows at most four titles the player has actually
-played**, ranked by `contestsEntered` — unplayed catalogue rows are never listed, so more
-games cannot crowd the row forever; a zero-play player sees a Browse-games empty state.
+**Eight facts drift easily.** **Play by Game shows at most four titles.** Once the player
+has entered any contest, the strip is **most-played only** (ranked by `contestsEntered`) —
+unplayed catalogue rows are never listed, so more titles cannot crowd the row forever. **When
+they have not played yet, the same four slots show catalogue discovery order** (featured
+first, then `sortOrder`) with zero stats and a dash best score — a document describing a
+Browse-games empty state as the only zero-play answer is correct as history (morning of
+29 Sep) and stale as a present fact — **say which**.
 **Card art is catalogue `bannerUrl` then `thumbnailUrl`** (same source as `/games` cards),
 with neon plates only as fallback — a document describing hard-coded per-title Overview art
 as the primary source is wrong. **Global Rank uses per-rank PNGs** under
@@ -3110,14 +3114,17 @@ service reaches mongoose and Turbopack then fails the browser build on `child_pr
 `dns` / `fs`). Never calls `getEnabledGameTypes()` for stats (R29). **Never verified by eye.**
 
 **Polish (same day, owner mark-ups):** hero art is full-bleed with a left fade; Player Progress
-+ Recent Activity sit side-by-side like mock image 5 (not the three loose cards of image 6);
-KPI and streak tiles use neon glowing borders and owner `ui/items` plates; KPI cards follow
-the horizontal image-2 layout (icon tile + value left, wide spark area right) and **omit
-fabricated “vs last week” %** until a real week series exists; Play-by-Game best score falls
-back through `bestScore` → `totalPoints` → max `game_round.rawScore` so a dash is not the only
-answer when seats lack a stamped best. **Page backdrop** is the owner mountain plate
-(`overview-backdrop.jpg`) behind the Overview tab only, with navy edge/top/bottom fades so
-cards stay readable — Welcome is glass over the same scene rather than a second image.
++ Recent Activity sit side-by-side like mock image 5 and **stretch to equal height**; KPI cards
+are rebuilt to the premium glass target (large icon tile, tinted gradient glass, week-delta row,
+integrated spark — bare credit amounts, no ⚡); week deltas come from wallet + contest history
+when comparable, otherwise a dash (never invented); Play-by-Game best score falls back through
+`bestScore` → `totalPoints` → max `game_round.rawScore`. **Missions** are the next up to **4**
+incomplete journey milestones on the player's active map (unlocked first, then map order), with
+the **map name** shown and real `calculateMilestoneProgress` bars — View All goes to
+`/profile?tab=journey`, not `/journey`. **Page backdrop** is the owner mountain plate behind the
+Overview tab only, with navy edge/top/bottom fades. **Account Status** is a **collapsed neon
+amber bar** (shield + title + issue count + Details) — badges and support copy appear only
+when expanded (`components/dashboard/AccountStatusCard.tsx`).
 
 ### 5.1a The contest cards, made game-aware - BUILT 6 September 2026
 

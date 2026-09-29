@@ -145,13 +145,14 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
             contestWinRate={overviewStanding.contestWinRate}
             roi={overview.roi}
             totalPrizesWon={overview.totalPrizesWon}
+            weekDelta={overviewStanding.kpiWeekDelta}
           />
 
           <OverviewPlayByGame cards={overviewStanding.playCards} />
 
-          {/* Reason: image 5 — Progress + Activity side by side, not stacked like image 6. */}
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <div className="lg:col-span-2">
+          {/* Reason: equal-height panels — stretch both columns to the taller rail. */}
+          <div className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-3">
+            <div className="flex lg:col-span-2">
               <OverviewProgress
                 globalRank={overviewStanding.globalRank}
                 totalUsers={overviewStanding.totalUsers}
@@ -160,6 +161,7 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
                 xpToNextLevel={player.xpToNextLevel}
                 progressPercent={player.progressPercent}
                 title={player.title}
+                journeyMapName={overviewStanding.journeyMapName}
                 missions={overviewStanding.missions}
               />
             </div>

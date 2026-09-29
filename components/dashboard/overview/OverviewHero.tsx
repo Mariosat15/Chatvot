@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+import { OVERVIEW_HERO_BANNER } from "@/lib/services/games/overview-assets";
 import { NEON_HEADING, NEON_LABEL } from "@/components/neon/tokens";
 
 interface OverviewHeroProps {
@@ -8,30 +10,35 @@ interface OverviewHeroProps {
 }
 
 /**
- * Welcome strip over the Overview page backdrop.
- *
- * The mountain art lives only on `OverviewBackdrop` — this panel is glass so
- * the scene shows through without a second competing image.
+ * Welcome strip with full-bleed hero art and a left readability fade.
  */
 export default function OverviewHero({ name, accountActive }: OverviewHeroProps) {
   const first = name?.trim().split(/\s+/)[0] || "Player";
 
   return (
     <section
-      className="relative min-h-[168px] overflow-hidden rounded-xl border border-cyan-400/20 bg-[#070E1C]/40 p-4 shadow-[0_0_48px_-20px_rgba(34,211,238,0.4),inset_0_1px_0_rgba(150,210,255,0.14)] backdrop-blur-md sm:min-h-[200px] sm:p-5"
+      className="relative min-h-[168px] overflow-hidden rounded-xl border border-cyan-400/20 shadow-[0_0_48px_-20px_rgba(34,211,238,0.4)] sm:min-h-[200px]"
       aria-label="Welcome"
     >
-      {/* Left wash keeps welcome copy readable over neon peaks. */}
+      <Image
+        src={OVERVIEW_HERO_BANNER}
+        alt=""
+        fill
+        priority
+        sizes="100vw"
+        className="object-cover object-center"
+      />
+      {/* Left wash keeps welcome copy readable over the art. */}
       <div
-        className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#050B18]/92 via-[#050B18]/55 to-transparent"
+        className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#050B18] via-[#050B18]/75 to-transparent"
         aria-hidden
       />
       <div
-        className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#050B18]/55 via-transparent to-[#050B18]/25"
+        className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#050B18]/55 via-transparent to-[#050B18]/20"
         aria-hidden
       />
 
-      <div className="relative z-10 flex max-w-xl flex-col gap-2">
+      <div className="relative z-10 flex max-w-xl flex-col gap-2 p-4 sm:p-5">
         <p className={NEON_LABEL}>Overview</p>
         <h1 className={`${NEON_HEADING} text-2xl text-cyan-100 sm:text-3xl`}>
           Welcome back, {first}

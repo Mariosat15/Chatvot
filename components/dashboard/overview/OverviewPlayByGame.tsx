@@ -17,11 +17,14 @@ function formatScore(n: number | null): string {
 }
 
 /**
- * Top N most-played games for this player (default 4). Art comes from the
- * catalogue banner/thumbnail (game page assets). Unplayed catalogue titles
- * are not listed — more games must not crowd this row forever.
+ * Play-by-game strip: most-played titles once the player has history;
+ * catalogue top N (featured + sortOrder) when they have not played yet.
  */
 export default function OverviewPlayByGame({ cards }: OverviewPlayByGameProps) {
+  // Reason: zero contests on every card means the discovery fallback — caption
+  // must not claim "most played" for a player who has never entered.
+  const hasPlayHistory = cards.some((c) => c.contestsEntered > 0);
+
   return (
     <section aria-labelledby="play-by-game-heading">
       <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
@@ -35,8 +38,9 @@ export default function OverviewPlayByGame({ cards }: OverviewPlayByGameProps) {
           </h2>
         </div>
         <p className="text-xs text-gray-500">
-          Your top {OVERVIEW_PLAY_CARD_LIMIT} most played. Each game builds
-          different skills.
+          {hasPlayHistory
+            ? `Your top ${OVERVIEW_PLAY_CARD_LIMIT} most played. Each game builds different skills.`
+            : `Featured games to get started. Each builds different skills.`}
         </p>
       </div>
 
@@ -45,10 +49,10 @@ export default function OverviewPlayByGame({ cards }: OverviewPlayByGameProps) {
           className={`${NEON_PANEL} flex flex-col items-start gap-3 p-5 sm:flex-row sm:items-center sm:justify-between`}
         >
           <div>
-            <p className={NEON_HEADING}>No games played yet</p>
+            <p className={NEON_HEADING}>No games available yet</p>
             <p className="mt-1 text-sm text-gray-400">
-              Join a contest from the Games hub — your most-played titles will
-              show up here with your stats.
+              Check the Games hub once titles are listed — your most-played
+              will show here with your stats.
             </p>
           </div>
           <Link

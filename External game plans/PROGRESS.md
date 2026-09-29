@@ -319,7 +319,7 @@ project low risk.
 
 This plan has two tracks. **As of 29 September 2026**:
 
-- **Neon Overview redesign CODE-COMPLETE 29 Sep (eng)** — Header **nav-only** Overview/Wallet/Performance/Competitions/Tutorials (`?tab=` sync); Global Rank **per-rank PNGs 1–20** (else dash); Play by Game = **top 4 most-played** with catalogue art + best-score fallbacks; KPI/streak neon plates from `ui/items`; Progress+Activity side-by-side. See `13` **s5.1g**. Tests: `overview-standing.test.ts` + `user-game-stats.test.ts` + updated `games-first-nav.test.ts`. **Never verified by eye.**
+- **Neon Overview redesign CODE-COMPLETE 29 Sep (eng)** — Header **nav-only** Overview/Wallet/Performance/Competitions/Tutorials (`?tab=` sync); Global Rank **per-rank PNGs 1–20** (else dash); Play by Game = **top 4 most-played**, or **catalogue featured/`sortOrder` discovery** when the player has never entered; Account Status = **thin expandable neon amber bar**; KPI/streak neon plates from `ui/items`; Progress+Activity side-by-side. See `13` **s5.1g**. Tests: `overview-standing.test.ts` + `user-game-stats.test.ts` + updated `games-first-nav.test.ts`. **Never verified by eye.**
 - **Volt Stack second title CODE-COMPLETE 27 Sep (eng)** — `volt-stack` in games-service catalogue; server-authoritative locks/score; play at `/play/volt-stack/?t=`; Circuit-compatible iframe messages. **Operator:** sync catalogue + enable title, then competition/challenge as for Circuit. See `21` **s4.1u**. Never verified by eye on live money.
 - **Provider contest lobby live updates CODE-COMPLETE 26 Sep (eng)** — same `/standings` poll as the arena (`ArenaLiveProvider` + `LobbyLiveParts`); players / your score / board / prize seats refresh without reload; trading keeps `LiveContestRefresher`. Not verified by eye.
 - **Prioritized task list:** `External game plans/NEXT-TASKS.md` — P0→P3 + closed items so stale paste-lists are not reopened. **Owner P1 decisions 24 Sep:** A5 last-when-asked; R11 owner/lawyers; R93 already closed; R96b content done; Q16 built; ops `--apply` backfills not needed; R99 optional.
@@ -1123,6 +1123,20 @@ real best scores; Progress+Activity like image 5; neon KPI/streak graphics from 
 - `resolvePlayCardBestScore` + `game_round` max rawScore merge for Play-by-Game
 - Progress + Activity side-by-side (`NEON_PANEL_LIT`); KPI/streak neon glow + owner art
 - Docs: `13` s5.1g amendment; tests extended in `overview-standing.test.ts`
+
+**Owner tested:** not yet.
+**Never verified by eye.**
+
+### 29 Sep 2026 - Play-by-Game discovery fallback + Account Status bar
+
+**Owner:** zero-play Overview must still list 4 games by catalogue rank; once they play,
+switch to most-played. Account Status must be a thin expandable bar (not a tall box), neon.
+
+**Shipped:**
+- `buildTopPlayCards` discovery fallback: featured → `sortOrder` → slug, capped at 4
+- `OverviewPlayByGame` caption switches for discovery vs most-played
+- `AccountStatusCard` collapsed = header-only neon amber bar; badges + support only when expanded
+- Docs: `13` s5.1g amendment; tests in `overview-standing.test.ts`
 
 **Owner tested:** not yet.
 **Never verified by eye.**

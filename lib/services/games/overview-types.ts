@@ -42,12 +42,17 @@ export interface OverviewPlayCard {
 export interface OverviewMission {
   id: string;
   name: string;
+  /** Short milestone description from the journey catalogue. */
+  description: string;
   icon: string;
   xp: number;
   /** 0..target; when target is 0 the bar is empty. */
   current: number;
   target: number;
 }
+
+/** Cap on Overview mission tiles — next N incomplete, in map order. */
+export const OVERVIEW_MISSION_LIMIT = 4;
 
 export interface OverviewActivityItem {
   id: string;
@@ -81,9 +86,21 @@ export interface OverviewStanding {
   /** Contest win rate across every game including trading contests; null if none completed. */
   contestWinRate: number | null;
   playCards: OverviewPlayCard[];
+  /** Active journey map display name (empty when no progress). */
+  journeyMapName: string;
   missions: OverviewMission[];
   recentActivity: OverviewActivityItem[];
   streaks: OverviewStreaksFacts;
+  /**
+   * Week-over-week % change for Overview KPIs. Null when there is not enough
+   * history to compare — UI shows a dash, never a fabricated number.
+   */
+  kpiWeekDelta: {
+    credits: number | null;
+    winRate: number | null;
+    roi: number | null;
+    prizes: number | null;
+  };
 }
 
 export type { OverviewRankBadge };

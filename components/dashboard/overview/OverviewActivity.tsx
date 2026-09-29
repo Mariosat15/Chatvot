@@ -60,7 +60,7 @@ function ActivityIcon({ kind }: { kind: OverviewActivityItem["kind"] }) {
 export default function OverviewActivity({ items }: OverviewActivityProps) {
   return (
     <section
-      className={`${NEON_PANEL_LIT} flex h-full flex-col p-4 sm:p-5`}
+      className={`${NEON_PANEL_LIT} flex h-full min-h-0 flex-col p-4 sm:p-5`}
       aria-labelledby="activity-heading"
     >
       <div className="mb-3 flex items-center justify-between gap-2">

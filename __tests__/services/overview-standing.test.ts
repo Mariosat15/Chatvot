@@ -157,10 +157,79 @@ describe("buildTopPlayCards", () => {
       "provider:chartvolt:volt-stack",
     ]);
     expect(cards.length).toBeLessThanOrEqual(OVERVIEW_PLAY_CARD_LIMIT);
-    // Unplayed catalogue title must not appear.
+    // Once the player has history, unplayed catalogue titles must not appear.
     expect(cards.every((c) => c.gameKey !== "provider:chartvolt:never-played")).toBe(
       true,
     );
+  });
+
+  it("falls back to catalogue rank when the player has not played yet", () => {
+    const rankedCatalogue: BrowsableGame[] = [
+      cat({
+        slug: "volt-stack",
+        gameKey: "provider:chartvolt:volt-stack",
+        displayName: "Volt Stack",
+        kind: "provider",
+        gameCode: "volt-stack",
+        sortOrder: 30,
+        isFeatured: false,
+      }),
+      cat({
+        slug: "circuit-sprint",
+        gameKey: "provider:chartvolt:circuit-sprint",
+        displayName: "Circuit Sprint",
+        kind: "provider",
+        gameCode: "circuit-sprint",
+        sortOrder: 10,
+        isFeatured: true,
+        tagline: "Connect the paths, beat the clock!",
+        bannerUrl: "/uploads/sprint.webp",
+      }),
+      cat({
+        slug: "trading",
+        gameKey: "trading",
+        displayName: "Trading",
+        kind: "trading",
+        sortOrder: 20,
+        isFeatured: false,
+      }),
+      cat({
+        slug: "never-played",
+        gameKey: "provider:chartvolt:never-played",
+        displayName: "Never Played",
+        kind: "provider",
+        gameCode: "never-played",
+        sortOrder: 40,
+        isFeatured: false,
+      }),
+      cat({
+        slug: "extra",
+        gameKey: "provider:chartvolt:extra",
+        displayName: "Extra",
+        kind: "provider",
+        gameCode: "extra",
+        sortOrder: 50,
+        isFeatured: false,
+      }),
+    ];
+
+    const cards = buildTopPlayCards(standing([]), rankedCatalogue);
+
+    expect(cards).toHaveLength(OVERVIEW_PLAY_CARD_LIMIT);
+    // Featured first, then ascending sortOrder.
+    expect(cards.map((c) => c.gameKey)).toEqual([
+      "provider:chartvolt:circuit-sprint",
+      "trading",
+      "provider:chartvolt:volt-stack",
+      "provider:chartvolt:never-played",
+    ]);
+    expect(cards.every((c) => c.contestsEntered === 0)).toBe(true);
+    expect(cards.every((c) => c.bestScore === null)).toBe(true);
+    expect(cards[0]?.tagline).toBe("Connect the paths, beat the clock!");
+  });
+
+  it("empty catalogue and no play yields an empty strip", () => {
+    expect(buildTopPlayCards(standing([]), [])).toEqual([]);
   });
 
   it("uses catalogue banner then thumbnail then neon fallback", () => {
@@ -422,7 +491,7 @@ describe("Overview streaks chrome", () => {
     expect(backdrop).toMatch(/bg-gradient-to-r/);
   });
 
-  it("KPI row uses the horizontal spark layout and never invents week deltas", () => {
+  it("KPI row matches the premium glass target — week row present, no lightning symbol", () => {
     const kpi = readFileSync(
       join(ROOT, "components/dashboard/overview/OverviewKpiRow.tsx"),
       "utf8",
@@ -430,8 +499,94 @@ describe("Overview streaks chrome", () => {
       .replace(/\/\*[\s\S]*?\*\//g, "")
       .replace(/\/\/.*$/gm, "");
     expect(kpi).toMatch(/SparkArea/);
-    expect(kpi).toMatch(/w-\[48%\]/);
-    expect(kpi).not.toMatch(/vs last week/i);
+    expect(kpi).toMatch(/vs last week/);
+    expect(kpi).toMatch(/WeekDelta/);
+    expect(kpi).toMatch(/bare:\s*true/);
+    expect(kpi).toMatch(/linear-gradient\(110deg/);
+    expect(kpi).toMatch(/h-12 w-12/);
+    expect(kpi).not.toMatch(/w-\[48%\]/);
+  });
+
+  it("View All Missions links to profile journey tab and missions are capped at 4", () => {
+    const progress = readFileSync(
+      join(ROOT, "components/dashboard/overview/OverviewProgress.tsx"),
+      "utf8",
+    )
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    const types = readFileSync(
+      join(ROOT, "lib/services/games/overview-types.ts"),
+      "utf8",
+    );
+    const standing = readFileSync(
+      join(ROOT, "lib/services/games/overview-standing.service.ts"),
+      "utf8",
+    )
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    expect(progress).toMatch(/\/profile\?tab=journey/);
+    expect(progress).not.toMatch(/href=["']\/journey["']/);
+    expect(types).toMatch(/OVERVIEW_MISSION_LIMIT\s*=\s*4/);
+    expect(standing).toMatch(/OVERVIEW_MISSION_LIMIT/);
+    expect(standing).toMatch(/journeyMapName/);
+    expect(standing).toMatch(/calculateMilestoneProgress/);
+  });
+
+  it("Progress and Activity stretch to equal height", () => {
+    const layout = readFileSync(
+      join(ROOT, "components/dashboard/DashboardLayout.tsx"),
+      "utf8",
+    )
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    expect(layout).toMatch(/items-stretch/);
+    expect(layout).toMatch(/journeyMapName/);
+  });
+
+  it("Welcome hero restores full-bleed banner art", () => {
+    const hero = readFileSync(
+      join(ROOT, "components/dashboard/overview/OverviewHero.tsx"),
+      "utf8",
+    )
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    expect(hero).toMatch(/OVERVIEW_HERO_BANNER/);
+    expect(hero).toMatch(/object-cover/);
+  });
+
+  it("Play by Game caption distinguishes discovery from most-played", () => {
+    const ui = readFileSync(
+      join(ROOT, "components/dashboard/overview/OverviewPlayByGame.tsx"),
+      "utf8",
+    )
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    expect(ui).toMatch(/hasPlayHistory/);
+    expect(ui).toMatch(/Featured games to get started/);
+    expect(ui).toMatch(/most played/);
+    // Empty CTA is only for an empty catalogue — not the zero-play discovery path.
+    expect(ui).toMatch(/No games available yet/);
+  });
+
+  it("Account Status collapses to a header bar — badges and support only when expanded", () => {
+    const code = readFileSync(
+      join(ROOT, "components/dashboard/AccountStatusCard.tsx"),
+      "utf8",
+    )
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    // Collapsed chrome is one full-width toggle button.
+    expect(code).toMatch(/aria-expanded=\{expanded\}/);
+    expect(code).toMatch(/py-2\.5/);
+    // Reason: support footer must not render beside the collapsed bar.
+    expect(code).not.toMatch(/!expanded\s*&&/);
+    // Badges + support live inside the expanded panel (position, not a comment).
+    const expandIdx = code.indexOf("expanded &&");
+    const investigationBadge = code.indexOf("Investigation");
+    const supportIdx = code.lastIndexOf("contact support");
+    expect(expandIdx).toBeGreaterThan(-1);
+    expect(investigationBadge).toBeGreaterThan(expandIdx);
+    expect(supportIdx).toBeGreaterThan(expandIdx);
   });
 });
 

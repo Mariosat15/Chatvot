@@ -285,105 +285,118 @@ export default function AccountStatusCard({
     ),
   ];
 
+  // Reason: Collapsed is a single header bar (owner mark). Badges + support
+  // copy live only in the expanded panel so the strip stays thin by default.
   return (
     <motion.div
-      className="relative overflow-hidden rounded-xl border border-amber-500/30 backdrop-blur-sm bg-gradient-to-br from-gray-800/80 to-gray-900/80 p-4"
-      style={{ boxShadow: "0 0 20px rgba(245,158,11,0.12)" }}
-      initial={{ opacity: 0, y: 20 }}
+      className="relative overflow-hidden rounded-xl border border-amber-400/35 bg-[#0A1224]/90 backdrop-blur-md"
+      style={{
+        boxShadow:
+          "0 0 24px rgba(245,158,11,0.14), inset 0 1px 0 rgba(251,191,36,0.08)",
+      }}
+      initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: 0.1 }}
+      transition={{ duration: 0.4, delay: 0.05 }}
     >
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <ShieldAlert
-            className={`w-5 h-5 text-amber-400 ${hasActiveRestriction ? "animate-pulse" : ""}`}
-          />
-          <h3 className="text-sm font-semibold text-white">Account Status</h3>
-          <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full uppercase bg-amber-500/10 text-amber-400">
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
+        className="flex w-full items-center justify-between gap-3 px-3.5 py-2.5 text-left transition-colors hover:bg-amber-500/[0.04] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-400/50"
+      >
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-amber-500/15 ring-1 ring-amber-400/35">
+            <ShieldAlert
+              className={`h-4 w-4 text-amber-300 ${hasActiveRestriction ? "animate-pulse" : ""}`}
+              aria-hidden
+            />
+          </span>
+          <h3 className="truncate text-sm font-semibold tracking-wide text-white">
+            Account Status
+          </h3>
+          <span className="shrink-0 rounded-md bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-300 ring-1 ring-amber-400/30">
             {totalIssues} {totalIssues === 1 ? "issue" : "issues"}
           </span>
         </div>
 
-        <button
-          onClick={() => setExpanded((v) => !v)}
-          className="flex items-center gap-1 text-xs text-gray-400 hover:text-white transition-colors min-h-[44px] min-w-[44px] justify-center"
-        >
+        <span className="flex shrink-0 items-center gap-1 text-xs font-medium text-gray-400">
           {expanded ? "Hide" : "Details"}
           <ChevronDown
-            className={`w-3.5 h-3.5 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
+            className={`h-3.5 w-3.5 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
+            aria-hidden
           />
-        </button>
-      </div>
+        </span>
+      </button>
 
-      {/* Quick Status Badges */}
-      <div className="flex items-center gap-3 mt-3 flex-wrap">
-        {restrictions.map((r) => (
-          <div
-            key={r.id}
-            className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-red-500/10 border border-red-500/20"
-          >
-            <Ban className="w-3.5 h-3.5 text-red-400" />
-            <span className="text-[11px] text-red-300 font-medium">
-              {r.type === "banned" ? "Restricted" : "Under Review"}
-            </span>
-          </div>
-        ))}
-
-        {lockouts.map((l) => (
-          <div
-            key={l.id}
-            className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-orange-500/10 border border-orange-500/20"
-          >
-            <Lock className="w-3.5 h-3.5 text-orange-400" />
-            <span className="text-[11px] text-orange-300 font-medium">
-              Temporarily Locked
-            </span>
-          </div>
-        ))}
-
-        {fraudAlerts.length > 0 && (
-          <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20">
-            <Eye className="w-3.5 h-3.5 text-amber-400" />
-            <span className="text-[11px] text-amber-300 font-medium">
-              {fraudAlerts.length} Investigation
-              {fraudAlerts.length > 1 ? "s" : ""}
-            </span>
-          </div>
-        )}
-
-        {hasKycIssue && (
-          <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-purple-500/10 border border-purple-500/20">
-            <Fingerprint className="w-3.5 h-3.5 text-purple-400" />
-            <span className="text-[11px] text-purple-300 font-medium">
-              KYC{" "}
-              {kycStatus === "declined"
-                ? "Declined"
-                : "Resubmission Required"}
-            </span>
-          </div>
-        )}
-
-        {showChargebackNotice && (
-          <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-red-500/10 border border-red-500/20">
-            <CreditCard className="w-3.5 h-3.5 text-red-400" />
-            <span className="text-[11px] text-red-300 font-medium">
-              Chargeback Under Review
-            </span>
-          </div>
-        )}
-      </div>
-
-      {/* Expanded Details */}
       <AnimatePresence>
         {expanded && (
           <motion.div
-            className="mt-4 space-y-4"
+            className="space-y-4 border-t border-amber-400/15 px-3.5 pb-3.5 pt-3"
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.25 }}
           >
+            {/* Quick Status Badges — only when expanded */}
+            <div className="flex flex-wrap items-center gap-2">
+              {restrictions.map((r) => (
+                <div
+                  key={r.id}
+                  className="flex items-center gap-1.5 rounded-lg border border-red-500/25 bg-red-500/10 px-2 py-1"
+                >
+                  <Ban className="h-3.5 w-3.5 text-red-400" aria-hidden />
+                  <span className="text-[11px] font-medium text-red-300">
+                    {r.type === "banned" ? "Restricted" : "Under Review"}
+                  </span>
+                </div>
+              ))}
+
+              {lockouts.map((l) => (
+                <div
+                  key={l.id}
+                  className="flex items-center gap-1.5 rounded-lg border border-orange-500/25 bg-orange-500/10 px-2 py-1"
+                >
+                  <Lock className="h-3.5 w-3.5 text-orange-400" aria-hidden />
+                  <span className="text-[11px] font-medium text-orange-300">
+                    Temporarily Locked
+                  </span>
+                </div>
+              ))}
+
+              {fraudAlerts.length > 0 && (
+                <div className="flex items-center gap-1.5 rounded-lg border border-amber-500/25 bg-amber-500/10 px-2 py-1">
+                  <Eye className="h-3.5 w-3.5 text-amber-400" aria-hidden />
+                  <span className="text-[11px] font-medium text-amber-300">
+                    {fraudAlerts.length} Investigation
+                    {fraudAlerts.length > 1 ? "s" : ""}
+                  </span>
+                </div>
+              )}
+
+              {hasKycIssue && (
+                <div className="flex items-center gap-1.5 rounded-lg border border-purple-500/25 bg-purple-500/10 px-2 py-1">
+                  <Fingerprint
+                    className="h-3.5 w-3.5 text-purple-400"
+                    aria-hidden
+                  />
+                  <span className="text-[11px] font-medium text-purple-300">
+                    KYC{" "}
+                    {kycStatus === "declined"
+                      ? "Declined"
+                      : "Resubmission Required"}
+                  </span>
+                </div>
+              )}
+
+              {showChargebackNotice && (
+                <div className="flex items-center gap-1.5 rounded-lg border border-red-500/25 bg-red-500/10 px-2 py-1">
+                  <CreditCard className="h-3.5 w-3.5 text-red-400" aria-hidden />
+                  <span className="text-[11px] font-medium text-red-300">
+                    Chargeback Under Review
+                  </span>
+                </div>
+              )}
+            </div>
             {/* ── Chargeback Under Review ── */}
             {showChargebackNotice && (
               <div className="space-y-2">
@@ -681,40 +694,24 @@ export default function AccountStatusCard({
             )}
 
             {/* ── Support Contact ── */}
-            <div className="pt-3 border-t border-gray-700/30">
+            <div className="border-t border-amber-400/10 pt-3">
               <div className="flex items-center justify-center gap-2">
-                <MessageCircle className="w-3.5 h-3.5 text-blue-400" />
+                <MessageCircle className="h-3.5 w-3.5 text-sky-400" aria-hidden />
                 <p className="text-[11px] text-gray-400">
-                  Need help or have questions?{" "}
+                  If you believe this is an error, please{" "}
                   <Link
                     href="/messaging"
-                    className="text-blue-400 hover:text-blue-300 underline font-medium"
+                    className="font-medium text-sky-400 underline hover:text-sky-300"
                   >
-                    Contact our support team
+                    contact support
                   </Link>{" "}
-                  — we&apos;re here to assist you.
+                  for assistance.
                 </p>
               </div>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* Collapsed support link — always visible */}
-      {!expanded && (
-        <div className="mt-3 pt-2 border-t border-gray-700/20">
-          <p className="text-[11px] text-gray-500 text-center">
-            If you believe this is an error, please{" "}
-            <Link
-              href="/messaging"
-              className="text-blue-400 hover:text-blue-300 underline"
-            >
-              contact support
-            </Link>{" "}
-            for assistance.
-          </p>
-        </div>
-      )}
     </motion.div>
   );
 }
