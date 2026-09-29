@@ -18,8 +18,11 @@ describe("Presence GET security surface", () => {
 
   it("batch and list selects omit ipAddress and userAgent", () => {
     // Reason: presence POST stores IP for admin live-ops; player GET must not echo it.
-    const getFn = route.slice(route.indexOf("export async function GET"));
-    const postFn = route.slice(route.indexOf("export async function POST"));
+    const getStart = route.indexOf("export async function GET");
+    const postStart = route.indexOf("export async function POST");
+    const getFn = route.slice(getStart, postStart);
+    const postFn = route.slice(postStart);
+    expect(getFn).toMatch(/\.select\(/);
     expect(getFn).not.toMatch(/ipAddress/);
     expect(getFn).not.toMatch(/userAgent/);
     expect(postFn).toMatch(/ipAddress/);
