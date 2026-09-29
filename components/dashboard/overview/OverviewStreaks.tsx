@@ -1,17 +1,10 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
-import {
-  Flame,
-  Award,
-  Trophy,
-  Calendar,
-  TrendingUp,
-  BarChart2,
-  ChevronRight,
-  type LucideIcon,
-} from "lucide-react";
+import { ChevronRight, Flame } from "lucide-react";
 import type { OverviewStanding } from "@/lib/services/games/overview-types";
+import { OVERVIEW_STREAK_ART } from "@/lib/services/games/overview-assets";
 import { NEON_PANEL, NEON_HEADING, NEON_LABEL } from "@/components/neon/tokens";
 
 interface OverviewStreaksProps {
@@ -21,9 +14,8 @@ interface OverviewStreaksProps {
 interface StreakTile {
   key: keyof OverviewStanding["streaks"];
   label: string;
-  icon: LucideIcon;
+  artSrc: string;
   color: string;
-  bg: string;
   border: string;
   glow: string;
   format?: (n: number) => string;
@@ -33,7 +25,7 @@ interface StreakTile {
 /**
  * Six tiles from UserGameStats `_overall` — trading contests + every provider
  * game. Labels stay contest-shaped so a new title needs no Overview edit.
- * Trading-only day / P&L streaks stay on the Performance tab.
+ * Icons are owner game art (image 7), not Lucide placeholders.
  */
 function streakValue(
   streaks: OverviewStanding["streaks"],
@@ -61,61 +53,55 @@ const TILES: StreakTile[] = [
   {
     key: "podiumStreak",
     label: "Podium streak",
-    icon: Flame,
+    artSrc: OVERVIEW_STREAK_ART.podiumStreak,
     color: "#F97316",
-    bg: "bg-orange-500/10",
-    border: "border-orange-500/30",
-    glow: "rgba(249,115,22,0.28)",
+    border: "border-orange-400/45",
+    glow: "rgba(249,115,22,0.4)",
     activeWhen: (n) => n > 0,
   },
   {
     key: "bestStreak",
     label: "Best streak",
-    icon: Award,
+    artSrc: OVERVIEW_STREAK_ART.bestStreak,
     color: "#EAB308",
-    bg: "bg-yellow-500/10",
-    border: "border-yellow-500/30",
-    glow: "rgba(234,179,8,0.28)",
+    border: "border-yellow-400/45",
+    glow: "rgba(234,179,8,0.4)",
     activeWhen: (n) => n > 2,
   },
   {
     key: "contestWins",
     label: "Contest wins",
-    icon: TrendingUp,
+    artSrc: OVERVIEW_STREAK_ART.contestWins,
     color: "#22C55E",
-    bg: "bg-green-500/10",
-    border: "border-green-500/30",
-    glow: "rgba(34,197,94,0.28)",
+    border: "border-green-400/45",
+    glow: "rgba(34,197,94,0.4)",
     activeWhen: (n) => n > 0,
   },
   {
     key: "contestsPlayed",
     label: "Contests played",
-    icon: Calendar,
+    artSrc: OVERVIEW_STREAK_ART.contestsPlayed,
     color: "#3B82F6",
-    bg: "bg-blue-500/10",
-    border: "border-blue-500/30",
-    glow: "rgba(59,130,246,0.28)",
+    border: "border-blue-400/45",
+    glow: "rgba(59,130,246,0.4)",
     activeWhen: (n) => n > 0,
   },
   {
     key: "topThreeFinishes",
     label: "Top 3 finishes",
-    icon: Trophy,
+    artSrc: OVERVIEW_STREAK_ART.topThreeFinishes,
     color: "#A855F7",
-    bg: "bg-purple-500/10",
-    border: "border-purple-500/30",
-    glow: "rgba(168,85,247,0.28)",
+    border: "border-purple-400/45",
+    glow: "rgba(168,85,247,0.4)",
     activeWhen: (n) => n > 0,
   },
   {
     key: "weeksActive",
     label: "Weeks active",
-    icon: BarChart2,
+    artSrc: OVERVIEW_STREAK_ART.weeksActive,
     color: "#F43F5E",
-    bg: "bg-rose-500/10",
-    border: "border-rose-500/30",
-    glow: "rgba(244,63,94,0.28)",
+    border: "border-rose-400/45",
+    glow: "rgba(244,63,94,0.4)",
     activeWhen: (n) => n > 0,
   },
 ];
@@ -124,23 +110,28 @@ export default function OverviewStreaks({ streaks }: OverviewStreaksProps) {
   return (
     <section
       aria-labelledby="streaks-heading"
-      className={`${NEON_PANEL} p-4 sm:p-5`}
+      className={`${NEON_PANEL} border-cyan-400/25 p-4 shadow-[0_0_28px_-12px_rgba(34,211,238,0.45)] sm:p-5`}
     >
       <div className="mb-4 flex items-start justify-between gap-3">
-        <div>
-          <h2
-            id="streaks-heading"
-            className={`${NEON_HEADING} text-sm uppercase tracking-[0.14em]`}
-          >
-            Streaks &amp; Consistency
-          </h2>
-          <p className="mt-1 text-xs text-gray-400 sm:text-sm">
-            Keep showing up. Consistency leads to greatness.
-          </p>
+        <div className="flex items-start gap-2.5">
+          <span className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-lg border border-orange-400/40 bg-orange-500/15 text-orange-300 shadow-[0_0_14px_rgba(251,146,60,0.45)]">
+            <Flame className="h-4 w-4" aria-hidden />
+          </span>
+          <div>
+            <h2
+              id="streaks-heading"
+              className={`${NEON_HEADING} text-sm uppercase tracking-[0.14em] text-white`}
+            >
+              Streaks &amp; Consistency
+            </h2>
+            <p className="mt-1 text-xs text-gray-400 sm:text-sm">
+              Keep showing up. Consistency leads to greatness.
+            </p>
+          </div>
         </div>
         <Link
           href="/profile"
-          className={`${NEON_LABEL} inline-flex shrink-0 items-center gap-1 text-[11px] transition-colors hover:text-cyan-300`}
+          className={`${NEON_LABEL} inline-flex shrink-0 items-center gap-1 text-[11px] text-amber-300 transition-colors hover:text-amber-200`}
         >
           View Details
           <ChevronRight className="h-3.5 w-3.5" aria-hidden />
@@ -149,51 +140,43 @@ export default function OverviewStreaks({ streaks }: OverviewStreaksProps) {
 
       <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
         {TILES.map(
-          ({
-            key,
-            label,
-            icon: Icon,
-            color,
-            bg,
-            border,
-            glow,
-            format,
-            activeWhen,
-          }) => {
+          ({ key, label, artSrc, color, border, glow, format, activeWhen }) => {
             const value = streakValue(streaks, key);
             const active = activeWhen(value);
-            const display = format
-              ? format(value)
-              : value.toLocaleString();
+            const display = format ? format(value) : value.toLocaleString();
 
             return (
               <li
                 key={key}
-                className={`relative overflow-hidden rounded-lg border ${border} ${bg} p-3 text-center transition-shadow`}
+                className={`relative flex items-center gap-2.5 overflow-hidden rounded-xl border ${border} bg-[#070E1C]/85 px-2.5 py-3 transition-shadow`}
                 style={
                   active
-                    ? { boxShadow: `0 0 14px ${glow}` }
-                    : undefined
+                    ? { boxShadow: `0 0 18px ${glow}` }
+                    : { boxShadow: `0 0 10px ${glow}` }
                 }
               >
-                {active && key === "podiumStreak" ? (
-                  <Flame
-                    className="absolute right-1.5 top-1.5 h-3.5 w-3.5 text-orange-400/60"
-                    aria-hidden
+                <div className="relative h-9 w-9 shrink-0">
+                  <Image
+                    src={artSrc}
+                    alt=""
+                    fill
+                    sizes="36px"
+                    className="object-contain"
                   />
-                ) : null}
-                <Icon
-                  className="mx-auto mb-1.5 h-5 w-5 opacity-80"
-                  style={{ color }}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p
+                    className="text-lg font-bold leading-none"
+                    style={{ color }}
+                  >
+                    {display}
+                  </p>
+                  <p className={`${NEON_LABEL} mt-1 leading-tight`}>{label}</p>
+                </div>
+                <ChevronRight
+                  className="h-4 w-4 shrink-0 text-gray-600"
                   aria-hidden
                 />
-                <p
-                  className={`${NEON_HEADING} text-xl`}
-                  style={{ color }}
-                >
-                  {display}
-                </p>
-                <p className={`${NEON_LABEL} mt-0.5 leading-tight`}>{label}</p>
               </li>
             );
           },

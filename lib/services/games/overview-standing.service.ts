@@ -26,6 +26,8 @@ import JourneyMilestone from "@/database/models/journey-milestone.model";
 import UserJourneyProgress from "@/database/models/user-journey-progress.model";
 import JourneyMapConfig from "@/database/models/journey-map-config.model";
 import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
+import GameRound from "@/database/models/games/game-round.model";
+import { SCORE_PRODUCING_ROUND_STATUSES } from "@/lib/services/games/round-types";
 
 export {
   OVERVIEW_PLAY_CARD_LIMIT,
@@ -43,6 +45,87 @@ function activityLabelFor(game: {
   const code = (game.gameCode ?? "").toLowerCase();
   if (code.includes("sprint") || code.includes("race")) return "Races";
   return "Runs";
+}
+
+/**
+ * Best score shown on a Play-by-Game card.
+ *
+ * Provider games prefer stored `bestScore`; when that is still zero (legacy
+ * seats / missing sync) fall back to `totalPoints`. Trading has no provider
+ * score — use totalPoints. Round maxes are merged in by the caller.
+ */
+export function resolvePlayCardBestScore(
+  row: {
+    isTrading?: boolean;
+    gameKey: string;
+    bestScore?: number;
+    totalPoints?: number;
+  },
+  roundBest?: number | null,
+): number | null {
+  const isTrading = row.isTrading || row.gameKey === TRADING_GAME_TYPE;
+  const stored =
+    typeof row.bestScore === "number" && Number.isFinite(row.bestScore)
+      ? row.bestScore
+      : 0;
+  const points =
+    typeof row.totalPoints === "number" && Number.isFinite(row.totalPoints)
+      ? row.totalPoints
+      : 0;
+  const fromRound =
+    typeof roundBest === "number" && Number.isFinite(roundBest) && roundBest > 0
+      ? roundBest
+      : 0;
+
+  if (isTrading) {
+    const n = Math.max(points, fromRound);
+    return n > 0 ? n : null;
+  }
+  const n = Math.max(stored, points, fromRound);
+  return n > 0 ? n : null;
+}
+
+/**
+ * Max rawScore per gameKey for this player from scored rounds.
+ * Complements UserGameStats.bestScore when that field was never stamped.
+ */
+async function loadRoundBestScores(
+  userId: string,
+  gameKeys: string[],
+): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  if (gameKeys.length === 0) return out;
+  try {
+    const rows = await GameRound.aggregate<{
+      _id: string;
+      best: number;
+    }>([
+      {
+        $match: {
+          userId,
+          gameKey: { $in: gameKeys },
+          status: { $in: [...SCORE_PRODUCING_ROUND_STATUSES] },
+          rawScore: { $type: "number" },
+        },
+      },
+      {
+        $group: {
+          _id: "$gameKey",
+          // Reason: live catalogue titles are higher-is-better; lower-is-better
+          // titles still prefer UserGameStats.bestScore when stamped correctly.
+          best: { $max: "$rawScore" },
+        },
+      },
+    ]);
+    for (const row of rows) {
+      if (typeof row.best === "number" && Number.isFinite(row.best)) {
+        out.set(row._id, row.best);
+      }
+    }
+  } catch {
+    /* fail soft — cards still render with stored bestScore */
+  }
+  return out;
 }
 
 /**
@@ -68,6 +151,7 @@ export function buildTopPlayCards(
   standing: PlayerGameProfile,
   catalogue: BrowsableGame[],
   limit: number = OVERVIEW_PLAY_CARD_LIMIT,
+  roundBests: Map<string, number> = new Map(),
 ): OverviewPlayCard[] {
   const byKey = new Map(catalogue.map((g) => [g.gameKey, g]));
 
@@ -102,13 +186,7 @@ export function buildTopPlayCards(
       contestsCompleted: row.contestsCompleted,
       wins: row.wins,
       bestRank: row.bestRank,
-      bestScore: isTrading
-        ? row.totalPoints > 0
-          ? row.totalPoints
-          : null
-        : row.bestScore > 0
-          ? row.bestScore
-          : null,
+      bestScore: resolvePlayCardBestScore(row, roundBests.get(row.gameKey)),
       activityLabel: activityLabelFor({ isTrading, gameCode }),
     };
   });
@@ -187,15 +265,26 @@ async function loadRecentContestActivity(
       score?: number;
       gameKey?: string;
     }>).map((s) => {
-      const rank = s.currentRank && s.currentRank > 0 ? `#${s.currentRank}` : "—";
+      const rank = s.currentRank && s.currentRank > 0 ? `#${s.currentRank}` : null;
       const prize =
         typeof s.prizeWon === "number" && s.prizeWon > 0
-          ? ` · ${s.prizeWon} ⚡`
-          : "";
+          ? `+${Math.round(s.prizeWon)} ⚡`
+          : null;
+      const score =
+        typeof s.score === "number" && Number.isFinite(s.score)
+          ? `Score: ${Math.round(s.score).toLocaleString()}`
+          : null;
+      const detail =
+        [rank ? `Rank ${rank}` : null, prize, score].filter(Boolean).join(" · ") ||
+        "Contest result";
       return {
         id: s._id.toString(),
-        title: s.isWinner ? "Contest win" : "Contest finish",
-        detail: `Rank ${rank}${prize}`,
+        title: s.isWinner
+          ? "Won a contest"
+          : rank
+            ? `Contest finish (${rank})`
+            : "Contest finish",
+        detail,
         at: (s.updatedAt ?? new Date()).toISOString(),
         kind: "contest" as const,
       };
@@ -215,21 +304,27 @@ export async function getOverviewStanding(opts: {
 }): Promise<OverviewStanding> {
   const { userId, gameStanding } = opts;
 
-  const [board, catalogue, missions, contestActivity] = await Promise.all([
-    getGlobalBoard({ viewerUserId: userId, limit: OVERVIEW_RANK_TOP_N }).catch(
-      () => ({
-        entries: [],
-        totalCount: 0,
-        page: 1,
-        limit: OVERVIEW_RANK_TOP_N,
-        weights: [],
-        myPosition: { rank: 0, totalUsers: 0, percentile: 0 },
-      }),
-    ),
-    listBrowsableGames().catch(() => [] as BrowsableGame[]),
-    loadMissions(userId),
-    loadRecentContestActivity(userId),
-  ]);
+  const playedKeys = gameStanding.perGame
+    .filter((row) => (row.contestsEntered ?? 0) > 0 || (row.contestsCompleted ?? 0) > 0)
+    .map((row) => row.gameKey);
+
+  const [board, catalogue, missions, contestActivity, roundBests] =
+    await Promise.all([
+      getGlobalBoard({ viewerUserId: userId, limit: OVERVIEW_RANK_TOP_N }).catch(
+        () => ({
+          entries: [],
+          totalCount: 0,
+          page: 1,
+          limit: OVERVIEW_RANK_TOP_N,
+          weights: [],
+          myPosition: { rank: 0, totalUsers: 0, percentile: 0 },
+        }),
+      ),
+      listBrowsableGames().catch(() => [] as BrowsableGame[]),
+      loadMissions(userId),
+      loadRecentContestActivity(userId),
+      loadRoundBestScores(userId, playedKeys),
+    ]);
 
   const overall = gameStanding.overall;
   const completed = overall?.contestsCompleted ?? 0;
@@ -241,7 +336,7 @@ export async function getOverviewStanding(opts: {
     globalRank: resolveOverviewRankBadge(board.myPosition.rank),
     totalUsers: board.myPosition.totalUsers,
     contestWinRate,
-    playCards: buildTopPlayCards(gameStanding, catalogue),
+    playCards: buildTopPlayCards(gameStanding, catalogue, OVERVIEW_PLAY_CARD_LIMIT, roundBests),
     missions,
     recentActivity: contestActivity,
     streaks: {

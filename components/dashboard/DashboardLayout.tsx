@@ -147,23 +147,26 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
 
           <OverviewPlayByGame cards={overviewStanding.playCards} />
 
-          <OverviewProgress
-            globalRank={overviewStanding.globalRank}
-            totalUsers={overviewStanding.totalUsers}
-            level={player.level}
-            currentXP={player.currentXP}
-            xpToNextLevel={player.xpToNextLevel}
-            progressPercent={player.progressPercent}
-            title={player.title}
-            missions={overviewStanding.missions}
-          />
-
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {/* Reason: image 5 — Progress + Activity side by side, not stacked like image 6. */}
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <div className="lg:col-span-2">
+              <OverviewProgress
+                globalRank={overviewStanding.globalRank}
+                totalUsers={overviewStanding.totalUsers}
+                level={player.level}
+                currentXP={player.currentXP}
+                xpToNextLevel={player.xpToNextLevel}
+                progressPercent={player.progressPercent}
+                title={player.title}
+                missions={overviewStanding.missions}
+              />
+            </div>
             <OverviewActivity items={overviewStanding.recentActivity} />
-            <GameSuggestionsCard />
           </div>
 
           <OverviewStreaks streaks={overviewStanding.streaks} />
+
+          <GameSuggestionsCard />
         </TabsContent>
 
         <TabsContent value="wallet" className="mt-4 space-y-4">

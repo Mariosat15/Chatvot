@@ -10,23 +10,44 @@ interface OverviewHeroProps {
 }
 
 /**
- * Welcome strip + hero art. Status comes from the account-status payload
- * already on the dashboard — never invents "active".
+ * Welcome strip. Hero art is full-bleed behind the copy and fades left so
+ * text stays readable (owner mark-up, 29 Sep 2026).
  */
 export default function OverviewHero({ name, accountActive }: OverviewHeroProps) {
   const first = name?.trim().split(/\s+/)[0] || "Player";
 
   return (
     <section
-      className={`${NEON_PANEL} relative overflow-hidden p-4 sm:p-5`}
+      className={`${NEON_PANEL} relative min-h-[168px] overflow-hidden p-4 sm:min-h-[200px] sm:p-5`}
       aria-label="Welcome"
     >
+      {/* Full-bleed art — cover the whole panel, fade out toward the left. */}
+      <div className="pointer-events-none absolute inset-0">
+        <Image
+          src={OVERVIEW_HERO_BANNER}
+          alt=""
+          fill
+          sizes="100vw"
+          className="object-cover object-right"
+          priority
+        />
+        {/* Reason: left-heavy wash so "Welcome back" stays legible on every width. */}
+        <div
+          className="absolute inset-0 bg-gradient-to-r from-[#050B18] via-[#050B18]/92 to-[#050B18]/15 sm:via-[#050B18]/85 sm:to-transparent"
+          aria-hidden
+        />
+        <div
+          className="absolute inset-0 bg-gradient-to-t from-[#050B18]/80 via-transparent to-[#050B18]/40"
+          aria-hidden
+        />
+      </div>
+
       <div className="relative z-10 flex max-w-xl flex-col gap-2">
         <p className={NEON_LABEL}>Overview</p>
-        <h1 className={`${NEON_HEADING} text-2xl sm:text-3xl`}>
+        <h1 className={`${NEON_HEADING} text-2xl text-cyan-100 sm:text-3xl`}>
           Welcome back, {first}
         </h1>
-        <p className="text-sm text-gray-400">
+        <p className="text-sm text-gray-300">
           Higher skills, bigger rewards. Keep climbing the Global board.
         </p>
         <span
@@ -44,16 +65,6 @@ export default function OverviewHero({ name, accountActive }: OverviewHeroProps)
           />
           {accountActive ? "Account active" : "Account attention"}
         </span>
-      </div>
-      <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-[45%] sm:block">
-        <Image
-          src={OVERVIEW_HERO_BANNER}
-          alt=""
-          fill
-          sizes="40vw"
-          className="object-contain object-right opacity-90"
-          priority
-        />
       </div>
     </section>
   );

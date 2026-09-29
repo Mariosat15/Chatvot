@@ -3091,10 +3091,13 @@ played**, ranked by `contestsEntered` — unplayed catalogue rows are never list
 games cannot crowd the row forever; a zero-play player sees a Browse-games empty state.
 **Card art is catalogue `bannerUrl` then `thumbnailUrl`** (same source as `/games` cards),
 with neon plates only as fallback — a document describing hard-coded per-title Overview art
-as the primary source is wrong. **Global Rank reads `getGlobalBoard`**, ranks 1–20 overlay
-one shell asset, else the dash — never twenty near-identical WebPs. **Header destinations are
-Overview / Wallet / Performance / Competitions / Tutorials**; Games / Challenges / Marketplace
-stay on `UserSidebar` and mobile nav (recorded deviation from games-first Header). **`?tab=`
+as the primary source is wrong. **Global Rank uses per-rank PNGs** under
+`public/assets/neon/overview/ranks/{1..20}.png` (owner `ui/levels` plates) with **no text
+overlay** — the number is baked into the art; outside top 20 uses the dash. A document
+describing one shell + `#n` overlay is correct as history (morning of 29 Sep) and stale as a
+present fact — **say which**. **Header is nav-only** (Overview / Wallet / Performance /
+Competitions / Tutorials) — logo, level chip, bell and profile were removed because they
+already live on the sidebar; Games / Challenges / Marketplace stay on `UserSidebar`. **`?tab=`
 is the addressable source** for the active dashboard section; localStorage is fallback only;
 the in-page TabsList chrome is hidden so Header and content are not two navs. **Win rate on
 Overview KPIs is contest win rate from `_overall`**, not the trading trade win rate.
@@ -3105,6 +3108,12 @@ streaks (those stay on Performance). New games need no Overview edit. **Overview
 tiles import `overview-types.ts` only, never `overview-standing.service.ts`** (R58 — that
 service reaches mongoose and Turbopack then fails the browser build on `child_process` /
 `dns` / `fs`). Never calls `getEnabledGameTypes()` for stats (R29). **Never verified by eye.**
+
+**Polish (same day, owner mark-ups):** hero art is full-bleed with a left fade; Player Progress
++ Recent Activity sit side-by-side like mock image 5 (not the three loose cards of image 6);
+KPI and streak tiles use neon glowing borders and owner `ui/items` plates; Play-by-Game best
+score falls back through `bestScore` → `totalPoints` → max `game_round.rawScore` so a dash is
+not the only answer when seats lack a stamped best.
 
 ### 5.1a The contest cards, made game-aware - BUILT 6 September 2026
 

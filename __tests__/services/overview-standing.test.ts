@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import {
   buildTopPlayCards,
+  resolvePlayCardBestScore,
   OVERVIEW_PLAY_CARD_LIMIT,
 } from "@/lib/services/games/overview-standing.service";
 import {
@@ -37,12 +38,13 @@ function cat(partial: Partial<BrowsableGame> & Pick<BrowsableGame, "slug" | "gam
 }
 
 describe("resolveOverviewRankBadge", () => {
-  it("overlays ranks 1..20 on the shell", () => {
+  it("uses a dedicated PNG for ranks 1..20 with no text overlay", () => {
     for (let n = 1; n <= OVERVIEW_RANK_TOP_N; n++) {
       const badge = resolveOverviewRankBadge(n);
       expect(badge.inTopN).toBe(true);
-      expect(badge.overlay).toBe(`#${n}`);
-      expect(badge.src).toContain("rank-badge-shell");
+      expect(badge.overlay).toBeNull();
+      expect(badge.src).toBe(`/assets/neon/overview/ranks/${n}.png`);
+      expect(badge.rank).toBe(n);
     }
   });
 
@@ -248,6 +250,72 @@ describe("buildTopPlayCards", () => {
     expect(cards).toHaveLength(OVERVIEW_PLAY_CARD_LIMIT);
   });
 
+  it("shows best score from stored field, totalPoints fallback, or round max", () => {
+    expect(
+      resolvePlayCardBestScore({
+        gameKey: "provider:x:g",
+        bestScore: 900,
+        totalPoints: 50,
+      }),
+    ).toBe(900);
+    // Reason: UserGameStats.bestScore was often left at 0 while contests still ran.
+    expect(
+      resolvePlayCardBestScore({
+        gameKey: "provider:x:g",
+        bestScore: 0,
+        totalPoints: 1224,
+      }),
+    ).toBe(1224);
+    expect(
+      resolvePlayCardBestScore(
+        { gameKey: "provider:x:g", bestScore: 0, totalPoints: 0 },
+        440,
+      ),
+    ).toBe(440);
+    expect(
+      resolvePlayCardBestScore({
+        gameKey: "trading",
+        isTrading: true,
+        bestScore: 0,
+        totalPoints: 88,
+      }),
+    ).toBe(88);
+    expect(
+      resolvePlayCardBestScore({
+        gameKey: "provider:x:g",
+        bestScore: 0,
+        totalPoints: 0,
+      }),
+    ).toBeNull();
+  });
+
+  it("merges round bests into play cards so the UI is not stuck on a dash", () => {
+    const cards = buildTopPlayCards(
+      standing([
+        {
+          gameKey: "provider:chartvolt:circuit-sprint",
+          label: "Sprint",
+          isTrading: false,
+          contestsEntered: 14,
+          contestsCompleted: 14,
+          wins: 1,
+          podiums: 2,
+          totalPoints: 0,
+          seasonPoints: 0,
+          rating: 0,
+          bestRank: 2,
+          bestScore: 0,
+          currentStreak: 0,
+          bestStreak: 0,
+        },
+      ]),
+      catalogue,
+      4,
+      new Map([["provider:chartvolt:circuit-sprint", 1280]]),
+    );
+    expect(cards[0]?.bestScore).toBe(1280);
+  });
+
   it("overview standing service never calls getEnabledGameTypes", () => {
     const code = readFileSync(
       join(ROOT, "lib/services/games/overview-standing.service.ts"),
@@ -318,6 +386,20 @@ describe("Overview streaks chrome", () => {
     expect(
       readFileSync(join(ROOT, "lib/services/games/overview-types.ts"), "utf8"),
     ).toMatch(/OVERVIEW_PLAY_CARD_LIMIT\s*=\s*4/);
+  });
+
+  it("overview Header is nav-only — logo, level, bell and profile live elsewhere", () => {
+    const header = readFileSync(
+      join(ROOT, "components/Header.tsx"),
+      "utf8",
+    )
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    expect(header).toMatch(/NavItems/);
+    expect(header).not.toMatch(/UserDropdown/);
+    expect(header).not.toMatch(/NotificationDropdown/);
+    expect(header).not.toMatch(/\/api\/user\/level/);
+    expect(header).not.toMatch(/appLogo/);
   });
 });
 
