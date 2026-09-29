@@ -3134,7 +3134,9 @@ badges (`player.recentBadges`, newest first) — each new earn slides into the s
 oldest drops off. **Compete** sits between Progress/Activity and Streaks: up to **3** best
 challenge matches from `/api/matchmaking?action=ranked` (name, avatar, win rate / challenge
 wins, match %, Challenge dialog) plus a **Matching Cards** deep-link to
-`/leaderboard?board=trading&view=cards`. **KPI /
+`/leaderboard?board=trading&view=cards`. Matching Cards show **Score**,
+**Level**, **Competitions** (won · entered) and **1v1** (won · entered) as
+the primary four tiles — Win/P&L are not the card headline. **KPI /
 Progress / Activity header icons**
 fill their boxes edge-to-edge (`object-cover`); Recent Activity uses `icon-activity.png`
 (owner neon clock). **Global Rank plates are from `ui/Rank`** under `ranks/{1..20}.png`

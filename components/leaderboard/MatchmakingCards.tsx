@@ -3,7 +3,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence, PanInfo } from "framer-motion";
-import { formatProfitFactor } from "@/lib/services/trading-metrics";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import Image from "next/image";
@@ -15,8 +14,6 @@ import {
   ChevronRight,
   Sparkles,
   Trophy,
-  Target,
-  TrendingUp,
   Loader2,
   RefreshCw,
   Users,
@@ -799,89 +796,65 @@ function TraderCard({
           {/* Divider */}
           <div className="flex-shrink-0 mx-4 h-px bg-gradient-to-r from-transparent via-gray-700 to-transparent" />
 
-          {/* Stats Content Area - No scroll needed */}
+          {/* Stats — Score, Level, Competitions, 1v1 (entered + won). */}
           <div className="flex-1 px-3 pt-3">
-            <div className="grid grid-cols-4 gap-1.5 mb-2">
-              {/* Win Rate */}
-              <div className="bg-gradient-to-br from-green-500/10 to-green-500/5 rounded-lg p-2 border border-green-500/20 text-center">
-                <Target className="h-3.5 w-3.5 mx-auto mb-0.5 text-green-400/80" />
-                <p
-                  className={cn(
-                    "text-lg font-black",
-                    trader.winRate >= 50 ? "text-green-400" : "text-red-400",
-                  )}
-                >
-                  {trader.winRate.toFixed(1)}%
+            <div className="grid grid-cols-2 gap-2 mb-2">
+              <div className="bg-gradient-to-br from-primary-500/15 to-purple-500/10 rounded-xl p-2.5 border border-primary-500/25 text-center">
+                <Shield className="h-3.5 w-3.5 mx-auto mb-0.5 text-primary-300/90" />
+                <p className="text-xl font-black text-primary-300 drop-shadow-[0_0_8px_rgba(168,85,247,0.45)]">
+                  {trader.overallScore.toFixed(0)}
                 </p>
-                <span className="text-[10px] text-gray-500 uppercase">Win</span>
-              </div>
-
-              {/* P&L */}
-              <div className="bg-gradient-to-br from-blue-500/10 to-blue-500/5 rounded-lg p-2 border border-blue-500/20 text-center">
-                <TrendingUp className="h-3.5 w-3.5 mx-auto mb-0.5 text-blue-400/80" />
-                <p
-                  className={cn(
-                    "text-lg font-black",
-                    trader.totalPnl >= 0 ? "text-green-400" : "text-red-400",
-                  )}
-                >
-                  {trader.totalPnl >= 0 ? "+" : ""}
-                  {trader.totalPnl.toFixed(0)}
-                </p>
-                <span className="text-[10px] text-gray-500 uppercase">P&L</span>
-              </div>
-
-              {/* Competitions */}
-              <div className="bg-gradient-to-br from-yellow-500/10 to-yellow-500/5 rounded-lg p-2 border border-yellow-500/20 text-center">
-                <Trophy className="h-3.5 w-3.5 mx-auto mb-0.5 text-yellow-400/80" />
-                <p className="text-lg font-black text-yellow-400">
-                  {trader.competitionsWon}/{trader.competitionsEntered}
-                </p>
-                <span className="text-[10px] text-gray-500 uppercase">
-                  Comps
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                  Score
                 </span>
               </div>
 
-              {/* Challenges */}
-              <div className="bg-gradient-to-br from-purple-500/10 to-purple-500/5 rounded-lg p-2 border border-purple-500/20 text-center">
-                <Swords className="h-3.5 w-3.5 mx-auto mb-0.5 text-purple-400/80" />
-                <p className="text-lg font-black text-purple-400">
-                  {trader.challengesWon}/{trader.challengesEntered}
+              <div
+                className={cn(
+                  "rounded-xl p-2.5 border text-center",
+                  levelInfo.bgColor,
+                  levelInfo.borderColor,
+                )}
+              >
+                <span className="mb-0.5 block text-sm" aria-hidden>
+                  {levelInfo.icon}
+                </span>
+                <p className={cn("text-lg font-black", levelInfo.color)}>
+                  {levelInfo.label}
                 </p>
-                <span className="text-[10px] text-gray-500 uppercase">1v1</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                  Level
+                </span>
               </div>
-            </div>
 
-            {/* Quick Stats Row */}
-            <div className="flex justify-center gap-4 py-2 px-3 bg-gray-800/30 rounded-lg border border-gray-700/30 mb-2">
-              <div className="text-center">
-                <p className="text-sm font-bold text-white">
-                  {trader.totalTrades}
+              <div className="bg-gradient-to-br from-yellow-500/10 to-yellow-500/5 rounded-xl p-2.5 border border-yellow-500/25 text-center">
+                <Trophy className="h-3.5 w-3.5 mx-auto mb-0.5 text-yellow-400/90" />
+                <p className="text-base font-black text-yellow-300">
+                  {trader.competitionsWon}
+                  <span className="mx-0.5 text-gray-500 font-semibold">/</span>
+                  {trader.competitionsEntered}
                 </p>
-                <p className="text-[10px] text-gray-500 uppercase">Trades</p>
+                <span className="block text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                  Competitions
+                </span>
+                <span className="block text-[9px] text-gray-500">
+                  won · entered
+                </span>
               </div>
-              <div className="w-px h-8 bg-gray-700 self-center" />
-              <div className="text-center">
-                <p
-                  className={cn(
-                    "text-sm font-bold",
-                    trader.profitFactor >= 1.5
-                      ? "text-green-400"
-                      : trader.profitFactor >= 1
-                        ? "text-yellow-400"
-                        : "text-red-400",
-                  )}
-                >
-                  {formatProfitFactor(trader.profitFactor, 1)}
+
+              <div className="bg-gradient-to-br from-purple-500/10 to-purple-500/5 rounded-xl p-2.5 border border-purple-500/25 text-center">
+                <Swords className="h-3.5 w-3.5 mx-auto mb-0.5 text-purple-400/90" />
+                <p className="text-base font-black text-purple-300">
+                  {trader.challengesWon}
+                  <span className="mx-0.5 text-gray-500 font-semibold">/</span>
+                  {trader.challengesEntered}
                 </p>
-                <p className="text-[10px] text-gray-500 uppercase">P.Factor</p>
-              </div>
-              <div className="w-px h-8 bg-gray-700 self-center" />
-              <div className="text-center">
-                <p className="text-sm font-bold text-white">
-                  {trader.totalBadges}
-                </p>
-                <p className="text-[10px] text-gray-500 uppercase">Badges</p>
+                <span className="block text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                  1v1
+                </span>
+                <span className="block text-[9px] text-gray-500">
+                  won · entered
+                </span>
               </div>
             </div>
 
@@ -905,34 +878,18 @@ function TraderCard({
             )}
           </div>
 
-          {/* Footer - Always visible */}
+          {/* Footer */}
           <div className="flex-shrink-0 px-3 py-2.5 bg-gray-900/80 border-t border-gray-800/50">
-            <div className="flex items-center justify-between p-2.5 bg-gradient-to-r from-gray-800/80 to-gray-800/60 rounded-lg border border-gray-700/50 shadow-lg">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded-md bg-gradient-to-br from-primary-500/40 to-purple-500/40 border border-primary-500/30">
-                  <Shield className="h-4 w-4 text-primary-400" />
-                </div>
-                <span className="text-xs text-gray-200 font-semibold">
-                  Score
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-2xl font-black text-primary-400 drop-shadow-[0_0_10px_rgba(168,85,247,0.5)]">
-                  {trader.overallScore.toFixed(0)}
-                </span>
-                <span className="text-[11px] text-gray-500 font-medium">
-                  pts
-                </span>
-              </div>
-            </div>
-
-            {/* Availability Warning */}
-            {!trader.acceptingChallenges && (
-              <div className="mt-1.5 py-1.5 px-2 rounded-md bg-yellow-500/10 border border-yellow-500/30 text-center">
+            {!trader.acceptingChallenges ? (
+              <div className="py-1.5 px-2 rounded-md bg-yellow-500/10 border border-yellow-500/30 text-center">
                 <p className="text-[11px] text-yellow-400 font-semibold">
                   ⚠️ Not accepting challenges
                 </p>
               </div>
+            ) : (
+              <p className="text-center text-[11px] text-gray-500">
+                Swipe right or tap Challenge to start a 1v1
+              </p>
             )}
           </div>
         </div>

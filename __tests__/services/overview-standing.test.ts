@@ -614,6 +614,24 @@ describe("Overview streaks chrome", () => {
     expect(assets).toMatch(/icon-swords\.png/);
     expect(client).toMatch(/get\("view"\)\s*===\s*"cards"/);
     expect(client).toMatch(/initialViewMode/);
+    const cards = readFileSync(
+      join(ROOT, "components/leaderboard/MatchmakingCards.tsx"),
+      "utf8",
+    )
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    // Reason: Matching Cards must surface Score, Level, Competitions and 1v1
+    // with entered + won — not Win/P&L as the primary four tiles.
+    expect(cards).toMatch(/overallScore/);
+    expect(cards).toMatch(/Competitions/);
+    expect(cards).toMatch(/won · entered/);
+    expect(cards).toMatch(/competitionsWon/);
+    expect(cards).toMatch(/competitionsEntered/);
+    expect(cards).toMatch(/challengesWon/);
+    expect(cards).toMatch(/challengesEntered/);
+    expect(cards).toMatch(/>\s*1v1\s*</);
+    expect(cards).not.toMatch(/P\.Factor/);
+    expect(cards).not.toMatch(/uppercase">Win</);
   });
 
   it("Global Rank uses ranks art, not level plates", () => {

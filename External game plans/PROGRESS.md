@@ -1109,6 +1109,20 @@ days, and stay agnostic when new titles arrive.
 **Owner tested:** not yet.
 **Never verified by eye.**
 
+### 29 Sep 2026 - Matching Cards Score / Level / Competitions / 1v1
+
+**Owner:** Matching Cards must show Score, Level, Competitions and 1v1 with
+how many entered and how many won.
+
+**Shipped:**
+- `MatchmakingCards` TraderCard primary grid = Score, Level, Competitions, 1v1
+- Competitions / 1v1 labelled `won · entered` with `won/entered` figures
+- Win/P&L/trades/profit-factor demoted off the primary tiles
+- Test pin in `overview-standing.test.ts`; `13` s5.1g note
+
+**Owner tested:** not yet.
+**Never verified by eye.**
+
 ### 29 Sep 2026 - Overview Compete neon plates + Activity calendar + crisp KPIs
 
 **Owner:** Compete must match the neon reference exactly (transparent graphics);
