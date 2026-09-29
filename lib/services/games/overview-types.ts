@@ -49,6 +49,12 @@ export interface OverviewMission {
   /** 0..target; when target is 0 the bar is empty. */
   current: number;
   target: number;
+  /**
+   * Display names of badges still required to claim this milestone.
+   * Reason: progress can hit 100% while badge gates remain — showing the
+   * names under "% complete" stops that looking finished (owner, 29 Sep 2026).
+   */
+  requiredBadges: string[];
 }
 
 /**

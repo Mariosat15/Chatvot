@@ -140,6 +140,16 @@ function MissionCard({
       <p className="text-right text-[11px] font-semibold text-amber-200/90">
         {pct}% complete
       </p>
+      {mission.requiredBadges.length > 0 && (
+        <div className="rounded-lg border border-violet-400/20 bg-violet-500/5 px-2 py-1.5">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-violet-300/90">
+            Required badges
+          </p>
+          <p className="mt-0.5 text-[11px] leading-snug text-gray-300">
+            {mission.requiredBadges.join(" · ")}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

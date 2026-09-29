@@ -3125,7 +3125,11 @@ glass, week-delta row, integrated spark — **credit amounts keep ⚡** via `for
 the player's active map (unlocked first), in a **2-column grid** that fills the Progress rail,
 with the **map name**, real progress bars, and rounded **% complete** — View All goes to
 `/profile?tab=journey`, not `/journey`. A **milestones ring** (`journeyMilestonesDone` /
-`journeyMilestonesTotal`) sits above that grid. **KPI / Progress / Activity header icons**
+`journeyMilestonesTotal`) sits above that grid. **When a mission lists `requiredBadgeIds`,
+Overview resolves display names** (same catalogue path as the journey milestones API) and
+shows a **Required badges** line under `% complete` — metric progress can hit 100% while
+badge gates remain, so a full bar alone looked finished (owner, 29 Sep 2026). **KPI /
+Progress / Activity header icons**
 fill their boxes edge-to-edge (`object-cover`); Recent Activity uses `icon-activity.png`
 (owner neon clock). **Global Rank plates are from `ui/Rank`** under `ranks/{1..20}.png`
 (say RANK); **level plates from `ui/levels` live under `levels/` for later screens** and must
@@ -3138,13 +3142,15 @@ only when expanded (`components/dashboard/AccountStatusCard.tsx`).
 
 **Hero art amended later the same day:** Overview uses
 `hero-banner-chartvolt.png` (panoramic mountains + baked “Bigger traders / Bolder players /
-A brighter you” + ChartVolt neon mark). The strip is `aspect-[1024/341]` matching the file so
-`object-cover` shows the **whole** frame — a document describing the storm-silhouette crop or
-`object-[72%_28%]` is correct as history and stale as a present fact — **say which**. Left wash
-is narrowed so the centre slogan and right logo stay visible beside the welcome copy.
+A brighter you” + ChartVolt neon mark). The strip is **height-capped** (`h-[120px]` /
+`sm:h-[136px]` / `lg:h-[148px]`) to the owner’s red-marked band — a document describing
+`aspect-[1024/341]` (full native frame) is correct as history and stale as a present fact —
+**say which**. `object-cover object-[center_42%]` keeps the centre slogan and right logo in
+view while cropping sky/foreground. Left wash is narrowed so welcome copy stays readable.
 
 A document still saying missions are capped at **1**, or that KPI amounts are **bare**, or that
-rank plates come from `ui/levels`, or that Activity uses a Lucide clock, is correct as history
+rank plates come from `ui/levels`, or that Activity uses a Lucide clock, or that Overview
+mission cards omit required badges, is correct as history
 (earlier 29 Sep) and stale as a present fact — **say which**.
 
 ### 5.1a The contest cards, made game-aware - BUILT 6 September 2026

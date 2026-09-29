@@ -31,6 +31,8 @@ import GameRound from "@/database/models/games/game-round.model";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import { SCORE_PRODUCING_ROUND_STATUSES } from "@/lib/services/games/round-types";
 import { calculateMilestoneProgress } from "@/lib/services/journey-progress.service";
+import { getBadgesFromDB } from "@/lib/services/badge-config-seed.service";
+import { resolveBadgeDisplayName } from "@/lib/utils/badge-display-name";
 
 export {
   OVERVIEW_MISSION_LIMIT,
@@ -281,7 +283,9 @@ async function loadMissions(userId: string): Promise<{
       mapId,
       isActive: true,
     })
-      .select("id name description icon rewards order")
+      // Reason: requiredBadgeIds gates claiming even when metric progress is
+      // 100% — Overview must surface the names or a full bar reads finished.
+      .select("id name description icon rewards order requiredBadgeIds")
       .sort({ order: 1 })
       .lean();
 
@@ -297,6 +301,7 @@ async function loadMissions(userId: string): Promise<{
         description?: string;
         icon?: string;
         rewards?: { xp?: number };
+        requiredBadgeIds?: string[] | null;
       }>
     ).filter((m) => !done.has(m.id));
 
@@ -306,10 +311,23 @@ async function loadMissions(userId: string): Promise<{
     const lockedOpen = openRows.filter((m) => !unlocked.has(m.id));
     const next = [...unlockedOpen, ...lockedOpen].slice(0, OVERVIEW_MISSION_LIMIT);
 
-    const progressRows = await calculateMilestoneProgress(userId, mapId).catch(
-      () => [] as Array<{ milestoneId: string; currentValue: number; targetValue: number }>,
-    );
+    const [progressRows, badges] = await Promise.all([
+      calculateMilestoneProgress(userId, mapId).catch(
+        () =>
+          [] as Array<{
+            milestoneId: string;
+            currentValue: number;
+            targetValue: number;
+          }>,
+      ),
+      // Reason: same catalogue resolution as the journey milestones API — raw
+      // slugs must never reach the Overview card.
+      getBadgesFromDB().catch(() => [] as Array<{ id: string; name: string }>),
+    ]);
     const byId = new Map(progressRows.map((r) => [r.milestoneId, r]));
+    const nameById = new Map(
+      badges.map((b: { id: string; name: string }) => [b.id, b.name]),
+    );
 
     return {
       journeyMapName,
@@ -319,6 +337,11 @@ async function loadMissions(userId: string): Promise<{
         const p = byId.get(m.id);
         const target = Math.max(1, p?.targetValue ?? 1);
         const current = Math.min(target, Math.max(0, p?.currentValue ?? 0));
+        const badgeIds = Array.isArray(m.requiredBadgeIds)
+          ? m.requiredBadgeIds.filter(
+              (id): id is string => typeof id === "string" && id.length > 0,
+            )
+          : [];
         return {
           id: m.id,
           name: m.name || m.id,
@@ -329,6 +352,9 @@ async function loadMissions(userId: string): Promise<{
           xp: m.rewards?.xp ?? 0,
           current,
           target,
+          requiredBadges: badgeIds.map((id) =>
+            resolveBadgeDisplayName(id, null, nameById),
+          ),
         };
       }),
     };

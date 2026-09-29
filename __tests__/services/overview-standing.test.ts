@@ -554,6 +554,14 @@ describe("Overview streaks chrome", () => {
     expect(progress).toMatch(/Math\.round\(progressPercent\)/);
     expect(progress).toMatch(/OVERVIEW_ICON_ART/);
     expect(progress).toMatch(/object-cover/);
+    // Reason: metric progress can hit 100% while badge gates remain — the card
+    // must name Required badges under "% complete" or it looks finished.
+    expect(progress).toMatch(/Required badges/);
+    expect(progress).toMatch(/requiredBadges/);
+    expect(types).toMatch(/requiredBadges:\s*string\[\]/);
+    expect(standing).toMatch(/requiredBadgeIds/);
+    expect(standing).toMatch(/resolveBadgeDisplayName/);
+    expect(standing).toMatch(/getBadgesFromDB/);
     expect(layout).toMatch(/journeyMilestonesDone/);
     expect(layout).toMatch(/journeyMilestonesTotal/);
     expect(activity).toMatch(/OVERVIEW_ICON_ART\.activity/);
@@ -592,7 +600,7 @@ describe("Overview streaks chrome", () => {
     expect(layout).toMatch(/journeyMapName/);
   });
 
-  it("Welcome hero uses panoramic ChartVolt banner at native aspect", () => {
+  it("Welcome hero uses a compact ChartVolt banner strip", () => {
     const hero = readFileSync(
       join(ROOT, "components/dashboard/overview/OverviewHero.tsx"),
       "utf8",
@@ -605,8 +613,10 @@ describe("Overview streaks chrome", () => {
     );
     expect(hero).toMatch(/OVERVIEW_HERO_BANNER/);
     expect(hero).toMatch(/object-cover/);
-    expect(hero).toMatch(/aspect-\[1024\/341\]/);
-    expect(hero).not.toMatch(/object-\[72%_28%\]/);
+    expect(hero).toMatch(/h-\[120px\]/);
+    expect(hero).toMatch(/sm:h-\[136px\]/);
+    expect(hero).toMatch(/lg:h-\[148px\]/);
+    expect(hero).not.toMatch(/aspect-\[1024\/341\]/);
     expect(assets).toMatch(/hero-banner-chartvolt\.png/);
   });
 

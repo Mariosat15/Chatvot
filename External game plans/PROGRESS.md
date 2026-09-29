@@ -319,7 +319,7 @@ project low risk.
 
 This plan has two tracks. **As of 29 September 2026**:
 
-- **Neon Overview redesign CODE-COMPLETE 29 Sep (eng)** — Header **nav-only**; Global Rank from **`ui/Rank`**; Play by Game top 4 / discovery; Account Status thin expandable bar; KPI icons **fill their boxes**; Activity uses neon **clock** tile; Player Progress = **4** next missions (2-col grid) + milestones ring + rounded XP %; ⚡ on credits; hero padded/washed. See `13` **s5.1g**. Tests: `overview-standing.test.ts`. **Never verified by eye.**
+- **Neon Overview redesign CODE-COMPLETE 29 Sep (eng)** — Header **nav-only**; Global Rank from **`ui/Rank`**; Play by Game top 4 / discovery; Account Status thin expandable bar; KPI icons **fill their boxes**; Activity uses neon **clock** tile; Player Progress = **4** next missions (2-col grid) + milestones ring + rounded XP % + **Required badges** under `% complete` when `requiredBadgeIds` exist; ⚡ on credits; hero height-capped ChartVolt panoramic. See `13` **s5.1g**. Tests: `overview-standing.test.ts`. **Never verified by eye.**
 - **Volt Stack second title CODE-COMPLETE 27 Sep (eng)** — `volt-stack` in games-service catalogue; server-authoritative locks/score; play at `/play/volt-stack/?t=`; Circuit-compatible iframe messages. **Operator:** sync catalogue + enable title, then competition/challenge as for Circuit. See `21` **s4.1u**. Never verified by eye on live money.
 - **Provider contest lobby live updates CODE-COMPLETE 26 Sep (eng)** — same `/standings` poll as the arena (`ArenaLiveProvider` + `LobbyLiveParts`); players / your score / board / prize seats refresh without reload; trading keeps `LiveContestRefresher`. Not verified by eye.
 - **Prioritized task list:** `External game plans/NEXT-TASKS.md` — P0→P3 + closed items so stale paste-lists are not reopened. **Owner P1 decisions 24 Sep:** A5 last-when-asked; R11 owner/lawyers; R93 already closed; R96b content done; Q16 built; ops `--apply` backfills not needed; R99 optional.
@@ -1109,6 +1109,21 @@ days, and stay agnostic when new titles arrive.
 **Owner tested:** not yet.
 **Never verified by eye.**
 
+### 29 Sep 2026 - Overview mission Required badges
+
+**Owner:** milestones can show 100% complete while still needing Required Badges — fetch and
+show badge names under `% complete` on each Overview mission card so players are not confused.
+
+**Shipped:**
+- `OverviewMission.requiredBadges` — display names from `requiredBadgeIds`
+- `loadMissions` selects `requiredBadgeIds`, resolves via `getBadgesFromDB` +
+  `resolveBadgeDisplayName` (same path as journey milestones API)
+- `OverviewProgress` MissionCard shows **Required badges** under `% complete` when any exist
+- Docs: `13` s5.1g amendment; tests updated
+
+**Owner tested:** not yet.
+**Never verified by eye.**
+
 ### 29 Sep 2026 - Overview panoramic ChartVolt hero
 
 **Owner:** use the mountain panoramic (Bigger traders / Bolder players / ChartVolt neon) as
@@ -1116,7 +1131,9 @@ the Overview banner; fit so every baked line shows.
 
 **Shipped:**
 - `hero-banner-chartvolt.png` (1024×341); `OVERVIEW_HERO_BANNER` points there (cache-bust)
-- `OverviewHero` `aspect-[1024/341]` + `object-cover object-center` — no crop of slogan/logo
+- `OverviewHero` height-capped to owner red band (`h-[120px]` / `sm:h-[136px]` /
+  `lg:h-[148px]`) + `object-cover object-[center_42%]` — a document describing
+  `aspect-[1024/341]` as current is correct as history and stale as a present fact
 - Narrow left wash so welcome copy stays readable without covering the centre/right art
 - Docs: `13` s5.1g amendment; tests updated
 

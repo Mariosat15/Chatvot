@@ -10,16 +10,17 @@ interface OverviewHeroProps {
 }
 
 /**
- * Welcome strip over the panoramic ChartVolt hero (slogan + logo baked in).
- * Aspect matches the art so object-cover never crops the centre line or
- * ChartVolt mark — owner requirement 29 Sep 2026.
+ * Compact welcome strip over the panoramic ChartVolt hero.
+ * Height is capped to the owner-marked band (29 Sep 2026) — shorter than the
+ * native 1024×341 frame — with object-cover centred so the baked slogan and
+ * ChartVolt mark stay in view.
  */
 export default function OverviewHero({ name, accountActive }: OverviewHeroProps) {
   const first = name?.trim().split(/\s+/)[0] || "Player";
 
   return (
     <section
-      className="relative aspect-[1024/341] w-full overflow-hidden rounded-xl border border-cyan-400/20 shadow-[0_0_48px_-20px_rgba(34,211,238,0.4)]"
+      className="relative h-[120px] w-full overflow-hidden rounded-xl border border-cyan-400/20 shadow-[0_0_48px_-20px_rgba(34,211,238,0.4)] sm:h-[136px] lg:h-[148px]"
       aria-label="Welcome"
     >
       <Image
@@ -28,26 +29,28 @@ export default function OverviewHero({ name, accountActive }: OverviewHeroProps)
         fill
         priority
         sizes="100vw"
-        // Reason: container aspect equals the PNG (1024×341), so cover = full
-        // frame — no crop of the baked slogan or ChartVolt neon logo.
-        className="object-cover object-center"
+        // Reason: strip is shorter than the PNG; cover + slight vertical bias
+        // keeps the centre slogan and right ChartVolt logo inside the red-marked band.
+        className="object-cover object-[center_42%]"
       />
       {/* Narrow left wash only — keep centre slogan + right logo readable. */}
       <div
-        className="pointer-events-none absolute inset-y-0 left-0 w-[42%] max-w-md bg-gradient-to-r from-[#050B18]/90 via-[#050B18]/55 to-transparent"
+        className="pointer-events-none absolute inset-y-0 left-0 w-[40%] max-w-sm bg-gradient-to-r from-[#050B18]/92 via-[#050B18]/55 to-transparent"
         aria-hidden
       />
 
-      <div className="relative z-10 flex h-full max-w-[min(100%,22rem)] flex-col justify-center gap-1.5 p-3 sm:max-w-sm sm:gap-2 sm:p-5">
-        <p className={NEON_LABEL}>Overview</p>
-        <h1 className={`${NEON_HEADING} text-xl text-cyan-100 sm:text-2xl lg:text-3xl`}>
+      <div className="relative z-10 flex h-full max-w-[min(100%,20rem)] flex-col justify-center gap-0.5 p-3 sm:max-w-sm sm:gap-1 sm:p-4">
+        <p className={`${NEON_LABEL} text-[10px] leading-none`}>Overview</p>
+        <h1
+          className={`${NEON_HEADING} text-lg leading-tight text-cyan-100 sm:text-xl lg:text-2xl`}
+        >
           Welcome back, {first}
         </h1>
-        <p className="text-xs text-gray-300 sm:text-sm">
+        <p className="hidden text-xs leading-snug text-gray-300 sm:block">
           Higher skills, bigger rewards. Keep climbing the Global board.
         </p>
         <span
-          className={`mt-1 inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider ${
+          className={`mt-0.5 inline-flex w-fit items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider sm:mt-1 sm:px-2.5 sm:py-1 sm:text-[11px] ${
             accountActive
               ? "bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-400/40"
               : "bg-amber-500/15 text-amber-300 ring-1 ring-amber-400/40"
