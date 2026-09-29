@@ -1192,6 +1192,15 @@ fire/ice panoramic if the ChartVolt PNG cannot be fixed; KPI icons must fill the
 **Owner tested:** not yet.
 **Never verified by eye.**
 
+### 29 Sep 2026 - Desktop Compete: Challenge and Matching Cards use neon button art
+
+The CSS pills on each opponent card are replaced by the owner's Challenge (gold
+chamfered) and Matching Cards (violet pill) art, keyed out of black and written over
+`btn-challenge.png` / `btn-matching-cards.png`. Both sit at a shared `h-12` in the
+two-column footer. Hover brightens (`brightness-125`) and deepens the glow; press
+shrinks to `0.96`; always `cursor-pointer`. Phone CSS pills are unchanged. Tests
+flipped. **Never verified by eye.**
+
 ### 29 Sep 2026 - Desktop Compete: Matching Cards sits beside Challenge on each card
 
 Same layout as mobile. Matching Cards left the section header and now sits beside Challenge at the
