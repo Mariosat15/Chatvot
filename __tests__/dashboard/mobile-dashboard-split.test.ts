@@ -162,6 +162,9 @@ describe("mobile dashboard split", () => {
     expect(compete).toMatch(/src=\{OVERVIEW_COMPETE_ART\.score\}/);
     expect(compete).toMatch(/src=\{OVERVIEW_COMPETE_ART\.competitions\}/);
     expect(compete).not.toMatch(/OVERVIEW_ICON_ART\.(target|trophy)/);
+    // Reason: 29 Sep 2026 - Level moved to the owner's blue crown badge too.
+    expect(compete).toMatch(/src=\{OVERVIEW_COMPETE_ART\.level\}/);
+    expect(compete).not.toMatch(/OVERVIEW_COMPETE_ART\.crown/);
     expect((compete.match(/min-w-0 flex-1">\s*<p className="(?:truncate )?text-xl/g) ?? []).length).toBe(4);
   });
 

@@ -363,7 +363,7 @@ export default function OverviewCompete({
                 <div className={COMPETE_TILE}>
                   <span className="relative h-11 w-11 shrink-0 drop-shadow-[0_0_8px_rgba(34,211,238,0.6)]">
                     <Image
-                      src={OVERVIEW_COMPETE_ART.crown}
+                      src={OVERVIEW_COMPETE_ART.level}
                       alt=""
                       fill
                       sizes="88px"

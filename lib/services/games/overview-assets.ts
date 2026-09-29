@@ -42,7 +42,8 @@ export const OVERVIEW_ICON_ART = {
 export const OVERVIEW_COMPETE_ART = {
   swords: "/assets/neon/overview/compete/icon-swords.png",
   crown: "/assets/neon/overview/compete/icon-crown.png",
-  oneVsOne: "/assets/neon/overview/compete/icon-1v1-swords.png",
+  oneVsOne: "/assets/neon/overview/compete/icon-1v1-badge.png",
+  level: "/assets/neon/overview/compete/icon-level-crown.png",
   score: "/assets/neon/overview/compete/icon-score-target.png",
   competitions: "/assets/neon/overview/compete/icon-competitions-trophy.png",
   avatarRing: "/assets/neon/overview/compete/avatar-ring.png",
