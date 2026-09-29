@@ -16,7 +16,7 @@ import { NEON_HEADING, NEON_LABEL } from "@/components/neon/tokens";
 import { PERFORMANCE_INTERVALS } from "@/lib/utils/performance";
 
 const COMPETE_TILE =
-  "flex min-h-[58px] items-center justify-center gap-3 rounded-lg border border-cyan-400/30 bg-[#07101f]/90 px-2.5 py-2 shadow-[inset_0_0_12px_rgba(34,211,238,0.06)]";
+  "flex min-h-[58px] items-center gap-3 rounded-lg border border-cyan-400/30 bg-[#07101f]/90 px-3 py-2 shadow-[inset_0_0_12px_rgba(34,211,238,0.06)]";
 
 export interface CompeteMatch {
   userId: string;
@@ -343,82 +343,82 @@ export default function OverviewCompete({
                   caption beside it; same four facts, all real. */}
               <div className="grid grid-cols-2 gap-2">
                 <div className={COMPETE_TILE}>
-                  <span className="relative h-8 w-8 shrink-0 drop-shadow-[0_0_8px_rgba(34,211,238,0.6)]">
+                  <span className="relative h-11 w-11 shrink-0 drop-shadow-[0_0_8px_rgba(34,211,238,0.6)]">
                     <Image
                       src={OVERVIEW_ICON_ART.target}
                       alt=""
                       fill
-                      sizes="32px"
+                      sizes="88px"
                       className="object-contain"
                     />
                   </span>
-                  <div className="min-w-0">
-                    <p className="text-base font-bold leading-tight tabular-nums text-white">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xl font-bold leading-tight tabular-nums text-white">
                       {m.overallScore}
                     </p>
-                    <span className="block text-[9px] font-semibold uppercase tracking-wide text-gray-400">
+                    <span className="block text-[11px] font-semibold uppercase tracking-wide text-gray-400">
                       Score
                     </span>
                   </div>
                 </div>
                 <div className={COMPETE_TILE}>
-                  <span className="relative h-8 w-8 shrink-0 drop-shadow-[0_0_8px_rgba(34,211,238,0.6)]">
+                  <span className="relative h-11 w-11 shrink-0 drop-shadow-[0_0_8px_rgba(34,211,238,0.6)]">
                     <Image
                       src={OVERVIEW_COMPETE_ART.crown}
                       alt=""
                       fill
-                      sizes="32px"
+                      sizes="88px"
                       className="object-contain"
                     />
                   </span>
-                  <div className="min-w-0">
-                    <p className="truncate text-base font-bold leading-tight tabular-nums text-amber-200">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xl font-bold leading-tight tabular-nums text-amber-200">
                       {m.profileLevel}
                     </p>
-                    <span className="block text-[9px] font-semibold uppercase tracking-wide text-gray-400">
+                    <span className="block text-[11px] font-semibold uppercase tracking-wide text-gray-400">
                       Level
                     </span>
                   </div>
                 </div>
                 <div className={COMPETE_TILE}>
-                  <span className="relative h-8 w-8 shrink-0 drop-shadow-[0_0_8px_rgba(251,191,36,0.55)]">
+                  <span className="relative h-11 w-11 shrink-0 drop-shadow-[0_0_8px_rgba(251,191,36,0.55)]">
                     <Image
                       src={OVERVIEW_ICON_ART.trophy}
                       alt=""
                       fill
-                      sizes="32px"
+                      sizes="88px"
                       className="object-contain"
                     />
                   </span>
-                  <div className="min-w-0">
-                    <p className="text-base font-bold leading-tight tabular-nums text-amber-200">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xl font-bold leading-tight tabular-nums text-amber-200">
                       {m.competitionsWon}
                       <span className="mx-0.5 font-semibold text-gray-500">/</span>
                       {m.competitionsEntered}
                     </p>
-                    <span className="block text-[9px] font-semibold uppercase tracking-wide text-gray-400">
+                    <span className="block text-[11px] font-semibold uppercase tracking-wide text-gray-400">
                       Competitions
                     </span>
-                    <span className="block text-[9px] font-semibold tracking-wide text-gray-400">
+                    <span className="block text-[11px] font-semibold tracking-wide text-gray-400">
                       won · entered
                     </span>
                   </div>
                 </div>
                 <div className={COMPETE_TILE}>
                   <Swords
-                    className="h-7 w-7 shrink-0 text-violet-300 drop-shadow-[0_0_8px_rgba(167,139,250,0.7)]"
+                    className="h-10 w-10 shrink-0 text-violet-300 drop-shadow-[0_0_8px_rgba(167,139,250,0.7)]"
                     aria-hidden
                   />
-                  <div className="min-w-0">
-                    <p className="text-base font-bold leading-tight tabular-nums text-violet-200">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xl font-bold leading-tight tabular-nums text-violet-200">
                       {m.challengesWon}
                       <span className="mx-0.5 font-semibold text-gray-500">/</span>
                       {m.challengesEntered}
                     </p>
-                    <span className="block text-[9px] font-semibold uppercase tracking-wide text-gray-400">
+                    <span className="block text-[11px] font-semibold uppercase tracking-wide text-gray-400">
                       1v1
                     </span>
-                    <span className="block text-[9px] font-semibold tracking-wide text-gray-400">
+                    <span className="block text-[11px] font-semibold tracking-wide text-gray-400">
                       won · entered
                     </span>
                   </div>

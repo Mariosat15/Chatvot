@@ -1192,6 +1192,14 @@ fire/ice panoramic if the ChartVolt PNG cannot be fixed; KPI icons must fill the
 **Owner tested:** not yet.
 **Never verified by eye.**
 
+### 29 Sep 2026 - Desktop Compete tiles fill their box
+
+This follows the owner's screenshot. Centring the stat tiles, done earlier the same day, left a dead gap
+on the left. The tiles are now left-aligned (`px-3 gap-3`), with larger icons (the images are 44px, served
+at `sizes="88px"` for sharpness on 2x screens, and the 1v1 swords are 40px). The text block is `flex-1`,
+figures are `text-xl` and captions are 11px. The centring assertion was **flipped, not deleted**, and pins
+were added for the icon sizes and the text block. Only the desktop tree changed. **Never verified by eye.**
+
 ### 29 Sep 2026 - Phone Overview: Upcoming competitions moved above Play by game
 
 This was an owner request, and it is a reorder only. `MobileUpcomingCompetitions` already existed below

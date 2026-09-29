@@ -3209,6 +3209,11 @@ Matching Cards / Challenge lack loom/press/hand, is correct as history
 > blurs. A resized copy from the image optimiser would have blurred on hover. The mobile tree is
 > untouched. The flipped test is in `__tests__/dashboard/mobile-dashboard-split.test.ts`. **Never verified by eye.**
 
+> **Amended again 29 September 2026 (tiles fill the box):** the centred tiles were reverted. Each Compete
+> stat tile is left-aligned, with a 44px icon (40px swords), a `flex-1` text block, `text-xl` figures and
+> 11px captions, so the content covers the tile instead of floating in the middle. A document describing
+> centred tiles is correct as history only. **Never verified by eye.**
+
 > **Amended 29 September 2026 (phone order):** `Upcoming competitions` now sits **above** `Play by game`,
 > directly after Getting Started, on the owner's request. This is a reorder of `MobileDashboard.tsx` only.
 > A document listing it after Featured games is correct as history and stale as a present fact.

@@ -132,7 +132,12 @@ describe("mobile dashboard split", () => {
     expect(compete).not.toMatch(/clip-path:polygon/);
     expect(compete).not.toMatch(/rounded-tl-\[16px\] border-l-2 border-t-2/);
     expect(compete).not.toMatch(/rounded-br-\[16px\] border-b-2 border-r-2/);
-    expect(compete).toMatch(/const COMPETE_TILE =\s*"[^"]*justify-center/);
+    // Reason: flipped 29 Sep 2026 - centring left a dead gap on the left; the
+    // owner wants a larger icon at the edge and the text filling the tile.
+    expect(compete).not.toMatch(/const COMPETE_TILE =\s*"[^"]*justify-center/);
+    expect((compete.match(/relative h-11 w-11 shrink-0 drop-shadow-\[0_0_8px/g) ?? []).length).toBe(3);
+    expect(compete).toMatch(/h-10 w-10 shrink-0 text-violet-300/);
+    expect((compete.match(/min-w-0 flex-1">\s*<p className="(?:truncate )?text-xl/g) ?? []).length).toBe(4);
   });
 
   it("desktop Challenge button is larger and served at source resolution", () => {
