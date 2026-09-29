@@ -1192,6 +1192,16 @@ fire/ice panoramic if the ChartVolt PNG cannot be fixed; KPI icons must fill the
 **Owner tested:** not yet.
 **Never verified by eye.**
 
+### 29 Sep 2026 - Desktop Compete: Score and Competitions tiles use the owner's blue art
+
+The Score (target) and Competitions (trophy) tile icons on the desktop Compete cards are replaced by the
+owner's blue crystal art, keyed out of black the same way as the 1v1 swords (brightness to alpha,
+un-premultiplied colour, trimmed and saved at 256px). They are stored as
+`compete/icon-score-target.png` and `compete/icon-competitions-trophy.png` under new keys
+`OVERVIEW_COMPETE_ART.score` and `.competitions`, rather than overwriting `OVERVIEW_ICON_ART.target` and
+`.trophy`, which other dashboard screens still render. The trophy tile's amber glow became the same cyan
+as the others. All four tiles now share one blue set. **Never verified by eye.**
+
 ### 29 Sep 2026 - Desktop Play by game: a neon frame for the section, a glow for each card
 
 This follows the owner's screenshot. The strip did not read as one section, and the four artworks ran into
