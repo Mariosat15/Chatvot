@@ -3121,17 +3121,19 @@ are rebuilt to the premium glass target (large neon icon tile from `ui/items`, t
 glass, week-delta row, integrated spark — **credit amounts keep ⚡** via `formatVolts`, never
 `bare: true`); week deltas come from wallet + contest history when comparable, otherwise a dash
 (never invented); Play-by-Game best score falls back through `bestScore` → `totalPoints` → max
-`game_round.rawScore`. **Missions** show up to **4** next incomplete journey milestones on
-the player's active map (unlocked first), in a **2-column grid** that fills the Progress rail,
+`game_round.rawScore`. **Missions** show up to **3** next incomplete journey milestones on
+the player's active map (unlocked first), in a **2+1 grid** (two on top, third full-width),
 with the **map name**, real progress bars, and rounded **% complete** — View All goes to
-`/profile?tab=journey`, not `/journey`. A **milestones ring** (`journeyMilestonesDone` /
-`journeyMilestonesTotal`) sits above that grid. **When a mission lists `requiredBadgeIds`,
-Overview resolves display names** (same catalogue path as the journey milestones API) and
-shows a **Required badges** line under `% complete` — metric progress can hit 100% while
-badge gates remain, so a full bar alone looked finished (owner, 29 Sep 2026). **Beside the
-milestones ring, a six-slot Recent badges strip** shows the player's most recently earned
-badges (`player.recentBadges`, newest first) — each new earn slides into the strip and the
-oldest drops off. **Compete** sits between Progress/Activity and Streaks: up to **3** best
+`/profile?tab=journey`, not `/journey`, as a **gold outline pill**. A **milestone tile strip**
+(stars / trophies for done, cyan border for current, locks for remaining — capped at 12 tiles)
+replaces the earlier amber ring; `journeyMilestonesDone` / `journeyMilestonesTotal` still feed
+it. **When a mission lists `requiredBadgeIds`, Overview resolves display names** (same catalogue
+path as the journey milestones API) and shows a **Required badge** footer under `% complete` —
+metric progress can hit 100% while badge gates remain, so a full bar alone looked finished
+(owner, 29 Sep 2026). **Recent badges left this panel** on 29 Sep (owner Player Progress
+reference) — `OVERVIEW_RECENT_BADGE_LIMIT` remains for other surfaces; a document describing the
+six-slot strip beside milestones is correct as history and stale as a present fact — **say which**.
+**Compete** sits between Progress/Activity and Streaks: up to **3** best
 challenge matches from `/api/matchmaking?action=ranked` (name, avatar, win rate / challenge
 wins, match %, Challenge dialog) plus a **Matching Cards** deep-link to
 `/leaderboard?board=trading&view=cards`. Matching Cards show **Score**,

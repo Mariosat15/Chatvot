@@ -58,12 +58,15 @@ export interface OverviewMission {
 }
 
 /**
- * Cap on Overview mission tiles — fill the Progress panel with the next
- * incomplete milestones (owner, 29 Sep 2026; restored to 4 to fill the rail).
+ * Cap on Overview active missions — owner reference is three cards in a 2+1
+ * grid (29 Sep 2026 mockup). Was 4 briefly to fill the rail.
  */
-export const OVERVIEW_MISSION_LIMIT = 4;
+export const OVERVIEW_MISSION_LIMIT = 3;
 
-/** Cap on recent earned badges shown beside the milestones ring. */
+/**
+ * Cap on recent earned badges (profile / future strips). Progress panel no
+ * longer shows them — the reference uses milestone tiles instead.
+ */
 export const OVERVIEW_RECENT_BADGE_LIMIT = 6;
 
 /**
@@ -113,7 +116,7 @@ export interface OverviewStanding {
   playCards: OverviewPlayCard[];
   /** Active journey map display name (empty when no progress). */
   journeyMapName: string;
-  /** Completed milestones on the active map (for the ring readout). */
+  /** Completed milestones on the active map (for the tile strip). */
   journeyMilestonesDone: number;
   /** Total active milestones on the active map. */
   journeyMilestonesTotal: number;

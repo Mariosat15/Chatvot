@@ -504,8 +504,9 @@ describe("Overview streaks chrome", () => {
     // Reason: credit symbol stays on overview amounts — owner asked it restored
     // after a brief bare experiment (29 Sep 2026).
     expect(kpi).not.toMatch(/bare:\s*true/);
-    expect(kpi).toMatch(/formatVolts\(creditBalance\)/);
-    expect(kpi).toMatch(/formatVolts\(totalPrizesWon\)/);
+    // Reason: live poll renames the values — assert the formatVolts call sites, not the props.
+    expect(kpi).toMatch(/formatVolts\(liveCredits\)/);
+    expect(kpi).toMatch(/formatVolts\(livePrizes\)/);
     expect(kpi).toMatch(/linear-gradient\(110deg/);
     expect(kpi).toMatch(/fill/);
     expect(kpi).toMatch(/object-contain/);
@@ -516,7 +517,7 @@ describe("Overview streaks chrome", () => {
     expect(kpi).not.toMatch(/w-\[48%\]/);
   });
 
-  it("View All Missions links to profile journey tab and shows four next missions plus completion", () => {
+  it("View All Missions links to profile journey tab and shows three missions in 2+1 with milestone tiles", () => {
     const progress = readFileSync(
       join(ROOT, "components/dashboard/overview/OverviewProgress.tsx"),
       "utf8",
@@ -547,25 +548,30 @@ describe("Overview streaks chrome", () => {
       .replace(/\/\/.*$/gm, "");
     expect(progress).toMatch(/\/profile\?tab=journey/);
     expect(progress).not.toMatch(/href=["']\/journey["']/);
-    expect(types).toMatch(/OVERVIEW_MISSION_LIMIT\s*=\s*4/);
+    expect(types).toMatch(/OVERVIEW_MISSION_LIMIT\s*=\s*3/);
     expect(standing).toMatch(/OVERVIEW_MISSION_LIMIT/);
     expect(standing).toMatch(/journeyMapName/);
     expect(standing).toMatch(/journeyMilestonesDone/);
     expect(standing).toMatch(/calculateMilestoneProgress/);
-    expect(progress).toMatch(/MilestoneRing/);
-    expect(progress).toMatch(/linearGradient/);
-    expect(progress).toMatch(/border-amber-400\/55/);
-    expect(progress).toMatch(/drop-shadow-\[0_0_12px_rgba\(34,211,238/);
+    // Reason: owner reference uses a star/lock tile strip, not the amber ring.
+    expect(progress).toMatch(/MilestoneTiles/);
+    expect(progress).not.toMatch(/MilestoneRing/);
+    expect(progress).toMatch(/MILESTONE_TILE_CAP/);
+    expect(progress).toMatch(/Active Missions/);
+    expect(progress).toMatch(/View Leaderboard/);
+    expect(progress).toMatch(/OVERVIEW_COMPETE_ART\.crown/);
+    expect(progress).toMatch(/sm:col-span-2/);
     expect(progress).toMatch(/missions\.map/);
     expect(progress).toMatch(/Math\.round\(progressPercent\)/);
     expect(progress).toMatch(/OVERVIEW_ICON_ART/);
     expect(progress).toMatch(/object-cover/);
     // Reason: metric progress can hit 100% while badge gates remain — the card
-    // must name Required badges under "% complete" or it looks finished.
-    expect(progress).toMatch(/Required badges/);
+    // must name Required badge under "% complete" or it looks finished.
+    expect(progress).toMatch(/Required badge/);
     expect(progress).toMatch(/requiredBadges/);
-    expect(progress).toMatch(/Recent badges/);
-    expect(progress).toMatch(/OVERVIEW_RECENT_BADGE_LIMIT/);
+    // Reason: Recent badges left the Progress panel — reference has milestone tiles only.
+    expect(progress).not.toMatch(/Recent badges/);
+    expect(progress).not.toMatch(/OVERVIEW_RECENT_BADGE_LIMIT/);
     expect(types).toMatch(/requiredBadges:\s*string\[\]/);
     expect(types).toMatch(/OVERVIEW_RECENT_BADGE_LIMIT\s*=\s*6/);
     expect(types).toMatch(/OVERVIEW_COMPETE_MATCH_LIMIT\s*=\s*3/);
@@ -575,8 +581,7 @@ describe("Overview streaks chrome", () => {
     expect(layout).toMatch(/journeyMilestonesDone/);
     expect(layout).toMatch(/journeyMilestonesTotal/);
     expect(layout).toMatch(/OverviewCompete/);
-    expect(layout).toMatch(/OVERVIEW_RECENT_BADGE_LIMIT/);
-    expect(layout).toMatch(/recentBadges/);
+    expect(layout).not.toMatch(/OVERVIEW_RECENT_BADGE_LIMIT/);
     expect(activity).toMatch(/OVERVIEW_ICON_ART\.activity/);
     expect(activity).toMatch(/object-contain/);
     expect(activity).toMatch(/trophyGlass/);
