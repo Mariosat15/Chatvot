@@ -35,10 +35,11 @@ export default function MobileDashboard({
       <MobileQuickActions />
       <MobileQuickAccess />
       {gettingStarted}
+      {/* Reason: owner, 29 Sep 2026 - what starts soon sits above Play by game. */}
+      <MobileUpcomingCompetitions />
       <MobileGameCarousel />
       <MobilePlayerProgress />
       <MobileFeaturedGames />
-      <MobileUpcomingCompetitions />
       <MobileCompeteCarousel />
       <MobileRecentActivity />
       <MobileStreakGrid />

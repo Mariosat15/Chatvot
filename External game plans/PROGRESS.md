@@ -1192,6 +1192,13 @@ fire/ice panoramic if the ChartVolt PNG cannot be fixed; KPI icons must fill the
 **Owner tested:** not yet.
 **Never verified by eye.**
 
+### 29 Sep 2026 - Phone Overview: Upcoming competitions moved above Play by game
+
+This was an owner request, and it is a reorder only. `MobileUpcomingCompetitions` already existed below
+Featured games. It now renders directly after Getting Started and before `MobileGameCarousel`. The order
+test in `mobile-dashboard-split.test.ts` was updated, and its note says why. No data or component changed,
+and desktop is untouched. **Never verified by eye.**
+
 ### 29 Sep 2026 - Desktop Compete cards: no cut-off borders, centred tiles, sharp larger Challenge button
 
 The owner rejected the corner brackets and the notched match plate as "cut-off" borders. Both are gone:

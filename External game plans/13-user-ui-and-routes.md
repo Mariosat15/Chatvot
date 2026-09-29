@@ -3209,6 +3209,10 @@ Matching Cards / Challenge lack loom/press/hand, is correct as history
 > blurs. A resized copy from the image optimiser would have blurred on hover. The mobile tree is
 > untouched. The flipped test is in `__tests__/dashboard/mobile-dashboard-split.test.ts`. **Never verified by eye.**
 
+> **Amended 29 September 2026 (phone order):** `Upcoming competitions` now sits **above** `Play by game`,
+> directly after Getting Started, on the owner's request. This is a reorder of `MobileDashboard.tsx` only.
+> A document listing it after Featured games is correct as history and stale as a present fact.
+
 #### 5.1g-m The phone Overview is a second tree - BUILT 29 September 2026
 
 Owner spec `External game plans/Mobile Dashboard` (three-phone reference). **The desktop was

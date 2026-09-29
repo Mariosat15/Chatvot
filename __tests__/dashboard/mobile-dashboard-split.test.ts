@@ -62,9 +62,10 @@ describe("mobile dashboard split", () => {
     const order = [
       "<MobileBalanceCard",
       "<MobileQuickActions",
+      // Reason: moved 29 Sep 2026 - owner put Upcoming competitions above Play by game.
+      "<MobileUpcomingCompetitions",
       "<MobileGameCarousel",
       "<MobilePlayerProgress",
-      "<MobileUpcomingCompetitions",
       "<MobileCompeteCarousel",
     ].map((tag) => code.indexOf(tag));
     for (const idx of order) expect(idx).toBeGreaterThan(-1);
