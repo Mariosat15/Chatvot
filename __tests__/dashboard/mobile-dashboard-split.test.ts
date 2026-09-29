@@ -169,12 +169,16 @@ describe("mobile dashboard split", () => {
   });
 
   it("each desktop Compete card carries Matching Cards beside its Challenge button", () => {
-    // Reason: flipped 29 Sep 2026 - owner asked for the same layout as mobile.
-    // The full-width Challenge raster no longer fits beside Matching Cards, so
-    // both are CSS pills at one height; the header art survives only when empty.
+    // Reason: flipped 29 Sep 2026 - owner replaced the CSS pills with neon art
+    // (Challenge + Matching Cards). Same two-column layout; hover brightens,
+    // press shrinks, hand cursor. Header art survives only when empty.
     const compete = read("components/dashboard/overview/OverviewCompete.tsx");
-    expect(compete).not.toMatch(/src=\{OVERVIEW_COMPETE_ART\.challenge\}/);
-    expect(compete).not.toMatch(/aspect-\[967\/172\] w-\[94%\] max-w-\[340px\]/);
+    expect(compete).toMatch(/src=\{OVERVIEW_COMPETE_ART\.challenge\}/);
+    expect(compete).toMatch(/src=\{OVERVIEW_COMPETE_ART\.matchingCards\}/);
+    expect(compete).not.toMatch(/const ACTION_BUTTON =/);
+    expect(compete).toMatch(
+      /const ART_ACTION =\s*"[^"]*cursor-pointer[^"]*hover:brightness-125[^"]*active:scale-\[0\.96\]/,
+    );
     expect(compete).toMatch(
       /matches\.length === 0 && !loading && \([\s\S]*?MATCHING_CARDS_HREF/,
     );
@@ -186,7 +190,7 @@ describe("mobile dashboard split", () => {
     const cards = row.indexOf("href={MATCHING_CARDS_HREF}");
     expect(challenge).toBeGreaterThan(-1);
     expect(cards).toBeGreaterThan(challenge);
-    expect((row.match(/\$\{ACTION_BUTTON\}/g) ?? []).length).toBe(2);
-    expect(compete).toMatch(/const ACTION_BUTTON =\s*"[^"]*h-12[^"]*active:scale-95/);
+    expect((row.match(/\$\{ART_ACTION\}/g) ?? []).length).toBe(2);
+    expect(row).toMatch(/\bunoptimized\b/);
   });
 });

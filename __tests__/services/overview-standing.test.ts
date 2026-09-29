@@ -626,13 +626,12 @@ describe("Overview streaks chrome", () => {
     expect(compete).toMatch(/btn-challenge|challenge|Challenge/);
     // Reason: Matching Cards + Challenge must loom on hover, press in, and show a hand.
     expect(compete).toMatch(/cursor-pointer/);
-    expect(compete).toMatch(/hover:scale-1[01]0/);
-    expect(compete).toMatch(/active:scale-95/);
-    // Reason: flipped 29 Sep 2026 - Matching Cards moved beside Challenge on each
-    // card (same as mobile). Half-width raster art is too short, so both are CSS
-    // pills; the old aspect-[967/172] Challenge banner no longer fits.
-    expect(compete).not.toMatch(/aspect-\[967\/172\]/);
-    expect(compete).toMatch(/const ACTION_BUTTON =\s*"[^"]*h-12[^"]*active:scale-95/);
+    // Reason: flipped 29 Sep 2026 - owner supplied neon button art for both
+    // footer actions. CSS pills are gone; art brightens on hover and shrinks on press.
+    expect(compete).not.toMatch(/const ACTION_BUTTON =/);
+    expect(compete).toMatch(
+      /const ART_ACTION =\s*"[^"]*cursor-pointer[^"]*hover:brightness-125[^"]*active:scale-\[0\.96\]/,
+    );
     const actionRow = compete.indexOf('className="mt-auto grid grid-cols-2 gap-2"');
     expect(actionRow).toBeGreaterThan(-1);
     const cardFooter = compete.slice(actionRow, compete.indexOf("</article>", actionRow));
@@ -640,7 +639,9 @@ describe("Overview streaks chrome", () => {
     expect(cardFooter.indexOf("href={MATCHING_CARDS_HREF}")).toBeGreaterThan(
       cardFooter.indexOf("setChallengeTarget("),
     );
-    expect((cardFooter.match(/\$\{ACTION_BUTTON\}/g) ?? []).length).toBe(2);
+    expect(cardFooter).toMatch(/OVERVIEW_COMPETE_ART\.challenge/);
+    expect(cardFooter).toMatch(/OVERVIEW_COMPETE_ART\.matchingCards/);
+    expect((cardFooter.match(/\$\{ART_ACTION\}/g) ?? []).length).toBe(2);
     // Reason: header Matching Cards survives only for the empty state.
     expect(compete).toMatch(
       /matches\.length === 0 && !loading && \([\s\S]*?MATCHING_CARDS_HREF/,
