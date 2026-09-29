@@ -6,11 +6,13 @@ import { getUserDashboardDataForApi } from "@/lib/actions/dashboard.actions";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+/**
+ * Legacy trading live-stats endpoint.
+ * Prefer ContestsSidebar dashboard-live routes + `/api/dashboard/overview-live`
+ * for the Overview tab — this path is heavier and trading-shaped.
+ */
 export async function GET() {
   try {
-    console.log("🔄 API: /api/dashboard/live-stats called");
-
-    // Check authentication in the API route, not in the server action
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -25,15 +27,6 @@ export async function GET() {
       );
     }
 
-    console.log("✅ API: Dashboard data fetched successfully");
-    console.log(
-      `   - Active competitions: ${dashboardData.activeCompetitions.length}`,
-    );
-    console.log(
-      `   - Total capital: $${dashboardData.overallStats.totalCapital}`,
-    );
-    console.log("   - Total P&L: $", dashboardData.overallStats.totalPnL);
-
     return NextResponse.json(dashboardData, {
       headers: {
         "Cache-Control":
@@ -43,11 +36,7 @@ export async function GET() {
       },
     });
   } catch (error) {
-    console.error("❌ API Error fetching live dashboard stats:", error);
-    console.error(
-      "Error details:",
-      error instanceof Error ? error.message : "Unknown error",
-    );
+    console.error("Error fetching live dashboard stats:", error);
     return NextResponse.json(
       { error: "Failed to fetch dashboard stats" },
       { status: 500 },
