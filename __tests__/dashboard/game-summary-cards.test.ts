@@ -24,7 +24,9 @@ function stripComments(source: string): string {
 describe("Dashboard per-game summary cards (13 s5.1f)", () => {
   const actionPath = "lib/actions/comprehensive-dashboard.actions.ts";
   const typesPath = "lib/actions/dashboard/types.ts";
-  const layoutPath = "components/dashboard/DashboardLayout.tsx";
+  // Reason: re-pointed 29 Sep 2026 - the desktop Overview moved out of DashboardLayout into
+  // DesktopDashboard when the phone tree was split off; the claims are unchanged.
+  const layoutPath = "components/dashboard/desktop/DesktopDashboard.tsx";
   const cardsPath = "components/dashboard/GameSummaryCards.tsx";
   const playPath = "components/dashboard/overview/OverviewPlayByGame.tsx";
 

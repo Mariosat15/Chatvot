@@ -11,7 +11,7 @@ interface OverviewStreaksProps {
   streaks: OverviewStanding["streaks"];
 }
 
-interface StreakTile {
+export interface StreakTile {
   key: keyof OverviewStanding["streaks"];
   label: string;
   artSrc: string;
@@ -27,7 +27,7 @@ interface StreakTile {
  * game. Labels stay contest-shaped so a new title needs no Overview edit.
  * Icons are owner game art (image 7), not Lucide placeholders.
  */
-function streakValue(
+export function streakValue(
   streaks: OverviewStanding["streaks"],
   key: keyof OverviewStanding["streaks"],
 ): number {
@@ -49,7 +49,7 @@ function streakValue(
   }
 }
 
-const TILES: StreakTile[] = [
+export const TILES: StreakTile[] = [
   {
     key: "podiumStreak",
     label: "Podium streak",

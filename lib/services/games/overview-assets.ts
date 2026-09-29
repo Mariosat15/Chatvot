@@ -65,6 +65,21 @@ export const OVERVIEW_STREAK_ART = {
   weeksActive: "/assets/neon/overview/items/streak-bars.png",
 } as const;
 
+/**
+ * Mobile Overview art — owner `menu items/ui/wallet items` tiles (29 Sep 2026),
+ * downsized to webp. Phones only; desktop keeps the plates above.
+ */
+export const MOBILE_OVERVIEW_ART = {
+  deposit: "/assets/neon/overview/mobile/action-deposit.webp",
+  withdraw: "/assets/neon/overview/mobile/action-withdraw.webp",
+  compete: "/assets/neon/overview/mobile/action-compete.webp",
+  play: "/assets/neon/overview/mobile/action-play.webp",
+  volt: "/assets/neon/overview/mobile/icon-volt.webp",
+  walletChart: "/assets/neon/overview/mobile/wallet-chart.webp",
+  star: "/assets/neon/overview/mobile/icon-star.webp",
+  gift: "/assets/neon/overview/mobile/icon-gift.webp",
+} as const;
+
 const PLAY_GENERIC = "/assets/neon/overview/play-generic.png";
 
 const PLAY_BY_CODE = new Map<string, string>([
@@ -105,6 +120,7 @@ export function allOverviewAssets(): string[] {
     ...Object.values(OVERVIEW_KPI_ART),
     ...Object.values(OVERVIEW_STREAK_ART),
     ...Object.values(OVERVIEW_COMPETE_ART),
+    ...Object.values(MOBILE_OVERVIEW_ART),
     ...ranks,
     ...levels,
   ];

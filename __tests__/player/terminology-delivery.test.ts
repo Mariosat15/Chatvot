@@ -114,11 +114,17 @@ describe("pass 1 nav consumers read tokens, not hard-coded nouns", () => {
     expect(source).toMatch(/terms\.player/);
   });
 
-  it("MobileBottomNav uses terms.contests / terms.challenges / terms.leaderboard", () => {
+  it("MobileBottomNav takes its renameable noun (games) from the pack", () => {
+    /*
+      Reason: flipped 29 Sep 2026, not deleted. The phone nav became five tabs (owner
+      "Mobile Dashboard" spec): Home / Games / Compete / Wallet / Profile. Contests,
+      challenges and the leaderboard left the bar for the UserSidebar drawer, which
+      still reads all three from the pack (test above). The one renameable noun left
+      on the bar is "games", so that is the one that must come from the pack.
+    */
     const source = readCode(MOBILE_NAV);
-    expect(source).toMatch(/terms\.contests/);
-    expect(source).toMatch(/terms\.challenges/);
-    expect(source).toMatch(/terms\.leaderboard/);
+    expect(source).toMatch(/label:\s*terms\.games/);
+    expect(source).not.toMatch(/label:\s*["']Games["']/);
   });
 
   it("UserSidebar no longer hard-codes the section header Trading or the fallback Trader", () => {

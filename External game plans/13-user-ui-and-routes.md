@@ -3177,6 +3177,40 @@ row, or that the hero is still `hero-banner-chartvolt.png`, or that KPI icons ar
 Matching Cards / Challenge lack loom/press/hand, is correct as history
 (earlier 29 Sep) and stale as a present fact — **say which**.
 
+#### 5.1g-m The phone Overview is a second tree - BUILT 29 September 2026
+
+Owner spec `External game plans/Mobile Dashboard` (three-phone reference). **The desktop was
+not restyled.** Below `md` (768px) the Overview renders `MobileDashboard`; at `md+` it renders
+`DesktopDashboard`, which is the previous Overview markup moved out of `DashboardLayout.tsx`
+unchanged. Both sit inside one `DashboardOverviewProvider` (`hooks/useDashboardOverview.tsx`)
+and read the same payload, so the two trees cannot disagree about a figure.
+
+- **Order on the phone is Wallet, Actions, Games, Progress, Competition** (owner): welcome,
+  balance, quick actions + quick access, getting-started, play-by-game carousel, player
+  progress, featured games (only when the player has history — otherwise the carousel *is*
+  the featured list), upcoming competitions (one card per swipe), compete (one opponent per
+  swipe), recent activity (4 rows), streaks (2-column grid). Files under
+  `components/dashboard/mobile/`.
+- **A CSS-hidden tree stays mounted**, so every mobile fetch or poll is gated on
+  `useOverviewLive("mobile")` or `viewport === "mobile"` — otherwise each dashboard load
+  polls matchmaking and presence twice. Pinned by `__tests__/dashboard/mobile-dashboard-split.test.ts`.
+- **R58:** no mobile file imports `overview-standing.service`; types come from
+  `overview-types.ts`.
+- **Bottom nav is five tabs** — Home, Games (`terms.games`), Compete, Wallet, Profile — 72px
+  plus `env(safe-area-inset-bottom)`, `min-h-[44px]` targets, cyan glow on the active tab.
+  Compete lights on `/competitions`, `/challenges` and `/leaderboard`. Challenges,
+  Marketplace, Leaderboard and Sign out left the bar for the UserSidebar drawer and Quick
+  Access; two nav tests were **flipped, not deleted**.
+- The Header's phone tab strip is withheld on the Overview only; every other dashboard tab
+  keeps it so a player can get back.
+- Real data only: upcoming competitions are the player's own active/upcoming contests plus
+  `/api/games/suggestions`; a joinable suggestion has no player count and shows `-`.
+
+**Not built:** there is no games catalogue API, so featured games come from the player's own
+play cards rather than a curated list. **Never verified by eye** — the dashboard is behind
+sign-in; the 360–430px no-overflow claim rests on the layout's `overflow-x-hidden` and the
+carousels' `-mx-3 px-3`, not on a screenshot.
+
 ### 5.1a The contest cards, made game-aware - BUILT 6 September 2026
 
 `lib/actions/comprehensive-dashboard.actions.ts`, `components/dashboard/ContestsSidebar.tsx`,

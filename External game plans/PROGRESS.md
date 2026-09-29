@@ -319,7 +319,7 @@ project low risk.
 
 This plan has two tracks. **As of 29 September 2026**:
 
-- **Neon Overview redesign CODE-COMPLETE 29 Sep (eng)** — Header **nav-only**; Global Rank from **`ui/Rank`**; Play by Game top 4 / discovery; Account Status thin expandable bar; KPI icons **`h-14` + scale-1.08 contain (crisp)**; Activity **calendar glass** header + trophy-glass rows; Player Progress = **3** active missions (**2+1** grid) + **milestone tile strip** (stars/locks) + cyan **View Leaderboard** + gold **View All Missions** pill + rounded XP % + **Required badge** footer — ring + recent-badges strip removed from this panel (owner mockup, later 29 Sep); **Compete** neon plates (swords / Matching Cards / Challenge / avatar ring); ⚡ on credits; hero height-capped **`hero-banner-elements.jpg`**. See `13` **s5.1g**. Tests: `overview-standing.test.ts`. **Never verified by eye.**
+- **Neon Overview redesign CODE-COMPLETE 29 Sep (eng)** — Header **nav-only**; Global Rank from **`ui/Rank`**; Play by Game top 4 / discovery; Account Status thin expandable bar; KPI icons **`h-14` + scale-1.08 contain (crisp)**; Activity **calendar glass** header + trophy-glass rows; Player Progress = **3** active missions (**2+1** grid) + **milestone tile strip** (stars/locks) + cyan **View Leaderboard** + gold **View All Missions** pill + rounded XP % + **Required badge** footer — ring + recent-badges strip removed from this panel (owner mockup, later 29 Sep); **Compete** neon plates (swords / Matching Cards / Challenge / avatar ring); ⚡ on credits; hero height-capped **`hero-banner-elements.jpg`**. See `13` **s5.1g**. Tests: `overview-standing.test.ts`. **Phones get their own tree** since later 29 Sep (`13` **s5.1g-m**): `MobileDashboard` below `md`, five-tab bottom nav, desktop untouched. **Never verified by eye.**
 - **Volt Stack second title CODE-COMPLETE 27 Sep (eng)** — `volt-stack` in games-service catalogue; server-authoritative locks/score; play at `/play/volt-stack/?t=`; Circuit-compatible iframe messages. **Operator:** sync catalogue + enable title, then competition/challenge as for Circuit. See `21` **s4.1u**. Never verified by eye on live money.
 - **Provider contest lobby live updates CODE-COMPLETE 26 Sep (eng)** — same `/standings` poll as the arena (`ArenaLiveProvider` + `LobbyLiveParts`); players / your score / board / prize seats refresh without reload; trading keeps `LiveContestRefresher`. Not verified by eye.
 - **Prioritized task list:** `External game plans/NEXT-TASKS.md` — P0→P3 + closed items so stale paste-lists are not reopened. **Owner P1 decisions 24 Sep:** A5 last-when-asked; R11 owner/lawyers; R93 already closed; R96b content done; Q16 built; ops `--apply` backfills not needed; R99 optional.
@@ -1192,6 +1192,30 @@ fire/ice panoramic if the ChartVolt PNG cannot be fixed; KPI icons must fill the
 **Owner tested:** not yet.
 **Never verified by eye.**
 
+### 29 Sep 2026 - Mobile Overview as a second tree (owner "Mobile Dashboard" spec)
+
+**Owner:** build an exact replica of the three-phone reference without touching the desktop;
+`hidden md:block` Desktop / `md:hidden` Mobile, both on one `useDashboardOverview()`; phone
+order Wallet → Actions → Games → Progress → Competition; five-tab bottom nav.
+
+**Shipped:**
+- `DesktopDashboard` (previous Overview markup, moved unchanged) + `MobileDashboard` and ten
+  section components under `components/dashboard/mobile/`, one provider
+- Viewport-gated polling (`useOverviewLive("mobile")`) so the hidden tree never fetches
+- `MobileBottomNav` → Home / Games / Compete / Wallet / Profile, 72px + safe area, 44px
+  targets, cyan active glow; Header phone tab strip withheld on the Overview only
+- Additive exports on `OverviewStreaks` (`TILES`, `streakValue`) and `OverviewCompete`
+  (`mapMatches`); `MOBILE_OVERVIEW_ART` webp set
+- Tests: new `mobile-dashboard-split.test.ts` (6); `games-first-nav` + `terminology-delivery`
+  **flipped** for the five-tab bar; `overview-standing` + `game-summary-cards` re-pointed at
+  `DesktopDashboard` with claims unchanged
+- Found on the way: `arena-band.test.ts` has 2 failures on a clean tree — pre-existing, not
+  touched here
+- Docs: `13` **s5.1g-m**
+
+**Owner tested:** not yet.
+**Never verified by eye** — behind sign-in.
+
 ### 29 Sep 2026 - Player Progress matches owner mockup (3 missions + tiles)
 
 **Owner:** desktop Player Progress must look like the reference — 3 active missions (2+1),
@@ -1207,7 +1231,8 @@ Leaderboard with crown; no Recent badges on this panel.
 
 **Owner tested:** not yet.
 **Never verified by eye.**
-**Mobile Overview:** planned — wait for owner start; do not begin from this entry.
+**Mobile Overview:** ~~planned — wait for owner start~~ **built later 29 Sep** — see the
+entry above this one.
 
 ### 29 Sep 2026 - Overview recent badges + Compete matches
 

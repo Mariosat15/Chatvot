@@ -58,6 +58,13 @@ describe("games-first navigation (sidebar)", () => {
     const code = readCode("components/MobileBottomNav.tsx");
     expect(code).toMatch(/href:\s*"\/games"/);
     expect(code).toMatch(/href:\s*"\/competitions"/);
-    expect(code).toMatch(/href:\s*"\/challenges"/);
+    /*
+      Reason: flipped 29 Sep 2026. The five-tab phone nav (Home/Games/Compete/Wallet/
+      Profile) has no /challenges tab; the Compete tab lights on /challenges instead,
+      and the route stays in the UserSidebar drawer and the Overview's Quick Access.
+    */
+    expect(code).not.toMatch(/href:\s*"\/challenges"/);
+    expect(code).toMatch(/alsoActive:\s*\[[^\]]*"\/challenges"/);
+    expect(readCode("components/UserSidebar.tsx")).toMatch(/href:\s*"\/challenges"/);
   });
 });

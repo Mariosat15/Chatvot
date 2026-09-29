@@ -12,7 +12,7 @@ import { OVERVIEW_COMPETE_ART } from "@/lib/services/games/overview-assets";
 import { NEON_HEADING, NEON_LABEL } from "@/components/neon/tokens";
 import { PERFORMANCE_INTERVALS } from "@/lib/utils/performance";
 
-interface CompeteMatch {
+export interface CompeteMatch {
   userId: string;
   username: string;
   profileImage?: string;
@@ -36,7 +36,7 @@ interface CompeteMatch {
   isOnline: boolean;
 }
 
-function mapMatches(data: {
+export function mapMatches(data: {
   matches?: Array<{
     matchScore?: number;
     trader: {

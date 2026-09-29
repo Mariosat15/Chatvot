@@ -474,7 +474,8 @@ describe("Overview streaks chrome", () => {
 
   it("Overview tab mounts the mountain backdrop with faded washes", () => {
     const layout = readFileSync(
-      join(ROOT, "components/dashboard/DashboardLayout.tsx"),
+      // Reason: re-pointed 29 Sep 2026 - desktop Overview markup now lives in DesktopDashboard.
+      join(ROOT, "components/dashboard/desktop/DesktopDashboard.tsx"),
       "utf8",
     )
       .replace(/\/\*[\s\S]*?\*\//g, "")
@@ -535,7 +536,8 @@ describe("Overview streaks chrome", () => {
       .replace(/\/\*[\s\S]*?\*\//g, "")
       .replace(/\/\/.*$/gm, "");
     const layout = readFileSync(
-      join(ROOT, "components/dashboard/DashboardLayout.tsx"),
+      // Reason: re-pointed 29 Sep 2026 - desktop Overview markup now lives in DesktopDashboard.
+      join(ROOT, "components/dashboard/desktop/DesktopDashboard.tsx"),
       "utf8",
     )
       .replace(/\/\*[\s\S]*?\*\//g, "")
@@ -722,7 +724,8 @@ describe("Overview streaks chrome", () => {
 
   it("Progress and Activity stretch to equal height", () => {
     const layout = readFileSync(
-      join(ROOT, "components/dashboard/DashboardLayout.tsx"),
+      // Reason: re-pointed 29 Sep 2026 - desktop Overview markup now lives in DesktopDashboard.
+      join(ROOT, "components/dashboard/desktop/DesktopDashboard.tsx"),
       "utf8",
     )
       .replace(/\/\*[\s\S]*?\*\//g, "")

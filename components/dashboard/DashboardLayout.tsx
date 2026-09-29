@@ -9,21 +9,14 @@ import TradingAnalytics from "./TradingAnalytics";
 import ContestsSidebar from "./ContestsSidebar";
 import PerformanceRings from "./PerformanceRings";
 import ContestStatsCards from "./ContestStatsCards";
-import AccountStatusCard from "./AccountStatusCard";
 import CreditBreakdownChart from "./CreditBreakdownChart";
 import GettingStartedCard from "./GettingStartedCard";
-import GameSuggestionsCard from "./GameSuggestionsCard";
 import PlayerGamePerformancePanel from "./PlayerGamePerformancePanel";
 import HeroStatsBar from "./HeroStatsBar";
 import MarketHolidaysCard from "./MarketHolidaysCard";
-import OverviewHero from "./overview/OverviewHero";
-import OverviewBackdrop from "./overview/OverviewBackdrop";
-import OverviewKpiRow from "./overview/OverviewKpiRow";
-import OverviewPlayByGame from "./overview/OverviewPlayByGame";
-import OverviewProgress from "./overview/OverviewProgress";
-import OverviewActivity from "./overview/OverviewActivity";
-import OverviewStreaks from "./overview/OverviewStreaks";
-import OverviewCompete from "./overview/OverviewCompete";
+import DesktopDashboard from "./desktop/DesktopDashboard";
+import MobileDashboard from "./mobile/MobileDashboard";
+import { DashboardOverviewProvider } from "@/hooks/useDashboardOverview";
 import { DASHBOARD_TABS, type DashboardNavTab } from "@/lib/constants";
 import { useTerms } from "@/contexts/TerminologyContext";
 
@@ -56,12 +49,9 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
     charts,
     competitions,
     challenges,
-    player,
     journey,
-    accountStatus,
     gamePerformance,
     tradingEnabled,
-    overviewStanding,
   } = data;
 
   // Reason: a games-only player never places a trade; rounds.started/scored complete
@@ -107,22 +97,28 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
     [pathname, router, searchParams],
   );
 
-  const accountOk =
-    !accountStatus.hasActiveRestriction &&
-    !accountStatus.isLocked &&
-    !accountStatus.hasOpenAlert;
+  const gettingStarted = (
+    <GettingStartedCard
+      tradingEnabled={tradingEnabled}
+      hasFundedWallet={overview.totalDeposited > 0}
+      hasJoinedCompetition={competitions.stats.total > 0}
+      hasPlacedTrade={overview.totalTrades > 0}
+      hasPlayedGame={hasPlayedGame}
+      hasCompletedMilestone={journey?.completedMilestones > 0}
+      hasChallengedUser={challenges.stats.total > 0}
+    />
+  );
 
   return (
     <div className="w-full overflow-x-hidden">
-      <GettingStartedCard
-        tradingEnabled={tradingEnabled}
-        hasFundedWallet={overview.totalDeposited > 0}
-        hasJoinedCompetition={competitions.stats.total > 0}
-        hasPlacedTrade={overview.totalTrades > 0}
-        hasPlayedGame={hasPlayedGame}
-        hasCompletedMilestone={journey?.completedMilestones > 0}
-        hasChallengedUser={challenges.stats.total > 0}
-      />
+      {/*
+        Reason: on a phone the Overview opens on the wallet, not a setup
+        checklist — the mobile tree mounts the card below Quick Access instead.
+        Every other tab keeps it on top at all widths.
+      */}
+      <div className={activeTab === "overview" ? "hidden md:block" : undefined}>
+        {gettingStarted}
+      </div>
 
       {/*
         Reason: Header already carries Overview / Wallet / Performance /
@@ -131,53 +127,19 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
       */}
       <Tabs value={activeTab} onValueChange={handleTabChange} className="mt-4">
         <TabsContent value="overview" className="mt-0">
-          <OverviewBackdrop>
-          {(accountStatus.hasActiveRestriction ||
-            accountStatus.isLocked ||
-            accountStatus.hasOpenAlert ||
-            accountStatus.openChargebackCaseId) && (
-            <AccountStatusCard accountStatus={accountStatus} />
-          )}
-
-          <OverviewHero name={data.user.name} accountActive={accountOk} />
-
-          <OverviewKpiRow
-            creditBalance={overview.creditBalance}
-            contestWinRate={overviewStanding.contestWinRate}
-            roi={overview.roi}
-            totalPrizesWon={overview.totalPrizesWon}
-            weekDelta={overviewStanding.kpiWeekDelta}
-            liveEnabled={activeTab === "overview"}
-          />
-
-          <OverviewPlayByGame cards={overviewStanding.playCards} />
-
-          {/* Reason: equal-height panels — stretch both columns to the taller rail. */}
-          <div className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-3">
-            <div className="flex lg:col-span-2">
-              <OverviewProgress
-                globalRank={overviewStanding.globalRank}
-                totalUsers={overviewStanding.totalUsers}
-                level={player.level}
-                currentXP={player.currentXP}
-                xpToNextLevel={player.xpToNextLevel}
-                progressPercent={player.progressPercent}
-                title={player.title}
-                journeyMapName={overviewStanding.journeyMapName}
-                journeyMilestonesDone={overviewStanding.journeyMilestonesDone}
-                journeyMilestonesTotal={overviewStanding.journeyMilestonesTotal}
-                missions={overviewStanding.missions}
-              />
+          {/*
+            Reason: two trees, not one responsive tree — a desktop layout squeezed
+            onto a phone is the crowded screen the owner rejected. Both read the
+            same provider; only the visible tree polls (useOverviewLive).
+          */}
+          <DashboardOverviewProvider data={data} activeTab={activeTab}>
+            <div className="hidden md:block">
+              <DesktopDashboard />
             </div>
-            <OverviewActivity items={overviewStanding.recentActivity} />
-          </div>
-
-          <OverviewCompete liveEnabled={activeTab === "overview"} />
-
-          <OverviewStreaks streaks={overviewStanding.streaks} />
-
-          <GameSuggestionsCard />
-          </OverviewBackdrop>
+            <div className="md:hidden">
+              <MobileDashboard gettingStarted={gettingStarted} />
+            </div>
+          </DashboardOverviewProvider>
         </TabsContent>
 
         <TabsContent value="wallet" className="mt-4 space-y-4">
