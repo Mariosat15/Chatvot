@@ -1474,6 +1474,19 @@ man not cut off; (6) Player Progress — only one next mission + completion % / 
 **Owner tested:** not yet.
 **Never verified by eye.**
 
+### 29 Sep 2026 - Header back to Lucide gold pills (neon chrome rejected)
+
+**Owner:** do not like the neon frame; restore the strip from before those changes and
+improve it slightly (gold active pill, white inactive, wider gaps — matching the
+screenshot they sent).
+
+**Shipped:** `NavItems` is again one Lucide pill list for Header + phone; no
+`OVERVIEW_NAV_TAB_ART` import; `Header` row back to `h-16`. Neon PNGs stay on disk /
+asset inventory only. Test flipped in `games-first-nav.test.ts`. Docs: `13` s5.1g.
+
+**Owner tested:** not yet.
+**Never verified by eye.**
+
 ### 29 Sep 2026 - Header is ONE shared neon frame (not five floating plates)
 
 **Owner:** the five separate HUD plates were a "complete disaster" — the target is the

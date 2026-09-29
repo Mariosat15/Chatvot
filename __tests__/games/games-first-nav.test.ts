@@ -37,25 +37,22 @@ describe("dashboard Header NAV_ITEMS", () => {
     expect(NAV_ITEMS.every((i) => !i.href.startsWith("/games"))).toBe(true);
   });
 
-  it("desktop Header is one shared neon frame with tabs inside; phone keeps Lucide pills", () => {
+  it("Header uses Lucide gold-pill tabs; neon HUD art stays off the live strip", () => {
     /*
-      Reason: flipped 29 Sep 2026 — five floating plates were the wrong reading of
-      the individual button assets. Owner image 2 is ONE outer frame with the five
-      destinations inside (orange active chip, cyan inactive, vertical dividers).
-      The neon frame stays md+ only; Lucide pills stay for MobileTabStrip.
+      Reason: flipped twice 29 Sep 2026 — first away from five floating plates,
+      then away from the shared neon frame. Owner asked to restore the pre-neon
+      Lucide strip (gold active pill, white inactive) with a light polish.
     */
     const nav = readCode("components/NavItems.tsx");
-    expect(nav).toMatch(/OVERVIEW_NAV_TAB_ART\.frame/);
-    expect(nav).toMatch(/nav-frame|OVERVIEW_NAV_TAB_ART\.frame/);
-    expect(nav).toMatch(/md:block/);
-    expect(nav).toMatch(/md:hidden/);
-    expect(nav).toMatch(/clip-path:polygon/);
     expect(nav).toMatch(/LayoutDashboard/);
-    // Reason: floating per-tab plates must not come back — that was the disaster screenshot.
-    // Do not ban the substring TAB_ART: OVERVIEW_NAV_TAB_ART.frame is the shared shell.
+    expect(nav).toMatch(/rounded-full/);
+    expect(nav).toMatch(/ring-amber/);
+    expect(nav).toMatch(/text-white/);
+    expect(nav).not.toMatch(/OVERVIEW_NAV_TAB_ART/);
+    expect(nav).not.toMatch(/nav-frame/);
     expect(nav).not.toMatch(/tab-overview\.png/);
-    expect(nav).not.toMatch(/\["overview",\s*OVERVIEW_NAV_TAB_ART\.overview\]/);
-    expect(nav).not.toMatch(/new Map<\s*DashboardNavTab,\s*string\s*>/);
+    expect(nav).not.toMatch(/clip-path:polygon/);
+    expect(nav).not.toMatch(/from ["']next\/image["']/);
   });
 });
 

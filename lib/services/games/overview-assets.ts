@@ -71,11 +71,10 @@ export const OVERVIEW_STREAK_ART = {
 } as const;
 
 /**
- * Desktop Header chrome — owner `ui/match/uper` (29 Sep 2026).
- * `frame` is the shared HUD shell the desktop strip renders inside.
- * Per-tab plates stay on disk for art reference; the live Header does not
- * mount five floating plates (owner rejected that reading the same day).
- * Phones keep Lucide pills — a full neon frame at phone width is too busy.
+ * Owner `ui/match/uper` HUD plates (29 Sep 2026) — kept on disk for reference.
+ * The live Header does **not** mount these: owner rejected both five floating
+ * plates and the shared-frame reading, and asked to keep the Lucide gold-pill
+ * strip. Still listed in the asset inventory so a missing file fails the suite.
  */
 export const OVERVIEW_NAV_TAB_ART = {
   overview: "/assets/neon/overview/nav/tab-overview.png",
@@ -83,7 +82,6 @@ export const OVERVIEW_NAV_TAB_ART = {
   performance: "/assets/neon/overview/nav/tab-performance.png",
   contests: "/assets/neon/overview/nav/tab-competitions.png",
   tutorials: "/assets/neon/overview/nav/tab-tutorials.png",
-  /** Shared outer frame — the only plate the desktop Header mounts. */
   frame: "/assets/neon/overview/nav/nav-frame.png",
 } as const;
 

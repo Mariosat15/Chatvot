@@ -3105,16 +3105,14 @@ Overview Global Rank. A document describing rank art as coming from `ui/levels`,
 Competitions / Tutorials) — logo, level chip, bell and profile were removed because they
 already live on the sidebar; Games / Challenges / Marketplace stay on `UserSidebar`. **`?tab=`
 is the addressable source** for the active dashboard section; localStorage is fallback only;
-the in-page TabsList chrome is hidden so Header and content are not two navs. **Desktop Header
-tabs are owner neon HUD chrome** under `public/assets/neon/overview/nav/` from later 29 Sep 2026 —
-**one shared `nav-frame.png` shell with the five tabs inside** (orange active chip, cyan
-inactive, vertical dividers). Five floating per-tab plates were the wrong reading and were
-**replaced the same day** after the owner rejected that screenshot — a document describing
-five separate plates on the Header is correct as history and stale as a present fact —
-**say which**. **Phones keep the
-compact Lucide strip** (`md:hidden`) and never mount the neon frame — packing glowing
-plates into ~375px is the "large desktop top navigation" the Mobile Dashboard brief forbids;
-the Overview phone tree still hides the strip entirely (`MobileTabStrip`). **Win rate on
+the in-page TabsList chrome is hidden so Header and content are not two navs. **Header
+tabs are Lucide gold-pill chrome** (icon + uppercase label; active = amber pill + ring;
+inactive = white) — the pre-neon strip, lightly polished on 29 Sep 2026 after the owner
+rejected both five floating HUD plates and the shared `nav-frame.png` bar. Neon assets under
+`public/assets/neon/overview/nav/` remain on disk for reference only; a document describing
+neon plates or a shared frame on the live Header is correct as history and stale as a
+present fact — **say which**. The Overview phone tree still hides the strip entirely
+(`MobileTabStrip`). **Win rate on
 Overview KPIs is contest win rate from `_overall`**, not the trading trade win rate.
 **Streaks & Consistency reads `_overall` only** — podium streak, `bestStreak` (new field on
 both `UserGameStats` copies, stamped at settlement), contest wins, contests played, top-3
