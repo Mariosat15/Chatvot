@@ -99,7 +99,8 @@ export default function MobileCompeteCarousel() {
     <MobileSection
       title="Compete"
       href="/leaderboard?board=trading&view=cards"
-      linkLabel="Matching cards"
+      linkLabel="Matching Cards"
+      linkAsButton
     >
       {loading ? (
         <div className={`${MOBILE_CARD} flex items-center justify-center gap-2 p-6 text-sm text-gray-400`}>

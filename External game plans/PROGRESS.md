@@ -1192,6 +1192,19 @@ fire/ice panoramic if the ChartVolt PNG cannot be fixed; KPI icons must fill the
 **Owner tested:** not yet.
 **Never verified by eye.**
 
+### 29 Sep 2026 - Desktop Compete rebuilt to the owner's reference; phone Matching Cards is a button
+
+Desktop `OverviewCompete.tsx` now follows the owner's three-card picture. The avatar is 64-72px
+and a shield sits beside `Lv. N`. The match % is in a notched glass plate. The four tiles
+(Score / Level / Competitions / 1v1, all real fields, unchanged) have the icon on the left and the
+figure beside it (`COMPETE_TILE`). Corner brackets were added. The gold Challenge button is centred
+and narrower, and the Matching Cards pill is smaller. All images are transparent: `btn-challenge.png`
+and `btn-matching-cards.png` were trimmed of their empty transparent margin, and nothing was keyed.
+On the phone, the Compete header's "Matching Cards" is now a violet pill with an icon and a chevron
+(`MobileSection linkAsButton`), because a bare cyan word did not read as tappable. Pinned by 2 new
+tests in `mobile-dashboard-split.test.ts`. The mobile one was probed red, exactly 1 failure.
+**Never verified by eye.**
+
 ### 29 Sep 2026 - Player Progress "View Leaderboard" is the owner's neon button art
 
 The solid cyan crown pill on the desktop Player Progress rank column is replaced by the owner-supplied

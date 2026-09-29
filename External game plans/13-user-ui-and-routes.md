@@ -3180,6 +3180,9 @@ Matching Cards / Challenge lack loom/press/hand, is correct as history
 > **Amendment, 29 Sep 2026:** the desktop Player Progress **View Leaderboard** control is now the
 > owner's neon image (`OVERVIEW_COMPETE_ART.viewLeaderboard`, keyed to a transparent background) and
 > animates like Matching Cards (`hover:scale-110 active:scale-95`, `cursor-pointer`). Same destination.
+> The desktop **Compete** cards were rebuilt to the owner's three-card reference: icon-left tiles, a notched
+> match plate, and a centred Challenge button. On the phone, Compete's **Matching Cards** is a pill button
+> (`linkAsButton`) rather than a bare link. Same data, same routes.
 
 #### 5.1g-m The phone Overview is a second tree - BUILT 29 September 2026
 

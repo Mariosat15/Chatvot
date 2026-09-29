@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { ChevronRight, GalleryHorizontalEnd } from "lucide-react";
 import { NEON_HEADING } from "@/components/neon/tokens";
 
 /** Glass card shell shared by every mobile Overview section. */
@@ -14,11 +15,14 @@ export default function MobileSection({
   title,
   href,
   linkLabel = "See all",
+  linkAsButton = false,
   children,
 }: {
   title: string;
   href?: string;
   linkLabel?: string;
+  /** Render the header link as a pill button so it reads as pressable. */
+  linkAsButton?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -27,7 +31,17 @@ export default function MobileSection({
         <h2 className={`${NEON_HEADING} text-xs tracking-[0.16em] text-white`}>
           {title}
         </h2>
-        {href && (
+        {href && linkAsButton && (
+          <Link
+            href={href}
+            className="inline-flex min-h-[44px] cursor-pointer items-center gap-1.5 rounded-full border border-violet-400/70 bg-gradient-to-r from-indigo-700/80 to-violet-600/80 px-3.5 text-xs font-semibold text-white shadow-[0_0_14px_rgba(139,92,246,0.55)] transition-transform duration-200 ease-out active:scale-95"
+          >
+            <GalleryHorizontalEnd className="h-3.5 w-3.5" aria-hidden />
+            {linkLabel}
+            <ChevronRight className="h-3.5 w-3.5" aria-hidden />
+          </Link>
+        )}
+        {href && !linkAsButton && (
           <Link
             href={href}
             className="inline-flex min-h-[44px] items-center text-xs font-semibold text-cyan-300"

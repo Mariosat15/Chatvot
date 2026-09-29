@@ -3,14 +3,20 @@
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Loader2, Shield, Swords, TrendingUp, Trophy } from "lucide-react";
+import { Loader2, Shield, Swords, TrendingUp } from "lucide-react";
 import ProfileImage from "@/components/ui/ProfileImage";
 import ProfileCard from "@/components/profile/ProfileCard";
 import ChallengeCreateDialog from "@/components/challenges/ChallengeCreateDialog";
 import { OVERVIEW_COMPETE_MATCH_LIMIT } from "@/lib/services/games/overview-types";
-import { OVERVIEW_COMPETE_ART } from "@/lib/services/games/overview-assets";
+import {
+  OVERVIEW_COMPETE_ART,
+  OVERVIEW_ICON_ART,
+} from "@/lib/services/games/overview-assets";
 import { NEON_HEADING, NEON_LABEL } from "@/components/neon/tokens";
 import { PERFORMANCE_INTERVALS } from "@/lib/utils/performance";
+
+const COMPETE_TILE =
+  "flex min-h-[58px] items-center gap-2.5 rounded-lg border border-cyan-400/30 bg-[#07101f]/90 px-2.5 py-2 shadow-[inset_0_0_12px_rgba(34,211,238,0.06)]";
 
 export interface CompeteMatch {
   userId: string;
@@ -238,14 +244,14 @@ export default function OverviewCompete({
 
         <Link
           href="/leaderboard?board=trading&view=cards"
-          className="relative inline-flex h-14 w-[260px] shrink-0 cursor-pointer drop-shadow-[0_0_16px_rgba(139,92,246,0.55)] transition-transform duration-200 ease-out hover:scale-110 active:scale-95 sm:h-16 sm:w-[300px]"
+          className="relative inline-flex h-10 w-[184px] shrink-0 cursor-pointer drop-shadow-[0_0_14px_rgba(139,92,246,0.6)] transition-transform duration-200 ease-out hover:scale-110 active:scale-95 sm:h-11 sm:w-[204px]"
           aria-label="Matching Cards"
         >
           <Image
             src={OVERVIEW_COMPETE_ART.matchingCards}
             alt="Matching Cards"
             fill
-            sizes="300px"
+            sizes="204px"
             className="object-contain"
           />
         </Link>
@@ -266,13 +272,22 @@ export default function OverviewCompete({
           {matches.map((m) => (
             <article
               key={m.userId}
-              className="flex flex-col gap-3 rounded-[16px] border border-cyan-400/50 bg-[linear-gradient(160deg,rgba(12,28,52,0.95)_0%,rgba(6,12,28,0.98)_100%)] p-3.5 shadow-[0_0_22px_-8px_rgba(34,211,238,0.55),inset_0_0_24px_rgba(34,211,238,0.05)]"
+              className="relative flex flex-col gap-3 rounded-[16px] border border-cyan-400/55 bg-[linear-gradient(160deg,rgba(12,28,52,0.95)_0%,rgba(6,12,28,0.98)_100%)] p-3.5 shadow-[0_0_22px_-8px_rgba(34,211,238,0.6),inset_0_0_24px_rgba(34,211,238,0.06)] sm:p-4"
             >
-              <div className="flex items-center gap-2.5">
+              {/* Reason: the reference's bright corner brackets — decoration only. */}
+              <span
+                className="pointer-events-none absolute -left-px -top-px h-5 w-5 rounded-tl-[16px] border-l-2 border-t-2 border-cyan-300 shadow-[0_0_10px_rgba(34,211,238,0.8)]"
+                aria-hidden
+              />
+              <span
+                className="pointer-events-none absolute -bottom-px -right-px h-5 w-5 rounded-br-[16px] border-b-2 border-r-2 border-cyan-300 shadow-[0_0_10px_rgba(34,211,238,0.8)]"
+                aria-hidden
+              />
+              <div className="flex items-center gap-3">
                 <button
                   type="button"
                   onClick={() => setProfileTarget(m)}
-                  className="relative h-14 w-14 shrink-0 cursor-pointer rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/70"
+                  className="relative h-16 w-16 shrink-0 cursor-pointer rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/70 sm:h-[72px] sm:w-[72px]"
                   aria-label={`Open ${m.username}'s card`}
                 >
                   <div className="absolute inset-[10%] overflow-hidden rounded-full bg-[#0A1528]">
@@ -288,7 +303,7 @@ export default function OverviewCompete({
                     src={OVERVIEW_COMPETE_ART.avatarRing}
                     alt=""
                     fill
-                    sizes="56px"
+                    sizes="72px"
                     className="pointer-events-none object-contain drop-shadow-[0_0_10px_rgba(34,211,238,0.55)]"
                   />
                   <span
@@ -303,103 +318,118 @@ export default function OverviewCompete({
                   <button
                     type="button"
                     onClick={() => setProfileTarget(m)}
-                    className="block max-w-full truncate text-left text-sm font-semibold text-gray-100 transition-colors hover:text-cyan-300 hover:underline cursor-pointer"
+                    className="block max-w-full truncate text-left text-[15px] font-semibold text-gray-100 transition-colors hover:text-cyan-300 hover:underline cursor-pointer"
                   >
                     {m.username}
                   </button>
                   <p
-                    className={`${NEON_LABEL} flex items-center gap-1 truncate text-[10px] text-cyan-300/90`}
+                    className={`${NEON_LABEL} mt-1 flex items-center gap-1.5 truncate text-[11px] text-cyan-200/90`}
                   >
-                    <Image
-                      src={OVERVIEW_COMPETE_ART.crown}
-                      alt=""
-                      width={12}
-                      height={12}
-                      className="h-3 w-3 object-contain"
-                    />
+                    <Shield className="h-3.5 w-3.5 text-cyan-300" aria-hidden />
                     Lv. {m.profileLevel}
                   </p>
                 </div>
 
-                <div className="flex shrink-0 items-center gap-1 text-right">
-                  <div>
-                    <p className="text-lg font-bold tabular-nums text-cyan-300 drop-shadow-[0_0_8px_rgba(34,211,238,0.65)]">
-                      {m.matchScore}%
-                    </p>
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-cyan-400/85">
-                      Match
-                    </p>
-                  </div>
-                  <TrendingUp
-                    className="h-4 w-4 text-emerald-400"
-                    aria-hidden
-                  />
+                {/* Reason: reference frames the match % in a notched glass plate. */}
+                <div className="shrink-0 border border-cyan-400/60 bg-cyan-500/10 px-3 py-1.5 text-center shadow-[0_0_14px_-2px_rgba(34,211,238,0.55),inset_0_0_12px_rgba(34,211,238,0.12)] [clip-path:polygon(12px_0,100%_0,100%_calc(100%-12px),calc(100%-12px)_100%,0_100%,0_12px)]">
+                  <p className="flex items-center justify-center gap-1 text-2xl font-bold leading-none tabular-nums text-cyan-200 drop-shadow-[0_0_8px_rgba(34,211,238,0.7)]">
+                    {m.matchScore}%
+                    <TrendingUp
+                      className="h-4 w-4 text-cyan-300"
+                      aria-hidden
+                    />
+                  </p>
+                  <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-cyan-300/85">
+                    Match
+                  </p>
                 </div>
               </div>
 
               {/* Reason: same four tiles as Matching Cards — Score, Level, Competitions, 1v1.
                   Level is profile XP (`profileLevel`), never the matchmaking skill-band. */}
-              <div className="grid grid-cols-2 gap-1.5">
-                <div className="rounded-lg border border-cyan-400/20 bg-[#07101f]/90 px-2 py-1.5 text-center">
-                  <Shield
-                    className="mx-auto mb-0.5 h-3 w-3 text-cyan-300/90"
-                    aria-hidden
-                  />
-                  <p className="text-sm font-bold tabular-nums text-cyan-200">
-                    {m.overallScore}
-                  </p>
-                  <span className="text-[9px] font-semibold uppercase tracking-wide text-gray-400">
-                    Score
+              {/* Reason: reference tiles put the icon on the left and the figure +
+                  caption beside it; same four facts, all real. */}
+              <div className="grid grid-cols-2 gap-2">
+                <div className={COMPETE_TILE}>
+                  <span className="relative h-8 w-8 shrink-0 drop-shadow-[0_0_8px_rgba(34,211,238,0.6)]">
+                    <Image
+                      src={OVERVIEW_ICON_ART.target}
+                      alt=""
+                      fill
+                      sizes="32px"
+                      className="object-contain"
+                    />
                   </span>
+                  <div className="min-w-0">
+                    <p className="text-base font-bold leading-tight tabular-nums text-white">
+                      {m.overallScore}
+                    </p>
+                    <span className="block text-[9px] font-semibold uppercase tracking-wide text-gray-400">
+                      Score
+                    </span>
+                  </div>
                 </div>
-                <div className="rounded-lg border border-cyan-400/20 bg-[#07101f]/90 px-2 py-1.5 text-center">
-                  <Image
-                    src={OVERVIEW_COMPETE_ART.crown}
-                    alt=""
-                    width={12}
-                    height={12}
-                    className="mx-auto mb-0.5 h-3 w-3 object-contain"
-                  />
-                  <p className="truncate text-sm font-bold tabular-nums text-amber-200">
-                    {m.profileLevel}
-                  </p>
-                  <span className="text-[9px] font-semibold uppercase tracking-wide text-gray-400">
-                    Level
+                <div className={COMPETE_TILE}>
+                  <span className="relative h-8 w-8 shrink-0 drop-shadow-[0_0_8px_rgba(34,211,238,0.6)]">
+                    <Image
+                      src={OVERVIEW_COMPETE_ART.crown}
+                      alt=""
+                      fill
+                      sizes="32px"
+                      className="object-contain"
+                    />
                   </span>
+                  <div className="min-w-0">
+                    <p className="truncate text-base font-bold leading-tight tabular-nums text-amber-200">
+                      {m.profileLevel}
+                    </p>
+                    <span className="block text-[9px] font-semibold uppercase tracking-wide text-gray-400">
+                      Level
+                    </span>
+                  </div>
                 </div>
-                <div className="rounded-lg border border-cyan-400/20 bg-[#07101f]/90 px-2 py-1.5 text-center">
-                  <Trophy
-                    className="mx-auto mb-0.5 h-3 w-3 text-amber-300"
-                    aria-hidden
-                  />
-                  <p className="text-sm font-bold tabular-nums text-amber-200">
-                    {m.competitionsWon}
-                    <span className="mx-0.5 font-semibold text-gray-500">/</span>
-                    {m.competitionsEntered}
-                  </p>
-                  <span className="block text-[9px] font-semibold uppercase tracking-wide text-gray-400">
-                    Competitions
+                <div className={COMPETE_TILE}>
+                  <span className="relative h-8 w-8 shrink-0 drop-shadow-[0_0_8px_rgba(251,191,36,0.55)]">
+                    <Image
+                      src={OVERVIEW_ICON_ART.trophy}
+                      alt=""
+                      fill
+                      sizes="32px"
+                      className="object-contain"
+                    />
                   </span>
-                  <span className="block text-[9px] font-semibold tracking-wide text-gray-400">
-                    won · entered
-                  </span>
+                  <div className="min-w-0">
+                    <p className="text-base font-bold leading-tight tabular-nums text-amber-200">
+                      {m.competitionsWon}
+                      <span className="mx-0.5 font-semibold text-gray-500">/</span>
+                      {m.competitionsEntered}
+                    </p>
+                    <span className="block text-[9px] font-semibold uppercase tracking-wide text-gray-400">
+                      Competitions
+                    </span>
+                    <span className="block text-[9px] font-semibold tracking-wide text-gray-400">
+                      won · entered
+                    </span>
+                  </div>
                 </div>
-                <div className="rounded-lg border border-cyan-400/20 bg-[#07101f]/90 px-2 py-1.5 text-center">
+                <div className={COMPETE_TILE}>
                   <Swords
-                    className="mx-auto mb-0.5 h-3 w-3 text-violet-300"
+                    className="h-7 w-7 shrink-0 text-violet-300 drop-shadow-[0_0_8px_rgba(167,139,250,0.7)]"
                     aria-hidden
                   />
-                  <p className="text-sm font-bold tabular-nums text-violet-200">
-                    {m.challengesWon}
-                    <span className="mx-0.5 font-semibold text-gray-500">/</span>
-                    {m.challengesEntered}
-                  </p>
-                  <span className="block text-[9px] font-semibold uppercase tracking-wide text-gray-400">
-                    1v1
-                  </span>
-                  <span className="block text-[9px] font-semibold tracking-wide text-gray-400">
-                    won · entered
-                  </span>
+                  <div className="min-w-0">
+                    <p className="text-base font-bold leading-tight tabular-nums text-violet-200">
+                      {m.challengesWon}
+                      <span className="mx-0.5 font-semibold text-gray-500">/</span>
+                      {m.challengesEntered}
+                    </p>
+                    <span className="block text-[9px] font-semibold uppercase tracking-wide text-gray-400">
+                      1v1
+                    </span>
+                    <span className="block text-[9px] font-semibold tracking-wide text-gray-400">
+                      won · entered
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -411,7 +441,7 @@ export default function OverviewCompete({
                     username: m.username,
                   })
                 }
-                className="relative mt-auto h-14 w-full cursor-pointer drop-shadow-[0_0_18px_rgba(251,146,60,0.55)] transition-transform duration-200 ease-out hover:scale-105 active:scale-95 sm:h-16"
+                className="relative mx-auto mt-auto h-12 w-[82%] max-w-[260px] cursor-pointer drop-shadow-[0_0_18px_rgba(251,146,60,0.55)] transition-transform duration-200 ease-out hover:scale-110 active:scale-95 sm:h-14"
                 aria-label={`Challenge ${m.username}`}
               >
                 <Image

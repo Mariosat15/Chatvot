@@ -84,4 +84,22 @@ describe("mobile dashboard split", () => {
       expect(existsSync(join(ROOT, "public", src)), src).toBe(true);
     }
   });
+
+  it("the phone Compete header's Matching Cards is a pressable pill, not bare text", () => {
+    // Reason: owner, 29 Sep 2026 - a plain cyan word did not read as tappable.
+    const carousel = read("components/dashboard/mobile/MobileCompeteCarousel.tsx");
+    const section = read("components/dashboard/mobile/MobileSection.tsx");
+    expect(carousel).toMatch(/linkLabel="Matching Cards"\s*linkAsButton/);
+    const pill = section.slice(section.indexOf("linkAsButton && ("));
+    expect(pill.length).toBeGreaterThan(40);
+    expect(pill).toMatch(/rounded-full[^"]*active:scale-95/);
+    expect(pill).toMatch(/<ChevronRight/);
+  });
+
+  it("desktop Compete tiles put the icon beside the figure, as in the reference", () => {
+    const compete = read("components/dashboard/overview/OverviewCompete.tsx");
+    expect(compete).toMatch(/const COMPETE_TILE =\s*"flex[^"]*items-center/);
+    expect((compete.match(/className=\{COMPETE_TILE\}/g) ?? []).length).toBe(4);
+    expect(compete).toMatch(/clip-path:polygon/);
+  });
 });
