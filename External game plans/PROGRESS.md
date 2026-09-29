@@ -1192,6 +1192,16 @@ fire/ice panoramic if the ChartVolt PNG cannot be fixed; KPI icons must fill the
 **Owner tested:** not yet.
 **Never verified by eye.**
 
+### 29 Sep 2026 - Desktop Compete: the 1v1 tile uses the owner's swords art
+
+The violet line icon on the desktop `1v1` tile is replaced by the owner's blue swords, stored as
+`public/assets/neon/overview/compete/icon-1v1-swords.png` (`OVERVIEW_COMPETE_ART.oneVsOne`). The supplied
+JPEG was on solid black, so the black was turned into transparency by brightness: alpha is taken from each
+pixel's brightest channel and the colour is un-premultiplied. That keeps the glow soft on the card instead
+of leaving a dark square or a hard cut-out edge. The file is trimmed, padded square and saved at 256px.
+All four tiles now carry art. The phone card's 12px line-icon stats were left alone on purpose, since one
+picture among line icons would not match. **Never verified by eye.**
+
 ### 29 Sep 2026 - Phone Compete: Matching Cards beside every Challenge button
 
 This follows the owner's phone screenshot. The Matching Cards pill left the section header. Each card now
