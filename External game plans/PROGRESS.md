@@ -1192,6 +1192,17 @@ fire/ice panoramic if the ChartVolt PNG cannot be fixed; KPI icons must fill the
 **Owner tested:** not yet.
 **Never verified by eye.**
 
+### 29 Sep 2026 - Phone Compete: Matching Cards beside every Challenge button
+
+This follows the owner's phone screenshot. The Matching Cards pill left the section header. Each card now
+ends in a two-column row: Challenge (amber) and Matching Cards (violet), both CSS pills at `h-12`. The
+raster Challenge art at half a card's width would have been about 24px tall and unreadable. The header
+pill survives only in the empty state, where there is no card to carry it. **A test gap was also found
+and closed:** the two desktop commits earlier the same day (`52fd166c`, `c8f4b382`) broke two assertions
+in `overview-standing.test.ts`, the fixed `h-14` button and the 9px caption size, because only the
+dashboard folder was run. Both were updated with their claims unchanged: the button now has an aspect
+ratio, and the captions are 11px and still equal. **Never verified by eye.**
+
 ### 29 Sep 2026 - Desktop Compete tiles fill their box
 
 This follows the owner's screenshot. Centring the stat tiles, done earlier the same day, left a dead gap

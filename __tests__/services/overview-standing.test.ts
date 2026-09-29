@@ -628,7 +628,9 @@ describe("Overview streaks chrome", () => {
     expect(compete).toMatch(/cursor-pointer/);
     expect(compete).toMatch(/hover:scale-1[01]0/);
     expect(compete).toMatch(/active:scale-95/);
-    expect(compete).toMatch(/h-14|sm:h-16/);
+    // Reason: 29 Sep 2026 - the Challenge button is sized by the art's own
+    // aspect ratio (967x172) rather than a fixed h-14, so it grows sharp.
+    expect(compete).toMatch(/aspect-\[967\/172\]/);
     // Reason: Compete strip must show the same four tiles as Matching Cards, and
     // names must open ProfileCard like the leaderboard (not only a challenge dialog).
     expect(compete).toMatch(/overallScore/);
@@ -646,13 +648,15 @@ describe("Overview streaks chrome", () => {
     expect(compete).toMatch(/profileLevel/);
     expect(compete).toMatch(/Lv\.\s*\{m\.profileLevel\}/);
     expect(compete).not.toMatch(/formatLevel\(m\.level\)/);
-    // Reason: "won · entered" must match the COMPETITIONS / 1v1 label size (text-[9px]), not smaller.
+    // Reason: "won · entered" must match the COMPETITIONS / 1v1 label size, not
+    // smaller. Raised from text-[9px] to text-[11px] on 29 Sep 2026 so the tile
+    // text fills its box (owner); the equal-size claim is unchanged.
     const wonEntered = [...compete.matchAll(/won · entered[\s\S]{0,80}/g)];
     expect(wonEntered.length).toBeGreaterThanOrEqual(2);
     for (const hit of wonEntered) {
       const before = compete.slice(Math.max(0, hit.index! - 120), hit.index!);
-      expect(before).toMatch(/text-\[9px\]/);
-      expect(before).not.toMatch(/text-\[8px\]/);
+      expect(before).toMatch(/text-\[11px\]/);
+      expect(before).not.toMatch(/text-\[(8|9)px\]/);
     }
     expect(assets).toMatch(/OVERVIEW_COMPETE_ART/);
     expect(assets).toMatch(/btn-matching-cards\.png/);

@@ -123,6 +123,23 @@ describe("mobile dashboard split", () => {
     expect(pill).toMatch(/<ChevronRight/);
   });
 
+  it("each phone Compete card carries Matching Cards beside its Challenge button", () => {
+    // Reason: owner, 29 Sep 2026 - moved off the header onto every card. The
+    // header pill survives only for the empty state, so it is conditional.
+    const carousel = read("components/dashboard/mobile/MobileCompeteCarousel.tsx");
+    expect(carousel).toMatch(/href=\{matches\.length === 0 && !loading \? MATCHING_CARDS_HREF : undefined\}/);
+    const start = carousel.indexOf('<div className="grid grid-cols-2 gap-2">');
+    expect(start).toBeGreaterThan(-1);
+    const row = carousel.slice(start, carousel.indexOf("</article>", start));
+    expect(row.length).toBeGreaterThan(100);
+    const challenge = row.indexOf("setChallengeTarget(");
+    const cards = row.indexOf("href={MATCHING_CARDS_HREF}");
+    expect(challenge).toBeGreaterThan(-1);
+    expect(cards).toBeGreaterThan(challenge);
+    expect((row.match(/\$\{ACTION_BUTTON\}/g) ?? []).length).toBe(2);
+    expect(carousel).toMatch(/const ACTION_BUTTON =\s*"[^"]*h-12[^"]*active:scale-95/);
+  });
+
   it("desktop Compete tiles put the icon beside the figure, as in the reference", () => {
     const compete = read("components/dashboard/overview/OverviewCompete.tsx");
     expect(compete).toMatch(/const COMPETE_TILE =\s*"flex[^"]*items-center/);

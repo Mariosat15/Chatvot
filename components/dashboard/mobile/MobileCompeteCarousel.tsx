@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Image from "next/image";
-import { Loader2, Shield, Swords, Trophy } from "lucide-react";
+import Link from "next/link";
+import { GalleryHorizontalEnd, Loader2, Shield, Swords, Trophy } from "lucide-react";
 import ProfileImage from "@/components/ui/ProfileImage";
 import ProfileCard from "@/components/profile/ProfileCard";
 import ChallengeCreateDialog from "@/components/challenges/ChallengeCreateDialog";
@@ -15,6 +16,11 @@ import { OVERVIEW_COMPETE_ART } from "@/lib/services/games/overview-assets";
 import { useOverviewLive } from "@/hooks/useDashboardOverview";
 import { PERFORMANCE_INTERVALS } from "@/lib/utils/performance";
 import MobileSection, { MOBILE_CARD, MOBILE_CAROUSEL } from "./MobileSection";
+
+const MATCHING_CARDS_HREF = "/leaderboard?board=trading&view=cards";
+
+const ACTION_BUTTON =
+  "inline-flex h-12 min-w-0 cursor-pointer items-center justify-center gap-1.5 rounded-full border px-3 text-xs font-bold transition-transform duration-200 ease-out active:scale-95 motion-reduce:active:scale-100";
 
 /**
  * Compete — one opponent card per swipe with a large Challenge button (spec s14).
@@ -96,9 +102,10 @@ export default function MobileCompeteCarousel() {
   }, [live, idsKey]);
 
   return (
+    // Reason: the header pill only returns when there is no card to carry it.
     <MobileSection
       title="Compete"
-      href="/leaderboard?board=trading&view=cards"
+      href={matches.length === 0 && !loading ? MATCHING_CARDS_HREF : undefined}
       linkLabel="Matching Cards"
       linkAsButton
     >
@@ -182,21 +189,28 @@ export default function MobileCompeteCarousel() {
                   />
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setChallengeTarget({ userId: m.userId, username: m.username })}
-                  className="relative h-14 w-full active:scale-95 motion-reduce:active:scale-100"
-                  aria-label={`Challenge ${m.username}`}
-                >
-                  <Image
-                    src={OVERVIEW_COMPETE_ART.challenge}
-                    alt=""
-                    fill
-                    sizes="86vw"
-                    className="object-contain"
-                  />
-                  <span className="sr-only">Challenge</span>
-                </button>
+                {/* Reason: owner, 29 Sep 2026 - Matching Cards sits beside each
+                    Challenge button instead of in the section header. Both are
+                    drawn in CSS at one height: the raster art at half a card's
+                    width would be ~24px tall and unreadable. */}
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setChallengeTarget({ userId: m.userId, username: m.username })}
+                    className={`${ACTION_BUTTON} border-amber-300/80 bg-gradient-to-b from-amber-400 to-orange-600 text-[#1A0B02] shadow-[0_0_14px_rgba(251,146,60,0.55)]`}
+                    aria-label={`Challenge ${m.username}`}
+                  >
+                    <Swords className="h-4 w-4 shrink-0" aria-hidden />
+                    Challenge
+                  </button>
+                  <Link
+                    href={MATCHING_CARDS_HREF}
+                    className={`${ACTION_BUTTON} border-violet-400/70 bg-gradient-to-r from-indigo-700/80 to-violet-600/80 text-white shadow-[0_0_14px_rgba(139,92,246,0.55)]`}
+                  >
+                    <GalleryHorizontalEnd className="h-4 w-4 shrink-0" aria-hidden />
+                    <span className="truncate">Matching Cards</span>
+                  </Link>
+                </div>
               </article>
             </li>
           ))}
