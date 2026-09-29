@@ -1,8 +1,12 @@
 "use client";
 
+"use client";
+
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { formatVolts } from "@/lib/utils/format-volts";
 import { OVERVIEW_KPI_ART } from "@/lib/services/games/overview-assets";
+import { PERFORMANCE_INTERVALS } from "@/lib/utils/performance";
 
 interface OverviewKpiRowProps {
   creditBalance: number;
@@ -16,6 +20,8 @@ interface OverviewKpiRowProps {
     roi: number | null;
     prizes: number | null;
   };
+  /** When false, skip the light live poll (other dashboard tabs). */
+  liveEnabled?: boolean;
 }
 
 type KpiTone = "gold" | "violet" | "cyan" | "orange";
@@ -247,6 +253,9 @@ function KpiCard({
 /**
  * Four Overview KPIs rebuilt to the image-4 premium neon glass system.
  * Credit figures keep the platform credit symbol (⚡) — never strip it here.
+ *
+ * Live: polls `/api/dashboard/overview-live` (wallet + contest win rate only)
+ * while the tab is visible — never re-runs the full comprehensive dashboard.
  */
 export default function OverviewKpiRow({
   creditBalance,
@@ -254,26 +263,91 @@ export default function OverviewKpiRow({
   roi,
   totalPrizesWon,
   weekDelta,
+  liveEnabled = true,
 }: OverviewKpiRowProps) {
+  const [liveCredits, setLiveCredits] = useState(creditBalance);
+  const [livePrizes, setLivePrizes] = useState(totalPrizesWon);
+  const [liveWinRate, setLiveWinRate] = useState(contestWinRate);
+
+  useEffect(() => {
+    setLiveCredits(creditBalance);
+    setLivePrizes(totalPrizesWon);
+    setLiveWinRate(contestWinRate);
+  }, [creditBalance, totalPrizesWon, contestWinRate]);
+
+  useEffect(() => {
+    if (!liveEnabled) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const poll = async () => {
+      if (document.visibilityState === "hidden") {
+        timer = setTimeout(poll, PERFORMANCE_INTERVALS.DASHBOARD_REFRESH);
+        return;
+      }
+      try {
+        const res = await fetch("/api/dashboard/overview-live", {
+          cache: "no-store",
+        });
+        if (res.ok) {
+          const data = (await res.json()) as {
+            creditBalance?: number;
+            totalPrizesWon?: number;
+            contestWinRate?: number | null;
+          };
+          if (!cancelled) {
+            if (typeof data.creditBalance === "number") {
+              setLiveCredits(data.creditBalance);
+            }
+            if (typeof data.totalPrizesWon === "number") {
+              setLivePrizes(data.totalPrizesWon);
+            }
+            if (
+              data.contestWinRate === null ||
+              typeof data.contestWinRate === "number"
+            ) {
+              setLiveWinRate(data.contestWinRate);
+            }
+          }
+        }
+      } catch {
+        // Keep last good values
+      } finally {
+        if (!cancelled) {
+          timer = setTimeout(poll, PERFORMANCE_INTERVALS.DASHBOARD_REFRESH);
+        }
+      }
+    };
+
+    timer = setTimeout(poll, PERFORMANCE_INTERVALS.DASHBOARD_REFRESH);
+
+    const onVis = () => {
+      if (document.visibilityState === "visible") void poll();
+    };
+    document.addEventListener("visibilitychange", onVis);
+
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [liveEnabled]);
+
   const winDisplay =
-    contestWinRate == null ? "—" : `${contestWinRate.toFixed(1)}%`;
-  const roiDisplay = `${roi.toFixed(1)}%`;
+    liveWinRate == null ? "—" : `${liveWinRate.toFixed(1)}%`;
 
   return (
-    <section
-      className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4"
-      aria-label="Key stats"
-    >
+    <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <KpiCard
-        label="Credit Balance"
-        value={formatVolts(creditBalance)}
+        label="Credits"
+        value={formatVolts(liveCredits)}
         artSrc={OVERVIEW_KPI_ART.credits}
         tone="gold"
         sparkId="credits"
         weekDelta={weekDelta.credits}
       />
       <KpiCard
-        label="Win Rate"
+        label="Contest win rate"
         value={winDisplay}
         artSrc={OVERVIEW_KPI_ART.winRate}
         tone="violet"
@@ -281,22 +355,22 @@ export default function OverviewKpiRow({
         weekDelta={weekDelta.winRate}
       />
       <KpiCard
-        label="Net ROI"
-        value={roiDisplay}
+        label="ROI"
+        value={`${roi >= 0 ? "+" : ""}${roi.toFixed(1)}%`}
         artSrc={OVERVIEW_KPI_ART.roi}
         tone="cyan"
-        valueClass={roi < 0 ? "text-rose-400" : "text-white"}
         sparkId="roi"
         weekDelta={weekDelta.roi}
+        valueClass={roi >= 0 ? "text-emerald-300" : "text-rose-300"}
       />
       <KpiCard
-        label="Prizes Won"
-        value={formatVolts(totalPrizesWon)}
+        label="Prizes won"
+        value={formatVolts(livePrizes)}
         artSrc={OVERVIEW_KPI_ART.prizes}
         tone="orange"
         sparkId="prizes"
         weekDelta={weekDelta.prizes}
       />
-    </section>
+    </div>
   );
 }

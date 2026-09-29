@@ -660,6 +660,32 @@ describe("Overview streaks chrome", () => {
     expect(assets).toMatch(/icon-activity-calendar\.png/);
   });
 
+  it("Overview KPI and Compete poll light live endpoints, not full dashboard", () => {
+    const kpi = readFileSync(
+      join(ROOT, "components/dashboard/overview/OverviewKpiRow.tsx"),
+      "utf8",
+    )
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    const compete = readFileSync(
+      join(ROOT, "components/dashboard/overview/OverviewCompete.tsx"),
+      "utf8",
+    )
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    const tracker = readFileSync(
+      join(ROOT, "components/GlobalPresenceTracker.tsx"),
+      "utf8",
+    )
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    expect(kpi).toMatch(/\/api\/dashboard\/overview-live/);
+    expect(kpi).not.toMatch(/getComprehensiveDashboardData/);
+    expect(compete).toMatch(/\/api\/user\/presence\?userIds=/);
+    expect(tracker).toMatch(/releasePresenceTab/);
+    expect(tracker).toMatch(/pagehide/);
+  });
+
   it("Progress and Activity stretch to equal height", () => {
     const layout = readFileSync(
       join(ROOT, "components/dashboard/DashboardLayout.tsx"),

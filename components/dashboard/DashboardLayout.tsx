@@ -148,6 +148,7 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
             roi={overview.roi}
             totalPrizesWon={overview.totalPrizesWon}
             weekDelta={overviewStanding.kpiWeekDelta}
+            liveEnabled={activeTab === "overview"}
           />
 
           <OverviewPlayByGame cards={overviewStanding.playCards} />
@@ -180,7 +181,7 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
             <OverviewActivity items={overviewStanding.recentActivity} />
           </div>
 
-          <OverviewCompete />
+          <OverviewCompete liveEnabled={activeTab === "overview"} />
 
           <OverviewStreaks streaks={overviewStanding.streaks} />
 

@@ -1123,6 +1123,32 @@ how many entered and how many won.
 **Owner tested:** not yet.
 **Never verified by eye.**
 
+### 29 Sep 2026 - Presence: any open tab is online + Overview live polls
+
+**Owner:** a user with ChartVolt open on any page (including a background tab) must
+stay online; dashboard stats and online dots must update live without a refresh;
+dashboard must stay light; lock down presence/live-stats exposure.
+
+**Shipped (presence):**
+- Multi-tab bookkeeping (`lib/utils/presence-tabs.ts`) — offline beacon only when the
+  **last** open tab closes (`pagehide`); React cleanup never marks offline
+- Offline threshold **180s** for background-tab timer throttling
+- `GET /api/user/presence?userIds=` batch status (cap 20, no IP/UA)
+
+**Shipped (live, light):**
+- `/api/dashboard/overview-live` — wallet credits/prizes + contest win rate only
+- Overview KPI + Compete poll while Overview tab is active (`liveEnabled`)
+- Compete online dots via presence `userIds` poll; rematch every 60s
+- Contests sidebar live polls unchanged
+
+**Shipped (security / weight):**
+- Own presence GET uses an allow-listed select (no IP to the browser)
+- Online list capped at 100; removed verbose financial `console.log` from live-stats
+- Live polls skip when Overview tab is hidden or document is hidden
+
+**Owner tested:** not yet.
+**Never verified by eye.**
+
 ### 29 Sep 2026 - Overview Compete buttons loom + Activity calendar refresh
 
 **Owner:** Matching Cards + Challenge buttons bigger, hand cursor, loom on hover and

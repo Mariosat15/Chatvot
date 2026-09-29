@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { BarChart3, Loader2, TrendingUp, Trophy } from "lucide-react";
@@ -9,6 +9,7 @@ import ChallengeCreateDialog from "@/components/challenges/ChallengeCreateDialog
 import { OVERVIEW_COMPETE_MATCH_LIMIT } from "@/lib/services/games/overview-types";
 import { OVERVIEW_COMPETE_ART } from "@/lib/services/games/overview-assets";
 import { NEON_HEADING, NEON_LABEL } from "@/components/neon/tokens";
+import { PERFORMANCE_INTERVALS } from "@/lib/utils/performance";
 
 interface CompeteMatch {
   userId: string;
@@ -22,14 +23,45 @@ interface CompeteMatch {
   isOnline: boolean;
 }
 
+function mapMatches(data: {
+  matches?: Array<{
+    matchScore?: number;
+    trader: {
+      userId: string;
+      username: string;
+      profileImage?: string;
+      level: string;
+      winRate: number;
+      challengesWon: number;
+      challengesEntered: number;
+      isOnline: boolean;
+    };
+  }>;
+}): CompeteMatch[] {
+  return (data.matches ?? []).slice(0, OVERVIEW_COMPETE_MATCH_LIMIT).map((m) => ({
+    userId: m.trader.userId,
+    username: m.trader.username,
+    profileImage: m.trader.profileImage,
+    level: m.trader.level,
+    winRate: m.trader.winRate,
+    challengesWon: m.trader.challengesWon,
+    challengesEntered: m.trader.challengesEntered,
+    matchScore: Math.round(m.matchScore ?? 0),
+    isOnline: m.trader.isOnline,
+  }));
+}
+
 /**
  * Overview Compete strip — owner neon reference (29 Sep 2026).
  *
- * Layout and chrome match the Compete mock: swords header mark, Matching Cards
- * capsule art, cyan-framed player cards, avatar ring + crown, gold Challenge
- * plate. Client-fetched so the dashboard payload stays free of matchmaking I/O.
+ * Live online dots poll `/api/user/presence?userIds=` (light). Match list
+ * rematches every 60s. Never re-fetches the full dashboard payload.
  */
-export default function OverviewCompete() {
+export default function OverviewCompete({
+  liveEnabled = true,
+}: {
+  liveEnabled?: boolean;
+}) {
   const [matches, setMatches] = useState<CompeteMatch[]>([]);
   const [loading, setLoading] = useState(true);
   const [challengeTarget, setChallengeTarget] = useState<{
@@ -37,60 +69,97 @@ export default function OverviewCompete() {
     username: string;
   } | null>(null);
 
+  const matchIdsKey = useMemo(
+    () => matches.map((m) => m.userId).join(","),
+    [matches],
+  );
+
   useEffect(() => {
+    if (!liveEnabled) return;
     let cancelled = false;
-    (async () => {
+    let rematchTimer: ReturnType<typeof setInterval> | null = null;
+
+    const loadMatches = async () => {
       try {
         const res = await fetch(
           `/api/matchmaking?action=ranked&limit=${OVERVIEW_COMPETE_MATCH_LIMIT}`,
+          { cache: "no-store" },
         );
         if (!res.ok) throw new Error("matchmaking failed");
         const data = await res.json();
-        const rows: CompeteMatch[] = (data.matches ?? [])
-          .slice(0, OVERVIEW_COMPETE_MATCH_LIMIT)
-          .map(
-            (m: {
-              matchScore?: number;
-              trader: {
-                userId: string;
-                username: string;
-                profileImage?: string;
-                level: string;
-                winRate: number;
-                challengesWon: number;
-                challengesEntered: number;
-                isOnline: boolean;
-              };
-            }) => ({
-              userId: m.trader.userId,
-              username: m.trader.username,
-              profileImage: m.trader.profileImage,
-              level: m.trader.level,
-              winRate: m.trader.winRate,
-              challengesWon: m.trader.challengesWon,
-              challengesEntered: m.trader.challengesEntered,
-              matchScore: Math.round(m.matchScore ?? 0),
-              isOnline: m.trader.isOnline,
-            }),
-          );
-        if (!cancelled) setMatches(rows);
+        if (!cancelled) setMatches(mapMatches(data));
       } catch {
         if (!cancelled) setMatches([]);
       } finally {
         if (!cancelled) setLoading(false);
       }
-    })();
+    };
+
+    void loadMatches();
+    rematchTimer = setInterval(() => {
+      if (document.visibilityState === "visible") void loadMatches();
+    }, 60_000);
+
     return () => {
       cancelled = true;
+      if (rematchTimer) clearInterval(rematchTimer);
     };
-  }, []);
+  }, [liveEnabled]);
+
+  useEffect(() => {
+    if (!liveEnabled || !matchIdsKey) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const ids = matchIdsKey.split(",").filter(Boolean);
+
+    const tick = async () => {
+      if (document.visibilityState === "hidden") {
+        timer = setTimeout(tick, PERFORMANCE_INTERVALS.DASHBOARD_REFRESH);
+        return;
+      }
+      try {
+        const res = await fetch(
+          `/api/user/presence?userIds=${encodeURIComponent(ids.join(","))}`,
+          { cache: "no-store" },
+        );
+        if (res.ok) {
+          const data = (await res.json()) as {
+            statuses?: Array<{ userId: string; isOnline: boolean }>;
+          };
+          const map = new Map(
+            (data.statuses ?? []).map((s) => [s.userId, s.isOnline]),
+          );
+          if (!cancelled && map.size > 0) {
+            setMatches((prev) =>
+              prev.map((m) =>
+                map.has(m.userId)
+                  ? { ...m, isOnline: Boolean(map.get(m.userId)) }
+                  : m,
+              ),
+            );
+          }
+        }
+      } catch {
+        // keep last
+      } finally {
+        if (!cancelled) {
+          timer = setTimeout(tick, PERFORMANCE_INTERVALS.DASHBOARD_REFRESH);
+        }
+      }
+    };
+
+    timer = setTimeout(tick, PERFORMANCE_INTERVALS.DASHBOARD_REFRESH);
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [liveEnabled, matchIdsKey]);
 
   return (
     <section
       className="relative overflow-hidden rounded-[18px] border border-cyan-400/55 bg-[linear-gradient(165deg,rgba(8,24,48,0.92)_0%,rgba(4,10,22,0.96)_55%,rgba(10,20,40,0.9)_100%)] p-4 shadow-[0_0_28px_-6px_rgba(34,211,238,0.45),inset_0_0_40px_rgba(34,211,238,0.06)] sm:p-5"
       aria-label="Compete"
     >
-      {/* Inner neon rail — matches the reference double frame. */}
       <div
         className="pointer-events-none absolute inset-2 rounded-[14px] border border-cyan-300/25"
         aria-hidden
