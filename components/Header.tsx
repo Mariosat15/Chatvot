@@ -14,10 +14,11 @@ import NavItems from "@/components/NavItems";
 const Header = ({ user: _user }: { user: User }) => {
   return (
     <header className="sticky top-16 lg:top-0 z-40 border-b border-[#1B2540]/80 bg-[#050B18]/90 backdrop-blur-md">
-      <div className="mx-auto hidden h-16 max-w-[1400px] items-center justify-center px-3 sm:px-4 md:flex lg:px-6">
+      {/* Reason: neon HUD plates need ~48–52px; keep phone strip on its own row below. */}
+      <div className="mx-auto hidden h-[4.25rem] max-w-[1400px] items-center justify-center px-3 sm:px-4 md:flex lg:h-[4.5rem] lg:px-6">
         <nav className="hidden min-w-0 w-full justify-center md:flex">
           {/* Reason: useSearchParams requires a Suspense boundary in the App Router. */}
-          <Suspense fallback={<div className="h-8 w-80" aria-hidden />}>
+          <Suspense fallback={<div className="h-12 w-80" aria-hidden />}>
             <NavItems variant="header" />
           </Suspense>
         </nav>

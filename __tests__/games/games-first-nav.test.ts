@@ -36,6 +36,26 @@ describe("dashboard Header NAV_ITEMS", () => {
   it("does not put /games in the Header list", () => {
     expect(NAV_ITEMS.every((i) => !i.href.startsWith("/games"))).toBe(true);
   });
+
+  it("desktop Header tabs use neon HUD plates; phone keeps Lucide pills", () => {
+    /*
+      Reason: owner supplied five uper HUD buttons (29 Sep 2026). Mounting those
+      plates on a phone packs five glowing frames into ~375px and is exactly the
+      "large desktop top navigation" the Mobile Dashboard brief forbids — so the
+      neon row is md+ only and the Lucide strip stays for MobileTabStrip.
+    */
+    const nav = readCode("components/NavItems.tsx");
+    expect(nav).toMatch(/OVERVIEW_NAV_TAB_ART/);
+    expect(nav).toMatch(/hidden[\s\S]*?md:flex/);
+    expect(nav).toMatch(/md:hidden/);
+    expect(nav).toMatch(/hover:brightness-125/);
+    expect(nav).toMatch(/LayoutDashboard/);
+    expect(nav).toMatch(/\["overview"/);
+    expect(nav).toMatch(/\["wallet"/);
+    expect(nav).toMatch(/\["performance"/);
+    expect(nav).toMatch(/\["contests"/);
+    expect(nav).toMatch(/\["tutorials"/);
+  });
 });
 
 describe("games-first navigation (sidebar)", () => {

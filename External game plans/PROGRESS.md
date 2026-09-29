@@ -1474,6 +1474,27 @@ man not cut off; (6) Player Progress — only one next mission + completion % / 
 **Owner tested:** not yet.
 **Never verified by eye.**
 
+### 29 Sep 2026 - Desktop Header neon HUD tabs (phone stays compact)
+
+**Owner:** replace the amber Overview/Wallet/Performance/Competitions/Tutorials pills with
+the five `ui/match/uper` neon plates, and ask how to show them on mobile without looking busy.
+
+**Answer on mobile:** do **not** mount the neon plates below `md`. Five glowing frames at
+phone width is the "large desktop top navigation" the Mobile Dashboard brief forbids.
+`MobileTabStrip` keeps compact Lucide + label pills; Overview phones still hide the strip
+entirely (existing rule). Empty shared frame asset is keyed and reserved — tabs carry their
+own borders today so stacking a second frame would double the chrome.
+
+**Shipped:**
+- `public/assets/neon/overview/nav/tab-{overview,wallet,performance,competitions,tutorials}.png`
+  + `nav-frame.png` (black keyed)
+- `OVERVIEW_NAV_TAB_ART` in `overview-assets.ts`; `NavItems` desktop = art buttons with
+  Matching Cards loom; phone = Lucide pills; `Header` desktop row slightly taller
+- Docs: `13` s5.1g amendment; test in `games-first-nav.test.ts`
+
+**Owner tested:** not yet.
+**Never verified by eye.**
+
 ### 29 Sep 2026 - Overview polish (nav-only Header, full-bleed hero, rank plates, best score)
 
 **Owner:** nine annotated screenshots + `ui/levels` (1–20) + `ui/items` — strip duplicate

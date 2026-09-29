@@ -71,6 +71,21 @@ export const OVERVIEW_STREAK_ART = {
 } as const;
 
 /**
+ * Desktop Header tab plates — owner `ui/match/uper` HUD buttons (29 Sep 2026).
+ * Text and icons are baked into the art. Phones keep Lucide pills — five neon
+ * frames at phone width read as busy chrome, not navigation.
+ */
+export const OVERVIEW_NAV_TAB_ART = {
+  overview: "/assets/neon/overview/nav/tab-overview.png",
+  wallet: "/assets/neon/overview/nav/tab-wallet.png",
+  performance: "/assets/neon/overview/nav/tab-performance.png",
+  contests: "/assets/neon/overview/nav/tab-competitions.png",
+  tutorials: "/assets/neon/overview/nav/tab-tutorials.png",
+  /** Empty shared frame — reserved; tabs carry their own borders today. */
+  frame: "/assets/neon/overview/nav/nav-frame.png",
+} as const;
+
+/**
  * Mobile Overview art — owner `menu items/ui/wallet items` tiles (29 Sep 2026),
  * downsized to webp. Phones only; desktop keeps the plates above.
  */
@@ -125,6 +140,7 @@ export function allOverviewAssets(): string[] {
     ...Object.values(OVERVIEW_KPI_ART),
     ...Object.values(OVERVIEW_STREAK_ART),
     ...Object.values(OVERVIEW_COMPETE_ART),
+    ...Object.values(OVERVIEW_NAV_TAB_ART),
     ...Object.values(MOBILE_OVERVIEW_ART),
     ...ranks,
     ...levels,

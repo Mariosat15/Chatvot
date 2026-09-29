@@ -3105,7 +3105,13 @@ Overview Global Rank. A document describing rank art as coming from `ui/levels`,
 Competitions / Tutorials) — logo, level chip, bell and profile were removed because they
 already live on the sidebar; Games / Challenges / Marketplace stay on `UserSidebar`. **`?tab=`
 is the addressable source** for the active dashboard section; localStorage is fallback only;
-the in-page TabsList chrome is hidden so Header and content are not two navs. **Win rate on
+the in-page TabsList chrome is hidden so Header and content are not two navs. **Desktop Header
+tabs are owner neon HUD plates** under `public/assets/neon/overview/nav/` (`OVERVIEW_NAV_TAB_ART`,
+Matching Cards loom) from later 29 Sep 2026 — a document describing amber Lucide pills on
+desktop is correct as history and stale as a present fact — **say which**. **Phones keep the
+compact Lucide strip** (`md:hidden`) and never mount the five neon frames — packing glowing
+plates into ~375px is the "large desktop top navigation" the Mobile Dashboard brief forbids;
+the Overview phone tree still hides the strip entirely (`MobileTabStrip`). **Win rate on
 Overview KPIs is contest win rate from `_overall`**, not the trading trade win rate.
 **Streaks & Consistency reads `_overall` only** — podium streak, `bestStreak` (new field on
 both `UserGameStats` copies, stamped at settlement), contest wins, contests played, top-3
