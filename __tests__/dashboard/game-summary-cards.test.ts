@@ -68,6 +68,18 @@ describe("Dashboard per-game summary cards (13 s5.1f)", () => {
     expect(source).not.toMatch(/getEnabledGameTypes/);
   });
 
+  it("Play-by-Game is framed as one section and each card glows apart", () => {
+    const source = stripComments(read(playPath));
+    // Reason: 29 Sep 2026 - owner could not tell the strip was a section or
+    // where one game's artwork ended; frame the section, light each card edge.
+    expect(source).toMatch(/<section aria-labelledby="play-by-game-heading" className=\{PLAY_SECTION_FRAME\}>/);
+    expect(source).toMatch(/const PLAY_SECTION_FRAME =\s*"[^"]*border-sky-400\/35[^"]*shadow-\[/);
+    expect(source).toMatch(/const PLAY_CARD =\s*"[^"]*border-sky-400\/45[^"]*shadow-\[0_0_12px/);
+    expect(source).toMatch(/className=\{`group \$\{PLAY_CARD\}/);
+    // A shared panel beside PLAY_CARD would carry a second, dark border colour.
+    expect(source).not.toMatch(/group \$\{NEON_PANEL\}/);
+  });
+
   it("cards do not recompute totals or call getEnabledGameTypes (R29)", () => {
     const source = stripComments(read(cardsPath));
     expect(source).not.toMatch(/getEnabledGameTypes/);

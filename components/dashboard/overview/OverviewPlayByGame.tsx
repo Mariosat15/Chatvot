@@ -7,6 +7,14 @@ import type { OverviewPlayCard } from "@/lib/services/games/overview-types";
 import { OVERVIEW_PLAY_CARD_LIMIT } from "@/lib/services/games/overview-types";
 import { NEON_PANEL, NEON_HEADING, NEON_LABEL } from "@/components/neon/tokens";
 
+// Reason: 29 Sep 2026 - the owner could not tell the strip was one section, or
+// where one game's artwork ended and the next began. A fine neon frame bounds
+// the section; each card carries its own brighter edge and glow.
+const PLAY_SECTION_FRAME =
+  "rounded-2xl border border-sky-400/35 bg-[#050B18]/40 p-3 shadow-[0_0_18px_-6px_rgba(56,189,248,0.45),inset_0_0_14px_rgba(56,189,248,0.06)]";
+const PLAY_CARD =
+  "rounded-xl border border-sky-400/45 bg-[#0A0F1F]/80 backdrop-blur-sm shadow-[0_0_12px_-2px_rgba(56,189,248,0.45)] hover:border-sky-300/80 hover:shadow-[0_0_18px_0_rgba(56,189,248,0.6)]";
+
 interface OverviewPlayByGameProps {
   cards: OverviewPlayCard[];
 }
@@ -26,7 +34,7 @@ export default function OverviewPlayByGame({ cards }: OverviewPlayByGameProps) {
   const hasPlayHistory = cards.some((c) => c.contestsEntered > 0);
 
   return (
-    <section aria-labelledby="play-by-game-heading">
+    <section aria-labelledby="play-by-game-heading" className={PLAY_SECTION_FRAME}>
       <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
         <div className="flex items-center gap-2">
           <Gamepad2 className="h-4 w-4 text-sky-400" aria-hidden />
@@ -69,7 +77,7 @@ export default function OverviewPlayByGame({ cards }: OverviewPlayByGameProps) {
             <li key={card.gameKey}>
               <Link
                 href={card.href}
-                className={`group ${NEON_PANEL} relative flex h-full min-h-[148px] overflow-hidden transition hover:border-sky-400/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60`}
+                className={`group ${PLAY_CARD} relative flex h-full min-h-[148px] overflow-hidden transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60`}
                 aria-label={`Open ${card.label}`}
               >
                 <div className="relative z-10 flex min-w-0 flex-1 flex-col justify-between p-3.5 pr-24 sm:pr-28">
