@@ -16,7 +16,10 @@ interface CompeteMatch {
   userId: string;
   username: string;
   profileImage?: string;
+  /** Matchmaking skill-band — kept for challenge dialogs, not shown as Level. */
   level: string;
+  /** Real XP level from UserLevel / profile. */
+  profileLevel: number;
   overallScore: number;
   winRate: number;
   totalTrades: number;
@@ -41,6 +44,7 @@ function mapMatches(data: {
       username: string;
       profileImage?: string;
       level: string;
+      profileLevel?: number;
       overallScore?: number;
       winRate: number;
       totalTrades?: number;
@@ -57,31 +61,32 @@ function mapMatches(data: {
     };
   }>;
 }): CompeteMatch[] {
-  return (data.matches ?? []).slice(0, OVERVIEW_COMPETE_MATCH_LIMIT).map((m) => ({
-    userId: m.trader.userId,
-    username: m.trader.username,
-    profileImage: m.trader.profileImage,
-    level: m.trader.level,
-    overallScore: Math.round(m.trader.overallScore ?? 0),
-    winRate: m.trader.winRate,
-    totalTrades: m.trader.totalTrades ?? 0,
-    totalPnl: m.trader.totalPnl ?? 0,
-    competitionsEntered: m.trader.competitionsEntered ?? 0,
-    competitionsWon: m.trader.competitionsWon ?? 0,
-    challengesWon: m.trader.challengesWon,
-    challengesEntered: m.trader.challengesEntered,
-    totalBadges: m.trader.totalBadges ?? 0,
-    userTitle: m.trader.userTitle,
-    userTitleIcon: m.trader.userTitleIcon,
-    userTitleColor: m.trader.userTitleColor,
-    matchScore: Math.round(m.matchScore ?? 0),
-    isOnline: m.trader.isOnline,
-  }));
-}
-
-function formatLevel(level: string): string {
-  if (!level) return "—";
-  return level.charAt(0).toUpperCase() + level.slice(1);
+  return (data.matches ?? []).slice(0, OVERVIEW_COMPETE_MATCH_LIMIT).map((m) => {
+    const raw = Number(m.trader.profileLevel);
+    const profileLevel =
+      Number.isFinite(raw) && raw >= 1 ? Math.floor(raw) : 1;
+    return {
+      userId: m.trader.userId,
+      username: m.trader.username,
+      profileImage: m.trader.profileImage,
+      level: m.trader.level,
+      profileLevel,
+      overallScore: Math.round(m.trader.overallScore ?? 0),
+      winRate: m.trader.winRate,
+      totalTrades: m.trader.totalTrades ?? 0,
+      totalPnl: m.trader.totalPnl ?? 0,
+      competitionsEntered: m.trader.competitionsEntered ?? 0,
+      competitionsWon: m.trader.competitionsWon ?? 0,
+      challengesWon: m.trader.challengesWon,
+      challengesEntered: m.trader.challengesEntered,
+      totalBadges: m.trader.totalBadges ?? 0,
+      userTitle: m.trader.userTitle,
+      userTitleIcon: m.trader.userTitleIcon,
+      userTitleColor: m.trader.userTitleColor,
+      matchScore: Math.round(m.matchScore ?? 0),
+      isOnline: m.trader.isOnline,
+    };
+  });
 }
 
 /**
@@ -312,7 +317,7 @@ export default function OverviewCompete({
                       height={12}
                       className="h-3 w-3 object-contain"
                     />
-                    {formatLevel(m.level)}
+                    Lv. {m.profileLevel}
                   </p>
                 </div>
 
@@ -332,7 +337,8 @@ export default function OverviewCompete({
                 </div>
               </div>
 
-              {/* Reason: same four tiles as Matching Cards — Score, Level, Competitions, 1v1. */}
+              {/* Reason: same four tiles as Matching Cards — Score, Level, Competitions, 1v1.
+                  Level is profile XP (`profileLevel`), never the matchmaking skill-band. */}
               <div className="grid grid-cols-2 gap-1.5">
                 <div className="rounded-lg border border-cyan-400/20 bg-[#07101f]/90 px-2 py-1.5 text-center">
                   <Shield
@@ -354,8 +360,8 @@ export default function OverviewCompete({
                     height={12}
                     className="mx-auto mb-0.5 h-3 w-3 object-contain"
                   />
-                  <p className="truncate text-sm font-bold text-amber-200">
-                    {formatLevel(m.level)}
+                  <p className="truncate text-sm font-bold tabular-nums text-amber-200">
+                    {m.profileLevel}
                   </p>
                   <span className="text-[9px] font-semibold uppercase tracking-wide text-gray-400">
                     Level
@@ -374,7 +380,7 @@ export default function OverviewCompete({
                   <span className="block text-[9px] font-semibold uppercase tracking-wide text-gray-400">
                     Competitions
                   </span>
-                  <span className="block text-[8px] text-gray-500">
+                  <span className="block text-[9px] font-semibold tracking-wide text-gray-400">
                     won · entered
                   </span>
                 </div>
@@ -391,7 +397,7 @@ export default function OverviewCompete({
                   <span className="block text-[9px] font-semibold uppercase tracking-wide text-gray-400">
                     1v1
                   </span>
-                  <span className="block text-[8px] text-gray-500">
+                  <span className="block text-[9px] font-semibold tracking-wide text-gray-400">
                     won · entered
                   </span>
                 </div>

@@ -2,6 +2,7 @@
 
 import { connectToDatabase } from "@/database/mongoose";
 import UserPresence from "@/database/models/user-presence.model";
+import UserLevel from "@/database/models/user-level.model";
 import {
   getGlobalLeaderboard,
   GlobalLeaderboardEntry,
@@ -24,6 +25,11 @@ export interface MatchableTrader {
 
   // Core stats for matching (directly from leaderboard)
   level: TraderLevel;
+  /**
+   * Real XP ladder level from `UserLevel.currentLevel` (profile), not the
+   * matchmaking skill-band (`level`). Display must use this.
+   */
+  profileLevel: number;
   winRate: number;
   totalTrades: number;
   totalPnl: number;
@@ -196,8 +202,9 @@ function calculateMatchScore(
 function leaderboardEntryToMatchableTrader(
   entry: GlobalLeaderboardEntry,
   presence: { isOnline: boolean; acceptingChallenges: boolean },
+  profileLevel = 1,
 ): MatchableTrader {
-  // Calculate level based on activity
+  // Calculate skill-band for matching only — never show this as the profile level.
   const level = calculateTraderLevel({
     totalTrades: entry.totalTrades,
     competitionsEntered: entry.competitionsEntered,
@@ -212,6 +219,7 @@ function leaderboardEntryToMatchableTrader(
     username: entry.username,
     profileImage: entry.profileImage,
     level,
+    profileLevel: Number.isFinite(profileLevel) && profileLevel >= 1 ? Math.floor(profileLevel) : 1,
     winRate: entry.winRate,
     totalTrades: entry.totalTrades,
     totalPnl: entry.totalPnl,
@@ -233,6 +241,21 @@ function leaderboardEntryToMatchableTrader(
   };
 }
 
+async function loadProfileLevels(
+  userIds: string[],
+): Promise<Map<string, number>> {
+  const map = new Map<string, number>();
+  if (userIds.length === 0) return map;
+  const rows = await UserLevel.find({ userId: { $in: userIds } })
+    .select("userId currentLevel")
+    .lean<{ userId: string; currentLevel?: number }[]>();
+  for (const row of rows) {
+    const n = Number(row.currentLevel);
+    map.set(row.userId, Number.isFinite(n) && n >= 1 ? Math.floor(n) : 1);
+  }
+  return map;
+}
+
 /**
  * Get all matchable traders (excluding current user)
  * Now uses leaderboard data directly for consistency!
@@ -244,10 +267,12 @@ export async function getMatchableTraders(
 
   const leaderboardData = await getGlobalLeaderboard();
   const userIds = leaderboardData.map((e) => e.userId).filter(Boolean);
-  const onlineStatuses =
+  const [onlineStatuses, profileLevels] = await Promise.all([
     userIds.length > 0
-      ? await UserPresence.find({ userId: { $in: userIds } }).lean()
-      : [];
+      ? UserPresence.find({ userId: { $in: userIds } }).lean()
+      : Promise.resolve([]),
+    loadProfileLevels(userIds),
+  ]);
   const onlineMap = new Map(onlineStatuses.map((p) => [p.userId, p]));
 
   // Convert leaderboard entries to matchable traders
@@ -264,10 +289,14 @@ export async function getMatchableTraders(
 
     // Convert to matchable trader using leaderboard data directly
     traders.push(
-      leaderboardEntryToMatchableTrader(entry, {
-        isOnline,
-        acceptingChallenges,
-      }),
+      leaderboardEntryToMatchableTrader(
+        entry,
+        {
+          isOnline,
+          acceptingChallenges,
+        },
+        profileLevels.get(entry.userId) ?? 1,
+      ),
     );
   }
 
@@ -301,18 +330,24 @@ export async function findBestMatch(
   }
 
   const userIds = leaderboardData.map((e) => e.userId).filter(Boolean);
-  const onlineStatuses =
+  const [onlineStatuses, profileLevels] = await Promise.all([
     userIds.length > 0
-      ? await UserPresence.find({ userId: { $in: userIds } }).lean()
-      : [];
+      ? UserPresence.find({ userId: { $in: userIds } }).lean()
+      : Promise.resolve([]),
+    loadProfileLevels(userIds),
+  ]);
   const onlineMap = new Map(onlineStatuses.map((p) => [p.userId, p]));
 
   // Convert current user
   const currentUserPresence = onlineMap.get(currentUserId);
-  const currentUser = leaderboardEntryToMatchableTrader(currentUserEntry, {
-    isOnline: currentUserPresence?.status === "online",
-    acceptingChallenges: currentUserPresence?.acceptingChallenges ?? true,
-  });
+  const currentUser = leaderboardEntryToMatchableTrader(
+    currentUserEntry,
+    {
+      isOnline: currentUserPresence?.status === "online",
+      acceptingChallenges: currentUserPresence?.acceptingChallenges ?? true,
+    },
+    profileLevels.get(currentUserId) ?? 1,
+  );
 
   // Get all other traders
   const traders = await getMatchableTraders(currentUserId);
@@ -381,18 +416,24 @@ export async function getRankedMatches(
   }
 
   const userIds = leaderboardData.map((e) => e.userId).filter(Boolean);
-  const onlineStatuses =
+  const [onlineStatuses, profileLevels] = await Promise.all([
     userIds.length > 0
-      ? await UserPresence.find({ userId: { $in: userIds } }).lean()
-      : [];
+      ? UserPresence.find({ userId: { $in: userIds } }).lean()
+      : Promise.resolve([]),
+    loadProfileLevels(userIds),
+  ]);
   const onlineMap = new Map(onlineStatuses.map((p) => [p.userId, p]));
 
   // Convert current user
   const currentUserPresence = onlineMap.get(currentUserId);
-  const currentUser = leaderboardEntryToMatchableTrader(currentUserEntry, {
-    isOnline: currentUserPresence?.status === "online",
-    acceptingChallenges: currentUserPresence?.acceptingChallenges ?? true,
-  });
+  const currentUser = leaderboardEntryToMatchableTrader(
+    currentUserEntry,
+    {
+      isOnline: currentUserPresence?.status === "online",
+      acceptingChallenges: currentUserPresence?.acceptingChallenges ?? true,
+    },
+    profileLevels.get(currentUserId) ?? 1,
+  );
 
   // Get all other traders
   const traders = await getMatchableTraders(currentUserId);

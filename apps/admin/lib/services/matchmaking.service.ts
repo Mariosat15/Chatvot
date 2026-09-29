@@ -23,6 +23,8 @@ export interface MatchableTrader {
 
   // Core stats for matching (directly from leaderboard)
   level: TraderLevel;
+  /** XP ladder from UserLevel — display only; matching still uses `level`. */
+  profileLevel: number;
   winRate: number;
   totalTrades: number;
   totalPnl: number;
@@ -211,6 +213,7 @@ function leaderboardEntryToMatchableTrader(
     username: entry.username,
     profileImage: entry.profileImage,
     level,
+    profileLevel: 1,
     winRate: entry.winRate,
     totalTrades: entry.totalTrades,
     totalPnl: entry.totalPnl,

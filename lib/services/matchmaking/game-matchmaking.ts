@@ -13,6 +13,7 @@ import UserGameStats, {
 } from "@/database/models/games/user-game-stats.model";
 import UserGamePreference from "@/database/models/games/user-game-preference.model";
 import UserPresence from "@/database/models/user-presence.model";
+import UserLevel from "@/database/models/user-level.model";
 import BlockedUser from "@/database/models/messaging/blocked-user.model";
 import { getUsersByIds } from "@/lib/utils/user-lookup";
 import {
@@ -45,6 +46,7 @@ function toMatchable(
   rating: number,
   presence: { isOnline: boolean; acceptingChallenges: boolean },
   contestsCompleted: number,
+  profileLevel = 1,
 ): MatchableTrader {
   const level =
     contestsCompleted < 3
@@ -63,6 +65,10 @@ function toMatchable(
     username: profile.username ?? "Player",
     profileImage: profile.profileImage,
     level,
+    profileLevel:
+      Number.isFinite(profileLevel) && profileLevel >= 1
+        ? Math.floor(profileLevel)
+        : 1,
     winRate: 0,
     totalTrades: 0,
     totalPnl: 0,
@@ -124,34 +130,46 @@ export async function getRankedGameMatches(
 
   const userIds = candidates.map((c) => c.userId);
 
-  const [presenceRows, preferenceRows, blocks, profiles] = await Promise.all([
-    UserPresence.find({ userId: { $in: userIds } })
-      .select("userId status acceptingChallenges")
-      .lean<
-        Array<{
-          userId: string;
-          status?: string;
-          acceptingChallenges?: boolean;
-        }>
-      >(),
-    UserGamePreference.find({
-      userId: { $in: userIds },
-      gameKey: key,
-    })
-      .select("userId willingToBeChallenged")
-      .lean<Array<{ userId: string; willingToBeChallenged?: boolean }>>(),
-    BlockedUser.find({
-      $or: [
-        { blockerUserId: currentUserId, blockedUserId: { $in: userIds } },
-        { blockedUserId: currentUserId, blockerUserId: { $in: userIds } },
-      ],
-    })
-      .select("blockerUserId blockedUserId")
-      .lean<Array<{ blockerUserId: string; blockedUserId: string }>>(),
-    getUsersByIds(userIds),
-  ]);
+  const [presenceRows, preferenceRows, blocks, profiles, levelRows] =
+    await Promise.all([
+      UserPresence.find({ userId: { $in: userIds } })
+        .select("userId status acceptingChallenges")
+        .lean<
+          Array<{
+            userId: string;
+            status?: string;
+            acceptingChallenges?: boolean;
+          }>
+        >(),
+      UserGamePreference.find({
+        userId: { $in: userIds },
+        gameKey: key,
+      })
+        .select("userId willingToBeChallenged")
+        .lean<Array<{ userId: string; willingToBeChallenged?: boolean }>>(),
+      BlockedUser.find({
+        $or: [
+          { blockerUserId: currentUserId, blockedUserId: { $in: userIds } },
+          { blockedUserId: currentUserId, blockerUserId: { $in: userIds } },
+        ],
+      })
+        .select("blockerUserId blockedUserId")
+        .lean<Array<{ blockerUserId: string; blockedUserId: string }>>(),
+      getUsersByIds(userIds),
+      UserLevel.find({ userId: { $in: userIds } })
+        .select("userId currentLevel")
+        .lean<{ userId: string; currentLevel?: number }[]>(),
+    ]);
 
   const presenceMap = new Map(presenceRows.map((p) => [p.userId, p]));
+  const profileLevelMap = new Map<string, number>();
+  for (const row of levelRows) {
+    const n = Number(row.currentLevel);
+    profileLevelMap.set(
+      row.userId,
+      Number.isFinite(n) && n >= 1 ? Math.floor(n) : 1,
+    );
+  }
   const prefsByUser = new Map<string, Map<string, boolean>>();
   for (const row of preferenceRows) {
     prefsByUser.set(
@@ -201,6 +219,7 @@ export async function getRankedGameMatches(
         acceptingChallenges: accepting,
       },
       candidate.contestsCompleted ?? 0,
+      profileLevelMap.get(candidate.userId) ?? 1,
     );
 
     if (trader.isOnline && trader.acceptingChallenges) {

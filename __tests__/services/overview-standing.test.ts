@@ -626,6 +626,18 @@ describe("Overview streaks chrome", () => {
     expect(compete).toMatch(/ProfileCard/);
     expect(compete).toMatch(/setProfileTarget/);
     expect(compete).toMatch(/hover:underline/);
+    // Reason: Level is UserLevel.currentLevel (profileLevel), never the Master/Beginner skill-band.
+    expect(compete).toMatch(/profileLevel/);
+    expect(compete).toMatch(/Lv\.\s*\{m\.profileLevel\}/);
+    expect(compete).not.toMatch(/formatLevel\(m\.level\)/);
+    // Reason: "won · entered" must match the COMPETITIONS / 1v1 label size (text-[9px]), not smaller.
+    const wonEntered = [...compete.matchAll(/won · entered[\s\S]{0,80}/g)];
+    expect(wonEntered.length).toBeGreaterThanOrEqual(2);
+    for (const hit of wonEntered) {
+      const before = compete.slice(Math.max(0, hit.index! - 120), hit.index!);
+      expect(before).toMatch(/text-\[9px\]/);
+      expect(before).not.toMatch(/text-\[8px\]/);
+    }
     expect(assets).toMatch(/OVERVIEW_COMPETE_ART/);
     expect(assets).toMatch(/btn-matching-cards\.png/);
     expect(assets).toMatch(/btn-challenge\.png/);
@@ -648,6 +660,7 @@ describe("Overview streaks chrome", () => {
     expect(cards).toMatch(/challengesWon/);
     expect(cards).toMatch(/challengesEntered/);
     expect(cards).toMatch(/>\s*1v1\s*</);
+    expect(cards).toMatch(/profileLevel/);
     expect(cards).not.toMatch(/P\.Factor/);
     expect(cards).not.toMatch(/uppercase">Win</);
   });

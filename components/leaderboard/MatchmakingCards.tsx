@@ -29,6 +29,7 @@ interface MatchableTrader {
   username: string;
   profileImage?: string;
   level: "beginner" | "intermediate" | "advanced" | "expert" | "master";
+  profileLevel: number;
   winRate: number;
   totalTrades: number;
   totalPnl: number;
@@ -819,8 +820,8 @@ function TraderCard({
                 <span className="mb-0.5 block text-sm" aria-hidden>
                   {levelInfo.icon}
                 </span>
-                <p className={cn("text-lg font-black", levelInfo.color)}>
-                  {levelInfo.label}
+                <p className={cn("text-lg font-black tabular-nums", levelInfo.color)}>
+                  {trader.profileLevel ?? 1}
                 </p>
                 <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
                   Level
@@ -837,7 +838,7 @@ function TraderCard({
                 <span className="block text-[10px] font-semibold uppercase tracking-wide text-gray-400">
                   Competitions
                 </span>
-                <span className="block text-[9px] text-gray-500">
+                <span className="block text-[10px] font-semibold tracking-wide text-gray-400">
                   won · entered
                 </span>
               </div>
@@ -852,7 +853,7 @@ function TraderCard({
                 <span className="block text-[10px] font-semibold uppercase tracking-wide text-gray-400">
                   1v1
                 </span>
-                <span className="block text-[9px] text-gray-500">
+                <span className="block text-[10px] font-semibold tracking-wide text-gray-400">
                   won · entered
                 </span>
               </div>
