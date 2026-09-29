@@ -3,7 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Loader2, Shield, TrendingUp } from "lucide-react";
+import {
+  GalleryHorizontalEnd,
+  Loader2,
+  Shield,
+  Swords,
+  TrendingUp,
+} from "lucide-react";
 import ProfileImage from "@/components/ui/ProfileImage";
 import ProfileCard from "@/components/profile/ProfileCard";
 import ChallengeCreateDialog from "@/components/challenges/ChallengeCreateDialog";
@@ -13,6 +19,14 @@ import {
 } from "@/lib/services/games/overview-assets";
 import { NEON_HEADING, NEON_LABEL } from "@/components/neon/tokens";
 import { PERFORMANCE_INTERVALS } from "@/lib/utils/performance";
+
+const MATCHING_CARDS_HREF = "/leaderboard?board=trading&view=cards";
+
+// Reason: owner, 29 Sep 2026 - Matching Cards sits beside Challenge on each
+// card (same as mobile). Raster art at half a card's width is too short to
+// read, so both actions are drawn in CSS at one height.
+const ACTION_BUTTON =
+  "inline-flex h-12 min-w-0 cursor-pointer items-center justify-center gap-1.5 rounded-full border px-3 text-xs font-bold transition-transform duration-200 ease-out hover:scale-105 active:scale-95 motion-reduce:hover:scale-100 motion-reduce:active:scale-100";
 
 const COMPETE_TILE =
   "flex min-h-[58px] items-center gap-3 rounded-lg border border-cyan-400/30 bg-[#07101f]/90 px-3 py-2 shadow-[inset_0_0_12px_rgba(34,211,238,0.06)]";
@@ -241,19 +255,23 @@ export default function OverviewCompete({
           </div>
         </div>
 
-        <Link
-          href="/leaderboard?board=trading&view=cards"
-          className="relative inline-flex h-10 w-[184px] shrink-0 cursor-pointer drop-shadow-[0_0_14px_rgba(139,92,246,0.6)] transition-transform duration-200 ease-out hover:scale-110 active:scale-95 sm:h-11 sm:w-[204px]"
-          aria-label="Matching Cards"
-        >
-          <Image
-            src={OVERVIEW_COMPETE_ART.matchingCards}
-            alt="Matching Cards"
-            fill
-            sizes="204px"
-            className="object-contain"
-          />
-        </Link>
+        {/* Reason: Matching Cards lives on each card when matches exist; the
+            header copy survives only for the empty state, same as mobile. */}
+        {matches.length === 0 && !loading && (
+          <Link
+            href={MATCHING_CARDS_HREF}
+            className="relative inline-flex h-10 w-[184px] shrink-0 cursor-pointer drop-shadow-[0_0_14px_rgba(139,92,246,0.6)] transition-transform duration-200 ease-out hover:scale-110 active:scale-95 sm:h-11 sm:w-[204px]"
+            aria-label="Matching Cards"
+          >
+            <Image
+              src={OVERVIEW_COMPETE_ART.matchingCards}
+              alt="Matching Cards"
+              fill
+              sizes="204px"
+              className="object-contain"
+            />
+          </Link>
+        )}
       </div>
 
       {loading ? (
@@ -429,30 +447,33 @@ export default function OverviewCompete({
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={() =>
-                  setChallengeTarget({
-                    userId: m.userId,
-                    username: m.username,
-                  })
-                }
-                className="relative mx-auto mt-auto aspect-[967/172] w-[94%] max-w-[340px] cursor-pointer drop-shadow-[0_0_18px_rgba(251,146,60,0.55)] transition-transform duration-200 ease-out hover:scale-110 active:scale-95"
-                aria-label={`Challenge ${m.username}`}
-              >
-                {/* Reason: owner, 29 Sep 2026 - bigger and never blurry. The 967px
-                    source is served as-is (unoptimized), so even at 340px x 2x DPR
-                    x 1.1 hover (~750px) the browser downsamples rather than upscales. */}
-                <Image
-                  src={OVERVIEW_COMPETE_ART.challenge}
-                  alt=""
-                  fill
-                  unoptimized
-                  sizes="340px"
-                  className="object-contain"
-                />
-                <span className="sr-only">Challenge</span>
-              </button>
+              {/* Reason: owner, 29 Sep 2026 - Matching Cards beside Challenge on
+                  every card, same as mobile. Both CSS-drawn at one height so they
+                  fit; the wide Challenge raster would be unreadably short at half
+                  a three-column card. */}
+              <div className="mt-auto grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setChallengeTarget({
+                      userId: m.userId,
+                      username: m.username,
+                    })
+                  }
+                  className={`${ACTION_BUTTON} border-amber-300/80 bg-gradient-to-b from-amber-400 to-orange-600 text-[#1A0B02] shadow-[0_0_14px_rgba(251,146,60,0.55)]`}
+                  aria-label={`Challenge ${m.username}`}
+                >
+                  <Swords className="h-4 w-4 shrink-0" aria-hidden />
+                  Challenge
+                </button>
+                <Link
+                  href={MATCHING_CARDS_HREF}
+                  className={`${ACTION_BUTTON} border-violet-400/70 bg-gradient-to-r from-indigo-700/80 to-violet-600/80 text-white shadow-[0_0_14px_rgba(139,92,246,0.55)]`}
+                >
+                  <GalleryHorizontalEnd className="h-4 w-4 shrink-0" aria-hidden />
+                  <span className="truncate">Matching Cards</span>
+                </Link>
+              </div>
             </article>
           ))}
         </div>

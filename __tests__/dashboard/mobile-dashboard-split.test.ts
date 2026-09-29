@@ -168,14 +168,25 @@ describe("mobile dashboard split", () => {
     expect((compete.match(/min-w-0 flex-1">\s*<p className="(?:truncate )?text-xl/g) ?? []).length).toBe(4);
   });
 
-  it("desktop Challenge button is larger and served at source resolution", () => {
+  it("each desktop Compete card carries Matching Cards beside its Challenge button", () => {
+    // Reason: flipped 29 Sep 2026 - owner asked for the same layout as mobile.
+    // The full-width Challenge raster no longer fits beside Matching Cards, so
+    // both are CSS pills at one height; the header art survives only when empty.
     const compete = read("components/dashboard/overview/OverviewCompete.tsx");
-    const start = compete.indexOf("src={OVERVIEW_COMPETE_ART.challenge}");
+    expect(compete).not.toMatch(/src=\{OVERVIEW_COMPETE_ART\.challenge\}/);
+    expect(compete).not.toMatch(/aspect-\[967\/172\] w-\[94%\] max-w-\[340px\]/);
+    expect(compete).toMatch(
+      /matches\.length === 0 && !loading && \([\s\S]*?MATCHING_CARDS_HREF/,
+    );
+    const start = compete.indexOf('className="mt-auto grid grid-cols-2 gap-2"');
     expect(start).toBeGreaterThan(-1);
-    const img = compete.slice(start, compete.indexOf("/>", start));
-    // Reason: a resized copy upscaled by hover:scale-110 blurs; the 967px
-    // source served unoptimized is always downsampled instead.
-    expect(img).toMatch(/\bunoptimized\b/);
-    expect(compete).toMatch(/aspect-\[967\/172\] w-\[94%\] max-w-\[340px\]/);
+    const row = compete.slice(start, compete.indexOf("</article>", start));
+    expect(row.length).toBeGreaterThan(100);
+    const challenge = row.indexOf("setChallengeTarget(");
+    const cards = row.indexOf("href={MATCHING_CARDS_HREF}");
+    expect(challenge).toBeGreaterThan(-1);
+    expect(cards).toBeGreaterThan(challenge);
+    expect((row.match(/\$\{ACTION_BUTTON\}/g) ?? []).length).toBe(2);
+    expect(compete).toMatch(/const ACTION_BUTTON =\s*"[^"]*h-12[^"]*active:scale-95/);
   });
 });

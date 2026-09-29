@@ -623,14 +623,28 @@ describe("Overview streaks chrome", () => {
     expect(compete).toMatch(/\/leaderboard\?board=trading&view=cards/);
     expect(compete).toMatch(/Matching Cards/);
     expect(compete).toMatch(/OVERVIEW_COMPETE_ART/);
-    expect(compete).toMatch(/btn-challenge|challenge/);
+    expect(compete).toMatch(/btn-challenge|challenge|Challenge/);
     // Reason: Matching Cards + Challenge must loom on hover, press in, and show a hand.
     expect(compete).toMatch(/cursor-pointer/);
     expect(compete).toMatch(/hover:scale-1[01]0/);
     expect(compete).toMatch(/active:scale-95/);
-    // Reason: 29 Sep 2026 - the Challenge button is sized by the art's own
-    // aspect ratio (967x172) rather than a fixed h-14, so it grows sharp.
-    expect(compete).toMatch(/aspect-\[967\/172\]/);
+    // Reason: flipped 29 Sep 2026 - Matching Cards moved beside Challenge on each
+    // card (same as mobile). Half-width raster art is too short, so both are CSS
+    // pills; the old aspect-[967/172] Challenge banner no longer fits.
+    expect(compete).not.toMatch(/aspect-\[967\/172\]/);
+    expect(compete).toMatch(/const ACTION_BUTTON =\s*"[^"]*h-12[^"]*active:scale-95/);
+    const actionRow = compete.indexOf('className="mt-auto grid grid-cols-2 gap-2"');
+    expect(actionRow).toBeGreaterThan(-1);
+    const cardFooter = compete.slice(actionRow, compete.indexOf("</article>", actionRow));
+    expect(cardFooter.indexOf("setChallengeTarget(")).toBeGreaterThan(-1);
+    expect(cardFooter.indexOf("href={MATCHING_CARDS_HREF}")).toBeGreaterThan(
+      cardFooter.indexOf("setChallengeTarget("),
+    );
+    expect((cardFooter.match(/\$\{ACTION_BUTTON\}/g) ?? []).length).toBe(2);
+    // Reason: header Matching Cards survives only for the empty state.
+    expect(compete).toMatch(
+      /matches\.length === 0 && !loading && \([\s\S]*?MATCHING_CARDS_HREF/,
+    );
     // Reason: Compete strip must show the same four tiles as Matching Cards, and
     // names must open ProfileCard like the leaderboard (not only a challenge dialog).
     expect(compete).toMatch(/overallScore/);
