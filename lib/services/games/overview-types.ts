@@ -63,6 +63,22 @@ export interface OverviewMission {
  */
 export const OVERVIEW_MISSION_LIMIT = 4;
 
+/** Cap on recent earned badges shown beside the milestones ring. */
+export const OVERVIEW_RECENT_BADGE_LIMIT = 6;
+
+/**
+ * Cap on Compete match cards — 3 keeps the strip readable; owner allowed 4 or 3
+ * when cramped (29 Sep 2026).
+ */
+export const OVERVIEW_COMPETE_MATCH_LIMIT = 3;
+
+export interface OverviewRecentBadge {
+  id: string;
+  name: string;
+  icon: string;
+  rarity: string;
+}
+
 export interface OverviewActivityItem {
   id: string;
   title: string;

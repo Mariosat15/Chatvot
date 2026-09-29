@@ -87,6 +87,11 @@ interface LeaderboardContentProps {
   loading?: boolean;
   /** The board dropdown, rendered in the shared header. */
   boardPicker?: React.ReactNode;
+  /**
+   * Open Match Cards when arriving from Overview Compete
+   * (`/leaderboard?board=trading&view=cards`).
+   */
+  initialViewMode?: "table" | "cards";
 }
 
 // Sort columns
@@ -119,11 +124,12 @@ export default function LeaderboardContent({
   onPageChange,
   loading: paginationLoading = false,
   boardPicker,
+  initialViewMode = "table",
 }: LeaderboardContentProps) {
   const terms = useTerms();
   const isPaginated = typeof propTotalCount === "number" && typeof onPageChange === "function";
   const totalCount = propTotalCount ?? leaderboard.length;
-  const [viewMode, setViewMode] = useState<"table" | "cards">("table");
+  const [viewMode, setViewMode] = useState<"table" | "cards">(initialViewMode);
   const [selectedUser, setSelectedUser] = useState<LeaderboardEntry | null>(
     null,
   );

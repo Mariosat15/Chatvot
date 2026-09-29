@@ -3128,7 +3128,13 @@ with the **map name**, real progress bars, and rounded **% complete** — View A
 `journeyMilestonesTotal`) sits above that grid. **When a mission lists `requiredBadgeIds`,
 Overview resolves display names** (same catalogue path as the journey milestones API) and
 shows a **Required badges** line under `% complete` — metric progress can hit 100% while
-badge gates remain, so a full bar alone looked finished (owner, 29 Sep 2026). **KPI /
+badge gates remain, so a full bar alone looked finished (owner, 29 Sep 2026). **Beside the
+milestones ring, a six-slot Recent badges strip** shows the player's most recently earned
+badges (`player.recentBadges`, newest first) — each new earn slides into the strip and the
+oldest drops off. **Compete** sits between Progress/Activity and Streaks: up to **3** best
+challenge matches from `/api/matchmaking?action=ranked` (name, avatar, win rate / challenge
+wins, match %, Challenge dialog) plus a **Matching Cards** deep-link to
+`/leaderboard?board=trading&view=cards`. **KPI /
 Progress / Activity header icons**
 fill their boxes edge-to-edge (`object-cover`); Recent Activity uses `icon-activity.png`
 (owner neon clock). **Global Rank plates are from `ui/Rank`** under `ranks/{1..20}.png`
@@ -3150,7 +3156,8 @@ view while cropping sky/foreground. Left wash is narrowed so welcome copy stays 
 
 A document still saying missions are capped at **1**, or that KPI amounts are **bare**, or that
 rank plates come from `ui/levels`, or that Activity uses a Lucide clock, or that Overview
-mission cards omit required badges, is correct as history
+mission cards omit required badges, or that Overview has no recent-badges strip or Compete
+row, is correct as history
 (earlier 29 Sep) and stale as a present fact — **say which**.
 
 ### 5.1a The contest cards, made game-aware - BUILT 6 September 2026

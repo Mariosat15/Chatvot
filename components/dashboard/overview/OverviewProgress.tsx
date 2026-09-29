@@ -5,9 +5,18 @@ import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import type {
   OverviewMission,
+  OverviewRecentBadge,
   OverviewStanding,
 } from "@/lib/services/games/overview-types";
+import {
+  OVERVIEW_RECENT_BADGE_LIMIT,
+} from "@/lib/services/games/overview-types";
 import { OVERVIEW_ICON_ART } from "@/lib/services/games/overview-assets";
+import { GameIcon } from "@/components/ui/GameIcon";
+import {
+  isValidGameIconName,
+  type GameIconName,
+} from "@/lib/constants/game-icons";
 import {
   NEON_PANEL_LIT,
   NEON_HEADING,
@@ -28,6 +37,67 @@ interface OverviewProgressProps {
   journeyMilestonesDone: number;
   journeyMilestonesTotal: number;
   missions: OverviewMission[];
+  /** Up to 6 most recently earned badges — newest replaces oldest in the strip. */
+  recentBadges: OverviewRecentBadge[];
+}
+
+function rarityRing(rarity: string): string {
+  switch (rarity) {
+    case "legendary":
+      return "border-amber-400/60 shadow-[0_0_10px_rgba(251,191,36,0.45)]";
+    case "epic":
+      return "border-fuchsia-400/50 shadow-[0_0_8px_rgba(232,121,249,0.35)]";
+    case "rare":
+      return "border-sky-400/50 shadow-[0_0_8px_rgba(56,189,248,0.35)]";
+    default:
+      return "border-white/15";
+  }
+}
+
+function RecentBadgesStrip({ badges }: { badges: OverviewRecentBadge[] }) {
+  // Reason: pad to a fixed six slots so empty placeholders keep the layout stable;
+  // Array.at avoids the object-injection lint on a numeric index.
+  const slots: Array<OverviewRecentBadge | null> = Array.from(
+    { length: OVERVIEW_RECENT_BADGE_LIMIT },
+    (_, i) => badges.at(i) ?? null,
+  );
+  return (
+    <div
+      className="flex min-w-0 flex-1 flex-col gap-1.5"
+      aria-label="Recent badges"
+    >
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-violet-300/90">
+        Recent badges
+      </p>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {slots.map((badge, i) =>
+          badge ? (
+            <span
+              key={`${badge.id}-${i}`}
+              title={badge.name}
+              className={`relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-lg border bg-[#0A1224] ${rarityRing(badge.rarity)}`}
+            >
+              <GameIcon
+                name={
+                  (isValidGameIconName(badge.icon)
+                    ? badge.icon
+                    : "starBadge") as GameIconName
+                }
+                size={22}
+                alt={badge.name}
+              />
+            </span>
+          ) : (
+            <span
+              key={`empty-${i}`}
+              className="flex h-9 w-9 rounded-lg border border-dashed border-white/10 bg-white/[0.02]"
+              aria-hidden
+            />
+          ),
+        )}
+      </div>
+    </div>
+  );
 }
 
 function MilestoneRing({
@@ -47,7 +117,7 @@ function MilestoneRing({
 
   return (
     <div
-      className="flex items-center gap-3 rounded-xl border border-amber-400/25 bg-[#070E1C]/80 px-3 py-2.5"
+      className="flex shrink-0 items-center gap-3 rounded-xl border border-amber-400/25 bg-[#070E1C]/80 px-3 py-2.5"
       aria-label={`${safeDone} of ${safeTotal} milestones`}
     >
       <div className="relative h-[84px] w-[84px] shrink-0">
@@ -170,11 +240,14 @@ export default function OverviewProgress({
   journeyMilestonesDone,
   journeyMilestonesTotal,
   missions,
+  recentBadges,
 }: OverviewProgressProps) {
   // Reason: progressPercent can arrive as a long float from XP math — never
   // paint that raw into the UI (owner screenshot showed 78.692…%).
   const xpPct = Math.min(100, Math.max(0, Math.round(progressPercent)));
   const xpCap = currentXP + xpToNextLevel;
+  const showMilestoneRow =
+    journeyMilestonesTotal > 0 || recentBadges.length > 0;
 
   return (
     <section
@@ -266,11 +339,18 @@ export default function OverviewProgress({
             </p>
           </div>
 
-          {journeyMilestonesTotal > 0 && (
-            <MilestoneRing
-              done={journeyMilestonesDone}
-              total={journeyMilestonesTotal}
-            />
+          {showMilestoneRow && (
+            <div className="flex flex-wrap items-center gap-3">
+              {journeyMilestonesTotal > 0 && (
+                <MilestoneRing
+                  done={journeyMilestonesDone}
+                  total={journeyMilestonesTotal}
+                />
+              )}
+              <div className="min-w-0 flex-1 rounded-xl border border-violet-400/20 bg-[#070E1C]/80 px-3 py-2.5">
+                <RecentBadgesStrip badges={recentBadges} />
+              </div>
+            </div>
           )}
 
           {missions.length > 0 ? (

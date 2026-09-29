@@ -23,8 +23,10 @@ import OverviewPlayByGame from "./overview/OverviewPlayByGame";
 import OverviewProgress from "./overview/OverviewProgress";
 import OverviewActivity from "./overview/OverviewActivity";
 import OverviewStreaks from "./overview/OverviewStreaks";
+import OverviewCompete from "./overview/OverviewCompete";
 import { DASHBOARD_TABS, type DashboardNavTab } from "@/lib/constants";
 import { useTerms } from "@/contexts/TerminologyContext";
+import { OVERVIEW_RECENT_BADGE_LIMIT } from "@/lib/services/games/overview-types";
 
 const EquityChart = dynamic(() => import("./EquityChart"), { ssr: false });
 const DailyCreditFlow = dynamic(() => import("./DailyCreditFlow"), {
@@ -165,10 +167,20 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
                 journeyMilestonesDone={overviewStanding.journeyMilestonesDone}
                 journeyMilestonesTotal={overviewStanding.journeyMilestonesTotal}
                 missions={overviewStanding.missions}
+                recentBadges={(player.recentBadges ?? [])
+                  .slice(0, OVERVIEW_RECENT_BADGE_LIMIT)
+                  .map((b) => ({
+                    id: b.id,
+                    name: b.name,
+                    icon: b.icon,
+                    rarity: b.rarity,
+                  }))}
               />
             </div>
             <OverviewActivity items={overviewStanding.recentActivity} />
           </div>
+
+          <OverviewCompete />
 
           <OverviewStreaks streaks={overviewStanding.streaks} />
 

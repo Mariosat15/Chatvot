@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import LeaderboardContent from "@/components/leaderboard/LeaderboardContent";
 import GameLeaderboardTable from "@/components/leaderboard/GameLeaderboardTable";
 import GlobalLeaderboardTable, {
@@ -48,7 +49,16 @@ export default function LeaderboardClient({
   currentUserId: string;
 }) {
   const terms = useTerms();
-  const [board, setBoard] = useState<string>(GLOBAL_BOARD);
+  const searchParams = useSearchParams();
+  // Reason: Overview Compete deep-links `/leaderboard?board=trading&view=cards`.
+  const initialBoard = useMemo(() => {
+    const q = searchParams.get("board");
+    if (q === TRADING_BOARD || q === GAMES_BOARD || q === GLOBAL_BOARD) return q;
+    return GLOBAL_BOARD;
+  }, [searchParams]);
+  const matchCardsView = searchParams.get("view") === "cards";
+
+  const [board, setBoard] = useState<string>(initialBoard);
   const [boards, setBoards] = useState<BoardOption[]>(() => [
     { id: GLOBAL_BOARD, label: `Global ${terms.leaderboard}` },
     { id: TRADING_BOARD, label: `Trading ${terms.leaderboard}` },
@@ -203,6 +213,7 @@ export default function LeaderboardClient({
         onPageChange={handlePageChange}
         loading={loading}
         boardPicker={picker}
+        initialViewMode={matchCardsView ? "cards" : "table"}
       />
     );
   }

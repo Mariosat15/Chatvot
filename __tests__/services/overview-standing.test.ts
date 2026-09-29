@@ -558,14 +558,43 @@ describe("Overview streaks chrome", () => {
     // must name Required badges under "% complete" or it looks finished.
     expect(progress).toMatch(/Required badges/);
     expect(progress).toMatch(/requiredBadges/);
+    expect(progress).toMatch(/Recent badges/);
+    expect(progress).toMatch(/OVERVIEW_RECENT_BADGE_LIMIT/);
     expect(types).toMatch(/requiredBadges:\s*string\[\]/);
+    expect(types).toMatch(/OVERVIEW_RECENT_BADGE_LIMIT\s*=\s*6/);
+    expect(types).toMatch(/OVERVIEW_COMPETE_MATCH_LIMIT\s*=\s*3/);
     expect(standing).toMatch(/requiredBadgeIds/);
     expect(standing).toMatch(/resolveBadgeDisplayName/);
     expect(standing).toMatch(/getBadgesFromDB/);
     expect(layout).toMatch(/journeyMilestonesDone/);
     expect(layout).toMatch(/journeyMilestonesTotal/);
+    expect(layout).toMatch(/OverviewCompete/);
+    expect(layout).toMatch(/OVERVIEW_RECENT_BADGE_LIMIT/);
+    expect(layout).toMatch(/recentBadges/);
     expect(activity).toMatch(/OVERVIEW_ICON_ART\.activity/);
     expect(activity).not.toMatch(/Clock3/);
+  });
+
+  it("Compete strip fetches ranked matches and links Match Cards", () => {
+    const compete = readFileSync(
+      join(ROOT, "components/dashboard/overview/OverviewCompete.tsx"),
+      "utf8",
+    )
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    const client = readFileSync(
+      join(ROOT, "components/leaderboard/LeaderboardClient.tsx"),
+      "utf8",
+    )
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    expect(compete).toMatch(/\/api\/matchmaking\?action=ranked/);
+    expect(compete).toMatch(/OVERVIEW_COMPETE_MATCH_LIMIT/);
+    expect(compete).toMatch(/ChallengeCreateDialog/);
+    expect(compete).toMatch(/\/leaderboard\?board=trading&view=cards/);
+    expect(compete).toMatch(/Matching Cards/);
+    expect(client).toMatch(/get\("view"\)\s*===\s*"cards"/);
+    expect(client).toMatch(/initialViewMode/);
   });
 
   it("Global Rank uses ranks art, not level plates", () => {
