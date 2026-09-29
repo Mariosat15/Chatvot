@@ -1192,6 +1192,14 @@ fire/ice panoramic if the ChartVolt PNG cannot be fixed; KPI icons must fill the
 **Owner tested:** not yet.
 **Never verified by eye.**
 
+### 29 Sep 2026 - Desktop Compete: Level and 1v1 tiles use the owner's blue badges
+
+This completes the set. Level now uses `compete/icon-level-crown.png` (`OVERVIEW_COMPETE_ART.level`), and
+1v1 now uses `compete/icon-1v1-badge.png`, which replaces the plain swords from earlier the same day; that
+file is deleted, since nothing else used it. Both were keyed out of black the same way. `OVERVIEW_COMPETE_ART.crown`
+is left in the asset map, but the Compete card no longer reads it, and a test says so. All four stat tiles
+are now one matching blue badge set. **Never verified by eye.**
+
 ### 29 Sep 2026 - Desktop Compete: Score and Competitions tiles use the owner's blue art
 
 The Score (target) and Competitions (trophy) tile icons on the desktop Compete cards are replaced by the
