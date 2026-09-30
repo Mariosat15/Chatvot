@@ -3275,29 +3275,33 @@ play cards rather than a curated list. **Never verified by eye** — the dashboa
 sign-in; the 360–430px no-overflow claim rests on the layout's `overflow-x-hidden` and the
 carousels' `-mx-3 px-3`, not on a screenshot.
 
-### 5.1h Wallet Analytics tab - BUILT 30 September 2026
+### 5.1h Wallet Analytics tab - BUILT 30 September 2026 (REBUILT same day)
 
 Owner mock: reconstruct the dashboard `?tab=wallet` surface as **Wallet Analytics** and
-rename the Header tab label to match. Graphics from `Desktop/games/menu items/ui/wallet items`.
+rename the Header tab label to match. First pass was rejected (flat, wrong graphics, weak
+hierarchy). **Rebuild follows `External game plans/Rebuil Wallet Analitics.md` + reference
+mock** — structure, proportions, subtitles, one global period, Lucide chip icons.
 
-**Live code:** `lib/services/games/wallet-assets.ts`, `components/dashboard/wallet/`
-(`WalletAnalytics.tsx`, `WalletChrome.tsx`, `SpendingVsEarnings.tsx`),
-`DashboardLayout.tsx` wallet `TabsContent`, `NAV_ITEMS` label in `lib/constants.ts`,
-assets under `public/assets/neon/wallet/`. Tests: `__tests__/dashboard/wallet-analytics.test.ts`
-(6) + `games-first-nav` label pin. **Nothing mirrored.**
+**Live code:** `components/dashboard/wallet/` —
+`WalletAnalytics.tsx` (orchestrator), `WalletAnalyticsHeader.tsx`, `WalletKpiGrid.tsx`,
+`WalletBalanceTrend.tsx`, `CreditBreakdownPanel.tsx`, `DailyCreditFlowPanel.tsx`,
+`SpendingVsEarnings.tsx`, `WalletInsights.tsx`, `AnalyticsCard.tsx`, `wallet-tokens.ts`;
+`DashboardLayout.tsx` wallet `TabsContent`; `NAV_ITEMS` in `lib/constants.ts`; optional neon
+inventory still under `public/assets/neon/wallet/` + `wallet-assets.ts`. Tests:
+`__tests__/dashboard/wallet-analytics.test.ts` (8) + `games-first-nav` label pin.
+**Nothing mirrored.** Dead `WalletChrome.tsx` deleted with the rebuild.
 
-**Six facts drift easily.** **The tab id stays `wallet`** — only the visible label became
-"Wallet Analytics", so every `?tab=wallet` deep link and localStorage value survives.
-**Charts reuse the existing payload** (`walletBalanceHistory`, `dailyCreditBreakdown`,
-`dailyCreditFlow`, `allTimeTotals`) — a document describing new money aggregation is wrong.
-**HeroStatsBar left the wallet tab** — the four KPI cards (Credit Balance / Total Spend /
-Game Earnings / Prizes Won) live in `WalletKpiRow` with neon art and period % from half-window
-splits. **`embedded` on EquityChart / DailyCreditFlow / CreditBreakdownChart** strips their
-old grey card chrome so only the neon `WalletPanel` border shows; EquityChart keeps its own
-7d/30d/90d/all chips (default **30d** on this tab). **View All Transactions links to `/wallet`**,
-the existing money page — the sidebar ACCOUNT "Wallet" item is unchanged. And **Game Earnings
-≈ wins; Bonuses ≈ refunds** — the ledger has no separate "game earnings" / "bonuses" buckets,
-so a document treating those labels as new transaction types is describing a display rename.
+**Eight facts drift easily.** **The tab id stays `wallet`** — only the visible label became
+"Wallet Analytics". **Charts reuse the existing payload** — no new money aggregation.
+**One global `WalletRange` (default 30d)** drives Balance Trend, Breakdown, Daily Flow,
+Spending vs Earnings and Insights together — a document describing independent chip state
+per panel is describing the first pass. **KPI icons are Lucide chips** (Coins / ShoppingCart /
+Gamepad2 / Trophy) matching the reference, not the ChatGPT 3D plates. **Insights has seven
+cards** including Prizes Won. **Credit Breakdown is a multi-series Recharts bar** with six
+summary tiles (Deposits / Purchases / Game Earnings / Bonuses / Prizes / Withdrawals).
+**View All Transactions links to `/wallet`**. And **Game Earnings ≈ `gmEarnings`; Prizes ≈
+`wins`; Bonuses ≈ `refunds`; Purchases ≈ marketplace + entries** — display mapping, not new
+ledger types.
 
 **Never verified by eye** — dashboard behind sign-in.
 
