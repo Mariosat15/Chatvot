@@ -1,6 +1,30 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import { requireSectionAccess } from "@/lib/admin/auth";
+import { userIdFilter } from "@/lib/utils/user-id-filter";
+
+/**
+ * Reason: `requireSectionAccess` refuses by throwing, and these handlers used to echo
+ * `error.message` back with a 500 - so a denied grant read as a server fault, and any
+ * database error text reached the browser. Refusals keep their status; everything else
+ * gets the generic message.
+ */
+function refusalResponse(error: unknown): NextResponse {
+  const message = error instanceof Error ? error.message : "";
+  if (message === "Unauthorized") {
+    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+  }
+  if (message.startsWith("Access denied to section")) {
+    return NextResponse.json(
+      { success: false, error: "You do not have access to this section." },
+      { status: 403 },
+    );
+  }
+  return NextResponse.json(
+    { success: false, error: "Something went wrong. Please contact support." },
+    { status: 500 },
+  );
+}
 
 /**
  * POST /api/gamemasters/sync-referrals
@@ -58,7 +82,7 @@ export async function POST() {
         // Check if user already has correct referredByGameMasterId
         const user = await db
           .collection("user")
-          .findOne({ id: referral.userId });
+          .findOne(userIdFilter([referral.userId]));
 
         if (!user) {
           console.warn(`   ⚠️ User ${referral.userId} not found`);
@@ -74,7 +98,7 @@ export async function POST() {
 
         // Update user with referral data
         const updateResult = await db.collection("user").updateOne(
-          { id: referral.userId },
+          { _id: user._id },
           {
             $set: {
               referredByGameMasterId: referral.gameMasterId,
@@ -98,7 +122,7 @@ export async function POST() {
         console.error(`   ❌ Error syncing user ${referral.userId}:`, err);
         errors++;
         errorDetails.push(
-          `Error with user ${referral.userId}: ${err instanceof Error ? err.message : "Unknown error"}`,
+          `Error with user ${referral.userId}`,
         );
       }
     }
@@ -120,14 +144,8 @@ export async function POST() {
       },
     });
   } catch (error) {
-    console.error("Error syncing referrals:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 },
-    );
+    console.error("❌ Error syncing referrals:", error);
+    return refusalResponse(error);
   }
 }
 
@@ -169,7 +187,7 @@ export async function GET() {
     }> = [];
 
     for (const referral of userReferrals) {
-      const user = await db.collection("user").findOne({ id: referral.userId });
+      const user = await db.collection("user").findOne(userIdFilter([referral.userId]));
 
       if (!user) {
         missing++;
@@ -201,13 +219,7 @@ export async function GET() {
       },
     });
   } catch (error) {
-    console.error("Error checking sync status:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 },
-    );
+    console.error("❌ Error checking sync status:", error);
+    return refusalResponse(error);
   }
 }

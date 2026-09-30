@@ -2,6 +2,7 @@ import { Types } from "mongoose";
 // Reason: these are the operator's reconciliation lines for a settled contest, and every
 // figure in them is credits. They read euros, which is the same defect as the screens.
 import { formatVolts } from "@/lib/utils/format-volts";
+import { userDocumentIds, userIdFilter } from "@/lib/utils/user-id-filter";
 import type {
   GameMasterFeeCalculation,
   GameMasterPayment,
@@ -63,11 +64,16 @@ async function buildReferralMap(
     `   Found ${userReferrals.length} referred participants (via UserReferral collection)`,
   );
 
+  // Reason: Better Auth keeps the identity in `_id`, so `{ id: { $in } }` alone matched
+  // nothing for accounts without an `id` field, and their fallback referral was silently
+  // skipped. Match every id shape, then key the result only under ids the caller passed in.
   const referredParticipantsFromUser = await db
     .collection("user")
     .find({
-      id: { $in: participantUserIds },
-      referredByGameMasterId: { $exists: true, $ne: null },
+      $and: [
+        userIdFilter(participantUserIds),
+        { referredByGameMasterId: { $exists: true, $ne: null } },
+      ],
     })
     .toArray();
 
@@ -80,12 +86,16 @@ async function buildReferralMap(
     { gmId: string; userName: string; userEmail: string }
   >();
 
+  const requestedIds = new Set(participantUserIds);
   for (const user of referredParticipantsFromUser) {
-    referralMap.set(user.id, {
-      gmId: user.referredByGameMasterId,
-      userName: user.name || "Unknown",
-      userEmail: user.email,
-    });
+    for (const docId of userDocumentIds(user)) {
+      if (!requestedIds.has(docId)) continue;
+      referralMap.set(docId, {
+        gmId: user.referredByGameMasterId,
+        userName: user.name || "Unknown",
+        userEmail: user.email,
+      });
+    }
   }
 
   for (const ref of userReferrals) {

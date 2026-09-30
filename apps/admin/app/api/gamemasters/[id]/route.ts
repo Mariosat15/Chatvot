@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import { requireSectionAccess } from "@/lib/admin/auth";
+import { buildReferralLink } from "@/lib/services/gamemaster/referral-link";
 import {
   validateLimitsUpdate,
   validateOverrideUpdate,
@@ -196,7 +197,7 @@ export async function GET(
         autoRenew: subscription.autoRenew,
         renewalPrice: subscription.renewalPrice,
         referralCode: subscription.referralCode,
-        referralLink: subscription.referralLink,
+        referralLink: buildReferralLink(subscription.referralCode),
         limits: currentLimits,
         // Returned separately from the resolved limits so the screen can show BOTH what
         // applies and whether an administrator set it by hand. Without the raw value a

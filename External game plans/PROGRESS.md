@@ -915,6 +915,37 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 30 Sep 2026 - Gamemaster Program v2 planned; step 0 (referral foundations, R116) built
+
+**Plan:** `24-gamemaster-program-v2.md`. It covers public and private GM contests, the Join GM
+flow, versioned affiliation terms, the GM leaderboard, the admin redesign with export, and one
+affiliation service. Steps 0-8, flag-gated. Owner decisions recorded in its s1:
+- **Join GM is greyed out** for a user already affiliated to another GM; only an admin can
+  reassign, and the server refuses too.
+- A user whose GM has expired or been deleted may join a new one.
+- A GM sees the name, email and country of users who accepted.
+- GM earnings are admin-only.
+
+**Step 0 closed R116:**
+- The stored referral link pointed at `/register`, which does not exist. It now points at
+  `/sign-up`, built by one mirrored helper and derived from the code on every read.
+- The settlement fallback and `sync-referrals` looked users up by `id` alone. They now use
+  the mirrored `$or` filter.
+- A referral dropped at sign-up is now logged.
+- Both admin routes now return the generic error message.
+
+The harm: the link defect was **live** for anyone who used the stored link; the settlement
+fallback was **latent** for money. **Not retroactive, nothing backfilled.**
+
+**Checks:** 23 new tests pass. 7 of 8 probes are red on exactly one failure; the eighth is
+unprobed with its reason (two guards cover each other). The existing GM and settlement suites
+pass: 202 tests, plus 1033 route-guard tests. `check:mirrors` is OK. The admin-route audit
+shows 0 no-check and 0 helper debt. Both typechecks match the pre-change error lists exactly
+(228 main, 244 admin, no new errors and none gone). **Deviation:** no report script for stored
+links, because nothing reads that field any more.
+
+**Next:** step 1, the data model (`24` s3).
+
 ### 30 Sep 2026 - Wallet Analytics REBUILD to reference layout
 
 **Owner:** first ship was wrong (flat, wrong graphics, missing data hierarchy). Rebuild to match

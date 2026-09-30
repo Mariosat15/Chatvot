@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import { verifyGameMasterAuth } from "@/lib/admin/auth";
 import mongoose from "mongoose";
+import { buildReferralLink } from "@/lib/services/gamemaster/referral-link";
+
+const GENERIC_ERROR = "Something went wrong. Please contact support.";
 
 /**
  * GET /api/gamemaster/link
@@ -38,16 +41,16 @@ export async function GET() {
       );
     }
 
+    // Reason: the stored referralLink on older subscriptions points at /register,
+    // which does not exist. The link is derived from the code on every read so
+    // those subscriptions are repaired without a data migration.
     return NextResponse.json({
       referralCode: subscription.referralCode,
-      referralLink: subscription.referralLink,
+      referralLink: buildReferralLink(subscription.referralCode),
     });
   } catch (error) {
-    console.error("Error fetching referral link:", error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unknown error" },
-      { status: 500 },
-    );
+    console.error("❌ Error fetching referral link:", error);
+    return NextResponse.json({ error: GENERIC_ERROR }, { status: 500 });
   }
 }
 
@@ -101,7 +104,7 @@ export async function POST() {
       if (!existing) isUnique = true;
     }
 
-    const newLink = `${process.env.NEXT_PUBLIC_APP_URL || "https://app.chartvolt.com"}/register?ref=${newCode!}`;
+    const newLink = buildReferralLink(newCode!);
 
     // Update subscription with new code
     await db.collection("gamemastersubscriptions").updateOne(
@@ -123,10 +126,7 @@ export async function POST() {
         "Referral link regenerated successfully. Your old link will no longer work.",
     });
   } catch (error) {
-    console.error("Error regenerating referral link:", error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unknown error" },
-      { status: 500 },
-    );
+    console.error("❌ Error regenerating referral link:", error);
+    return NextResponse.json({ error: GENERIC_ERROR }, { status: 500 });
   }
 }

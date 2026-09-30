@@ -92,6 +92,7 @@ which**. |
 | **R113** | **`prize_pool_mismatch` alerted every correctly-settled unscored contest that refunded entry fees.** `checkPrizePoolMismatch` summed finalLeaderboard prizes + PlatformTransaction (`platform_fee` / `unclaimed_pool` / `retained_gm_fee`) and never looked at WalletTransaction `competition_refund`. Under `refund_entry_fees`, settlement returns the net pot on the wallet ledger and books only the fee — so prizes 0 + fee 2 against prizePool 20 looked like an 18-credit hole every minute. The contests were correct (fee + refunds = pool). The admin no-winners notice always said the pot went to the unclaimed pool | **Medium** | **LIVE and REPORTING-ONLY.** Alerts were false; no wallet was mis-paid and **nothing was backfilled**. Owner screenshots of Warrior's / Circuit Sniper matched the ledger | **CLOSED 21 Sep 2026.** Monitor counts completed `competition_refund` rows by `competitionId` (String). Notice branches on `unscoredContestPolicy`. See detail section |
 | **R114** | **`prize_pool_mismatch` alerted every correctly-settled contest that paid a Game Master.** Same equation as R113, one money row along: `platform_fee` is booked **net** of GM commission (`fees.service.ts`), and the GM share is credited as WalletTransaction `gamemaster_earning`. The monitor counted only the net fee, so prizes 18 + fee 1.50 = 19.50 against pool 20 looked short by exactly the GM amount on "This is annw". Settlement and the ledger were correct (18 + 1.50 + 0.50 = 20) | **Medium** | **LIVE and REPORTING-ONLY.** False critical alert; **nothing was backfilled**. Owner ledger + screenshot matched | **CLOSED 24 Sep 2026.** Monitor also sums completed `gamemaster_earning` by `competitionId`. `retained_gm_fee` still covers the inactive-GM case in PlatformTransaction. See detail section |
 | **R115** | **A player who did not finish was stored as a score of 0, and on a lower-is-better game that 0 was the best time on the board.** The ChartVolt Games adapter normalised a result with no score to `rawScore: 0`; ingestion stored it; ranking turned it into `-0` for a lower-is-better title, which sorts above every real time. Volt Velocity closes a non-finisher `completed` with no score, so the racer who never finished sat crowned at #1 | **High** | **LIVE for the board, possibly for money** - whether the phantom 0 was paid depends on the title's `zeroIsValidResult`; not confirmed against production. **Not retroactive, nothing backfilled** | **CLOSED 28 Sep 2026.** Adapter reports `scoreReported: false`, ingestion stores no score, ranking sorts no result last in both directions. See detail section |
+| **R116** | **The Game Master referral link pointed at `/register`, a page that does not exist, and two user lookups used the `id` field alone.** Admin screens showed the stored broken link; the settlement fallback and the sync tool missed users whose identity is in `_id` | **High** | **LIVE for the link** (lost referrals unrecorded); **latent for money** (the fallback runs only without a `userreferrals` row). **Not retroactive, nothing backfilled** | **CLOSED 30 Sep 2026.** One link builder, derived on read; `$or` id filter; dropped referrals logged; generic errors. See detail section |
 | **R107** | **Journey editor selection did not load the selected map; Required Badges showed raw badge ids.** Clicking a sequence card only set `selectedSequenceMap`, so the highlight moved while Current Map / Milestones / Zones kept map 1's data. Separately, `MilestoneDetailModal` resolved badge names only through `lib/constants/badges`, so blueprint ids like `trading_beat_top_trader_flag` rendered as snake_case | **Medium** | **LIVE and DISPLAY / EDITOR only** — no money, no wrong unlocks from the naming half; the editor half blocked editing maps 2–10. **Nothing was backfilled** | **CLOSED 17 Sep 2026.** `selectAndLoadMap` + tab-change reload by mapId; `resolveBadgeDisplayName` + milestones API enrichment from `getBadgesFromDB` |
 | **R108** | **Badge Simulator reported every `game_*` condition as unrecognized; `consecutive_trading_days` could never earn.** Simulator allow-list drifted from the registry; mock omitted `gameStats`/`gameTypes`; evaluator switch missed the registry streak name; vitest JSON blew `maxBuffer` | **Medium** | **LIVE for the simulator report and for streak badges in production**; Games badges were already earnable in production (registry door) — the simulator lied. **Nothing was backfilled** | **CLOSED 17 Sep 2026.** `isSupportedConditionType` + gameStats mocks; evaluator `consecutive_trading_days`; blueprint ladders for season/best score; vitest `--outputFile` |
 | R8 | Bulk find-and-replace on wording | High | Medium | X8 |
@@ -5832,6 +5833,59 @@ counts it. No live title counts a zero today.
 `lib/games/provider/scoring.ts` (plus admin copies); tests in
 `__tests__/services/chartvolt-games-adapter.test.ts`, `participant-score-arrival.test.ts`,
 `provider-entry-and-ranking.test.ts`.
+
+### R116 - The Game Master referral link pointed at a missing page, and two lookups missed real users - **CLOSED 30 Sep 2026**
+
+**What it is.** Four pre-existing defects found while mapping the Gamemaster Program v2
+(`24` s0.1), fixed as its step 0 before any feature was built on them.
+
+1. **The stored referral link pointed at `/register?ref=`, and the only sign-up route is
+   `/sign-up`.** It was written in two places (the activate route and the admin link route)
+   and read by five admin routes. The Game Master's own dashboard builds the link from the
+   browser address and was correct, so the GM saw a working link while every admin screen
+   showed the broken one.
+2. **Two user lookups used the `id` field alone.** Better Auth keeps identity in `_id` (the
+   R68 shape). The settlement fallback in `buildReferralMap` and both lookups in
+   `POST /api/gamemasters/sync-referrals` matched no user whose identity lives only in `_id`.
+3. **A referral to a Game Master who was not active was dropped at sign-up without a log
+   line**, so "my link didn't work" could not be answered.
+4. **`sync-referrals` and the admin link route returned `error.message`** to the client.
+
+**Harm, stated precisely.** (1) was **live for anyone who used the stored link**: they reached
+a 404, signed up elsewhere, and the referral was lost. How many did is not recorded anywhere.
+(2) was **latent for money**: the fallback runs only when a `userreferrals` row is missing,
+and the normal sign-up path writes that row, so the Game Master was paid through the row.
+It was **live for the sync tool**, which reported Better Auth users as not found. The
+behavioural test proves the lookup; it was **not checked against the production database**.
+**Not retroactive and nothing was backfilled**: which lost referrals to restore is an owner
+decision, and a script that attaches users to a Game Master from inferred history is an
+unreviewed money writer.
+
+**The fix.**
+- `lib/services/gamemaster/referral-link.ts` (mirrored) is the one builder of the link. Every
+  reader now derives the link from `referralCode`, so the stored field is read by nothing.
+- `lib/utils/user-id-filter.ts` (mirrored) matches `id`, the `_id` ObjectId and the `_id`
+  string. The settlement map keys a found user only under ids the caller asked for, and
+  `userreferrals` still wins over the fallback.
+- Sign-up logs every dropped referral with `⚠️`.
+- Both routes return the generic message.
+
+**Deviation from the plan.** `24` s0.1 proposed a report-only script listing subscriptions
+with a stored `/register` link. It was not written: no code reads the stored field any more
+(a test forbids it), so the old values are inert. POST on the admin link route still writes
+the corrected link, for anything outside this repository that reads it.
+
+**Probing note.** 7 of 8 probes went red on exactly one failure. The eighth stayed green
+because the guard can't be reached alone: the `requestedIds` check and the later
+`isParticipant` filter each cover for the other, so removing either changes no payout. It is
+recorded as unprobed in the harness, with the reason, and the behavioural test pins the pair.
+
+**Files:** `lib/services/gamemaster/referral-link.ts`, `lib/utils/user-id-filter.ts`,
+`lib/services/settlement/game-master-fees/calculate.ts` (all plus admin copies),
+`app/api/gamemaster/{activate,status}/route.ts`, `apps/admin/app/api/gamemaster/{link,dashboard}/route.ts`,
+`apps/admin/app/api/gamemasters/{route.ts,[id]/route.ts,sync-referrals/route.ts}`,
+`lib/actions/auth.actions.ts`; test `__tests__/services/gm-referral-foundations.test.ts`
+(23 tests); probes `tools/probe-gm-program.ps1`.
 
 ---
 

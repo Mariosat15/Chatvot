@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import { verifyGameMasterAuth } from "@/lib/admin/auth";
 import mongoose from "mongoose";
+import { buildReferralLink } from "@/lib/services/gamemaster/referral-link";
 
 /**
  * GET /api/gamemaster/dashboard
@@ -161,7 +162,7 @@ export async function GET() {
         packageName: subscription.packageName,
         status: subscription.status,
         referralCode: subscription.referralCode,
-        referralLink: subscription.referralLink,
+        referralLink: buildReferralLink(subscription.referralCode),
         startDate: subscription.startDate,
         endDate: subscription.endDate,
         nextRenewalDate: subscription.nextRenewalDate,

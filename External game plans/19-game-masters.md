@@ -377,6 +377,7 @@ contests. That half was never gated.
 | ~~Per-game analytics, Game Master and admin~~ **BUILT 16 Sep 2026 (X7 step 5)** | X7 | 2 days |
 | ~~Implement or remove `toggleCompetitionCreation`~~ **BUILT 7 Sep 2026** | X6 | 0.5 day |
 | Tier wording | X8 | Database content, non-developer |
+| ~~Referral link to `/register`, `id`-only user lookups, silent dropped referrals (R116)~~ **BUILT 30 Sep 2026** - step 0 of `24` | Gamemaster Program v2 | 1 day |
 | **Total** | | **~2.5 weeks** |
 
 That is an order of magnitude more than the "roughly four days of residuals" the earlier

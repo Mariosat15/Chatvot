@@ -8,6 +8,7 @@ import { resolveCreationLimits } from "@/lib/services/gamemaster/game-permission
 import { countGameMasterActiveCompetitions } from "@/lib/services/gamemaster/active-competitions";
 import { loadGameMasterPackageConfig } from "@/lib/services/gamemaster/package-config";
 import { buildSubscriptionLimits } from "@/lib/services/gamemaster/subscription-limits";
+import { buildReferralLink } from "@/lib/services/gamemaster/referral-link";
 
 /**
  * GET /api/gamemaster/status
@@ -104,7 +105,7 @@ export async function GET() {
         status: subscription.status,
         packageName: subscription.packageName,
         referralCode: subscription.referralCode,
-        referralLink: subscription.referralLink,
+        referralLink: buildReferralLink(subscription.referralCode),
         startDate: subscription.startDate,
         endDate: subscription.endDate,
         nextRenewalDate: subscription.nextRenewalDate,

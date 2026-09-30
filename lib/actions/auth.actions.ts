@@ -320,14 +320,20 @@ export const signUpWithEmail = async ({
                 `✅ User ${userId} successfully linked to Game Master ${gmSubscription.userId} via referral code ${referralCode}`,
               );
             } else {
-              console.log(
-                `⚠️ Referral code ${referralCode} not found or game master not active`,
+              // Reason: a dropped referral is money a Game Master is owed and never gets,
+              // so it must be visible in the logs rather than an info line nobody reads.
+              console.warn(
+                `⚠️ Referral dropped: code ${referralCode} not found or game master not active (user ${userId})`,
               );
             }
           } catch (referralError) {
             console.error("⚠️ Failed to process referral:", referralError);
             // Don't fail registration if referral processing fails
           }
+        } else if (referralCode) {
+          console.warn(
+            `⚠️ Referral dropped: code ${referralCode} is not a Game Master code (user ${userId})`,
+          );
         }
 
         // Send verification email (required before login)

@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
-import mongoose from "mongoose";
 import { MarketplaceItem } from "@/database/models/marketplace/marketplace-item.model";
 import { UserPurchase } from "@/database/models/marketplace/user-purchase.model";
 import GameMasterSubscription from "@/database/models/gamemaster/gamemaster-subscription.model";
 import { buildSubscriptionLimits } from "@/lib/services/gamemaster/subscription-limits";
+import { buildReferralLink } from "@/lib/services/gamemaster/referral-link";
 
 /**
  * POST /api/gamemaster/activate
@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
       autoRenew: true,
       renewalPrice: item.price,
       referralCode: referralCode!,
-      referralLink: `${process.env.NEXT_PUBLIC_APP_URL || "https://app.chartvolt.com"}/register?ref=${referralCode!}`,
+      referralLink: buildReferralLink(referralCode!),
       limits: buildSubscriptionLimits(gmConfig),
       currentPeriodCompetitionsCreated: 0,
       lastCompetitionResetDate: startDate,
@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
       subscription: {
         id: subscription._id.toString(),
         referralCode: subscription.referralCode,
-        referralLink: subscription.referralLink,
+        referralLink: buildReferralLink(subscription.referralCode),
         endDate: subscription.endDate,
         autoRenew: subscription.autoRenew,
         limits: subscription.limits,
@@ -142,11 +142,11 @@ export async function POST(request: NextRequest) {
       message: "Game Master package activated successfully!",
     });
   } catch (error) {
-    console.error("Error activating game master package:", error);
+    console.error("❌ Error activating game master package:", error);
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: "Something went wrong. Please contact support.",
       },
       { status: 500 },
     );
