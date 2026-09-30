@@ -207,7 +207,10 @@ describe("step 4 structural guards", () => {
     const guards = route.match(/guardSection\("gamemaster-management"\)/g) ?? [];
     expect(handlers.length).toBe(2);
     expect(guards.length).toBe(handlers.length);
-    expect(route).toMatch(/PROGRAM_SWITCHES: ReadonlySet<string> = new Set\(\["gmJoinEnabled"\]\)/);
+    // Step 5 added the second switch; the claim is unchanged - a named Set of exactly these.
+    expect(route).toMatch(
+      /PROGRAM_SWITCHES: ReadonlySet<string> = new Set\(\[\s*"gmJoinEnabled",\s*"gmPrivateContestsEnabled",\s*\]\)/,
+    );
     expect(route).toMatch(/if \(!PROGRAM_SWITCHES\.has\(key\)\)/);
     expect(route).not.toMatch(/\$set:\s*body/);
     expect(route).toMatch(/logSettingsUpdated\(/);

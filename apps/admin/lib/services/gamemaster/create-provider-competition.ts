@@ -89,8 +89,10 @@ export async function createGameMasterProviderCompetition(args: {
   userId: string;
   gameMasterName: string;
   maxUsersPerCompetition: number;
+  /** Already checked against the package by the route (checkVisibilityAllowed). */
+  visibility: "public" | "gm_private";
 }): Promise<GameMasterProviderCreateResult> {
-  const { body, userId, gameMasterName, maxUsersPerCompetition } = args;
+  const { body, userId, gameMasterName, maxUsersPerCompetition, visibility } = args;
 
   const name = typeof body.name === "string" ? body.name.trim() : "";
   const description =
@@ -188,6 +190,7 @@ export async function createGameMasterProviderCompetition(args: {
       createdBy: userId,
       gameMasterId: userId,
       gameMasterName,
+      visibility,
     });
 
   if (!created.success || !created.competitionId) {

@@ -57,6 +57,7 @@ describe("createGameMasterProviderCompetition validation", () => {
       userId: "aaaaaaaaaaaaaaaaaaaaaaaa",
       gameMasterName: "GM",
       maxUsersPerCompetition: 50,
+      visibility: "public",
     });
 
     expect(result.ok).toBe(false);
@@ -89,6 +90,7 @@ describe("createGameMasterProviderCompetition validation", () => {
       userId,
       gameMasterName: "Ada",
       maxUsersPerCompetition: 50,
+      visibility: "public",
     });
 
     expect(result.ok).toBe(true);
@@ -126,6 +128,7 @@ describe("createGameMasterProviderCompetition validation", () => {
       userId: "dddddddddddddddddddddddd",
       gameMasterName: "GM",
       maxUsersPerCompetition: 30,
+      visibility: "public",
     });
 
     expect(createAndPublish.mock.calls[0][0].platformFeePercentage).toBe(12);
@@ -151,6 +154,7 @@ describe("createGameMasterProviderCompetition validation", () => {
       userId: "cccccccccccccccccccccccc",
       gameMasterName: "GM",
       maxUsersPerCompetition: 30,
+      visibility: "public",
     });
 
     expect(createAndPublish.mock.calls[0][0].maxParticipants).toBe(30);

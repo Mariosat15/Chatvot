@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import mongoose from "mongoose";
+import {
+  publicContestsFilter,
+  withVisibleContests,
+} from "@/lib/services/gamemaster/visible-contests";
 
 interface ActivityItem {
   id: string;
@@ -56,6 +60,9 @@ export async function GET() {
           },
         },
         { $unwind: { path: "$competition", preserveNullAndEmptyArrays: true } },
+        // Reason: an anonymous activity ticker must not name a Game Master's private
+        // contest (R117). Before `$limit`, so a private win does not take a public one's slot.
+        { $match: publicContestsFilter("competition.") },
         { $limit: 5 },
         { $sort: { updatedAt: -1 } },
       ])
@@ -112,13 +119,18 @@ export async function GET() {
     // Get recently started/upcoming competitions
     const upcomingCompetitions = await db
       .collection("competitions")
-      .find({
-        status: { $in: ["active", "upcoming"] },
-        startTime: {
-          $gte: oneHourAgo,
-          $lte: new Date(Date.now() + 24 * 60 * 60 * 1000),
-        },
-      })
+      .find(
+        withVisibleContests(
+          {
+            status: { $in: ["active", "upcoming"] },
+            startTime: {
+              $gte: oneHourAgo,
+              $lte: new Date(Date.now() + 24 * 60 * 60 * 1000),
+            },
+          },
+          null,
+        ),
+      )
       .sort({ startTime: -1 })
       .limit(3)
       .toArray();

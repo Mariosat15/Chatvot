@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import mongoose from "mongoose";
 import { getHiddenUserIds } from "@/lib/services/user-restriction.service";
+import { publicContestsFilter } from "@/lib/services/gamemaster/visible-contests";
 
 interface LeaderboardEntry {
   rank: number;
@@ -175,12 +176,16 @@ export async function GET() {
             let: { compId: { $toObjectId: "$competitionId" } },
             pipeline: [
               { $match: { $expr: { $eq: ["$_id", "$$compId"] } } },
-              { $project: { name: 1, prizePool: 1 } },
+              // Reason: `visibility` must be projected or the filter below sees it absent,
+              // which reads as public, and every private win passes (R117).
+              { $project: { name: 1, prizePool: 1, visibility: 1 } },
             ],
             as: "competition",
           },
         },
         { $unwind: { path: "$competition", preserveNullAndEmptyArrays: true } },
+        // Reason: an anonymous landing strip must not name a Game Master's private contest.
+        { $match: publicContestsFilter("competition.") },
         { $sort: { prizeWon: -1 } },
         { $limit: 5 },
       ])

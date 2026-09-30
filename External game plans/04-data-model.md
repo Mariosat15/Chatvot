@@ -455,3 +455,10 @@ a stored field.
 | `TermsAcceptance` (**main app only**) | `termsVersion`, `context.{ gameMasterId, affiliationSource, competitionId }` | none | The admin app reads nothing from this collection, so it is not mirrored (R42) |
 | `SitePage` (mirrored) | `version: string` | none | An identity a dispute can cite; the editor bump arrives in step 3 |
 | `CustomerAuditTrail` (admin only) | four `gm_*` action types | - | Category `assignment`; add-only |
+| `WhiteLabel` (mirrored) | `gmPrivateContestsEnabled: boolean` | `false` | **Added in step 5.** It gates the *creation* of a `gm_private` contest only. The entry guard and the discovery filters run whatever its value (`24` s10). |
+
+**Since step 5 (30 Sep 2026), two of these fields are no longer inert.**
+- `Competition.visibility` is stamped by both Game Master creation routes and read by the entry guard and every discovery reader.
+- `allowedVisibility` is read by `checkVisibilityAllowed` and written by the package editor through `parseAllowedVisibilityInput`.
+
+The authoritative account is `24` s4's BUILT note.

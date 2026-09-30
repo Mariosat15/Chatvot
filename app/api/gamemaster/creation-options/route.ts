@@ -8,6 +8,9 @@ import { resolveCreationLimits } from "@/lib/services/gamemaster/game-permission
 import { countGameMasterActiveCompetitions } from "@/lib/services/gamemaster/active-competitions";
 import { loadGameMasterPackageConfig } from "@/lib/services/gamemaster/package-config";
 import { resolveGameMasterPlatformFeePercentage } from "@/lib/services/gamemaster/platform-fee";
+import { checkVisibilityAllowed } from "@/lib/services/gamemaster/visibility-permission";
+import { isGmPrivateContestsEnabled } from "@/lib/services/gamemaster/gm-program-flags";
+import { COMPETITION_VISIBILITIES } from "@/lib/services/gamemaster/competition-visibility";
 
 /**
  * GET /api/gamemaster/creation-options
@@ -81,9 +84,24 @@ export async function GET() {
       session.user.id,
     );
 
+    // Reason: the picker offers exactly what the create route will accept, by asking the
+    // same gate about each value rather than restating its precedence here.
+    const privateContestsEnabled = await isGmPrivateContestsEnabled();
+    const creatableVisibilities = COMPETITION_VISIBILITIES.filter(
+      (requested) =>
+        checkVisibilityAllowed({
+          requested,
+          hasPackage: packageConfig !== null,
+          packageAllowed: packageConfig?.allowedVisibility,
+          cachedAllowed: subscription.limits?.allowedVisibility,
+          privateContestsEnabled,
+        }).ok,
+    );
+
     return NextResponse.json({
       success: true,
       allowedGameTypes,
+      creatableVisibilities,
       canCreateCompetitions: effectiveLimits.canCreateCompetitions,
       maxUsersPerCompetition: effectiveLimits.maxUsersPerCompetition,
       maxCompetitionsPerDay: effectiveLimits.maxCompetitionsPerDay,

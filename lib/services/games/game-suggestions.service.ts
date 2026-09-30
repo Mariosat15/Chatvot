@@ -7,6 +7,8 @@
  */
 import Competition from "@/database/models/trading/competition.model";
 import { listInterestedGameKeys } from "@/lib/services/games/interest-inference.service";
+import { resolveContestViewer } from "@/lib/services/gamemaster/contest-viewer.service";
+import { withVisibleContests } from "@/lib/services/gamemaster/visible-contests";
 
 export interface GameSuggestion {
   gameKey: string;
@@ -26,15 +28,24 @@ export async function suggestOpenContests(
   if (gameKeys.length === 0) return [];
 
   const now = new Date();
-  const contests = await Competition.find({
-    gameKey: { $in: gameKeys },
-    status: { $in: ["upcoming", "active"] },
-    // Still accepting entrants: start in the future or registration still open.
-    $or: [
-      { startTime: { $gt: now } },
-      { registrationDeadline: { $gt: now } },
-    ],
-  })
+  // Reason: a suggestion is a list another player sees - a private Game Master contest is
+  // suggested only to that GM's affiliates (R117). `$and`, never a spread: this query has
+  // its own `$or`, which a spread would silently overwrite.
+  const viewer = await resolveContestViewer(userId);
+  const contests = await Competition.find(
+    withVisibleContests(
+      {
+        gameKey: { $in: gameKeys },
+        status: { $in: ["upcoming", "active"] },
+        // Still accepting entrants: start in the future or registration still open.
+        $or: [
+          { startTime: { $gt: now } },
+          { registrationDeadline: { $gt: now } },
+        ],
+      },
+      viewer,
+    ),
+  )
     .select("name entryFee startTime status gameKey")
     .sort({ startTime: 1 })
     .limit(limit)

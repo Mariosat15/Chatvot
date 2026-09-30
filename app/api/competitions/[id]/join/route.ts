@@ -44,6 +44,8 @@ const STATUS_BY_CODE: Record<ContestEntryFailureCode, number> = {
   no_wallet: 400,
   insufficient_balance: 400,
   provider_unavailable: 503,
+  own_contest: 403,
+  private_not_affiliated: 403,
   contended: 409,
   failed: 500,
 };

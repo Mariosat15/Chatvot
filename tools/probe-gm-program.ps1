@@ -11,6 +11,10 @@ $ErrorActionPreference = "Continue"
 $enc = New-Object System.Text.UTF8Encoding($false)
 $suite = "__tests__/services/gm-referral-foundations.test.ts"
 $results = @()
+# Reason: a full run takes a long time; $env:PROBE_FROM=65 runs only probe 65 onward, so a
+# new step can be proved without re-running every earlier step's probes.
+$probeFrom = if ($env:PROBE_FROM) { [int]$env:PROBE_FROM } else { 1 }
+$script:probeIndex = 0
 
 function Invoke-Probe {
     param(
@@ -22,8 +26,13 @@ function Invoke-Probe {
         [string]$Suite = $suite
     )
 
+    $script:probeIndex++
+    if ($script:probeIndex -lt $probeFrom) {
+        return [pscustomobject]@{ Name = $Name; Outcome = "SKIPPED" }
+    }
+
     Write-Host ""
-    Write-Host "PROBE: $Name" -ForegroundColor Cyan
+    Write-Host "PROBE: $script:probeIndex $Name" -ForegroundColor Cyan
 
     $path = (Resolve-Path -LiteralPath $File).Path
     $original = [System.IO.File]::ReadAllText($path, $enc)
@@ -625,10 +634,202 @@ $results += Invoke-Probe `
     -To 'const INDEX_NOT_FOUND = 26;' `
     -TestName "the admin copy is byte-identical to the main copy" -Suite $MR
 
+# ---- Step 5: private contests - visibility, entry, discovery ---------------------------
+
+$PE = "__tests__/services/gm-private-entry.test.ts"
+$PD = "__tests__/services/gm-private-discovery.test.ts"
+$VP = "__tests__/services/gm-visibility-permission.test.ts"
+$VIS = "lib/services/gamemaster/visible-contests.ts"
+$PERM = "lib/services/gamemaster/visibility-permission.ts"
+
+# 65. The entry door left open.
+$results += Invoke-Probe `
+    -Name "Entry guard never refuses" `
+    -File "lib/services/contest-entry.service.ts" `
+    -From 'if (!canEnterPrivateContest(competition, affiliation?.gameMasterId)) {' `
+    -To 'if (false && !canEnterPrivateContest(competition, affiliation?.gameMasterId)) {' `
+    -TestName "refuses an unaffiliated player through Gate A" -Suite $PE
+
+# 66. Gate B reports the refusal as a malformed request.
+$results += Invoke-Probe `
+    -Name "Gate B maps the refusal to 400" `
+    -File "app/api/competitions/[id]/join/route.ts" `
+    -From 'private_not_affiliated: 403,' `
+    -To 'private_not_affiliated: 400,' `
+    -TestName "through Gate B with 403" -Suite $PE
+
+# 66b. The step-4 gap this step closed: own_contest missing from Gate B's table -> 500.
+$results += Invoke-Probe `
+    -Name "Gate B has no status for own_contest" `
+    -File "app/api/competitions/[id]/join/route.ts" `
+    -From '  own_contest: 403,' `
+    -To '' `
+    -TestName "maps a Game Master joining their own contest to 403" -Suite $PE
+
+# 67. Any affiliation admits, whichever Game Master it is to.
+$results += Invoke-Probe `
+    -Name "Private door admits any affiliated player" `
+    -File $VIS `
+    -From 'contest.gameMasterId === affiliatedGameMasterId' `
+    -To 'contest.gameMasterId !== ""' `
+    -TestName "refuses a player affiliated to a DIFFERENT Game Master" -Suite $PE
+
+# 68. The batch writer seats strangers in bulk.
+$results += Invoke-Probe `
+    -Name "Batch route stops refusing private contests" `
+    -File "app/api/simulator/competitions/join-batch/route.ts" `
+    -From 'if (resolveCompetitionVisibility(competition.visibility) === "gm_private") {' `
+    -To 'if (false) {' `
+    -TestName "returns 403 before it reads any participant or wallet" -Suite $PE
+
+# 69. The plan's `$ne` - an unknown stored value listed to everybody.
+$results += Invoke-Probe `
+    -Name "Discovery filter written as ne gm_private" `
+    -File $VIS `
+    -From '{ $in: [...PUBLIC_VISIBILITY_VALUES] }' `
+    -To '{ $ne: "gm_private" }' `
+    -TestName "an unrecognised stored value is HIDDEN" -Suite $PD
+
+# 70. Every contest written before the field existed vanishes.
+$results += Invoke-Probe `
+    -Name "Public values lose null" `
+    -File $VIS `
+    -From '[null, "", "public"]' `
+    -To '["", "public"]' `
+    -TestName "an anonymous viewer sees every public shape" -Suite $PD
+
+# 71. A spread overwrites the reader's own $or.
+$results += Invoke-Probe `
+    -Name "withVisibleContests spreads instead of and" `
+    -File $VIS `
+    -From 'return { $and: [query, visibleContestsFilter(viewer)] };' `
+    -To 'return { ...query, ...visibleContestsFilter(viewer) };' `
+    -TestName "keeps the caller's own" -Suite $PD
+
+# 72. A Game Master cannot find the private contest they just made.
+$results += Invoke-Probe `
+    -Name "Viewer filter forgets the viewer's own id" `
+    -File $VIS `
+    -From '[viewer?.affiliatedGameMasterId, viewer?.userId]' `
+    -To '[viewer?.affiliatedGameMasterId]' `
+    -TestName "a Game Master sees their own private contest" -Suite $PD
+
+# 73. One reader lists everything again.
+$results += Invoke-Probe `
+    -Name "Competition list reader unfiltered" `
+    -File "lib/actions/trading/competition.actions.ts" `
+    -From 'Competition.find(withVisibleContests(query, viewer))' `
+    -To 'Competition.find(query)' `
+    -TestName "lib/actions/trading/competition.actions.ts filters its query" -Suite $PD
+
+# 74. The lookup stops carrying the field, so every private win reads as public.
+$results += Invoke-Probe `
+    -Name "Leaderboard preview drops visibility from the projection" `
+    -File "app/api/landing/leaderboard-preview/route.ts" `
+    -From '{ $project: { name: 1, prizePool: 1, visibility: 1 } }' `
+    -To '{ $project: { name: 1, prizePool: 1 } }' `
+    -TestName "the leaderboard preview projects visibility" -Suite $PD
+
+# 75. The platform switch ignored.
+$results += Invoke-Probe `
+    -Name "Private switch not consulted" `
+    -File $PERM `
+    -From 'if (visibility === "gm_private" && !input.privateContestsEnabled) {' `
+    -To 'if (false) {' `
+    -TestName "refuses private while the platform switch is off" -Suite $VP
+
+# 76. The cached copy beats the current package.
+$results += Invoke-Probe `
+    -Name "Cached limits outrank the current package" `
+    -File $PERM `
+    -From 'input.hasPackage && Array.isArray(input.packageAllowed)' `
+    -To '!Array.isArray(input.cachedAllowed) && input.hasPackage && Array.isArray(input.packageAllowed)' `
+    -TestName "the CURRENT package beats the cached limits" -Suite $VP
+
+# 77. An unknown request is guessed rather than refused.
+$results += Invoke-Probe `
+    -Name "Unknown requested visibility accepted" `
+    -File $PERM `
+    -From 'if (!requestedBlank && (typeof raw !== "string" || !KNOWN.has(raw))) {' `
+    -To 'if (false) {' `
+    -TestName "refuses an unknown requested value" -Suite $VP
+
+# 78. The route stops asking about what the caller asked for.
+$results += Invoke-Probe `
+    -Name "Main creation route ignores body.visibility" `
+    -File "app/api/gamemaster/competitions/route.ts" `
+    -From 'requested: body.visibility,' `
+    -To 'requested: undefined,' `
+    -TestName "app/api/gamemaster/competitions/route.ts reads the requested value" -Suite $VP
+
+# 79. The form's options stop coming from the rule.
+$results += Invoke-Probe `
+    -Name "creation-options offers every visibility" `
+    -File "app/api/gamemaster/creation-options/route.ts" `
+    -From 'const creatableVisibilities = COMPETITION_VISIBILITIES.filter(' `
+    -To 'const creatableVisibilities = ["public", "gm_private"].filter(' `
+    -TestName "app/api/gamemaster/creation-options/route.ts computes" -Suite $VP
+
+# 80. The provider form is never told the choice.
+$results += Invoke-Probe `
+    -Name "Gate withholds visibility from the provider form" `
+    -File "components/gamemaster/CreateCompetitionGate.tsx" `
+    -From "title={selection.title}`r`n          visibility={visibility}" `
+    -To "title={selection.title}" `
+    -TestName "the gate hands the chosen visibility to BOTH create forms" -Suite $VP
+
+# 81. The provider form drops it from the POST.
+$results += Invoke-Probe `
+    -Name "Provider form does not send visibility" `
+    -File "components/gamemaster/ProviderContestCreateForm.tsx" `
+    -From "gameCode: title.gameCode,`r`n          visibility," `
+    -To "gameCode: title.gameCode," `
+    -TestName "ProviderContestCreateForm.tsx sends visibility" -Suite $VP
+
+# 82. A pointless one-option picker is drawn.
+$results += Invoke-Probe `
+    -Name "Picker renders a public-only choice" `
+    -File "components/gamemaster/ContestVisibilityPicker.tsx" `
+    -From 'if (options.length === 1 && options[0] === "public") return null;' `
+    -To '' `
+    -TestName "the picker hides itself when public is the only option" -Suite $VP
+
+# 83. The package editor stores an unchecked list.
+$results += Invoke-Probe `
+    -Name "Marketplace PUT skips the visibility parser" `
+    -File "apps/admin/app/api/marketplace/route.ts" `
+    -From 'const parsed = parseAllowedVisibilityInput(updates.gameMasterConfig.allowedVisibility);' `
+    -To 'const parsed = { ok: true as const, value: updates.gameMasterConfig.allowedVisibility, error: "" };' `
+    -TestName "validates the visibility list before the write" -Suite $VP
+
+# 84. A tightened tier leaves the cached grant behind.
+$results += Invoke-Probe `
+    -Name "Marketplace does not sync limits.allowedVisibility" `
+    -File "apps/admin/app/api/marketplace/route.ts" `
+    -From 'limitsUpdate["limits.allowedVisibility"] = gmConfig.allowedVisibility;' `
+    -To 'void gmConfig.allowedVisibility;' `
+    -TestName "syncs the cached limits" -Suite $VP
+
+# 85. The switch can no longer be set.
+$results += Invoke-Probe `
+    -Name "Program settings allow-list loses the private switch" `
+    -File "apps/admin/app/api/gamemasters/program-settings/route.ts" `
+    -From '  "gmPrivateContestsEnabled",' `
+    -To '  "gmPrivateContestsEnabledRenamed",' `
+    -TestName "the program settings allow-list names the private switch" -Suite $VP
+
+# 86. The admin copy of the rule drifts - the one the admin-hosted route runs.
+$results += Invoke-Probe `
+    -Name "Admin visibility-permission copy drifts" `
+    -File "apps/admin/$PERM" `
+    -From 'Private competitions are not available on the platform yet.' `
+    -To 'Private competitions are unavailable.' `
+    -TestName "visibility-permission.ts matches its admin copy" -Suite $VP
+
 Write-Host ""
 Write-Host "================ SUMMARY ================"
 $results | Format-Table -AutoSize
-$bad = @($results | Where-Object { $_.Outcome -notlike "RED*" })
+$bad = @($results | Where-Object { $_.Outcome -notlike "RED*" -and $_.Outcome -ne "SKIPPED" })
 if ($bad.Count -gt 0) {
     Write-Host "$($bad.Count) probe(s) did NOT come back red - read each one."
 }

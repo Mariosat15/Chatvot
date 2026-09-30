@@ -100,10 +100,13 @@ interface GMCreateCompetitionContentProps {
    * look correct for a year, and the failure is silent, so the compiler is what has to object.
    */
   levelLadder: TitleLevel[];
+  /** Chosen on the gate from the server's `creatableVisibilities`; the route re-checks it. */
+  visibility?: "public" | "gm_private";
 }
 
 export default function GMCreateCompetitionContent({
   levelLadder,
+  visibility,
 }: GMCreateCompetitionContentProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -606,6 +609,7 @@ export default function GMCreateCompetitionContent({
         body: JSON.stringify({
           name: formData.name,
           description: formData.description,
+          visibility,
           entryFee: formData.entryFeeCredits,
           startingCapital: formData.startingTradingPoints,
           minParticipants: formData.minParticipants,

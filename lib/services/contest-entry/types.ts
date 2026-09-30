@@ -23,6 +23,7 @@ export type ContestEntryFailureCode =
   | "insufficient_balance"
   | "provider_unavailable"
   | "own_contest"
+  | "private_not_affiliated"
   | "contended"
   | "failed";
 

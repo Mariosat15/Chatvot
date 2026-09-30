@@ -16,6 +16,12 @@ import {
 import { countGameMasterActiveCompetitions } from "@/lib/services/gamemaster/active-competitions";
 import { createGameMasterProviderCompetition } from "@/lib/services/gamemaster/create-provider-competition";
 import { resolveGameMasterPlatformFeePercentage } from "@/lib/services/gamemaster/platform-fee";
+import { checkVisibilityAllowed } from "@/lib/services/gamemaster/visibility-permission";
+import {
+  COMPETITION_VISIBILITIES,
+  resolveCompetitionVisibility,
+} from "@/lib/services/gamemaster/competition-visibility";
+import { isGmPrivateContestsEnabled } from "@/lib/services/gamemaster/gm-program-flags";
 
 /**
  * GET /api/gamemaster/competitions
@@ -63,11 +69,15 @@ export async function GET() {
         subscription.limits?.canCreateCompetitions !== false,
     };
 
+    let packageAllowedVisibility: unknown;
+    let hasPackage = false;
     if (subscription.packageId) {
       const currentPackage = await MarketplaceItem.findById(
         subscription.packageId,
       ).lean();
       if (currentPackage?.gameMasterConfig) {
+        hasPackage = true;
+        packageAllowedVisibility = currentPackage.gameMasterConfig.allowedVisibility;
         currentLimits = {
           maxCompetitionsPerDay:
             currentPackage.gameMasterConfig.maxCompetitionsPerDay || 1,
@@ -87,6 +97,20 @@ export async function GET() {
       .limit(50)
       .toArray();
 
+    // Reason: the form offers exactly what the POST would accept, by asking the same rule
+    // about each value - a second copy of the precedence here would drift from the gate.
+    const privateContestsEnabled = await isGmPrivateContestsEnabled();
+    const creatableVisibilities = COMPETITION_VISIBILITIES.filter(
+      (requested) =>
+        checkVisibilityAllowed({
+          requested,
+          hasPackage,
+          packageAllowed: packageAllowedVisibility,
+          cachedAllowed: subscription.limits?.allowedVisibility,
+          privateContestsEnabled,
+        }).ok,
+    );
+
     return NextResponse.json({
       success: true,
       competitions: competitions.map((c) => ({
@@ -100,8 +124,10 @@ export async function GET() {
         startTime: c.startTime,
         endTime: c.endTime,
         createdAt: c.createdAt,
+        visibility: resolveCompetitionVisibility(c.visibility),
       })),
       limits: {
+        creatableVisibilities,
         maxCompetitionsPerDay: currentLimits.maxCompetitionsPerDay,
         maxUsersPerCompetition: currentLimits.maxUsersPerCompetition,
         canCreateCompetitions: currentLimits.canCreateCompetitions,
@@ -300,12 +326,35 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Public or private (step 5). The current package decides, then the cached limits, then
+    // public only - an admin creation override never widens it. Resolved ONCE and stamped
+    // explicitly on the insert: the raw driver applies no schema default (R7).
+    const visibilityVerdict = checkVisibilityAllowed({
+      requested: body.visibility,
+      hasPackage: packageConfig !== null,
+      packageAllowed: packageConfig?.allowedVisibility,
+      cachedAllowed: subscription.limits?.allowedVisibility,
+      privateContestsEnabled: await isGmPrivateContestsEnabled(),
+    });
+    if (!visibilityVerdict.ok) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: visibilityVerdict.message,
+          reason: visibilityVerdict.reason,
+          decidedBy: visibilityVerdict.decidedBy,
+        },
+        { status: visibilityVerdict.reason === "visibility_unknown" ? 400 : 403 },
+      );
+    }
+
     if (verdict.gameType === "provider") {
       const providerResult = await createGameMasterProviderCompetition({
         body,
         userId,
         gameMasterName: session.user.name || "Game Master",
         maxUsersPerCompetition: effectiveLimits.maxUsersPerCompetition,
+        visibility: visibilityVerdict.visibility,
       });
 
       if (!providerResult.ok) {
@@ -499,6 +548,7 @@ export async function POST(request: NextRequest) {
       // Game Master fields
       gameMasterId: userId,
       gameMasterName: session.user.name || "Game Master",
+      visibility: visibilityVerdict.visibility,
       createdBy: userId,
       // Competition rules (use provided or defaults)
       rules: rules

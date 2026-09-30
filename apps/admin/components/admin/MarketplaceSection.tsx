@@ -82,6 +82,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import StrategyBuilder from "./StrategyBuilder";
+import { PackageVisibilityField } from "./gamemaster/PackageVisibilityField";
 import { Lightbulb } from "lucide-react";
 
 // Available icons for icon picker
@@ -146,6 +147,8 @@ interface GameMasterConfig {
   challengeReferralFeePercentage?: number;
   /** Which contest families this tier may CREATE. Default trading-only. */
   allowedGameTypes?: string[];
+  /** Which competition visibilities this tier may CREATE. Absent = public only. */
+  allowedVisibility?: string[];
 }
 
 interface MarketplaceItem {
@@ -2034,6 +2037,22 @@ export default function MarketplaceSection() {
                             );
                           })()}
                         </div>
+                      )}
+
+                      {editingItem.gameMasterConfig?.canCreateCompetitions !==
+                        false && (
+                        <PackageVisibilityField
+                          value={editingItem.gameMasterConfig?.allowedVisibility}
+                          onChange={(next) =>
+                            setEditingItem({
+                              ...editingItem,
+                              gameMasterConfig: {
+                                ...editingItem.gameMasterConfig!,
+                                allowedVisibility: next,
+                              },
+                            })
+                          }
+                        />
                       )}
 
                       {/* Max Competitions Per Day - Only show if canCreateCompetitions is enabled */}

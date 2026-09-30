@@ -14,6 +14,7 @@ import mongoose from "mongoose";
 import { computeProfitFactor } from "@/lib/services/trading-metrics";
 import { createDashboardRankResolver } from "@/lib/services/games/dashboard-contest-rank.service";
 import { hasProviderGameLabel } from "@/lib/services/games/contest-config";
+import { withVisibleContests } from "@/lib/services/gamemaster/visible-contests";
 
 export const dynamic = "force-dynamic";
 
@@ -30,15 +31,22 @@ export async function GET() {
     const now = new Date();
     const windowStart = new Date(now.getTime() - 48 * 60 * 60 * 1000);
 
-    const competitionsRaw = await Competition.find({
-      $or: [
-        { status: { $in: ["active", "upcoming"] } },
+    // Reason: this route has no session, so it can never know a viewer is affiliated - a
+    // private Game Master contest is always excluded here (R117).
+    const competitionsRaw = await Competition.find(
+      withVisibleContests(
         {
-          status: { $in: ["completed", "finalizing", "emergency_ended"] },
-          startTime: { $gte: windowStart },
+          $or: [
+            { status: { $in: ["active", "upcoming"] } },
+            {
+              status: { $in: ["completed", "finalizing", "emergency_ended"] },
+              startTime: { $gte: windowStart },
+            },
+          ],
         },
-      ],
-    })
+        null,
+      ),
+    )
       .sort({ startTime: -1 })
       .limit(50)
       .lean();

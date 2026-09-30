@@ -5,17 +5,49 @@ import { toast } from "sonner";
 
 const GENERIC_ERROR = "Something went wrong. Please contact support.";
 
+type SwitchKey = "gmJoinEnabled" | "gmPrivateContestsEnabled";
+
+const SWITCHES: ReadonlyArray<{
+  key: SwitchKey;
+  title: string;
+  description: string;
+  onToast: string;
+  offToast: string;
+}> = [
+  {
+    key: "gmJoinEnabled",
+    title: "Join Game Master and leaderboard",
+    description:
+      "Shows players the Game Master leaderboard and lets them join one after accepting the Game Master terms. Off by default.",
+    onToast: "Join Game Master is now on.",
+    offToast: "Join Game Master is now off.",
+  },
+  {
+    key: "gmPrivateContestsEnabled",
+    title: "Private Game Master competitions",
+    description:
+      "Lets a Game Master whose package allows it create a competition only their own players can see and enter. Off by default. Turning it off stops new private competitions; existing ones stay private.",
+    onToast: "Private Game Master competitions are now on.",
+    offToast: "Private Game Master competitions are now off.",
+  },
+];
+
 /**
- * The Gamemaster Program v2 master switch (`External game plans/24` s6.1). While it is off,
- * players see no Game Master leaderboard and no Join button, and both player routes refuse.
+ * The Gamemaster Program v2 switches (`External game plans/24` s6.1).
  *
- * Reason: the control shows the STORED value read back from the server after every save,
+ * Reason: each control shows the STORED value read back from the server after every save,
  * never the value the operator clicked - a switch that shows what you meant rather than what
  * was saved is the "appears to work and does nothing" shape.
  */
+// Reason: a Map lookup rather than values[key] - the key is typed, but the lint rule cannot
+// see that, and the pre-commit hook blocks on its warning.
+function readSwitch(values: Record<SwitchKey, boolean>, key: SwitchKey): boolean {
+  return new Map(Object.entries(values)).get(key) === true;
+}
+
 export default function GmProgramSwitches() {
-  const [enabled, setEnabled] = useState<boolean | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [values, setValues] = useState<Record<SwitchKey, boolean> | null>(null);
+  const [saving, setSaving] = useState<SwitchKey | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -27,7 +59,10 @@ export default function GmProgramSwitches() {
         setError(body?.error || GENERIC_ERROR);
         return;
       }
-      setEnabled(body.switches?.gmJoinEnabled === true);
+      setValues({
+        gmJoinEnabled: body.switches?.gmJoinEnabled === true,
+        gmPrivateContestsEnabled: body.switches?.gmPrivateContestsEnabled === true,
+      });
     } catch {
       setError(GENERIC_ERROR);
     }
@@ -37,50 +72,62 @@ export default function GmProgramSwitches() {
     void load();
   }, [load]);
 
-  const toggle = async () => {
-    if (enabled === null) return;
-    setSaving(true);
+  const toggle = async (key: SwitchKey) => {
+    if (values === null) return;
+    const spec = SWITCHES.find((s) => s.key === key);
+    if (!spec) return;
+    setSaving(key);
     try {
       const res = await fetch("/api/gamemasters/program-settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ gmJoinEnabled: !enabled }),
+        body: JSON.stringify({ [key]: !readSwitch(values, key) }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok || !body?.success) {
         toast.error(body?.error || GENERIC_ERROR);
         return;
       }
-      const stored = body.switches?.gmJoinEnabled === true;
-      setEnabled(stored);
-      toast.success(stored ? "Join Game Master is now on." : "Join Game Master is now off.");
+      const next = {
+        gmJoinEnabled: body.switches?.gmJoinEnabled === true,
+        gmPrivateContestsEnabled: body.switches?.gmPrivateContestsEnabled === true,
+      };
+      setValues(next);
+      toast.success(readSwitch(next, key) ? spec.onToast : spec.offToast);
     } catch {
       toast.error(GENERIC_ERROR);
     } finally {
-      setSaving(false);
+      setSaving(null);
     }
   };
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-700 bg-gray-800 p-4">
-      <div>
-        <p className="font-semibold text-white">Join Game Master and leaderboard</p>
-        <p className="text-sm text-gray-400">
-          Shows players the Game Master leaderboard and lets them join one after accepting the
-          Game Master terms. Off by default.
-        </p>
-        {error && <p className="mt-1 text-sm text-red-400">{error}</p>}
-      </div>
-      <button
-        type="button"
-        onClick={() => void toggle()}
-        disabled={enabled === null || saving}
-        className={`rounded px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 ${
-          enabled ? "bg-emerald-600 hover:bg-emerald-700" : "bg-gray-600 hover:bg-gray-500"
-        }`}
-      >
-        {enabled === null ? "Loading…" : enabled ? "On" : "Off"}
-      </button>
+    <div className="space-y-3">
+      {error && <p className="text-sm text-red-400">{error}</p>}
+      {SWITCHES.map((spec) => {
+        const on = values?.[spec.key] === true;
+        return (
+          <div
+            key={spec.key}
+            className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-700 bg-gray-800 p-4"
+          >
+            <div>
+              <p className="font-semibold text-white">{spec.title}</p>
+              <p className="text-sm text-gray-400">{spec.description}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void toggle(spec.key)}
+              disabled={values === null || saving !== null}
+              className={`rounded px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 ${
+                on ? "bg-emerald-600 hover:bg-emerald-700" : "bg-gray-600 hover:bg-gray-500"
+              }`}
+            >
+              {values === null ? "Loading…" : saving === spec.key ? "Saving…" : on ? "On" : "Off"}
+            </button>
+          </div>
+        );
+      })}
     </div>
   );
 }

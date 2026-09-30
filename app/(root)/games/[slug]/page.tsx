@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { getGamePageData } from "@/lib/services/games/game-page.service";
 import { GamePageView } from "@/components/game-page/GamePageView";
+import { resolveRequestContestViewer } from "@/lib/services/gamemaster/request-contest-viewer";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +38,10 @@ export default async function GamePage({
   const tab =
     normalised && ALLOWED_TABS.has(normalised) ? normalised : "overview";
 
-  const game = await getGamePageData(slug);
+  // Reason: the Competitions tab lists a Game Master's private contests only to that GM's
+  // affiliates (R117); metadata below needs no contests, so it stays public-only.
+  const viewer = await resolveRequestContestViewer();
+  const game = await getGamePageData(slug, viewer);
   if (!game) notFound();
 
   return <GamePageView game={game} tab={tab} />;

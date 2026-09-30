@@ -30,6 +30,7 @@ import {
   type BrowsableGame,
 } from "@/lib/services/games/player-catalogue.service";
 import { loadTradingPageContent } from "@/lib/services/games/trading-page-content";
+import type { ContestViewer } from "@/lib/services/gamemaster/visible-contests";
 import type { TradingPageStoredContent } from "@/lib/services/games/trading-page-content";
 
 const PROVIDER_PAGE_SELECT = [
@@ -449,6 +450,7 @@ function buildProviderPage(
  */
 export async function getGamePageData(
   slug: string,
+  viewer: ContestViewer | null = null,
 ): Promise<GamePageData | null> {
   const card = await getBrowsableGameBySlug(slug);
   if (!card) return null;
@@ -456,7 +458,7 @@ export async function getGamePageData(
   // Reason: still load contests for non-coming-soon; coming-soon forces [] in the builders.
   const contests = card.comingSoon
     ? []
-    : await listContestsForGame(card.gameKey);
+    : await listContestsForGame(card.gameKey, viewer);
 
   if (card.kind === "trading" || card.slug === TRADING_GAME_TYPE) {
     const content = await loadTradingPageContent();

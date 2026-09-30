@@ -1,6 +1,7 @@
 # 24 - Game Master Program v2: private contests, Join GM, leaderboard, terms, admin reporting
 
-**Status (30 September 2026): steps 0-4 BUILT (step 4 dark behind `gmJoinEnabled`); steps 5-8 are plan only.** This line
+**Status (30 September 2026): steps 0-5 BUILT (step 4 dark behind `gmJoinEnabled`; step 5's creation half dark behind `gmPrivateContestsEnabled`, its entry guard and discovery filters live); steps 6-8 are plan only.** This line
+read "steps 0-4 BUILT" until step 5 shipped, and before that
 read "PLAN ONLY ... Nothing in this chapter is built" until step 0 shipped - correct as
 history, stale as a present fact.
 Owner brief of 30 Sep 2026, sections 1-5 plus source tracking, filters, exports and the
@@ -188,6 +189,43 @@ Rules the service enforces, each with a test:
 ## 4. Private competitions - enforcement at every door
 
 The rule: **a `gm_private` contest can be entered, and its details read, only by users affiliated to its creating GM.** Discovery hides it from others; direct URL shows a Join GM gate, never the entry control.
+
+> **BUILT 30 Sep 2026 (step 5): permission, creation, entry guard and discovery. Read the code, not the table below.** The details-page gate, the per-contest API 404s, the admin badge and the notification exclusion are **step 6 and later, and not built.**
+>
+> **Live code:**
+> - `lib/services/gamemaster/visible-contests.ts` (model-free, main app only): `publicContestsFilter`, `visibleContestsFilter`, `withVisibleContests`, `canEnterPrivateContest`.
+> - `contest-viewer.service.ts` and `request-contest-viewer.ts` beside it: who is looking.
+> - `visibility-permission.ts` (`checkVisibilityAllowed`, `parseAllowedVisibilityInput`), mirrored into `apps/admin` and held byte-identical by a test.
+> - `gm-program-flags.ts`, now also mirrored.
+> - The `private_not_affiliated` guard in `lib/services/contest-entry.service.ts`.
+> - `components/gamemaster/ContestVisibilityPicker.tsx` and `apps/admin/components/admin/gamemaster/PackageVisibilityField.tsx`.
+>
+> **Eight deviations from the table, recorded rather than absorbed:**
+> 1. **The discovery filter is `$in: [null, "", "public"]`, NOT `$ne: "gm_private"`.** `resolveCompetitionVisibility` reads any unrecognised stored value as private. `$ne` would list such a contest to everybody, so the list and the entry gate would disagree about one document, in the direction that leaks. `null` inside `$in` still matches a missing field, so pre-migration contests stay listed.
+> 2. **The narrowing is `$and`, never a spread.** Several readers already carry their own `$or`, and spreading a second one over it silently replaces the first.
+> 3. **The viewer set is `[affiliatedGameMasterId, userId]`**, so a Game Master can find the private contest they just created. `resolveContestViewer` never throws: a failed affiliation read degrades to public contests only, never to an error page and never to everything.
+> 4. **More readers than the table names.** The filtered readers are:
+>    - `app/api/competitions`
+>    - the `competition.actions.ts` list reads
+>    - the public arena (`app/api/dashboard/competitions`, no session, so public only)
+>    - `game-suggestions.service.ts`, `game-page.service.ts`, `player-catalogue.service.ts` and the game page
+>    - **three** landing feeds (`landing/competitions`, `leaderboard-preview`, `live-activity`)
+>
+>    **Two named readers need no filter: `comprehensive-dashboard.actions.ts` and `dashboard-live`.** Both load only contests the player already holds a seat in, and D5 says a seated player keeps seeing their contest.
+> 5. **`gmPrivateContestsEnabled` gates CREATION only.** The entry guard and the filters run regardless, as s10 requires. Turning the switch off stops new private contests, and existing ones stay private.
+> 6. **Refusal order: an unknown value, then the switch, then the package.** An unknown requested value is **refused** (`visibility_unknown`, 400) rather than read as private. That function reads caller input, where guessing either way stores a visibility nobody chose. The package precedence is current package, then cached limits, then default public. **An admin creation override does not widen it**, just as it never widens `allowedGameTypes`.
+> 7. **The package editor needed its own validator**, `parseAllowedVisibilityInput`. The marketplace PUT writes with `findByIdAndUpdate` and no `runValidators`, so the schema enum never ran on that path. It refuses an empty list, because `[]` resolves to public-only and the editor and the routes would then disagree.
+> 8. **The creation picker is fed by `GET /api/gamemaster/creation-options`**, so the browser never works out the allow-list for itself. The batch simulator route refuses a private contest outright, because it has no affiliation context.
+>
+> **Where the entry guard sits:** after the existing-seat return, so a seated player re-enters idempotently (D5), and before any wallet read. It covers both gates. Gate B answers 403.
+>
+> **A live defect found on the way, and found only because a typecheck error DISAPPEARED:** Gate B's `STATUS_BY_CODE` had no entry for `own_contest`.
+> - The gap dates from 24 Sep 2026 (`9b8c7c64`).
+> - A Game Master pressing Join on their own contest was refused correctly, but with HTTP 500, which reads as a server fault.
+> - The missing key had sat in the 228-error baseline for six days.
+> - Fixed, pinned by a test, and probed. No money moved.
+>
+> Tests: 61 new across `gm-private-entry` (10), `gm-private-discovery` and `gm-visibility-permission`. Probes 63-85 are all red on exactly one test. Risk **R117** in `17`.
 
 | Door | Change |
 |---|---|
@@ -403,7 +441,7 @@ Verification gates: `npm run check:mirrors`, main + admin `tsc --noEmit` diffed 
 | **2** (**BUILT 30 Sep 2026**) | Central service; sign-up rewired onto it (behaviour identical, pinned by the existing sign-up tests plus new ones) | none |
 | **3** (**BUILT 30 Sep 2026**, sign-up checkbox deferred - see s5) | Terms page seed + acceptance versioning; server-side version bump; Join GM verifies consent | none |
 | **4** (**BUILT 30 Sep 2026**, dark by default - see s6.1) | Join GM API + leaderboard; admin switch on the existing Game Master screen (deviation from s7, recorded in s6.1) | `WhiteLabel.gmJoinEnabled` (default false) |
-| **5** | Visibility permission in packages + creation routes + entry guard + discovery filters | `WhiteLabel.gmPrivateContestsEnabled` (default false). **Entry guard and discovery filters ship ON regardless of the flag** - they are inert while no private contest exists, and a private contest must never exist without them |
+| **5** (**BUILT 30 Sep 2026** - see s4's BUILT note) | Visibility permission in packages + creation routes + entry guard + discovery filters | `WhiteLabel.gmPrivateContestsEnabled` (default false). **Entry guard and discovery filters ship ON regardless of the flag** - they are inert while no private contest exists, and a private contest must never exist without them |
 | **6** | Private contest gate + Join GM CTA | same flag |
 | **7** | Admin redesign, filters, read model, exports, RBAC section | none (admin only) |
 | **8** | Notifications, financial breakdown, wiki/help, fraud hook | none |

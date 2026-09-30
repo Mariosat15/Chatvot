@@ -13,6 +13,8 @@ import {
 import { countGameMasterActiveCompetitions } from "@/lib/services/gamemaster/active-competitions";
 import { createGameMasterProviderCompetition } from "@/lib/services/gamemaster/create-provider-competition";
 import { resolveGameMasterPlatformFeePercentage } from "@/lib/services/gamemaster/platform-fee";
+import { checkVisibilityAllowed } from "@/lib/services/gamemaster/visibility-permission";
+import { isGmPrivateContestsEnabled } from "@/lib/services/gamemaster/gm-program-flags";
 
 /**
  * GET /api/gamemaster/competitions
@@ -260,6 +262,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Public or private (step 5) - the same rule as the main route, from the same mirrored
+    // module. Stamped explicitly on the insert below: the raw driver applies no default (R7).
+    const visibilityVerdict = checkVisibilityAllowed({
+      requested: body.visibility,
+      hasPackage: packageConfig !== null,
+      packageAllowed: packageConfig?.allowedVisibility,
+      cachedAllowed: subscription.limits?.allowedVisibility,
+      privateContestsEnabled: await isGmPrivateContestsEnabled(),
+    });
+    if (!visibilityVerdict.ok) {
+      return NextResponse.json(
+        {
+          error: visibilityVerdict.message,
+          reason: visibilityVerdict.reason,
+          decidedBy: visibilityVerdict.decidedBy,
+        },
+        { status: visibilityVerdict.reason === "visibility_unknown" ? 400 : 403 },
+      );
+    }
+
     if (verdict.gameType === "provider") {
       const user = await db.collection("user").findOne({ id: auth.userId });
       const gameMasterName = user?.name || auth.name || "Game Master";
@@ -269,6 +291,7 @@ export async function POST(request: NextRequest) {
         userId: auth.userId!,
         gameMasterName,
         maxUsersPerCompetition: effectiveLimits.maxUsersPerCompetition,
+        visibility: visibilityVerdict.visibility,
       });
 
       if (!providerResult.ok) {
@@ -403,6 +426,7 @@ export async function POST(request: NextRequest) {
       imageUrl: imageUrl || null,
       gameMasterId: auth.userId,
       gameMasterName,
+      visibility: visibilityVerdict.visibility,
       createdBy: auth.userId,
       // Reason: this route inserts with the raw MongoDB driver, so Mongoose schema
       // defaults never run and the game label would be absent (risk R7).

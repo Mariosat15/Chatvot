@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import mongoose from "mongoose";
 import { formatVoltsCompact } from "@/lib/utils/format-volts";
+import { withVisibleContests } from "@/lib/services/gamemaster/visible-contests";
 
 /**
  * GET /api/landing/competitions
@@ -23,9 +24,8 @@ export async function GET() {
     // Get active and upcoming competitions
     const competitions = await db
       .collection("competitions")
-      .find({
-        status: { $in: ["active", "upcoming"] },
-      })
+      // Reason: anonymous landing strip - public contests only (R117).
+      .find(withVisibleContests({ status: { $in: ["active", "upcoming"] } }, null))
       .sort({
         status: 1, // Active first, then upcoming
         startTime: 1,

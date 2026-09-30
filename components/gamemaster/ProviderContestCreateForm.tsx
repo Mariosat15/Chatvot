@@ -17,8 +17,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { defaultConfigValues } from "@/lib/services/games/config-schema";
-import type { ConfigField } from "@/lib/services/games/config-schema";
+import { defaultConfigValues, type ConfigField } from "@/lib/services/games/config-schema";
 import type { PlayMode } from "@/lib/services/games/play-shape";
 import {
   joinUtcDraft,
@@ -56,6 +55,7 @@ interface PrizeShare {
 
 interface Props {
   title: ContestableTitleOption;
+  visibility: "public" | "gm_private" | undefined;
   maxUsersPerCompetition: number;
   /** Admin-controlled fee from Challenge Settings — display only; create ignores body. */
   platformFeePercentage: number;
@@ -96,6 +96,7 @@ function defaultUtcDraft(daysFromNow: number, time: string): string {
  */
 export default function ProviderContestCreateForm({
   title,
+  visibility,
   maxUsersPerCompetition,
   platformFeePercentage,
   maxCompetitionsPerDay,
@@ -240,6 +241,7 @@ export default function ProviderContestCreateForm({
           description: description.trim(),
           providerKey: title.providerKey,
           gameCode: title.gameCode,
+          visibility,
           settings,
           entryFee: entryNum,
           maxParticipants: maxNum,

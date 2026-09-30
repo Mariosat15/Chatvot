@@ -1045,6 +1045,15 @@
   <div class="sec-h"><div class="sec-n">15</div><h2>Game Masters on the new games</h2></div>
   <p class="sec-sub">Game Masters must work on provider games exactly as they work on trading &mdash; create competitions, refer players, earn a share of the fees those players generate. Most of that already works. One part is a gate, and one part is a commercial problem trading never had.</p>
 
+  <div class="cal plain"><p><strong>Game Master Program v2 (chapter 24), 30 Sep 2026: steps 0-5 are built.</strong> Step 5 adds private competitions:
+  <ul>
+    <li>A package can allow a private competition, alongside the games it allows and never widening them.</li>
+    <li>Both creation routes check that permission. Creating one stays switched off behind <code>gmPrivateContestsEnabled</code>.</li>
+    <li>Only affiliated players may enter. This entry guard is live.</li>
+    <li>Every contest list hides private competitions from other players, using one shared filter that fails closed (risk R117).</li>
+  </ul>
+  The details-page gate is step 6, so the switch must stay off in production until it ships.</p></div>
+
   <div class="cal plain">
     <div class="t">A correction to an earlier draft</div>
     <p>An earlier version of this plan described Game Masters as &ldquo;four smaller items, roughly three to four days&rdquo;. Checked against the code, that was wrong by an order of magnitude. The real system is <b>three dedicated collections, twenty-eight API routes, three subscription tiers, a referral attribution chain, a daily renewal worker job, and two separate earning paths</b> at competition and challenge settlement.</p>

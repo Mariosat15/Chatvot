@@ -7,6 +7,18 @@ import ProviderContestCreateForm, {
   type ContestableTitleOption,
 } from "@/components/gamemaster/ProviderContestCreateForm";
 import type { TitleLevel } from "@/lib/constants/levels";
+import ContestVisibilityPicker from "@/components/gamemaster/ContestVisibilityPicker";
+import {
+  COMPETITION_VISIBILITIES,
+  type CompetitionVisibility,
+} from "@/lib/services/gamemaster/competition-visibility";
+
+// Reason: the response is JSON, so an unrecognised value is dropped here rather than being
+// rendered as a choice the create route would refuse.
+function readCreatableVisibilities(value: unknown): CompetitionVisibility[] {
+  if (!Array.isArray(value)) return ["public"];
+  return COMPETITION_VISIBILITIES.filter((v) => value.includes(v));
+}
 
 type Selection =
   | { type: "trading" }
@@ -34,6 +46,12 @@ export default function CreateCompetitionGate({
   const [maxActiveCompetitions, setMaxActiveCompetitions] = useState(10);
   const [activeCompetitions, setActiveCompetitions] = useState(0);
   const [selection, setSelection] = useState<Selection | null>(null);
+  const [visibilityOptions, setVisibilityOptions] = useState<
+    CompetitionVisibility[]
+  >(["public"]);
+  const [visibility, setVisibility] = useState<CompetitionVisibility | undefined>(
+    "public",
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -54,6 +72,10 @@ export default function CreateCompetitionGate({
         const canProvider = allowed.includes("provider") && list.length > 0;
         setProviderAllowed(canProvider);
         setTitles(list);
+        const creatable = readCreatableVisibilities(data.creatableVisibilities);
+        setVisibilityOptions(creatable);
+        // An empty list means nothing is creatable; send nothing and let the route name why.
+        setVisibility(creatable[0]);
         setMaxUsers(data.maxUsersPerCompetition ?? 100);
         setMaxCompetitionsPerDay(data.maxCompetitionsPerDay ?? 1);
         setCompetitionsCreatedToday(data.competitionsCreatedToday ?? 0);
@@ -89,6 +111,14 @@ export default function CreateCompetitionGate({
     );
   }
 
+  const visibilityPicker = (
+    <ContestVisibilityPicker
+      options={visibilityOptions}
+      value={visibility}
+      onChange={setVisibility}
+    />
+  );
+
   if (selection?.type === "trading") {
     return (
       <>
@@ -103,23 +133,31 @@ export default function CreateCompetitionGate({
             </button>
           </div>
         )}
-        <GMCreateCompetitionContent levelLadder={levelLadder} />
+        {visibilityPicker}
+        <GMCreateCompetitionContent
+          levelLadder={levelLadder}
+          visibility={visibility}
+        />
       </>
     );
   }
 
   if (selection?.type === "provider") {
     return (
-      <ProviderContestCreateForm
-        title={selection.title}
-        maxUsersPerCompetition={maxUsers}
-        platformFeePercentage={platformFeePercentage}
-        maxCompetitionsPerDay={maxCompetitionsPerDay}
-        competitionsCreatedToday={competitionsCreatedToday}
-        maxActiveCompetitions={maxActiveCompetitions}
-        activeCompetitions={activeCompetitions}
-        onBack={() => setSelection(null)}
-      />
+      <>
+        {visibilityPicker}
+        <ProviderContestCreateForm
+          title={selection.title}
+          visibility={visibility}
+          maxUsersPerCompetition={maxUsers}
+          platformFeePercentage={platformFeePercentage}
+          maxCompetitionsPerDay={maxCompetitionsPerDay}
+          competitionsCreatedToday={competitionsCreatedToday}
+          maxActiveCompetitions={maxActiveCompetitions}
+          activeCompetitions={activeCompetitions}
+          onBack={() => setSelection(null)}
+        />
+      </>
     );
   }
 

@@ -11,6 +11,10 @@ import {
   ensureCatalogueEntries,
 } from "@/lib/services/games/game-catalogue-entry.service";
 import { loadTradingPageContent } from "@/lib/services/games/trading-page-content";
+import {
+  withVisibleContests,
+  type ContestViewer,
+} from "@/lib/services/gamemaster/visible-contests";
 import { TRADING_PAGE_DEFAULTS } from "@/lib/services/games/trading-page-defaults";
 
 /**
@@ -320,6 +324,7 @@ function providerContestFilter(gameKey: string): Record<string, unknown> {
  */
 export async function listContestsForGame(
   gameKey: string,
+  viewer: ContestViewer | null = null,
 ): Promise<CatalogueContestSummary[]> {
   const trimmed = gameKey?.trim();
   if (!trimmed) return [];
@@ -331,7 +336,9 @@ export async function listContestsForGame(
       ? tradingContestFilter()
       : providerContestFilter(trimmed);
 
-  const rows = await Competition.find(query)
+  // Reason: a Game Master's private contest is listed only to that GM's affiliates (D8). An
+  // absent viewer defaults to public-only, so a new caller cannot leak one by forgetting it.
+  const rows = await Competition.find(withVisibleContests(query, viewer))
     .select(
       "name status entryFee prizePool currentParticipants maxParticipants startTime endTime gameType gameKey providerKey currentParticipants",
     )

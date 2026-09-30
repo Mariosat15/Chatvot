@@ -109,6 +109,11 @@ export interface CreateProviderContestInput {
    */
   gameMasterId?: string;
   gameMasterName?: string;
+  /**
+   * Public or private (GM Program v2 step 5). Only read on the Game Master path, where the
+   * creation route has already checked it against the package - see visibility-permission.ts.
+   */
+  visibility?: "public" | "gm_private";
 }
 
 export interface CreateProviderContestResult {
@@ -526,6 +531,7 @@ export async function createProviderContest(
         ? {
             gameMasterId: input.gameMasterId,
             gameMasterName: input.gameMasterName || "Game Master",
+            visibility: input.visibility ?? "public",
           }
         : {}),
     });

@@ -9,6 +9,7 @@ import {
   getMarketplaceStats,
 } from "@/lib/services/marketplace-seed.service";
 import { packageIdSyncFilter } from "@/lib/services/gamemaster/package-config";
+import { parseAllowedVisibilityInput } from "@/lib/services/gamemaster/visibility-permission";
 
 /**
  * GET /api/admin/marketplace
@@ -117,6 +118,15 @@ export async function POST(request: NextRequest) {
       data.codeTemplate = JSON.stringify(data.codeTemplate);
     }
 
+    // Same visibility rule as PUT, so a package cannot be created with a list the editor refuses.
+    if (data.gameMasterConfig?.allowedVisibility !== undefined) {
+      const parsed = parseAllowedVisibilityInput(data.gameMasterConfig.allowedVisibility);
+      if (!parsed.ok) {
+        return NextResponse.json({ success: false, error: parsed.error }, { status: 400 });
+      }
+      data.gameMasterConfig.allowedVisibility = parsed.value;
+    }
+
     const item = await MarketplaceItem.create(data);
 
     // Reason: attribute from the guard — a follow-up getAdminSession is the R101b shape.
@@ -183,6 +193,16 @@ export async function PUT(request: NextRequest) {
       updates.codeTemplate = JSON.stringify(updates.codeTemplate);
     }
 
+    // Reason: this write runs no schema validators, so the visibility enum is checked here,
+    // before anything is stored or copied onto subscriptions (GM Program v2 step 5).
+    if (updates.gameMasterConfig?.allowedVisibility !== undefined) {
+      const parsed = parseAllowedVisibilityInput(updates.gameMasterConfig.allowedVisibility);
+      if (!parsed.ok) {
+        return NextResponse.json({ success: false, error: parsed.error }, { status: 400 });
+      }
+      updates.gameMasterConfig.allowedVisibility = parsed.value;
+    }
+
     // Get the item before update to compare gameMasterConfig changes
     const oldItem = await MarketplaceItem.findById(itemId).lean();
 
@@ -202,6 +222,7 @@ export async function PUT(request: NextRequest) {
     // SYNC GAME MASTER SUBSCRIPTIONS: When a Game Master package's settings change,
     // update all active subscriptions that use this package
     let subscriptionsUpdated = 0;
+    let visibilityChange: { from: unknown; to: unknown } | null = null;
     if (item.category === "gamemaster" && updates.gameMasterConfig && db) {
       const gmConfig = updates.gameMasterConfig;
 
@@ -269,6 +290,15 @@ export async function PUT(request: NextRequest) {
           `   → allowedGameTypes: ${JSON.stringify(oldItem?.gameMasterConfig?.allowedGameTypes)} → ${JSON.stringify(gmConfig.allowedGameTypes)}`,
         );
       }
+      if (gmConfig.allowedVisibility !== undefined) {
+        // Reason: same sync as allowedGameTypes - the cache is the fallback for a deleted
+        // package, so a stale copy would let a tightened tier keep private contests.
+        limitsUpdate["limits.allowedVisibility"] = gmConfig.allowedVisibility;
+        visibilityChange = {
+          from: oldItem?.gameMasterConfig?.allowedVisibility ?? null,
+          to: gmConfig.allowedVisibility,
+        };
+      }
 
       // Only update if there are changes
       if (Object.keys(limitsUpdate).length > 0) {
@@ -299,6 +329,8 @@ export async function PUT(request: NextRequest) {
         name: item.name,
         updates: Object.keys(updates),
         subscriptionsUpdated,
+        // Which contests a tier may create is a commercial grant, so the audit names it.
+        ...(visibilityChange ? { allowedVisibility: visibilityChange } : {}),
       },
     );
 

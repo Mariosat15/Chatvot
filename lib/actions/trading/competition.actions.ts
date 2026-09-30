@@ -19,6 +19,8 @@ import { getUsersWithTitles } from "@/lib/services/xp-level.service";
 import { getTitleLevels } from "@/lib/services/xp-config.service";
 import { resolveLevelTitle } from "@/lib/utils/level-title";
 import { isCompetitionIdShaped } from "@/lib/utils/competition-id";
+import { resolveRequestContestViewer } from "@/lib/services/gamemaster/request-contest-viewer";
+import { withVisibleContests } from "@/lib/services/gamemaster/visible-contests";
 
 // Get all competitions with filters
 export const getCompetitions = async (filters?: {
@@ -34,7 +36,11 @@ export const getCompetitions = async (filters?: {
       query.status = filters.status;
     }
 
-    const competitions = await Competition.find(query)
+    // Reason: private Game Master contests are listed only to that Game Master's affiliated
+    // players (R117). A failed session read lists public contests only, never everything.
+    const viewer = await resolveRequestContestViewer();
+
+    const competitions = await Competition.find(withVisibleContests(query, viewer))
       .sort({ startTime: -1 })
       .limit(filters?.limit || 50)
       .lean();

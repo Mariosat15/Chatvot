@@ -61,6 +61,9 @@ import {
   providerBlocksContestEntry,
   providerKeyFromContest,
 } from "./game-providers/provider-entry-gate";
+import { getAffiliation } from "./gamemaster/affiliation.service";
+import { resolveCompetitionVisibility } from "./gamemaster/competition-visibility";
+import { canEnterPrivateContest } from "./gamemaster/visible-contests";
 
 export type {
   ContestEntryActor,
@@ -190,6 +193,26 @@ export async function enterContest(
             startingCapital: competition.startingCapital,
           },
         };
+      }
+
+      // Reason: a Game Master's private contest is open only to their own affiliated players
+      // (`External game plans/24` s4). AFTER the seat check, so a player already seated keeps
+      // their idempotent success if their affiliation later ends (D5); BEFORE any wallet read,
+      // so a refusal cannot leave a debit applied. Not flag-gated, deliberately: a private
+      // contest must never exist without this door shut. Trusted simulator actors skip it, as
+      // they skip `own_contest`; the batch simulator route refuses private contests itself.
+      if (
+        !actor.trusted &&
+        resolveCompetitionVisibility(competition.visibility) === "gm_private"
+      ) {
+        const affiliation = await getAffiliation(actor.userId);
+        if (!canEnterPrivateContest(competition, affiliation?.gameMasterId)) {
+          await session.abortTransaction();
+          return fail(
+            "private_not_affiliated",
+            "This is a private competition. Join its Game Master to enter.",
+          );
+        }
       }
 
       // Reason: chapter 07 s3.2 — while a provider is down (or kill-switched off), stop

@@ -7,6 +7,7 @@ import CreditWallet from "@/database/models/trading/credit-wallet.model";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import { guardSimulatorRoute } from "@/lib/services/simulator/simulator-mode";
 import { buildSimulatorParticipant } from "@/lib/services/simulator/simulator-participant";
+import { resolveCompetitionVisibility } from "@/lib/services/gamemaster/competition-visibility";
 
 /**
  * POST /api/simulator/competitions/join-batch
@@ -45,6 +46,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { success: false, error: "Competition is not accepting participants" },
         { status: 400 },
+      );
+    }
+
+    // Reason: a private contest admits only its Game Master's affiliated players, and this
+    // bulk writer has no affiliation context to check that per user (`External game plans/24`
+    // s4). Refuse outright, before any wallet read, rather than seat strangers in bulk.
+    if (resolveCompetitionVisibility(competition.visibility) === "gm_private") {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Private Game Master competitions cannot be joined in bulk",
+        },
+        { status: 403 },
       );
     }
 

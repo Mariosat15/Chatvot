@@ -7,19 +7,34 @@ import { auditLogService } from "@/lib/services/audit-log.service";
 const GENERIC_ERROR = "Something went wrong. Please contact support.";
 
 /**
- * The Gamemaster Program v2 switches (`External game plans/24` s6.1). Only
- * `gmJoinEnabled` today: it opens the Game Master leaderboard and the Join GM button.
+ * The Gamemaster Program v2 switches (`External game plans/24` s6.1):
+ * - `gmJoinEnabled` opens the Game Master leaderboard and the Join GM button (step 4);
+ * - `gmPrivateContestsEnabled` lets a permitted Game Master CREATE a private contest (step 5).
+ *   The entry guard and the discovery filters run whatever it says.
  *
  * Reason: a named allow-list in a `Set`, never a spread of the body - a spread would let
  * this route write any WhiteLabel field, and `"constructor"` would pass an object lookup.
  */
-const PROGRAM_SWITCHES: ReadonlySet<string> = new Set(["gmJoinEnabled"]);
+const PROGRAM_SWITCHES: ReadonlySet<string> = new Set([
+  "gmJoinEnabled",
+  "gmPrivateContestsEnabled",
+]);
 
-async function readSwitches(): Promise<{ gmJoinEnabled: boolean }> {
-  const doc = await WhiteLabel.findOne().select({ gmJoinEnabled: 1 }).lean<{ gmJoinEnabled?: unknown }>();
+interface ProgramSwitches {
+  gmJoinEnabled: boolean;
+  gmPrivateContestsEnabled: boolean;
+}
+
+async function readSwitches(): Promise<ProgramSwitches> {
+  const doc = await WhiteLabel.findOne()
+    .select({ gmJoinEnabled: 1, gmPrivateContestsEnabled: 1 })
+    .lean<{ gmJoinEnabled?: unknown; gmPrivateContestsEnabled?: unknown }>();
   // Reason: only a stored `true` is on - absent, null or a legacy string all read as off,
-  // matching the player app's `isGmJoinEnabled()`.
-  return { gmJoinEnabled: doc?.gmJoinEnabled === true };
+  // matching the player app's `isGmJoinEnabled()` / `isGmPrivateContestsEnabled()`.
+  return {
+    gmJoinEnabled: doc?.gmJoinEnabled === true,
+    gmPrivateContestsEnabled: doc?.gmPrivateContestsEnabled === true,
+  };
 }
 
 export async function GET() {

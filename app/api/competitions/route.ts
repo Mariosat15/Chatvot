@@ -3,6 +3,8 @@ import { connectToDatabase } from "@/database/mongoose";
 import Competition from "@/database/models/trading/competition.model";
 import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
 import { auth } from "@/lib/better-auth/auth";
+import { resolveContestViewer } from "@/lib/services/gamemaster/contest-viewer.service";
+import { withVisibleContests } from "@/lib/services/gamemaster/visible-contests";
 
 export const dynamic = "force-dynamic";
 
@@ -19,10 +21,12 @@ export async function GET(request: NextRequest) {
       // Not logged in, continue without user data
     }
 
-    // Fetch non-draft competitions (capped to prevent unbounded scan)
-    const competitions = await Competition.find({
-      status: { $ne: "draft" },
-    })
+    // Fetch non-draft competitions (capped to prevent unbounded scan). Private Game Master
+    // contests are listed only to that Game Master's affiliated players (R117).
+    const viewer = await resolveContestViewer(userId);
+    const competitions = await Competition.find(
+      withVisibleContests({ status: { $ne: "draft" } }, viewer),
+    )
       .sort({ startTime: -1 })
       .limit(200)
       .lean();
@@ -37,9 +41,7 @@ export async function GET(request: NextRequest) {
         .select("competitionId")
         .lean();
 
-      userInCompetitionIds = participations.map((p: any) =>
-        p.competitionId.toString(),
-      );
+      userInCompetitionIds = participations.map((p) => String(p.competitionId));
     }
 
     return NextResponse.json({

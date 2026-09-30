@@ -915,6 +915,54 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 30 Sep 2026 - Gamemaster Program v2 step 5 built: private competitions, with creation switched off
+
+A Game Master whose package allows it can create a competition that only their own players
+can see and enter. **Creation is off** until an operator turns on **Admin -> Game Masters ->
+Program switches -> Private Game Master competitions** (`WhiteLabel.gmPrivateContestsEnabled`,
+default off). **The entry guard and the list filters are live now**, whatever that switch says,
+as `24` s10 requires. They change nothing today, because no private contest exists. Full
+account and eight recorded deviations in `24` s4's BUILT note. Risk **R117**, mitigated.
+
+**Do not turn the switch on in production yet.** The details page and the per-contest APIs
+still answer for a private contest by direct URL. They get their gate in step 6.
+
+**What is built:**
+- **Package permission.**
+  - `checkVisibilityAllowed` (mirrored, byte-identical test) is shared by both creation routes.
+  - It refuses an unknown value (400), the switch being off (403) and the package not allowing it (403), in that order.
+  - Precedence is current package, then cached limits, then public. An admin creation override does not widen it.
+  - The admin package editor gained a Public/Private field. `parseAllowedVisibilityInput` guards it, because the marketplace PUT never ran the schema enum.
+- **Creation.**
+  - Both Game Master creation routes stamp `visibility` on the raw insert (R7).
+  - The player creation screen shows a picker fed by `creation-options`, so the browser never decides the allow-list itself.
+  - The batch simulator route refuses a private contest outright.
+- **Entry.** `private_not_affiliated` sits in `enterContest` after the seat return (D5) and before any wallet read. It covers both gates, and Gate B answers 403.
+- **Discovery.**
+  - One shared filter, `$in: [null, "", "public"]` joined with `$and`, applied to every list reader, including three landing feeds the plan did not name.
+  - The dashboard's two readers need none, because they read only seated contests.
+
+**Found on the way, and fixed: Gate B answered 500 when a Game Master joined their own contest.**
+- `STATUS_BY_CODE` had had no `own_contest` entry since 24 Sep (`9b8c7c64`).
+- The refusal itself worked; only the HTTP status was wrong.
+- The missing key had sat in the main typecheck baseline for six days. It surfaced because that error *disappeared* when this step added a sibling key.
+- No money moved.
+
+**Checks:**
+- 61 new tests: `gm-private-entry` 10, plus `gm-private-discovery` and `gm-visibility-permission`. All related suites pass.
+- **85 of 85 probes are red on exactly one test** (23 new, numbered 63-85).
+- The harness now takes `$env:PROBE_FROM` to rerun from a probe number, and it no longer counts skipped probes as failures.
+- `check:mirrors` is OK (84 pairs).
+- `audit:admin-routes` shows 0 unguarded routes.
+- Typecheck:
+  - Main is 227: the 228 baseline minus the fixed `own_contest` error, with 4 new test-call errors fixed along the way.
+  - Admin is 244, matching the baseline.
+- Lint passes at `--max-warnings=0`.
+- **Never verified by eye.**
+
+**Next:** step 6 - the private-contest gate on the details page, `results` / `trade` / `play`,
+and 404s on the per-contest APIs. After that, the switch can be turned on.
+
 ### 30 Sep 2026 - Gamemaster Program v2: the step 1 migration is a button now
 
 The owner asked not to run a command-line script against production. The migration that
