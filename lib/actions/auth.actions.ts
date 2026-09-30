@@ -16,6 +16,10 @@ import {
 } from "@/lib/services/registration-security.service";
 import { getFraudSettings } from "@/lib/services/fraud-settings.service";
 import { parseSignupInterest } from "@/lib/utils/signup-interest";
+import type {
+  AffiliationSource,
+  AffiliationSurface,
+} from "@/database/models/user-referral.model";
 
 export const signUpWithEmail = async ({
   email,
@@ -272,6 +276,12 @@ export const signUpWithEmail = async ({
                     referredAt: referredAt,
                     signupIP: ip || undefined,
                     isActive: true,
+                    // Reason: a raw insert bypasses schema defaults (R7) and `source` has
+                    // none by design, so the writer must say how the affiliation happened.
+                    source: "gm_referral_link" satisfies AffiliationSource,
+                    affiliatedVia: {
+                      surface: "signup" satisfies AffiliationSurface,
+                    },
                     totalEntryFees: 0,
                     totalGMEarnings: 0,
                     competitionsEntered: 0,

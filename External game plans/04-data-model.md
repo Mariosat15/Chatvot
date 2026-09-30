@@ -440,3 +440,18 @@ new fields sit unused and harmless.
 At 1,000 rounds a day, `game_round` grows by roughly 30,000 documents a month -
 trivial for Atlas, but worth indexing correctly from day one rather than after the
 first slow-query warning.
+## 7. Game Master Program v2 fields (built 30 Sep 2026, `24` step 1)
+
+Every field below is inert until a later step of `24` reads it. The authoritative account is
+`24` s2 and its BUILT note; the table is here so this chapter stays the one place to look up
+a stored field.
+
+| Model | Field | Default | Why |
+|---|---|---|---|
+| `Competition` (mirrored) | `visibility: "public" \| "gm_private"` | `"public"` | Every existing contest is public. Read only through `resolveCompetitionVisibility`, which treats absent/`null`/`""` as public and **any other unknown value as private** (fails closed, R117). In `NEVER_EDITABLE_FIELDS`. Index `{ visibility: 1, status: 1 }` |
+| `GameMasterSubscription.limits`, `MarketplaceItem.gameMasterConfig` (both copies) | `allowedVisibility: string[]` | **`default: undefined`** | Mongoose gives every `[String]` path an implicit `[]`; without the explicit `undefined` "never configured" and "configured empty" become one stored fact. Absent or empty resolves to `["public"]` via `resolveAllowedVisibility` |
+| `UserReferral` (mirrored) | `source`, `termsAcceptanceId`, `termsSlug`, `termsVersion`, `affiliatedVia`, `endedAt`, `endedReason` | **none** | `source` has no default so a pre-migration row stays distinguishable; every writer sets it explicitly (raw inserts bypass defaults, R7) |
+| `UserReferral` index | partial unique `userId_active_unique` on `{ userId, isActive }` where `isActive: true` | - | Replaces the plain unique `userId_1` so a player whose GM expired can join another (D4). **Built by the backfill, which drops `userId_1` only after the new index exists** |
+| `TermsAcceptance` (**main app only**) | `termsVersion`, `context.{ gameMasterId, affiliationSource, competitionId }` | none | The admin app reads nothing from this collection, so it is not mirrored (R42) |
+| `SitePage` (mirrored) | `version: string` | none | An identity a dispute can cite; the editor bump arrives in step 3 |
+| `CustomerAuditTrail` (admin only) | four `gm_*` action types | - | Category `assignment`; add-only |

@@ -20,6 +20,13 @@ export type AuditActionType =
   | "customer_transferred"
   | "customer_unassigned"
   | "customer_auto_reassigned"
+  // Game Master affiliation (Gamemaster Program v2, `External game plans/24` s2.5).
+  // Category "assignment": a player being attached to a Game Master is an assignment of
+  // the customer, and grouping it there keeps it on the filter operators already use.
+  | "gm_affiliation_created"
+  | "gm_affiliation_refused"
+  | "gm_affiliation_reassigned"
+  | "gm_terms_accepted"
   // Profile actions
   | "profile_updated"
   | "profile_viewed"
@@ -93,7 +100,9 @@ export interface ICustomerAuditTrail extends Document {
 
   // Additional context
   metadata?: {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Reason: audit metadata is free-form per action; pre-existing shape read across the admin app.
     previousValue?: any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Reason: audit metadata is free-form per action; pre-existing shape read across the admin app.
     newValue?: any;
     amount?: number;
     currency?: string;
@@ -116,6 +125,7 @@ export interface ICustomerAuditTrail extends Document {
     };
     reason?: string;
     notes?: string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Reason: audit metadata is free-form per action; pre-existing shape read across the admin app.
     [key: string]: any;
   };
 
@@ -242,6 +252,7 @@ CustomerAuditTrailSchema.statics.getCustomerHistory = function (
     endDate?: Date;
   } = {},
 ) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Reason: audit metadata is free-form per action; pre-existing shape read across the admin app.
   const query: any = { customerId };
 
   if (options.category) {
@@ -290,8 +301,10 @@ export const AUDIT_CATEGORY_CONFIG: Record<
 // Helper to get human-readable action descriptions
 export function getActionDescription(
   action: AuditActionType,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Reason: audit metadata is free-form per action; pre-existing shape read across the admin app.
   metadata?: any,
 ): string {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Reason: audit metadata is free-form per action; pre-existing shape read across the admin app.
   const descriptions: Record<AuditActionType, string | ((m: any) => string)> = {
     // Assignment
     customer_assigned: (m) =>
@@ -303,6 +316,16 @@ export function getActionDescription(
     customer_unassigned: "Customer unassigned",
     customer_auto_reassigned: (m) =>
       `Customer auto-reassigned due to: ${m?.reason || "employee deletion"}`,
+    gm_affiliation_created: (m) =>
+      `Affiliated to Game Master ${m?.gameMasterName || m?.gameMasterId || "unknown"}` +
+      (m?.source ? ` (${m.source})` : ""),
+    gm_affiliation_refused: (m) =>
+      `Game Master affiliation refused: ${m?.reason || "not eligible"}`,
+    gm_affiliation_reassigned: (m) =>
+      `Game Master reassigned from ${m?.fromGameMasterName || m?.fromGameMasterId || "unknown"} to ${m?.toGameMasterName || m?.toGameMasterId || "unknown"}`,
+    gm_terms_accepted: (m) =>
+      `Accepted Game Master affiliation terms` +
+      (m?.termsVersion ? ` (version ${m.termsVersion})` : ""),
 
     // Profile
     profile_updated: "Profile information updated",
@@ -380,6 +403,7 @@ export function getActionDescription(
     custom_action: (m) => m?.description || "Custom action performed",
   };
 
+  // eslint-disable-next-line security/detect-object-injection -- Reason: `action` is the typed AuditActionType union, never raw request text.
   const desc = descriptions[action];
   if (typeof desc === "function") {
     return desc(metadata || {});

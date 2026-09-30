@@ -12,7 +12,12 @@
 
 export interface RequiredIndex {
   keys: Record<string, number>;
-  options: { name: string; unique?: boolean; expireAfterSeconds?: number };
+  options: {
+    name: string;
+    unique?: boolean;
+    expireAfterSeconds?: number;
+    partialFilterExpression?: Record<string, unknown>;
+  };
 }
 
 export const REQUIRED_INDEXES: Record<string, RequiredIndex[]> = {
@@ -343,7 +348,19 @@ export const REQUIRED_INDEXES: Record<string, RequiredIndex[]> = {
     { keys: { referredUserId: 1, gameMasterId: 1 }, options: { name: "referredUserId_1_gameMasterId_1" } },
   ],
   userreferrals: [
-    { keys: { userId: 1 }, options: { unique: true, name: "userId_1" } },
+    // Reason: NOT a plain unique `userId_1`. Gamemaster Program v2 (D4) lets a player whose
+    // Game Master expired or was deleted join a new one, so uniqueness applies to the ACTIVE
+    // row only. Listing the old unique index here would let "create missing indexes" rebuild
+    // it after the migration dropped it, silently blocking every re-affiliation.
+    {
+      keys: { userId: 1, isActive: 1 },
+      options: {
+        unique: true,
+        name: "userId_active_unique",
+        partialFilterExpression: { isActive: true },
+      },
+    },
+    { keys: { userId: 1, referredAt: -1 }, options: { name: "userId_1_referredAt_-1" } },
     { keys: { gameMasterId: 1 }, options: { name: "gameMasterId_1" } },
     { keys: { referralCode: 1 }, options: { name: "referralCode_1" } },
   ],

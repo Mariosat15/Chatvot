@@ -140,6 +140,7 @@ export interface IGameMasterConfig {
   canEarnFromChallenges: boolean; // Whether GM earns referral fees from 1v1 challenges
   challengeReferralFeePercentage?: number; // Optional separate % for challenges (defaults to referralFeePercentage if not set)
   allowedGameTypes?: string[]; // Which games this tier may CREATE contests for
+  allowedVisibility?: ("public" | "gm_private")[]; // Public / private / both - absent = public only
 }
 
 export interface IMarketplaceItem extends Document {
@@ -362,6 +363,16 @@ const MarketplaceItemSchema = new Schema<IMarketplaceItem>(
       // platform fee after provider cost (s5) - see `game-permissions.ts`, which applies
       // that default in code because both creation routes bypass Mongoose.
       allowedGameTypes: { type: [String], default: ["trading"] },
+      // Which competition visibilities this tier may CREATE (`External game plans/24` s2.3).
+      // Deliberately no default: `resolveAllowedVisibility` applies public-only in code, so
+      // an existing package behaves exactly as before until the owner opts it in.
+      allowedVisibility: {
+        type: [String],
+        enum: ["public", "gm_private"],
+        // Reason: Mongoose gives every array path an implicit `[]` default; undefined
+        // keeps "never set" distinguishable from an explicit empty list.
+        default: undefined,
+      },
     },
     cosmeticType: {
       type: String,

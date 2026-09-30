@@ -34,6 +34,12 @@ export interface ISitePage extends Document {
    * @default true
    */
   showEveryTime: boolean;
+  /**
+   * Operator-set wording version (e.g. "1.0", "2026-09-30"). Stamped on every
+   * `TermsAcceptance` so a changed page can require re-acceptance (`24` s2.4). Absent on
+   * pages that have never been versioned; readers treat that as "unversioned", never "1".
+   */
+  version?: string;
   seoTitle?: string;
   seoDescription?: string;
   lastUpdatedBy?: string;
@@ -79,6 +85,9 @@ const SitePageSchema = new Schema<ISitePage>(
       index: true,
     },
     showEveryTime: { type: Boolean, default: true },
+    // Reason: no default. A default "1" would claim every existing page had been reviewed
+    // as version 1, and an acceptance stamped with it would record a version nobody set.
+    version: { type: String, trim: true },
     seoTitle: { type: String, default: "" },
     seoDescription: { type: String, default: "" },
     lastUpdatedBy: { type: String, default: "" },

@@ -79,6 +79,10 @@ export const NEVER_EDITABLE_FIELDS = [
   "createdBy",
   "currentParticipants",
   "prizePool",
+  // Reason: who may enter is part of what an entrant paid for. Flipping a contest private
+  // after people joined locks out players who are already seated; flipping it public
+  // exposes a contest a Game Master sold as closed. A different audience is a new contest.
+  "visibility",
 ] as const;
 
 export interface UpdateFilterResult {

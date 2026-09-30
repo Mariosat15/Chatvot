@@ -291,6 +291,9 @@ export interface ICompetition extends Document {
   // Game Master (if created by a game master)
   gameMasterId?: string; // User ID of the game master who created this
   gameMasterName?: string; // Cached for display
+  // Who may see and enter it. `gm_private` = only players affiliated to `gameMasterId`.
+  // Read through `resolveCompetitionVisibility`, never directly - see the schema comment.
+  visibility?: "public" | "gm_private";
 
   createdAt: Date;
   updatedAt: Date;
@@ -750,6 +753,18 @@ const CompetitionSchema = new Schema<ICompetition>(
     gameMasterName: {
       type: String,
     },
+    // Gamemaster Program v2 (`External game plans/24` s2.2). A default is right here, unlike
+    // most additive fields: every existing contest is public and must stay so. But the Game
+    // Master creation routes insert with the raw driver, which never applies it (R7), so
+    // those routes set it explicitly and every reader goes through
+    // `resolveCompetitionVisibility` (lib/services/gamemaster/competition-visibility.ts),
+    // which reads absent as public and an unknown value as private. The enum is add-only.
+    // Immutable after creation - listed in `NEVER_EDITABLE_FIELDS`.
+    visibility: {
+      type: String,
+      enum: ["public", "gm_private"],
+      default: "public",
+    },
   },
   {
     timestamps: true,
@@ -764,6 +779,7 @@ CompetitionSchema.index({ status: 1, registrationDeadline: 1 });
 // Game-scoped queries: contest lists filtered by game, and the finalization sweeps
 CompetitionSchema.index({ gameType: 1, status: 1 });
 CompetitionSchema.index({ gameKey: 1, status: 1 });
+CompetitionSchema.index({ visibility: 1, status: 1 }); // Discovery excludes gm_private
 // Reason: the reconciliation sweep asks "which contests have a play window closing soon",
 // which without this index is a collection scan on the hot path ("04" section 2.1).
 CompetitionSchema.index({ status: 1, playWindowEnd: 1 });

@@ -40,6 +40,7 @@ export interface IGameMasterSubscription extends Document {
     canEarnFromChallenges: boolean; // Whether GM earns from 1v1 challenges
     challengeReferralFeePercentage?: number; // % for challenges (defaults to referralFeePercentage)
     allowedGameTypes?: string[]; // Which games they may CREATE contests for - see the schema
+    allowedVisibility?: ("public" | "gm_private")[]; // Public / private contests - see the schema
   };
 
   // Admin Override for Competition Creation
@@ -214,6 +215,17 @@ const GameMasterSubscriptionSchema = new Schema<IGameMasterSubscription>(
       allowedGameTypes: {
         type: [String],
         default: ["trading"],
+      },
+      // Which competition visibilities they may CREATE (`External game plans/24` s2.3).
+      // No explicit default: an undeclared array path hydrates as `[]`, and
+      // `resolveAllowedVisibility` reads `[]`, absent and `null` alike as public-only.
+      // That resolver is the only thing a gate may read - the same rule as the field above.
+      allowedVisibility: {
+        type: [String],
+        enum: ["public", "gm_private"],
+        // Reason: Mongoose gives every array path an implicit `[]` default; undefined
+        // keeps "never set" distinguishable from an explicit empty list.
+        default: undefined,
       },
     },
     competitionCreationOverride: {

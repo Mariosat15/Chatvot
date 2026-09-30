@@ -2280,6 +2280,10 @@ async function createGmReferralData(
         userName: userName,
         referredAt: now,
         isActive: true, // Required field - production code queries for this!
+        // Reason: seed what the signup writer stores, so the harness exercises the
+        // labelled path production takes rather than the unlabelled legacy shape.
+        source: "gm_referral_link",
+        affiliatedVia: { surface: "signup" },
         totalEntryFees: 0,
         totalGMEarnings: 0,
         competitionsEntered: 0,

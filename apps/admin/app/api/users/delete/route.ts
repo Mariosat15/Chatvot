@@ -477,12 +477,16 @@ export async function DELETE(request: Request) {
 
     try {
       // Find if this user was referred by a GM
-      const userReferral = await db
+      // Reason: since Gamemaster Program v2 (D4) a user may hold several referral rows -
+      // one active plus ended ones from Game Masters who expired or were deleted - so every
+      // row is counted off its own Game Master and all of them are removed. A `findOne` +
+      // `deleteOne` would decrement one Game Master and orphan the rest.
+      const userReferrals = await db
         .collection("userreferrals")
-        .findOne({ userId });
+        .find({ userId })
+        .toArray();
 
-      if (userReferral) {
-        // Decrement the GM's referral counter
+      for (const userReferral of userReferrals) {
         await db.collection("gamemastersubscriptions").updateOne(
           { userId: userReferral.gameMasterId },
           {
@@ -495,10 +499,13 @@ export async function DELETE(request: Request) {
         console.log(
           `✅ Decremented referral counter for GM ${userReferral.gameMasterId}`,
         );
+      }
 
-        // Delete the UserReferral record
-        await db.collection("userreferrals").deleteOne({ userId });
-        console.log(`✅ Deleted UserReferral record for user ${userId}`);
+      if (userReferrals.length > 0) {
+        await db.collection("userreferrals").deleteMany({ userId });
+        console.log(
+          `✅ Deleted ${userReferrals.length} UserReferral record(s) for user ${userId}`,
+        );
       }
 
       // Also delete any GM earnings that were generated from this user
@@ -515,7 +522,7 @@ export async function DELETE(request: Request) {
       }
 
       // Clear user.referredByGameMasterId (already deleted above, but just in case)
-      deletionResults.userReferral = userReferral ? 1 : 0;
+      deletionResults.userReferral = userReferrals.length;
     } catch (e) {
       console.log(`⚠️ Error cleaning up referral data:`, e);
       deletionResults.userReferral = 0;

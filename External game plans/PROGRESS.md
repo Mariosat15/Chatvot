@@ -915,6 +915,41 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 30 Sep 2026 - Gamemaster Program v2 step 1 built: the data model
+
+Every new field exists and is **inert**, because nothing reads it until steps 2-6. The details
+and the deviations are in the BUILT note under `24` s2, and the new fields are tabled in `04`
+s7. **Nothing was computed wrongly, there is no risk number, and the backfill has NOT been
+run** (`tools/gamemaster/backfill-affiliation-source.ts`, report-only until `--apply`).
+
+**Four findings while building:**
+- The admin **`required-indexes.ts`** would have recreated the plain unique `userId_1` from its
+  "create missing indexes" button, which silently undoes D4 with no error.
+- **`users/delete`** removed only one referral row, which would orphan the rest once a player
+  can hold several.
+- **Mongoose gives every `[String]` path an implicit `[]`**, so `allowedVisibility` needed
+  `default: undefined` to keep "never configured" distinct from "configured empty".
+- **The partial-index test was weak.** Probe 15 came back green because one ended row plus one
+  active row passes an unfiltered compound index too. The test now uses two ended rows, and
+  the probe is red.
+
+**Incidental change:** both backfill cores now import the shared missing-value filter through
+`../../tools/games/...`, because the `../games/...` spelling tripped the invariant-1 import
+wildcard. The committed `backfill-gm-earning-gamekey-core.ts` had the same latent lint error.
+This is the fifth collision with that wildcard.
+
+**Checks:**
+- 24 new tests pass, and the related Game Master, settlement and edit suites pass (190 tests).
+- 16 of 16 probes are red on exactly one test, and one is recorded as unprobed with its reason.
+- `check:mirrors` is OK.
+- Both typechecks match their baselines (228 main, 244 admin). A transient 245th error was a
+  stale variable in `users/delete`, and it is fixed.
+- Lint on every touched file passes at `--max-warnings=0`. The seven old warnings in
+  `customer-audit-trail.model.ts` got rule-scoped disables with reasons.
+
+**Next:** step 2, the central affiliation service, with the sign-up rewired onto it and the
+E11000 classification (`24` s3).
+
 ### 30 Sep 2026 - Gamemaster Program v2 planned; step 0 (referral foundations, R116) built
 
 **Plan:** `24-gamemaster-program-v2.md`. It covers public and private GM contests, the Join GM

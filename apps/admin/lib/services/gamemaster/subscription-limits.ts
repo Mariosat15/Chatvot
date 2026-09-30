@@ -18,6 +18,11 @@
  * treat this copy as the fallback.
  */
 
+import {
+  COMPETITION_VISIBILITIES,
+  type CompetitionVisibility,
+} from "./competition-visibility";
+
 export interface GameMasterPackageConfig {
   maxCompetitionsPerDay?: number;
   /**
@@ -31,6 +36,7 @@ export interface GameMasterPackageConfig {
   canEarnFromChallenges?: boolean;
   challengeReferralFeePercentage?: number;
   allowedGameTypes?: string[];
+  allowedVisibility?: string[];
 }
 
 export interface GameMasterSubscriptionLimits {
@@ -42,6 +48,7 @@ export interface GameMasterSubscriptionLimits {
   canEarnFromChallenges: boolean;
   challengeReferralFeePercentage?: number;
   allowedGameTypes: readonly string[];
+  allowedVisibility: readonly CompetitionVisibility[];
 }
 
 export const DEFAULT_GM_LIMITS = {
@@ -104,6 +111,46 @@ export function resolveAllowedGameTypes(stored: unknown): readonly string[] {
 }
 
 /**
+ * Which competition visibilities a Game Master may CREATE when nothing says otherwise.
+ * Public only: private contests are a feature the owner opts a package into
+ * (`External game plans/24` s2.3), so every existing package behaves exactly as before.
+ */
+export const DEFAULT_ALLOWED_VISIBILITY: readonly CompetitionVisibility[] = [
+  "public",
+];
+
+/**
+ * The stored visibility allow-list, or public only.
+ *
+ * Same reading as `resolveAllowedGameTypes`, for the same three reasons: the default must
+ * be applied in code because legacy documents lack the field and the creation routes use
+ * the raw driver; and an EMPTY array means the default, never "nothing allowed", because
+ * `[]` is only ever produced by a form posting no checkbox or a half-run migration - and
+ * Mongoose itself initialises an undeclared array path to `[]`.
+ *
+ * Unknown entries are DROPPED rather than kept, unlike game types: the visibility
+ * vocabulary is closed (`COMPETITION_VISIBILITIES`), so an unrecognised string is a typo,
+ * and carrying it through would let a gate compare against a value nothing enforces.
+ */
+export function resolveAllowedVisibility(
+  stored: unknown,
+): readonly CompetitionVisibility[] {
+  if (!Array.isArray(stored)) return DEFAULT_ALLOWED_VISIBILITY;
+
+  const known = new Set<string>(COMPETITION_VISIBILITIES);
+  const cleaned = Array.from(
+    new Set(
+      stored
+        .filter((entry): entry is string => typeof entry === "string")
+        .map((entry) => entry.trim())
+        .filter((entry): entry is CompetitionVisibility => known.has(entry)),
+    ),
+  );
+
+  return cleaned.length > 0 ? cleaned : DEFAULT_ALLOWED_VISIBILITY;
+}
+
+/**
  * A stored number, or the default when the package genuinely declares none.
  *
  * Reason it is not `??` alone: `??` would let `NaN` through, and these values arrive from
@@ -155,6 +202,9 @@ export function buildSubscriptionLimits(
     // change holding a value nothing else uses - and every one of them would look correctly
     // configured. A test asserts the two agree.
     allowedGameTypes: resolveAllowedGameTypes(c.allowedGameTypes),
+    // Same rule as the line above: resolved through the one function the creation gate
+    // will read, never a local literal.
+    allowedVisibility: resolveAllowedVisibility(c.allowedVisibility),
     // And the opposite default here, deliberately: earning from challenges is opt-in, so
     // only an explicit `true` grants it. The asymmetry matches the schema.
     canEarnFromChallenges: c.canEarnFromChallenges === true,

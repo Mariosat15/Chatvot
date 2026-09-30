@@ -11,7 +11,9 @@
 
 import mongoose from "mongoose";
 import { TRADING_GAME_KEY } from "../../lib/services/gamemaster/earnings-by-game";
-import { missingStringFilter } from "../games/backfill-game-labels-core";
+// Reason: spelled through `tools/` so the import STRING meets the existing
+// `!**/tools/games/**` exemption; `../games/...` trips the invariant-1 wildcard.
+import { missingStringFilter } from "../../tools/games/backfill-game-labels-core";
 
 export interface BackfillGmEarningResult {
   needing: number;

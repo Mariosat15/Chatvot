@@ -68,6 +68,31 @@ Default in **bold** is what this plan assumes if not answered.
 
 ## 2. Data model (all add-only; both mirrors in the same commit; `npm run check:mirrors`)
 
+> **BUILT 30 Sep 2026 (step 1).** Every field below exists and is **inert** - nothing reads it
+> until steps 2-6. Live code: `lib/services/gamemaster/competition-visibility.ts` (mirrored,
+> byte-identical test), `resolveAllowedVisibility` in both `subscription-limits.ts` copies, the
+> models listed, and `tools/gamemaster/backfill-affiliation-source{,-core}.ts` (**report-only
+> until `--apply`; not run against production**). Tests: `__tests__/services/gm-program-data-model.test.ts`
+> (24); probes 9-17 in `tools/probe-gm-program.ps1`, all red on exactly one test, plus one
+> recorded as unprobed. **Deviations from the text below, recorded rather than absorbed:**
+> - **`TermsAcceptance` is main-app only**, not mirrored: `apps/admin` has no copy and reads
+>   nothing from the collection, and mirroring ahead of a caller is the R42 shape.
+> - **The partial unique index is on `{ userId, isActive }`**, not `{ userId }`, named
+>   `userId_active_unique`, plus a plain lookup `{ userId, referredAt: -1 }` replacing the old
+>   one. The test proving it needs **two** ended rows: one ended plus one active differ on
+>   `isActive` and pass an unfiltered index too, which a probe proved green.
+> - **`required-indexes.ts` in the admin app would have rebuilt `userId_1`** from its
+>   "create missing indexes" button and silently blocked D4 again. It now lists the new pair.
+> - **`users/delete` handled one referral row** (`findOne` + `deleteOne`); with D4 a player can
+>   hold several, so it now decrements each row's Game Master and deletes them all.
+> - **`allowedVisibility` needs `default: undefined`** on every array path - Mongoose gives a
+>   `[String]` path an implicit `[]`, which is the "empty array means configured" fact s2.3 says
+>   must not exist.
+> - **`SitePage.version` has no editor bump yet** - that is step 3.
+> - **Two writers of `userreferrals` besides fixtures** (sign-up and the admin end-logic
+>   harness); both now set `source: "gm_referral_link"` and `affiliatedVia.surface: "signup"`,
+>   which is also what the backfill writes onto legacy rows.
+
 ### 2.1 `UserReferral` (mirrored)
 - `source: "gm_referral_link" | "chartvolt_join_gm"` - **required on new writes, no schema default.** A default would make a pre-migration row indistinguishable from a real referral-link row (the `zeroIsValidResult` lesson). Backfill sets `gm_referral_link` on every existing row (s10).
 - `termsAcceptanceId?: ObjectId`, `termsSlug?`, `termsVersion?` - set for Join GM; set for referral link too once the sign-up form shows the terms (s5.3).
@@ -85,7 +110,7 @@ Default in **bold** is what this plan assumes if not answered.
 - Resolver `resolveAllowedVisibility(limits)` in `subscription-limits.ts` (mirrored): **absent or empty array means `["public"]`** (the `resolveAllowedGameTypes` reading: an empty array is only ever an accident). Existing packages therefore behave exactly as today; the owner opts packages in from the package editor.
 - `buildSubscriptionLimits` copies it (the single writer since R31), so "works for new and existing packages" is: new purchases copy it, and the resolver reads the **current package first** for existing subscriptions, as the fee percentage already does. No bulk rewrite of subscriptions.
 
-### 2.4 `TermsAcceptance` (mirrored)
+### 2.4 `TermsAcceptance` (main app only as built - see the BUILT note above)
 - `termsVersion` (string, from the page), `context?: { gameMasterId?: string; affiliationSource?: string; competitionId?: string }`.
 - `SitePage` gains `version` (string, bumped by the admin editor on every content save of an `action_terms` page) - `termsUpdatedAt` alone is a timestamp, not an identity you can cite in a dispute.
 
@@ -233,7 +258,7 @@ Verification gates: `npm run check:mirrors`, main + admin `tsc --noEmit` diffed 
 | Step | Content | Flag |
 |---|---|---|
 | **0** | s0.1 defect fixes + tests. Ships alone | none |
-| **1** | Models (s2) + backfill script `tools/gamemaster/backfill-affiliation-source.ts`: sets `source: gm_referral_link` only where missing (absent, `null`, `""` all handled), refuses to overwrite, report-only until `--apply`. Index change only if D4 = yes | none (inert fields) |
+| **1** (**BUILT 30 Sep 2026**, backfill not yet applied) | Models (s2) + backfill script `tools/gamemaster/backfill-affiliation-source.ts`: sets `source: gm_referral_link` only where missing (absent, `null`, `""` all handled), refuses to overwrite, report-only until `--apply`. Index change only if D4 = yes | none (inert fields) |
 | **2** | Central service; sign-up rewired onto it (behaviour identical, pinned by the existing sign-up tests plus new ones) | none |
 | **3** | Terms page seed + acceptance versioning | none |
 | **4** | Join GM API + leaderboard | `WhiteLabel.gmJoinEnabled` (default false) |
@@ -252,7 +277,7 @@ Rollback: flags off; fields are inert; no data deleted. A private contest alread
 - **R118 - Join GM becomes a commission-farming tool** (GM creates accounts, joins them, enters own private contests). Mitigated by: GM cannot enter own contests (exists), affiliation needs a real account + terms, existing fraud detectors on entry, burst recording. Residual: owner decision on auto-action.
 - **R119 - double affiliation under concurrency.** Unique index + transaction + E11000 classification; concurrency test.
 - **R120 - personal-data export.** Separate RBAC section, audit row per export, row cap.
-- Existing **19 s5 constraint unchanged**: GMs still cannot create provider contests; private visibility does not widen game types.
+- Existing **19 s5 constraint unchanged**: private visibility is a second, independent permission and **does not widen `allowedGameTypes`** - a package allowing `gm_private` still creates only the games it already allowed, and Game Masters still cannot create provider contests (`19` s3.2a).
 
 ---
 

@@ -141,6 +141,87 @@ $results += Invoke-Probe `
     -To '`Error with user ${referral.userId}: ${err instanceof Error ? err.message : ""}`,' `
     -TestName "never echoes an error message to the caller"
 
+# ---- Step 1: data model ----------------------------------------------------------------
+
+$DM = "__tests__/services/gm-program-data-model.test.ts"
+$MIG = "tools/gamemaster/backfill-affiliation-source-core.ts"
+
+# 9. Visibility becomes editable - a private contest could be flipped public after entry.
+$results += Invoke-Probe `
+    -Name "visibility dropped from NEVER_EDITABLE_FIELDS" `
+    -File "apps/admin/lib/admin/competition-update-fields.ts" `
+    -From '  "visibility",' `
+    -To '' `
+    -TestName "visibility can never be edited after creation" -Suite $DM
+
+# 10. An unknown stored visibility fails OPEN (R117 - a private contest leaks).
+$results += Invoke-Probe `
+    -Name "resolveCompetitionVisibility fails open" `
+    -File "lib/services/gamemaster/competition-visibility.ts" `
+    -From 'return stored === "public" ? "public" : "gm_private";' `
+    -To 'return "public";' `
+    -TestName "fails CLOSED on an unknown stored value" -Suite $DM
+
+# 11. The admin copy of the vocabulary drifts.
+$results += Invoke-Probe `
+    -Name "Admin competition-visibility.ts drifts" `
+    -File "apps/admin/lib/services/gamemaster/competition-visibility.ts" `
+    -From 'export const DEFAULT_COMPETITION_VISIBILITY: CompetitionVisibility = "public";' `
+    -To 'export const DEFAULT_COMPETITION_VISIBILITY: CompetitionVisibility = "gm_private";' `
+    -TestName "lib/services/gamemaster/competition-visibility.ts matches its admin copy" -Suite $DM
+
+# 12. The implicit [] default returns on a subscription's allowedVisibility.
+$results += Invoke-Probe `
+    -Name "default: undefined removed from subscription allowedVisibility" `
+    -File "database/models/gamemaster/gamemaster-subscription.model.ts" `
+    -From '        default: undefined,' `
+    -To '' `
+    -TestName "the allowed-visibility arrays enumerate the same values and carry NO default" -Suite $DM
+
+# 13. The signup writer stops labelling its source (R7 - raw insert, no default).
+$results += Invoke-Probe `
+    -Name "Signup referral insert loses its source" `
+    -File "lib/actions/auth.actions.ts" `
+    -From '                    source: "gm_referral_link" satisfies AffiliationSource,' `
+    -To '' `
+    -TestName "the signup writer stores gm_referral_link with the signup surface" -Suite $DM
+
+# 14. "Create missing indexes" would rebuild the plain unique userId_1 and block D4.
+$results += Invoke-Probe `
+    -Name "required-indexes names userId_1 again" `
+    -File "apps/admin/app/api/admin/database/indexes/required-indexes.ts" `
+    -From '        name: "userId_active_unique",' `
+    -To '        name: "userId_1",' `
+    -TestName "the admin index list no longer rebuilds a plain unique userId_1" -Suite $DM
+
+# 15. The schema index loses its partial filter - an ended row blocks re-joining.
+$results += Invoke-Probe `
+    -Name "UserReferral index loses partialFilterExpression" `
+    -File "database/models/user-referral.model.ts" `
+    -From '    partialFilterExpression: { isActive: true },' `
+    -To '' `
+    -TestName "allows a new active row once the previous one has ended" -Suite $DM
+
+# 16. The backfill loses its missing filter and overwrites a stored chartvolt_join_gm.
+$results += Invoke-Probe `
+    -Name "Backfill labels every row, not only missing ones" `
+    -File $MIG `
+    -From '  const filter = missingStringFilter("source");' `
+    -To '  const filter = {};' `
+    -TestName "labels all three missing shapes and never overwrites a stored source" -Suite $DM
+
+# 17. The duplicate-active refusal is removed; the build then fails mid-migration.
+$results += Invoke-Probe `
+    -Name "Backfill builds the index despite duplicate active rows" `
+    -File $MIG `
+    -From '  if (duplicateActiveUsers > 0) {' `
+    -To '  if (false) {' `
+    -TestName "refuses the index build while a user holds two active rows" -Suite $DM
+
+# 18. DELIBERATELY UNPROBED. Dropping the `has(ACTIVE_REFERRAL_INDEX_NAME)` half of the drop
+# guard changes no observable: the create step directly above always leaves the new index
+# present, so the half is a tripwire for a future reordering rather than a live branch.
+
 Write-Host ""
 Write-Host "================ SUMMARY ================"
 $results | Format-Table -AutoSize
