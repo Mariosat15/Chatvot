@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo } from "react";
+import { PieChart } from "lucide-react";
 import { formatVolts } from "@/lib/utils/format-volts";
-import { WalletPanel, WalletPanelHeader } from "./WalletChrome";
+import { AnalyticsCard } from "./AnalyticsCard";
 
 export type SpendingSlice = {
   key: string;
@@ -12,8 +13,7 @@ export type SpendingSlice = {
 };
 
 /**
- * Donut + legend for Spending vs Earnings — mock layout.
- * Values are absolute credit amounts for the selected window.
+ * Spending vs Earnings — donut + horizontal breakdown (rebuild guide §10).
  */
 export default function SpendingVsEarnings({ slices }: { slices: SpendingSlice[] }) {
   const total = useMemo(
@@ -24,7 +24,7 @@ export default function SpendingVsEarnings({ slices }: { slices: SpendingSlice[]
   const arcs = useMemo(() => {
     if (total <= 0) return [];
     let angle = -90;
-    const r = 54;
+    const r = 58;
     const c = 2 * Math.PI * r;
     return slices
       .filter((s) => s.value > 0)
@@ -38,45 +38,49 @@ export default function SpendingVsEarnings({ slices }: { slices: SpendingSlice[]
       });
   }, [slices, total]);
 
+  const totalLabel =
+    total >= 1000
+      ? `${(total / 1000).toFixed(2).replace(/\.?0+$/, "")}K`
+      : formatVolts(total);
+
   return (
-    <WalletPanel tone="magenta" className="flex h-full flex-col">
-      <WalletPanelHeader
-        title="Spending vs Earnings"
-        subtitle="Where credits came from and where they went."
-      />
-      <div className="flex flex-1 flex-col items-center gap-5 p-4 sm:flex-row sm:items-stretch sm:p-5">
-        <div className="relative mx-auto h-40 w-40 shrink-0 sm:mx-0">
-          <svg viewBox="0 0 140 140" className="h-full w-full -rotate-0">
+    <AnalyticsCard
+      title="Spending vs Earnings"
+      subtitle="Compare your spending with earnings and prizes."
+      icon={<PieChart className="h-4 w-4" />}
+      accent="magenta"
+      bodyClassName="justify-center"
+    >
+      <div className="flex flex-1 flex-col items-center gap-5 sm:flex-row sm:items-center">
+        <div className="relative mx-auto h-[168px] w-[168px] shrink-0 sm:mx-0">
+          <svg viewBox="0 0 140 140" className="h-full w-full">
             <circle
               cx="70"
               cy="70"
-              r="54"
+              r="58"
               fill="none"
               stroke="rgba(255,255,255,0.06)"
-              strokeWidth="14"
+              strokeWidth="16"
             />
             {arcs.map((a) => (
               <circle
                 key={a.key}
                 cx="70"
                 cy="70"
-                r="54"
+                r="58"
                 fill="none"
                 stroke={a.color}
-                strokeWidth="14"
+                strokeWidth="16"
                 strokeDasharray={a.dash}
                 strokeLinecap="butt"
                 transform={`rotate(${a.rot} 70 70)`}
-                className="drop-shadow-[0_0_6px_currentColor]"
-                style={{ color: a.color }}
+                style={{ filter: `drop-shadow(0 0 4px ${a.color})` }}
               />
             ))}
           </svg>
           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-lg font-bold tabular-nums text-white">
-              {total >= 1000
-                ? `${(total / 1000).toFixed(2).replace(/\.?0+$/, "")}K`
-                : formatVolts(total)}
+            <span className="text-xl font-bold tabular-nums text-white">
+              {totalLabel}
             </span>
             <span className="text-[10px] uppercase tracking-wider text-slate-400">
               Total Credits
@@ -93,12 +97,18 @@ export default function SpendingVsEarnings({ slices }: { slices: SpendingSlice[]
                   <span className="flex min-w-0 items-center gap-2 text-slate-300">
                     <span
                       className="h-2 w-2 shrink-0 rounded-full"
-                      style={{ background: s.color, boxShadow: `0 0 8px ${s.color}` }}
+                      style={{
+                        background: s.color,
+                        boxShadow: `0 0 8px ${s.color}`,
+                      }}
                     />
-                    <span className="truncate">{s.label}</span>
+                    <span className="truncate font-medium">{s.label}</span>
+                    <span className="tabular-nums text-slate-400">
+                      {pct.toFixed(1)}%
+                    </span>
                   </span>
-                  <span className="shrink-0 tabular-nums text-slate-200">
-                    {pct.toFixed(1)}% · {formatVolts(s.value)}
+                  <span className="shrink-0 tabular-nums font-semibold text-slate-100">
+                    {formatVolts(s.value)}
                   </span>
                 </div>
                 <div className="h-1.5 overflow-hidden rounded-full bg-white/5">
@@ -116,6 +126,6 @@ export default function SpendingVsEarnings({ slices }: { slices: SpendingSlice[]
           })}
         </ul>
       </div>
-    </WalletPanel>
+    </AnalyticsCard>
   );
 }

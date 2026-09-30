@@ -319,7 +319,8 @@ project low risk.
 
 This plan has two tracks. **As of 30 September 2026**:
 
-- **Wallet Analytics CODE-COMPLETE 30 Sep (eng)** — desktop `?tab=wallet` rebuilt to the owner mock (hero + 4 KPIs + balance trend / credit breakdown + daily flow / spending donut + Wallet Insights); Header label **"Wallet Analytics"** (`tab` id still `wallet`); neon art under `public/assets/neon/wallet/`. See `13` **s5.1h**. Tests: `wallet-analytics.test.ts`. **Never verified by eye.**
+- **Wallet Analytics REBUILT 30 Sep (eng)** — first pass rejected; page rebuilt to `Rebuil Wallet Analitics.md` + reference mock (compact header, Lucide KPI chips, Recharts panels, one global 30d range, 7 insight cards). See `13` **s5.1h**. Tests: `wallet-analytics.test.ts` (8). **Never verified by eye.**
+- **Wallet Analytics CODE-COMPLETE 30 Sep (eng)** — first ship (superseded same day by rebuild above — correct as history). Header label **"Wallet Analytics"** (`tab` id still `wallet`).
 - **Neon Overview redesign CODE-COMPLETE 29 Sep (eng)** — Header **nav-only**; Global Rank from **`ui/Rank`**; Play by Game top 4 / discovery; Account Status thin expandable bar; KPI icons **`h-14` + scale-1.08 contain (crisp)**; Activity **calendar glass** header + trophy-glass rows; Player Progress = **3** active missions (**2+1** grid) + **milestone tile strip** (stars/locks) + cyan **View Leaderboard** + gold **View All Missions** pill + rounded XP % + **Required badge** footer — ring + recent-badges strip removed from this panel (owner mockup, later 29 Sep); **Compete** neon plates (swords / Matching Cards / Challenge / avatar ring); ⚡ on credits; hero height-capped **`hero-banner-elements.jpg`**. See `13` **s5.1g**. Tests: `overview-standing.test.ts`. **Phones get their own tree** since later 29 Sep (`13` **s5.1g-m**): `MobileDashboard` below `md`, five-tab bottom nav, desktop untouched. **Never verified by eye.**
 - **Volt Stack second title CODE-COMPLETE 27 Sep (eng)** — `volt-stack` in games-service catalogue; server-authoritative locks/score; play at `/play/volt-stack/?t=`; Circuit-compatible iframe messages. **Operator:** sync catalogue + enable title, then competition/challenge as for Circuit. See `21` **s4.1u**. Never verified by eye on live money.
 - **Provider contest lobby live updates CODE-COMPLETE 26 Sep (eng)** — same `/standings` poll as the arena (`ArenaLiveProvider` + `LobbyLiveParts`); players / your score / board / prize seats refresh without reload; trading keeps `LiveContestRefresher`. Not verified by eye.
@@ -914,18 +915,28 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 30 Sep 2026 - Wallet Analytics REBUILD to reference layout
+
+**Owner:** first ship was wrong (flat, wrong graphics, missing data hierarchy). Rebuild to match
+`Rebuil Wallet Analitics.md` + reference mock exactly — structure, proportions, subtitles, one
+global period, Lucide chip icons matching the mock (coins / cart / gamepad / trophy).
+
+**Shipped:** modular `components/dashboard/wallet/` — Header, KpiGrid, BalanceTrend, CreditBreakdown,
+DailyFlow, SpendingVsEarnings, Insights (7 cards inc. Prizes Won). Recharts panels; tokens in
+`wallet-tokens.ts`. Dead `WalletChrome.tsx` deleted. Tests updated.
+
+**Not changed:** data/API payload, `/wallet` money page, tab id `wallet`.
+
+**Owner tested:** not yet. **Never verified by eye.**
+
 ### 30 Sep 2026 - Wallet Analytics tab (desktop dashboard)
 
 **Owner:** reconstruct the Wallet page to match the Wallet Analytics mock; rename the top-menu
 label to Wallet Analytics; use graphics from `Desktop/games/menu items/ui/wallet items`.
 
-**Shipped:**
+**Shipped (superseded same day by rebuild above — correct as history):**
 - Assets keyed under `public/assets/neon/wallet/` + `lib/services/games/wallet-assets.ts`
-- `components/dashboard/wallet/WalletAnalytics.tsx` (+ chrome + SpendingVsEarnings)
-- `DashboardLayout` wallet tab mounts WalletAnalytics (HeroStatsBar / bare charts removed there)
-- `NAV_ITEMS` label → "Wallet Analytics" (`tab: "wallet"` unchanged)
-- Charts get `embedded` so neon panels are not double-bordered; EquityChart defaults to 30d here
-- Tests: `__tests__/dashboard/wallet-analytics.test.ts` (6) + nav label pin
+- First chrome pass + Header rename; see rebuild entry for current code
 - Docs: `13` **s5.1h**, this entry, START HERE NEXT
 
 **Not changed:** `/wallet` money page, sidebar ACCOUNT Wallet link, mobile Overview wallet strip.
