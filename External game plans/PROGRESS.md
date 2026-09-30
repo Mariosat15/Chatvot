@@ -915,6 +915,51 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 30 Sep 2026 - Gamemaster Program v2 step 6 built: the Join GM gate, and the direct-link gap closed
+
+A player who is not affiliated to the creating Game Master now sees a **Join this Game
+Master** gate instead of a private contest's lobby. It shows no leaderboard and no
+participant names. After they accept the terms and join, the page reloads and they can
+enter. The join records `affiliatedVia: { surface: "private_contest", competitionId }`.
+Full account in `24` s4's step-6 BUILT note. **R117's direct-link gap is closed, so
+`gmPrivateContestsEnabled` may now be turned on.**
+
+**What is built:**
+- **One viewing rule.** `canViewContest` / `canViewContestById` in
+  `lib/services/gamemaster/private-contest-access.service.ts` checks, in order:
+  - not private → allowed;
+  - signed out → refused;
+  - the creator → allowed;
+  - seated → allowed (D5);
+  - otherwise the entry rule.
+
+  It fails closed on any error. A missing contest answers true so each route's own
+  not-found handling runs.
+- **Seven doors carry it:** the lobby renders the gate; `play` and `results` redirect to it;
+  and `standings`, `status`, `live-ranking` and `rounds` GET and POST answer **404, never 403**.
+- **Ordering matters in two places.** `live-ranking` checks *before* its shared cache.
+  `status` judges the session and never its query `userId`.
+- **The gate reads the same row state `affiliate()` uses** (`joinGmRowState`). Terms
+  acceptance records the Game Master's **user** id, while the join URL carries the
+  **subscription** id.
+- **Deleted:** `app/api/competitions/[id]/participant-status/route.ts`. It had no callers
+  and no authentication, and it returned any user's status, capital and P&L for any contest.
+
+**Found on the way.** The trade-page entry in `competition-id-guard.test.ts` had been stale
+since 23 Sep, when `/trade` became a redirect. It was corrected rather than deleted.
+
+**Not part of step 6**, and asked about by the owner the same day: the Public/Private
+picker in the Game Master wizard (`ContestVisibilityPicker`) was built in step 5. It is
+**hidden** until two things are both true:
+- the platform switch is on;
+- the package's `allowedVisibility` includes Private (admin package editor).
+
+Still open: the admin Private badge (step 7) and the announcement exclusion (step 8). No
+automatic "new contest" announcement exists today (checked), so step 8 is a precaution.
+
+**Tests:** `gm-private-contest-view.test.ts` (24) plus two join-surface tests; probes
+86-104 in `tools/probe-gm-program.ps1`, all red with exactly one failure each.
+
 ### 30 Sep 2026 - Gamemaster Program v2 step 5 built: private competitions, with creation switched off
 
 A Game Master whose package allows it can create a competition that only their own players
@@ -924,8 +969,9 @@ default off). **The entry guard and the list filters are live now**, whatever th
 as `24` s10 requires. They change nothing today, because no private contest exists. Full
 account and eight recorded deviations in `24` s4's BUILT note. Risk **R117**, mitigated.
 
-**Do not turn the switch on in production yet.** The details page and the per-contest APIs
-still answer for a private contest by direct URL. They get their gate in step 6.
+~~**Do not turn the switch on in production yet.** The details page and the per-contest APIs
+still answer for a private contest by direct URL. They get their gate in step 6.~~ Closed by
+step 6 the same day (entry above), so this paragraph is correct as history only.
 
 **What is built:**
 - **Package permission.**
@@ -961,7 +1007,8 @@ still answer for a private contest by direct URL. They get their gate in step 6.
 - **Never verified by eye.**
 
 **Next:** step 6 - the private-contest gate on the details page, `results` / `trade` / `play`,
-and 404s on the per-contest APIs. After that, the switch can be turned on.
+and 404s on the per-contest APIs. After that, the switch can be turned on. **(Built the same
+day - see the entry above.)**
 
 ### 30 Sep 2026 - Gamemaster Program v2: the step 1 migration is a button now
 

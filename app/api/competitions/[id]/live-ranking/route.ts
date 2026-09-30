@@ -7,6 +7,7 @@ import {
   getRankingFromCache,
   setRankingCache,
 } from "@/lib/caches/ranking-cache";
+import { canViewContestById } from "@/lib/services/gamemaster/private-contest-access.service";
 
 /**
  * GET /api/competitions/[id]/live-ranking
@@ -24,6 +25,17 @@ export async function GET(
     }
 
     const { id: competitionId } = await params;
+
+    // Reason: BEFORE the cache. The cache is shared across callers, so a check placed after it
+    // would hand a private contest's rankings to anybody once one invited player had polled.
+    // 404, never 403, so the answer does not confirm the contest exists (R117). A malformed id
+    // skips it and still gets the 400 below, unchanged.
+    if (
+      mongoose.Types.ObjectId.isValid(competitionId) &&
+      !(await canViewContestById(competitionId, session.user.id))
+    ) {
+      return NextResponse.json({ error: "Competition not found" }, { status: 404 });
+    }
 
     // Check shared cache first — avoids DB queries when multiple users poll simultaneously
     const cached = getRankingFromCache(competitionId);

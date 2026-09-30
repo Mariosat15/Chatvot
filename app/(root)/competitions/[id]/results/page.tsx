@@ -27,6 +27,7 @@ import { ProviderResultsScreen } from "@/components/games/ProviderResultsScreen"
 import { getGamePresentation } from "@/lib/services/games/game-presentation.service";
 import { findUnscoredRefund } from "@/lib/services/settlement/unscored-refund";
 import AppSettingsModel from "@/database/models/app-settings.model";
+import { canViewContest } from "@/lib/services/gamemaster/private-contest-access.service";
 
 /*
   The two row shapes this page reduces over, named rather than annotated `any` at each call
@@ -69,6 +70,11 @@ const CompetitionResultsPage = async ({
   const competition = await getCompetitionById(competitionId);
   if (!competition) {
     redirect("/competitions");
+  }
+
+  // Reason: final standings are what "private" protects (R117). Back to the lobby gate.
+  if (!(await canViewContest(competitionId, competition, session.user.id))) {
+    redirect(`/competitions/${competitionId}`);
   }
 
   /*

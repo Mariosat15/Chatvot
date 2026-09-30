@@ -826,6 +826,167 @@ $results += Invoke-Probe `
     -To 'Private competitions are unavailable.' `
     -TestName "visibility-permission.ts matches its admin copy" -Suite $VP
 
+# ---------------- Step 6: who may VIEW a private contest ----------------
+$CV = "__tests__/services/gm-private-contest-view.test.ts"
+$ACC = "lib/services/gamemaster/private-contest-access.service.ts"
+$GATE = "lib/services/gamemaster/private-contest-gate.service.ts"
+# Reason: the signed-out clause in canViewContest is deliberately NOT probed. Removing it
+# changes no answer - a blank id finds no seat and no affiliation, so the rule below refuses
+# too. It stays because it saves two queries and states the intent; a probe would be green.
+
+# 86. The creating Game Master is shut out of their own contest.
+$results += Invoke-Probe `
+    -Name "Creator shortcut removed" `
+    -File $ACC `
+    -From 'if (typeof contest.gameMasterId === "string" && contest.gameMasterId === userId) return true;' `
+    -To '' `
+    -TestName "admits the creating Game Master" -Suite $CV
+
+# 87. D5 - a seated player loses sight of their own contest.
+$results += Invoke-Probe `
+    -Name "Seat shortcut removed (D5)" `
+    -File $ACC `
+    -From 'if (seated) return true;' `
+    -To 'void seated;' `
+    -TestName "admits a seated player after their Game Master changed" -Suite $CV
+
+# 88. A database error opens the contest.
+$results += Invoke-Probe `
+    -Name "Access check fails OPEN" `
+    -File $ACC `
+    -From 'Private contest access check failed; refusing:", error);' `
+    -To 'Private contest access check failed; refusing:", error); return true;' `
+    -TestName "fails CLOSED when the seat lookup throws" -Suite $CV
+
+# 89. A missing contest answers false and pre-empts the route's own 404.
+$results += Invoke-Probe `
+    -Name "Missing contest answers false" `
+    -File $ACC `
+    -From 'if (!contest) return true;' `
+    -To 'if (!contest) return false;' `
+    -TestName "answers true for a contest that does not exist" -Suite $CV
+
+# 90. The gate offers Join GM while joining is switched off.
+$results += Invoke-Probe `
+    -Name "Gate ignores the join switch" `
+    -File $GATE `
+    -From 'if (!(await isGmJoinEnabled())) return { ...base, state: "join_disabled" };' `
+    -To '' `
+    -TestName "says joining is off while the platform switch is off" -Suite $CV
+
+# 91. The join URL is built from the user id instead of the subscription id.
+$results += Invoke-Probe `
+    -Name "Gate hands out the user id for the URL" `
+    -File $GATE `
+    -From 'return { ...base, state: "joinable", subscriptionId };' `
+    -To 'return { ...base, state: "joinable", subscriptionId: gmUserId };' `
+    -TestName "offers Join GM with the SUBSCRIPTION id" -Suite $CV
+
+# 92. The arena's round state is answered for an outsider.
+$results += Invoke-Probe `
+    -Name "Rounds GET guard removed" `
+    -File "app/api/competitions/[id]/rounds/route.ts" `
+    -From 'if (!(await canViewContestById(competitionId, userId))) return privateNotFound();' `
+    -To '' `
+    -TestName "rounds GET and POST refuse before the downstream" -Suite $CV
+
+# 93. An outsider can ask for a round to be launched.
+$results += Invoke-Probe `
+    -Name "Rounds POST guard removed" `
+    -File "app/api/competitions/[id]/rounds/route.ts" `
+    -From 'if (!(await canViewContestById(competitionId, userId))) {' `
+    -To 'if (false) {' `
+    -TestName "rounds GET and POST refuse before the downstream" -Suite $CV
+
+# 94. The live standings are served to an outsider.
+$results += Invoke-Probe `
+    -Name "Standings guard removed" `
+    -File "app/api/competitions/[id]/standings/route.ts" `
+    -From 'if (!(await canViewContestById(id, session.user.id))) {' `
+    -To 'if (false) {' `
+    -TestName "standings refuses an outsider" -Suite $CV
+
+# 95. The shared ranking cache is read for an outsider.
+$results += Invoke-Probe `
+    -Name "Live-ranking guard removed" `
+    -File "app/api/competitions/[id]/live-ranking/route.ts" `
+    -From '!(await canViewContestById(competitionId, session.user.id))' `
+    -To 'false' `
+    -TestName "live-ranking refuses before the shared cache" -Suite $CV
+
+# 96. Status trusts the userId query parameter - a spoofable identity.
+$results += Invoke-Probe `
+    -Name "Status judges the query userId" `
+    -File "app/api/competitions/[id]/status/route.ts" `
+    -From 'canViewContest(id, competition, session?.user?.id)' `
+    -To 'canViewContest(id, competition, session?.user?.id ?? userId ?? undefined)' `
+    -TestName "status judges the signed-in caller" -Suite $CV
+
+# 97. Status skips the private check altogether.
+$results += Invoke-Probe `
+    -Name "Status private check removed" `
+    -File "app/api/competitions/[id]/status/route.ts" `
+    -From 'if (isPrivateContest(competition)) {' `
+    -To 'if (false) {' `
+    -TestName "status judges the signed-in caller" -Suite $CV
+
+# 98. The lobby renders the private page to an outsider.
+$results += Invoke-Probe `
+    -Name "Lobby guard removed" `
+    -File "app/(root)/competitions/[id]/page.tsx" `
+    -From 'if (!(await canViewContest(id, competition, userId, { isSeated: isUserIn || undefined }))) {' `
+    -To 'if (false) {' `
+    -TestName "the lobby returns the gate before it uses the leaderboard" -Suite $CV
+
+# 99. The lobby stops handing over the seat it already read, so every lobby view of a
+# private contest pays a second participant query.
+$results += Invoke-Probe `
+    -Name "Lobby stops passing its seat fact" `
+    -File "app/(root)/competitions/[id]/page.tsx" `
+    -From '{ isSeated: isUserIn || undefined }' `
+    -To '{}' `
+    -TestName "the lobby returns the gate before it uses the leaderboard" -Suite $CV
+
+# 100. The arena opens for an outsider.
+$results += Invoke-Probe `
+    -Name "Play page redirect removed" `
+    -File "app/(root)/competitions/[id]/play/page.tsx" `
+    -From 'if (!(await canViewContestById(competitionId, session.user.id))) {' `
+    -To 'if (false) {' `
+    -TestName "the play and results screens redirect" -Suite $CV
+
+# 101. The results screen opens for an outsider.
+$results += Invoke-Probe `
+    -Name "Results page redirect removed" `
+    -File "app/(root)/competitions/[id]/results/page.tsx" `
+    -From 'if (!(await canViewContest(competitionId, competition, session.user.id))) {' `
+    -To 'if (false) {' `
+    -TestName "the play and results screens redirect" -Suite $CV
+
+# 102. R58 - the client gate pulls the service (and Mongoose) into the browser bundle.
+$results += Invoke-Probe `
+    -Name "Gate component value-imports the service" `
+    -File "components/gamemaster/PrivateContestGate.tsx" `
+    -From 'import type { PrivateContestGate as GateFacts }' `
+    -To 'import { getPrivateContestGate as _probe, type PrivateContestGate as GateFacts }' `
+    -TestName "the gate component imports services as types only" -Suite $CV
+
+# 103. A join from a private contest is filed as a leaderboard join.
+$results += Invoke-Probe `
+    -Name "Join route loses the private-contest surface" `
+    -File $JOIN `
+    -From 'surface: competitionId ? "private_contest" : "leaderboard",' `
+    -To 'surface: "leaderboard",' `
+    -TestName "records a join from a private" -Suite $LJ
+
+# 104. A garbage competition id reaches the referral row.
+$results += Invoke-Probe `
+    -Name "Join route skips the id shape check" `
+    -File $JOIN `
+    -From 'typeof rawCompetitionId === "string" && isCompetitionIdShaped(rawCompetitionId)' `
+    -To 'typeof rawCompetitionId === "string"' `
+    -TestName "ignores a malformed competition id" -Suite $LJ
+
 Write-Host ""
 Write-Host "================ SUMMARY ================"
 $results | Format-Table -AutoSize

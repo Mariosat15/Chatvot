@@ -6,6 +6,12 @@ import {
 } from "@/lib/utils/competition-id";
 import { connectToDatabase } from "@/database/mongoose";
 import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
+import { headers } from "next/headers";
+import { auth } from "@/lib/better-auth/auth";
+import {
+  canViewContest,
+  isPrivateContest,
+} from "@/lib/services/gamemaster/private-contest-access.service";
 
 /**
  * GET /api/competitions/[id]/status
@@ -45,6 +51,19 @@ export async function GET(
         { error: "Competition not found" },
         { status: 404 },
       );
+    }
+
+    // Reason: this route takes no session, and for a public contest it keeps working without
+    // one. A PRIVATE contest is judged against the signed-in caller - never the `userId` query
+    // parameter, which anybody can set - and answers the same 404 as a missing one (R117).
+    if (isPrivateContest(competition)) {
+      const session = await auth.api.getSession({ headers: await headers() });
+      if (!(await canViewContest(id, competition, session?.user?.id))) {
+        return NextResponse.json(
+          { error: "Competition not found" },
+          { status: 404 },
+        );
+      }
     }
 
     // Base response

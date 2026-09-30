@@ -26,6 +26,7 @@ import GameRulesPanel from "@/components/games/GameRulesPanel";
 import { resolveProviderBanner } from "@/components/neon/banners";
 import { Button } from "@/components/ui/button";
 import CompetitionTradingWorkspace from "@/components/trading/CompetitionTradingWorkspace";
+import { canViewContestById } from "@/lib/services/gamemaster/private-contest-access.service";
 
 /**
  * Where a player actually plays — the `/play` dispatcher for every contest.
@@ -79,6 +80,12 @@ export default async function PlayPage({ params, searchParams }: PlayPageProps) 
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) {
     redirect("/sign-in");
+  }
+
+  // Reason: a private contest's arena shows its standings, and the trading branch below renders
+  // a spectator workspace for a non-entrant. Back to the lobby, which shows the Join GM gate.
+  if (!(await canViewContestById(competitionId, session.user.id))) {
+    redirect(`/competitions/${competitionId}`);
   }
 
   // The authoritative check, and it does all the refusing: the contest exists, it is a provider

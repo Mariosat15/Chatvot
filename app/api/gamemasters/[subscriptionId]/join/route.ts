@@ -4,6 +4,7 @@ import { RateLimiters } from "@/lib/utils/rate-limiter";
 import { isGmJoinEnabled } from "@/lib/services/gamemaster/gm-program-flags";
 import { affiliate } from "@/lib/services/gamemaster/affiliation.service";
 import { JOIN_GM_REFUSAL_STATUS } from "@/lib/services/gamemaster/gm-leaderboard-rules";
+import { isCompetitionIdShaped } from "@/lib/utils/competition-id";
 
 const GENERIC_ERROR = "Something went wrong. Please contact support.";
 
@@ -51,14 +52,25 @@ export async function POST(
         { status: 400 },
       );
     }
-    const termsAcceptanceId = (body as { termsAcceptanceId?: unknown } | null)?.termsAcceptanceId;
+    const parsed = body as { termsAcceptanceId?: unknown; competitionId?: unknown } | null;
+    const termsAcceptanceId = parsed?.termsAcceptanceId;
+    // Reason: REPORTING ONLY. It records that the join began on a private competition's gate
+    // (s6.2) so the audit trail can say where it came from. It grants nothing and is not checked
+    // against the Game Master - every rule about who may join lives in `affiliate()` - so a
+    // caller supplying somebody else's contest id changes one audit field and nothing else.
+    const rawCompetitionId = parsed?.competitionId;
+    const competitionId =
+      typeof rawCompetitionId === "string" && isCompetitionIdShaped(rawCompetitionId)
+        ? rawCompetitionId
+        : undefined;
     const { subscriptionId } = await context.params;
 
     const result = await affiliate({
       user: { id: session.user.id, email: session.user.email, name: session.user.name },
       gameMaster: { subscriptionId },
       channel: "chartvolt_join_gm",
-      surface: "leaderboard",
+      surface: competitionId ? "private_contest" : "leaderboard",
+      ...(competitionId ? { competitionId } : {}),
       // Reason: passed through untyped-but-checked - `affiliate()` refuses anything that is
       // not the id of this player's fresh acceptance of the current wording for this GM.
       termsAcceptanceId: typeof termsAcceptanceId === "string" ? termsAcceptanceId : undefined,

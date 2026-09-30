@@ -1052,7 +1052,7 @@
     <li>Only affiliated players may enter. This entry guard is live.</li>
     <li>Every contest list hides private competitions from other players, using one shared filter that fails closed (risk R117).</li>
   </ul>
-  The details-page gate is step 6, so the switch must stay off in production until it ships.</p></div>
+  <s>The details-page gate is step 6, so the switch must stay off in production until it ships.</s> <strong>Step 6 is built (30 Sep 2026):</strong> a player who is not affiliated sees a <em>Join this Game Master</em> gate instead of the lobby. After accepting the terms and joining, they can enter. The play and results pages and every per-contest API refuse other players with a 404, and an unauthenticated route that leaked player status was deleted. The switch may now be turned on. Still open: the admin Private badge (step 7) and the announcement exclusion (step 8).</p></div>
 
   <div class="cal plain">
     <div class="t">A correction to an earlier draft</div>

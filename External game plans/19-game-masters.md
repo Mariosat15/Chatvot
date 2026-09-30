@@ -378,7 +378,7 @@ contests. That half was never gated.
 | ~~Implement or remove `toggleCompetitionCreation`~~ **BUILT 7 Sep 2026** | X6 | 0.5 day |
 | Tier wording | X8 | Database content, non-developer |
 | ~~Referral link to `/register`, `id`-only user lookups, silent dropped referrals (R116)~~ **BUILT 30 Sep 2026** - step 0 of `24` | Gamemaster Program v2 | 1 day |
-| ~~Private Game Master contests: package permission, creation, entry guard, discovery filters~~ **BUILT 30 Sep 2026** - step 5 of `24`, creation behind `gmPrivateContestsEnabled` (off). A second permission beside `allowedGameTypes`, **never widening it**, and an admin creation override does not widen it either. Details-page gate is step 6 | Gamemaster Program v2 | 2 days |
+| ~~Private Game Master contests: package permission, creation, entry guard, discovery filters~~ **BUILT 30 Sep 2026** - step 5 of `24`, creation behind `gmPrivateContestsEnabled` (off). A second permission beside `allowedGameTypes`, **never widening it**, and an admin creation override does not widen it either. ~~Details-page gate is step 6~~ **Details-page gate BUILT 30 Sep 2026 (step 6)**: a Join GM gate replaces the lobby for an unaffiliated player, and every per-contest API answers 404 | Gamemaster Program v2 | 2 days |
 | **Total** | | **~2.5 weeks** |
 
 That is an order of magnitude more than the "roughly four days of residuals" the earlier

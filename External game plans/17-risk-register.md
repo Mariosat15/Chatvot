@@ -93,7 +93,7 @@ which**. |
 | **R114** | **`prize_pool_mismatch` alerted every correctly-settled contest that paid a Game Master.** Same equation as R113, one money row along: `platform_fee` is booked **net** of GM commission (`fees.service.ts`), and the GM share is credited as WalletTransaction `gamemaster_earning`. The monitor counted only the net fee, so prizes 18 + fee 1.50 = 19.50 against pool 20 looked short by exactly the GM amount on "This is annw". Settlement and the ledger were correct (18 + 1.50 + 0.50 = 20) | **Medium** | **LIVE and REPORTING-ONLY.** False critical alert; **nothing was backfilled**. Owner ledger + screenshot matched | **CLOSED 24 Sep 2026.** Monitor also sums completed `gamemaster_earning` by `competitionId`. `retained_gm_fee` still covers the inactive-GM case in PlatformTransaction. See detail section |
 | **R115** | **A player who did not finish was stored as a score of 0, and on a lower-is-better game that 0 was the best time on the board.** The ChartVolt Games adapter normalised a result with no score to `rawScore: 0`; ingestion stored it; ranking turned it into `-0` for a lower-is-better title, which sorts above every real time. Volt Velocity closes a non-finisher `completed` with no score, so the racer who never finished sat crowned at #1 | **High** | **LIVE for the board, possibly for money** - whether the phantom 0 was paid depends on the title's `zeroIsValidResult`; not confirmed against production. **Not retroactive, nothing backfilled** | **CLOSED 28 Sep 2026.** Adapter reports `scoreReported: false`, ingestion stores no score, ranking sorts no result last in both directions. See detail section |
 | **R116** | **The Game Master referral link pointed at `/register`, a page that does not exist, and two user lookups used the `id` field alone.** Admin screens showed the stored broken link; the settlement fallback and the sync tool missed users whose identity is in `_id` | **High** | **LIVE for the link** (lost referrals unrecorded); **latent for money** (the fallback runs only without a `userreferrals` row). **Not retroactive, nothing backfilled** | **CLOSED 30 Sep 2026.** One link builder, derived on read; `$or` id filter; dropped referrals logged; generic errors. See detail section |
-| **R117** | **A private Game Master contest leaks through a contest reader nobody filtered.** Many readers exist, and a missed one lists the contest to everybody with no error | **High** | **Latent** - no private contest can exist until an operator enables `gmPrivateContestsEnabled` and a package allows it. Nothing backfilled | **MITIGATED 30 Sep 2026 (step 5 of `24`).** One shared filter, fail-closed `$in` rather than `$ne`, entry guard independent of the flag, readers counted. **Details page and per-contest APIs still open until step 6 - keep the switch off.** See detail section |
+| **R117** | **A private Game Master contest leaks through a contest reader nobody filtered.** Many readers exist, and a missed one lists the contest to everybody with no error | **High** | **Latent** - no private contest can exist until an operator enables `gmPrivateContestsEnabled` and a package allows it. Nothing backfilled | **MITIGATED 30 Sep 2026 (step 5 of `24`).** One shared filter, fail-closed `$in` rather than `$ne`, entry guard independent of the flag, readers counted. ~~Details page and per-contest APIs still open until step 6 - keep the switch off.~~ **Step 6, 30 Sep 2026: the direct-link gap is closed** (the gate plus a 404 on every per-contest API; the unauthenticated `participant-status` route was deleted), so the switch may be turned on. See detail section |
 | **R107** | **Journey editor selection did not load the selected map; Required Badges showed raw badge ids.** Clicking a sequence card only set `selectedSequenceMap`, so the highlight moved while Current Map / Milestones / Zones kept map 1's data. Separately, `MilestoneDetailModal` resolved badge names only through `lib/constants/badges`, so blueprint ids like `trading_beat_top_trader_flag` rendered as snake_case | **Medium** | **LIVE and DISPLAY / EDITOR only** — no money, no wrong unlocks from the naming half; the editor half blocked editing maps 2–10. **Nothing was backfilled** | **CLOSED 17 Sep 2026.** `selectAndLoadMap` + tab-change reload by mapId; `resolveBadgeDisplayName` + milestones API enrichment from `getBadgesFromDB` |
 | **R108** | **Badge Simulator reported every `game_*` condition as unrecognized; `consecutive_trading_days` could never earn.** Simulator allow-list drifted from the registry; mock omitted `gameStats`/`gameTypes`; evaluator switch missed the registry streak name; vitest JSON blew `maxBuffer` | **Medium** | **LIVE for the simulator report and for streak badges in production**; Games badges were already earnable in production (registry door) — the simulator lied. **Nothing was backfilled** | **CLOSED 17 Sep 2026.** `isSupportedConditionType` + gameStats mocks; evaluator `consecutive_trading_days`; blueprint ladders for season/best score; vitest `--outputFile` |
 | R8 | Bulk find-and-replace on wording | High | Medium | X8 |
@@ -5888,7 +5888,7 @@ recorded as unprobed in the harness, with the reason, and the behavioural test p
 `lib/actions/auth.actions.ts`; test `__tests__/services/gm-referral-foundations.test.ts`
 (23 tests); probes `tools/probe-gm-program.ps1`.
 
-### R117 - A private contest leaks through a reader that was never filtered - **MITIGATED 30 Sep 2026 (step 5); open until step 6 ships**
+### R117 - A private contest leaks through a reader that was never filtered - **MITIGATED 30 Sep 2026 (step 5); direct-link gap CLOSED the same day (step 6)**
 
 **What it is.** A `gm_private` contest must be visible and enterable only to players
 affiliated to the Game Master who created it (`24` s4). The platform has many contest
@@ -5914,9 +5914,31 @@ filter is added per call site.
 **Harm, stated precisely.** Latent. No private contest can exist until an operator turns
 `gmPrivateContestsEnabled` on **and** a package allows `gm_private`. Nothing was backfilled.
 
-**Still open.** The details page and the per-contest APIs (`standings`, `live-ranking`,
+~~**Still open.** The details page and the per-contest APIs (`standings`, `live-ranking`,
 `status` and the rest) still answer for a private contest by direct URL. They get the gate
-and a 404 in **step 6**. Until then, **do not turn the switch on in production.**
+and a 404 in **step 6**. Until then, **do not turn the switch on in production.**~~
+**Closed by step 6, 30 Sep 2026, so the paragraph above is correct as history and stale as
+a present fact.** The switch may now be turned on.
+
+**What step 6 built.**
+- **One viewing rule**, `canViewContest` in `private-contest-access.service.ts`. It admits the
+  creator, a seated player (D5), and anybody the entry rule admits; it refuses everybody else
+  and fails closed on any error.
+- **Seven doors carry it:** the lobby, `play`, `results`, `standings`, `status`,
+  `live-ranking` and `rounds` GET and POST. The lobby renders the Join GM gate, with no
+  leaderboard and no participant names. `play` and `results` redirect to that gate. Every
+  API answers **404, never 403**, because a 403 confirms the contest exists.
+- **`live-ranking` checks before its shared cache.** The cache is keyed per contest, so a
+  check placed after the read would serve the ranking regardless.
+- **`participant-status` was deleted.** It had no callers and no authentication, and it
+  returned any user's status, capital and P&L for any contest, public or private.
+
+**Still open, deliberately, and not a privacy issue.** `GET /api/competitions/[id]/status`
+still accepts a `userId` query parameter and reports that user's rank and prize on a
+**public** contest. The private check reads the session and ignores the parameter, and a
+test proves a spoofed parameter cannot open a private contest. The public-contest
+disclosure pre-dates this programme; it is logged here rather than fixed in a privacy
+commit.
 
 **Found on the way, and fixed.** Gate B's `STATUS_BY_CODE` had no `own_contest` entry since
 24 Sep 2026 (`9b8c7c64`).

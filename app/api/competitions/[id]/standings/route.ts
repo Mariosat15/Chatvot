@@ -7,6 +7,7 @@ import {
   logMalformedCompetitionId,
 } from "@/lib/utils/competition-id";
 import { getArenaStandings } from "@/lib/services/games/arena-standings.service";
+import { canViewContestById } from "@/lib/services/gamemaster/private-contest-access.service";
 
 export const dynamic = "force-dynamic";
 
@@ -28,9 +29,11 @@ export const dynamic = "force-dynamic";
  * later. See that service's header for why agreement with the first render is the property
  * being engineered for rather than liveness.
  *
- * A SESSION IS REQUIRED THOUGH A SEAT IS NOT. The standings are already public on the lobby,
- * so a seat check here would buy nothing; a session check keeps an anonymous caller from
- * driving two indexed reads per request against any contest id they can guess.
+ * A SESSION IS REQUIRED THOUGH A SEAT IS NOT. The standings of a PUBLIC contest are already
+ * public on the lobby, so a seat check here would buy nothing; a session check keeps an anonymous
+ * caller from driving two indexed reads per request against any contest id they can guess. A
+ * `gm_private` contest is the exception since 30 Sep 2026 - it answers only the viewers its lobby
+ * does (`canViewContestById`), because its lobby is no longer public either.
  */
 export async function GET(
   _request: Request,
@@ -54,6 +57,12 @@ export async function GET(
     }
 
     await connectToDatabase();
+
+    // Reason: 404, not 403, for a private contest the caller may not view - a 403 would confirm
+    // the contest exists to somebody the Game Master did not invite (R117).
+    if (!(await canViewContestById(id, session.user.id))) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
 
     const standings = await getArenaStandings(id, session.user.id);
 

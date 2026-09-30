@@ -9,6 +9,7 @@ import {
   getPlayState,
   type PlayStateRefusal,
 } from "@/lib/services/games/round-status.service";
+import { canViewContestById } from "@/lib/services/gamemaster/private-contest-access.service";
 
 /**
  * POST /api/competitions/[id]/rounds - start a round in a provider-game competition.
@@ -24,6 +25,18 @@ import {
  */
 
 export const dynamic = "force-dynamic";
+
+/**
+ * A private contest the caller may not view answers exactly like a missing one. Reason: the
+ * `not_a_participant` 403 below would otherwise confirm the contest exists to somebody the Game
+ * Master did not invite (R117). A seated player always passes the check (D5).
+ */
+function privateNotFound() {
+  return NextResponse.json(
+    { success: false, error: "Competition not found", refusal: "not_found" },
+    { status: 404 },
+  );
+}
 
 /**
  * HTTP status per refusal.
@@ -116,7 +129,9 @@ export async function GET(
     // query to it, which is what stops this being a way to read another player's score before
     // the leaderboard is published. A query parameter here would be a silent information leak
     // that returns 200 with correct-looking data.
-    const outcome = await getPlayState(competitionId, session.user.id);
+    const userId = session.user.id;
+    if (!(await canViewContestById(competitionId, userId))) return privateNotFound();
+    const outcome = await getPlayState(competitionId, userId);
 
     if (!outcome.success) {
       return NextResponse.json(
@@ -150,8 +165,12 @@ export async function POST(
 
     const { id: competitionId } = await params;
 
+    const userId = session.user.id;
+    if (!(await canViewContestById(competitionId, userId))) {
+      return privateNotFound();
+    }
     const outcome = await launchContestRound(competitionId, {
-      userId: session.user.id,
+      userId,
       // Reason: the provider receives a display name and nothing else. No email, no user
       // id from our side beyond the round's own opaque identifier, and never a wallet -
       // an external provider never touches money and is given no way to identify a

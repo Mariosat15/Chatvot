@@ -324,6 +324,35 @@ describe("Gamemaster leaderboard and Join GM", () => {
       expect(await UserReferral.countDocuments({ userId: PLAYER, isActive: true })).toBe(1);
     });
 
+    // Reason: step 6 - the private contest gate sends the contest id so the audit trail can say
+    // the join started there. It is reporting only; a malformed id falls back to the leaderboard.
+    it("records a join from a private contest's gate as that surface", async () => {
+      await switchOn();
+      await seedGmPage();
+      sessionUser.current = player;
+      const contestId = String(new ObjectId());
+      const ok = await join(await subIdOf("GMONE"), {
+        termsAcceptanceId: await acceptFor(GM_1),
+        competitionId: contestId,
+      });
+      expect(ok.status).toBe(200);
+      const row = await UserReferral.findOne({ userId: PLAYER, isActive: true }).lean<{ affiliatedVia?: unknown }>();
+      expect(row?.affiliatedVia).toEqual({ surface: "private_contest", competitionId: contestId });
+    });
+
+    it("ignores a malformed competition id and records the leaderboard surface", async () => {
+      await switchOn();
+      await seedGmPage();
+      sessionUser.current = player;
+      const ok = await join(await subIdOf("GMONE"), {
+        termsAcceptanceId: await acceptFor(GM_1),
+        competitionId: "not-an-id",
+      });
+      expect(ok.status).toBe(200);
+      const row = await UserReferral.findOne({ userId: PLAYER, isActive: true }).lean<{ affiliatedVia?: unknown }>();
+      expect(row?.affiliatedVia).toEqual({ surface: "leaderboard" });
+    });
+
     it("rate-limits the eleventh attempt in an hour", async () => {
       await switchOn();
       // Reason: a user no other test signs in as - the limiter store is per process.

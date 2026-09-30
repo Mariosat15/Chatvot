@@ -35,6 +35,9 @@ import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import AppSettingsModel from "@/database/models/app-settings.model";
 import { loadTradingPageContent } from "@/lib/services/games/trading-page-content";
+import { canViewContest } from "@/lib/services/gamemaster/private-contest-access.service";
+import { getPrivateContestGate } from "@/lib/services/gamemaster/private-contest-gate.service";
+import PrivateContestGate from "@/components/gamemaster/PrivateContestGate";
 
 interface CompetitionDetailsPageProps {
   params: Promise<{ id: string }>;
@@ -98,6 +101,26 @@ const CompetitionDetailsPage = async ({
     // on the first field read and being reported as a failure in the catch below.
     if (!competition) {
       notFound();
+    }
+
+    // Reason: before ANYTHING renders. A private contest's leaderboard and participant names
+    // are exactly what "private" protects, and the direct link used to show both (R117). The
+    // same check the entry gate runs; a seated player keeps seeing it (D5). `isSeated` is passed
+    // only when TRUE: `isUserInCompetition` answers false on an error too, and that must not
+    // hide a seated player's own contest, so a false re-reads the seat inside the check.
+    if (!(await canViewContest(id, competition, userId, { isSeated: isUserIn || undefined }))) {
+      const gate = await getPrivateContestGate({
+        gameMasterId: competition.gameMasterId,
+        viewerUserId: userId,
+      });
+      return (
+        <PrivateContestGate
+          competitionId={id}
+          competitionName={competition.name}
+          entryFee={competition.entryFee}
+          gate={gate}
+        />
+      );
     }
 
     const creditSymbol = appSettings?.credits?.symbol || undefined;

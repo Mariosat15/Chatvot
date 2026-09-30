@@ -190,7 +190,51 @@ Rules the service enforces, each with a test:
 
 The rule: **a `gm_private` contest can be entered, and its details read, only by users affiliated to its creating GM.** Discovery hides it from others; direct URL shows a Join GM gate, never the entry control.
 
-> **BUILT 30 Sep 2026 (step 5): permission, creation, entry guard and discovery. Read the code, not the table below.** The details-page gate, the per-contest API 404s, the admin badge and the notification exclusion are **step 6 and later, and not built.**
+> **BUILT 30 Sep 2026 (step 5): permission, creation, entry guard and discovery. Read the code, not the table below.** ~~The details-page gate, the per-contest API 404s, the admin badge and the notification exclusion are **step 6 and later, and not built.**~~ **The details-page gate and the per-contest 404s were built the same day as step 6** (see the step-6 note below). The admin badge and the notification exclusion are **still not built**, so that half of the sentence is still true.
+>
+> **BUILT 30 Sep 2026 (step 6): who may VIEW a private contest, and the Join GM gate.**
+>
+> **Live code:**
+> - `lib/services/gamemaster/private-contest-access.service.ts`: `isPrivateContest`, `canViewContest`, `canViewContestById`.
+> - `private-contest-gate.service.ts` beside it: `getPrivateContestGate`, the facts the gate renders.
+> - `components/gamemaster/PrivateContestGate.tsx`, which reuses the leaderboard's terms dialog and join API.
+> - The guard at the top of the lobby, `play`, `results`, `standings`, `status`, `live-ranking` and `rounds`.
+>
+> **The viewing rule, in order:**
+> 1. Not private: allowed.
+> 2. No signed-in user: refused.
+> 3. The creating Game Master: allowed.
+> 4. Holds a seat: allowed (D5, so a player whose Game Master changed keeps seeing the contest).
+> 5. Otherwise `canEnterPrivateContest` with the viewer's current affiliation, which is the same rule the entry guard uses.
+>
+> Any error refuses (fails closed). `canViewContestById` answers **true for a contest that does not exist**, so each route's own not-found handling runs unchanged, rather than this helper inventing a second 404.
+>
+> **The gate replaces the entry button; it is never shown beside it.** Its state comes from `joinGmRowState`, the same decision the leaderboard row and `affiliate()` use, so the gate can never offer a join the API refuses. The states are:
+> - `joinable`
+> - `locked` (D1, naming the current Game Master)
+> - `join_disabled` (the switch is off)
+> - `signed_out`
+> - `unavailable` (paused or deleted Game Master, D7)
+>
+> After joining, the page calls `router.refresh()` and the server re-reads eligibility. The join response is never trusted for this.
+>
+> **Six things worth carrying:**
+> 1. **404, never 403.** A 403 confirms to an outsider that a private contest exists under that id.
+> 2. **`live-ranking` checks BEFORE its shared cache.** The cache is keyed by contest, not by viewer, so a check placed after the cache read would serve the ranking to whoever asked second.
+> 3. **`status` judges the session, never its `userId` query parameter.** That parameter is caller input; trusting it lets anybody claim to be a seated player. The pre-existing leak is still open on **public** contests: the parameter still reveals any user's rank and prize there. It is recorded in `17` R117 and not fixed here, because it is not about privacy.
+> 4. **`app/api/competitions/[id]/participant-status` was DELETED, not guarded.** Nothing called it, it had no authentication, and it returned any user's status, capital and P&L for any contest. A route nobody calls is still reachable over HTTP (the Prerequisite B precedent).
+> 5. **The gate records the Game Master's USER id on the terms acceptance and puts the SUBSCRIPTION id in the join URL.** The two ids are not interchangeable, and a test asserts the whole gate object.
+> 6. **The join records where it came from.** `affiliatedVia.surface: "private_contest"` plus the `competitionId`. The id is reporting only: it is shape-checked and never used to decide anything, and a malformed one falls back to `"leaderboard"`.
+>
+> **`positions/check` needed no change.** It returns only the caller's own positions, so it cannot reveal anything about a contest the caller has no seat in.
+>
+> **Also fixed on the way:** `competition-id-guard.test.ts` had gone stale since 23 Sep 2026, when `/trade` became a redirect to `/play` and stopped reading the contest. It now asserts the guard precedes the redirect. No behaviour changed.
+>
+> **Still not built, and must not be summarised as done:**
+> - The admin **Private** badge and filter in the competitions list (step 7).
+> - Excluding private contests from platform-wide announcements (step 8).
+>
+> **Tests and probes:** `__tests__/services/gm-private-contest-view.test.ts` has 24 tests, and `gm-leaderboard-join` has 2 more. Probes 86-104 are all red on exactly one test. One clause is deliberately unprobed, with the reason in the harness: the signed-out refusal. Removing it changes no answer, because a blank id finds no seat and no affiliation.
 >
 > **Live code:**
 > - `lib/services/gamemaster/visible-contests.ts` (model-free, main app only): `publicContestsFilter`, `visibleContestsFilter`, `withVisibleContests`, `canEnterPrivateContest`.
@@ -235,7 +279,7 @@ The rule: **a `gm_private` contest can be entered, and its details read, only by
 | Batch simulator route (fixed-in-place writer) | Refuses `gm_private` contests outright - it has no affiliation context. Count writers again before building (the rule: four entry paths were once two) |
 | Discovery - `app/api/competitions/route.ts`, `competition.actions.ts` list reads, `comprehensive-dashboard.actions.ts`, `dashboard-live`, `app/api/dashboard/competitions` (public arena), `game-suggestions.service.ts`, landing-page contest feeds | Filter `visibility: { $ne: "gm_private" }` **unless** the viewer is affiliated to that contest's GM (one `$or` clause built by a shared `visibleContestsFilter(viewer)` helper). `$ne` also matches contests with no field, so pre-migration contests stay visible. The **public arena route has no session** -> always excludes private |
 | Details page `app/(root)/competitions/[id]/page.tsx` and `results`, `trade`, `play` | Server-side check. Not affiliated: render a **private-contest gate** (name, GM, entry fee, Join GM CTA) - no leaderboard, no participant names. `play`/`trade` redirect to the lobby gate. Seated player (D5) sees everything |
-| Per-contest APIs: `standings`, `live-ranking`, `participant-status`, `status`, `rounds`, `positions/check` | Same check; 404 (not 403) for a non-affiliated, non-seated caller, so the API does not confirm a private contest exists |
+| Per-contest APIs: `standings`, `live-ranking`, `participant-status` (**deleted in step 6** - uncalled and unauthenticated), `status`, `rounds`, `positions/check` (no change needed - caller's own positions only) | Same check; 404 (not 403) for a non-affiliated, non-seated caller, so the API does not confirm a private contest exists |
 | Admin | Unchanged visibility (operators see all) plus a **Private** badge and a filter in the competitions list |
 | Notifications / emails announcing new contests | Exclude private contests from platform-wide announcements; optionally notify the GM's affiliates only (s6) |
 
@@ -361,6 +405,8 @@ The rule: **a `gm_private` contest can be entered, and its details read, only by
 - Only `status: active`, not paused, not scheduled for deletion.
 
 ### 6.2 Private competition page CTA
+
+> **BUILT 30 Sep 2026 (step 6)** as `components/gamemaster/PrivateContestGate.tsx`. See s4's step-6 note. A paused or deleted Game Master shows an "unavailable" gate with no join offered (D7).
 - Not affiliated: primary CTA **Join GM to enter** -> same terms dialog -> same join API -> on success the page calls `router.refresh()` and the normal `CompetitionEntryButton` appears (eligibility is re-read server-side, never trusted from the join response).
 - Affiliated to a different GM: CTA replaced by an explanation; no join offered (D1).
 
@@ -442,7 +488,7 @@ Verification gates: `npm run check:mirrors`, main + admin `tsc --noEmit` diffed 
 | **3** (**BUILT 30 Sep 2026**, sign-up checkbox deferred - see s5) | Terms page seed + acceptance versioning; server-side version bump; Join GM verifies consent | none |
 | **4** (**BUILT 30 Sep 2026**, dark by default - see s6.1) | Join GM API + leaderboard; admin switch on the existing Game Master screen (deviation from s7, recorded in s6.1) | `WhiteLabel.gmJoinEnabled` (default false) |
 | **5** (**BUILT 30 Sep 2026** - see s4's BUILT note) | Visibility permission in packages + creation routes + entry guard + discovery filters | `WhiteLabel.gmPrivateContestsEnabled` (default false). **Entry guard and discovery filters ship ON regardless of the flag** - they are inert while no private contest exists, and a private contest must never exist without them |
-| **6** | Private contest gate + Join GM CTA | same flag |
+| **6** (**BUILT 30 Sep 2026** - see s4's step-6 note) | Private contest gate + Join GM CTA; every per-contest page and API refuses an outsider with 404 | same flag for creation. The view check ships ON regardless, like the entry guard. **After this step, `gmPrivateContestsEnabled` can be switched on**; the admin badge (step 7) and the announcement exclusion (step 8) are still open |
 | **7** | Admin redesign, filters, read model, exports, RBAC section | none (admin only) |
 | **8** | Notifications, financial breakdown, wiki/help, fraud hook | none |
 

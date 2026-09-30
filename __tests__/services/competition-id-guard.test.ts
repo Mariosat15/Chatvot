@@ -271,7 +271,9 @@ const GUARDED_ROUTES: Array<{ file: string; firstRead: string }> = [
   },
   {
     file: "app/(root)/competitions/[id]/trade/page.tsx",
-    firstRead: "getCompetitionById(",
+    // Reason: since 23 Sep 2026 this page reads nothing - it redirects to `/play`. The id is
+    // still interpolated into that URL, so the guard must precede the redirect.
+    firstRead: "redirect(`/competitions/",
   },
   {
     file: "app/(root)/competitions/[id]/play/page.tsx",
