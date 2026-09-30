@@ -180,9 +180,15 @@ describe("mirrored non-model files are byte-identical", () => {
 
 describe("every referral writer labels its source", () => {
   it("the signup writer stores gm_referral_link with the signup surface", () => {
+    // Reason: re-pointed in step 2, claim unchanged. Sign-up used to raw-insert the row and
+    // write `source` itself; it now hands the channel to the single writer, which stores it
+    // as `source`. The behavioural proof is in gm-affiliation-service.test.ts.
     const src = code("lib/actions/auth.actions.ts");
-    expect(src).toMatch(/source:\s*"gm_referral_link"/);
+    expect(src).toMatch(/channel:\s*"gm_referral_link"/);
     expect(src).toMatch(/surface:\s*"signup"/);
+    expect(code("lib/services/gamemaster/affiliation.service.ts")).toMatch(
+      /source:\s*input\.channel/,
+    );
   });
 
   it("the admin index list no longer rebuilds a plain unique userId_1", () => {

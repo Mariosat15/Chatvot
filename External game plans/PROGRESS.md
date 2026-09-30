@@ -915,6 +915,54 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 30 Sep 2026 - Gamemaster Program v2 step 2 built: one door for every affiliation
+
+`lib/services/gamemaster/affiliation.service.ts` (`affiliate`, `getAffiliation`) is now the
+only writer of `userreferrals` and `user.referredByGameMasterId`. The rules it applies are
+in `affiliation-rules.ts`. Sign-up calls it with `channel: "gm_referral_link"`, and
+registration still never fails because of a referral. The details and the six deliberate
+deviations from the plan are in the BUILT note under `24` s3. **Nothing was computed wrongly,
+there is no risk number, nothing was backfilled, and nothing is player-visible yet** (Join GM
+is step 4).
+
+**What it enforces, each with a test against a real replica set:**
+- A Game Master cannot affiliate with themselves.
+- A repeat of the same join succeeds without a second row, counter or audit entry.
+- D1: another active Game Master blocks the move, and the refusal names them.
+- D4: an `expired` or deleted Game Master frees the player; the old row is ended and its
+  active count decremented in the same transaction. `cancelled` and `suspended` still block,
+  because they are reversible and a move there dodges commission.
+- A paused Game Master is refused for Join GM but still accepted through a referral link,
+  which is what sign-up always did.
+- An unknown user rolls everything back.
+- 20 concurrent joins produce one row and one increment. A race to two Game Masters leaves
+  exactly one active row.
+
+**Three findings while building:**
+- **The writer scan had a blind spot.** A raw write through a variable holding the
+  collection (`collection.updateMany` in the step-1 backfill) is invisible to a regex on
+  chained calls. It was found only because the stale-exception test demanded that every
+  exception still matched a write. The scan now also flags any file that both names
+  `"userreferrals"` and calls a write method.
+- **`user-data-reset.service.ts` was never a writer.** It drops collections by name and
+  `$unset`s fields, so its exception entry was removed.
+- **Not fixed, recorded:** five admin messaging routes insert into `customer_audit_trails`
+  (**plural**), a collection nothing reads, while the model and every reader use
+  `customer_audit_trail`. Those audit rows are written successfully and never seen. The
+  routes are `conversations/[conversationId]/resolve` (twice), `transfer-back`, `transfer`
+  and `clear`. It needs its own change, because it moves where existing rows land.
+
+**Checks:**
+- 51 tests pass across the two suites.
+- 26 of 26 probes are red on exactly one test (10 new, numbered 19-28). Probe 13 was
+  re-aimed at the channel, because sign-up no longer writes `source` itself.
+- `check:mirrors` is OK.
+- Both typechecks match their baselines (228 main, 244 admin), after two new casts were fixed.
+- Lint on every touched file passes at `--max-warnings=0`.
+
+**Next:** step 3, the terms page seed and acceptance versioning (`24` s5). The terms codes
+and the acceptance check join `decideAffiliation` then.
+
 ### 30 Sep 2026 - Gamemaster Program v2 step 1 built: the data model
 
 Every new field exists and is **inert**, because nothing reads it until steps 2-6. The details

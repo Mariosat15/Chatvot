@@ -1,6 +1,8 @@
 # 24 - Game Master Program v2: private contests, Join GM, leaderboard, terms, admin reporting
 
-**Status: PLAN ONLY (30 September 2026). Nothing in this chapter is built.**
+**Status (30 September 2026): steps 0, 1 and 2 BUILT; steps 3-8 are plan only.** This line
+read "PLAN ONLY ... Nothing in this chapter is built" until step 0 shipped - correct as
+history, stale as a present fact.
 Owner brief of 30 Sep 2026, sections 1-5 plus source tracking, filters, exports and the
 "one central service" requirement. This chapter is the design; `19-game-masters.md`
 remains the authoritative analysis of the system as it stands and must be amended as
@@ -120,6 +122,43 @@ Default in **bold** is what this plan assumes if not answered.
 ---
 
 ## 3. The one service: `lib/services/gamemaster/affiliation.service.ts`
+
+> **BUILT 30 Sep 2026 (step 2) - read the code, not this section's table.** Live code:
+> `lib/services/gamemaster/affiliation-rules.ts` (pure decision), `affiliation.service.ts`
+> (`affiliate`, `getAffiliation`), and sign-up in `lib/actions/auth.actions.ts` now calls
+> `affiliate({ channel: "gm_referral_link", surface: "signup" })`. Pinned by
+> `__tests__/services/gm-affiliation-service.test.ts` (27 tests, real replica set) and
+> probes 19-28 in `tools/probe-gm-program.ps1` (26 probes in all, each red on exactly one
+> test; 13 was re-aimed because sign-up no longer writes `source` itself). **Six deviations
+> from the plan below, each deliberate:**
+> - **Neither module is mirrored yet.** Nothing in `apps/admin` calls them, and R42 is the
+>   case that shows a mirror ahead of its caller is two copies agreeing while one runs. They
+>   are mirrored in step 7 with the first admin caller.
+> - **`canJoinGameMaster` is not a separate function.** The decision is `decideAffiliation`,
+>   run *inside* the transaction against what it read there, because a pre-check outside it
+>   is a second answer that can be stale by the time the insert runs.
+> - **The input is `channel`, not `source`**, and `surface` (signup / leaderboard / private
+>   contest) is stored under `affiliatedVia`. The GM is named by `referralCode` or
+>   `subscriptionId`, never by a GM user id from the client.
+> - **D4 is in the service**: a previous GM whose subscription is `expired` or has been
+>   deleted frees the player - the old row is ended (`gm_expired` / `gm_deleted`) and its
+>   `activeReferredUsers` decremented in the same transaction. **`cancelled` and
+>   `suspended` still block** - they are reversible, and a move there is a way to dodge a
+>   Game Master's commission. Only an administrator reassigns (D1).
+> - **Joinability differs by channel.** The referral link needs only `status: "active"`, as
+>   sign-up always did, so behaviour there is unchanged; Join GM also refuses a paused GM or
+>   one scheduled for deletion.
+> - **Terms codes, `canEnterPrivateContest`, the rate limit and the report rows are not
+>   here yet** - steps 3, 5, 4 and 7. The transaction is a manual retry loop on E11000 and
+>   transient conflicts (following `contest-entry.service.ts`), and the retry reads the
+>   winner's row, so a race to one GM is idempotent and a race to two leaves exactly one.
+>
+> Audit: `gm_affiliation_created` / `gm_affiliation_refused` in `customer_audit_trail`,
+> best-effort after commit, none on the idempotent repeat. The structural writer scan found
+> a real blind spot while being built - a raw write through a *variable* holding the
+> collection (`collection.updateMany`) is invisible to a chained-call regex - so it also
+> flags any file that both names `"userreferrals"` and calls a write method, with named
+> exceptions carrying reasons and a test that fails when an exception stops matching.
 
 Main app, with a model-free rules module `lib/services/gamemaster/affiliation-rules.ts` **mirrored and pinned byte-identical** (the admin reporting needs the same eligibility answers). Every caller - sign-up, Join GM API, private-contest entry, leaderboard, admin reports - goes through it. Nothing else writes `userreferrals` or `user.referredByGameMasterId` (a structural test counts writers, s9).
 
@@ -259,7 +298,7 @@ Verification gates: `npm run check:mirrors`, main + admin `tsc --noEmit` diffed 
 |---|---|---|
 | **0** | s0.1 defect fixes + tests. Ships alone | none |
 | **1** (**BUILT 30 Sep 2026**, backfill not yet applied) | Models (s2) + backfill script `tools/gamemaster/backfill-affiliation-source.ts`: sets `source: gm_referral_link` only where missing (absent, `null`, `""` all handled), refuses to overwrite, report-only until `--apply`. Index change only if D4 = yes | none (inert fields) |
-| **2** | Central service; sign-up rewired onto it (behaviour identical, pinned by the existing sign-up tests plus new ones) | none |
+| **2** (**BUILT 30 Sep 2026**) | Central service; sign-up rewired onto it (behaviour identical, pinned by the existing sign-up tests plus new ones) | none |
 | **3** | Terms page seed + acceptance versioning | none |
 | **4** | Join GM API + leaderboard | `WhiteLabel.gmJoinEnabled` (default false) |
 | **5** | Visibility permission in packages + creation routes + entry guard + discovery filters | `WhiteLabel.gmPrivateContestsEnabled` (default false). **Entry guard and discovery filters ship ON regardless of the flag** - they are inert while no private contest exists, and a private contest must never exist without them |

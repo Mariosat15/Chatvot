@@ -178,12 +178,13 @@ $results += Invoke-Probe `
     -To '' `
     -TestName "the allowed-visibility arrays enumerate the same values and carry NO default" -Suite $DM
 
-# 13. The signup writer stops labelling its source (R7 - raw insert, no default).
+# 13. The signup writer mislabels its source. Re-aimed in step 2: sign-up no longer writes
+# `source` itself, it hands the channel to affiliate(), so the mutation is the channel.
 $results += Invoke-Probe `
-    -Name "Signup referral insert loses its source" `
+    -Name "Signup hands affiliate() the wrong channel" `
     -File "lib/actions/auth.actions.ts" `
-    -From '                    source: "gm_referral_link" satisfies AffiliationSource,' `
-    -To '' `
+    -From '              channel: "gm_referral_link",' `
+    -To '              channel: "chartvolt_join_gm",' `
     -TestName "the signup writer stores gm_referral_link with the signup surface" -Suite $DM
 
 # 14. "Create missing indexes" would rebuild the plain unique userId_1 and block D4.
@@ -221,6 +222,93 @@ $results += Invoke-Probe `
 # 18. DELIBERATELY UNPROBED. Dropping the `has(ACTIVE_REFERRAL_INDEX_NAME)` half of the drop
 # guard changes no observable: the create step directly above always leaves the new index
 # present, so the half is a tripwire for a future reordering rather than a live branch.
+
+# ---- Step 2: the single affiliation writer ---------------------------------------------
+
+$AS = "__tests__/services/gm-affiliation-service.test.ts"
+$RULES = "lib/services/gamemaster/affiliation-rules.ts"
+$SVC = "lib/services/gamemaster/affiliation.service.ts"
+
+# 19. A Game Master may affiliate with themselves (and so earn on their own entry fees).
+$results += Invoke-Probe `
+    -Name "Self-affiliation check removed" `
+    -File $RULES `
+    -From '  if (gm.userId === userId) {' `
+    -To '  if (false) {' `
+    -TestName "refuses a Game Master affiliating with themselves" -Suite $AS
+
+# 20. D1 undone: a player can move to a second Game Master while the first is active.
+$results += Invoke-Probe `
+    -Name "Another active Game Master no longer blocks" `
+    -File $RULES `
+    -From '    if (!ended) {' `
+    -To '    if (false) {' `
+    -TestName "refuses a second Game Master while the first is active" -Suite $AS
+
+# 21. D4 widened: a merely cancelled Game Master frees the player (commission dodge).
+$results += Invoke-Probe `
+    -Name "Any non-active previous Game Master frees the player" `
+    -File $RULES `
+    -From '  if (previousGm.status === "expired") return "gm_expired";' `
+    -To '  if (previousGm.status !== "active") return "gm_expired";' `
+    -TestName "a cancelled previous Game Master still blocks a move" -Suite $AS
+
+# 22. Join GM offers a paused Game Master (D7).
+$results += Invoke-Probe `
+    -Name "Join GM ignores isPaused" `
+    -File $RULES `
+    -From '  return gm.isPaused !== true && gm.scheduledForDeletion !== true;' `
+    -To '  return true;' `
+    -TestName "refuses a paused Game Master for Join GM" -Suite $AS
+
+# 23. Both-or-neither broken: an unmatched user no longer aborts, so a row and a counter
+# survive for a player whose user document was never linked.
+$results += Invoke-Probe `
+    -Name "Unmatched user no longer aborts the transaction" `
+    -File $SVC `
+    -From '      if (userUpdate.matchedCount === 0) {' `
+    -To '      if (false) {' `
+    -TestName "writes both stores or neither" -Suite $AS
+
+# 24. A lost race is reported as a failure instead of retried.
+$results += Invoke-Probe `
+    -Name "Duplicate-key / conflict retry removed" `
+    -File $SVC `
+    -From '      if ((isDuplicateKey(error) || isTransientConflict(error)) && attempt < MAX_RETRIES) {' `
+    -To '      if (false) {' `
+    -TestName "20 concurrent joins to one Game Master produce one row and one increment" -Suite $AS
+
+# 25. The row stops recording how the affiliation happened.
+$results += Invoke-Probe `
+    -Name "source no longer stored" `
+    -File $SVC `
+    -From '            source: input.channel,' `
+    -To '' `
+    -TestName "creates the row, the user fallback and one counter increment" -Suite $AS
+
+# 26. The idempotent repeat writes a second audit row.
+$results += Invoke-Probe `
+    -Name "Idempotent repeat audits again" `
+    -File $SVC `
+    -From '      if (decision.kind === "already_affiliated") {' `
+    -To '      if (decision.kind === "already_affiliated") { await writeAudit(auditInput, "gm_affiliation_created", "dup", {});' `
+    -TestName "writes exactly one audit row on creation and none on the idempotent repeat" -Suite $AS
+
+# 27. A second door: sign-up raw-inserts into userreferrals again.
+$results += Invoke-Probe `
+    -Name "Sign-up writes userreferrals directly" `
+    -File "lib/actions/auth.actions.ts" `
+    -From '            const result = await affiliate({' `
+    -To '            await db.collection("userreferrals").insertOne({}); const result = await affiliate({' `
+    -TestName "no file outside the named exceptions writes" -Suite $AS
+
+# 28. D4 move leaves the old Game Master's active count inflated.
+$results += Invoke-Probe `
+    -Name "Previous Game Master's active count not decremented" `
+    -File $SVC `
+    -From '            { $inc: { activeReferredUsers: -1 } },' `
+    -To '            { $inc: { activeReferredUsers: 0 } },' `
+    -TestName "an expired previous Game Master frees the player" -Suite $AS
 
 Write-Host ""
 Write-Host "================ SUMMARY ================"

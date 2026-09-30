@@ -16,10 +16,7 @@ import {
 } from "@/lib/services/registration-security.service";
 import { getFraudSettings } from "@/lib/services/fraud-settings.service";
 import { parseSignupInterest } from "@/lib/utils/signup-interest";
-import type {
-  AffiliationSource,
-  AffiliationSurface,
-} from "@/database/models/user-referral.model";
+import { affiliate } from "@/lib/services/gamemaster/affiliation.service";
 
 export const signUpWithEmail = async ({
   email,
@@ -205,135 +202,35 @@ export const signUpWithEmail = async ({
         // Process game master referral if present
         if (referralCode && referralCode.startsWith("GM")) {
           try {
-            console.log(`🎮 Processing referral code: ${referralCode}`);
+            // Reason: `affiliate` is the single writer of both affiliation stores
+            // (`External game plans/24` s3). It writes the referral row, the user-document
+            // fallback and the Game Master's counters in one transaction or not at all, so
+            // a half-linked player - counted but never paid for, or paid for but never
+            // counted - can no longer be left behind by a failure between steps.
+            let userAgent: string | undefined;
+            try {
+              userAgent = (await headers()).get("user-agent") || undefined;
+            } catch {
+              userAgent = undefined;
+            }
+            const result = await affiliate({
+              user: { id: userId, email, name: fullName },
+              gameMaster: { referralCode },
+              channel: "gm_referral_link",
+              surface: "signup",
+              ipAddress: ip || undefined,
+              userAgent,
+            });
 
-            // Find the game master subscription with this referral code
-            const gmSubscription = await db
-              .collection("gamemastersubscriptions")
-              .findOne({
-                referralCode: referralCode,
-                status: "active",
-              });
-
-            if (gmSubscription) {
-              const referredAt = new Date();
-
-              // STEP 1: Update the user document with referral info
-              // This MUST succeed before we create other records
-              const userUpdateResult = await db.collection("user").updateOne(
-                { $or: queries },
-                {
-                  $set: {
-                    referredByGameMasterId: gmSubscription.userId,
-                    referredByReferralCode: referralCode,
-                    referredAt: referredAt,
-                  },
-                },
-              );
-
-              // CRITICAL: Verify user was actually updated
-              if (userUpdateResult.matchedCount === 0) {
-                console.error(
-                  `❌ Referral: Failed to find user ${userId} to update with referral data`,
-                );
-                throw new Error("User not found for referral update");
-              }
-
-              if (userUpdateResult.modifiedCount === 0) {
-                console.warn(
-                  `⚠️ Referral: User ${userId} already had referral data or update failed`,
-                );
-                // Continue anyway - user might already have the referral set
-              }
-
+            if (result.success) {
               console.log(
-                `✅ Referral: Updated user ${userId} with GM reference`,
-              );
-
-              // STEP 2: Check if UserReferral already exists (prevent duplicates)
-              const existingReferral = await db
-                .collection("userreferrals")
-                .findOne({
-                  userId: userId,
-                  gameMasterId: gmSubscription.userId,
-                });
-
-              if (existingReferral) {
-                console.warn(
-                  `⚠️ Referral: UserReferral already exists for user ${userId} -> GM ${gmSubscription.userId}`,
-                );
-              } else {
-                // STEP 3: Create UserReferral record
-                const referralInsertResult = await db
-                  .collection("userreferrals")
-                  .insertOne({
-                    userId: userId,
-                    userEmail: email,
-                    userName: fullName,
-                    gameMasterId: gmSubscription.userId,
-                    gameMasterEmail: gmSubscription.userEmail,
-                    referralCode: referralCode,
-                    referredAt: referredAt,
-                    signupIP: ip || undefined,
-                    isActive: true,
-                    // Reason: a raw insert bypasses schema defaults (R7) and `source` has
-                    // none by design, so the writer must say how the affiliation happened.
-                    source: "gm_referral_link" satisfies AffiliationSource,
-                    affiliatedVia: {
-                      surface: "signup" satisfies AffiliationSurface,
-                    },
-                    totalEntryFees: 0,
-                    totalGMEarnings: 0,
-                    competitionsEntered: 0,
-                    challengesEntered: 0,
-                    createdAt: new Date(),
-                    updatedAt: new Date(),
-                  });
-
-                if (!referralInsertResult.insertedId) {
-                  console.error(
-                    `❌ Referral: Failed to create UserReferral record for user ${userId}`,
-                  );
-                  throw new Error("Failed to create UserReferral record");
-                }
-
-                console.log(
-                  `✅ Referral: Created UserReferral record ${referralInsertResult.insertedId}`,
-                );
-
-                // STEP 4: Only increment counter AFTER UserReferral is created
-                const counterUpdateResult = await db
-                  .collection("gamemastersubscriptions")
-                  .updateOne(
-                    { _id: gmSubscription._id },
-                    {
-                      $inc: {
-                        totalReferredUsers: 1,
-                        activeReferredUsers: 1,
-                      },
-                    },
-                  );
-
-                if (counterUpdateResult.modifiedCount === 0) {
-                  console.error(
-                    `❌ Referral: Failed to increment GM counter for ${gmSubscription._id}`,
-                  );
-                  // Don't throw - referral is already created, counter can be fixed via sync
-                } else {
-                  console.log(
-                    `✅ Referral: Incremented GM ${gmSubscription.userId} referral count`,
-                  );
-                }
-              }
-
-              console.log(
-                `✅ User ${userId} successfully linked to Game Master ${gmSubscription.userId} via referral code ${referralCode}`,
+                `✅ User ${userId} linked to Game Master ${result.gameMasterId} via referral code ${referralCode}`,
               );
             } else {
               // Reason: a dropped referral is money a Game Master is owed and never gets,
               // so it must be visible in the logs rather than an info line nobody reads.
               console.warn(
-                `⚠️ Referral dropped: code ${referralCode} not found or game master not active (user ${userId})`,
+                `⚠️ Referral dropped: code ${referralCode} refused (${result.code}) for user ${userId}`,
               );
             }
           } catch (referralError) {
