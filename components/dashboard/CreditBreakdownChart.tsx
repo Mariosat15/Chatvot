@@ -31,6 +31,8 @@ interface CreditBreakdownChartProps {
   // Reason: All-time totals from getUserFinancialSummary() — single source of truth.
   // Without this, summary chips only reflect the 30-day chart window.
   allTimeTotals?: AllTimeTotals;
+  /** When true, skip the outer card shell (parent already provides chrome). */
+  embedded?: boolean;
 }
 
 const INCOME_CATEGORIES = [
@@ -48,7 +50,14 @@ const SPENDING_CATEGORIES = [
 
 // Reason: Paired side-by-side bar chart showing daily income (green) vs spending (red)
 // with proper spacing so bars never overlay numbers or axis labels.
-export default function CreditBreakdownChart({ data, allTimeTotals }: CreditBreakdownChartProps) {
+export default function CreditBreakdownChart({
+  data,
+  allTimeTotals,
+  embedded = false,
+}: CreditBreakdownChartProps) {
+  const shell = embedded
+    ? "p-0"
+    : "rounded-xl border border-gray-700/50 bg-gradient-to-br from-gray-800/60 to-gray-900/60 p-4 sm:p-5";
   const [range, setRange] = useState<"7d" | "30d">("30d");
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
   const chartRef = useRef<HTMLDivElement>(null);
@@ -112,13 +121,15 @@ export default function CreditBreakdownChart({ data, allTimeTotals }: CreditBrea
   if (!data || data.length === 0) {
     return (
       <motion.div
-        className="rounded-xl border border-gray-700/50 bg-gradient-to-br from-gray-800/60 to-gray-900/60 p-5"
+        className={shell || "p-5"}
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
       >
-        <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">
-          📊 Credit Breakdown
-        </h3>
+        {!embedded ? (
+          <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">
+            📊 Credit Breakdown
+          </h3>
+        ) : null}
         <div className="h-48 flex items-center justify-center text-gray-500 text-sm">
           Your credit breakdown will appear here
         </div>
@@ -131,7 +142,7 @@ export default function CreditBreakdownChart({ data, allTimeTotals }: CreditBrea
 
   return (
     <motion.div
-      className="rounded-xl border border-gray-700/50 bg-gradient-to-br from-gray-800/60 to-gray-900/60 p-4 sm:p-5"
+      className={shell}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: 0.5 }}
@@ -139,9 +150,11 @@ export default function CreditBreakdownChart({ data, allTimeTotals }: CreditBrea
       {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-2 mb-3">
         <div className="min-w-0">
+          {!embedded ? (
           <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
             📊 Credit Breakdown
           </h3>
+          ) : null}
           <div className="flex items-center gap-3 mt-1 flex-wrap">
             <span
               className={`text-lg font-bold ${totalNet >= 0 ? "text-yellow-400" : "text-red-400"}`}

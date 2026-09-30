@@ -11,16 +11,27 @@ import { motion } from "framer-motion";
 
 interface EquityChartProps {
   data: { date: string; balance: number; change: number }[];
+  /** When true, skip the outer card shell (parent already provides chrome). */
+  embedded?: boolean;
+  /** Initial range chip — Wallet Analytics mock defaults to 30d. */
+  defaultRange?: "7d" | "30d" | "90d" | "all";
 }
 
 // Reason: Renamed from "Equity Curve" to "Wallet Balance" because this chart
 // tracks wallet balance history (from WalletTransaction.balanceAfter), not
 // trading equity. Uses ⚡ (Volt) branding to match the credits system.
-export default function EquityChart({ data }: EquityChartProps) {
+export default function EquityChart({
+  data,
+  embedded = false,
+  defaultRange = "all",
+}: EquityChartProps) {
+  const shell = embedded
+    ? "p-0"
+    : "rounded-xl border border-gray-700/50 bg-gradient-to-br from-gray-800/60 to-gray-900/60 p-4 sm:p-5";
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<any>(null);
   const seriesRef = useRef<any>(null);
-  const [range, setRange] = useState<"7d" | "30d" | "90d" | "all">("all");
+  const [range, setRange] = useState<"7d" | "30d" | "90d" | "all">(defaultRange);
   const [hoveredPoint, setHoveredPoint] = useState<{ date: string; value: number; change: number } | null>(null);
 
   const filteredData = useMemo(() => {
@@ -157,13 +168,15 @@ export default function EquityChart({ data }: EquityChartProps) {
   if (!data || data.length < 2) {
     return (
       <motion.div
-        className="rounded-xl border border-gray-700/50 bg-gradient-to-br from-gray-800/60 to-gray-900/60 p-5"
+        className={shell || "p-5"}
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
       >
-        <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">
-          ⚡ Wallet Balance
-        </h3>
+        {!embedded ? (
+          <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">
+            ⚡ Wallet Balance
+          </h3>
+        ) : null}
         <div className="h-48 flex items-center justify-center text-gray-500 text-sm">
           Make a deposit to start tracking your wallet balance
         </div>
@@ -173,7 +186,7 @@ export default function EquityChart({ data }: EquityChartProps) {
 
   return (
     <motion.div
-      className="rounded-xl border border-gray-700/50 bg-gradient-to-br from-gray-800/60 to-gray-900/60 p-4 sm:p-5"
+      className={shell}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: 0.35 }}
@@ -181,9 +194,11 @@ export default function EquityChart({ data }: EquityChartProps) {
       {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-2 mb-3">
         <div className="min-w-0">
+          {!embedded ? (
           <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
             ⚡ Wallet Balance
           </h3>
+          ) : null}
           {hoveredPoint ? (
             <div className="flex items-center gap-2 mt-1">
               <span className="text-lg font-bold text-yellow-400" style={{ fontFamily: "var(--font-geist-mono), monospace" }}>

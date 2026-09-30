@@ -9,10 +9,8 @@ import TradingAnalytics from "./TradingAnalytics";
 import ContestsSidebar from "./ContestsSidebar";
 import PerformanceRings from "./PerformanceRings";
 import ContestStatsCards from "./ContestStatsCards";
-import CreditBreakdownChart from "./CreditBreakdownChart";
 import GettingStartedCard from "./GettingStartedCard";
 import PlayerGamePerformancePanel from "./PlayerGamePerformancePanel";
-import HeroStatsBar from "./HeroStatsBar";
 import MarketHolidaysCard from "./MarketHolidaysCard";
 import DesktopDashboard from "./desktop/DesktopDashboard";
 import MobileDashboard from "./mobile/MobileDashboard";
@@ -20,13 +18,14 @@ import { DashboardOverviewProvider } from "@/hooks/useDashboardOverview";
 import { DASHBOARD_TABS, type DashboardNavTab } from "@/lib/constants";
 import { useTerms } from "@/contexts/TerminologyContext";
 
-const EquityChart = dynamic(() => import("./EquityChart"), { ssr: false });
-const DailyCreditFlow = dynamic(() => import("./DailyCreditFlow"), {
-  ssr: false,
-});
 // Reason: Tutorials tab is lazy-loaded — it only fetches videos when the user
 // actually opens this tab, so it adds zero cost to the default Overview view.
 const TutorialsTab = dynamic(() => import("./TutorialsTab"), { ssr: false });
+// Reason: Wallet Analytics mounts Lightweight Charts — keep it off the Overview
+// first paint the same way EquityChart used to be.
+const WalletAnalytics = dynamic(() => import("./wallet/WalletAnalytics"), {
+  ssr: false,
+});
 
 const TAB_STORAGE_KEY = "chartvolt_dashboard_tab";
 
@@ -143,25 +142,7 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
         </TabsContent>
 
         <TabsContent value="wallet" className="mt-4 space-y-4">
-          <HeroStatsBar
-            creditBalance={overview.creditBalance}
-            totalSpent={overview.totalSpent}
-            winRate={overview.winRate}
-            roi={overview.roi}
-            gmEarnings={overview.gmEarnings}
-            totalPrizesWon={overview.totalPrizesWon}
-            variant="wallet"
-          />
-
-          <EquityChart data={charts.walletBalanceHistory} />
-
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <DailyCreditFlow data={charts.dailyCreditFlow} />
-            <CreditBreakdownChart
-              data={charts.dailyCreditBreakdown}
-              allTimeTotals={charts.allTimeTotals}
-            />
-          </div>
+          <WalletAnalytics overview={overview} charts={charts} />
         </TabsContent>
 
         <TabsContent value="performance" className="mt-4 space-y-4">

@@ -3101,7 +3101,7 @@ text overlay** — the number is baked into the art; outside top 20 uses the das
 from `ui/levels` are stored separately under `levels/` for later use and **must not** drive
 Overview Global Rank. A document describing rank art as coming from `ui/levels`, or one shell +
 `#n` overlay, is correct as history (earlier 29 Sep) and stale as a present fact — **say which**.
-**Header is nav-only** (Overview / Wallet / Performance /
+**Header is nav-only** (Overview / Wallet Analytics / Performance /
 Competitions / Tutorials) — logo, level chip, bell and profile were removed because they
 already live on the sidebar; Games / Challenges / Marketplace stay on `UserSidebar`. **`?tab=`
 is the addressable source** for the active dashboard section; localStorage is fallback only;
@@ -3111,7 +3111,9 @@ inactive = white) — the pre-neon strip, lightly polished on 29 Sep 2026 after 
 rejected both five floating HUD plates and the shared `nav-frame.png` bar. Neon assets under
 `public/assets/neon/overview/nav/` remain on disk for reference only; a document describing
 neon plates or a shared frame on the live Header is correct as history and stale as a
-present fact — **say which**. **The Header tab strip is desktop-only** from 30 Sep 2026
+present fact — **say which**. **The Wallet tab label is "Wallet Analytics" from 30 Sep 2026**
+(`13` **s5.1h**) — a document saying the Header still reads "Wallet" is correct as history
+and stale as a present fact, so **say which**. **The Header tab strip is desktop-only** from 30 Sep 2026
 (`hidden md:block`; `MobileTabStrip` deleted) — phones do not show Overview / Wallet /
 Performance / Competitions / Tutorials on any page until the owner asks to restore it;
 the sidebar drawer is the phone nav. **Win rate on
@@ -3272,6 +3274,32 @@ and read the same payload, so the two trees cannot disagree about a figure.
 play cards rather than a curated list. **Never verified by eye** — the dashboard is behind
 sign-in; the 360–430px no-overflow claim rests on the layout's `overflow-x-hidden` and the
 carousels' `-mx-3 px-3`, not on a screenshot.
+
+### 5.1h Wallet Analytics tab - BUILT 30 September 2026
+
+Owner mock: reconstruct the dashboard `?tab=wallet` surface as **Wallet Analytics** and
+rename the Header tab label to match. Graphics from `Desktop/games/menu items/ui/wallet items`.
+
+**Live code:** `lib/services/games/wallet-assets.ts`, `components/dashboard/wallet/`
+(`WalletAnalytics.tsx`, `WalletChrome.tsx`, `SpendingVsEarnings.tsx`),
+`DashboardLayout.tsx` wallet `TabsContent`, `NAV_ITEMS` label in `lib/constants.ts`,
+assets under `public/assets/neon/wallet/`. Tests: `__tests__/dashboard/wallet-analytics.test.ts`
+(6) + `games-first-nav` label pin. **Nothing mirrored.**
+
+**Six facts drift easily.** **The tab id stays `wallet`** — only the visible label became
+"Wallet Analytics", so every `?tab=wallet` deep link and localStorage value survives.
+**Charts reuse the existing payload** (`walletBalanceHistory`, `dailyCreditBreakdown`,
+`dailyCreditFlow`, `allTimeTotals`) — a document describing new money aggregation is wrong.
+**HeroStatsBar left the wallet tab** — the four KPI cards (Credit Balance / Total Spend /
+Game Earnings / Prizes Won) live in `WalletKpiRow` with neon art and period % from half-window
+splits. **`embedded` on EquityChart / DailyCreditFlow / CreditBreakdownChart** strips their
+old grey card chrome so only the neon `WalletPanel` border shows; EquityChart keeps its own
+7d/30d/90d/all chips (default **30d** on this tab). **View All Transactions links to `/wallet`**,
+the existing money page — the sidebar ACCOUNT "Wallet" item is unchanged. And **Game Earnings
+≈ wins; Bonuses ≈ refunds** — the ledger has no separate "game earnings" / "bonuses" buckets,
+so a document treating those labels as new transaction types is describing a display rename.
+
+**Never verified by eye** — dashboard behind sign-in.
 
 ### 5.1a The contest cards, made game-aware - BUILT 6 September 2026
 

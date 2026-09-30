@@ -31,6 +31,10 @@ describe("dashboard Header NAV_ITEMS", () => {
       expect(item.href).toBe(`/dashboard?tab=${item.tab}`);
     }
     expect(DASHBOARD_TABS).toEqual(NAV_ITEMS.map((i) => i.tab));
+    // Reason: owner 30 Sep 2026 — Wallet tab label is "Wallet Analytics".
+    expect(NAV_ITEMS.find((i) => i.tab === "wallet")?.label).toBe(
+      "Wallet Analytics",
+    );
   });
 
   it("does not put /games in the Header list", () => {
