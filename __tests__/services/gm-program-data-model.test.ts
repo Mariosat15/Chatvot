@@ -5,6 +5,7 @@ import {
   beforeAll,
   afterAll,
   beforeEach,
+  vi,
 } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -32,9 +33,10 @@ import TermsAcceptance from "@/database/models/terms-acceptance.model";
 import { NEVER_EDITABLE_FIELDS } from "@/apps/admin/lib/admin/competition-update-fields";
 import {
   migrateAffiliationSource,
+  isAffiliationMigrationComplete,
   LEGACY_AFFILIATION_SOURCE,
   LEGACY_UNIQUE_USER_INDEX_NAME,
-} from "../../tools/gamemaster/backfill-affiliation-source-core";
+} from "../../lib/services/gamemaster/affiliation-migration";
 
 /**
  * Gamemaster Program v2, step 1 (`External game plans/24` s2): the data model.
@@ -332,6 +334,41 @@ describe("the D4 partial unique index and the migration", () => {
       expect(second.needingSource).toBe(0);
       expect(second.activeIndexCreated).toBe(false);
       expect(second.legacyUniqueIndexDropped).toBe(false);
+    });
+
+    it("reports complete only once rows are labelled and the old rule is gone", async () => {
+      await coll().insertOne(referral({ userId: "u1" }));
+      expect(isAffiliationMigrationComplete(await migrateAffiliationSource(false))).toBe(false);
+      await migrateAffiliationSource(true);
+      expect(isAffiliationMigrationComplete(await migrateAffiliationSource(false))).toBe(true);
+    });
+
+    it("treats the old index already gone as done when two admins run it at once", async () => {
+      // Reason: the second click sees userId_1 in its listing and the first click drops it
+      // before the second one's drop lands. That loser must not report "Something went wrong".
+      const spy = vi
+        .spyOn(Object.getPrototypeOf(coll()), "dropIndex")
+        .mockRejectedValueOnce(Object.assign(new Error("index not found"), { code: 27 }));
+      try {
+        await coll().insertOne(referral({ userId: "u1" }));
+        const result = await migrateAffiliationSource(true);
+        expect(result.legacyUniqueIndexDropped).toBe(false);
+        expect(result.legacyUniqueIndexPresent).toBe(false);
+      } finally {
+        spy.mockRestore();
+      }
+    });
+
+    it("still fails on any other drop error, so a real fault is not reported as done", async () => {
+      const spy = vi
+        .spyOn(Object.getPrototypeOf(coll()), "dropIndex")
+        .mockRejectedValueOnce(Object.assign(new Error("not authorised"), { code: 13 }));
+      try {
+        await coll().insertOne(referral({ userId: "u1" }));
+        await expect(migrateAffiliationSource(true)).rejects.toThrow(/not authorised/);
+      } finally {
+        spy.mockRestore();
+      }
     });
   });
 });

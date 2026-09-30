@@ -915,6 +915,30 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 30 Sep 2026 - Gamemaster Program v2: the step 1 migration is a button now
+
+The owner asked not to run a command-line script against production. The migration that
+labels old referral rows and swaps `userId_1` for `userId_active_unique` (D4) now runs from
+**Admin -> Game Masters -> Affiliation migration -> Run migration**. The screen shows what is
+left to do, turns into **Done** once nothing is left, and names any player with two active
+Game Masters, because the index cannot be built until that is resolved by hand. **It has not
+been run against production yet.** Until it is, a player whose Game Master expired cannot
+join a new one. They get the generic error, because the old index refuses the second row.
+
+- **One function, two callers.** The logic moved from `tools/gamemaster/backfill-affiliation-source-core.ts`
+  (deleted) to `lib/services/gamemaster/affiliation-migration.ts`, mirrored into `apps/admin`
+  and held **byte-identical by a test**, since `check:mirrors` compares models only. The CLI
+  and the button both call it. Both copies are on the single-writer exception list.
+- **Route** `apps/admin/app/api/gamemasters/affiliation-migration`: GET reports only, POST
+  applies and then **re-reads**, because an applied result's `needingSource` is the count found
+  before writing. Both handlers are `guardSection("gamemaster-management")`, and every run is
+  written to the audit trail as `gm_affiliation_migration` with the full before and after.
+- **Found while building: two admins pressing at once would show one of them an error.** Both
+  see `userId_1` in their listing, and the slower drop finds it already gone (MongoDB code 27).
+  That is now treated as done, and any other drop error still fails. Both halves are tested.
+- Tests: `gm-program-data-model.test.ts` 27 (+3), new `__tests__/admin/gm-affiliation-migration-route.test.ts` 6.
+  Probes 16-17 re-aimed at the moved file, and 59-64 are new.
+
 ### 30 Sep 2026 - Gamemaster Program v2 step 4 built: Join GM and the Game Master leaderboard, switched off
 
 A signed-in player can now see a Game Master leaderboard and join a Game Master from it, once

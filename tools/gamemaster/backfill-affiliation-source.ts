@@ -11,7 +11,7 @@
  */
 
 import mongoose from "mongoose";
-import { migrateAffiliationSource } from "./backfill-affiliation-source-core";
+import { migrateAffiliationSource } from "../../lib/services/gamemaster/affiliation-migration";
 
 async function main(): Promise<void> {
   const apply = process.argv.includes("--apply");

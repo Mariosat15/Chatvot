@@ -146,7 +146,7 @@ $results += Invoke-Probe `
 # ---- Step 1: data model ----------------------------------------------------------------
 
 $DM = "__tests__/services/gm-program-data-model.test.ts"
-$MIG = "tools/gamemaster/backfill-affiliation-source-core.ts"
+$MIG = "lib/services/gamemaster/affiliation-migration.ts"
 
 # 9. Visibility becomes editable - a private contest could be flipped public after entry.
 $results += Invoke-Probe `
@@ -209,7 +209,7 @@ $results += Invoke-Probe `
 $results += Invoke-Probe `
     -Name "Backfill labels every row, not only missing ones" `
     -File $MIG `
-    -From '  const filter = missingStringFilter("source");' `
+    -From '  const filter = missingSourceFilter();' `
     -To '  const filter = {};' `
     -TestName "labels all three missing shapes and never overwrites a stored source" -Suite $DM
 
@@ -505,8 +505,8 @@ $results += Invoke-Probe `
 $results += Invoke-Probe `
     -Name "Public row spread with earnings" `
     -File "lib/services/gamemaster/gm-leaderboard.service.ts" `
-    -From '  for (const key of GM_LEADERBOARD_ROW_KEYS) out[key] = source.get(key);' `
-    -To '  Object.assign(out, row, { totalEarnings: 999 }); void source;' `
+    -From '  const out = Object.fromEntries(GM_LEADERBOARD_ROW_KEYS.map((key) => [key, source.get(key)]));' `
+    -To '  const out = { ...row, totalEarnings: 999 }; void source;' `
     -TestName "rows carry exactly the public keys" -Suite $LJ
 
 # 51. A paused Game Master is listed (D7).
@@ -573,6 +573,57 @@ $results += Invoke-Probe `
     -To 'import { decideAffiliation, type AffiliationGameMasterFacts } from "./affiliation-rules";
 import "@/database/models/user-referral.model";' `
     -TestName "the leaderboard rules module reaches no model" -Suite $LR
+
+$MR = "__tests__/admin/gm-affiliation-migration-route.test.ts"
+$MROUTE = "apps/admin/app/api/gamemasters/affiliation-migration/route.ts"
+
+# 59. Two admins press Run migration at once and the loser reports a failure.
+$results += Invoke-Probe `
+    -Name "Migration race reported as an error" `
+    -File $MIG `
+    -From '      if (!isIndexNotFound(error)) throw error;' `
+    -To '      throw error;' `
+    -TestName "treats the old index already gone as done when two admins run it at once" -Suite $DM
+
+# 60. Every drop error swallowed, so a real fault reads as done.
+$results += Invoke-Probe `
+    -Name "Migration swallows every drop error" `
+    -File $MIG `
+    -From '      if (!isIndexNotFound(error)) throw error;' `
+    -To '      if (false) throw error;' `
+    -TestName "still fails on any other drop error" -Suite $DM
+
+# 61. The status read applies the migration.
+$results += Invoke-Probe `
+    -Name "Migration GET writes" `
+    -File $MROUTE `
+    -From 'const report = await migrateAffiliationSource(false);' `
+    -To 'const report = await migrateAffiliationSource(true);' `
+    -TestName "GET only reports and POST applies" -Suite $MR
+
+# 62. The run leaves no trace under its own action name.
+$results += Invoke-Probe `
+    -Name "Migration run not audited as itself" `
+    -File $MROUTE `
+    -From '        "gm_affiliation_migration",' `
+    -To '        "system_action",' `
+    -TestName "a run is written to the audit trail" -Suite $MR
+
+# 63. The route granted by a different section.
+$results += Invoke-Probe `
+    -Name "Migration route under the wrong grant" `
+    -File $MROUTE `
+    -From 'guardSection("gamemaster-management")' `
+    -To 'guardSection("users")' `
+    -TestName "every handler is section-granted" -Suite $MR
+
+# 64. The admin copy drifts from the main copy.
+$results += Invoke-Probe `
+    -Name "Admin migration copy drifts" `
+    -File "apps/admin/lib/services/gamemaster/affiliation-migration.ts" `
+    -From 'const INDEX_NOT_FOUND = 27;' `
+    -To 'const INDEX_NOT_FOUND = 26;' `
+    -TestName "the admin copy is byte-identical to the main copy" -Suite $MR
 
 Write-Host ""
 Write-Host "================ SUMMARY ================"

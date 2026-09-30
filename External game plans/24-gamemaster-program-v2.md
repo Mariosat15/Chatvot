@@ -73,8 +73,11 @@ Default in **bold** is what this plan assumes if not answered.
 > **BUILT 30 Sep 2026 (step 1).** Every field below exists and is **inert** - nothing reads it
 > until steps 2-6. Live code: `lib/services/gamemaster/competition-visibility.ts` (mirrored,
 > byte-identical test), `resolveAllowedVisibility` in both `subscription-limits.ts` copies, the
-> models listed, and `tools/gamemaster/backfill-affiliation-source{,-core}.ts` (**report-only
-> until `--apply`; not run against production**). Tests: `__tests__/services/gm-program-data-model.test.ts`
+> models listed, and the migration in `lib/services/gamemaster/affiliation-migration.ts`
+> (mirrored, byte-identical test), run from **Admin -> Game Masters -> Run migration** or from
+> `tools/gamemaster/backfill-affiliation-source.ts` (**report-only until applied; not run
+> against production**). The `-core.ts` file named here before 30 Sep 2026 was moved into that
+> module, so the name is correct as history only. Tests: `__tests__/services/gm-program-data-model.test.ts`
 > (24); probes 9-17 in `tools/probe-gm-program.ps1`, all red on exactly one test, plus one
 > recorded as unprobed. **Deviations from the text below, recorded rather than absorbed:**
 > - **`TermsAcceptance` is main-app only**, not mirrored: `apps/admin` has no copy and reads
@@ -396,7 +399,7 @@ Verification gates: `npm run check:mirrors`, main + admin `tsc --noEmit` diffed 
 | Step | Content | Flag |
 |---|---|---|
 | **0** | s0.1 defect fixes + tests. Ships alone | none |
-| **1** (**BUILT 30 Sep 2026**, backfill not yet applied) | Models (s2) + backfill script `tools/gamemaster/backfill-affiliation-source.ts`: sets `source: gm_referral_link` only where missing (absent, `null`, `""` all handled), refuses to overwrite, report-only until `--apply`. Index change only if D4 = yes | none (inert fields) |
+| **1** (**BUILT 30 Sep 2026**, backfill not yet applied) | Models (s2) + backfill script `tools/gamemaster/backfill-affiliation-source.ts`: sets `source: gm_referral_link` only where missing (absent, `null`, `""` all handled), refuses to overwrite, report-only until `--apply`. Since 30 Sep 2026 it also runs from the admin **Run migration** button (same function, audited). Index change only if D4 = yes | none (inert fields) |
 | **2** (**BUILT 30 Sep 2026**) | Central service; sign-up rewired onto it (behaviour identical, pinned by the existing sign-up tests plus new ones) | none |
 | **3** (**BUILT 30 Sep 2026**, sign-up checkbox deferred - see s5) | Terms page seed + acceptance versioning; server-side version bump; Join GM verifies consent | none |
 | **4** (**BUILT 30 Sep 2026**, dark by default - see s6.1) | Join GM API + leaderboard; admin switch on the existing Game Master screen (deviation from s7, recorded in s6.1) | `WhiteLabel.gmJoinEnabled` (default false) |

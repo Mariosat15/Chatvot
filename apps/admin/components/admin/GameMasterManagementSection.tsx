@@ -23,6 +23,7 @@ import GameMasterDetailView, {
   type DetailedGameMasterData,
 } from "./GameMasterDetailView";
 import GmProgramSwitches from "./gamemaster/GmProgramSwitches";
+import GmAffiliationMigration from "./gamemaster/GmAffiliationMigration";
 
 interface GameMaster {
   id: string;
@@ -328,6 +329,7 @@ export default function GameMasterManagementSection({
       </div>
 
       <GmProgramSwitches />
+      <GmAffiliationMigration />
 
       {/* Sync Referrals Panel */}
       {showSyncPanel && (

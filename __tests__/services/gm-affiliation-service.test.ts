@@ -359,7 +359,8 @@ describe("the service is the only writer (s9 test 7)", () => {
     ["apps/admin/app/api/users/delete/route.ts", "deletes a user's rows"],
     ["apps/admin/app/api/admin/end-logic-tests/run/route.ts", "test harness fixtures"],
     ["apps/admin/app/api/admin/end-logic-tests/cleanup/route.ts", "test harness cleanup"],
-    ["tools/gamemaster/backfill-affiliation-source-core.ts", "step 1 source backfill"],
+    ["lib/services/gamemaster/affiliation-migration.ts", "step 1 source backfill"],
+    ["apps/admin/lib/services/gamemaster/affiliation-migration.ts", "step 1 source backfill, the copy the admin Run migration button runs"],
     ["apps/admin/app/api/gamemasters/[id]/route.ts", "only READS userreferrals; its write calls target the subscription (coarse-scan false positive)"],
   ]);
 
