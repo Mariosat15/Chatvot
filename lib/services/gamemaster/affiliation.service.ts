@@ -90,7 +90,7 @@ function isDuplicateKey(error: unknown): boolean {
   return (error as { code?: number })?.code === DUPLICATE_KEY;
 }
 
-function toFacts(sub: unknown): AffiliationGameMasterFacts | undefined {
+export function toFacts(sub: unknown): AffiliationGameMasterFacts | undefined {
   if (!sub) return undefined;
   const s = sub as Record<string, unknown>;
   return {
@@ -107,9 +107,11 @@ function toFacts(sub: unknown): AffiliationGameMasterFacts | undefined {
  * is the answer when it exists; otherwise the most recent, so an expired Game Master reads
  * as expired rather than as missing (which would mean "deleted").
  */
-async function findSubscriptionForUser(
+export async function findSubscriptionForUser(
   gmUserId: string,
-  session: mongoose.ClientSession,
+  // Reason: optional so the leaderboard (a read, no transaction) asks the SAME question
+  // `affiliate()` asks, rather than restating "active, else most recent" in a second file.
+  session: mongoose.ClientSession | null = null,
 ) {
   const active = await GameMasterSubscription.findOne({ userId: gmUserId, status: "active" })
     .session(session)

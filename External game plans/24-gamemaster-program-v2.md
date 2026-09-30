@@ -1,6 +1,6 @@
 # 24 - Game Master Program v2: private contests, Join GM, leaderboard, terms, admin reporting
 
-**Status (30 September 2026): steps 0, 1, 2 and 3 BUILT; steps 4-8 are plan only.** This line
+**Status (30 September 2026): steps 0-4 BUILT (step 4 dark behind `gmJoinEnabled`); steps 5-8 are plan only.** This line
 read "PLAN ONLY ... Nothing in this chapter is built" until step 0 shipped - correct as
 history, stale as a present fact.
 Owner brief of 30 Sep 2026, sections 1-5 plus source tracking, filters, exports and the
@@ -261,6 +261,58 @@ The rule: **a `gm_private` contest can be entered, and its details read, only by
 ## 6. Player surfaces
 
 ### 6.1 Gamemaster Leaderboard - `/leaderboard?tab=gamemasters` (or `/gamemasters`)
+
+> **BUILT 30 Sep 2026 (step 4), SWITCHED OFF BY DEFAULT - read the code, not the bullets below.**
+> Live code: `lib/services/gamemaster/gm-leaderboard-rules.ts` (pure, model-free - R58),
+> `gm-leaderboard-metrics.ts` (the cached aggregate), `gm-leaderboard.service.ts` (paging + row
+> state), `gm-program-flags.ts` (`isGmJoinEnabled`), `GET /api/gamemasters/leaderboard`,
+> `POST /api/gamemasters/[subscriptionId]/join`, `components/leaderboard/GameMasterLeaderboard.tsx`,
+> the `gmBoardEnabled` gate in `LeaderboardClient.tsx` / `app/(root)/leaderboard/page.tsx`,
+> `RateLimiters.gmJoin`, `gmJoinEnabled` on both `whitelabel.model.ts` copies, and on the admin
+> side `apps/admin/app/api/gamemasters/program-settings/route.ts` + `GmProgramSwitches.tsx`.
+> 29 tests (`gm-leaderboard-rules.test.ts` 19, `gm-leaderboard-join.test.ts` 10), probes 41-58 in
+> `tools/probe-gm-program.ps1`, each red on exactly one test. **Never verified by eye.**
+>
+> **Ten facts drift easily.**
+> - **Dark means dark on BOTH routes and on the tab.** With `gmJoinEnabled` off the leaderboard
+>   route and the join route both answer 403 `feature_disabled`, and the tab is not rendered - the
+>   page reads the flag server-side and passes `gmBoardEnabled`, so `?tab=gamemasters` cannot reach
+>   a board the server would refuse. **Only a stored boolean `true` is on**; absent, `null` and a
+>   legacy string `"true"` all read as off (a probe makes the check truthy and a test goes red).
+> - **The switch is on the existing Game Master screen, not a new section** - a deviation from s7,
+>   which puts everything under a redesigned `GameMasterProgramSection`. It sits above the Sync
+>   Referrals panel in `GameMasterManagementSection.tsx` (3 lines added), behind the same
+>   `gamemaster-management` grant, because s7's redesign is step 7 and an operator must be able to
+>   switch step 4 on before then. The route is a **named `Set` allow-list**, refuses an unknown
+>   field by name, refuses a non-boolean, upserts, and writes `logSettingsUpdated` with before/after.
+> - **Every join rule is `affiliate()`'s.** The route adds only transport, in a pinned order:
+>   session, switch, `RateLimiters.gmJoin` (10 an hour per user, counted **before** the body is
+>   read so garbage requests spend the budget), then the body. Channel `chartvolt_join_gm`,
+>   surface `leaderboard`. Refusals map through `JOIN_GM_REFUSAL_STATUS`, a `Map`; an unlisted code
+>   is 500 with the generic message, never a success.
+> - **The row's button state is decided by `decideAffiliation`**, the function `affiliate()` calls,
+>   via `joinGmRowState` - `own` (no button), `your_gm` (badge), `locked` (greyed, D1 tooltip),
+>   `joinable`. A test asserts every row state agrees with the decision on the same facts, so the
+>   board cannot offer a join the server refuses or grey out one it allows. A paused current GM
+>   still **locks** (only expired/deleted frees the player, D4).
+> - **Consent is recorded against the GM's USER id** (`recordedContext.gameMasterId =
+>   joining.gameMasterUserId`) while the join URL carries the **subscription** id - swapping them
+>   makes every join refuse `terms_not_accepted`, because the stored acceptance names a different
+>   Game Master than the one `affiliate()` checks against; probe 57.
+> - **The public row is built from an explicit key list, never a spread** -
+>   `GM_LEADERBOARD_ROW_KEYS`, asserted as the exact key set of every response row, with a
+>   `totalEarnings: 999` seeded on the subscription to prove it cannot leak. No earnings, no email.
+> - **Metrics are one cached aggregate, 5 minutes** (`GM_LEADERBOARD_CACHE_MS`), never per request.
+>   Listed GMs only: `status: "active"`, not paused, not scheduled for deletion (D7). Drafts are not
+>   counted as created; participants and entry Volts count only non-cancelled contests; **active
+>   affiliate = entered a contest with `entryFee > 0` in the last 30 days**. Seats are joined by
+>   converting `competition_participant.competitionId` (String) to ObjectId - the known trap, probe 52.
+> - **Rank is the board's standing, not the sort** - active affiliates then affiliates, ties share a
+>   rank, and re-sorting by another metric keeps each row's rank.
+> - **Sort is a `Set` allow-list and an unknown sort is REFUSED (400)**, never silently defaulted;
+>   page size is capped at 50.
+> - **Nothing is player-visible until an operator flips the switch**, and the terms page from step
+>   3 must be live, or every join refuses `terms_unavailable` (503).
 - Same `LeaderboardClient` shell/tab pattern and neon kit as the existing board; paginated API `GET /api/gamemasters/leaderboard` (never ship the full list - the global board's own comment explains why).
 - Metrics, **computed by a stored/cached aggregate, never on every request**: affiliated users, active affiliated users (entered a paid contest in last 30 days), competitions created, completed, total participants in their contests, total entry Volts generated, GM rank. **GM earnings are not shown** (owner, 30 Sep 2026) - they appear only in the admin report and the GM's own dashboard, and the leaderboard API must not select them (a test asserts the response fields).
 - Sort by any metric; default sort = active affiliated users.
@@ -347,7 +399,7 @@ Verification gates: `npm run check:mirrors`, main + admin `tsc --noEmit` diffed 
 | **1** (**BUILT 30 Sep 2026**, backfill not yet applied) | Models (s2) + backfill script `tools/gamemaster/backfill-affiliation-source.ts`: sets `source: gm_referral_link` only where missing (absent, `null`, `""` all handled), refuses to overwrite, report-only until `--apply`. Index change only if D4 = yes | none (inert fields) |
 | **2** (**BUILT 30 Sep 2026**) | Central service; sign-up rewired onto it (behaviour identical, pinned by the existing sign-up tests plus new ones) | none |
 | **3** (**BUILT 30 Sep 2026**, sign-up checkbox deferred - see s5) | Terms page seed + acceptance versioning; server-side version bump; Join GM verifies consent | none |
-| **4** | Join GM API + leaderboard | `WhiteLabel.gmJoinEnabled` (default false) |
+| **4** (**BUILT 30 Sep 2026**, dark by default - see s6.1) | Join GM API + leaderboard; admin switch on the existing Game Master screen (deviation from s7, recorded in s6.1) | `WhiteLabel.gmJoinEnabled` (default false) |
 | **5** | Visibility permission in packages + creation routes + entry guard + discovery filters | `WhiteLabel.gmPrivateContestsEnabled` (default false). **Entry guard and discovery filters ship ON regardless of the flag** - they are inert while no private contest exists, and a private contest must never exist without them |
 | **6** | Private contest gate + Join GM CTA | same flag |
 | **7** | Admin redesign, filters, read model, exports, RBAC section | none (admin only) |

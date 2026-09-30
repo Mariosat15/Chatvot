@@ -156,6 +156,16 @@ export const RateLimiters = {
       keyPrefix: "challenge_invite",
     }),
 
+  // Join GM (`24` s6.3): 10 attempts per hour per user. Reason: a join is permanent,
+  // so there is no legitimate reason to press it more than a handful of times, and the
+  // refusals name the current Game Master, which should not be pollable.
+  gmJoin: (userId: string) =>
+    checkRateLimit(userId, {
+      maxRequests: 10,
+      windowMs: 60 * 60 * 1000,
+      keyPrefix: "gm_join",
+    }),
+
   // API general: 60 requests per minute per user
   apiGeneral: (userId: string) =>
     checkRateLimit(userId, {

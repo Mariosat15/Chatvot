@@ -12,6 +12,7 @@ import LeaderboardBoardPicker, {
 } from "@/components/leaderboard/LeaderboardBoardPicker";
 import LeaderboardPageHeader from "@/components/leaderboard/LeaderboardPageHeader";
 import LeaderboardRankCard from "@/components/leaderboard/LeaderboardRankCard";
+import GameMasterLeaderboard from "@/components/leaderboard/GameMasterLeaderboard";
 import RankingsExplainer, {
   type ExplainerWeight,
 } from "@/components/leaderboard/RankingsExplainer";
@@ -24,6 +25,10 @@ const PAGE_SIZE = 50;
 const GLOBAL_BOARD = "global";
 const TRADING_BOARD = "trading";
 const GAMES_BOARD = "games";
+// Reason: a fourth board with its own endpoint (`24` s6.1). It is offered only while
+// `WhiteLabel.gmJoinEnabled` is on, read on the server, and is never fetched from
+// `/api/leaderboard` - its rows and rules are the Game Master programme's, not a ranking.
+const GM_BOARD = "gamemasters";
 
 interface MyPosition {
   rank: number;
@@ -45,8 +50,10 @@ interface MyPosition {
  */
 export default function LeaderboardClient({
   currentUserId,
+  gmBoardEnabled = false,
 }: {
   currentUserId: string;
+  gmBoardEnabled?: boolean;
 }) {
   const terms = useTerms();
   const searchParams = useSearchParams();
@@ -54,8 +61,9 @@ export default function LeaderboardClient({
   const initialBoard = useMemo(() => {
     const q = searchParams.get("board");
     if (q === TRADING_BOARD || q === GAMES_BOARD || q === GLOBAL_BOARD) return q;
+    if (q === GM_BOARD && gmBoardEnabled) return q;
     return GLOBAL_BOARD;
-  }, [searchParams]);
+  }, [searchParams, gmBoardEnabled]);
   const matchCardsView = searchParams.get("view") === "cards";
 
   const [board, setBoard] = useState<string>(initialBoard);
@@ -141,6 +149,7 @@ export default function LeaderboardClient({
   }, []);
 
   useEffect(() => {
+    if (board === GM_BOARD) return;
     void fetchPage(1, board);
   }, [fetchPage, board]);
 
@@ -158,20 +167,32 @@ export default function LeaderboardClient({
     if (
       next === GLOBAL_BOARD ||
       next === TRADING_BOARD ||
-      next === GAMES_BOARD
+      next === GAMES_BOARD ||
+      (next === GM_BOARD && gmBoardEnabled)
     ) {
       setBoard(next);
     }
-  }, []);
+  }, [gmBoardEnabled]);
+
+  // Reason: appended here rather than in state, because `/api/leaderboard` replaces
+  // `boards` with its own list on every fetch and would silently drop this option.
+  const pickerBoards = useMemo(
+    () => (gmBoardEnabled ? [...boards, { id: GM_BOARD, label: `Game Master ${terms.leaderboard}` }] : boards),
+    [boards, gmBoardEnabled, terms.leaderboard],
+  );
 
   const picker = (
     <LeaderboardBoardPicker
-      boards={boards}
+      boards={pickerBoards}
       value={board}
       onChange={handleBoardChange}
-      disabled={loading}
+      disabled={loading && board !== GM_BOARD}
     />
   );
+
+  if (board === GM_BOARD) {
+    return <GameMasterLeaderboard boardPicker={picker} />;
+  }
 
   if (error) {
     return (

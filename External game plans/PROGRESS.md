@@ -915,6 +915,55 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 30 Sep 2026 - Gamemaster Program v2 step 4 built: Join GM and the Game Master leaderboard, switched off
+
+A signed-in player can now see a Game Master leaderboard and join a Game Master from it, once
+an operator turns on **Admin -> Game Masters -> Program switches -> Join GM**
+(`WhiteLabel.gmJoinEnabled`, default **off**). While it is off, both new routes answer 403 and
+the tab is not rendered. The details are in the BUILT note under `24` s6.1. **Nothing was
+computed wrongly, there is no risk number, nothing was backfilled, and no money path changed** -
+commission for a Join GM player flows through the existing `GameMasterEarning` rows exactly as
+for a referral-link player.
+
+**What is built:**
+- `GET /api/gamemasters/leaderboard` - paged (max 50), sortable by six metrics through a `Set`
+  allow-list, unknown sort refused. Rows carry an exact key list with **no earnings and no
+  email** (owner decision). Metrics come from one aggregate cached for 5 minutes. Only active,
+  unpaused GMs not scheduled for deletion are listed (D7).
+- `POST /api/gamemasters/[subscriptionId]/join` - session, switch, rate limit (10 an hour),
+  then `affiliate()` on channel `chartvolt_join_gm`. Every rule stays in the one writer, so
+  D1 (another GM locks you), D4 (an expired or deleted GM frees you) and consent from step 3
+  are enforced server-side. The recorded terms dialog from step 3 has its first caller here.
+- The Join button's state is computed by the same `decideAffiliation` the writer uses, so the
+  board cannot disagree with the server. The button is greyed out, with the D1 reason, for
+  a player already affiliated elsewhere.
+
+**Deviation from `24` s7, recorded rather than absorbed:** the switch sits on the existing
+`GameMasterManagementSection.tsx` screen (three lines, above Sync Referrals) rather than in
+the redesigned program section, because that redesign is step 7 and an operator needs the
+switch now. It is guarded by `gamemaster-management`, accepts only named boolean fields, and
+writes a settings audit row with the before and after values.
+
+**Checks:**
+- 29 new tests (19 rules, 10 routes against a real database), and 78 pass across the related
+  suites.
+- 58 of 58 probes are red on exactly one test (18 new, numbered 41-58). Two needed fixing
+  first:
+  - Probe 43 matched no test, because vitest quotes and shortens long `it.each` names. The
+    cases were renamed short, and the harness now reports "all skipped" as a broken probe
+    rather than a verdict.
+  - Probe 58 stayed green because the import guard read only `from "..."`, so a bare
+    side-effect `import "model"` passed. The guard now collects both spellings.
+- `check:mirrors` is OK.
+- `audit:admin-routes` shows 0 unguarded routes (342 section-granted).
+- Both typechecks match their baselines exactly (228 main, 244 admin).
+- Lint on every touched file passes at `--max-warnings=0`.
+- **Never verified by eye.**
+
+**Next:** step 5 - visibility permission in packages, creation routes, the private-contest
+entry guard and discovery filters (`24` s4). The guard and filters ship on regardless of
+`gmPrivateContestsEnabled`.
+
 ### 30 Sep 2026 - Gamemaster Program v2 step 3 built: the terms page and which version was accepted
 
 A new system page, `terms-gamemaster-affiliation` (version "1"), is seeded on startup. It is

@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/better-auth/auth";
 import LeaderboardClient from "@/components/leaderboard/LeaderboardClient";
+import { isGmJoinEnabled } from "@/lib/services/gamemaster/gm-program-flags";
 
 /**
  * Global leaderboard: data is loaded client-side via /api/leaderboard (paginated)
@@ -13,8 +14,12 @@ const GlobalLeaderboardPage = async () => {
     redirect("/sign-in");
   }
 
+  // Reason: read on the server so the option is simply absent while the programme is
+  // off; the API refuses too, so hiding it is presentation and not the protection.
+  const gmBoardEnabled = await isGmJoinEnabled();
+
   return (
-    <LeaderboardClient currentUserId={session.user.id} />
+    <LeaderboardClient currentUserId={session.user.id} gmBoardEnabled={gmBoardEnabled} />
   );
 };
 

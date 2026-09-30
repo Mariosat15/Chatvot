@@ -3639,6 +3639,13 @@ player now actually reaches.
 **nine terms, five of them trading-specific**, roughly **7 seconds** to rebuild, cached
 **5 minutes**, capped at **5,000 users**.
 
+> **A Game Masters tab exists since 30 Sep 2026 and is dark by default** (`24` s6.1, step 4).
+> `LeaderboardClient.tsx` renders `GameMasterLeaderboard.tsx` only when the page passes
+> `gmBoardEnabled`, which it reads server-side from `WhiteLabel.gmJoinEnabled`, so
+> `?tab=gamemasters` cannot open a board the API would refuse. It has its own paged endpoint
+> (`GET /api/gamemasters/leaderboard`) and does not touch the global player board or
+> `UserGameStats`. It shows **no earnings**. It has not been verified by eye.
+
 | Change | Note |
 |---|---|
 | Back it with `UserGameStats` | Per-game rows plus an `"_overall"` rollup - **`04` s3.6**, which did not exist until 16 Sep 2026; see 7.3 |

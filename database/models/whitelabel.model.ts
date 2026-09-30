@@ -97,6 +97,10 @@ export interface WhiteLabelDocument extends Document {
   // action rather than N.
   externalGamesEnabled: boolean;
 
+  // Gamemaster Program v2 (`24` s10 step 4): the public Game Master leaderboard and the
+  // Join GM button. Off by default - see the schema comment.
+  gmJoinEnabled: boolean;
+
   // Non-secret, freely readable provider configuration. Mirrors `game_provider` for the
   // settings screen; the collection remains the source of truth.
   gameProviders: {
@@ -458,6 +462,13 @@ const WhiteLabelSchema = new Schema<WhiteLabelDocument>(
     // see. Every rollout step in chapter 18 assumes the feature stays dark until an
     // operator turns it on, and a default of true would launch it on deploy.
     externalGamesEnabled: {
+      type: Boolean,
+      default: false,
+    },
+    // Reason: off by default so that deploying step 4 changes nothing a player can see.
+    // The leaderboard and the join route both refuse while this is anything but a stored
+    // `true`, so a missing field, a failed read or a bad edit keeps the feature dark.
+    gmJoinEnabled: {
       type: Boolean,
       default: false,
     },

@@ -22,6 +22,7 @@ import { useRouter, usePathname } from "next/navigation";
 import GameMasterDetailView, {
   type DetailedGameMasterData,
 } from "./GameMasterDetailView";
+import GmProgramSwitches from "./gamemaster/GmProgramSwitches";
 
 interface GameMaster {
   id: string;
@@ -325,6 +326,8 @@ export default function GameMasterManagementSection({
           </button>
         </div>
       </div>
+
+      <GmProgramSwitches />
 
       {/* Sync Referrals Panel */}
       {showSyncPanel && (

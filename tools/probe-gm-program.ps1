@@ -54,7 +54,9 @@ function Invoke-Probe {
         [System.IO.File]::WriteAllText($path, $original, $enc)
     }
 
-    if ($out -match 'No test files found' -or $out -match 'Tests\s+no tests') {
+    # Reason: it.each quotes a $name string, so a probe naming the unquoted title matches
+    # nothing and vitest reports every test skipped - which is not a verdict on the guard.
+    if ($out -match 'No test files found' -or $out -match 'Tests\s+no tests' -or $out -match 'Tests\s+\d+\s+skipped\s+\(') {
         $outcome = "PROBE BROKEN (no test ran)"
     }
     elseif ($out -match 'Tests\s+(\d+)\s+failed') {
@@ -417,6 +419,160 @@ $results += Invoke-Probe `
 # Deliberately unprobed: the acceptance route's own 400 for a missing Game Master. Removing it
 # hands `undefined` to recordGmTermsAcceptance, whose `invalid_input` also maps to 400, so the
 # two guards cover each other and a probe of either alone stays green (R42's shape).
+
+# ---- Step 4: Join GM API and the Gamemaster leaderboard -------------------------------
+
+$LR = "__tests__/services/gm-leaderboard-rules.test.ts"
+$LJ = "__tests__/services/gm-leaderboard-join.test.ts"
+$LBRULES = "lib/services/gamemaster/gm-leaderboard-rules.ts"
+$LBMET = "lib/services/gamemaster/gm-leaderboard-metrics.ts"
+$JOIN = "app/api/gamemasters/[subscriptionId]/join/route.ts"
+$LBR = "app/api/gamemasters/leaderboard/route.ts"
+
+# 41. Any query-string sort accepted - including "constructor".
+$results += Invoke-Probe `
+    -Name "Sort not checked against the list" `
+    -File $LBRULES `
+    -From '  return SORT_SET.has(value) ? (value as GmLeaderboardSort) : null;' `
+    -To '  return value as GmLeaderboardSort;' `
+    -TestName "an absent sort is the default" -Suite $LR
+
+# 42. One request pulls the whole board.
+$results += Invoke-Probe `
+    -Name "Page size uncapped" `
+    -File $LBRULES `
+    -From 'size > GM_LEADERBOARD_MAX_PAGE_SIZE' `
+    -To 'size > 100000' `
+    -TestName "pages are whole positive numbers" -Suite $LR
+
+# 43. D1 broken on the board: a Join button beside another Game Master.
+$results += Invoke-Probe `
+    -Name "Locked row offered as joinable" `
+    -File $LBRULES `
+    -From '  if (decision.code === "already_affiliated_other") return "locked";' `
+    -To '  if (decision.code === "already_affiliated_other") return "joinable";' `
+    -TestName "paused current GM locks" -Suite $LR
+
+# 44. Ties stop sharing a rank.
+$results += Invoke-Probe `
+    -Name "Ties ranked apart" `
+    -File $LBRULES `
+    -From '    if (!prev || prev.activeAffiliates !== row.activeAffiliates || prev.affiliates !== row.affiliates) {' `
+    -To '    if (true) {' `
+    -TestName "ranks by active affiliates then affiliates" -Suite $LR
+
+# 45. A refusal reported with a success status.
+$results += Invoke-Probe `
+    -Name "Refusal mapped to 200" `
+    -File $LBRULES `
+    -From '  ["already_affiliated_other", 409],' `
+    -To '  ["already_affiliated_other", 200],' `
+    -TestName "maps each refusal to its status" -Suite $LR
+
+# 46. The join is not rate-limited.
+$results += Invoke-Probe `
+    -Name "Join rate limit ignored" `
+    -File $JOIN `
+    -From '    if (!limit.success) {' `
+    -To '    if (false) {' `
+    -TestName "rate-limits the eleventh attempt" -Suite $LJ
+
+# 47. The join works while the feature is switched off.
+$results += Invoke-Probe `
+    -Name "Join ignores the switch" `
+    -File $JOIN `
+    -From '    if (!(await isGmJoinEnabled())) {' `
+    -To '    if (false) {' `
+    -TestName "refuses a signed-out caller and stays dark while the switch is off" -Suite $LJ
+
+# 48. The board is readable while the feature is switched off.
+$results += Invoke-Probe `
+    -Name "Leaderboard ignores the switch" `
+    -File $LBR `
+    -From '    if (!(await isGmJoinEnabled())) {' `
+    -To '    if (false) {' `
+    -TestName "is dark by default" -Suite $LJ
+
+# 49. The switch fails open on a legacy string.
+$results += Invoke-Probe `
+    -Name "Switch reads truthiness" `
+    -File "lib/services/gamemaster/gm-program-flags.ts" `
+    -From '    return doc?.gmJoinEnabled === true;' `
+    -To '    return Boolean(doc?.gmJoinEnabled);' `
+    -TestName "is dark by default" -Suite $LJ
+
+# 50. A row is spread rather than built from the key list, and a money field rides along.
+$results += Invoke-Probe `
+    -Name "Public row spread with earnings" `
+    -File "lib/services/gamemaster/gm-leaderboard.service.ts" `
+    -From '  for (const key of GM_LEADERBOARD_ROW_KEYS) out[key] = source.get(key);' `
+    -To '  Object.assign(out, row, { totalEarnings: 999 }); void source;' `
+    -TestName "rows carry exactly the public keys" -Suite $LJ
+
+# 51. A paused Game Master is listed (D7).
+$results += Invoke-Probe `
+    -Name "Paused GM listed" `
+    -File $LBMET `
+    -From '    isPaused: { $ne: true },' `
+    -To '' `
+    -TestName "counts affiliates, active affiliates and contests" -Suite $LJ
+
+# 52. The String/ObjectId boundary: every seat looks like a seat in no contest.
+$results += Invoke-Probe `
+    -Name "Seat competitionId not converted" `
+    -File $LBMET `
+    -From '          cid: { $convert: { input: "$competitionId", to: "objectId", onError: null, onNull: null } },' `
+    -To '          cid: "$competitionId",' `
+    -TestName "counts affiliates, active affiliates and contests" -Suite $LJ
+
+# 53. Drafts counted as contests created.
+$results += Invoke-Probe `
+    -Name "Drafts counted" `
+    -File $LBMET `
+    -From '      { $match: { gameMasterId: { $in: gmIds }, status: { $ne: "draft" } } },' `
+    -To '      { $match: { gameMasterId: { $in: gmIds } } },' `
+    -TestName "counts affiliates, active affiliates and contests" -Suite $LJ
+
+# 54. The route calls the referral-link channel, which needs no consent and allows paused GMs.
+$results += Invoke-Probe `
+    -Name "Join route uses the referral channel" `
+    -File $JOIN `
+    -From '      channel: "chartvolt_join_gm",' `
+    -To '      channel: "gm_referral_link",' `
+    -TestName "refuses a bad body and a join without consent" -Suite $LJ
+
+# 55. The admin switch route writes any field it is sent.
+$results += Invoke-Probe `
+    -Name "Admin switch allow-list bypassed" `
+    -File "apps/admin/app/api/gamemasters/program-settings/route.ts" `
+    -From '      if (!PROGRAM_SWITCHES.has(key)) {' `
+    -To '      if (false) {' `
+    -TestName "the admin switch route is section-granted" -Suite $LR
+
+# 56. The player board opened from a link while the switch is off.
+$results += Invoke-Probe `
+    -Name "GM board reachable by query string" `
+    -File "components/leaderboard/LeaderboardClient.tsx" `
+    -From '    if (q === GM_BOARD && gmBoardEnabled) return q;' `
+    -To '    if (q === GM_BOARD) return q;' `
+    -TestName "the player board is offered only when the switch is on" -Suite $LR
+
+# 57. Consent recorded against the subscription id, which affiliate() never matches.
+$results += Invoke-Probe `
+    -Name "Consent recorded against the subscription" `
+    -File "components/leaderboard/GameMasterLeaderboard.tsx" `
+    -From 'recordedContext={{ gameMasterId: joining.gameMasterUserId }}' `
+    -To 'recordedContext={{ gameMasterId: joining.subscriptionId }}' `
+    -TestName "the board records consent against the Game Master user id" -Suite $LR
+
+# 58. The client-imported rules module reaches a model (R58).
+$results += Invoke-Probe `
+    -Name "Leaderboard rules import a model" `
+    -File $LBRULES `
+    -From 'import { decideAffiliation, type AffiliationGameMasterFacts } from "./affiliation-rules";' `
+    -To 'import { decideAffiliation, type AffiliationGameMasterFacts } from "./affiliation-rules";
+import "@/database/models/user-referral.model";' `
+    -TestName "the leaderboard rules module reaches no model" -Suite $LR
 
 Write-Host ""
 Write-Host "================ SUMMARY ================"
