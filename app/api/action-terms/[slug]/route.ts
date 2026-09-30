@@ -32,10 +32,24 @@ export async function GET(
       console.warn("⚠️ [action-terms] DB lookup failed, will try fallback:", dbError);
     }
 
+    // Reason: an unversioned consent page cannot say which wording was agreed to, so it is
+    // as unavailable as a missing one - the acceptance route would refuse it anyway, and
+    // showing the dialog first only to fail on "I Accept" is worse than saying so up front.
+    const requiresLive = DEFAULT_ACTION_TERMS.some(
+      (p) => p.slug === slug && p.requiresLivePage === true,
+    );
+    if (page && requiresLive && !(typeof page.version === "string" && page.version.trim())) {
+      page = null;
+    }
+
     // Reason: Fall back to hardcoded defaults if the DB page doesn't exist.
     // This covers the gap between deploy and first seed run.
     if (!page) {
-      const fallback = DEFAULT_ACTION_TERMS.find((p) => p.slug === slug);
+      // Reason: a consent page (`requiresLivePage`, the Gamemaster terms) fails closed -
+      // missing or deactivated, there is no wording a player may agree to (`24` s5.4).
+      const fallback = DEFAULT_ACTION_TERMS.find(
+        (p) => p.slug === slug && p.requiresLivePage !== true,
+      );
       if (fallback) {
         return NextResponse.json({
           success: true,
@@ -67,6 +81,7 @@ export async function GET(
         // Reason: Client uses this to decide caching strategy:
         // true = session-only cache, false = permanent (check server-side acceptance)
         showEveryTime: page.showEveryTime ?? true,
+        version: typeof page.version === "string" ? page.version : undefined,
       },
     });
   } catch (error) {

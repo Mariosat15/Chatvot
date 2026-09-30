@@ -35,7 +35,9 @@ export interface ISitePage extends Document {
    */
   showEveryTime: boolean;
   /**
-   * Operator-set wording version (e.g. "1.0", "2026-09-30"). Stamped on every
+   * Wording version (e.g. "1", "2.1"). Written "operator-set" until 30 Sep 2026: for an
+   * `action_terms` page the admin PUT now bumps it on every wording change and never reads
+   * it from the request (`24` s5, step 3). Stamped on every
    * `TermsAcceptance` so a changed page can require re-acceptance (`24` s2.4). Absent on
    * pages that have never been versioned; readers treat that as "unversioned", never "1".
    */

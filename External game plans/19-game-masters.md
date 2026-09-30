@@ -26,7 +26,7 @@ rather than how it is assumed to work.
 |---|---|---|
 | `gamemastersubscriptions` | `database/models/gamemaster/gamemaster-subscription.model.ts` | One subscription per user - tier, limits, referral code, counters |
 | `gamemasterearnings` | `database/models/gamemaster/gamemaster-earning.model.ts` | One row per earning event, per referred player |
-| `userreferrals` | `database/models/user-referral.model.ts` | Which Game Master referred which player. **The source of truth for attribution**. Since 30 Sep 2026 every new row is written by `affiliate()` in `lib/services/gamemaster/affiliation.service.ts` (`24` s3), sign-up included; a structural test refuses any other writer outside named exceptions |
+| `userreferrals` | `database/models/user-referral.model.ts` | Which Game Master referred which player. **The source of truth for attribution**. Since 30 Sep 2026 every new row is written by `affiliate()` in `lib/services/gamemaster/affiliation.service.ts` (`24` s3), sign-up included; a structural test refuses any other writer outside named exceptions. Since step 3 (`24` s5) a Join GM row requires a verified acceptance of the Gamemaster terms and carries `termsAcceptanceId` / `termsSlug` / `termsVersion`; referral-link rows still need none (the sign-up checkbox is deferred) |
 
 **None of these has an `apps/admin/` mirror.** The admin app reaches the same collections
 through the raw MongoDB driver instead. That is a different failure mode from the mirror

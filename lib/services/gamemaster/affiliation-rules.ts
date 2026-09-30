@@ -18,7 +18,11 @@ export type AffiliationRefusalCode =
   | "gm_not_found"
   | "gm_not_joinable"
   | "already_affiliated_other"
-  | "user_not_found";
+  | "user_not_found"
+  // Step 3 (`24` s5): consent to the Gamemaster terms, checked by `affiliate()`.
+  | "terms_unavailable"
+  | "terms_not_accepted"
+  | "terms_outdated";
 
 export type PreviousAffiliationEnd = "gm_expired" | "gm_deleted";
 

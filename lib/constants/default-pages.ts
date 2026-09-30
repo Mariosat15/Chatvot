@@ -18,6 +18,8 @@
  * would change what users already accepted without a new acceptance record.
  */
 
+import { GM_AFFILIATION_TERMS_PAGE } from "./gm-affiliation-terms-page";
+
 export type DefaultPageCategory = "page" | "action_terms";
 
 export interface DefaultPageSection {
@@ -41,6 +43,17 @@ export interface DefaultPage {
    * false = show only once ever per user
    */
   showEveryTime?: boolean;
+  /**
+   * Wording version stamped on every acceptance (`External game plans/24` s2.4). Omitted
+   * pages stay unversioned until an admin edits them; the admin editor owns bumping it.
+   */
+  version?: string;
+  /**
+   * Never serve this page from the built-in fallback when the database has no usable copy.
+   * Reason: consent pages (s5.4) must fail closed - agreeing to built-in text records
+   * consent to wording that has no version and may have been withdrawn by the operator.
+   */
+  requiresLivePage?: boolean;
   seoTitle: string;
   seoDescription: string;
   sections: DefaultPageSection[];
@@ -638,6 +651,7 @@ export const DEFAULT_ACTION_TERMS: DefaultPage[] = [
   ACTION_TERMS_MARKETPLACE,
   ACTION_TERMS_COMPETITION,
   ACTION_TERMS_CHALLENGE,
+  GM_AFFILIATION_TERMS_PAGE,
 ];
 
 /** All default pages combined (for backward compatibility with seed logic) */

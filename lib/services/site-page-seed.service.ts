@@ -39,9 +39,25 @@ function toSeedDoc(page: DefaultPage) {
     isSystem: page.isSystem,
     category: page.category || "page",
     showEveryTime: page.showEveryTime ?? true,
+    // Reason: only written when the source declares one - an unversioned page stays
+    // unversioned rather than claiming a version nobody assigned (s2.4).
+    ...(typeof page.version === "string" && page.version ? { version: page.version } : {}),
     seoTitle: page.seoTitle || "",
     seoDescription: page.seoDescription || "",
   };
+}
+
+/**
+ * Saved defaults plus any built-in system page the file predates.
+ * Reason: `pages.json` is a snapshot of the database on the day an operator saved it, so a
+ * system page added to the constants later (the Gamemaster terms, `24` s5.1) would never be
+ * seeded on any deployment that has saved defaults - and Join GM fails closed without it.
+ * Only missing slugs are added; nothing in the file is overridden.
+ */
+export function withMissingSystemPages(saved: DefaultPage[]): DefaultPage[] {
+  const present = new Set(saved.map((p) => p.slug));
+  const missing = ALL_DEFAULT_PAGES.filter((p) => p.isSystem && !present.has(p.slug));
+  return missing.length > 0 ? [...saved, ...missing] : saved;
 }
 
 /**
@@ -63,7 +79,9 @@ export async function seedSitePages(): Promise<void> {
 
     // Determine source: saved defaults or hardcoded constants
     const savedDefaults = getDefaultPagesFromFile();
-    const source = savedDefaults ?? ALL_DEFAULT_PAGES;
+    const source = savedDefaults
+      ? withMissingSystemPages(savedDefaults)
+      : ALL_DEFAULT_PAGES;
     const sourceName = savedDefaults ? "saved defaults" : "constants";
 
     if (existingCount === 0) {

@@ -915,6 +915,56 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 30 Sep 2026 - Gamemaster Program v2 step 3 built: the terms page and which version was accepted
+
+A new system page, `terms-gamemaster-affiliation` (version "1"), is seeded on startup. It is
+editable in Admin -> Site Pages. Accepting it through `POST /api/terms-acceptance` with
+`context.gameMasterId` records the page's **current version** and the Game Master, writes a
+`gm_terms_accepted` audit row, and returns the acceptance id. `affiliate()` now requires that
+id for Join GM and stamps `termsAcceptanceId` / `termsSlug` / `termsVersion` on the affiliation.
+The details are in the BUILT note under `24` s5. **Nothing was computed wrongly, there is no
+risk number, nothing was backfilled, and nothing is player-visible yet** - no screen offers
+Join GM until step 4.
+
+**What an acceptance proves, each clause with a test:**
+- It is for this player, this slug and this Game Master; consent to GM_2 does not join GM_1.
+- It matches the page's live version, so an edited page invalidates earlier consent.
+- It is less than 30 minutes old, with 60 seconds of clock skew tolerated.
+- The page is live. Missing, deactivated or unversioned all refuse, and a refusal is audited
+  as `gm_affiliation_refused` with nothing else written.
+
+**Deviations from `24` s5, recorded rather than absorbed:**
+- **The version is bumped by the server.** The admin PUT raises it on any wording change to an
+  `action_terms` page and never reads `body.version`. Toggling on/off does not bump it. The
+  `SitePage` comment that called it "operator-set" was corrected in both copies.
+- **Fail closed is wider than 5.4 said.** The public route serves no built-in fallback for this
+  page (`requiresLivePage`), so missing and unversioned count as unavailable too. Every other
+  action-terms page still falls back.
+- **5.3, the sign-up checkbox, is deferred.** The referral link still needs no consent; it is
+  verified on that channel only when an id is supplied.
+- **`withMissingSystemPages` was added**, because a saved `data/defaults/pages.json` older than
+  this page would otherwise never seed it. It adds missing system pages only.
+- The dialog gained a **recorded mode** (awaits the POST, never caches, passes the id to
+  `onAccept`) and `{{name}}` interpolation that HTML-escapes the value in HTML sections, since
+  a Game Master's name is user-controlled and those sections render as HTML.
+
+**Recorded, not fixed:** the admin `seedPagesFromDefaults` deletes and reinserts from its own
+list, so running it can drop the GM page until the main app's startup seeder re-adds it. Join
+GM refuses meanwhile, which is the safe direction.
+
+**Checks:**
+- 26 new tests; 310 pass across the 17 related suites.
+- 38 of 38 probes are red on exactly one test (12 new, numbered 29-40). One probe is
+  deliberately absent: the route's 400 for a missing Game Master and the service's
+  `invalid_input` cover each other.
+- `check:mirrors` is OK.
+- Both typechecks match their baselines exactly (228 main, 244 admin), with no error in any
+  touched file.
+- Lint on every touched file passes at `--max-warnings=0`.
+
+**Next:** step 4, the Join GM API and the Gamemaster leaderboard, behind
+`WhiteLabel.gmJoinEnabled` (default false). The recorded dialog gets its first caller there.
+
 ### 30 Sep 2026 - Gamemaster Program v2 step 2 built: one door for every affiliation
 
 `lib/services/gamemaster/affiliation.service.ts` (`affiliate`, `getAffiliation`) is now the

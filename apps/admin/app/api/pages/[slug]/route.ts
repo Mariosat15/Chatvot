@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import SitePage from "@/database/models/site-page.model";
+import { hasTermsContentChanged, nextTermsVersion } from "@/lib/admin/site-page-version";
 
 /**
  * GET /api/pages/:slug — Fetch a single site page by slug (admin).
@@ -61,6 +62,12 @@ export async function PUT(
       );
     }
 
+    const before = {
+      title: page.title,
+      subtitle: page.subtitle,
+      sections: page.toObject().sections,
+    };
+
     // Update allowed fields
     if (body.title !== undefined) page.title = body.title;
     if (body.subtitle !== undefined) page.subtitle = body.subtitle;
@@ -72,6 +79,19 @@ export async function PUT(
       page.seoDescription = body.seoDescription;
     if (body.lastUpdatedBy !== undefined)
       page.lastUpdatedBy = body.lastUpdatedBy;
+
+    // Reason: an action-terms acceptance is proven against the page version (`24` s5.2),
+    // so changed wording must carry a new one. `body.version` is deliberately never read.
+    if (
+      page.category === "action_terms" &&
+      hasTermsContentChanged(before, {
+        title: page.title,
+        subtitle: page.subtitle,
+        sections: page.toObject().sections,
+      })
+    ) {
+      page.version = nextTermsVersion(page.version);
+    }
 
     await page.save();
 

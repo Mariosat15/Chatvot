@@ -310,6 +310,114 @@ $results += Invoke-Probe `
     -To '            { $inc: { activeReferredUsers: 0 } },' `
     -TestName "an expired previous Game Master frees the player" -Suite $AS
 
+# ---- Step 3: Game Master terms and the accepted version ---------------------------------
+$TS = "__tests__/services/gm-terms.test.ts"
+$RULES = "lib/services/gamemaster/gm-terms-rules.ts"
+$TERMS = "lib/services/gamemaster/gm-terms.service.ts"
+$ATR = "app/api/action-terms/[slug]/route.ts"
+$VER = "apps/admin/lib/admin/site-page-version.ts"
+$APUT = "apps/admin/app/api/pages/[slug]/route.ts"
+
+# 29. A deactivated page still counts as live.
+$results += Invoke-Probe `
+    -Name "Inactive terms page treated as live" `
+    -File $RULES `
+    -From '  if (!page || page.isActive !== true) return undefined;' `
+    -To '  if (!page) return undefined;' `
+    -TestName "a page is live only while active AND versioned" -Suite $TS
+
+# 30. Consent to one Game Master accepted for another.
+$results += Invoke-Probe `
+    -Name "Game Master id not compared" `
+    -File $RULES `
+    -From '  if (acceptance.gameMasterId !== gameMasterId) return notAccepted;' `
+    -To '' `
+    -TestName "Join GM with consent to ANOTHER Game Master is refused" -Suite $TS
+
+# 31. Old wording still counts after an edit.
+$results += Invoke-Probe `
+    -Name "Version not compared" `
+    -File $RULES `
+    -From '  if (acceptance.termsVersion !== live.version) return outdated;' `
+    -To '' `
+    -TestName "verification follows the live version" -Suite $TS
+
+# 32. A week-old acceptance replayed for a join.
+$results += Invoke-Probe `
+    -Name "Acceptance age not bounded" `
+    -File $RULES `
+    -From 'if (age > GM_TERMS_ACCEPTANCE_MAX_AGE_MS || age < -FUTURE_SKEW_MS) return outdated;' `
+    -To 'if (age < -FUTURE_SKEW_MS) return outdated;' `
+    -TestName "changed wording or a stale acceptance is outdated" -Suite $TS
+
+# 33. The Game Master's name reaches dangerouslySetInnerHTML unescaped.
+$results += Invoke-Probe `
+    -Name "HTML sections not escaped" `
+    -File $RULES `
+    -From '    return html ? escapeHtml(value) : value;' `
+    -To '    return value;' `
+    -TestName "interpolation escapes HTML only in HTML sections" -Suite $TS
+
+# 34. The built-in text is served for the consent page after all.
+$results += Invoke-Probe `
+    -Name "Fallback allowed for a requiresLivePage page" `
+    -File $ATR `
+    -From '        (p) => p.slug === slug && p.requiresLivePage !== true,' `
+    -To '        (p) => p.slug === slug,' `
+    -TestName "the public terms route has NO built-in fallback" -Suite $TS
+
+# 35. Join GM skips the consent check.
+$results += Invoke-Probe `
+    -Name "Affiliate skips terms verification" `
+    -File $SVC `
+    -From '      if (input.channel === "chartvolt_join_gm" || input.termsAcceptanceId !== undefined) {' `
+    -To '      if (input.termsAcceptanceId !== undefined) {' `
+    -TestName "Join GM without consent is refused" -Suite $TS
+
+# 36. The accepted version never reaches the affiliation row.
+$results += Invoke-Probe `
+    -Name "Affiliation not stamped with the version" `
+    -File $SVC `
+    -From '                  termsVersion: terms.termsVersion,' `
+    -To '' `
+    -TestName "Join GM with valid consent stamps the acceptance" -Suite $TS
+
+# 37. The acceptance itself does not record the version.
+$results += Invoke-Probe `
+    -Name "Acceptance row not stamped with the version" `
+    -File $TERMS `
+    -From '      termsVersion: live.version,' `
+    -To '' `
+    -TestName "records the version and Game Master" -Suite $TS
+
+# 38. Editing the sections of a consent page leaves the version alone.
+$results += Invoke-Probe `
+    -Name "Version bump ignores sections" `
+    -File $VER `
+    -From '    JSON.stringify(normaliseSections(before.sections)) !==' `
+    -To '    JSON.stringify(normaliseSections(before.sections)) !== JSON.stringify(normaliseSections(before.sections)) && "" !==' `
+    -TestName "any wording change is a change" -Suite $TS
+
+# 39. The admin PUT takes the version from the request body.
+$results += Invoke-Probe `
+    -Name "Admin PUT reads body.version" `
+    -File $APUT `
+    -From '      page.version = nextTermsVersion(page.version);' `
+    -To '      page.version = body.version ?? nextTermsVersion(page.version);' `
+    -TestName "the admin PUT bumps action-terms pages" -Suite $TS
+
+# 40. A saved pages.json predating the Game Master page never seeds it.
+$results += Invoke-Probe `
+    -Name "Seeder drops missing system pages" `
+    -File "lib/services/site-page-seed.service.ts" `
+    -From '  return missing.length > 0 ? [...saved, ...missing] : saved;' `
+    -To '  return saved;' `
+    -TestName "the seeder adds a system page that saved defaults predate" -Suite $TS
+
+# Deliberately unprobed: the acceptance route's own 400 for a missing Game Master. Removing it
+# hands `undefined` to recordGmTermsAcceptance, whose `invalid_input` also maps to 400, so the
+# two guards cover each other and a probe of either alone stays green (R42's shape).
+
 Write-Host ""
 Write-Host "================ SUMMARY ================"
 $results | Format-Table -AutoSize

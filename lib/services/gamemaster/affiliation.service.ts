@@ -12,6 +12,7 @@ import {
   type AffiliationRefusalCode,
   type PreviousAffiliationEnd,
 } from "./affiliation-rules";
+import { verifyGmTermsAcceptance } from "./gm-terms.service";
 
 /**
  * The ONE writer of a player's Game Master affiliation (`External game plans/24` s3).
@@ -39,6 +40,11 @@ export interface AffiliateInput {
   competitionId?: string;
   ipAddress?: string;
   userAgent?: string;
+  /**
+   * The `TermsAcceptance` id from the Gamemaster terms dialog. Required for Join GM; when
+   * supplied on any channel it is verified and stamped on the row (`24` s3, s5).
+   */
+  termsAcceptanceId?: string;
 }
 
 export type AffiliateResult =
@@ -298,6 +304,34 @@ export async function affiliate(input: AffiliateInput): Promise<AffiliateResult>
       }
 
       const gmSub = gmDoc as unknown as { _id: unknown; userId: string; userEmail?: string; referralCode: string };
+
+      // Reason: consent is checked only once the rules say a row WOULD be created, so an
+      // idempotent repeat or a D1 refusal never asks for terms, and before any write, so a
+      // refusal leaves nothing behind. Join GM always needs it; the referral link has no
+      // dialog yet (s5.3) and is checked only when an id is actually supplied.
+      let terms: { termsAcceptanceId: string; termsSlug: string; termsVersion: string } | undefined;
+      if (input.channel === "chartvolt_join_gm" || input.termsAcceptanceId !== undefined) {
+        const verdict = await verifyGmTermsAcceptance({
+          acceptanceId: input.termsAcceptanceId,
+          userId,
+          gameMasterId: gmSub.userId,
+        });
+        if (!verdict.ok) {
+          await session.abortTransaction();
+          if (verdict.code === "error") {
+            return { success: false, code: "error", error: verdict.message };
+          }
+          await writeAudit(auditInput, "gm_affiliation_refused", verdict.message, {
+            code: verdict.code,
+            reason: verdict.message,
+            gameMasterId: gmSub.userId,
+            termsAcceptanceId: input.termsAcceptanceId,
+          });
+          return { success: false, code: verdict.code, error: verdict.message };
+        }
+        terms = verdict;
+      }
+
       const now = new Date();
 
       if (decision.endPrevious && activeRow) {
@@ -332,6 +366,13 @@ export async function affiliate(input: AffiliateInput): Promise<AffiliateResult>
             // Reason: `source` has no schema default by design (s2.1) - the writer states
             // how the affiliation happened, permanently.
             source: input.channel,
+            ...(terms
+              ? {
+                  termsAcceptanceId: terms.termsAcceptanceId,
+                  termsSlug: terms.termsSlug,
+                  termsVersion: terms.termsVersion,
+                }
+              : {}),
             affiliatedVia: {
               surface,
               ...(input.competitionId ? { competitionId: input.competitionId } : {}),

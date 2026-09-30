@@ -17,6 +17,10 @@ import {
   CheckCircle2,
   ChevronDown,
 } from "lucide-react";
+import {
+  GM_AFFILIATION_TERMS_SLUG,
+  interpolateTermsText,
+} from "@/lib/services/gamemaster/gm-terms-rules";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 interface TermsSection {
@@ -41,10 +45,18 @@ interface ActionTermsDialogProps {
   slug: string;
   /** Whether the dialog is open */
   open: boolean;
-  /** Called when user accepts the terms */
-  onAccept: () => void;
+  /** Called when user accepts the terms. Recorded mode passes the stored acceptance id. */
+  onAccept: (acceptanceId?: string) => void;
   /** Called when user declines/closes the dialog */
   onDecline: () => void;
+  /** Values for `{{name}}` placeholders in the page copy (e.g. `gameMasterName`). */
+  variables?: Record<string, string>;
+  /**
+   * Recorded mode, for consent the server must be able to prove (Gamemaster terms, `24` s5).
+   * The dialog is always shown, nothing is cached, and `onAccept` fires only once the
+   * server has stored the acceptance - with its id, which the join then presents.
+   */
+  recordedContext?: { gameMasterId: string; competitionId?: string };
 }
 
 // ─── Permanent Acceptance Helpers (for "once only" mode) ────────────────────
@@ -94,10 +106,16 @@ export default function ActionTermsDialog({
   open,
   onAccept,
   onDecline,
+  variables,
+  recordedContext,
 }: ActionTermsDialogProps) {
   const [terms, setTerms] = useState<TermsData | null>(null);
   const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const isRecorded = recordedContext !== undefined;
+  const fill = (value: string, html = false) =>
+    interpolateTermsText(value, variables ?? {}, html);
   const [checked, setChecked] = useState(false);
   const [hasScrolledToBottom, setHasScrolledToBottom] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -121,7 +139,9 @@ export default function ActionTermsDialog({
 
       try {
         // ── Step 1: Get terms data (from cache or API) ─────────────────
-        let termsData = termsCache.get(slug);
+        // Reason: recorded consent is checked against the CURRENT version, so a cached
+        // copy could show wording the server no longer accepts.
+        let termsData = isRecorded ? undefined : termsCache.get(slug);
         if (!termsData) {
           const res = await fetch(
             `/api/action-terms/${encodeURIComponent(slug)}`,
@@ -130,7 +150,7 @@ export default function ActionTermsDialog({
           if (cancelled) return;
           if (data.success && data.terms) {
             termsData = data.terms;
-            termsCache.set(slug, termsData!);
+            if (!isRecorded) termsCache.set(slug, termsData!);
           } else {
             setError(data.error || "Terms not available");
             return;
@@ -138,14 +158,18 @@ export default function ActionTermsDialog({
         }
 
         // ── Step 2: Evaluate based on showEveryTime flag ───────────────
-        const isEveryTime = termsData!.showEveryTime !== false; // default true
+        // Reason: recorded mode never skips - an earlier acceptance was given to a
+        // different Game Master or wording, so it proves nothing about this join.
+        const isEveryTime = isRecorded || termsData!.showEveryTime !== false; // default true
 
         if (isEveryTime) {
           // Reason: "Every Time" mode — admin wants the popup on EVERY action.
           // No caching whatsoever. Always show the terms dialog.
           // Also clear any stale permanent acceptance from a previous "once only" setting.
-          clearPermanentAcceptance(slug);
-          serverAcceptanceCache.delete(slug);
+          if (!isRecorded) {
+            clearPermanentAcceptance(slug);
+            serverAcceptanceCache.delete(slug);
+          }
 
           if (!cancelled) setTerms(termsData!);
           return;
@@ -195,7 +219,7 @@ export default function ActionTermsDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, slug]);
+  }, [open, slug, isRecorded]);
 
   // Track scroll position
   const handleScroll = useCallback(() => {
@@ -222,7 +246,34 @@ export default function ActionTermsDialog({
     return () => clearTimeout(timer);
   }, [open, terms]);
 
+  const handleAcceptRecorded = async () => {
+    // Reason: the join refuses without a stored acceptance, so firing and forgetting here
+    // would let a lost POST turn into a confusing refusal one step later.
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/terms-acceptance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug, context: recordedContext }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.success || typeof data.acceptanceId !== "string") {
+        setError(data?.error || "Something went wrong. Please contact support.");
+        return;
+      }
+      onAccept(data.acceptanceId);
+    } catch {
+      setError("Something went wrong. Please contact support.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleAccept = () => {
+    if (isRecorded) {
+      void handleAcceptRecorded();
+      return;
+    }
     // Reason: Only persist acceptance for "once only" mode.
     // "Every time" mode should NEVER cache — dialog must show on every action.
     if (terms?.showEveryTime === false) {
@@ -252,7 +303,7 @@ export default function ActionTermsDialog({
             key={section.id}
             className="text-sm font-bold text-gray-100 mt-4 mb-2"
           >
-            {section.title || section.content}
+            {fill(section.title || section.content)}
           </h3>
         );
       case "paragraph":
@@ -261,7 +312,7 @@ export default function ActionTermsDialog({
             key={section.id}
             className="text-xs text-gray-300 leading-relaxed mb-3"
           >
-            {section.content}
+            {fill(section.content)}
           </p>
         );
       case "list":
@@ -270,7 +321,7 @@ export default function ActionTermsDialog({
             key={section.id}
             className="text-xs text-gray-300 space-y-1.5 mb-3 ml-4"
           >
-            {section.content.split("\n").map((item, i) => (
+            {fill(section.content).split("\n").map((item, i) => (
               <li key={i} className="flex items-start gap-2">
                 <span className="text-yellow-500 mt-0.5 shrink-0">•</span>
                 <span className="leading-relaxed">{item}</span>
@@ -290,7 +341,9 @@ export default function ActionTermsDialog({
           <div
             key={section.id}
             className="text-xs text-gray-300 mb-3"
-            dangerouslySetInnerHTML={{ __html: section.content }}
+            // Reason: substituted values are HTML-escaped - a Game Master chooses their own
+            // display name, and it must not become markup inside another player's dialog.
+            dangerouslySetInnerHTML={{ __html: fill(section.content, true) }}
           />
         );
       default:
@@ -307,11 +360,11 @@ export default function ActionTermsDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-gray-100">
             <ScrollText className="h-5 w-5 text-yellow-500" />
-            {terms?.title || "Terms & Conditions"}
+            {terms?.title ? fill(terms.title) : "Terms & Conditions"}
           </DialogTitle>
           {terms?.subtitle && (
             <DialogDescription className="text-gray-400">
-              {terms.subtitle}
+              {fill(terms.subtitle)}
             </DialogDescription>
           )}
         </DialogHeader>
@@ -392,10 +445,14 @@ export default function ActionTermsDialog({
               <Button
                 type="button"
                 onClick={handleAccept}
-                disabled={!checked}
+                disabled={!checked || submitting}
                 className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-semibold disabled:opacity-50"
               >
-                <CheckCircle2 className="h-4 w-4 mr-2" />
+                {submitting ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                )}
                 I Accept
               </Button>
             </div>
@@ -416,4 +473,6 @@ export const ACTION_TERM_SLUGS = {
   MARKETPLACE: "terms-marketplace",
   COMPETITION_ENTRY: "terms-competition-entry",
   CHALLENGE: "terms-challenge",
+  // Recorded consent: open with `recordedContext` (`24` s5).
+  GM_AFFILIATION: GM_AFFILIATION_TERMS_SLUG,
 } as const;

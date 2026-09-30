@@ -1,6 +1,6 @@
 # 24 - Game Master Program v2: private contests, Join GM, leaderboard, terms, admin reporting
 
-**Status (30 September 2026): steps 0, 1 and 2 BUILT; steps 3-8 are plan only.** This line
+**Status (30 September 2026): steps 0, 1, 2 and 3 BUILT; steps 4-8 are plan only.** This line
 read "PLAN ONLY ... Nothing in this chapter is built" until step 0 shipped - correct as
 history, stale as a present fact.
 Owner brief of 30 Sep 2026, sections 1-5 plus source tracking, filters, exports and the
@@ -204,6 +204,53 @@ The rule: **a `gm_private` contest can be entered, and its details read, only by
 
 ## 5. Gamemaster Affiliation Terms
 
+> **BUILT 30 Sep 2026 (step 3) - read the code, not this section.** Live code:
+> `lib/services/gamemaster/gm-terms-rules.ts` (pure, **model-free by requirement** - the
+> `"use client"` dialog imports the slug from it, R58), `lib/services/gamemaster/gm-terms.service.ts`
+> (main app only - R42, nothing in `apps/admin` calls it), `lib/constants/gm-affiliation-terms-page.ts`,
+> `withMissingSystemPages` in `lib/services/site-page-seed.service.ts`, the GM branch of
+> `app/api/terms-acceptance/route.ts`, the no-fallback rule in `app/api/action-terms/[slug]/route.ts`,
+> the recorded mode of `components/ActionTermsDialog.tsx`, and `apps/admin/lib/admin/site-page-version.ts`
+> used by the admin `PUT /api/pages/[slug]`. 26 tests in `__tests__/services/gm-terms.test.ts`,
+> probes 29-40 in `tools/probe-gm-program.ps1` (38 of 38 red on exactly one test). **Nothing is
+> player-visible yet** - no screen offers Join GM until step 4, so the recorded dialog has no caller.
+>
+> **What an acceptance proves, and every clause is checked:** THIS player, THIS slug, THIS Game
+> Master, THIS version, and less than **30 minutes** old (60s of clock skew tolerated). Each missing
+> clause is a different way to join one Game Master on consent given to something else - an id for
+> GM_2 presented to join GM_1 is a real document proving nothing about this join.
+>
+> **Five deviations from the plan above, recorded rather than absorbed:**
+> - **5.2's "bumped by the admin editor" is done by the SERVER, not the operator.** The PUT bumps
+>   `version` whenever title, subtitle or section content changes on an `action_terms` page, and
+>   **never reads `body.version`**. Left to the operator, one forgotten field keeps every old
+>   acceptance valid against new wording with nothing failing. Toggling `isActive` or
+>   `showEveryTime` changes no words and does **not** bump. The `SitePage` model comment still says
+>   "operator-set"; it is now server-set for `action_terms` pages.
+> - **5.4 is wider than stated: fail closed covers MISSING and UNVERSIONED too, not only
+>   deactivated.** The page definition carries `requiresLivePage: true`, and the public route serves
+>   **no built-in fallback** for it - every other action-terms page still falls back. Serving the
+>   built-in text would record consent to words the operator never published or has withdrawn.
+> - **5.3 (the sign-up checkbox) is DEFERRED.** The referral link therefore still needs no consent;
+>   `affiliate()` verifies an acceptance on that channel only when an id is supplied. Join GM always
+>   requires one. A document saying referral sign-ups now record consent is wrong.
+> - **`withMissingSystemPages` was added**, because the seeder prefers a saved
+>   `data/defaults/pages.json` and one saved before this page existed would never seed it. It adds
+>   missing **system** pages only and overrides nothing.
+> - **Verification is wired into `affiliate()` now** (s3's "must present that id") rather than
+>   waiting for step 4: consent is checked only after the rules say a row would be created, so an
+>   idempotent repeat or a D1 refusal never asks for terms, and before any write, so a refusal leaves
+>   nothing behind. A refusal writes a `gm_affiliation_refused` audit row; a recorded acceptance
+>   writes `gm_terms_accepted`. The affiliation row carries `termsAcceptanceId`, `termsSlug`,
+>   `termsVersion`.
+>
+> **Two things recorded, not fixed.** The admin `seedPagesFromDefaults` does `deleteMany` then
+> `insertMany` from its own list, so running it from Admin can drop the GM page until the main app's
+> startup seeder re-adds it - and while it is gone Join GM refuses, which is the safe direction.
+> One probe is deliberately absent: the acceptance route's own 400 for a missing Game Master is
+> covered by the service's `invalid_input` (also 400), so the two guards cover each other.
+> **Never verified by eye.**
+
 5.1 **Seed** a new default page in `lib/constants/default-pages.ts`: slug `terms-gamemaster-affiliation`, category `action_terms`, title "Gamemaster Affiliation Terms", `showEveryTime: false`, `version: "1"`. Content covers: what affiliation means and that it is permanent unless an admin reassigns; that the GM earns a percentage of the platform fee on the user's paid entries (competitions, and challenges where the package allows), **at no extra cost to the user**; that the GM will see the user's display name, email and country (owner, s1 D6); access to that GM's private contests; that switching GMs is not self-service. Editable in Admin -> Site Pages, **not hard-coded** - the dialog renders the page.
 5.2 **Acceptance flow** reuses `ActionTermsDialog` with the GM's name interpolated as a variable (no per-GM page). POST `/api/terms-acceptance` gains optional `context.gameMasterId`; the route stores `termsVersion` from the live page and returns the acceptance id; the Join GM call must present that id (s3).
 5.3 **Referral-link sign-up**: the sign-up form shows a required "I accept the Gamemaster Affiliation Terms" checkbox **only when `?ref=` is present and resolves to an active GM**; the acceptance is recorded after the user exists. Existing referral users (pre-v2) have no acceptance - D6 keeps their data sharing as today.
@@ -299,7 +346,7 @@ Verification gates: `npm run check:mirrors`, main + admin `tsc --noEmit` diffed 
 | **0** | s0.1 defect fixes + tests. Ships alone | none |
 | **1** (**BUILT 30 Sep 2026**, backfill not yet applied) | Models (s2) + backfill script `tools/gamemaster/backfill-affiliation-source.ts`: sets `source: gm_referral_link` only where missing (absent, `null`, `""` all handled), refuses to overwrite, report-only until `--apply`. Index change only if D4 = yes | none (inert fields) |
 | **2** (**BUILT 30 Sep 2026**) | Central service; sign-up rewired onto it (behaviour identical, pinned by the existing sign-up tests plus new ones) | none |
-| **3** | Terms page seed + acceptance versioning | none |
+| **3** (**BUILT 30 Sep 2026**, sign-up checkbox deferred - see s5) | Terms page seed + acceptance versioning; server-side version bump; Join GM verifies consent | none |
 | **4** | Join GM API + leaderboard | `WhiteLabel.gmJoinEnabled` (default false) |
 | **5** | Visibility permission in packages + creation routes + entry guard + discovery filters | `WhiteLabel.gmPrivateContestsEnabled` (default false). **Entry guard and discovery filters ship ON regardless of the flag** - they are inert while no private contest exists, and a private contest must never exist without them |
 | **6** | Private contest gate + Join GM CTA | same flag |
