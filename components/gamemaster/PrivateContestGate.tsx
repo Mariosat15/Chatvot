@@ -92,7 +92,7 @@ export default function PrivateContestGate({
         </dl>
 
         <p className="mt-5 text-sm text-gray-400">
-          Only players who belong to {gmName} can see and enter this competition.
+          Only players who belong to {gmName} can enter this competition or see its leaderboard.
         </p>
 
         <div className="mt-5">

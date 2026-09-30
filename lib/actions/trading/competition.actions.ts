@@ -21,6 +21,7 @@ import { resolveLevelTitle } from "@/lib/utils/level-title";
 import { isCompetitionIdShaped } from "@/lib/utils/competition-id";
 import { resolveRequestContestViewer } from "@/lib/services/gamemaster/request-contest-viewer";
 import { withVisibleContests } from "@/lib/services/gamemaster/visible-contests";
+import { annotatePrivateContests } from "@/lib/services/gamemaster/private-contest-listing.service";
 
 // Get all competitions with filters
 export const getCompetitions = async (filters?: {
@@ -36,8 +37,9 @@ export const getCompetitions = async (filters?: {
       query.status = filters.status;
     }
 
-    // Reason: private Game Master contests are listed only to that Game Master's affiliated
-    // players (R117). A failed session read lists public contests only, never everything.
+    // Reason: private Game Master contests are listed to every signed-in player (owner
+    // decision 30 Sep 2026) and annotated below with what this viewer may do about one. A
+    // failed session read is anonymous and lists public contests only, never everything.
     const viewer = await resolveRequestContestViewer();
 
     const competitions = await Competition.find(withVisibleContests(query, viewer))
@@ -54,7 +56,8 @@ export const getCompetitions = async (filters?: {
       (c) => !shouldHideUpcomingEmptyDuringOutage(c as never, blocking),
     );
 
-    return JSON.parse(JSON.stringify(visible));
+    const annotated = await annotatePrivateContests(visible, viewer);
+    return JSON.parse(JSON.stringify(annotated));
   } catch (error) {
     console.error("Error getting competitions:", error);
     throw new Error("Failed to get competitions");

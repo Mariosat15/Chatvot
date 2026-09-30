@@ -5,6 +5,7 @@ import CompetitionParticipant from "@/database/models/trading/competition-partic
 import { auth } from "@/lib/better-auth/auth";
 import { resolveContestViewer } from "@/lib/services/gamemaster/contest-viewer.service";
 import { withVisibleContests } from "@/lib/services/gamemaster/visible-contests";
+import { annotatePrivateContests } from "@/lib/services/gamemaster/private-contest-listing.service";
 
 export const dynamic = "force-dynamic";
 
@@ -22,14 +23,17 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch non-draft competitions (capped to prevent unbounded scan). Private Game Master
-    // contests are listed only to that Game Master's affiliated players (R117).
+    // contests are listed to every signed-in player and annotated with what this viewer may
+    // do about each one - the same answer `getCompetitions` gives, since the page refetches here.
     const viewer = await resolveContestViewer(userId);
-    const competitions = await Competition.find(
+    const listed = await Competition.find(
       withVisibleContests({ status: { $ne: "draft" } }, viewer),
     )
       .sort({ startTime: -1 })
       .limit(200)
       .lean();
+    const rows = listed as Array<Record<string, unknown>>;
+    const competitions = await annotatePrivateContests(rows, viewer);
 
     // Get user's participation status if logged in
     let userInCompetitionIds: string[] = [];

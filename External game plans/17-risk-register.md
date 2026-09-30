@@ -5890,6 +5890,17 @@ recorded as unprobed in the harness, with the reason, and the behavioural test p
 
 ### R117 - A private contest leaks through a reader that was never filtered - **MITIGATED 30 Sep 2026 (step 5); direct-link gap CLOSED the same day (step 6)**
 
+> **Amended 30 Sep 2026, owner decision: LISTING a private contest is no longer the leak.**
+> The owner asked for every signed-in player to see private competitions, so a non-member
+> can join the Game Master from the competition. `visibleContestsFilter` now lists every contest
+> to a signed-in viewer and public contests only to an anonymous one. The step-5 rule survives as
+> `enterableContestsFilter`, which game suggestions use. **The risk that remains is the same one
+> in a narrower place:** a private contest's **entry**, **leaderboard** or **per-contest API**
+> reaching a non-member, or an anonymous reader listing one. Both stay covered: entry by
+> `private_not_affiliated`, viewing by `canViewContest`, and anonymous readers pass no viewer.
+> The text below describes the step-5 design. It is correct as history, and stale where it says
+> the lists hide private contests. See `24` s4's owner-directed deviation note.
+
 **What it is.** A `gm_private` contest must be visible and enterable only to players
 affiliated to the Game Master who created it (`24` s4). The platform has many contest
 readers, so the likely failure is one reader nobody filtered. That reader lists the contest

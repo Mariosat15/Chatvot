@@ -8,7 +8,7 @@
 import Competition from "@/database/models/trading/competition.model";
 import { listInterestedGameKeys } from "@/lib/services/games/interest-inference.service";
 import { resolveContestViewer } from "@/lib/services/gamemaster/contest-viewer.service";
-import { withVisibleContests } from "@/lib/services/gamemaster/visible-contests";
+import { withEnterableContests } from "@/lib/services/gamemaster/visible-contests";
 
 export interface GameSuggestion {
   gameKey: string;
@@ -28,12 +28,14 @@ export async function suggestOpenContests(
   if (gameKeys.length === 0) return [];
 
   const now = new Date();
-  // Reason: a suggestion is a list another player sees - a private Game Master contest is
-  // suggested only to that GM's affiliates (R117). `$and`, never a spread: this query has
-  // its own `$or`, which a spread would silently overwrite.
+  // Reason: a suggestion is an invitation, not a listing - a private Game Master contest is
+  // suggested only to that GM's affiliates, even though the lists now show it to everyone
+  // (owner decision 30 Sep 2026). Suggesting a contest the player can never enter, e.g. one
+  // run by a Game Master other than theirs (D1), is noise. `$and`, never a spread: this query
+  // has its own `$or`, which a spread would silently overwrite.
   const viewer = await resolveContestViewer(userId);
   const contests = await Competition.find(
-    withVisibleContests(
+    withEnterableContests(
       {
         gameKey: { $in: gameKeys },
         status: { $in: ["upcoming", "active"] },

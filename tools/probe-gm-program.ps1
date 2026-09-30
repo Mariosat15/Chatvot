@@ -704,15 +704,15 @@ $results += Invoke-Probe `
     -File $VIS `
     -From 'return { $and: [query, visibleContestsFilter(viewer)] };' `
     -To 'return { ...query, ...visibleContestsFilter(viewer) };' `
-    -TestName "keeps the caller's own" -Suite $PD
+    -TestName "keeps the caller's own visibility condition for an anonymous viewer" -Suite $PD
 
 # 72. A Game Master cannot find the private contest they just made.
 $results += Invoke-Probe `
-    -Name "Viewer filter forgets the viewer's own id" `
+    -Name "Enterable filter forgets the viewer's own id" `
     -File $VIS `
     -From '[viewer?.affiliatedGameMasterId, viewer?.userId]' `
     -To '[viewer?.affiliatedGameMasterId]' `
-    -TestName "a Game Master sees their own private contest" -Suite $PD
+    -TestName "a Game Master may enter their own private contest" -Suite $PD
 
 # 73. One reader lists everything again.
 $results += Invoke-Probe `
@@ -986,6 +986,87 @@ $results += Invoke-Probe `
     -From 'typeof rawCompetitionId === "string" && isCompetitionIdShaped(rawCompetitionId)' `
     -To 'typeof rawCompetitionId === "string"' `
     -TestName "ignores a malformed competition id" -Suite $LJ
+
+# ---- Private contests listed to everyone (owner decision 30 Sep 2026) ----
+$PL = "__tests__/services/gm-private-listing.test.ts"
+$PLS = "lib/services/gamemaster/private-contest-listing.service.ts"
+$PCC = "lib/utils/private-contest-card-copy.ts"
+$CARD = "components/trading/CompetitionCard.tsx"
+
+# 105. The step-5 rule comes back: signed-in outsiders stop seeing private contests.
+$results += Invoke-Probe `
+    -Name "Listing filter hides private from signed-in players again" `
+    -File $VIS `
+    -From 'if (nonEmpty(viewer?.userId)) return {};' `
+    -To 'if (nonEmpty(viewer?.userId)) return enterableContestsFilter(viewer);' `
+    -TestName "now sees every private contest LISTED" -Suite $PD
+
+# 106. Anonymous feeds start listing private contests to the internet.
+$results += Invoke-Probe `
+    -Name "Listing filter lists everything to anonymous viewers" `
+    -File $VIS `
+    -From 'if (nonEmpty(viewer?.userId)) return {};' `
+    -To 'return {};' `
+    -TestName "an anonymous viewer is still listed public contests only" -Suite $PD
+
+# 107. Suggestions invite players into contests they can never enter.
+$results += Invoke-Probe `
+    -Name "Suggestions use the listing filter" `
+    -File "lib/services/games/game-suggestions.service.ts" `
+    -From '    withEnterableContests(' `
+    -To '    withVisibleContests(' `
+    -TestName "game-suggestions.service.ts filters its query" -Suite $PD
+
+# 108. Everyone is treated as a member, so the card offers Enter Arena to outsiders.
+$results += Invoke-Probe `
+    -Name "Annotation skips the entry rule" `
+    -File $PLS `
+    -From 'canEnterPrivateContest(contest, viewer?.affiliatedGameMasterId)' `
+    -To 'true' `
+    -TestName "gives anyone else the gate's own state" -Suite $PL
+
+# 109. A gate read per contest instead of per Game Master.
+$results += Invoke-Probe `
+    -Name "Annotation stops caching per Game Master" `
+    -File $PLS `
+    -From '        gates.set(gmId, pending);' `
+    -To '' `
+    -TestName "asks the gate once per Game Master" -Suite $PL
+
+# 110. The page list stops annotating, so the card cannot tell a member from an outsider.
+$results += Invoke-Probe `
+    -Name "getCompetitions stops annotating" `
+    -File "lib/actions/trading/competition.actions.ts" `
+    -From 'const annotated = await annotatePrivateContests(visible, viewer);' `
+    -To 'const annotated = visible;' `
+    -TestName "competition.actions.ts annotates what it lists" -Suite $PL
+
+# 111. A locked player is offered a join the server refuses (D1).
+$results += Invoke-Probe `
+    -Name "Locked copy offers a join" `
+    -File $PCC `
+    -From '        action: "Members only",
+        hint: `Only players under' `
+    -To '        action: "Join GM to enter",
+        hint: `Only players under' `
+    -TestName "never offers a join to a player locked" -Suite $PL
+
+# 112. A seated player is shown the gate instead of Enter Arena (D5).
+$results += Invoke-Probe `
+    -Name "Card ignores the seat" `
+    -File $CARD `
+    -From '        !isUserIn &&
+        competition.privateAccess &&' `
+    -To '        competition.privateAccess &&' `
+    -TestName "the card replaces the entry button for a non-member" -Suite $PL
+
+# 113. The enterable narrowing spreads, so an affiliate's $or replaces the reader's own.
+$results += Invoke-Probe `
+    -Name "withEnterableContests spreads instead of and" `
+    -File $VIS `
+    -From 'return { $and: [query, enterableContestsFilter(viewer)] };' `
+    -To 'return { ...query, ...enterableContestsFilter(viewer) };' `
+    -TestName "withEnterableContests keeps the caller's own" -Suite $PD
 
 Write-Host ""
 Write-Host "================ SUMMARY ================"

@@ -6,7 +6,9 @@ import { startTestMongo, stopTestMongo, clearTestMongo } from "../helpers/mongo-
 import {
   canEnterPrivateContest,
   publicContestsFilter,
+  enterableContestsFilter,
   visibleContestsFilter,
+  withEnterableContests,
   withVisibleContests,
 } from "@/lib/services/gamemaster/visible-contests";
 
@@ -80,24 +82,70 @@ describe("the discovery filters, against real documents", () => {
     );
   });
 
-  it("an affiliated player also sees their Game Master's private contests, and nobody else's", async () => {
+  it("an affiliated player may ENTER their Game Master's private contests, and nobody else's", async () => {
     await seed();
-    const seen = await names(visibleContestsFilter({ userId: PLAYER, affiliatedGameMasterId: GM }));
+    const seen = await names(enterableContestsFilter({ userId: PLAYER, affiliatedGameMasterId: GM }));
     expect(seen).toContain("mine-private");
     expect(seen).not.toContain("other-private");
   });
 
-  it("a Game Master sees their own private contest", async () => {
+  it("a Game Master may enter their own private contest", async () => {
     await seed();
-    const seen = await names(visibleContestsFilter({ userId: GM, affiliatedGameMasterId: null }));
+    const seen = await names(enterableContestsFilter({ userId: GM, affiliatedGameMasterId: null }));
     expect(seen).toContain("mine-private");
     expect(seen).not.toContain("other-private");
   });
 
-  it("an unaffiliated signed-in player sees public contests only", async () => {
+  it("an unaffiliated signed-in player now sees every private contest LISTED, and may enter none", async () => {
     await seed();
-    expect(await names(visibleContestsFilter({ userId: PLAYER, affiliatedGameMasterId: null })))
-      .not.toContain("mine-private");
+    // Reason: this test used to be "an unaffiliated signed-in player sees public contests
+    // only" (step 5, R117). The owner reversed it on 30 Sep 2026: a private contest is how a
+    // player discovers a Game Master, so every signed-in player sees it listed and the card
+    // offers "Join GM to enter". The leaderboard and the seat stay behind the lobby gate and
+    // the entry guard, which is why the enterable half below must still refuse.
+    const listed = await names(visibleContestsFilter({ userId: PLAYER, affiliatedGameMasterId: null }));
+    expect(listed).toContain("mine-private");
+    expect(listed).toContain("other-private");
+    expect(listed).toContain("unknown");
+    const enterable = await names(
+      enterableContestsFilter({ userId: PLAYER, affiliatedGameMasterId: null }),
+    );
+    expect(enterable).not.toContain("mine-private");
+    expect(enterable).not.toContain("other-private");
+  });
+
+  it("an anonymous viewer is still listed public contests only", async () => {
+    await seed();
+    // Reason: the landing feeds and the public arena display carry no session. Listing private
+    // contests there would put a private leaderboard's existence in front of the whole internet.
+    expect(await names(visibleContestsFilter(null))).toEqual(
+      ["blank", "draft-public", "legacy", "null", "public"],
+    );
+    expect(await names(visibleContestsFilter({ userId: "  ", affiliatedGameMasterId: GM }))).not.toContain(
+      "mine-private",
+    );
+  });
+
+  it("withEnterableContests keeps the caller's own $or too", async () => {
+    await seed();
+    // Reason: an affiliated viewer's enterable filter is itself an `$or`, so a spread would
+    // replace the caller's status `$or` with it and the draft would reappear.
+    const query = { $or: [{ status: "active" }, { status: "upcoming" }] };
+    const seen = await names(
+      withEnterableContests(query, { userId: PLAYER, affiliatedGameMasterId: GM }),
+    );
+    expect(seen).not.toContain("draft-public");
+    expect(seen).toContain("mine-private");
+    expect(seen).not.toContain("other-private");
+  });
+
+  it("withVisibleContests keeps the caller's own visibility condition for an anonymous viewer", async () => {
+    await seed();
+    // Reason: for a signed-in viewer the listing filter is `{}`, so `$and` and a spread agree
+    // there and only this case can tell them apart - a spread would replace the caller's
+    // `visibility` with the public one and hand an anonymous caller every public contest.
+    const seen = await names(withVisibleContests({ visibility: "gm_private" }, null));
+    expect(seen).toEqual([]);
   });
 
   it("withVisibleContests keeps the caller's own $or rather than replacing it", async () => {
@@ -142,7 +190,9 @@ describe("every reader another player sees applies the filter", () => {
   const readers: [string, RegExp][] = [
     ["lib/actions/trading/competition.actions.ts", /Competition\.find\(withVisibleContests\(query,\s*viewer\)\)/],
     ["lib/services/games/player-catalogue.service.ts", /Competition\.find\(withVisibleContests\(query,\s*viewer\)\)/],
-    ["lib/services/games/game-suggestions.service.ts", /Competition\.find\(\s*withVisibleContests\(/],
+    // Reason: suggestions are an invitation, so they use the ENTERABLE filter - offering a
+    // contest the player can never enter (another Game Master's, D1) is noise.
+    ["lib/services/games/game-suggestions.service.ts", /Competition\.find\(\s*withEnterableContests\(/],
     ["app/api/competitions/route.ts", /Competition\.find\(\s*withVisibleContests\(/],
     ["app/api/dashboard/competitions/route.ts", /Competition\.find\(\s*withVisibleContests\(/],
     ["app/api/landing/competitions/route.ts", /\.find\(withVisibleContests\(/],
@@ -176,7 +226,10 @@ describe("every reader another player sees applies the filter", () => {
     );
   });
 
-  it("a failed affiliation read degrades to public-only, never to everything", () => {
+  // Reason: since 30 Sep 2026 a failed affiliation read still LISTS private contests (the
+  // viewer is signed in), but as a non-member - the card offers the gate, never "Enter Arena",
+  // and suggestions stay public-only. It must never degrade to "member of everything".
+  it("a failed affiliation read degrades to no affiliation, never to everything", () => {
     const source = code("lib/services/gamemaster/contest-viewer.service.ts");
     expect(source).toMatch(/catch[\s\S]*affiliatedGameMasterId:\s*null/);
   });

@@ -24,6 +24,10 @@ import {
 import { resolveLevelName } from "@/lib/utils/level-title";
 import type { TitleLevel } from "@/lib/constants/levels";
 import { levelEmoji } from "@/components/trading/level-emoji";
+import {
+  PrivateContestBadge,
+  PrivateContestCardAction,
+} from "@/components/gamemaster/PrivateContestCardParts";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 interface CompetitionCardProps {
@@ -367,6 +371,7 @@ export default function CompetitionCard({
                   >
                     {isGmCreated ? "🎮" : "🛡️"} {creatorLabel}
                   </span>
+                  <PrivateContestBadge access={competition.privateAccess} />
                 </div>
                 <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm text-gray-400 flex-wrap">
                   <span className="flex items-center gap-1">
@@ -647,6 +652,7 @@ export default function CompetitionCard({
           >
             {isGmCreated ? "🎮" : "🛡️"} {creatorLabel}
           </span>
+          <PrivateContestBadge access={competition.privateAccess} />
         </div>
 
         {/* Difficulty Badge */}
@@ -1031,7 +1037,20 @@ export default function CompetitionCard({
         </div>
 
         {/* Action Button - Casino Style */}
-        {!isCompleted && !isCancelled ? (
+        {/* Reason: a private Game Master contest is listed to every signed-in player (owner
+            decision 30 Sep 2026). A non-member who is not already seated (D5) gets "Join GM to
+            enter" or "Members only" instead of an entry button the server would refuse. */}
+        {!isCompleted &&
+        !isCancelled &&
+        !isUserIn &&
+        competition.privateAccess &&
+        competition.privateAccess !== "member" ? (
+          <PrivateContestCardAction
+            competitionId={String(competition._id)}
+            access={competition.privateAccess}
+            gameMasterName={competition.privateGameMasterName}
+          />
+        ) : !isCompleted && !isCancelled ? (
           <Link href={`/competitions/${competition._id}`} className="block">
             <Button
               className={`w-full font-black text-base py-6 rounded-xl transition-all duration-300 transform hover:scale-105 active:scale-95 ${

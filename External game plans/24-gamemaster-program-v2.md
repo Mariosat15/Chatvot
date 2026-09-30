@@ -271,6 +271,22 @@ The rule: **a `gm_private` contest can be entered, and its details read, only by
 >
 > Tests: 61 new across `gm-private-entry` (10), `gm-private-discovery` and `gm-visibility-permission`. Probes 63-85 are all red on exactly one test. Risk **R117** in `17`.
 
+> **OWNER-DIRECTED DEVIATION, 30 Sep 2026 (after step 6): private competitions are LISTED to every signed-in player.** The step-5 design above hid a private contest from the lists of anybody outside the Game Master's group. The owner reversed that: *"all must be able to see them, so if they are not under the specific GM, the ones that don't have another GM can join the GM from the competition."* The step-5 note is kept as it was written, because the reversal is the fact worth carrying. **What is true now:**
+>
+> - **Listing and entering are two filters.** `visibleContestsFilter` answers `{}` (every contest) for a signed-in viewer and public-only for an anonymous one. The old step-5 rule survives unchanged as **`enterableContestsFilter` / `withEnterableContests`**, which **game suggestions** use, because a suggestion is an invitation to play and must not suggest a contest the player cannot enter.
+> - **Anonymous readers stay public-only.** The landing feeds and the public arena pass no viewer.
+> - **A card tells a non-member what they need to do** instead of offering an entry button that would be refused. `annotatePrivateContests` (`lib/services/gamemaster/private-contest-listing.service.ts`) stamps `privateAccess` and `privateGameMasterName` on the list read by `getCompetitions` and `GET /api/competitions`:
+>   - `member`: the creator, or a player affiliated to that Game Master. The card is unchanged.
+>   - Anybody else gets **the lobby gate's own state** from `getPrivateContestGate`, so the card and the lobby cannot disagree. D4 (an expired Game Master frees the player) is honoured for free this way, which `getAffiliation` alone could not tell apart.
+>   - The card shows a **Private** badge and **Join GM to enter**, **Members only** (D1: locked under another Game Master, and the hint says only an admin can move them) or **Sign in to join**. It links to the lobby, where `PrivateContestGate` performs the join. A seated player always gets the normal button (D5).
+> - **Nothing about entry or viewing changed.** `private_not_affiliated` in `enterContest` and `canViewContest` on the lobby, `play`, `results` and the per-contest APIs are exactly as step 6 left them, so being able to *see* a card never lets anyone *enter* or read the leaderboard.
+> - **Deviation 2's reason moved.** For a signed-in viewer the listing filter is `{}`, so `$and` and a spread behave the same there. The `$and` is still load-bearing in two places: for an anonymous viewer against a query carrying its own `visibility`, and in `withEnterableContests`, whose affiliated filter is itself an `$or`. Each place has its own test and probe (70 and 113).
+> - The gate copy now reads *"can enter this competition or see its leaderboard"*, since seeing that the contest exists is no longer members-only.
+>
+> **Not built:** a Private badge on the game page's contest list (`player-catalogue`), which lists private contests now but does not annotate them. Clicking one still reaches the gate, so nothing is exposed.
+>
+> Tests: `gm-private-listing.test.ts` (14) and flipped/new cases in `gm-private-discovery.test.ts`. Probes 105-113 are all red on exactly one test.
+
 | Door | Change |
 |---|---|
 | Creation - `app/api/gamemaster/competitions` (main) and `apps/admin/app/api/gamemaster/competitions` | Accept `visibility`; refuse a value not in `resolveAllowedVisibility`, naming who refused (override / package / default, as `creationDecidedBy` does). Stamp it on the insert (raw driver, so set explicitly - the schema default does not run on this path, R7) |

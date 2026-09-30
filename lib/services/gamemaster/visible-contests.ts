@@ -39,11 +39,12 @@ function nonEmpty(value: string | null | undefined): value is string {
 }
 
 /**
- * Contests this viewer may see: every public one, plus any contest created by the Game Master
- * they are affiliated to, plus their own if they ARE a Game Master (a creator must be able to
- * find the private contest they just made).
+ * Contests this viewer may ENTER (or already could): every public one, plus any contest created
+ * by the Game Master they are affiliated to, plus their own if they ARE a Game Master.
+ *
+ * Used where offering a contest the viewer can never take would be noise - suggestions.
  */
-export function visibleContestsFilter(viewer: ContestViewer | null): Record<string, unknown> {
+export function enterableContestsFilter(viewer: ContestViewer | null): Record<string, unknown> {
   const gameMasterIds = [viewer?.affiliatedGameMasterId, viewer?.userId].filter(nonEmpty);
   if (gameMasterIds.length === 0) return publicContestsFilter();
   return {
@@ -52,7 +53,22 @@ export function visibleContestsFilter(viewer: ContestViewer | null): Record<stri
 }
 
 /**
- * Narrow an existing competition query to what the viewer may see.
+ * Contests this viewer may see LISTED. A signed-in player sees every contest, private ones
+ * included; an anonymous viewer (landing feeds, the public arena display) sees public only.
+ *
+ * Reason (owner decision, 30 Sep 2026, reversing step 5's "hide from other players"): a private
+ * contest is how a player discovers a Game Master worth joining, so it is listed to everyone
+ * signed in and the card offers "Join GM to enter". What "private" still protects is the
+ * leaderboard, the participant names and the seat - the lobby gate (`canViewContest`) and the
+ * entry guard (`canEnterPrivateContest`) are unchanged and do not depend on any list.
+ */
+export function visibleContestsFilter(viewer: ContestViewer | null): Record<string, unknown> {
+  if (nonEmpty(viewer?.userId)) return {};
+  return publicContestsFilter();
+}
+
+/**
+ * Narrow an existing competition query to what the viewer may see listed.
  *
  * Reason: `$and`, never a spread. Several readers already carry their own `$or` (status
  * windows, legacy game labels); spreading a second `$or` over it silently replaces the first,
@@ -63,6 +79,14 @@ export function withVisibleContests(
   viewer: ContestViewer | null,
 ): Record<string, unknown> {
   return { $and: [query, visibleContestsFilter(viewer)] };
+}
+
+/** Narrow a query to contests the viewer may enter - see `enterableContestsFilter`. */
+export function withEnterableContests(
+  query: Record<string, unknown>,
+  viewer: ContestViewer | null,
+): Record<string, unknown> {
+  return { $and: [query, enterableContestsFilter(viewer)] };
 }
 
 /**

@@ -915,6 +915,32 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 30 Sep 2026 - Private competitions are now listed to every signed-in player (owner reversal of step 5)
+
+The owner asked that players outside a Game Master's group still **see** that Game Master's
+private competitions. A player with no Game Master can then join that Game Master from the
+competition. A player under another Game Master sees it but is locked (D1: only an admin can
+move them). This **reverses step 5's hide-from-lists design** and is recorded as an
+owner-directed deviation in `24` s4 and an amendment to `17` R117, not by rewriting the
+step-5 entry below.
+
+- **Listing:** `visibleContestsFilter` is `{}` for a signed-in viewer and public-only for an
+  anonymous one, so the landing feeds and the arena are unchanged.
+- **Entering:** the old rule is kept as `enterableContestsFilter` / `withEnterableContests`,
+  and game suggestions use it.
+- **The card:** `annotatePrivateContests` stamps each private contest with the lobby gate's own
+  state, so the card and the lobby agree, including D4. A non-member who holds no seat sees a
+  **Private** badge and **Join GM to enter**, **Members only** or **Sign in to join**. These
+  link to the lobby gate, which performs the join.
+- **Unchanged:** the entry guard, `canViewContest` and every 404.
+- **Not built:** the Private badge on the game page's contest list. Those contests are listed,
+  and clicking one reaches the gate.
+
+**Tests:** `gm-private-listing.test.ts` (14 tests) plus flipped cases in
+`gm-private-discovery.test.ts`. Probes 105-113 are all red with exactly one failure each.
+Probe 70 was re-aimed at an anonymous viewer, because for a signed-in viewer a spread and an
+`$and` now agree, so that probe had gone green.
+
 ### 30 Sep 2026 - Gamemaster Program v2 step 6 built: the Join GM gate, and the direct-link gap closed
 
 A player who is not affiliated to the creating Game Master now sees a **Join this Game
