@@ -84,8 +84,12 @@ describe("mobile dashboard split", () => {
     expect(existsSync(join(ROOT, "components/MobileBottomNav.tsx"))).toBe(false);
     expect(layout).not.toMatch(/MobileBottomNav|pb-20/);
     expect(layout).toMatch(/<main className="[^"]*\bpt-16 lg:pt-0\b/);
-    expect(read("components/UserSidebar.tsx")).toMatch(/lg:hidden fixed top-0[^"]*\bh-16\b/);
+    expect(read("components/UserSidebar.tsx")).toMatch(
+      /fixed left-0 right-0 top-0[^"]*\bh-16\b[^"]*\blg:hidden\b/,
+    );
     expect(read("components/Header.tsx")).toMatch(/sticky top-16 lg:top-0/);
+    // Reason: Header tab strip withheld on phone from 30 Sep 2026 — no MobileTabStrip.
+    expect(read("components/Header.tsx")).not.toMatch(/MobileTabStrip/);
   });
 
   it("Quick access is All Competitions / Profile / 1v1 / Marketplace, not split by game", () => {

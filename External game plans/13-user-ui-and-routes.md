@@ -3111,8 +3111,10 @@ inactive = white) — the pre-neon strip, lightly polished on 29 Sep 2026 after 
 rejected both five floating HUD plates and the shared `nav-frame.png` bar. Neon assets under
 `public/assets/neon/overview/nav/` remain on disk for reference only; a document describing
 neon plates or a shared frame on the live Header is correct as history and stale as a
-present fact — **say which**. The Overview phone tree still hides the strip entirely
-(`MobileTabStrip`). **Win rate on
+present fact — **say which**. **The Header tab strip is desktop-only** from 30 Sep 2026
+(`hidden md:block`; `MobileTabStrip` deleted) — phones do not show Overview / Wallet /
+Performance / Competitions / Tutorials on any page until the owner asks to restore it;
+the sidebar drawer is the phone nav. **Win rate on
 Overview KPIs is contest win rate from `_overall`**, not the trading trade win rate.
 **Streaks & Consistency reads `_overall` only** — podium streak, `bestStreak` (new field on
 both `UserGameStats` copies, stamped at settlement), contest wins, contests played, top-3

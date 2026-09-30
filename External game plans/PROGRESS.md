@@ -1474,6 +1474,17 @@ man not cut off; (6) Player Progress — only one next mission + completion % / 
 **Owner tested:** not yet.
 **Never verified by eye.**
 
+### 30 Sep 2026 - Header tab strip withheld on every phone page
+
+**Owner:** do not show the Overview / Wallet / Performance / Competitions / Tutorials
+strip on mobile anywhere for now — will say when to put it back.
+
+**Shipped:** `Header` is `hidden md:block`; `MobileTabStrip` deleted (not gated). Desktop
+Lucide gold pills unchanged. Test added in `games-first-nav.test.ts`. Docs: `13` s5.1g.
+
+**Owner tested:** not yet.
+**Never verified by eye.**
+
 ### 29 Sep 2026 - Header back to Lucide gold pills (neon chrome rejected)
 
 **Owner:** do not like the neon frame; restore the strip from before those changes and

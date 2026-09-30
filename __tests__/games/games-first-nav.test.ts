@@ -54,6 +54,19 @@ describe("dashboard Header NAV_ITEMS", () => {
     expect(nav).not.toMatch(/clip-path:polygon/);
     expect(nav).not.toMatch(/from ["']next\/image["']/);
   });
+
+  it("Header tab strip is desktop-only — withheld on every phone page", () => {
+    /*
+      Reason: owner 30 Sep 2026 — do not show Overview/Wallet/Performance/
+      Competitions/Tutorials on mobile anywhere until told to put it back.
+      MobileTabStrip is deleted rather than gated; sidebar drawer is the phone nav.
+    */
+    const header = readCode("components/Header.tsx");
+    expect(header).toMatch(/hidden[\s\S]*md:block/);
+    expect(header).toMatch(/NavItems/);
+    expect(header).not.toMatch(/MobileTabStrip/);
+    expect(header).not.toMatch(/md:hidden/);
+  });
 });
 
 describe("games-first navigation (sidebar)", () => {
