@@ -111,6 +111,9 @@ export type NotificationType =
   | "customer_reassigned"
   | "account_manager_assigned"
   | "account_manager_changed"
+  // Game Master affiliation terms (`External game plans/24` s5.5)
+  | "gm_terms_request"
+  | "gm_terms_request_answered"
   // Employee notifications
   | "employee_new_customer"
   | "employee_customer_removed"
@@ -1010,6 +1013,51 @@ function getDefaultTemplates(): Partial<INotificationTemplate>[] {
       isDefault: true,
       isCustom: false,
       channels: { inApp: true, email: true, push: false },
+    },
+
+    // ========== GAME MASTER AFFILIATION TERMS ==========
+    {
+      templateId: "gm_terms_request",
+      name: "Game Master Terms Request",
+      description:
+        "Sent when the player's Game Master asks them to read and accept the Game Master terms",
+      category: "system",
+      type: "gm_terms_request",
+      title: "📜 {{gameMasterName}} sent you the Game Master terms",
+      message:
+        "{{gameMasterName}} asked you to review the Game Master terms. Open ChartVolt to accept or decline - nothing changes until you answer.",
+      icon: "📜",
+      priority: "normal",
+      color: "#6366F1",
+      isEnabled: true,
+      isDefault: true,
+      isCustom: false,
+      // Reason: email OFF here because this event has its own admin-editable email template
+      // (`gm_terms_request` under Settings -> Email Templates). With it on, the generic
+      // notification email would arrive as well and the player would get two mails.
+      channels: { inApp: true, email: false, push: true },
+      // Reason: the terms window is mounted in the signed-in layout and asks the server on
+      // load, so any page opens it while a request is pending and does nothing once answered.
+      actionUrl: "/dashboard",
+      actionText: "Review Terms",
+    },
+    {
+      templateId: "gm_terms_request_answered",
+      name: "Game Master Terms Answered",
+      description: "Sent to a Game Master when a player answers the terms they sent",
+      category: "system",
+      type: "gm_terms_request_answered",
+      title: "📜 {{playerName}} {{answer}} your terms",
+      message: "{{playerName}} {{answer}} the Game Master terms you sent. {{outcomeLine}}",
+      icon: "📜",
+      priority: "normal",
+      color: "#6366F1",
+      isEnabled: true,
+      isDefault: true,
+      isCustom: false,
+      channels: { inApp: true, email: false, push: true },
+      actionUrl: "/gamemaster/referrals",
+      actionText: "View Referrals",
     },
 
     // ========== 1v1 CHALLENGES ==========

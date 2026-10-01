@@ -70,6 +70,19 @@ export function ReferralContact({
   return <span className="text-xs text-gray-400 truncate">{referral.userEmail}</span>;
 }
 
+/**
+ * The player's country. Reason: not contact data, so it is shown whatever the consent and the
+ * package switch say - and "Country not set" rather than nothing, so an absent value never
+ * reads as one the screen forgot to load.
+ */
+export function ReferralCountry({ referral }: { referral: Pick<GmReferralView, "country"> }) {
+  return (
+    <span className="text-[11px] text-gray-500" title="Country">
+      {referral.country ? `Country: ${referral.country}` : "Country not set"}
+    </span>
+  );
+}
+
 /** The full client id - the one identifier every package shows, so a masked row stays traceable. */
 export function ReferralClientId({ referral }: { referral: Pick<GmReferralView, "userId"> }) {
   return (

@@ -84,10 +84,12 @@ interface SyncResult {
 
 interface GameMasterManagementSectionProps {
   initialGmId?: string;
+  canExport?: boolean;
 }
 
 export default function GameMasterManagementSection({
   initialGmId,
+  canExport = false,
 }: GameMasterManagementSectionProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -283,6 +285,7 @@ export default function GameMasterManagementSection({
     return (
       <GameMasterDetailView
         data={selectedGM}
+        canExport={canExport}
         onBack={() => {
           setSelectedGM(null);
           if (initialGmId) {

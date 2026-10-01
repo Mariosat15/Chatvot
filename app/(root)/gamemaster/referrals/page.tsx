@@ -21,7 +21,13 @@ import { cn } from "@/lib/utils";
 
 import type { GmReferralView } from "@/lib/services/gamemaster/gm-referral-view";
 import { describeAffiliationState, REFERRAL_KIND_LABELS } from "@/lib/services/gamemaster/referral-kind";
-import { ReferralClientId, ReferralContact, ReferralKindBadge } from "@/components/gamemaster/GmReferralBadges";
+import {
+  ReferralClientId,
+  ReferralContact,
+  ReferralCountry,
+  ReferralKindBadge,
+} from "@/components/gamemaster/GmReferralBadges";
+import SendTermsButton from "@/components/gamemaster/SendTermsButton";
 
 const KIND_FILTERS = [
   { value: "all", label: "All" },
@@ -298,10 +304,16 @@ export default function GMReferralsPage() {
                       >
                         <td className="px-6 py-4">
                           <div className="flex flex-col gap-1">
-                            <p className="text-white font-medium">
-                              {user.userName || "Unknown"}
-                            </p>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="text-white font-medium">
+                                {user.userName || "Unknown"}
+                              </p>
+                              {user.canSendTerms && (
+                                <SendTermsButton referralId={user.referralId} playerName={user.userName} />
+                              )}
+                            </div>
                             <ReferralContact referral={user} />
+                            <ReferralCountry referral={user} />
                             <ReferralClientId referral={user} />
                             <ReferralKindBadge referral={user} />
                           </div>

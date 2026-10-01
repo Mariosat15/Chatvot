@@ -80,6 +80,9 @@ export interface ReferredPlayerRow {
   pending: number;
   /** Covered by D6 - the Game Master screens show contact details only when true. */
   termsAccepted: boolean;
+  /** From the player's profile. `phone` is contact data: the Game Master view never maps it. */
+  phone: string | null;
+  country: string | null;
 }
 
 export interface ReferralGroupTotals {
@@ -115,6 +118,10 @@ function num(value: unknown): number {
 
 function iso(value: unknown): string | null {
   return value instanceof Date && Number.isFinite(value.getTime()) ? value.toISOString() : null;
+}
+
+function text(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
 function searchMatch(filter: ReferredPlayersFilter, withConsent: boolean): Document {
@@ -298,6 +305,30 @@ function earningsLookup(): Document {
   };
 }
 
+/**
+ * Phone and country live on the Better Auth `user` document, never on the referral row.
+ * Reason: inside the rows facet AFTER `$limit`, so it costs one page of index lookups, and
+ * keyed on `_id` as the ObjectId the id string spells - Better Auth keeps the identity in
+ * `_id`, and a lookup on an `id` field alone finds nothing (R68). The string itself is the
+ * fallback for a string `_id`. Only the two fields are projected, never the whole account.
+ */
+function contactLookup(): Document[] {
+  const uid = { $convert: { input: "$userId", to: "objectId", onError: "$userId", onNull: "$userId" } };
+  return [
+    { $addFields: { _uid: uid } },
+    {
+      $lookup: {
+        from: "user",
+        localField: "_uid",
+        foreignField: "_id",
+        pipeline: [{ $project: { _id: 0, phone: 1, country: 1 } }],
+        as: "_user",
+      },
+    },
+    { $addFields: { phone: { $first: "$_user.phone" }, country: { $first: "$_user.country" } } },
+  ];
+}
+
 export function buildReferredPlayersPipeline(
   filter: ReferredPlayersFilter,
   paging: ReferredPlayersPaging,
@@ -351,7 +382,12 @@ export function buildReferredPlayersPipeline(
           { $sort: { referredAt: -1, _id: -1 } },
           { $skip: (paging.page - 1) * paging.limit },
           { $limit: paging.limit },
-          { $project: { _comp: 0, _chal: 0, _earn: 0, _from: 0, _to: 0, signupIP: 0, signupUserAgent: 0 } },
+          ...contactLookup(),
+          {
+            $project: {
+              _comp: 0, _chal: 0, _earn: 0, _from: 0, _to: 0, _uid: 0, _user: 0, signupIP: 0, signupUserAgent: 0,
+            },
+          },
         ],
         total: [{ $count: "n" }],
         groups: [
@@ -401,6 +437,8 @@ export function toReferredPlayerRow(doc: Document): ReferredPlayerRow {
     paid: num(doc.paid),
     pending: num(doc.pending),
     termsAccepted: typeof doc.termsAcceptanceId === "string" && doc.termsAcceptanceId.length > 0,
+    phone: text(doc.phone),
+    country: text(doc.country),
   };
 }
 

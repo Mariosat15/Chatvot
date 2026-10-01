@@ -5,9 +5,12 @@ import {
   escapeCsvCell,
   exportCapMessage,
   csvHeaderLine,
+  csvRowLine,
   EXPORT_COLUMNS,
   REFERRED_PLAYERS_EXPORT_CAP,
 } from "../../apps/admin/lib/admin/gm-report-csv";
+import { filterDetailReferrals } from "../../apps/admin/lib/admin/gm-detail-referrals";
+import type { ReferredPlayerRow } from "../../apps/admin/lib/services/gamemaster/referral-read-model";
 import {
   readReportState,
   writeReportState,
@@ -33,6 +36,7 @@ const MOVE_ROUTE = "apps/admin/app/api/gamemasters/referred-players/[userId]/rou
 const DIALOG = "apps/admin/components/admin/gamemaster/GmAffiliationActionDialog.tsx";
 const DASHBOARD = "apps/admin/components/admin/AdminDashboard.tsx";
 const BADGE = "apps/admin/components/admin/gamemaster/AffiliationSourceBadge.tsx";
+const DETAIL_TAB = "apps/admin/components/admin/gamemaster/GmDetailReferralsTab.tsx";
 
 describe("CSV cells", () => {
   it.each(["=SUM(A1)", "+1", "-2+3", "@cmd", "\tx", "\rx"])("neutralises a formula start: %j", (raw) => {
@@ -60,6 +64,77 @@ describe("CSV cells", () => {
     const msg = exportCapMessage(12_345);
     expect(msg).toContain("12,345");
     expect(msg).toContain(REFERRED_PLAYERS_EXPORT_CAP.toLocaleString("en-US"));
+  });
+});
+
+describe("phone and country in the export and the detail tab (s5.5)", () => {
+  const row = {
+    referralId: "r1",
+    userId: "64c000000000000000000001",
+    userName: "Ann",
+    userEmail: "ann@x.test",
+    phone: "+35799000000",
+    country: "Cyprus",
+    kind: "own",
+    surface: "signup",
+    isCurrent: true,
+    isActive: true,
+    termsAccepted: false,
+  } as unknown as ReferredPlayerRow;
+
+  it("the export carries the player phone and country beside the email", () => {
+    const headers = EXPORT_COLUMNS.map((c) => c.header);
+    const email = headers.indexOf("Player email");
+    expect(headers.slice(email, email + 3)).toEqual(["Player email", "Player phone", "Player country"]);
+    const cells = csvRowLine(row).trim().split(",");
+    expect(cells[headers.indexOf("Player country")]).toBe("Cyprus");
+    // Reason: a phone starts with "+", which a spreadsheet would run as a formula.
+    expect(cells[headers.indexOf("Player phone")]).toBe("'+35799000000");
+  });
+
+  it("the detail search matches phone and country as well as name and email", () => {
+    const other = { ...row, referralId: "r2", userName: "Bob", userEmail: "bob@x.test", phone: null, country: "Greece" };
+    const rows = [row, other] as ReferredPlayerRow[];
+    expect(filterDetailReferrals(rows, "35799").map((r) => r.referralId)).toEqual(["r1"]);
+    expect(filterDetailReferrals(rows, "greece").map((r) => r.referralId)).toEqual(["r2"]);
+    expect(filterDetailReferrals(rows, "  ")).toHaveLength(2);
+  });
+
+  it("the detail tab renders the badge, the phone, the country and the export", () => {
+    const tab = code(DETAIL_TAB);
+    expect(tab).toMatch(/<AffiliationSourceBadge kind=\{row\.kind\}/);
+    expect(tab).toContain("{row.phone ||");
+    expect(tab).toContain("{row.country ||");
+    expect(tab).toMatch(/<GmExportButton state=\{\{ gameMasterId \}\} canExport=\{canExport\}/);
+  });
+
+  it("the detail view renders the shared tab, fed by the shared read model", () => {
+    const view = code("apps/admin/components/admin/GameMasterDetailView.tsx");
+    expect(view).toMatch(/<GmDetailReferralsTab[\s\S]*?rows=\{data\.referredPlayers \?\? \[\]\}/);
+    expect(view).not.toMatch(/function ReferralsTab\b/);
+    const route = code("apps/admin/app/api/gamemasters/[id]/route.ts");
+    expect(route).toMatch(/readReferredPlayers\(\s*db,\s*\{\s*gameMasterIds:\s*\[String\(subscription\.userId\)\]\s*\}/);
+    expect(route).toMatch(/referredPlayers:\s*referredPlayers\.rows/);
+  });
+
+  it("the export grant reaches the detail view from the dashboard", () => {
+    expect(code("apps/admin/components/admin/GameMasterProgramSection.tsx")).toMatch(
+      /<GameMasterManagementSection[^>]*canExport=\{canExport\}/,
+    );
+    expect(code("apps/admin/components/admin/GameMasterManagementSection.tsx")).toMatch(
+      /<GameMasterDetailView[\s\S]*?canExport=\{canExport\}/,
+    );
+  });
+
+  it("the terms-request email template exists in both apps and in the admin screens", () => {
+    for (const p of [
+      "database/models/email-template.model.ts",
+      "apps/admin/database/models/email-template.model.ts",
+      "apps/admin/app/api/email-templates/route.ts",
+      "apps/admin/components/admin/EmailTemplatesSection.tsx",
+    ]) {
+      expect(code(p)).toContain("gm_terms_request");
+    }
   });
 });
 

@@ -391,6 +391,10 @@ describe("the service is the only writer (s9 test 7)", () => {
     // cannot import the main-app writer, so the audited move/detach is the one admin door
     // (`24` s8, D1), pinned behaviourally in __tests__/admin/gm-admin-affiliation.test.ts.
     ["apps/admin/lib/services/gamemaster/admin-affiliation.service.ts", "audited admin move/detach (task 4, D1)"],
+    // Reason: an own referral affiliated before terms existed cannot record consent through
+    // `affiliate()` (same Game Master = alreadyAffiliated, no write). This fills ONLY the three
+    // terms fields on an active row that has none - never creates, ends or moves (s5.5).
+    ["lib/services/gamemaster/affiliation-consent.service.ts", "consent stamp on an existing row (Send T&C, s5.5)"],
   ]);
 
   const DIRECT_WRITE = [

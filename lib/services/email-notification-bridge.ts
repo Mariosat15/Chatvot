@@ -261,6 +261,24 @@ export const emailNotificationBridge = {
       actionText: notification.actionText || "Open ChartVolt",
     });
   },
+
+  /**
+   * A Game Master asking their own referral to accept the Game Master terms.
+   *
+   * Reason: its own template rather than `notificationAlert`, so the operator can word it
+   * on its own; the matching NotificationTemplate therefore has `channels.email` off, or
+   * the player would get this mail and the generic one. Preferences are still honoured,
+   * under the same category and template id the in-app notification uses.
+   */
+  async gmTermsRequest(target: EmailTarget, gameMasterName: string): Promise<void> {
+    if (!(await shouldSendEmail(target.userId, "system", "gm_terms_request"))) return;
+    const { baseUrl } = await getEmailContext();
+    await sendTemplateEmail("gm_terms_request", target.email, {
+      name: target.name,
+      gameMasterName,
+      actionUrl: `${baseUrl}/dashboard`,
+    });
+  },
 };
 
 /**
@@ -268,7 +286,12 @@ export const emailNotificationBridge = {
  * Uses sample placeholder values so the admin can see how the template looks.
  */
 export async function sendTestNotificationEmail(
-  templateType: "competition_starting" | "competition_ended" | "margin_warning" | "challenge_received",
+  templateType:
+    | "competition_starting"
+    | "competition_ended"
+    | "margin_warning"
+    | "challenge_received"
+    | "gm_terms_request",
   toEmail: string,
 ): Promise<void> {
   const sampleVars: Record<string, Record<string, string>> = {
@@ -291,6 +314,11 @@ export async function sendTestNotificationEmail(
       name: "Test User",
       challengerName: "ProTrader99",
       stakeAmount: "500",
+    },
+    gm_terms_request: {
+      name: "Test User",
+      gameMasterName: "Alex the Game Master",
+      actionUrl: `${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/dashboard`,
     },
   };
   // eslint-disable-next-line security/detect-object-injection

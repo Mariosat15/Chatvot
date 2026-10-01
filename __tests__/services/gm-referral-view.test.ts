@@ -102,8 +102,10 @@ describe("toGameMasterReferralView - contact only with consent (D6)", () => {
     const keys = Object.keys(toGameMasterReferralView(report.rows[0], MASKED)).sort();
     expect(keys).toEqual(
       [
+        // Reason: `country` and `canSendTerms` added 1 Oct 2026 (owner); `phone` deliberately
+        // absent - it is contact data and never reaches a Game Master screen.
         "referralId", "userId", "userName", "userEmail", "contactHidden", "contactMasked", "termsAccepted",
-        "kind", "surface", "joinedAt", "endedAt", "isCurrent", "isActive", "lastActivityAt",
+        "country", "canSendTerms", "kind", "surface", "joinedAt", "endedAt", "isCurrent", "isActive", "lastActivityAt",
         "competitionsEntered", "challengesEntered", "entryFees", "earned", "paid", "pending",
       ].sort(),
     );

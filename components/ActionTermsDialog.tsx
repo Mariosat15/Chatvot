@@ -59,7 +59,7 @@ interface ActionTermsDialogProps {
   recordedContext?: {
     gameMasterId: string;
     competitionId?: string;
-    affiliationSource?: "chartvolt_join_gm" | "gm_referral_link";
+    affiliationSource?: "chartvolt_join_gm" | "gm_referral_link" | "gm_terms_request";
   };
 }
 

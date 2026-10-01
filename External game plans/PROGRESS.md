@@ -915,6 +915,46 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 1 Oct 2026 - A Game Master can send their own referral the terms; country and phone reach the screens (`24` s5.5)
+
+The owner asked for four things, all built:
+- **Send T&C.** An own referral who has not accepted the Gamemaster terms gets a small button
+  beside their name on both Game Master screens. Pressing it sends an in-app notification (popup
+  at once if the player is online), an email from a new editable template `gm_terms_request`, and
+  writes an audit row. The player accepts or declines in a popup; the email's button opens the
+  same popup, and does nothing if they have already accepted.
+- **Accept** records consent on the player's existing affiliation, so their email becomes visible
+  to the Game Master. **Decline** changes nothing. Either answer notifies the Game Master, the
+  player's assigned account manager (admin bell), and writes an audit row.
+- **Country** now shows to the Game Master and the admin, **phone** to the admin only, both read
+  from the player's profile.
+- **Admin, Manage Game Masters -> Referrals:** Own/External badge, phone beside email, country,
+  search over all of them, and Export CSV with phone and country. The main report CSV gained the
+  same two columns.
+
+**Load-bearing decisions.**
+- **`affiliate()` is still the single writer.** Accepting uses `recordAffiliationConsent`, which
+  only fills an empty consent on an active row matching the player and the Game Master, and never
+  creates a row. Tests prove it neither creates, overwrites, nor touches another Game Master's row.
+- **A referral claim could not carry this.** `decideClaimPrompt` lapses a claim for a player who is
+  already affiliated, which is exactly this player, so requests have their own collection
+  `gm_terms_requests` (main app only, one row per referral).
+- **Limits:** 3 sends per referral, 24 hours apart. External, ended and already-accepted referrals
+  are refused, and so is a paused, expired or deletion-scheduled Game Master.
+- **Identity is always the session**, on both routes; another Game Master's referral id reads as
+  "not found", so ids cannot be probed.
+- **Phone is contact data and never reaches the Game Master view.** Country is not, so it is shown
+  whatever the consent or the package switch say.
+
+**Tests:** `gm-terms-request.test.ts` (30, real replica set), plus additions to
+`gm-report-screen.test.ts` and `gm-referral-read-model.test.ts`; the related Game Master suites
+(26 files, 579 tests) pass. **Probes 207-227 are new and all 227 are red on the expected test.**
+One guard is recorded unprobed with its reason. Typecheck baselines unchanged (main 228, admin
+243). `check:mirrors` OK. No risk number: no defect was found.
+
+**Not built:** an admin bell entry for a player with no assigned account manager (the audit row
+and the Referrals tab still show the outcome). **Never verified by eye.**
+
 ### 1 Oct 2026 - A package switch decides whether a Game Master sees an external referral's details (R120)
 
 The owner asked for a new option on Game Master packages in the admin marketplace editor:

@@ -34,10 +34,13 @@ export interface RecordGmTermsInput {
   userAgent?: string;
 }
 
-export type GmConsentSource = "chartvolt_join_gm" | "gm_referral_link";
+// Reason: `gm_terms_request` labels consent given AFTER affiliation, when a Game Master sent
+// the terms to an own referral who never recorded them (s5.5). Labelling only, like the rest.
+export type GmConsentSource = "chartvolt_join_gm" | "gm_referral_link" | "gm_terms_request";
 const CONSENT_SOURCES: ReadonlySet<string> = new Set<GmConsentSource>([
   "chartvolt_join_gm",
   "gm_referral_link",
+  "gm_terms_request",
 ]);
 
 /** Narrow a browser-supplied label; anything unknown reads as Join GM, the historical value. */

@@ -14,6 +14,8 @@ import {
   countGameMasterActiveCompetitions,
   remainingActiveCompetitionSlots,
 } from "@/lib/services/gamemaster/active-competitions";
+import { readReferredPlayers } from "@/lib/services/gamemaster/referral-read-model";
+import { MAX_PAGE_LIMIT } from "@/lib/services/gamemaster/referral-report-filter";
 import mongoose from "mongoose";
 import { ObjectId } from "mongodb";
 
@@ -106,6 +108,15 @@ export async function GET(
             createdAt: r.createdAt,
             referredAt: r.referredAt,
           }));
+
+    // Reason: the Referrals tab needs Own/External, phone, country and status. Those come from
+    // the same read model the referred-players report and its CSV use, so the tab cannot
+    // disagree with them. `referredUsers` above is kept unchanged for existing consumers.
+    const referredPlayers = await readReferredPlayers(
+      db,
+      { gameMasterIds: [String(subscription.userId)] },
+      { page: 1, limit: MAX_PAGE_LIMIT },
+    );
 
     // Get competitions created
     const competitions = await db
@@ -231,6 +242,8 @@ export async function GET(
         createdAt: u.createdAt,
         referredAt: u.referredAt,
       })),
+      referredPlayers: referredPlayers.rows,
+      referredPlayersTotal: referredPlayers.total,
       // Diagnostic info to help debug referral data inconsistencies
       referralDiagnostics,
       competitions: competitions.map((c) => ({

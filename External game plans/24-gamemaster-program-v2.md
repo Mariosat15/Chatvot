@@ -437,7 +437,8 @@ The rule: **a `gm_private` contest can be entered, and its details read, only by
 >   accepted terms "keep today's visibility". The build **hides** their email instead. Today's
 >   visibility was the R118 leak, and an affiliation with no acceptance is not consent to share.
 >   This fails closed. The display name is still shown.
-> - **Not built:** country (D6 names it, but no field carries it on this read). A further change in
+> - ~~**Not built:** country (D6 names it, but no field carries it on this read).~~ **Built 1 Oct
+>   2026 (s5.5 below)** - correct as history, stale as a present fact. A further change in
 >   behaviour: entry fees and earnings now exclude cancelled earnings and count only within the
 >   affiliation window, because they come from the shared model.
 >
@@ -465,6 +466,61 @@ The rule: **a `gm_private` contest can be entered, and its details read, only by
 > contest in 30 days". An admin move is now windowed from the new row's `referredAt`, not the epoch,
 > so the new Game Master no longer inherits the old seats. A moved player still shows once under
 > each Game Master. Tests are in `gm-referral-history.test.ts`.
+
+### 5.5 Send T&C, and a referral's country and phone (BUILT 1 Oct 2026, owner request)
+
+> **Read the code, not this note.** Live code: `lib/services/gamemaster/gm-terms-request-rules.ts`
+> (pure), `gm-terms-request.service.ts`, `affiliation-consent.service.ts`,
+> `database/models/gamemaster/gm-terms-request.model.ts` (`gm_terms_requests`, main app only),
+> `POST /api/gamemaster/referrals/send-terms`, `GET|POST /api/gamemaster/terms-request`,
+> `components/gamemaster/SendTermsButton.tsx` and `GmTermsRequestPrompt.tsx` (mounted once in
+> `app/(root)/layout.tsx`). Admin: `GmDetailReferralsTab.tsx`, `lib/admin/gm-detail-referrals.ts`,
+> the `referredPlayers` read on `apps/admin/app/api/gamemasters/[id]/route.ts`.
+>
+> **Send T&C.** An own referral (`source: gm_referral_link`) that is still current and has no
+> recorded acceptance shows a small **Send T&C** button beside the name, on the dashboard tab and
+> the full referrals page. One flag, `canSendTerms`, decided in the view, gates both renders and the
+> service asks the same question again (`decideTermsRequestSend`). Refusals, in order: not own,
+> ended, already accepted, cap (**3 sends per referral**), cooldown (**24 hours**, with the time it
+> lifts). External referrals never get the button, on the owner's instruction that it is for the
+> Game Master's **own** referrals: an external player's Game Master was chosen through ChartVolt
+> or by an admin, and their terms are asked for on those paths.
+> - **A send** writes one `gm_terms_requests` row per referral (unique `referralId`, resends update
+>   it), an in-app notification `gm_terms_request` (bell, push, popup), the email template
+>   `gm_terms_request` (editable under Email Templates, preference category `system`), and a
+>   `gm_terms_request_sent` row on the customer audit trail with IP and browser.
+> - **The player** sees a popup on their next page, at once if they are online: Accept or Decline.
+>   The email's button opens `/dashboard`, where the same popup appears. **If the player has already
+>   accepted, the popup resolves the request and shows nothing** - pressing the email does nothing.
+> - **Accept** stamps the consent onto the **existing** affiliation through
+>   `recordAffiliationConsent`, which only fills an empty consent on an active row matching
+>   `_id`, `userId` **and** `gameMasterId`, and never creates a row. `affiliate()` stays the single
+>   writer. The player was already under this Game Master; what changes is that consent is now on
+>   record, so their email becomes visible to the Game Master (D6).
+> - **Decline** changes nothing about the affiliation (D1) and records the answer.
+> - **Either answer** tells the Game Master (`gm_terms_request_answered`), writes
+>   `gm_terms_request_accepted` / `_declined` to the audit trail, and puts a message in the bell of
+>   the player's **assigned account manager** (`employee_notifications`). A player with no account
+>   manager produces no admin bell entry; the audit row and the detail tab still show the outcome.
+> - A refused consent leaves the request pending. The status change is one conditional update, so
+>   a double click notifies once. The Game Master is always the session user and the player is
+>   always the session user; neither route reads an identity from the body.
+>
+> **Country and phone.** Both come from the player's profile (`user.country`, `user.phone`) via a
+> `$lookup` on `_id` in the shared read model. **Country** is shown to the Game Master whatever the
+> consent or the package switch say - it is not a way to contact anybody. **Phone is contact data
+> and never reaches the Game Master view.** Admins see both.
+>
+> **Admin, Manage Game Masters -> Referrals tab.** Now rendered by `GmDetailReferralsTab` from the
+> same read model as the report: Own/External badge, email, phone, country, search across all of
+> them, and **Export CSV** (behind the existing export grant). The report CSV gained **Player
+> phone** and **Player country** after Player email; a phone starting with `+` is written `'+...`
+> so a spreadsheet does not run it as a formula.
+>
+> Tests: `gm-terms-request.test.ts` (30), plus additions to `gm-report-screen.test.ts` and
+> `gm-referral-read-model.test.ts`. Probes 207-227, each red on exactly one test. One guard is
+> recorded unprobed with its reason in the harness: the pending condition on the answer claim,
+> which only a true race reaches. **Never verified by eye.**
 
 ---
 

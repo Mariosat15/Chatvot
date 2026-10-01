@@ -16,11 +16,12 @@ import {
   User,
   Shield,
   BarChart3,
-  Search,
   Filter,
 } from "lucide-react";
 import Link from "next/link";
 import CompetitionCreationControl from "./gamemaster/CompetitionCreationControl";
+import GmDetailReferralsTab from "./gamemaster/GmDetailReferralsTab";
+import type { ReferredPlayerRow } from "@/lib/services/gamemaster/referral-read-model";
 import { isGameMasterActiveCompetition } from "@/lib/services/gamemaster/active-competitions";
 
 // ─── Interfaces ───────────────────────────────────────────────────────
@@ -105,6 +106,9 @@ interface GMEarning {
 export interface DetailedGameMasterData {
   subscription: GMSubscription;
   referredUsers: ReferredUser[];
+  /** Shared read-model rows behind the Referrals tab (kind, phone, country, status). */
+  referredPlayers?: ReferredPlayerRow[];
+  referredPlayersTotal?: number;
   competitions: GMCompetition[];
   earnings: GMEarning[];
 }
@@ -118,6 +122,8 @@ interface GameMasterDetailViewProps {
     extraData?: Record<string, unknown>,
   ) => Promise<void>;
   actionLoading: boolean;
+  /** `gamemaster-reports-export` grant; the export route refuses without it either way. */
+  canExport?: boolean;
 }
 
 // ─── Component ────────────────────────────────────────────────────────
@@ -126,12 +132,12 @@ export default function GameMasterDetailView({
   onBack,
   onAction,
   actionLoading,
+  canExport = false,
 }: GameMasterDetailViewProps) {
   const gm = data.subscription;
   const [activeSection, setActiveSection] = useState<
     "overview" | "competitions" | "referrals" | "earnings"
   >("overview");
-  const [referralSearch, setReferralSearch] = useState("");
   const [earningsFilter, setEarningsFilter] = useState<string>("all");
   const [compFilter, setCompFilter] = useState<string>("all");
 
@@ -210,17 +216,6 @@ export default function GameMasterDetailView({
   }, [data.earnings]);
 
   // Filtered lists
-  const filteredReferrals = useMemo(() => {
-    if (!referralSearch) return data.referredUsers;
-    const q = referralSearch.toLowerCase();
-    return data.referredUsers.filter(
-      (u) =>
-        u.name?.toLowerCase().includes(q) ||
-        u.email?.toLowerCase().includes(q) ||
-        u.id?.includes(q),
-    );
-  }, [data.referredUsers, referralSearch]);
-
   const filteredCompetitions = useMemo(() => {
     if (compFilter === "all") return data.competitions;
     return data.competitions.filter((c) => c.status === compFilter);
@@ -260,7 +255,7 @@ export default function GameMasterDetailView({
     },
     {
       id: "referrals" as const,
-      label: `Referrals (${data.referredUsers.length})`,
+      label: `Referrals (${data.referredPlayersTotal ?? data.referredUsers.length})`,
       icon: Users,
     },
     {
@@ -457,11 +452,11 @@ export default function GameMasterDetailView({
       )}
 
       {activeSection === "referrals" && (
-        <ReferralsTab
-          referrals={filteredReferrals}
-          search={referralSearch}
-          onSearchChange={setReferralSearch}
-          total={data.referredUsers.length}
+        <GmDetailReferralsTab
+          rows={data.referredPlayers ?? []}
+          total={data.referredPlayersTotal ?? data.referredPlayers?.length ?? 0}
+          gameMasterId={data.subscription.userId}
+          canExport={canExport}
         />
       )}
 
@@ -808,98 +803,6 @@ function CompetitionsTab({
                     </td>
                     <td className="px-4 py-3 text-gray-400 text-sm">
                       {new Date(comp.endTime).toLocaleDateString()}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Referrals Tab ───────────────────────────────────────────────────
-function ReferralsTab({
-  referrals,
-  search,
-  onSearchChange,
-  total,
-}: {
-  referrals: ReferredUser[];
-  search: string;
-  onSearchChange: (s: string) => void;
-  total: number;
-}) {
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <span className="text-sm text-gray-400">
-          Total referrals: {total}
-        </span>
-        <div className="relative w-64">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search by name, email, ID..."
-            value={search}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded text-white text-sm placeholder-gray-400"
-          />
-        </div>
-      </div>
-
-      {referrals.length === 0 ? (
-        <div className="text-center py-8 text-gray-400">
-          <Users className="h-10 w-10 mx-auto mb-2 text-gray-600" />
-          {search ? "No referrals match your search." : "No referrals yet."}
-        </div>
-      ) : (
-        <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="text-left text-gray-400 text-sm border-b border-gray-700 bg-gray-900/50">
-                  <th className="px-4 py-3">User</th>
-                  <th className="px-4 py-3">Email</th>
-                  <th className="px-4 py-3">User ID</th>
-                  <th className="px-4 py-3">Referred At</th>
-                  <th className="px-4 py-3">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {referrals.map((user) => (
-                  <tr
-                    key={user.id}
-                    className="border-b border-gray-700/50 hover:bg-gray-900/30"
-                  >
-                    <td className="px-4 py-3">
-                      <p className="text-white text-sm font-medium">
-                        {user.name}
-                      </p>
-                    </td>
-                    <td className="px-4 py-3 text-gray-400 text-sm">
-                      {user.email}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="text-gray-500 text-xs font-mono">
-                        {user.id}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-gray-400 text-sm">
-                      {new Date(
-                        user.referredAt || user.createdAt,
-                      ).toLocaleDateString()}
-                    </td>
-                    <td className="px-4 py-3">
-                      <Link
-                        href={`/dashboard?activeTab=users&userId=${user.id}`}
-                        className="text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1"
-                      >
-                        <User className="h-3 w-3" />
-                        View User
-                      </Link>
                     </td>
                   </tr>
                 ))}

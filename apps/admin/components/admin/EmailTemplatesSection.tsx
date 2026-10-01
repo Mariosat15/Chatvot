@@ -23,6 +23,7 @@ import {
   Target,
   AlertTriangle,
   Swords,
+  FileSignature,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -83,7 +84,8 @@ type TemplateType =
   | "competition_starting"
   | "competition_ended"
   | "margin_warning"
-  | "challenge_received";
+  | "challenge_received"
+  | "gm_terms_request";
 
 const TEMPLATE_CONFIG: Record<
   TemplateType,
@@ -428,6 +430,36 @@ const TEMPLATE_CONFIG: Record<
         "Log in to accept or decline the challenge before it expires.",
       ctaButtonText: "View Challenge",
       ctaButtonUrl: "{{baseUrl}}/challenges",
+    },
+  },
+  gm_terms_request: {
+    title: "Game Master Terms Request",
+    description:
+      "Sent when a Game Master asks their own referral to accept the Game Master terms",
+    icon: FileSignature,
+    variables: [
+      "{{name}}",
+      "{{gameMasterName}}",
+      "{{actionUrl}}",
+      "{{platformName}}",
+      "{{baseUrl}}",
+    ],
+    defaults: {
+      templateType: "gm_terms_request",
+      name: "Game Master Terms Request",
+      subject: "📜 {{gameMasterName}} sent you the Game Master terms",
+      headingText: "📜 Please review the Game Master terms",
+      introText:
+        "Hi {{name}}, {{gameMasterName}} is your Game Master on {{platformName}} and has asked you to read and accept the Game Master terms.",
+      featureListLabel: "What this means",
+      featureItems: [
+        "Nothing changes until you answer",
+        "You can accept or decline in the window that opens",
+        "Accepting confirms you play under {{gameMasterName}}",
+      ],
+      closingText: "If you have already answered, there is nothing more to do.",
+      ctaButtonText: "Review Terms",
+      ctaButtonUrl: "{{actionUrl}}",
     },
   },
 };

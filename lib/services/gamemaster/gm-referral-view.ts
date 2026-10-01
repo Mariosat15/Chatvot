@@ -29,6 +29,17 @@ export interface GmReferralView {
    */
   contactMasked: boolean;
   termsAccepted: boolean;
+  /**
+   * The player's country. Reason: a country is not a way to contact anybody, so it is shown
+   * whatever the consent and the package switch say (owner, 1 Oct 2026). The phone number is
+   * contact data and is deliberately NOT a field here.
+   */
+  country: string | null;
+  /**
+   * The Game Master may send this player the affiliation terms: an OWN referral, still current,
+   * with no recorded acceptance. Decided here so the button and the route ask one question.
+   */
+  canSendTerms: boolean;
   kind: ReferralKind;
   surface: AffiliationSurface | null;
   joinedAt: string | null;
@@ -72,6 +83,18 @@ export interface GmReferralViewOptions {
   showExternalDetails: boolean;
 }
 
+/**
+ * Whether "Send T&C" applies to this row. Reason: only an OWN referral - an external player's
+ * hidden contact is the package's decision, and terms would not change it - and only a live
+ * affiliation without an acceptance, so a Game Master cannot re-prompt a player who agreed or
+ * who has already left them.
+ */
+export function canSendReferralTerms(
+  row: Pick<ReferredPlayerRow, "kind" | "isCurrent" | "termsAccepted">,
+): boolean {
+  return row.kind === "own" && row.isCurrent === true && row.termsAccepted !== true;
+}
+
 export function toGameMasterReferralView(
   row: ReferredPlayerRow,
   options: GmReferralViewOptions,
@@ -91,6 +114,8 @@ export function toGameMasterReferralView(
     contactHidden: !visible,
     contactMasked: visible && masked,
     termsAccepted: visible,
+    country: row.country ?? null,
+    canSendTerms: canSendReferralTerms(row),
     kind: row.kind,
     surface: row.surface,
     joinedAt: row.joinedAt,

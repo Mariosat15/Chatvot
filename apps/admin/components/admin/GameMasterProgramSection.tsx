@@ -59,7 +59,7 @@ export default function GameMasterProgramSection({
         ))}
       </div>
       {tab === "masters" ? (
-        <GameMasterManagementSection initialGmId={initialGmId} />
+        <GameMasterManagementSection initialGmId={initialGmId} canExport={canExport} />
       ) : (
         <GmReferredPlayersReport canExport={canExport} />
       )}

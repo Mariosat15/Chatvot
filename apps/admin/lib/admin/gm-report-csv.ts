@@ -51,6 +51,10 @@ export const EXPORT_COLUMNS: readonly Column[] = [
   { header: "Player ID", cell: (r) => r.userId },
   { header: "Player name", cell: (r) => r.userName },
   { header: "Player email", cell: (r) => r.userEmail },
+  // Reason: a phone starting "+" is quoted by escapeCsvCell like any formula start, so the
+  // spreadsheet shows "+44..." as text instead of evaluating it - kept as a string on purpose.
+  { header: "Player phone", cell: (r) => r.phone },
+  { header: "Player country", cell: (r) => r.country },
   { header: "Game Master ID", cell: (r) => r.gameMasterId },
   { header: "Game Master email", cell: (r) => r.gameMasterEmail },
   { header: "Referral type", cell: (r) => REFERRAL_KIND_LABELS[r.kind] },

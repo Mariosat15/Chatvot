@@ -51,6 +51,7 @@ export async function GET(request: NextRequest) {
       "competition_ended",
       "margin_warning",
       "challenge_received",
+      "gm_terms_request",
     ];
 
     const existingTypes = new Set(templates.map((t) => t.templateType));
@@ -190,7 +191,8 @@ export async function POST(request: NextRequest) {
       templateType === "competition_starting" ||
       templateType === "competition_ended" ||
       templateType === "margin_warning" ||
-      templateType === "challenge_received"
+      templateType === "challenge_received" ||
+      templateType === "gm_terms_request"
     ) {
       const { sendTestNotificationEmail } = await import(
         "../../../../../lib/services/email-notification-bridge"
@@ -253,6 +255,7 @@ function getDefaultName(type: string): string {
     competition_ended: "Competition Ended — Results Available",
     margin_warning: "Margin Warning Alert",
     challenge_received: "Challenge Received",
+    gm_terms_request: "Game Master Terms Request",
   };
   return names[type] || "Email Template"; // eslint-disable-line security/detect-object-injection
 }

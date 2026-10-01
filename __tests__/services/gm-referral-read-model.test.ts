@@ -302,6 +302,25 @@ describe("readReferredPlayers - filters, summary, privacy", () => {
     expect(facet.rows[0]).not.toHaveProperty("signupUserAgent");
   });
 
+  // Reason: phone and country live on the Better Auth `user` document, whose identity is `_id`
+  // (R68). A lookup on an `id` field alone reads perfectly and finds nothing, so this is
+  // behavioural: the row must carry the profile's values, and nothing else from the account.
+  it("reads phone and country from the player profile, and only those", async () => {
+    const withProfile = await referral();
+    const without = await referral();
+    await db().collection("user").insertOne({
+      _id: new mongoose.Types.ObjectId(withProfile.userId),
+      email: "secret-account@x.test",
+      phone: "+35799000000",
+      country: "Cyprus",
+    });
+    const { rows } = await readReferredPlayers(db(), all().filter, all().paging, NOW);
+    const found = rows.find((r) => r.userId === withProfile.userId);
+    expect(found).toMatchObject({ phone: "+35799000000", country: "Cyprus" });
+    expect(rows.find((r) => r.userId === without.userId)).toMatchObject({ phone: null, country: null });
+    expect(JSON.stringify(rows)).not.toContain("secret-account");
+  });
+
   it("termsAccepted reflects a stored acceptance only", async () => {
     await referral({ termsAcceptanceId: "t1" });
     await referral();

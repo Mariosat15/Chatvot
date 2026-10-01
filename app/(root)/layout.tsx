@@ -8,6 +8,7 @@ import { getTerms } from "@/lib/services/terminology.service";
 import GlobalPresenceTracker from "@/components/GlobalPresenceTracker";
 import ChallengePopup from "@/components/challenges/ChallengePopup";
 import GmReferralTermsPrompt from "@/components/gamemaster/GmReferralTermsPrompt";
+import GmTermsRequestPrompt from "@/components/gamemaster/GmTermsRequestPrompt";
 import UserSidebar from "@/components/UserSidebar";
 import Header from "@/components/Header";
 import { connectToDatabase } from "@/database/mongoose";
@@ -72,6 +73,10 @@ const Layout = async ({ children }: { children: React.ReactNode }) => {
         {/* Reason: a referral-link sign-up is attached only after the player accepts the
             Gamemaster terms here, once, on their first visit (`External game plans/24` s5.3). */}
         <GmReferralTermsPrompt />
+
+        {/* Reason: an own referral who never accepted the terms answers them here when their
+            Game Master presses "Send T&C" - on load, or the moment the push arrives (s5.5). */}
+        <GmTermsRequestPrompt />
 
         <div className="min-h-screen bg-gray-950 text-gray-400 flex">
           {/* Sidebar Navigation - Desktop Only */}

@@ -17,7 +17,8 @@ export interface IEmailTemplate extends Document {
     | "competition_ended"
     | "margin_warning"
     | "challenge_received"
-    | "notification_alert";
+    | "notification_alert"
+    | "gm_terms_request";
   name: string;
   subject: string;
   fromName: string;
@@ -75,6 +76,10 @@ const EmailTemplateSchema = new Schema<IEmailTemplate>(
         // NotificationTemplate marked `channels.email` needs no enum value here.
         // A missing enum value rejects the whole write, so this list is add-only.
         "notification_alert",
+        // Reason: a Game Master asking their own referral to accept the GM terms.
+        // A dedicated template rather than `notification_alert`, because the owner
+        // wanted it editable on its own under Email Templates.
+        "gm_terms_request",
       ],
       required: true,
       unique: true,
@@ -438,6 +443,29 @@ function getTemplateDefaults(type: string): Partial<IEmailTemplate> {
         closingText:
           "You can change which notifications reach you by email in your account settings.",
         ctaButtonText: "{{actionText}}",
+        ctaButtonUrl: "{{actionUrl}}",
+        useAIPersonalization: false,
+      };
+
+    case "gm_terms_request":
+      // Reason: the button opens the signed-in dashboard, where the terms window asks
+      // the server whether a request is still pending. A player who already answered
+      // therefore sees nothing - pressing an old email does no harm.
+      return {
+        name: "Game Master Terms Request",
+        subject: "📜 {{gameMasterName}} sent you the Game Master terms",
+        headingText: "📜 Please review the Game Master terms",
+        introText:
+          "Hi {{name}}, {{gameMasterName}} is your Game Master on {{platformName}} and has asked you to read and accept the Game Master terms.",
+        featureListLabel: "What this means",
+        featureItems: [
+          "Nothing changes until you answer",
+          "You can accept or decline in the window that opens",
+          "Accepting confirms you play under {{gameMasterName}}",
+        ],
+        closingText:
+          "If you have already answered, there is nothing more to do.",
+        ctaButtonText: "Review Terms",
         ctaButtonUrl: "{{actionUrl}}",
         useAIPersonalization: false,
       };

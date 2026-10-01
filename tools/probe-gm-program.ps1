@@ -1771,6 +1771,164 @@ $results += Invoke-Probe `
     -To '  if (false) {' `
     -TestName "the contact component renders the masked branch" -Suite $EXT
 
+# ---- s5.5: Send T&C, referral phone and country, admin detail tab ----
+$TRT = "__tests__/services/gm-terms-request.test.ts"
+$TRRULES = "lib/services/gamemaster/gm-terms-request-rules.ts"
+$TRSVC = "lib/services/gamemaster/gm-terms-request.service.ts"
+$CONSENT = "lib/services/gamemaster/affiliation-consent.service.ts"
+$RPT = "__tests__/admin/gm-report-screen.test.ts"
+$RMT = "__tests__/services/gm-referral-read-model.test.ts"
+
+# 207. An external referral may be sent the terms.
+$results += Invoke-Probe `
+    -Name "Send allowed on external" -File $TRRULES `
+    -From '  if (facts.kind !== "own") return { ok: false, reason: "not_own_referral" };' `
+    -To '' `
+    -TestName "refuses external and unclassified referrals" -Suite $TRT
+
+# 208. An ended referral may be sent the terms.
+$results += Invoke-Probe `
+    -Name "Send allowed on ended" -File $TRRULES `
+    -From '  if (!facts.isActive) return { ok: false, reason: "referral_ended" };' `
+    -To '' `
+    -TestName "refuses an ended referral and one that already accepted" -Suite $TRT
+
+# 209. No cooldown between sends.
+$results += Invoke-Probe `
+    -Name "Cooldown dropped" -File $TRRULES `
+    -From 'if (facts.now < retryAt) return { ok: false, reason: "cooldown", retryAt };' `
+    -To '' `
+    -TestName "holds a 24 hour cooldown" -Suite $TRT
+
+# 210. No cap on sends.
+$results += Invoke-Probe `
+    -Name "Cap dropped" -File $TRRULES `
+    -From 'if (previous.sendCount >= TERMS_REQUEST_MAX_SENDS) {' `
+    -To 'if (false) {' `
+    -TestName "caps the sends, even after the cooldown" -Suite $TRT
+
+# 211. The send lookup is not scoped to the session Game Master.
+$results += Invoke-Probe `
+    -Name "Send lookup unscoped" -File $TRSVC `
+    -From "      gameMasterId: input.gameMasterUserId,`r`n    }).lean<{" `
+    -To "    }).lean<{" `
+    -TestName "another Game Master.s referral reads as not found" -Suite $TRT
+
+# 212. A paused Game Master may send.
+$results += Invoke-Probe `
+    -Name "Paused GM may send" -File $TRSVC `
+    -From 'if (!gm || gm.status !== "active" || gm.isPaused || gm.scheduledForDeletion) {' `
+    -To 'if (!gm) {' `
+    -TestName "only an active Game Master may send" -Suite $TRT
+
+# 213. A send writes no audit row.
+$results += Invoke-Probe `
+    -Name "Send not audited" -File $TRSVC `
+    -From 'action: "gm_terms_request_sent",' `
+    -To 'action: "gm_terms_request_x",' `
+    -TestName "a send notifies the player, emails them and writes an audit row" -Suite $TRT
+
+# 214. A request on an ended row stays pending.
+$results += Invoke-Probe `
+    -Name "Stale prompt on ended row" -File $TRSVC `
+    -From '      referral?.isActive === true &&' `
+    -To '      true &&' `
+    -TestName "the prompt resolves a request whose row has ended" -Suite $TRT
+
+# 215. A refused consent still marks the request accepted.
+$results += Invoke-Probe `
+    -Name "Consent result ignored" -File $TRSVC `
+    -From '      if (!consent.success) return { success: false, code: consent.code, error: consent.error };' `
+    -To '' `
+    -TestName "a refused consent keeps the request pending" -Suite $TRT
+
+# 216. The account manager is not told about the answer.
+$results += Invoke-Probe `
+    -Name "Account manager not notified" -File $TRSVC `
+    -From '    await notifyAccountManager({' `
+    -To '    void ({' `
+    -TestName "accepting stamps consent on the existing row" -Suite $TRT
+# Unprobed, with reason: the pending condition on the claim. The answer path re-reads a
+# PENDING request first, so a sequential double answer is refused before the claim runs; only
+# a true race reaches it, and a one-file harness cannot produce one.
+
+# 217. The consent stamp is not scoped to the Game Master.
+$results += Invoke-Probe `
+    -Name "Consent stamp unscoped" -File $CONSENT `
+    -From '      gameMasterId: input.gameMasterId,' `
+    -To '' `
+    -TestName "recordAffiliationConsent refuses another Game Master.s row" -Suite $TRT
+
+# 218. The consent stamp overwrites an existing acceptance.
+$results += Invoke-Probe `
+    -Name "Consent stamp overwrites" -File $CONSENT `
+    -From '        { termsAcceptanceId: { $exists: false } },' `
+    -To '        { _id: { $exists: true } },' `
+    -TestName "recordAffiliationConsent never creates a row and never overwrites one" -Suite $TRT
+
+# 219. The send route takes the Game Master from the body.
+$results += Invoke-Probe `
+    -Name "Send route trusts body" -File "app/api/gamemaster/referrals/send-terms/route.ts" `
+    -From 'gameMasterUserId: userId,' `
+    -To 'gameMasterUserId: body?.gameMasterUserId,' `
+    -TestName "both routes take identity from the session" -Suite $TRT
+
+# 220. The dashboard tab offers the button on every row.
+$results += Invoke-Probe `
+    -Name "Button ungated on dashboard" -File "app/(root)/gamemaster/gamemaster-dashboard-tabs.tsx" `
+    -From '{r.canSendTerms && <SendTermsButton' `
+    -To '{<SendTermsButton' `
+    -TestName "the dashboard tab offers Send T and C only behind canSendTerms" -Suite $TRT
+
+# 221. The CSV loses the phone column.
+$results += Invoke-Probe `
+    -Name "CSV phone dropped" -File "apps/admin/lib/admin/gm-report-csv.ts" `
+    -From '  { header: "Player phone", cell: (r) => r.phone },' `
+    -To '' `
+    -TestName "the export carries the player phone and country" -Suite $RPT
+
+# 222. The detail search ignores the phone.
+$results += Invoke-Probe `
+    -Name "Detail search ignores phone" -File "apps/admin/lib/admin/gm-detail-referrals.ts" `
+    -From 'r.phone,' `
+    -To 'null,' `
+    -TestName "the detail search matches phone and country" -Suite $RPT
+
+# 223. The detail tab loses the own/external badge.
+$results += Invoke-Probe `
+    -Name "Detail badge dropped" -File "apps/admin/components/admin/gamemaster/GmDetailReferralsTab.tsx" `
+    -From '<AffiliationSourceBadge kind={row.kind}' `
+    -To '<AffiliationSourceBadge kind={"own"}' `
+    -TestName "the detail tab renders the badge, the phone, the country and the export" -Suite $RPT
+
+# 224. The detail route stops sending the shared rows.
+$results += Invoke-Probe `
+    -Name "Detail rows not sent" -File "apps/admin/app/api/gamemasters/[id]/route.ts" `
+    -From 'referredPlayers: referredPlayers.rows,' `
+    -To 'referredPlayers: [],' `
+    -TestName "the detail view renders the shared tab" -Suite $RPT
+
+# 225. The profile lookup joins on the wrong key.
+$results += Invoke-Probe `
+    -Name "Profile joined on id" -File "lib/services/gamemaster/referral-read-model.ts" `
+    -From '        foreignField: "_id",' `
+    -To '        foreignField: "id",' `
+    -TestName "reads phone and country from the player profile" -Suite $RMT
+
+# 226. The terms-request email template is missing from the admin screen.
+$results += Invoke-Probe `
+    -Name "Email template off screen" -File "apps/admin/components/admin/EmailTemplatesSection.tsx" `
+    -From 'gm_terms_request' `
+    -To 'gm_terms_x' `
+    -TestName "the terms-request email template exists" -Suite $RPT
+
+# 227. The full referrals page offers the button on every row.
+$results += Invoke-Probe `
+    -Name "Button ungated on referrals page" -File "app/(root)/gamemaster/referrals/page.tsx" `
+    -From '{user.canSendTerms && (' `
+    -To '{true && (' `
+    -TestName "the referrals page offers Send T and C only behind canSendTerms" -Suite $TRT
+
 Write-Host ""
 Write-Host "================ SUMMARY ================"
 $results | Format-Table -AutoSize
