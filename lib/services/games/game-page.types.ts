@@ -66,6 +66,12 @@ export interface GamePageContestSummary {
   maxParticipants: number;
   startTime: string;
   endTime: string;
+  /**
+   * Present on a private Game Master contest only. A string rather than the service's union
+   * because this type is client-reachable (R58); read it through `isPrivateCardAccess`.
+   */
+  privateAccess?: string;
+  privateGameMasterName?: string;
 }
 
 /** Alias used by client helpers — same row as `GamePageContestSummary`. */

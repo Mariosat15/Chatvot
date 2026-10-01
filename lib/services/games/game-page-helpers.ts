@@ -48,10 +48,17 @@ export function resolvePlayNowHref(
   game: Pick<GamePageData, "slug" | "formats">,
   contests: GamePageContest[],
 ): string | null {
-  const active = contests.find((c) => c.status === "active");
+  // Reason: private contests are listed to every signed-in player, but "Play now" is a promise
+  // the player can play. A private contest they are not a member of leads to the Join GM gate,
+  // so it is never the one-click target - the card itself still offers "Join GM to enter".
+  const playable = contests.filter(
+    (c) => !c.privateAccess || c.privateAccess === "member",
+  );
+
+  const active = playable.find((c) => c.status === "active");
   if (active) return `/competitions/${active.id}`;
 
-  const upcoming = contests.find((c) => c.status === "upcoming");
+  const upcoming = playable.find((c) => c.status === "upcoming");
   if (upcoming) return `/competitions/${upcoming.id}`;
 
   if (game.formats.practice) return practiceHref(game.slug);

@@ -915,6 +915,29 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 1 Oct 2026 - The private badge on the game page and in the admin list
+
+A private contest on a game's own page (`/games/[slug]`) looked public: no badge, and a
+"Join Competition" button that led a non-member to the Join GM gate. The admin competitions
+list did not mark private contests at all.
+
+- **The change:** the game page's contest list reuses `annotatePrivateContests`, the badge and
+  the "Join GM to enter" / "Members only" action from the competitions list, so the two lists
+  word it identically. The admin list shows an amber **Private** badge, read through
+  `resolveCompetitionVisibility`.
+- **A seated player reads as a member (D5).** The game page has no seated state of its own, so
+  the catalogue looks up the viewer's own seats in one query.
+- **Behaviour change:** "Play now" no longer targets a private contest the player cannot
+  enter; it falls through to the next option.
+- **What was not done:** the admin public/private **filter**, which belongs with the rebuilt
+  admin Game Master area (task 4). Nothing was backfilled; this is display only.
+- **Incidental:** a pre-existing `exhaustive-deps` warning in `CompetitionsListSection.tsx`
+  was silenced in place with its reason, because the pre-commit hook blocks any edit to that
+  file at zero warnings. Behaviour unchanged: it still loads once on mount.
+- **Tests:** `gm-private-game-page.test.ts`, 7 tests. Probes 115-120 added; each is red on
+  exactly one test. Both typechecks show no errors in the changed files (admin 244, unchanged).
+- **Never verified by eye:** both screens are behind sign-in.
+
 ### 1 Oct 2026 - The status route no longer reports a named player's rank and prize (R117, public half)
 
 `GET /api/competitions/[id]/status` used to read a `userId` from the address. That meant

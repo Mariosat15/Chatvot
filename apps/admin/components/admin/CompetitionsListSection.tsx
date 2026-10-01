@@ -23,11 +23,13 @@ import {
   Shield,
   FileEdit,
   Gamepad2,
+  Lock,
 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
 import { PublishContestButton } from "@/components/admin/games/PublishContestButton";
 import { hasProviderGameLabel } from "@/lib/admin/contest-game-label";
+import { resolveCompetitionVisibility } from "@/lib/services/gamemaster/competition-visibility";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -138,6 +140,8 @@ interface Competition {
   // that `GET /api/competitions` uses `.lean()`, so the schema default is NOT filled in.
   gameType?: string;
   gameKey?: string;
+  // Lean read, so absent on every contest created before the field existed - which means public.
+  visibility?: string;
 }
 
 export default function CompetitionsListSection() {
@@ -160,8 +164,11 @@ export default function CompetitionsListSection() {
   const [cancelReason, setCancelReason] = useState("");
   const [isCancelling, setIsCancelling] = useState(false);
 
+  // Reason: load once on mount. `fetchCompetitions` is recreated every render, so listing it
+  // would refetch on every render; the pre-existing warning only blocks commits to this file.
   useEffect(() => {
     fetchCompetitions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchCompetitions = async () => {
@@ -461,6 +468,17 @@ export default function CompetitionsListSection() {
                     <div className="px-3 py-1 rounded-full border text-xs font-semibold flex items-center gap-1 bg-cyan-500/20 text-cyan-400 border-cyan-500/30">
                       <Shield className="h-3 w-3" />
                       Admin
+                    </div>
+                  )}
+
+                  {/* Reason: a members-only contest looked exactly like a public one here, so an
+                      operator answering "why can't I join?" had nothing on screen to go on. Read
+                      through the resolver, never `=== "gm_private"`: an absent, null or empty
+                      stored value means public, and anything unrecognised means private. */}
+                  {resolveCompetitionVisibility(competition.visibility) === "gm_private" && (
+                    <div className="px-3 py-1 rounded-full border text-xs font-semibold flex items-center gap-1 bg-amber-500/20 text-amber-300 border-amber-500/30">
+                      <Lock className="h-3 w-3" />
+                      Private
                     </div>
                   )}
 

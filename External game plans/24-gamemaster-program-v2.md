@@ -231,8 +231,15 @@ The rule: **a `gm_private` contest can be entered, and its details read, only by
 > **Also fixed on the way:** `competition-id-guard.test.ts` had gone stale since 23 Sep 2026, when `/trade` became a redirect to `/play` and stopped reading the contest. It now asserts the guard precedes the redirect. No behaviour changed.
 >
 > **Still not built, and must not be summarised as done:**
-> - The admin **Private** badge and filter in the competitions list (step 7).
+> - ~~The admin **Private** badge~~ and filter in the competitions list (step 7). **The badge was built 1 Oct 2026; the filter is still not built** (it belongs with the rebuilt admin Game Master area).
 > - Excluding private contests from platform-wide announcements (step 8).
+>
+> **BUILT 1 Oct 2026: the private badge on the game page and in the admin list.**
+> - **Game page** (`/games/[slug]`): `listContestsForGame` now runs the same `annotatePrivateContests` the competitions list uses, so each private contest carries `privateAccess` and the Game Master's name. `GamePageContests` renders the same `PrivateContestBadge`, and swaps "Join Competition" for the same `PrivateContestCardAction` ("Join GM to enter" / "Members only") for a non-member. The wording therefore has one source.
+> - **A seat counts as membership here (D5).** The competitions card checks its own seated state first; the game page has no seated state, so the catalogue looks up the viewer's own seats among the private contests in one query and reports them as `member`. The lookup compares `competitionId` as a **string**, because the participant model declares it `String`.
+> - **Behaviour change: "Play now" skips private contests the player cannot enter.** `resolvePlayNowHref` used to pick the first live contest. It now ignores a private one unless the player is a member, falling through to the next contest, practice or a challenge. The card itself still offers "Join GM to enter".
+> - **Admin list:** `CompetitionsListSection` shows an amber **Private** badge beside the creator badge, read through `resolveCompetitionVisibility` (absent, `null` or `""` means public). Nothing in the admin list's data changed: `GET /api/competitions` already returned `visibility`.
+> - **Tests and probes:** `__tests__/services/gm-private-game-page.test.ts` (7 tests). Probes 115-120 are all red on exactly one test.
 >
 > **Tests and probes:** `__tests__/services/gm-private-contest-view.test.ts` has 24 tests, and `gm-leaderboard-join` has 2 more. Probes 86-104 are all red on exactly one test. One clause is deliberately unprobed, with the reason in the harness: the signed-out refusal. Removing it changes no answer, because a blank id finds no seat and no affiliation.
 >

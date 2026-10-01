@@ -1,5 +1,6 @@
 import { connectToDatabase } from "@/database/mongoose";
 import Competition from "@/database/models/trading/competition.model";
+import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
 import GameCatalogueEntry from "@/database/models/games/game-catalogue-entry.model";
 import GameProvider from "@/database/models/games/game-provider.model";
 import ProviderGame from "@/database/models/games/provider-game.model";
@@ -15,6 +16,10 @@ import {
   withVisibleContests,
   type ContestViewer,
 } from "@/lib/services/gamemaster/visible-contests";
+import {
+  annotatePrivateContests,
+  type PrivateListingAccess,
+} from "@/lib/services/gamemaster/private-contest-listing.service";
 import { TRADING_PAGE_DEFAULTS } from "@/lib/services/games/trading-page-defaults";
 
 /**
@@ -69,6 +74,9 @@ export interface CatalogueContestSummary {
   maxParticipants: number;
   startTime: string;
   endTime: string;
+  /** Present on a private Game Master contest only - same answer the competitions list gives. */
+  privateAccess?: PrivateListingAccess;
+  privateGameMasterName?: string;
 }
 
 /** Fallback when the DB read fails mid-list — same copy the store seeds from. */
@@ -315,6 +323,28 @@ function providerContestFilter(gameKey: string): Record<string, unknown> {
   };
 }
 
+/** Which of these contest ids the viewer already holds a seat in. One query; never throws. */
+async function seatedAmong(
+  contestIds: string[],
+  userId: string | null | undefined,
+): Promise<Set<string>> {
+  if (!userId || contestIds.length === 0) return new Set();
+  try {
+    // Reason: `competitionId` is declared String on the participant model, so the ids are
+    // compared as strings - an ObjectId `$in` here would match nothing and say so silently.
+    const rows = await CompetitionParticipant.find({
+      userId,
+      competitionId: { $in: contestIds },
+    })
+      .select("competitionId")
+      .lean<{ competitionId: string }[]>();
+    return new Set(rows.map((r) => String(r.competitionId)));
+  } catch (error) {
+    console.warn("⚠️ Seat lookup for private contest labels failed:", error);
+    return new Set();
+  }
+}
+
 /**
  * Live and upcoming contests for one catalogue game.
  *
@@ -336,11 +366,12 @@ export async function listContestsForGame(
       ? tradingContestFilter()
       : providerContestFilter(trimmed);
 
-  // Reason: a Game Master's private contest is listed only to that GM's affiliates (D8). An
-  // absent viewer defaults to public-only, so a new caller cannot leak one by forgetting it.
+  // Reason: an absent viewer defaults to public-only, so a new caller cannot leak a private
+  // contest by forgetting it. A signed-in viewer is listed every contest (owner, 30 Sep 2026)
+  // and private ones are labelled below.
   const rows = await Competition.find(withVisibleContests(query, viewer))
     .select(
-      "name status entryFee prizePool currentParticipants maxParticipants startTime endTime gameType gameKey providerKey currentParticipants",
+      "name status entryFee prizePool currentParticipants maxParticipants startTime endTime gameType gameKey providerKey visibility gameMasterId",
     )
     .sort({ startTime: 1 })
     .limit(50)
@@ -358,6 +389,8 @@ export async function listContestsForGame(
         gameType?: string;
         gameKey?: string;
         providerKey?: string;
+        visibility?: string;
+        gameMasterId?: string;
       }[]
     >();
 
@@ -370,7 +403,18 @@ export async function listContestsForGame(
     (c) => !shouldHideUpcomingEmptyDuringOutage(c as never, blocking),
   );
 
-  return visible.map((c) => ({
+  // Reason: since 30 Sep 2026 a signed-in player is listed every private contest, so this page
+  // must label them exactly as the competitions list does - same helper, same gate state -
+  // or a non-member is shown a plain "Join Competition" the lobby then refuses.
+  const annotated = await annotatePrivateContests(visible, viewer);
+  const seated = await seatedAmong(
+    annotated
+      .filter((c) => c.privateAccess && c.privateAccess !== "member")
+      .map((c) => c._id.toString()),
+    viewer?.userId,
+  );
+
+  return annotated.map((c) => ({
     id: c._id.toString(),
     name: c.name,
     status: c.status === "active" ? "active" : "upcoming",
@@ -382,5 +426,14 @@ export async function listContestsForGame(
       typeof c.maxParticipants === "number" ? c.maxParticipants : 0,
     startTime: new Date(c.startTime).toISOString(),
     endTime: new Date(c.endTime).toISOString(),
+    ...(c.privateAccess
+      ? {
+          // Reason: D5 - a seated player keeps the contest whatever their Game Master status
+          // has become since. The competitions card shows its seated state first; this list
+          // has no seated state, so the seat is folded in as membership.
+          privateAccess: seated.has(c._id.toString()) ? "member" : c.privateAccess,
+          privateGameMasterName: c.privateGameMasterName,
+        }
+      : {}),
   }));
 }

@@ -8,6 +8,10 @@ import {
   competitionBrowseHref,
 } from "@/lib/services/games/game-page-helpers";
 import type { GamePageData } from "@/lib/services/games/game-page.types";
+import {
+  PrivateContestBadge,
+  PrivateContestCardAction,
+} from "@/components/gamemaster/PrivateContestCardParts";
 import { GamePagePanel, GP_CTA_PRIMARY, GP_CTA_SECONDARY } from "./GamePageChrome";
 
 function timeLabel(iso: string, status: "active" | "upcoming"): string {
@@ -131,9 +135,12 @@ export function GamePageContests({ game }: { game: GamePageData }) {
                 </span>
               </div>
               <div className="flex flex-1 flex-col gap-3 p-4">
-                <p className="text-[17px] font-bold leading-snug text-white">
-                  {c.name}
-                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-[17px] font-bold leading-snug text-white">
+                    {c.name}
+                  </p>
+                  <PrivateContestBadge access={c.privateAccess} />
+                </div>
                 <div className="space-y-1.5 text-[14px] text-[var(--gp-muted)]">
                   <p className="inline-flex items-center gap-1.5">
                     <Users className="h-3.5 w-3.5" />
@@ -156,12 +163,25 @@ export function GamePageContests({ game }: { game: GamePageData }) {
                     {timeLabel(clockIso, c.status)}
                   </p>
                 </div>
-                <Link
-                  href={`/competitions/${c.id}`}
-                  className={`${GP_CTA_PRIMARY} mt-auto !py-2.5 !text-[13px]`}
-                >
-                  {live ? "Join Competition" : "View Competition"}
-                </Link>
+                {/* Reason: the same parts the competitions list renders, so a non-member is
+                    offered "Join GM to enter" or "Members only" rather than a join button the
+                    lobby would refuse. A member and a public contest get the ordinary link. */}
+                {c.privateAccess && c.privateAccess !== "member" ? (
+                  <div className="mt-auto">
+                    <PrivateContestCardAction
+                      competitionId={c.id}
+                      access={c.privateAccess}
+                      gameMasterName={c.privateGameMasterName}
+                    />
+                  </div>
+                ) : (
+                  <Link
+                    href={`/competitions/${c.id}`}
+                    className={`${GP_CTA_PRIMARY} mt-auto !py-2.5 !text-[13px]`}
+                  >
+                    {live ? "Join Competition" : "View Competition"}
+                  </Link>
+                )}
               </div>
             </li>
           );

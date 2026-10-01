@@ -1076,6 +1076,61 @@ $results += Invoke-Probe `
     -To 'competition.status === "completed" ? (new URL(_request.url).searchParams.get("userId") ?? undefined) : undefined;' `
     -TestName "status reports the ranking of the signed-in caller only" -Suite $CV
 
+# ---- Task 2 (1 Oct 2026): the private badge on the game page and the admin list ----
+$GP = "__tests__/services/gm-private-game-page.test.ts"
+$CAT = "lib/services/games/player-catalogue.service.ts"
+
+# 115. The game page drops the access state, so a private contest looks public.
+$results += Invoke-Probe `
+    -Name "Catalogue drops privateAccess" `
+    -File $CAT `
+    -From 'privateAccess: seated.has(c._id.toString()) ? "member" : c.privateAccess,' `
+    -To 'privateAccess: undefined,' `
+    -TestName "carries the private access state and Game Master name" -Suite $GP
+
+# 116. A seated player is offered the gate again (D5).
+$results += Invoke-Probe `
+    -Name "Catalogue ignores the seat" `
+    -File $CAT `
+    -From 'privateAccess: seated.has(c._id.toString()) ? "member" : c.privateAccess,' `
+    -To 'privateAccess: c.privateAccess,' `
+    -TestName "reads a seated player as a member" -Suite $GP
+
+# 117. Anybody's seat counts as the viewer's.
+$results += Invoke-Probe `
+    -Name "Seat lookup not scoped to the viewer" `
+    -File $CAT `
+    -From '    const rows = await CompetitionParticipant.find({
+      userId,
+      competitionId' `
+    -To '    const rows = await CompetitionParticipant.find({
+      competitionId' `
+    -TestName "counts only the viewer's own seat" -Suite $GP
+
+# 118. Play now one-clicks into a contest the player cannot enter.
+$results += Invoke-Probe `
+    -Name "Play now ignores private access" `
+    -File "lib/services/games/game-page-helpers.ts" `
+    -From '(c) => !c.privateAccess || c.privateAccess === "member",' `
+    -To '() => true,' `
+    -TestName "skips a live private contest the player cannot enter" -Suite $GP
+
+# 119. The game page card offers Join Competition on every private contest.
+$results += Invoke-Probe `
+    -Name "Game page card drops the gate" `
+    -File "components/game-page/GamePageContests.tsx" `
+    -From '{c.privateAccess && c.privateAccess !== "member" ? (' `
+    -To '{false ? (' `
+    -TestName "gates the action on membership" -Suite $GP
+
+# 120. The admin list stops badging private contests.
+$results += Invoke-Probe `
+    -Name "Admin list loses the Private badge" `
+    -File "apps/admin/components/admin/CompetitionsListSection.tsx" `
+    -From '{resolveCompetitionVisibility(competition.visibility) === "gm_private" && (' `
+    -To '{false && (' `
+    -TestName "the admin competitions list renders Private" -Suite $GP
+
 Write-Host ""
 Write-Host "================ SUMMARY ================"
 $results | Format-Table -AutoSize
