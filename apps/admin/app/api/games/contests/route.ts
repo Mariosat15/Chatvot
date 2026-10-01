@@ -15,6 +15,7 @@ import {
   type UnscoredContestPolicy,
 } from "@/lib/services/games/round-types";
 import type { PlayMode } from "@/lib/services/games/play-shape";
+import type { GameTieRule } from "@/lib/services/games/game-tie-rule";
 
 /**
  * GET  /api/games/contests - the titles a contest can be created on, with their settings schema
@@ -53,6 +54,7 @@ interface ContestBody {
   resultGracePeriodSeconds?: number;
   perRoundCostAcknowledged?: boolean;
   playMode?: PlayMode;
+  tieRule?: string;
 }
 
 export async function GET() {
@@ -144,16 +146,18 @@ export async function POST(request: NextRequest) {
       startTime: dates.startTime,
       endTime: dates.endTime,
       // Validated against the allowed list rather than passed through, because this decides
-      // where a whole prize pool goes. An unrecognised value falls back to the refund the
-      // wizard defaults to, so a stale client cannot silently redirect money to the platform.
+      // where a whole prize pool goes. An unrecognised value falls back to the unclaimed
+      // pool, which is both the wizard's default (owner, 1 Oct 2026) and the schema's.
       unscoredContestPolicy: UNSCORED_CONTEST_POLICIES.includes(
         body.unscoredContestPolicy as UnscoredContestPolicy,
       )
         ? body.unscoredContestPolicy
-        : "refund_entry_fees",
+        : "unclaimed_pool",
       // Passed through: the service refuses an out-of-range value by name rather than this
       // route quietly replacing the operator's choice with the default.
       startWaitSeconds: body.startWaitSeconds,
+      // Passed through: the service refuses anything but the two game tie rules by name.
+      tieRule: body.tieRule as GameTieRule | undefined,
       createdBy: guard.admin.id,
     });
 

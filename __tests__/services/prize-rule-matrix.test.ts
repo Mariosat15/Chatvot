@@ -630,6 +630,7 @@ describe("the redistribution rule is mirrored byte for byte", () => {
       const code = strip(read(copy));
       expect(code, copy).toContain('participant.status === "disqualified"');
       expect(code, copy).toContain("normalisePrizeShares(");
+      expect(code, copy).toContain("mergeTiedRankShares(");
       expect(code, copy).toContain("allocateWithoutRoundingLoss(");
     }
   });

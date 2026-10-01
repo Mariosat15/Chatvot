@@ -15,6 +15,7 @@ import { getGameModuleOrTrading } from "@/lib/games/registry";
 import type { GameModule, ScoreDirection } from "@/lib/games/types";
 import {
   allocateWithoutRoundingLoss,
+  mergeTiedRankShares,
   normalisePrizeShares,
 } from "@/lib/utils/prize-shares";
 
@@ -82,14 +83,18 @@ export interface CompetitionRules {
     | "total_capital"
     | "roi"
     | "join_time"
-    | "split_prize";
+    | "split_prize"
+    | "fastest_time"
+    | "completed_at";
   tieBreaker2?:
     | "trades_count"
     | "win_rate"
     | "total_capital"
     | "roi"
     | "join_time"
-    | "split_prize";
+    | "split_prize"
+    | "fastest_time"
+    | "completed_at";
   minimumTrades: number;
   minimumWinRate?: number;
   tiePrizeDistribution: "split_equally" | "split_weighted" | "first_gets_all";
@@ -462,11 +467,12 @@ export function calculateRankings(
  * `calculateRankings` gives two tied players rank 1 and sends the next player to rank 3.
  * So the change reaches tie payouts as well as ineligible ones - there is no way for the
  * normalisation to tell "nobody eligible holds this rank" from "a tie skipped past it",
- * and inventing one would mean two redistribution rules. What was NOT changed is which
- * ranks a tied group absorbs: two players tied for first still share first place's share
- * alone, with second place's share normalised across everybody. Making a tied group
- * absorb the ranks it occupies is a defensible different rule and a third behaviour
- * change nobody asked for, so it is recorded here rather than smuggled in.
+ * and inventing one would mean two redistribution rules. UNTIL 1 OCTOBER 2026 a tied group
+ * did NOT absorb the ranks it occupies: two players tied for first shared first place's
+ * share alone, with second place's share normalised across everybody (50/30/20 paid
+ * 35.7 / 35.7 / 28.6). The owner chose the other rule that day - a tied group takes the
+ * shares of every position it occupies (40 / 40 / 20) - and it is `mergeTiedRankShares`,
+ * applied before normalisation so a tie no longer reads as a vacated rank.
  *
  * @param platformFeeFraction A FRACTION, not a percentage: pass 0.1 for a 10% fee.
  *   Renamed from `platformFeePercentage` on 4 Sep 2026 (risk R30). The old name was
@@ -533,7 +539,11 @@ export function distributePrizesWithTies(
     settlement pays another - and the promise is the one the player read before paying.
   */
   const normalised = normalisePrizeShares(
-    prizeDistribution,
+    mergeTiedRankShares(
+      prizeDistribution,
+      // eslint-disable-next-line security/detect-object-injection -- rank from the prize table
+      (rank) => rankGroups[rank]?.length ?? 0,
+    ),
     // Reason: `rank` comes from the contest's own prize table, not from a request, and the
     // linter cannot tell the two apart. Disabled inline, which is the convention already
     // used for this false positive in `app/arena/page.tsx` and `api-server/routes/`.

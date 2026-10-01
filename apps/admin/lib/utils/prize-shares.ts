@@ -129,6 +129,56 @@ export function normalisePrizeShares(
 }
 
 /**
+ * Give a tied group the shares of EVERY position it occupies, before normalisation.
+ *
+ * Owner's rule, 1 October 2026: with 50/30/20 and two players tied for first, each is paid
+ * 40 and third place keeps 20. `calculateRankings` gives both rank 1 and sends the next
+ * player to rank 3, so rank 2 has no holder - and without this step `normalisePrizeShares`
+ * read that as a VACATED rank and spread its 30 across every winner in proportion, paying
+ * 35.7 / 35.7 / 28.6. Third place was being handed part of a share the tie had used up.
+ *
+ * A rank is absorbed only when nobody holds it, so a well-formed ranking can never lose a
+ * share here; a rank somebody holds always keeps its own row. Every field is copied by
+ * name for the Mongoose-subdocument reason documented in `normalisePrizeShares`.
+ *
+ * @param groupSizeAt How many eligible players hold this rank (0 when none).
+ */
+export function mergeTiedRankShares(
+  distribution: ConfiguredShare[],
+  groupSizeAt: (rank: number) => number,
+): ConfiguredShare[] {
+  const rows = distribution
+    .map((d) => ({
+      rank: d.rank,
+      percentage: Number.isFinite(d.percentage) ? d.percentage : 0,
+    }))
+    .sort((a, b) => a.rank - b.rank);
+
+  const absorbed = new Set<number>();
+  const merged: ConfiguredShare[] = [];
+  for (const row of rows) {
+    if (absorbed.has(row.rank)) continue;
+    const size = groupSizeAt(row.rank);
+    let percentage = row.percentage;
+    if (size > 1) {
+      const lastOccupied = row.rank + size - 1;
+      for (const other of rows) {
+        if (
+          other.rank > row.rank &&
+          other.rank <= lastOccupied &&
+          groupSizeAt(other.rank) === 0
+        ) {
+          percentage += other.percentage;
+          absorbed.add(other.rank);
+        }
+      }
+    }
+    merged.push({ rank: row.rank, percentage });
+  }
+  return merged;
+}
+
+/**
  * Round a set of exact prize amounts to whole cents so that they still add up.
  *
  * LARGEST REMAINDER, because flooring each winner independently LOSES credits. Three

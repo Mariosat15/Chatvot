@@ -15,6 +15,7 @@ import {
   unresolvedRoundPolicyCopy,
 } from "@/lib/services/games/round-types";
 import { PrizeDistributionEditor } from "../PrizeDistributionEditor";
+import { TieRuleField } from "../TieRuleField";
 import { UnscoredPolicyField } from "../UnscoredPolicyField";
 import type { ContestDraft } from "../contest-draft";
 import { NumberField } from "./fields";
@@ -57,6 +58,11 @@ export function StepPrizes({
           platformFeePercentage={draft.platformFeePercentage}
         />
       </div>
+
+      <TieRuleField
+        value={draft.tieRule}
+        onChange={(tieRule) => patch({ tieRule })}
+      />
 
       {/*
         WITHHELD WITH ITS REASON on a simultaneous title, matching the round-start control on

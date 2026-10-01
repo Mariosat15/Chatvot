@@ -9,6 +9,10 @@
 import type { ConfigField } from "@/lib/services/games/config-schema";
 import { resolveAttemptSeconds } from "@/lib/services/games/config-schema";
 import type { PlayMode } from "@/lib/services/games/play-shape";
+import {
+  DEFAULT_GAME_TIE_RULE,
+  type GameTieRule,
+} from "@/lib/services/games/game-tie-rule";
 import { DEFAULT_START_WAIT_SECONDS } from "@/lib/services/games/start-wait";
 import {
   deriveResultGraceSeconds as deriveGraceFromFloor,
@@ -73,6 +77,8 @@ export interface ContestDraft {
   attemptsAllowed?: number;
   unresolvedRoundPolicy: "score_zero" | "exclude" | "hold_and_alert";
   unscoredContestPolicy: UnscoredContestPolicy;
+  /** What happens on an equal score (owner, 1 Oct 2026). Create only, like playMode. */
+  tieRule: GameTieRule;
   roundStartPolicy: RoundStartPolicy;
   /**
    * Together-start contests only: how many minutes play may wait for two ready players before
@@ -119,10 +125,11 @@ export const emptyDraft: ContestDraft = {
   playMode: "anytime",
   attemptsPolicy: "single",
   unresolvedRoundPolicy: "score_zero",
-  // Defaults to the refund, which is NOT the schema default. The schema keeps
-  // `unclaimed_pool` so documents written before the field existed settle the way they always
-  // did; a new contest an operator is creating today gets the owner's preferred answer.
-  unscoredContestPolicy: "refund_entry_fees",
+  // Reason: the owner reversed the 7 Sep 2026 refund default on 1 Oct 2026 - when nobody
+  // scores, the pot goes to the unclaimed pool. It now AGREES with the schema default; the
+  // operator can still pick the refund on the schedule step.
+  unscoredContestPolicy: "unclaimed_pool",
+  tieRule: DEFAULT_GAME_TIE_RULE,
   // Reason: the owner's answer, 8 September 2026, and it AGREES with the schema default -
   // unlike the line above, these two are deliberately the same. Every player gets the same
   // playing time or does not start at all, which is only fair once the playing time is the
@@ -202,6 +209,7 @@ export function toRequestBody(
       draft.attemptsPolicy === "single" ? undefined : draft.attemptsAllowed,
     unresolvedRoundPolicy: draft.unresolvedRoundPolicy,
     unscoredContestPolicy: draft.unscoredContestPolicy,
+    tieRule: draft.tieRule,
     roundStartPolicy: draft.roundStartPolicy,
     // How long a together-start contest waits for two ready players before it is cancelled
     // and refunded in full. Scheduled contests only, and create only: an edit must not move

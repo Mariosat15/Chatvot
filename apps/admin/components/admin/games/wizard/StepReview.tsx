@@ -6,6 +6,7 @@ import type { ContestableTitle } from "../contest-types";
 import { Notice, Problem } from "./fields";
 import { formatVolts } from "@/lib/utils/format-volts";
 import { useTerms } from "@/contexts/TerminologyContext";
+import { GAME_TIE_RULE_COPY } from "@/lib/services/games/game-tie-rule";
 
 /**
  * Step six: what the pre-flight said, a summary of the answers, and the publish decision.
@@ -95,6 +96,9 @@ export function StepReview({
                 : `${draft.attemptsPolicy === "best_of_n" ? "Best" : "Total"} of ${
                     draft.attemptsAllowed ?? "-"
                   }`}
+            </SummaryRow>
+            <SummaryRow label="Equal scores">
+              {GAME_TIE_RULE_COPY.get(draft.tieRule)?.label ?? draft.tieRule}
             </SummaryRow>
           </div>
 

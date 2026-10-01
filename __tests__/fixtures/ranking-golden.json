@@ -450,19 +450,19 @@
       "payouts": [
         {
           "userId": "ddddddddddddddddddddddd1",
-          "prizeAmount": 428.57,
+          "prizeAmount": 450,
           "rank": 1,
           "isTied": true
         },
         {
           "userId": "ddddddddddddddddddddddd2",
-          "prizeAmount": 428.57,
+          "prizeAmount": 450,
           "rank": 1,
           "isTied": true
         },
         {
           "userId": "ddddddddddddddddddddddd3",
-          "prizeAmount": 142.86,
+          "prizeAmount": 100,
           "rank": 3,
           "isTied": false
         }

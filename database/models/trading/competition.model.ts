@@ -189,14 +189,18 @@ export interface ICompetition extends Document {
       | "total_capital"
       | "roi"
       | "join_time"
-      | "split_prize";
+      | "split_prize"
+      | "fastest_time"
+      | "completed_at";
     tieBreaker2?:
       | "trades_count"
       | "win_rate"
       | "total_capital"
       | "roi"
       | "join_time"
-      | "split_prize";
+      | "split_prize"
+      | "fastest_time"
+      | "completed_at";
     minimumTrades: number;
     minimumWinRate?: number;
     tiePrizeDistribution: "split_equally" | "split_weighted" | "first_gets_all";
@@ -577,6 +581,9 @@ const CompetitionSchema = new Schema<ICompetition>(
           "roi",
           "join_time",
           "split_prize",
+          // Game tie-breakers (1 Oct 2026, `lib/services/games/game-tie-rule.ts`).
+          "fastest_time",
+          "completed_at",
         ],
         required: true,
         default: "trades_count",
@@ -590,6 +597,9 @@ const CompetitionSchema = new Schema<ICompetition>(
           "roi",
           "join_time",
           "split_prize",
+          // Game tie-breakers (1 Oct 2026, `lib/services/games/game-tie-rule.ts`).
+          "fastest_time",
+          "completed_at",
         ],
       },
       minimumTrades: {

@@ -15,6 +15,12 @@ import { runPreflight } from "@/lib/services/games/contest-preflight";
 import { resolveContestEntryDeadline } from "@/lib/services/games/entry-deadline";
 import { scheduledStartTooSoon } from "@/lib/services/games/scheduled-start";
 import {
+  DEFAULT_GAME_TIE_RULE,
+  gameTieRuleToRules,
+  isGameTieRule,
+  type GameTieRule,
+} from "@/lib/services/games/game-tie-rule";
+import {
   isValidStartWaitSeconds,
   MAX_START_WAIT_SECONDS,
   MIN_START_WAIT_SECONDS,
@@ -86,6 +92,12 @@ export interface CreateProviderContestInput {
   unresolvedRoundPolicy: UnresolvedRoundPolicy;
   /** Owner decision, 7 Sep 2026. See `UnscoredContestPolicy`. */
   unscoredContestPolicy?: UnscoredContestPolicy;
+  /**
+   * Owner decision, 1 Oct 2026: what happens on an equal score. Absent means
+   * `fastest_wins`. The stored `rules` are written FROM this, so a caller can never
+   * store trading's `split_weighted` or `first_gets_all` on a game contest.
+   */
+  tieRule?: GameTieRule;
   /** Owner decision, 7 Sep 2026. See `RoundStartPolicy`. */
   roundStartPolicy?: RoundStartPolicy;
   /** Owner rule, 28 Sep 2026. Together-start contests only; absent means the default. */
@@ -494,10 +506,18 @@ export async function createProviderContest(
       attemptsPolicy,
       attemptsAllowed: attemptsPolicy === "single" ? undefined : input.attemptsAllowed,
       unresolvedRoundPolicy: input.unresolvedRoundPolicy,
-      // Reason for the fallback rather than leaving it absent: the schema default is
-      // `unclaimed_pool`, so omitting it on a NEW provider contest would silently give the
-      // operator the trading answer while the wizard showed them the refund selected.
-      unscoredContestPolicy: input.unscoredContestPolicy ?? "refund_entry_fees",
+      // Reason for stamping it explicitly rather than leaving it absent: the stored value is
+      // what settlement reads, and an explicit field survives a later change of schema
+      // default. `unclaimed_pool` is the owner's answer from 1 Oct 2026 (was the refund).
+      unscoredContestPolicy: input.unscoredContestPolicy ?? "unclaimed_pool",
+      // Reason: written explicitly so a game contest never relies on the schema's TRADING
+      // rule defaults (`trades_count`, liquidation on) or on settlement's placeholder.
+      rules: {
+        rankingMethod: "pnl",
+        ...gameTieRuleToRules(input.tieRule ?? DEFAULT_GAME_TIE_RULE),
+        minimumTrades: 0,
+        disqualifyOnLiquidation: false,
+      },
       // The fallback used to be `until_window_closes`, to match a wizard that defaulted to the
       // permissive option. The owner reversed that on 8 September 2026, so the fallback now
       // agrees with both the wizard and the schema again. Kept explicit rather than dropped:
@@ -571,6 +591,9 @@ function validateBasics(input: CreateProviderContestInput): string | null {
   }
   if (input.endTime.getTime() <= input.startTime.getTime()) {
     return "The contest must end after it starts.";
+  }
+  if (input.tieRule !== undefined && !isGameTieRule(input.tieRule)) {
+    return "Choose what happens on an equal score: the faster player wins, or they share the prize.";
   }
 
   const total = input.prizeDistribution.reduce((sum, p) => sum + p.percentage, 0);

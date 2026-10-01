@@ -18,6 +18,10 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { defaultConfigValues, type ConfigField } from "@/lib/services/games/config-schema";
+import {
+  DEFAULT_GAME_TIE_RULE,
+  type GameTieRule,
+} from "@/lib/services/games/game-tie-rule";
 import type { PlayMode } from "@/lib/services/games/play-shape";
 import {
   joinUtcDraft,
@@ -133,6 +137,7 @@ export default function ProviderContestCreateForm({
     endTime,
   });
   const [prizes, setPrizes] = useState<PrizeShare[]>(DEFAULT_PRIZES);
+  const [tieRule, setTieRule] = useState<GameTieRule>(DEFAULT_GAME_TIE_RULE);
   const [submitting, setSubmitting] = useState(false);
 
   const canPickMode = title.supportedPlayModes.length > 1;
@@ -255,7 +260,8 @@ export default function ProviderContestCreateForm({
           // time, exactly as the schedule step showed them.
           ...rules.requestFields,
           unresolvedRoundPolicy: "score_zero",
-          unscoredContestPolicy: "refund_entry_fees",
+          unscoredContestPolicy: "unclaimed_pool",
+          tieRule,
           perRoundCostAcknowledged: true,
           prizeDistribution: prizes,
         }),
@@ -433,6 +439,8 @@ export default function ProviderContestCreateForm({
                     prizeTotal={prizeTotal}
                     fee={fee}
                     onChange={setPrizes}
+                    tieRule={tieRule}
+                    onTieRule={setTieRule}
                   />
                 )}
                 {step === 5 && (
@@ -446,6 +454,7 @@ export default function ProviderContestCreateForm({
                     fee={fee}
                     prizes={prizes}
                     rules={rules}
+                    tieRule={tieRule}
                   />
                 )}
 

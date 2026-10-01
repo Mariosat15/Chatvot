@@ -8,6 +8,11 @@ import {
 } from "@/components/gamemaster/ProviderRoundControls";
 import type { ProviderContestRules } from "@/components/gamemaster/use-provider-contest-rules";
 import type { ConfigField } from "@/lib/services/games/config-schema";
+import {
+  GAME_TIE_RULES,
+  GAME_TIE_RULE_COPY,
+  type GameTieRule,
+} from "@/lib/services/games/game-tie-rule";
 import { ROUND_START_POLICY_COPY } from "@/lib/services/games/round-types";
 import {
   PLAY_MODE_COPY,
@@ -280,11 +285,15 @@ export function PrizesStep({
   prizeTotal,
   fee,
   onChange,
+  tieRule,
+  onTieRule,
 }: {
   prizes: { rank: number; percentage: number }[];
   prizeTotal: number;
   fee: number;
   onChange: (next: { rank: number; percentage: number }[]) => void;
+  tieRule: GameTieRule;
+  onTieRule: (next: GameTieRule) => void;
 }) {
   return (
     <StepPanel title="Prizes" subtitle="How the pool is split">
@@ -323,6 +332,22 @@ export function PrizesStep({
       <p className="text-xs text-gray-500">
         Winners receive net of the {fee}% platform fee.
       </p>
+      <Field label="If two players have the same score">
+        <select
+          className={inputClass}
+          value={tieRule}
+          onChange={(e) => onTieRule(e.target.value as GameTieRule)}
+        >
+          {GAME_TIE_RULES.map((rule) => (
+            <option key={rule} value={rule}>
+              {GAME_TIE_RULE_COPY.get(rule)?.label ?? rule}
+            </option>
+          ))}
+        </select>
+        <p className="mt-2 text-xs text-gray-400">
+          {GAME_TIE_RULE_COPY.get(tieRule)?.description}
+        </p>
+      </Field>
     </StepPanel>
   );
 }
@@ -337,6 +362,7 @@ export function ReviewStep({
   fee,
   prizes,
   rules,
+  tieRule,
 }: {
   name: string;
   displayName: string;
@@ -347,6 +373,7 @@ export function ReviewStep({
   fee: number;
   prizes: { rank: number; percentage: number }[];
   rules: ProviderContestRules;
+  tieRule: GameTieRule;
 }) {
   const attempts =
     rules.attemptsPolicy === "single"
@@ -371,6 +398,10 @@ export function ReviewStep({
         <ReviewRow
           label="Prizes"
           value={prizes.map((p) => `#${p.rank} ${p.percentage}%`).join(" · ")}
+        />
+        <ReviewRow
+          label="Equal scores"
+          value={GAME_TIE_RULE_COPY.get(tieRule)?.label ?? tieRule}
         />
         <ReviewRow
           label="Play style"

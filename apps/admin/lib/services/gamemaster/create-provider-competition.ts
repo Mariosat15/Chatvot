@@ -9,6 +9,7 @@ import type { CreateProviderContestResult } from "@/lib/services/game-providers/
 import { createAndPublishProviderContest } from "@/lib/services/game-providers/provider-contest.service";
 import { clampMinParticipants } from "@/lib/services/gamemaster/game-permissions";
 import { resolveGameMasterPlatformFeePercentage } from "@/lib/services/gamemaster/platform-fee";
+import type { GameTieRule } from "@/lib/services/games/game-tie-rule";
 import type { PlayMode } from "@/lib/services/games/play-shape";
 import type {
   AttemptsPolicy,
@@ -39,6 +40,7 @@ export interface GameMasterProviderCreateBody {
   unscoredContestPolicy?: unknown;
   roundStartPolicy?: unknown;
   playMode?: unknown;
+  tieRule?: unknown;
   resultGracePeriodSeconds?: unknown;
   perRoundCostAcknowledged?: unknown;
 }
@@ -181,10 +183,13 @@ export async function createGameMasterProviderCompetition(args: {
       unresolvedRoundPolicy,
       unscoredContestPolicy:
         (body.unscoredContestPolicy as UnscoredContestPolicy | undefined) ??
-        "refund_entry_fees",
+        // Reason: owner, 1 Oct 2026 - when nobody scores, the pot goes to the unclaimed pool.
+        "unclaimed_pool",
       roundStartPolicy:
         (body.roundStartPolicy as RoundStartPolicy | undefined) ?? undefined,
       playMode: (body.playMode as PlayMode | undefined) ?? undefined,
+      // The create service refuses anything that is not a game tie rule.
+      tieRule: (body.tieRule as GameTieRule | undefined) ?? undefined,
       resultGracePeriodSeconds,
       perRoundCostAcknowledged: body.perRoundCostAcknowledged !== false,
       createdBy: userId,
