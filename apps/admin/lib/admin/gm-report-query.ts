@@ -39,10 +39,16 @@ interface ReadableParams {
  * Which tab to open. `gmId` is the existing deep link into one Game Master's details
  * (`UserFullDetailPanel` links to it), so it always wins and opens the masters tab -
  * otherwise a stale `gmTab=players` in the URL would swallow that link silently.
+ *
+ * Default (no `gmTab`, no `gmId`) is **players** - Part 2 made the referred-players report
+ * the primary Manage Game Masters screen. An explicit `gmTab=masters` still opens the list.
  */
 export function resolveGmTab(params: ReadableParams): GmTab {
   if (params.get("gmId")) return "masters";
-  return params.get(GM_TAB_PARAM) === "players" ? "players" : "masters";
+  const raw = params.get(GM_TAB_PARAM);
+  if (raw === "masters") return "masters";
+  if (raw === "players") return "players";
+  return "players";
 }
 
 export function readReportState(params: ReadableParams): ReportState {

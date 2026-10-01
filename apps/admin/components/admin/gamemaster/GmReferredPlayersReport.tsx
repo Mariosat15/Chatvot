@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Users } from "lucide-react";
 import type {
   ReferredPlayerRow,
   ReferredPlayersReport,
@@ -16,7 +17,6 @@ import {
 import GmReportFilters, { type GameMasterOption } from "./GmReportFilters";
 import GmReportSummary from "./GmReportSummary";
 import GmReportTable from "./GmReportTable";
-import GmExportButton from "./GmExportButton";
 import GmAffiliationActionDialog, { type AffiliationAction } from "./GmAffiliationActionDialog";
 
 const GENERIC_ERROR = "Something went wrong. Please contact support.";
@@ -25,8 +25,8 @@ const GENERIC_ERROR = "Something went wrong. Please contact support.";
 const GAME_MASTER_LIST_LIMIT = 100;
 
 /**
- * The admin referred-players report (`External game plans/24` s7.3-s7.5): filters,
- * overview figures, the per-affiliation table, export, and move / detach.
+ * The admin referred-players report (`External game plans/24` s7.3-s7.5 + Part 2 redesign):
+ * filters, KPI cards, source breakdown, the per-affiliation table, export, and move / detach.
  *
  * Reason: the filters live in the URL (`rp_*`), read once per render into `state`, so the
  * report, the export and the page number can never describe three different filter sets.
@@ -95,28 +95,45 @@ export default function GmReferredPlayersReport({ canExport }: { canExport: bool
 
   return (
     <div className="space-y-4">
-      <GmReportFilters state={state} gameMasters={gameMasters} onApply={applyState} />
+      <GmReportFilters
+        state={state}
+        gameMasters={gameMasters}
+        canExport={canExport}
+        onApply={applyState}
+      />
 
       {error && (
         <div className="rounded-lg border border-red-700 bg-red-900/30 p-3 text-sm text-red-200">{error}</div>
       )}
 
+      {loading && !report && (
+        <div className="rounded-xl border border-gray-700 bg-gray-900/40 p-8 text-center text-sm text-gray-400">
+          Loading referred players…
+        </div>
+      )}
+
       {report && <GmReportSummary report={report} />}
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <span className="text-sm text-gray-400">
-          {loading ? "Loading..." : report ? `${report.total} affiliations` : ""}
-        </span>
-        <GmExportButton state={state} canExport={canExport} />
+      <div className="overflow-hidden rounded-xl border border-gray-700/80 bg-gray-900/40">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-800 px-4 py-3">
+          <div className="flex items-center gap-2 text-sm font-medium text-gray-100">
+            <Users className="h-4 w-4 text-amber-400" />
+            Affiliations &amp; referred players
+          </div>
+          <span className="rounded-full border border-gray-700 bg-gray-800 px-2.5 py-0.5 text-xs text-gray-300">
+            {loading ? "Loading…" : report ? `${report.total} player${report.total === 1 ? "" : "s"}` : ""}
+          </span>
+        </div>
+        <div className="p-0">
+          {report && (
+            <GmReportTable
+              rows={report.rows}
+              canManage
+              onAction={(row, action) => setPending({ row, action })}
+            />
+          )}
+        </div>
       </div>
-
-      {report && (
-        <GmReportTable
-          rows={report.rows}
-          canManage
-          onAction={(row, action) => setPending({ row, action })}
-        />
-      )}
 
       {report && totalPages > 1 && (
         <div className="flex items-center justify-end gap-2 text-sm text-gray-300">

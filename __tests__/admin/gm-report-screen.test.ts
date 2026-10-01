@@ -152,7 +152,10 @@ describe("report URL state", () => {
   it("gmId always opens the masters tab, so the existing deep link survives", () => {
     expect(resolveGmTab(new URLSearchParams("gmTab=players&gmId=abc"))).toBe("masters");
     expect(resolveGmTab(new URLSearchParams("gmTab=players"))).toBe("players");
-    expect(resolveGmTab(new URLSearchParams("gmTab=bogus"))).toBe("masters");
+    expect(resolveGmTab(new URLSearchParams("gmTab=masters"))).toBe("masters");
+    // Reason: Part 2 made referred players the default Manage Game Masters screen.
+    expect(resolveGmTab(new URLSearchParams("gmTab=bogus"))).toBe("players");
+    expect(resolveGmTab(new URLSearchParams(""))).toBe("players");
   });
 
   it("the API query is understood by the REAL parser", () => {
@@ -259,5 +262,55 @@ describe("screen wiring", () => {
     const src = code(BADGE);
     expect(src).toMatch(/new Map/);
     expect(src).not.toMatch(/\[kind\]|\[surface\]/);
+  });
+});
+
+describe("Part 2 Manage Game Masters redesign", () => {
+  const program = code("apps/admin/components/admin/GameMasterProgramSection.tsx");
+  const filters = code("apps/admin/components/admin/gamemaster/GmReportFilters.tsx");
+  const summary = code("apps/admin/components/admin/gamemaster/GmReportSummary.tsx");
+  const table = code("apps/admin/components/admin/gamemaster/GmReportTable.tsx");
+  const readModel = code("lib/services/gamemaster/referral-read-model.ts");
+
+  it("the chrome titles Manage Game Masters and defaults to referred players", () => {
+    expect(program).toContain("Manage Game Masters");
+    expect(program).toContain('id: "players"');
+    expect(program).toMatch(/Add Game Master/);
+    const query = code("apps/admin/lib/admin/gm-report-query.ts");
+    expect(query).toContain('if (raw === "masters") return "masters"');
+    expect(query).toContain('return "players"');
+  });
+
+  it("the filter bar searches phone and exports beside Apply", () => {
+    expect(filters).toMatch(/Search players, email or phone/);
+    expect(filters).toMatch(/<GmExportButton/);
+    // Reason: phone search resolves user ids in the read model before the pipeline;
+    // inventing a month-trend chart is forbidden (nothing stores a prior snapshot).
+    expect(summary).not.toMatch(/sparkline|prior.?month|trend/i);
+  });
+
+  it("six KPI cards and a conversion column come from affiliationConversionPercent", () => {
+    expect(summary).toContain("Referred players");
+    expect(summary).toContain("Currently affiliated");
+    expect(summary).toContain("Played in last 30 days");
+    expect(summary).toContain("Entry fees (total)");
+    expect(summary).toContain("GM earned (total)");
+    expect(summary).toContain("GM pending (total)");
+    expect(summary).toMatch(/affiliationConversionPercent\(totals\.players,\s*totals\.current\)/);
+  });
+
+  it("the affiliations table shows phone, relative activity and View/Move/Detach", () => {
+    expect(table).toMatch(/formatPhoneDisplay\(row\.phone\)/);
+    expect(table).toMatch(/formatRelativeActivity\(row\.lastActivityAt\)/);
+    expect(table).toMatch(/onAction\(row,\s*"view"\)|Eye/);
+    expect(table).toMatch(/"move"/);
+    expect(table).toMatch(/"detach"/);
+  });
+
+  it("phone search resolves user ids and is withheld under maskExternalContact", () => {
+    expect(readModel).toMatch(/async function withPhoneSearchIds/);
+    expect(readModel).toMatch(/if \(!needle \|\| filter\.maskExternalContact\) return filter/);
+    expect(readModel).toMatch(/phoneUserIds/);
+    expect(readModel).toMatch(/withPhoneSearchIds\(db,\s*filter\)/);
   });
 });

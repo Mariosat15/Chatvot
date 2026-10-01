@@ -29,6 +29,13 @@ export interface ReferredPlayersFilter {
   activity?: ActivityFilter;
   search?: string;
   /**
+   * User ids whose `user.phone` matched the search string. Filled by `readReferredPlayers`
+   * for the admin report (never by a Game Master route - those set `maskExternalContact`).
+   * Reason: phone lives on the user document, so a referral-row regex cannot find it; resolving
+   * the ids first keeps the aggregation index-friendly and keeps D6 out of this path.
+   */
+  phoneUserIds?: string[];
+  /**
    * Set by the Game Master's own routes, never parsed from the query string. Reason: without
    * it a Game Master could learn a hidden email (D6) by searching for it and watching the row
    * appear - so the search matches an email only on rows whose terms were accepted.

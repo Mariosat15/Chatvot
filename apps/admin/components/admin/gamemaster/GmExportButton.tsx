@@ -59,7 +59,7 @@ export default function GmExportButton({
     <button
       type="button"
       disabled={busy}
-      className="rounded-md border border-yellow-600 px-4 py-2 text-sm text-yellow-300 hover:bg-yellow-900/30 disabled:opacity-50"
+      className="rounded-md border border-teal-600/70 bg-teal-500/10 px-4 py-2 text-sm font-medium text-teal-300 hover:bg-teal-500/20 disabled:opacity-50"
       onClick={() => void run()}
     >
       {busy ? "Preparing CSV..." : "Export CSV"}

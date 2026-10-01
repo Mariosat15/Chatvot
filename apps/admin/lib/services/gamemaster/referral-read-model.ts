@@ -45,7 +45,48 @@ export interface AggregatableDb {
     aggregate(pipeline: Document[], options?: { allowDiskUse?: boolean }): {
       toArray(): Promise<Document[]>;
     };
+    find?(
+      filter: Document,
+      options?: { projection?: Document; limit?: number },
+    ): { toArray(): Promise<Document[]> };
   };
+}
+
+/**
+ * Resolve a free-text phone fragment into user ids before the affiliation pipeline
+ * runs. Reason: `userreferrals` does not store phone; the reference search matches
+ * phone and the only place that field lives is `user`. Skipped when
+ * `maskExternalContact` is set — operators without the grant must not discover
+ * users by phone number.
+ */
+async function withPhoneSearchIds(
+  db: AggregatableDb,
+  filter: ReferredPlayersFilter,
+): Promise<ReferredPlayersFilter> {
+  const needle = filter.search?.trim();
+  if (!needle || filter.maskExternalContact) return filter;
+  // Digits-only: letters are handled by the pipeline's email/name match alone.
+  if (!/\d/.test(needle)) return filter;
+  const find = db.collection("user").find;
+  if (typeof find !== "function") return filter;
+
+  const digits = needle.replace(/\D/g, "");
+  const pattern = digits.length >= 3 ? digits : escapeRegex(needle);
+  const rows = await find.call(db.collection("user"), {
+    phone: { $regex: pattern, $options: "i" },
+  }, { projection: { _id: 1, id: 1 }, limit: 200 }).toArray();
+
+  const phoneUserIds = rows
+    .flatMap((row) => {
+      const ids: string[] = [];
+      if (typeof row.id === "string" && row.id) ids.push(row.id);
+      if (row._id != null) ids.push(String(row._id));
+      return ids;
+    })
+    .filter((id, i, arr) => arr.indexOf(id) === i);
+
+  if (phoneUserIds.length === 0) return filter;
+  return { ...filter, phoneUserIds };
 }
 
 export interface ReferredPlayerRow {
@@ -138,7 +179,14 @@ function searchMatch(filter: ReferredPlayersFilter, withConsent: boolean): Docum
   // Reason: the client id is the one identifier every screen shows, so an exact match on it
   // is always allowed - it reveals nothing the row does not already display.
   const byId: Document = { userId: filter.search.trim() };
-  const open: Document = { $or: [byId, byEmail, { userName: { $regex: pattern, $options: "i" } }] };
+  const openOr: Document[] = [byId, byEmail, { userName: { $regex: pattern, $options: "i" } }];
+  // Reason: admin phone search resolves matching user ids before the aggregation (see
+  // `resolvePhoneSearchUserIds`). Never attached when `maskExternalContact` is set - a Game
+  // Master must not discover a hidden phone by whether a row appears.
+  if (filter.phoneUserIds && filter.phoneUserIds.length > 0 && !filter.maskExternalContact) {
+    openOr.push({ userId: { $in: filter.phoneUserIds } });
+  }
+  const open: Document = { $or: openOr };
   if (!(withConsent && filter.maskExternalContact)) return open;
   // Reason: a masked external row must not be findable by what the screen hides, or typing a
   // guessed email or surname confirms it by whether the row appears. Only the exact id, or the
@@ -461,9 +509,10 @@ export async function readReferredPlayers(
   paging: ReferredPlayersPaging,
   now: Date = new Date(),
 ): Promise<ReferredPlayersReport> {
+  const enriched = await withPhoneSearchIds(db, filter);
   const [facet] = await db
     .collection("userreferrals")
-    .aggregate(buildReferredPlayersPipeline(filter, paging, now), { allowDiskUse: true })
+    .aggregate(buildReferredPlayersPipeline(enriched, paging, now), { allowDiskUse: true })
     .toArray();
 
   const byKind = Object.fromEntries(REFERRAL_KINDS.map((k) => [k, emptyTotals()])) as Record<

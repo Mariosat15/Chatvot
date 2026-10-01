@@ -819,6 +819,26 @@ KPIs for the filtered set (affiliates, active, by source, commission generated/p
 > something other than the password stored. Now a literal split/join. Latent, nothing backfilled -
 > an affected employee simply could not log in with the emailed password and would have been reset.
 
+> **BUILT 1 Oct 2026 (Part 2 redesign): the Manage Game Masters chrome matches the owner's
+> reference.** Live code: `GameMasterProgramSection.tsx` (title, LIVE clock, Add → masters tab),
+> redesigned `GmReportFilters` / `GmReportSummary` / `GmReportTable`, `gm-report-display.ts`
+> (conversion %, relative activity, phone display), and phone search via `withPhoneSearchIds` in
+> both mirrored `referral-read-model.ts` copies. Default tab is **Referred players**; `gmId` still
+> forces masters. **Read the code, not a screenshot.** Six facts drift easily:
+> - **No sparklines / month-over-month trends** - nothing stores a prior-month snapshot, and
+>   inventing one would be a report that lies. Conversion = currently affiliated ÷ referred.
+> - **Phone search resolves user ids before the aggregation** and is **withheld under
+>   `maskExternalContact`** - an operator without the grant must not discover users by phone.
+> - **Add Game Master opens the masters tab**, not a create API - there is still no
+>   one-click create from this chrome.
+> - **Filters, KPI cards and the affiliations table share one filtered report** - figures are
+>   never summed from the 25 rows on screen.
+> - **Nothing new is mirrored** except the phone-search half of the read model / filter
+>   (byte-identical tests already cover those files).
+> - **Never verified by eye** - the screen is behind an admin sign-in.
+>
+> Tests: `__tests__/admin/gm-report-display.test.ts`, Part 2 block in `gm-report-screen.test.ts`.
+
 ### 7.6 Package editor
 Add "Competition visibility allowed: Public / Private / Both" to the GM package config in the marketplace item editor (admin), writing `gameMasterConfig.allowedVisibility`.
 
