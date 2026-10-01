@@ -1,6 +1,15 @@
 import { connectToDatabase } from "../config/database";
 import { exec } from "child_process";
 import path from "path";
+import { testRunEnvironment } from "../../database/test-database-guard";
+/** The slice of vitest's JSON reporter output this job reads. */
+interface VitestJson {
+  testResults?: Array<{
+    name?: string;
+    assertionResults?: Array<{ fullName?: string; title?: string; status?: string; duration?: number; failureMessages?: string[] }>;
+  }>;
+}
+
 
 interface TestRunResult {
   ran: boolean;
@@ -53,14 +62,15 @@ export async function runScheduledTests(): Promise<TestRunResult> {
   const command = "npx vitest run --reporter=json";
 
   return new Promise<TestRunResult>((resolve) => {
-    exec(command, { cwd: rootDir, timeout: 120_000, env: { ...process.env, NODE_ENV: "test" } }, async (error, stdout) => {
+    // Reason: never hand tests the live database address - see testRunEnvironment.
+    exec(command, { cwd: rootDir, timeout: 120_000, env: testRunEnvironment() }, async (error, stdout) => {
       try {
         await connectToDatabase();
 
         const completedAt = new Date();
         const duration = completedAt.getTime() - run.startedAt.getTime();
 
-        let parsed: any = null;
+        let parsed: VitestJson | null = null;
         try {
           parsed = JSON.parse(stdout);
         } catch {
@@ -71,8 +81,8 @@ export async function runScheduledTests(): Promise<TestRunResult> {
         }
 
         if (parsed?.testResults) {
-          const testResults = parsed.testResults.flatMap((file: any) =>
-            (file.assertionResults || []).map((t: any) => ({
+          const testResults = parsed.testResults.flatMap((file) =>
+            (file.assertionResults || []).map((t) => ({
               name: t.fullName || t.title || "unknown",
               suite: file.name?.split("/").pop()?.replace(/\.(test|spec)\.\w+$/, "") || "unknown",
               status: t.status === "passed" ? "passed" : t.status === "failed" ? "failed" : "skipped",
@@ -81,9 +91,9 @@ export async function runScheduledTests(): Promise<TestRunResult> {
             })),
           );
 
-          const passed = testResults.filter((t: any) => t.status === "passed").length;
-          const failed = testResults.filter((t: any) => t.status === "failed").length;
-          const skipped = testResults.filter((t: any) => t.status === "skipped").length;
+          const passed = testResults.filter((t) => t.status === "passed").length;
+          const failed = testResults.filter((t) => t.status === "failed").length;
+          const skipped = testResults.filter((t) => t.status === "skipped").length;
 
           run.status = failed > 0 ? "failed" : "passed";
           run.testResults = testResults;

@@ -12,14 +12,35 @@
  */
 import mongoose from "mongoose";
 import { MongoMemoryReplSet } from "mongodb-memory-server";
+import { isLoopbackMongoUri } from "../../database/test-database-guard";
 
 let replSet: MongoMemoryReplSet | null = null;
+
+/**
+ * Throws unless Mongoose's default connection is closed or points at this machine.
+ *
+ * Reason: Mongoose is loaded natively, so one connection object survives across test
+ * files in a worker. If anything ever connected it to a real cluster, `clearTestMongo`
+ * would empty that cluster - which is how production lost its admins, symbols and
+ * settings on 1 Oct 2026. Check the live connection, not the environment variable.
+ */
+function assertConnectionIsLocal(where: string): void {
+  const connection = mongoose.connection;
+  if (connection.readyState === 0) return;
+  const host = connection.host;
+  if (!host || !isLoopbackMongoUri(`mongodb://${host}`)) {
+    throw new Error(
+      `❌ ${where}: Mongoose is connected to "${host ?? "unknown"}", not the local test server. Refusing.`,
+    );
+  }
+}
 
 /**
  * Boots a single-node replica set and connects Mongoose to it.
  * Returns the connection string, which is useful when a second client is needed.
  */
 export async function startTestMongo(): Promise<string> {
+  assertConnectionIsLocal("startTestMongo");
   if (replSet) {
     return replSet.getUri();
   }
@@ -92,6 +113,7 @@ export async function stopTestMongo(): Promise<void> {
 export async function clearTestMongo(): Promise<void> {
   const db = mongoose.connection.db;
   if (!db) return;
+  assertConnectionIsLocal("clearTestMongo");
 
   const collections = await db.collections();
   await Promise.all(collections.map((collection) => collection.deleteMany({})));

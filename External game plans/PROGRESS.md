@@ -920,6 +920,17 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 1 Oct 2026 - R122: the Performance Simulator test run wiped production data (CRITICAL)
+
+Owner ran the unit tests from the admin Performance Simulator; afterwards players could not sign
+in and the admin showed no data. Cause: both vitest launchers (admin `tests/run` route and the
+worker's scheduled run) passed `{ ...process.env }` to the child, so tests connected to the live
+Atlas cluster and their cleanup emptied collections there (admins, trading symbols, WhiteLabel
+settings and with it the Redis config). Fixed with four independent guards (see `17` R122) and
+21 tests. **Not retroactive: the data must be restored from an Atlas backup taken before the run.**
+The paused Game Master competition-defaults work resumes at the admin section id, menu entry and
+render case.
+
 ### 1 Oct 2026 - GM last-attempt options follow admin Join any time / Everyone at once
 
 Owner: when a Game Master creates a game competition, "When can the last attempt start?" must

@@ -5,6 +5,7 @@ import TestRun from "@/database/models/test-run.model";
 import { exec } from "child_process";
 import fs from "fs";
 import path from "path";
+import { testRunEnvironment } from "@/database/test-database-guard";
 
 /**
  * POST /api/tests/run
@@ -93,7 +94,7 @@ async function executeTests(
       // Reason: full suite regularly exceeds 2 minutes on a cold Windows box.
       timeout: 300_000,
       maxBuffer: 20 * 1024 * 1024,
-      env: { ...process.env, NODE_ENV: "test" },
+      env: testRunEnvironment(),
     },
     async (error, stdout, stderr) => {
       try {

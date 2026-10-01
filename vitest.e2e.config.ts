@@ -30,6 +30,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "node",
+    setupFiles: ["__tests__/setup/forbid-live-database.ts"],
     include: ["__tests__/games/end-to-end-round.test.ts"],
     // Generous, and not padding: the sprint's 60-second clock plus a sweeper tick plus settlement
     // is most of two minutes on a slow machine, and a timeout here would report as a hang.

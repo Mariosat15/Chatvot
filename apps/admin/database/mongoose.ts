@@ -1,5 +1,22 @@
 import mongoose from "mongoose";
 import { MongoClient } from "mongodb";
+import { assertTestDatabaseIsLocal } from "./test-database-guard";
+
+/** The one settings document read from `mdbclustersettings` (string _id, numeric pool fields). */
+interface ClusterSettingsDoc {
+  _id: string;
+  clusterTier?: string;
+  mainMaxPoolSize?: number;
+  mainMinPoolSize?: number;
+  workerMaxPoolSize?: number;
+  workerMinPoolSize?: number;
+  adminMaxPoolSize?: number;
+  adminMinPoolSize?: number;
+  maxIdleTimeMS?: number;
+  serverSelectionTimeoutMS?: number;
+  socketTimeoutMS?: number;
+  connectTimeoutMS?: number;
+}
 
 const MONGODB_URI = process.env.MONGODB_URI;
 
@@ -35,8 +52,8 @@ async function loadAdminPoolSettings(
     await client.connect();
     const doc = await client
       .db()
-      .collection("mdbclustersettings")
-      .findOne({ _id: "global-mdb-cluster-settings" as any });
+      .collection<ClusterSettingsDoc>("mdbclustersettings")
+      .findOne({ _id: "global-mdb-cluster-settings" });
     await client.close();
 
     if (doc) {
@@ -53,6 +70,7 @@ async function loadAdminPoolSettings(
 
 export const connectToDatabase = async () => {
   if (!MONGODB_URI) throw new Error("MONGODB_URI must be set within .env");
+  assertTestDatabaseIsLocal(MONGODB_URI, "connectToDatabase");
 
   if (cached.conn) return cached.conn;
 

@@ -5,6 +5,8 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "node",
+    // Reason: strips any real database address before a test loads (see the file).
+    setupFiles: ["__tests__/setup/forbid-live-database.ts"],
     include: ["**/*.{test,spec}.{ts,tsx}"],
     exclude: [
       "node_modules",
