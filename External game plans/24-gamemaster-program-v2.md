@@ -443,6 +443,20 @@ The rule: **a `gm_private` contest can be entered, and its details read, only by
 >
 > **Never verified by eye.**
 >
+> **Amendment, 1 Oct 2026 (R120, owner request): a package switch for external referrals.**
+> `gameMasterConfig.showExternalReferralDetails` is set in the marketplace package editor and
+> cached on `subscription.limits`.
+> - **Off, which is the default and also applies when the field is absent:** an **external**
+>   referral (`chartvolt_join_gm` / `admin_assigned`) shows `**********` for the email and the
+>   surname, plus the full client id.
+> - **On:** full details are shown.
+> - **Own referrals are never masked**, and D6 applies first, so no terms means no email.
+> - The current package outranks the cache, and only `=== true` reveals.
+> - A masked row is searchable **only** by exact client id or by the start of the first name, so
+>   a guessed email cannot confirm itself.
+> - Existing packages are masked until an admin turns the switch on. That is deliberate and
+>   fail-closed.
+>
 > **Amendment, 1 Oct 2026 (R119, owner test).** A detached player who rejoined showed twice in the
 > admin report, as "inactive", while the Game Master saw them as active. The read model now groups
 > by player and Game Master, sums contests and money across stints, and applies its filters after

@@ -37,6 +37,7 @@ export interface GameMasterPackageConfig {
   challengeReferralFeePercentage?: number;
   allowedGameTypes?: string[];
   allowedVisibility?: string[];
+  showExternalReferralDetails?: boolean;
 }
 
 export interface GameMasterSubscriptionLimits {
@@ -49,6 +50,7 @@ export interface GameMasterSubscriptionLimits {
   challengeReferralFeePercentage?: number;
   allowedGameTypes: readonly string[];
   allowedVisibility: readonly CompetitionVisibility[];
+  showExternalReferralDetails: boolean;
 }
 
 export const DEFAULT_GM_LIMITS = {
@@ -208,6 +210,9 @@ export function buildSubscriptionLimits(
     // And the opposite default here, deliberately: earning from challenges is opt-in, so
     // only an explicit `true` grants it. The asymmetry matches the schema.
     canEarnFromChallenges: c.canEarnFromChallenges === true,
+    // Opt-in for the same reason: only an explicit `true` shows an external referral's
+    // email and last name to the Game Master. Absent, `null` or a stray string stays masked.
+    showExternalReferralDetails: c.showExternalReferralDetails === true,
     // Left undefined when the package declares none, NOT defaulted to the competition rate.
     // Both money paths already fall back to `referralFeePercentage` when this is absent, so
     // filling it in here would freeze today's competition rate into the challenge rate and
@@ -217,4 +222,23 @@ export function buildSubscriptionLimits(
       ? { challengeReferralFeePercentage: c.challengeReferralFeePercentage }
       : {}),
   };
+}
+
+/**
+ * Whether a Game Master sees an EXTERNAL referral's email and last name.
+ *
+ * Same precedence as every other limit: the CURRENT package decides when it still exists,
+ * so an admin unticking the box takes effect on the next request rather than waiting for a
+ * subscription sync; the cached `subscription.limits` copy is only the fallback for a
+ * deleted package. Only an explicit `true` reveals - absent, `null`, a string `"true"` and
+ * a missing subscription all mask, because the two mistakes are not symmetric: wrongly
+ * masking is visible and someone complains, wrongly revealing hands a third party's contact
+ * details to somebody the player never chose and nothing reports it.
+ */
+export function resolveShowExternalReferralDetails(input: {
+  packageConfig: { showExternalReferralDetails?: unknown } | null | undefined;
+  cachedLimits: { showExternalReferralDetails?: unknown } | null | undefined;
+}): boolean {
+  if (input.packageConfig) return input.packageConfig.showExternalReferralDetails === true;
+  return input.cachedLimits?.showExternalReferralDetails === true;
 }

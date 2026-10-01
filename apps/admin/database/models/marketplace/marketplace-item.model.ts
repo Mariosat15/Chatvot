@@ -141,6 +141,7 @@ export interface IGameMasterConfig {
   challengeReferralFeePercentage?: number; // Optional separate % for challenges (defaults to referralFeePercentage if not set)
   allowedGameTypes?: string[]; // Which games this tier may CREATE contests for
   allowedVisibility?: ("public" | "gm_private")[]; // Public / private / both - absent = public only
+  showExternalReferralDetails?: boolean; // External referrals' email + last name shown to the GM - absent = masked
 }
 
 export interface IMarketplaceItem extends Document {
@@ -373,6 +374,10 @@ const MarketplaceItemSchema = new Schema<IMarketplaceItem>(
         // keeps "never set" distinguishable from an explicit empty list.
         default: undefined,
       },
+      // Whether a Game Master on this tier sees an EXTERNAL referral's email and last name.
+      // No default: absent reads as masked in code (`resolveShowExternalReferralDetails`), so
+      // every existing package hides them until the owner opts it in.
+      showExternalReferralDetails: { type: Boolean },
     },
     cosmeticType: {
       type: String,

@@ -34,6 +34,13 @@ export interface ReferredPlayersFilter {
    * appear - so the search matches an email only on rows whose terms were accepted.
    */
   contactRequiresConsent?: boolean;
+  /**
+   * Set by the Game Master's own routes from the SESSION user's package switch
+   * (`resolveShowExternalReferralDetails`), never parsed from the query string. When true, an
+   * external referral is searchable only by exact client id or the start of the first name -
+   * the same things the masked row still shows.
+   */
+  maskExternalContact?: boolean;
 }
 
 export interface ReferredPlayersPaging {

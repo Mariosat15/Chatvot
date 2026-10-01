@@ -10,6 +10,8 @@ import {
   type ReferredPlayersFilter,
 } from "@/lib/services/gamemaster/referral-report-filter";
 import { toGameMasterReferralView } from "@/lib/services/gamemaster/gm-referral-view";
+import { loadGameMasterPackageConfig } from "@/lib/services/gamemaster/package-config";
+import { resolveShowExternalReferralDetails } from "@/lib/services/gamemaster/subscription-limits";
 
 /**
  * GET /api/gamemaster/referrals - the signed-in Game Master's own referred players
@@ -37,13 +39,25 @@ export async function GET(request: NextRequest) {
     }
     const userId = session.user.id;
 
-    const subscription = await GameMasterSubscription.exists({ userId });
+    const subscription = (await GameMasterSubscription.findOne({ userId })
+      .select("packageId limits")
+      .lean()) as { packageId?: string; limits?: { showExternalReferralDetails?: boolean } } | null;
     if (!subscription) {
       return NextResponse.json({ success: false, error: "Not a Game Master" }, { status: 403 });
     }
 
     const db = mongoose.connection.db;
     if (!db) throw new Error("database connection unavailable");
+
+    // Reason: read from the SESSION user's package, never the request - the switch decides
+    // whether an external referral's email and surname reach this Game Master at all.
+    // Reason: mongoose bundles its own copy of the driver, so its `Db` is a different TYPE
+    // from the top-level `mongodb` one the loader names - identical at runtime.
+    const packageDb = db as unknown as Parameters<typeof loadGameMasterPackageConfig>[0];
+    const showExternalDetails = resolveShowExternalReferralDetails({
+      packageConfig: await loadGameMasterPackageConfig(packageDb, subscription.packageId),
+      cachedLimits: subscription.limits,
+    });
 
     const params = new URL(request.url).searchParams;
     const { filter, paging } = parseReferredPlayersQuery(params);
@@ -52,7 +66,11 @@ export async function GET(request: NextRequest) {
 
     // Reason: the Game Master is ALWAYS the session user. A `gameMasterId` in the query string
     // would otherwise let one Game Master read another's players.
-    const scope: ReferredPlayersFilter = { gameMasterIds: [userId], contactRequiresConsent: true };
+    const scope: ReferredPlayersFilter = {
+      gameMasterIds: [userId],
+      contactRequiresConsent: true,
+      maskExternalContact: !showExternalDetails,
+    };
     const filtered = Object.keys(filter).some((k) => k !== "gameMasterIds");
     const report = await readReferredPlayers(db, { ...filter, ...scope }, paging);
     // The headline figures describe every player, not just the filtered page.
@@ -64,7 +82,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: {
-        referrals: report.rows.map(toGameMasterReferralView),
+        referrals: report.rows.map((row) => toGameMasterReferralView(row, { showExternalDetails })),
         stats: {
           totalReferred: all.players,
           currentReferred: all.current,

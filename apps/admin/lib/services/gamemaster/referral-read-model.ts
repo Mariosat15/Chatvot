@@ -126,7 +126,30 @@ function searchMatch(filter: ReferredPlayersFilter, withConsent: boolean): Docum
   if (withConsent && filter.contactRequiresConsent) {
     byEmail.termsAcceptanceId = { $type: "string", $ne: "" };
   }
-  return { $or: [byEmail, { userName: { $regex: pattern, $options: "i" } }] };
+  // Reason: the client id is the one identifier every screen shows, so an exact match on it
+  // is always allowed - it reveals nothing the row does not already display.
+  const byId: Document = { userId: filter.search.trim() };
+  const open: Document = { $or: [byId, byEmail, { userName: { $regex: pattern, $options: "i" } }] };
+  if (!(withConsent && filter.maskExternalContact)) return open;
+  // Reason: a masked external row must not be findable by what the screen hides, or typing a
+  // guessed email or surname confirms it by whether the row appears. Only the exact id, or the
+  // START of the name when the query has no whitespace (so it cannot reach the second word),
+  // and never a name holding an `@`, which `maskLastName` hides whole.
+  const masked: Document[] = [byId];
+  if (!/\s/.test(filter.search.trim())) {
+    masked.push({
+      $and: [
+        { userName: { $regex: `^${pattern}`, $options: "i" } },
+        { userName: { $not: /@/ } },
+      ],
+    });
+  }
+  return {
+    $or: [
+      { kind: { $ne: "external" }, ...open },
+      { kind: "external", $or: masked },
+    ],
+  };
 }
 
 /** Stages on the raw referral row, before anything is computed. Index-friendly. */

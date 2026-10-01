@@ -184,7 +184,7 @@ describe("detach then rejoin the SAME Game Master", () => {
   it("the Game Master's own view lists the player once, with the current stint's consent", async () => {
     await detachAndRejoin();
     const r = await report({}, GM_1);
-    const views = r.rows.map(toGameMasterReferralView);
+    const views = r.rows.map((row) => toGameMasterReferralView(row, { showExternalDetails: false }));
     expect(views).toHaveLength(1);
     expect(views[0]).toMatchObject({ isCurrent: true, termsAccepted: true });
   });

@@ -7,7 +7,7 @@ import {
 } from "recharts";
 import Link from "next/link";
 import { Shield } from "lucide-react";
-import { ReferralContact, ReferralKindBadge, ReferralStateLabel } from "@/components/gamemaster/GmReferralBadges";
+import { ReferralClientId, ReferralContact, ReferralKindBadge, ReferralStateLabel } from "@/components/gamemaster/GmReferralBadges";
 import type { DashboardStats, CompetitionItem, EarningItem, ReferralItem, SubscriptionData, EarningsByGameRow } from "./gamemaster-dashboard-types";
 
 // Re-export types so existing imports still work
@@ -281,6 +281,7 @@ export function ReferralsTab({ referrals, search, onSearchChange, total, own, ex
               <div className="flex-1 min-w-0">
                 <p className="text-white font-medium text-sm truncate">{r.userName || "Unknown"}</p>
                 <ReferralContact referral={r} />
+                <div><ReferralClientId referral={r} /></div>
                 <div className="mt-1"><ReferralKindBadge referral={r} /></div>
               </div>
               <div className="text-right shrink-0">

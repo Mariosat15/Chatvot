@@ -1280,7 +1280,7 @@ $results += Invoke-Probe `
 # 141. The Game Master list labels rows itself.
 $results += Invoke-Probe `
     -Name "GM list re-derives the kind" -File "app/api/gamemaster/referrals/route.ts" `
-    -From 'referrals: report.rows.map(toGameMasterReferralView),' `
+    -From 'referrals: report.rows.map((row) => toGameMasterReferralView(row, { showExternalDetails })),' `
     -To 'referrals: report.rows.map((r) => ({ ...r, kind: "own" })),' `
     -TestName "the Game Master referrals list reads the shared model through the D6 view" -Suite $RM
 
@@ -1509,8 +1509,8 @@ $BADGES = "components/gamemaster/GmReferralBadges.tsx"
 # 171. The view hands over every email, consent or not.
 $results += Invoke-Probe `
     -Name "View shows email without consent" -File "lib/services/gamemaster/gm-referral-view.ts" `
-    -From 'userEmail: visible ? row.userEmail : null,' `
-    -To 'userEmail: row.userEmail,' `
+    -From 'userEmail: !visible ? null : masked ? MASKED_CONTACT : row.userEmail,' `
+    -To 'userEmail: masked ? MASKED_CONTACT : row.userEmail,' `
     -TestName "withholds the email when no acceptance is recorded" -Suite $VIEWT
 
 # 172. A hidden email can be found by searching for it.
@@ -1523,8 +1523,8 @@ $results += Invoke-Probe `
 # 173. The referrals route forgets the consent scope.
 $results += Invoke-Probe `
     -Name "Route drops consent scope" -File $REFROUTE `
-    -From 'const scope: ReferredPlayersFilter = { gameMasterIds: [userId], contactRequiresConsent: true };' `
-    -To 'const scope: ReferredPlayersFilter = { gameMasterIds: [userId] };' `
+    -From '      contactRequiresConsent: true,' `
+    -To '' `
     -TestName "referrals/route.ts scopes to the session user" -Suite $VIEWT
 
 # 174. The query string can replace the session Game Master.
@@ -1537,8 +1537,8 @@ $results += Invoke-Probe `
 # 175. The dashboard bypasses the view.
 $results += Invoke-Probe `
     -Name "Dashboard bypasses view" -File "app/api/gamemaster/dashboard/route.ts" `
-    -From '.map(toGameMasterReferralView);' `
-    -To '.map((r) => ({ ...r }));' `
+    -From 'toGameMasterReferralView(row, { showExternalDetails }),' `
+    -To '({ ...row }),' `
     -TestName "dashboard/route.ts maps rows through the view" -Suite $VIEWT
 
 # 176. The referrals 500 leaks the error text.
@@ -1630,6 +1630,146 @@ $results += Invoke-Probe `
     -From 'export function describeAffiliationState(row: { isCurrent: boolean; isActive: boolean }): string {' `
     -To 'export function describeAffiliationState(row: { isCurrent: boolean; isActive: boolean }): string { if (row.isCurrent && !row.isActive) return "Inactive";' `
     -TestName "never calls an affiliated player inactive" -Suite $HIST
+
+# --- Owner request 1 Oct 2026: package switch for an external referral's details (R120) ---
+$EXT = "__tests__/services/gm-external-referral-details.test.ts"
+$LIM = "lib/services/gamemaster/subscription-limits.ts"
+$VIEW = "lib/services/gamemaster/gm-referral-view.ts"
+$MKT = "apps/admin/app/api/marketplace/route.ts"
+$BADGES = "components/gamemaster/GmReferralBadges.tsx"
+
+# 188. A truthy package value reveals details (a string "true" is not a decision).
+$results += Invoke-Probe `
+    -Name "Package switch truthy" -File $LIM `
+    -From 'if (input.packageConfig) return input.packageConfig.showExternalReferralDetails === true;' `
+    -To 'if (input.packageConfig) return Boolean(input.packageConfig.showExternalReferralDetails);' `
+    -TestName "is not true" -Suite $EXT
+
+# 189. A stale cache outranks the current package.
+$results += Invoke-Probe `
+    -Name "Cache outranks package" -File $LIM `
+    -From 'if (input.packageConfig) return input.packageConfig.showExternalReferralDetails === true;' `
+    -To 'if (input.cachedLimits) return input.cachedLimits.showExternalReferralDetails === true;' `
+    -TestName "the current package decides over a stale cache" -Suite $EXT
+
+# 190. The cache writer stores whatever the package said.
+$results += Invoke-Probe `
+    -Name "Cache writer not opt-in" -File $LIM `
+    -From 'showExternalReferralDetails: c.showExternalReferralDetails === true,' `
+    -To 'showExternalReferralDetails: c.showExternalReferralDetails !== false,' `
+    -TestName "buildSubscriptionLimits caches the switch opt-in" -Suite $EXT
+
+# 191. The mapper masks only when no options are passed (any caller passing options reveals).
+$results += Invoke-Probe `
+    -Name "Mapper fails open" -File $VIEW `
+    -From 'const masked = row.kind === "external" && options?.showExternalDetails !== true;' `
+    -To 'const masked = row.kind === "external" && !options;' `
+    -TestName "an admin move is external and is masked too" -Suite $EXT
+
+# 192. The switch masks own referrals too.
+$results += Invoke-Probe `
+    -Name "Own referral masked" -File $VIEW `
+    -From 'const masked = row.kind === "external" && options?.showExternalDetails !== true;' `
+    -To 'const masked = row.kind !== "unclassified" && options?.showExternalDetails !== true;' `
+    -TestName "an own referral is never masked by the switch" -Suite $EXT
+
+# 193. The masked email is the real email.
+$results += Invoke-Probe `
+    -Name "Masked email leaks" -File $VIEW `
+    -From 'userEmail: !visible ? null : masked ? MASKED_CONTACT : row.userEmail,' `
+    -To 'userEmail: !visible ? null : row.userEmail,' `
+    -TestName "off: an external referral shows the id" -Suite $EXT
+
+# 194. The switch overrides D6 consent.
+$results += Invoke-Probe `
+    -Name "Switch beats consent" -File $VIEW `
+    -From 'userEmail: !visible ? null : masked ? MASKED_CONTACT : row.userEmail,' `
+    -To 'userEmail: !visible && masked ? null : masked ? MASKED_CONTACT : row.userEmail,' `
+    -TestName "D6 still applies on top" -Suite $EXT
+
+# 195. A name holding an email keeps its first word.
+$results += Invoke-Probe `
+    -Name "Email-name not masked whole" -File $VIEW `
+    -From '  if (trimmed.includes("@")) return MASKED_CONTACT;' `
+    -To '' `
+    -TestName "a name holding an email is masked whole" -Suite $EXT
+
+# 196. The masked search still searches the email.
+$results += Invoke-Probe `
+    -Name "Masked search by email" -File $READ `
+    -From '  const masked: Document[] = [byId];' `
+    -To '  const masked: Document[] = [byId, byEmail];' `
+    -TestName "by email: not found masked" -Suite $EXT
+
+# 197. The masked search reaches the last name.
+$results += Invoke-Probe `
+    -Name "Masked search unanchored" -File $READ `
+    -From '        { userName: { $regex: `^${pattern}`, $options: "i" } },' `
+    -To '        { userName: { $regex: pattern, $options: "i" } },' `
+    -TestName "by last name: not found masked" -Suite $EXT
+
+# 198. A full-name query reaches the second word.
+$results += Invoke-Probe `
+    -Name "Masked search allows whitespace" -File $READ `
+    -From '  if (!/\s/.test(filter.search.trim())) {' `
+    -To '  if (true) {' `
+    -TestName "a full-name query cannot reach the second word" -Suite $EXT
+
+# 199. A name holding an email is searchable while masked.
+$results += Invoke-Probe `
+    -Name "Masked search reaches email-name" -File $READ `
+    -From '        { userName: { $not: /@/ } },' `
+    -To '' `
+    -TestName "a name holding an email cannot be searched while masked" -Suite $EXT
+
+# 200. The exact client id is no longer searchable.
+$results += Invoke-Probe `
+    -Name "Client id not searchable" -File $READ `
+    -From '  const masked: Document[] = [byId];' `
+    -To '  const masked: Document[] = [];' `
+    -TestName "by exact client id: found" -Suite $EXT
+
+# 201. The referrals route reads the switch from the cache alone.
+$results += Invoke-Probe `
+    -Name "Route ignores current package" -File $REFROUTE `
+    -From 'maskExternalContact: !showExternalDetails,' `
+    -To 'maskExternalContact: false,' `
+    -TestName "referrals/route.ts scopes to the session user with consent search" -Suite $VIEWT
+
+# 202. The admin PUT accepts a non-boolean switch.
+$results += Invoke-Probe `
+    -Name "PUT accepts non-boolean" -File $MKT `
+    -From 'if (!isOptionalBoolean(updates.gameMasterConfig?.showExternalReferralDetails)) {' `
+    -To 'if (false) {' `
+    -TestName "the admin route refuses a non-boolean" -Suite $EXT
+
+# 203. The admin route leaves live subscriptions on the old switch.
+$results += Invoke-Probe `
+    -Name "Switch not synced" -File $MKT `
+    -From 'limitsUpdate["limits.showExternalReferralDetails"] = gmConfig.showExternalReferralDetails;' `
+    -To '' `
+    -TestName "the admin route syncs the cache and audits the change" -Suite $EXT
+
+# 204. The editor toggle reads absent as on.
+$results += Invoke-Probe `
+    -Name "Toggle absent reads on" -File "apps/admin/components/admin/gamemaster/ExternalReferralDetailsToggle.tsx" `
+    -From 'const on = value === true;' `
+    -To 'const on = value !== false;' `
+    -TestName "the toggle reads absent as off" -Suite $EXT
+
+# 205. The full referrals page stops showing the client id.
+$results += Invoke-Probe `
+    -Name "Client id not shown" -File "app/(root)/gamemaster/referrals/page.tsx" `
+    -From '<ReferralClientId referral=' `
+    -To '<span data-x=' `
+    -TestName "referrals/page.tsx shows the client id" -Suite $EXT
+
+# 206. The masked branch is dropped from the contact component.
+$results += Invoke-Probe `
+    -Name "Masked branch dropped" -File $BADGES `
+    -From '  if (referral.contactMasked) {' `
+    -To '  if (false) {' `
+    -TestName "the contact component renders the masked branch" -Suite $EXT
 
 Write-Host ""
 Write-Host "================ SUMMARY ================"

@@ -11,6 +11,13 @@ import {
 import { packageIdSyncFilter } from "@/lib/services/gamemaster/package-config";
 import { parseAllowedVisibilityInput } from "@/lib/services/gamemaster/visibility-permission";
 
+const EXTERNAL_DETAILS_ERROR = "showExternalReferralDetails must be true or false";
+
+/** Absent is allowed (the package keeps its current switch); anything else must be a boolean. */
+function isOptionalBoolean(value: unknown): boolean {
+  return value === undefined || typeof value === "boolean";
+}
+
 /**
  * GET /api/admin/marketplace
  * Get all marketplace items (admin view - includes unpublished)
@@ -127,6 +134,12 @@ export async function POST(request: NextRequest) {
       data.gameMasterConfig.allowedVisibility = parsed.value;
     }
 
+    // Reason: no schema validator runs on the PUT path, so both paths refuse a non-boolean here
+    // rather than letting `"true"` reach a switch that only `=== true` reads.
+    if (!isOptionalBoolean(data.gameMasterConfig?.showExternalReferralDetails)) {
+      return NextResponse.json({ success: false, error: EXTERNAL_DETAILS_ERROR }, { status: 400 });
+    }
+
     const item = await MarketplaceItem.create(data);
 
     // Reason: attribute from the guard — a follow-up getAdminSession is the R101b shape.
@@ -202,6 +215,9 @@ export async function PUT(request: NextRequest) {
       }
       updates.gameMasterConfig.allowedVisibility = parsed.value;
     }
+    if (!isOptionalBoolean(updates.gameMasterConfig?.showExternalReferralDetails)) {
+      return NextResponse.json({ success: false, error: EXTERNAL_DETAILS_ERROR }, { status: 400 });
+    }
 
     // Get the item before update to compare gameMasterConfig changes
     const oldItem = await MarketplaceItem.findById(itemId).lean();
@@ -223,6 +239,7 @@ export async function PUT(request: NextRequest) {
     // update all active subscriptions that use this package
     let subscriptionsUpdated = 0;
     let visibilityChange: { from: unknown; to: unknown } | null = null;
+    let externalDetailsChange: { from: unknown; to: unknown } | null = null;
     if (item.category === "gamemaster" && updates.gameMasterConfig && db) {
       const gmConfig = updates.gameMasterConfig;
 
@@ -299,6 +316,15 @@ export async function PUT(request: NextRequest) {
           to: gmConfig.allowedVisibility,
         };
       }
+      if (gmConfig.showExternalReferralDetails !== undefined) {
+        // Reason: the cache is the fallback for a deleted package, so it must follow the
+        // switch or a tightened tier keeps showing external referrals' contact details.
+        limitsUpdate["limits.showExternalReferralDetails"] = gmConfig.showExternalReferralDetails;
+        externalDetailsChange = {
+          from: oldItem?.gameMasterConfig?.showExternalReferralDetails ?? null,
+          to: gmConfig.showExternalReferralDetails,
+        };
+      }
 
       // Only update if there are changes
       if (Object.keys(limitsUpdate).length > 0) {
@@ -331,6 +357,8 @@ export async function PUT(request: NextRequest) {
         subscriptionsUpdated,
         // Which contests a tier may create is a commercial grant, so the audit names it.
         ...(visibilityChange ? { allowedVisibility: visibilityChange } : {}),
+        // Who may read a third party's contact details is a data-access grant, so it is named too.
+        ...(externalDetailsChange ? { showExternalReferralDetails: externalDetailsChange } : {}),
       },
     );
 

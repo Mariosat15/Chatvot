@@ -13,7 +13,10 @@ import { earningsByGameGroupStages } from "@/lib/services/gamemaster/earnings-by
 import { labelForGameKey } from "@/lib/services/games/game-leaderboard.service";
 import { resolveCreationLimits } from "@/lib/services/gamemaster/game-permissions";
 import { loadGameMasterPackageConfig } from "@/lib/services/gamemaster/package-config";
-import { buildSubscriptionLimits } from "@/lib/services/gamemaster/subscription-limits";
+import {
+  buildSubscriptionLimits,
+  resolveShowExternalReferralDetails,
+} from "@/lib/services/gamemaster/subscription-limits";
 import {
   countActiveCompetitionsInList,
   remainingActiveCompetitionSlots,
@@ -70,6 +73,7 @@ export async function GET() {
         canEarnFromChallenges?: boolean;
         challengeReferralFeePercentage?: number;
         allowedGameTypes?: string[];
+        showExternalReferralDetails?: boolean;
       };
       competitionCreationOverride?: "enabled" | "disabled" | null;
       overrideLimits?: {
@@ -146,14 +150,22 @@ export async function GET() {
     // ── Referred Users ──────────────────────────────────────────────
     // Reason: the shared read model plus the D6 view, the same pair /api/gamemaster/referrals
     // uses. The old query selected `userEmail` for every player, consent or not.
+    // Reason: the switch comes from the session user's own package (current first, cached
+    // limits as the fallback), never from the request - same resolver as the referrals route.
+    const showExternalDetails = resolveShowExternalReferralDetails({
+      packageConfig,
+      cachedLimits: subscription.limits,
+    });
     const referralReport = db
       ? await readReferredPlayers(
           db,
-          { gameMasterIds: [userId], contactRequiresConsent: true },
+          { gameMasterIds: [userId], contactRequiresConsent: true, maskExternalContact: !showExternalDetails },
           { page: 1, limit: MAX_PAGE_LIMIT },
         )
       : null;
-    const referredUsers = (referralReport?.rows ?? []).map(toGameMasterReferralView);
+    const referredUsers = (referralReport?.rows ?? []).map((row) =>
+      toGameMasterReferralView(row, { showExternalDetails }),
+    );
 
     // ── Competitions ────────────────────────────────────────────────
     const competitions = await Competition.find({ gameMasterId: userId })

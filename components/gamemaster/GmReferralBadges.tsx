@@ -5,6 +5,7 @@ import {
 } from "@/lib/services/gamemaster/referral-kind";
 import {
   CONTACT_HIDDEN_NOTE,
+  CONTACT_MASKED_NOTE,
   type GmReferralView,
 } from "@/lib/services/gamemaster/gm-referral-view";
 
@@ -43,8 +44,15 @@ export function ReferralStateLabel({ referral }: { referral: Pick<GmReferralView
   return <span className={`text-xs ${tone}`}>{describeAffiliationState(referral)}</span>;
 }
 
-/** The email when the player consented (D6), otherwise the reason it is missing. */
-export function ReferralContact({ referral }: { referral: Pick<GmReferralView, "userEmail" | "contactHidden"> }) {
+/**
+ * The email when the player consented (D6), otherwise the reason it is missing. An external
+ * referral on a package without the details switch arrives already masked by the server.
+ */
+export function ReferralContact({
+  referral,
+}: {
+  referral: Pick<GmReferralView, "userEmail" | "contactHidden" | "contactMasked">;
+}) {
   if (referral.contactHidden || !referral.userEmail) {
     return (
       <span className="text-xs text-gray-500 italic" title={CONTACT_HIDDEN_NOTE}>
@@ -52,5 +60,21 @@ export function ReferralContact({ referral }: { referral: Pick<GmReferralView, "
       </span>
     );
   }
+  if (referral.contactMasked) {
+    return (
+      <span className="text-xs text-gray-500 font-mono" title={CONTACT_MASKED_NOTE}>
+        {referral.userEmail}
+      </span>
+    );
+  }
   return <span className="text-xs text-gray-400 truncate">{referral.userEmail}</span>;
+}
+
+/** The full client id - the one identifier every package shows, so a masked row stays traceable. */
+export function ReferralClientId({ referral }: { referral: Pick<GmReferralView, "userId"> }) {
+  return (
+    <span className="text-[11px] text-gray-500 font-mono break-all" title="Client id">
+      ID: {referral.userId}
+    </span>
+  );
 }

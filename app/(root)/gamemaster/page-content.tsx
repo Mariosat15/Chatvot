@@ -155,8 +155,13 @@ export default function GameMasterDashboardContent() {
     if (!referralSearch.trim()) return data.referredUsers;
     const q = referralSearch.toLowerCase();
     // Reason: userEmail is already null for a player who has not consented (D6), so this search
-    // can only match an email the Game Master is allowed to see.
-    return data.referredUsers.filter((r) => r.userName?.toLowerCase().includes(q) || r.userEmail?.toLowerCase().includes(q));
+    // can only match an email the Game Master is allowed to see. A masked external row already
+    // carries the masked name and email, so the search cannot see past the mask either; the
+    // client id is the one identifier every package shows, so it matches exactly.
+    const id = referralSearch.trim();
+    return data.referredUsers.filter(
+      (r) => r.userId === id || r.userName?.toLowerCase().includes(q) || r.userEmail?.toLowerCase().includes(q),
+    );
   }, [data?.referredUsers, referralSearch]);
 
   // ── Loading ───────────────────────────────────────────────────────

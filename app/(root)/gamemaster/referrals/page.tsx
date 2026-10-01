@@ -21,7 +21,7 @@ import { cn } from "@/lib/utils";
 
 import type { GmReferralView } from "@/lib/services/gamemaster/gm-referral-view";
 import { describeAffiliationState, REFERRAL_KIND_LABELS } from "@/lib/services/gamemaster/referral-kind";
-import { ReferralContact, ReferralKindBadge } from "@/components/gamemaster/GmReferralBadges";
+import { ReferralClientId, ReferralContact, ReferralKindBadge } from "@/components/gamemaster/GmReferralBadges";
 
 const KIND_FILTERS = [
   { value: "all", label: "All" },
@@ -302,6 +302,7 @@ export default function GMReferralsPage() {
                               {user.userName || "Unknown"}
                             </p>
                             <ReferralContact referral={user} />
+                            <ReferralClientId referral={user} />
                             <ReferralKindBadge referral={user} />
                           </div>
                         </td>

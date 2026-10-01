@@ -41,6 +41,7 @@ export interface IGameMasterSubscription extends Document {
     challengeReferralFeePercentage?: number; // % for challenges (defaults to referralFeePercentage)
     allowedGameTypes?: string[]; // Which games they may CREATE contests for - see the schema
     allowedVisibility?: ("public" | "gm_private")[]; // Public / private contests - see the schema
+    showExternalReferralDetails?: boolean; // External referrals' email + last name - absent = masked
   };
 
   // Admin Override for Competition Creation
@@ -227,6 +228,9 @@ const GameMasterSubscriptionSchema = new Schema<IGameMasterSubscription>(
         // keeps "never set" distinguishable from an explicit empty list.
         default: undefined,
       },
+      // Cached copy of the package's external-referral details switch. No default: only
+      // `resolveShowExternalReferralDetails` may read it, and absent means masked.
+      showExternalReferralDetails: { type: Boolean },
     },
     competitionCreationOverride: {
       type: String,

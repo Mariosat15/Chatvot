@@ -65,12 +65,15 @@ afterAll(async () => stopTestMongo());
 beforeEach(async () => clearTestMongo());
 
 const PAGE = { page: 1, limit: 25 };
+// Reason: the stricter package setting; these rows are own/unclassified, so it masks nothing
+// and the D6 assertions below are unaffected by the switch.
+const MASKED = { showExternalDetails: false };
 
 describe("toGameMasterReferralView - contact only with consent (D6)", () => {
   it("withholds the email when no acceptance is recorded", async () => {
     await referral();
     const report = await readReferredPlayers(db(), { gameMasterIds: [GM] }, PAGE, NOW);
-    const view = toGameMasterReferralView(report.rows[0]);
+    const view = toGameMasterReferralView(report.rows[0], MASKED);
     expect(view.userEmail).toBeNull();
     expect(view.contactHidden).toBe(true);
     expect(view.termsAccepted).toBe(false);
@@ -79,7 +82,7 @@ describe("toGameMasterReferralView - contact only with consent (D6)", () => {
   it("shows the email once the player accepted the terms", async () => {
     const row = await referral({ termsAcceptanceId: "acc-1" });
     const report = await readReferredPlayers(db(), { gameMasterIds: [GM] }, PAGE, NOW);
-    const view = toGameMasterReferralView(report.rows[0]);
+    const view = toGameMasterReferralView(report.rows[0], MASKED);
     expect(view.userEmail).toBe(row.userEmail);
     expect(view.contactHidden).toBe(false);
   });
@@ -88,7 +91,7 @@ describe("toGameMasterReferralView - contact only with consent (D6)", () => {
     const view = toGameMasterReferralView({
       termsAccepted: "" as unknown as boolean,
       userEmail: "x@y.test",
-    } as ReferredPlayerRow);
+    } as ReferredPlayerRow, MASKED);
     expect(view.userEmail).toBeNull();
   });
 
@@ -96,10 +99,10 @@ describe("toGameMasterReferralView - contact only with consent (D6)", () => {
   it("the view carries exactly its declared fields and no tracking data", async () => {
     await referral();
     const report = await readReferredPlayers(db(), { gameMasterIds: [GM] }, PAGE, NOW);
-    const keys = Object.keys(toGameMasterReferralView(report.rows[0])).sort();
+    const keys = Object.keys(toGameMasterReferralView(report.rows[0], MASKED)).sort();
     expect(keys).toEqual(
       [
-        "referralId", "userId", "userName", "userEmail", "contactHidden", "termsAccepted",
+        "referralId", "userId", "userName", "userEmail", "contactHidden", "contactMasked", "termsAccepted",
         "kind", "surface", "joinedAt", "endedAt", "isCurrent", "isActive", "lastActivityAt",
         "competitionsEntered", "challengesEntered", "entryFees", "earned", "paid", "pending",
       ].sort(),
@@ -165,13 +168,19 @@ describe("the Game Master routes are scoped and redacted", () => {
 
   it.each(ROUTES)("%s maps rows through the view", (path) => {
     const src = stripComments(read(path));
-    expect(src).toMatch(/\.map\(toGameMasterReferralView\)/);
+    // Reason: flipped 1 Oct 2026 - the claim is unchanged (every row goes through the one
+    // mapper) and the call now passes the package switch; a bare `.map(fn)` would hand the
+    // array index to the options argument.
+    expect(src).toMatch(/\.map\(\(row\)\s*=>\s*toGameMasterReferralView\(row,\s*\{\s*showExternalDetails\s*\}\)/);
+    expect(src).not.toMatch(/\.map\(toGameMasterReferralView\)/);
     expect(src).not.toMatch(/userEmail\s*:/);
   });
 
   it.each(ROUTES)("%s scopes to the session user with consent search", (path) => {
     const src = stripComments(read(path));
-    expect(src).toMatch(/gameMasterIds:\s*\[userId\],\s*contactRequiresConsent:\s*true/);
+    expect(src).toMatch(
+      /gameMasterIds:\s*\[userId\],\s*contactRequiresConsent:\s*true,\s*maskExternalContact:\s*!showExternalDetails/,
+    );
   });
 
   it.each(ROUTES)("%s returns a generic 500", (path) => {

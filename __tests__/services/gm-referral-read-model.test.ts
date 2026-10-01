@@ -380,7 +380,8 @@ describe("wiring", () => {
   it("the Game Master referrals list reads the shared model through the D6 view", () => {
     const src = stripComments(read("app/api/gamemaster/referrals/route.ts"));
     expect(src).toMatch(/readReferredPlayers\(/);
-    expect(src).toMatch(/\.map\(toGameMasterReferralView\)/);
+    // Reason: since 1 Oct 2026 the mapper also takes the package's external-details switch.
+    expect(src).toMatch(/\.map\(\(row\)\s*=>\s*toGameMasterReferralView\(row,\s*\{\s*showExternalDetails\s*\}\)/);
     expect(src).not.toMatch(/\.\.\.r\b/);
   });
 });

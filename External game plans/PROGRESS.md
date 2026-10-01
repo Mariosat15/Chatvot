@@ -915,6 +915,40 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 1 Oct 2026 - A package switch decides whether a Game Master sees an external referral's details (R120)
+
+The owner asked for a new option on Game Master packages in the admin marketplace editor:
+**"Show external referral details"**.
+- **Off.** For a player who came through ChartVolt or an admin move, the email reads
+  `**********`, the name keeps only its first word (`Jane **********`), and the full client
+  id is shown on both Game Master screens.
+- **On.** Full details are shown.
+
+**Off is the default, and that changes what existing Game Masters see, on purpose.** No package
+had the field before, so every external referral is masked until an admin switches it on.
+Own referrals are never masked, and D6 still applies: no terms means no email, whatever the
+switch says.
+
+**Load-bearing decisions.**
+- **Precedence.** The current package decides first, then the cached `subscription.limits`.
+  Only `=== true` reveals.
+- **The flag comes from the session's subscription, never from the request.** The query parser
+  never reads it.
+- **Search cannot reveal what the screen hides.** A masked row is found only by its exact
+  client id, or by the start of the first name, never by email, surname or a full name.
+  Otherwise a guessed email would be confirmed by whether a row appears. Exact client-id
+  search was added for every caller, the admin report included.
+- **The admin route** refuses a non-boolean, syncs the cache onto live subscriptions, and
+  writes from/to into the marketplace audit entry.
+
+**Tests:** `gm-external-referral-details.test.ts` (34 tests, real replica set for the search
+half). The mapper's options argument is now required, and 3 assertions in the view, history
+and read-model suites were flipped to the new call. Probes 188-206 are new; 141, 171, 173 and
+175 were re-aimed. **All 206 are red on the expected test.** Typecheck baselines are unchanged
+(main 228, admin 243). `check:mirrors` OK. R120 in `17`.
+
+**Not built:** nothing on the admin report changes. Admins always see full details.
+
 ### 1 Oct 2026 - A rejoined player shows once, and the two apps agree on what "active" means (R119)
 
 This came from an owner test. The owner detached a player from a Game Master, and the player

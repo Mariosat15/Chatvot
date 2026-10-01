@@ -96,6 +96,7 @@ which**. |
 | **R117** | **A private Game Master contest leaks through a contest reader nobody filtered.** Many readers exist, and a missed one lists the contest to everybody with no error | **High** | **Latent** - no private contest can exist until an operator enables `gmPrivateContestsEnabled` and a package allows it. Nothing backfilled | **MITIGATED 30 Sep 2026 (step 5 of `24`).** One shared filter, fail-closed `$in` rather than `$ne`, entry guard independent of the flag, readers counted. ~~Details page and per-contest APIs still open until step 6 - keep the switch off.~~ **Step 6, 30 Sep 2026: the direct-link gap is closed** (the gate plus a 404 on every per-contest API; the unauthenticated `participant-status` route was deleted), so the switch may be turned on. See detail section |
 | **R118** | **The Game Master's own referral screens sent every referred player's email, IP address and browser string to the Game Master's browser.** A `...r` spread in `/api/gamemaster/referrals`, and the email in `/dashboard`, with no check that the player had accepted the terms (D6) | **High** | **Live** - readable from the network tab by any Game Master. No money moved; a read leaves no record, so there is no way to know whether it was used | **CLOSED 1 Oct 2026.** One field-listed view that shows the email only on accepted terms, the session scope spread last, and a search that cannot match a hidden email. See detail section |
 | **R119** | **A detached-then-rejoined player showed twice in the admin Game Master report, as "inactive", while the Game Master saw them as active; an admin move credited the new Game Master with the player's earlier seats.** One row per affiliation document, a 30-day-activity label colliding with "currently affiliated", and an epoch window for every non-link source | **Medium** | **Live, reporting only** - no payment reads this model. Nothing backfilled | **CLOSED 1 Oct 2026.** One row per player per Game Master with stints summed, filters after grouping, `referredAt` window for moves, one shared state label. See detail section |
+| **R120** | **An external referral's name and email reached every Game Master once consented, with no package control.** Owner asked for a per-package switch | **Low** | **Missing control, not a defect.** Default OFF masks existing packages on purpose | **CLOSED 1 Oct 2026.** `showExternalReferralDetails` on the package: off shows `**********` for email and surname plus the full client id; search cannot reach the hidden fields. See detail section |
 | **R107** | **Journey editor selection did not load the selected map; Required Badges showed raw badge ids.** Clicking a sequence card only set `selectedSequenceMap`, so the highlight moved while Current Map / Milestones / Zones kept map 1's data. Separately, `MilestoneDetailModal` resolved badge names only through `lib/constants/badges`, so blueprint ids like `trading_beat_top_trader_flag` rendered as snake_case | **Medium** | **LIVE and DISPLAY / EDITOR only** — no money, no wrong unlocks from the naming half; the editor half blocked editing maps 2–10. **Nothing was backfilled** | **CLOSED 17 Sep 2026.** `selectAndLoadMap` + tab-change reload by mapId; `resolveBadgeDisplayName` + milestones API enrichment from `getBadgesFromDB` |
 | **R108** | **Badge Simulator reported every `game_*` condition as unrecognized; `consecutive_trading_days` could never earn.** Simulator allow-list drifted from the registry; mock omitted `gameStats`/`gameTypes`; evaluator switch missed the registry streak name; vitest JSON blew `maxBuffer` | **Medium** | **LIVE for the simulator report and for streak badges in production**; Games badges were already earnable in production (registry door) — the simulator lied. **Nothing was backfilled** | **CLOSED 17 Sep 2026.** `isSupportedConditionType` + gameStats mocks; evaluator `consecutive_trading_days`; blueprint ladders for season/best score; vitest `--outputFile` |
 | R8 | Bulk find-and-replace on wording | High | Medium | X8 |
@@ -6042,6 +6043,57 @@ backfilled.
 `components/gamemaster/GmReferralBadges.tsx`. Tests:
 `__tests__/services/gm-referral-history.test.ts` (10 tests). Probes 180-187 are new; 126,
 127, 141, 172 and 179 were re-aimed.
+
+### R120 - An external referral's personal details reached every Game Master, with no package control - **CLOSED 1 Oct 2026**
+
+**What it was.** An external referral is a player who reached a Game Master through ChartVolt
+(`chartvolt_join_gm`) or through an admin move (`admin_assigned`), not through that Game
+Master's own link. Once the player accepted the terms (D6), their full name and email were
+shown to the Game Master. No package could withhold them. The owner asked for a package switch.
+
+**What the switch does.** `gameMasterConfig.showExternalReferralDetails` is a new field on
+the marketplace package, in both model copies with no default. It is cached on
+`subscription.limits`.
+- **Off, which is also the state when the field is absent:** an external referral's email
+  reads `**********`, the name keeps its first word only (`Jane **********`), and the full
+  client id is shown.
+- **On:** full details are shown.
+- **Own referrals are never masked**, and D6 still applies on top: no acceptance means no
+  email, whatever the switch says.
+
+**This changes what existing Game Masters see, on purpose.** Every package predates the field,
+so every external referral is masked until an admin turns the switch on. That is fail-closed:
+withholding something you should have shown can be fixed with one click, but showing something
+you should have withheld cannot be taken back.
+
+**Search cannot reveal what the screen hides.** If a masked row could be found by typing its
+email or surname, a guess would be confirmed by whether the row appears. For a masked external
+row, `searchMatch` in `referral-read-model.ts` (mirrored) accepts only three things:
+- the exact client id;
+- the start of the name, when the query contains no whitespace;
+- never a name that contains an `@`, because `maskLastName` hides such a name whole.
+
+The exact-id search was added for every caller, the admin report included.
+
+**Precedence.** `resolveShowExternalReferralDetails` reads the current package first, then
+the cached limits, and only `=== true` reveals. Both Game Master routes read it from the
+**session's** subscription. The query parser never reads the mask flag. The admin marketplace
+route:
+- refuses a non-boolean value on POST and PUT;
+- syncs the cache onto live subscriptions;
+- records from/to in the audit entry.
+
+**Harm, stated precisely.** This was not a defect. It was a missing control, and nothing was
+computed wrongly. Nothing was backfilled.
+
+**Files:** `subscription-limits.ts`, `referral-read-model.ts`, `referral-report-filter.ts`
+(all mirrored, byte-identical), `gm-referral-view.ts`, both `marketplace-item.model.ts`
+copies, `gamemaster-subscription.model.ts`, `app/api/gamemaster/{referrals,dashboard}/route.ts`,
+`apps/admin/app/api/marketplace/route.ts`,
+`apps/admin/components/admin/gamemaster/ExternalReferralDetailsToggle.tsx`,
+`MarketplaceSection.tsx`, `components/gamemaster/GmReferralBadges.tsx`. Tests:
+`__tests__/services/gm-external-referral-details.test.ts` (34 tests). Probes 188-206 are
+new; 141, 171, 173 and 175 were re-aimed. All 206 come back red.
 
 ---
 

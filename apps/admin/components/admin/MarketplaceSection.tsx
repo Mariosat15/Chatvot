@@ -83,6 +83,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import StrategyBuilder from "./StrategyBuilder";
 import { PackageVisibilityField } from "./gamemaster/PackageVisibilityField";
+import { ExternalReferralDetailsToggle } from "./gamemaster/ExternalReferralDetailsToggle";
 import { Lightbulb } from "lucide-react";
 
 // Available icons for icon picker
@@ -149,6 +150,8 @@ interface GameMasterConfig {
   allowedGameTypes?: string[];
   /** Which competition visibilities this tier may CREATE. Absent = public only. */
   allowedVisibility?: string[];
+  /** Whether the GM sees external referrals' email and last name. Absent = masked. */
+  showExternalReferralDetails?: boolean;
 }
 
 interface MarketplaceItem {
@@ -2167,6 +2170,19 @@ export default function MarketplaceSection() {
                         </div>
                       )}
                     </div>
+
+                    <ExternalReferralDetailsToggle
+                      value={editingItem.gameMasterConfig?.showExternalReferralDetails}
+                      onChange={(next) =>
+                        setEditingItem({
+                          ...editingItem,
+                          gameMasterConfig: {
+                            ...editingItem.gameMasterConfig!,
+                            showExternalReferralDetails: next,
+                          },
+                        })
+                      }
+                    />
 
                     {/* Challenge Earnings Section */}
                     <div className="border-t border-gray-700 pt-6 mt-6">
