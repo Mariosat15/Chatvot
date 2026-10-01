@@ -25,6 +25,8 @@ node_modules/
 # misc
 .DS_Store
 *.pem
+# 16.9 MB standalone export; kept on disk, too large to version (owner, 1 Oct 2026)
+/Docs/Volt-Stack-Standalone.html
 
 # debug
 npm-debug.log*
