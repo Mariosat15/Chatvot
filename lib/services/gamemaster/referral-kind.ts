@@ -31,12 +31,15 @@ export const LEGACY_AFFILIATION_SOURCE: AffiliationSource = "gm_referral_link";
 const KIND_BY_SOURCE = {
   gm_referral_link: "own",
   chartvolt_join_gm: "external",
+  // Reason: an admin move is not the Game Master's own recruiting, so it never counts as own.
+  admin_assigned: "external",
 } as const satisfies Record<AffiliationSource, Exclude<ReferralKind, "unclassified">>;
 
 /** Mirrors the writer: `affiliate()` stamps exactly this when no surface was supplied. */
 const DEFAULT_SURFACE_BY_SOURCE = {
   gm_referral_link: "signup",
   chartvolt_join_gm: "leaderboard",
+  admin_assigned: "admin",
 } as const satisfies Record<AffiliationSource, AffiliationSurface>;
 
 export const REFERRAL_SURFACE_LABELS = {
@@ -44,6 +47,7 @@ export const REFERRAL_SURFACE_LABELS = {
   leaderboard: "GM leaderboard",
   private_contest: "Private competition",
   gm_profile: "GM profile",
+  admin: "Admin move",
 } as const satisfies Record<AffiliationSurface, string>;
 
 export const REFERRAL_KIND_LABELS: Readonly<Record<ReferralKind, string>> = {

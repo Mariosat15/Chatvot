@@ -88,6 +88,10 @@ export const ADMIN_SECTIONS = [
   // Game Master
   "gamemaster-dashboard", // For game masters - their referrals, earnings, competitions
   "gamemaster-management", // For super admin - manage all game masters
+  // Reason: exporting the referred-players report hands out every player's email in bulk, so it
+  // is granted separately from viewing it (Gamemaster Program v2, task 4). Add-only enum value;
+  // deliberately in NO default role template - an operator must grant it by name.
+  "gamemaster-reports-export",
   // AI & Automation
   "ai-agent",
   "ai-knowledge",

@@ -915,6 +915,40 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 1 Oct 2026 - The admin Game Master report, its export, and moving or detaching a player
+
+Programme v2 task 4. An operator could see the Game Master list but not the players each one
+brought in, could not download that list, and had no way to move a player locked to a Game Master
+(D1) except by editing the database.
+
+- **The change:** the Game Master screen gains a **Referred players** tab - filters in the URL, a
+  figures strip, an own/external/surface breakdown, a paged table with source badges - built on
+  task 3's read model. Per row, **Move** and **Detach** with a mandatory reason. A **CSV export**
+  of the whole filtered set behind a new grant, `gamemaster-reports-export`. Details in `24`
+  s7.5's BUILT note.
+- **Recorded in:** the system log (`gm_affiliation_moved` / `_detached`, `gm_report_exported` /
+  `_export_refused`, with filters and row count, written before the download starts) and the
+  player's customer audit trail (who moved them and why). No new money rows; detach clears the
+  settlement fallback so the old Game Master stops being paid.
+- **Deviations, recorded rather than absorbed:** CSV only - no xlsx, no `exceljs` (the route
+  refuses other formats); the cap is 10,000 rows, not the plan's "e.g. 100k", because nothing has
+  been measured at that size; and the competition-type, public/private, game, country, package and
+  money-range filters plus the overview charts are **not built**.
+- **Found on the way, and fixed:** the employee credentials email used `String.replace` for its
+  template variables, which reads `$&` in the value as "the matched text". Generated passwords can
+  contain `$&`, so the emailed password could differ from the stored one. Now a literal
+  split/join; 2 tests, probe 160. The same file's six other lint warnings (`any` types, an unused
+  argument) were cleaned so the pre-commit hook would accept the one-line label change; that also
+  removed a pre-existing `boolean | null` type error, so **admin typecheck is 243, one below the
+  244 baseline** - an explained drop, not a lost file.
+- **A probe lesson:** probe 149 (drop the row count from the refusal audit) first came back green.
+  The assertion's lazy `[\s\S]*?` ran on into the *other* audit call, which still carried a row
+  count. Bounded to `[^;]*?`, one statement; now red. Weak test, not wrong claim.
+- **Tests:** `gm-admin-affiliation.test.ts` (10, real database), `gm-report-screen.test.ts` (25),
+  `employee-email-template.test.ts` (2). Probes 142-160; all 160 red on exactly one test. Route
+  audit 0 no-check; mirrors agree. **Never verified by eye** - the screen is behind an admin
+  sign-in.
+
 ### 1 Oct 2026 - One shared answer to "who did this Game Master bring in, and what did it earn"
 
 Programme v2 task 3. Before this, the admin screen, the Game Master's own list and any future

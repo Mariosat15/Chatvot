@@ -22,7 +22,10 @@ import { auditLogService } from "@/lib/services/audit-log.service";
 import { adminEventsService } from "@/lib/services/admin-events.service";
 
 // Check if an admin is the original/super admin
-async function isOriginalAdmin(admin: any): Promise<boolean> {
+async function isOriginalAdmin(admin: {
+  email: string;
+  _id: { toString(): string };
+}): Promise<boolean> {
   const defaultAdminEmail = (
     process.env.ADMIN_EMAIL || "admin@email.com"
   ).toLowerCase();
@@ -35,7 +38,7 @@ async function isOriginalAdmin(admin: any): Promise<boolean> {
   const isFirstAdmin =
     oldestAdmin && oldestAdmin._id.toString() === admin._id.toString();
 
-  return isDefaultEmail || isFirstAdmin;
+  return isDefaultEmail || Boolean(isFirstAdmin);
 }
 
 // Generate random password using unbiased random selection
@@ -53,14 +56,17 @@ function generatePassword(length = 12): string {
 // Replace template variables
 function replaceTemplateVariables(
   text: string,
-  variables: Record<string, any>,
+  variables: Record<string, unknown>,
 ): string {
   let result = text;
 
   // Handle simple variables
+  // Reason: a literal split/join, never `replace` with a string - `replace`
+  // reads `$&` and `$$` in the replacement as patterns, and the generated
+  // password alphabet contains both `$` and `&`, so the emailed password
+  // could differ from the stored one.
   for (const [key, value] of Object.entries(variables)) {
-    const regex = new RegExp(`\\{\\{${key}\\}\\}`, "g");
-    result = result.replace(regex, String(value || ""));
+    result = result.split(`{{${key}}}`).join(String(value || ""));
   }
 
   // Handle sections list (Mustache-like)
@@ -81,7 +87,7 @@ function replaceTemplateVariables(
 }
 
 // GET - List all employees
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const guard = await guardAnySection(["employees", "users"]);
 
@@ -471,7 +477,7 @@ async function getEmailTransporter() {
 
 // Helper function to send credentials email
 async function sendEmployeeCredentialsEmail(
-  employee: any,
+  employee: { email: string; name?: string; role?: string },
   password: string,
   allowedSections: AdminSection[],
 ): Promise<boolean> {
@@ -568,6 +574,7 @@ async function sendEmployeeCredentialsEmail(
       // Game Master
       "gamemaster-dashboard": "GM Dashboard",
       "gamemaster-management": "Manage Game Masters",
+      "gamemaster-reports-export": "Export GM Reports",
       // AI & Automation
       "ai-agent": "AI Agent",
       "ai-knowledge": "AI Database",
@@ -601,7 +608,10 @@ async function sendEmployeeCredentialsEmail(
       profile: "My Profile",
     };
 
-    const sections = allowedSections.map((s) => sectionLabels[s] || s);
+    const sections = allowedSections.map(
+      // eslint-disable-next-line security/detect-object-injection -- `s` is an AdminSection enum value from the stored employee, not request text
+      (s) => sectionLabels[s] || s,
+    );
     const sectionsText = sections.map((s) => `• ${s}`).join("\n");
 
     const variables = {
@@ -644,10 +654,10 @@ async function sendEmployeeCredentialsEmail(
 
     console.log(`✅ Credentials email sent to ${employee.email}`);
     return true;
-  } catch (error: any) {
+  } catch (error) {
     console.error(
       "❌ Error sending credentials email:",
-      error?.message || error,
+      error instanceof Error ? error.message : error,
     );
     console.error("❌ Full error:", error);
     return false;

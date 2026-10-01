@@ -26,6 +26,7 @@ export type AuditActionType =
   | "gm_affiliation_created"
   | "gm_affiliation_refused"
   | "gm_affiliation_reassigned"
+  | "gm_affiliation_detached"
   | "gm_terms_accepted"
   // Profile actions
   | "profile_updated"
@@ -323,6 +324,9 @@ export function getActionDescription(
       `Game Master affiliation refused: ${m?.reason || "not eligible"}`,
     gm_affiliation_reassigned: (m) =>
       `Game Master reassigned from ${m?.fromGameMasterName || m?.fromGameMasterId || "unknown"} to ${m?.toGameMasterName || m?.toGameMasterId || "unknown"}`,
+    gm_affiliation_detached: (m) =>
+      `Detached from Game Master ${m?.fromGameMasterName || m?.fromGameMasterId || "unknown"}` +
+      (m?.reason ? `: ${m.reason}` : ""),
     gm_terms_accepted: (m) =>
       `Accepted Game Master affiliation terms` +
       (m?.termsVersion ? ` (version ${m.termsVersion})` : ""),

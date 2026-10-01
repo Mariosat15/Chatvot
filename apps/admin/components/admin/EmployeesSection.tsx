@@ -152,6 +152,7 @@ const SECTION_LABELS: Record<string, string> = {
   // Game Master
   "gamemaster-dashboard": "GM Dashboard",
   "gamemaster-management": "Manage Game Masters",
+  "gamemaster-reports-export": "Export GM Reports",
   // AI & Automation
   "ai-agent": "AI Agent",
   "ai-knowledge": "AI Database",
@@ -211,7 +212,7 @@ const SECTION_GROUPS = {
   Operations: ["price-health", "incidents"],
   Messaging: ["messaging", "messaging-settings"],
   Help: ["wiki"],
-  "Game Master": ["gamemaster-dashboard", "gamemaster-management"],
+  "Game Master": ["gamemaster-dashboard", "gamemaster-management", "gamemaster-reports-export"],
   "AI & Automation": ["ai-agent", "ai-knowledge"],
   Settings: [
     "settings",

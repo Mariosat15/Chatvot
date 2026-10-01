@@ -137,7 +137,7 @@ import EmployeeProfileSection from "@/components/admin/EmployeeProfileSection";
 import MessagingSection from "@/components/admin/MessagingSection";
 import MessagingSettingsSection from "@/components/admin/MessagingSettingsSection";
 import GameMasterDashboardSection from "@/components/admin/GameMasterDashboardSection";
-import GameMasterManagementSection from "@/components/admin/GameMasterManagementSection";
+import GameMasterProgramSection from "@/components/admin/GameMasterProgramSection";
 import PriceHealthWidget from "@/components/admin/PriceHealthWidget";
 import TradingSectionTabs from "@/components/admin/trading/TradingSectionTabs";
 import TradingPageSection from "@/components/admin/trading/TradingPageSection";
@@ -1290,9 +1290,10 @@ export default function AdminDashboard({
         return <GameMasterDashboardSection key={currentRefreshKey} />;
       case "gamemaster-management":
         return (
-          <GameMasterManagementSection
+          <GameMasterProgramSection
             key={currentRefreshKey}
             initialGmId={urlGmId || undefined}
+            canExport={hasAccessToSection("gamemaster-reports-export")}
           />
         );
       case "price-health":

@@ -1284,6 +1284,148 @@ $results += Invoke-Probe `
     -To 'const kind = "own"; const surface = null; void ({' `
     -TestName "labels rows with the shared classifier" -Suite $RM
 
+# ---- Task 4: the admin report screen, export, move and detach ----
+$SCR = "__tests__/admin/gm-report-screen.test.ts"
+$AFF = "__tests__/admin/gm-admin-affiliation.test.ts"
+$CSV = "apps/admin/lib/admin/gm-report-csv.ts"
+$QRY = "apps/admin/lib/admin/gm-report-query.ts"
+$EXP = "apps/admin/app/api/gamemasters/report/export/route.ts"
+$SVC = "apps/admin/lib/services/gamemaster/admin-affiliation.service.ts"
+
+# 142. A formula cell reaches the spreadsheet as a formula.
+$results += Invoke-Probe `
+    -Name "CSV formula not neutralised" -File $CSV `
+    -From 'if (FORMULA_START.test(text)) text = `''${text}`;' `
+    -To '' `
+    -TestName "a formula that also needs quoting" -Suite $SCR
+
+# 143. A negative number is quoted into text.
+$results += Invoke-Probe `
+    -Name "CSV quotes negative numbers" -File $CSV `
+    -From 'if (typeof value === "number") return Number.isFinite(value) ? String(value) : "";' `
+    -To '' `
+    -TestName "leaves numbers as numbers" -Suite $SCR
+
+# 144. The export only takes the page on screen.
+$results += Invoke-Probe `
+    -Name "Export query carries paging" -File $QRY `
+    -From 'if (key === "page") continue;' `
+    -To '' `
+    -TestName "the export query carries no paging" -Suite $SCR
+
+# 145. A stale gmTab swallows the gmId deep link.
+$results += Invoke-Probe `
+    -Name "gmId does not win" -File $QRY `
+    -From 'if (params.get("gmId")) return "masters";' `
+    -To '' `
+    -TestName "gmId always opens the masters tab" -Suite $SCR
+
+# 146. Report filters leak into other sections unprefixed.
+$results += Invoke-Probe `
+    -Name "Filters not prefixed" -File $QRY `
+    -From 'if (value) next.set(REPORT_PARAM_PREFIX + key, value);' `
+    -To 'if (value) next.set(key, value);' `
+    -TestName "round-trips through the rp_ prefix" -Suite $SCR
+
+# 147. The export needs only the view grant.
+$results += Invoke-Probe `
+    -Name "Export single grant" -File $EXP `
+    -From 'guardSection("gamemaster-reports-export")' `
+    -To 'guardSection("gamemaster-management")' `
+    -TestName "requires BOTH the view grant and the export grant" -Suite $SCR
+
+# 148. A successful export leaves no audit row.
+$results += Invoke-Probe `
+    -Name "Export not audited" -File $EXP `
+    -From '"gm_report_exported",' `
+    -To '"gm_report_streamed",' `
+    -TestName "refuses at the cap, and writes the audit row BEFORE" -Suite $SCR
+
+# 149. The cap refusal forgets how many rows were asked for.
+$results += Invoke-Probe `
+    -Name "Refusal audit drops row count" -File $EXP `
+    -From '{ filters: auditFilter, rowCount: first.total, cap: REFERRED_PLAYERS_EXPORT_CAP }' `
+    -To '{ filters: auditFilter, cap: REFERRED_PLAYERS_EXPORT_CAP }' `
+    -TestName "the audit rows carry the filters and the row count" -Suite $SCR
+
+# 150. Any format is accepted.
+$results += Invoke-Probe `
+    -Name "Non-CSV format accepted" -File $EXP `
+    -From 'if (format !== "csv")' `
+    -To 'if (format === "pdf")' `
+    -TestName "refuses any format other than CSV" -Suite $SCR
+
+# 151. The dialog lets a shorter reason through than the server accepts.
+$results += Invoke-Probe `
+    -Name "Dialog reason bound drifts" -File "apps/admin/components/admin/gamemaster/GmAffiliationActionDialog.tsx" `
+    -From 'const MIN_REASON = 10;' `
+    -To 'const MIN_REASON = 5;' `
+    -TestName "the dialog reason bounds equal the service" -Suite $SCR
+
+# 152. The export button is shown to anyone who can view.
+$results += Invoke-Probe `
+    -Name "Dashboard passes view grant" -File "apps/admin/components/admin/AdminDashboard.tsx" `
+    -From 'canExport={hasAccessToSection("gamemaster-reports-export")}' `
+    -To 'canExport={hasAccessToSection("gamemaster-management")}' `
+    -TestName "the dashboard renders the program section" -Suite $SCR
+
+# 153. The move route is granted by the wrong section.
+$results += Invoke-Probe `
+    -Name "Move route wrong section" -File "apps/admin/app/api/gamemasters/referred-players/[userId]/route.ts" `
+    -From 'guardSection("gamemaster-management")' `
+    -To 'guardSection("users")' `
+    -TestName "every handler is section-guarded" -Suite $SCR
+
+# 154. A player is parked under a paused Game Master (D7).
+$results += Invoke-Probe `
+    -Name "Move to paused GM" -File $SVC `
+    -From 'if (target.status !== "active" || target.isPaused === true || target.scheduledForDeletion === true) {' `
+    -To 'if (target.status !== "active") {' `
+    -TestName "refuses a move to a paused Game Master" -Suite $AFF
+
+# 155. Detach leaves the settlement fallback, so the old GM keeps being paid.
+$results += Invoke-Probe `
+    -Name "Detach keeps fallback" -File $SVC `
+    -From '{ $unset: { referredByGameMasterId: "", referredByReferralCode: "" } },' `
+    -To '{ $unset: { referredByReferralCode: "" } },' `
+    -TestName "detach ends the row as admin_detached" -Suite $AFF
+
+# 156. A moved player is labelled as a link signup.
+$results += Invoke-Probe `
+    -Name "Moved row wrong source" -File $SVC `
+    -From 'source: "admin_assigned",' `
+    -To 'source: "gm_referral_link",' `
+    -TestName "move ends the old row as admin_reassigned" -Suite $AFF
+
+# 157. The old Game Master keeps the slot.
+$results += Invoke-Probe `
+    -Name "Old slot not released" -File $SVC `
+    -From '{ $inc: { activeReferredUsers: -1 } },' `
+    -To '{ $inc: { activeReferredUsers: 0 } },' `
+    -TestName "move ends the old row as admin_reassigned" -Suite $AFF
+
+# 158. The audit row does not name the real admin.
+$results += Invoke-Probe `
+    -Name "Audit not attributed" -File $SVC `
+    -From 'employeeId: input.actor.id,' `
+    -To 'employeeId: "system",' `
+    -TestName "move writes ONE customer audit row" -Suite $AFF
+
+# 159. Any reason is accepted.
+$results += Invoke-Probe `
+    -Name "Reason unbounded" -File $SVC `
+    -From 'return r.length >= MIN_REASON_LENGTH && r.length <= MAX_REASON_LENGTH ? r : null;' `
+    -To 'return r.length > 0 ? r : null;' `
+    -TestName "trims and bounds the reason" -Suite $AFF
+
+# 160. The credentials email goes back to a pattern-reading replace.
+$EMP = "__tests__/admin/employee-email-template.test.ts"
+$results += Invoke-Probe `
+    -Name "Template replace reads dollar patterns" -File "apps/admin/app/api/employees/route.ts" `
+    -From 'result = result.split(`{{${key}}}`).join(String(value || ""));' `
+    -To 'result = result.replace(new RegExp(`\\{\\{${key}\\}\\}`, "g"), String(value || ""));' `
+    -TestName "substitutes variables literally so a password with a dollar sign survives" -Suite $EMP
+
 Write-Host ""
 Write-Host "================ SUMMARY ================"
 $results | Format-Table -AutoSize

@@ -498,6 +498,61 @@ KPIs for the filtered set (affiliates, active, by source, commission generated/p
 - Report + export behind `requireSectionAccess("gamemaster-management")`; export additionally behind new section id `gamemaster-reports-export` (add-only enum value) so the owner can grant viewing without bulk personal-data download.
 - Route guard audit (`npm run audit:admin-routes`) must stay at 0 no-check.
 
+> **BUILT 1 Oct 2026 (programme v2 task 4): the report screen, CSV export, move and detach.**
+> Live code: `apps/admin/components/admin/GameMasterProgramSection.tsx` (two tabs - the existing
+> Game Master list and the new Referred players report) and, under
+> `apps/admin/components/admin/gamemaster/`, `GmReferredPlayersReport`, `GmReportFilters`,
+> `GmReportSummary`, `GmReportTable`, `GmAffiliationActionDialog`, `GmExportButton`,
+> `AffiliationSourceBadge`; the pure modules `apps/admin/lib/admin/gm-report-query.ts` (URL state)
+> and `gm-report-csv.ts` (cells, columns, cap); the service
+> `apps/admin/lib/services/gamemaster/admin-affiliation.service.ts`; and the routes
+> `POST /api/gamemasters/referred-players/[userId]` (move / detach) and
+> `GET /api/gamemasters/report/export`. **All admin-only; nothing here is mirrored** except the two
+> model enums. Tests: `__tests__/admin/gm-admin-affiliation.test.ts` (10, real database),
+> `gm-report-screen.test.ts` (25), `employee-email-template.test.ts` (2); probes 142-160, each
+> red on exactly one test. Nine facts drift easily:
+> - **The export needs BOTH grants** - `gamemaster-management` to see the data and the new
+>   add-only `gamemaster-reports-export` to download it - and the dashboard passes the **export**
+>   grant to the button, never the view grant; a probe swaps them.
+> - **The export is the whole filtered set, streamed in batches of 500, capped at 10,000 rows.**
+>   The plan said "e.g. 100k"; 10,000 was chosen because one aggregation per batch reads seats and
+>   earnings, and nothing has been measured at 100k. Above the cap the route refuses with a message
+>   naming the cap and telling the operator to narrow the filters.
+> - **Every export is audited BEFORE the stream starts**, refused or not: `gm_report_exported` /
+>   `gm_report_export_refused` in the system log, with the actor, the filters and the row count. A
+>   test asserts the audit call sits before the `ReadableStream` is built, because an audit written
+>   after streaming is lost whenever the download is interrupted.
+> - **CSV only. Deviation: no xlsx and no `exceljs`.** The route refuses any other `format` with a
+>   400 rather than silently sending CSV. A spreadsheet library is a new dependency in the app that
+>   holds every secret, for a format CSV already opens in.
+> - **Formula injection is neutralised inside the quotes.** A cell starting `= + - @`, tab or CR is
+>   prefixed with `'`; plain numbers, including negatives, are left as numbers so a refund column
+>   still sums. A cell that needs both is quoted *after* the prefix.
+> - **Move and detach take a reason of 10-500 characters**, and the dialog's bounds are asserted
+>   equal to the service's. Move refuses a paused, scheduled-for-deletion or expired target, and the
+>   same Game Master; detach refuses a player with no Game Master. Each runs in one transaction that
+>   ends the old row (`admin_reassigned` / `admin_detached`), moves the counters, and - **for
+>   detach - `$unset`s `user.referredByGameMasterId`**, or settlement would keep paying the old
+>   Game Master through the fallback.
+> - **A moved row is `source: admin_assigned`, `surface: admin`, with no terms acceptance** - an
+>   admin decision is not the player's consent, so D6 will hide that player's contacts from the new
+>   Game Master too. Three add-only enum values in both `user-referral.model.ts` copies.
+> - **Two audit stores, deliberately**: one customer audit row naming the real admin and the reason
+>   (the player's history), and the system-log row in the route (the operator's). The customer row
+>   is written after commit and best-effort, so an audit-store outage cannot roll back a move.
+> - **Filters actually built:** Game Master, own/external, surface, affiliation status, active,
+>   joined-date range, search, all in the URL under an `rp_` prefix so they cannot collide with the
+>   dashboard's own parameters, and `gmId` still opens the list tab so the existing deep link
+>   survives. **Not built:** competition-type, public/private, game, country, package and the money
+>   range filters of s7.2, and the s7.3 charts - the overview is figures and an own/external/surface
+>   breakdown only. **Never verified by eye.**
+>
+> **Found on the way, and fixed:** the employee credentials email substituted template variables
+> with `String.replace`, which reads `$&` and `$$` in the replacement as patterns. The generated
+> password alphabet contains both `$` and `&`, so a password containing `$&` was emailed as
+> something other than the password stored. Now a literal split/join. Latent, nothing backfilled -
+> an affected employee simply could not log in with the emailed password and would have been reset.
+
 ### 7.6 Package editor
 Add "Competition visibility allowed: Public / Private / Both" to the GM package config in the marketplace item editor (admin), writing `gameMasterConfig.allowedVisibility`.
 

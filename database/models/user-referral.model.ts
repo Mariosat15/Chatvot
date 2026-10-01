@@ -9,7 +9,13 @@ import { Schema, model, models, Document } from "mongoose";
  * How a player came to be affiliated. Stored permanently and never rewritten
  * (`External game plans/24` s2.1). Add-only enum.
  */
-export const AFFILIATION_SOURCES = ["gm_referral_link", "chartvolt_join_gm"] as const;
+// Reason: `admin_assigned` (task 4, 1 Oct 2026) records a player moved by an audited admin
+// reassignment - neither of the two player-driven channels describes how they got here.
+export const AFFILIATION_SOURCES = [
+  "gm_referral_link",
+  "chartvolt_join_gm",
+  "admin_assigned",
+] as const;
 export type AffiliationSource = (typeof AFFILIATION_SOURCES)[number];
 
 export const AFFILIATION_SURFACES = [
@@ -17,6 +23,7 @@ export const AFFILIATION_SURFACES = [
   "private_contest",
   "gm_profile",
   "signup",
+  "admin",
 ] as const;
 export type AffiliationSurface = (typeof AFFILIATION_SURFACES)[number];
 
@@ -24,6 +31,8 @@ export const AFFILIATION_END_REASONS = [
   "gm_expired",
   "gm_deleted",
   "admin_reassigned",
+  // Reason: an admin may end an affiliation without moving the player anywhere (task 4).
+  "admin_detached",
 ] as const;
 export type AffiliationEndReason = (typeof AFFILIATION_END_REASONS)[number];
 
