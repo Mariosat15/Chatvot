@@ -4,6 +4,8 @@ import { headers } from "next/headers";
 import { connectToDatabase } from "@/database/mongoose";
 import { ObjectId } from "mongodb";
 import { syncUserProfile } from "@/lib/services/profile-sync.service";
+import { parseOptionalPhoneInput } from "@/lib/utils/phone";
+import { assertPhoneAvailable } from "@/lib/services/phone-uniqueness.service";
 
 export interface UserProfile {
   id: string;
@@ -181,18 +183,65 @@ export async function PUT(req: NextRequest) {
     if (address !== undefined) updateFields.address = address.trim();
     if (city !== undefined) updateFields.city = city.trim();
     if (postalCode !== undefined) updateFields.postalCode = postalCode.trim();
-    if (phone !== undefined) updateFields.phone = phone.trim();
+
+    // Reason: existing accounts are not forced to have a phone (owner, 1 Oct 2026),
+    // but any value they submit must be valid E.164 and not already taken. Changing
+    // the number clears verification so a later SMS step cannot trust a stale flag.
+    let phoneUnset: Record<string, 1> | undefined;
+    if (phone !== undefined) {
+      const countryHint =
+        typeof country === "string" && country ? country : undefined;
+      const existingForHint = countryHint
+        ? null
+        : await findUserById(db, session.user.id);
+      const hint =
+        countryHint ||
+        (typeof existingForHint?.country === "string"
+          ? existingForHint.country
+          : undefined);
+      const parsed = parseOptionalPhoneInput(phone, hint);
+      if (!parsed.ok) {
+        return NextResponse.json({ error: parsed.error }, { status: 400 });
+      }
+      if (parsed.e164 === null) {
+        // Reason: empty string would match every other cleared profile on a future
+        // unique index and pollutes the duplicate check; absent means no phone.
+        phoneUnset = {
+          phone: 1,
+          phoneCountry: 1,
+          phoneVerified: 1,
+          phoneVerifiedAt: 1,
+        };
+      } else {
+        const availability = await assertPhoneAvailable(
+          parsed.e164,
+          session.user.id,
+        );
+        if (!availability.available) {
+          return NextResponse.json(
+            { error: availability.reason },
+            { status: 409 },
+          );
+        }
+        updateFields.phone = parsed.e164;
+        updateFields.phoneCountry = parsed.country;
+        updateFields.phoneVerified = false;
+        phoneUnset = { phoneVerifiedAt: 1 };
+      }
+    }
 
     console.log(`📝 Profile Update - Fields to update:`, updateFields);
 
     // Update user in database (try multiple ID formats)
+    const updateDoc: Record<string, unknown> = { $set: updateFields };
+    if (phoneUnset) {
+      updateDoc.$unset = phoneUnset;
+    }
     const result = await db
       .collection("user")
-      .findOneAndUpdate(
-        buildUserQuery(session.user.id),
-        { $set: updateFields },
-        { returnDocument: "after" },
-      );
+      .findOneAndUpdate(buildUserQuery(session.user.id), updateDoc, {
+        returnDocument: "after",
+      });
 
     if (!result) {
       console.error("User not found for update, ID:", session.user.id);

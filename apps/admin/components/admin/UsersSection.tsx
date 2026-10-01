@@ -406,6 +406,7 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
           user.name.toLowerCase().includes(query) ||
           user.email.toLowerCase().includes(query) ||
           user.id.toLowerCase().includes(query) ||
+          (user.phone || "").toLowerCase().includes(query) ||
           user.assignment?.employeeName?.toLowerCase().includes(query),
       );
     }
@@ -628,7 +629,7 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
-                placeholder="Search by name, email, or ID..."
+                placeholder="Search by name, email, phone, or ID..."
                 value={searchQuery}
                 onChange={(e) => {
                   setSearchQuery(e.target.value);
@@ -943,6 +944,11 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
                             <p className="text-xs text-gray-500 truncate">
                               {user.email}
                             </p>
+                            {user.phone ? (
+                              <p className="text-xs text-gray-600 truncate font-mono">
+                                {user.phone}
+                              </p>
+                            ) : null}
                           </div>
                         </div>
                       </td>

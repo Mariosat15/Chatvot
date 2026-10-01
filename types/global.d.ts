@@ -13,6 +13,10 @@ declare global {
     address: string;
     city: string;
     postalCode: string;
+    /** ISO 3166-1 alpha-2 for the phone dial code (may differ from residence country). */
+    phoneCountry: string;
+    /** National digits as typed; server normalises to E.164 with phoneCountry. */
+    phoneNational: string;
     /** Q16 — trading | games | both. Informational; not a permission. */
     signupInterest?: "trading" | "games" | "both";
   };

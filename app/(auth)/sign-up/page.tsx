@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import InputField from "@/components/forms/InputField";
 import { CountrySelectField } from "@/components/forms/CountrySelectField";
+import { PhoneInputField } from "@/components/forms/PhoneInputField";
 import FooterLink from "@/components/forms/FooterLink";
 import { signUpWithEmail } from "@/lib/actions/auth.actions";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -71,6 +72,7 @@ const SignUp = () => {
     handleSubmit,
     control,
     watch,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<ExtendedSignUpFormData>({
     defaultValues: {
@@ -79,6 +81,8 @@ const SignUp = () => {
       password: "",
       confirmPassword: "",
       country: "",
+      phoneCountry: "",
+      phoneNational: "",
       address: "",
       city: "",
       postalCode: "",
@@ -282,6 +286,16 @@ const SignUp = () => {
             control as any
           }
           error={errors.country}
+          required
+        />
+
+        <PhoneInputField
+          control={control}
+          register={register}
+          setValue={setValue}
+          watch={watch}
+          countryError={errors.phoneCountry}
+          nationalError={errors.phoneNational}
           required
         />
 

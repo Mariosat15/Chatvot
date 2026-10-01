@@ -16,6 +16,8 @@ import {
 } from "@/lib/services/registration-security.service";
 import { getFraudSettings } from "@/lib/services/fraud-settings.service";
 import { parseSignupInterest } from "@/lib/utils/signup-interest";
+import { parsePhoneInput } from "@/lib/utils/phone";
+import { assertPhoneAvailable } from "@/lib/services/phone-uniqueness.service";
 import { recordReferralClaim } from "@/lib/services/gamemaster/referral-claim.service";
 
 export const signUpWithEmail = async ({
@@ -26,6 +28,8 @@ export const signUpWithEmail = async ({
   address,
   city,
   postalCode,
+  phoneCountry,
+  phoneNational,
   honeypot,
   referralCode,
   captchaToken,
@@ -132,6 +136,27 @@ export const signUpWithEmail = async ({
       };
     }
 
+    // Reason: phone is mandatory for new registrations only (owner, 1 Oct 2026).
+    // Parse before Better Auth creates the account so a bad or taken number never
+    // leaves an orphan user row without a usable phone. Runs after the bot /
+    // origin gates so a PHONE_TAKEN reply is not a free probe for scrapers.
+    const phoneParsed = parsePhoneInput(phoneNational, phoneCountry);
+    if (!phoneParsed.ok) {
+      return {
+        success: false,
+        error: phoneParsed.error,
+        code: "INVALID_PHONE",
+      };
+    }
+    const phoneCheck = await assertPhoneAvailable(phoneParsed.e164);
+    if (!phoneCheck.available) {
+      return {
+        success: false,
+        error: phoneCheck.reason,
+        code: phoneCheck.code,
+      };
+    }
+
     const response = await auth.api.signUpEmail({
       body: { email, password, name: fullName },
     });
@@ -166,6 +191,14 @@ export const signUpWithEmail = async ({
           address,
           city,
           postalCode,
+          // Reason: always E.164 so differently typed versions of one number collide
+          // on the duplicate check. phoneCountry is the dial ISO for admin flags.
+          phone: phoneParsed.e164,
+          phoneCountry: phoneParsed.country,
+          // Reason: unset means "never asked"; false means "registered, not yet
+          // SMS-verified". SMS slots in later without migrating existing rows —
+          // existing accounts keep these fields absent.
+          phoneVerified: false,
           role, // All signups are traders - admin role assigned via admin panel only
           emailVerified: false, // Must verify email before login
           updatedAt: new Date(),
@@ -193,6 +226,8 @@ export const signUpWithEmail = async ({
         } else {
           console.log(`✅ Sign-up: Profile data saved for user ${userId}`, {
             country,
+            phone: phoneParsed.e164,
+            phoneCountry: phoneParsed.country,
             address,
             city,
             postalCode,

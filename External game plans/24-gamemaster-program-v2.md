@@ -525,7 +525,9 @@ The rule: **a `gm_private` contest can be entered, and its details read, only by
 > **Country and phone.** Both come from the player's profile (`user.country`, `user.phone`) via a
 > `$lookup` on `_id` in the shared read model. **Country** is shown to the Game Master whatever the
 > consent or the package switch say - it is not a way to contact anybody. **Phone is contact data
-> and never reaches the Game Master view.** Admins see both.
+> and never reaches the Game Master view.** Admins see both. **From 1 Oct 2026** new registrations
+> store `user.phone` as E.164 (validated, duplicate-refused) with `phoneVerified: false` reserved
+> for a later SMS step; existing accounts are not forced to add a number.
 >
 > **Admin, Manage Game Masters -> Referrals tab.** Now rendered by `GmDetailReferralsTab` from the
 > same read model as the report: Own/External badge, email, phone, country, search across all of

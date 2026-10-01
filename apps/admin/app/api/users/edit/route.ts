@@ -3,6 +3,8 @@ import { connectToDatabase } from "@/database/mongoose";
 import { guardSection } from "@/lib/admin/section-route-guard";
 import { auditLogService } from "@/lib/services/audit-log.service";
 import { ObjectId } from "mongodb";
+import { parseOptionalPhoneInput } from "@/lib/utils/phone";
+import { assertPhoneAvailable } from "@/lib/services/phone-uniqueness.service";
 
 // Valid user roles (includes legacy roles for backwards compatibility)
 // Active roles: trader, affiliate (coming soon), gamemaster (coming soon)
@@ -14,7 +16,6 @@ const VALID_ROLES = [
   "admin",
   "backoffice",
 ] as const;
-type UserRole = (typeof VALID_ROLES)[number];
 
 /**
  * Build a query that matches user by various ID formats
@@ -111,7 +112,7 @@ export async function PATCH(request: Request) {
     }
 
     // Build update object - only include fields that were explicitly provided
-    const updateData: Record<string, any> = {};
+    const updateData: Record<string, unknown> = {};
 
     // Basic fields
     if (name) updateData.name = name;
@@ -123,7 +124,44 @@ export async function PATCH(request: Request) {
     if (city !== undefined) updateData.city = city;
     if (address !== undefined) updateData.address = address;
     if (postalCode !== undefined) updateData.postalCode = postalCode;
-    if (phone !== undefined) updateData.phone = phone;
+
+    const unsetData: Record<string, 1> = {};
+    if (phone !== undefined) {
+      const hint =
+        typeof country === "string" && country
+          ? country
+          : typeof updateData.country === "string"
+            ? updateData.country
+            : undefined;
+      const parsed = parseOptionalPhoneInput(
+        typeof phone === "string" ? phone : "",
+        hint,
+      );
+      if (!parsed.ok) {
+        return NextResponse.json(
+          { success: false, message: parsed.error },
+          { status: 400 },
+        );
+      }
+      if (parsed.e164 === null) {
+        unsetData.phone = 1;
+        unsetData.phoneCountry = 1;
+        unsetData.phoneVerified = 1;
+        unsetData.phoneVerifiedAt = 1;
+      } else {
+        const availability = await assertPhoneAvailable(parsed.e164, userId);
+        if (!availability.available) {
+          return NextResponse.json(
+            { success: false, message: availability.reason },
+            { status: 409 },
+          );
+        }
+        updateData.phone = parsed.e164;
+        updateData.phoneCountry = parsed.country;
+        updateData.phoneVerified = false;
+        unsetData.phoneVerifiedAt = 1;
+      }
+    }
 
     updateData.updatedAt = new Date();
 
@@ -131,9 +169,12 @@ export async function PATCH(request: Request) {
     const query = buildUserQuery(userId);
     console.log(`🔍 Searching for user with query:`, JSON.stringify(query));
 
-    const result = await db
-      .collection("user")
-      .updateOne(query, { $set: updateData });
+    const updateDoc: Record<string, unknown> = { $set: updateData };
+    if (Object.keys(unsetData).length > 0) {
+      updateDoc.$unset = unsetData;
+    }
+
+    const result = await db.collection("user").updateOne(query, updateDoc);
 
     if (result.matchedCount === 0) {
       console.error(`❌ User not found with ID: ${userId}`);

@@ -43,6 +43,7 @@
     "isomorphic-dompurify": "^2.35.0",
     "jose": "^6.2.2",
     "jsonwebtoken": "^9.0.3",
+    "libphonenumber-js": "^1.13.14",
     "lucide-react": "^1.7.0",
     "mongodb": "^6.21.0",
     "mongoose": "^8.20.0",
