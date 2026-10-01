@@ -142,6 +142,9 @@ async function seedContest(over: Record<string, unknown> = {}): Promise<string> 
   return String(id);
 }
 
+// Reason (R121): a MEMBER is an active row WITH accepted Affiliate Terms. Before R121 this
+// fixture carried none and still admitted the player - that was the defect; the unaccepted
+// shapes are now asserted to be refused in `gm-private-membership.test.ts`.
 const affiliateTo = (gameMasterId: string) =>
   UserReferral.collection.insertOne({
     userId: PLAYER,
@@ -149,6 +152,7 @@ const affiliateTo = (gameMasterId: string) =>
     referralCode: "X",
     isActive: true,
     source: "gm_referral_link",
+    termsAcceptanceId: "accepted-1",
     createdAt: new Date(),
     updatedAt: new Date(),
   });

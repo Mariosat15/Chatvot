@@ -207,6 +207,14 @@ The rule: **a `gm_private` contest can be entered, and its details read, only by
 > 4. Holds a seat: allowed (D5, so a player whose Game Master changed keeps seeing the contest).
 > 5. Otherwise `canEnterPrivateContest` with the viewer's current affiliation, which is the same rule the entry guard uses.
 >
+> **AMENDED 1 Oct 2026 (R121): "current affiliation" means MEMBERSHIP, not the earnings answer.** Step 6 passed `getAffiliation`, which counts an admin-moved row with no accepted terms and the `user.referredByGameMasterId` fallback. Both screens show only accepted links, so a player shown as *Ended (detached by an admin)* could enter. Access now passes `getPrivateContestMembership` (`private-contest-membership.service.ts`, main app only). It counts an **active row with a non-empty `termsAcceptanceId`, to a Game Master that has not expired or been deleted (D4)**, and it never reads the fallback. The view, the competitions list and `contest-entry.service.ts` all call it. `getAffiliation` is unchanged and still decides earnings. The gate now returns **`joinable`** for a `your_gm` row with no accepted terms, unless the Game Master is paused (D7). Join GM on that row stamps the verified acceptance onto it through `recordAffiliationConsent`, instead of creating a second row. **Decisions:**
+> - Legacy unaccepted rows keep earning but need Join GM for private contests.
+> - An expired Game Master ends access.
+> - Seated players keep their seat (D5).
+> - Not retroactive, and nothing was backfilled.
+>
+> The card's copy is the owner's: "Want to join this private competition?", the host's full name, and a Join GM sentence by surname that shows only when the button does (`private-contest-card-copy.ts`). In the table in s3, `canEnterPrivateContest`'s "affiliation active" is read through this rule.
+>
 > Any error refuses (fails closed). `canViewContestById` answers **true for a contest that does not exist**, so each route's own not-found handling runs unchanged, rather than this helper inventing a second 404.
 >
 > **The gate replaces the entry button; it is never shown beside it.** Its state comes from `joinGmRowState`, the same decision the leaderboard row and `affiliate()` use, so the gate can never offer a join the API refuses. The states are:

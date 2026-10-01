@@ -2076,6 +2076,99 @@ $results += Invoke-Probe `
     -To '' `
     -TestName "an accepted but ended referral cannot be found by email" -Suite $VIEWT
 
+# ---- R121: private-contest membership is accepted terms, never earnings alone ----------
+$MEMBER = "lib/services/gamemaster/private-contest-membership.service.ts"
+$MEMT = "__tests__/services/gm-private-membership.test.ts"
+$ENTT = "__tests__/services/gm-private-entry.test.ts"
+$GATE = "lib/services/gamemaster/private-contest-gate.service.ts"
+$ACCEPTED = 'return typeof row?.termsAcceptanceId === "string" && row.termsAcceptanceId.trim() !== "";'
+
+# 248. An admin-moved row with no terms is a member again - the owner's report.
+$results += Invoke-Probe `
+    -Name "Unaccepted row is a member" -File $MEMBER `
+    -From $ACCEPTED -To 'return true;' `
+    -TestName "refuses a moved row with no accepted terms" -Suite $MEMT
+
+# 249. A stored empty-string acceptance reads as accepted.
+$results += Invoke-Probe `
+    -Name "Empty acceptance counts" -File $MEMBER `
+    -From $ACCEPTED -To 'return typeof row?.termsAcceptanceId === "string";' `
+    -TestName "refuses a legacy row whose stored acceptance is an empty string" -Suite $ENTT
+
+# 250. An expired Game Master's players keep entering their private contests.
+$results += Invoke-Probe `
+    -Name "Expired GM still admits" -File $MEMBER `
+    -From '  if (previousAffiliationEnd(gm) !== null) return null;' -To '  void previousAffiliationEnd;' `
+    -TestName "refuses an accepted member once their Game Master has expired" -Suite $MEMT
+
+# 251. A detached (ended) row admits.
+$results += Invoke-Probe `
+    -Name "Ended row admits" -File $MEMBER `
+    -From 'UserReferral.findOne({ userId, isActive: true })' -To 'UserReferral.findOne({ userId })' `
+    -TestName "refuses a detached player whose ended row once had accepted terms" -Suite $ENTT
+
+# 252. The view check asks the EARNINGS question again (row or user-document fallback).
+$results += Invoke-Probe `
+    -Name "View uses getAffiliation" -File "lib/services/gamemaster/private-contest-access.service.ts" `
+    -From 'await getPrivateContestMembership(userId)' `
+    -To '((await (await import("./affiliation.service")).getAffiliation(userId))?.gameMasterId ?? null)' `
+    -TestName "refuses a player known only to the user-document fallback" -Suite $MEMT
+
+# 253. The entry gate asks the earnings question again.
+$results += Invoke-Probe `
+    -Name "Entry uses getAffiliation" -File "lib/services/contest-entry.service.ts" `
+    -From 'const membership = await getPrivateContestMembership(actor.userId);' `
+    -To 'const membership = (await (await import("./gamemaster/affiliation.service")).getAffiliation(actor.userId))?.gameMasterId ?? null;' `
+    -TestName "refuses an admin-moved row that carries no accepted terms" -Suite $ENTT
+
+# 254. The list marks an unaccepted row as a member again.
+$results += Invoke-Probe `
+    -Name "Listing uses getAffiliation" -File "lib/services/gamemaster/contest-viewer.service.ts" `
+    -From 'affiliatedGameMasterId: await getPrivateContestMembership(userId)' `
+    -To 'affiliatedGameMasterId: ((await (await import("./affiliation.service")).getAffiliation(userId))?.gameMasterId ?? null)' `
+    -TestName "refuses a moved row with no accepted terms" -Suite $MEMT
+
+# 255. The gate goes back to offering nothing to an unaccepted same-GM row.
+$results += Invoke-Probe `
+    -Name "Gate offers no Join GM" -File $GATE `
+    -From '      rowState === "your_gm" &&' -To '      rowState === "never" &&' `
+    -TestName "offers Join GM to a player whose row to THIS Game Master has no accepted terms" -Suite $MEMT
+
+# 256. The gate offers Join GM for a paused Game Master.
+$results += Invoke-Probe `
+    -Name "Gate ignores paused GM" -File $GATE `
+    -From '      isGameMasterJoinable(facts, "chartvolt_join_gm")
+    ) {' `
+    -To '      true
+    ) {' `
+    -TestName "does not offer Join GM for an unaccepted row when the Game Master is paused" -Suite $MEMT
+
+# 257. Join GM reports success on the existing row and records nothing.
+$results += Invoke-Probe `
+    -Name "Join GM stamps nothing" -File "lib/services/gamemaster/affiliation.service.ts" `
+    -From 'if (unaccepted && input.termsAcceptanceId !== undefined) {' -To 'if (false) {' `
+    -TestName "stamps the verified acceptance onto the existing unaccepted row" -Suite $MEMT
+
+# 258. A refused verification is swallowed into success.
+$results += Invoke-Probe `
+    -Name "Consent refusal swallowed" -File "lib/services/gamemaster/affiliation.service.ts" `
+    -From '          if (!consent.success) {' -To '          if (false) {' `
+    -TestName "refuses an unverified acceptance and leaves the row unaccepted" -Suite $MEMT
+
+# 259. The surname sentence names the whole name (owner wording).
+$results += Invoke-Probe `
+    -Name "Invitation uses full name" -File "lib/utils/private-contest-card-copy.ts" `
+    -From 'notLinked: `Not linked to ${lastName} yet?' -To 'notLinked: `Not linked to ${host} yet?' `
+    -TestName "names the host in full and the surname" -Suite $MEMT
+
+# 260. The Join GM sentence shows for a locked or unavailable gate too.
+$results += Invoke-Probe `
+    -Name "Join sentence unconditional" -File "components/gamemaster/PrivateContestGate.tsx" `
+    -From '        {gate.state === "joinable" && (
+          <p' -To '        {true && (
+          <p' `
+    -TestName "shows the Join GM sentence only when the gate offers the button" -Suite $MEMT
+
 Write-Host ""
 Write-Host "================ SUMMARY ================"
 $results | Format-Table -AutoSize

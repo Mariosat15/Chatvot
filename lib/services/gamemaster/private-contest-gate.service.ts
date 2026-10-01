@@ -12,7 +12,8 @@
 
 import UserReferral from "@/database/models/user-referral.model";
 import { findSubscriptionForUser, toFacts } from "./affiliation.service";
-import type { AffiliationGameMasterFacts } from "./affiliation-rules";
+import { isGameMasterJoinable, type AffiliationGameMasterFacts } from "./affiliation-rules";
+import { hasAcceptedAffiliateTerms } from "./private-contest-membership.service";
 import { isGmJoinEnabled } from "./gm-program-flags";
 import { joinGmRowState } from "./gm-leaderboard-rules";
 
@@ -60,8 +61,8 @@ export async function getPrivateContestGate(input: {
 
     // Reason: the ACTIVE referral row only, the row `affiliate()` decides against.
     const activeRow = await UserReferral.findOne({ userId: input.viewerUserId, isActive: true })
-      .select({ gameMasterId: 1 })
-      .lean<{ gameMasterId: string }>();
+      .select({ gameMasterId: 1, termsAcceptanceId: 1 })
+      .lean<{ gameMasterId: string; termsAcceptanceId?: unknown }>();
     const activeGameMasterId = activeRow?.gameMasterId;
     const activeGameMaster: AffiliationGameMasterFacts | undefined = activeGameMasterId
       ? toFacts(await findSubscriptionForUser(activeGameMasterId))
@@ -78,8 +79,19 @@ export async function getPrivateContestGate(input: {
     if (rowState === "locked") {
       return { ...base, state: "locked", currentGameMasterName: activeGameMaster?.userName };
     }
-    // `own` and `your_gm` cannot reach here - `canViewContest` admits both - so anything else
-    // is a Game Master the rules will not offer.
+    // Reason (R121): `your_gm` DOES reach here now - membership needs accepted terms, so a row
+    // to this Game Master with none (an admin move, a legacy link) is not admitted. Pressing
+    // Join GM stamps the acceptance onto that row (`affiliate()`'s already-affiliated path),
+    // so offer it, unless the Game Master can no longer take players (paused, expired).
+    if (
+      rowState === "your_gm" &&
+      !hasAcceptedAffiliateTerms(activeRow) &&
+      isGameMasterJoinable(facts, "chartvolt_join_gm")
+    ) {
+      return { ...base, state: "joinable", subscriptionId };
+    }
+    // `own` cannot reach here - `canViewContest` admits it - so anything else is a Game Master
+    // the rules will not offer.
     return base;
   } catch (error) {
     console.warn("⚠️ Private contest gate could not be resolved:", error);

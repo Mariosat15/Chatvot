@@ -97,6 +97,7 @@ which**. |
 | **R118** | **The Game Master's own referral screens sent every referred player's email, IP address and browser string to the Game Master's browser.** A `...r` spread in `/api/gamemaster/referrals`, and the email in `/dashboard`, with no check that the player had accepted the terms (D6) | **High** | **Live** - readable from the network tab by any Game Master. No money moved; a read leaves no record, so there is no way to know whether it was used | **CLOSED 1 Oct 2026.** One field-listed view that shows the email only on accepted terms, the session scope spread last, and a search that cannot match a hidden email. See detail section |
 | **R119** | **A detached-then-rejoined player showed twice in the admin Game Master report, as "inactive", while the Game Master saw them as active; an admin move credited the new Game Master with the player's earlier seats.** One row per affiliation document, a 30-day-activity label colliding with "currently affiliated", and an epoch window for every non-link source | **Medium** | **Live, reporting only** - no payment reads this model. Nothing backfilled | **CLOSED 1 Oct 2026.** One row per player per Game Master with stints summed, filters after grouping, `referredAt` window for moves, one shared state label. See detail section |
 | **R120** | **An external referral's name and email reached every Game Master once consented, with no package control.** Owner asked for a per-package switch | **Low** | **Missing control, not a defect.** Default OFF masks existing packages on purpose | **CLOSED 1 Oct 2026.** `showExternalReferralDetails` on the package: off shows `**********` for email and surname plus the full client id; search cannot reach the hidden fields. See detail section |
+| **R121** | **A player the admin had detached or moved could still enter a Game Master's private competition, and was shown "unavailable" with no Join GM button.** Private access asked the earnings question (`getAffiliation`), which counts an admin-moved row with no accepted terms and the `user.referredByGameMasterId` fallback, while both screens show only accepted links | **High** | **LIVE, access only** - no payment was wrong; a non-member could take a seat and a prize in a contest meant for members. Not retroactive, nothing backfilled | **CLOSED 1 Oct 2026.** `getPrivateContestMembership`: an active row with accepted terms and a Game Master that has not expired; the fallback is never used. The gate offers Join GM on an unaccepted row, and Join GM stamps the acceptance onto it. See detail section |
 | **R107** | **Journey editor selection did not load the selected map; Required Badges showed raw badge ids.** Clicking a sequence card only set `selectedSequenceMap`, so the highlight moved while Current Map / Milestones / Zones kept map 1's data. Separately, `MilestoneDetailModal` resolved badge names only through `lib/constants/badges`, so blueprint ids like `trading_beat_top_trader_flag` rendered as snake_case | **Medium** | **LIVE and DISPLAY / EDITOR only** — no money, no wrong unlocks from the naming half; the editor half blocked editing maps 2–10. **Nothing was backfilled** | **CLOSED 17 Sep 2026.** `selectAndLoadMap` + tab-change reload by mapId; `resolveBadgeDisplayName` + milestones API enrichment from `getBadgesFromDB` |
 | **R108** | **Badge Simulator reported every `game_*` condition as unrecognized; `consecutive_trading_days` could never earn.** Simulator allow-list drifted from the registry; mock omitted `gameStats`/`gameTypes`; evaluator switch missed the registry streak name; vitest JSON blew `maxBuffer` | **Medium** | **LIVE for the simulator report and for streak badges in production**; Games badges were already earnable in production (registry door) — the simulator lied. **Nothing was backfilled** | **CLOSED 17 Sep 2026.** `isSupportedConditionType` + gameStats mocks; evaluator `consecutive_trading_days`; blueprint ladders for season/best score; vitest `--outputFile` |
 | R8 | Bulk find-and-replace on wording | High | Medium | X8 |
@@ -6094,6 +6095,67 @@ copies, `gamemaster-subscription.model.ts`, `app/api/gamemaster/{referrals,dashb
 `MarketplaceSection.tsx`, `components/gamemaster/GmReferralBadges.tsx`. Tests:
 `__tests__/services/gm-external-referral-details.test.ts` (34 tests). Probes 188-206 are
 new; 141, 171, 173 and 175 were re-aimed. All 206 come back red.
+
+### R121 - A detached or moved player could still enter a private competition, with no Join GM button - **CLOSED 1 Oct 2026**
+
+**What the owner saw.** `athinodoroumarios@yahoo.com` showed as *Ended (detached by an admin)*
+on both the admin and the Game Master screens, and could still enter that Game Master's private
+competition. The card offered no Join GM button. A second player, detached the same way, was
+correctly shown the button. After the owner joined that second player, the first one started
+showing it too, and after joining, both screens listed them correctly.
+
+**Why.** Private access asked `getAffiliation`, which answers the **earnings** question: who
+should be paid for this player's entry fees. That answer counts:
+- any active `UserReferral` row, including an admin-moved row whose player never accepted the
+  Affiliate Terms (`termsAcceptanceId` empty);
+- and, when no row is active, the `user.referredByGameMasterId` fallback, which a detach does
+  not always clear.
+
+Both screens show only **accepted** links, so the screens said "Ended" while the access check
+said "member". The gate then saw a row to this very Game Master, returned `your_gm`, and drew
+"unavailable" instead of Join GM. Which shape a player is in depends on their history (moved
+before they were detached, or referred before programme v2 wrote rows with terms), which is
+why one detached player behaved and the other did not. **The exact document for this player
+was not read**: the production database refused a connection from the build machine, so which
+of the two shapes it was is inferred from the code paths, both of which are now closed and
+tested.
+
+**The fix.** A player is a member for private access only when all three hold:
+- there is an **active** `UserReferral` row;
+- it carries a **non-empty** `termsAcceptanceId` (`""` reads as absent: "missing has three
+  shapes");
+- the Game Master has **not expired or been deleted** (`previousAffiliationEnd` returns null, D4).
+
+The user-document fallback is **never** used for access. This lives in
+`private-contest-membership.service.ts` and is the one answer for the contest view, the
+competitions list and the entry service, so the screen and the seat cannot disagree.
+**Earnings are unchanged**: `getAffiliation` still pays exactly who it paid before.
+
+**The button.** The gate now returns `joinable` for a `your_gm` row with no accepted terms,
+when the Game Master accepts ChartVolt joins (paused stays refused, D7). Pressing Join GM on
+such a row reaches `already_affiliated`, which now calls `recordAffiliationConsent` to stamp
+the **verified** acceptance onto the existing row rather than creating a second one. A refused
+acceptance is returned as a refusal, never swallowed into success.
+
+**Decisions recorded with it.**
+- **An expired Game Master ends private access** at once, even for an accepted member.
+- **Legacy rows that never accepted the terms keep earning and lose private access** until
+  the player presses Join GM. That is the intended reading of D6, applied to access.
+- **A player already seated keeps their seat** (D5). Only new entry is checked.
+- **Not retroactive, nothing backfilled.** Seats already taken stand; there is no ledger
+  question because no payment depended on this check.
+
+**Harm, stated precisely.** Live, access only. A non-member could enter, play and win a prize
+in a contest meant for members. Nothing was paid to the wrong Game Master.
+
+**Files:** `lib/services/gamemaster/private-contest-membership.service.ts` (new),
+`private-contest-access.service.ts`, `contest-viewer.service.ts`, `private-contest-gate.service.ts`,
+`affiliation.service.ts`, `lib/services/contest-entry.service.ts`,
+`lib/utils/private-contest-card-copy.ts`, `components/gamemaster/PrivateContestGate.tsx`. All
+main-app only, so `check:mirrors` says nothing about them. Tests:
+`__tests__/services/gm-private-membership.test.ts` (13, new) and five added to
+`gm-private-entry.test.ts`; one fixture in `gm-private-contest-view.test.ts` now carries
+accepted terms. Probes 248-260 are new; all 260 come back red.
 
 ---
 

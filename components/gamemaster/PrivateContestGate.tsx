@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import ActionTermsDialog, { ACTION_TERM_SLUGS } from "@/components/ActionTermsDialog";
 import { useAppSettings } from "@/contexts/AppSettingsContext";
 import { formatVolts } from "@/lib/utils/format-volts";
+import { privateContestInvitation } from "@/lib/utils/private-contest-card-copy";
 import type { PrivateContestGate as GateFacts } from "@/lib/services/gamemaster/private-contest-gate.service";
 
 const GENERIC_ERROR = "Something went wrong. Please contact support.";
@@ -39,6 +40,7 @@ export default function PrivateContestGate({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const gmName = gate.gameMasterName || "this Game Master";
+  const invitation = privateContestInvitation(gate.gameMasterName);
 
   const handleAccepted = async (acceptanceId?: string) => {
     setDialogOpen(false);
@@ -91,9 +93,11 @@ export default function PrivateContestGate({
           </div>
         </dl>
 
-        <p className="mt-5 text-sm text-gray-400">
-          Only players who belong to {gmName} can enter this competition or see its leaderboard.
-        </p>
+        <h2 className="mt-5 text-base font-semibold text-white">{invitation.title}</h2>
+        <p className="mt-2 text-sm text-gray-400">{invitation.body}</p>
+        {gate.state === "joinable" && (
+          <p className="mt-2 text-sm text-gray-400">{invitation.notLinked}</p>
+        )}
 
         <div className="mt-5">
           {gate.state === "joinable" && (

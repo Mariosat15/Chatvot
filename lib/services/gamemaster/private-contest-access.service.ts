@@ -24,7 +24,7 @@
 import { connectToDatabase } from "@/database/mongoose";
 import Competition from "@/database/models/trading/competition.model";
 import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
-import { getAffiliation } from "./affiliation.service";
+import { getPrivateContestMembership } from "./private-contest-membership.service";
 import { resolveCompetitionVisibility } from "./competition-visibility";
 import { canEnterPrivateContest } from "./visible-contests";
 
@@ -58,8 +58,9 @@ export async function canViewContest(
         null;
     if (seated) return true;
 
-    const affiliation = await getAffiliation(userId);
-    return canEnterPrivateContest(contest, affiliation?.gameMasterId);
+    // Reason: membership, not earnings (R121) - an unaccepted, fallback-only or expired-GM link
+    // must reach the gate's Join GM button rather than the private leaderboard.
+    return canEnterPrivateContest(contest, await getPrivateContestMembership(userId));
   } catch (error) {
     console.warn("⚠️ Private contest access check failed; refusing:", error);
     return false;

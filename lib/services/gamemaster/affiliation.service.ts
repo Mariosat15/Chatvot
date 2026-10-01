@@ -13,6 +13,7 @@ import {
   type PreviousAffiliationEnd,
 } from "./affiliation-rules";
 import { verifyGmTermsAcceptance } from "./gm-terms.service";
+import { recordAffiliationConsent } from "./affiliation-consent.service";
 import { defaultSurfaceForSource } from "./referral-kind";
 
 /**
@@ -271,7 +272,7 @@ export async function affiliate(input: AffiliateInput): Promise<AffiliateResult>
 
       const activeRow = await UserReferral.findOne({ userId, isActive: true })
         .session(session)
-        .lean<{ _id: unknown; gameMasterId: string }>();
+        .lean<{ _id: unknown; gameMasterId: string; termsAcceptanceId?: unknown }>();
 
       let activeGmDoc: unknown;
       if (activeRow && (!gm || activeRow.gameMasterId !== gm.userId)) {
@@ -298,6 +299,24 @@ export async function affiliate(input: AffiliateInput): Promise<AffiliateResult>
 
       if (decision.kind === "already_affiliated") {
         await session.abortTransaction();
+        // Reason (R121): a row to this Game Master with no accepted terms (an admin move, a
+        // legacy link) is not a private-contest member, so the gate offers Join GM. When the
+        // player accepts, stamp that acceptance on the EXISTING row - verified exactly as a new
+        // row's would be - or the button would report success and change nothing.
+        const unaccepted =
+          activeRow &&
+          !(typeof activeRow.termsAcceptanceId === "string" && activeRow.termsAcceptanceId.trim() !== "");
+        if (unaccepted && input.termsAcceptanceId !== undefined) {
+          const consent = await recordAffiliationConsent({
+            userId,
+            gameMasterId: gm!.userId,
+            referralId: String(activeRow._id),
+            termsAcceptanceId: input.termsAcceptanceId,
+          });
+          if (!consent.success) {
+            return { success: false, code: consent.code as AffiliationRefusalCode, error: consent.error };
+          }
+        }
         return {
           success: true,
           created: false,

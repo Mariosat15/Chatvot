@@ -37,6 +37,31 @@ export function isPrivateCardAccess(value: unknown): value is PrivateCardAccess 
   return typeof value === "string" && KNOWN.has(value as PrivateCardAccess);
 }
 
+export interface PrivateContestInvitation {
+  title: string;
+  body: string;
+  /** Shown only when the viewer can press Join GM - it promises a button that exists. */
+  notLinked: string;
+}
+
+/**
+ * The private-contest lobby's explanation (owner wording, 1 Oct 2026).
+ *
+ * Reason the surname is the LAST word of the stored name and the fallback is the generic
+ * phrase: `userName` is free text, so a single-word name is its own surname, and an absent
+ * name must never render "Not linked to undefined yet?".
+ */
+export function privateContestInvitation(gameMasterName: string | undefined): PrivateContestInvitation {
+  const full = gameMasterName?.trim() || "";
+  const host = full || "this Game Master";
+  const lastName = full ? full.split(/\s+/).at(-1) ?? full : "this Game Master";
+  return {
+    title: "Want to join this private competition?",
+    body: `This competition is hosted by ${host} and is only open to players who have joined this Game Master as a referral.`,
+    notLinked: `Not linked to ${lastName} yet? No problem — press Join GM, accept the Affiliate Terms, and you'll be able to enter this competition and future private competitions hosted by this Game Master.`,
+  };
+}
+
 export function privateContestCardCopy(
   access: PrivateCardAccess,
   gameMasterName: string | undefined,

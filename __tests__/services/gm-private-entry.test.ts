@@ -156,15 +156,35 @@ async function seedWallet(): Promise<void> {
   });
 }
 
-async function affiliateTo(gameMasterId: string): Promise<void> {
+async function seedGameMaster(gameMasterId: string, status = "active"): Promise<void> {
+  await db().collection("gamemastersubscriptions").updateOne(
+    { userId: gameMasterId },
+    {
+      $setOnInsert: { userId: gameMasterId, userName: "Ada Lovelace", referralCode: `RC${gameMasterId.slice(-4)}` },
+      $set: { status, isPaused: false, scheduledForDeletion: false, updatedAt: new Date() },
+    },
+    { upsert: true },
+  );
+}
+
+/**
+ * Reason (R121): a MEMBER is an active row with accepted Affiliate Terms, under a Game Master
+ * who has not expired or been deleted. Before R121 this fixture carried no terms and no
+ * subscription and still admitted the player - that was the defect. `over` builds the
+ * unaccepted shapes the R121 tests below refuse.
+ */
+async function affiliateTo(gameMasterId: string, over: Record<string, unknown> = {}): Promise<void> {
+  await seedGameMaster(gameMasterId);
   await UserReferral.collection.insertOne({
     userId: DEFAULT_USER_ID,
     gameMasterId,
     referralCode: "PRIV",
     isActive: true,
     source: "gm_referral_link",
+    termsAcceptanceId: "accepted-1",
     createdAt: new Date(),
     updatedAt: new Date(),
+    ...over,
   });
 }
 
@@ -204,6 +224,8 @@ describe("private Game Master contest - the entry door", () => {
       "userlevels",
       "tradingbehaviorprofiles",
       "userreferrals",
+      "gamemastersubscriptions",
+      "user",
     ]);
   }, 120_000);
 
@@ -306,6 +328,55 @@ describe("private Game Master contest - the entry door", () => {
     await UserReferral.collection.updateMany({}, { $set: { isActive: false } });
     expect((await enterCompetition(id)).success).toBe(true);
     await expectSeated(id);
+  });
+
+  // R121: the owner's report - a player the GM and admin pages showed as Ended entered a
+  // private contest. Membership is accepted terms on an ACTIVE row, never earnings alone.
+  describe("R121 - only a player who accepted the Affiliate Terms is a member", () => {
+    it("refuses an admin-moved row that carries no accepted terms (D6)", async () => {
+      const id = await seedCompetition();
+      await seedWallet();
+      await affiliateTo(OWNER_GM, { source: "admin_assigned", termsAcceptanceId: undefined });
+      expect((await enterCompetition(id)).success).toBe(false);
+      expect((await callGateB(id)).status).toBe(403);
+      await expectNothingMoved(id);
+    });
+
+    it("refuses a legacy row whose stored acceptance is an empty string", async () => {
+      const id = await seedCompetition();
+      await seedWallet();
+      await affiliateTo(OWNER_GM, { termsAcceptanceId: "" });
+      expect((await enterCompetition(id)).success).toBe(false);
+      await expectNothingMoved(id);
+    });
+
+    it("refuses a player known only to the user-document fallback (detached or legacy)", async () => {
+      const id = await seedCompetition();
+      await seedWallet();
+      await seedGameMaster(OWNER_GM);
+      await db()
+        .collection("user")
+        .insertOne({ _id: new mongoose.Types.ObjectId(DEFAULT_USER_ID), referredByGameMasterId: OWNER_GM });
+      expect((await enterCompetition(id)).success).toBe(false);
+      await expectNothingMoved(id);
+    });
+
+    it("refuses a detached player whose ended row once had accepted terms", async () => {
+      const id = await seedCompetition();
+      await seedWallet();
+      await affiliateTo(OWNER_GM, { isActive: false, endReason: "admin_detached" });
+      expect((await enterCompetition(id)).success).toBe(false);
+      await expectNothingMoved(id);
+    });
+
+    it("refuses an accepted member whose Game Master has expired (D4)", async () => {
+      const id = await seedCompetition();
+      await seedWallet();
+      await affiliateTo(OWNER_GM);
+      await seedGameMaster(OWNER_GM, "expired");
+      expect((await enterCompetition(id)).success).toBe(false);
+      await expectNothingMoved(id);
+    });
   });
 });
 

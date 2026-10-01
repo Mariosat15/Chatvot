@@ -61,7 +61,7 @@ import {
   providerBlocksContestEntry,
   providerKeyFromContest,
 } from "./game-providers/provider-entry-gate";
-import { getAffiliation } from "./gamemaster/affiliation.service";
+import { getPrivateContestMembership } from "./gamemaster/private-contest-membership.service";
 import { resolveCompetitionVisibility } from "./gamemaster/competition-visibility";
 import { canEnterPrivateContest } from "./gamemaster/visible-contests";
 
@@ -205,8 +205,11 @@ export async function enterContest(
         !actor.trusted &&
         resolveCompetitionVisibility(competition.visibility) === "gm_private"
       ) {
-        const affiliation = await getAffiliation(actor.userId);
-        if (!canEnterPrivateContest(competition, affiliation?.gameMasterId)) {
+        // Reason: membership, not earnings (R121) - a moved row with no terms accepted, the
+        // user-document fallback and an expired Game Master all earn or once earned, and none
+        // of them is a player who pressed Join GM and accepted the Affiliate Terms.
+        const membership = await getPrivateContestMembership(actor.userId);
+        if (!canEnterPrivateContest(competition, membership)) {
           await session.abortTransaction();
           return fail(
             "private_not_affiliated",
