@@ -245,6 +245,50 @@ percentage as trading - section 5.
 > `context="competition"`). No server change was needed; the construction helper already
 > accepted every field.
 
+#### 3.3a The admin's competition defaults (BUILT 1 October 2026)
+
+An admin sets, for each competition option, **a default value and whether a Game Master may
+change it** (admin section `gm-competition-defaults`, under Game Masters). The intent
+is that a Game Master can only ever create a correct competition.
+
+- **Locked option:** hidden from the Game Master's form, and **the create route writes the
+  admin's value whatever the request says**. The form hiding it is display only; the server
+  is the enforcement.
+- **Open option:** shown, starting at the admin's value. A value sent is checked by **the
+  same validator the admin's save uses** and refused naming the option. It is **never
+  clamped**, because a quietly changed value is a different competition from the one the Game
+  Master reviewed. An open option left blank is filled with the admin's value.
+- **Nothing configured** means every option is open with the shipped default, which is
+  exactly what a Game Master could do before the screen existed.
+
+Live code: `lib/services/gamemaster/competition-defaults.ts` (the option list),
+`competition-defaults-apply.ts` (validate, resolve, apply), `competition-defaults.service.ts`
+(load/save). **All three are mirrored, and `check:mirrors` does not see them** because it
+compares models; the guarantee is a byte-for-byte test in
+`__tests__/services/gamemaster-competition-defaults.test.ts`. The stored model
+`gamemaster-competition-defaults.model.ts` is mirrored and covered by `check:mirrors`. Both
+`POST /api/gamemaster/competitions` copies apply the defaults **before** anything else reads the
+body, so the prize pool, package cap and provider pre-flight all see what will be stored.
+
+**Deviation, recorded:** the plan was a separate small endpoint for the forms to read. The
+defaults were instead added to the existing `GET /api/gamemaster/creation-options` as
+`competitionDefaults: { trading, provider }`, because both forms already wait for that response,
+and a second fetch would be a second point where the form and the gate could disagree. The forms
+read it through `components/gamemaster/competition-defaults-lookup.ts`, which **fails open**: a
+missing or malformed response shows every option with its built-in value, and the server still
+enforces any lock.
+
+Two edges worth knowing:
+- A **locked maximum players above the Game Master's package cap** cannot be honoured. The form
+  says so and asks them to contact support, rather than silently lowering it.
+- A **locked prize split** is shown read-only, because a Game Master deciding whether to publish
+  needs to see what winners are paid.
+- The game form's "if a game never reports a result" and "if nobody scores" policies were sent as
+  the literals `score_zero` and `unclaimed_pool`. They now come from the admin's defaults, which
+  start at those same values.
+
+**Never verified by eye.**
+
 Only games in `limits.allowedGameTypes` appear in the picker (and only contestable
 catalogue titles that pass the same enablement as admin).
 

@@ -36,6 +36,14 @@ import {
 } from "@/components/gamemaster/provider-contest-wizard-steps";
 import { ProviderContestLimitBanners } from "@/components/gamemaster/ProviderContestLimitBanners";
 import { useProviderContestRules } from "@/components/gamemaster/use-provider-contest-rules";
+import {
+  NO_GAME_MASTER_DEFAULTS,
+  type GameMasterDefaultsLookup,
+} from "@/components/gamemaster/competition-defaults-lookup";
+import type {
+  UnresolvedRoundPolicy,
+  UnscoredContestPolicy,
+} from "@/lib/services/games/round-types";
 
 export interface ContestableTitleOption {
   providerKey: string;
@@ -69,6 +77,8 @@ interface Props {
   /** Concurrent draft/upcoming/active cap from the package. */
   maxActiveCompetitions: number;
   activeCompetitions: number;
+  /** Admin competition defaults for games. Missing means nothing locked. */
+  competitionDefaults?: GameMasterDefaultsLookup;
   onBack: () => void;
 }
 
@@ -107,9 +117,13 @@ export default function ProviderContestCreateForm({
   competitionsCreatedToday,
   maxActiveCompetitions,
   activeCompetitions,
+  competitionDefaults = NO_GAME_MASTER_DEFAULTS,
   onBack,
 }: Props) {
   const router = useRouter();
+  // Reason: every option starts at the admin's value; a locked one keeps it because its
+  // input is hidden. The create route applies the same defaults again, so this is display.
+  const defaults = competitionDefaults;
   const fields = title.schema.ok ? title.schema.fields : [];
   const [step, setStep] = useState(1);
   const [settings, setSettings] = useState<Record<string, unknown>>(() =>
@@ -117,9 +131,15 @@ export default function ProviderContestCreateForm({
   );
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [entryFee, setEntryFee] = useState("10");
-  const [maxParticipants, setMaxParticipants] = useState(
-    String(Math.min(20, maxUsersPerCompetition)),
+  const [entryFee, setEntryFee] = useState(() =>
+    String(defaults.valueOf<number>("entryFee", 10)),
+  );
+  const [maxParticipants, setMaxParticipants] = useState(() =>
+    String(
+      defaults.isLocked("maxParticipants")
+        ? defaults.valueOf<number>("maxParticipants", 20)
+        : Math.min(defaults.valueOf<number>("maxParticipants", 20), maxUsersPerCompetition),
+    ),
   );
   // Reason: seed tomorrow/day-after UTC so the white calendar opens on a usable day and
   // start is after server time without forcing an empty datetime-local.
@@ -135,9 +155,23 @@ export default function ProviderContestCreateForm({
     maxDurationSeconds: title.maxDurationSeconds,
     startTime,
     endTime,
+    defaults,
   });
-  const [prizes, setPrizes] = useState<PrizeShare[]>(DEFAULT_PRIZES);
-  const [tieRule, setTieRule] = useState<GameTieRule>(DEFAULT_GAME_TIE_RULE);
+  const [prizes, setPrizes] = useState<PrizeShare[]>(() =>
+    defaults.valueOf<PrizeShare[]>("prizeDistribution", DEFAULT_PRIZES),
+  );
+  const [tieRule, setTieRule] = useState<GameTieRule>(() =>
+    defaults.valueOf<GameTieRule>("tieRule", DEFAULT_GAME_TIE_RULE),
+  );
+  // Not offered on this form; the admin's choice (or the shipped default) is what is sent.
+  const unresolvedRoundPolicy = defaults.valueOf<UnresolvedRoundPolicy>(
+    "unresolvedRoundPolicy",
+    "score_zero",
+  );
+  const unscoredContestPolicy = defaults.valueOf<UnscoredContestPolicy>(
+    "unscoredContestPolicy",
+    "unclaimed_pool",
+  );
   const [submitting, setSubmitting] = useState(false);
 
   const canPickMode = title.supportedPlayModes.length > 1;
@@ -182,7 +216,10 @@ export default function ProviderContestCreateForm({
       if (entryNum < 0) return "Entry fee cannot be negative.";
       if (maxNum < 2) return "At least 2 players are required.";
       if (maxNum > maxUsersPerCompetition) {
-        return `Max players cannot exceed ${maxUsersPerCompetition}.`;
+        // Reason: a locked player limit has no input to correct, so say whose numbers clash.
+        return defaults.isLocked("maxParticipants")
+          ? `The platform's player limit (${maxNum}) is above your package's limit (${maxUsersPerCompetition}). Please contact support.`
+          : `Max players cannot exceed ${maxUsersPerCompetition}.`;
       }
       const roundError = rules.scheduleError();
       if (roundError) return roundError;
@@ -259,8 +296,8 @@ export default function ProviderContestCreateForm({
           // Play style, attempts, last-start rule and the grace derived from the playing
           // time, exactly as the schedule step showed them.
           ...rules.requestFields,
-          unresolvedRoundPolicy: "score_zero",
-          unscoredContestPolicy: "unclaimed_pool",
+          unresolvedRoundPolicy,
+          unscoredContestPolicy,
           tieRule,
           perRoundCostAcknowledged: true,
           prizeDistribution: prizes,
@@ -430,6 +467,7 @@ export default function ProviderContestCreateForm({
                     onEntryFee={setEntryFee}
                     onMaxParticipants={setMaxParticipants}
                     rules={rules}
+                    defaults={defaults}
                     disabled={submitting}
                   />
                 )}
@@ -441,6 +479,7 @@ export default function ProviderContestCreateForm({
                     onChange={setPrizes}
                     tieRule={tieRule}
                     onTieRule={setTieRule}
+                    defaults={defaults}
                   />
                 )}
                 {step === 5 && (

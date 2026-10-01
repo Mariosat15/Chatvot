@@ -11,6 +11,8 @@ import { resolveGameMasterPlatformFeePercentage } from "@/lib/services/gamemaste
 import { checkVisibilityAllowed } from "@/lib/services/gamemaster/visibility-permission";
 import { isGmPrivateContestsEnabled } from "@/lib/services/gamemaster/gm-program-flags";
 import { COMPETITION_VISIBILITIES } from "@/lib/services/gamemaster/competition-visibility";
+import { loadGameMasterCompetitionDefaults } from "@/lib/services/gamemaster/competition-defaults.service";
+import { gameMasterDefaultsView } from "@/lib/services/gamemaster/competition-defaults-apply";
 
 /**
  * GET /api/gamemaster/creation-options
@@ -98,8 +100,17 @@ export async function GET() {
         }).ok,
     );
 
+    // Reason: the forms hide a locked option and start an open one at the admin's value.
+    // Display only - the create route applies the same defaults itself, so a form that
+    // ignored this would still produce the competition the admin configured.
+    const competitionDefaults = await loadGameMasterCompetitionDefaults();
+
     return NextResponse.json({
       success: true,
+      competitionDefaults: {
+        trading: gameMasterDefaultsView(competitionDefaults, "trading"),
+        provider: gameMasterDefaultsView(competitionDefaults, "provider"),
+      },
       allowedGameTypes,
       creatableVisibilities,
       canCreateCompetitions: effectiveLimits.canCreateCompetitions,

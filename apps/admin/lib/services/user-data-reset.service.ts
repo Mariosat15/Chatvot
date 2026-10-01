@@ -255,6 +255,7 @@ export const PRESERVED_CONFIG_COLLECTIONS: string[] = [
   "cookieconsents", // the consent BANNER's settings, not per-user consent
   "creditconversionsettings",
   "fraudsettings",
+  "gamemaster_competition_defaults",
   "herosettings",
   "invoicesettings",
   "kycsettings",

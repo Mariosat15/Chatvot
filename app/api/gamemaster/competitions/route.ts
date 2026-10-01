@@ -22,6 +22,8 @@ import {
   resolveCompetitionVisibility,
 } from "@/lib/services/gamemaster/competition-visibility";
 import { isGmPrivateContestsEnabled } from "@/lib/services/gamemaster/gm-program-flags";
+import { applyGameMasterCompetitionDefaults } from "@/lib/services/gamemaster/competition-defaults-apply";
+import { loadGameMasterCompetitionDefaults } from "@/lib/services/gamemaster/competition-defaults.service";
 
 /**
  * GET /api/gamemaster/competitions
@@ -167,7 +169,32 @@ export async function POST(request: NextRequest) {
     }
 
     const userId = session.user.id;
-    const body = await request.json();
+    const requestBody = await request.json();
+
+    // Reason: the admin's defaults are applied BEFORE anything below reads the body, so every
+    // later check - prize pool, package cap, provider pre-flight - sees the competition that
+    // will actually be stored. A locked option is overwritten whatever the request said; an
+    // open one is validated and refused, never clamped. Same call as the admin-hosted copy.
+    const defaultsGame = requestBody?.gameType === "provider" ? "provider" : "trading";
+    const withDefaults = applyGameMasterCompetitionDefaults(
+      requestBody,
+      await loadGameMasterCompetitionDefaults(),
+      defaultsGame,
+    );
+    if (!withDefaults.ok) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: withDefaults.errors[0],
+          errors: withDefaults.errors,
+        },
+        { status: 400 },
+      );
+    }
+    // Reason: the body was `any` from `request.json()` before the defaults existed, and the
+    // trading path below parses its fields itself; re-typing all of them is not this change.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = withDefaults.body as Record<string, any>;
 
     const {
       name,

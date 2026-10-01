@@ -36,6 +36,10 @@ import {
   splitUtcDraft,
 } from "@/components/gamemaster/UtcScheduleFields";
 import type { TitleLevel } from "@/lib/constants/levels";
+import {
+  NO_GAME_MASTER_DEFAULTS,
+  type GameMasterDefaultsLookup,
+} from "@/components/gamemaster/competition-defaults-lookup";
 
 interface GMSubscription {
   limits: {
@@ -102,13 +106,21 @@ interface GMCreateCompetitionContentProps {
   levelLadder: TitleLevel[];
   /** Chosen on the gate from the server's `creatableVisibilities`; the route re-checks it. */
   visibility?: "public" | "gm_private";
+  /**
+   * Admin competition defaults for trading. Every option starts at the admin's value and a
+   * locked option's input is hidden. Display only: the create route applies the same defaults.
+   */
+  competitionDefaults?: GameMasterDefaultsLookup;
 }
 
 export default function GMCreateCompetitionContent({
   levelLadder,
   visibility,
+  competitionDefaults = NO_GAME_MASTER_DEFAULTS,
 }: GMCreateCompetitionContentProps) {
   const router = useRouter();
+  const defaults = competitionDefaults;
+  const locked = (key: string) => defaults.isLocked(key);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -131,60 +143,77 @@ export default function GMCreateCompetitionContent({
   } | null>(null);
 
   // Form state
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState(() => ({
     name: "",
     description: "",
-    entryFeeCredits: 10,
-    startingTradingPoints: 10000,
-    minParticipants: 2,
-    maxParticipants: 50,
+    entryFeeCredits: defaults.valueOf("entryFee", 10),
+    startingTradingPoints: defaults.valueOf("startingCapital", 10000),
+    minParticipants: defaults.valueOf("minParticipants", 2),
+    maxParticipants: defaults.valueOf("maxParticipants", 50),
     startDate: "",
     startTime: "12:00",
     endDate: "",
     endTime: "18:00",
-    leverageAllowed: 30,
+    leverageAllowed: defaults.valueOf("leverage", 30),
     // Risk Limits
-    riskLimitsEnabled: false,
-    maxDrawdownPercent: 50,
-    dailyLossLimitPercent: 20,
+    riskLimitsEnabled: defaults.valueOf("riskLimitsEnabled", false),
+    maxDrawdownPercent: defaults.valueOf("maxDrawdownPercent", 50),
+    dailyLossLimitPercent: defaults.valueOf("dailyLossLimitPercent", 20),
     // Equity-based check (anti-fraud)
     equityCheckEnabled: false,
     equityDrawdownPercent: 30,
+  }));
+
+  const [assetClasses, setAssetClasses] = useState(() => {
+    const chosen = defaults.valueOf<string[]>("assetClasses", ["forex"]);
+    return {
+      forex: chosen.includes("forex"),
+      crypto: chosen.includes("crypto"),
+      stocks: chosen.includes("stocks"),
+    };
   });
 
-  const [assetClasses, setAssetClasses] = useState({
-    forex: true,
-    crypto: false,
-    stocks: false,
-  });
+  const [prizeDistribution, setPrizeDistribution] = useState(() =>
+    defaults.valueOf("prizeDistribution", [
+      { rank: 1, percentage: 70 },
+      { rank: 2, percentage: 20 },
+      { rank: 3, percentage: 10 },
+    ]),
+  );
 
-  const [prizeDistribution, setPrizeDistribution] = useState([
-    { rank: 1, percentage: 70 },
-    { rank: 2, percentage: 20 },
-    { rank: 3, percentage: 10 },
-  ]);
-
-  const [competitionRules, setCompetitionRules] = useState<CompetitionRules>({
-    rankingMethod: "pnl",
-    tieBreaker1: "trades_count",
+  const [competitionRules, setCompetitionRules] = useState<CompetitionRules>(() => ({
+    rankingMethod: defaults.valueOf<CompetitionRules["rankingMethod"]>(
+      "rankingMethod",
+      "pnl",
+    ),
+    tieBreaker1: defaults.valueOf<CompetitionRules["tieBreaker1"]>(
+      "tieBreaker1",
+      "trades_count",
+    ),
     tieBreaker2: undefined,
-    minimumTrades: 1,
+    minimumTrades: defaults.valueOf("minimumTrades", 1),
     minimumWinRate: undefined,
-    tiePrizeDistribution: "split_equally",
-    disqualifyOnLiquidation: true,
-  });
+    tiePrizeDistribution: defaults.valueOf<CompetitionRules["tiePrizeDistribution"]>(
+      "tiePrizeDistribution",
+      "split_equally",
+    ),
+    disqualifyOnLiquidation: defaults.valueOf("disqualifyOnLiquidation", true),
+  }));
 
-  const [levelRequirement, setLevelRequirement] = useState<LevelRequirement>({
-    enabled: false,
-    minLevel: 1,
+  const [levelRequirement, setLevelRequirement] = useState<LevelRequirement>(() => ({
+    enabled: defaults.valueOf("levelRequirementEnabled", false),
+    minLevel: defaults.valueOf("minLevel", 1),
     maxLevel: undefined,
-  });
+  }));
 
   const [difficultySettings, setDifficultySettings] =
-    useState<DifficultySettings>({
-      mode: "auto",
-      manualLevel: undefined,
-    });
+    useState<DifficultySettings>(() => ({
+      mode: defaults.valueOf<DifficultySettings["mode"]>("difficultyMode", "auto"),
+      manualLevel: defaults.valueOf<DifficultySettings["manualLevel"]>(
+        "difficultyLevel",
+        undefined,
+      ),
+    }));
 
   // Market status state
   const [marketStatus, setMarketStatus] = useState<{
@@ -202,6 +231,19 @@ export default function GMCreateCompetitionContent({
     canCreateCompetition: true,
     loading: true,
   });
+
+  const maxParticipantsLocked = locked("maxParticipants");
+  const leverageLocked = locked("leverage");
+  // The risk panel has nothing left to show once its switch is locked and either off or
+  // with both figures locked too.
+  const tieRulesHidden =
+    locked("tieBreaker1") &&
+    locked("minimumTrades") &&
+    locked("disqualifyOnLiquidation");
+  const riskLimitsHidden =
+    locked("riskLimitsEnabled") &&
+    (!formData.riskLimitsEnabled ||
+      (locked("maxDrawdownPercent") && locked("dailyLossLimitPercent")));
 
   // Fetch GM subscription data
   useEffect(() => {
@@ -229,13 +271,17 @@ export default function GMCreateCompetitionContent({
             packageName: data.subscription.packageName || "Game Master",
           });
           // Set max participants based on package limit
-          setFormData((prev) => ({
-            ...prev,
-            maxParticipants: Math.min(
-              prev.maxParticipants,
-              data.subscription.limits.maxUsersPerCompetition,
-            ),
-          }));
+          // Reason: a locked player limit is the admin's value and the server writes it as is,
+          // so clamping it here would show a figure the contest will not have.
+          if (!maxParticipantsLocked) {
+            setFormData((prev) => ({
+              ...prev,
+              maxParticipants: Math.min(
+                prev.maxParticipants,
+                data.subscription.limits.maxUsersPerCompetition,
+              ),
+            }));
+          }
         } else {
           toast.error("You need an active Game Master subscription");
           router.push("/gamemaster");
@@ -250,7 +296,7 @@ export default function GMCreateCompetitionContent({
     };
 
     fetchSubscription();
-  }, [router]);
+  }, [router, maxParticipantsLocked]);
 
   // Fetch risk settings and platform settings
   useEffect(() => {
@@ -266,7 +312,9 @@ export default function GMCreateCompetitionContent({
           });
           setFormData((prev) => ({
             ...prev,
-            leverageAllowed: Math.min(settings.maxLeverage || 100, 30),
+            leverageAllowed: leverageLocked
+              ? prev.leverageAllowed
+              : Math.min(settings.maxLeverage || 100, prev.leverageAllowed),
           }));
         }
       } catch (error) {
@@ -310,7 +358,7 @@ export default function GMCreateCompetitionContent({
 
     fetchSettings();
     fetchPlatformSettings();
-  }, []);
+  }, [leverageLocked]);
 
   // Fetch market status
   useEffect(() => {
@@ -1296,6 +1344,7 @@ export default function GMCreateCompetitionContent({
                         </div>
                       </div>
 
+                      {!locked("entryFee") && (
                       <div>
                         <label
                           htmlFor="entryFeeCredits"
@@ -1319,7 +1368,9 @@ export default function GMCreateCompetitionContent({
                           Amount users pay to enter
                         </p>
                       </div>
+                      )}
 
+                      {!locked("startingCapital") && (
                       <div>
                         <label
                           htmlFor="startingTradingPoints"
@@ -1352,8 +1403,10 @@ export default function GMCreateCompetitionContent({
                           Minimum 100 virtual capital for trading
                         </p>
                       </div>
+                      )}
 
                       <div className="grid grid-cols-2 gap-4">
+                        {!locked("minParticipants") && (
                         <div>
                           <label
                             htmlFor="minParticipants"
@@ -1386,6 +1439,8 @@ export default function GMCreateCompetitionContent({
                             Minimum 2 required
                           </p>
                         </div>
+                        )}
+                        {!locked("maxParticipants") && (
                         <div>
                           <label
                             htmlFor="maxParticipants"
@@ -1420,7 +1475,19 @@ export default function GMCreateCompetitionContent({
                             (package limit)
                           </p>
                         </div>
+                        )}
                       </div>
+                      {maxParticipantsLocked &&
+                        formData.maxParticipants >
+                          subscription.limits.maxUsersPerCompetition && (
+                          <p className="text-sm text-red-400">
+                            The platform&apos;s player limit (
+                            {formData.maxParticipants}) is above your
+                            package&apos;s limit (
+                            {subscription.limits.maxUsersPerCompetition}).
+                            Please contact support.
+                          </p>
+                        )}
 
                       {/* Platform Fee - LOCKED */}
                       <div className="md:col-span-2 p-4 bg-gray-700/50 border border-gray-600 rounded-xl">
@@ -1574,6 +1641,7 @@ export default function GMCreateCompetitionContent({
 
                   <div className="p-8 space-y-6">
                     {/* Asset Classes */}
+                    {!locked("assetClasses") && (
                     <div>
                       <label className="text-gray-300 mb-4 flex items-center gap-2">
                         <TrendingUp className="h-4 w-4 text-orange-400" />
@@ -1621,8 +1689,10 @@ export default function GMCreateCompetitionContent({
                         Select at least one asset class for trading
                       </p>
                     </div>
+                    )}
 
                     {/* Leverage */}
+                    {!leverageLocked && (
                     <div>
                       <label
                         htmlFor="leverageAllowed"
@@ -1671,8 +1741,10 @@ export default function GMCreateCompetitionContent({
                         Higher leverage = higher risk and potential reward
                       </p>
                     </div>
+                    )}
 
                     {/* Risk Limits */}
+                    {!riskLimitsHidden && (
                     <div className="p-6 bg-red-500/10 border border-red-500/30 rounded-xl">
                       <div className="flex items-start gap-3 mb-4">
                         <Shield className="h-5 w-5 text-red-400 mt-1" />
@@ -1687,6 +1759,7 @@ export default function GMCreateCompetitionContent({
                         </div>
                       </div>
 
+                      {!locked("riskLimitsEnabled") && (
                       <div className="flex items-center space-x-3 mb-4">
                         <input
                           type="checkbox"
@@ -1707,9 +1780,11 @@ export default function GMCreateCompetitionContent({
                           Enable Risk Limits for this Competition
                         </label>
                       </div>
+                      )}
 
                       {formData.riskLimitsEnabled && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                          {!locked("maxDrawdownPercent") && (
                           <div>
                             <label className="text-gray-300 flex items-center gap-2 mb-2">
                               <TrendingDown className="h-4 w-4 text-red-400" />
@@ -1734,7 +1809,9 @@ export default function GMCreateCompetitionContent({
                               capital
                             </p>
                           </div>
+                          )}
 
+                          {!locked("dailyLossLimitPercent") && (
                           <div>
                             <label className="text-gray-300 flex items-center gap-2 mb-2">
                               <AlertTriangle className="h-4 w-4 text-orange-400" />
@@ -1759,9 +1836,11 @@ export default function GMCreateCompetitionContent({
                               capital
                             </p>
                           </div>
+                          )}
                         </div>
                       )}
                     </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -1786,6 +1865,15 @@ export default function GMCreateCompetitionContent({
                   </div>
 
                   <div className="p-8 space-y-6">
+                    {locked("prizeDistribution") ? (
+                      <p className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl text-sm text-gray-200">
+                        Prize split set by the platform:{" "}
+                        {prizeDistribution
+                          .map((p) => `#${p.rank} ${p.percentage}%`)
+                          .join(" · ")}
+                      </p>
+                    ) : (
+                    <>
                     <div className="flex items-center justify-between p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl">
                       <div>
                         <div className="text-sm text-gray-400">
@@ -1884,6 +1972,8 @@ export default function GMCreateCompetitionContent({
                         </div>
                       ))}
                     </div>
+                    </>
+                    )}
                   </div>
                 </div>
               )}
@@ -1909,6 +1999,7 @@ export default function GMCreateCompetitionContent({
 
                   <div className="p-8 space-y-6">
                     {/* Ranking Method */}
+                    {!locked("rankingMethod") && (
                     <div className="p-6 bg-gray-800/50 border border-gray-600 rounded-xl">
                       <h3 className="text-lg font-semibold text-gray-100 mb-4 flex items-center gap-2">
                         <Award className="h-5 w-5 text-red-400" />
@@ -1980,13 +2071,16 @@ export default function GMCreateCompetitionContent({
                         ))}
                       </div>
                     </div>
+                    )}
 
                     {/* Tie Breaker */}
+                    {!tieRulesHidden && (
                     <div className="p-6 bg-gray-800/50 border border-gray-600 rounded-xl">
                       <h3 className="text-lg font-semibold text-gray-100 mb-4">
                         Tie Breaker Rules
                       </h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {!locked("tieBreaker1") && (
                         <div>
                           <label className="text-gray-300 text-sm mb-2 block">
                             Primary Tie Breaker
@@ -2012,6 +2106,8 @@ export default function GMCreateCompetitionContent({
                             <option value="split_prize">Split Prize</option>
                           </select>
                         </div>
+                        )}
+                        {!locked("minimumTrades") && (
                         <div>
                           <label className="text-gray-300 text-sm mb-2 block">
                             Minimum Trades Required
@@ -2029,7 +2125,9 @@ export default function GMCreateCompetitionContent({
                             className="w-full bg-gray-800 border border-gray-600 text-gray-100 rounded-lg h-11 px-4 focus:ring-2 focus:ring-red-500 focus:border-transparent"
                           />
                         </div>
+                        )}
                       </div>
+                      {!locked("disqualifyOnLiquidation") && (
                       <div className="mt-4 flex items-center space-x-3">
                         <input
                           type="checkbox"
@@ -2050,7 +2148,9 @@ export default function GMCreateCompetitionContent({
                           Disqualify participants who get liquidated
                         </label>
                       </div>
+                      )}
                     </div>
+                    )}
 
                     {/* Difficulty */}
                     <div className="p-6 bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/30 rounded-xl">
@@ -2059,6 +2159,7 @@ export default function GMCreateCompetitionContent({
                         Difficulty Level
                       </h3>
 
+                      {!locked("difficultyMode") && (
                       <div className="grid grid-cols-2 gap-4 mb-4">
                         <button
                           type="button"
@@ -2086,7 +2187,9 @@ export default function GMCreateCompetitionContent({
                           onClick={() =>
                             setDifficultySettings({
                               mode: "manual",
-                              manualLevel: "intermediate",
+                              manualLevel: defaults.valueOf<
+                                DifficultySettings["manualLevel"]
+                              >("difficultyLevel", "intermediate"),
                             })
                           }
                           className={`p-4 rounded-xl border-2 transition-all ${
@@ -2102,6 +2205,7 @@ export default function GMCreateCompetitionContent({
                           </div>
                         </button>
                       </div>
+                      )}
 
                       {difficultySettings.mode === "auto" && (
                         <div
@@ -2181,7 +2285,8 @@ export default function GMCreateCompetitionContent({
                         </div>
                       )}
 
-                      {difficultySettings.mode === "manual" && (
+                      {difficultySettings.mode === "manual" &&
+                        !locked("difficultyLevel") && (
                         <div className="grid grid-cols-5 gap-2">
                           {[
                             {
@@ -2256,6 +2361,7 @@ export default function GMCreateCompetitionContent({
                         Level Requirement
                       </h3>
 
+                      {!locked("levelRequirementEnabled") && (
                       <div className="flex items-center space-x-3 mb-4">
                         <input
                           type="checkbox"
@@ -2276,9 +2382,11 @@ export default function GMCreateCompetitionContent({
                           Enable Level Restrictions
                         </label>
                       </div>
+                      )}
 
                       {levelRequirement.enabled && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 rounded-lg bg-gray-900/50 border border-gray-700">
+                          {!locked("minLevel") && (
                           <div>
                             <label className="text-gray-200 text-sm">
                               Minimum Level Required
@@ -2301,6 +2409,7 @@ export default function GMCreateCompetitionContent({
                               ))}
                             </select>
                           </div>
+                          )}
 
                           <div>
                             <label className="text-gray-200 text-sm">

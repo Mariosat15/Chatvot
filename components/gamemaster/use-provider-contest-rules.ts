@@ -17,6 +17,10 @@ import type {
   AttemptsPolicy,
   RoundStartPolicy,
 } from "@/lib/services/games/round-types";
+import {
+  NO_GAME_MASTER_DEFAULTS,
+  type GameMasterDefaultsLookup,
+} from "@/components/gamemaster/competition-defaults-lookup";
 
 /**
  * The grace period a Game Master contest starts from. Only ever raised, by
@@ -24,7 +28,7 @@ import type {
  */
 export const GM_RESULT_GRACE_FLOOR_SECONDS = 900;
 
-/** Used when a creator first picks "best of" or "total of" and has not chosen a count. */
+/** Used when a creator first picks "best of" or "total of" and the admin set no count. */
 const DEFAULT_SEVERAL_ATTEMPTS = 3;
 
 /**
@@ -49,14 +53,24 @@ export function useProviderContestRules(input: {
   maxDurationSeconds?: number;
   startTime: string;
   endTime: string;
+  /** Admin competition defaults: the starting attempts values and which are locked. */
+  defaults?: GameMasterDefaultsLookup;
 }) {
+  const defaults = input.defaults ?? NO_GAME_MASTER_DEFAULTS;
+  const defaultAttemptsPolicy = defaults.valueOf<AttemptsPolicy>("attemptsPolicy", "single");
+  const defaultAttemptsCount = defaults.valueOf<number>(
+    "attemptsAllowed",
+    DEFAULT_SEVERAL_ATTEMPTS,
+  );
   const allowedRoundStart = gmAllowedRoundStartPolicies(input.supportedPlayModes);
   const initialShape = playShapeRules(input.initialPlayMode);
   const [playMode, setPlayModeState] = useState<PlayMode>(input.initialPlayMode);
-  const [attemptsPolicy, setAttemptsPolicyState] = useState<AttemptsPolicy>(
-    initialShape.forcedAttemptsPolicy ?? "single",
+  const initialAttemptsPolicy = initialShape.forcedAttemptsPolicy ?? defaultAttemptsPolicy;
+  const [attemptsPolicy, setAttemptsPolicyState] =
+    useState<AttemptsPolicy>(initialAttemptsPolicy);
+  const [attemptsAllowed, setAttemptsAllowed] = useState<number | undefined>(
+    initialAttemptsPolicy === "single" ? undefined : defaultAttemptsCount,
   );
-  const [attemptsAllowed, setAttemptsAllowed] = useState<number | undefined>();
   const [roundStartPolicy, setRoundStartPolicyState] = useState<RoundStartPolicy>(
     initialShape.forcedRoundStartPolicy ??
       clampGmRoundStartPolicy(undefined, input.supportedPlayModes) ??
@@ -68,8 +82,9 @@ export function useProviderContestRules(input: {
   function selectPlayMode(mode: PlayMode) {
     const next = playShapeRules(mode);
     setPlayModeState(mode);
-    setAttemptsPolicyState(next.forcedAttemptsPolicy ?? "single");
-    if (next.forcedAttemptsPolicy) setAttemptsAllowed(undefined);
+    const policy = next.forcedAttemptsPolicy ?? defaultAttemptsPolicy;
+    setAttemptsPolicyState(policy);
+    setAttemptsAllowed(policy === "single" ? undefined : defaultAttemptsCount);
     setRoundStartPolicyState(
       next.forcedRoundStartPolicy ??
         clampGmRoundStartPolicy(undefined, input.supportedPlayModes) ??
@@ -80,7 +95,7 @@ export function useProviderContestRules(input: {
   function setAttemptsPolicy(policy: AttemptsPolicy) {
     setAttemptsPolicyState(policy);
     if (policy === "single") setAttemptsAllowed(undefined);
-    else setAttemptsAllowed((n) => n ?? DEFAULT_SEVERAL_ATTEMPTS);
+    else setAttemptsAllowed((n) => n ?? defaultAttemptsCount);
   }
 
   function setRoundStartPolicy(policy: RoundStartPolicy) {
@@ -132,6 +147,9 @@ export function useProviderContestRules(input: {
     setAttemptsPolicy,
     attemptsAllowed,
     setAttemptsAllowed,
+    /** The admin locked these: the control is hidden and the admin value is sent. */
+    attemptsPolicyLocked: defaults.isLocked("attemptsPolicy"),
+    attemptsAllowedLocked: defaults.isLocked("attemptsAllowed"),
     roundStartPolicy,
     setRoundStartPolicy,
     /** Policies the admin settings still allow; the dropdown is built from this. */

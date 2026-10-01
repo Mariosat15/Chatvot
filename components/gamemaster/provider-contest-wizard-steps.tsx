@@ -7,6 +7,7 @@ import {
   ProviderRoundPolicyFields,
 } from "@/components/gamemaster/ProviderRoundControls";
 import type { ProviderContestRules } from "@/components/gamemaster/use-provider-contest-rules";
+import type { GameMasterDefaultsLookup } from "@/components/gamemaster/competition-defaults-lookup";
 import type { ConfigField } from "@/lib/services/games/config-schema";
 import {
   GAME_TIE_RULES,
@@ -210,9 +211,12 @@ export function ScheduleStep({
   onEntryFee,
   onMaxParticipants,
   rules,
+  defaults,
   disabled,
 }: {
   rules: ProviderContestRules;
+  /** Locked options are hidden; the admin's value is sent and the server enforces it. */
+  defaults: GameMasterDefaultsLookup;
   startTime: string;
   endTime: string;
   entryFee: string;
@@ -243,28 +247,32 @@ export function ScheduleStep({
       <ProviderRoundFitNote rules={rules} startTime={startTime} onFitContest={onEnd} />
       <ProviderRoundPolicyFields rules={rules} disabled={disabled} />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Entry fee (credits)">
-          <input
-            type="number"
-            min={0}
-            step="1"
-            className={inputClass}
-            value={entryFee}
-            disabled={disabled}
-            onChange={(e) => onEntryFee(e.target.value)}
-          />
-        </Field>
-        <Field label={`Max players (up to ${maxUsersPerCompetition})`}>
-          <input
-            type="number"
-            min={2}
-            max={maxUsersPerCompetition}
-            className={inputClass}
-            value={maxParticipants}
-            disabled={disabled}
-            onChange={(e) => onMaxParticipants(e.target.value)}
-          />
-        </Field>
+        {!defaults.isLocked("entryFee") && (
+          <Field label="Entry fee (credits)">
+            <input
+              type="number"
+              min={0}
+              step="1"
+              className={inputClass}
+              value={entryFee}
+              disabled={disabled}
+              onChange={(e) => onEntryFee(e.target.value)}
+            />
+          </Field>
+        )}
+        {!defaults.isLocked("maxParticipants") && (
+          <Field label={`Max players (up to ${maxUsersPerCompetition})`}>
+            <input
+              type="number"
+              min={2}
+              max={maxUsersPerCompetition}
+              className={inputClass}
+              value={maxParticipants}
+              disabled={disabled}
+              onChange={(e) => onMaxParticipants(e.target.value)}
+            />
+          </Field>
+        )}
       </div>
       <LockedPlatformFee fee={fee} />
       <div className="rounded-xl border border-green-500/30 bg-green-500/10 p-4 text-sm">
@@ -287,6 +295,7 @@ export function PrizesStep({
   onChange,
   tieRule,
   onTieRule,
+  defaults,
 }: {
   prizes: { rank: number; percentage: number }[];
   prizeTotal: number;
@@ -294,9 +303,20 @@ export function PrizesStep({
   onChange: (next: { rank: number; percentage: number }[]) => void;
   tieRule: GameTieRule;
   onTieRule: (next: GameTieRule) => void;
+  defaults: GameMasterDefaultsLookup;
 }) {
+  // Reason: a locked split is still shown, read-only - it decides what the players win, so
+  // the creator should see it - but there is nothing to edit.
+  const prizesLocked = defaults.isLocked("prizeDistribution");
   return (
     <StepPanel title="Prizes" subtitle="How the pool is split">
+      {prizesLocked ? (
+        <p className="text-sm text-gray-300">
+          Prize split set by the platform:{" "}
+          {prizes.map((p) => `#${p.rank} ${p.percentage}%`).join(" · ")}
+        </p>
+      ) : (
+        <>
       <div className="space-y-3">
         {prizes.map((row, idx) => (
           <div key={row.rank} className="flex items-center gap-3">
@@ -329,9 +349,12 @@ export function PrizesStep({
       >
         Total: {prizeTotal}% (must be 100%)
       </p>
+        </>
+      )}
       <p className="text-xs text-gray-500">
         Winners receive net of the {fee}% platform fee.
       </p>
+      {!defaults.isLocked("tieRule") && (
       <Field label="If two players have the same score">
         <select
           className={inputClass}
@@ -348,6 +371,7 @@ export function PrizesStep({
           {GAME_TIE_RULE_COPY.get(tieRule)?.description}
         </p>
       </Field>
+      )}
     </StepPanel>
   );
 }

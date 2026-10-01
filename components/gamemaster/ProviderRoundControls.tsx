@@ -137,8 +137,15 @@ export function ProviderRoundPolicyFields({
   const attempt = terms.attempt.toLowerCase();
   const attempts = terms.attempts.toLowerCase();
 
+  // Reason: the admin locked both attempts settings, so there is nothing to choose. A locked
+  // policy with an open count still offers the count; a locked count hides only its input.
+  const attemptsHidden =
+    rules.attemptsPolicyLocked &&
+    (rules.attemptsPolicy === "single" || rules.attemptsAllowedLocked);
+
   return (
     <div className="space-y-4">
+      {!attemptsHidden && (
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-300">
           {terms.attempts} per {terms.player.toLowerCase()}
@@ -149,17 +156,19 @@ export function ProviderRoundPolicyFields({
           </p>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2">
-            <select
-              value={rules.attemptsPolicy}
-              disabled={disabled}
-              onChange={(e) => rules.setAttemptsPolicy(e.target.value as AttemptsPolicy)}
-              className={inputClass}
-            >
-              <option value="single">One {attempt} each</option>
-              <option value="best_of_n">Best of several</option>
-              <option value="sum_of_n">Total of several</option>
-            </select>
-            {rules.attemptsPolicy !== "single" && (
+            {!rules.attemptsPolicyLocked && (
+              <select
+                value={rules.attemptsPolicy}
+                disabled={disabled}
+                onChange={(e) => rules.setAttemptsPolicy(e.target.value as AttemptsPolicy)}
+                className={inputClass}
+              >
+                <option value="single">One {attempt} each</option>
+                <option value="best_of_n">Best of several</option>
+                <option value="sum_of_n">Total of several</option>
+              </select>
+            )}
+            {rules.attemptsPolicy !== "single" && !rules.attemptsAllowedLocked && (
               <input
                 type="number"
                 min={2}
@@ -177,6 +186,7 @@ export function ProviderRoundPolicyFields({
           </div>
         )}
       </div>
+      )}
 
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-300">

@@ -9,6 +9,11 @@ import ProviderContestCreateForm, {
 import type { TitleLevel } from "@/lib/constants/levels";
 import ContestVisibilityPicker from "@/components/gamemaster/ContestVisibilityPicker";
 import {
+  NO_GAME_MASTER_DEFAULTS,
+  readGameMasterDefaults,
+  type GameMasterDefaultsLookup,
+} from "@/components/gamemaster/competition-defaults-lookup";
+import {
   COMPETITION_VISIBILITIES,
   type CompetitionVisibility,
 } from "@/lib/services/gamemaster/competition-visibility";
@@ -46,6 +51,10 @@ export default function CreateCompetitionGate({
   const [maxActiveCompetitions, setMaxActiveCompetitions] = useState(10);
   const [activeCompetitions, setActiveCompetitions] = useState(0);
   const [selection, setSelection] = useState<Selection | null>(null);
+  const [tradingDefaults, setTradingDefaults] =
+    useState<GameMasterDefaultsLookup>(NO_GAME_MASTER_DEFAULTS);
+  const [providerDefaults, setProviderDefaults] =
+    useState<GameMasterDefaultsLookup>(NO_GAME_MASTER_DEFAULTS);
   const [visibilityOptions, setVisibilityOptions] = useState<
     CompetitionVisibility[]
   >(["public"]);
@@ -72,6 +81,8 @@ export default function CreateCompetitionGate({
         const canProvider = allowed.includes("provider") && list.length > 0;
         setProviderAllowed(canProvider);
         setTitles(list);
+        setTradingDefaults(readGameMasterDefaults(data.competitionDefaults?.trading));
+        setProviderDefaults(readGameMasterDefaults(data.competitionDefaults?.provider));
         const creatable = readCreatableVisibilities(data.creatableVisibilities);
         setVisibilityOptions(creatable);
         // An empty list means nothing is creatable; send nothing and let the route name why.
@@ -137,6 +148,7 @@ export default function CreateCompetitionGate({
         <GMCreateCompetitionContent
           levelLadder={levelLadder}
           visibility={visibility}
+          competitionDefaults={tradingDefaults}
         />
       </>
     );
@@ -155,6 +167,7 @@ export default function CreateCompetitionGate({
           competitionsCreatedToday={competitionsCreatedToday}
           maxActiveCompetitions={maxActiveCompetitions}
           activeCompetitions={activeCompetitions}
+          competitionDefaults={providerDefaults}
           onBack={() => setSelection(null)}
         />
       </>

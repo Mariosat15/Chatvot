@@ -107,7 +107,11 @@ describe("the GM wizard offers the admin wizard's round rules", () => {
     const rules = code(RULES);
     const select = rules.slice(rules.indexOf("function selectPlayMode"), rules.indexOf("function setAttemptsPolicy"));
     expect(select.length).toBeGreaterThan(0);
-    expect(select).toMatch(/forcedAttemptsPolicy \?\? "single"/);
+    // Reason: re-pointed, claim unchanged. A shape that forces nothing used to fall back to a
+    // literal "single"; it now falls back to the admin's Game Master default, which is itself
+    // "single" until an admin changes it.
+    expect(select).toMatch(/forcedAttemptsPolicy \?\? defaultAttemptsPolicy/);
+    expect(rules).toMatch(/defaults\.valueOf<AttemptsPolicy>\("attemptsPolicy", "single"\)/);
     expect(select).toMatch(/forcedRoundStartPolicy \?\?/);
     expect(select).toMatch(/clampGmRoundStartPolicy/);
     expect(code(FORM)).toMatch(/onPlayMode=\{rules\.selectPlayMode\}/);

@@ -15,6 +15,8 @@ import { createGameMasterProviderCompetition } from "@/lib/services/gamemaster/c
 import { resolveGameMasterPlatformFeePercentage } from "@/lib/services/gamemaster/platform-fee";
 import { checkVisibilityAllowed } from "@/lib/services/gamemaster/visibility-permission";
 import { isGmPrivateContestsEnabled } from "@/lib/services/gamemaster/gm-program-flags";
+import { applyGameMasterCompetitionDefaults } from "@/lib/services/gamemaster/competition-defaults-apply";
+import { loadGameMasterCompetitionDefaults } from "@/lib/services/gamemaster/competition-defaults.service";
 
 /**
  * GET /api/gamemaster/competitions
@@ -106,7 +108,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await request.json();
+    const requestBody = await request.json();
+
+    // Reason: the same call as the main app's copy - the admin's defaults are applied before
+    // anything below reads the body. Two routes create Game Master contests, and a default
+    // enforced on one is a default anybody can bypass through the other.
+    const defaultsGame = requestBody?.gameType === "provider" ? "provider" : "trading";
+    const withDefaults = applyGameMasterCompetitionDefaults(
+      requestBody,
+      await loadGameMasterCompetitionDefaults(),
+      defaultsGame,
+    );
+    if (!withDefaults.ok) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: withDefaults.errors[0],
+          errors: withDefaults.errors,
+        },
+        { status: 400 },
+      );
+    }
+    // Reason: the body was `any` from `request.json()` before the defaults existed, and the
+    // trading path below parses its fields itself; re-typing all of them is not this change.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = withDefaults.body as Record<string, any>;
     const {
       name,
       description,

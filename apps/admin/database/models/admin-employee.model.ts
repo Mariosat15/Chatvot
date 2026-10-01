@@ -92,6 +92,9 @@ export const ADMIN_SECTIONS = [
   // is granted separately from viewing it (Gamemaster Program v2, task 4). Add-only enum value;
   // deliberately in NO default role template - an operator must grant it by name.
   "gamemaster-reports-export",
+  // Reason: the admin's default and "Game Master can change this" switch for every competition
+  // option (1 Oct 2026). Add-only enum value - removing it orphans every employee storing it.
+  "gm-competition-defaults",
   // AI & Automation
   "ai-agent",
   "ai-knowledge",

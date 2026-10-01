@@ -5814,6 +5814,31 @@ export default function AdminWikiSection() {
           <Card className="bg-gray-800 border-gray-700">
             <CardHeader>
               <CardTitle className="text-lg text-purple-400">
+                Competition Defaults
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-gray-300 text-sm">
+              <p>
+                Game Masters → Competition Defaults sets, for every competition
+                option, a default value and whether a Game Master may change it.
+              </p>
+              <p>
+                A locked option is hidden from the Game Master form and the
+                server always stores your value. An open option starts at your
+                value; anything the Game Master enters is checked with the same
+                rules as this screen and refused if wrong, never quietly
+                adjusted.
+              </p>
+              <p>
+                If you lock a maximum player count above a package cap, those
+                Game Masters are told to contact support instead of creating.
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-purple-400">
                 How It Works
               </CardTitle>
             </CardHeader>
