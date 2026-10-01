@@ -1,0 +1,1074 @@
+TASK: REBUILD CHARTVOLT DASHBOARD OVERVIEW FOR MOBILE
+
+We already have a desktop Dashboard Overview page. DO NOT simply shrink or stack the desktop version.
+
+Create a dedicated mobile Dashboard Overview layout that feels like a proper native mobile gaming/fintech application.
+
+The desktop version must remain unchanged.
+
+==================================================
+1. MAIN OBJECTIVE
+==================================================
+
+Build a completely different mobile structure for screens below 768px.
+
+The mobile dashboard must:
+
+- Be easy to understand for novice users.
+- Have less information visible at once.
+- Feel gamified, modern and premium.
+- Use the existing ChartVolt visual theme.
+- Use the same real backend data as desktop.
+- Use the same icons/assets where appropriate.
+- Be fully responsive.
+- Be retina-ready.
+- Be touch-friendly.
+- Look like a proper mobile app, not a responsive website.
+- Keep ChartVolt's neon gaming identity.
+
+Desktop remains exactly as it currently is.
+
+Use a dedicated mobile component structure instead of squeezing desktop cards into one column.
+
+==================================================
+2. BREAKPOINTS
+==================================================
+
+Use mobile-first responsive rules.
+
+Primary mobile design:
+375px - 430px wide
+
+Also support:
+360px minimum
+430px+
+Tablet from approximately 768px
+
+Recommended logic:
+
+desktop:
+min-width: 769px
+
+mobile:
+max-width: 768px
+
+Do not simply apply CSS scaling to desktop components.
+
+Render dedicated mobile sections/components where required.
+
+Example:
+
+<div className="hidden md:block">
+   <DesktopDashboard />
+</div>
+
+<div className="block md:hidden">
+   <MobileDashboard />
+</div>
+
+Shared DATA and API hooks are encouraged.
+
+Shared desktop LAYOUT is not.
+
+==================================================
+3. MOBILE PAGE STRUCTURE
+==================================================
+
+The order should be:
+
+1. Mobile header
+2. Welcome / account status
+3. Main wallet / balance card
+4. Main quick actions
+5. Featured / quick game access
+6. Player progress
+7. Featured games
+8. Upcoming competitions
+9. Challenges / Compete
+10. Recent activity
+11. Streaks and performance
+12. Bottom mobile navigation
+
+Do not display everything from desktop simultaneously.
+
+Prioritize the information users actually need.
+
+==================================================
+4. MOBILE HEADER
+==================================================
+
+Replace the desktop sidebar/top navigation with a compact mobile app header.
+
+Header layout:
+
+LEFT:
+ChartVolt logo
+
+RIGHT:
+Notification icon
+User avatar
+
+Optional:
+small status indicator on avatar
+
+Header height approximately:
+64-72px
+
+It must remain visually clean.
+
+Do NOT show:
+Overview
+Wallet
+Performance
+Competitions
+Tutorials
+
+as a desktop-style horizontal menu.
+
+Those belong in mobile navigation or secondary screens.
+
+==================================================
+5. ACCOUNT STATUS
+==================================================
+
+The current desktop Account Status bar is too wide for mobile.
+
+Turn it into a small compact status pill/card.
+
+Example:
+
+Account Status
+VERIFIED
+
+or
+
+Account Status
+1 ISSUE
+
+Use existing account status logic.
+
+Do not hardcode data.
+
+Keep it approximately 44-50px high.
+
+==================================================
+6. REMOVE THE LARGE DESKTOP WELCOME BANNER
+==================================================
+
+Do not use the massive wide desktop welcome banner on mobile.
+
+Instead create a compact welcome block.
+
+Example:
+
+Welcome back,
+Marios
+
+Continue your journey.
+
+Account Level 11
+
+It can use a subtle ChartVolt lightning / energy background.
+
+Maximum height around 110-140px.
+
+Do not waste half the screen with a decorative hero.
+
+==================================================
+7. MAIN BALANCE CARD
+==================================================
+
+This should become one of the most important cards.
+
+Large mobile card:
+
+WALLET / VOLTS
+
+967.62 ⚡
+
++12.4%
++93.4 today
+
+Use actual wallet / Volt data.
+
+Visually:
+dark navy glass background
+orange/gold neon edge
+small sparkline graph
+Volt lightning icon
+large readable balance
+
+Card height:
+approximately 110-130px.
+
+It should feel similar to a fintech balance card.
+
+==================================================
+8. QUICK ACTIONS
+==================================================
+
+Immediately below the balance card create 4 large touch buttons.
+
+2x2 grid or 4-column if space permits.
+
+Buttons:
+
+Deposit
+Withdraw
+Compete
+Play
+
+Icons should be prominent.
+
+Recommended minimum:
+70-80px card height
+
+Touch area:
+minimum 44x44px
+
+Use ChartVolt neon color coding:
+
+Deposit:
+green/cyan
+
+Withdraw:
+purple
+
+Compete:
+gold/orange
+
+Play:
+blue/cyan
+
+Do not use tiny desktop buttons.
+
+==================================================
+9. QUICK ACCESS
+==================================================
+
+Below the main actions add a second area named:
+
+QUICK ACCESS
+
+Possible cards:
+
+Trading Competitions
+Game Competitions
+1v1 Challenges
+Marketplace
+
+Use 2x2 cards.
+
+Each should contain:
+
+large neon icon
+short label
+
+Avoid descriptions.
+
+This should be easy to scan with one thumb.
+
+==================================================
+10. PLAYER PROGRESS
+==================================================
+
+The existing desktop Player Progress area is too complex.
+
+Create ONE strong mobile card.
+
+Structure:
+
+PLAYER PROGRESS
+
+[Rank badge]      Level 11
+
+Progress:
+████████████ 75%
+
+XP:
+8,475 / 9,300 XP
+
+Below it:
+
+Recent Badges
+[badge] [badge] [badge] [badge]
+
+Optional:
+Weekly Mission
+0/1 complete
+
+Important:
+
+Use the existing large golden rank badge artwork.
+
+Do not shrink it until it becomes unreadable.
+
+Approximate rank badge:
+80-100px.
+
+Progress bar:
+full card width.
+
+Only show the most important information.
+
+Additional details can be accessible through:
+"View Progress"
+
+==================================================
+11. PLAY BY GAME
+==================================================
+
+The desktop horizontal game row is too dense.
+
+Convert this into a horizontally swipeable mobile carousel.
+
+Title:
+
+PLAY BY GAME
+
+Cards:
+
+Circuit Sprint
+Volt Velocity
+Volt Stack
+Trading
+etc.
+
+Each card width:
+approximately 75-85% of the viewport
+
+or use small image cards showing 2.3 cards.
+
+Preferred approach:
+
+Featured carousel card:
+image
+game name
+competition type
+small Play button
+
+Use:
+overflow-x-auto
+scroll-snap-type: x mandatory
+
+Each item:
+scroll-snap-align: start
+
+Hide scrollbar visually.
+
+Users should swipe naturally.
+
+==================================================
+12. FEATURED GAMES
+==================================================
+
+Create a compact section:
+
+FEATURED GAMES              See All
+
+Show 3 games.
+
+For example:
+
+Circuit Sprint
+Volt Velocity
+Volt Stack
+
+Use square or portrait artwork.
+
+Each card should include:
+
+game artwork
+game name
+
+Do not put unnecessary stats on the image.
+
+Use actual game data.
+
+If there are more than 3:
+use horizontal scrolling.
+
+==================================================
+13. UPCOMING COMPETITIONS
+==================================================
+
+Instead of many tiny cards, show ONE strong competition card at a time.
+
+Example:
+
+BTC FUTURES CHALLENGE
+
+32 / 100 Players
+
+02:14:36
+
+Entry:
+500 ⚡
+
+[JOIN]
+
+The card should be very clear.
+
+Use competition status color.
+
+If multiple competitions exist:
+horizontal swipe carousel.
+
+Add dots below if useful.
+
+==================================================
+14. COMPETE / MATCHING
+==================================================
+
+The desktop currently shows 3 opponent cards simultaneously.
+
+Do NOT do this on mobile.
+
+Show:
+
+COMPETE
+
+Matching opponent card #1
+
+Avatar
+Name
+Win rate
+Games / competitions
+
+[CHALLENGE]
+
+Then allow:
+horizontal swipe
+
+or:
+
+Next opponent arrow.
+
+Only one full card should be visible at a time.
+
+Keep Challenge button large.
+
+==================================================
+15. RECENT ACTIVITY
+==================================================
+
+Create a clean activity card.
+
+Title:
+
+RECENT ACTIVITY        See All
+
+Each row:
+
+[icon]
+Competition name / event
+short description
+time
+
+Example:
+
+🏆 Won Circuit Sprint
+5 hours ago
+
+Rows approximately:
+56-64px
+
+Show only 3-4 activities.
+
+Do not show the huge desktop activity list.
+
+==================================================
+16. STREAKS AND CONSISTENCY
+==================================================
+
+The desktop version currently has many horizontal tiny statistics.
+
+On mobile use a 2-column grid.
+
+Example:
+
+Current Streak
+8
+
+Best Streak
+11
+
+Competitions Played
+35
+
+Top 3 Finishes
+13
+
+Win Activity
+9
+
+Maximum:
+4-6 cards.
+
+Cards should be visually clear.
+
+Use the same colorful icon system.
+
+==================================================
+17. MOBILE BOTTOM NAVIGATION
+==================================================
+
+THIS IS IMPORTANT.
+
+Create a fixed bottom navigation that behaves like a mobile app.
+
+Use 5 primary items:
+
+Home
+Games
+Compete
+Wallet
+Profile
+
+Icons should use the ChartVolt neon style.
+
+Recommended height:
+70-78px
+
+Plus:
+env(safe-area-inset-bottom)
+
+Example:
+
+position: fixed;
+bottom: 0;
+left: 0;
+right: 0;
+
+The active button should have:
+
+blue/cyan glow
+slightly larger icon
+active text
+
+Inactive icons should remain readable but less bright.
+
+Do not place 8-10 menu items in this bottom bar.
+
+Secondary items such as:
+
+Marketplace
+Leaderboard
+Messages
+Help
+Tutorials
+Sign Out
+
+should be available through Profile or More.
+
+==================================================
+18. SAFE AREA SUPPORT
+==================================================
+
+Support modern phones including iPhones.
+
+Use:
+
+padding-top: env(safe-area-inset-top);
+
+padding-bottom:
+calc(80px + env(safe-area-inset-bottom));
+
+For side padding:
+
+padding-inline:
+max(16px, env(safe-area-inset-left));
+
+Do not allow content behind the bottom navigation.
+
+==================================================
+19. MOBILE SPACING
+==================================================
+
+Page horizontal padding:
+16px
+
+Large section gap:
+20-24px
+
+Card gap:
+12-16px
+
+Card internal padding:
+14-18px
+
+Border radius:
+16-20px
+
+Large feature card:
+20-24px radius if appropriate.
+
+Avoid the extremely small gaps currently used by the desktop UI.
+
+==================================================
+20. TYPOGRAPHY
+==================================================
+
+Text must remain readable.
+
+Do not shrink typography to make desktop content fit.
+
+Suggested mobile scale:
+
+Page title:
+20-24px
+
+Section title:
+14-17px
+
+Large balance:
+28-34px
+
+Important stat:
+20-26px
+
+Normal text:
+13-15px
+
+Secondary:
+11-13px
+
+Buttons:
+13-15px
+
+Use clamp() where useful.
+
+Example:
+
+font-size: clamp(1rem, 4vw, 1.25rem);
+
+==================================================
+21. GRAPHIC STYLE
+==================================================
+
+Keep the existing ChartVolt style.
+
+Background:
+
+#030916
+#050b18
+deep navy-black
+
+Cards:
+dark navy
+slightly transparent
+glass effect
+
+Borders:
+
+cyan
+electric blue
+purple
+orange/gold
+green
+
+depending on content category.
+
+Use gradients instead of flat colors.
+
+Examples:
+
+background:
+linear-gradient(
+135deg,
+rgba(7,19,42,.95),
+rgba(3,8,20,.95)
+);
+
+border:
+1px solid rgba(0,220,255,.35);
+
+box-shadow:
+0 0 20px rgba(0,210,255,.08);
+
+Important:
+
+DO NOT OVERUSE GLOW.
+
+The desktop already has many glowing areas.
+
+Mobile should feel cleaner and more premium.
+
+Use glow primarily for:
+
+active navigation
+important CTA
+rank
+wallet
+winning / rewards
+selected elements
+
+==================================================
+22. RETINA / HIGH-DPI REQUIREMENTS
+==================================================
+
+All mobile graphics must look sharp on modern phone screens.
+
+Prefer:
+
+SVG:
+icons
+logos
+simple illustrations
+
+For PNG/WebP:
+provide 2x / 3x source resolution.
+
+Example:
+
+display size:
+160x90
+
+asset:
+320x180 minimum
+
+or preferably:
+480x270.
+
+Use:
+
+object-fit: cover
+
+Do not enlarge low-resolution screenshots.
+
+Use Next.js Image where appropriate.
+
+==================================================
+23. TOUCH INTERACTION
+==================================================
+
+All interactive elements:
+
+minimum 44x44px.
+
+Prefer:
+48px+
+
+Buttons must have:
+
+pressed state
+active state
+disabled state
+
+Cards that open another page:
+show clear visual affordance.
+
+Do not rely on hover.
+
+Hover may remain for desktop, but mobile interaction must work fully using touch.
+
+==================================================
+24. MOBILE ANIMATIONS
+==================================================
+
+Keep animations subtle.
+
+Allowed:
+
+small card entrance fade
+progress bar animation
+active nav glow
+button press scale
+carousel snap
+tiny icon pulse
+reward glow
+
+Example:
+
+active:scale-[0.97]
+
+transition:
+150-250ms
+
+Do NOT animate everything.
+
+==================================================
+25. DO NOT COPY DESKTOP LAYOUT
+==================================================
+
+STRICT RULE:
+
+Do not create:
+
+desktop sidebar
++
+desktop panels stacked vertically.
+
+That is not acceptable.
+
+Mobile must use different UX architecture.
+
+DESKTOP:
+information-rich control dashboard.
+
+MOBILE:
+action-oriented app dashboard.
+
+==================================================
+26. COMPONENT STRUCTURE
+==================================================
+
+Recommended structure:
+
+components/
+dashboard/
+desktop/
+DesktopDashboard.tsx
+
+mobile/
+MobileDashboard.tsx
+MobileHeader.tsx
+MobileStatusCard.tsx
+MobileBalanceCard.tsx
+MobileQuickActions.tsx
+MobileQuickAccess.tsx
+MobilePlayerProgress.tsx
+MobileGameCarousel.tsx
+MobileUpcomingCompetitions.tsx
+MobileChallengeCarousel.tsx
+MobileRecentActivity.tsx
+MobileStreakGrid.tsx
+MobileBottomNavigation.tsx
+
+IMPORTANT:
+
+Do not duplicate API requests.
+
+Create shared hooks/data services.
+
+Example:
+
+hooks/
+useDashboardOverview.ts
+
+This hook supplies data to both:
+
+DesktopDashboard
+MobileDashboard
+
+==================================================
+27. DATA MUST REMAIN REAL
+==================================================
+
+Do NOT hardcode the example values shown in the design.
+
+All values must come from the current ChartVolt system.
+
+Examples:
+
+wallet balance
+rank
+level
+XP
+game list
+competition list
+challenge data
+recent activity
+badges
+streaks
+wins
+ROI
+competition rate
+
+Reuse current APIs/state.
+
+The image is a UI reference, NOT fake production data.
+
+==================================================
+28. BOTTOM NAV ROUTING
+==================================================
+
+Map navigation to existing ChartVolt routes.
+
+Example:
+
+Home
+/dashboard
+
+Games
+/games
+
+Compete
+/competitions or existing arena route
+
+Wallet
+/wallet
+
+Profile
+/profile
+
+Use the actual existing route names in this project.
+
+Do not create duplicate pages if equivalent routes already exist.
+
+==================================================
+29. PERFORMANCE
+==================================================
+
+Mobile performance matters.
+
+Do:
+
+lazy load lower-page artwork
+
+use next/image
+
+load visible carousel images first
+
+use WebP / AVIF where appropriate
+
+avoid massive background PNG files
+
+reuse existing SVG icons
+
+avoid unnecessary rerenders
+
+memoize expensive mappings if necessary
+
+Do not preload every game image.
+
+==================================================
+30. ACCESSIBILITY
+==================================================
+
+Provide:
+
+aria-labels
+
+button semantics
+
+navigation semantics
+
+sufficient contrast
+
+visible active states
+
+alt text
+
+Do not convey information using glow color alone.
+
+==================================================
+31. MOBILE SCROLL BEHAVIOR
+==================================================
+
+Mobile page should scroll vertically.
+
+Horizontal scrolling should ONLY exist inside intentional carousels.
+
+Prevent accidental horizontal page overflow.
+
+Add:
+
+overflow-x: hidden
+
+to main mobile wrapper.
+
+For carousel:
+
+overflow-x: auto
+
+Do not cause the entire page to slide horizontally.
+
+==================================================
+32. EXACT DESIGN DIRECTION
+==================================================
+
+The result should visually feel like:
+
+ChartVolt
++
+high-end gaming app
++
+modern fintech wallet
++
+competition platform.
+
+It should NOT feel like:
+
+an admin panel
+a shrunk desktop site
+a data table
+a Bootstrap dashboard.
+
+User should immediately understand:
+
+1. My balance
+2. My progress
+3. What can I play?
+4. What competition can I enter?
+5. Can I challenge someone?
+6. What happened recently?
+
+==================================================
+33. IMPORTANT THINGS TO REMOVE FROM MOBILE
+==================================================
+
+Do not show:
+
+large desktop sidebar
+large desktop top navigation
+huge desktop welcome banner
+three opponent cards at once
+full desktop activity list
+long horizontal stat strips
+tiny game information
+very small buttons
+desktop tables
+unnecessary labels
+redundant descriptions
+
+==================================================
+34. MOBILE HOME VISUAL HIERARCHY
+==================================================
+
+FIRST SCREEN BEFORE SCROLLING should ideally show:
+
+Header
+Wallet / Volt balance
+Quick Actions
+Beginning of Quick Access
+
+The user should immediately be able to:
+
+Play
+Compete
+Deposit
+Withdraw
+
+without scrolling far.
+
+==================================================
+35. FINAL REQUIREMENT
+==================================================
+
+Before completing:
+
+Test at:
+
+360x800
+375x812
+390x844
+393x852
+412x915
+430x932
+
+Test Android and iPhone-style safe areas.
+
+Verify:
+
+no horizontal overflow
+no clipped text
+no hidden buttons
+no card collisions
+bottom nav never covers content
+game artwork preserves ratio
+all buttons work with touch
+all existing data still works
+desktop layout is unaffected
+
+The mobile dashboard MUST look intentionally designed for mobile and visually match the ChartVolt neon futuristic gaming theme.
