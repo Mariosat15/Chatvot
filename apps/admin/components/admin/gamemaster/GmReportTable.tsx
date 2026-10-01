@@ -2,6 +2,7 @@
 
 import { formatVolts } from "@/lib/utils/format-volts";
 import type { ReferredPlayerRow } from "@/lib/services/gamemaster/referral-read-model";
+import { describeAffiliationState, describeEndedReason } from "@/lib/services/gamemaster/referral-kind";
 import AffiliationSourceBadge from "./AffiliationSourceBadge";
 import type { AffiliationAction } from "./GmAffiliationActionDialog";
 
@@ -10,7 +11,8 @@ function formatDate(value: string | null): string {
 }
 
 /**
- * One row per affiliation (a player who moved appears once per Game Master they were with).
+ * One row per player per Game Master: a player who left and rejoined the same Game Master is
+ * ONE row with their stints summed; a player moved to another appears once under each.
  *
  * Reason: Move and Detach are offered ONLY on a current affiliation - an ended row has
  * nothing to move, and a button whose only outcome is a refusal teaches the operator the
@@ -69,13 +71,18 @@ export default function GmReportTable({
               <td className="px-3 py-2 text-xs">
                 {row.isCurrent ? (
                   <span className={row.isActive ? "text-emerald-300" : "text-gray-300"}>
-                    {row.isActive ? "Current, active" : "Current, inactive"}
+                    {describeAffiliationState(row)}
                   </span>
                 ) : (
                   <span className="text-gray-400">
-                    Ended {formatDate(row.endedAt)}
-                    {row.endedReason ? ` (${row.endedReason.replace(/_/g, " ")})` : ""}
+                    {describeAffiliationState(row)} {formatDate(row.endedAt)}
+                    {describeEndedReason(row.endedReason) ? ` (${describeEndedReason(row.endedReason)})` : ""}
                   </span>
+                )}
+                {row.affiliations > 1 && (
+                  <div className="mt-0.5 text-gray-500">
+                    Rejoined - {row.affiliations} stints since {formatDate(row.firstJoinedAt)}
+                  </div>
                 )}
               </td>
               <td className="px-3 py-2 text-xs">{formatDate(row.lastActivityAt)}</td>

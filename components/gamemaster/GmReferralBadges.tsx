@@ -1,4 +1,8 @@
-import { REFERRAL_KIND_LABELS, REFERRAL_SURFACE_LABELS } from "@/lib/services/gamemaster/referral-kind";
+import {
+  describeAffiliationState,
+  REFERRAL_KIND_LABELS,
+  REFERRAL_SURFACE_LABELS,
+} from "@/lib/services/gamemaster/referral-kind";
 import {
   CONTACT_HIDDEN_NOTE,
   type GmReferralView,
@@ -35,12 +39,8 @@ export function ReferralKindBadge({ referral }: { referral: Pick<GmReferralView,
 
 /** Ended beats active: a player whose affiliation ended is not "inactive", they are gone. */
 export function ReferralStateLabel({ referral }: { referral: Pick<GmReferralView, "isCurrent" | "isActive"> }) {
-  if (!referral.isCurrent) return <span className="text-xs text-gray-500">Ended</span>;
-  return referral.isActive ? (
-    <span className="text-xs text-emerald-400">Active</span>
-  ) : (
-    <span className="text-xs text-gray-400">Inactive</span>
-  );
+  const tone = !referral.isCurrent ? "text-gray-500" : referral.isActive ? "text-emerald-400" : "text-gray-400";
+  return <span className={`text-xs ${tone}`}>{describeAffiliationState(referral)}</span>;
 }
 
 /** The email when the player consented (D6), otherwise the reason it is missing. */

@@ -95,6 +95,7 @@ which**. |
 | **R116** | **The Game Master referral link pointed at `/register`, a page that does not exist, and two user lookups used the `id` field alone.** Admin screens showed the stored broken link; the settlement fallback and the sync tool missed users whose identity is in `_id` | **High** | **LIVE for the link** (lost referrals unrecorded); **latent for money** (the fallback runs only without a `userreferrals` row). **Not retroactive, nothing backfilled** | **CLOSED 30 Sep 2026.** One link builder, derived on read; `$or` id filter; dropped referrals logged; generic errors. See detail section |
 | **R117** | **A private Game Master contest leaks through a contest reader nobody filtered.** Many readers exist, and a missed one lists the contest to everybody with no error | **High** | **Latent** - no private contest can exist until an operator enables `gmPrivateContestsEnabled` and a package allows it. Nothing backfilled | **MITIGATED 30 Sep 2026 (step 5 of `24`).** One shared filter, fail-closed `$in` rather than `$ne`, entry guard independent of the flag, readers counted. ~~Details page and per-contest APIs still open until step 6 - keep the switch off.~~ **Step 6, 30 Sep 2026: the direct-link gap is closed** (the gate plus a 404 on every per-contest API; the unauthenticated `participant-status` route was deleted), so the switch may be turned on. See detail section |
 | **R118** | **The Game Master's own referral screens sent every referred player's email, IP address and browser string to the Game Master's browser.** A `...r` spread in `/api/gamemaster/referrals`, and the email in `/dashboard`, with no check that the player had accepted the terms (D6) | **High** | **Live** - readable from the network tab by any Game Master. No money moved; a read leaves no record, so there is no way to know whether it was used | **CLOSED 1 Oct 2026.** One field-listed view that shows the email only on accepted terms, the session scope spread last, and a search that cannot match a hidden email. See detail section |
+| **R119** | **A detached-then-rejoined player showed twice in the admin Game Master report, as "inactive", while the Game Master saw them as active; an admin move credited the new Game Master with the player's earlier seats.** One row per affiliation document, a 30-day-activity label colliding with "currently affiliated", and an epoch window for every non-link source | **Medium** | **Live, reporting only** - no payment reads this model. Nothing backfilled | **CLOSED 1 Oct 2026.** One row per player per Game Master with stints summed, filters after grouping, `referredAt` window for moves, one shared state label. See detail section |
 | **R107** | **Journey editor selection did not load the selected map; Required Badges showed raw badge ids.** Clicking a sequence card only set `selectedSequenceMap`, so the highlight moved while Current Map / Milestones / Zones kept map 1's data. Separately, `MilestoneDetailModal` resolved badge names only through `lib/constants/badges`, so blueprint ids like `trading_beat_top_trader_flag` rendered as snake_case | **Medium** | **LIVE and DISPLAY / EDITOR only** — no money, no wrong unlocks from the naming half; the editor half blocked editing maps 2–10. **Nothing was backfilled** | **CLOSED 17 Sep 2026.** `selectAndLoadMap` + tab-change reload by mapId; `resolveBadgeDisplayName` + milestones API enrichment from `getBadgesFromDB` |
 | **R108** | **Badge Simulator reported every `game_*` condition as unrecognized; `consecutive_trading_days` could never earn.** Simulator allow-list drifted from the registry; mock omitted `gameStats`/`gameTypes`; evaluator switch missed the registry streak name; vitest JSON blew `maxBuffer` | **Medium** | **LIVE for the simulator report and for streak badges in production**; Games badges were already earnable in production (registry door) — the simulator lied. **Nothing was backfilled** | **CLOSED 17 Sep 2026.** `isSupportedConditionType` + gameStats mocks; evaluator `consecutive_trading_days`; blueprint ladders for season/best score; vitest `--outputFile` |
 | R8 | Bulk find-and-replace on wording | High | Medium | X8 |
@@ -6002,6 +6003,45 @@ whether it was ever used.**
 `components/gamemaster/GmReferralBadges.tsx`; tests
 `__tests__/services/gm-referral-view.test.ts` (20 tests); probes 171-179 in
 `tools/probe-gm-program.ps1`.
+
+### R119 - A rejoined player showed twice, as "inactive", and an admin move credited the new Game Master with old seats - **CLOSED 1 Oct 2026**
+
+**What it was.** The owner detached a player from a Game Master, and the player then rejoined
+that Game Master from a competition. Three defects showed up:
+- **Twice.** The admin report built one row per `UserReferral` document, so the ended stint
+  and the current stint were two rows.
+- **"Inactive".** The admin column meant "no contest in 30 days", while the Game Master's own
+  screen said "Active Referrals", meaning "currently affiliated". So one player read active on
+  one screen and inactive on the other, and both were right about different questions.
+- **Over-counting.** The affiliation window started at the epoch for every row that was not
+  a referral link. An `admin_assigned` row therefore credited the new Game Master with every
+  seat and earning the player had before the move.
+
+**Harm, stated precisely.** This was a live reporting defect and never a payment one. Earnings
+are written at settlement by `distribute.ts`, which this read does not touch. Nothing was
+backfilled.
+
+**What closed it.**
+- **One row per player per Game Master.** `groupPerPlayer()` in
+  `lib/services/gamemaster/referral-read-model.ts` (mirrored) sums contests and money across
+  stints and counts them in `affiliations`. The current stint wins the row.
+- **Filters run after grouping**, so the status filter, the joined range and the consent
+  search all judge the stint currently shown.
+- **Only referral-link and legacy rows start at the epoch.** Every other source is windowed
+  from its own `referredAt`.
+- **Shared wording.** `describeAffiliationState` in `referral-kind.ts` (mirrored) returns
+  "Ended", "Affiliated · played in last 30 days" or "Affiliated · no contest in 30 days". All
+  four screens use it. The end-reason lookup is a `Map`, so a stored `__proto__` cannot
+  return something truthy.
+- **A moved player** still appears once under each Game Master, by design: the old row is
+  ended `admin_reassigned`, and the new row is current with no terms.
+
+**Files:** `referral-read-model.ts`, `referral-kind.ts` (both mirrored),
+`apps/admin/components/admin/gamemaster/GmReport{Table,Filters,Summary}.tsx`,
+`app/(root)/gamemaster/{page-content.tsx,referrals/page.tsx}`,
+`components/gamemaster/GmReferralBadges.tsx`. Tests:
+`__tests__/services/gm-referral-history.test.ts` (10 tests). Probes 180-187 are new; 126,
+127, 141, 172 and 179 were re-aimed.
 
 ---
 

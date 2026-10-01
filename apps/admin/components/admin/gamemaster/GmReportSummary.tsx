@@ -48,7 +48,7 @@ export default function GmReportSummary({ report }: { report: ReferredPlayersRep
       <div className="grid grid-cols-2 gap-3 md:grid-cols-6">
         <Figure label="Referred players" value={String(all.players)} />
         <Figure label="Currently affiliated" value={String(all.current)} />
-        <Figure label="Active (30 days)" value={String(all.active)} />
+        <Figure label="Played in last 30 days" value={String(all.active)} />
         <Figure label="Entry fees" value={formatVolts(all.entryFees)} />
         <Figure label="GM earned" value={formatVolts(all.earned)} />
         <Figure label="GM pending" value={formatVolts(all.pending)} />
@@ -60,7 +60,7 @@ export default function GmReportSummary({ report }: { report: ReferredPlayersRep
               <th className="px-3 py-2 text-left">Breakdown</th>
               <th className="px-3 py-2 text-right">Players</th>
               <th className="px-3 py-2 text-right">Current</th>
-              <th className="px-3 py-2 text-right">Active</th>
+              <th className="px-3 py-2 text-right">Played (30d)</th>
               <th className="px-3 py-2 text-right">Entry fees</th>
               <th className="px-3 py-2 text-right">Earned</th>
               <th className="px-3 py-2 text-right">Pending</th>

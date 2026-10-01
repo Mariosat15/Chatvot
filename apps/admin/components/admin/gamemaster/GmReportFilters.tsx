@@ -125,8 +125,8 @@ export default function GmReportFilters({
           onChange={(e) => set("activity")(e.target.value)}
         >
           <option value="">Any</option>
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
+          <option value="active">Played in last 30 days</option>
+          <option value="inactive">No contest in 30 days</option>
         </select>
       </label>
       <label className="text-xs text-gray-400">

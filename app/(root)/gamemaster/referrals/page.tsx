@@ -20,7 +20,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 import type { GmReferralView } from "@/lib/services/gamemaster/gm-referral-view";
-import { REFERRAL_KIND_LABELS } from "@/lib/services/gamemaster/referral-kind";
+import { describeAffiliationState, REFERRAL_KIND_LABELS } from "@/lib/services/gamemaster/referral-kind";
 import { ReferralContact, ReferralKindBadge } from "@/components/gamemaster/GmReferralBadges";
 
 const KIND_FILTERS = [
@@ -145,7 +145,7 @@ export default function GMReferralsPage() {
             <div className="bg-gray-800/50 rounded-2xl p-3 sm:p-5 border border-gray-700/50">
               <div className="text-xs sm:text-sm text-gray-400 mb-1 flex items-center gap-1">
                 <UserCheck className="h-3 w-3 text-emerald-400" />
-                Active
+                Played (30 days)
               </div>
               <div className="text-lg sm:text-2xl font-bold text-emerald-400">
                 {data.stats.activeUsers}
@@ -325,19 +325,12 @@ export default function GMReferralsPage() {
                                 : "bg-gray-700 text-gray-400",
                             )}
                           >
-                            {!user.isCurrent ? (
-                              <>
-                                <UserX className="h-3 w-3" /> Ended
-                              </>
-                            ) : user.isActive ? (
-                              <>
-                                <UserCheck className="h-3 w-3" /> Active
-                              </>
+                            {user.isCurrent && user.isActive ? (
+                              <UserCheck className="h-3 w-3" />
                             ) : (
-                              <>
-                                <UserX className="h-3 w-3" /> Inactive
-                              </>
-                            )}
+                              <UserX className="h-3 w-3" />
+                            )}{" "}
+                            {describeAffiliationState(user)}
                           </span>
                           {user.termsAccepted && (
                             <p className="text-emerald-500/80 text-xs mt-1">Terms accepted</p>

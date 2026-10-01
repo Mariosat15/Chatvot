@@ -1175,14 +1175,14 @@ $results += Invoke-Probe `
 # 126. A Join GM row earns from before it began.
 $results += Invoke-Probe `
     -Name "Join GM window opens at epoch" -File $READ `
-    -From '_from: { $cond: [{ $eq: ["$_effSource", "chartvolt_join_gm"] }, "$referredAt", EPOCH] },' `
+    -From '_from: { $cond: [{ $eq: ["$_effSource", LEGACY_AFFILIATION_SOURCE] }, EPOCH, "$referredAt"] },' `
     -To '_from: EPOCH,' `
     -TestName "a Join GM row earns only from its own start" -Suite $RM
 
 # 127. Link rows are windowed by a referredAt the old sync route stamped late.
 $results += Invoke-Probe `
     -Name "Link rows windowed by referredAt" -File $READ `
-    -From '_from: { $cond: [{ $eq: ["$_effSource", "chartvolt_join_gm"] }, "$referredAt", EPOCH] },' `
+    -From '_from: { $cond: [{ $eq: ["$_effSource", LEGACY_AFFILIATION_SOURCE] }, EPOCH, "$referredAt"] },' `
     -To '_from: "$referredAt",' `
     -TestName "a link row is not windowed by a late referredAt" -Suite $RM
 
@@ -1280,9 +1280,9 @@ $results += Invoke-Probe `
 # 141. The Game Master list labels rows itself.
 $results += Invoke-Probe `
     -Name "GM list re-derives the kind" -File "app/api/gamemaster/referrals/route.ts" `
-    -From 'const { kind, surface } = classifyReferral({' `
-    -To 'const kind = "own"; const surface = null; void ({' `
-    -TestName "labels rows with the shared classifier" -Suite $RM
+    -From 'referrals: report.rows.map(toGameMasterReferralView),' `
+    -To 'referrals: report.rows.map((r) => ({ ...r, kind: "own" })),' `
+    -TestName "the Game Master referrals list reads the shared model through the D6 view" -Suite $RM
 
 # ---- Task 4: the admin report screen, export, move and detach ----
 $SCR = "__tests__/admin/gm-report-screen.test.ts"
@@ -1516,8 +1516,8 @@ $results += Invoke-Probe `
 # 172. A hidden email can be found by searching for it.
 $results += Invoke-Probe `
     -Name "Consent search ignored" -File "lib/services/gamemaster/referral-read-model.ts" `
-    -From 'if (filter.contactRequiresConsent) byEmail.termsAcceptanceId' `
-    -To 'if (false) byEmail.termsAcceptanceId' `
+    -From 'if (withConsent && filter.contactRequiresConsent) {' `
+    -To 'if (false) {' `
     -TestName "contactRequiresConsent stops email search" -Suite $VIEWT
 
 # 173. The referrals route forgets the consent scope.
@@ -1562,12 +1562,74 @@ $results += Invoke-Probe `
     -To '' `
     -TestName "gamemaster-dashboard-tabs.tsx renders the kind badge" -Suite $VIEWT
 
-# 179. An ended affiliation reads as merely inactive.
+# 179. An ended affiliation reads as merely inactive. Re-aimed 1 Oct 2026: the word moved into
+# the shared describeAffiliationState, so the probe mutates the shared rule.
+$KIND = "lib/services/gamemaster/referral-kind.ts"
 $results += Invoke-Probe `
-    -Name "Ended reads Inactive" -File $BADGES `
-    -From 'if (!referral.isCurrent) return <span className="text-xs text-gray-500">Ended</span>;' `
-    -To 'if (false) return <span className="text-xs text-gray-500">Ended</span>;' `
+    -Name "Ended reads Inactive" -File $KIND `
+    -From 'if (!row.isCurrent) return "Ended";' `
+    -To 'if (false) return "Ended";' `
     -TestName "an ended affiliation reads Ended" -Suite $VIEWT
+
+# --- Owner report 1 Oct 2026: detach + rejoin listed the player twice; move over-counted ---
+$HIST = "__tests__/services/gm-referral-history.test.ts"
+$READ = "lib/services/gamemaster/referral-read-model.ts"
+
+# 180. An admin move is windowed from the epoch again (the new GM gets the old GM's seats).
+$results += Invoke-Probe `
+    -Name "Admin move windowed from epoch" -File $READ `
+    -From '$cond: [{ $eq: ["$_effSource", LEGACY_AFFILIATION_SOURCE] }, EPOCH, "$referredAt"]' `
+    -To '$cond: [{ $in: ["$_effSource", [LEGACY_AFFILIATION_SOURCE, "admin_assigned"]] }, EPOCH, "$referredAt"]' `
+    -TestName "the old Game Master keeps an ended row" -Suite $HIST
+
+# 181. The consent search looks at the raw rows, so an older consented stint answers it.
+$results += Invoke-Probe `
+    -Name "Consent search before grouping" -File $READ `
+    -From 'const match: Document = { ...searchMatch(filter, true) };' `
+    -To 'const match: Document = { ...searchMatch(filter, false) };' `
+    -TestName "a consent-gated email search judges the stint on screen" -Suite $HIST
+
+# 182. The Ended filter no longer applies to the grouped row.
+$results += Invoke-Probe `
+    -Name "Ended filter dropped" -File $READ `
+    -From 'if (filter.status === "ended") match.isActive = { $ne: true };' `
+    -To '' `
+    -TestName "the Ended filter does not return a player who has rejoined" -Suite $HIST
+
+# 183. Stints are not summed - the older stint's contests and money vanish.
+$results += Invoke-Probe `
+    -Name "Stints not summed" -File $READ `
+    -From '...Object.fromEntries(summed.map((f) => [f, { $sum: `$${f}` }])),' `
+    -To '...Object.fromEntries(summed.map((f) => [f, { $last: `$${f}` }])),' `
+    -TestName "the rejoined player is one current row with both stints summed" -Suite $HIST
+
+# 184. Grouping by player alone merges two Game Masters' relationships into one row.
+$results += Invoke-Probe `
+    -Name "Group key drops GM" -File $READ `
+    -From '_id: { u: "$userId", gm: "$gameMasterId" },' `
+    -To '_id: { u: "$userId" },' `
+    -TestName "moved away and back is one row under the original Game Master" -Suite $HIST
+
+# 185. The end-reason lookup walks the prototype chain.
+$results += Invoke-Probe `
+    -Name "End reason object lookup" -File $KIND `
+    -From 'return ENDED_REASON_LABELS.get(reason) ?? reason.replace(/_/g, " ");' `
+    -To 'return ({ admin_detached: "detached by an admin" } as Record<string, string>)[reason] ?? reason.replace(/_/g, " ");' `
+    -TestName "an end reason is looked up in a Map" -Suite $HIST
+
+# 186. The admin table hand-writes one branch's state word.
+$results += Invoke-Probe `
+    -Name "Table hand-writes Inactive" -File "apps/admin/components/admin/gamemaster/GmReportTable.tsx" `
+    -From '{describeAffiliationState(row)} {formatDate(row.endedAt)}' `
+    -To 'Inactive {formatDate(row.endedAt)}' `
+    -TestName "both report screens take their state words from the shared function" -Suite $HIST
+
+# 187. Affiliated-but-quiet is called inactive again.
+$results += Invoke-Probe `
+    -Name "Quiet reads inactive" -File $KIND `
+    -From 'export function describeAffiliationState(row: { isCurrent: boolean; isActive: boolean }): string {' `
+    -To 'export function describeAffiliationState(row: { isCurrent: boolean; isActive: boolean }): string { if (row.isCurrent && !row.isActive) return "Inactive";' `
+    -TestName "never calls an affiliated player inactive" -Suite $HIST
 
 Write-Host ""
 Write-Host "================ SUMMARY ================"

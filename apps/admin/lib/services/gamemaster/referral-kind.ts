@@ -56,6 +56,31 @@ export const REFERRAL_KIND_LABELS: Readonly<Record<ReferralKind, string>> = {
   unclassified: "Unclassified",
 };
 
+/**
+ * The words for an affiliation's state, shared by the admin report and the Game Master's
+ * screens. Reason: "active" meant "affiliated" on the Game Master dashboard and "played in
+ * the last 30 days" on the admin report, so one player read as active on one screen and
+ * inactive on the other (owner report, 1 Oct 2026). Affiliation and recent play are two
+ * facts; each gets its own word, and neither screen may say "inactive" for "no recent play".
+ */
+export function describeAffiliationState(row: { isCurrent: boolean; isActive: boolean }): string {
+  if (!row.isCurrent) return "Ended";
+  return row.isActive ? "Affiliated · played in last 30 days" : "Affiliated · no contest in 30 days";
+}
+
+const ENDED_REASON_LABELS: ReadonlyMap<string, string> = new Map([
+  ["admin_detached", "detached by an admin"],
+  ["admin_reassigned", "moved to another Game Master"],
+  ["gm_expired", "Game Master expired"],
+  ["gm_deleted", "Game Master deleted"],
+]);
+
+/** A Map, not an object - `endedReason` is stored data and must not walk the prototype chain. */
+export function describeEndedReason(reason: string | null | undefined): string | null {
+  if (!reason) return null;
+  return ENDED_REASON_LABELS.get(reason) ?? reason.replace(/_/g, " ");
+}
+
 export const REFERRAL_SOURCES = Object.keys(KIND_BY_SOURCE) as AffiliationSource[];
 export const REFERRAL_SURFACES = Object.keys(REFERRAL_SURFACE_LABELS) as AffiliationSurface[];
 export const REFERRAL_KINDS: readonly ReferralKind[] = ["own", "external", "unclassified"];

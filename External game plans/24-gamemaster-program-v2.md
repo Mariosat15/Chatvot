@@ -442,6 +442,15 @@ The rule: **a `gm_private` contest can be entered, and its details read, only by
 >   affiliation window, because they come from the shared model.
 >
 > **Never verified by eye.**
+>
+> **Amendment, 1 Oct 2026 (R119, owner test).** A detached player who rejoined showed twice in the
+> admin report, as "inactive", while the Game Master saw them as active. The read model now groups
+> by player and Game Master, sums contests and money across stints, and applies its filters after
+> grouping. "Active" was two questions under one word, so all four screens now use one label,
+> `describeAffiliationState`: "Ended", "Affiliated · played in last 30 days" or "Affiliated · no
+> contest in 30 days". An admin move is now windowed from the new row's `referredAt`, not the epoch,
+> so the new Game Master no longer inherits the old seats. A moved player still shows once under
+> each Game Master. Tests are in `gm-referral-history.test.ts`.
 
 ---
 
@@ -692,7 +701,7 @@ Rollback: flags off; fields are inert; no data deleted. A private contest alread
 
 ---
 
-## 11. Risks (next free number is R119 since R118 on 1 Oct 2026 - re-check with `rg -o "R\d+"` before adding)
+## 11. Risks (next free number is R120 since R119 on 1 Oct 2026 - re-check with `rg -o "R\d+"` before adding)
 
 - **R117 - private contest leaks through an unfiltered reader.** Many list readers exist; the fix is the shared filter helper plus the per-reader test in s9.3. High likelihood if done per call site.
 - **R118 - Join GM becomes a commission-farming tool** (GM creates accounts, joins them, enters own private contests). Mitigated by: GM cannot enter own contests (exists), affiliation needs a real account + terms, existing fraud detectors on entry, burst recording. Residual: owner decision on auto-action.

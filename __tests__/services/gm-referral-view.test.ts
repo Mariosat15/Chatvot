@@ -205,7 +205,11 @@ describe("the Game Master screens label own and external from the shared map", (
   });
 
   it("an ended affiliation reads Ended, not Inactive", () => {
+    // Reason: the claim is unchanged; since 1 Oct 2026 the word lives in the shared
+    // describeAffiliationState so the admin report and this badge cannot disagree again.
     const src = stripComments(read("components/gamemaster/GmReferralBadges.tsx"));
-    expect(src).toMatch(/if \(!referral\.isCurrent\) return <span[^>]*>Ended</);
+    expect(src).toMatch(/describeAffiliationState\(referral\)/);
+    const shared = stripComments(read("lib/services/gamemaster/referral-kind.ts"));
+    expect(shared).toMatch(/if \(!row\.isCurrent\) return "Ended";/);
   });
 });

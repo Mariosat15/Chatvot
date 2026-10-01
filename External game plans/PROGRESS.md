@@ -915,6 +915,39 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 1 Oct 2026 - A rejoined player shows once, and the two apps agree on what "active" means (R119)
+
+This came from an owner test. The owner detached a player from a Game Master, and the player
+then rejoined that Game Master from a competition. The Game Master's screen showed the player
+as active, while the admin report showed them twice, both times as inactive.
+
+**Three causes, all in the read model, and none of them touched money.**
+- **Twice.** The report built one row per affiliation document. It now builds one row per
+  player per Game Master (`groupPerPlayer`): contests and money are summed across stints, the
+  current stint wins, and `affiliations` counts the stints. The table says "Rejoined - N
+  stints since ...".
+- **Inactive.** The admin column meant "no contest in 30 days", while the Game Master's
+  "active" meant "currently affiliated". One shared label, `describeAffiliationState` in
+  `referral-kind.ts` (mirrored), is now used on all four screens and never says "inactive".
+- **The admin move over-counted.** Every source except a referral link was windowed from the
+  epoch, so a player moved to Game Master B credited B with the seats they had played under A.
+  Only link and legacy rows start at the epoch now.
+- **Filters run after grouping**, so the status filter, the joined range and the consent
+  search all judge the stint currently shown. A player who rejoined without terms is not
+  found by an email search.
+
+**A move to another Game Master was verified.** The old row reads Ended (`admin_reassigned`)
+with its own contests; the new one is current, `admin_assigned` and has no terms. A player
+moved away and back is one row under the original Game Master.
+
+**Recorded, not changed:** the summary's "players" figure counts player-and-Game-Master pairs,
+so across all Game Masters a moved player counts once under each.
+
+**Tests:** `gm-referral-history.test.ts` (10 tests, real replica set), plus one flipped
+assertion in `gm-referral-view.test.ts`. Probes 180-187 are new. Probes 126, 127, 141, 172
+and 179 were re-aimed, 141 having been stale since task 5 flipped its test. **All 187 are red
+on the expected test.** Typecheck baselines are unchanged (main 228, admin 243). R119 in `17`.
+
 ### 1 Oct 2026 - A Game Master sees a player's email only after the terms, and a referral link asks once
 
 Programme v2 task 5 plus two owner instructions. The work has three parts.

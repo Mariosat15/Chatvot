@@ -235,7 +235,7 @@ export default function GameMasterDashboardContent() {
           <KPI icon={TrendingUp} color="emerald" label="Total Earnings" value={`⚡ ${(stats?.totalEarnings ?? 0).toFixed(2)}`} />
           <KPI icon={Clock} color="yellow" label="Pending" value={`⚡ ${(stats?.pendingEarnings ?? 0).toFixed(2)}`} />
           <KPI icon={Users} color="blue" label="Total Referrals" value={String(stats?.totalReferredUsers ?? 0)} />
-          <KPI icon={Users} color="purple" label="Active Referrals" value={String(stats?.activeReferredUsers ?? 0)} />
+          <KPI icon={Users} color="purple" label="Affiliated Referrals" value={String(stats?.activeReferredUsers ?? 0)} />
           <KPI
             icon={Trophy}
             color="emerald"
