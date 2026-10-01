@@ -5819,7 +5819,7 @@ export default function AdminWikiSection() {
             </CardHeader>
             <CardContent className="space-y-2 text-gray-300 text-sm">
               <p>
-                Game Masters → Competition Defaults sets, for every competition
+                Competitions → Settings sets, for every competition
                 option, a default value and whether a Game Master may change it.
               </p>
               <p>

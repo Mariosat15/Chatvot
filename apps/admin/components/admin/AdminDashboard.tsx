@@ -73,7 +73,6 @@ import {
   Video,
   Gamepad2,
   LayoutTemplate,
-  SlidersHorizontal,
 } from "lucide-react";
 import { toast } from "sonner";
 import CredentialsSection from "@/components/admin/CredentialsSection";
@@ -139,7 +138,7 @@ import MessagingSection from "@/components/admin/MessagingSection";
 import MessagingSettingsSection from "@/components/admin/MessagingSettingsSection";
 import GameMasterDashboardSection from "@/components/admin/GameMasterDashboardSection";
 import GameMasterProgramSection from "@/components/admin/GameMasterProgramSection";
-import GameMasterCompetitionDefaultsSection from "@/components/admin/gamemaster/GameMasterCompetitionDefaultsSection";
+import CompetitionsAdminSection from "@/components/admin/competitions/CompetitionsAdminSection";
 import PriceHealthWidget from "@/components/admin/PriceHealthWidget";
 import TradingSectionTabs from "@/components/admin/trading/TradingSectionTabs";
 import TradingPageSection from "@/components/admin/trading/TradingPageSection";
@@ -588,13 +587,6 @@ const menuGroups: MenuGroup[] = [
         id: "gamemaster-management",
         label: "Manage Game Masters",
         icon: <Users className="h-5 w-5" />,
-        color: "text-amber-400",
-        bgColor: "bg-amber-500/10 hover:bg-amber-500/20",
-      },
-      {
-        id: "gm-competition-defaults",
-        label: "Competition Defaults",
-        icon: <SlidersHorizontal className="h-5 w-5" />,
         color: "text-amber-400",
         bgColor: "bg-amber-500/10 hover:bg-amber-500/20",
       },
@@ -1152,7 +1144,13 @@ export default function AdminDashboard({
       case "visitors":
         return <VisitorAnalyticsSection key={currentRefreshKey} />;
       case "competitions":
-        return <CompetitionsListSection key={currentRefreshKey} />;
+        return (
+          <CompetitionsAdminSection
+            key={currentRefreshKey}
+            canViewList
+            canEditSettings={hasAccess("gm-competition-defaults")}
+          />
+        );
       case "challenges":
         return <ChallengesAdminSection key={currentRefreshKey} />;
       case "marketplace":
@@ -1297,8 +1295,17 @@ export default function AdminDashboard({
         return <MessagingSettingsSection key={currentRefreshKey} />;
       case "gamemaster-dashboard":
         return <GameMasterDashboardSection key={currentRefreshKey} />;
+      // Reason: no menu entry of its own any more (it is the Settings tab of Competitions),
+      // but the id stays a grant and an addressable deep link.
       case "gm-competition-defaults":
-        return <GameMasterCompetitionDefaultsSection key={currentRefreshKey} />;
+        return (
+          <CompetitionsAdminSection
+            key={currentRefreshKey}
+            canViewList={hasAccess("competitions")}
+            canEditSettings
+            initialTab="settings"
+          />
+        );
       case "gamemaster-management":
         return (
           <GameMasterProgramSection

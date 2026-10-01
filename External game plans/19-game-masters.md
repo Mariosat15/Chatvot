@@ -248,7 +248,7 @@ percentage as trading - section 5.
 #### 3.3a The admin's competition defaults (BUILT 1 October 2026)
 
 An admin sets, for each competition option, **a default value and whether a Game Master may
-change it** (admin section `gm-competition-defaults`, under Game Masters). The intent
+change it** (admin section `gm-competition-defaults`, shown as the **Settings** tab of **Competitions**, the same shape as 1v1 Challenges - moved there on the owner's instruction later on 1 Oct 2026; it first shipped as its own Game Master menu entry, and the id still deep-links). The intent
 is that a Game Master can only ever create a correct competition.
 
 - **Locked option:** hidden from the Game Master's form, and **the create route writes the

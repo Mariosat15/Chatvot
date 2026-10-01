@@ -930,6 +930,12 @@ switch, so a Game Master can only ever create a correct competition.
   (mirrored, byte-identical test); stored model `gamemaster-competition-defaults.model.ts` (mirrored).
 - Admin screen and `GET/PUT /api/gamemaster-competition-defaults`, behind the new add-only
   section id `gm-competition-defaults`.
+- **Moved the same day on the owner's instruction:** the screen is the **Settings** tab of
+  **Competitions** (`apps/admin/components/admin/competitions/CompetitionsAdminSection.tsx`), the
+  same shape as 1v1 Challenges, rather than its own Game Master menu entry. Each tab is shown only
+  to holders of its own grant (`competitions` / `gm-competition-defaults`), so the move widens no
+  access; `?activeTab=gm-competition-defaults` still opens it. An employee holding only the
+  defaults grant has no sidebar entry and reaches it by that link.
 - Both Game Master create routes apply the defaults before reading the body: a locked option gets
   the admin's value whatever was sent, and an open one is validated and refused, never clamped.
 - Both Game Master forms (trading and game) hide locked options and start open ones at the admin's

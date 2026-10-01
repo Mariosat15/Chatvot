@@ -285,3 +285,24 @@ describe("the Game Master forms hide locked options", () => {
     expect(form).not.toMatch(/unscoredContestPolicy:\s*"/);
   });
 });
+
+describe("the admin finds the defaults under Competitions -> Settings", () => {
+  const dashboard = read("apps/admin/components/admin/AdminDashboard.tsx");
+  const section = read("apps/admin/components/admin/competitions/CompetitionsAdminSection.tsx");
+
+  it("has no sidebar entry of its own any more", () => {
+    expect(dashboard).not.toContain('id: "gm-competition-defaults"');
+  });
+
+  it("the Competitions item renders the tabbed page, gated on the defaults grant", () => {
+    expect(dashboard).toMatch(
+      /case "competitions":\s*return \(\s*<CompetitionsAdminSection[\s\S]{0,120}canEditSettings=\{hasAccess\("gm-competition-defaults"\)\}/,
+    );
+  });
+
+  it("each tab is shown only with its own grant", () => {
+    expect(section).toContain('(requested === "settings" && canEditSettings)');
+    expect(section).toContain('(requested === "list" && canViewList)');
+    expect(section).toContain("<GameMasterCompetitionDefaultsSection />");
+  });
+});
