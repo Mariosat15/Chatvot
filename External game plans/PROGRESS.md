@@ -915,6 +915,26 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 1 Oct 2026 - The status route no longer reports a named player's rank and prize (R117, public half)
+
+`GET /api/competitions/[id]/status` used to read a `userId` from the address. That meant
+anybody could read any player's final rank and prize on a public contest by naming that player.
+
+- **The change:** the parameter is now ignored. The ranking fields are the signed-in caller's
+  own, and only once the contest is completed. The session is read lazily because the route is
+  polled.
+- **What else changed:** `CompetitionStatusMonitor` was the only sender, and it always sent the
+  viewer's own id, so it now sends nothing and its behaviour is unchanged. The competitions
+  list's status poll never sent the parameter.
+- **What did not change:** a public contest still answers without a session.
+- **What was not done:** nothing was backfilled, since a read leaves no record. The leak was
+  live, and there is no way to know whether it was ever used.
+- **Tests:** 1 new test in `gm-private-contest-view.test.ts`. Probe 96 was re-aimed and probe
+  114 was added; all 114 probes are red on exactly one test.
+- **A harness lesson:** the first probe run reported "DID NOT APPLY" because it was started in
+  parallel with the edit to the probe script, so it ran the old script. **Never run a harness
+  in the same batch as an edit to it.**
+
 ### 30 Sep 2026 - Private competitions are now listed to every signed-in player (owner reversal of step 5)
 
 The owner asked that players outside a Game Master's group still **see** that Game Master's

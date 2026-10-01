@@ -8,7 +8,8 @@ interface CompetitionStatusMonitorProps {
   competitionId: string;
   initialStatus: string;
   startTime: string; // ISO string — used for adaptive polling
-  userId: string; // Current user's ID to check their ranking
+  // Reason: no longer sent - the status route answers for the session, never for a named id.
+  userId?: string;
 }
 
 // Polling thresholds (ms)
@@ -29,7 +30,6 @@ export default function CompetitionStatusMonitor({
   competitionId,
   initialStatus,
   startTime,
-  userId,
 }: CompetitionStatusMonitorProps) {
   const router = useRouter();
   const hasRedirectedRef = useRef(false);
@@ -55,7 +55,7 @@ export default function CompetitionStatusMonitor({
 
     try {
       const response = await fetch(
-        `/api/competitions/${competitionId}/status?userId=${userId}`,
+        `/api/competitions/${competitionId}/status`,
       );
       if (!response.ok) {
         if (response.status === 404) return;
@@ -168,7 +168,7 @@ export default function CompetitionStatusMonitor({
       // Fail silently
     }
    
-  }, [competitionId, userId, router]);
+  }, [competitionId, router]);
 
   // Reason: Schedule the next poll with the current adaptive interval.
   // Using setTimeout (not setInterval) lets us re-calculate the interval

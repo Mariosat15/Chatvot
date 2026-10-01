@@ -5944,7 +5944,9 @@ a present fact.** The switch may now be turned on.
 - **`participant-status` was deleted.** It had no callers and no authentication, and it
   returned any user's status, capital and P&L for any contest, public or private.
 
-**Still open, deliberately, and not a privacy issue.** `GET /api/competitions/[id]/status`
+**CLOSED 1 Oct 2026; what follows is history.** The route now ignores the parameter. It reports the ranking only for the signed-in caller, and only once the contest is completed. The only sender, `CompetitionStatusMonitor`, always sent the viewer's own id, so nothing a player sees changed. Nothing was backfilled, because a read leaves no record, and there is no way to know whether the leak was ever used.
+
+~~**Still open, deliberately, and not a privacy issue.**~~ `GET /api/competitions/[id]/status`
 still accepts a `userId` query parameter and reports that user's rank and prize on a
 **public** contest. The private check reads the session and ignores the parameter, and a
 test proves a spoofed parameter cannot open a private contest. The public-contest

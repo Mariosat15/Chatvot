@@ -18,17 +18,23 @@ import {
  * Returns the current status of a competition
  * Used for polling to detect when competition ends
  *
- * Query params:
- * - userId: Optional user ID to get their ranking when competition completes
+ * The ranking fields are the SIGNED-IN caller's own, and only once the contest is completed.
  */
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get("userId");
+    // Reason: until 1 Oct 2026 the ranking was read for a `userId` QUERY parameter, so anybody
+    // could read any player's final rank and prize on a public contest by naming them. The
+    // parameter is now ignored entirely; the session is read lazily because this route is
+    // polled, and only the two branches below need it.
+    let sessionRead: Promise<string | undefined> | null = null;
+    const sessionUserId = () =>
+      (sessionRead ??= headers()
+        .then((h) => auth.api.getSession({ headers: h }))
+        .then((s) => s?.user?.id));
 
     // A junk id gets the 404 below rather than the 500 the catch would produce. This route is
     // POLLED, so a page left open on a bad id used to write a stack trace every few seconds.
@@ -57,8 +63,7 @@ export async function GET(
     // one. A PRIVATE contest is judged against the signed-in caller - never the `userId` query
     // parameter, which anybody can set - and answers the same 404 as a missing one (R117).
     if (isPrivateContest(competition)) {
-      const session = await auth.api.getSession({ headers: await headers() });
-      if (!(await canViewContest(id, competition, session?.user?.id))) {
+      if (!(await canViewContest(id, competition, await sessionUserId()))) {
         return NextResponse.json(
           { error: "Competition not found" },
           { status: 404 },
@@ -83,8 +88,9 @@ export async function GET(
       cancellationReason: competition.cancellationReason || null,
     };
 
-    // If competition is completed and userId provided, get user's ranking
-    if (competition.status === "completed" && userId) {
+    const userId =
+      competition.status === "completed" ? await sessionUserId() : undefined;
+    if (userId) {
       await connectToDatabase();
 
       // Get user's participant record

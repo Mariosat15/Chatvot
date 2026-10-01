@@ -345,6 +345,26 @@ describe("private Game Master contest - who may view it (step 6)", () => {
       const id = await seedContest({ visibility: "public" });
       expect((await statusGet(req(id, "status"), ctx(id))).status).toBe(200);
     });
+
+    // Reason: until 1 Oct 2026 a PUBLIC contest's final rank and prize were read for the
+    // `userId` query parameter, so naming any player revealed their result. Both halves are
+    // asserted: a named id with no session gets nothing, the session gets its own result.
+    it("status reports the ranking of the signed-in caller only, never a named userId", async () => {
+      const id = await seedContest({ visibility: "public", status: "completed" });
+      await seat(id);
+      await CompetitionParticipant.collection.updateOne(
+        { competitionId: id, userId: PLAYER },
+        { $set: { finalRank: 2, prizeWon: 7 } },
+      );
+      const spoofed = new NextRequest(`http://x/api/competitions/${id}/status?userId=${PLAYER}`);
+      const anonymous = await (await statusGet(spoofed, ctx(id))).json();
+      expect(anonymous.userRank).toBeUndefined();
+      expect(anonymous.prizeWon).toBeUndefined();
+      sessionUser.current = player;
+      const own = await (await statusGet(req(id, "status"), ctx(id))).json();
+      expect(own.userRank).toBe(2);
+      expect(own.prizeWon).toBe(7);
+    });
   });
 });
 

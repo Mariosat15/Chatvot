@@ -918,8 +918,8 @@ $results += Invoke-Probe `
 $results += Invoke-Probe `
     -Name "Status judges the query userId" `
     -File "app/api/competitions/[id]/status/route.ts" `
-    -From 'canViewContest(id, competition, session?.user?.id)' `
-    -To 'canViewContest(id, competition, session?.user?.id ?? userId ?? undefined)' `
+    -From 'canViewContest(id, competition, await sessionUserId())' `
+    -To 'canViewContest(id, competition, (await sessionUserId()) ?? new URL(_request.url).searchParams.get("userId") ?? undefined)' `
     -TestName "status judges the signed-in caller" -Suite $CV
 
 # 97. Status skips the private check altogether.
@@ -1067,6 +1067,14 @@ $results += Invoke-Probe `
     -From 'return { $and: [query, enterableContestsFilter(viewer)] };' `
     -To 'return { ...query, ...enterableContestsFilter(viewer) };' `
     -TestName "withEnterableContests keeps the caller's own" -Suite $PD
+
+# 114. The completed-contest ranking is read for the query userId again (any player's prize).
+$results += Invoke-Probe `
+    -Name "Status ranking reads the query userId" `
+    -File "app/api/competitions/[id]/status/route.ts" `
+    -From 'competition.status === "completed" ? await sessionUserId() : undefined;' `
+    -To 'competition.status === "completed" ? (new URL(_request.url).searchParams.get("userId") ?? undefined) : undefined;' `
+    -TestName "status reports the ranking of the signed-in caller only" -Suite $CV
 
 Write-Host ""
 Write-Host "================ SUMMARY ================"
