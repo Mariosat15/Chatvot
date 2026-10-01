@@ -131,6 +131,10 @@ export function PhoneInputField({
             required: required ? "Select a country code" : false,
           }}
           render={({ field }) => (
+            // Reason: `.country-select-trigger` lives in `@layer utilities` after Tailwind's
+            // generated classes and carries `w-full`, so a width on the button itself loses
+            // and the code takes the whole row. The wrapper owns the width instead.
+            <div className="w-[7.5rem] shrink-0">
             <Popover open={open} onOpenChange={setOpen}>
               <PopoverTrigger asChild>
                 <Button
@@ -138,7 +142,7 @@ export function PhoneInputField({
                   variant="outline"
                   role="combobox"
                   aria-expanded={open}
-                  className="country-select-trigger w-[9.5rem] shrink-0 px-2"
+                  className="country-select-trigger px-2"
                 >
                   {field.value && dialCodeFor(field.value) ? (
                     <span className="flex items-center gap-1.5 truncate">
@@ -199,6 +203,7 @@ export function PhoneInputField({
                 </Command>
               </PopoverContent>
             </Popover>
+            </div>
           )}
         />
 
@@ -211,7 +216,7 @@ export function PhoneInputField({
             placeholder={
               dialPrefix ? `Number without ${dialPrefix}` : "Phone number"
             }
-            className="form-input"
+            className="form-input w-full"
             {...register("phoneNational", {
               required: required ? "Phone number is required" : false,
               validate: (value: string) => {
