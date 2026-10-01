@@ -915,6 +915,33 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 1 Oct 2026 - One shared answer to "who did this Game Master bring in, and what did it earn"
+
+Programme v2 task 3. Before this, the admin screen, the Game Master's own list and any future
+report each had to work out for themselves whether a referred player was the Game Master's
+**own** (signed up through their link) or **external** (an existing player who joined them), and
+what that player had earned them. Two lists working it out separately is how they end up
+disagreeing.
+
+- **The change:** one mirrored read model (`referral-kind.ts`, `referral-read-model.ts`,
+  `referral-report-filter.ts`) with a guarded admin route, `GET /api/gamemasters/referred-players`.
+  The Game Master's own list now carries the same `kind` and `surface` and escapes its search.
+  Details and deviations are in `24` s7.1's BUILT note.
+- **Two things found on the way.** The activity and earnings counters stored on `UserReferral`
+  are written by nothing, so the read model ignores them. And the first Mongo version of the
+  surface rule gave an unknown source a surface where the JavaScript version gave none; the
+  row-by-row agreement test caught it.
+- **Deviations, recorded rather than absorbed:** "active" counts any seat in 30 days, not only
+  paid ones; and the plan's 15-minute `gm_affiliate_stats` cache is not built.
+- **Behaviour change:** the Game Master's referral search used to pass the search text straight
+  into a regular expression; it is now escaped and capped at 100 characters, so a search for
+  `a.b` finds `a.b` and not `axb`.
+- **Not built:** the admin report screen, exports, move/detach (task 4). Nothing was backfilled;
+  this only reads.
+- **Tests:** `gm-referral-read-model.test.ts`, 35 tests against a real database. Probes 121-141;
+  all 141 red on exactly one test. Lint clean; typechecks at baseline (admin 244; main's one extra
+  error is in a generated `.next` file). **Never verified by eye** - nothing renders it yet.
+
 ### 1 Oct 2026 - The private badge on the game page and in the admin list
 
 A private contest on a game's own page (`/games/[slug]`) looked public: no badge, and a

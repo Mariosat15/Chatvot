@@ -448,6 +448,43 @@ GM, user, registration date, affiliation date, source (badge), affiliation statu
 
 Sources, all read-only: `userreferrals`, `user`, `competition_participant` (+ `Competition` for GM/visibility/game - **attribute by the contest's labels, cast `competitionId` String -> ObjectId**, the known trap), `challenge_participant`, `wallettransactions` (entry, refunds), `gamemasterearnings` (grouped by `referredUserId`), `platform_financials` retained rows. Built as **one aggregation per page** with pre-computed per-user facts cached in a small `gm_affiliate_stats` read model refreshed by the worker every 15 minutes (report on 10k affiliates must not do 10k lookups per request). The report says "as of HH:MM".
 
+> **BUILT 1 Oct 2026 (programme v2 task 3): the shared read model, NOT the report screen.** Live
+> code: `lib/services/gamemaster/referral-kind.ts`, `referral-read-model.ts` and
+> `referral-report-filter.ts` (all three **mirrored**, held byte-identical by a test -
+> `check:mirrors` compares models and says nothing about them), the admin route
+> `GET /api/gamemasters/referred-players` (`guardSection("gamemaster-management")`), and the
+> Game Master's own list `app/api/gamemaster/referrals/route.ts`, which now carries `kind` and
+> `surface` and escapes its search. Tests: `__tests__/services/gm-referral-read-model.test.ts`
+> (35, against a real database), probes 121-141 in `tools/probe-gm-program.ps1`, each red on
+> exactly one test. **Read the code, not the row list above.** Seven facts drift easily:
+> - **Own versus external is decided in ONE table** (`KIND_BY_SOURCE`): `gm_referral_link` is
+>   own, `chartvolt_join_gm` is external, and an absent, `null` or `""` `source` is legacy, which
+>   means `gm_referral_link`. The JavaScript classifier and the Mongo `$switch` are both generated
+>   from that table and a test proves they agree **row by row against a real database**, because
+>   two spellings of one rule is the shape behind `referenceId`, `failedReason` and `challengeId`.
+>   An unknown source has **no** kind and **no** surface on both sides.
+> - **The counters stored on `UserReferral` are written by nothing** and the read model does not
+>   read them. Activity comes from the seat collections, money from `gamemasterearnings`.
+> - **Money is windowed by the affiliation**: cancelled earnings excluded, paid and pending split
+>   by status, another Game Master's rows excluded, the window ends at `endedAt` (open rows run for
+>   ever) and starts at `referredAt` for Join GM rows only. Link rows start at epoch, because a
+>   link referral exists from sign-up and its `referredAt` is not always written at sign-up time.
+> - **Deviation: "active" counts ANY seat in the last 30 days**, free or paid, while s6.1 says
+>   paid. Recorded rather than absorbed - the paid version needs an entry-fee join this step
+>   deliberately left out; revisit with task 7's money breakdown.
+> - **Deviation: no `gm_affiliate_stats` cache and no worker.** One aggregation per page with
+>   server-side paging (max 100 rows). The 15-minute read model is deferred until a real Game
+>   Master has enough affiliates to measure; a cache built ahead of a measurement is a second
+>   source that can disagree with the first.
+> - **The signup IP is never selected**, asserted at the pipeline level and not only on the
+>   mapped row, since a row mapper that drops it is green while the pipeline still carries it.
+> - **Legacy link rows carry no `termsAcceptanceId`**, so `termsAccepted` is false for them and
+>   D6 will hide their contact details. That is correct (they never accepted these terms) and it
+>   will read as a bug to an operator - task 5 must say so on screen.
+> Filters are allow-listed (`Set`s), dates are whole days, search is capped at 100 characters and
+> regex-escaped, and nothing from the query string reaches an operator position. **Not built:** the
+> report UI, exports, move/detach, the competition-type and country filters - task 4.
+
 ### 7.2 Filters (combinable, all server-side)
 GM, user search, affiliation/registration/activity date ranges, source, affiliation status, active, competition type, public/private, game, trading, challenge, earnings/commission/entry-Volts ranges, country, package, commission status. Filters live in the URL (`?activeTab=gamemaster-management&...`) so a report is bookmarkable - the deep-link rule from `12` s1.1. Filter values are validated against **allow-lists (Sets)**; ranges are `Number.isFinite`-checked; nothing from the query string reaches a Mongo operator position.
 

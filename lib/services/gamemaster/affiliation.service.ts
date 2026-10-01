@@ -13,6 +13,7 @@ import {
   type PreviousAffiliationEnd,
 } from "./affiliation-rules";
 import { verifyGmTermsAcceptance } from "./gm-terms.service";
+import { defaultSurfaceForSource } from "./referral-kind";
 
 /**
  * The ONE writer of a player's Game Master affiliation (`External game plans/24` s3).
@@ -246,8 +247,9 @@ export async function affiliate(input: AffiliateInput): Promise<AffiliateResult>
   }
 
   const userId = input.user.id;
-  const surface: AffiliationSurface =
-    input.surface ?? (input.channel === "gm_referral_link" ? "signup" : "leaderboard");
+  // Reason: the default comes from `referral-kind.ts`, which the reports also use to fill a
+  // surface on rows that carry none - the writer and the reader must not disagree about it.
+  const surface: AffiliationSurface = input.surface ?? defaultSurfaceForSource(input.channel);
   const auditInput = { ...input, surface };
 
   try {

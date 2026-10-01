@@ -1131,6 +1131,159 @@ $results += Invoke-Probe `
     -To '{false && (' `
     -TestName "the admin competitions list renders Private" -Suite $GP
 
+# ---- Task 3 (1 Oct 2026): the referral data foundation (24 s7.1) ----
+$RM = "__tests__/services/gm-referral-read-model.test.ts"
+$KIND = "lib/services/gamemaster/referral-kind.ts"
+$READ = "lib/services/gamemaster/referral-read-model.ts"
+$FLT = "lib/services/gamemaster/referral-report-filter.ts"
+
+# 121. An empty-string source stops reading as legacy.
+$results += Invoke-Probe `
+    -Name "Empty source not legacy" -File $KIND `
+    -From 'source === null || source === "") return' `
+    -To 'source === null) return' `
+    -TestName "empty-string source is legacy" -Suite $RM
+
+# 122. The Mongo surface keeps a stored surface on an unknown source - the two spellings disagree.
+$results += Invoke-Probe `
+    -Name "Mongo surface ignores unknown source" -File $KIND `
+    -From '      { $in: [sourceField, REFERRAL_SOURCES] },' `
+    -To '      true,' `
+    -TestName "row by row, for every shape" -Suite $RM
+
+# 123. Cancelled earnings are counted.
+$results += Invoke-Probe `
+    -Name "Cancelled entry fees counted" -File $READ `
+    -From 'entryFees: { $sum: { $cond: [notCancelled, "$entryFeeAmount", 0] } },' `
+    -To 'entryFees: { $sum: "$entryFeeAmount" },' `
+    -TestName "sums non-cancelled earnings" -Suite $RM
+
+# 124. Another Game Master's earnings on the same player are counted.
+$results += Invoke-Probe `
+    -Name "Earnings not scoped to the Game Master" -File $READ `
+    -From '                { $eq: ["$gameMasterId", "$$gm"] },' `
+    -To '' `
+    -TestName "never counts another Game Master" -Suite $RM
+
+# 125. An ended affiliation keeps earning.
+$results += Invoke-Probe `
+    -Name "Window ignores endedAt" -File $READ `
+    -From '_to: { $ifNull: ["$endedAt", FAR_FUTURE] },' `
+    -To '_to: FAR_FUTURE,' `
+    -TestName "an ended affiliation stops earning at endedAt" -Suite $RM
+
+# 126. A Join GM row earns from before it began.
+$results += Invoke-Probe `
+    -Name "Join GM window opens at epoch" -File $READ `
+    -From '_from: { $cond: [{ $eq: ["$_effSource", "chartvolt_join_gm"] }, "$referredAt", EPOCH] },' `
+    -To '_from: EPOCH,' `
+    -TestName "a Join GM row earns only from its own start" -Suite $RM
+
+# 127. Link rows are windowed by a referredAt the old sync route stamped late.
+$results += Invoke-Probe `
+    -Name "Link rows windowed by referredAt" -File $READ `
+    -From '_from: { $cond: [{ $eq: ["$_effSource", "chartvolt_join_gm"] }, "$referredAt", EPOCH] },' `
+    -To '_from: "$referredAt",' `
+    -TestName "a link row is not windowed by a late referredAt" -Suite $RM
+
+# 128. An ended affiliation reads as active.
+$results += Invoke-Probe `
+    -Name "Active ignores the affiliation" -File $READ `
+    -From '$and: [{ $eq: ["$isActive", true] }, { $gte:' `
+    -To '$and: [{ $gte:' `
+    -TestName "active means current AND a seat inside the window" -Suite $RM
+
+# 129. The activity filter is dropped.
+$results += Invoke-Probe `
+    -Name "Activity filter ignored" -File $READ `
+    -From 'if (filter.activity) derivedMatch.isActiveNow = filter.activity === "active";' `
+    -To '' `
+    -TestName "active means current AND a seat inside the window" -Suite $RM
+
+# 130. Search becomes a pattern.
+$results += Invoke-Probe `
+    -Name "Read-model search unescaped" -File $READ `
+    -From 'const pattern = escapeRegex(filter.search);' `
+    -To 'const pattern = filter.search;' `
+    -TestName "search is a literal substring" -Suite $RM
+
+# 131. The signup IP and user agent leak into the report.
+$results += Invoke-Probe `
+    -Name "Signup IP projected" -File $READ `
+    -From ', signupIP: 0, signupUserAgent: 0 }' `
+    -To ' }' `
+    -TestName "the pipeline itself never selects the signup IP" -Suite $RM
+
+# 132. The kind filter matches every row.
+$results += Invoke-Probe `
+    -Name "Kind filter ignored" -File $READ `
+    -From 'if (filter.kind) derivedMatch.kind = filter.kind;' `
+    -To '' `
+    -TestName "filters by kind and surface" -Suite $RM
+
+# 133. A Game Master scope returns every Game Master's players.
+$results += Invoke-Probe `
+    -Name "Game Master scope dropped" -File $READ `
+    -From 'if (filter.gameMasterIds) match.gameMasterId = { $in: filter.gameMasterIds };' `
+    -To '' `
+    -TestName "scopes to the given Game Masters" -Suite $RM
+
+# 134. termsAccepted is always true, so D6 would show every contact.
+$results += Invoke-Probe `
+    -Name "termsAccepted always true" -File $READ `
+    -From 'termsAccepted: typeof doc.termsAcceptanceId === "string" && doc.termsAcceptanceId.length > 0,' `
+    -To 'termsAccepted: true,' `
+    -TestName "termsAccepted reflects a stored acceptance only" -Suite $RM
+
+# 135. The parser accepts any kind.
+$results += Invoke-Probe `
+    -Name "Parser kind not allow-listed" -File $FLT `
+    -From 'if (kind && KIND_SET.has(kind))' `
+    -To 'if (kind)' `
+    -TestName "drops values outside the allow-lists" -Suite $RM
+
+# 136. A plain end date stops at midnight and loses the day.
+$results += Invoke-Probe `
+    -Name "End date not end of day" -File $FLT `
+    -From 'endOfDay ? "23:59:59.999" : "00:00:00.000"' `
+    -To '"00:00:00.000"' `
+    -TestName "a plain date covers the whole day" -Suite $RM
+
+# 137. The search is not capped.
+$results += Invoke-Probe `
+    -Name "Search uncapped" -File $FLT `
+    -From 'filter.search = search.slice(0, MAX_SEARCH_LENGTH);' `
+    -To 'filter.search = search;' `
+    -TestName "caps the search" -Suite $RM
+
+# 138. The admin copy of the read model drifts.
+$results += Invoke-Probe `
+    -Name "Admin read model drifts" -File "apps/admin/$READ" `
+    -From 'export const ACTIVE_WINDOW_DAYS = 30;' `
+    -To 'export const ACTIVE_WINDOW_DAYS = 31;' `
+    -TestName "referral-read-model.ts is byte-identical" -Suite $RM
+
+# 139. The admin report route is granted by the wrong section.
+$results += Invoke-Probe `
+    -Name "Report route wrong section" -File "apps/admin/app/api/gamemasters/referred-players/route.ts" `
+    -From 'guardSection("gamemaster-management")' `
+    -To 'guardSection("users")' `
+    -TestName "the admin report route is section-guarded" -Suite $RM
+
+# 140. The writer hard-codes its own default surface.
+$results += Invoke-Probe `
+    -Name "Writer restates the default surface" -File "lib/services/gamemaster/affiliation.service.ts" `
+    -From 'input.surface ?? defaultSurfaceForSource(input.channel)' `
+    -To 'input.surface ?? "signup"' `
+    -TestName "the writer takes its default surface" -Suite $RM
+
+# 141. The Game Master list labels rows itself.
+$results += Invoke-Probe `
+    -Name "GM list re-derives the kind" -File "app/api/gamemaster/referrals/route.ts" `
+    -From 'const { kind, surface } = classifyReferral({' `
+    -To 'const kind = "own"; const surface = null; void ({' `
+    -TestName "labels rows with the shared classifier" -Suite $RM
+
 Write-Host ""
 Write-Host "================ SUMMARY ================"
 $results | Format-Table -AutoSize

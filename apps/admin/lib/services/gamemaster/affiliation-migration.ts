@@ -20,13 +20,13 @@
  */
 
 import mongoose from "mongoose";
-import {
-  ACTIVE_REFERRAL_INDEX_NAME,
-  type AffiliationSource,
-} from "../../../database/models/user-referral.model";
+import { ACTIVE_REFERRAL_INDEX_NAME } from "../../../database/models/user-referral.model";
+import { LEGACY_AFFILIATION_SOURCE } from "./referral-kind";
 
-/** Legacy rows were all created by the signup referral link. Imported type, not a copy. */
-export const LEGACY_AFFILIATION_SOURCE: AffiliationSource = "gm_referral_link";
+// Reason: defined once in `referral-kind.ts`, which the reports read too - a backfill that
+// labelled legacy rows one way while the report classified them another would be the
+// "one rule, two copies" shape. Re-exported so existing importers keep working.
+export { LEGACY_AFFILIATION_SOURCE };
 
 export const LEGACY_UNIQUE_USER_INDEX_NAME = "userId_1";
 export const REFERRAL_LOOKUP_INDEX_NAME = "userId_1_referredAt_-1";

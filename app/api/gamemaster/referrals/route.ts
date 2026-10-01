@@ -5,6 +5,11 @@ import { headers } from "next/headers";
 import GameMasterSubscription from "@/database/models/gamemaster/gamemaster-subscription.model";
 import UserReferral from "@/database/models/user-referral.model";
 import mongoose from "mongoose";
+import { classifyReferral } from "@/lib/services/gamemaster/referral-kind";
+import {
+  escapeRegex,
+  MAX_SEARCH_LENGTH,
+} from "@/lib/services/gamemaster/referral-report-filter";
 
 /**
  * GET /api/gamemaster/referrals
@@ -49,9 +54,12 @@ export async function GET(request: NextRequest) {
     }
 
     if (search) {
+      // Reason: escaped and length-capped - the raw string was a regex, so `.*` matched
+      // everything and a crafted pattern could stall the query (ReDoS).
+      const pattern = escapeRegex(search.slice(0, MAX_SEARCH_LENGTH));
       query.$or = [
-        { userEmail: { $regex: search, $options: "i" } },
-        { userName: { $regex: search, $options: "i" } },
+        { userEmail: { $regex: pattern, $options: "i" } },
+        { userName: { $regex: pattern, $options: "i" } },
       ];
     }
 
@@ -108,8 +116,16 @@ export async function GET(request: NextRequest) {
         totalEntryFees: 0,
         totalEarnings: 0,
       };
+      // Reason: own/external comes from the shared classifier, never re-derived here, so this
+      // list and every report label the same player the same way (`24` s7.1).
+      const { kind, surface } = classifyReferral({
+        source: r.source,
+        affiliatedVia: r.affiliatedVia,
+      });
       return {
         ...r,
+        kind,
+        surface,
         totalEntryFees: earnings.totalEntryFees,
         totalGMEarnings: earnings.totalEarnings,
       };
