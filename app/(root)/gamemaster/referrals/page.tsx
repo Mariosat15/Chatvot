@@ -19,15 +19,17 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
-import type { GmReferralView } from "@/lib/services/gamemaster/gm-referral-view";
+import type { GmAwaitingClaimView, GmReferralView } from "@/lib/services/gamemaster/gm-referral-view";
 import { describeAffiliationState, REFERRAL_KIND_LABELS } from "@/lib/services/gamemaster/referral-kind";
 import {
   ReferralClientId,
+  ReferralConsentBadge,
   ReferralContact,
   ReferralCountry,
   ReferralKindBadge,
 } from "@/components/gamemaster/GmReferralBadges";
 import SendTermsButton from "@/components/gamemaster/SendTermsButton";
+import AwaitingTermsList from "@/components/gamemaster/AwaitingTermsList";
 
 const KIND_FILTERS = [
   { value: "all", label: "All" },
@@ -39,7 +41,10 @@ interface ReferralsData {
   // Reason: the route maps every row through `toGameMasterReferralView`; typing the same shape
   // here means a hand-written interface cannot quietly re-admit a raw field.
   referrals: GmReferralView[];
+  awaitingTerms: GmAwaitingClaimView[];
   stats: {
+    pendingTerms: number;
+    declinedTerms: number;
     totalReferred: number;
     currentReferred: number;
     activeUsers: number;
@@ -190,6 +195,14 @@ export default function GMReferralsPage() {
           </div>
         )}
 
+        {data && (
+          <AwaitingTermsList
+            rows={data.awaitingTerms ?? []}
+            pending={data.stats.pendingTerms ?? 0}
+            declined={data.stats.declinedTerms ?? 0}
+          />
+        )}
+
         {/* Search & Filter */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 mb-6">
           <form onSubmit={handleSearch} className="flex-1 flex gap-2">
@@ -308,8 +321,13 @@ export default function GMReferralsPage() {
                               <p className="text-white font-medium">
                                 {user.userName || "Unknown"}
                               </p>
-                              {user.canSendTerms && (
-                                <SendTermsButton referralId={user.referralId} playerName={user.userName} />
+                              <ReferralConsentBadge consent={user.consent} />
+                              {(user.canSendTerms || user.termsSent) && (
+                                <SendTermsButton
+                                  target={{ referralId: user.referralId }}
+                                  playerName={user.userName}
+                                  alreadySent={user.termsSent}
+                                />
                               )}
                             </div>
                             <ReferralContact referral={user} />

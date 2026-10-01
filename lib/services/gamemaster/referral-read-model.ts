@@ -128,10 +128,12 @@ function searchMatch(filter: ReferredPlayersFilter, withConsent: boolean): Docum
   if (!filter.search) return {};
   const pattern = escapeRegex(filter.search);
   const byEmail: Document = { userEmail: { $regex: pattern, $options: "i" } };
-  // Reason: the same test as `termsAccepted` below - a non-empty string id - so a row the
+  // Reason: the same test as the view's email gate - a non-empty acceptance id AND a referral
+  // still assigned to this Game Master (`isCurrent` is `isActive === true`) - so a row the
   // search can find by email is exactly a row whose email the screen may show.
   if (withConsent && filter.contactRequiresConsent) {
     byEmail.termsAcceptanceId = { $type: "string", $ne: "" };
+    byEmail.isActive = true;
   }
   // Reason: the client id is the one identifier every screen shows, so an exact match on it
   // is always allowed - it reveals nothing the row does not already display.

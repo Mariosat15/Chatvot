@@ -7,7 +7,7 @@ import {
 } from "recharts";
 import Link from "next/link";
 import { Shield } from "lucide-react";
-import { ReferralClientId, ReferralContact, ReferralCountry, ReferralKindBadge, ReferralStateLabel } from "@/components/gamemaster/GmReferralBadges";
+import { ReferralClientId, ReferralConsentBadge, ReferralContact, ReferralCountry, ReferralKindBadge, ReferralStateLabel } from "@/components/gamemaster/GmReferralBadges";
 import SendTermsButton from "@/components/gamemaster/SendTermsButton";
 import type { DashboardStats, CompetitionItem, EarningItem, ReferralItem, SubscriptionData, EarningsByGameRow } from "./gamemaster-dashboard-types";
 
@@ -282,7 +282,10 @@ export function ReferralsTab({ referrals, search, onSearchChange, total, own, ex
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 min-w-0">
                   <p className="text-white font-medium text-sm truncate">{r.userName || "Unknown"}</p>
-                  {r.canSendTerms && <SendTermsButton referralId={r.referralId} playerName={r.userName} />}
+                  <ReferralConsentBadge consent={r.consent} />
+                  {(r.canSendTerms || r.termsSent) && (
+                    <SendTermsButton target={{ referralId: r.referralId }} playerName={r.userName} alreadySent={r.termsSent} />
+                  )}
                 </div>
                 <ReferralContact referral={r} />
                 <div><ReferralCountry referral={r} /></div>

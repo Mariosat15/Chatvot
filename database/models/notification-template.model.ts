@@ -114,6 +114,8 @@ export type NotificationType =
   // Game Master affiliation terms (`External game plans/24` s5.5)
   | "gm_terms_request"
   | "gm_terms_request_answered"
+  // One reminder template for every "please answer the terms" send (`24` s5.6)
+  | "affiliate_terms_required"
   // Employee notifications
   | "employee_new_customer"
   | "employee_customer_removed"
@@ -1039,6 +1041,30 @@ function getDefaultTemplates(): Partial<INotificationTemplate>[] {
       // Reason: the terms window is mounted in the signed-in layout and asks the server on
       // load, so any page opens it while a request is pending and does nothing once answered.
       actionUrl: "/dashboard",
+      actionText: "Review Terms",
+    },
+    {
+      templateId: "affiliate_terms_required",
+      name: "Affiliate Terms Pending",
+      description:
+        "Sent when a Game Master or an admin reminds a player to answer the Game Master affiliation terms",
+      category: "system",
+      type: "affiliate_terms_required",
+      title: "📜 Affiliate Terms Pending",
+      message:
+        "{{gameMasterName}} invited you to play under them. Review the affiliate terms to accept or decline - nothing changes until you answer.",
+      icon: "📜",
+      priority: "normal",
+      color: "#6366F1",
+      isEnabled: true,
+      isDefault: true,
+      isCustom: false,
+      // Reason: email OFF - the dedicated `gm_terms_request` email template is sent beside it,
+      // and the generic notification email would make it two mails for one reminder.
+      channels: { inApp: true, email: false, push: true },
+      // Reason: carries no player data. The bell click opens the terms modal directly, and the
+      // query string opens it from a push or an email link on any device.
+      actionUrl: "/dashboard?affiliateTerms=1",
       actionText: "Review Terms",
     },
     {

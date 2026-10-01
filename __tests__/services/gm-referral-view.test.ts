@@ -12,7 +12,9 @@ import { readReferredPlayers, type ReferredPlayerRow } from "@/lib/services/game
 import {
   toGameMasterReferralView,
   CONTACT_HIDDEN_NOTE,
+  REFERRAL_CONSENT_LABELS,
 } from "@/lib/services/gamemaster/gm-referral-view";
+import { ADMIN_CONSENT_LABELS } from "../../apps/admin/lib/admin/admin-terms-reminder-view";
 
 /**
  * Task 5 (1 Oct 2026) - the Game Master's own affiliate area (`External game plans/24` s1 D6).
@@ -87,6 +89,17 @@ describe("toGameMasterReferralView - contact only with consent (D6)", () => {
     expect(view.contactHidden).toBe(false);
   });
 
+  // Reason: the consent was to THIS affiliation. An ended or moved referral stays on the old
+  // Game Master's history but must not keep handing them the player's email (s5.6).
+  it("an accepted referral that has ended hides the email and still reads accepted", async () => {
+    await referral({ termsAcceptanceId: "acc-3", isActive: false, endedAt: NOW });
+    const report = await readReferredPlayers(db(), { gameMasterIds: [GM] }, PAGE, NOW);
+    const view = toGameMasterReferralView(report.rows[0], MASKED);
+    expect(view.userEmail).toBeNull();
+    expect(view.contactHidden).toBe(true);
+    expect(view.consent).toBe("accepted");
+  });
+
   it("an empty acceptance id is not consent", () => {
     const view = toGameMasterReferralView({
       termsAccepted: "" as unknown as boolean,
@@ -103,12 +116,21 @@ describe("toGameMasterReferralView - contact only with consent (D6)", () => {
     expect(keys).toEqual(
       [
         // Reason: `country` and `canSendTerms` added 1 Oct 2026 (owner); `phone` deliberately
-        // absent - it is contact data and never reaches a Game Master screen.
+        // absent - it is contact data and never reaches a Game Master screen. `consent` and
+        // `termsSent` added 1 Oct 2026 (s5.6): the Accepted / Pending / Declined badge and the
+        // once-only SEND TERMS state - neither is contact data.
+        "consent", "termsSent",
         "referralId", "userId", "userName", "userEmail", "contactHidden", "contactMasked", "termsAccepted",
         "country", "canSendTerms", "kind", "surface", "joinedAt", "endedAt", "isCurrent", "isActive", "lastActivityAt",
         "competitionsEntered", "challengesEntered", "entryFees", "earned", "paid", "pending",
       ].sort(),
     );
+  });
+
+  // Reason: two copies of one label set (the admin app cannot import the player module), so the
+  // Game Master and the admin would otherwise read the same referral under different words.
+  it("the Game Master and admin consent labels agree", () => {
+    expect([...REFERRAL_CONSENT_LABELS]).toEqual([...ADMIN_CONSENT_LABELS]);
   });
 
   it("the hidden-contact note names the reason", () => {
@@ -150,6 +172,17 @@ describe("a hidden email cannot be found by searching for it", () => {
     expect(scoped.total).toBe(1);
   });
 
+  it("an accepted but ended referral cannot be found by email under the flag", async () => {
+    await referral({ userEmail: "gone@x.test", termsAcceptanceId: "acc-4", isActive: false, endedAt: NOW });
+    const scoped = await readReferredPlayers(
+      db(),
+      { gameMasterIds: [GM], search: "gone@x", contactRequiresConsent: true },
+      PAGE,
+      NOW,
+    );
+    expect(scoped.total).toBe(0);
+  });
+
   it("name search is unaffected by the flag", async () => {
     await referral({ userName: "Zed Hidden" });
     const scoped = await readReferredPlayers(
@@ -173,7 +206,10 @@ describe("the Game Master routes are scoped and redacted", () => {
     // Reason: flipped 1 Oct 2026 - the claim is unchanged (every row goes through the one
     // mapper) and the call now passes the package switch; a bare `.map(fn)` would hand the
     // array index to the options argument.
-    expect(src).toMatch(/\.map\(\(row\)\s*=>\s*toGameMasterReferralView\(row,\s*\{\s*showExternalDetails\s*\}\)/);
+    // Reason (s5.6): the consent state now rides along too, keyed by the row's own referral id.
+    expect(src).toMatch(
+      /\.map\(\(row\)\s*=>\s*toGameMasterReferralView\(row,\s*\{\s*showExternalDetails,\s*consentState:\s*consent\.get\(row\.referralId\)\s*\}\)/,
+    );
     expect(src).not.toMatch(/\.map\(toGameMasterReferralView\)/);
     expect(src).not.toMatch(/userEmail\s*:/);
   });

@@ -12,9 +12,11 @@ import { REFERRAL_CLAIM_STATUSES, type ReferralClaimStatus } from "@/lib/service
  * resolves the claim for good, so a player who said no is never attached and never asked
  * again.
  *
- * Main app only: nothing in `apps/admin` reads it yet, and mirroring ahead of a caller is two
- * copies agreeing while one runs (R42). The admin sees the outcome through the customer audit
- * trail (`gm_referral_link_pending` / `_declined` / `_lapsed`).
+ * Main app only as a MODEL. This comment once said "nothing in `apps/admin` reads it yet"; since
+ * `24` s5.6 the admin app reads and writes the collection with the raw driver
+ * (`admin-terms-reminder.service.ts`: the waiting list and the reminder counter), never through a
+ * model, so there is still no second schema copy to keep in step (R42). The admin also sees the
+ * outcome through the customer audit trail (`gm_referral_link_pending` / `_declined` / `_lapsed`).
  */
 export interface IGmReferralClaim extends Document {
   userId: string;
@@ -31,6 +33,15 @@ export interface IGmReferralClaim extends Document {
   resolvedAt?: Date;
   signupIP?: string;
   signupUserAgent?: string;
+  /**
+   * The Game Master's once-only "Send terms" reminder (`24` s5.6). Set by ONE conditional
+   * update on `gmTermsReminderSent: { $ne: true }`, so a double click sends once.
+   */
+  gmTermsReminderSent?: boolean;
+  gmTermsReminderSentAt?: Date;
+  /** Admin reminders - unlimited, audited, and never counted against the Game Master's one. */
+  adminTermsReminderCount?: number;
+  lastAdminTermsReminderAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -50,6 +61,10 @@ const GmReferralClaimSchema = new Schema<IGmReferralClaim>(
     resolvedAt: { type: Date },
     signupIP: { type: String },
     signupUserAgent: { type: String },
+    gmTermsReminderSent: { type: Boolean },
+    gmTermsReminderSentAt: { type: Date },
+    adminTermsReminderCount: { type: Number, min: 0 },
+    lastAdminTermsReminderAt: { type: Date },
   },
   { timestamps: true, collection: "gm_referral_claims" },
 );

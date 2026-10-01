@@ -10,18 +10,21 @@ export const TERMS_REQUEST_STATUSES = ["pending", "accepted", "declined"] as con
 export type TermsRequestStatus = (typeof TERMS_REQUEST_STATUSES)[number];
 
 /**
- * Reason: each send is a notification and an email to a player who has not yet agreed
- * to anything with this Game Master. Without a cooldown a button press is a way to
- * spam somebody; without a cap it is a way to do it for ever.
+ * Reason: each send is a notification and an email to a player who has not yet agreed to
+ * anything with this Game Master. Owner, 1 Oct 2026: a Game Master may send ONCE per
+ * referral - the popup already shows on every visit while the answer is pending, so a second
+ * send adds nothing but noise. Further reminders are an admin decision (unlimited, audited).
+ *
+ * The 24-hour cooldown that used to sit beside a cap of 3 was removed with it: under a cap of
+ * one it can never fire, and a rule that cannot fire is an invitation to "fix" the cap back.
  */
-export const TERMS_REQUEST_COOLDOWN_MS = 24 * 60 * 60 * 1000;
-export const TERMS_REQUEST_MAX_SENDS = 3;
+export const TERMS_REQUEST_MAX_SENDS = 1;
 
 export type TermsRequestSendRefusal =
   | "not_own_referral"
   | "referral_ended"
   | "already_accepted"
-  | "cooldown"
+  | "declined"
   | "limit_reached";
 
 export interface TermsRequestSendFacts {
@@ -30,14 +33,13 @@ export interface TermsRequestSendFacts {
   isActive: boolean;
   /** Whether the referral row already carries a terms acceptance. */
   termsAccepted: boolean;
-  /** The existing request, when one was sent before. */
-  previous?: { sendCount: number; lastSentAt: Date | null } | null;
-  now: Date;
+  /** The existing request, when one was sent (or answered) before. */
+  previous?: { sendCount: number; status?: TermsRequestStatus | null } | null;
 }
 
 export type TermsRequestSendDecision =
   | { ok: true }
-  | { ok: false; reason: TermsRequestSendRefusal; retryAt?: Date };
+  | { ok: false; reason: TermsRequestSendRefusal };
 
 export function decideTermsRequestSend(facts: TermsRequestSendFacts): TermsRequestSendDecision {
   // Reason: an external referral came through somebody else's channel, so the Game
@@ -50,13 +52,9 @@ export function decideTermsRequestSend(facts: TermsRequestSendFacts): TermsReque
 
   const previous = facts.previous;
   if (previous) {
-    if (previous.sendCount >= TERMS_REQUEST_MAX_SENDS) {
-      return { ok: false, reason: "limit_reached" };
-    }
-    if (previous.lastSentAt) {
-      const retryAt = new Date(previous.lastSentAt.getTime() + TERMS_REQUEST_COOLDOWN_MS);
-      if (facts.now < retryAt) return { ok: false, reason: "cooldown", retryAt };
-    }
+    // Reason: a decline is final - the player is never asked again, by anybody's button.
+    if (previous.status === "declined") return { ok: false, reason: "declined" };
+    if (previous.sendCount >= TERMS_REQUEST_MAX_SENDS) return { ok: false, reason: "limit_reached" };
   }
   return { ok: true };
 }
@@ -65,9 +63,9 @@ export const TERMS_REQUEST_REFUSAL_COPY: ReadonlyMap<TermsRequestSendRefusal, st
   ["not_own_referral", "Terms can only be sent to players who joined through your own link."],
   ["referral_ended", "This player is no longer your referral."],
   ["already_accepted", "This player has already accepted the terms."],
-  ["cooldown", "You already sent the terms recently. You can send them again in 24 hours."],
+  ["declined", "This player declined the terms, so they will not be asked again."],
   [
     "limit_reached",
-    `You have sent the terms ${TERMS_REQUEST_MAX_SENDS} times. Please contact support if the player still needs them.`,
+    "You already sent the terms to this player. They will see them every time they open the app.",
   ],
 ]);

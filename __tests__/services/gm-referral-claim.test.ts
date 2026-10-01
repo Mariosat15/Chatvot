@@ -388,10 +388,13 @@ describe("the referral claim against a real replica set", () => {
 });
 
 describe("wiring", () => {
+  // Reason (flipped 1 Oct 2026): this pinned `GmReferralTermsPrompt`. The link prompt and the
+  // Send Terms prompt were merged into ONE `AffiliateTermsModal` (s5.6) that asks whichever
+  // question is open, so the claim is unchanged: the question is mounted in the signed-in layout.
   it("the prompt is mounted in the signed-in layout", () => {
     const layout = code("app/(root)/layout.tsx");
-    expect(layout).toMatch(/import GmReferralTermsPrompt from "@\/components\/gamemaster\/GmReferralTermsPrompt"/);
-    expect(layout).toMatch(/<GmReferralTermsPrompt \/>/);
+    expect(layout).toMatch(/import AffiliateTermsModal from "@\/components\/gamemaster\/AffiliateTermsModal"/);
+    expect(layout).toMatch(/<AffiliateTermsModal \/>/);
   });
 
   it("the route takes the player from the session, never from the body", () => {
@@ -401,7 +404,11 @@ describe("wiring", () => {
   });
 
   it("closing the terms opens a confirm step that Escape and outside clicks cannot dismiss", () => {
-    const src = code("components/gamemaster/GmReferralTermsPrompt.tsx");
+    // Reason (flipped 1 Oct 2026): moved from GmReferralTermsPrompt to the shared modal. The
+    // decline body is now `decision: "decline"` on /api/affiliate/consent, and the link sign-up's
+    // ConsentRecord source comes from CONSENT_AFFILIATION_SOURCE.claim, which must stay the value
+    // `affiliate()` verifies.
+    const src = code("components/gamemaster/AffiliateTermsModal.tsx");
     expect(src).toMatch(/onDecline=\{\(\) => setStage\("confirm-decline"\)\}/);
     const confirm = src.slice(src.indexOf('open={stage === "confirm-decline"}'));
     expect(confirm.length).toBeGreaterThan(100);
@@ -409,7 +416,8 @@ describe("wiring", () => {
     expect(confirm).toMatch(/onPointerDownOutside=\{\(e\) => e\.preventDefault\(\)\}/);
     expect(confirm).toMatch(/showCloseButton=\{false\}/);
     // The decline POST is reachable only from the confirm step's Decline button.
-    expect(src.match(/action: "decline"/g)).toHaveLength(1);
-    expect(src).toMatch(/affiliationSource: "gm_referral_link"/);
+    expect(src.match(/decision: "decline"/g)).toHaveLength(1);
+    expect(src).toMatch(/affiliationSource: CONSENT_AFFILIATION_SOURCE\[pending\.kind\]/);
+    expect(code("lib/utils/affiliate-consent-kind.ts")).toMatch(/claim: "gm_referral_link"/);
   });
 });

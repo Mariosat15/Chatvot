@@ -55,7 +55,6 @@ import {
 } from "@/lib/services/gamemaster/gm-terms-request.service";
 import { recordAffiliationConsent } from "@/lib/services/gamemaster/affiliation-consent.service";
 import {
-  TERMS_REQUEST_COOLDOWN_MS,
   TERMS_REQUEST_MAX_SENDS,
   TERMS_REQUEST_REFUSAL_COPY,
   decideTermsRequestSend,
@@ -134,7 +133,7 @@ const send = (referralId: unknown, gameMasterUserId = GM_1, now = NOW) =>
 const player = { id: PLAYER, email: `${PLAYER}@player.test`, name: "Player One" };
 
 describe("terms request rules (pure)", () => {
-  const base = { kind: "own" as const, isActive: true, termsAccepted: false, previous: null, now: NOW };
+  const base = { kind: "own" as const, isActive: true, termsAccepted: false, previous: null };
 
   it("allows a first send to an own, active referral with no terms", () => {
     expect(decideTermsRequestSend(base)).toEqual({ ok: true });
@@ -151,30 +150,26 @@ describe("terms request rules (pure)", () => {
     expect(decideTermsRequestSend({ ...base, termsAccepted: true })).toMatchObject({ reason: "already_accepted" });
   });
 
-  it("holds a 24 hour cooldown and names when it lifts", () => {
-    const lastSentAt = new Date(NOW.getTime() - TERMS_REQUEST_COOLDOWN_MS + 1000);
-    const d = decideTermsRequestSend({ ...base, previous: { sendCount: 1, lastSentAt } });
-    expect(d).toEqual({
-      ok: false,
-      reason: "cooldown",
-      retryAt: new Date(lastSentAt.getTime() + TERMS_REQUEST_COOLDOWN_MS),
-    });
-    const lifted = new Date(NOW.getTime() - TERMS_REQUEST_COOLDOWN_MS);
-    expect(decideTermsRequestSend({ ...base, previous: { sendCount: 1, lastSentAt: lifted } })).toEqual({ ok: true });
+  // Reason (flipped 1 Oct 2026): this used to pin a 24-hour cooldown under a cap of 3. The owner
+  // made the Game Master's send ONCE per referral - the popup already reappears on every visit
+  // while the answer is pending - so the cooldown could never fire and was removed. What is
+  // pinned now is the replacement: the cap is one, and a request created by an ADMIN reminder
+  // (sendCount 0) still leaves the Game Master their one send.
+  it("a Game Master may send exactly once per referral", () => {
+    expect(TERMS_REQUEST_MAX_SENDS).toBe(1);
+    expect(decideTermsRequestSend({ ...base, previous: { sendCount: 1 } })).toEqual({ ok: false, reason: "limit_reached" });
+    expect(decideTermsRequestSend({ ...base, previous: { sendCount: 0, status: "pending" } })).toEqual({ ok: true });
   });
 
-  it("caps the sends, even after the cooldown", () => {
-    const longAgo = new Date(NOW.getTime() - 10 * TERMS_REQUEST_COOLDOWN_MS);
-    expect(
-      decideTermsRequestSend({ ...base, previous: { sendCount: TERMS_REQUEST_MAX_SENDS, lastSentAt: longAgo } }),
-    ).toEqual({ ok: false, reason: "limit_reached" });
-    expect(
-      decideTermsRequestSend({ ...base, previous: { sendCount: TERMS_REQUEST_MAX_SENDS - 1, lastSentAt: longAgo } }),
-    ).toEqual({ ok: true });
+  it("a declined request is final and is refused before the cap", () => {
+    expect(decideTermsRequestSend({ ...base, previous: { sendCount: 0, status: "declined" } })).toEqual({
+      ok: false,
+      reason: "declined",
+    });
   });
 
   it("every refusal has its own copy", () => {
-    for (const reason of ["not_own_referral", "referral_ended", "already_accepted", "cooldown", "limit_reached"] as const) {
+    for (const reason of ["not_own_referral", "referral_ended", "already_accepted", "declined", "limit_reached"] as const) {
       expect(TERMS_REQUEST_REFUSAL_COPY.get(reason)).toBeTruthy();
     }
   });
@@ -225,7 +220,11 @@ describe("terms requests against a real replica set", () => {
 
     const row = await GmTermsRequest.findOne({ referralId }).lean();
     expect(row).toMatchObject({ userId: PLAYER, gameMasterId: GM_1, status: "pending", sendCount: 1 });
-    expect(sent).toEqual([{ userId: PLAYER, templateId: "gm_terms_request", variables: { gameMasterName: "Master GMONE" } }]);
+    // Reason (flipped 1 Oct 2026): the request now uses the one AFFILIATE_TERMS_REQUIRED template
+    // whose "Review Terms" button opens the shared modal - formerly `gm_terms_request`.
+    expect(sent).toEqual([
+      { userId: PLAYER, templateId: "affiliate_terms_required", variables: { gameMasterName: "Master GMONE" } },
+    ]);
     expect(emails).toEqual([{ email: `${PLAYER}@player.test`, gameMasterName: "Master GMONE" }]);
 
     const audit = await db().collection("customer_audit_trail").find({ action: "gm_terms_request_sent" }).toArray();
@@ -233,24 +232,49 @@ describe("terms requests against a real replica set", () => {
     expect(audit[0]).toMatchObject({ customerId: PLAYER, performedBy: { type: "user", id: GM_1 }, ipAddress: "10.0.0.1" });
   });
 
-  it("a second send after the cooldown updates the same row", async () => {
-    const referralId = await seedReferral();
-    await send(referralId);
-    const later = new Date(NOW.getTime() + TERMS_REQUEST_COOLDOWN_MS);
-    expect(await send(referralId, GM_1, later)).toEqual({ success: true, sendCount: 2 });
-    expect(await GmTermsRequest.countDocuments()).toBe(1);
-  });
-
-  it("a send inside the cooldown is refused and sends nothing more", async () => {
+  // Reason (flipped 1 Oct 2026): these two pinned "a second send after the cooldown succeeds" and
+  // "a send inside the cooldown is refused". Under the once-only rule the second send is refused
+  // whenever it comes, and the row is untouched.
+  it("a second send is refused at any time and sends nothing more", async () => {
     const referralId = await seedReferral();
     await send(referralId);
     sent.length = 0;
     emails.length = 0;
-    const r = await send(referralId, GM_1, new Date(NOW.getTime() + 60_000));
-    expect(r).toMatchObject({ success: false, code: "cooldown" });
-    expect((r as { retryAt?: string }).retryAt).toBe(new Date(NOW.getTime() + TERMS_REQUEST_COOLDOWN_MS).toISOString());
+    const r = await send(referralId, GM_1, new Date(NOW.getTime() + 30 * 24 * 3_600_000));
+    expect(r).toMatchObject({ success: false, code: "limit_reached" });
+    expect(await GmTermsRequest.countDocuments()).toBe(1);
+    expect((await GmTermsRequest.findOne({ referralId }).lean())?.sendCount).toBe(1);
     expect(sent).toHaveLength(0);
     expect(emails).toHaveLength(0);
+  });
+
+  it("two simultaneous sends send once", async () => {
+    const referralId = await seedReferral();
+    const results = await Promise.all([send(referralId), send(referralId)]);
+    expect(results.filter((r) => r.success)).toHaveLength(1);
+    expect((await GmTermsRequest.findOne({ referralId }).lean())?.sendCount).toBe(1);
+    expect(sent).toHaveLength(1);
+  });
+
+  it("a declined request is never sent again", async () => {
+    const referralId = await seedReferral();
+    await GmTermsRequest.collection.insertOne({ referralId, userId: PLAYER, gameMasterId: GM_1, status: "declined", sendCount: 0 });
+    expect(await send(referralId)).toMatchObject({ success: false, code: "declined" });
+    expect(sent).toHaveLength(0);
+  });
+
+  it("an admin reminder does not use up the Game Master's one send", async () => {
+    const referralId = await seedReferral();
+    await GmTermsRequest.collection.insertOne({
+      referralId,
+      userId: PLAYER,
+      gameMasterId: GM_1,
+      status: "pending",
+      sendCount: 0,
+      adminTermsReminderCount: 4,
+    });
+    expect(await send(referralId)).toEqual({ success: true, sendCount: 1 });
+    expect(await GmTermsRequest.findOne({ referralId }).lean()).toMatchObject({ sendCount: 1, adminTermsReminderCount: 4 });
   });
 
   it("another Game Master's referral reads as not found", async () => {
@@ -287,7 +311,7 @@ describe("terms requests against a real replica set", () => {
       gameMasterId: GM_1,
       status: "pending",
       sendCount: TERMS_REQUEST_MAX_SENDS,
-      lastSentAt: new Date(NOW.getTime() - 10 * TERMS_REQUEST_COOLDOWN_MS),
+      lastSentAt: new Date(NOW.getTime() - 10 * 24 * 3_600_000),
     });
     expect(await send(referralId)).toMatchObject({ success: false, code: "limit_reached" });
     expect(sent).toHaveLength(0);
@@ -426,16 +450,21 @@ describe("terms request wiring (structural)", () => {
     }
   });
 
-  it("the prompt is mounted once in the player layout", () => {
+  // Reason (flipped 1 Oct 2026): this pinned `GmTermsRequestPrompt`. The two prompts were merged
+  // into ONE modal for both kinds (link sign-up and Send Terms), so a second prompt mounted
+  // beside it would show the player the same question twice.
+  it("one affiliate terms modal is mounted in the player layout, and the old prompts are gone", () => {
     const layout = code("app/(root)/layout.tsx");
-    expect(layout.match(/<GmTermsRequestPrompt\b/g)).toHaveLength(1);
+    expect(layout.match(/<AffiliateTermsModal\b/g)).toHaveLength(1);
+    expect(layout).not.toMatch(/GmTermsRequestPrompt|GmReferralTermsPrompt/);
   });
 
   // Reason: the service refuses anyway, but a button offered on an external or accepted row is
   // a control whose only outcome is a refusal - so every render must sit behind the row flag.
+  // Since 1 Oct 2026 the gate also admits `termsSent`, so a sent row shows "TERMS SENT ✓".
   it.each([
-    ["dashboard tab", "app/(root)/gamemaster/gamemaster-dashboard-tabs.tsx", /\{r\.canSendTerms && \(?\s*$/],
-    ["referrals page", "app/(root)/gamemaster/referrals/page.tsx", /\{user\.canSendTerms && \(?\s*$/],
+    ["dashboard tab", "app/(root)/gamemaster/gamemaster-dashboard-tabs.tsx", /\{\(r\.canSendTerms \|\| r\.termsSent\) && \(?\s*$/],
+    ["referrals page", "app/(root)/gamemaster/referrals/page.tsx", /\{\(user\.canSendTerms \|\| user\.termsSent\) && \(?\s*$/],
   ])("the %s offers Send T and C only behind canSendTerms", (_name, file, gate) => {
     const src = code(file);
     const renders = src.match(/<SendTermsButton\b/g) ?? [];

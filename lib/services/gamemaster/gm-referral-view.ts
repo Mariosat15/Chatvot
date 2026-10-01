@@ -40,6 +40,14 @@ export interface GmReferralView {
    * with no recorded acceptance. Decided here so the button and the route ask one question.
    */
   canSendTerms: boolean;
+  /**
+   * The terms answer (`24` s5.6): `accepted`, `pending` (never answered) or `declined`. A
+   * declined LEGACY player stays assigned (owner decision "keep"), so this is not the same
+   * fact as `isCurrent`.
+   */
+  consent: ReferralConsent;
+  /** The Game Master's one reminder has been used - the button then reads "Terms sent". */
+  termsSent: boolean;
   kind: ReferralKind;
   surface: AffiliationSurface | null;
   joinedAt: string | null;
@@ -55,6 +63,39 @@ export interface GmReferralView {
   earned: number;
   paid: number;
   pending: number;
+}
+
+export type ReferralConsent = "accepted" | "pending" | "declined";
+
+// Reason: a `Map`, like the admin's `ADMIN_CONSENT_LABELS`, so a lookup cannot walk the
+// prototype chain. The admin app keeps its own copy (it cannot import this module); a test
+// pins the two to the same entries.
+export const REFERRAL_CONSENT_LABELS: ReadonlyMap<ReferralConsent, string> = new Map([
+  ["accepted", "Accepted"],
+  ["pending", "Pending Terms"],
+  ["declined", "Declined"],
+]);
+
+/** What `readReferralConsentStates` knows about one assigned referral's terms request. */
+export interface ReferralConsentState {
+  declined: boolean;
+  termsSent: boolean;
+}
+
+/**
+ * A player who signed up through the Game Master's link and is NOT assigned yet - pending
+ * their answer, or declined for good. Name only: they have accepted nothing, so there is no
+ * contact field to hide or to leak.
+ */
+export interface GmAwaitingClaimView {
+  claimId: string;
+  userId: string;
+  userName: string | null;
+  referredAt: string | null;
+  consent: Exclude<ReferralConsent, "accepted">;
+  declinedAt: string | null;
+  termsSent: boolean;
+  canSendTerms: boolean;
 }
 
 /** What replaces a withheld email or last name for an external referral. */
@@ -81,6 +122,11 @@ export interface GmReferralViewOptions {
    * would otherwise pass the array index here, and a forgotten argument must not compile.
    */
   showExternalDetails: boolean;
+  /**
+   * The row's terms request, if any. Absent means no request exists: never sent, never
+   * declined - which is what every row was before s5.5.
+   */
+  consentState?: ReferralConsentState;
 }
 
 /**
@@ -100,12 +146,17 @@ export function toGameMasterReferralView(
   options: GmReferralViewOptions,
 ): GmReferralView {
   // Reason: fails closed - a row with no recorded acceptance (every pre-v2 link referral and
-  // every admin move) shows no email. An admin decision is not the player's consent.
-  const visible = row.termsAccepted === true;
+  // every admin move) shows no email. An admin decision is not the player's consent. And the
+  // consent was to THIS affiliation: once the referral ended or moved to another Game Master,
+  // the old one keeps the history row and loses the contact details (s5.6).
+  const accepted = row.termsAccepted === true;
+  const visible = accepted && row.isCurrent === true;
   // Reason: an external player came to this Game Master through ChartVolt rather than the
   // Game Master's own link, so their package decides whether the name and email are theirs to
   // read. Only `=== true` reveals; own referrals are never masked by this switch.
   const masked = row.kind === "external" && options?.showExternalDetails !== true;
+  const declined = !accepted && options?.consentState?.declined === true;
+  const termsSent = options?.consentState?.termsSent === true;
   return {
     referralId: row.referralId,
     userId: row.userId,
@@ -113,9 +164,13 @@ export function toGameMasterReferralView(
     userEmail: !visible ? null : masked ? MASKED_CONTACT : row.userEmail,
     contactHidden: !visible,
     contactMasked: visible && masked,
-    termsAccepted: visible,
+    termsAccepted: accepted,
     country: row.country ?? null,
-    canSendTerms: canSendReferralTerms(row),
+    // Reason: once per referral (s5.6) and never after a decline - the same rule
+    // `decideTermsRequestSend` enforces, so the button is never offered for a refusal.
+    canSendTerms: canSendReferralTerms(row) && !termsSent && !declined,
+    consent: accepted ? "accepted" : declined ? "declined" : "pending",
+    termsSent,
     kind: row.kind,
     surface: row.surface,
     joinedAt: row.joinedAt,
@@ -134,7 +189,7 @@ export function toGameMasterReferralView(
 
 /** Shown wherever an email is withheld, so a hidden email never reads as a missing one. */
 export const CONTACT_HIDDEN_NOTE =
-  "Contact details hidden - this player has not accepted the Game Master affiliation terms.";
+  "Contact details hidden - this player has not accepted the Game Master affiliation terms, or is no longer assigned to you.";
 
 /** Shown wherever an external referral's details are masked by the package. */
 export const CONTACT_MASKED_NOTE =

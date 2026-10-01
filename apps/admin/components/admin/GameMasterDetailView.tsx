@@ -20,8 +20,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import CompetitionCreationControl from "./gamemaster/CompetitionCreationControl";
-import GmDetailReferralsTab from "./gamemaster/GmDetailReferralsTab";
-import type { ReferredPlayerRow } from "@/lib/services/gamemaster/referral-read-model";
+import GmDetailReferralsTab, { type ReferralTabRow } from "./gamemaster/GmDetailReferralsTab";
+import type { AdminAwaitingClaimRow } from "@/lib/admin/admin-terms-reminder-view";
 import { isGameMasterActiveCompetition } from "@/lib/services/gamemaster/active-competitions";
 
 // ─── Interfaces ───────────────────────────────────────────────────────
@@ -107,8 +107,10 @@ export interface DetailedGameMasterData {
   subscription: GMSubscription;
   referredUsers: ReferredUser[];
   /** Shared read-model rows behind the Referrals tab (kind, phone, country, status). */
-  referredPlayers?: ReferredPlayerRow[];
+  referredPlayers?: ReferralTabRow[];
   referredPlayersTotal?: number;
+  /** Link sign-ups still waiting on the terms - referred, not assigned (`24` s5.6). */
+  awaitingTerms?: AdminAwaitingClaimRow[];
   competitions: GMCompetition[];
   earnings: GMEarning[];
 }
@@ -456,6 +458,8 @@ export default function GameMasterDetailView({
           rows={data.referredPlayers ?? []}
           total={data.referredPlayersTotal ?? data.referredPlayers?.length ?? 0}
           gameMasterId={data.subscription.userId}
+          subscriptionId={data.subscription.id}
+          awaitingTerms={data.awaitingTerms ?? []}
           canExport={canExport}
         />
       )}

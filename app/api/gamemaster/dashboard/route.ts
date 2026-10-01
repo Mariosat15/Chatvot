@@ -6,6 +6,7 @@ import GameMasterEarning from "@/database/models/gamemaster/gamemaster-earning.m
 import { readReferredPlayers } from "@/lib/services/gamemaster/referral-read-model";
 import { MAX_PAGE_LIMIT } from "@/lib/services/gamemaster/referral-report-filter";
 import { toGameMasterReferralView } from "@/lib/services/gamemaster/gm-referral-view";
+import { readReferralConsentStates } from "@/lib/services/gamemaster/gm-referral-consent.service";
 import Competition from "@/database/models/trading/competition.model";
 import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
@@ -163,8 +164,10 @@ export async function GET() {
           { page: 1, limit: MAX_PAGE_LIMIT },
         )
       : null;
-    const referredUsers = (referralReport?.rows ?? []).map((row) =>
-      toGameMasterReferralView(row, { showExternalDetails }),
+    const referralRows = referralReport?.rows ?? [];
+    const consent = await readReferralConsentStates(referralRows.map((row) => row.referralId));
+    const referredUsers = referralRows.map((row) =>
+      toGameMasterReferralView(row, { showExternalDetails, consentState: consent.get(row.referralId) }),
     );
 
     // ── Competitions ────────────────────────────────────────────────

@@ -6,7 +6,9 @@ import {
 import {
   CONTACT_HIDDEN_NOTE,
   CONTACT_MASKED_NOTE,
+  REFERRAL_CONSENT_LABELS,
   type GmReferralView,
+  type ReferralConsent,
 } from "@/lib/services/gamemaster/gm-referral-view";
 
 /**
@@ -79,6 +81,26 @@ export function ReferralCountry({ referral }: { referral: Pick<GmReferralView, "
   return (
     <span className="text-[11px] text-gray-500" title="Country">
       {referral.country ? `Country: ${referral.country}` : "Country not set"}
+    </span>
+  );
+}
+
+const CONSENT_TONE = new Map<ReferralConsent, string>([
+  ["accepted", "bg-emerald-900/40 text-emerald-300 border-emerald-700/50"],
+  ["pending", "bg-amber-900/40 text-amber-300 border-amber-700/50"],
+  ["declined", "bg-red-900/40 text-red-300 border-red-700/50"],
+]);
+
+/**
+ * Accepted / Pending Terms / Declined (`External game plans/24` s5.6). Reason: the label comes
+ * from REFERRAL_CONSENT_LABELS (the admin app's ADMIN_CONSENT_LABELS is pinned to the same
+ * entries by a test), and the value is decided on the server - the screen never infers consent
+ * from a missing email.
+ */
+export function ReferralConsentBadge({ consent }: { consent: ReferralConsent }) {
+  return (
+    <span className={`px-2 py-0.5 rounded border text-[11px] font-medium ${CONSENT_TONE.get(consent) ?? ""}`}>
+      {REFERRAL_CONSENT_LABELS.get(consent) ?? ""}
     </span>
   );
 }

@@ -15,6 +15,10 @@ import {
   remainingActiveCompetitionSlots,
 } from "@/lib/services/gamemaster/active-competitions";
 import { readReferredPlayers } from "@/lib/services/gamemaster/referral-read-model";
+import {
+  readAdminAwaitingClaims,
+  readAdminTermsStates,
+} from "@/lib/services/gamemaster/admin-terms-reminder.service";
 import { MAX_PAGE_LIMIT } from "@/lib/services/gamemaster/referral-report-filter";
 import mongoose from "mongoose";
 import { ObjectId } from "mongodb";
@@ -117,6 +121,13 @@ export async function GET(
       { gameMasterIds: [String(subscription.userId)] },
       { page: 1, limit: MAX_PAGE_LIMIT },
     );
+    // Reason: "referred" and "assigned" are separate facts (`24` s5.6). The rows above are the
+    // assigned players; link sign-ups still waiting on the terms are referred but NOT assigned,
+    // so they arrive as their own list rather than being mixed into the assigned rows.
+    const [termsStates, awaitingTerms] = await Promise.all([
+      readAdminTermsStates(db, referredPlayers.rows),
+      readAdminAwaitingClaims(db, String(subscription.userId)),
+    ]);
 
     // Get competitions created
     const competitions = await db
@@ -242,8 +253,12 @@ export async function GET(
         createdAt: u.createdAt,
         referredAt: u.referredAt,
       })),
-      referredPlayers: referredPlayers.rows,
+      referredPlayers: referredPlayers.rows.map((row) => ({
+        ...row,
+        termsState: termsStates.get(row.referralId) ?? null,
+      })),
       referredPlayersTotal: referredPlayers.total,
+      awaitingTerms,
       // Diagnostic info to help debug referral data inconsistencies
       referralDiagnostics,
       competitions: competitions.map((c) => ({

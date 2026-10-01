@@ -14,6 +14,7 @@ $results = @()
 # Reason: a full run takes a long time; $env:PROBE_FROM=65 runs only probe 65 onward, so a
 # new step can be proved without re-running every earlier step's probes.
 $probeFrom = if ($env:PROBE_FROM) { [int]$env:PROBE_FROM } else { 1 }
+$probeTo = if ($env:PROBE_TO) { [int]$env:PROBE_TO } else { [int]::MaxValue }
 $script:probeIndex = 0
 
 function Invoke-Probe {
@@ -27,7 +28,7 @@ function Invoke-Probe {
     )
 
     $script:probeIndex++
-    if ($script:probeIndex -lt $probeFrom) {
+    if ($script:probeIndex -lt $probeFrom -or $script:probeIndex -gt $probeTo) {
         return [pscustomobject]@{ Name = $Name; Outcome = "SKIPPED" }
     }
 
@@ -1476,13 +1477,13 @@ $results += Invoke-Probe `
 # 167. The prompt is never mounted, so nobody is ever asked.
 $results += Invoke-Probe `
     -Name "Prompt not mounted" -File "app/(root)/layout.tsx" `
-    -From '<GmReferralTermsPrompt />' `
+    -From '<AffiliateTermsModal />' `
     -To '' `
     -TestName "the prompt is mounted in the signed-in layout" -Suite $CLAIM
 
 # 168. Escape on the confirm step dismisses the decision silently.
 $results += Invoke-Probe `
-    -Name "Confirm step escapable" -File "components/gamemaster/GmReferralTermsPrompt.tsx" `
+    -Name "Confirm step escapable" -File "components/gamemaster/AffiliateTermsModal.tsx" `
     -From 'onEscapeKeyDown={(e) => e.preventDefault()}' `
     -To 'onEscapeKeyDown={() => setStage("idle")}' `
     -TestName "closing the terms opens a confirm step" -Suite $CLAIM
@@ -1537,7 +1538,7 @@ $results += Invoke-Probe `
 # 175. The dashboard bypasses the view.
 $results += Invoke-Probe `
     -Name "Dashboard bypasses view" -File "app/api/gamemaster/dashboard/route.ts" `
-    -From 'toGameMasterReferralView(row, { showExternalDetails }),' `
+    -From 'toGameMasterReferralView(row, { showExternalDetails, consentState: consent.get(row.referralId) }),' `
     -To '({ ...row }),' `
     -TestName "dashboard/route.ts maps rows through the view" -Suite $VIEWT
 
@@ -1793,19 +1794,19 @@ $results += Invoke-Probe `
     -To '' `
     -TestName "refuses an ended referral and one that already accepted" -Suite $TRT
 
-# 209. No cooldown between sends.
+# 209. A declined request may be sent again. Re-aimed 1 Oct 2026 (s5.6): the cooldown is gone.
 $results += Invoke-Probe `
-    -Name "Cooldown dropped" -File $TRRULES `
-    -From 'if (facts.now < retryAt) return { ok: false, reason: "cooldown", retryAt };' `
+    -Name "Decline not final" -File $TRRULES `
+    -From '    if (previous.status === "declined") return { ok: false, reason: "declined" };' `
     -To '' `
-    -TestName "holds a 24 hour cooldown" -Suite $TRT
+    -TestName "a declined request is final and is refused before the cap" -Suite $TRT
 
-# 210. No cap on sends.
+# 210. No limit on sends. Re-aimed 1 Oct 2026 (s5.6): the limit is one send.
 $results += Invoke-Probe `
     -Name "Cap dropped" -File $TRRULES `
-    -From 'if (previous.sendCount >= TERMS_REQUEST_MAX_SENDS) {' `
-    -To 'if (false) {' `
-    -TestName "caps the sends, even after the cooldown" -Suite $TRT
+    -From '    if (previous.sendCount >= TERMS_REQUEST_MAX_SENDS) return { ok: false, reason: "limit_reached" };' `
+    -To '' `
+    -TestName "a Game Master may send exactly once per referral" -Suite $TRT
 
 # 211. The send lookup is not scoped to the session Game Master.
 $results += Invoke-Probe `
@@ -1876,8 +1877,8 @@ $results += Invoke-Probe `
 # 220. The dashboard tab offers the button on every row.
 $results += Invoke-Probe `
     -Name "Button ungated on dashboard" -File "app/(root)/gamemaster/gamemaster-dashboard-tabs.tsx" `
-    -From '{r.canSendTerms && <SendTermsButton' `
-    -To '{<SendTermsButton' `
+    -From '{(r.canSendTerms || r.termsSent) && (' `
+    -To '{true && (' `
     -TestName "the dashboard tab offers Send T and C only behind canSendTerms" -Suite $TRT
 
 # 221. The CSV loses the phone column.
@@ -1904,8 +1905,8 @@ $results += Invoke-Probe `
 # 224. The detail route stops sending the shared rows.
 $results += Invoke-Probe `
     -Name "Detail rows not sent" -File "apps/admin/app/api/gamemasters/[id]/route.ts" `
-    -From 'referredPlayers: referredPlayers.rows,' `
-    -To 'referredPlayers: [],' `
+    -From 'referredPlayers: referredPlayers.rows.map((row) => ({' `
+    -To 'referredPlayers: ([] as typeof referredPlayers.rows).map((row) => ({' `
     -TestName "the detail view renders the shared tab" -Suite $RPT
 
 # 225. The profile lookup joins on the wrong key.
@@ -1925,9 +1926,155 @@ $results += Invoke-Probe `
 # 227. The full referrals page offers the button on every row.
 $results += Invoke-Probe `
     -Name "Button ungated on referrals page" -File "app/(root)/gamemaster/referrals/page.tsx" `
-    -From '{user.canSendTerms && (' `
+    -From '{(user.canSendTerms || user.termsSent) && (' `
     -To '{true && (' `
     -TestName "the referrals page offers Send T and C only behind canSendTerms" -Suite $TRT
+
+# ---- s5.6: one consent backend, the admin SEND TERMS reminder ----
+$FLOW = "__tests__/services/gm-affiliate-consent-flow.test.ts"
+$ADMREM = "apps/admin/lib/services/gamemaster/admin-terms-reminder.service.ts"
+$AFFC = "lib/services/gamemaster/affiliate-consent.service.ts"
+$ADMROUTE = "apps/admin/app/api/gamemasters/[id]/referrals/[userId]/send-terms/route.ts"
+
+# 228. An admin reminder spends the Game Master's one send.
+$results += Invoke-Probe `
+    -Name "Admin reminder spends GM send" -File $ADMREM `
+    -From '              sendCount: 0,' `
+    -To '              sendCount: 1,' `
+    -TestName "is unlimited and never spends the Game Master.s one send" -Suite $FLOW
+
+# 229. An admin may remind a player who declined.
+$results += Invoke-Probe `
+    -Name "Admin reminds after decline" -File $ADMREM `
+    -From '{ referralId: targetId, status: { $nin: ["accepted", "declined"] } },' `
+    -To '{ referralId: targetId, status: { $nin: ["accepted"] } },' `
+    -TestName "refuses a declined request" -Suite $FLOW
+
+# 230. An admin may remind a player who already accepted.
+$results += Invoke-Probe `
+    -Name "Admin reminds after accept" -File $ADMREM `
+    -From 'if (typeof referral.termsAcceptanceId === "string" && referral.termsAcceptanceId) return refusal("already_accepted");' `
+    -To '' `
+    -TestName "refuses an accepted referral and sends nothing" -Suite $FLOW
+
+# 231. The admin lookup is not scoped to the Game Master in the URL.
+$results += Invoke-Probe `
+    -Name "Admin lookup unscoped" -File $ADMREM `
+    -From '{ gameMasterId: gameMasterUserId, userId: input.playerUserId, isActive: true },' `
+    -To '{ userId: input.playerUserId, isActive: true },' `
+    -TestName "another Game Master.s player reads as not found" -Suite $FLOW
+
+# 232. The reminder notification carries player data.
+$results += Invoke-Probe `
+    -Name "Reminder leaks player email" -File $ADMREM `
+    -From '      variables: { gameMasterName },' `
+    -To '      variables: { gameMasterName, playerEmail },' `
+    -TestName "reminds a pending referral, counts it" -Suite $FLOW
+
+# 233. The reminder writes no audit row.
+$results += Invoke-Probe `
+    -Name "Reminder not audited" -File $ADMREM `
+    -From 'action: "admin_terms_reminder_sent",' `
+    -To 'action: "admin_terms_reminder_x",' `
+    -TestName "reminds a pending referral, counts it" -Suite $FLOW
+
+# 234. A declined link sign-up is refused for the wrong reason.
+$results += Invoke-Probe `
+    -Name "Declined claim wrong refusal" -File $ADMREM `
+    -From '      if (claim.status === "declined") return refusal("declined");' `
+    -To '' `
+    -TestName "a pending link sign-up is reminded on the claim" -Suite $FLOW
+
+# 235. A declined request reads as pending in the tab.
+$results += Invoke-Probe `
+    -Name "Declined reads pending" -File $ADMREM `
+    -From 'consent: row.termsAccepted ? "accepted" : doc?.status === "declined" ? "declined" : "pending",' `
+    -To 'consent: row.termsAccepted ? "accepted" : "pending",' `
+    -TestName "reports consent and both reminder sources" -Suite $FLOW
+
+# 236. The button is offered after a decline.
+$results += Invoke-Probe `
+    -Name "Admin button after decline" -File "apps/admin/lib/admin/admin-terms-reminder-view.ts" `
+    -From 'return state?.consent === "pending";' `
+    -To 'return state?.consent !== "accepted";' `
+    -TestName "reports consent and both reminder sources" -Suite $FLOW
+
+# 237. The waiting list shows another Game Master's sign-ups.
+$results += Invoke-Probe `
+    -Name "Awaiting list unscoped" -File $ADMREM `
+    -From '.find({ gameMasterId: gameMasterUserId, status: { $in: [...OPEN_CLAIM_STATUSES, "declined"] } })' `
+    -To '.find({ status: { $in: [...OPEN_CLAIM_STATUSES, "declined"] } })' `
+    -TestName "lists waiting and declined link sign-ups" -Suite $FLOW
+
+# 238. The admin route takes the admin from the body.
+$results += Invoke-Probe `
+    -Name "Admin route trusts body" -File $ADMROUTE `
+    -From '      admin: guard.admin,' `
+    -To '      admin: (await request.json()).admin,' `
+    -TestName "takes the admin from the guard" -Suite $FLOW
+
+# 239. The admin route is granted by an unrelated section.
+$results += Invoke-Probe `
+    -Name "Admin route wrong section" -File $ADMROUTE `
+    -From 'guardSection("gamemaster-management")' `
+    -To 'guardSection("analytics")' `
+    -TestName "every exported handler is guarded" -Suite $FLOW
+
+# 240. The tab offers the admin button on every row.
+$results += Invoke-Probe `
+    -Name "Admin button ungated" -File "apps/admin/components/admin/gamemaster/GmTermsReminderCells.tsx" `
+    -From 'if (!canAdminSendTerms(state)) return null;' `
+    -To '' `
+    -TestName "the tab hides the button unless consent is pending" -Suite $FLOW
+
+# 241. An unknown decision is not refused as such.
+$results += Invoke-Probe `
+    -Name "Decision not validated" -File $AFFC `
+    -From 'if (!isAffiliateConsentDecision(decision)) {' `
+    -To 'if (false) {' `
+    -TestName "refuses an unknown decision" -Suite $FLOW
+
+# 242. The bell reminder survives the answer.
+$results += Invoke-Probe `
+    -Name "Bell not resolved" -File $AFFC `
+    -From '    await resolveTermsReminderNotifications(user.id);' `
+    -To '' `
+    -TestName "accepting stamps consent on the existing row and resolves the bell" -Suite $FLOW
+
+# 243. The Game Master is not told a link sign-up declined.
+$results += Invoke-Probe `
+    -Name "GM not told of claim answer" -File $AFFC `
+    -From 'if (result.outcome !== "already_affiliated") {' `
+    -To 'if (false) {' `
+    -TestName "a pending link sign-up is declined into independence" -Suite $FLOW
+
+# 244. The consent route lets the body name the player.
+$results += Invoke-Probe `
+    -Name "Consent route trusts body" -File "app/api/affiliate/consent/route.ts" `
+    -From 'termsAcceptanceId: body?.termsAcceptanceId,' `
+    -To 'termsAcceptanceId: body?.termsAcceptanceId, ...(body?.user ? { user: body?.user } : {}),' `
+    -TestName "the route takes the player from the session" -Suite $FLOW
+
+# 245. Two simultaneous Game Master sends both land (the one-send lock is the filter).
+$results += Invoke-Probe `
+    -Name "Send lock dropped" -File $TRSVC `
+    -From '{ referralId, status: { $ne: "declined" }, sendCount: { $lt: TERMS_REQUEST_MAX_SENDS } },' `
+    -To '{ referralId, status: { $ne: "declined" } },' `
+    -TestName "two simultaneous sends send once" -Suite $TRT
+
+# 246. An ended referral that once accepted still hands the old Game Master the email.
+$results += Invoke-Probe `
+    -Name "Contact outlives affiliation" -File "lib/services/gamemaster/gm-referral-view.ts" `
+    -From 'const visible = accepted && row.isCurrent === true;' `
+    -To 'const visible = accepted;' `
+    -TestName "an accepted referral that has ended hides the email" -Suite $VIEWT
+
+# 247. The same ended player is still findable by typing their email.
+$results += Invoke-Probe `
+    -Name "Ended email searchable" -File "lib/services/gamemaster/referral-read-model.ts" `
+    -From '    byEmail.isActive = true;' `
+    -To '' `
+    -TestName "an accepted but ended referral cannot be found by email" -Suite $VIEWT
 
 Write-Host ""
 Write-Host "================ SUMMARY ================"

@@ -14,11 +14,14 @@ import {
  * claim would be closed before it was ever shown. Nor can `affiliate()` record it - it
  * returns `alreadyAffiliated` and writes nothing for the same Game Master.
  *
- * One row per referral (unique `referralId`), so re-sending updates the same row and the
- * cooldown and cap in `gm-terms-request-rules.ts` have a single place to read.
+ * One row per referral (unique `referralId`), so the once-only send in
+ * `gm-terms-request-rules.ts` has a single place to read. Until `24` s5.6 a Game Master could
+ * send three times with a 24-hour cooldown; the owner made it once per referral, and the
+ * player is reminded by the terms modal on every visit instead.
  *
- * Main app only: nothing in `apps/admin` reads it, and mirroring ahead of a caller is two
- * copies agreeing while one runs (R42). The admin sees each step in the customer audit trail.
+ * Main app only as a MODEL: `apps/admin` reaches the collection with the raw driver
+ * (`admin-terms-reminder.service.ts`), and mirroring ahead of a model caller is two copies
+ * agreeing while one runs (R42). The admin also sees each step in the customer audit trail.
  */
 export interface IGmTermsRequest extends Document {
   referralId: string;
@@ -31,6 +34,12 @@ export interface IGmTermsRequest extends Document {
   lastSentAt?: Date;
   termsAcceptanceId?: string;
   resolvedAt?: Date;
+  /**
+   * Reminders sent by an ADMIN (`24` s5.6). Kept apart from `sendCount`, which is the Game
+   * Master's once-only allowance - an admin reminder must never use it up, nor be capped by it.
+   */
+  adminTermsReminderCount?: number;
+  lastAdminTermsReminderAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -47,6 +56,8 @@ const GmTermsRequestSchema = new Schema<IGmTermsRequest>(
     lastSentAt: { type: Date },
     termsAcceptanceId: { type: String },
     resolvedAt: { type: Date },
+    adminTermsReminderCount: { type: Number, min: 0 },
+    lastAdminTermsReminderAt: { type: Date },
   },
   { timestamps: true, collection: "gm_terms_requests" },
 );

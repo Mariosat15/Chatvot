@@ -395,6 +395,9 @@ describe("the service is the only writer (s9 test 7)", () => {
     // `affiliate()` (same Game Master = alreadyAffiliated, no write). This fills ONLY the three
     // terms fields on an active row that has none - never creates, ends or moves (s5.5).
     ["lib/services/gamemaster/affiliation-consent.service.ts", "consent stamp on an existing row (Send T&C, s5.5)"],
+    // Reason: the admin SEND TERMS reminder (s5.6) only READS userreferrals to find the active
+    // row; its write calls target gm_terms_requests, gm_referral_claims and the audit trail.
+    ["apps/admin/lib/services/gamemaster/admin-terms-reminder.service.ts", "only READS userreferrals (coarse-scan false positive)"],
   ]);
 
   const DIRECT_WRITE = [

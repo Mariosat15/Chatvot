@@ -469,6 +469,14 @@ The rule: **a `gm_private` contest can be entered, and its details read, only by
 
 ### 5.5 Send T&C, and a referral's country and phone (BUILT 1 Oct 2026, owner request)
 
+> **AMENDED later on 1 Oct 2026 by s5.6, and four facts below are now history only - say which.**
+> The Game Master's send is **one per referral**, not three with a 24-hour cooldown. The two popups
+> (`GmTermsRequestPrompt.tsx`, `GmReferralTermsPrompt.tsx`) are **deleted** and replaced by one
+> `AffiliateTermsModal.tsx`. The player answers through **`POST /api/affiliate/consent`**; the old
+> `GET|POST /api/gamemaster/terms-request` route survives as a wrapper and nothing calls it. And
+> `gm_terms_requests` is **written by the admin app too** now (raw driver), so "main app only"
+> describes the model file, not who writes the collection.
+
 > **Read the code, not this note.** Live code: `lib/services/gamemaster/gm-terms-request-rules.ts`
 > (pure), `gm-terms-request.service.ts`, `affiliation-consent.service.ts`,
 > `database/models/gamemaster/gm-terms-request.model.ts` (`gm_terms_requests`, main app only),
@@ -521,6 +529,94 @@ The rule: **a `gm_private` contest can be entered, and its details read, only by
 > `gm-referral-read-model.test.ts`. Probes 207-227, each red on exactly one test. One guard is
 > recorded unprobed with its reason in the harness: the pending condition on the answer claim,
 > which only a true race reaches. **Never verified by eye.**
+
+### 5.6 One consent flow for every referral, and the admin SEND TERMS (BUILT 1 Oct 2026, owner request)
+
+> **Read the code, not this note.** Live code: `lib/services/gamemaster/affiliate-consent.service.ts`
+> (`getAffiliateConsentPrompt`, `answerAffiliateConsent`), `app/api/affiliate/consent/route.ts`,
+> `components/gamemaster/AffiliateTermsModal.tsx` (mounted once in `app/(root)/layout.tsx`),
+> `lib/services/gamemaster/gm-referral-consent.service.ts`, `referral-claim-reminder.service.ts`,
+> `gm-terms-request-shared.ts`, `lib/utils/affiliate-consent-kind.ts`,
+> `components/gamemaster/AwaitingTermsList.tsx`, `SendTermsButton.tsx`, `GmReferralBadges.tsx`. Admin:
+> `apps/admin/lib/services/gamemaster/admin-terms-reminder.service.ts`,
+> `apps/admin/lib/admin/admin-terms-reminder-view.ts`,
+> `apps/admin/app/api/gamemasters/[id]/referrals/[userId]/send-terms/route.ts`,
+> `GmTermsReminderCells.tsx` and `GmDetailReferralsTab.tsx`.
+>
+> **The rule.** A referral link creates a **pending** referral (a `gm_referral_claims` row), never an
+> assignment. The player belongs to the Game Master only after accepting the Affiliate Terms. If they
+> decline they stay independent, the claim is marked declined, and they are never asked again. If
+> they do not answer, the modal appears **every time they enter the app**. What decides that is the
+> stored state, read after the session has loaded, never `localStorage`.
+>
+> **One modal, one backend.** `AffiliateTermsModal` shows the Game Master's name, the terms in a
+> scrolling box, and **Decline** / **Accept Terms**. Nothing is pre-ticked, and Escape and clicking
+> outside do not close it, so the only ways out are the two answers. Both answers go to
+> `POST /api/affiliate/consent`, which takes the player from the session and never from the body, and
+> refuses an unknown decision (400) or an answer with nothing open (409). It handles both shapes of
+> question: a pending link sign-up (a claim) and an existing affiliation that has no recorded consent
+> (a terms request, including the legacy rows below). After either answer the bell reminder is
+> marked resolved and the screen refreshes without a new sign-in.
+>
+> **Legacy referrals (owner decision, 1 Oct 2026: "keep").** A player who was affiliated before this
+> rule, and has no recorded consent, **stays attached and keeps earning the Game Master their share**.
+> They get the same modal. Accepting records the consent on the existing row. **Declining keeps them
+> with the Game Master** and is final - this is the one place a decline does not make the player
+> independent, because detaching an earning affiliation would be a change to money the owner declined.
+>
+> **The Game Master's list.** Each row carries **Accepted**, **Pending Terms** or **Declined**. Pending
+> link sign-ups are listed separately (`AwaitingTermsList`) as *referred, not assigned*, and they are
+> not counted as assigned anywhere. **SEND TERMS is once per referral** (`TERMS_REQUEST_MAX_SENDS = 1`)
+> and atomic: the upsert's filter carries `sendCount < 1`, so two clicks at the same moment send once.
+> Afterwards the button reads **TERMS SENT ✓** and stays disabled. A declined request is final.
+>
+> **The notification.** Template `affiliate_terms_required`, titled **Affiliate Terms Pending**, with a
+> **Review Terms** button that opens the modal itself (not a page). Its only variable is the Game
+> Master's name - no email, no phone, no amounts.
+>
+> **Admin, Manage Game Masters -> Referrals.** Columns: Player, Referral Date, Consent Status,
+> Assigned Status, Terms Reminder Status, Actions. Pending link sign-ups and declined ones appear in
+> their own section under the table. **Admin SEND TERMS is unlimited** and shown only while consent is
+> pending. Each send increments `adminTermsReminderCount`, sets `lastAdminTermsReminderAt`, sends the
+> notification, and writes an `admin_terms_reminder_sent` row to the customer audit trail naming the
+> admin. **It never spends the Game Master's one send** (`$setOnInsert: { sendCount: 0 }`). The route is
+> `POST` only, guarded by `guardSection("gamemaster-management")`, takes the admin from the guard and
+> never reads a body. Another Game Master's player reads as not found.
+>
+> **Contact data.** The player's email and phone stay hidden from the Game Master unless the player
+> accepted **and** is assigned to that same Game Master. This is decided on the server, in the view
+> the routes return, so the browser never receives them. **Assigned is checked as well as accepted**:
+> before this work the view checked acceptance alone, so a referral that had accepted and then ended
+> or moved to another Game Master still showed its email to the old one, and could still be found by
+> typing that email. Both the view and the email search now require `isActive`. The row stays on the
+> old Game Master's history and still reads Accepted; only the contact details go.
+>
+> **Deviations, recorded rather than absorbed.**
+> - **The Game Master's send went from three with a 24-hour cooldown to one** (s5.5 said three). With
+>   one send a cooldown has nothing to cool down, so it was removed rather than left as dead code.
+> - **Admin SEND TERMS refuses an answered referral** (already accepted, or declined). "Unlimited" was
+>   read as *no count limit*, not as *may override a decline*: a decline is final, and re-asking a
+>   player who said no is the harassment the rule exists to prevent.
+> - **Admin reminders are in-app and push only, no email.** The Game Master's send also emails; an
+>   unlimited email is a mailing an admin can repeat without bound, which costs deliverability.
+> - **The waiting list is a separate section**, not extra rows in the referrals table, because a
+>   pending sign-up has no affiliation row and mixing them would make the table count people who are
+>   not assigned.
+> - **The two old popups were merged into one modal**, and **the old player routes
+>   (`/api/gamemaster/terms-request`, `/api/gamemaster/referral-claim`) are kept for one release** as
+>   session-guarded wrappers over the same services, so a browser still running the previous bundle
+>   can answer. Nothing in the app calls them. Delete them after the next deploy - the tests that pin
+>   their session guard must then be flipped to assert the files are gone, not deleted.
+> - **`gm_terms_requests` and `gm_referral_claims` are now written by the admin app** through the raw
+>   driver (the counters and the claim reminder). Neither model is mirrored, because the admin app
+>   reaches them only through the driver - so `check:mirrors` says nothing about them, and the two
+>   new fields are declared on the main-app models so the player app can read them.
+>
+> Tests: `gm-affiliate-consent-flow.test.ts` (18), `gm-terms-request.test.ts` (32), and additions to
+> `gm-referral-claim.test.ts`, `gm-referral-view.test.ts` and `gm-referral-read-model.test.ts`. Probes
+> 228-247 are new (246-247 pin the assigned check), and 167, 168, 175, 209, 210, 220, 224 and 227 were
+> re-aimed at the redesigned code. All 247 probes turn exactly one test red.
+> **Never verified by eye.**
 
 ---
 

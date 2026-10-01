@@ -8,6 +8,16 @@ import { describeAffiliationState, describeEndedReason } from "@/lib/services/ga
 import { filterDetailReferrals } from "@/lib/admin/gm-detail-referrals";
 import AffiliationSourceBadge from "./AffiliationSourceBadge";
 import GmExportButton from "./GmExportButton";
+import type { AdminAwaitingClaimRow, AdminTermsReminderState } from "@/lib/admin/admin-terms-reminder-view";
+import {
+  AdminAwaitingTermsTable,
+  AdminSendTermsButton,
+  ConsentCell,
+  ReminderStatusCell,
+} from "./GmTermsReminderCells";
+
+/** A row of the assigned list, with the consent and reminder facts the detail route adds. */
+export type ReferralTabRow = ReferredPlayerRow & { termsState?: AdminTermsReminderState | null };
 
 function formatDate(value: string | Date | null | undefined): string {
   if (!value) return "-";
@@ -27,18 +37,32 @@ export default function GmDetailReferralsTab({
   rows,
   total,
   gameMasterId,
+  subscriptionId,
+  awaitingTerms = [],
   canExport,
 }: {
-  rows: ReferredPlayerRow[];
+  rows: ReferralTabRow[];
   total: number;
   gameMasterId: string;
+  /** The subscription id - the `[id]` of every `/api/gamemasters/[id]` route. */
+  subscriptionId: string;
+  awaitingTerms?: AdminAwaitingClaimRow[];
   canExport: boolean;
 }) {
   const [search, setSearch] = useState("");
+  // Reason: a send only moves the reminder counters, so the row is updated in place rather
+  // than reloading the whole Game Master.
+  const [sent, setSent] = useState<Map<string, { count: number; at: string }>>(new Map());
   const filtered = useMemo(() => filterDetailReferrals(rows, search), [rows, search]);
+  const stateOf = (row: ReferralTabRow): AdminTermsReminderState | null => {
+    const base = row.termsState ?? null;
+    const local = sent.get(row.referralId);
+    return base && local ? { ...base, adminReminderCount: local.count, lastAdminReminderAt: local.at } : base;
+  };
 
   return (
     <div className="space-y-4">
+      <AdminAwaitingTermsTable rows={awaitingTerms} subscriptionId={subscriptionId} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <span className="text-sm text-gray-400">
           Total referrals: {total}
@@ -74,8 +98,9 @@ export default function GmDetailReferralsTab({
                   <th className="px-4 py-3">Type</th>
                   <th className="px-4 py-3">Email / Phone</th>
                   <th className="px-4 py-3">Country</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Terms</th>
+                  <th className="px-4 py-3">Assigned Status</th>
+                  <th className="px-4 py-3">Consent Status</th>
+                  <th className="px-4 py-3">Terms Reminder Status</th>
                   <th className="px-4 py-3">Referred At</th>
                   <th className="px-4 py-3">Actions</th>
                 </tr>
@@ -108,14 +133,27 @@ export default function GmDetailReferralsTab({
                       )}
                     </td>
                     <td className="px-4 py-3 text-xs">
-                      {row.termsAccepted ? (
+                      {row.termsState ? (
+                        <ConsentCell state={stateOf(row)} />
+                      ) : row.termsAccepted ? (
                         <span className="text-emerald-300">Accepted</span>
                       ) : (
-                        <span className="text-amber-300">Not accepted</span>
+                        <span className="text-amber-300">Pending Terms</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-gray-400 text-sm">{formatDate(row.joinedAt)}</td>
                     <td className="px-4 py-3">
+                      <ReminderStatusCell state={stateOf(row)} />
+                    </td>
+                    <td className="px-4 py-3 text-gray-400 text-sm">{formatDate(row.joinedAt)}</td>
+                    <td className="px-4 py-3 space-y-1.5">
+                      <AdminSendTermsButton
+                        subscriptionId={subscriptionId}
+                        userId={row.userId}
+                        state={stateOf(row)}
+                        onSent={(count, at) =>
+                          setSent((prev) => new Map(prev).set(row.referralId, { count, at }))
+                        }
+                      />
                       <Link
                         href={`/dashboard?activeTab=users&userId=${row.userId}`}
                         className="text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1"

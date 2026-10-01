@@ -24,10 +24,15 @@ import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { PERFORMANCE_INTERVALS } from "@/lib/utils/performance";
 import { GameIcon } from "@/components/ui/GameIcon";
-import { NOTIFICATION_PUSH_EVENT } from "@/lib/utils/notification-events";
+import {
+  NOTIFICATION_PUSH_EVENT,
+  isAffiliateTermsTemplate,
+  openAffiliateTermsModal,
+} from "@/lib/utils/notification-events";
 
 interface Notification {
   _id: string;
+  templateId?: string;
   title: string;
   message: string;
   icon: string;
@@ -232,6 +237,12 @@ export default function NotificationDropdown() {
     }
     if (notification.actionUrl) {
       setOpen(false);
+    }
+    // Reason: "Review Terms" must open the terms modal itself. The modal lives in the
+    // signed-in layout, which does not remount on navigation, so the link alone would land
+    // on the dashboard with nothing open (`External game plans/24` s5.6).
+    if (isAffiliateTermsTemplate(notification.templateId)) {
+      openAffiliateTermsModal();
     }
   };
 
