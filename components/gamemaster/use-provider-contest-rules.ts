@@ -3,7 +3,11 @@
 import { useState } from "react";
 import type { ConfigField } from "@/lib/services/games/config-schema";
 import { resolveAttemptSeconds } from "@/lib/services/games/config-schema";
-import { playShapeRules } from "@/lib/services/games/play-shape";
+import {
+  clampGmRoundStartPolicy,
+  gmAllowedRoundStartPolicies,
+  playShapeRules,
+} from "@/lib/services/games/play-shape";
 import type { PlayMode } from "@/lib/services/games/play-shape";
 import {
   deriveResultGraceSeconds,
@@ -35,20 +39,28 @@ const DEFAULT_SEVERAL_ATTEMPTS = 3;
  */
 export function useProviderContestRules(input: {
   initialPlayMode: PlayMode;
+  /**
+   * Admin "A Competition may be created as" set for this title. Gates which
+   * last-attempt options the GM may pick (owner, 1 Oct 2026).
+   */
+  supportedPlayModes: PlayMode[];
   fields: ConfigField[];
   settings: Record<string, unknown>;
   maxDurationSeconds?: number;
   startTime: string;
   endTime: string;
 }) {
+  const allowedRoundStart = gmAllowedRoundStartPolicies(input.supportedPlayModes);
   const initialShape = playShapeRules(input.initialPlayMode);
   const [playMode, setPlayModeState] = useState<PlayMode>(input.initialPlayMode);
   const [attemptsPolicy, setAttemptsPolicyState] = useState<AttemptsPolicy>(
     initialShape.forcedAttemptsPolicy ?? "single",
   );
   const [attemptsAllowed, setAttemptsAllowed] = useState<number | undefined>();
-  const [roundStartPolicy, setRoundStartPolicy] = useState<RoundStartPolicy>(
-    initialShape.forcedRoundStartPolicy ?? "reserve_full_round",
+  const [roundStartPolicy, setRoundStartPolicyState] = useState<RoundStartPolicy>(
+    initialShape.forcedRoundStartPolicy ??
+      clampGmRoundStartPolicy(undefined, input.supportedPlayModes) ??
+      "reserve_full_round",
   );
 
   const shape = playShapeRules(playMode);
@@ -58,13 +70,25 @@ export function useProviderContestRules(input: {
     setPlayModeState(mode);
     setAttemptsPolicyState(next.forcedAttemptsPolicy ?? "single");
     if (next.forcedAttemptsPolicy) setAttemptsAllowed(undefined);
-    setRoundStartPolicy(next.forcedRoundStartPolicy ?? "reserve_full_round");
+    setRoundStartPolicyState(
+      next.forcedRoundStartPolicy ??
+        clampGmRoundStartPolicy(undefined, input.supportedPlayModes) ??
+        "reserve_full_round",
+    );
   }
 
   function setAttemptsPolicy(policy: AttemptsPolicy) {
     setAttemptsPolicyState(policy);
     if (policy === "single") setAttemptsAllowed(undefined);
     else setAttemptsAllowed((n) => n ?? DEFAULT_SEVERAL_ATTEMPTS);
+  }
+
+  function setRoundStartPolicy(policy: RoundStartPolicy) {
+    // Reason: never store a policy the admin settings have withdrawn — a stale
+    // select option or a hand-crafted request would otherwise survive until save.
+    setRoundStartPolicyState(
+      clampGmRoundStartPolicy(policy, input.supportedPlayModes) ?? policy,
+    );
   }
 
   const attemptSeconds = resolveAttemptSeconds(
@@ -110,6 +134,8 @@ export function useProviderContestRules(input: {
     setAttemptsAllowed,
     roundStartPolicy,
     setRoundStartPolicy,
+    /** Policies the admin settings still allow; the dropdown is built from this. */
+    allowedRoundStartPolicies: allowedRoundStart,
     fit,
     resultGracePeriodSeconds,
     scheduleError,

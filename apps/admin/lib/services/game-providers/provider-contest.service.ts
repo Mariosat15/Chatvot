@@ -21,6 +21,7 @@ import {
   resolveStartWaitSeconds,
 } from "@/lib/services/games/start-wait";
 import {
+  clampGmRoundStartPolicy,
   isPlayModeSupported,
   PLAY_MODE_COPY,
   playModeHasLobby,
@@ -433,8 +434,15 @@ export async function createProviderContest(
       error: `The waiting limit must be a whole number of minutes from ${MIN_START_WAIT_SECONDS / 60} to ${MAX_START_WAIT_SECONDS / 60}.`,
     };
   }
+  const supportedModes = resolveSupportedPlayModes(title);
+  // Reason: Game Masters are gated by the admin "A Competition may be created as"
+  // set (owner, 1 Oct 2026). Admin operators keep the full choice. Shape forcing
+  // still wins when the contest is scheduled.
+  const requestedRoundStart = input.gameMasterId
+    ? clampGmRoundStartPolicy(input.roundStartPolicy, supportedModes)
+    : input.roundStartPolicy;
   const roundStartPolicy =
-    shape.forcedRoundStartPolicy ?? input.roundStartPolicy ?? "reserve_full_round";
+    shape.forcedRoundStartPolicy ?? requestedRoundStart ?? "reserve_full_round";
   const attemptsPolicy = shape.forcedAttemptsPolicy ?? input.attemptsPolicy;
   const attemptSeconds = resolveAttemptSeconds(
     parsed.fields,

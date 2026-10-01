@@ -72,6 +72,8 @@ const {
   resolveSupportedPlayModes,
   isPlayModeSupported,
   resolveContestPlayMode,
+  gmAllowedRoundStartPolicies,
+  clampGmRoundStartPolicy,
   PLAY_MODES,
 } = await import("@/lib/services/games/play-shape");
 
@@ -287,6 +289,45 @@ describe("resolveSupportedPlayModes", () => {
         supportedPlayModes: ["anytime", "scheduled"],
       }),
     ).toEqual(["scheduled"]);
+  });
+});
+
+describe("gmAllowedRoundStartPolicies (owner, 1 Oct 2026)", () => {
+  it("Join-any-time-only offers only until_window_closes", () => {
+    expect(gmAllowedRoundStartPolicies(["anytime"])).toEqual(["until_window_closes"]);
+  });
+
+  it("Everyone-at-once-only offers nothing — the scheduled shape withholds the control", () => {
+    expect(gmAllowedRoundStartPolicies(["scheduled"])).toEqual([]);
+  });
+
+  it("both supported modes offer both last-attempt policies", () => {
+    expect(gmAllowedRoundStartPolicies(["anytime", "scheduled"])).toEqual([
+      "reserve_full_round",
+      "until_window_closes",
+    ]);
+  });
+
+  it("an empty set reads as both, so a title mid-migration is not locked", () => {
+    expect(gmAllowedRoundStartPolicies([])).toEqual([
+      "reserve_full_round",
+      "until_window_closes",
+    ]);
+  });
+
+  it("clampGmRoundStartPolicy keeps an allowed request and replaces a withdrawn one", () => {
+    expect(
+      clampGmRoundStartPolicy("reserve_full_round", ["anytime"]),
+    ).toBe("until_window_closes");
+    expect(
+      clampGmRoundStartPolicy("until_window_closes", ["anytime"]),
+    ).toBe("until_window_closes");
+    expect(
+      clampGmRoundStartPolicy("reserve_full_round", ["anytime", "scheduled"]),
+    ).toBe("reserve_full_round");
+    expect(clampGmRoundStartPolicy("until_window_closes", ["scheduled"])).toBe(
+      "until_window_closes",
+    );
   });
 });
 

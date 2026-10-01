@@ -7,7 +7,6 @@ import {
   endTimeThatFits,
 } from "@/lib/services/games/round-fit";
 import {
-  ROUND_START_POLICIES,
   ROUND_START_POLICY_COPY,
 } from "@/lib/services/games/round-types";
 import type { AttemptsPolicy } from "@/lib/services/games/round-types";
@@ -187,13 +186,13 @@ export function ProviderRoundPolicyFields({
           <>
             <select
               value={rules.roundStartPolicy}
-              disabled={disabled}
+              disabled={disabled || rules.allowedRoundStartPolicies.length <= 1}
               onChange={(e) =>
                 rules.setRoundStartPolicy(e.target.value as typeof rules.roundStartPolicy)
               }
               className={inputClass}
             >
-              {ROUND_START_POLICIES.map((policy) => (
+              {rules.allowedRoundStartPolicies.map((policy) => (
                 <option key={policy} value={policy}>
                   {ROUND_START_POLICY_COPY.get(policy)?.label ?? policy}
                 </option>

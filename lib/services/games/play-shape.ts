@@ -304,6 +304,48 @@ export function isPlayModeSupported(
 }
 
 /**
+ * Which last-attempt policies a Game Master may pick, given the admin's
+ * "A Competition may be created as" set (`supportedPlayModes`).
+ *
+ * Owner rule, 1 October 2026: Join-any-time-only → only `until_window_closes`
+ * (players may start until the contest ends); Everyone-at-once-only → the
+ * scheduled shape already withholds the control; both → both policies when the
+ * GM has chosen the anytime shape. Admin operators are unaffected — this list
+ * is only for the Game Master wizard and its create path.
+ *
+ * An empty or absent set reads as both, matching `resolveSupportedPlayModes`'
+ * "nobody has said" reading, so a title mid-migration is not locked to one
+ * policy by accident.
+ */
+export function gmAllowedRoundStartPolicies(
+  supported: readonly PlayMode[],
+): RoundStartPolicy[] {
+  const hasAnytime = supported.includes("anytime");
+  const hasScheduled = supported.includes("scheduled");
+  if ((hasAnytime && hasScheduled) || (!hasAnytime && !hasScheduled)) {
+    return ["reserve_full_round", "until_window_closes"];
+  }
+  if (hasAnytime) return ["until_window_closes"];
+  // scheduled-only: playShapeRules withholds the control; empty means no choice to offer
+  return [];
+}
+
+/**
+ * Clamp a requested last-attempt policy to what a Game Master may choose for
+ * this title's supported set. Returns the request when it is allowed, otherwise
+ * the first allowed policy, otherwise the request unchanged (scheduled path).
+ */
+export function clampGmRoundStartPolicy(
+  requested: RoundStartPolicy | undefined,
+  supported: readonly PlayMode[],
+): RoundStartPolicy | undefined {
+  const allowed = gmAllowedRoundStartPolicies(supported);
+  if (allowed.length === 0) return requested;
+  if (requested && allowed.includes(requested)) return requested;
+  return allowed[0];
+}
+
+/**
  * The shape of one CONTEST, which is not the same question as the shape of its title.
  *
  * THE WHOLE REASON THIS EXISTS. Once a title supports two shapes, `resolvePlayMode(title)` is

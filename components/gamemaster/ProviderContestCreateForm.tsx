@@ -125,6 +125,7 @@ export default function ProviderContestCreateForm({
   const [endTime, setEndTime] = useState(() => defaultUtcDraft(1, "18:00"));
   const rules = useProviderContestRules({
     initialPlayMode: title.playMode,
+    supportedPlayModes: title.supportedPlayModes,
     fields,
     settings,
     maxDurationSeconds: title.maxDurationSeconds,

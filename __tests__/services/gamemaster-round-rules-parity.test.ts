@@ -108,8 +108,22 @@ describe("the GM wizard offers the admin wizard's round rules", () => {
     const select = rules.slice(rules.indexOf("function selectPlayMode"), rules.indexOf("function setAttemptsPolicy"));
     expect(select.length).toBeGreaterThan(0);
     expect(select).toMatch(/forcedAttemptsPolicy \?\? "single"/);
-    expect(select).toMatch(/forcedRoundStartPolicy \?\? "reserve_full_round"/);
+    expect(select).toMatch(/forcedRoundStartPolicy \?\?/);
+    expect(select).toMatch(/clampGmRoundStartPolicy/);
     expect(code(FORM)).toMatch(/onPlayMode=\{rules\.selectPlayMode\}/);
+  });
+
+  it("passes the title's supportedPlayModes into the rules hook so admin settings gate the dropdown", () => {
+    const form = code(FORM);
+    expect(form).toMatch(/supportedPlayModes:\s*title\.supportedPlayModes/);
+    expect(code(RULES)).toMatch(/gmAllowedRoundStartPolicies\(input\.supportedPlayModes\)/);
+  });
+
+  it("the last-attempt dropdown is built from allowedRoundStartPolicies, never the full list", () => {
+    const controls = code(CONTROLS);
+    expect(controls).toMatch(/rules\.allowedRoundStartPolicies\.map/);
+    expect(controls).not.toMatch(/ROUND_START_POLICIES\.map/);
+    expect(controls).toMatch(/allowedRoundStartPolicies\.length <= 1/);
   });
 
   it("a refusing fit blocks the schedule step, and only where the server refuses", () => {

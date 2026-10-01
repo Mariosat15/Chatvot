@@ -839,6 +839,15 @@ KPIs for the filtered set (affiliates, active, by source, commission generated/p
 >
 > Tests: `__tests__/admin/gm-report-display.test.ts`, Part 2 block in `gm-report-screen.test.ts`.
 
+> **BUILT 1 Oct 2026: GM last-attempt options follow admin "A Competition may be created as".**
+> Live code: `gmAllowedRoundStartPolicies` / `clampGmRoundStartPolicy` in `play-shape.ts`
+> (mirrored), `use-provider-contest-rules.ts`, `ProviderRoundControls.tsx`, and the
+> `gameMasterId` clamp in `provider-contest.service.ts`. Join-any-time-only → only
+> `until_window_closes`; both → both policies on an anytime contest; Everyone-at-once-only →
+> the scheduled shape still withholds the control. Admin operators are unaffected.
+> Tests: `play-shape.test.ts`, `gamemaster-round-rules-parity.test.ts`,
+> `gamemaster-provider-creation.test.ts`. Never verified by eye.
+
 ### 7.6 Package editor
 Add "Competition visibility allowed: Public / Private / Both" to the GM package config in the marketplace item editor (admin), writing `gameMasterConfig.allowedVisibility`.
 

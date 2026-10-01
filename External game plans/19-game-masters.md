@@ -415,6 +415,11 @@ allowed, the trading wizard is unchanged (no one-option friction picker).
 - [x] A Game Master creating a provider contest sees settings generated from
       `configSchema` - **done 23 Sep 2026** on `/gamemaster/create-competition`
 - [x] No trading field is required to create a provider contest - **done 23 Sep 2026**
+- [x] The GM "When can the last attempt start?" choices follow admin
+      "A Competition may be created as" - **done 1 Oct 2026**: Join-any-time-only →
+      `until_window_closes` only; both → both policies; Everyone-at-once-only →
+      withheld by the scheduled shape. `gmAllowedRoundStartPolicies` + create clamp when
+      `gameMasterId` is set
 - [ ] A Game Master earns correctly when a referred player enters a **provider**
       competition, and when they enter a **provider challenge**. **Competition path is the
       shared fee stage (unchanged).** Provider challenges remain a separate creation path

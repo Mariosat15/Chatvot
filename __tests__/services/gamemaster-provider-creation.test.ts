@@ -170,6 +170,20 @@ describe("createAndPublishProviderContest composition", () => {
     // gameMasterId is optional and written when present.
     expect(main).toMatch(/gameMasterId/);
   });
+
+  it("a Game Master create clamps roundStartPolicy to the admin supportedPlayModes set", () => {
+    // Owner, 1 Oct 2026: Join-any-time-only must not accept reserve_full_round from a crafted body.
+    const main = code("lib/services/game-providers/provider-contest.service.ts");
+    expect(main).toMatch(/clampGmRoundStartPolicy\(input\.roundStartPolicy, supportedModes\)/);
+    expect(main).toMatch(/input\.gameMasterId\s*\?[\s\S]*?clampGmRoundStartPolicy/);
+    // Admin path (no gameMasterId) keeps the caller's choice.
+    const clampBlock = main.slice(
+      main.indexOf("const requestedRoundStart"),
+      main.indexOf("const roundStartPolicy"),
+    );
+    expect(clampBlock).toMatch(/input\.gameMasterId/);
+    expect(clampBlock).toMatch(/: input\.roundStartPolicy/);
+  });
 });
 
 describe("mirrors stay byte-identical", () => {
