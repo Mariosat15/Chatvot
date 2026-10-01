@@ -422,13 +422,35 @@ describe("recording and verifying Game Master consent", () => {
     expect(await UserReferral.countDocuments({})).toBe(0);
   });
 
-  it("the referral link still needs no consent (s5.3 is deferred)", async () => {
-    const r = await affiliate({
-      user: { id: PLAYER, email: player.email },
-      gameMaster: { referralCode: "GMONE" },
-      channel: "gm_referral_link",
+  it("the referral link needs consent too (s5.3), and stamps it with its own source", async () => {
+    // Reason: flipped in s5.3. This used to assert the link "still needs no consent"; the
+    // exemption is closed, so a link sign-up is attached only with a stored acceptance.
+    await seedGmPage({ version: "3" });
+    const viaLink = (termsAcceptanceId?: string) =>
+      affiliate({
+        user: { id: PLAYER, email: player.email },
+        gameMaster: { referralCode: "GMONE" },
+        channel: "gm_referral_link",
+        surface: "signup",
+        termsAcceptanceId,
+      });
+    expect(await viaLink()).toMatchObject({ success: false, code: "terms_not_accepted" });
+    expect(await UserReferral.countDocuments({})).toBe(0);
+
+    const r = await recordGmTermsAcceptance({
+      user: player,
+      gameMasterId: GM_1,
+      affiliationSource: "gm_referral_link",
     });
-    expect(r).toMatchObject({ success: true, created: true });
+    if (!r.success) throw new Error(`accept failed: ${r.code}`);
+    expect(await viaLink(r.acceptanceId)).toMatchObject({ success: true, created: true });
+    expect(await UserReferral.findOne({ userId: PLAYER }).lean()).toMatchObject({
+      source: "gm_referral_link",
+      termsAcceptanceId: r.acceptanceId,
+      termsVersion: "3",
+    });
+    const stored = await TermsAcceptance.findById(r.acceptanceId).lean<{ context?: Record<string, unknown> }>();
+    expect(stored?.context).toMatchObject({ affiliationSource: "gm_referral_link" });
   });
 
   it("the public terms route has NO built-in fallback for the Game Master page", async () => {

@@ -185,7 +185,9 @@ describe("every referral writer labels its source", () => {
     // Reason: re-pointed in step 2, claim unchanged. Sign-up used to raw-insert the row and
     // write `source` itself; it now hands the channel to the single writer, which stores it
     // as `source`. The behavioural proof is in gm-affiliation-service.test.ts.
-    const src = code("lib/actions/auth.actions.ts");
+    // Re-pointed again in s5.3, claim unchanged: sign-up now records a claim and the
+    // player's accepted claim is what calls the writer, so the label lives there.
+    const src = code("lib/services/gamemaster/referral-claim.service.ts");
     expect(src).toMatch(/channel:\s*"gm_referral_link"/);
     expect(src).toMatch(/surface:\s*"signup"/);
     expect(code("lib/services/gamemaster/affiliation.service.ts")).toMatch(

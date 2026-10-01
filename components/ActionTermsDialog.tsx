@@ -56,7 +56,11 @@ interface ActionTermsDialogProps {
    * The dialog is always shown, nothing is cached, and `onAccept` fires only once the
    * server has stored the acceptance - with its id, which the join then presents.
    */
-  recordedContext?: { gameMasterId: string; competitionId?: string };
+  recordedContext?: {
+    gameMasterId: string;
+    competitionId?: string;
+    affiliationSource?: "chartvolt_join_gm" | "gm_referral_link";
+  };
 }
 
 // ─── Permanent Acceptance Helpers (for "once only" mode) ────────────────────

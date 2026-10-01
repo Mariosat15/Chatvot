@@ -4,7 +4,10 @@ import { auth } from "@/lib/better-auth/auth";
 import TermsAcceptance from "@/database/models/terms-acceptance.model";
 import SitePage from "@/database/models/site-page.model";
 import { GM_AFFILIATION_TERMS_SLUG } from "@/lib/services/gamemaster/gm-terms-rules";
-import { recordGmTermsAcceptance } from "@/lib/services/gamemaster/gm-terms.service";
+import {
+  recordGmTermsAcceptance,
+  toGmConsentSource,
+} from "@/lib/services/gamemaster/gm-terms.service";
 
 /**
  * GET /api/terms-acceptance?slug=terms-credit-purchase
@@ -108,6 +111,7 @@ export async function POST(request: NextRequest) {
         },
         gameMasterId,
         competitionId: typeof competitionId === "string" ? competitionId : undefined,
+        affiliationSource: toGmConsentSource(body?.context?.affiliationSource),
         ipAddress,
         userAgent,
       });

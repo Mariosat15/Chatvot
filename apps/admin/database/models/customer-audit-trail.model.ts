@@ -28,6 +28,10 @@ export type AuditActionType =
   | "gm_affiliation_reassigned"
   | "gm_affiliation_detached"
   | "gm_terms_accepted"
+  // A referral-link sign-up waits for the player's own consent (s5.3) before attaching.
+  | "gm_referral_link_pending"
+  | "gm_referral_link_declined"
+  | "gm_referral_link_lapsed"
   // Profile actions
   | "profile_updated"
   | "profile_viewed"
@@ -330,6 +334,12 @@ export function getActionDescription(
     gm_terms_accepted: (m) =>
       `Accepted Game Master affiliation terms` +
       (m?.termsVersion ? ` (version ${m.termsVersion})` : ""),
+    gm_referral_link_pending: (m) =>
+      `Signed up through Game Master ${m?.gameMasterName || m?.gameMasterId || "unknown"}'s link; waiting for the player to accept the terms`,
+    gm_referral_link_declined: (m) =>
+      `Declined the Game Master terms; not attached to ${m?.gameMasterName || m?.gameMasterId || "the Game Master"}`,
+    gm_referral_link_lapsed: (m) =>
+      `Referral link no longer applies: ${m?.reason || "Game Master unavailable"}`,
 
     // Profile
     profile_updated: "Profile information updated",

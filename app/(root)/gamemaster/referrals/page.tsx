@@ -9,7 +9,6 @@ import {
   Calendar,
   Trophy,
   Swords,
-  TrendingUp,
   Loader2,
   ChevronLeft,
   ChevronRight,
@@ -20,25 +19,26 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
-interface ReferredUser {
-  _id: string;
-  userId: string;
-  userEmail: string;
-  userName: string;
-  referredAt: string;
-  isActive: boolean;
-  lastActivityAt?: string;
-  totalEntryFees: number;
-  totalGMEarnings: number;
-  competitionsEntered: number;
-  challengesEntered: number;
-}
+import type { GmReferralView } from "@/lib/services/gamemaster/gm-referral-view";
+import { REFERRAL_KIND_LABELS } from "@/lib/services/gamemaster/referral-kind";
+import { ReferralContact, ReferralKindBadge } from "@/components/gamemaster/GmReferralBadges";
+
+const KIND_FILTERS = [
+  { value: "all", label: "All" },
+  { value: "own", label: REFERRAL_KIND_LABELS.own },
+  { value: "external", label: REFERRAL_KIND_LABELS.external },
+] as const;
 
 interface ReferralsData {
-  referrals: ReferredUser[];
+  // Reason: the route maps every row through `toGameMasterReferralView`; typing the same shape
+  // here means a hand-written interface cannot quietly re-admit a raw field.
+  referrals: GmReferralView[];
   stats: {
     totalReferred: number;
+    currentReferred: number;
     activeUsers: number;
+    ownReferrals: number;
+    externalReferrals: number;
     totalEarningsGenerated: number;
     totalEntryFees: number;
     avgEarningsPerUser: number;
@@ -56,11 +56,15 @@ export default function GMReferralsPage() {
   const [data, setData] = useState<ReferralsData | null>(null);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<"all" | "active" | "inactive">("all");
+  const [filter, setFilter] = useState<"all" | "current" | "ended">("all");
+  const [kind, setKind] = useState<"all" | "own" | "external">("all");
 
   useEffect(() => {
     fetchReferrals();
-  }, [page, filter]);
+    // Reason: `search` is deliberately not a dependency - the search box fetches on submit, not
+    // on every keystroke, so listing fetchReferrals (which closes over search) would change that.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, filter, kind]);
 
   const fetchReferrals = async () => {
     try {
@@ -71,6 +75,9 @@ export default function GMReferralsPage() {
       });
       if (filter !== "all") {
         params.set("status", filter);
+      }
+      if (kind !== "all") {
+        params.set("kind", kind);
       }
       if (search) {
         params.set("search", search);
@@ -128,7 +135,7 @@ export default function GMReferralsPage() {
       <div className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-8">
         {/* Summary Cards */}
         {data && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-4 mb-4 sm:mb-8">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 sm:gap-4 mb-4 sm:mb-8">
             <div className="bg-gray-800/50 rounded-2xl p-3 sm:p-5 border border-gray-700/50">
               <div className="text-xs sm:text-sm text-gray-400 mb-1">Total Referred</div>
               <div className="text-lg sm:text-2xl font-bold text-white">
@@ -142,6 +149,18 @@ export default function GMReferralsPage() {
               </div>
               <div className="text-lg sm:text-2xl font-bold text-emerald-400">
                 {data.stats.activeUsers}
+              </div>
+            </div>
+            <div className="bg-gray-800/50 rounded-2xl p-3 sm:p-5 border border-gray-700/50">
+              <div className="text-xs sm:text-sm text-gray-400 mb-1">{REFERRAL_KIND_LABELS.own}</div>
+              <div className="text-lg sm:text-2xl font-bold text-yellow-300">
+                {data.stats.ownReferrals}
+              </div>
+            </div>
+            <div className="bg-gray-800/50 rounded-2xl p-3 sm:p-5 border border-gray-700/50">
+              <div className="text-xs sm:text-sm text-gray-400 mb-1">{REFERRAL_KIND_LABELS.external}</div>
+              <div className="text-lg sm:text-2xl font-bold text-sky-300">
+                {data.stats.externalReferrals}
               </div>
             </div>
             <div className="bg-gray-800/50 rounded-2xl p-3 sm:p-5 border border-gray-700/50">
@@ -174,7 +193,7 @@ export default function GMReferralsPage() {
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search by email or name..."
+                placeholder="Search by name..."
                 className="w-full pl-10 pr-4 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
               />
             </div>
@@ -191,8 +210,8 @@ export default function GMReferralsPage() {
             <div className="flex gap-1">
               {[
                 { value: "all", label: "All" },
-                { value: "active", label: "Active" },
-                { value: "inactive", label: "Inactive" },
+                { value: "current", label: "Current" },
+                { value: "ended", label: "Ended" },
               ].map((f) => (
                 <button
                   key={f.value}
@@ -208,6 +227,29 @@ export default function GMReferralsPage() {
                   )}
                 >
                   {f.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-400">Source:</span>
+            <div className="flex gap-1">
+              {KIND_FILTERS.map((k) => (
+                <button
+                  key={k.value}
+                  onClick={() => {
+                    setKind(k.value);
+                    setPage(1);
+                  }}
+                  className={cn(
+                    "px-3 py-1.5 rounded-lg text-sm font-medium transition-colors min-h-[36px]",
+                    kind === k.value
+                      ? "bg-blue-500/20 text-blue-400"
+                      : "text-gray-400 hover:text-white hover:bg-gray-800",
+                  )}
+                >
+                  {k.label}
                 </button>
               ))}
             </div>
@@ -251,35 +293,43 @@ export default function GMReferralsPage() {
                   <tbody>
                     {data.referrals.map((user) => (
                       <tr
-                        key={user._id}
+                        key={user.referralId}
                         className="border-t border-gray-700/50 hover:bg-gray-800/30"
                       >
                         <td className="px-6 py-4">
-                          <div>
+                          <div className="flex flex-col gap-1">
                             <p className="text-white font-medium">
                               {user.userName || "Unknown"}
                             </p>
-                            <p className="text-gray-500 text-sm">
-                              {user.userEmail}
-                            </p>
+                            <ReferralContact referral={user} />
+                            <ReferralKindBadge referral={user} />
                           </div>
                         </td>
                         <td className="px-6 py-4 text-gray-300 text-sm">
                           <div className="flex items-center gap-1">
                             <Calendar className="h-3 w-3" />
-                            {new Date(user.referredAt).toLocaleDateString()}
+                            {user.joinedAt ? new Date(user.joinedAt).toLocaleDateString() : "-"}
                           </div>
+                          {user.endedAt && (
+                            <p className="text-gray-500 text-xs mt-1">
+                              Ended {new Date(user.endedAt).toLocaleDateString()}
+                            </p>
+                          )}
                         </td>
                         <td className="px-6 py-4">
                           <span
                             className={cn(
                               "inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium",
-                              user.isActive
+                              user.isCurrent && user.isActive
                                 ? "bg-emerald-500/20 text-emerald-400"
                                 : "bg-gray-700 text-gray-400",
                             )}
                           >
-                            {user.isActive ? (
+                            {!user.isCurrent ? (
+                              <>
+                                <UserX className="h-3 w-3" /> Ended
+                              </>
+                            ) : user.isActive ? (
                               <>
                                 <UserCheck className="h-3 w-3" /> Active
                               </>
@@ -289,6 +339,9 @@ export default function GMReferralsPage() {
                               </>
                             )}
                           </span>
+                          {user.termsAccepted && (
+                            <p className="text-emerald-500/80 text-xs mt-1">Terms accepted</p>
+                          )}
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3 text-sm">
@@ -312,10 +365,10 @@ export default function GMReferralsPage() {
                           )}
                         </td>
                         <td className="px-6 py-4 text-gray-300">
-                          ⚡ {user.totalEntryFees.toLocaleString()}
+                          ⚡ {user.entryFees.toLocaleString()}
                         </td>
                         <td className="px-6 py-4 text-emerald-400 font-semibold">
-                          ⚡ {user.totalGMEarnings.toLocaleString()}
+                          ⚡ {user.earned.toLocaleString()}
                         </td>
                       </tr>
                     ))}

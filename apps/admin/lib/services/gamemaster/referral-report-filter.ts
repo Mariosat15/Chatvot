@@ -28,6 +28,12 @@ export interface ReferredPlayersFilter {
   status?: AffiliationStatusFilter;
   activity?: ActivityFilter;
   search?: string;
+  /**
+   * Set by the Game Master's own routes, never parsed from the query string. Reason: without
+   * it a Game Master could learn a hidden email (D6) by searching for it and watching the row
+   * appear - so the search matches an email only on rows whose terms were accepted.
+   */
+  contactRequiresConsent?: boolean;
 }
 
 export interface ReferredPlayersPaging {

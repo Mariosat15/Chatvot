@@ -915,6 +915,51 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 1 Oct 2026 - A Game Master sees a player's email only after the terms, and a referral link asks once
+
+Programme v2 task 5 plus two owner instructions. The work has three parts.
+
+**1. A referral link now asks before it attaches.** Sign-up used to attach the player to the
+Game Master with no consent.
+- **The change:** sign-up now records only a pending claim (`gm_referral_claims`). On the
+  player's first visit a one-time terms prompt opens.
+- **Accept** affiliates the player through `affiliate()`, which is still the only writer.
+- **Decline**, or never answering, attaches nobody, and the player is not asked again. Closing
+  the dialog leads to a confirm step and does not count as an answer.
+- **Recorded in:** the customer audit trail (`gm_referral_link_pending` / `_declined` /
+  `_lapsed`, add-only). The existing `gm_terms_accepted` row covers acceptance.
+- **Deviation from `24` s5.3**, recorded there: a first-visit prompt was built instead of a
+  sign-up checkbox, as the owner asked.
+
+**2. Expiry (D4) was verified, not changed.** A player is freed from a Game Master who
+**expired** and stays locked to one who is merely paused or suspended. Only an admin move
+changes the lock (task 4).
+- **One gap is recorded:** expiry is set by the daily renewal job, so a player can stay locked
+  for up to a day after a subscription ends.
+
+**3. The Game Master's own screens obey D6 (R118, live, closed).**
+- **The defect:** `/api/gamemaster/referrals` spread each stored row, sending every referred
+  player's email, IP address and browser string to the Game Master. The dashboard sent the
+  email too.
+- **The fix:** both routes now read the shared model, scoped to the session's Game Master. They
+  go through one field-listed view that shows the email only on accepted terms. Search cannot
+  match a hidden email.
+- **Badges:** each row carries **Own referral** or **External** with the surface it came
+  through, and an **Ended** state. The referrals page gains a Source filter and Own/External
+  counts.
+- **Deviations from D6, recorded in `24`:**
+  - Legacy link players' emails are **hidden**, not kept visible, because there is no consent to
+    share them.
+  - Country is not built.
+  - Entry fees and earnings now exclude cancelled earnings and count only within the
+    affiliation window.
+- **Harm:** no money moved. A read leaves no record, so whether the leak was used is unknowable.
+
+**Tests:** 19 in `gm-referral-claim.test.ts`, 20 in `gm-referral-view.test.ts`, plus flipped
+assertions in four suites. All 19 GM suites pass (372 tests). Probes 161-179: **all 179 red on
+exactly one test**. Mirrors agree. Typecheck is at baseline (main 228, admin 243). **Never verified
+by eye.**
+
 ### 1 Oct 2026 - The admin Game Master report, its export, and moving or detaching a player
 
 Programme v2 task 4. An operator could see the Game Master list but not the players each one

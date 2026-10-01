@@ -1426,6 +1426,149 @@ $results += Invoke-Probe `
     -To 'result = result.replace(new RegExp(`\\{\\{${key}\\}\\}`, "g"), String(value || ""));' `
     -TestName "substitutes variables literally so a password with a dollar sign survives" -Suite $EMP
 
+# ─── s5.3: the one-time terms prompt for a referral-link sign-up ───────────────
+$CLAIM = "__tests__/services/gm-referral-claim.test.ts"
+$AFFSVC = "__tests__/services/gm-affiliation-service.test.ts"
+$CLAIMSVC = "lib/services/gamemaster/referral-claim.service.ts"
+
+# 161. Sign-up attaches the player again instead of recording a claim.
+$results += Invoke-Probe `
+    -Name "Sign-up attaches without consent" -File "lib/actions/auth.actions.ts" `
+    -From 'const result = await recordReferralClaim({' `
+    -To 'const result = await affiliate({' `
+    -TestName "sign-up records a referral claim and never attaches" -Suite $AFFSVC
+
+# 162. The writer exempts the link channel from consent again.
+$results += Invoke-Probe `
+    -Name "Link exempt from consent" -File "lib/services/gamemaster/affiliation.service.ts" `
+    -From 'if (!verdict.ok) {' `
+    -To 'if (!verdict.ok && input.channel !== "gm_referral_link") {' `
+    -TestName "the referral link without consent is refused" -Suite $AFFSVC
+
+# 163. Decline is not final.
+$results += Invoke-Probe `
+    -Name "Decline reopens" -File $CLAIMSVC `
+    -From '{ $set: { status: "declined", resolution: "declined", resolvedAt: now } },' `
+    -To '{ $set: { status: "pending", resolution: "declined", resolvedAt: now } },' `
+    -TestName "declining is final" -Suite $CLAIM
+
+# 164. A retryable refusal closes the claim for good.
+$results += Invoke-Probe `
+    -Name "Retryable refusal is final" -File $CLAIMSVC `
+    -From '? { $set: { status: "pending" } }' `
+    -To '? { $set: { status: "refused" } }' `
+    -TestName "an Accept without valid consent attaches nobody" -Suite $CLAIM
+
+# 165. A crashed Accept strands the claim for ever.
+$results += Invoke-Probe `
+    -Name "Stalled Accept never taken over" -File $CLAIMSVC `
+    -From '$lte: new Date(now.getTime() - ACCEPTING_STALE_MS)' `
+    -To '$lte: new Date(0)' `
+    -TestName "a stalled Accept is taken over" -Suite $CLAIM
+
+# 166. A suspended Game Master lapses the claim instead of waiting.
+$results += Invoke-Probe `
+    -Name "Suspended GM lapses claim" -File "lib/services/gamemaster/referral-claim-rules.ts" `
+    -From 'if (decision.code === "gm_not_joinable") return { kind: "wait" };' `
+    -To '' `
+    -TestName "a suspended Game Master makes the claim wait" -Suite $CLAIM
+
+# 167. The prompt is never mounted, so nobody is ever asked.
+$results += Invoke-Probe `
+    -Name "Prompt not mounted" -File "app/(root)/layout.tsx" `
+    -From '<GmReferralTermsPrompt />' `
+    -To '' `
+    -TestName "the prompt is mounted in the signed-in layout" -Suite $CLAIM
+
+# 168. Escape on the confirm step dismisses the decision silently.
+$results += Invoke-Probe `
+    -Name "Confirm step escapable" -File "components/gamemaster/GmReferralTermsPrompt.tsx" `
+    -From 'onEscapeKeyDown={(e) => e.preventDefault()}' `
+    -To 'onEscapeKeyDown={() => setStage("idle")}' `
+    -TestName "closing the terms opens a confirm step" -Suite $CLAIM
+
+# 169. The route lets the body name the player.
+$results += Invoke-Probe `
+    -Name "Route trusts body user" -File "app/api/gamemaster/referral-claim/route.ts" `
+    -From 'result = await declineReferralClaim({ user, ...meta });' `
+    -To 'result = await declineReferralClaim({ user: body?.user ?? user, ...meta });' `
+    -TestName "the route takes the player from the session" -Suite $CLAIM
+
+# 170. A dead link still records a claim.
+$results += Invoke-Probe `
+    -Name "Dead link recorded" -File $CLAIMSVC `
+    -From 'if (decision.kind === "refuse") {' `
+    -To 'if (false) {' `
+    -TestName "a dead link records no claim at all" -Suite $CLAIM
+
+# ---- Task 5: the Game Master's own affiliate area (D6 redaction) ----
+$VIEWT = "__tests__/services/gm-referral-view.test.ts"
+$REFROUTE = "app/api/gamemaster/referrals/route.ts"
+$BADGES = "components/gamemaster/GmReferralBadges.tsx"
+
+# 171. The view hands over every email, consent or not.
+$results += Invoke-Probe `
+    -Name "View shows email without consent" -File "lib/services/gamemaster/gm-referral-view.ts" `
+    -From 'userEmail: visible ? row.userEmail : null,' `
+    -To 'userEmail: row.userEmail,' `
+    -TestName "withholds the email when no acceptance is recorded" -Suite $VIEWT
+
+# 172. A hidden email can be found by searching for it.
+$results += Invoke-Probe `
+    -Name "Consent search ignored" -File "lib/services/gamemaster/referral-read-model.ts" `
+    -From 'if (filter.contactRequiresConsent) byEmail.termsAcceptanceId' `
+    -To 'if (false) byEmail.termsAcceptanceId' `
+    -TestName "contactRequiresConsent stops email search" -Suite $VIEWT
+
+# 173. The referrals route forgets the consent scope.
+$results += Invoke-Probe `
+    -Name "Route drops consent scope" -File $REFROUTE `
+    -From 'const scope: ReferredPlayersFilter = { gameMasterIds: [userId], contactRequiresConsent: true };' `
+    -To 'const scope: ReferredPlayersFilter = { gameMasterIds: [userId] };' `
+    -TestName "referrals/route.ts scopes to the session user" -Suite $VIEWT
+
+# 174. The query string can replace the session Game Master.
+$results += Invoke-Probe `
+    -Name "Query overrides session GM" -File $REFROUTE `
+    -From '{ ...filter, ...scope }' `
+    -To '{ ...scope, ...filter }' `
+    -TestName "the referrals route spreads the scope last" -Suite $VIEWT
+
+# 175. The dashboard bypasses the view.
+$results += Invoke-Probe `
+    -Name "Dashboard bypasses view" -File "app/api/gamemaster/dashboard/route.ts" `
+    -From '.map(toGameMasterReferralView);' `
+    -To '.map((r) => ({ ...r }));' `
+    -TestName "dashboard/route.ts maps rows through the view" -Suite $VIEWT
+
+# 176. The referrals 500 leaks the error text.
+$results += Invoke-Probe `
+    -Name "Referrals 500 leaks message" -File $REFROUTE `
+    -From '{ success: false, error: "Something went wrong. Please contact support." },' `
+    -To '{ success: false, error: error instanceof Error ? error.message : "x" },' `
+    -TestName "referrals/route.ts returns a generic 500" -Suite $VIEWT
+
+# 177. The badge words own/external itself.
+$results += Invoke-Probe `
+    -Name "Badge hard-codes labels" -File $BADGES `
+    -From '{REFERRAL_KIND_LABELS[referral.kind]}' `
+    -To '{referral.kind === "own" ? "Own referral" : "External"}' `
+    -TestName "the badge component reads REFERRAL_KIND_LABELS" -Suite $VIEWT
+
+# 178. The dashboard tab drops the own/external badge.
+$results += Invoke-Probe `
+    -Name "Dashboard tab drops badge" -File "app/(root)/gamemaster/gamemaster-dashboard-tabs.tsx" `
+    -From '<div className="mt-1"><ReferralKindBadge referral={r} /></div>' `
+    -To '' `
+    -TestName "gamemaster-dashboard-tabs.tsx renders the kind badge" -Suite $VIEWT
+
+# 179. An ended affiliation reads as merely inactive.
+$results += Invoke-Probe `
+    -Name "Ended reads Inactive" -File $BADGES `
+    -From 'if (!referral.isCurrent) return <span className="text-xs text-gray-500">Ended</span>;' `
+    -To 'if (false) return <span className="text-xs text-gray-500">Ended</span>;' `
+    -TestName "an ended affiliation reads Ended" -Suite $VIEWT
+
 Write-Host ""
 Write-Host "================ SUMMARY ================"
 $results | Format-Table -AutoSize

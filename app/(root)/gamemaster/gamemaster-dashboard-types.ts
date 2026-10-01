@@ -1,8 +1,12 @@
 // ─── Shared Types for Game Master Dashboard ──────────────────────────
 
+import type { GmReferralView } from "@/lib/services/gamemaster/gm-referral-view";
+
 export interface DashboardStats {
   totalReferredUsers: number;
   activeReferredUsers: number;
+  ownReferrals?: number;
+  externalReferrals?: number;
   totalCompetitions: number;
   activeCompetitions: number;
   /** Package concurrent cap — denominator for Active / Slots Left KPIs. */
@@ -49,13 +53,9 @@ export interface EarningsByGameRow {
   count: number;
 }
 
-export interface ReferralItem {
-  _id: string;
-  name: string;
-  email: string;
-  createdAt: string;
-  isActive?: boolean;
-}
+// Reason: the dashboard route maps every row through `toGameMasterReferralView`, so the screen
+// types the same shape rather than a second hand-written copy that could re-admit the email.
+export type ReferralItem = GmReferralView;
 
 export interface SubscriptionData {
   _id: string;

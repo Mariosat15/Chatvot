@@ -16,6 +16,17 @@ vi.mock("@/database/mongoose", () => ({
   default: async () => mongoose,
 }));
 
+// Reason: since s5.3 BOTH channels require stored consent, so these tests (about the writer,
+// not the terms) present a stub consent id. The real verification is proven end to end in
+// gm-terms.test.ts; here the stub refuses anything else so a missing id still refuses.
+const CONSENT_OK = "consent-ok";
+vi.mock("@/lib/services/gamemaster/gm-terms.service", () => ({
+  verifyGmTermsAcceptance: async ({ acceptanceId }: { acceptanceId?: string }) =>
+    acceptanceId === "consent-ok"
+      ? { ok: true, termsAcceptanceId: "consent-ok", termsSlug: "terms-gamemaster-affiliation", termsVersion: "v1" }
+      : { ok: false, code: "terms_not_accepted", message: "Please accept the Gamemaster terms first." },
+}));
+
 import UserReferral from "@/database/models/user-referral.model";
 import GameMasterSubscription from "@/database/models/gamemaster/gamemaster-subscription.model";
 import { affiliate, getAffiliation } from "@/lib/services/gamemaster/affiliation.service";
@@ -111,6 +122,7 @@ const viaLink = (userId = PLAYER, referralCode = "GMONE") =>
     user: { id: userId, email: `${userId}@player.test`, name: "Player" },
     gameMaster: { referralCode },
     channel: "gm_referral_link",
+    termsAcceptanceId: CONSENT_OK,
     ipAddress: "10.0.0.1",
     userAgent: "vitest",
   });
@@ -299,6 +311,19 @@ describe("affiliate() against a real replica set", () => {
     expect(await viaLink()).toMatchObject({ success: true, created: true });
   });
 
+  it("the referral link without consent is refused and writes nothing (s5.3)", async () => {
+    const result = await affiliate({
+      user: { id: PLAYER, email: `${PLAYER}@player.test`, name: "Player" },
+      gameMaster: { referralCode: "GMONE" },
+      channel: "gm_referral_link",
+      surface: "signup",
+    });
+    expect(result).toMatchObject({ success: false, code: "terms_not_accepted" });
+    expect(await UserReferral.countDocuments({})).toBe(0);
+    expect(await userFallback(PLAYER)).toBeUndefined();
+    expect(await counters("GMONE")).toEqual({ total: 0, active: 0 });
+  });
+
   it("an unknown code is refused as gm_not_found", async () => {
     expect(await viaLink(PLAYER, "GMNOPE")).toMatchObject({ success: false, code: "gm_not_found" });
   });
@@ -362,6 +387,10 @@ describe("the service is the only writer (s9 test 7)", () => {
     ["lib/services/gamemaster/affiliation-migration.ts", "step 1 source backfill"],
     ["apps/admin/lib/services/gamemaster/affiliation-migration.ts", "step 1 source backfill, the copy the admin Run migration button runs"],
     ["apps/admin/app/api/gamemasters/[id]/route.ts", "only READS userreferrals; its write calls target the subscription (coarse-scan false positive)"],
+    // Reason: added after task 4 shipped without it, which left this test red. The admin app
+    // cannot import the main-app writer, so the audited move/detach is the one admin door
+    // (`24` s8, D1), pinned behaviourally in __tests__/admin/gm-admin-affiliation.test.ts.
+    ["apps/admin/lib/services/gamemaster/admin-affiliation.service.ts", "audited admin move/detach (task 4, D1)"],
   ]);
 
   const DIRECT_WRITE = [
@@ -418,10 +447,14 @@ describe("the service is the only writer (s9 test 7)", () => {
     expect(WRITE.some((re) => re.test(code("lib/services/gamemaster/affiliation.service.ts")))).toBe(true);
   });
 
-  it("sign-up no longer raw-inserts a referral and calls affiliate()", () => {
+  it("sign-up records a referral claim and never attaches the player itself", () => {
+    // Reason: flipped in s5.3. This used to assert sign-up CALLS affiliate(); a link sign-up
+    // is now attached only after the player accepts the terms (referral-claim.service), so
+    // sign-up calling the writer directly would attach a player who never consented.
     const src = code("lib/actions/auth.actions.ts");
     expect(src).not.toMatch(/userreferrals/);
-    expect(src).toMatch(/await affiliate\(\{/);
+    expect(src).not.toMatch(/\baffiliate\(/);
+    expect(src).toMatch(/await recordReferralClaim\(\{/);
   });
 
   it("no client component imports the service", () => {

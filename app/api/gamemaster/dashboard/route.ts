@@ -3,7 +3,9 @@ import mongoose from "mongoose";
 import { connectToDatabase } from "@/database/mongoose";
 import GameMasterSubscription from "@/database/models/gamemaster/gamemaster-subscription.model";
 import GameMasterEarning from "@/database/models/gamemaster/gamemaster-earning.model";
-import UserReferral from "@/database/models/user-referral.model";
+import { readReferredPlayers } from "@/lib/services/gamemaster/referral-read-model";
+import { MAX_PAGE_LIMIT } from "@/lib/services/gamemaster/referral-report-filter";
+import { toGameMasterReferralView } from "@/lib/services/gamemaster/gm-referral-view";
 import Competition from "@/database/models/trading/competition.model";
 import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
@@ -142,20 +144,16 @@ export async function GET() {
     const canEarnFromChallenges = displayLimits.canEarnFromChallenges;
 
     // ── Referred Users ──────────────────────────────────────────────
-    const referredUsers = await UserReferral.find({ gameMasterId: userId })
-      .select("userName userEmail referredAt userId isActive")
-      .sort({ referredAt: -1 })
-      .limit(100)
-      .lean()
-      .then((users) =>
-        users.map((u) => ({
-          _id: u.userId,
-          name: u.userName || "Unknown",
-          email: u.userEmail,
-          createdAt: u.referredAt,
-          isActive: u.isActive,
-        })),
-      );
+    // Reason: the shared read model plus the D6 view, the same pair /api/gamemaster/referrals
+    // uses. The old query selected `userEmail` for every player, consent or not.
+    const referralReport = db
+      ? await readReferredPlayers(
+          db,
+          { gameMasterIds: [userId], contactRequiresConsent: true },
+          { page: 1, limit: MAX_PAGE_LIMIT },
+        )
+      : null;
+    const referredUsers = (referralReport?.rows ?? []).map(toGameMasterReferralView);
 
     // ── Competitions ────────────────────────────────────────────────
     const competitions = await Competition.find({ gameMasterId: userId })
@@ -279,8 +277,11 @@ export async function GET() {
         recentCompetitions: competitions,
         earningsByGame,
         stats: {
-          totalReferredUsers: referredUsers.length,
-          activeReferredUsers: referredUsers.filter((r) => r.isActive).length,
+          // Reason: from the summary, not the list - the list stops at one page.
+          totalReferredUsers: referralReport?.summary.all.players ?? 0,
+          activeReferredUsers: referralReport?.summary.all.current ?? 0,
+          ownReferrals: referralReport?.summary.byKind.own.players ?? 0,
+          externalReferrals: referralReport?.summary.byKind.external.players ?? 0,
           totalCompetitions,
           activeCompetitions,
           maxActiveCompetitions,
@@ -291,11 +292,11 @@ export async function GET() {
       },
     });
   } catch (error) {
-    console.error("Error fetching GM dashboard:", error);
+    console.error("❌ Error fetching GM dashboard:", error);
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: "Something went wrong. Please contact support.",
       },
       { status: 500 },
     );

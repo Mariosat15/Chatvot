@@ -28,8 +28,23 @@ export interface RecordGmTermsInput {
   user: { id: string; email: string; name?: string };
   gameMasterId: string;
   competitionId?: string;
+  /** Which door the consent was given at. Labelling only; never widens what it proves. */
+  affiliationSource?: GmConsentSource;
   ipAddress?: string;
   userAgent?: string;
+}
+
+export type GmConsentSource = "chartvolt_join_gm" | "gm_referral_link";
+const CONSENT_SOURCES: ReadonlySet<string> = new Set<GmConsentSource>([
+  "chartvolt_join_gm",
+  "gm_referral_link",
+]);
+
+/** Narrow a browser-supplied label; anything unknown reads as Join GM, the historical value. */
+export function toGmConsentSource(value: unknown): GmConsentSource {
+  return typeof value === "string" && CONSENT_SOURCES.has(value)
+    ? (value as GmConsentSource)
+    : "chartvolt_join_gm";
 }
 
 export type RecordGmTermsResult =
@@ -147,7 +162,7 @@ export async function recordGmTermsAcceptance(
       termsVersion: live.version,
       context: {
         gameMasterId: input.gameMasterId,
-        affiliationSource: "chartvolt_join_gm",
+        affiliationSource: toGmConsentSource(input.affiliationSource),
         ...(isNonEmpty(input.competitionId) ? { competitionId: input.competitionId } : {}),
       },
       ipAddress: input.ipAddress || "",
@@ -166,7 +181,8 @@ export async function recordGmTermsAcceptance(
 
 /**
  * Does this acceptance id prove consent to join THIS Game Master under the CURRENT wording?
- * Called by `affiliate()` for Join GM before anything is written.
+ * Called by `affiliate()` on BOTH channels (Join GM, and the referral link since s5.3)
+ * before anything is written.
  */
 export async function verifyGmTermsAcceptance(input: {
   acceptanceId: string | undefined;

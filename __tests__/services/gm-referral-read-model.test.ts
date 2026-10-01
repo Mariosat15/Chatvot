@@ -373,9 +373,14 @@ describe("wiring", () => {
     expect(src).not.toMatch(/LEGACY_AFFILIATION_SOURCE\s*[:=]/);
   });
 
-  it("the Game Master referrals list labels rows with the shared classifier", () => {
+  // Reason: flipped in task 5. This used to pin the route's own `classifyReferral` call and its
+  // own escaped search - correct labelling, but over raw rows spread with `...r`, which handed
+  // every Game Master each player's email, sign-up IP and browser string. The route now reads
+  // through the shared read model (which classifies and escapes for it) and the D6 view.
+  it("the Game Master referrals list reads the shared model through the D6 view", () => {
     const src = stripComments(read("app/api/gamemaster/referrals/route.ts"));
-    expect(src).toMatch(/classifyReferral\(\{\s*source: r\.source,\s*affiliatedVia: r\.affiliatedVia/);
-    expect(src).toMatch(/escapeRegex\(search/);
+    expect(src).toMatch(/readReferredPlayers\(/);
+    expect(src).toMatch(/\.map\(toGameMasterReferralView\)/);
+    expect(src).not.toMatch(/\.\.\.r\b/);
   });
 });

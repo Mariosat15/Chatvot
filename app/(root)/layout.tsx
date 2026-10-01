@@ -7,6 +7,7 @@ import { TerminologyProvider } from "@/contexts/TerminologyContext";
 import { getTerms } from "@/lib/services/terminology.service";
 import GlobalPresenceTracker from "@/components/GlobalPresenceTracker";
 import ChallengePopup from "@/components/challenges/ChallengePopup";
+import GmReferralTermsPrompt from "@/components/gamemaster/GmReferralTermsPrompt";
 import UserSidebar from "@/components/UserSidebar";
 import Header from "@/components/Header";
 import { connectToDatabase } from "@/database/mongoose";
@@ -67,6 +68,10 @@ const Layout = async ({ children }: { children: React.ReactNode }) => {
 
         {/* Real-time challenge popup notifications (WS push) */}
         <ChallengePopup userId={session.user.id} />
+
+        {/* Reason: a referral-link sign-up is attached only after the player accepts the
+            Gamemaster terms here, once, on their first visit (`External game plans/24` s5.3). */}
+        <GmReferralTermsPrompt />
 
         <div className="min-h-screen bg-gray-950 text-gray-400 flex">
           {/* Sidebar Navigation - Desktop Only */}

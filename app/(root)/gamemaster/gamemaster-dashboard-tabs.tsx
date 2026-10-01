@@ -7,6 +7,7 @@ import {
 } from "recharts";
 import Link from "next/link";
 import { Shield } from "lucide-react";
+import { ReferralContact, ReferralKindBadge, ReferralStateLabel } from "@/components/gamemaster/GmReferralBadges";
 import type { DashboardStats, CompetitionItem, EarningItem, ReferralItem, SubscriptionData, EarningsByGameRow } from "./gamemaster-dashboard-types";
 
 // Re-export types so existing imports still work
@@ -246,16 +247,22 @@ export function CompetitionsTab({ competitions, filter, onFilterChange, subscrip
 }
 
 // ─── Referrals Tab ────────────────────────────────────────────────────
-export function ReferralsTab({ referrals, search, onSearchChange, total }: {
+export function ReferralsTab({ referrals, search, onSearchChange, total, own, external }: {
   referrals: ReferralItem[]; search: string; onSearchChange: (s: string) => void; total: number;
+  own?: number; external?: number;
 }) {
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <span className="text-sm text-gray-400">Total: <span className="text-white font-medium">{total}</span> referred users</span>
+        <span className="text-sm text-gray-400">
+          Total: <span className="text-white font-medium">{total}</span> referred users
+          {(own !== undefined || external !== undefined) && (
+            <> · {own ?? 0} own · {external ?? 0} external</>
+          )}
+        </span>
         <div className="relative w-full sm:w-72">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <input type="text" placeholder="Search name or email..." value={search} onChange={(e) => onSearchChange(e.target.value)}
+          <input type="text" placeholder="Search name..." value={search} onChange={(e) => onSearchChange(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-white text-sm placeholder-gray-500 focus:border-yellow-500/50 focus:outline-none transition-colors min-h-[44px]" />
         </div>
       </div>
@@ -267,21 +274,18 @@ export function ReferralsTab({ referrals, search, onSearchChange, total }: {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {referrals.map((r) => (
-            <div key={r._id} className="flex items-center gap-3 p-4 bg-gray-800/50 rounded-xl border border-gray-700/50 hover:border-gray-600 transition-colors">
+            <div key={r.referralId} className="flex items-center gap-3 p-4 bg-gray-800/50 rounded-xl border border-gray-700/50 hover:border-gray-600 transition-colors">
               <div className="w-10 h-10 bg-gradient-to-br from-yellow-500 to-amber-600 rounded-full flex items-center justify-center text-black font-bold text-sm shrink-0">
-                {r.name?.charAt(0)?.toUpperCase() || "?"}
+                {r.userName?.charAt(0)?.toUpperCase() || "?"}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-white font-medium text-sm truncate">{r.name}</p>
-                <p className="text-gray-400 text-xs truncate">{r.email}</p>
+                <p className="text-white font-medium text-sm truncate">{r.userName || "Unknown"}</p>
+                <ReferralContact referral={r} />
+                <div className="mt-1"><ReferralKindBadge referral={r} /></div>
               </div>
               <div className="text-right shrink-0">
-                <p className="text-gray-400 text-xs">{new Date(r.createdAt).toLocaleDateString()}</p>
-                {r.isActive !== undefined && (
-                  <p className={`text-xs mt-0.5 ${r.isActive ? "text-emerald-400" : "text-gray-500"}`}>
-                    {r.isActive ? "Active" : "Inactive"}
-                  </p>
-                )}
+                {r.joinedAt && <p className="text-gray-400 text-xs">{new Date(r.joinedAt).toLocaleDateString()}</p>}
+                <ReferralStateLabel referral={r} />
               </div>
             </div>
           ))}

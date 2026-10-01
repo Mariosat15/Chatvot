@@ -154,7 +154,9 @@ export default function GameMasterDashboardContent() {
     if (!data?.referredUsers) return [];
     if (!referralSearch.trim()) return data.referredUsers;
     const q = referralSearch.toLowerCase();
-    return data.referredUsers.filter((r) => r.name?.toLowerCase().includes(q) || r.email?.toLowerCase().includes(q));
+    // Reason: userEmail is already null for a player who has not consented (D6), so this search
+    // can only match an email the Game Master is allowed to see.
+    return data.referredUsers.filter((r) => r.userName?.toLowerCase().includes(q) || r.userEmail?.toLowerCase().includes(q));
   }, [data?.referredUsers, referralSearch]);
 
   // ── Loading ───────────────────────────────────────────────────────
@@ -269,7 +271,7 @@ export default function GameMasterDashboardContent() {
           />
         )}
         {activeTab === "Competitions" && <CompetitionsTab competitions={filteredComps} filter={compFilter} onFilterChange={setCompFilter} subscription={sub} isExpired={isExpired} />}
-        {activeTab === "Referrals" && <ReferralsTab referrals={filteredReferrals} search={referralSearch} onSearchChange={setReferralSearch} total={stats?.totalReferredUsers ?? 0} />}
+        {activeTab === "Referrals" && <ReferralsTab referrals={filteredReferrals} search={referralSearch} onSearchChange={setReferralSearch} total={stats?.totalReferredUsers ?? 0} own={stats?.ownReferrals} external={stats?.externalReferrals} />}
         {activeTab === "Earnings" && stats && <EarningsTab earnings={filteredEarnings} filter={earningsFilter} onFilterChange={setEarningsFilter} stats={stats} />}
 
         <SubscriptionPanel sub={sub} isExpired={isExpired} isPaused={isPaused} isScheduledForDeletion={isScheduledForDeletion} togglingRenewal={togglingRenewal} togglingPause={togglingPause} schedulingCancel={schedulingCancel} renewingNow={renewingNow} toggleAutoRenew={toggleAutoRenew} togglePause={togglePause} onShowCancelConfirm={() => setShowCancelConfirm(true)} toggleScheduledCancellation={toggleScheduledCancellation} onRenewNow={renewNow} />

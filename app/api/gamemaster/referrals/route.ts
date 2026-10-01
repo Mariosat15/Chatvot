@@ -1,172 +1,93 @@
 import { NextRequest, NextResponse } from "next/server";
+import mongoose from "mongoose";
+import { headers } from "next/headers";
 import { connectToDatabase } from "@/database/mongoose";
 import { auth } from "@/lib/better-auth/auth";
-import { headers } from "next/headers";
 import GameMasterSubscription from "@/database/models/gamemaster/gamemaster-subscription.model";
-import UserReferral from "@/database/models/user-referral.model";
-import mongoose from "mongoose";
-import { classifyReferral } from "@/lib/services/gamemaster/referral-kind";
+import { readReferredPlayers } from "@/lib/services/gamemaster/referral-read-model";
 import {
-  escapeRegex,
-  MAX_SEARCH_LENGTH,
+  parseReferredPlayersQuery,
+  type ReferredPlayersFilter,
 } from "@/lib/services/gamemaster/referral-report-filter";
+import { toGameMasterReferralView } from "@/lib/services/gamemaster/gm-referral-view";
 
 /**
- * GET /api/gamemaster/referrals
- * Get detailed list of referred users for a Game Master
+ * GET /api/gamemaster/referrals - the signed-in Game Master's own referred players
+ * (`External game plans/24` s6, task 5 of the v2 programme).
+ *
+ * Read through the shared read model, so this list, the admin report and the financial
+ * breakdown agree about every player, and mapped through `toGameMasterReferralView`, so an
+ * email is shown only for a player who accepted the affiliation terms (D6).
  */
+
+// Reason: the screen predates the read model and sent `status=active|inactive` meaning "is the
+// affiliation live". Mapped rather than dropped so an old bookmark still filters.
+const LEGACY_STATUS = new Map<string, ReferredPlayersFilter["status"]>([
+  ["active", "current"],
+  ["inactive", "ended"],
+]);
+
 export async function GET(request: NextRequest) {
   try {
     await connectToDatabase();
 
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user?.id) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 },
-      );
+      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
-
     const userId = session.user.id;
-    const { searchParams } = new URL(request.url);
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "20");
-    const status = searchParams.get("status"); // 'active' or 'inactive'
-    const search = searchParams.get("search");
 
-    // Check if user is a Game Master
-    const subscription = await GameMasterSubscription.findOne({ userId });
+    const subscription = await GameMasterSubscription.exists({ userId });
     if (!subscription) {
-      return NextResponse.json(
-        { success: false, error: "Not a Game Master" },
-        { status: 403 },
-      );
+      return NextResponse.json({ success: false, error: "Not a Game Master" }, { status: 403 });
     }
 
-    // Build query
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const query: any = { gameMasterId: userId };
-
-    if (status === "active") {
-      query.isActive = true;
-    } else if (status === "inactive") {
-      query.isActive = false;
-    }
-
-    if (search) {
-      // Reason: escaped and length-capped - the raw string was a regex, so `.*` matched
-      // everything and a crafted pattern could stall the query (ReDoS).
-      const pattern = escapeRegex(search.slice(0, MAX_SEARCH_LENGTH));
-      query.$or = [
-        { userEmail: { $regex: pattern, $options: "i" } },
-        { userName: { $regex: pattern, $options: "i" } },
-      ];
-    }
-
-    // Get total count
-    const total = await UserReferral.countDocuments(query);
-
-    // Get referrals with pagination
-    const referrals = await UserReferral.find(query)
-      .sort({ referredAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(limit)
-      .lean();
-
-    // Get MongoDB connection for aggregations
     const db = mongoose.connection.db;
+    if (!db) throw new Error("database connection unavailable");
 
-    // Get earnings data from gamemasterearnings collection (source of truth)
-    let earningsByUser: Map<
-      string,
-      { totalEntryFees: number; totalEarnings: number }
-    > = new Map();
-    let totalEntryFees = 0;
-    let totalEarningsGenerated = 0;
+    const params = new URL(request.url).searchParams;
+    const { filter, paging } = parseReferredPlayersQuery(params);
+    const legacy = LEGACY_STATUS.get(params.get("status") ?? "");
+    if (legacy) filter.status = legacy;
 
-    if (db) {
-      // Get earnings grouped by referred user
-      const earningsData = await db
-        .collection("gamemasterearnings")
-        .aggregate([
-          { $match: { gameMasterId: userId } },
-          {
-            $group: {
-              _id: "$referredUserId",
-              totalEntryFees: { $sum: "$entryFeeAmount" },
-              totalEarnings: { $sum: "$netEarning" },
-            },
-          },
-        ])
-        .toArray();
-
-      for (const e of earningsData) {
-        earningsByUser.set(e._id, {
-          totalEntryFees: e.totalEntryFees || 0,
-          totalEarnings: e.totalEarnings || 0,
-        });
-        totalEntryFees += e.totalEntryFees || 0;
-        totalEarningsGenerated += e.totalEarnings || 0;
-      }
-    }
-
-    // Enrich referrals with actual earnings data
-    const enrichedReferrals = referrals.map((r) => {
-      const earnings = earningsByUser.get(r.userId) || {
-        totalEntryFees: 0,
-        totalEarnings: 0,
-      };
-      // Reason: own/external comes from the shared classifier, never re-derived here, so this
-      // list and every report label the same player the same way (`24` s7.1).
-      const { kind, surface } = classifyReferral({
-        source: r.source,
-        affiliatedVia: r.affiliatedVia,
-      });
-      return {
-        ...r,
-        kind,
-        surface,
-        totalEntryFees: earnings.totalEntryFees,
-        totalGMEarnings: earnings.totalEarnings,
-      };
-    });
-
-    // Count stats from UserReferral
-    const allReferrals = await UserReferral.find({
-      gameMasterId: userId,
-    }).lean();
-    const totalReferred = allReferrals.length;
-    const activeUsers = allReferrals.filter((r) => r.isActive).length;
-
-    const stats = {
-      totalReferred,
-      activeUsers,
-      totalEntryFees,
-      totalEarningsGenerated,
-      avgEarningsPerUser:
-        totalReferred > 0 ? totalEarningsGenerated / totalReferred : 0,
-    };
+    // Reason: the Game Master is ALWAYS the session user. A `gameMasterId` in the query string
+    // would otherwise let one Game Master read another's players.
+    const scope: ReferredPlayersFilter = { gameMasterIds: [userId], contactRequiresConsent: true };
+    const filtered = Object.keys(filter).some((k) => k !== "gameMasterIds");
+    const report = await readReferredPlayers(db, { ...filter, ...scope }, paging);
+    // The headline figures describe every player, not just the filtered page.
+    const overall = filtered
+      ? await readReferredPlayers(db, scope, { page: 1, limit: 1 })
+      : report;
+    const all = overall.summary.all;
 
     return NextResponse.json({
       success: true,
       data: {
-        referrals: enrichedReferrals,
-        stats,
-        pagination: {
-          page,
-          limit,
-          total,
-          totalPages: Math.ceil(total / limit),
+        referrals: report.rows.map(toGameMasterReferralView),
+        stats: {
+          totalReferred: all.players,
+          currentReferred: all.current,
+          activeUsers: all.active,
+          ownReferrals: overall.summary.byKind.own.players,
+          externalReferrals: overall.summary.byKind.external.players,
+          totalEntryFees: all.entryFees,
+          totalEarningsGenerated: all.earned,
+          avgEarningsPerUser: all.players > 0 ? all.earned / all.players : 0,
         },
+        pagination: {
+          page: report.page,
+          limit: report.limit,
+          total: report.total,
+          totalPages: Math.max(1, Math.ceil(report.total / report.limit)),
+        },
+        asOf: report.asOf,
       },
     });
   } catch (error) {
-    console.error("Error fetching GM referrals:", error);
+    console.error("❌ Error fetching GM referrals:", error);
     return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
-      },
+      { success: false, error: "Something went wrong. Please contact support." },
       { status: 500 },
     );
   }

@@ -16,7 +16,7 @@ import {
 } from "@/lib/services/registration-security.service";
 import { getFraudSettings } from "@/lib/services/fraud-settings.service";
 import { parseSignupInterest } from "@/lib/utils/signup-interest";
-import { affiliate } from "@/lib/services/gamemaster/affiliation.service";
+import { recordReferralClaim } from "@/lib/services/gamemaster/referral-claim.service";
 
 export const signUpWithEmail = async ({
   email,
@@ -202,35 +202,33 @@ export const signUpWithEmail = async ({
         // Process game master referral if present
         if (referralCode && referralCode.startsWith("GM")) {
           try {
-            // Reason: `affiliate` is the single writer of both affiliation stores
-            // (`External game plans/24` s3). It writes the referral row, the user-document
-            // fallback and the Game Master's counters in one transaction or not at all, so
-            // a half-linked player - counted but never paid for, or paid for but never
-            // counted - can no longer be left behind by a failure between steps.
+            // Reason: sign-up does NOT attach the player (`External game plans/24` s5.3).
+            // Registering gives no chance to read the Gamemaster terms, so it records a
+            // pending claim; the player's first visit shows the terms once, and only an
+            // acceptance becomes an affiliation - through `affiliate()`, the single writer.
+            // A decline, or ignoring it, leaves the player unattached.
             let userAgent: string | undefined;
             try {
               userAgent = (await headers()).get("user-agent") || undefined;
             } catch {
               userAgent = undefined;
             }
-            const result = await affiliate({
+            const result = await recordReferralClaim({
               user: { id: userId, email, name: fullName },
-              gameMaster: { referralCode },
-              channel: "gm_referral_link",
-              surface: "signup",
+              referralCode,
               ipAddress: ip || undefined,
               userAgent,
             });
 
-            if (result.success) {
+            if (result.recorded) {
               console.log(
-                `✅ User ${userId} linked to Game Master ${result.gameMasterId} via referral code ${referralCode}`,
+                `✅ User ${userId} invited to Game Master ${result.gameMasterId} via referral code ${referralCode}; awaiting terms`,
               );
             } else {
               // Reason: a dropped referral is money a Game Master is owed and never gets,
               // so it must be visible in the logs rather than an info line nobody reads.
               console.warn(
-                `⚠️ Referral dropped: code ${referralCode} refused (${result.code}) for user ${userId}`,
+                `⚠️ Referral dropped: code ${referralCode} refused (${result.reason}) for user ${userId}`,
               );
             }
           } catch (referralError) {

@@ -126,10 +126,11 @@ function baseMatch(filter: ReferredPlayersFilter): Document {
   }
   if (filter.search) {
     const pattern = escapeRegex(filter.search);
-    match.$or = [
-      { userEmail: { $regex: pattern, $options: "i" } },
-      { userName: { $regex: pattern, $options: "i" } },
-    ];
+    const byEmail: Document = { userEmail: { $regex: pattern, $options: "i" } };
+    // Reason: the same test as `termsAccepted` below - a non-empty string id - so a row the
+    // search can find by email is exactly a row whose email the screen may show.
+    if (filter.contactRequiresConsent) byEmail.termsAcceptanceId = { $type: "string", $ne: "" };
+    match.$or = [byEmail, { userName: { $regex: pattern, $options: "i" } }];
   }
   return match;
 }

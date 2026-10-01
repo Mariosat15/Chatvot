@@ -339,9 +339,11 @@ The rule: **a `gm_private` contest can be entered, and its details read, only by
 >   deactivated.** The page definition carries `requiresLivePage: true`, and the public route serves
 >   **no built-in fallback** for it - every other action-terms page still falls back. Serving the
 >   built-in text would record consent to words the operator never published or has withdrawn.
-> - **5.3 (the sign-up checkbox) is DEFERRED.** The referral link therefore still needs no consent;
+> - ~~**5.3 (the sign-up checkbox) is DEFERRED.** The referral link therefore still needs no consent;
 >   `affiliate()` verifies an acceptance on that channel only when an id is supplied. Join GM always
->   requires one. A document saying referral sign-ups now record consent is wrong.
+>   requires one. A document saying referral sign-ups now record consent is wrong.~~ **Superseded 1 Oct
+>   2026 by the first-visit prompt below.** A referral link no longer attaches anybody at sign-up, and
+>   `affiliate()` now requires consent on every channel. Correct as history, stale as a present fact.
 > - **`withMissingSystemPages` was added**, because the seeder prefers a saved
 >   `data/defaults/pages.json` and one saved before this page existed would never seed it. It adds
 >   missing **system** pages only and overrides nothing.
@@ -363,6 +365,83 @@ The rule: **a `gm_private` contest can be entered, and its details read, only by
 5.2 **Acceptance flow** reuses `ActionTermsDialog` with the GM's name interpolated as a variable (no per-GM page). POST `/api/terms-acceptance` gains optional `context.gameMasterId`; the route stores `termsVersion` from the live page and returns the acceptance id; the Join GM call must present that id (s3).
 5.3 **Referral-link sign-up**: the sign-up form shows a required "I accept the Gamemaster Affiliation Terms" checkbox **only when `?ref=` is present and resolves to an active GM**; the acceptance is recorded after the user exists. Existing referral users (pre-v2) have no acceptance - D6 keeps their data sharing as today.
 5.4 If the page is **deactivated** by an admin, Join GM is refused with a clear message rather than skipping terms (fail closed).
+
+> **BUILT 1 Oct 2026 (programme v2, owner instruction): a referral link asks once, on the first
+> visit, instead of a sign-up checkbox.** This deviates from 5.3. The owner asked for a pop-up on
+> the player's first visit, because the sign-up form has no room for terms.
+>
+> **Live code:**
+> - `lib/services/gamemaster/referral-claim-rules.ts` (pure, model-free, R58);
+> - `referral-claim.service.ts` (main app only, R42);
+> - `database/models/gamemaster/gm-referral-claim.model.ts` (`gm_referral_claims`; main app only,
+>   since nothing in `apps/admin` reads it);
+> - `GET/POST /api/gamemaster/referral-claim`;
+> - `components/gamemaster/GmReferralTermsPrompt.tsx`, mounted in `app/(root)/layout.tsx`;
+> - `recordReferralClaim` in `lib/actions/auth.actions.ts`.
+>
+> Tests: 19 in `__tests__/services/gm-referral-claim.test.ts`, plus flipped assertions in
+> `gm-affiliation-service`, `gm-terms` and `gm-program-data-model`. Probes 161-170, each red on
+> exactly one test.
+>
+> - **Sign-up attaches NOBODY.** It records a `pending` claim and nothing else, so the referral
+>   writes no row and pays no commission until the player accepts. **Accept** goes through
+>   `affiliate()` with the acceptance id, which is still the single writer. **Decline is final**,
+>   and the player is never asked again. **Closing the dialog is not an answer**: it opens a
+>   confirm step that can be left only by Decline or by going back to the terms. A player who never
+>   answers is never attached.
+> - **The prompt asks `decideAffiliation`, never a copy of D1/D4.** Another active Game Master
+>   (D1) lapses the claim. An expired previous Game Master (D4) shows the prompt. A **suspended**
+>   Game Master makes the prompt **wait** rather than lapse, because the player has not said no.
+> - **`accepting` is a claim state with a 2-minute takeover** (`ACCEPTING_STALE_MS`), so two tabs
+>   cannot both accept, and a crashed Accept cannot strand the claim. A retryable refusal
+>   (`RETRYABLE_ACCEPT_CODES`, a `Set`) puts the claim back to `pending`.
+> - **The route takes the user from the session, never from the body.**
+> - **Audited:** `gm_referral_link_pending`, `_declined` and `_lapsed` were added to the admin
+>   `customer-audit-trail` enum (add-only). Each write is best-effort and happens after the state
+>   change.
+>
+> **Expiry and D4, verified rather than assumed.** A player whose Game Master has **expired** may
+> join another. A player whose Game Master is merely paused or suspended may not. Only an admin
+> move changes that. One gap is recorded: a subscription becomes `expired` only when the daily job
+> `worker/jobs/gamemaster-renewal.job.ts` runs, so the player is freed **up to a day late**. That
+> errs in the safe direction (locked a little longer). It is not fixed here.
+>
+> **Never verified by eye.**
+
+> **BUILT 1 Oct 2026 (programme v2 task 5): the Game Master's own referral screens obey D6.**
+> Recorded as **R118** in `17`, because the old routes leaked.
+>
+> **Live code:**
+> - `lib/services/gamemaster/gm-referral-view.ts` (`toGameMasterReferralView`, `CONTACT_HIDDEN_NOTE`);
+> - `contactRequiresConsent` on `ReferredPlayersFilter`, in both `referral-report-filter.ts` copies
+>   and both `referral-read-model.ts` copies (mirrored, byte-identical test);
+> - `app/api/gamemaster/{referrals,dashboard}/route.ts`;
+> - `components/gamemaster/GmReferralBadges.tsx`;
+> - the referrals tab and `app/(root)/gamemaster/referrals/page.tsx`.
+>
+> Tests: 20 in `__tests__/services/gm-referral-view.test.ts`. Probes 171-179, each red on exactly
+> one test.
+>
+> - **Both routes read task 3's shared model**, scoped to `{ gameMasterIds: [sessionUserId],
+>   contactRequiresConsent: true }`. The scope is spread last, so the query string cannot point the
+>   read at another Game Master.
+> - **The email shows only when `termsAccepted === true`.** Otherwise the screen says "Contact
+>   hidden - terms not accepted". The view lists every field it returns, so `signupIP` and
+>   `signupUserAgent` can no longer arrive by spread.
+> - **Search cannot find a hidden email.** With the flag set, an email match also needs a stored
+>   acceptance. The flag is never read from the query, and the admin report does not set it.
+> - **Badges:** "Own referral" or "External" with the surface label, from `REFERRAL_KIND_LABELS` /
+>   `REFERRAL_SURFACE_LABELS`, never hard-coded. An ended affiliation reads **Ended**, not Inactive.
+>   The list gains a Source filter and Own/External counts.
+> - **Deviation from D6's last sentence, recorded:** D6 says referral-link players who never
+>   accepted terms "keep today's visibility". The build **hides** their email instead. Today's
+>   visibility was the R118 leak, and an affiliation with no acceptance is not consent to share.
+>   This fails closed. The display name is still shown.
+> - **Not built:** country (D6 names it, but no field carries it on this read). A further change in
+>   behaviour: entry fees and earnings now exclude cancelled earnings and count only within the
+>   affiliation window, because they come from the shared model.
+>
+> **Never verified by eye.**
 
 ---
 
@@ -434,6 +513,8 @@ The rule: **a `gm_private` contest can be entered, and its details read, only by
 - Affiliated to a different GM: CTA replaced by an explanation; no join offered (D1).
 
 ### 6.3 GM dashboard (`app/(root)/gamemaster`)
+
+> **BUILT 1 Oct 2026 except the private-contests count** - see the task-5 note at the end of s5.
 - Affiliates list shows the **source badge** and terms-accepted date; shows contact details only for users covered by D6.
 - New "Private contests" count and the link fix from s0.1.
 
@@ -611,7 +692,7 @@ Rollback: flags off; fields are inert; no data deleted. A private contest alread
 
 ---
 
-## 11. Risks (next free number is R117 - re-check with `rg -o "R\d+"` before adding)
+## 11. Risks (next free number is R119 since R118 on 1 Oct 2026 - re-check with `rg -o "R\d+"` before adding)
 
 - **R117 - private contest leaks through an unfiltered reader.** Many list readers exist; the fix is the shared filter helper plus the per-reader test in s9.3. High likelihood if done per call site.
 - **R118 - Join GM becomes a commission-farming tool** (GM creates accounts, joins them, enters own private contests). Mitigated by: GM cannot enter own contests (exists), affiliation needs a real account + terms, existing fraud detectors on entry, burst recording. Residual: owner decision on auto-action.
