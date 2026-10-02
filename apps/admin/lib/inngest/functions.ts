@@ -337,6 +337,12 @@ export const updateCompetitionStatuses = inngest.createFunction(
               `🔔 Sent competition_started notifications to ${participants.length} participants for ${comp.name}`,
             );
           }
+          // The Game Master who created a contest hears that it started and how full it is.
+          const { notifyGmContestStarted } =
+            await import("@/lib/services/gamemaster/gm-contest-notifications");
+          for (const comp of competitionsStarting) {
+            if (comp.gameMasterId) await notifyGmContestStarted(comp.toObject?.() ?? comp);
+          }
         } catch (notifError) {
           console.error(
             "Error sending competition started notifications:",

@@ -135,6 +135,15 @@ export async function awardContestRewards(
     }
   }
 
+  // Reason: this stage runs once per settled contest in BOTH apps and every game, after the
+  // money has committed, so it is the one place a Game Master's "finished, you earned X"
+  // notice cannot depend on which cron settled the contest. Fire-and-forget; never throws.
+  if (kind === "competition") {
+    void import("@/lib/services/gamemaster/gm-contest-notifications")
+      .then(({ notifyGmContestFinished }) => notifyGmContestFinished(contestId))
+      .catch(() => {});
+  }
+
   if (bestByUser.size === 0) {
     return { playersRewarded: 0, podiumAwards: 0 };
   }

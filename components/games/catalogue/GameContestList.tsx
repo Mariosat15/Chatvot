@@ -4,6 +4,7 @@ import { NeonPanel } from "@/components/neon/Cards";
 import { NeonButton } from "@/components/neon/Buttons";
 import { NEON_HEADING, NEON_LABEL } from "@/components/neon/tokens";
 import { formatVolts } from "@/lib/utils/format-volts";
+import SponsoredContestBanner from "@/components/gamemaster/SponsoredContestBanner";
 import type { CatalogueContestSummary } from "@/lib/services/games/player-catalogue.service";
 
 /**
@@ -46,8 +47,15 @@ export function GameContestList({
                       {c.status === "active" ? "Live" : "Upcoming"}
                     </span>
                   </div>
+                  <SponsoredContestBanner
+                    compact
+                    fundingMode={c.sponsoredBy !== undefined ? "gm_funded" : undefined}
+                    gameMasterName={c.sponsoredBy}
+                  />
                   <p className="text-sm text-gray-400 flex flex-wrap gap-x-4 gap-y-1">
-                    <span>Entry {formatVolts(c.entryFee)}</span>
+                    <span>
+                      Entry {c.sponsoredBy !== undefined ? "FREE" : formatVolts(c.entryFee)}
+                    </span>
                     <span>Pool {formatVolts(c.prizePool)}</span>
                     <span className="inline-flex items-center gap-1">
                       <Users className="h-3.5 w-3.5" />

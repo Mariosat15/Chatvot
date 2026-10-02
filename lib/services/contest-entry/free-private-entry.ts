@@ -13,6 +13,12 @@ import mongoose from "mongoose";
 import { sponsorFreePrivateSeat } from "../gamemaster/free-private-reserve";
 import { verifyFreePrivateTermsAcceptance } from "../gamemaster/free-private-terms.service";
 import { fail, type ContestEntryActor, type ContestEntryFailure } from "./types";
+import { WhiteLabel } from "@/database/models/whitelabel.model";
+import CreditWallet from "@/database/models/trading/credit-wallet.model";
+import {
+  freePrivateEntryRefusal,
+  resolveFreePrivateEntryRule,
+} from "@/lib/utils/free-private-entry-rule";
 
 type ClientSession = mongoose.mongo.ClientSession;
 
@@ -66,6 +72,23 @@ export async function payFundedEntry(
       "free_private_unfunded",
       "Simulated players cannot enter a Game Master-funded competition.",
     );
+  }
+
+  // Reason: a funded seat costs the player nothing, so without this an empty wallet joins.
+  // Checked inside the transaction, before the only write, and never debited.
+  const rule = resolveFreePrivateEntryRule(
+    await WhiteLabel.findOne()
+      .select({ freePrivateEntryPolicy: 1, freePrivateMinEntryBalance: 1 })
+      .session(session)
+      .lean<{ freePrivateEntryPolicy?: unknown; freePrivateMinEntryBalance?: unknown }>(),
+  );
+  if (rule.policy !== "open") {
+    const wallet = await CreditWallet.findOne({ userId: actor.userId })
+      .select({ creditBalance: 1 })
+      .session(session)
+      .lean<{ creditBalance?: number }>();
+    const refusal = freePrivateEntryRefusal(rule, Number(wallet?.creditBalance ?? 0));
+    if (refusal) return fail("free_private_min_balance", refusal);
   }
 
   const terms = await verifyFreePrivateTermsAcceptance(

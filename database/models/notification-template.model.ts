@@ -114,6 +114,10 @@ export type NotificationType =
   // Game Master affiliation terms (`External game plans/24` s5.5)
   | "gm_terms_request"
   | "gm_terms_request_answered"
+  // Game Master's own contests: created, started, finished with earnings
+  | "gm_competition_created"
+  | "gm_competition_started"
+  | "gm_competition_finished"
   // One reminder template for every "please answer the terms" send (`24` s5.6)
   | "affiliate_terms_required"
   // Employee notifications
@@ -1084,6 +1088,69 @@ function getDefaultTemplates(): Partial<INotificationTemplate>[] {
       channels: { inApp: true, email: false, push: true },
       actionUrl: "/gamemaster/referrals",
       actionText: "View Referrals",
+    },
+
+    // ========== GAME MASTER'S OWN CONTESTS ==========
+    // Reason: category "competition" so a Game Master silences these with the same switch as
+    // every other competition notice; email off because a GM running many contests would get
+    // a mail per lifecycle step.
+    {
+      templateId: "gm_competition_created",
+      name: "Game Master Competition Created",
+      description: "Sent to a Game Master when a competition they created is published",
+      category: "competition",
+      type: "gm_competition_created",
+      title: "🎮 {{contestKind}} competition created: {{competitionName}}",
+      message:
+        "Your {{contestKind}} competition {{competitionName}} is published. Entry: {{entryFee}}. Starts {{startTime}}. {{kindLine}}",
+      icon: "🎮",
+      priority: "normal",
+      color: "#8B5CF6",
+      isEnabled: true,
+      isDefault: true,
+      isCustom: false,
+      channels: { inApp: true, email: false, push: true },
+      actionUrl: "/gamemaster",
+      actionText: "View Competitions",
+    },
+    {
+      templateId: "gm_competition_started",
+      name: "Game Master Competition Started",
+      description: "Sent to a Game Master when a competition they created starts",
+      category: "competition",
+      type: "gm_competition_started",
+      title: "🚀 {{competitionName}} has started",
+      message:
+        "Your {{contestKind}} competition {{competitionName}} has started with {{participantCount}} player(s).",
+      icon: "🚀",
+      priority: "normal",
+      color: "#8B5CF6",
+      isEnabled: true,
+      isDefault: true,
+      isCustom: false,
+      channels: { inApp: true, email: false, push: true },
+      actionUrl: "/gamemaster",
+      actionText: "View Competitions",
+    },
+    {
+      templateId: "gm_competition_finished",
+      name: "Game Master Competition Finished",
+      description:
+        "Sent to a Game Master when a competition finishes: players and what the Game Master earned from it",
+      category: "competition",
+      type: "gm_competition_finished",
+      title: "🏁 {{competitionName}} has finished",
+      message:
+        "{{competitionName}} finished with {{participantCount}} player(s). You earned {{totalEarned}} from it in total.",
+      icon: "🏁",
+      priority: "normal",
+      color: "#8B5CF6",
+      isEnabled: true,
+      isDefault: true,
+      isCustom: false,
+      channels: { inApp: true, email: false, push: true },
+      actionUrl: "/gamemaster/earnings",
+      actionText: "View Earnings",
     },
 
     // ========== 1v1 CHALLENGES ==========

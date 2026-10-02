@@ -14,6 +14,7 @@ import {
   START_IN_PAST_TOLERANCE_MS,
 } from "@/lib/services/gamemaster/contest-start-guard";
 import { resolveGameMasterPlatformFeePercentage } from "@/lib/services/gamemaster/platform-fee";
+import { notifyGmContestCreated } from "@/lib/services/gamemaster/gm-contest-notifications";
 import type { FundingMode } from "@/lib/services/gamemaster/free-private-competition";
 import {
   releaseUnusedFreePrivateReserve,
@@ -288,6 +289,19 @@ export async function createGameMasterProviderCompetition(args: {
       competitionId: created.competitionId,
     };
   }
+
+  void notifyGmContestCreated(
+    {
+      _id: created.competitionId,
+      name,
+      entryFee,
+      startTime,
+      visibility,
+      fundingMode: funded ? "gm_funded" : "player_paid",
+      gameMasterId: userId,
+    },
+    { reserve: fundingReserve },
+  );
 
   return {
     ok: true,

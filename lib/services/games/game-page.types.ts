@@ -72,6 +72,8 @@ export interface GamePageContestSummary {
    */
   privateAccess?: string;
   privateGameMasterName?: string;
+  /** Present only on a Game Master-funded (free-entry) contest: the sponsor's name. */
+  sponsoredBy?: string;
 }
 
 /** Alias used by client helpers — same row as `GamePageContestSummary`. */

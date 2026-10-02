@@ -12,6 +12,7 @@ import {
   PrivateContestBadge,
   PrivateContestCardAction,
 } from "@/components/gamemaster/PrivateContestCardParts";
+import SponsoredContestBanner from "@/components/gamemaster/SponsoredContestBanner";
 import { GamePagePanel, GP_CTA_PRIMARY, GP_CTA_SECONDARY } from "./GamePageChrome";
 
 function timeLabel(iso: string, status: "active" | "upcoming"): string {
@@ -141,6 +142,10 @@ export function GamePageContests({ game }: { game: GamePageData }) {
                   </p>
                   <PrivateContestBadge access={c.privateAccess} />
                 </div>
+                <SponsoredContestBanner
+                  fundingMode={c.sponsoredBy !== undefined ? "gm_funded" : undefined}
+                  gameMasterName={c.sponsoredBy}
+                />
                 <div className="space-y-1.5 text-[14px] text-[var(--gp-muted)]">
                   <p className="inline-flex items-center gap-1.5">
                     <Users className="h-3.5 w-3.5" />
@@ -149,7 +154,7 @@ export function GamePageContests({ game }: { game: GamePageData }) {
                   <p>
                     Entry{" "}
                     <span className="font-semibold text-[var(--gp-gold,#ffd33d)]">
-                      {formatVolts(c.entryFee)}
+                      {c.sponsoredBy !== undefined ? "FREE" : formatVolts(c.entryFee)}
                     </span>
                   </p>
                   <p>

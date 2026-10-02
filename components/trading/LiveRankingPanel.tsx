@@ -11,6 +11,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useAppSettings } from "@/contexts/AppSettingsContext";
 import { formatVolts } from "@/lib/utils/format-volts";
+import { GameMasterBadge } from "@/components/gamemaster/GameMasterBadge";
 
 interface RankingEntry {
   rank: number;
@@ -376,7 +377,7 @@ function RankingRow({
       </div>
 
       {/* Username */}
-      <div className="col-span-4 min-w-0">
+      <div className="col-span-4 min-w-0 flex items-center gap-1">
         <p
           className={cn(
             "text-xs font-medium truncate",
@@ -386,6 +387,7 @@ function RankingRow({
         >
           {isCurrentUser ? "You" : entry.username}
         </p>
+        <GameMasterBadge userId={entry.userId} compact />
       </div>
 
       {/* Display Value (P&L, ROI, etc based on ranking method) */}

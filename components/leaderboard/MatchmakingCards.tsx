@@ -22,6 +22,7 @@ import {
 import { cn } from "@/lib/utils";
 import ChallengeCreateDialog from "@/components/challenges/ChallengeCreateDialog";
 import VsScreen from "@/components/challenges/VsScreen";
+import { GameMasterBadge } from "@/components/gamemaster/GameMasterBadge";
 
 interface MatchableTrader {
   userId: string;
@@ -778,6 +779,7 @@ function TraderCard({
             <h3 className="text-xl font-black text-white mb-2 drop-shadow-lg">
               {trader.username}
             </h3>
+            <GameMasterBadge userId={trader.userId} className="mb-2" />
 
             {/* Level Badge - More margin below */}
             <div

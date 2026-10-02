@@ -8,6 +8,7 @@ import {
   type RoundActivitySummary,
 } from "@/lib/utils/round-activity";
 import { formatGameScore, type GameScoreType } from "@/lib/utils/format-game-score";
+import { GameMasterBadge } from "@/components/gamemaster/GameMasterBadge";
 
 /**
  * The two seats of a 1v1, in the arena's standings rail - the challenge-side answer to
@@ -87,6 +88,7 @@ export default function ChallengeStandingsPanel({ seats, scoreLabel, scoreType }
                 >
                   {seat.name}
                 </span>
+                <GameMasterBadge userId={seat.userId} compact />
                 <span className="shrink-0 text-base font-bold text-gray-100">
                   {formatGameScore(seat.score, scoreType, "—")}
                 </span>

@@ -9,6 +9,7 @@ import Link from "next/link";
 import { Shield } from "lucide-react";
 import { ReferralClientId, ReferralConsentBadge, ReferralContact, ReferralCountry, ReferralKindBadge, ReferralStateLabel } from "@/components/gamemaster/GmReferralBadges";
 import SendTermsButton from "@/components/gamemaster/SendTermsButton";
+import { GmContestKindBadge, GmContestKindFilter, type GmContestKindFilterValue } from "@/components/gamemaster/GmContestKindBadge";
 import type { DashboardStats, CompetitionItem, EarningItem, ReferralItem, SubscriptionData, EarningsByGameRow } from "./gamemaster-dashboard-types";
 
 // Re-export types so existing imports still work
@@ -183,20 +184,25 @@ export function OverviewTab({ stats, subscription, earningsChartData, compStatus
 }
 
 // ─── Competitions Tab ─────────────────────────────────────────────────
-export function CompetitionsTab({ competitions, filter, onFilterChange, subscription, isExpired }: {
-  competitions: CompetitionItem[]; filter: string; onFilterChange: (f: string) => void; subscription: SubscriptionData; isExpired: boolean;
+export function CompetitionsTab({ competitions, filter, onFilterChange, kindFilter, onKindFilterChange, subscription, isExpired }: {
+  competitions: CompetitionItem[]; filter: string; onFilterChange: (f: string) => void;
+  kindFilter: GmContestKindFilterValue; onKindFilterChange: (k: GmContestKindFilterValue) => void;
+  subscription: SubscriptionData; isExpired: boolean;
 }) {
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-          <Filter className="h-4 w-4 text-gray-400" />
-          {["all", "active", "upcoming", "completed", "cancelled"].map((f) => (
-            <button key={f} onClick={() => onFilterChange(f)}
-              className={`px-2.5 sm:px-3 py-1.5 rounded-full text-xs font-medium transition-colors min-h-[36px] ${filter === f ? "bg-yellow-500 text-black" : "bg-gray-800 text-gray-400 hover:bg-gray-700"}`}>
-              {f === "all" ? "All" : f.charAt(0).toUpperCase() + f.slice(1)}
-            </button>
-          ))}
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+            <Filter className="h-4 w-4 text-gray-400" />
+            {["all", "active", "upcoming", "completed", "cancelled"].map((f) => (
+              <button key={f} onClick={() => onFilterChange(f)}
+                className={`px-2.5 sm:px-3 py-1.5 rounded-full text-xs font-medium transition-colors min-h-[36px] ${filter === f ? "bg-yellow-500 text-black" : "bg-gray-800 text-gray-400 hover:bg-gray-700"}`}>
+                {f === "all" ? "All" : f.charAt(0).toUpperCase() + f.slice(1)}
+              </button>
+            ))}
+          </div>
+          <GmContestKindFilter value={kindFilter} onChange={onKindFilterChange} />
         </div>
         {subscription.canCreateCompetitions && (
           <Link href={isExpired ? "#" : "/gamemaster/create-competition"} onClick={(e) => isExpired && e.preventDefault()}
@@ -230,7 +236,12 @@ export function CompetitionsTab({ competitions, filter, onFilterChange, subscrip
                 {competitions.map((comp) => (
                   <tr key={comp.id} className="border-b border-gray-700/50 hover:bg-gray-900/30 transition-colors">
                     <td className="px-4 py-3 text-white font-medium">{comp.name}</td>
-                    <td className="px-4 py-3"><StatusBadge status={comp.status} /></td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <StatusBadge status={comp.status} />
+                        <GmContestKindBadge kind={comp.kind} />
+                      </div>
+                    </td>
                     <td className="px-4 py-3 text-gray-300">{comp.participants}{comp.maxParticipants ? ` / ${comp.maxParticipants}` : ""}</td>
                     <td className="px-4 py-3 text-gray-300">⚡ {comp.entryFee}</td>
                     <td className="px-4 py-3 text-gray-300">⚡ {(comp.prizePool || 0).toFixed(0)}</td>
@@ -305,8 +316,10 @@ export function ReferralsTab({ referrals, search, onSearchChange, total, own, ex
 }
 
 // ─── Earnings Tab ─────────────────────────────────────────────────────
-export function EarningsTab({ earnings, filter, onFilterChange, stats }: {
-  earnings: EarningItem[]; filter: string; onFilterChange: (f: string) => void; stats: DashboardStats;
+export function EarningsTab({ earnings, filter, onFilterChange, kindFilter, onKindFilterChange, stats }: {
+  earnings: EarningItem[]; filter: string; onFilterChange: (f: string) => void;
+  kindFilter: GmContestKindFilterValue; onKindFilterChange: (k: GmContestKindFilterValue) => void;
+  stats: DashboardStats;
 }) {
   return (
     <div className="space-y-4">
@@ -316,14 +329,17 @@ export function EarningsTab({ earnings, filter, onFilterChange, stats }: {
         <MiniStat label="Pending" value={`⚡ ${(stats.pendingEarnings ?? 0).toFixed(2)}`} color="yellow" />
         <MiniStat label="Total Transactions" value={String(stats.totalTransactions ?? 0)} color="blue" />
       </div>
-      <div className="flex items-center gap-2">
-        <Filter className="h-4 w-4 text-gray-400" />
-        {["all", "paid", "pending"].map((f) => (
-          <button key={f} onClick={() => onFilterChange(f)}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors min-h-[36px] ${filter === f ? "bg-yellow-500 text-black" : "bg-gray-800 text-gray-400 hover:bg-gray-700"}`}>
-            {f.charAt(0).toUpperCase() + f.slice(1)}
-          </button>
-        ))}
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-2">
+          <Filter className="h-4 w-4 text-gray-400" />
+          {["all", "paid", "pending"].map((f) => (
+            <button key={f} onClick={() => onFilterChange(f)}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors min-h-[36px] ${filter === f ? "bg-yellow-500 text-black" : "bg-gray-800 text-gray-400 hover:bg-gray-700"}`}>
+              {f.charAt(0).toUpperCase() + f.slice(1)}
+            </button>
+          ))}
+        </div>
+        <GmContestKindFilter value={kindFilter} onChange={onKindFilterChange} />
       </div>
       {earnings.length === 0 ? (
         <div className="text-center py-12 text-gray-500">
@@ -350,9 +366,12 @@ export function EarningsTab({ earnings, filter, onFilterChange, stats }: {
                   <tr key={e.id} className="border-b border-gray-700/50 hover:bg-gray-900/30 transition-colors">
                     <td className="px-4 py-3 text-white font-medium">{e.sourceName}</td>
                     <td className="px-4 py-3">
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${e.sourceType === "competition" ? "bg-purple-900/50 text-purple-400" : "bg-blue-900/50 text-blue-400"}`}>
-                        {e.sourceType}
-                      </span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${e.sourceType === "competition" ? "bg-purple-900/50 text-purple-400" : "bg-blue-900/50 text-blue-400"}`}>
+                          {e.sourceType}
+                        </span>
+                        <GmContestKindBadge kind={e.kind} />
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-gray-300">{e.referredUserName}</td>
                     <td className="px-4 py-3 text-gray-300">⚡ {e.entryFeeAmount ?? 0}</td>

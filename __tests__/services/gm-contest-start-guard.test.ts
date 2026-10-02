@@ -112,20 +112,23 @@ describe("every Game Master writer asks the guard", () => {
   });
 });
 
-describe("Access & Mode is a step of the provider wizard", () => {
+// Reason: renamed "Access & Funding" on 2 Oct 2026, when the owner asked that Normal / Funded
+// be a choice inside the steps (never a strip above the wizard) in BOTH wizards.
+describe("Access & Funding is a step of the provider wizard", () => {
   const form = code("components/gamemaster/ProviderContestCreateForm.tsx");
   const gate = code("components/gamemaster/CreateCompetitionGate.tsx");
   const step = code("components/gamemaster/AccessAndModeStep.tsx");
   const settings = code("components/gamemaster/provider-contest-wizard-steps.tsx");
 
   it("is listed in the Creation Progress steps, second", () => {
-    expect(form).toMatch(/number: 2, title: "Access & Mode"/);
+    expect(form).toMatch(/number: 2, title: "Access & Funding"/);
     expect(form).toMatch(/number: 6, title: "Launch"/);
     expect(form).toMatch(/<AccessAndModeStep/);
   });
 
   it("holds the visibility choice and the play mode; Game Settings no longer does", () => {
-    expect(step).toMatch(/VISIBILITY_OPTION_COPY/);
+    expect(step).toMatch(/<AccessFundingFields/);
+    expect(code("components/gamemaster/AccessFundingFields.tsx")).toMatch(/VISIBILITY_OPTION_COPY/);
     expect(step).toMatch(/How players join/);
     expect(step).toMatch(/PLAY_MODE_COPY/);
     const gameSettings = settings.slice(
@@ -141,7 +144,9 @@ describe("Access & Mode is a step of the provider wizard", () => {
     expect(form).toMatch(/visibilityOptions\.includes\(visibility\)/);
   });
 
-  it("the provider path no longer renders the strip above the wizard; trading still does", () => {
+  // Reason: flipped 2 Oct 2026. Trading used to keep the strip above its wizard; the owner
+  // asked for the choice inside the steps in both wizards, so neither path renders it now.
+  it("neither path renders the strip above the wizard", () => {
     const provider = gate.slice(gate.indexOf('selection?.type === "provider"'));
     const trading = gate.slice(
       gate.indexOf('selection?.type === "trading"'),
@@ -150,10 +155,13 @@ describe("Access & Mode is a step of the provider wizard", () => {
     expect(provider).not.toMatch(/\{visibilityPicker\}/);
     expect(provider).toMatch(/visibilityOptions=\{visibilityOptions\}/);
     expect(provider).toMatch(/onVisibilityChange=\{setVisibility\}/);
-    expect(trading).toMatch(/\{visibilityPicker\}/);
+    expect(trading.length).toBeGreaterThan(50);
+    expect(trading).not.toMatch(/\{visibilityPicker\}|<FundingModePicker|<ContestVisibilityPicker/);
+    expect(trading).toMatch(/visibilityOptions=\{visibilityOptions\}/);
+    expect(trading).toMatch(/onFundingModeChange=\{setFundingMode\}/);
   });
 
-  it("Launch re-validates every earlier step, including Access & Mode", () => {
+  it("Launch re-validates every earlier step, including Access & Funding", () => {
     expect(form).toMatch(/for \(let n = 1; n < LAST_STEP; n\+\+\)/);
     expect(form).toMatch(/const LAST_STEP = STEPS\.length/);
   });

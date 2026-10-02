@@ -31,6 +31,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useTerms } from "@/contexts/TerminologyContext";
 import type { GameLeaderboardEntry } from "@/lib/services/games/game-leaderboard.service";
+import { GameMasterBadge } from "@/components/gamemaster/GameMasterBadge";
 
 interface MyPosition {
   rank: number;
@@ -264,6 +265,7 @@ export default function GameLeaderboardTable({
                         >
                           {row.username}
                         </button>
+                        <GameMasterBadge userId={row.userId} />
                         {title ? (
                           <span
                             className={cn(
@@ -369,6 +371,7 @@ export default function GameLeaderboardTable({
                   >
                     {row.username}
                   </button>
+                  <GameMasterBadge userId={row.userId} compact />
                   <span className="font-black text-primary-400">
                     {Math.round(row.totalPoints).toLocaleString()}
                   </span>

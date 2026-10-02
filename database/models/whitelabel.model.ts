@@ -103,6 +103,10 @@ export interface WhiteLabelDocument extends Document {
   // Step 5 (`24` s10): may Game Masters create private contests? Off by default.
   gmPrivateContestsEnabled: boolean;
   gmFreePrivateContestsEnabled: boolean;
+  // Who may take a funded seat - see `lib/utils/free-private-entry-rule.ts`. Absent means
+  // `min_balance` with a minimum of 1 credit.
+  freePrivateEntryPolicy?: "open" | "min_balance";
+  freePrivateMinEntryBalance?: number;
 
   // Non-secret, freely readable provider configuration. Mirrors `game_provider` for the
   // settings screen; the collection remains the source of truth.
@@ -487,6 +491,17 @@ const WhiteLabelSchema = new Schema<WhiteLabelDocument>(
     gmFreePrivateContestsEnabled: {
       type: Boolean,
       default: false,
+    },
+    // Reason: no schema default on either field. The resolver decides what an absent value
+    // means, so a deployment that never saved the setting gets the strict rule rather than a
+    // stored value nobody chose.
+    freePrivateEntryPolicy: {
+      type: String,
+      enum: ["open", "min_balance"],
+    },
+    freePrivateMinEntryBalance: {
+      type: Number,
+      min: 0,
     },
     gameProviders: {
       type: [

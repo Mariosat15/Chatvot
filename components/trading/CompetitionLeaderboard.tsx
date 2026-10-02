@@ -7,9 +7,11 @@ import { GAME_ICONS, type GameIconName } from "@/lib/constants/game-icons";
 import { neonRowClasses } from "@/components/neon/LeaderboardRow";
 import { NEON_TABLE_HEAD } from "@/components/neon/tokens";
 import ProfileCard from "@/components/profile/ProfileCard";
+import { GameMasterBadge } from "@/components/gamemaster/GameMasterBadge";
 
 interface LeaderboardEntry {
   _id: string;
+  userId?: string;
   username: string;
   userTitle?: string;
   userTitleIcon?: string;
@@ -246,6 +248,7 @@ export default function CompetitionLeaderboard({
                   >
                     {entry.username}
                   </button>
+                  <GameMasterBadge userId={entry.userId} />
                   {entry.userTitle && !isDisqualified && (
                     <span
                       className={`px-2 py-0.5 rounded-full text-xs font-semibold flex-shrink-0 inline-flex items-center gap-1 ${entry.userTitleColor || "text-purple-400"} bg-gray-800/80 border border-gray-700`}

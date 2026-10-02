@@ -11,6 +11,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { GameIcon } from "@/components/ui/GameIcon";
+import { GameMasterBadge } from "@/components/gamemaster/GameMasterBadge";
 import { GAME_ICONS, type GameIconName } from "@/lib/constants/game-icons";
 import { useTerms } from "@/contexts/TerminologyContext";
 import Image from "next/image";
@@ -190,7 +191,10 @@ export default function ProfileCard({
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <h2 className={`text-lg font-extrabold ${config.textColor} leading-tight`}>{username}</h2>
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    <h2 className={`text-lg font-extrabold ${config.textColor} leading-tight`}>{username}</h2>
+                    <GameMasterBadge userId={userId} />
+                  </div>
                   {stats?.rank && (
                     <div className="flex items-center gap-1">
                       <span className="text-[11px] font-bold text-gray-400 uppercase">{terms.rank}</span>

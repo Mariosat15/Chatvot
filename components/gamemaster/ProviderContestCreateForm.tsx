@@ -18,6 +18,10 @@ import type { FundingMode } from "@/lib/services/gamemaster/free-private-competi
 import { WizardFooterNav, WizardProgressRail } from "@/components/gamemaster/WizardProgressRail";
 import { gameMasterScheduleError } from "@/lib/services/gamemaster/contest-start-guard";
 import type { CompetitionVisibility } from "@/lib/services/gamemaster/competition-visibility";
+import {
+  accessFundingStepError,
+  effectiveFundingMode,
+} from "@/lib/utils/access-funding-step";
 import { defaultConfigValues, type ConfigField } from "@/lib/services/games/config-schema";
 import {
   DEFAULT_GAME_TIE_RULE,
@@ -96,7 +100,7 @@ interface Props {
 
 const STEPS = [
   { number: 1, title: "Basic Info", description: "Name and description", icon: FileText },
-  { number: 2, title: "Access & Mode", description: "Who can join, how it plays", icon: ShieldCheck },
+  { number: 2, title: "Access & Funding", description: "Who can join, who pays", icon: ShieldCheck },
   { number: 3, title: "Game Settings", description: "Options for this game", icon: SlidersHorizontal },
   { number: 4, title: "Schedule & Entry", description: "Clock, players and fee", icon: Calendar },
   { number: 5, title: "Prizes", description: "Who gets how much", icon: Trophy },
@@ -122,7 +126,7 @@ export default function ProviderContestCreateForm({
   visibilityOptions,
   onVisibilityChange,
   fundingOffered = false,
-  fundingMode = "player_paid",
+  fundingMode,
   onFundingModeChange,
   walletBalance = null,
   maxUsersPerCompetition,
@@ -231,6 +235,13 @@ export default function ProviderContestCreateForm({
           ? "Your package does not allow creating a competition. Please contact support."
           : "Choose who can join.";
       }
+      const accessErr = accessFundingStepError({
+        visibilityOptionCount: visibilityOptions.length,
+        visibility,
+        fundingOffered,
+        fundingMode,
+      });
+      if (accessErr) return accessErr;
     }
     if (n === 3 && !title.schema.ok) {
       return "This game cannot be configured yet.";
@@ -317,7 +328,7 @@ export default function ProviderContestCreateForm({
           providerKey: title.providerKey,
           gameCode: title.gameCode,
           visibility,
-          fundingMode,
+          fundingMode: effectiveFundingMode(fundingOffered, fundingMode),
           settings,
           entryFee: entryNum,
           maxParticipants: maxNum,
@@ -456,7 +467,8 @@ export default function ProviderContestCreateForm({
                     disabled={submitting}
                   />
                 )}
-                {(step === 4 || step === LAST_STEP) && fundingMode === "gm_funded" && (
+                {(step === 2 || step === 4 || step === LAST_STEP) &&
+                  effectiveFundingMode(fundingOffered, fundingMode) === "gm_funded" && (
                   <div className="px-6 pb-6">
                     <FreePrivateReserveSummary
                       entryFee={entryNum}

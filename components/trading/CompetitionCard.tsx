@@ -28,6 +28,8 @@ import {
   PrivateContestBadge,
   PrivateContestCardAction,
 } from "@/components/gamemaster/PrivateContestCardParts";
+import SponsoredContestBanner from "@/components/gamemaster/SponsoredContestBanner";
+import { isSponsoredContest } from "@/lib/utils/sponsored-contest-copy";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 interface CompetitionCardProps {
@@ -131,7 +133,11 @@ export default function CompetitionCard({
   const router = useRouter();
   const { settings } = useAppSettings();
 
+  // Reason: a Game Master-funded seat costs the player nothing, so their balance is irrelevant;
+  // without this an empty wallet reads "Need X More" on a free contest.
+  const isSponsored = isSponsoredContest(competition.fundingMode);
   const canAfford =
+    isSponsored ||
     userBalance >= (competition.entryFee || competition.entryFeeCredits || 0);
   const isFull = competition.currentParticipants >= competition.maxParticipants;
   const isActive = competition.status === "active";
@@ -372,6 +378,11 @@ export default function CompetitionCard({
                     {isGmCreated ? "🎮" : "🛡️"} {creatorLabel}
                   </span>
                   <PrivateContestBadge access={competition.privateAccess} />
+                  <SponsoredContestBanner
+                    compact
+                    fundingMode={competition.fundingMode}
+                    gameMasterName={competition.gameMasterName}
+                  />
                 </div>
                 <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm text-gray-400 flex-wrap">
                   <span className="flex items-center gap-1">
@@ -422,7 +433,7 @@ export default function CompetitionCard({
                 </div>
                 <div className="flex-shrink-0 text-right px-4 border-l border-gray-700">
                   <div className="text-lg font-bold text-gray-100">
-                    {getEntryFee()}
+                    {isSponsored ? "FREE" : getEntryFee()}
                   </div>
                   <p className="text-xs text-gray-500">Entry</p>
                 </div>
@@ -466,7 +477,9 @@ export default function CompetitionCard({
               <span className="text-[11px] text-gray-400">
                 Fee:{" "}
                 <span className="text-gray-200 font-bold">
-                  {formatVolts(getEntryFee(), { symbol: settings?.credits?.symbol })}
+                  {isSponsored
+                    ? "FREE"
+                    : formatVolts(getEntryFee(), { symbol: settings?.credits?.symbol })}
                 </span>
               </span>
               <span className="text-gray-600">·</span>
@@ -655,6 +668,12 @@ export default function CompetitionCard({
           <PrivateContestBadge access={competition.privateAccess} />
         </div>
 
+        <SponsoredContestBanner
+          className="mb-3"
+          fundingMode={competition.fundingMode}
+          gameMasterName={competition.gameMasterName}
+        />
+
         {/* Difficulty Badge */}
         <div className="flex justify-center mb-3">
           <DifficultyBadge
@@ -741,7 +760,9 @@ export default function CompetitionCard({
                 <p
                   className={`text-sm font-bold ${isCancelled ? "text-red-400 line-through" : "text-gray-100"}`}
                 >
-                  {formatVolts(getEntryFee(), { symbol: settings?.credits?.symbol })}
+                  {isSponsored
+                    ? "FREE"
+                    : formatVolts(getEntryFee(), { symbol: settings?.credits?.symbol })}
                 </p>
               </div>
             </div>

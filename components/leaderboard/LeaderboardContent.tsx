@@ -32,6 +32,7 @@ import ProfileImage from "@/components/ui/ProfileImage";
 import ChallengeCreateDialog from "@/components/challenges/ChallengeCreateDialog";
 import { useTerms } from "@/contexts/TerminologyContext";
 import { cn } from "@/lib/utils";
+import { GameMasterBadge } from "@/components/gamemaster/GameMasterBadge";
 
 // Types
 interface LeaderboardFilters {
@@ -649,6 +650,7 @@ export default function LeaderboardContent({
                             >
                               {entry.username}
                             </button>
+                            <GameMasterBadge userId={entry.userId} />
                             {entry.userTitle && (
                               <span
                                 className={cn(
@@ -883,6 +885,7 @@ export default function LeaderboardContent({
                         >
                           {entry.username}
                         </button>
+                        <GameMasterBadge userId={entry.userId} compact />
                         {isCurrentUser && (
                           <span className="px-1.5 py-0.5 text-[11px] bg-primary-500/20 text-primary-400 rounded font-bold">
                             YOU

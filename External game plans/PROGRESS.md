@@ -922,6 +922,95 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 2 Oct 2026 - Who may take a free seat, kind badges for Game Masters, Game Master notifications, and the GM badge on names (owner request)
+
+Owner: players with no credits could enter funded competitions; the Game Master dashboard should
+badge and filter Normal / Private / Funded; Game Masters get no notifications; and a Game Master
+should carry a badge beside their name everywhere, leaderboards and cards included. Four pieces:
+
+- **Entry rule for funded (free) seats.** A platform setting on `WhiteLabel`
+  (`freePrivateEntryPolicy` = `open` | `min_balance`, `freePrivateMinEntryBalance`), read
+  through `lib/utils/free-private-entry-rule.ts` (mirrored, model-free for R58) and enforced in
+  `free-private-entry.ts`. **The balance is checked and never debited** - the Game Master still
+  pays the seat. It **fails towards the strict rule**: only a stored `"open"` opens entry, and the
+  unsaved default is `min_balance` at 1 credit, so the reported hole is closed on every deployment
+  without anybody saving the setting. A non-finite or negative minimum falls back to the default
+  rather than becoming `NaN`, which would make every comparison false and admit everyone.
+  **Deviation:** the owner asked for it "in competition settings"; it is one platform-wide rule,
+  not a per-contest field, so a Game Master cannot set it on their own contest.
+- **Kind badges and filters** on the Game Master dashboard's Competitions tab (funded checked
+  first, then private, otherwise normal) and a kind badge beside Type on Earnings. **Earnings has
+  no kind filter, deliberately** - it is paginated on the server, so a client filter would filter
+  one page and read as complete. `earning-contest-kind.ts`, `gm-contest-kind.test.ts` (13).
+- **Game Master notifications.** Three templates in both `notification-template.model.ts`
+  copies - `gm_competition_created` (states the kind, the entry fee or "free for players (you pay
+  X per seat)", and the reserve), `gm_competition_started` (players in), `gm_competition_finished`
+  (total earned) - category `competition` so the existing competition switch silences them, push
+  on, email off. Sent by `lib/services/gamemaster/gm-contest-notifications.ts` (mirrored), from
+  the shared `insertGameMasterCompetition` (funded: **after** the reserve transaction commits),
+  the provider creator, both `lib/inngest/functions.ts` start crons, and the shared
+  `contest-rewards.ts` stage - so the finish notice fires whichever app settles, and
+  `competition-end.actions.ts` was not touched. The creator is always told, at 0 if they earned
+  nothing; any other referring Game Master who earned is told too. Every send is try/catch and
+  never throws into a money path. **Limitation:** the start notice covers the inngest start cron
+  only. `gm-contest-notifications.test.ts` (24), `tools/probe-gm-contest-notifications.ps1` (5 RED).
+- **GM badge on names.** `components/gamemaster/GameMasterBadge.tsx` (the profile header's
+  crown style), fed by one shared request per page (`hooks/useGameMasterIds.ts`) to
+  `GET /api/gamemaster/active-ids` (session required, cached 60s) over
+  `lib/services/gamemaster/active-game-masters.ts`. A Game Master is an `active` subscription
+  **whose `endDate` has not passed** - status alone keeps the badge on a lapsed role until the
+  renewal job runs. Drawn on the global and per-game leaderboards (row and mobile card), the
+  leaderboard page, matchmaking cards, the contest leaderboard, both live ranking panels, the
+  provider board and challenge standings (crown only, the name line there truncates), and the
+  profile card popup. `gm-user-badge.test.ts` (15, behavioural against a real database for who
+  counts), `tools/probe-gm-user-badge.ps1` (5 RED). **Not covered:** the landing-page leaderboard
+  preview (anonymous visitors cannot read the list), messaging and the admin app.
+
+Verification: 28 touched suites, 769 pass; the one failure,
+`wallet-writer-inventory`, names three files committed 29 Sep 2026 and untouched here, so it was
+already red. `check:mirrors` OK. **Never verified by eye.**
+
+### 2 Oct 2026 - "Sponsored by <GM>" on every contest card, and Access & Funding is a wizard step (owner request)
+
+Owner, with screenshots: *"the competition card must prominently say sponsored competition by
+GM name, users must know that is a free competition, also the funded and normal option must be
+part of the steps so one must pick before continue, make sure both wizards have that."*
+
+**What was built.**
+- `lib/utils/sponsored-contest-copy.ts` (model-free, R58) is the one source of the wording:
+  "Sponsored competition by {name}" and "Free to enter - {name} pays every seat". A contest
+  counts as sponsored **only when `fundingMode === "gm_funded"`**. If no name is stored, it
+  reads "your Game Master" rather than showing a blank.
+- `SponsoredContestBanner` is shown on `CompetitionCard`, `GamePageContests`,
+  `GameContestList` and the lobby's `CompetitionEntryButton`. On a sponsored card every
+  entry-fee site reads **FREE** (three sites, counted by a test). The card also treats the
+  contest as affordable, so a player with zero Volts is not told they cannot afford it.
+- `player-catalogue.service.ts` selects `gameMasterName fundingMode` and sets `sponsoredBy`
+  only on funded contests.
+- **Both GM wizards now have an Access & Funding step.** In the trading wizard it is step 3 of
+  8, between Financial and Schedule. In the provider wizard it is step 2. Both use the same
+  `AccessFundingFields` component and the same `accessFundingStepError`. Next is refused until
+  the GM has chosen who can join and, when funding is offered, who pays. The trading wizard
+  checks again at launch.
+- **No funding mode is pre-selected.** `CreateCompetitionGate` now starts with `undefined`,
+  where it used to start with `player_paid`. The pickers that used to sit above the wizards
+  were removed, so each choice exists in one place only.
+- `effectiveFundingMode` is the only thing that decides what gets posted. If funding is not
+  offered, or not picked, the post is `player_paid`. So switching from Private back to Public
+  cannot leave a stale `gm_funded` behind.
+
+**Flipped, not deleted.** `gm-contest-start-guard.test.ts` used to assert that the trading
+wizard had pickers in a strip above it. It now asserts there is no strip, and that the step is
+wired through props.
+
+**Verification.**
+- `__tests__/services/sponsored-contest-and-funding-step.test.ts`: 20 tests.
+- Five related suites: 133 passing.
+- `tools/probe-sponsored-funding.ps1`: 9 probes, each exactly one red on the expected test.
+- Lint is clean on every changed file.
+- Nothing is mirrored: the admin app has no GM wizard and no player cards.
+- **Never verified by eye.**
+
 ### 2 Oct 2026 - Free private competitions, funded by the Game Master (owner plan)
 
 A Game Master can now create a **private** competition, trading or provider game, whose seats

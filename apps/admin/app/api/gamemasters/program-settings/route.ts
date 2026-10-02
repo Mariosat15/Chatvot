@@ -3,6 +3,10 @@ import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import { WhiteLabel } from "@/database/models/whitelabel.model";
 import { auditLogService } from "@/lib/services/audit-log.service";
+import {
+  resolveFreePrivateEntryRule,
+  type FreePrivateEntryRule,
+} from "@/lib/utils/free-private-entry-rule";
 
 const GENERIC_ERROR = "Something went wrong. Please contact support.";
 
@@ -23,27 +27,63 @@ const PROGRAM_SWITCHES: ReadonlySet<string> = new Set([
   "gmFreePrivateContestsEnabled",
 ]);
 
+/** Who may take a funded seat - validated by `validateEntryRuleField`, not as booleans. */
+const ENTRY_RULE_FIELDS: ReadonlySet<string> = new Set([
+  "freePrivateEntryPolicy",
+  "freePrivateMinEntryBalance",
+]);
+
 interface ProgramSwitches {
   gmJoinEnabled: boolean;
   gmPrivateContestsEnabled: boolean;
   gmFreePrivateContestsEnabled: boolean;
 }
 
-async function readSwitches(): Promise<ProgramSwitches> {
+interface ProgramSettings {
+  switches: ProgramSwitches;
+  freePrivateEntry: FreePrivateEntryRule;
+}
+
+async function readSettings(): Promise<ProgramSettings> {
   const doc = await WhiteLabel.findOne()
-    .select({ gmJoinEnabled: 1, gmPrivateContestsEnabled: 1, gmFreePrivateContestsEnabled: 1 })
+    .select({
+      gmJoinEnabled: 1,
+      gmPrivateContestsEnabled: 1,
+      gmFreePrivateContestsEnabled: 1,
+      freePrivateEntryPolicy: 1,
+      freePrivateMinEntryBalance: 1,
+    })
     .lean<{
       gmJoinEnabled?: unknown;
       gmPrivateContestsEnabled?: unknown;
       gmFreePrivateContestsEnabled?: unknown;
+      freePrivateEntryPolicy?: unknown;
+      freePrivateMinEntryBalance?: unknown;
     }>();
   // Reason: only a stored `true` is on - absent, null or a legacy string all read as off,
   // matching the player app's `isGmJoinEnabled()` / `isGmPrivateContestsEnabled()`.
   return {
-    gmJoinEnabled: doc?.gmJoinEnabled === true,
-    gmPrivateContestsEnabled: doc?.gmPrivateContestsEnabled === true,
-    gmFreePrivateContestsEnabled: doc?.gmFreePrivateContestsEnabled === true,
+    switches: {
+      gmJoinEnabled: doc?.gmJoinEnabled === true,
+      gmPrivateContestsEnabled: doc?.gmPrivateContestsEnabled === true,
+      gmFreePrivateContestsEnabled: doc?.gmFreePrivateContestsEnabled === true,
+    },
+    // Reason: the same resolver the entry guard runs, so the screen shows the rule players
+    // actually meet, not the raw stored fields.
+    freePrivateEntry: resolveFreePrivateEntryRule(doc),
   };
+}
+
+/** Validate the two entry-rule fields. Returns an error message, or null when valid. */
+function validateEntryRuleField(key: string, value: unknown): string | null {
+  if (key === "freePrivateEntryPolicy") {
+    return value === "open" || value === "min_balance"
+      ? null
+      : "freePrivateEntryPolicy must be open or min_balance.";
+  }
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1_000_000
+    ? null
+    : "freePrivateMinEntryBalance must be a number from 0 to 1,000,000.";
 }
 
 export async function GET() {
@@ -51,7 +91,8 @@ export async function GET() {
     const guard = await guardSection("gamemaster-management");
     if (!guard.ok) return guard.response;
     await connectToDatabase();
-    return NextResponse.json({ success: true, switches: await readSwitches() });
+    const settings = await readSettings();
+    return NextResponse.json({ success: true, ...settings });
   } catch (error) {
     console.error("❌ Read Game Master program settings failed:", error);
     return NextResponse.json({ success: false, error: GENERIC_ERROR }, { status: 500 });
@@ -73,8 +114,16 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Invalid request body." }, { status: 400 });
     }
 
-    const updates = new Map<string, boolean>();
+    const updates = new Map<string, boolean | string | number>();
     for (const [key, value] of Object.entries(body)) {
+      if (ENTRY_RULE_FIELDS.has(key)) {
+        const invalid = validateEntryRuleField(key, value);
+        if (invalid) {
+          return NextResponse.json({ success: false, error: invalid }, { status: 400 });
+        }
+        updates.set(key, value as string | number);
+        continue;
+      }
       // Reason: an unknown field is REFUSED with its name, never dropped - dropping makes a
       // typo look like a save that did nothing.
       if (!PROGRAM_SWITCHES.has(key)) {
@@ -90,11 +139,11 @@ export async function PUT(request: NextRequest) {
     }
 
     await connectToDatabase();
-    const previous = await readSwitches();
+    const previous = await readSettings();
     // Reason: upsert, so the switch can be turned on for a deployment whose settings
     // document has never been saved - otherwise the first save 404s silently.
     await WhiteLabel.updateOne({}, { $set: Object.fromEntries(updates) }, { upsert: true });
-    const next = await readSwitches();
+    const next = await readSettings();
 
     try {
       await auditLogService.logSettingsUpdated(
@@ -105,14 +154,14 @@ export async function PUT(request: NextRequest) {
           role: guard.admin.role ?? "admin",
         },
         "Game Master Program",
-        previous,
-        next,
+        { ...previous.switches, ...previous.freePrivateEntry },
+        { ...next.switches, ...next.freePrivateEntry },
       );
     } catch (auditError) {
       console.error("❌ Failed to audit Game Master program settings:", auditError);
     }
 
-    return NextResponse.json({ success: true, switches: next });
+    return NextResponse.json({ success: true, ...next });
   } catch (error) {
     console.error("❌ Update Game Master program settings failed:", error);
     return NextResponse.json({ success: false, error: GENERIC_ERROR }, { status: 500 });

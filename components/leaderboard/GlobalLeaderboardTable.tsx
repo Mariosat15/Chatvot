@@ -26,6 +26,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useTerms } from "@/contexts/TerminologyContext";
 import type { GlobalScoreComponentId } from "@/lib/services/leaderboard/global-score";
+import { GameMasterBadge } from "@/components/gamemaster/GameMasterBadge";
 
 export interface GlobalBoardRow {
   userId: string;
@@ -300,6 +301,7 @@ export default function GlobalLeaderboardTable({
                         >
                           {row.username}
                         </button>
+                        <GameMasterBadge userId={row.userId} />
                         {row.userTitle ? (
                           <span
                             className={cn(
@@ -427,6 +429,7 @@ export default function GlobalLeaderboardTable({
                   >
                     {row.username}
                   </button>
+                  <GameMasterBadge userId={row.userId} compact />
                   <div className="flex items-center gap-1">
                     <Zap className="h-4 w-4 text-primary-400" />
                     <span className="font-black text-primary-400">

@@ -27,6 +27,7 @@ import {
   Minus,
   Gauge,
   Lock,
+  ShieldCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -39,6 +40,12 @@ import {
 import type { TitleLevel } from "@/lib/constants/levels";
 import FreePrivateReserveSummary from "@/components/gamemaster/FreePrivateReserveSummary";
 import type { FundingMode } from "@/lib/services/gamemaster/free-private-competition";
+import type { CompetitionVisibility } from "@/lib/services/gamemaster/competition-visibility";
+import TradingAccessFundingStep from "@/components/gamemaster/TradingAccessFundingStep";
+import {
+  accessFundingStepError,
+  effectiveFundingMode,
+} from "@/lib/utils/access-funding-step";
 import {
   NO_GAME_MASTER_DEFAULTS,
   type GameMasterDefaultsLookup,
@@ -107,10 +114,16 @@ interface GMCreateCompetitionContentProps {
    * look correct for a year, and the failure is silent, so the compiler is what has to object.
    */
   levelLadder: TitleLevel[];
-  /** Chosen on the gate from the server's `creatableVisibilities`; the route re-checks it. */
-  visibility?: "public" | "gm_private";
-  /** Normal or Game Master-funded; the gate only offers funded on a private contest. */
+  /** Chosen on the Access & Funding step from the server's `creatableVisibilities`; the route re-checks it. */
+  visibility?: CompetitionVisibility;
+  /** The visibilities the server says this Game Master may create. */
+  visibilityOptions?: readonly CompetitionVisibility[];
+  onVisibilityChange?: (next: CompetitionVisibility) => void;
+  /** True only for a private contest the server says this Game Master may fund. */
+  fundingOffered?: boolean;
+  /** Undefined until the Game Master picks on the Access & Funding step - never defaulted. */
   fundingMode?: FundingMode;
+  onFundingModeChange?: (next: FundingMode) => void;
   /** The Game Master's spendable wallet balance, for the live reserve check. */
   walletBalance?: number | null;
   /**
@@ -123,11 +136,23 @@ interface GMCreateCompetitionContentProps {
 export default function GMCreateCompetitionContent({
   levelLadder,
   visibility,
-  fundingMode = "player_paid",
+  visibilityOptions = ["public"],
+  onVisibilityChange,
+  fundingOffered = false,
+  fundingMode,
+  onFundingModeChange,
   walletBalance = null,
   competitionDefaults = NO_GAME_MASTER_DEFAULTS,
 }: GMCreateCompetitionContentProps) {
   const router = useRouter();
+  const effectiveFunding = effectiveFundingMode(fundingOffered, fundingMode);
+  const accessFundingError = () =>
+    accessFundingStepError({
+      visibilityOptionCount: visibilityOptions.length,
+      visibility,
+      fundingOffered,
+      fundingMode,
+    });
   const defaults = competitionDefaults;
   const locked = (key: string) => defaults.isLocked(key);
   const [loading, setLoading] = useState(true);
@@ -563,14 +588,22 @@ export default function GMCreateCompetitionContent({
     }
 
     // Step 3
+    const accessError = accessFundingError();
+    if (accessError) {
+      toast.error(`Please complete Step 3: ${accessError}`);
+      setCurrentStep(3);
+      return false;
+    }
+
+    // Step 4
     if (
       !formData.startDate ||
       !formData.startTime ||
       !formData.endDate ||
       !formData.endTime
     ) {
-      toast.error("Please complete Step 3: Set start and end times");
-      setCurrentStep(3);
+      toast.error("Please complete Step 4: Set start and end times");
+      setCurrentStep(4);
       return false;
     }
 
@@ -580,15 +613,15 @@ export default function GMCreateCompetitionContent({
       .map(([asset, _]) => asset);
 
     if (selectedAssets.length === 0) {
-      toast.error("Please complete Step 4: Select at least one asset class");
-      setCurrentStep(4);
+      toast.error("Please complete Step 5: Select at least one asset class");
+      setCurrentStep(5);
       return false;
     }
 
     // Step 5
     if (prizeDistribution.length < 2) {
       toast.error("At least 2 prize ranks are required");
-      setCurrentStep(5);
+      setCurrentStep(6);
       return false;
     }
 
@@ -597,7 +630,7 @@ export default function GMCreateCompetitionContent({
       toast.error(
         `Prize distribution must equal 100% (currently ${totalPrize}%)`,
       );
-      setCurrentStep(5);
+      setCurrentStep(6);
       return false;
     }
 
@@ -666,7 +699,7 @@ export default function GMCreateCompetitionContent({
           name: formData.name,
           description: formData.description,
           visibility,
-          fundingMode,
+          fundingMode: effectiveFunding,
           entryFee: formData.entryFeeCredits,
           startingCapital: formData.startingTradingPoints,
           minParticipants: formData.minParticipants,
@@ -730,34 +763,41 @@ export default function GMCreateCompetitionContent({
     },
     {
       number: 3,
+      title: "Access & Funding",
+      icon: ShieldCheck,
+      description: "Who can join, who pays",
+      color: "blue",
+    },
+    {
+      number: 4,
       title: "Schedule",
       icon: Calendar,
       description: "Start and end times",
       color: "purple",
     },
     {
-      number: 4,
+      number: 5,
       title: "Trading",
       icon: TrendingUp,
       description: "Assets and leverage",
       color: "orange",
     },
     {
-      number: 5,
+      number: 6,
       title: "Prizes",
       icon: Trophy,
       description: "Distribution rules",
       color: "yellow",
     },
     {
-      number: 6,
+      number: 7,
       title: "Rules",
       icon: Shield,
       description: "Competition rules",
       color: "red",
     },
     {
-      number: 7,
+      number: 8,
       title: "Launch",
       icon: Zap,
       description: "Review and launch",
@@ -1565,7 +1605,25 @@ export default function GMCreateCompetitionContent({
                 </div>
               )}
 
-              {currentStep === 2 && fundingMode === "gm_funded" && (
+              {currentStep === 3 && (
+                <TradingAccessFundingStep
+                  visibilityOptions={visibilityOptions}
+                  visibility={visibility}
+                  onVisibility={(next) => onVisibilityChange?.(next)}
+                  fundingOffered={fundingOffered}
+                  fundingMode={fundingMode}
+                  onFundingMode={onFundingModeChange}
+                  entryFee={formData.entryFeeCredits}
+                  maxParticipants={Math.min(
+                    formData.maxParticipants,
+                    subscription?.limits?.maxUsersPerCompetition ?? formData.maxParticipants,
+                  )}
+                  walletBalance={walletBalance}
+                  currencySymbol={platformSettings.currencySymbol}
+                />
+              )}
+
+              {currentStep === 2 && effectiveFunding === "gm_funded" && (
                 <div className="mt-4">
                   <FreePrivateReserveSummary
                     entryFee={formData.entryFeeCredits}
@@ -1579,8 +1637,8 @@ export default function GMCreateCompetitionContent({
                 </div>
               )}
 
-              {/* Step 3: Schedule */}
-              {currentStep === 3 && (
+              {/* Step 4: Schedule */}
+              {currentStep === 4 && (
                 <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-purple-500/50 rounded-2xl shadow-2xl shadow-purple-500/10 overflow-hidden">
                   <div className="bg-gradient-to-r from-purple-500 to-purple-600 p-6">
                     <div className="flex items-center gap-3">
@@ -1643,8 +1701,8 @@ export default function GMCreateCompetitionContent({
                 </div>
               )}
 
-              {/* Step 4: Trading Settings */}
-              {currentStep === 4 && (
+              {/* Step 5: Trading Settings */}
+              {currentStep === 5 && (
                 <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-orange-500/50 rounded-2xl shadow-2xl shadow-orange-500/10 overflow-hidden">
                   <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-6">
                     <div className="flex items-center gap-3">
@@ -1868,8 +1926,8 @@ export default function GMCreateCompetitionContent({
                 </div>
               )}
 
-              {/* Step 5: Prize Distribution */}
-              {currentStep === 5 && (
+              {/* Step 6: Prize Distribution */}
+              {currentStep === 6 && (
                 <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-yellow-500/50 rounded-2xl shadow-2xl shadow-yellow-500/10 overflow-hidden">
                   <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 p-6">
                     <div className="flex items-center gap-3">
@@ -2001,8 +2059,8 @@ export default function GMCreateCompetitionContent({
                 </div>
               )}
 
-              {/* Step 6: Competition Rules */}
-              {currentStep === 6 && (
+              {/* Step 7: Competition Rules */}
+              {currentStep === 7 && (
                 <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-red-500/50 rounded-2xl shadow-2xl shadow-red-500/10 overflow-hidden">
                   <div className="bg-gradient-to-r from-red-500 to-red-600 p-6">
                     <div className="flex items-center gap-3">
@@ -2470,8 +2528,8 @@ export default function GMCreateCompetitionContent({
                 </div>
               )}
 
-              {/* Step 7: Launch */}
-              {currentStep === 7 && (
+              {/* Step 8: Launch */}
+              {currentStep === 8 && (
                 <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-green-500/50 rounded-2xl shadow-2xl shadow-green-500/10 overflow-hidden">
                   <div className="bg-gradient-to-r from-green-500 to-green-600 p-6">
                     <div className="flex items-center gap-3">
@@ -2522,6 +2580,19 @@ export default function GMCreateCompetitionContent({
                           <p className="text-sm font-semibold text-gray-100">
                             {platformSettings.currencySymbol}
                             {formData.entryFeeCredits}
+                            {effectiveFunding === "gm_funded" && " - paid by you"}
+                          </p>
+                        </div>
+                        <div className="p-4 bg-gray-900/50 rounded-lg">
+                          <p className="text-xs text-gray-400 mb-1">
+                            Access &amp; Funding
+                          </p>
+                          <p className="text-sm font-semibold text-gray-100">
+                            {visibility === "gm_private" ? "Private" : "Public"}
+                            {" · "}
+                            {effectiveFunding === "gm_funded"
+                              ? "Funded by you (free for players)"
+                              : "Normal (players pay)"}
                           </p>
                         </div>
                         <div className="p-4 bg-gray-900/50 rounded-lg">
@@ -2640,7 +2711,7 @@ export default function GMCreateCompetitionContent({
                   {currentStep === 1 ? "Cancel" : "Previous"}
                 </button>
 
-                {currentStep < 7 ? (
+                {currentStep < 8 ? (
                   <button
                     type="button"
                     onClick={() => {
@@ -2682,6 +2753,13 @@ export default function GMCreateCompetitionContent({
                         }
                       }
                       if (currentStep === 3) {
+                        const accessError = accessFundingError();
+                        if (accessError) {
+                          toast.error(accessError);
+                          return;
+                        }
+                      }
+                      if (currentStep === 4) {
                         if (
                           !formData.startDate ||
                           !formData.startTime ||
@@ -2706,7 +2784,7 @@ export default function GMCreateCompetitionContent({
                           return;
                         }
                       }
-                      if (currentStep === 4) {
+                      if (currentStep === 5) {
                         const selectedAssets =
                           Object.values(assetClasses).filter(Boolean).length;
                         if (selectedAssets === 0) {
@@ -2714,7 +2792,7 @@ export default function GMCreateCompetitionContent({
                           return;
                         }
                       }
-                      if (currentStep === 5) {
+                      if (currentStep === 6) {
                         if (prizeDistribution.length < 2) {
                           toast.error("At least 2 prize ranks are required");
                           return;

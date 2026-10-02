@@ -42,7 +42,8 @@ export default function FundingModePicker({
   disabled,
 }: {
   visible: boolean;
-  value: FundingMode;
+  /** `undefined` means not chosen yet - neither card is highlighted. */
+  value: FundingMode | undefined;
   onChange: (next: FundingMode) => void;
   disabled?: boolean;
 }) {
@@ -50,6 +51,9 @@ export default function FundingModePicker({
   return (
     <div className="space-y-1.5">
       <span className="text-sm text-gray-300">Who pays the entry fee</span>
+      {!value && (
+        <p className="text-xs text-amber-300">Pick one to continue.</p>
+      )}
       <div className="grid gap-3 sm:grid-cols-2">
         {[...FUNDING_MODE_COPY.entries()].map(([id, option]) => {
           const Icon = option.icon;

@@ -77,6 +77,11 @@ export interface CatalogueContestSummary {
   /** Present on a private Game Master contest only - same answer the competitions list gives. */
   privateAccess?: PrivateListingAccess;
   privateGameMasterName?: string;
+  /**
+   * Present only on a Game Master-funded contest: the sponsor's display name ("" when the
+   * cache is empty - the banner falls back to "your Game Master"). Free entry for the player.
+   */
+  sponsoredBy?: string;
 }
 
 /** Fallback when the DB read fails mid-list — same copy the store seeds from. */
@@ -371,7 +376,7 @@ export async function listContestsForGame(
   // and private ones are labelled below.
   const rows = await Competition.find(withVisibleContests(query, viewer))
     .select(
-      "name status entryFee prizePool currentParticipants maxParticipants startTime endTime gameType gameKey providerKey visibility gameMasterId",
+      "name status entryFee prizePool currentParticipants maxParticipants startTime endTime gameType gameKey providerKey visibility gameMasterId gameMasterName fundingMode",
     )
     .sort({ startTime: 1 })
     .limit(50)
@@ -391,6 +396,8 @@ export async function listContestsForGame(
         providerKey?: string;
         visibility?: string;
         gameMasterId?: string;
+        gameMasterName?: string;
+        fundingMode?: string;
       }[]
     >();
 
@@ -434,6 +441,9 @@ export async function listContestsForGame(
           privateAccess: seated.has(c._id.toString()) ? "member" : c.privateAccess,
           privateGameMasterName: c.privateGameMasterName,
         }
+      : {}),
+    ...(c.fundingMode === "gm_funded"
+      ? { sponsoredBy: c.gameMasterName?.trim() || c.privateGameMasterName || "" }
       : {}),
   }));
 }

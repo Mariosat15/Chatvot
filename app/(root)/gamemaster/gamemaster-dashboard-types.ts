@@ -1,6 +1,7 @@
 // ─── Shared Types for Game Master Dashboard ──────────────────────────
 
 import type { GmReferralView } from "@/lib/services/gamemaster/gm-referral-view";
+import type { GmContestKind } from "@/lib/utils/gm-contest-kind";
 
 export interface DashboardStats {
   totalReferredUsers: number;
@@ -32,10 +33,14 @@ export interface CompetitionItem {
   startTime: string;
   endTime: string;
   createdAt: string;
+  /** Normal / Private / Funded, resolved server-side by `gmContestKind`. */
+  kind?: GmContestKind;
 }
 
 export interface EarningItem {
   id: string;
+  /** Kind of the source competition; `null` for a challenge earning or a deleted contest. */
+  kind?: GmContestKind | null;
   sourceType: string;
   sourceName: string;
   referredUserName: string;

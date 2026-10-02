@@ -13,6 +13,7 @@ import { OverviewTab, CompetitionsTab, ReferralsTab, EarningsTab } from "./gamem
 import { isGameMasterActiveCompetition } from "@/lib/services/gamemaster/active-competitions";
 import { WarningBanner, RefField, KPI, SubscriptionPanel, CancelModal } from "./gamemaster-dashboard-helpers";
 import { useGmSubscription } from "./use-gm-subscription";
+import { filterByContestKind, type GmContestKindFilterValue } from "@/components/gamemaster/GmContestKindBadge";
 import type { DashboardStats, CompetitionItem, EarningItem, ReferralItem, SubscriptionData, EarningsByGameRow } from "./gamemaster-dashboard-types";
 
 // ─── Types ────────────────────────────────────────────────────────────
@@ -37,6 +38,8 @@ export default function GameMasterDashboardContent() {
   const [activeTab, setActiveTab] = useState<Tab>("Overview");
   const [compFilter, setCompFilter] = useState("all");
   const [earningsFilter, setEarningsFilter] = useState("all");
+  const [compKindFilter, setCompKindFilter] = useState<GmContestKindFilterValue>("all");
+  const [earningsKindFilter, setEarningsKindFilter] = useState<GmContestKindFilterValue>("all");
   const [referralSearch, setReferralSearch] = useState("");
 
   // ── Subscription Management Hook ──────────────────────────────────
@@ -142,13 +145,15 @@ export default function GameMasterDashboardContent() {
 
   const filteredComps = useMemo(() => {
     if (!data?.recentCompetitions) return [];
-    return compFilter === "all" ? data.recentCompetitions : data.recentCompetitions.filter((c) => c.status === compFilter);
-  }, [data?.recentCompetitions, compFilter]);
+    const byStatus = compFilter === "all" ? data.recentCompetitions : data.recentCompetitions.filter((c) => c.status === compFilter);
+    return filterByContestKind(byStatus, compKindFilter);
+  }, [data?.recentCompetitions, compFilter, compKindFilter]);
 
   const filteredEarnings = useMemo(() => {
     if (!data?.recentEarnings) return [];
-    return earningsFilter === "all" ? data.recentEarnings : data.recentEarnings.filter((e) => e.status === earningsFilter);
-  }, [data?.recentEarnings, earningsFilter]);
+    const byStatus = earningsFilter === "all" ? data.recentEarnings : data.recentEarnings.filter((e) => e.status === earningsFilter);
+    return filterByContestKind(byStatus, earningsKindFilter);
+  }, [data?.recentEarnings, earningsFilter, earningsKindFilter]);
 
   const filteredReferrals = useMemo(() => {
     if (!data?.referredUsers) return [];
@@ -275,9 +280,9 @@ export default function GameMasterDashboardContent() {
             earningsByGame={data?.earningsByGame}
           />
         )}
-        {activeTab === "Competitions" && <CompetitionsTab competitions={filteredComps} filter={compFilter} onFilterChange={setCompFilter} subscription={sub} isExpired={isExpired} />}
+        {activeTab === "Competitions" && <CompetitionsTab competitions={filteredComps} filter={compFilter} onFilterChange={setCompFilter} kindFilter={compKindFilter} onKindFilterChange={setCompKindFilter} subscription={sub} isExpired={isExpired} />}
         {activeTab === "Referrals" && <ReferralsTab referrals={filteredReferrals} search={referralSearch} onSearchChange={setReferralSearch} total={stats?.totalReferredUsers ?? 0} own={stats?.ownReferrals} external={stats?.externalReferrals} />}
-        {activeTab === "Earnings" && stats && <EarningsTab earnings={filteredEarnings} filter={earningsFilter} onFilterChange={setEarningsFilter} stats={stats} />}
+        {activeTab === "Earnings" && stats && <EarningsTab earnings={filteredEarnings} filter={earningsFilter} onFilterChange={setEarningsFilter} kindFilter={earningsKindFilter} onKindFilterChange={setEarningsKindFilter} stats={stats} />}
 
         <SubscriptionPanel sub={sub} isExpired={isExpired} isPaused={isPaused} isScheduledForDeletion={isScheduledForDeletion} togglingRenewal={togglingRenewal} togglingPause={togglingPause} schedulingCancel={schedulingCancel} renewingNow={renewingNow} toggleAutoRenew={toggleAutoRenew} togglePause={togglePause} onShowCancelConfirm={() => setShowCancelConfirm(true)} toggleScheduledCancellation={toggleScheduledCancellation} onRenewNow={renewNow} />
       </div>

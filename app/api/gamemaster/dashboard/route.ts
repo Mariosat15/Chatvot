@@ -8,6 +8,11 @@ import { MAX_PAGE_LIMIT } from "@/lib/services/gamemaster/referral-report-filter
 import { toGameMasterReferralView } from "@/lib/services/gamemaster/gm-referral-view";
 import { readReferralConsentStates } from "@/lib/services/gamemaster/gm-referral-consent.service";
 import Competition from "@/database/models/trading/competition.model";
+import { gmContestKind } from "@/lib/utils/gm-contest-kind";
+import {
+  contestKindsForEarnings,
+  kindForEarning,
+} from "@/lib/services/gamemaster/earning-contest-kind";
 import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import { earningsByGameGroupStages } from "@/lib/services/gamemaster/earnings-by-game";
@@ -173,7 +178,7 @@ export async function GET() {
     // ── Competitions ────────────────────────────────────────────────
     const competitions = await Competition.find({ gameMasterId: userId })
       .select(
-        "name status currentParticipants minParticipants maxParticipants prizePool entryFee startTime endTime createdAt",
+        "name status currentParticipants minParticipants maxParticipants prizePool entryFee startTime endTime createdAt visibility fundingMode",
       )
       .sort({ createdAt: -1 })
       .limit(50)
@@ -191,6 +196,7 @@ export async function GET() {
           startTime: c.startTime,
           endTime: c.endTime,
           createdAt: c.createdAt,
+          kind: gmContestKind(c),
         })),
       );
 
@@ -201,9 +207,11 @@ export async function GET() {
       .sort({ createdAt: -1 })
       .limit(100)
       .lean()
-      .then((earnings) =>
-        earnings.map((e) => ({
+      .then(async (earnings) => {
+        const kinds = await contestKindsForEarnings(earnings);
+        return earnings.map((e) => ({
           id: String(e._id),
+          kind: kindForEarning(e, kinds),
           sourceType: e.sourceType || "competition",
           sourceName: e.sourceName || "Unknown",
           referredUserName: e.referredUserName || "Unknown",
@@ -211,8 +219,8 @@ export async function GET() {
           netEarning: e.netEarning || 0,
           status: e.status || "pending",
           createdAt: e.createdAt,
-        })),
-      );
+        }));
+      });
 
     // ── Earnings Aggregation ────────────────────────────────────────
     const earningsAgg = await GameMasterEarning.aggregate([

@@ -28,6 +28,7 @@ import ActionTermsDialog, {
 } from "@/components/ActionTermsDialog";
 import { isProviderContest } from "@/lib/services/games/contest-config";
 import InlineCountdown from "@/components/trading/InlineCountdown";
+import SponsoredContestBanner from "@/components/gamemaster/SponsoredContestBanner";
 import {
   describeEntryClose,
   resolveRegistrationDeadline,
@@ -472,6 +473,10 @@ export default function CompetitionEntryButton({
       ) : (
         /* Entry Section */
         <div className="space-y-4">
+          <SponsoredContestBanner
+            fundingMode={competition.fundingMode}
+            gameMasterName={competition.gameMasterName}
+          />
           <div>
             <h3 className="text-lg font-semibold text-gray-100 mb-2">
               Entry Requirements
@@ -480,7 +485,7 @@ export default function CompetitionEntryButton({
               <div className="flex items-center justify-between p-3 rounded-lg bg-gray-800/50">
                 <span className="text-sm text-gray-400">Entry Fee</span>
                 <span className="text-sm font-semibold text-gray-100">
-                  {isFunded ? "Funded by your Game Master" : volts(entryFee)}
+                  {isFunded ? `FREE - paid by ${gameMasterName}` : volts(entryFee)}
                 </span>
               </div>
               {!isFunded && (

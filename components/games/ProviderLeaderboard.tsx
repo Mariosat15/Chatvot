@@ -17,6 +17,7 @@ import {
   type RoundActivitySummary,
 } from "@/lib/utils/round-activity";
 import { formatGameScore, type GameScoreType } from "@/lib/utils/format-game-score";
+import { GameMasterBadge } from "@/components/gamemaster/GameMasterBadge";
 
 /**
  * The leaderboard for a contest played through a game provider.
@@ -258,11 +259,15 @@ export default function ProviderLeaderboard({
                     Neither fact is lost, which is the test for removing furniture rather than
                     shrinking it.
                   */}
-                  <NeonPlayerName
-                    name={row.username || "Anonymous"}
-                    isCurrentUser={isYou}
-                    showYouMarker={!ranking}
-                  />
+                  <div className="flex min-w-0 items-center gap-1">
+                    <NeonPlayerName
+                      name={row.username || "Anonymous"}
+                      isCurrentUser={isYou}
+                      showYouMarker={!ranking}
+                    />
+                    {/* Crown only: this line is the one the owner reported truncating. */}
+                    <GameMasterBadge userId={row.userId} compact />
+                  </div>
 
                   {phrase && (
                     <div className="mt-0.5 flex min-w-0 items-baseline gap-1.5 text-[11px] leading-tight">

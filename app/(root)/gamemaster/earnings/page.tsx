@@ -3,12 +3,10 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
-  Crown,
   ArrowLeft,
   TrendingUp,
   Calendar,
   Filter,
-  Download,
   Trophy,
   Swords,
   Loader2,
@@ -19,9 +17,12 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { GmContestKindBadge } from "@/components/gamemaster/GmContestKindBadge";
+import type { GmContestKind } from "@/lib/utils/gm-contest-kind";
 
 interface Earning {
   _id: string;
+  kind?: GmContestKind | null;
   sourceType: "competition" | "challenge";
   sourceId: string;
   sourceName: string;
@@ -424,6 +425,7 @@ export default function GMEarningsPage() {
                             <span className="text-white text-sm">
                               {earning.sourceName}
                             </span>
+                            <GmContestKindBadge kind={earning.kind ?? null} />
                           </div>
                         </td>
                         <td className="px-6 py-4">

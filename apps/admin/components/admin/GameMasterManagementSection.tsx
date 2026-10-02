@@ -23,6 +23,7 @@ import GameMasterDetailView, {
   type DetailedGameMasterData,
 } from "./GameMasterDetailView";
 import GmProgramSwitches from "./gamemaster/GmProgramSwitches";
+import FreePrivateEntryRuleControl from "./gamemaster/FreePrivateEntryRuleControl";
 import GmAffiliationMigration from "./gamemaster/GmAffiliationMigration";
 
 interface GameMaster {
@@ -332,6 +333,7 @@ export default function GameMasterManagementSection({
       </div>
 
       <GmProgramSwitches />
+      <FreePrivateEntryRuleControl />
       <GmAffiliationMigration />
 
       {/* Sync Referrals Panel */}

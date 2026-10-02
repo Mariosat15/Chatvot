@@ -29,6 +29,7 @@ export type ContestEntryFailureCode =
   | "free_private_terms_unavailable"
   | "free_private_unfunded"
   | "free_private_exhausted"
+  | "free_private_min_balance"
   | "contended"
   | "failed";
 

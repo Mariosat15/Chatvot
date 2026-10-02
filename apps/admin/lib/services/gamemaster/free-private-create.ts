@@ -12,6 +12,7 @@ type Db = mongoose.mongo.Db;
 type Document = mongoose.mongo.Document;
 import type { FundingMode } from "./free-private-competition";
 import { reserveFreePrivateFunds, type ReserveResult } from "./free-private-reserve";
+import { notifyGmContestCreated } from "./gm-contest-notifications";
 
 export type GmInsertResult =
   | { ok: true; reserve?: number }
@@ -40,6 +41,9 @@ export async function insertGameMasterCompetition(
 
   if (args.fundingMode !== "gm_funded") {
     await db.collection("competitions").insertOne(doc);
+    // Reason: void, not awaited - the contest is written, and a slow notification must not
+    // delay or fail the response the Game Master is waiting for.
+    void notifyGmContestCreated(doc);
     return { ok: true };
   }
 
@@ -63,6 +67,8 @@ export async function insertGameMasterCompetition(
       if (!result.ok) throw new ReserveRefused(result);
       reserve = result.reserve;
     });
+    // After the commit only, so an aborted reserve never announces a contest that is gone.
+    void notifyGmContestCreated(doc, { reserve });
     return { ok: true, reserve };
   } catch (error) {
     if (error instanceof ReserveRefused) {

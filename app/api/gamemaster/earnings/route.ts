@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
-import mongoose from "mongoose";
 import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import GameMasterSubscription from "@/database/models/gamemaster/gamemaster-subscription.model";
@@ -10,6 +9,10 @@ import {
   summariseEarningsByGame,
 } from "@/lib/services/gamemaster/earnings-by-game";
 import { labelForGameKey } from "@/lib/services/games/game-leaderboard.service";
+import {
+  contestKindsForEarnings,
+  kindForEarning,
+} from "@/lib/services/gamemaster/earning-contest-kind";
 
 /**
  * GET /api/gamemaster/earnings
@@ -119,11 +122,14 @@ export async function GET(request: NextRequest) {
       })),
     );
 
+    const kinds = await contestKindsForEarnings(earnings);
+
     return NextResponse.json({
       success: true,
       data: {
         earnings: earnings.map((e) => ({
           ...e,
+          kind: kindForEarning(e, kinds),
           gameKey: resolveEarningGameKey(
             (e as { gameKey?: string }).gameKey,
           ),

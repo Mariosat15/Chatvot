@@ -3,9 +3,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
-import { Skull, Target, Swords, Crown, Loader2 } from "lucide-react";
+import { Skull, Swords, Crown, Loader2 } from "lucide-react";
 import { useAppSettings } from "@/contexts/AppSettingsContext";
 import { formatVolts } from "@/lib/utils/format-volts";
+import { GameMasterBadge } from "@/components/gamemaster/GameMasterBadge";
 
 interface RankingEntry {
   rank: number;
@@ -351,7 +352,7 @@ function RankingRow({
       </div>
 
       {/* Username */}
-      <div className="col-span-4 min-w-0">
+      <div className="col-span-4 min-w-0 flex items-center gap-1">
         <p
           className={cn(
             "text-sm font-bold truncate",
@@ -361,6 +362,7 @@ function RankingRow({
         >
           {isCurrentUser ? "⚔️ You" : entry.username}
         </p>
+        <GameMasterBadge userId={entry.userId} compact />
       </div>
 
       {/* Display Value */}

@@ -7,8 +7,6 @@ import ProviderContestCreateForm, {
   type ContestableTitleOption,
 } from "@/components/gamemaster/ProviderContestCreateForm";
 import type { TitleLevel } from "@/lib/constants/levels";
-import ContestVisibilityPicker from "@/components/gamemaster/ContestVisibilityPicker";
-import FundingModePicker from "@/components/gamemaster/FundingModePicker";
 import type { FundingMode } from "@/lib/services/gamemaster/free-private-competition";
 import {
   NO_GAME_MASTER_DEFAULTS,
@@ -60,12 +58,14 @@ export default function CreateCompetitionGate({
   const [visibilityOptions, setVisibilityOptions] = useState<
     CompetitionVisibility[]
   >(["public"]);
+  // Reason: nothing is pre-selected when there is a real choice - the owner asked that a
+  // Game Master must pick access and funding before continuing (2 Oct 2026).
   const [visibility, setVisibility] = useState<CompetitionVisibility | undefined>(
-    "public",
+    undefined,
   );
   const [canFreePrivate, setCanFreePrivate] = useState(false);
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
-  const [fundingMode, setFundingMode] = useState<FundingMode>("player_paid");
+  const [fundingMode, setFundingMode] = useState<FundingMode | undefined>(undefined);
 
   useEffect(() => {
     let cancelled = false;
@@ -90,8 +90,9 @@ export default function CreateCompetitionGate({
         setProviderDefaults(readGameMasterDefaults(data.competitionDefaults?.provider));
         const creatable = readCreatableVisibilities(data.creatableVisibilities);
         setVisibilityOptions(creatable);
+        // A single option is a fact, not a choice; with several the Game Master must pick.
         // An empty list means nothing is creatable; send nothing and let the route name why.
-        setVisibility(creatable[0]);
+        setVisibility(creatable.length === 1 ? creatable[0] : undefined);
         setCanFreePrivate(data.canCreateFreePrivate === true);
         setWalletBalance(
           typeof data.walletBalance === "number" && Number.isFinite(data.walletBalance)
@@ -136,15 +137,6 @@ export default function CreateCompetitionGate({
   // Reason: funding is offered only on a private contest; switching back to public must not
   // leave a hidden "funded" choice that the create route would then refuse.
   const fundingOffered = visibility === "gm_private" && canFreePrivate;
-  const effectiveFunding: FundingMode = fundingOffered ? fundingMode : "player_paid";
-
-  const visibilityPicker = (
-    <ContestVisibilityPicker
-      options={visibilityOptions}
-      value={visibility}
-      onChange={setVisibility}
-    />
-  );
 
   if (selection?.type === "trading") {
     return (
@@ -160,22 +152,15 @@ export default function CreateCompetitionGate({
             </button>
           </div>
         )}
-        {visibilityPicker}
-        {fundingOffered && (
-          <div className="border-b border-gray-800 bg-gray-950 px-4 py-3">
-            <div className="mx-auto max-w-3xl">
-              <FundingModePicker
-                visible
-                value={fundingMode}
-                onChange={setFundingMode}
-              />
-            </div>
-          </div>
-        )}
+        {/* Access and funding are a step inside this wizard, not strips above it. */}
         <GMCreateCompetitionContent
           levelLadder={levelLadder}
           visibility={visibility}
-          fundingMode={effectiveFunding}
+          visibilityOptions={visibilityOptions}
+          onVisibilityChange={setVisibility}
+          fundingOffered={fundingOffered}
+          fundingMode={fundingMode}
+          onFundingModeChange={setFundingMode}
           walletBalance={walletBalance}
           competitionDefaults={tradingDefaults}
         />
@@ -193,7 +178,7 @@ export default function CreateCompetitionGate({
           visibilityOptions={visibilityOptions}
           onVisibilityChange={setVisibility}
           fundingOffered={fundingOffered}
-          fundingMode={effectiveFunding}
+          fundingMode={fundingMode}
           onFundingModeChange={setFundingMode}
           walletBalance={walletBalance}
           maxUsersPerCompetition={maxUsers}
