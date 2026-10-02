@@ -3,13 +3,11 @@
 import { AlertCircle, Clock, Loader2, Play, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { neonButtonClasses } from "@/components/neon/Buttons";
-import {
-  NEON_DIVIDER,
-  NEON_INSET,
-  NEON_STAGE_PANEL,
-} from "@/components/neon/tokens";
+import CountdownPanel from "@/components/competitions/CountdownPanel";
+import { NEON_INSET, NEON_STAGE_PANEL } from "@/components/neon/tokens";
 import { formatRemaining, useServerClock } from "@/hooks/useServerClock";
 import type { PlayState } from "./play-state";
+import { describeAttempts, formatShortUtc, PreflightRoundList } from "./preflight-parts";
 import { contestReservesFullRound, fullRoundCutoffMs } from "./round-window";
 import { playModePlayerRule, LATE_ENTRY_NOTICE } from "@/lib/services/games/play-shape";
 
@@ -39,17 +37,6 @@ interface RoundPreflightProps {
    * the start gate below is a competition rule only, and the play-mode sentence differs.
    */
   format?: "competition" | "challenge";
-}
-
-function describeAttempts(state: PlayState): string {
-  if (state.attemptsPolicy === "single") {
-    return state.attemptsUsed > 0
-      ? "You have used your one attempt."
-      : "You have one attempt.";
-  }
-
-  const verb = state.attemptsPolicy === "sum_of_n" ? "added together" : "your best counts";
-  return `${state.attemptsRemaining} of ${state.attemptsPermitted} attempts left — ${verb}.`;
 }
 
 export function RoundPreflight({
@@ -217,12 +204,49 @@ export function RoundPreflight({
     tooLateToStart ||
     exhausted;
 
+  /*
+    ONE BIG CLOCK, the competition page's own card (owner, 2 Oct 2026: "make the clocks more
+    prominent like the competition area"). Only the clock that answers the player's question
+    right now is shown, so the screen never carries two countdowns to read and compare.
+  */
+  const clock: { label: string; targetMs: number; note: string } | null = noLongerOpen ||
+    paused ||
+    exhausted ||
+    windowClosed
+    ? null
+    : notStartedYet && lobbyOpensMs !== null && lobbyOpensMs > now
+      ? {
+          label: "Lobby opens in",
+          targetMs: lobbyOpensMs,
+          note: "Your spot is saved! 🎮 Hop into the lobby when it opens and get ready - everyone starts together.",
+        }
+      : beforeTheGun && windowStartMs !== null
+        ? {
+            label: "Game starts in",
+            targetMs: windowStartMs,
+            note: "The lobby is open! 🎉 Jump in now and wait for the start.",
+          }
+        : (notStartedYet || windowNotOpen) && windowStartMs !== null && windowStartMs > now
+          ? {
+              label: "Play opens in",
+              targetMs: windowStartMs,
+              note: "Your spot is saved. Play unlocks by itself - no need to refresh.",
+            }
+          : !windowNotOpen && windowEndMs !== null
+            ? { label: "Play closes in", targetMs: windowEndMs, note: "" }
+            : null;
+  // The clock's own line says why Play is not open yet, so a second panel would repeat it.
+  const clockExplainsWait = clock !== null && (notStartedYet || windowNotOpen);
+  const showRoundNote =
+    roundNeedsMs !== null && !playsTogether && !tooLateToStart && !resuming;
+  const showWaitNote = playsTogether && startWaitEndsMs !== null;
+
   // Reason the order matters: a contest that has not started AND has a closed window should say
   // it has not started, because that is the fact the player can act on - they can come back.
   const blockedReason = notStartedYet
     ? lobbyOpensMs !== null
-      ? "The lobby for this race has not opened yet. Your seat is reserved - stay on this page and Play unlocks by itself when it opens."
-      : "This competition has not started yet. Your seat is reserved - come back when it opens."
+      ? "The lobby has not opened yet. Your spot is saved."
+      : "This has not started yet. Your spot is saved - come back when it opens."
     : noLongerOpen
       ? "This competition is no longer accepting rounds."
       : paused
@@ -246,7 +270,9 @@ export function RoundPreflight({
   const buttonLabel = launching
     ? "Opening the game…"
     : notStartedYet
-      ? "Not started yet"
+      ? lobbyOpensMs !== null
+        ? "Lobby opens soon"
+        : "Not started yet"
       : noLongerOpen
         ? "Closed"
         : paused
@@ -281,16 +307,40 @@ export function RoundPreflight({
         <h2 className="text-xl font-bold uppercase tracking-wide text-white">
           {gameName}
         </h2>
-        <p className="mt-1 text-sm text-gray-400">{describeAttempts(state)}</p>
-        {state.playMode && (
-          <p className="mt-2 text-xs text-gray-300">
-            <span className="font-semibold text-gray-100">
+        <div className="mt-2 flex flex-wrap gap-2">
+          <span className="rounded-full bg-white/5 px-3 py-1 text-xs font-medium text-gray-200">
+            {describeAttempts(state)}
+          </span>
+          {state.playMode && (
+            <span className="rounded-full bg-cyan-500/10 px-3 py-1 text-xs font-semibold text-cyan-300">
               {playModePlayerRule(state.playMode, format).label}
-            </span>{" "}
+            </span>
+          )}
+        </div>
+        {state.playMode && (
+          <p className="mt-2 text-xs leading-relaxed text-gray-400">
             {playModePlayerRule(state.playMode, format).detail}
           </p>
         )}
       </div>
+
+      {clock && (
+        <CountdownPanel
+          remainingMs={clock.targetMs - now}
+          label={clock.label}
+          variant={clock.label === "Play closes in" ? "end" : "start"}
+          details={
+            <div className="space-y-1">
+              {clock.note && (
+                <p className="text-sm font-medium text-gray-100">{clock.note}</p>
+              )}
+              <p className="text-xs tabular-nums text-gray-500">
+                {formatShortUtc(clock.targetMs)}
+              </p>
+            </div>
+          }
+        />
+      )}
 
       {/*
         Why the contest's own state gets its own panel rather than reusing the refusal box
@@ -298,7 +348,7 @@ export function RoundPreflight({
         rejection, it is the normal state of a contest a player has just joined, and colouring
         it as an error teaches them something is broken.
       */}
-      {blockedReason && (
+      {blockedReason && !clockExplainsWait && (
         <div className={`flex items-start gap-2 p-3 ${NEON_INSET}`}>
           <Clock className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
           <p className="text-xs text-gray-300">{blockedReason}</p>
@@ -319,38 +369,18 @@ export function RoundPreflight({
         absolute time is kept underneath, because a player planning when to come back needs it,
         but the figure that decides whether to press Play now is the remaining one.
 
-        It counts down to the window's OPEN while play has not started, and to its CLOSE once
-        it has, because those are the two questions in the two states. Both are anchored to the
-        server's clock, so the number agrees with the gate that will judge the click.
+        The big clock above now carries the countdown (lobby open, game start, play open or
+        play close - whichever matters now), anchored to the server's clock so the number
+        agrees with the gate that will judge the click. What remains here is the small print.
       */}
-      {windowNotOpen && windowStartMs !== null && !noLongerOpen && (
-        <div className={`flex items-center gap-2 p-3 ${NEON_INSET}`}>
-          <Clock className="h-4 w-4 shrink-0 text-gray-400" />
-          <p className="text-xs text-gray-300">
-            Play opens in{" "}
-            <span className="font-semibold tabular-nums text-gray-100">
-              {formatRemaining(windowStartMs - now)}
-            </span>
-            <span className="ml-1 text-gray-500">
-              ({new Date(windowStartMs).toUTCString()})
-            </span>
-          </p>
-        </div>
-      )}
-
-      {!windowNotOpen && windowEndMs !== null && !windowClosed && !noLongerOpen && (
+      {!windowNotOpen &&
+        windowEndMs !== null &&
+        !windowClosed &&
+        !noLongerOpen &&
+        (showRoundNote || showWaitNote) && (
         <div className={`flex items-start gap-2 p-3 ${NEON_INSET}`}>
           <Clock className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
           <div className="space-y-1">
-            <p className="text-xs text-gray-300">
-              Play closes in{" "}
-              <span className="font-semibold tabular-nums text-gray-100">
-                {formatRemaining(windowEndMs - now)}
-              </span>
-              <span className="ml-1 text-gray-500">
-                ({new Date(windowEndMs).toUTCString()})
-              </span>
-            </p>
             {/*
               THREE SENTENCES FOR THREE SITUATIONS, and they must not be collapsed into one.
 
@@ -363,35 +393,29 @@ export function RoundPreflight({
               states it outright and two panels about the same clock contradict each other in
               tone.
             */}
-            {roundNeedsMs !== null &&
-              !playsTogether &&
-              !tooLateToStart &&
-              !resuming &&
+            {showRoundNote &&
+              roundNeedsMs !== null &&
               (shortenedMs !== null ? (
                 <p className="text-xs text-amber-300/90">
-                  Less than a full round is left. Start now and you get{" "}
+                  Less than a full round is left. You get{" "}
                   <span className="font-semibold tabular-nums">
                     {formatRemaining(shortenedMs)}
                   </span>{" "}
-                  of play before the contest closes your round and scores what you
-                  managed.
+                  and score what you reach.
                 </p>
               ) : reservesFullRound && cutoffMs !== null ? (
                 <p className="text-xs text-gray-500">
-                  A round needs up to{" "}
-                  {Math.max(1, Math.round(roundNeedsMs / 60000))} min, so the last one
-                  can start{" "}
+                  Each round takes up to {Math.max(1, Math.round(roundNeedsMs / 60000))}{" "}
+                  min. Last start in{" "}
                   <span className="tabular-nums">
                     {formatRemaining(cutoffMs - now)}
-                  </span>{" "}
-                  from now.
+                  </span>
+                  .
                 </p>
               ) : (
                 <p className="text-xs text-gray-500">
-                  A round runs up to{" "}
-                  {Math.max(1, Math.round(roundNeedsMs / 60000))} min. You can start one
-                  at any time until the contest ends - anything still running then is
-                  closed and scored on what you managed.
+                  Each round takes up to {Math.max(1, Math.round(roundNeedsMs / 60000))}{" "}
+                  min. Start any time before the end.
                 </p>
               ))}
             {/*
@@ -400,13 +424,13 @@ export function RoundPreflight({
               cancelled and every entry fee returned in full. Stated only when the server sends
               the deadline, which it does for a stored `scheduled` contest alone.
             */}
-            {playsTogether && startWaitEndsMs !== null && (
+            {showWaitNote && startWaitEndsMs !== null && (
               <p className="text-xs text-gray-500">
-                If fewer than two players are ready by{" "}
+                Fewer than two players ready by{" "}
                 <span className="tabular-nums text-gray-300">
-                  {new Date(startWaitEndsMs).toUTCString()}
+                  {formatShortUtc(startWaitEndsMs)}
                 </span>
-                , the competition is cancelled and everyone gets their full entry fee back.
+                ? It is cancelled and everyone gets their full entry fee back.
               </p>
             )}
           </div>
@@ -463,28 +487,7 @@ export function RoundPreflight({
         {buttonLabel}
       </Button>
 
-      {state.rounds.length > 0 && (
-        <div className={`border-t ${NEON_DIVIDER} pt-4`}>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
-            Your rounds
-          </p>
-          <ul className="space-y-1">
-            {state.rounds.map((round) => (
-              <li
-                key={round.roundId}
-                className="flex items-center justify-between text-xs text-gray-400"
-              >
-                <span>Attempt {round.attemptNumber}</span>
-                <span className="capitalize">{round.status}</span>
-                {/* Absent is not zero. A round with no score yet shows a dash. */}
-                <span className="text-gray-300">
-                  {typeof round.score === "number" ? round.score : "—"}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      <PreflightRoundList rounds={state.rounds} />
     </div>
   );
 }

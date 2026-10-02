@@ -1493,9 +1493,29 @@ describe("the play screen counts down on the server's clock", () => {
 
     // The remaining figure is what decides whether to press Play now; the absolute time is what
     // a player planning to come back needs. The report was that only the second was shown.
-    expect(code).toMatch(/formatRemaining\(windowEndMs\s*-\s*now\)/);
-    expect(code).toMatch(/formatRemaining\(windowStartMs\s*-\s*now\)/);
-    expect(code).toMatch(/toUTCString\(\)/);
+    // Re-aimed 2 Oct 2026, claim unchanged: the two small text clocks became ONE large
+    // `CountdownPanel` (owner: "make the clocks more prominent like the competition area"), so
+    // both targets now feed one countdown, and the absolute time is printed from that SAME
+    // target - two sources here is how the clock and the time beneath it could disagree.
+    expect(code).toMatch(/targetMs:\s*windowStartMs/);
+    expect(code).toMatch(/targetMs:\s*windowEndMs/);
+    expect(code).toMatch(/remainingMs=\{clock\.targetMs\s*-\s*now\}/);
+    expect(code).toMatch(/formatShortUtc\(clock\.targetMs\)/);
+  });
+
+  it("counts down to the lobby opening on a play-together contest, and says the spot is saved", () => {
+    const code = readCode(PREFLIGHT);
+
+    // Owner, 2 Oct 2026: before the lobby opens, a player must see WHEN it opens and that they
+    // can come in and wait. The lobby target is chosen only while it is still in the future,
+    // or the clock would sit at zero instead of moving on to "Game starts in".
+    expect(code).toMatch(/lobbyOpensMs\s*>\s*now[\s\S]{0,80}label:\s*"Lobby opens in"/);
+    expect(code).toMatch(/targetMs:\s*lobbyOpensMs/);
+    expect(code).toMatch(/label:\s*"Game starts in"/);
+    expect(code).toMatch(/Your spot is saved/);
+
+    // One clock, never two: the big panel is rendered exactly once.
+    expect((code.match(/<CountdownPanel\b/g) ?? []).length).toBe(1);
   });
 
   it("refreshes the pre-flight for the facts a clock cannot know", () => {

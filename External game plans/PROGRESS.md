@@ -921,6 +921,32 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 2 Oct 2026 - The play screen's pre-flight shows one big clock and short wording (owner request)
+
+Owner, on the arena pre-flight of a play-together contest: *"add that in xxx time the lobby
+will be open and you can reserve your spot... make the clocks more prominent like we have in
+the competition area... less complicated and busy, easier to read fast."* **Nothing was
+computed wrongly, no risk number, nothing backfilled** - every gate is unchanged.
+
+- **One clock, the competition card's own** (`CountdownPanel`), rendered exactly once and
+  counting to whichever moment matters now: **Lobby opens in** (play-together, lobby not yet
+  open), **Game starts in** (in the lobby before the gun), **Play opens in**, or **Play closes
+  in**. Each has one short line under it ("Your spot is saved! Hop into the lobby when it opens
+  and get ready - everyone starts together.") and the time as `Fri 02 Oct, 07:50 UTC` instead of
+  `toUTCString()`. The lobby target is chosen only **while it is still in the future**, so the
+  clock moves on rather than sitting at zero.
+- **No repeated messages**: the grey "not started / not opened" panel is hidden while the clock
+  already explains the wait; the button reads **Lobby opens soon** in that case. Attempts and the
+  play style became two small pills; the round-length and waiting-limit sentences were shortened.
+- `describeAttempts`, `formatShortUtc` and the rounds list moved to
+  `components/games/preflight-parts.tsx` to keep `RoundPreflight.tsx` under 500 lines (496).
+- Tests: one `provider-play-ui` assertion **re-aimed, claim unchanged** (countdown and absolute
+  time from the same target); one new test pins the lobby clock, the saved-spot line and a single
+  `CountdownPanel`. Probe removing the "still in the future" condition: red on exactly that test.
+  **Pre-existing, unrelated failures** seen in the same run: `arena-band` (2),
+  `analytics-terminology` (2), `games-prose-terminology` (2), `user-data-reset-coverage` (1),
+  `game-willingness` (1) - none read the files changed here. **Never verified by eye.**
+
 ### 2 Oct 2026 - Access & Mode is a wizard step, and a GM contest cannot start in the past (owner request)
 
 The owner asked for two things. First, the Public/Private choice and the game mode should be
