@@ -378,7 +378,7 @@ export default async function ProviderContestLobby({
           are false - nobody starts "at any time" - so they are replaced rather than appended.
         */}
         <NeonNote>
-          <span className="font-semibold text-gray-100">{modeRule.label}.</span>{" "}
+          <span className="font-semibold text-gray-100">{modeRule.label}</span>{" "}
           {modeRule.detail}
           {playMode === "anytime" && (
             <>

@@ -113,19 +113,21 @@ export function playModePlayerRule(
   if (mode === "scheduled") {
     if (format === "challenge") {
       return {
-        label: "You play together",
+        label: "You play together.",
         detail:
           "Both players play at the same time. The game starts when you are both in and ready, so open it when your opponent is ready too.",
       };
     }
     return {
-      label: "Everyone starts together",
+      label: "Start together.",
       detail:
-        "Everyone plays at the same moment. Open the game before the start time, get ready and wait. At the start time, once at least two players are ready, a short countdown runs and play begins. You can still join after the start, but the time already played counts against you - so do not be late.",
+        "Be in the game before the start time and get ready. Once at least 2 players are ready, a short countdown begins and the game starts. You can still join late, but the timer keeps running — so don’t miss the start.",
     };
   }
+  // Reason: each label carries its own closing punctuation, because the screens print it
+  // as-is - appending a full stop there turned "ready! 🎮" into "ready! 🎮.".
   return {
-    label: format === "challenge" ? "Play any time" : "Jump in whenever you’re ready! 🎮",
+    label: format === "challenge" ? "Play any time." : "Jump in whenever you’re ready! 🎮",
     detail:
       format === "challenge"
         ? "You can each play whenever you like before the challenge ends. Your scores are compared when it does."

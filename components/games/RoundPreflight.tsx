@@ -285,7 +285,7 @@ export function RoundPreflight({
         {state.playMode && (
           <p className="mt-2 text-xs text-gray-300">
             <span className="font-semibold text-gray-100">
-              {playModePlayerRule(state.playMode, format).label}.
+              {playModePlayerRule(state.playMode, format).label}
             </span>{" "}
             {playModePlayerRule(state.playMode, format).detail}
           </p>

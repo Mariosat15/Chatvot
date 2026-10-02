@@ -72,13 +72,14 @@ describe("playModePlayerRule names the rule and never the game", () => {
     const rule = playModePlayerRule("scheduled", "competition");
     expect(rule.label).toMatch(/together/i);
     expect(rule.detail).toMatch(/before the start/i);
-    expect(rule.detail).toMatch(/two players are ready/i);
-    expect(rule.detail).toMatch(/still join after the start/i);
+    expect(rule.detail).toMatch(/2 players are ready/i);
+    expect(rule.detail).toMatch(/still join late/i);
   });
 
   it("says an anytime game can be played before the end", () => {
     const rule = playModePlayerRule("anytime", "competition");
-    expect(rule.label).toMatch(/any time/i);
+    expect(rule.label).toMatch(/whenever/i);
+    expect(rule.detail).toMatch(/anytime/i);
     expect(rule.detail).toMatch(/competition ends/i);
     expect(playModePlayerRule("anytime", "challenge").detail).toMatch(/challenge ends/i);
   });

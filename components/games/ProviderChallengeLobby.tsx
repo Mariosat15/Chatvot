@@ -267,7 +267,7 @@ export default async function ProviderChallengeLobby({
             )}
         </div>
         <NeonNote>
-          <span className="font-semibold text-gray-100">{modeRule.label}.</span>{" "}
+          <span className="font-semibold text-gray-100">{modeRule.label}</span>{" "}
           {modeRule.detail}
           {hasWindow && playMode === "anytime" && (
             <>
