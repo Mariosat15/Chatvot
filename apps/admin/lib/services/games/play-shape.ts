@@ -125,11 +125,11 @@ export function playModePlayerRule(
     };
   }
   return {
-    label: "Play any time",
+    label: format === "challenge" ? "Play any time" : "Jump in whenever you’re ready! 🎮",
     detail:
       format === "challenge"
         ? "You can each play whenever you like before the challenge ends. Your scores are compared when it does."
-        : "You can play whenever you like before the competition ends. Everyone's scores are compared when it does.",
+        : "Play anytime before the competition ends and push for your best score. When the timer hits zero, everyone’s final scores are compared and the winners are decided.",
   };
 }
 
