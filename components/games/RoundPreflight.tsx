@@ -209,20 +209,25 @@ export function RoundPreflight({
     prominent like the competition area"). Only the clock that answers the player's question
     right now is shown, so the screen never carries two countdowns to read and compare.
   */
+  const startsInLabel =
+    format === "challenge" ? "Challenge starts in" : "Competition starts in";
   const clock: { label: string; targetMs: number; note: string } | null = noLongerOpen ||
     paused ||
     exhausted ||
     windowClosed
     ? null
-    : notStartedYet && lobbyOpensMs !== null && lobbyOpensMs > now
+    : // Reason two clocks with two jobs (owner, 2 Oct 2026): the big clock always counts to the
+      // START of the competition, while the button counts to the lobby opening - so the player
+      // reads "when does it begin" at a glance and "when can I go in" where they would press.
+      notStartedYet && lobbyOpensMs !== null && lobbyOpensMs > now && windowStartMs !== null
       ? {
-          label: "Lobby opens in",
-          targetMs: lobbyOpensMs,
+          label: startsInLabel,
+          targetMs: windowStartMs,
           note: "Your spot is saved! 🎮 Hop into the lobby when it opens and get ready - everyone starts together.",
         }
       : beforeTheGun && windowStartMs !== null
         ? {
-            label: "Game starts in",
+            label: startsInLabel,
             targetMs: windowStartMs,
             note: "The lobby is open! 🎉 Jump in now and wait for the start.",
           }

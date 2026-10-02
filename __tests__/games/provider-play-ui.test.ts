@@ -1509,9 +1509,13 @@ describe("the play screen counts down on the server's clock", () => {
     // Owner, 2 Oct 2026: before the lobby opens, a player must see WHEN it opens and that they
     // can come in and wait. The lobby target is chosen only while it is still in the future,
     // or the clock would sit at zero instead of moving on to "Game starts in".
-    expect(code).toMatch(/lobbyOpensMs\s*>\s*now[\s\S]{0,80}label:\s*"Lobby opens in"/);
-    expect(code).toMatch(/targetMs:\s*lobbyOpensMs/);
-    expect(code).toMatch(/label:\s*"Game starts in"/);
+    // Amended 2 Oct 2026 (owner): the BIG clock counts to the competition start, never to the
+    // lobby opening; the lobby countdown lives on the button (asserted below).
+    expect(code).toMatch(
+      /lobbyOpensMs\s*>\s*now[\s\S]{0,80}\?\s*\{\s*label:\s*startsInLabel,\s*targetMs:\s*windowStartMs/,
+    );
+    expect(code).not.toMatch(/targetMs:\s*lobbyOpensMs/);
+    expect(code).toMatch(/"Competition starts in"/);
     expect(code).toMatch(/Your spot is saved/);
 
     // The button counts down too, on the same server clock, so the player sees the wait where
