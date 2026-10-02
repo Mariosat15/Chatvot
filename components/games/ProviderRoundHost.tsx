@@ -146,6 +146,55 @@ export function ProviderRoundHost({
     return () => clearInterval(timer);
   }, [phase.name, readState]);
 
+  /*
+    THE RE-READ AT THE GUN. The 20-second poll alone left Play locked for up to twenty seconds
+    after the countdown showed zero, which reads to a player as "it did not open" - the owner's
+    2 Oct 2026 report. So the pre-flight also re-reads just after the moment play opens (the
+    lobby for a scheduled race, otherwise the window start).
+
+    The moment is measured on the SERVER's clock, not the browser's: the delay is taken from
+    `serverNow` in the same payload, so a wrong device clock cannot fire it early or late. It
+    only asks the server; the server still decides whether the contest is open.
+  */
+  useEffect(() => {
+    if (phase.name !== "preflight") return;
+    if (state.contestStatus !== "upcoming") return;
+    const serverNowMs = Date.parse(state.serverNow);
+    const lobbyMs = state.lobbyOpensAt ? Date.parse(state.lobbyOpensAt) : NaN;
+    const startMs = state.playWindowStart ? Date.parse(state.playWindowStart) : NaN;
+    if (!Number.isFinite(serverNowMs)) return;
+    const upcomingOpens = [lobbyMs, startMs]
+      .filter((t) => Number.isFinite(t) && t > serverNowMs)
+      .sort((a, b) => a - b)[0];
+    // Reason: if the opening moment has JUST passed and the server still says `upcoming`
+    // (the read landed a beat early), keep re-reading every few seconds for two minutes
+    // rather than falling back to the 20-second poll. Each read moves `serverNow`, which
+    // re-arms this effect; it stops as soon as the status leaves `upcoming`.
+    const justOpened = [lobbyMs, startMs].some(
+      (t) => Number.isFinite(t) && t <= serverNowMs && serverNowMs - t < 120_000,
+    );
+    if (upcomingOpens === undefined && !justOpened) return;
+
+    const delays =
+      upcomingOpens !== undefined ? [upcomingOpens - serverNowMs + 1500] : [3000];
+    const timers = delays.map((ms) =>
+      setTimeout(() => {
+        void (async () => {
+          const refreshed = await readState();
+          if (refreshed) setState(refreshed);
+        })();
+      }, ms),
+    );
+    return () => timers.forEach(clearTimeout);
+  }, [
+    phase.name,
+    readState,
+    state.contestStatus,
+    state.serverNow,
+    state.lobbyOpensAt,
+    state.playWindowStart,
+  ]);
+
   const launch = useCallback(async () => {
     setRefusal(null);
     setPhase({ name: "launching" });

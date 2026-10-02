@@ -10,6 +10,25 @@ import {
   type PlayStateRefusal,
 } from "@/lib/services/games/round-status.service";
 import { canViewContestById } from "@/lib/services/gamemaster/private-contest-access.service";
+import { getCompetitionById } from "@/lib/actions/trading/competition.actions";
+
+/**
+ * Starts (or cancels) a contest whose start time has passed but whose stored status is still
+ * `upcoming`, exactly as opening the lobby page does.
+ *
+ * Reason: the status cron runs once a minute, and the lobby page applies this same backup
+ * start on render - so a player who reloaded saw Play while a player who stayed on the page
+ * kept reading "Not started yet" until the cron caught up, which is the owner's 2 Oct 2026
+ * report ("I must exit the lobby and come back"). Calling the one existing transition here,
+ * rather than writing a second, keeps the page and the poll on a single rule.
+ */
+async function applyBackupStart(competitionId: string): Promise<void> {
+  try {
+    await getCompetitionById(competitionId);
+  } catch (error) {
+    console.warn("⚠️ Backup contest start failed; continuing with stored status:", error);
+  }
+}
 
 /**
  * POST /api/competitions/[id]/rounds - start a round in a provider-game competition.
@@ -131,6 +150,7 @@ export async function GET(
     // that returns 200 with correct-looking data.
     const userId = session.user.id;
     if (!(await canViewContestById(competitionId, userId))) return privateNotFound();
+    await applyBackupStart(competitionId);
     const outcome = await getPlayState(competitionId, userId);
 
     if (!outcome.success) {
@@ -169,6 +189,7 @@ export async function POST(
     if (!(await canViewContestById(competitionId, userId))) {
       return privateNotFound();
     }
+    await applyBackupStart(competitionId);
     const outcome = await launchContestRound(competitionId, {
       userId,
       // Reason: the provider receives a display name and nothing else. No email, no user
