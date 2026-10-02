@@ -350,23 +350,43 @@ describe("the play style default (owner, 2 Oct 2026)", () => {
   });
 });
 
-describe("the admin finds the defaults under Competitions -> Settings", () => {
+// Reason: these lived under Competitions -> Settings until 2 Oct 2026, when the owner asked
+// for every Game Master setting on one screen. Flipped rather than deleted: the grant rule
+// (the defaults tab only with `gm-competition-defaults`, because its route refuses without
+// it) is unchanged and only the location moved.
+describe("the admin finds the defaults under Manage Game Masters -> Settings", () => {
   const dashboard = read("apps/admin/components/admin/AdminDashboard.tsx");
-  const section = read("apps/admin/components/admin/competitions/CompetitionsAdminSection.tsx");
+  const competitions = read("apps/admin/components/admin/competitions/CompetitionsAdminSection.tsx");
+  const program = read("apps/admin/components/admin/GameMasterProgramSection.tsx");
+  const panel = read("apps/admin/components/admin/gamemaster/GmSettingsPanel.tsx");
 
   it("has no sidebar entry of its own any more", () => {
     expect(dashboard).not.toContain('id: "gm-competition-defaults"');
   });
 
-  it("the Competitions item renders the tabbed page, gated on the defaults grant", () => {
-    expect(dashboard).toMatch(
-      /case "competitions":\s*return \(\s*<CompetitionsAdminSection[\s\S]{0,120}canEditSettings=\{hasAccess\("gm-competition-defaults"\)\}/,
-    );
+  it("Competitions no longer carries the defaults", () => {
+    expect(competitions).not.toContain("GameMasterCompetitionDefaultsSection");
   });
 
-  it("each tab is shown only with its own grant", () => {
-    expect(section).toContain('(requested === "settings" && canEditSettings)');
-    expect(section).toContain('(requested === "list" && canViewList)');
-    expect(section).toContain("<GameMasterCompetitionDefaultsSection />");
+  it("Manage Game Masters gets the defaults grant and a Settings tab", () => {
+    expect(dashboard).toMatch(
+      /<GameMasterProgramSection[\s\S]{0,300}canEditDefaults=\{hasAccess\("gm-competition-defaults"\)\}/,
+    );
+    expect(program).toContain('{ id: "settings", label: "Settings" }');
+    expect(program).toContain("<GmSettingsPanel canEditDefaults={canEditDefaults} />");
+  });
+
+  it("the defaults render only with their own grant, below the programme switches", () => {
+    expect(panel).toMatch(/canEditDefaults \? \(\s*<GameMasterCompetitionDefaultsSection \/>/);
+    const switches = panel.indexOf("<GmProgramSwitches />");
+    const defaults = panel.indexOf("<GameMasterCompetitionDefaultsSection />");
+    expect(switches).toBeGreaterThan(-1);
+    expect(defaults).toBeGreaterThan(switches);
+  });
+
+  it("the old deep link still opens the defaults", () => {
+    expect(dashboard).toMatch(
+      /case "gm-competition-defaults":\s*return <GameMasterCompetitionDefaultsSection/,
+    );
   });
 });

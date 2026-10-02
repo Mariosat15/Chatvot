@@ -153,6 +153,8 @@ describe("report URL state", () => {
     expect(resolveGmTab(new URLSearchParams("gmTab=players&gmId=abc"))).toBe("masters");
     expect(resolveGmTab(new URLSearchParams("gmTab=players"))).toBe("players");
     expect(resolveGmTab(new URLSearchParams("gmTab=masters"))).toBe("masters");
+    expect(resolveGmTab(new URLSearchParams("gmTab=settings"))).toBe("settings");
+    expect(resolveGmTab(new URLSearchParams("gmTab=settings&gmId=abc"))).toBe("masters");
     // Reason: Part 2 made referred players the default Manage Game Masters screen.
     expect(resolveGmTab(new URLSearchParams("gmTab=bogus"))).toBe("players");
     expect(resolveGmTab(new URLSearchParams(""))).toBe("players");

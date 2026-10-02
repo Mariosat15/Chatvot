@@ -139,6 +139,7 @@ import MessagingSettingsSection from "@/components/admin/MessagingSettingsSectio
 import GameMasterDashboardSection from "@/components/admin/GameMasterDashboardSection";
 import GameMasterProgramSection from "@/components/admin/GameMasterProgramSection";
 import CompetitionsAdminSection from "@/components/admin/competitions/CompetitionsAdminSection";
+import GameMasterCompetitionDefaultsSection from "@/components/admin/gamemaster/GameMasterCompetitionDefaultsSection";
 import PriceHealthWidget from "@/components/admin/PriceHealthWidget";
 import TradingSectionTabs from "@/components/admin/trading/TradingSectionTabs";
 import TradingPageSection from "@/components/admin/trading/TradingPageSection";
@@ -1145,11 +1146,7 @@ export default function AdminDashboard({
         return <VisitorAnalyticsSection key={currentRefreshKey} />;
       case "competitions":
         return (
-          <CompetitionsAdminSection
-            key={currentRefreshKey}
-            canViewList
-            canEditSettings={hasAccess("gm-competition-defaults")}
-          />
+          <CompetitionsAdminSection key={currentRefreshKey} />
         );
       case "challenges":
         return <ChallengesAdminSection key={currentRefreshKey} />;
@@ -1295,23 +1292,18 @@ export default function AdminDashboard({
         return <MessagingSettingsSection key={currentRefreshKey} />;
       case "gamemaster-dashboard":
         return <GameMasterDashboardSection key={currentRefreshKey} />;
-      // Reason: no menu entry of its own any more (it is the Settings tab of Competitions),
-      // but the id stays a grant and an addressable deep link.
+      // Reason: no menu entry of its own (it lives on Manage Game Masters -> Settings since
+      // 2 Oct 2026, and before that on Competitions -> Settings), but the id stays a grant and
+      // an addressable deep link, so an employee holding only this grant still reaches it.
       case "gm-competition-defaults":
-        return (
-          <CompetitionsAdminSection
-            key={currentRefreshKey}
-            canViewList={hasAccess("competitions")}
-            canEditSettings
-            initialTab="settings"
-          />
-        );
+        return <GameMasterCompetitionDefaultsSection key={currentRefreshKey} />;
       case "gamemaster-management":
         return (
           <GameMasterProgramSection
             key={currentRefreshKey}
             initialGmId={urlGmId || undefined}
             canExport={hasAccessToSection("gamemaster-reports-export")}
+            canEditDefaults={hasAccess("gm-competition-defaults")}
           />
         );
       case "price-health":

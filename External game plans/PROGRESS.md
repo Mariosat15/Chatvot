@@ -922,6 +922,37 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 2 October 2026 - Every Game Master setting on one screen: Manage Game Masters -> Settings
+
+**Owner request:** the Game Master settings were spread across two places, so put them together.
+Before this change, Join Game Master and leaderboard, Private competitions, Free Private competitions,
+the free-seat entry rule and Affiliation migration sat above the masters list. Game Master
+Competition Defaults was a separate tab under Competitions.
+
+**Built (admin only, nothing is mirrored).**
+- Manage Game Masters gains a third tab, **Settings**, reached through the URL as `?gmTab=settings`.
+  A `gmId` in the URL still forces the masters tab.
+- The tab renders `GmSettingsPanel.tsx`. It shows, in order: the program switches, the free-seat
+  entry rule, Affiliation migration, and then Game Master Competition Defaults.
+- The Competitions page is now just the list, because its Settings tab is gone.
+
+**RBAC is preserved, not widened.** The defaults route is guarded by `gm-competition-defaults`,
+and the other settings are guarded by `gamemaster-management`.
+- The panel renders the defaults only when the employee holds `hasAccess("gm-competition-defaults")`.
+  Otherwise it shows a note naming the missing permission.
+- So moving the defaults onto a screen granted by `gamemaster-management` gives nobody new access.
+- The old `?activeTab=gm-competition-defaults` deep link still renders the defaults on their own.
+  That id is an `ADMIN_SECTIONS` enum value, so it is add-only.
+
+**Tests.** Four mount tests were flipped, not deleted:
+- `gamemaster-competition-defaults`
+- `gm-affiliation-migration-route`
+- `free-private-entry-rule`
+- `gm-report-screen`, which gains the `gmTab=settings` cases.
+
+Seven admin terminology and user-data-reset tests fail with this change stashed exactly as with it
+applied, so they predate it. **Never verified by eye.**
+
 ### 2 Oct 2026 - Who may take a free seat, kind badges for Game Masters, Game Master notifications, and the GM badge on names (owner request)
 
 Owner: players with no credits could enter funded competitions; the Game Master dashboard should

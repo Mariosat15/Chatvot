@@ -22,10 +22,6 @@ import { useRouter, usePathname } from "next/navigation";
 import GameMasterDetailView, {
   type DetailedGameMasterData,
 } from "./GameMasterDetailView";
-import GmProgramSwitches from "./gamemaster/GmProgramSwitches";
-import FreePrivateEntryRuleControl from "./gamemaster/FreePrivateEntryRuleControl";
-import GmAffiliationMigration from "./gamemaster/GmAffiliationMigration";
-
 interface GameMaster {
   id: string;
   userId: string;
@@ -331,10 +327,6 @@ export default function GameMasterManagementSection({
           </button>
         </div>
       </div>
-
-      <GmProgramSwitches />
-      <FreePrivateEntryRuleControl />
-      <GmAffiliationMigration />
 
       {/* Sync Referrals Panel */}
       {showSyncPanel && (

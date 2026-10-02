@@ -8,7 +8,7 @@
  * or `search` would be inherited by whichever section the operator opens next.
  */
 
-export const GM_TABS = ["masters", "players"] as const;
+export const GM_TABS = ["masters", "players", "settings"] as const;
 export type GmTab = (typeof GM_TABS)[number];
 export const GM_TAB_PARAM = "gmTab";
 
@@ -48,6 +48,7 @@ export function resolveGmTab(params: ReadableParams): GmTab {
   const raw = params.get(GM_TAB_PARAM);
   if (raw === "masters") return "masters";
   if (raw === "players") return "players";
+  if (raw === "settings") return "settings";
   return "players";
 }
 

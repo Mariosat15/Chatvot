@@ -148,8 +148,9 @@ describe("the admin route and screen", () => {
     expect(screen).toMatch(/describeFreePrivateEntryRule\(rule\)/);
   });
 
-  it("is mounted on the Game Master management screen", () => {
-    expect(read("apps/admin/components/admin/GameMasterManagementSection.tsx")).toMatch(
+  // Reason: moved from the Game Masters list to Manage Game Masters -> Settings on 2 Oct 2026.
+  it("is mounted on the Game Master Settings tab", () => {
+    expect(read("apps/admin/components/admin/gamemaster/GmSettingsPanel.tsx")).toMatch(
       /<FreePrivateEntryRuleControl \/>/,
     );
   });

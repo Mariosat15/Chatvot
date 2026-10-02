@@ -58,8 +58,9 @@ describe("affiliation migration admin wiring", () => {
     expect(post).toMatch(/"gm_affiliation_migration"/);
   });
 
-  it("the button is mounted on the Game Masters screen", () => {
-    const section = readCode("apps/admin/components/admin/GameMasterManagementSection.tsx");
+  // Reason: moved from the Game Masters list to Manage Game Masters -> Settings on 2 Oct 2026.
+  it("the button is mounted on the Game Master Settings tab", () => {
+    const section = readCode("apps/admin/components/admin/gamemaster/GmSettingsPanel.tsx");
     expect(section).toMatch(/<GmAffiliationMigration \/>/);
     const component = readCode("apps/admin/components/admin/gamemaster/GmAffiliationMigration.tsx");
     expect(component).toMatch(/fetch\("\/api\/gamemasters\/affiliation-migration", \{ method: "POST" \}\)/);

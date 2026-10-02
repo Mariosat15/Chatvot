@@ -5,11 +5,13 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, Crown } from "lucide-react";
 import GameMasterManagementSection from "./GameMasterManagementSection";
 import GmReferredPlayersReport from "./gamemaster/GmReferredPlayersReport";
+import GmSettingsPanel from "./gamemaster/GmSettingsPanel";
 import { GM_TAB_PARAM, resolveGmTab, type GmTab } from "@/lib/admin/gm-report-query";
 
 const TABS: ReadonlyArray<{ id: GmTab; label: string }> = [
   { id: "players", label: "Referred players" },
   { id: "masters", label: "Game Masters" },
+  { id: "settings", label: "Settings" },
 ];
 
 /**
@@ -26,9 +28,11 @@ const TABS: ReadonlyArray<{ id: GmTab; label: string }> = [
 export default function GameMasterProgramSection({
   initialGmId,
   canExport,
+  canEditDefaults,
 }: {
   initialGmId?: string;
   canExport: boolean;
+  canEditDefaults: boolean;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -110,6 +114,8 @@ export default function GameMasterProgramSection({
 
       {tab === "masters" ? (
         <GameMasterManagementSection initialGmId={initialGmId} canExport={canExport} />
+      ) : tab === "settings" ? (
+        <GmSettingsPanel canEditDefaults={canEditDefaults} />
       ) : (
         <GmReferredPlayersReport canExport={canExport} />
       )}
