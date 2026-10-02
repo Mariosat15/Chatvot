@@ -1514,6 +1514,10 @@ describe("the play screen counts down on the server's clock", () => {
     expect(code).toMatch(/label:\s*"Game starts in"/);
     expect(code).toMatch(/Your spot is saved/);
 
+    // The button counts down too, on the same server clock, so the player sees the wait where
+    // they would press (owner, 2 Oct 2026).
+    expect(code).toMatch(/`Lobby opens in \$\{formatRemaining\(lobbyOpensMs\s*-\s*now\)\}`/);
+
     // One clock, never two: the big panel is rendered exactly once.
     expect((code.match(/<CountdownPanel\b/g) ?? []).length).toBe(1);
   });

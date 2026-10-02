@@ -271,7 +271,9 @@ export function RoundPreflight({
     ? "Opening the game…"
     : notStartedYet
       ? lobbyOpensMs !== null
-        ? "Lobby opens soon"
+        ? lobbyOpensMs > now
+          ? `Lobby opens in ${formatRemaining(lobbyOpensMs - now)}`
+          : "Lobby opens soon"
         : "Not started yet"
       : noLongerOpen
         ? "Closed"

@@ -936,7 +936,9 @@ computed wrongly, no risk number, nothing backfilled** - every gate is unchanged
   `toUTCString()`. The lobby target is chosen only **while it is still in the future**, so the
   clock moves on rather than sitting at zero.
 - **No repeated messages**: the grey "not started / not opened" panel is hidden while the clock
-  already explains the wait; the button reads **Lobby opens soon** in that case. Attempts and the
+  already explains the wait; the button reads **Lobby opens in 5m 45s**, ticking on the same
+  server clock (owner follow-up the same day), and **Lobby opens soon** only at the instant it
+  reaches zero, before the screen moves on. Attempts and the
   play style became two small pills; the round-length and waiting-limit sentences were shortened.
 - `describeAttempts`, `formatShortUtc` and the rounds list moved to
   `components/games/preflight-parts.tsx` to keep `RoundPreflight.tsx` under 500 lines (496).
