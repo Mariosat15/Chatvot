@@ -7,6 +7,7 @@ import { auditLogService } from "@/lib/services/audit-log.service";
 import { guardSection } from "@/lib/admin/section-route-guard";
 import { hasProviderGameLabel } from "@/lib/admin/contest-game-label";
 import { filterTradingCompetitionUpdate } from "@/lib/admin/competition-update-fields";
+import { refuseFundedReserveEdit } from "@/lib/admin/free-private-edit-guard";
 
 /**
  * Read, edit and delete one competition.
@@ -214,6 +215,14 @@ export async function PUT(
     const filtered = filterTradingCompetitionUpdate(body);
     if (!filtered.ok) {
       return NextResponse.json({ error: filtered.error }, { status: 400 });
+    }
+
+    const fundedRefusal = refuseFundedReserveEdit(
+      competition.fundingMode,
+      Object.keys(filtered.update),
+    );
+    if (fundedRefusal) {
+      return NextResponse.json({ error: fundedRefusal }, { status: 400 });
     }
 
     Object.assign(competition, filtered.update);

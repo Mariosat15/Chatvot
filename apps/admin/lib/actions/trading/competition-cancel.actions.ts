@@ -11,6 +11,12 @@ import TradingPosition from "@/database/models/trading/trading-position.model";
 import TradingOrder from "@/database/models/trading/trading-order.model";
 import TradeHistory from "@/database/models/trading/trade-history.model";
 import mongoose from "mongoose";
+import {
+  fundedGameMasterOf,
+  refundFundedContestToGameMaster,
+  type FundedRefundResult,
+} from "@/lib/services/settlement/free-private-refund";
+import { isGmFundedContest } from "@/lib/services/gamemaster/free-private-competition";
 import { formatVolts } from "@/lib/utils/format-volts";
 import {
   ForexSymbol,
@@ -27,7 +33,14 @@ import { getMultipleSymbolConfigs } from "@/lib/services/symbol-config.service";
 export async function cancelCompetitionAndRefund(
   competitionId: string,
   reason: string,
-): Promise<{ success: boolean; refundedCount: number; totalRefunded: number }> {
+  options: { fundedOutcome?: "cancelled" | "technical_fault" } = {},
+): Promise<{
+  success: boolean;
+  refundedCount: number;
+  totalRefunded: number;
+  /** Set only on a Game Master-funded contest: what went back to the Game Master. */
+  gameMasterRefund?: FundedRefundResult | null;
+}> {
   const session = await mongoose.startSession();
   session.startTransaction();
   let committed = false;
@@ -133,8 +146,14 @@ export async function cancelCompetitionAndRefund(
     const { notificationService } =
       await import("@/lib/services/notification.service");
 
-    // Refund each participant
-    for (const participant of participants) {
+    // Reason: a Game Master-funded contest took nothing from any player, so a player refund
+    // here would hand out Volts nobody spent. The consumed seats and the unused reserve go
+    // back to the funding Game Master in full instead, with no platform fee.
+    const fundedGameMaster = fundedGameMasterOf(competition);
+    let gameMasterRefund: FundedRefundResult | null = null;
+
+    // Refund each participant (none for a funded contest - see the block after the loop)
+    for (const participant of fundedGameMaster ? [] : participants) {
       const userId = participant.userId.toString();
 
       // Reason: already paid back, on an earlier run or by another caller. Skipping keeps a
@@ -234,6 +253,44 @@ export async function cancelCompetitionAndRefund(
       );
     }
 
+    if (fundedGameMaster) {
+      const funded = await refundFundedContestToGameMaster({
+        session,
+        contest: competition,
+        sponsoredUserIds: participants.map((p) => p.userId.toString()),
+        outcome: options.fundedOutcome ?? "cancelled",
+        reason,
+      });
+      await CompetitionParticipant.updateMany(
+        { competitionId, status: { $ne: "refunded" } },
+        { $set: { status: "refunded" } },
+        { session },
+      );
+      refundedCount = funded?.refundedSeatUserIds.length ?? 0;
+      totalRefunded = (funded?.seatsRefunded ?? 0) + (funded?.reserveReleased ?? 0);
+      gameMasterRefund = funded;
+      console.log(
+        `   🎟️ Free private: returned ${totalRefunded} credits to Game Master ${fundedGameMaster} (${refundedCount} seats)`,
+      );
+
+      for (const participant of participants) {
+        try {
+          await notificationService.createCustom({
+            userId: participant.userId.toString(),
+            type: "competition_cancelled",
+            title: "Competition Cancelled",
+            message: `${competition.name} has been cancelled. Your entry was sponsored, so nothing was charged to you.`,
+            icon: "x-circle",
+            category: "competition",
+            priority: "high",
+            color: "orange",
+          });
+        } catch (notifError) {
+          console.error(`Error sending notification:`, notifError);
+        }
+      }
+    }
+
     // A provider contest leaves a ROUND running where a trading contest leaves a position.
     // Nothing was closing it, so a cancellation produced a critical unresolved-round alert
     // for the operator's own deliberate action, and left the player inside a game for a
@@ -282,6 +339,8 @@ export async function cancelCompetitionAndRefund(
       success: true,
       refundedCount,
       totalRefunded,
+      // Reason: only on a funded contest, so a player-paid result keeps its old shape.
+      ...(gameMasterRefund ? { gameMasterRefund } : {}),
     };
   } catch (error) {
     if (!committed) {
@@ -321,7 +380,9 @@ export async function adminCancelCompetition(
 
     // If there are participants, refund them
     const participantCount = competition.currentParticipants || 0;
-    if (participantCount > 0) {
+    // Reason: a funded contest holds the Game Master's reserve even with nobody entered, so
+    // the plain status flip below would strand it. The refund path releases it.
+    if (participantCount > 0 || isGmFundedContest(competition)) {
       const result = await cancelCompetitionAndRefund(competitionId, reason);
       return {
         success: true,
@@ -372,6 +433,7 @@ export async function emergencyCancelActiveCompetition(
   voidedRounds?: number;
   refundedCount?: number;
   totalRefunded?: number;
+  gameMasterRefund?: FundedRefundResult | null;
 }> {
   const mongoSession = await mongoose.startSession();
   mongoSession.startTransaction();
@@ -600,7 +662,11 @@ export async function emergencyCancelActiveCompetition(
     const { notificationService } =
       await import("@/lib/services/notification.service");
 
-    for (const participant of participants) {
+    // Reason: same as the ordinary cancel - a funded seat was never paid for by the player.
+    const fundedGameMaster = fundedGameMasterOf(competition);
+    let gameMasterRefund: FundedRefundResult | null = null;
+
+    for (const participant of fundedGameMaster ? [] : participants) {
       const userId = participant.userId.toString();
 
       // Get wallet
@@ -682,6 +748,44 @@ export async function emergencyCancelActiveCompetition(
       refundedCount++;
     }
 
+    if (fundedGameMaster) {
+      const funded = await refundFundedContestToGameMaster({
+        session: mongoSession,
+        contest: competition,
+        sponsoredUserIds: participants.map((p) => p.userId.toString()),
+        outcome: "technical_fault",
+        reason,
+      });
+      await CompetitionParticipant.updateMany(
+        { competitionId, status: { $ne: "refunded" } },
+        { $set: { status: "refunded" } },
+        { session: mongoSession },
+      );
+      refundedCount = funded?.refundedSeatUserIds.length ?? 0;
+      totalRefunded = (funded?.seatsRefunded ?? 0) + (funded?.reserveReleased ?? 0);
+      gameMasterRefund = funded;
+      console.log(
+        `   🎟️ Free private: returned ${totalRefunded} credits to Game Master ${fundedGameMaster} (${refundedCount} seats)`,
+      );
+
+      for (const participant of participants) {
+        try {
+          await notificationService.createCustom({
+            userId: participant.userId.toString(),
+            type: "competition_cancelled",
+            title: "Competition Cancelled",
+            message: `${competition.name} has been cancelled. Your entry was sponsored, so nothing was charged to you.`,
+            icon: "x-circle",
+            category: "competition",
+            priority: "high",
+            color: "orange",
+          });
+        } catch (notifError) {
+          console.error(`Error sending notification:`, notifError);
+        }
+      }
+    }
+
     // Step 3b: end the rounds. Step 2 closed trading POSITIONS, which is the whole of what a
     // trading contest leaves running; a provider contest leaves a live ROUND, and nothing was
     // closing it. Without this the operator receives a critical unresolved-round alert as a
@@ -736,6 +840,8 @@ export async function emergencyCancelActiveCompetition(
       voidedRounds: voided.ended,
       refundedCount,
       totalRefunded,
+      // Reason: only on a funded contest, so a player-paid result keeps its old shape.
+      ...(gameMasterRefund ? { gameMasterRefund } : {}),
     };
   } catch (error) {
     if (!committed) {

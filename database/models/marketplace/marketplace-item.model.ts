@@ -144,6 +144,7 @@ export interface IGameMasterConfig {
   challengeReferralFeePercentage?: number; // Optional separate % for challenges (defaults to referralFeePercentage if not set)
   allowedGameTypes?: string[]; // Which games this tier may CREATE contests for
   allowedVisibility?: ("public" | "gm_private")[]; // Public / private / both - absent = public only
+  canCreateFreePrivateCompetitions?: boolean; // GM-funded private contests - absent = no
   showExternalReferralDetails?: boolean; // External referrals' email + last name shown to the GM - absent = masked
 }
 
@@ -392,6 +393,10 @@ const MarketplaceItemSchema = new Schema<IMarketplaceItem>(
       // No default: absent reads as masked in code (`resolveShowExternalReferralDetails`), so
       // every existing package hides them until the owner opts it in.
       showExternalReferralDetails: { type: Boolean },
+      // Free Private (GM-funded) competitions. No default: absent reads as "not allowed" in
+      // `resolveCanCreateFreePrivate`, and it is only meaningful when this tier already allows
+      // `gm_private` visibility - a funded contest is always private.
+      canCreateFreePrivateCompetitions: { type: Boolean },
     },
     codeTemplate: {
       type: String,

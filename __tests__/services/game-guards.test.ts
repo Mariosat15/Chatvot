@@ -91,11 +91,24 @@ describe("R7: every raw-driver contest insert stamps the game label", () => {
     for (const file of RAW_CONTEST_WRITERS) {
       const source = sourceOf(file);
       const inserts = source.match(
-        /\.collection\(\s*["'](?:competitions|challenges)["']\s*\)\s*\.insertOne|(?:competitions|challenges)Collection\.insertOne/g,
+        /\.collection\(\s*["'](?:competitions|challenges)["']\s*\)\s*\.insertOne|(?:competitions|challenges)Collection\.insertOne|insertGameMasterCompetition\(\s*db\b/g,
       );
       const labels = source.match(new RegExp(LABEL_SPREAD, "g"));
       expect(labels?.length ?? 0).toBe(inserts?.length ?? 0);
     }
+  });
+
+  it.each([
+    "lib/services/gamemaster/free-private-create.ts",
+    "apps/admin/lib/services/gamemaster/free-private-create.ts",
+  ])("%s inserts the labelled document it is handed, on both branches", (file) => {
+    // Reason: the Game Master routes stamp the label, then hand the document here. A
+    // writer that rebuilt it would drop the label while every route still counted green.
+    const source = sourceOf(file);
+    expect(source).toMatch(/const doc = \{ \.\.\.competition, fundingMode: args\.fundingMode \};/);
+    const inserts = source.match(/\.collection\("competitions"\)\.insertOne\(([^,)]+)/g) ?? [];
+    expect(inserts).toHaveLength(2);
+    for (const insert of inserts) expect(insert).toMatch(/insertOne\(doc$/);
   });
 });
 

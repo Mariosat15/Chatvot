@@ -4,6 +4,9 @@ import { Schema, model, models, Document } from "mongoose";
 export interface ICreditWallet extends Document {
   userId: string; // Reference to Better Auth user ID
   creditBalance: number; // Current credit balance (1 credit = 1 EUR)
+  // Credits already moved OUT of creditBalance and held for Free Private Competitions this
+  // wallet funds. Display and reconciliation only - see the schema comment.
+  reservedBalance: number;
   totalDeposited: number; // Lifetime deposits
   totalWithdrawn: number; // Lifetime withdrawals
   totalSpentOnCompetitions: number; // Total spent on competition entries
@@ -41,6 +44,17 @@ const CreditWalletSchema = new Schema<ICreditWallet>(
     creditBalance: {
       type: Number,
       required: true,
+      default: 0,
+      min: 0,
+    },
+    // Free Private Competition reserve (owner, 2 Oct 2026). The reserve is DEBITED from
+    // creditBalance when the contest is created and tracked here, so creditBalance is
+    // always the spendable figure. Reason for escrow rather than a hold beside an untouched
+    // balance: a hold would have to be honoured by every debit path in both apps (entry,
+    // challenges, marketplace, withdrawals, subscriptions), and the one that forgot it is a
+    // double spend. Escrow makes every existing path correct by construction.
+    reservedBalance: {
+      type: Number,
       default: 0,
       min: 0,
     },

@@ -1,3 +1,4 @@
+import { refuseFundedReserveEdit } from "../../admin/free-private-edit-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import Competition from "@/database/models/trading/competition.model";
 import ProviderGame from "@/database/models/games/provider-game.model";
@@ -134,6 +135,9 @@ export async function editProviderContest(
   if (submitted.length === 0) {
     return { success: false, error: "The update contained no fields." };
   }
+
+  const fundedRefusal = refuseFundedReserveEdit(competition.fundingMode, submitted);
+  if (fundedRefusal) return { success: false, error: fundedRefusal };
 
   const entered = (competition.currentParticipants ?? 0) > 0;
 

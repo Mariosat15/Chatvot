@@ -449,7 +449,7 @@ export const enterCompetition = async (competitionId: string) => {
     });
 
     if (!result.success) {
-      return { success: false as const, error: result.error };
+      return { success: false as const, code: result.code, error: result.error };
     }
 
     revalidatePath("/competitions");

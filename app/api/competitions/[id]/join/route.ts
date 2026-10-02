@@ -46,6 +46,10 @@ const STATUS_BY_CODE: Record<ContestEntryFailureCode, number> = {
   provider_unavailable: 503,
   own_contest: 403,
   private_not_affiliated: 403,
+  free_private_terms_required: 403,
+  free_private_terms_unavailable: 409,
+  free_private_unfunded: 409,
+  free_private_exhausted: 409,
   contended: 409,
   failed: 500,
 };
@@ -125,7 +129,10 @@ export async function POST(
 
     if (!result.success) {
       return NextResponse.json(
-        { success: false, error: result.error },
+        // Reason: the code is returned so the entry button can open the Free Private
+        // terms when the refusal is `free_private_terms_required`, rather than guessing
+        // from the wording.
+        { success: false, code: result.code, error: result.error },
         { status: STATUS_BY_CODE[result.code] ?? 500 },
       );
     }

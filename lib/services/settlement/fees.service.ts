@@ -9,6 +9,10 @@ import {
   distributeGameMasterFees,
 } from "./game-master-fees";
 import { resolveContestVocabulary, type SettlementContest } from "./types";
+import {
+  creditFundedRemainderToGameMaster,
+  fundedGameMasterOf,
+} from "./free-private-refund";
 
 /**
  * The platform's cut, the unclaimed pool and the Game Masters' share.
@@ -130,7 +134,20 @@ export async function settleFeesAndGameMasters({
     // put a row on the platform's books claiming it holds money it does not, and an operator
     // reconciling unclaimed funds would chase it. Below one hundredth of a credit there is
     // nothing to hold.
-    if (unclaimedNet >= 0.01) {
+    // Reason: on a Free Private contest the pot was the Game Master's money, so an
+    // unawarded pot goes back to them rather than becoming platform-held unclaimed funds.
+    // The platform keeps its fee either way (owner, 2 Oct 2026).
+    if (unclaimedNet >= 0.01 && fundedGameMasterOf(contest)) {
+      const returned = await creditFundedRemainderToGameMaster({
+        session,
+        contest,
+        amount: unclaimedNet,
+        reason: unclaimedReason.replace(/_/g, " "),
+      });
+      console.log(
+        `💳 Free competition pot returned to its Game Master: ${returned.toFixed(2)} credits (${unclaimedReason})`,
+      );
+    } else if (unclaimedNet >= 0.01) {
       console.log(
         `💰 Recording unclaimed pool: ${unclaimedNet.toFixed(2)} credits (${unclaimedReason})`,
       );

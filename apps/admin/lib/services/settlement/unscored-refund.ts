@@ -7,6 +7,7 @@ import {
   type RankableParticipant,
 } from "@/lib/games";
 import type { SettlementContest } from "./types";
+import { fundedGameMasterOf } from "./free-private-refund";
 
 /**
  * Returning entry fees when a contest finished and NOBODY recorded a score.
@@ -161,6 +162,11 @@ export async function refundUnscoredContest({
 
   // A free contest has nothing to return. Not an error, and not worth a log line.
   if (entryFee <= 0) return result;
+
+  // Reason: a Free Private contest's players paid nothing, so there is no fee to return to
+  // them. Returning nothing here leaves the whole net pot for the fee stage, which hands it
+  // to the funding Game Master instead of the unclaimed pool.
+  if (fundedGameMasterOf(contest)) return result;
 
   // Reason for flooring: credits are carried to two decimal places everywhere else, and
   // rounding UP would return more than was taken. The fractions of a credit this leaves

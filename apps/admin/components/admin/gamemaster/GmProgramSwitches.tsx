@@ -5,7 +5,7 @@ import { toast } from "sonner";
 
 const GENERIC_ERROR = "Something went wrong. Please contact support.";
 
-type SwitchKey = "gmJoinEnabled" | "gmPrivateContestsEnabled";
+type SwitchKey = "gmJoinEnabled" | "gmPrivateContestsEnabled" | "gmFreePrivateContestsEnabled";
 
 const SWITCHES: ReadonlyArray<{
   key: SwitchKey;
@@ -29,6 +29,14 @@ const SWITCHES: ReadonlyArray<{
       "Lets a Game Master whose package allows it create a competition only their own players can see and enter. Off by default. Turning it off stops new private competitions; existing ones stay private.",
     onToast: "Private Game Master competitions are now on.",
     offToast: "Private Game Master competitions are now off.",
+  },
+  {
+    key: "gmFreePrivateContestsEnabled",
+    title: "Free Private (Game Master-funded) competitions",
+    description:
+      "Lets a Game Master whose package allows it fund the entry fees of a private competition from their own Volts, so their players join free. The full reserve (entry fee x places) is held when the competition is created. Off by default. Turning it off stops new funded competitions; existing ones still settle and refund normally.",
+    onToast: "Free Private competitions are now on.",
+    offToast: "Free Private competitions are now off.",
   },
 ];
 
@@ -62,6 +70,7 @@ export default function GmProgramSwitches() {
       setValues({
         gmJoinEnabled: body.switches?.gmJoinEnabled === true,
         gmPrivateContestsEnabled: body.switches?.gmPrivateContestsEnabled === true,
+        gmFreePrivateContestsEnabled: body.switches?.gmFreePrivateContestsEnabled === true,
       });
     } catch {
       setError(GENERIC_ERROR);
@@ -91,6 +100,7 @@ export default function GmProgramSwitches() {
       const next = {
         gmJoinEnabled: body.switches?.gmJoinEnabled === true,
         gmPrivateContestsEnabled: body.switches?.gmPrivateContestsEnabled === true,
+        gmFreePrivateContestsEnabled: body.switches?.gmFreePrivateContestsEnabled === true,
       };
       setValues(next);
       toast.success(readSwitch(next, key) ? spec.onToast : spec.offToast);

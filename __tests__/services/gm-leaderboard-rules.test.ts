@@ -209,7 +209,7 @@ describe("step 4 structural guards", () => {
     expect(guards.length).toBe(handlers.length);
     // Step 5 added the second switch; the claim is unchanged - a named Set of exactly these.
     expect(route).toMatch(
-      /PROGRAM_SWITCHES: ReadonlySet<string> = new Set\(\[\s*"gmJoinEnabled",\s*"gmPrivateContestsEnabled",\s*\]\)/,
+      /PROGRAM_SWITCHES: ReadonlySet<string> = new Set\(\[\s*"gmJoinEnabled",\s*"gmPrivateContestsEnabled",\s*"gmFreePrivateContestsEnabled",\s*\]\)/,
     );
     expect(route).toMatch(/if \(!PROGRAM_SWITCHES\.has\(key\)\)/);
     expect(route).not.toMatch(/\$set:\s*body/);

@@ -15,6 +15,11 @@ import { createGameMasterProviderCompetition } from "@/lib/services/gamemaster/c
 import { resolveGameMasterPlatformFeePercentage } from "@/lib/services/gamemaster/platform-fee";
 import { checkVisibilityAllowed } from "@/lib/services/gamemaster/visibility-permission";
 import { isGmPrivateContestsEnabled } from "@/lib/services/gamemaster/gm-program-flags";
+import {
+  checkRouteFunding,
+  fundingRefusalStatus,
+} from "@/lib/services/gamemaster/funding-permission";
+import { insertGameMasterCompetition } from "@/lib/services/gamemaster/free-private-create";
 import { applyGameMasterCompetitionDefaults } from "@/lib/services/gamemaster/competition-defaults-apply";
 import { loadGameMasterCompetitionDefaults } from "@/lib/services/gamemaster/competition-defaults.service";
 import {
@@ -312,6 +317,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Normal or Game Master-funded (Free Private Competitions, 2 Oct 2026). Checked after
+    // visibility because a funded contest must be private, and resolved ONCE so both the
+    // trading insert and the provider builder stamp the same answer.
+    const fundingVerdict = await checkRouteFunding({
+      requested: body.fundingMode,
+      visibility: visibilityVerdict.visibility,
+      packageConfig,
+      cachedLimits: subscription.limits,
+      entryFee: body.entryFee,
+      maxParticipants: body.maxParticipants,
+      maxUsersPerCompetition: effectiveLimits.maxUsersPerCompetition,
+    });
+    if (!fundingVerdict.ok) {
+      return NextResponse.json(
+        {
+          error: fundingVerdict.message,
+          reason: fundingVerdict.reason,
+        },
+        { status: fundingRefusalStatus(fundingVerdict.reason) },
+      );
+    }
+
     if (verdict.gameType === "provider") {
       const user = await db.collection("user").findOne({ id: auth.userId });
       const gameMasterName = user?.name || auth.name || "Game Master";
@@ -323,6 +350,7 @@ export async function POST(request: NextRequest) {
         maxUsersPerCompetition: effectiveLimits.maxUsersPerCompetition,
         visibility: visibilityVerdict.visibility,
         adminFilled: withDefaults.adminFilled,
+        fundingMode: fundingVerdict.fundingMode,
       });
 
       if (!providerResult.ok) {
@@ -352,6 +380,8 @@ export async function POST(request: NextRequest) {
         competitionId: providerResult.competitionId,
         slug: providerResult.slug,
         warnings: providerResult.warnings,
+        fundingMode: fundingVerdict.fundingMode,
+        fundingReserve: providerResult.fundingReserve,
         message: "Competition created successfully",
       });
     }
@@ -481,7 +511,21 @@ export async function POST(request: NextRequest) {
       updatedAt: new Date(),
     };
 
-    await db.collection("competitions").insertOne(competition);
+    const inserted = await insertGameMasterCompetition(db, competition, {
+      fundingMode: fundingVerdict.fundingMode,
+      gameMasterUserId: auth.userId!,
+    });
+    if (!inserted.ok) {
+      return NextResponse.json(
+        {
+          error: inserted.message,
+          reason: "insufficient_balance",
+          required: inserted.required,
+          available: inserted.available,
+        },
+        { status: 400 },
+      );
+    }
 
     // Update subscription counters
     await db.collection("gamemastersubscriptions").updateOne(
@@ -503,6 +547,8 @@ export async function POST(request: NextRequest) {
         status: competition.status,
         startTime: competition.startTime,
         endTime: competition.endTime,
+        fundingMode: fundingVerdict.fundingMode,
+        fundingReserve: inserted.reserve,
       },
       limits: {
         dailyRemaining:

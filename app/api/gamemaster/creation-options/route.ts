@@ -9,7 +9,11 @@ import { countGameMasterActiveCompetitions } from "@/lib/services/gamemaster/act
 import { loadGameMasterPackageConfig } from "@/lib/services/gamemaster/package-config";
 import { resolveGameMasterPlatformFeePercentage } from "@/lib/services/gamemaster/platform-fee";
 import { checkVisibilityAllowed } from "@/lib/services/gamemaster/visibility-permission";
-import { isGmPrivateContestsEnabled } from "@/lib/services/gamemaster/gm-program-flags";
+import {
+  isGmFreePrivateContestsEnabled,
+  isGmPrivateContestsEnabled,
+} from "@/lib/services/gamemaster/gm-program-flags";
+import { resolveCanCreateFreePrivate } from "@/lib/services/gamemaster/free-private-competition";
 import { COMPETITION_VISIBILITIES } from "@/lib/services/gamemaster/competition-visibility";
 import { loadGameMasterCompetitionDefaults } from "@/lib/services/gamemaster/competition-defaults.service";
 import { gameMasterDefaultsView } from "@/lib/services/gamemaster/competition-defaults-apply";
@@ -100,6 +104,24 @@ export async function GET() {
         }).ok,
     );
 
+    // Reason: Funded is offered only when every gate the create route applies would pass
+    // for a private contest, so the wizard never shows a choice the API refuses.
+    const canCreateFreePrivate =
+      creatableVisibilities.includes("gm_private") &&
+      (await isGmFreePrivateContestsEnabled()) &&
+      resolveCanCreateFreePrivate({
+        hasPackage: packageConfig !== null,
+        packageConfig,
+        cachedLimits: subscription.limits,
+      });
+    const reserve = await db
+      .collection("creditwallets")
+      .findOne({ userId: session.user.id }, { projection: { creditBalance: 1 } });
+    const walletBalance =
+      typeof reserve?.creditBalance === "number" && Number.isFinite(reserve.creditBalance)
+        ? reserve.creditBalance
+        : 0;
+
     // Reason: the forms hide a locked option and start an open one at the admin's value.
     // Display only - the create route applies the same defaults itself, so a form that
     // ignored this would still produce the competition the admin configured.
@@ -113,6 +135,8 @@ export async function GET() {
       },
       allowedGameTypes,
       creatableVisibilities,
+      canCreateFreePrivate,
+      walletBalance,
       canCreateCompetitions: effectiveLimits.canCreateCompetitions,
       maxUsersPerCompetition: effectiveLimits.maxUsersPerCompetition,
       maxCompetitionsPerDay: effectiveLimits.maxCompetitionsPerDay,

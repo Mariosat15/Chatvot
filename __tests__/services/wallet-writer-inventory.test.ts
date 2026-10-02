@@ -108,6 +108,10 @@ const INVENTORY: readonly InventoryEntry[] = [
   { file: "lib/services/settlement/game-master-fees/distribute.ts", writers: 1, ledger: "writes-ledger" },
   { file: "lib/services/settlement/exclusion-refund.ts", writers: 1, ledger: "writes-ledger" },
   { file: "lib/services/settlement/unscored-refund.ts", writers: 1, ledger: "writes-ledger" },
+  // Free Private (2 Oct 2026): the reserve debit at creation and the one shared credit
+  // used by release and every Game Master refund. Each writes a free_private_* row.
+  { file: "lib/services/gamemaster/free-private-reserve.ts", writers: 2, ledger: "writes-ledger" },
+  { file: "apps/admin/lib/services/gamemaster/free-private-reserve.ts", writers: 2, ledger: "writes-ledger" },
   { file: "lib/services/withdrawal.service.ts", writers: 1, ledger: "writes-ledger" },
   { file: "lib/services/security/chargeback-case.writers.ts", writers: 1, ledger: "writes-ledger" },
   { file: "lib/actions/trading/competition-cancel.actions.ts", writers: 1, ledger: "writes-ledger" },

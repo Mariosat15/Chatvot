@@ -41,6 +41,8 @@ export interface IncidentSubjectFacts {
   isProviderGame: boolean;
   hasFinalLeaderboard: boolean;
   needsDecision: boolean;
+  /** A Game Master-funded (free private) contest. Absent means player-paid. */
+  isGmFunded?: boolean;
 }
 
 export interface ApplicableIncidentAction {
@@ -155,6 +157,28 @@ const DEFINITIONS: IncidentActionDefinition[] = [
     ],
     refusedBecause: (s) =>
       `Cancel-and-refund applies to an upcoming contest, and this one is ${s.status}.`,
+  },
+  {
+    id: "free_private_technical_fault",
+    label: "Platform / Technical Fault — Full GM Refund",
+    kind: "competition",
+    section: "competitions",
+    movesMoney: true,
+    irreversible: true,
+    applies: (s) =>
+      s.kind === "competition" &&
+      s.isGmFunded === true &&
+      ["draft", "upcoming", "active"].includes(s.status),
+    consequences: () => [
+      "Cancel the contest as a platform fault",
+      "Return every consumed seat and the unused reserve to the funding Game Master",
+      "Charge no platform fee; players were never charged and receive nothing",
+      "This cannot be undone",
+    ],
+    refusedBecause: (s) =>
+      s.isGmFunded !== true
+        ? "This contest is not Game Master-funded."
+        : `A technical-fault refund applies before settlement, and this contest is ${s.status}.`,
   },
   {
     id: "re_settle",

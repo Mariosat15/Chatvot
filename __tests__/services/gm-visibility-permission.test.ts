@@ -111,7 +111,9 @@ describe("both creation routes ask the rule and stamp its answer", () => {
     const gate = source.indexOf("const visibilityVerdict = checkVisibilityAllowed(");
     const refusal = source.indexOf("if (!visibilityVerdict.ok)");
     const provider = source.indexOf(providerCall);
-    const insert = source.indexOf('collection("competitions").insertOne(');
+    // Reason: the trading insert moved into insertGameMasterCompetition (Free Private, 2 Oct
+    // 2026) so the reserve can share its transaction; the gate must still precede it.
+    const insert = source.indexOf("insertGameMasterCompetition(db");
     expect(gate).toBeGreaterThan(-1);
     expect(refusal).toBeGreaterThan(gate);
     expect(provider).toBeGreaterThan(refusal);
@@ -123,8 +125,14 @@ describe("both creation routes ask the rule and stamp its answer", () => {
   });
 
   it.each(routes)("%s stamps the verdict on BOTH the provider call and the trading insert", (file) => {
-    const matches = code(file).match(/visibility:\s*visibilityVerdict\.visibility/g) ?? [];
-    expect(matches).toHaveLength(2);
+    const source = code(file);
+    const matches = source.match(/visibility:\s*visibilityVerdict\.visibility/g) ?? [];
+    // Reason: a third use feeds the Free Private funding gate (2 Oct 2026), which must
+    // refuse a funded contest that is not private. The two stamps are still asserted.
+    expect(matches).toHaveLength(3);
+    const funding = source.indexOf("checkRouteFunding({");
+    expect(funding).toBeGreaterThan(-1);
+    expect(source.slice(funding, funding + 200)).toMatch(/visibility:\s*visibilityVerdict\.visibility/);
   });
 
   it("the shared provider writer stores what it is handed", () => {
@@ -190,7 +198,7 @@ describe("the admin package editor and the program switch", () => {
 
   it("the program settings allow-list names the private switch", () => {
     expect(code("apps/admin/app/api/gamemasters/program-settings/route.ts")).toMatch(
-      /new Set\(\[\s*"gmJoinEnabled",\s*"gmPrivateContestsEnabled",\s*\]\)/,
+      /new Set\(\[\s*"gmJoinEnabled",\s*"gmPrivateContestsEnabled",\s*"gmFreePrivateContestsEnabled",\s*\]\)/,
     );
   });
 });

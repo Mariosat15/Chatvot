@@ -135,6 +135,12 @@ export interface CreateProviderContestInput {
    * creation route has already checked it against the package - see visibility-permission.ts.
    */
   visibility?: "public" | "gm_private";
+  /**
+   * Free Private Competition (2 Oct 2026). Already checked by the creation route
+   * (checkFundingAllowed). Stamped at create so the draft can never be entered as a
+   * player-paid contest; the reserve itself is taken by the caller's `beforePublish`.
+   */
+  fundingMode?: "player_paid" | "gm_funded";
 }
 
 export interface CreateProviderContestResult {
@@ -576,6 +582,7 @@ export async function createProviderContest(
             gameMasterId: input.gameMasterId,
             gameMasterName: input.gameMasterName || "Game Master",
             visibility: input.visibility ?? "public",
+            fundingMode: input.fundingMode ?? "player_paid",
           }
         : {}),
     });
@@ -684,14 +691,38 @@ async function uniqueSlug(name: string): Promise<string> {
  */
 export async function createAndPublishProviderContest(
   input: CreateProviderContestInput,
+  options?: {
+    /**
+     * Runs while the contest is still an invisible draft. Returns an error message to
+     * stop: the draft is then removed, since nothing can have referenced it yet.
+     */
+    beforePublish?: (competitionId: string) => Promise<string | null>;
+    /** Runs when publishing fails after `beforePublish` succeeded, to undo its effect. */
+    onPublishFailed?: (competitionId: string) => Promise<void>;
+  },
 ): Promise<CreateProviderContestResult> {
   const created = await createProviderContest(input);
   if (!created.success || !created.competitionId) {
     return created;
   }
 
+  if (options?.beforePublish) {
+    const refusal = await options.beforePublish(created.competitionId);
+    if (refusal) {
+      // Reason: a draft is invisible to players and holds no seat or ledger row, so
+      // deleting it is the clean undo - leaving it would strand an unpublishable draft.
+      await Competition.deleteOne({
+        _id: created.competitionId,
+        status: "draft",
+        currentParticipants: 0,
+      });
+      return { success: false, error: refusal, warnings: created.warnings };
+    }
+  }
+
   const published = await publishProviderContest(created.competitionId);
   if (!published.success) {
+    if (options?.onPublishFailed) await options.onPublishFailed(created.competitionId);
     return {
       success: false,
       error: published.error,

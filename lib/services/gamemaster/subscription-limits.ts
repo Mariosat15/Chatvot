@@ -38,6 +38,7 @@ export interface GameMasterPackageConfig {
   allowedGameTypes?: string[];
   allowedVisibility?: string[];
   showExternalReferralDetails?: boolean;
+  canCreateFreePrivateCompetitions?: boolean;
 }
 
 export interface GameMasterSubscriptionLimits {
@@ -51,6 +52,7 @@ export interface GameMasterSubscriptionLimits {
   allowedGameTypes: readonly string[];
   allowedVisibility: readonly CompetitionVisibility[];
   showExternalReferralDetails: boolean;
+  canCreateFreePrivateCompetitions: boolean;
 }
 
 export const DEFAULT_GM_LIMITS = {
@@ -213,6 +215,9 @@ export function buildSubscriptionLimits(
     // Opt-in for the same reason: only an explicit `true` shows an external referral's
     // email and last name to the Game Master. Absent, `null` or a stray string stays masked.
     showExternalReferralDetails: c.showExternalReferralDetails === true,
+    // Opt-in: a funded contest spends the Game Master's own Volts, so only an explicit `true`
+    // grants it. The private-visibility requirement is checked at the gate, not here.
+    canCreateFreePrivateCompetitions: c.canCreateFreePrivateCompetitions === true,
     // Left undefined when the package declares none, NOT defaulted to the competition rate.
     // Both money paths already fall back to `referralFeePercentage` when this is absent, so
     // filling it in here would freeze today's competition rate into the challenge rate and

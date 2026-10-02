@@ -93,6 +93,7 @@ export interface WhiteLabelDocument extends Document {
   gmJoinEnabled: boolean;
   // Step 5 (`24` s10): may Game Masters create private contests? Off by default.
   gmPrivateContestsEnabled: boolean;
+  gmFreePrivateContestsEnabled: boolean;
 
   // Non-secret, freely readable provider configuration. Mirrors `game_provider` for the
   // settings screen; the collection remains the source of truth.
@@ -436,6 +437,12 @@ const WhiteLabelSchema = new Schema<WhiteLabelDocument>(
     // contest. The entry guard and discovery filters run regardless of this switch - it
     // gates CREATION only, so switching it off never exposes a private contest already made.
     gmPrivateContestsEnabled: {
+      type: Boolean,
+      default: false,
+    },
+    // Free Private (GM-funded) competitions. Off by default and gates CREATION only: a funded
+    // contest already made keeps settling and refunding correctly when this is switched off.
+    gmFreePrivateContestsEnabled: {
       type: Boolean,
       default: false,
     },

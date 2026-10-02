@@ -83,6 +83,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import StrategyBuilder from "./StrategyBuilder";
 import { PackageVisibilityField } from "./gamemaster/PackageVisibilityField";
+import { PackageFreePrivateField } from "./gamemaster/PackageFreePrivateField";
 import { ExternalReferralDetailsToggle } from "./gamemaster/ExternalReferralDetailsToggle";
 import { Lightbulb } from "lucide-react";
 
@@ -152,6 +153,7 @@ interface GameMasterConfig {
   allowedVisibility?: string[];
   /** Whether the GM sees external referrals' email and last name. Absent = masked. */
   showExternalReferralDetails?: boolean;
+  canCreateFreePrivateCompetitions?: boolean;
 }
 
 interface MarketplaceItem {
@@ -2052,6 +2054,31 @@ export default function MarketplaceSection() {
                               gameMasterConfig: {
                                 ...editingItem.gameMasterConfig!,
                                 allowedVisibility: next,
+                                // Reason: a funded contest is always private, so narrowing to
+                                // public clears the switch instead of submitting a pair the
+                                // marketplace route refuses.
+                                ...(next.includes("gm_private")
+                                  ? {}
+                                  : { canCreateFreePrivateCompetitions: false }),
+                              },
+                            })
+                          }
+                        />
+                      )}
+
+                      {editingItem.gameMasterConfig?.canCreateCompetitions !==
+                        false && (
+                        <PackageFreePrivateField
+                          value={editingItem.gameMasterConfig?.canCreateFreePrivateCompetitions}
+                          privateAllowed={
+                            !!editingItem.gameMasterConfig?.allowedVisibility?.includes("gm_private")
+                          }
+                          onChange={(next) =>
+                            setEditingItem({
+                              ...editingItem,
+                              gameMasterConfig: {
+                                ...editingItem.gameMasterConfig!,
+                                canCreateFreePrivateCompetitions: next,
                               },
                             })
                           }

@@ -5,6 +5,8 @@ import { PLAY_MODE_COPY, type PlayMode } from "@/lib/services/games/play-shape";
 import type { CompetitionVisibility } from "@/lib/services/gamemaster/competition-visibility";
 import { VISIBILITY_OPTION_COPY } from "@/components/gamemaster/ContestVisibilityPicker";
 import { Field, StepPanel, inputClass } from "@/components/gamemaster/provider-contest-wizard-steps";
+import FundingModePicker from "@/components/gamemaster/FundingModePicker";
+import type { FundingMode } from "@/lib/services/gamemaster/free-private-competition";
 
 /**
  * Game Master provider wizard step: who can join, and how the game is played.
@@ -21,6 +23,9 @@ export function AccessAndModeStep({
   supportedPlayModes,
   onPlayMode,
   disabled,
+  fundingOffered = false,
+  fundingMode = "player_paid",
+  onFundingMode,
 }: {
   visibilityOptions: readonly CompetitionVisibility[];
   visibility: CompetitionVisibility | undefined;
@@ -30,6 +35,9 @@ export function AccessAndModeStep({
   supportedPlayModes: PlayMode[];
   onPlayMode: (m: PlayMode) => void;
   disabled: boolean;
+  fundingOffered?: boolean;
+  fundingMode?: FundingMode;
+  onFundingMode?: (m: FundingMode) => void;
 }) {
   const modes =
     supportedPlayModes.length > 0 ? supportedPlayModes : ([playMode] as PlayMode[]);
@@ -84,6 +92,13 @@ export function AccessAndModeStep({
           </div>
         )}
       </div>
+
+      <FundingModePicker
+        visible={fundingOffered && !!onFundingMode}
+        value={fundingMode}
+        onChange={(m) => onFundingMode?.(m)}
+        disabled={disabled}
+      />
 
       {/*
         Always surface play style. When the title supports more than one mode the GM picks;

@@ -3,6 +3,7 @@ import CreditWallet from "@/database/models/trading/credit-wallet.model";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
 import type { SettlementContest } from "./types";
+import { fundedGameMasterOf, refundFundedExcludedSeats } from "./free-private-refund";
 
 /**
  * Refunding the players the `exclude` policy removes, inside the settlement transaction.
@@ -64,6 +65,25 @@ export async function refundExcludedParticipants({
   // EXCLUDED from ranking. Returning early here is safe only because exclusion is driven
   // by the assessment in the caller, never by this result.
   if (entryFee <= 0) return result;
+
+  // Reason: the seat was the Game Master's money, so it goes back to them and never to the
+  // player, who paid nothing. The total still leaves the pool exactly as a player refund does.
+  if (fundedGameMasterOf(contest)) {
+    const funded = await refundFundedExcludedSeats({ session, contest, userIds });
+    for (const userId of funded.refundedUserIds) {
+      await CompetitionParticipant.updateOne(
+        { competitionId, userId },
+        { $set: { status: "refunded" } },
+        { session },
+      );
+    }
+    result.refundedUserIds = funded.refundedUserIds;
+    result.totalRefunded = funded.totalRefunded;
+    result.alreadyRefundedUserIds = userIds.filter(
+      (id) => !funded.refundedUserIds.includes(id),
+    );
+    return result;
+  }
 
   // IDEMPOTENCY, and it is not the transaction that provides it. The settlement transaction
   // is atomic, so a failed run rolls the refund back - but a contest can be settled twice

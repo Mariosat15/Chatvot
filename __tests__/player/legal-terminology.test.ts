@@ -47,6 +47,8 @@ describe("X8 pass 11 legal surfaces stay off the terminology pack", () => {
         ACTION_TERM_SLUGS.CREDIT_PURCHASE,
         // Gamemaster Program v2 step 3 (`24` s5): consent recorded per Game Master.
         ACTION_TERM_SLUGS.GM_AFFILIATION,
+        // Free Private Competitions: consent recorded per funded competition.
+        ACTION_TERM_SLUGS.FREE_PRIVATE,
         ACTION_TERM_SLUGS.MARKETPLACE,
         ACTION_TERM_SLUGS.WITHDRAWAL,
       ].sort(),

@@ -459,6 +459,7 @@ export async function wipeUserData(
       {
         $set: {
           creditBalance: 0,
+          reservedBalance: 0,
           totalDeposited: 0,
           totalWithdrawn: 0,
           totalSpentOnCompetitions: 0,

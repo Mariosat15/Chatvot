@@ -52,7 +52,12 @@ export async function POST(request: NextRequest) {
     // Reason: a private contest admits only its Game Master's affiliated players, and this
     // bulk writer has no affiliation context to check that per user (`External game plans/24`
     // s4). Refuse outright, before any wallet read, rather than seat strangers in bulk.
-    if (resolveCompetitionVisibility(competition.visibility) === "gm_private") {
+    // Reason: a Game Master-funded seat is paid from the contest's reserve by the entry
+    // service; this route debits wallets, so it must never seat one, whatever the visibility.
+    if (
+      resolveCompetitionVisibility(competition.visibility) === "gm_private" ||
+      competition.fundingMode === "gm_funded"
+    ) {
       return NextResponse.json(
         {
           success: false,

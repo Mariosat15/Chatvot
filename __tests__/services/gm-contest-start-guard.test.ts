@@ -92,7 +92,10 @@ describe("every Game Master writer asks the guard", () => {
     expect(tradingStart).toBeGreaterThan(-1);
     expect(guard).toBeGreaterThan(tradingStart);
     expect(source.slice(guard, guard + 300)).toMatch(/START_IN_PAST_TOLERANCE_MS/);
-    expect(guard).toBeLessThan(source.indexOf("insertOne(", tradingStart));
+    // Reason: the insert now goes through insertGameMasterCompetition (Free Private, 2 Oct 2026).
+    const insert = source.indexOf("insertGameMasterCompetition(db", tradingStart);
+    expect(insert).toBeGreaterThan(-1);
+    expect(guard).toBeLessThan(insert);
   });
 
   it("the wizard's schedule step uses the guard with no tolerance", () => {

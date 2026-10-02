@@ -37,6 +37,8 @@ import {
   splitUtcDraft,
 } from "@/components/gamemaster/UtcScheduleFields";
 import type { TitleLevel } from "@/lib/constants/levels";
+import FreePrivateReserveSummary from "@/components/gamemaster/FreePrivateReserveSummary";
+import type { FundingMode } from "@/lib/services/gamemaster/free-private-competition";
 import {
   NO_GAME_MASTER_DEFAULTS,
   type GameMasterDefaultsLookup,
@@ -107,6 +109,10 @@ interface GMCreateCompetitionContentProps {
   levelLadder: TitleLevel[];
   /** Chosen on the gate from the server's `creatableVisibilities`; the route re-checks it. */
   visibility?: "public" | "gm_private";
+  /** Normal or Game Master-funded; the gate only offers funded on a private contest. */
+  fundingMode?: FundingMode;
+  /** The Game Master's spendable wallet balance, for the live reserve check. */
+  walletBalance?: number | null;
   /**
    * Admin competition defaults for trading. Every option starts at the admin's value and a
    * locked option's input is hidden. Display only: the create route applies the same defaults.
@@ -117,6 +123,8 @@ interface GMCreateCompetitionContentProps {
 export default function GMCreateCompetitionContent({
   levelLadder,
   visibility,
+  fundingMode = "player_paid",
+  walletBalance = null,
   competitionDefaults = NO_GAME_MASTER_DEFAULTS,
 }: GMCreateCompetitionContentProps) {
   const router = useRouter();
@@ -658,6 +666,7 @@ export default function GMCreateCompetitionContent({
           name: formData.name,
           description: formData.description,
           visibility,
+          fundingMode,
           entryFee: formData.entryFeeCredits,
           startingCapital: formData.startingTradingPoints,
           minParticipants: formData.minParticipants,
@@ -1553,6 +1562,20 @@ export default function GMCreateCompetitionContent({
                       </div>
                     </div>
                   </div>
+                </div>
+              )}
+
+              {currentStep === 2 && fundingMode === "gm_funded" && (
+                <div className="mt-4">
+                  <FreePrivateReserveSummary
+                    entryFee={formData.entryFeeCredits}
+                    maxParticipants={Math.min(
+                      formData.maxParticipants,
+                      subscription?.limits?.maxUsersPerCompetition ?? formData.maxParticipants,
+                    )}
+                    walletBalance={walletBalance}
+                    currencySymbol={platformSettings.currencySymbol}
+                  />
                 </div>
               )}
 

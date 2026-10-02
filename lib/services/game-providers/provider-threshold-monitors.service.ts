@@ -213,10 +213,19 @@ async function checkPrizePoolMismatch(
     // alerts every correctly-settled unscored contest (R113).
     // `competitionId` is declared String on WalletTransaction; match the id
     // string, never an ObjectId, or the sum silently stays zero.
+    // A Game Master-funded contest sends the same money to the funding Game Master as
+    // `free_private_gm_refund` instead. Only the settlement kinds count here: a
+    // `seat_refund` comes from a cancellation, which leaves no prize pool to reconcile.
     const refundRows = await WalletTransaction.find({
       competitionId: id,
-      transactionType: "competition_refund",
       status: "completed",
+      $or: [
+        { transactionType: "competition_refund" },
+        {
+          transactionType: "free_private_gm_refund",
+          "metadata.kind": { $in: ["unclaimed_remainder", "excluded_seat"] },
+        },
+      ],
     })
       .select("amount")
       .lean<{ amount: number }[]>();

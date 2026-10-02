@@ -298,6 +298,20 @@ export interface ICompetition extends Document {
   // Who may see and enter it. `gm_private` = only players affiliated to `gameMasterId`.
   // Read through `resolveCompetitionVisibility`, never directly - see the schema comment.
   visibility?: "public" | "gm_private";
+  // Who pays for each seat. `gm_funded` = the Game Master reserved every seat at creation
+  // and the player pays nothing. Only legal on `gm_private`. Read through
+  // `resolveFundingMode` (lib/services/gamemaster/free-private-competition.ts).
+  fundingMode?: "player_paid" | "gm_funded";
+  freePrivate?: {
+    gameMasterUserId?: string;
+    reserveTotal: number; // entryFee x maxParticipants, moved out of the GM balance
+    reserveRemaining: number; // not yet spent on seats nor returned
+    sponsoredCount: number;
+    refundedToGameMaster: number;
+    reservedAt?: Date;
+    releasedAt?: Date;
+    outcome?: "settled" | "all_disqualified" | "cancelled" | "technical_fault";
+  };
 
   createdAt: Date;
   updatedAt: Date;
@@ -774,6 +788,32 @@ const CompetitionSchema = new Schema<ICompetition>(
       type: String,
       enum: ["public", "gm_private"],
       default: "public",
+    },
+    // Free Private Competition (owner, 2 Oct 2026). Immutable after creation, like
+    // `visibility`. The raw-driver Game Master insert stamps it explicitly (R7).
+    fundingMode: {
+      type: String,
+      enum: ["player_paid", "gm_funded"],
+      default: "player_paid",
+    },
+    // Reason: the reserve lives on the CONTEST as well as on the wallet, because the
+    // contest is what every sponsored seat and every refund is checked against. A seat is
+    // only granted by an atomic `$inc reserveRemaining: -entryFee` guarded by
+    // `reserveRemaining >= entryFee`, so the GM can never sponsor more than was reserved.
+    // No defaults on purpose: a nested default would stamp an empty reserve on every
+    // ordinary contest, and "absent" is how a player-paid contest is recognised.
+    freePrivate: {
+      gameMasterUserId: { type: String },
+      reserveTotal: { type: Number, min: 0 },
+      reserveRemaining: { type: Number, min: 0 },
+      sponsoredCount: { type: Number, min: 0 },
+      refundedToGameMaster: { type: Number, min: 0 },
+      reservedAt: { type: Date },
+      releasedAt: { type: Date },
+      outcome: {
+        type: String,
+        enum: ["settled", "all_disqualified", "cancelled", "technical_fault"],
+      },
     },
   },
   {

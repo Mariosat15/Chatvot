@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { AccessAndModeStep } from "@/components/gamemaster/AccessAndModeStep";
+import FreePrivateReserveSummary from "@/components/gamemaster/FreePrivateReserveSummary";
+import type { FundingMode } from "@/lib/services/gamemaster/free-private-competition";
 import { WizardFooterNav, WizardProgressRail } from "@/components/gamemaster/WizardProgressRail";
 import { gameMasterScheduleError } from "@/lib/services/gamemaster/contest-start-guard";
 import type { CompetitionVisibility } from "@/lib/services/gamemaster/competition-visibility";
@@ -73,6 +75,11 @@ interface Props {
   /** Server's `creatableVisibilities`; the Access & Mode step offers exactly these. */
   visibilityOptions: readonly CompetitionVisibility[];
   onVisibilityChange: (next: CompetitionVisibility) => void;
+  /** Private + package + platform switch all allow a Game Master-funded contest. */
+  fundingOffered?: boolean;
+  fundingMode?: FundingMode;
+  onFundingModeChange?: (next: FundingMode) => void;
+  walletBalance?: number | null;
   maxUsersPerCompetition: number;
   /** Admin-controlled fee from Challenge Settings â€” display only; create ignores body. */
   platformFeePercentage: number;
@@ -114,6 +121,10 @@ export default function ProviderContestCreateForm({
   visibility,
   visibilityOptions,
   onVisibilityChange,
+  fundingOffered = false,
+  fundingMode = "player_paid",
+  onFundingModeChange,
+  walletBalance = null,
   maxUsersPerCompetition,
   platformFeePercentage,
   maxCompetitionsPerDay,
@@ -306,6 +317,7 @@ export default function ProviderContestCreateForm({
           providerKey: title.providerKey,
           gameCode: title.gameCode,
           visibility,
+          fundingMode,
           settings,
           entryFee: entryNum,
           maxParticipants: maxNum,
@@ -410,6 +422,9 @@ export default function ProviderContestCreateForm({
                     supportedPlayModes={title.supportedPlayModes}
                     onPlayMode={rules.selectPlayMode}
                     disabled={submitting}
+                    fundingOffered={fundingOffered}
+                    fundingMode={fundingMode}
+                    onFundingMode={onFundingModeChange}
                   />
                 )}
                 {step === 3 && (
@@ -440,6 +455,15 @@ export default function ProviderContestCreateForm({
                     lobbySeconds={title.lobbySeconds}
                     disabled={submitting}
                   />
+                )}
+                {(step === 4 || step === LAST_STEP) && fundingMode === "gm_funded" && (
+                  <div className="px-6 pb-6">
+                    <FreePrivateReserveSummary
+                      entryFee={entryNum}
+                      maxParticipants={maxNum}
+                      walletBalance={walletBalance}
+                    />
+                  </div>
                 )}
                 {step === 5 && (
                   <PrizesStep

@@ -56,6 +56,7 @@ import { checkActor, checkLevelRequirement } from "./contest-entry/guards";
 import { buildParticipantSeat } from "./contest-entry/participant-seat";
 import { runPostEntrySideEffects } from "./contest-entry/side-effects";
 import { fail } from "./contest-entry/types";
+import { isFundedContest, payFundedEntry } from "./contest-entry/free-private-entry";
 import { resolveRegistrationDeadline } from "../utils/registration-deadline";
 import {
   PROVIDER_OUTAGE_ENTRY_MESSAGE,
@@ -245,8 +246,17 @@ export async function enterContest(
       }
 
       const entryFee = competition.entryFee || 0;
+      // Reason: a Game Master-funded seat is paid from the contest's reserve, never from the
+      // player's wallet, so the player gains no spendable credit and spends none.
+      const funded = isFundedContest(competition);
 
-      if (entryFee > 0) {
+      if (funded) {
+        const fundedFailure = await payFundedEntry(competition, actor, session);
+        if (fundedFailure) {
+          await session.abortTransaction();
+          return fundedFailure;
+        }
+      } else if (entryFee > 0) {
         const wallet = await CreditWallet.findOne({
           userId: actor.userId,
         }).session(session);
@@ -334,7 +344,7 @@ export async function enterContest(
       await session.commitTransaction();
 
       console.log(
-        `✅ User ${actor.userId} entered "${competition.name}" (fee €${entryFee})`,
+        `✅ User ${actor.userId} entered "${competition.name}" (fee €${entryFee}${funded ? ", funded by Game Master" : ""})`,
       );
 
       runPostEntrySideEffects(competitionId, competition.name, actor);
@@ -343,7 +353,7 @@ export async function enterContest(
         success: true,
         alreadyEntered: false,
         participantId: participant._id.toString(),
-        feeCharged: entryFee,
+        feeCharged: funded ? 0 : entryFee,
         competition: {
           name: competition.name,
           startingCapital: competition.startingCapital,

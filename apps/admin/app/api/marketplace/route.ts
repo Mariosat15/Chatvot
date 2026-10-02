@@ -12,6 +12,20 @@ import { packageIdSyncFilter } from "@/lib/services/gamemaster/package-config";
 import { parseAllowedVisibilityInput } from "@/lib/services/gamemaster/visibility-permission";
 
 const EXTERNAL_DETAILS_ERROR = "showExternalReferralDetails must be true or false";
+const FREE_PRIVATE_ERROR = "canCreateFreePrivateCompetitions must be true or false";
+const FREE_PRIVATE_NEEDS_PRIVATE =
+  "Free Private competitions need this package to allow Private competitions too.";
+
+/**
+ * A funded contest is always private, so the switch is refused unless the package's
+ * EFFECTIVE visibility list (the one being saved, or the stored one) allows `gm_private`.
+ * Reason: storing `true` beside a public-only list is a grant the creation gate can never
+ * honour - a control that appears to work and does nothing.
+ */
+function freePrivateNeedsPrivate(flag: unknown, effectiveVisibility: unknown): boolean {
+  if (flag !== true) return false;
+  return !(Array.isArray(effectiveVisibility) && effectiveVisibility.includes("gm_private"));
+}
 
 /** Absent is allowed (the package keeps its current switch); anything else must be a boolean. */
 function isOptionalBoolean(value: unknown): boolean {
@@ -139,6 +153,17 @@ export async function POST(request: NextRequest) {
     if (!isOptionalBoolean(data.gameMasterConfig?.showExternalReferralDetails)) {
       return NextResponse.json({ success: false, error: EXTERNAL_DETAILS_ERROR }, { status: 400 });
     }
+    if (!isOptionalBoolean(data.gameMasterConfig?.canCreateFreePrivateCompetitions)) {
+      return NextResponse.json({ success: false, error: FREE_PRIVATE_ERROR }, { status: 400 });
+    }
+    if (
+      freePrivateNeedsPrivate(
+        data.gameMasterConfig?.canCreateFreePrivateCompetitions,
+        data.gameMasterConfig?.allowedVisibility,
+      )
+    ) {
+      return NextResponse.json({ success: false, error: FREE_PRIVATE_NEEDS_PRIVATE }, { status: 400 });
+    }
 
     const item = await MarketplaceItem.create(data);
 
@@ -219,8 +244,23 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ success: false, error: EXTERNAL_DETAILS_ERROR }, { status: 400 });
     }
 
+    if (!isOptionalBoolean(updates.gameMasterConfig?.canCreateFreePrivateCompetitions)) {
+      return NextResponse.json({ success: false, error: FREE_PRIVATE_ERROR }, { status: 400 });
+    }
+
     // Get the item before update to compare gameMasterConfig changes
     const oldItem = await MarketplaceItem.findById(itemId).lean();
+
+    if (
+      freePrivateNeedsPrivate(
+        updates.gameMasterConfig?.canCreateFreePrivateCompetitions ??
+          oldItem?.gameMasterConfig?.canCreateFreePrivateCompetitions,
+        updates.gameMasterConfig?.allowedVisibility ??
+          oldItem?.gameMasterConfig?.allowedVisibility,
+      )
+    ) {
+      return NextResponse.json({ success: false, error: FREE_PRIVATE_NEEDS_PRIVATE }, { status: 400 });
+    }
 
     const item = await MarketplaceItem.findByIdAndUpdate(
       itemId,
@@ -240,6 +280,7 @@ export async function PUT(request: NextRequest) {
     let subscriptionsUpdated = 0;
     let visibilityChange: { from: unknown; to: unknown } | null = null;
     let externalDetailsChange: { from: unknown; to: unknown } | null = null;
+    let freePrivateChange: { from: unknown; to: unknown } | null = null;
     if (item.category === "gamemaster" && updates.gameMasterConfig && db) {
       const gmConfig = updates.gameMasterConfig;
 
@@ -326,6 +367,17 @@ export async function PUT(request: NextRequest) {
         };
       }
 
+      if (gmConfig.canCreateFreePrivateCompetitions !== undefined) {
+        // Reason: the cache is the fallback for a deleted package, so a stale copy would let a
+        // tightened tier keep spending its Game Masters' Volts on funded contests.
+        limitsUpdate["limits.canCreateFreePrivateCompetitions"] =
+          gmConfig.canCreateFreePrivateCompetitions;
+        freePrivateChange = {
+          from: oldItem?.gameMasterConfig?.canCreateFreePrivateCompetitions ?? null,
+          to: gmConfig.canCreateFreePrivateCompetitions,
+        };
+      }
+
       // Only update if there are changes
       if (Object.keys(limitsUpdate).length > 0) {
         limitsUpdate.updatedAt = new Date();
@@ -359,6 +411,8 @@ export async function PUT(request: NextRequest) {
         ...(visibilityChange ? { allowedVisibility: visibilityChange } : {}),
         // Who may read a third party's contact details is a data-access grant, so it is named too.
         ...(externalDetailsChange ? { showExternalReferralDetails: externalDetailsChange } : {}),
+        // Funding contests from a Game Master's own Volts is a money grant, so it is named.
+        ...(freePrivateChange ? { canCreateFreePrivateCompetitions: freePrivateChange } : {}),
       },
     );
 

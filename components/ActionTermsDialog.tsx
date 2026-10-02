@@ -21,6 +21,7 @@ import {
   GM_AFFILIATION_TERMS_SLUG,
   interpolateTermsText,
 } from "@/lib/services/gamemaster/gm-terms-rules";
+import { FREE_PRIVATE_TERMS_SLUG } from "@/lib/services/gamemaster/free-private-terms-rules";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 interface TermsSection {
@@ -479,4 +480,7 @@ export const ACTION_TERM_SLUGS = {
   CHALLENGE: "terms-challenge",
   // Recorded consent: open with `recordedContext` (`24` s5).
   GM_AFFILIATION: GM_AFFILIATION_TERMS_SLUG,
+  // Recorded consent per Game Master-funded competition; the server ignores the browser's
+  // Game Master id and takes it from the competition.
+  FREE_PRIVATE: FREE_PRIVATE_TERMS_SLUG,
 } as const;

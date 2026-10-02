@@ -13,6 +13,8 @@ import Competition from "@/database/models/trading/competition.model";
 import Challenge from "@/database/models/trading/challenge.model";
 import GameRound from "@/database/models/games/game-round.model";
 import { hasProviderGameLabel } from "@/lib/admin/contest-game-label";
+import { isGmFundedContest } from "@/lib/services/gamemaster/free-private-competition";
+import type { FundedRefundResult } from "@/lib/services/settlement/free-private-refund";
 import {
   explainInapplicable,
   actionsForSubject,
@@ -112,12 +114,14 @@ export async function loadIncidentSubject(
       return { subject: null, error: "This incident names no contest." };
     }
     const contest = await Competition.findById(incident.competitionId)
-      .select("name status gameType isPaused finalLeaderboard")
+      .select("name status gameType isPaused finalLeaderboard fundingMode freePrivate")
       .lean<{
         status?: string;
         gameType?: string;
         isPaused?: boolean;
         finalLeaderboard?: unknown[];
+        fundingMode?: string;
+        freePrivate?: { gameMasterUserId?: string } | null;
       } | null>();
     if (!contest) {
       return { subject: null, error: "The contest on this incident no longer exists." };
@@ -137,6 +141,7 @@ export async function loadIncidentSubject(
             Array.isArray(contest.finalLeaderboard) &&
             contest.finalLeaderboard.length > 0,
           needsDecision: false,
+          isGmFunded: isGmFundedContest(contest),
         },
       },
     };
@@ -234,6 +239,7 @@ async function delegate(
   detail?: string;
   voidedRounds?: number;
   closedPositions?: number;
+  gameMasterRefund?: FundedRefundResult | null;
 }> {
   if (actionId === "pause_contest") {
     const result = await pauseContest({
@@ -268,12 +274,46 @@ async function delegate(
     const detail = subject.facts.isProviderGame
       ? `${voided} rounds voided, ${result.refundedCount ?? 0} refunded`
       : `${closed} positions closed, ${result.refundedCount ?? 0} refunded`;
-    return { ok: true, detail, voidedRounds: voided, closedPositions: closed };
+    return {
+      ok: true,
+      detail,
+      voidedRounds: voided,
+      closedPositions: closed,
+      gameMasterRefund: result.gameMasterRefund,
+    };
+  }
+
+  if (actionId === "free_private_technical_fault") {
+    // Reason: a live contest needs its positions closed and rounds voided, which only the
+    // emergency path does; it already treats a funded contest as a technical fault.
+    if (subject.facts.status === "active") {
+      const result = await emergencyCancelActiveCompetition(subject.id, reason, actor.id);
+      if (!result.success) return { ok: false, error: result.message };
+      return {
+        ok: true,
+        detail: `Technical fault: ${result.totalRefunded ?? 0} credits returned to the Game Master`,
+        voidedRounds: result.voidedRounds,
+        closedPositions: result.closedPositions,
+        gameMasterRefund: result.gameMasterRefund,
+      };
+    }
+    const result = await cancelCompetitionAndRefund(subject.id, reason, {
+      fundedOutcome: "technical_fault",
+    });
+    return {
+      ok: true,
+      detail: `Technical fault: ${result.totalRefunded} credits returned to the Game Master`,
+      gameMasterRefund: result.gameMasterRefund,
+    };
   }
 
   if (actionId === "cancel_upcoming") {
-    await cancelCompetitionAndRefund(subject.id, reason);
-    return { ok: true, detail: "Cancelled and refunded" };
+    const result = await cancelCompetitionAndRefund(subject.id, reason);
+    return {
+      ok: true,
+      detail: "Cancelled and refunded",
+      gameMasterRefund: result.gameMasterRefund,
+    };
   }
 
   if (actionId === "re_settle") {
@@ -420,6 +460,7 @@ export async function performIncidentAction(input: {
   let finalOutcome: "applied" | "refused" | "failed" = outcome;
   let voidedRounds: number | undefined;
   let closedPositions: number | undefined;
+  let gameMasterRefund: FundedRefundResult | null | undefined;
 
   if (applicable) {
     try {
@@ -438,6 +479,7 @@ export async function performIncidentAction(input: {
         detail = result.detail || "Applied.";
         voidedRounds = result.voidedRounds;
         closedPositions = result.closedPositions;
+        gameMasterRefund = result.gameMasterRefund;
       }
     } catch (error) {
       finalOutcome = "failed";
@@ -486,6 +528,19 @@ export async function performIncidentAction(input: {
           by: input.actor.id,
           byEmail: input.actor.email,
           at: resolvedAt,
+          ...(gameMasterRefund
+            ? {
+                gameMasterRefund: {
+                  gameMasterUserId: gameMasterRefund.gameMasterUserId,
+                  seatsRefunded: gameMasterRefund.seatsRefunded,
+                  reserveReleased: gameMasterRefund.reserveReleased,
+                  totalRefunded:
+                    gameMasterRefund.seatsRefunded + gameMasterRefund.reserveReleased,
+                  outcome:
+                    input.actionId === "cancel_upcoming" ? "cancelled" : "technical_fault",
+                },
+              }
+            : {}),
         },
         auditLog: { $each: auditEntries },
       },

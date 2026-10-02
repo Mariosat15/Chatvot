@@ -24,6 +24,11 @@ export type ContestEntryFailureCode =
   | "provider_unavailable"
   | "own_contest"
   | "private_not_affiliated"
+  // Free Private (Game Master-funded) competitions.
+  | "free_private_terms_required"
+  | "free_private_terms_unavailable"
+  | "free_private_unfunded"
+  | "free_private_exhausted"
   | "contended"
   | "failed";
 

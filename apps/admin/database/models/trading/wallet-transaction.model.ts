@@ -46,7 +46,16 @@ export interface IWalletTransaction extends Document {
     */
     | "prize_reclaim" // Settled prize taken back after a disqualification
     | "prize_adjustment_add" // Settled prize increased by an operator
-    | "prize_adjustment_deduct"; // Settled prize reduced by an operator
+    | "prize_adjustment_deduct" // Settled prize reduced by an operator
+    // Free Private Competitions (owner, 2 Oct 2026). Rows on the GM wallet: the reserve
+    // leaving the balance, any unused part coming back, and refunds of sponsored seats.
+    // Rows on the PLAYER wallet: a sponsor credit and an entry debit of the same amount,
+    // written together so the player is never left holding spendable credits.
+    | "free_private_reserve"
+    | "free_private_reserve_release"
+    | "free_private_gm_refund"
+    | "free_private_entry_sponsor"
+    | "free_private_entry_payment";
   amount: number; // Amount of credits (+/-)
   balanceBefore: number; // Balance before transaction
   balanceAfter: number; // Balance after transaction
@@ -110,6 +119,11 @@ const WalletTransactionSchema = new Schema<IWalletTransaction>(
         "prize_reclaim",
         "prize_adjustment_add",
         "prize_adjustment_deduct",
+        "free_private_reserve",
+        "free_private_reserve_release",
+        "free_private_gm_refund",
+        "free_private_entry_sponsor",
+        "free_private_entry_payment",
       ],
     },
     amount: {

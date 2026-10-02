@@ -1,6 +1,7 @@
 import type { ClientSession } from "mongoose";
 import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
 import type { SettlementLeaderboardEntry } from "./types";
+import { releaseFundedReserveAtSettlement } from "./free-private-refund";
 
 /**
  * Closing a contest out: statuses, the stored leaderboard and each player's final rank.
@@ -16,6 +17,9 @@ interface CompletableContest {
   finalLeaderboard?: unknown;
   noWinners?: boolean;
   _id: { toString(): string };
+  name?: string;
+  fundingMode?: unknown;
+  freePrivate?: { gameMasterUserId?: unknown } | null;
   save(opts: { session: ClientSession }): Promise<unknown>;
 }
 
@@ -52,6 +56,18 @@ export async function completeContest({
   }
 
   await contest.save({ session });
+
+  // Reason: after the save, not before - the release writes `freePrivate` through the
+  // driver, and a later save of this document must not be the last word on it. A no-op for
+  // every player-paid contest.
+  const reserveReleased = await releaseFundedReserveAtSettlement({
+    session,
+    contest,
+    noWinners: prizeWinnerCount === 0,
+  });
+  if (reserveReleased > 0) {
+    console.log(`   💳 Unused free-competition reserve returned: ${reserveReleased}`);
+  }
 
   // Only `active` seats move to `completed`. A liquidated or disqualified player keeps the
   // status that explains why they are not in the prizes.

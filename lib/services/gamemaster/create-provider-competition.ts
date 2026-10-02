@@ -5,6 +5,7 @@
  * disagree about which fields are required or how gameMasterId is stamped. Reuses the
  * admin create + publish services rather than a third insert path.
  */
+import mongoose from "mongoose";
 import type { CreateProviderContestResult } from "@/lib/services/game-providers/provider-contest.service";
 import { createAndPublishProviderContest } from "@/lib/services/game-providers/provider-contest.service";
 import { clampMinParticipants } from "@/lib/services/gamemaster/game-permissions";
@@ -13,6 +14,12 @@ import {
   START_IN_PAST_TOLERANCE_MS,
 } from "@/lib/services/gamemaster/contest-start-guard";
 import { resolveGameMasterPlatformFeePercentage } from "@/lib/services/gamemaster/platform-fee";
+import type { FundingMode } from "@/lib/services/gamemaster/free-private-competition";
+import {
+  releaseUnusedFreePrivateReserve,
+  reserveFreePrivateFunds,
+  type ReserveResult,
+} from "@/lib/services/gamemaster/free-private-reserve";
 import type { GameTieRule } from "@/lib/services/games/game-tie-rule";
 import type { PlayMode } from "@/lib/services/games/play-shape";
 import type {
@@ -55,6 +62,8 @@ export type GameMasterProviderCreateResult =
       competitionId: string;
       slug?: string;
       warnings: string[];
+      /** Credits moved into the reserve, when the contest is Game Master-funded. */
+      fundingReserve?: number;
     }
   | {
       ok: false;
@@ -99,6 +108,8 @@ export async function createGameMasterProviderCompetition(args: {
   visibility: "public" | "gm_private";
   /** Option keys that hold the admin's default rather than the Game Master's own choice. */
   adminFilled?: readonly string[];
+  /** Already checked by the route (checkFundingAllowed). Absent = player-paid. */
+  fundingMode?: FundingMode;
 }): Promise<GameMasterProviderCreateResult> {
   const { body, userId, gameMasterName, maxUsersPerCompetition, visibility } = args;
 
@@ -173,6 +184,9 @@ export async function createGameMasterProviderCompetition(args: {
   const resultGracePeriodSeconds =
     asNumber(body.resultGracePeriodSeconds) ?? 900;
 
+  const funded = args.fundingMode === "gm_funded";
+  let fundingReserve: number | undefined;
+
   const created: CreateProviderContestResult =
     await createAndPublishProviderContest({
       name,
@@ -214,7 +228,56 @@ export async function createGameMasterProviderCompetition(args: {
       gameMasterId: userId,
       gameMasterName,
       visibility,
-    });
+      fundingMode: funded ? "gm_funded" : "player_paid",
+    }, funded
+      ? {
+          // Reason: the reserve is taken while the contest is still a draft, so no player
+          // can ever see a funded contest whose places are not yet paid for.
+          beforePublish: async (competitionId) => {
+            const db = mongoose.connection.db;
+            if (!db) return "Database connection failed";
+            const session = await mongoose.startSession();
+            try {
+              let result: ReserveResult | undefined;
+              await session.withTransaction(async () => {
+                result = await reserveFreePrivateFunds(
+                  db,
+                  {
+                    competitionId,
+                    competitionName: name,
+                    gameMasterUserId: userId,
+                    entryFee,
+                    maxParticipants: effectiveMaxParticipants,
+                  },
+                  session,
+                );
+              });
+              if (!result?.ok) return result?.message ?? "Could not reserve the funds.";
+              fundingReserve = result.reserve;
+              return null;
+            } finally {
+              await session.endSession();
+            }
+          },
+          onPublishFailed: async (competitionId) => {
+            const db = mongoose.connection.db;
+            if (!db) return;
+            const session = await mongoose.startSession();
+            try {
+              await session.withTransaction(async () => {
+                await releaseUnusedFreePrivateReserve(
+                  db,
+                  { competitionId, outcome: "cancelled" },
+                  session,
+                );
+              });
+            } finally {
+              await session.endSession();
+            }
+          },
+        }
+      : undefined,
+    );
 
   if (!created.success || !created.competitionId) {
     return {
@@ -231,5 +294,6 @@ export async function createGameMasterProviderCompetition(args: {
     competitionId: created.competitionId,
     slug: created.slug,
     warnings: created.warnings ?? [],
+    ...(fundingReserve !== undefined ? { fundingReserve } : {}),
   };
 }

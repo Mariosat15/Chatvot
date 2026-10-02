@@ -8,6 +8,8 @@ import {
   recordGmTermsAcceptance,
   toGmConsentSource,
 } from "@/lib/services/gamemaster/gm-terms.service";
+import { FREE_PRIVATE_TERMS_SLUG } from "@/lib/services/gamemaster/free-private-terms-rules";
+import { recordFreePrivateTermsAcceptance } from "@/lib/services/gamemaster/free-private-terms.service";
 
 /**
  * GET /api/terms-acceptance?slug=terms-credit-purchase
@@ -119,6 +121,34 @@ export async function POST(request: NextRequest) {
         const status =
           result.code === "invalid_input" ? 400
           : result.code === "gm_not_found" ? 404
+          : result.code === "terms_unavailable" ? 409
+          : 500;
+        return NextResponse.json(
+          { success: false, code: result.code, error: result.error },
+          { status },
+        );
+      }
+      return NextResponse.json({
+        success: true,
+        acceptanceId: result.acceptanceId,
+        termsVersion: result.termsVersion,
+      });
+    }
+
+    // Reason: consent to a Game Master-funded entry is recorded per competition, and the
+    // service takes the Game Master from the competition - a browser-supplied
+    // `context.gameMasterId` is ignored on purpose.
+    if (slug === FREE_PRIVATE_TERMS_SLUG) {
+      const result = await recordFreePrivateTermsAcceptance({
+        user: { id: session.user.id },
+        competitionId: body?.context?.competitionId,
+        ipAddress,
+        userAgent,
+      });
+      if (!result.success) {
+        const status =
+          result.code === "invalid_input" ? 400
+          : result.code === "not_funded" ? 404
           : result.code === "terms_unavailable" ? 409
           : 500;
         return NextResponse.json(

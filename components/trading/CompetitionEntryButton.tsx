@@ -78,6 +78,7 @@ export default function CompetitionEntryButton({
 }: CompetitionEntryButtonProps) {
   const [entering, setEntering] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
+  const [showFundedTerms, setShowFundedTerms] = useState(false);
   const router = useRouter();
   const { settings } = useAppSettings();
   // Reason: an entry fee and a wallet balance are both credits. `settings.currency.symbol` is
@@ -100,7 +101,15 @@ export default function CompetitionEntryButton({
   const entryFee = competition.entryFee || competition.entryFeeCredits || 0;
   const startingCapital =
     competition.startingCapital || competition.startingTradingPoints || 0;
-  const canAfford = userBalance >= entryFee;
+  // Reason: a Game Master-funded seat is paid from the contest's reserve, so the player's
+  // balance is irrelevant. The server decides this from the stored contest; this flag only
+  // chooses what the panel says and which terms it asks for.
+  const isFunded = competition.fundingMode === "gm_funded";
+  const canAfford = isFunded || userBalance >= entryFee;
+  const gameMasterName =
+    typeof competition.gameMasterName === "string" && competition.gameMasterName
+      ? competition.gameMasterName
+      : "your Game Master";
 
   /**
    * Whether this contest is played through an external game provider rather than by trading.
@@ -279,6 +288,17 @@ export default function CompetitionEntryButton({
   /** Called after user accepts terms — proceeds with competition entry */
   const proceedAfterTerms = async () => {
     setShowTerms(false);
+    // Reason: a funded seat needs the Free Private Competition terms as well, recorded on
+    // the server against this competition and Game Master before the seat is sponsored.
+    if (isFunded) {
+      setShowFundedTerms(true);
+      return;
+    }
+    await submitEntry();
+  };
+
+  const submitEntry = async () => {
+    setShowFundedTerms(false);
     setEntering(true);
 
     try {
@@ -288,6 +308,9 @@ export default function CompetitionEntryButton({
       if (result.success) {
         toast.success("Successfully entered competition!");
         router.refresh();
+      } else if (result.code === "free_private_terms_required") {
+        setEntering(false);
+        setShowFundedTerms(true);
       } else {
         toast.error("Entry blocked", {
           description: result.error || "Unable to enter competition. Please try again.",
@@ -457,9 +480,10 @@ export default function CompetitionEntryButton({
               <div className="flex items-center justify-between p-3 rounded-lg bg-gray-800/50">
                 <span className="text-sm text-gray-400">Entry Fee</span>
                 <span className="text-sm font-semibold text-gray-100">
-                  {volts(entryFee)}
+                  {isFunded ? "Funded by your Game Master" : volts(entryFee)}
                 </span>
               </div>
+              {!isFunded && (
               <div className="flex items-center justify-between p-3 rounded-lg bg-gray-800/50">
                 <span className="text-sm text-gray-400">Your Balance</span>
                 <span
@@ -470,6 +494,7 @@ export default function CompetitionEntryButton({
                   {volts(userBalance)}
                 </span>
               </div>
+              )}
             </div>
           </div>
 
@@ -699,7 +724,9 @@ export default function CompetitionEntryButton({
           */}
           <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
             <p className="text-xs text-blue-300">
-              ℹ️ Entry fee is non-refundable.
+              {isFunded
+                ? `ℹ️ ${gameMasterName} pays your entry. You receive no spendable or withdrawable credits - only any prize you win.`
+                : "ℹ️ Entry fee is non-refundable."}
               {!isProviderGame && (
                 <>
                   {" "}
@@ -719,6 +746,19 @@ export default function CompetitionEntryButton({
         onAccept={proceedAfterTerms}
         onDecline={() => setShowTerms(false)}
       />
+      {isFunded && typeof competition.gameMasterId === "string" && (
+        <ActionTermsDialog
+          slug={ACTION_TERM_SLUGS.FREE_PRIVATE}
+          open={showFundedTerms}
+          variables={{ gameMasterName }}
+          recordedContext={{
+            gameMasterId: competition.gameMasterId,
+            competitionId: String(competition._id),
+          }}
+          onAccept={() => void submitEntry()}
+          onDecline={() => setShowFundedTerms(false)}
+        />
+      )}
     </div>
   );
 }

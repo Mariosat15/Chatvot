@@ -55,6 +55,13 @@ export interface IIncidentActionTaken {
   by: string;
   byEmail?: string;
   at: Date;
+  gameMasterRefund?: {
+    gameMasterUserId?: string;
+    seatsRefunded?: number;
+    reserveReleased?: number;
+    totalRefunded?: number;
+    outcome?: string;
+  };
 }
 
 export interface IIncident extends Document {
@@ -176,6 +183,15 @@ const ActionTakenSchema = new Schema(
     by: { type: String, required: true },
     byEmail: { type: String },
     at: { type: Date, required: true, default: Date.now },
+    // Free private (GM-funded) contests only: the money returned to the funding Game
+    // Master, so a refund is attributable from the incident without reading the ledger.
+    gameMasterRefund: {
+      gameMasterUserId: { type: String },
+      seatsRefunded: { type: Number },
+      reserveReleased: { type: Number },
+      totalRefunded: { type: Number },
+      outcome: { type: String },
+    },
   },
   { _id: false },
 );

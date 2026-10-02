@@ -19,6 +19,7 @@
  */
 
 import { GM_AFFILIATION_TERMS_PAGE } from "./gm-affiliation-terms-page";
+import { FREE_PRIVATE_TERMS_PAGE } from "./free-private-terms-page";
 
 export type DefaultPageCategory = "page" | "action_terms";
 
@@ -652,6 +653,7 @@ export const DEFAULT_ACTION_TERMS: DefaultPage[] = [
   ACTION_TERMS_COMPETITION,
   ACTION_TERMS_CHALLENGE,
   GM_AFFILIATION_TERMS_PAGE,
+  FREE_PRIVATE_TERMS_PAGE,
 ];
 
 /** All default pages combined (for backward compatibility with seed logic) */

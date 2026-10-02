@@ -23,6 +23,7 @@ import {
   routeToTradingSettlement,
 } from "@/lib/games/settlement";
 import { settleFeesAndGameMasters } from "@/lib/services/settlement/fees.service";
+import { releaseFundedReserveAtSettlement } from "@/lib/services/settlement/free-private-refund";
 import {
   logPrizePoolIntegrityViolation,
   reconcilePrizePoolAgainstCollectedFees,
@@ -816,6 +817,15 @@ export async function finalizeCompetition(competitionId: string) {
     competition.winnerPnL = leaderboard[0]?.pnl;
     competition.finalLeaderboard = leaderboard;
     await competition.save({ session });
+
+    // Reason: this finalizer inlines completion rather than calling `completeContest`, so the
+    // Free Private reserve release that stage performs has to be called here too, or an
+    // admin-cron-settled funded contest keeps the Game Master's unused seats locked for ever.
+    await releaseFundedReserveAtSettlement({
+      session,
+      contest: competition,
+      noWinners: actualWinners === 0,
+    });
 
     // CRITICAL: Update ALL participant statuses to 'completed' so they don't block withdrawals!
     // Only update participants that are still 'active' (not liquidated/disqualified)
