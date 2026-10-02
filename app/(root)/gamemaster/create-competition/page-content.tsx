@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { defaultContestWindow } from "@/lib/utils/default-contest-window";
 import {
   UtcScheduleFields,
   joinUtcDraft,
@@ -402,18 +403,17 @@ export default function GMCreateCompetitionContent({
     formData.endTime,
   ]);
 
-  // Set default dates in UTC — local calendar days near midnight disagree with the server clock
+  // Set default dates in UTC — local calendar days near midnight disagree with the server clock.
+  // Reason: owner, 2 Oct 2026 - start TODAY about an hour ahead and run for a day, so a Game
+  // Master starting today only changes the time. Shared with every other wizard.
   useEffect(() => {
-    const now = new Date();
-    const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-    const dayAfter = new Date(now.getTime() + 48 * 60 * 60 * 1000);
-    const utcYmd = (d: Date) =>
-      `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
-
+    const w = defaultContestWindow(24 * 60);
     setFormData((prev) => ({
       ...prev,
-      startDate: utcYmd(tomorrow),
-      endDate: utcYmd(dayAfter),
+      startDate: w.startDate,
+      startTime: w.startTime,
+      endDate: w.endDate,
+      endTime: w.endTime,
     }));
   }, []);
 

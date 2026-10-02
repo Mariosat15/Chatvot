@@ -22,6 +22,7 @@ import {
   type GameTieRule,
 } from "@/lib/services/games/game-tie-rule";
 import type { PlayMode } from "@/lib/services/games/play-shape";
+import { defaultContestWindow } from "@/lib/utils/default-contest-window";
 import {
   joinUtcDraft,
   utcDraftToIso,
@@ -54,6 +55,8 @@ export interface ContestableTitleOption {
   playMode: PlayMode;
   supportedPlayModes: PlayMode[];
   maxDurationSeconds?: number;
+  /** Lobby lead time the create service will copy, resolved server-side. Display only. */
+  lobbySeconds?: number;
   schema:
     | { ok: true; fields: ConfigField[] }
     | { ok: false; error: string };
@@ -100,12 +103,6 @@ const DEFAULT_PRIZES: PrizeShare[] = [
   { rank: 3, percentage: 10 },
 ];
 
-function defaultUtcDraft(daysFromNow: number, time: string): string {
-  const d = new Date(Date.now() + daysFromNow * 24 * 60 * 60 * 1000);
-  const ymd = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
-  return joinUtcDraft(ymd, time);
-}
-
 /**
  * Game Master wizard for creating a provider contest.
  *
@@ -147,12 +144,15 @@ export default function ProviderContestCreateForm({
         : Math.min(defaults.valueOf<number>("maxParticipants", 20), maxUsersPerCompetition),
     ),
   );
-  // Reason: seed tomorrow/day-after UTC so the white calendar opens on a usable day and
-  // start is after server time without forcing an empty datetime-local.
+  // Reason: owner, 2 Oct 2026 - the calendar opens on TODAY, about an hour ahead, so a Game
+  // Master starting today only changes the time. One shared rule for every wizard.
+  const [openingWindow] = useState(() => defaultContestWindow(60));
   const [startTime, setStartTime] = useState(() =>
-    defaultUtcDraft(1, "12:00"),
+    joinUtcDraft(openingWindow.startDate, openingWindow.startTime),
   );
-  const [endTime, setEndTime] = useState(() => defaultUtcDraft(1, "18:00"));
+  const [endTime, setEndTime] = useState(() =>
+    joinUtcDraft(openingWindow.endDate, openingWindow.endTime),
+  );
   // Reason: the admin's play-style default only applies to a game that supports it (a game set
   // to Both); any other game keeps its own style, exactly as the create service falls back.
   const adminPlayMode = defaults.valueOf<PlayMode>("playMode", title.playMode);
@@ -437,6 +437,7 @@ export default function ProviderContestCreateForm({
                     onMaxParticipants={setMaxParticipants}
                     rules={rules}
                     defaults={defaults}
+                    lobbySeconds={title.lobbySeconds}
                     disabled={submitting}
                   />
                 )}

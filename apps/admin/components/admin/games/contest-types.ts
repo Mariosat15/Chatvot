@@ -46,6 +46,8 @@ export interface ContestableTitle {
   scoreDirection: string;
   scoreType: string;
   maxDurationSeconds?: number;
+  /** Lobby lead time the create service will copy, resolved server-side. Display only. */
+  lobbySeconds?: number;
   /** Provider's cap on players in one round. Absent means no cap. */
   maxPlayers?: number;
   supportsCompetition: boolean;

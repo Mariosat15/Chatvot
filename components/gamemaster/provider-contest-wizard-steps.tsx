@@ -18,6 +18,7 @@ import { ROUND_START_POLICY_COPY } from "@/lib/services/games/round-types";
 import {
   PLAY_MODE_COPY,
 } from "@/lib/services/games/play-shape";
+import { lobbyNotice } from "@/lib/utils/lobby-notice";
 import { Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -165,6 +166,7 @@ export function ScheduleStep({
   onMaxParticipants,
   rules,
   defaults,
+  lobbySeconds,
   disabled,
 }: {
   rules: ProviderContestRules;
@@ -181,8 +183,12 @@ export function ScheduleStep({
   onEnd: (v: string) => void;
   onEntryFee: (v: string) => void;
   onMaxParticipants: (v: string) => void;
+  /** The game's resolved lobby lead time; shown read-only for a scheduled contest. */
+  lobbySeconds?: number;
   disabled?: boolean;
 }) {
+  // Read-only: the lobby length is the GAME's, copied at creation (owner, 2 Oct 2026).
+  const lobbyLine = lobbyNotice(rules.playMode, lobbySeconds);
   return (
     <StepPanel title="Schedule & Entry" subtitle="When it runs and what it costs">
       {/* Labels and hints come from the play shape, as on the admin wizard's schedule step. */}
@@ -197,6 +203,11 @@ export function ScheduleStep({
         onEndChange={onEnd}
         disabled={disabled}
       />
+      {lobbyLine ? (
+        <p className="rounded-lg border border-cyan-500/30 bg-cyan-500/10 p-3 text-xs text-cyan-100">
+          {lobbyLine}
+        </p>
+      ) : null}
       <ProviderRoundFitNote rules={rules} startTime={startTime} onFitContest={onEnd} />
       <ProviderRoundPolicyFields rules={rules} disabled={disabled} />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

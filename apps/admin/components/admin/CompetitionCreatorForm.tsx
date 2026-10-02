@@ -40,6 +40,7 @@ import { calculateCompetitionDifficulty } from "@/lib/utils/competition-difficul
 import type { TitleLevel } from "@/lib/constants/levels";
 import { WHITE_DATE_INPUT_CLASS } from "@/components/admin/games/UtcScheduleFields";
 import { formatVolts } from "@/lib/utils/format-volts";
+import { defaultContestWindow } from "@/lib/utils/default-contest-window";
 import {
   WizardShell,
   WizardStepRail,
@@ -82,6 +83,10 @@ export default function CompetitionCreatorForm({
     minLeverage: number;
   } | null>(null);
 
+  // Reason: owner, 2 Oct 2026 - the calendar opens on TODAY about an hour ahead and runs for a
+  // day, so an operator starting today only changes the time. Shared with every wizard.
+  const [openingWindow] = useState(() => defaultContestWindow(24 * 60));
+
   // Form state
   const [formData, setFormData] = useState({
     name: "",
@@ -90,10 +95,7 @@ export default function CompetitionCreatorForm({
     startingTradingPoints: 10000,
     minParticipants: 2,
     maxParticipants: 50,
-    startDate: "",
-    startTime: "",
-    endDate: "",
-    endTime: "",
+    ...openingWindow,
     leverageAllowed: 30, // Will be updated from risk settings
     platformFeePercentage: 10,
     // Risk Limits

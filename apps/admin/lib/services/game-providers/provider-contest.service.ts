@@ -180,6 +180,12 @@ export interface ProviderContestOption {
   scoreDirection: string;
   scoreType: string;
   maxDurationSeconds?: number;
+  /**
+   * How long before the start the lobby opens, RESOLVED (default and bounds applied), because
+   * that is the number the create service copies onto the competition. Shown read-only on
+   * the wizards' schedule step for an everyone-at-once contest.
+   */
+  lobbySeconds: number;
   /** Provider's cap on players in one round; the wizard caps "Max participants" to it. */
   maxPlayers?: number;
   supportsCompetition: boolean;
@@ -247,6 +253,7 @@ export async function listContestableTitles(): Promise<ProviderContestOption[]> 
         scoreDirection: title.scoreDirection,
         scoreType: title.scoreType,
         maxDurationSeconds: title.maxDurationSeconds,
+        lobbySeconds: resolveLobbySeconds(title.lobbySeconds),
         maxPlayers: title.maxPlayers,
         supportsCompetition: Boolean(title.supportsCompetition),
         supportsOneVsOne: Boolean(title.supportsOneVsOne),

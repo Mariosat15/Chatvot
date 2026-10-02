@@ -20,6 +20,7 @@ import type { ContestableTitle } from "../contest-types";
 import { UtcScheduleFields } from "../UtcScheduleFields";
 import { NumberField } from "./fields";
 import { DEFAULT_CREDIT_SYMBOL } from "@/lib/utils/format-volts";
+import { lobbyNotice } from "@/lib/utils/lobby-notice";
 
 /**
  * Step four: the contest's clock, its fee and how many players it takes.
@@ -59,6 +60,8 @@ export function StepSchedule({
    */
   title?: {
     maxDurationSeconds?: number;
+    /** Resolved lobby lead time; shown read-only for a scheduled contest. */
+    lobbySeconds?: number;
     schema: ContestableTitle["schema"];
     playMode?: PlayMode;
     /**
@@ -102,6 +105,8 @@ export function StepSchedule({
         new Date(),
       )
     : null;
+  // Read-only: the lobby length is the GAME's, copied at creation (owner, 2 Oct 2026).
+  const lobbyLine = lobbyNotice(draft.playMode, title?.lobbySeconds);
 
   return (
     <>
@@ -140,6 +145,20 @@ export function StepSchedule({
         onStartChange={(v) => patch({ startTime: v })}
         onEndChange={(v) => patch({ endTime: v })}
       />
+
+      {lobbyLine ? (
+        <p className="rounded-lg border border-cyan-500/30 bg-cyan-500/10 p-3 text-xs text-cyan-100">
+          {lobbyLine}{" "}
+          <a
+            href="/dashboard?activeTab=game-providers"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-semibold text-cyan-300 underline hover:text-cyan-200"
+          >
+            Change it in Game Providers
+          </a>
+        </p>
+      ) : null}
 
       {startTooSoon ? (
         <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-200">

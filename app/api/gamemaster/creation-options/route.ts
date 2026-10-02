@@ -131,6 +131,7 @@ export async function GET() {
         playMode: t.playMode,
         supportedPlayModes: t.supportedPlayModes,
         maxDurationSeconds: t.maxDurationSeconds,
+        lobbySeconds: t.lobbySeconds,
         schema: t.schema,
       })),
     });

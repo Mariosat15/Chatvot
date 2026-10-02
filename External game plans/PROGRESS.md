@@ -921,6 +921,42 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 2 Oct 2026 - The wizards open on today, and say how long the lobby is (owner request)
+
+Owner, after a Game Master saw a one-minute lobby where the game was believed to say five:
+*"do it"* (show the lobby time in the wizards, read-only) *"and also in the gm and admin
+wizard always fill the default date today"*.
+
+**The lobby code was checked first and was right.** Both wizards create through the shared
+`createProviderContest`, which copies the title's resolved `lobbySeconds` onto the
+competition at creation. So a one-minute lobby means the title was stored at one minute (the
+minimum) or the contest was created before five was saved - **the copy is at creation, so
+editing the game later does not move existing contests.** The stored values could not be
+read from here (the database timed out), so which of the two it was is unverified. Nothing
+was backfilled.
+
+**What was built.** `lib/utils/lobby-notice.ts` (mirrored, byte-identical test) writes one
+sentence - *"Lobby opens 5 minutes before the start. This is set on the game and copied when
+you create the competition."* - and returns `null` for any shape other than `scheduled` and
+for an absent or non-finite value, so nothing is guessed. `listContestableTitles` (both
+copies, still byte-identical) now returns `lobbySeconds` **resolved** through
+`resolveLobbySeconds`, because that is the number the create service copies; the GM
+creation-options route passes it through. The admin schedule step shows it with a link to
+Game Providers, where it is changed; the GM step shows it without one. Read-only on both:
+the length belongs to the game, never to one contest.
+
+**Dates.** `lib/utils/default-contest-window.ts` (mirrored, byte-identical test) is the one
+rule: today, an hour ahead, rounded up to five minutes, UTC. All four create screens use it
+- admin game wizard (`defaultUpcomingUtcWindow` now delegates, so its name and tests are
+unchanged), admin trading form, GM game wizard and GM trading wizard. The two GM screens used
+to open on **tomorrow** at 12:00; the admin trading form opened empty. Game contests run an
+hour by default, trading contests a day. After 23:00 UTC "an hour ahead" is tomorrow, which
+is correct rather than a regression.
+
+`__tests__/utils/wizard-defaults-and-lobby-notice.test.ts` (12 tests),
+`tools/probe-wizard-defaults.ps1` (5 probes, all red). **Never verified by eye** - both
+wizards are behind sign-in.
+
 ### 2 Oct 2026 - The play screen's pre-flight shows one big clock and short wording (owner request)
 
 Owner, on the arena pre-flight of a play-together contest: *"add that in xxx time the lobby

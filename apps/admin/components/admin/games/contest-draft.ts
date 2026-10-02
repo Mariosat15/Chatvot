@@ -14,6 +14,7 @@ import {
   type GameTieRule,
 } from "@/lib/services/games/game-tie-rule";
 import { DEFAULT_START_WAIT_SECONDS } from "@/lib/services/games/start-wait";
+import { defaultContestWindow } from "@/lib/utils/default-contest-window";
 import {
   deriveResultGraceSeconds as deriveGraceFromFloor,
   isoToUtcDraft,
@@ -323,15 +324,10 @@ export function defaultUpcomingUtcWindow(now: Date = new Date()): {
   startTime: string;
   endTime: string;
 } {
-  const start = new Date(now.getTime() + 60 * 60 * 1000);
-  // Round up to the next 5 UTC minutes so the defaults look intentional, not noisy.
-  const minutes = start.getUTCMinutes();
-  const rounded = Math.ceil(minutes / 5) * 5;
-  start.setUTCMinutes(rounded === 60 ? 0 : rounded, 0, 0);
-  if (rounded === 60) start.setUTCHours(start.getUTCHours() + 1);
-  const end = new Date(start.getTime() + 60 * 60 * 1000);
+  // One rule for every wizard's opening schedule, so the four cannot drift apart.
+  const w = defaultContestWindow(60, now);
   return {
-    startTime: isoToUtcDraft(start),
-    endTime: isoToUtcDraft(end),
+    startTime: `${w.startDate}T${w.startTime}`,
+    endTime: `${w.endDate}T${w.endTime}`,
   };
 }
