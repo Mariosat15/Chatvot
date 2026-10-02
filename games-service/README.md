@@ -469,9 +469,11 @@ npm run probe:round-clock    # the same, for the clock, the length promised befo
 > the width is safe only because nothing we report changes it, where a height derived from our own
 > reported height is the postage-stamp defect of `21` s4.1f.
 
-`npm test` runs **356 tests**: 15 config, 44 engine, 29 scoring, 16 Volt Stack, 49 API, 93 play
-and delivery, 11 progress, 21 board client, 61 presentation, 17 Volt Velocity (any figure of 344
-is stale). **Every title offers practice**, Volt Velocity included since 28 Sep 2026: a practice
+`npm test` runs **365 tests**: 15 config, 44 engine, 29 scoring, 16 Volt Stack, 51 API, 99 play
+and delivery, 11 progress, 21 board client, 62 presentation, 17 Volt Velocity (any figure of 356
+or 344 is stale). **Every title honours a scheduled start** since 1 Oct 2026 (`21` s4.1v): a
+ranked round created before `scheduledStartAt` is held in the lobby, its clock starts at the gun,
+and the client starts itself at zero. **Every title offers practice**, Volt Velocity included since 28 Sep 2026: a practice
 race is a solo room seeded from the round's own id, and one carrying a start time is refused.
 Practice never sends a result callback (requirements v1.10); the platform pulls the result
 through `GET /v1/rounds/:id`. `test:velocity`

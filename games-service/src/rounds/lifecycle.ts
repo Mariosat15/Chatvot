@@ -350,19 +350,65 @@ export function hardDeadline(
  * min is a second place for the three deadlines to be weighed differently.
  */
 export function playableSeconds(
-  round: Pick<RoundDoc, "gameCode" | "startedAt" | "config" | "expiresAt">,
+  round: Pick<RoundDoc, "gameCode" | "startedAt" | "config" | "expiresAt"> & {
+    scheduledStartAt?: Date;
+  },
   now = new Date(),
 ): number {
-  const anchor = round.startedAt ?? now;
+  // Before the clock runs, a held round's deadline is measured from the gun, and the answer is
+  // what is left of it from the later of the gun and now: a player waiting in the lobby is told
+  // the full race, a player arriving after the gun is told the remainder rather than a full
+  // length that started without them.
+  const anchor = round.startedAt ?? startAnchor(round, now);
   const deadline = hardDeadline({
     gameCode: round.gameCode,
     startedAt: anchor,
     config: round.config,
     expiresAt: round.expiresAt,
   });
+  const from = round.startedAt ? anchor : new Date(Math.max(anchor.getTime(), now.getTime()));
   // Floored, never rounded: rounding up overstates by up to a second, and an overstatement here
   // is a promise the server then breaks.
-  return Math.max(0, Math.floor((deadline.getTime() - anchor.getTime()) / 1000));
+  return Math.max(0, Math.floor((deadline.getTime() - from.getTime()) / 1000));
+}
+
+/**
+ * When this round's clock starts if the player starts it now ("everyone at once").
+ *
+ * A scheduled round's clock starts at the gun for everyone: a player who arrives late is
+ * anchored on the gun too, so the time already played counts against them exactly as it does
+ * in a race. This is the same rule Volt Velocity applies, without needing a race room.
+ * An unscheduled round starts when the player presses Start.
+ */
+export function startAnchor(round: { scheduledStartAt?: Date }, now: Date): Date {
+  return round.scheduledStartAt ?? now;
+}
+
+/**
+ * The gun this round is still waiting for, or `null` when it may start now.
+ *
+ * Only a round that has not started can be held; a resumed round is never sent back to the
+ * lobby, whatever the clock says.
+ */
+export function heldUntil(
+  round: { status: string; scheduledStartAt?: Date },
+  now: Date,
+): Date | null {
+  if (round.status !== "created" || !round.scheduledStartAt) return null;
+  return round.scheduledStartAt.getTime() > now.getTime() ? round.scheduledStartAt : null;
+}
+
+/**
+ * The waiting-room fields of a play state: present only while the round is held. Shared by
+ * every title's state builder so a new title gets the lobby by calling this, not by
+ * re-deriving when the gun is.
+ */
+export function holdFields(
+  round: { status: string; scheduledStartAt?: Date },
+  now: Date,
+): { startsAt?: string; serverNow?: string } {
+  const gun = heldUntil(round, now);
+  return gun ? { startsAt: gun.toISOString(), serverNow: now.toISOString() } : {};
 }
 
 /**

@@ -15,7 +15,15 @@ import {
 } from "../games/titles";
 import { Round, isTerminal, type RoundDocument } from "../store/round.model";
 import { ApiError, unknownRound } from "../http/errors";
-import { finishRound, hardDeadline, playability, playableSeconds } from "./lifecycle";
+import {
+  finishRound,
+  hardDeadline,
+  heldUntil,
+  holdFields,
+  playability,
+  playableSeconds,
+  startAnchor,
+} from "./lifecycle";
 import { sendProgress } from "../callback/progress";
 import {
   startOrResumeVoltStack,
@@ -108,6 +116,18 @@ export interface PlayState {
    * nothing.
    */
   endsAt?: string;
+  /**
+   * Present only while the round is held for an "everyone at once" start: the gun, ISO 8601.
+   * The client shows a waiting countdown and starts the round itself when it reaches zero;
+   * the server refuses to start it any earlier, so a client that ignores this gains nothing.
+   */
+  startsAt?: string;
+  /**
+   * The server's clock at the moment this state was built, sent beside `startsAt` so the
+   * waiting countdown is measured against our time rather than a device clock that may be
+   * minutes out.
+   */
+  serverNow?: string;
   /** Where to send the player when they leave. */
   returnUrl?: string;
   /**
@@ -257,6 +277,7 @@ function stateFor(round: RoundDocument, board?: ClientPuzzle): PlayState {
    */
   state.durationSeconds = Math.floor(roundDurationMs(config) / 1000);
   state.playableSeconds = playableSeconds(round);
+  Object.assign(state, holdFields(round, new Date()));
   if (board) {
     state.board = board;
     // The next picture, so the frame can fetch it before this board is finished.
@@ -327,11 +348,24 @@ export async function startOrResume(token: string): Promise<PlayState> {
     return stateFor(settled ?? round);
   }
 
+  // "Everyone at once": before the gun the round is held, not started. The player waits in the
+  // game's own lobby and nothing is consumed; the client asks again when the countdown ends.
+  if (heldUntil(round, now)) return stateFor(round);
+
   if (round.status === "created") {
     round.status = "in_progress";
-    round.startedAt = now;
+    // At the gun for a scheduled round, so a player who arrives late is not handed a longer
+    // clock than the players who were there at the start.
+    round.startedAt = startAnchor(round, now);
     round.boards = [{ index: 0, issuedAt: now, attempts: 0 }];
     await round.save();
+    // A late arrival can find the shared clock has already run out.
+    const late = playability(round, now);
+    if (!late.playable) {
+      if (late.owes) await finishRound(round.roundId, { status: late.owes, at: now });
+      const settled = await Round.findOne({ roundId: round.roundId });
+      return stateFor(settled ?? round);
+    }
     return stateFor(round, puzzleFor(round, 0));
   }
 

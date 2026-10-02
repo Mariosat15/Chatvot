@@ -51,6 +51,7 @@ import {
   roundHeaderCells,
   soundControlCopy,
   undoState,
+  waitingRoom,
   withCountUpValue,
   HEIGHT_REPORT_THRESHOLD_PX,
 } from "./presentation.js";
@@ -464,7 +465,61 @@ function renderIntro() {
 
   ui.start.disabled = false;
   ui.start.textContent = copy.startLabel;
+
+  // "Everyone at once": the server is holding this round until the gun. Start is withheld and
+  // replaced by the countdown, and the round starts itself at zero - a player who opened the
+  // game early must not have to do anything at the gun, or be left behind for missing it.
+  const wait = waitingRoom(state, Date.now(), stateReceivedAt);
+  if (wait) {
+    ui.start.disabled = true;
+    ui.start.textContent = wait.label;
+    ui.introNote.textContent = wait.note;
+    watchTheGun();
+  }
   show("intro");
+}
+
+let stateReceivedAt = Date.now();
+let gunTimer = null;
+let lastAutoStartAt = 0;
+
+/** Tick the waiting countdown; at zero, ask the server to start the round. */
+function watchTheGun() {
+  if (gunTimer) return;
+  gunTimer = setInterval(() => {
+    const wait = waitingRoom(state, Date.now(), stateReceivedAt);
+    if (!wait) {
+      clearInterval(gunTimer);
+      gunTimer = null;
+      return;
+    }
+    ui.start.textContent = wait.label;
+    // Reason for the one-second spacing: if this device runs a few milliseconds ahead of the
+    // server, the first ask is answered "still waiting", and an unspaced retry would hammer it.
+    if (wait.msLeft === 0 && Date.now() - lastAutoStartAt >= 1000) {
+      clearInterval(gunTimer);
+      gunTimer = null;
+      lastAutoStartAt = Date.now();
+      void startAtTheGun();
+    }
+  }, 250);
+}
+
+async function startAtTheGun() {
+  try {
+    state = await call("/play/api/session", { t: token });
+    stateReceivedAt = Date.now();
+    if (state.board) {
+      // Not inside a gesture, so the browser may keep audio closed until the player's first
+      // touch on the board; asking is harmless either way.
+      sound.unlock();
+      sound.play("start");
+      sound.startMusic();
+    }
+    render();
+  } catch (error) {
+    fail(error.message);
+  }
 }
 
 let artWarmed = false;
@@ -970,6 +1025,7 @@ function render() {
 
 async function refresh() {
   state = await call("/play/api/state?t=" + encodeURIComponent(token), null, "GET");
+  stateReceivedAt = Date.now();
   render();
 }
 
@@ -991,6 +1047,7 @@ async function start() {
   ui.start.textContent = "Starting...";
   try {
     state = await call("/play/api/session", { t: token });
+    stateReceivedAt = Date.now();
     render();
   } catch (error) {
     sound.stopMusic();

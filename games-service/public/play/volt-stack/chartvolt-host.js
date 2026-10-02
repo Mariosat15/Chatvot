@@ -118,10 +118,83 @@
     }
   }
 
+  /*
+   * "EVERYONE AT ONCE" WAITING ROOM
+   * -------------------------------
+   * While the server is holding the round it reports `startsAt` and its own `serverNow`. Start
+   * is withheld and the hint counts down on the SERVER's clock (a fast or slow device must not
+   * decide when a race begins), then the game starts itself at zero so nobody who opened the
+   * frame early is left behind for missing the gun. The server stays the authority: starting a
+   * second early is answered "still waiting" and we simply ask again a second later.
+   */
+  let stateReceivedAt = Date.now();
+  let gunTimer = null;
+  let lastAutoStartAt = 0;
+
+  function msUntilGun() {
+    if (!hostState || !hostState.startsAt || hostState.finished) return null;
+    const startsAtMs = Date.parse(hostState.startsAt);
+    if (!Number.isFinite(startsAtMs)) return null;
+    const serverNowMs = hostState.serverNow ? Date.parse(hostState.serverNow) : NaN;
+    const offset = Number.isFinite(serverNowMs) ? serverNowMs - stateReceivedAt : 0;
+    return Math.max(0, startsAtMs - (Date.now() + offset));
+  }
+
+  function formatWait(ms) {
+    const total = Math.ceil(ms / 1000);
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const s = String(total % 60).padStart(2, "0");
+    return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${s}` : `${m}:${s}`;
+  }
+
+  function watchTheGun() {
+    if (gunTimer) return;
+    const button = document.getElementById("startBtn");
+    const hint = document.getElementById("startHint");
+    const tick = () => {
+      const msLeft = msUntilGun();
+      if (msLeft === null) {
+        clearInterval(gunTimer);
+        gunTimer = null;
+        if (button) button.disabled = false;
+        // An early ask at the gun leaves "not started yet" behind; it is no longer true.
+        const err = document.getElementById("startError");
+        if (err && err.textContent === "The competition has not started yet.") err.textContent = "";
+        return;
+      }
+      // Re-asserted every tick: the shell's own idle code may re-enable the button.
+      if (button) button.disabled = true;
+      if (hint) {
+        hint.textContent =
+          msLeft > 0
+            ? `Everyone starts together. Starts in ${formatWait(msLeft)}`
+            : "Starting...";
+      }
+      if (msLeft === 0 && Date.now() - lastAutoStartAt >= 1000) {
+        lastAutoStartAt = Date.now();
+        try {
+          window.ChartvoltTetris?.start?.();
+        } catch (error) {
+          const err = document.getElementById("startError");
+          if (err) err.textContent = error.message || "Could not start round.";
+        }
+      }
+    };
+    tick();
+    gunTimer = setInterval(tick, 250);
+  }
+
   const adapter = {
     async createSession() {
       hostState = await api("POST", "/play/api/session", { t: token });
+      stateReceivedAt = Date.now();
       applyHostHints(hostState);
+      if (hostState.startsAt && !hostState.finished) {
+        // Still held: never invent a local clock for a round the server has not started.
+        watchTheGun();
+        throw new Error("The competition has not started yet.");
+      }
       return sessionFromState(hostState);
     },
     async reportEvent(event) {
@@ -165,6 +238,7 @@
 
     try {
       hostState = await api("GET", `/play/api/state?t=${encodeURIComponent(token)}`);
+      stateReceivedAt = Date.now();
       applyHostHints(hostState);
 
       const ranked = hostState.mode === "ranked";
@@ -181,6 +255,8 @@
 
       if (hostState.finished) {
         tellPlatform("finished");
+      } else if (msUntilGun() !== null && ranked) {
+        watchTheGun();
       } else if (hostState.status === "in_progress" && ranked) {
         // Same attempt: Circuit resumes straight into the board; Volt Stack must too.
         // Defer one frame so ChartvoltTetris listeners are wired.

@@ -49,6 +49,11 @@ interface Presentation {
   MIN_FRAME_HEIGHT: number;
   MAX_FRAME_HEIGHT: number;
   HEIGHT_REPORT_THRESHOLD_PX: number;
+  waitingRoom(
+    state: unknown,
+    nowMs: number,
+    receivedAtMs: number,
+  ): { msLeft: number; label: string; note: string } | null;
   boardCellPx(w: number, h: number, gw: number, gh: number): number;
   widthBoundCellPx(availableWidth: number, gridWidth: number, gridHeight: number): number;
   desiredFrameHeight(input: Record<string, unknown>): number;
@@ -1144,6 +1149,26 @@ async function main(): Promise<void> {
     const surface = Object.keys(p).join(" ").toLowerCase();
     assert.ok(!surface.includes("hint" + "state"), "a hint control was added to the play surface");
     assert.ok(!surface.includes("hintsleft"), "a hint allowance was added to the play surface");
+  });
+
+  test("the waiting room counts down on the SERVER's clock and says nothing once started", () => {
+    const received = 1_000_000;
+    // The device is 10 s behind the server: the countdown must follow the server, or the first
+    // player whose clock runs slow is left on the intro after everybody else has started.
+    const state = {
+      startsAt: new Date(received + 70_000).toISOString(),
+      serverNow: new Date(received + 10_000).toISOString(),
+    };
+    const wait = p.waitingRoom(state, received, received);
+    assert.ok(wait);
+    assert.equal(wait!.msLeft, 60_000);
+    assert.equal(wait!.label, "Starts in 1:00");
+    assert.equal(p.waitingRoom(state, received + 60_000, received)!.msLeft, 0);
+    assert.equal(p.waitingRoom(state, received + 60_000, received)!.label, "Starting...");
+    assert.equal(p.waitingRoom({ status: "in_progress" }, received, received), null);
+    // An unparseable server time falls back to the device clock, never to NaN.
+    const noServer = p.waitingRoom({ startsAt: state.startsAt, serverNow: "junk" }, received, received);
+    assert.equal(noServer!.msLeft, 70_000);
   });
 
   console.log("");

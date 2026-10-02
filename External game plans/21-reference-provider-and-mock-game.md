@@ -1680,6 +1680,41 @@ launch URL; click acceptance is the same runbook shape as **s4.1e**.
 in one movement when server code changed (R52 / s4.1i). Platform `/play/:path*` rewrite already covers the subpath;
 no `next.config` change required.
 
+### 4.1v Every title honours the start gun, not only Volt Velocity - 1 October 2026
+
+**Owner report:** "everyone at once" worked for Volt Velocity, where players join early, wait
+in the lobby and all start together. On Circuit Sprint and Volt Stack, players who opened the game
+in the lobby started straight away, so no shared start ever happened.
+
+**The platform was already right, and it is game-agnostic.** It sends `scheduledStartAt` (=
+`playWindowStart`) for any contest stored as `scheduled`, opens the lobby from `lobbyOpensAt`,
+and has no per-game branch. Spec `01` lines 435-452 already require a provider to hold an early
+player until `scheduledStartAt`. **Only Volt Velocity did that.** So this is a conformance fix
+inside games-service. **`01` and the requirements HTML are unchanged and no version bump is needed.**
+
+| | What now happens for every non-Velocity title |
+|---|---|
+| Stored | `Round.scheduledStartAt`, accepted on ranked competition rounds only; a challenge or practice round carrying one is refused |
+| Before the gun | Starting the session leaves the round `created`. `PlayState` carries `startsAt` and `serverNow`, and a Volt Stack lock is refused with `not_started` |
+| At the gun | `startedAt` is anchored at the gun, not at the click, so everyone's clock is the same clock |
+| Late arrival | Still admitted (the platform's late-entry rule), but the time already raced counts against them. If their whole clock has already run out, the round is finished immediately |
+| Clients | Circuit (`app.js`) and Volt Stack (`chartvolt-host.js`) show "Everyone starts together. Starts in m:ss" on the **server's** clock and start by themselves at zero, retrying at most once a second. The server stays the authority |
+
+**Two traps.** `playableSeconds` measured from "now" before the start would promise a late
+arrival the full length; it now measures from the later of the gun and now. And an auto-start
+that hammered the session route every 250ms at zero would flood the service on a busy race,
+so it is rate-limited to one attempt a second.
+
+**The "go out and back in to see Play" half was the same defect, not a platform one.** The
+platform's pre-flight runs on a one-second server clock plus a 20-second poll and unlocks by
+itself when the lobby opens. What was missing was a game that waited. The one platform change
+is wording: the lobby message used to say "come back when it opens", which told players to
+leave a screen that unlocks itself.
+
+**Tests:** 6 new in `test-play`, 2 in `test-api`, 1 in `test-presentation` (365 in total), with two
+probes red (removing the hold, and anchoring on `now` instead of the gun). **Deploy:** TypeScript
+changed, so run `npm run build` and `pm2 restart chartvolt-games`. **Never verified by eye.**
+
 ---
 
 ## 5. What this does NOT prove

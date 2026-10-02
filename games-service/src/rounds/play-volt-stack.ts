@@ -15,7 +15,15 @@ import { applyLock, createStackEngine, derivePieceSeed } from "../games/volt-sta
 import type { StackLockInput } from "../games/volt-stack/scoring";
 import { Round, isTerminal, type RoundDocument } from "../store/round.model";
 import { ApiError } from "../http/errors";
-import { finishRound, hardDeadline, playability, playableSeconds } from "./lifecycle";
+import {
+  finishRound,
+  hardDeadline,
+  heldUntil,
+  holdFields,
+  playability,
+  playableSeconds,
+  startAnchor,
+} from "./lifecycle";
 import { sendProgress } from "../callback/progress";
 import type { PlayState } from "./play";
 
@@ -82,6 +90,7 @@ export function voltStackStateFor(round: RoundDocument): PlayState {
     state.durationSeconds = Math.floor(roundDurationMs(config) / 1000);
   }
   state.playableSeconds = playableSeconds(round);
+  Object.assign(state, holdFields(round, new Date()));
   if (endsAt) state.endsAt = endsAt.toISOString();
 
   const status = playability(round, new Date());
@@ -109,12 +118,21 @@ export async function startOrResumeVoltStack(
     return voltStackStateFor(settled ?? round);
   }
 
+  // "Everyone at once": held until the gun, exactly as Circuit is (see `startOrResume`).
+  if (heldUntil(round, now)) return voltStackStateFor(round);
+
   if (round.status === "created") {
     round.status = "in_progress";
-    round.startedAt = now;
+    round.startedAt = startAnchor(round, now);
     round.boards = [];
     round.stackLocks = [];
     await round.save();
+    const late = playability(round, now);
+    if (!late.playable) {
+      if (late.owes) await finishRound(round.roundId, { status: late.owes, at: now });
+      const settled = await Round.findOne({ roundId: round.roundId });
+      return voltStackStateFor(settled ?? round);
+    }
   }
 
   return voltStackStateFor(round);
@@ -156,9 +174,15 @@ export async function recordStackLock(
     };
   }
 
+  // A lock sent before the gun is refused rather than starting the clock early: a client that
+  // skipped the lobby must not be able to begin before everyone else.
+  if (heldUntil(round, now)) {
+    return { accepted: false, reason: "not_started", state: voltStackStateFor(round) };
+  }
+
   if (round.status === "created") {
     round.status = "in_progress";
-    round.startedAt = now;
+    round.startedAt = startAnchor(round, now);
     round.boards = [];
     round.stackLocks = [];
   }

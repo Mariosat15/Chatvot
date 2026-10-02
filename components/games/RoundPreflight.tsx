@@ -221,7 +221,7 @@ export function RoundPreflight({
   // it has not started, because that is the fact the player can act on - they can come back.
   const blockedReason = notStartedYet
     ? lobbyOpensMs !== null
-      ? "The lobby for this race has not opened yet. Your seat is reserved - come back when it opens."
+      ? "The lobby for this race has not opened yet. Your seat is reserved - stay on this page and Play unlocks by itself when it opens."
       : "This competition has not started yet. Your seat is reserved - come back when it opens."
     : noLongerOpen
       ? "This competition is no longer accepting rounds."

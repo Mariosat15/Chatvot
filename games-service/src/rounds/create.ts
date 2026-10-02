@@ -387,6 +387,21 @@ export async function createRound(input: CreateRoundInput): Promise<CreateRoundO
     );
   }
 
+  // Every other title: the same "everyone at once" contract with no race room. The round is
+  // held until the gun and its clock is anchored on it (`lifecycle.startAnchor`). Without this
+  // the start time was read and dropped, so an early lobby entrant's clock started on arrival
+  // and the contest was not played together at all.
+  let heldStartAt: Date | undefined;
+  if (!isVelocity) {
+    heldStartAt = parseScheduledStart(input.scheduledStartAt, expiresAt, now);
+    if (heldStartAt && contestType === "challenge") {
+      throw badRequest("'scheduledStartAt' must be absent on a challenge.");
+    }
+    if (heldStartAt && mode === "practice") {
+      throw badRequest("'scheduledStartAt' must be absent on a practice round.");
+    }
+  }
+
   try {
     const created = await Round.create({
       roundId,
@@ -417,6 +432,7 @@ export async function createRound(input: CreateRoundInput): Promise<CreateRoundO
       parentOrigin,
       status: "created",
       boards: [],
+      ...(heldStartAt ? { scheduledStartAt: heldStartAt } : {}),
       ...(seat
         ? {
             race: {

@@ -437,6 +437,75 @@ async function main(): Promise<number> {
     assert.notEqual(row!.status, "abandoned");
   });
 
+  await test("volt-stack: a scheduled round is held until the gun and refuses pieces before it", async () => {
+    // "Everyone at once" must work the same on every title, not only Volt Velocity: an early
+    // press is held, and a piece sent before the gun is refused rather than starting the clock
+    // through the back door (a lock is an implicit start).
+    await clearRounds();
+    const { VOLT_STACK_DURATION } = await import("../src/games/titles");
+    const { callPlay, tokenFromLaunchUrl } = await import("./api-harness");
+    const gun = new Date(Date.now() + 5 * 60_000);
+    const created = await callApi<{ launchUrl: string }>("/v1/rounds", {
+      method: "POST",
+      body: createBody({
+        resultCallbackUrl: callbackUrl,
+        gameCode: "volt-stack",
+        contestType: "competition",
+        scheduledStartAt: gun.toISOString(),
+        config: { durationSeconds: VOLT_STACK_DURATION.default },
+      }),
+    });
+    assert.equal(created.status, 201, created.raw);
+    const token = tokenFromLaunchUrl(created.body.launchUrl);
+
+    const session = await callPlay<{ status: string; startsAt?: string; serverNow?: string }>(
+      "/play/api/session",
+      { t: token },
+    );
+    assert.equal(session.body.status, "created", "an early press started the round");
+    assert.equal(session.body.startsAt, gun.toISOString());
+    assert.ok(session.body.serverNow);
+
+    const lock = { piece: "T", rotation: 0, x: 3, y: 18, hardDropCells: 0 };
+    const locked = await callPlay<{ accepted: boolean; reason?: string }>("/play/api/lock", {
+      t: token,
+      lock,
+    });
+    assert.equal(locked.body.accepted, false);
+    assert.equal(locked.body.reason, "not_started");
+
+    const { Round } = await import("../src/store/round.model");
+    const row = await Round.findOne({}).lean();
+    assert.equal(row?.status, "created");
+    assert.equal(row?.startedAt, undefined, "the clock started before the gun");
+  });
+
+  await test("volt-stack: a player arriving after the gun is anchored on the gun", async () => {
+    await clearRounds();
+    const { VOLT_STACK_DURATION } = await import("../src/games/titles");
+    const { callPlay, tokenFromLaunchUrl } = await import("./api-harness");
+    const gun = new Date(Date.now() - 20_000);
+    const created = await callApi<{ launchUrl: string }>("/v1/rounds", {
+      method: "POST",
+      body: createBody({
+        resultCallbackUrl: callbackUrl,
+        gameCode: "volt-stack",
+        contestType: "competition",
+        scheduledStartAt: gun.toISOString(),
+        config: { durationSeconds: VOLT_STACK_DURATION.default },
+      }),
+    });
+    const token = tokenFromLaunchUrl(created.body.launchUrl);
+    const session = await callPlay<{ status: string; startsAt?: string }>("/play/api/session", {
+      t: token,
+    });
+    assert.equal(session.body.status, "in_progress");
+    assert.equal(session.body.startsAt, undefined);
+    const { Round } = await import("../src/store/round.model");
+    const row = await Round.findOne({}).lean();
+    assert.equal(row?.startedAt?.getTime(), gun.getTime());
+  });
+
   await test("the launch URL does not leak the content seed", async () => {
     // Section 12: the seed is "never exposed to the player, in the page, the URL or any
     // client-visible response". A launch URL that carried it would let a player generate every

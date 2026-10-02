@@ -840,3 +840,37 @@ export function undoState(input) {
   if (!canUndo) return { disabled: true, title: "Nothing to undo yet." };
   return { disabled: false, title: "Remove the path you drew last" };
 }
+
+/**
+ * The waiting room for an "everyone at once" contest: how long until the gun, and what to say.
+ *
+ * `state.startsAt` is present only while the server is holding the round. The countdown is
+ * measured on the SERVER's clock - `serverNow` was its time when `receivedAtMs` (the device
+ * clock) was read - so a phone that is minutes out still starts with everyone else.
+ *
+ * Returns `null` when there is nothing to wait for. `msLeft` reaching 0 is the client's cue to
+ * ask the server to start; the server refuses anything earlier, so this is never the authority.
+ */
+export function waitingRoom(state, nowMs, receivedAtMs) {
+  const startsAt = Date.parse(state?.startsAt ?? "");
+  if (!Number.isFinite(startsAt)) return null;
+  const serverNow = Date.parse(state?.serverNow ?? "");
+  // An unparseable server time falls back to the device clock rather than to NaN, which would
+  // make every comparison false and the countdown never end.
+  const offset = Number.isFinite(serverNow) && Number.isFinite(receivedAtMs) ? serverNow - receivedAtMs : 0;
+  const msLeft = Math.max(0, startsAt - (nowMs + offset));
+  return {
+    msLeft,
+    label: msLeft > 0 ? `Starts in ${formatWait(msLeft)}` : "Starting...",
+    note: "Everyone starts together. Stay on this screen - the round begins on its own at the start time, and your clock starts then, not now.",
+  };
+}
+
+function formatWait(ms) {
+  const total = Math.ceil(ms / 1000);
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const seconds = total % 60;
+  const pad = (n) => String(n).padStart(2, "0");
+  return hours > 0 ? `${hours}:${pad(minutes)}:${pad(seconds)}` : `${minutes}:${pad(seconds)}`;
+}

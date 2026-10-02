@@ -1743,6 +1743,115 @@ async function main(): Promise<number> {
     assert.ok(stored?.startedAt, "startedAt was not recorded server-side");
   });
 
+  /*
+   * "EVERYONE AT ONCE". A scheduled competition sends `scheduledStartAt` (spec `01`: hold an
+   * early player until then rather than starting their clock on arrival). Before this, only
+   * Volt Velocity honoured it, so on every other title the first player to arrive started early
+   * and everybody else was late to their own race.
+   */
+  await test("a scheduled round is held before the gun and hands out no board", async () => {
+    await clearRounds();
+    const gun = new Date(Date.now() + 5 * 60_000);
+    const { roundId, token } = await openRound({
+      contestType: "competition",
+      scheduledStartAt: gun.toISOString(),
+    });
+
+    const started = await callPlay<PlayStateBody & { startsAt?: string; serverNow?: string }>(
+      "/play/api/session",
+      { t: token },
+    );
+    assert.equal(started.status, 200);
+    assert.equal(started.body.status, "created", "an early press started the round");
+    assert.equal(started.body.board, undefined, "a held round handed out a board");
+    assert.equal(started.body.startsAt, gun.toISOString());
+    assert.ok(started.body.serverNow, "no server clock to count down against");
+
+    const { Round } = await import("../src/store/round.model");
+    const stored = await Round.findOne({ roundId });
+    assert.equal(stored?.status, "created");
+    assert.equal(stored?.startedAt, undefined, "the clock started before the gun");
+  });
+
+  await test("a player arriving after the gun starts on the shared clock, not their own", async () => {
+    await clearRounds();
+    const gun = new Date(Date.now() - 30_000);
+    const { roundId, token } = await openRound({
+      contestType: "competition",
+      scheduledStartAt: gun.toISOString(),
+    });
+
+    const started = await callPlay<PlayStateBody & { startsAt?: string }>("/play/api/session", {
+      t: token,
+    });
+    assert.equal(started.body.status, "in_progress");
+    assert.ok(started.body.board, "no board after the gun");
+    assert.equal(started.body.startsAt, undefined, "a started round still reported a hold");
+
+    const { Round } = await import("../src/store/round.model");
+    const stored = await Round.findOne({ roundId });
+    assert.equal(stored?.startedAt?.getTime(), gun.getTime(), "the clock was not anchored at the gun");
+    // 120 s round, 30 s already gone: the clock the player watches ends 120 s after the GUN,
+    // never 120 s after they arrived.
+    assert.equal(
+      Date.parse(started.body.endsAt ?? ""),
+      gun.getTime() + 120_000,
+      "the late player was given a fresh clock",
+    );
+  });
+
+  await test("a late arrival is told the time left before pressing Start, not the full race", async () => {
+    await clearRounds();
+    const { token } = await openRound({
+      contestType: "competition",
+      scheduledStartAt: new Date(Date.now() - 30_000).toISOString(),
+    });
+    const state = await callPlay<PlayStateBody>(`/play/api/state?t=${token}`, undefined, "GET");
+    assert.equal(state.body.status, "created");
+    assert.ok((state.body.playableSeconds ?? 999) <= 90, `got ${state.body.playableSeconds}`);
+  });
+
+  await test("a player arriving after the race is over is finished, not given a fresh clock", async () => {
+    await clearRounds();
+    const { token } = await openRound({
+      contestType: "competition",
+      scheduledStartAt: new Date(Date.now() - 200_000).toISOString(),
+    });
+    const started = await callPlay<PlayStateBody>("/play/api/session", { t: token });
+    assert.equal(started.status, 200);
+    assert.ok(started.body.finished, "a round whose clock had run out was started anyway");
+    assert.equal(started.body.board, undefined);
+  });
+
+  await test("a start time is refused on a challenge and on practice", async () => {
+    await clearRounds();
+    const at = new Date(Date.now() + 60_000).toISOString();
+    const { callbackUrl } = await import("./api-harness");
+    const challenge = await callApi("/v1/rounds", {
+      method: "POST",
+      body: createBody({ contestType: "challenge", scheduledStartAt: at, resultCallbackUrl: callbackUrl }),
+    });
+    assert.equal(challenge.status, 400, challenge.raw);
+    // Assert WHICH refusal fired: a 400 for some unrelated field would pass a bare status check.
+    assert.match(challenge.raw, /scheduledStartAt' must be absent on a challenge/);
+    const practice = await callApi("/v1/rounds", {
+      method: "POST",
+      body: createBody({ mode: "practice", scheduledStartAt: at, resultCallbackUrl: callbackUrl }),
+    });
+    assert.equal(practice.status, 400, practice.raw);
+    assert.match(practice.raw, /scheduledStartAt' must be absent on a practice/);
+  });
+
+  await test("an unscheduled round still starts the moment the player presses Start", async () => {
+    await clearRounds();
+    const { token } = await openRound({ contestType: "competition" });
+    const started = await callPlay<PlayStateBody & { startsAt?: string }>("/play/api/session", {
+      t: token,
+    });
+    assert.equal(started.body.status, "in_progress");
+    assert.equal(started.body.startsAt, undefined);
+  });
+
   await test("the board payload carries no solution and no seed", async () => {
     await clearRounds();
     const { token } = await openRound({ contentSeed: "SEEDCANARY" });

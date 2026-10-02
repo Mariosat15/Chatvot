@@ -180,6 +180,15 @@ export interface RoundDoc {
   expiresAt: Date;
   launchToken: string;
   launchUrlExpiresAt: Date;
+  /**
+   * The contest's shared start ("everyone at once", spec section 3.2a). Set on scheduled
+   * competition rounds of every title except Volt Velocity, which keeps its own on `race`.
+   *
+   * A player who opens the round before this moment is held: the round stays `created` and
+   * `startedAt` stays empty. When they start at or after it, `startedAt` is set to THIS value,
+   * not to the moment they pressed Start, so every player's clock runs from the same gun.
+   */
+  scheduledStartAt?: Date;
   startedAt?: Date;
   completedAt?: Date;
 
@@ -312,6 +321,7 @@ const RoundSchema = new Schema<RoundDoc>(
     expiresAt: { type: Date, required: true },
     launchToken: { type: String, required: true },
     launchUrlExpiresAt: { type: Date, required: true },
+    scheduledStartAt: { type: Date },
     startedAt: { type: Date },
     completedAt: { type: Date },
 
