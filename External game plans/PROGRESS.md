@@ -929,9 +929,9 @@ the competition area... less complicated and busy, easier to read fast."* **Noth
 computed wrongly, no risk number, nothing backfilled** - every gate is unchanged.
 
 - **One clock, the competition card's own** (`CountdownPanel`), rendered exactly once and
-  counting to whichever moment matters now: **Lobby opens in** (play-together, lobby not yet
-  open), **Game starts in** (in the lobby before the gun), **Play opens in**, or **Play closes
-  in**. Each has one short line under it ("Your spot is saved! Hop into the lobby when it opens
+  counting to whichever moment matters now: **Competition starts in** (play-together, both
+  before and after the lobby opens - owner follow-up the same day: the big clock counts to the
+  START, the button counts to the lobby opening), **Play opens in**, or **Play closes in**. Each has one short line under it ("Your spot is saved! Hop into the lobby when it opens
   and get ready - everyone starts together.") and the time as `Fri 02 Oct, 07:50 UTC` instead of
   `toUTCString()`. The lobby target is chosen only **while it is still in the future**, so the
   clock moves on rather than sitting at zero.
