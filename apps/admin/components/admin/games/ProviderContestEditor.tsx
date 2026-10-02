@@ -649,9 +649,10 @@ function draftFromStored(contest: StoredContest): ContestDraft {
     // existed really will settle to the unclaimed pool, so showing the operator a refund here
     // would misreport what the stored contest does.
     unscoredContestPolicy: contest.unscoredContestPolicy ?? "unclaimed_pool",
-    // Same reasoning as the line above: the SCHEMA default, so a contest created before the
-    // field existed is shown the gate it really enforces rather than the wizard's answer.
-    roundStartPolicy: contest.roundStartPolicy ?? "reserve_full_round",
+    // Reason (owner rule, 2 Oct 2026): every game contest now lets a player start right up to
+    // the end, whatever was stored (`contestRoundConfig` reads it permissively), so the
+    // editor shows the gate the server really enforces - which is no late-start gate at all.
+    roundStartPolicy: "until_window_closes",
     resultGracePeriodSeconds: contest.resultGracePeriodSeconds ?? 900,
     perRoundCostAcknowledged: false,
     // Not an edit concept: the contest already exists, and publishing is its own control.

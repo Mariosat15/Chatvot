@@ -135,13 +135,12 @@ export function contestRoundConfig(
           }
         : {}),
       contentSeed: contest.contentSeed,
-      // Reason for the explicit comparison rather than a cast: an unrecognised stored value
-      // must fall back to the reserving branch, which is the safe one. A cast would carry a
-      // typo straight into the gate and open play the operator never asked to open.
-      roundStartPolicy:
-        contest.roundStartPolicy === "until_window_closes"
-          ? "until_window_closes"
-          : "reserve_full_round",
+      // Reason (owner rule, 2 Oct 2026): no game contest refuses a late start any more, on
+      // either play style - a player may start a round with seconds left and simply gets a
+      // shortened one (`resolveExpiry` clamps it to the window end). Read here, at the single
+      // place every runtime gate takes the policy from, so contests created earlier with a
+      // stored `reserve_full_round` stop refusing too, without a migration.
+      roundStartPolicy: "until_window_closes",
       settings: contest.gameConfig?.settings,
     },
   };

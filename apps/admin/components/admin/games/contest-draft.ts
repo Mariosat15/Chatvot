@@ -137,7 +137,7 @@ export const emptyDraft: ContestDraft = {
   // default to `until_window_closes`, which was the right answer while the gate reserved a
   // ceiling that could be five times the configured length; that arithmetic is fixed, so the
   // reservation now costs a player only the time they were actually going to be given.
-  roundStartPolicy: "reserve_full_round",
+  roundStartPolicy: "until_window_closes",
   startWaitMinutes: DEFAULT_START_WAIT_SECONDS / 60,
   // A floor, not the value sent. `deriveResultGraceSeconds` raises it to cover the playing
   // time the operator chooses; this covers a ten-minute session, which is the default.

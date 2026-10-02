@@ -74,7 +74,7 @@ export function useProviderContestRules(input: {
   const [roundStartPolicy, setRoundStartPolicyState] = useState<RoundStartPolicy>(
     initialShape.forcedRoundStartPolicy ??
       clampGmRoundStartPolicy(undefined, input.supportedPlayModes) ??
-      "reserve_full_round",
+      "until_window_closes",
   );
 
   const shape = playShapeRules(playMode);
@@ -88,7 +88,7 @@ export function useProviderContestRules(input: {
     setRoundStartPolicyState(
       next.forcedRoundStartPolicy ??
         clampGmRoundStartPolicy(undefined, input.supportedPlayModes) ??
-        "reserve_full_round",
+        "until_window_closes",
     );
   }
 

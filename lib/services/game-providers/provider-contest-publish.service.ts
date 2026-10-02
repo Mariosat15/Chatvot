@@ -174,11 +174,10 @@ export async function publishProviderContest(
       attemptsPolicy: contest.attemptsPolicy as never,
       attemptsAllowed: contest.attemptsAllowed,
       unresolvedRoundPolicy: contest.unresolvedRoundPolicy as never,
-      // From the STORED contest, like everything else here. Reading the wizard's default
-      // instead would let a short contest publish under a rule it does not carry, and then
-      // refuse every round once players had paid to enter it.
-      roundStartPolicy: (contest.roundStartPolicy ??
-        "reserve_full_round") as never,
+      // Reason (owner rule, 2 Oct 2026): every contest is read as `until_window_closes` at
+      // runtime (`contestRoundConfig`), so publishing checks the same permissive rule rather
+      // than refusing an older contest that stored the reserving one.
+      roundStartPolicy: "until_window_closes" as never,
       // The contest's own stored shape, never the title's current default.
       playMode: resolveContestPlayMode(contest.playMode, title),
       // Reason: acknowledged at creation. Re-asking on publish would make it a click to

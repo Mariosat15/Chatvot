@@ -82,20 +82,22 @@ interface EntryDeadlineInput {
  * for exactly one run the two coincide only by accident.
  */
 export function resolveContestEntryDeadline(input: EntryDeadlineInput): Date {
-  if (input.entryClosesAtStart) return new Date(input.startTime);
-
-  const reserves = input.roundStartPolicy !== "until_window_closes";
-  const reservedMs =
-    reserves && typeof input.attemptSeconds === "number"
-      ? input.attemptSeconds * 1000
-      : 0;
-
-  const deadline = input.playWindowEnd.getTime() - reservedMs;
-  return new Date(Math.max(deadline, input.startTime.getTime()));
+  // Reason (owner rule, 2 Oct 2026): entry stays open until play stops on EVERY game and
+  // both play styles. A late joiner of an everyone-at-once race joins the running race with
+  // whatever is left of the clock, and a late joiner of a join-any-time contest gets a
+  // shortened round - neither is turned away. `entryClosesAtStart`, `roundStartPolicy` and
+  // `attemptSeconds` are still accepted so no caller has to change, and deliberately unread.
+  return new Date(
+    Math.max(input.playWindowEnd.getTime(), input.startTime.getTime()),
+  );
 }
 
 /**
- * The same instant as milliseconds, for callers holding numbers rather than dates.
+ * The last moment a FULL-LENGTH attempt still fits, as milliseconds.
+ *
+ * Corrected in place 2 Oct 2026: this used to read "the same instant as milliseconds", which
+ * stopped being true when entry was opened to the window end on every game. It is no longer the
+ * entry deadline; the play screen uses it only to say how long an unshortened round remains.
  *
  * `null` when the window end is unknown, or when a reserving contest has no attempt length -
  * the two cases where a screen must say nothing rather than name a deadline. Note this is

@@ -77,7 +77,13 @@ describe("describeEntryClose - which rule shut the door", () => {
     ).toEqual({ kind: "runs_to_the_end", reservedMs: 0 });
   });
 
-  it("under 'everybody gets the full time' it reserves exactly one attempt", () => {
+  it("under the old 'everybody gets the full time' policy it now reserves NOTHING", () => {
+    /*
+      FLIPPED 2 OCTOBER 2026 (owner: "users can join even if only a few seconds left").
+      This test used to assert the writer held one whole attempt back before the end. The
+      writer no longer reserves on any game, so a contest still carrying the old stored
+      policy is described as running to the end - which is what it now does.
+    */
     const deadline = resolveContestEntryDeadline({
       playWindowEnd: END,
       attemptSeconds: TEN_MINUTES,
@@ -93,10 +99,8 @@ describe("describeEntryClose - which rule shut the door", () => {
       roundStartPolicy: "reserve_full_round",
     });
 
-    expect(answer.kind).toBe("reserves_round");
-    // The span the player is shown is the attempt length, to the millisecond. Asserted against
-    // the writer's own output rather than a literal, so the two cannot drift.
-    expect(answer.reservedMs).toBe(TEN_MINUTES * 1000);
+    expect(deadline.getTime()).toBe(END.getTime());
+    expect(answer).toEqual({ kind: "runs_to_the_end", reservedMs: 0 });
   });
 
   it("reserving nothing is described permissively, because that is how it behaves", () => {

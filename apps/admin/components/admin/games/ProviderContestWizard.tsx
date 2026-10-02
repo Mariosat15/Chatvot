@@ -248,7 +248,7 @@ export function ProviderContestWizard({ titles }: ProviderContestWizardProps) {
       playMode: mode,
       attemptsPolicy: shape.forcedAttemptsPolicy ?? "single",
       attemptsAllowed: shape.forcedAttemptsPolicy ? undefined : draft.attemptsAllowed,
-      roundStartPolicy: shape.forcedRoundStartPolicy ?? "reserve_full_round",
+      roundStartPolicy: shape.forcedRoundStartPolicy ?? "until_window_closes",
     });
   }
 

@@ -93,7 +93,7 @@ export const PLAY_MODE_COPY: ReadonlyMap<
     {
       label: "Everyone at once",
       detail:
-        "Every player's board opens at the same moment, so entry closes when the contest starts and each player gets one attempt. Right for a race or anything where players are up against each other live.",
+        "Every player's board opens at the same moment and each player gets one attempt. Players can still join after the start - they just get whatever time is left. Right for a race or anything where players are up against each other live.",
     },
   ],
 ]);
@@ -320,14 +320,13 @@ export function isPlayModeSupported(
 export function gmAllowedRoundStartPolicies(
   supported: readonly PlayMode[],
 ): RoundStartPolicy[] {
+  // Reason (owner rule, 2 Oct 2026, superseding the 1 Oct split above): no contest refuses a
+  // late start any more, so the only policy anybody may pick is the permissive one. The
+  // scheduled-only case still returns nothing, because that shape withholds the control.
   const hasAnytime = supported.includes("anytime");
   const hasScheduled = supported.includes("scheduled");
-  if ((hasAnytime && hasScheduled) || (!hasAnytime && !hasScheduled)) {
-    return ["reserve_full_round", "until_window_closes"];
-  }
-  if (hasAnytime) return ["until_window_closes"];
-  // scheduled-only: playShapeRules withholds the control; empty means no choice to offer
-  return [];
+  if (hasScheduled && !hasAnytime) return [];
+  return ["until_window_closes"];
 }
 
 /**
@@ -399,6 +398,11 @@ export interface PlayShapeRules {
    * simultaneous contest for a simpler reason than information: **you cannot join a race that
    * has already begun.** Everyone runs the same clock from the same instant, so a seat sold
    * after the gun is a seat that can only ever record a worse result than the field.
+   *
+   * SUPERSEDED 2 Oct 2026, kept so the reasoning above stays visible: the owner chose that a
+   * late joiner of an everyone-at-once race still gets in and plays whatever time is left, on
+   * every game. Both shapes now carry `false`, and `resolveContestEntryDeadline` no longer reads
+   * the flag. The field survives so no caller has to change.
    */
   entryClosesAtStart: boolean;
   /**
@@ -472,33 +476,41 @@ export interface PlayShapeRules {
   };
 }
 
+// Reason (owner rule, 2 Oct 2026): neither play style refuses a late start or a late entry.
+// The round-start control used to be offered on join-any-time contests and was mistaken for
+// the play-style choice ("Everybody gets the full playing time" read like "Everyone at once"),
+// so it is withheld on both and the permissive policy forced. A late player gets a shortened
+// round - `resolveExpiry` clamps it to the window end - and is never turned away.
 const ANYTIME: PlayShapeRules = {
   mode: "anytime",
   entryClosesAtStart: false,
   requiresSingleAttempt: false,
-  offersRoundStartPolicy: true,
+  offersRoundStartPolicy: false,
+  forcedRoundStartPolicy: "until_window_closes",
   copy: {
     startLabel: "Contest starts",
     startHint: "Play opens at this moment.",
     endLabel: "Contest ends",
     endHint: "Everything still running is closed here.",
+    roundStartWithheld:
+      "Players may join and start a round right up to the end. Anyone who starts late simply gets whatever is left of the clock.",
   },
 };
 
 const SCHEDULED: PlayShapeRules = {
   mode: "scheduled",
-  entryClosesAtStart: true,
+  entryClosesAtStart: false,
   requiresSingleAttempt: true,
   forcedAttemptsPolicy: "single",
   offersRoundStartPolicy: false,
   forcedRoundStartPolicy: "until_window_closes",
   copy: {
     startLabel: "Everyone starts at",
-    startHint: "Entry closes here. Every player's board opens at this moment.",
+    startHint: "Every player's board opens at this moment. Late joiners are still let in.",
     endLabel: "Everyone finishes by",
     endHint: "Long enough for one run, plus a margin.",
     roundStartWithheld:
-      "This game is played by everyone at once, so there is nothing to decide here: entry closes at the start, and a player who opens their board late gets whatever is left of the clock rather than being turned away.",
+      "This game is played by everyone at once, so there is nothing to decide here: players can still join after the start, and anyone who opens their board late gets whatever is left of the clock rather than being turned away.",
     attemptsWithheld:
       "Everyone plays this game at the same moment, so there is one attempt each. A race cannot be re-run against a field that has already finished.",
   },

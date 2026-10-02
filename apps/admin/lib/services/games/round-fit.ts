@@ -20,7 +20,6 @@
 import type { ConfigField } from "./config-schema";
 import { resolveAttemptSeconds } from "./config-schema";
 import { RESULT_GRACE_MARGIN_SECONDS } from "./contest-preflight";
-import { resolveContestEntryDeadline } from "./entry-deadline";
 import type { RoundStartPolicy } from "./round-types";
 
 /**
@@ -134,15 +133,12 @@ export function describeRoundFit(input: {
 
   return {
     reservedSeconds: attemptSeconds,
-    // Delegated rather than subtracted here: this is the same instant the contest stores as
-    // its `registrationDeadline` and the same one the play screen counts down to.
+    // Reason (2 Oct 2026): subtracted here rather than delegated to the entry deadline,
+    // because entry no longer closes before the end on any game. This only describes the old
+    // reserving rule for a caller that still passes it; every screen now passes
+    // `until_window_closes` and so gets no cut-off at all.
     lastAttemptStart: reservesFullRound
-      ? resolveContestEntryDeadline({
-          playWindowEnd: end,
-          attemptSeconds,
-          roundStartPolicy: input.roundStartPolicy,
-          startTime: start,
-        })
+      ? new Date(Math.max(start.getTime(), end.getTime() - attemptSeconds * 1000))
       : undefined,
     reservesFullRound,
     windowTooShort: windowSeconds < attemptSeconds,

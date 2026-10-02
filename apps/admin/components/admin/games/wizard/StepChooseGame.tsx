@@ -137,8 +137,8 @@ export function StepChooseGame({
                   {/*
                     The play style, because it changes the rest of the wizard more than any
                     other property of the title: under "Everyone at once" the schedule step
-                    relabels itself, entry closes at the start rather than at the last playable
-                    moment, and the attempts and round-start controls are withheld. An operator
+                    relabels itself and the attempts control is withheld (since 2 Oct 2026 entry
+                    stays open to the end on both styles, so that no longer differs). An operator
                     picking a game with no idea which of those is about to happen is how a
                     contest gets created with the wrong entry window.
 

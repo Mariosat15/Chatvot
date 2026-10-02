@@ -169,17 +169,20 @@ describe("playShapeRules", () => {
 
     expect(rules.entryClosesAtStart).toBe(false);
     expect(rules.requiresSingleAttempt).toBe(false);
-    expect(rules.offersRoundStartPolicy).toBe(true);
-    // Nothing forced. An `anytime` contest is exactly what shipped before this change, and
-    // a forced value here would silently rewrite every existing operator's choice.
-    expect(rules.forcedRoundStartPolicy).toBeUndefined();
+    // FLIPPED 2 Oct 2026 (owner: late joiners may always start). The round-start control
+    // is withheld and permissive is forced, so no operator can bring the late-start refusal
+    // back from a form. The attempts choice is untouched.
+    expect(rules.offersRoundStartPolicy).toBe(false);
+    expect(rules.forcedRoundStartPolicy).toBe("until_window_closes");
     expect(rules.forcedAttemptsPolicy).toBeUndefined();
   });
 
-  it("closes entry at the start of a scheduled contest, and grants one attempt", () => {
+  it("keeps entry OPEN after the start of a scheduled contest, and grants one attempt", () => {
     const rules = playShapeRules("scheduled");
 
-    expect(rules.entryClosesAtStart).toBe(true);
+    // FLIPPED 2 Oct 2026: "if the competition is everyone at once they still must be able to
+    // join even if they are late". Entry used to close at the gun.
+    expect(rules.entryClosesAtStart).toBe(false);
     expect(rules.requiresSingleAttempt).toBe(true);
     expect(rules.forcedAttemptsPolicy).toBe("single");
     expect(rules.offersRoundStartPolicy).toBe(false);
@@ -195,8 +198,9 @@ describe("playShapeRules", () => {
     // Both halves. A withheld control that says nothing teaches an operator the setting
     // does not exist; a reason attached to a control that IS shown is a sentence nobody can
     // act on, sitting next to a working select.
+    // Since 2 Oct 2026 the control is withheld on BOTH shapes, so both carry a reason.
     expect(playShapeRules("scheduled").copy.roundStartWithheld).toBeTruthy();
-    expect(playShapeRules("anytime").copy.roundStartWithheld).toBeUndefined();
+    expect(playShapeRules("anytime").copy.roundStartWithheld).toBeTruthy();
   });
 
   it("gives the two date controls different words, because they describe different things", () => {
@@ -205,9 +209,11 @@ describe("playShapeRules", () => {
 
     expect(scheduled.startLabel).not.toBe(anytime.startLabel);
     expect(scheduled.endLabel).not.toBe(anytime.endLabel);
-    // The scheduled hint must say entry closes here, because that is the rule
-    // `entryClosesAtStart` enforces and the sentence is the only place an operator meets it.
-    expect(scheduled.startHint.toLowerCase()).toContain("entry closes");
+    // FLIPPED 2 Oct 2026: entry no longer closes at the start, so the hint must say late
+    // joiners are let in and must NOT say entry closes - a sentence promising a rule the
+    // server stopped enforcing.
+    expect(scheduled.startHint.toLowerCase()).toContain("late joiners");
+    expect(scheduled.startHint.toLowerCase()).not.toContain("entry closes");
     // And the anytime hint must NOT, which is the half that was a live defect: the wizard
     // said "Registration closes at this moment" for a month after `12` s2.10 moved entry to
     // the last playable moment, because the sentence lived in the component and the rule
@@ -301,18 +307,15 @@ describe("gmAllowedRoundStartPolicies (owner, 1 Oct 2026)", () => {
     expect(gmAllowedRoundStartPolicies(["scheduled"])).toEqual([]);
   });
 
-  it("both supported modes offer both last-attempt policies", () => {
+  // FLIPPED 2 Oct 2026: the reserving policy is no longer offered on any shape.
+  it("both supported modes offer only the permissive policy", () => {
     expect(gmAllowedRoundStartPolicies(["anytime", "scheduled"])).toEqual([
-      "reserve_full_round",
       "until_window_closes",
     ]);
   });
 
   it("an empty set reads as both, so a title mid-migration is not locked", () => {
-    expect(gmAllowedRoundStartPolicies([])).toEqual([
-      "reserve_full_round",
-      "until_window_closes",
-    ]);
+    expect(gmAllowedRoundStartPolicies([])).toEqual(["until_window_closes"]);
   });
 
   it("clampGmRoundStartPolicy keeps an allowed request and replaces a withdrawn one", () => {
@@ -324,7 +327,7 @@ describe("gmAllowedRoundStartPolicies (owner, 1 Oct 2026)", () => {
     ).toBe("until_window_closes");
     expect(
       clampGmRoundStartPolicy("reserve_full_round", ["anytime", "scheduled"]),
-    ).toBe("reserve_full_round");
+    ).toBe("until_window_closes");
     expect(clampGmRoundStartPolicy("until_window_closes", ["scheduled"])).toBe(
       "until_window_closes",
     );
@@ -404,11 +407,14 @@ describe("resolveContestEntryDeadline under a scheduled contest", () => {
   const start = new Date("2026-10-01T12:00:00.000Z");
   const end = new Date("2026-10-01T13:00:00.000Z");
 
-  it("closes entry at the START, not one attempt before the end", () => {
-    // The fixture is chosen so the two branches CANNOT agree: a one-hour window with a
-    // five-minute attempt puts the reserving answer at 12:55 and the gun at 12:00. Sized
-    // the other way - a window exactly one attempt long - both branches return the start
-    // and the test would pass with the new rule deleted.
+  it("keeps entry open to the END, even at the gun of a scheduled contest", () => {
+    /*
+      FLIPPED 2 OCTOBER 2026, not deleted. The owner: "if the competition is everyone at once
+      they still must be able to join even if they are late". This test used to assert
+      entry closed at the START (12:00) and an anytime contest one attempt early (12:55).
+      Both now close at the window end; the fixture is kept because it is still the one
+      where a reserving answer (12:55) and the start (12:00) cannot be mistaken for the end.
+    */
     const scheduled = resolveContestEntryDeadline({
       playWindowEnd: end,
       attemptSeconds: 300,
@@ -423,16 +429,12 @@ describe("resolveContestEntryDeadline under a scheduled contest", () => {
       startTime: start,
     });
 
-    expect(scheduled.toISOString()).toBe(start.toISOString());
-    expect(anytime.getTime()).toBe(end.getTime() - 5 * MINUTE);
-    expect(scheduled.getTime()).not.toBe(anytime.getTime());
+    expect(scheduled.getTime()).toBe(end.getTime());
+    expect(anytime.getTime()).toBe(end.getTime());
+    expect(anytime.getTime()).not.toBe(end.getTime() - 5 * MINUTE);
   });
 
-  it("ignores the policy and the attempt length entirely", () => {
-    // `until_window_closes` normally means "no reservation, entry to the last second", and
-    // a scheduled contest is STORED with that policy. So if the flag were checked after the
-    // policy rather than before it, every scheduled contest would keep entry open for its
-    // whole duration - which is the exact defect the shape exists to prevent.
+  it("ignores the policy, the attempt length and the start flag entirely", () => {
     for (const policy of ["reserve_full_round", "until_window_closes"] as const) {
       for (const attemptSeconds of [undefined, 1, 3600]) {
         expect(
@@ -443,7 +445,7 @@ describe("resolveContestEntryDeadline under a scheduled contest", () => {
             startTime: start,
             entryClosesAtStart: true,
           }).toISOString(),
-        ).toBe(start.toISOString());
+        ).toBe(end.toISOString());
       }
     }
   });
@@ -644,11 +646,11 @@ describe("createProviderContest stores the shape's rules", () => {
     const stored = await readContest({ name: "Shape Test" });
     expect(stored?.attemptsPolicy).toBe("best_of_n");
     expect(stored?.attemptsAllowed).toBe(3);
-    expect(stored?.roundStartPolicy).toBe("reserve_full_round");
-    // Entry to the last playable moment: the window end less one attempt.
-    expect(stored?.registrationDeadline?.getTime()).toBe(
-      stored!.playWindowEnd!.getTime() - 300 * 1000,
-    );
+    // FLIPPED 2 Oct 2026: the operator's attempts choice survives, but the reserving start
+    // policy no longer does - every game contest stores the permissive one and keeps entry
+    // open to the window end ("users can join even if only a few seconds left").
+    expect(stored?.roundStartPolicy).toBe("until_window_closes");
+    expect(stored?.registrationDeadline?.getTime()).toBe(stored!.playWindowEnd!.getTime());
   });
 
   it("OVERRIDES the operator on a scheduled title, and stores all three consequences", async () => {
@@ -667,15 +669,10 @@ describe("createProviderContest stores the shape's rules", () => {
     // would render as "3 attempts" on a contest that grants one.
     expect(stored?.attemptsAllowed).toBeUndefined();
     expect(stored?.roundStartPolicy).toBe("until_window_closes");
-    // Entry at the gun. Asserted against `startTime` rather than a computed instant,
-    // because that is the fact an operator and a player both read.
-    expect(stored?.registrationDeadline?.getTime()).toBe(stored!.startTime.getTime());
-    // And NOT the permissive answer that policy would otherwise produce - the ordering trap
-    // in `resolveContestEntryDeadline`, where checking the flag after the policy leaves
-    // entry open for the contest's whole duration.
-    expect(stored?.registrationDeadline?.getTime()).not.toBe(
-      stored!.playWindowEnd!.getTime(),
-    );
+    // FLIPPED 2 Oct 2026: entry no longer closes at the gun of a scheduled contest. Late
+    // joiners are let in and play whatever time is left, so the stored deadline is the end.
+    expect(stored?.registrationDeadline?.getTime()).toBe(stored!.playWindowEnd!.getTime());
+    expect(stored?.registrationDeadline?.getTime()).not.toBe(stored!.startTime.getTime());
   });
 
   it("treats a head_to_head title as scheduled even though it declares nothing", async () => {
@@ -685,7 +682,8 @@ describe("createProviderContest stores the shape's rules", () => {
 
     const stored = await readContest({ name: "Shape Test" });
     expect(stored?.attemptsPolicy).toBe("single");
-    expect(stored?.registrationDeadline?.getTime()).toBe(stored!.startTime.getTime());
+    // Entry open to the end since 2 Oct 2026, as above.
+    expect(stored?.registrationDeadline?.getTime()).toBe(stored!.playWindowEnd!.getTime());
   });
 });
 
@@ -727,7 +725,8 @@ describe("editProviderContest keeps the shape's rules", () => {
     expect(stored?.attemptsPolicy).toBe("single");
     expect(stored?.attemptsAllowed).toBeUndefined();
     expect(stored?.roundStartPolicy).toBe("until_window_closes");
-    expect(stored?.registrationDeadline?.getTime()).toBe(stored!.startTime.getTime());
+    // Re-forced to the END, not the start, since 2 Oct 2026.
+    expect(stored?.registrationDeadline?.getTime()).toBe(stored!.playWindowEnd!.getTime());
   });
 
   it("refuses to let an operator opt a scheduled contest back out", async () => {
@@ -857,7 +856,8 @@ describe("createProviderContest with an operator-chosen shape", () => {
     expect(stored?.attemptsPolicy).toBe("single");
     expect(stored?.attemptsAllowed).toBeUndefined();
     expect(stored?.roundStartPolicy).toBe("until_window_closes");
-    expect(stored?.registrationDeadline?.getTime()).toBe(stored!.startTime.getTime());
+    // Entry open to the end since 2 Oct 2026 - late joiners are let in.
+    expect(stored?.registrationDeadline?.getTime()).toBe(stored!.playWindowEnd!.getTime());
   });
 
   it("refuses a shape the title does not support, and NAMES what it does support", async () => {
@@ -943,8 +943,10 @@ describe("editProviderContest reads the CONTEST's shape, never the title's", () 
     expect(after?.playMode).toBe("anytime");
     expect(after?.attemptsPolicy).toBe("best_of_n");
     expect(after?.attemptsAllowed).toBe(3);
-    expect(after?.roundStartPolicy).toBe("reserve_full_round");
-    // And entry still closes at the last playable moment rather than at the gun.
+    // The start policy is permissive on every shape since 2 Oct 2026, so it no longer tells
+    // the two shapes apart; the attempts above are what prove the scheduled rules were not
+    // applied. Entry still does not close at the gun.
+    expect(after?.roundStartPolicy).toBe("until_window_closes");
     expect(after?.registrationDeadline?.getTime()).not.toBe(after!.startTime.getTime());
   });
 

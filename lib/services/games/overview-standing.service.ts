@@ -28,7 +28,6 @@ import UserJourneyProgress from "@/database/models/user-journey-progress.model";
 import JourneyMapConfig from "@/database/models/journey-map-config.model";
 import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
 import GameRound from "@/database/models/games/game-round.model";
-import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import { SCORE_PRODUCING_ROUND_STATUSES } from "@/lib/services/games/round-types";
 import { calculateMilestoneProgress } from "@/lib/services/journey-progress.service";
 import { getBadgesFromDB } from "@/lib/services/badge-config-seed.service";
@@ -377,44 +376,28 @@ function pctDelta(current: number, previous: number): number | null {
   return Math.round(((current - previous) / Math.abs(previous)) * 1000) / 10;
 }
 
-async function loadKpiWeekDelta(userId: string): Promise<OverviewStanding["kpiWeekDelta"]> {
+async function loadKpiWeekDelta(
+  userId: string,
+  weeklyCreditNet: { thisWeek: number; lastWeek: number } | null | undefined,
+): Promise<OverviewStanding["kpiWeekDelta"]> {
   const empty = { credits: null, winRate: null, roi: null, prizes: null };
   try {
     const { thisWeek, lastWeek } = weekWindows();
 
-    const [txThis, txPrev, seats] = await Promise.all([
-      WalletTransaction.aggregate<{ net: number }>([
-        {
-          $match: {
-            userId,
-            createdAt: { $gte: thisWeek },
-          },
-        },
-        { $group: { _id: null, net: { $sum: "$amount" } } },
-      ]).catch(() => [] as { net: number }[]),
-      WalletTransaction.aggregate<{ net: number }>([
-        {
-          $match: {
-            userId,
-            createdAt: { $gte: lastWeek, $lt: thisWeek },
-          },
-        },
-        { $group: { _id: null, net: { $sum: "$amount" } } },
-      ]).catch(() => [] as { net: number }[]),
-      CompetitionParticipant.find({
-        userId,
-        status: "completed",
-        updatedAt: { $gte: lastWeek },
-      })
-        .select("prizeWon isWinner updatedAt")
-        .lean()
-        .catch(() => []),
-    ]);
+    const seats = await CompetitionParticipant.find({
+      userId,
+      status: "completed",
+      updatedAt: { $gte: lastWeek },
+    })
+      .select("prizeWon isWinner updatedAt")
+      .lean()
+      .catch(() => []);
 
-    const credits = pctDelta(
-      txThis[0]?.net ?? 0,
-      txPrev[0]?.net ?? 0,
-    );
+    // Reason: the ledger is read by the dashboard action and handed in, because
+    // nothing under lib/services/games/ may import a money model (invariant 6).
+    const credits = weeklyCreditNet
+      ? pctDelta(weeklyCreditNet.thisWeek, weeklyCreditNet.lastWeek)
+      : null;
 
     const seatRows = seats as Array<{
       prizeWon?: number;
@@ -507,8 +490,10 @@ async function loadRecentContestActivity(
 export async function getOverviewStanding(opts: {
   userId: string;
   gameStanding: PlayerGameProfile;
+  /** Net wallet movement this week and last, read by the caller (see weekly-credit-net.ts). */
+  weeklyCreditNet?: { thisWeek: number; lastWeek: number } | null;
 }): Promise<OverviewStanding> {
-  const { userId, gameStanding } = opts;
+  const { userId, gameStanding, weeklyCreditNet } = opts;
 
   const playedKeys = gameStanding.perGame
     .filter((row) => (row.contestsEntered ?? 0) > 0 || (row.contestsCompleted ?? 0) > 0)
@@ -530,7 +515,7 @@ export async function getOverviewStanding(opts: {
       loadMissions(userId),
       loadRecentContestActivity(userId),
       loadRoundBestScores(userId, playedKeys),
-      loadKpiWeekDelta(userId),
+      loadKpiWeekDelta(userId, weeklyCreditNet),
     ]);
 
   const overall = gameStanding.overall;

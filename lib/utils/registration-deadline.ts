@@ -22,6 +22,15 @@
 interface RegistrationWindow {
   registrationDeadline?: Date | string | null;
   startTime?: Date | string | null;
+  /** Present on game contests; trading contests keep their operator-chosen deadline. */
+  gameType?: string | null;
+  playWindowEnd?: Date | string | null;
+}
+
+function validDate(value: Date | string | null | undefined): Date | null {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 /**
@@ -40,9 +49,16 @@ export function resolveRegistrationDeadline(
   if (Number.isNaN(deadline.getTime())) return null;
 
   const start = contest.startTime ? new Date(contest.startTime) : null;
-  return start && !Number.isNaN(start.getTime()) && deadline < start
-    ? start
-    : deadline;
+  const clamped =
+    start && !Number.isNaN(start.getTime()) && deadline < start ? start : deadline;
+
+  // Reason (owner rule, 2 Oct 2026): a game contest accepts entries until play stops, on both
+  // play styles. Contests created before the rule stored an earlier deadline (the start, for
+  // everyone-at-once; one round before the end otherwise), so the window end is a FLOOR here
+  // rather than relying on new writes alone - otherwise every existing contest keeps refusing.
+  const windowEnd =
+    contest.gameType === "provider" ? validDate(contest.playWindowEnd) : null;
+  return windowEnd && windowEnd > clamped ? windowEnd : clamped;
 }
 
 /** Whether registration for a contest has closed. */
@@ -108,7 +124,9 @@ export function describeEntryClose(
 
   const policy = contest.roundStartPolicy;
   if (!policy) return none;
-  if (policy === "until_window_closes") {
+  // Reason: no game contest reserves time any more (owner rule, 2 Oct 2026), whatever an
+  // older contest stored - `contestRoundConfig` reads every one as `until_window_closes`.
+  if (policy === "until_window_closes" || contest.gameType === "provider") {
     return { kind: "runs_to_the_end", reservedMs: 0 };
   }
 

@@ -654,6 +654,10 @@ describe("editProviderContest", () => {
     // `configSchema` declares no `duration-seconds` field and the contest reserves a full
     // round. Deriving it in the test the way the service does would be tautological, so the
     // load-bearing assertion is the second one - it is nowhere near the start time.
+    //
+    // FLIPPED AGAIN 2 October 2026: the owner removed the late-entry close on every game and
+    // mode ("users can join even if only a few seconds left"), so the deadline is now the play
+    // window end itself rather than one round before it.
     const contest = await seedContest();
     const newStart = new Date(Date.now() + 3 * HOUR);
     const result = await editProviderContest(String(contest._id), {
@@ -668,7 +672,7 @@ describe("editProviderContest", () => {
     } | null>();
 
     expect(saved?.registrationDeadline.getTime()).toBe(
-      saved!.playWindowEnd.getTime() - 300_000,
+      saved!.playWindowEnd.getTime(),
     );
     // The defect this replaces, stated as a behaviour: entry survives the start.
     expect(saved!.registrationDeadline.getTime()).toBeGreaterThan(

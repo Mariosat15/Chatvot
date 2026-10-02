@@ -765,8 +765,15 @@ describe("contestRoundConfig", () => {
     expect(result.config.attemptsAllowed).toBeUndefined();
   });
 
-  it("normalises the round-start policy, failing CLOSED on anything unrecognised", () => {
+  it("reads EVERY stored round-start policy as permissive (owner rule, 2 Oct 2026)", () => {
     /*
+      FLIPPED 2 OCTOBER 2026, not deleted. The owner ruled that no game contest refuses a late
+      start: "users can join even if only a few seconds left". The normaliser below used to
+      fail closed onto `reserve_full_round`; it now answers `until_window_closes` for every
+      input, including contests that stored the old rule, because the runtime gate is the
+      one place every existing contest is read through. The original reasoning is kept
+      below because it explains why this function, and not the writers, is where it changed.
+
       ADDED BECAUSE A PROBE FOUND NOTHING COVERING THIS. Reversing the comparison here - reading
       anything that is not `reserve_full_round` as permissive - left the whole round-lifecycle
       suite green, because every test in it hands `createRound` a hand-built config and never
@@ -787,12 +794,11 @@ describe("contestRoundConfig", () => {
     };
 
     expect(policyOf("until_window_closes")).toBe("until_window_closes");
-    expect(policyOf("reserve_full_round")).toBe("reserve_full_round");
+    expect(policyOf("reserve_full_round")).toBe("until_window_closes");
 
-    expect(policyOf(undefined)).toBe("reserve_full_round");
-    expect(policyOf("")).toBe("reserve_full_round");
-    // A typo, which a cast would have carried straight into the gate.
-    expect(policyOf("until_window_close")).toBe("reserve_full_round");
+    expect(policyOf(undefined)).toBe("until_window_closes");
+    expect(policyOf("")).toBe("until_window_closes");
+    expect(policyOf("until_window_close")).toBe("until_window_closes");
   });
 });
 

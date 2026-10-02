@@ -247,12 +247,10 @@ export async function editProviderContest(
       attemptsAllowed: input.attemptsAllowed ?? competition.attemptsAllowed,
       unresolvedRoundPolicy: (input.unresolvedRoundPolicy ??
         competition.unresolvedRoundPolicy) as UnresolvedRoundPolicy,
-      // Falls back to the STORED value and then to the schema default, never to the wizard's.
-      // A contest created before this field existed must be re-checked against the rule it
-      // was created under, or an unrelated edit would refuse it for being too short.
-      roundStartPolicy: (input.roundStartPolicy ??
-        competition.roundStartPolicy ??
-        "reserve_full_round") as RoundStartPolicy,
+      // Reason (owner rule, 2 Oct 2026): no contest reserves a whole round any more - the
+      // runtime reads every contest as `until_window_closes` - so the pre-flight checks the
+      // same permissive rule, or an older contest would be refused for being "too short".
+      roundStartPolicy: "until_window_closes" as RoundStartPolicy,
       resultGracePeriodSeconds:
         input.resultGracePeriodSeconds ??
         competition.resultGracePeriodSeconds ??

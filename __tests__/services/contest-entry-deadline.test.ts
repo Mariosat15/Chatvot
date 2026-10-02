@@ -61,7 +61,7 @@ describe("resolveContestEntryDeadline", () => {
     expect(deadline.getTime()).toBeGreaterThan(start.getTime());
   });
 
-  it("holds back exactly one attempt while the contest reserves a full round", () => {
+  it("FLIPPED 2 Oct 2026: no longer holds back an attempt, even under the old reserving policy", () => {
     const deadline = resolveContestEntryDeadline({
       playWindowEnd: windowEnd,
       attemptSeconds: 600,
@@ -69,10 +69,11 @@ describe("resolveContestEntryDeadline", () => {
       startTime: start,
     });
 
-    // Reason: the same subtraction `roundFitsInWindow` performs. A fraction of an attempt
-    // would admit a player the gate then refuses, which is the defect being fixed wearing
-    // different clothes.
-    expect(deadline.getTime()).toBe(windowEnd.getTime() - 600_000);
+    // Reason: this used to assert the window end less one attempt, matching the round-start
+    // gate's `reserve_full_round` subtraction, so a player was never sold a seat the gate then
+    // refused. The owner removed that gate on every game (2 Oct 2026): a late joiner now plays a
+    // shortened round, so the seat is playable to the last second and entry stays open with it.
+    expect(deadline.getTime()).toBe(windowEnd.getTime());
   });
 
   it("runs to the window end under until_window_closes, because a short round is allowed there", () => {
@@ -86,7 +87,10 @@ describe("resolveContestEntryDeadline", () => {
     expect(deadline.getTime()).toBe(windowEnd.getTime());
   });
 
-  it("treats an absent policy as reserving, matching the schema and contest-config", () => {
+  it("FLIPPED 2 Oct 2026: an absent policy reserves nothing either", () => {
+    // Was: "treats an absent policy as reserving, matching the schema and contest-config".
+    // contest-config now normalises every stored policy to until_window_closes, so an absent
+    // one must not quietly reinstate the reservation here.
     const deadline = resolveContestEntryDeadline({
       playWindowEnd: windowEnd,
       attemptSeconds: 600,
@@ -94,7 +98,20 @@ describe("resolveContestEntryDeadline", () => {
       startTime: start,
     });
 
-    expect(deadline.getTime()).toBe(windowEnd.getTime() - 600_000);
+    expect(deadline.getTime()).toBe(windowEnd.getTime());
+  });
+
+  it("keeps entry open to the end of an everyone-at-once contest too", () => {
+    // Reason (owner, 2 Oct 2026): a late joiner of a scheduled race joins the running race.
+    const deadline = resolveContestEntryDeadline({
+      playWindowEnd: windowEnd,
+      attemptSeconds: 600,
+      roundStartPolicy: "until_window_closes",
+      startTime: start,
+      entryClosesAtStart: true,
+    });
+
+    expect(deadline.getTime()).toBe(windowEnd.getTime());
   });
 
   it("reserves nothing when no attempt length is known, matching the gate's own fallback", () => {
@@ -112,13 +129,13 @@ describe("resolveContestEntryDeadline", () => {
   });
 
   it("never lands before the contest starts", () => {
-    // A contest exactly as long as one attempt. The subtraction alone gives the start; a
-    // longer attempt than window would give a moment already past, and a deadline before the
-    // start is not a short entry window, it is a contest nobody can enter.
+    // Re-aimed 2 Oct 2026: with no subtraction left, the floor is reached only by a window
+    // that ends before the start - a malformed document. A deadline before the start is not a
+    // short entry window, it is a contest nobody can enter.
     const deadline = resolveContestEntryDeadline({
-      playWindowEnd: windowEnd,
-      attemptSeconds: 7200,
-      roundStartPolicy: "reserve_full_round",
+      playWindowEnd: new Date(start.getTime() - 60_000),
+      attemptSeconds: 600,
+      roundStartPolicy: "until_window_closes",
       startTime: start,
     });
 
@@ -127,15 +144,21 @@ describe("resolveContestEntryDeadline", () => {
 });
 
 describe("entryDeadlineMs - the screens' half", () => {
-  it("agrees with the date version for the reserving case", () => {
+  it("FLIPPED 2 Oct 2026: is the last full-length attempt, no longer the entry deadline", () => {
+    // Was: "agrees with the date version for the reserving case". Entry now stays open to the
+    // window end, so the two deliberately differ: this number only tells the play screen how
+    // long an UNSHORTENED round remains, and must not be read as the moment entry closes.
     expect(entryDeadlineMs(windowEnd.getTime(), 600)).toBe(
+      windowEnd.getTime() - 600_000,
+    );
+    expect(
       resolveContestEntryDeadline({
         playWindowEnd: windowEnd,
         attemptSeconds: 600,
         roundStartPolicy: "reserve_full_round",
         startTime: start,
       }).getTime(),
-    );
+    ).toBe(windowEnd.getTime());
   });
 
   it("says nothing rather than guessing, which the writer cannot do", () => {
@@ -183,16 +206,18 @@ describe("one producer, and every consumer delegates to it", () => {
     expect(src).not.toMatch(/\*\s*1000/);
   });
 
-  it("the wizard's clock note forwards rather than repeating the sum", () => {
-    // Re-pointed 28 Sep 2026: `describeRoundFit` moved from the admin draft module to the
-    // shared `round-fit.ts` (both wizards use it). Same claim, new location.
+  it("FLIPPED 2 Oct 2026: the wizard's clock note no longer reads the ENTRY deadline", () => {
+    // Was: "the wizard's clock note forwards rather than repeating the sum" - it delegated the
+    // last-attempt moment to `resolveContestEntryDeadline`. Once entry stayed open to the end
+    // the two answers stopped being the same moment, so delegating would make the note claim
+    // the last full attempt starts at the final whistle. The note now computes it once,
+    // floored at the start, and the entry deadline is not imported at all.
     const src = stripComments(read(ROUND_FIT));
-    expect(src).toMatch(/resolveContestEntryDeadline\s*\(/);
-    // Scoped to the fit description, because `deriveResultGraceSeconds` legitimately does
-    // arithmetic of its own elsewhere in this file.
+    expect(src).not.toMatch(/resolveContestEntryDeadline/);
     const fit = src.slice(src.indexOf("export function describeRoundFit"));
     expect(fit.length).toBeGreaterThan(200);
-    expect(fit).not.toMatch(/end\.getTime\(\)\s*-\s*attemptSeconds/);
+    expect(fit.match(/end\.getTime\(\)\s*-\s*attemptSeconds\s*\*\s*1000/g)).toHaveLength(1);
+    expect(fit).toMatch(/Math\.max\(\s*start\.getTime\(\)/);
   });
 });
 
@@ -215,12 +240,16 @@ describe("the two writers", () => {
     // field and once inside the deadline call, and a probe changing either one stayed green
     // because the assertion found the other. Two copies here is not cosmetic - the contest
     // would store one policy while closing entry under the other, with nothing to compare.
+    //
+    // FLIPPED 2 Oct 2026: the fallback now names `until_window_closes`, because the owner
+    // removed the late-start reservation on every game. The shape forces that value anyway;
+    // the fallback must not name the removed policy, or a shape without a forced value would
+    // silently reinstate it.
     const src = stripComments(read(CREATE));
-    const fallbacks = src.match(
-      /input\.roundStartPolicy\s*\?\?\s*"[a-z_]+"/g,
-    );
+    const fallbacks = src.match(/RoundStart\s*\?\?\s*"[a-z_]+"/g);
     expect(fallbacks).toHaveLength(1);
-    expect(fallbacks?.[0]).toContain('"reserve_full_round"');
+    expect(fallbacks?.[0]).toContain('"until_window_closes"');
+    expect(src).not.toMatch(/\?\?\s*"reserve_full_round"/);
   });
 
   it("edit recomputes the deadline AFTER every other field is written", () => {

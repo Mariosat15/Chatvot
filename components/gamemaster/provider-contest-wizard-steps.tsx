@@ -180,8 +180,8 @@ export function GameSettingsStep({
         )}
         {playMode === "scheduled" && (
           <p className="mt-2 text-xs text-amber-200/90">
-            Entry closes when the competition starts and each player gets one
-            attempt. Those settings are fixed for this play style.
+            Everyone starts together and each player gets one attempt. Players
+            who join late still get in and play whatever time is left.
           </p>
         )}
       </Field>

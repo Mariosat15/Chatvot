@@ -60,6 +60,8 @@ interface Props {
 
 /** The sentinel for "we have taken no decision, follow the provider". */
 const FOLLOW = "__follow_provider__";
+/** The sentinel for "contests on this title may be created as either style". */
+const BOTH = "__both_styles__";
 
 export default function GamePlayStyleControl({
   providerKey,
@@ -104,29 +106,57 @@ export default function GamePlayStyleControl({
   }
 
   const declared = resolvePlayMode({ family: title.family, playMode: title.playMode });
+  const supported = resolveSupportedPlayModes(title);
+  // Reason (owner report, 2 Oct 2026): with only one style per select, ticking both boxes
+  // below still left the select reading one style, and operators took that to mean every
+  // contest would be played that way. "Both" makes the two-style state a visible choice.
+  const selectValue =
+    supported.length >= PLAY_MODES.length ? BOTH : (title.playModeOverride ?? FOLLOW);
+
+  const patch = async (body: Record<string, unknown>) => {
+    const response = await fetch(`/api/games/providers/${providerKey}/games/play-style`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ gameCode: title.gameCode, ...body }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      toast.error(data.error ?? "Something went wrong. Please contact support.");
+      return null;
+    }
+    return data;
+  };
 
   const save = async (value: string) => {
-    const playMode = value === FOLLOW ? null : (value as PlayMode);
     setSaving(true);
     try {
-      const response = await fetch(
-        `/api/games/providers/${providerKey}/games/play-style`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ gameCode: title.gameCode, playMode }),
-        },
-      );
-      const data = await response.json();
-
-      if (!response.ok) {
-        toast.error(data.error ?? "Something went wrong. Please contact support.");
+      if (value === BOTH) {
+        // Only the supported set changes; the game's default style stays what it was and
+        // becomes the wizard's pre-selected card.
+        const data = await patch({ supportedPlayModes: [...PLAY_MODES] });
+        if (!data) return;
+        onChanged({ supportedPlayModes: data.supported as string[] });
+        toast.success(
+          `${terms.contests} on ${title.displayName} can now be created as either style - the admin chooses per ${terms.contest}.`,
+        );
         return;
       }
 
-      onChanged({ playModeOverride: playMode ?? undefined });
+      const playMode = value === FOLLOW ? null : (value as PlayMode);
+      const styled = await patch({ playMode });
+      if (!styled) return;
+
+      // Reason: picking ONE style means one style. Without narrowing the set as well, a
+      // previously ticked second style survives and the wizard keeps offering it. Sent as a
+      // second request because the route refuses a body carrying both fields (one audit line
+      // per decision).
+      const narrowed = await patch({ supportedPlayModes: [styled.effective] });
+      onChanged({
+        playModeOverride: playMode ?? undefined,
+        ...(narrowed ? { supportedPlayModes: narrowed.supported as string[] } : {}),
+      });
       toast.success(
-        `${title.displayName} is now played "${PLAY_MODE_COPY.get(data.effective as PlayMode)?.label}".`,
+        `${title.displayName} is now played "${PLAY_MODE_COPY.get(styled.effective as PlayMode)?.label}".`,
       );
     } catch {
       toast.error("Something went wrong. Please contact support.");
@@ -139,7 +169,7 @@ export default function GamePlayStyleControl({
     <div className="space-y-1">
       <div className="flex items-center gap-2">
         <Select
-          value={title.playModeOverride ?? FOLLOW}
+          value={selectValue}
           disabled={saving}
           onValueChange={save}
         >
@@ -155,11 +185,16 @@ export default function GamePlayStyleControl({
                 {PLAY_MODE_COPY.get(mode)?.label}
               </SelectItem>
             ))}
+            <SelectItem value={BOTH}>Both — choose per {terms.contest}</SelectItem>
           </SelectContent>
         </Select>
         {saving && <Loader2 className="h-3 w-3 animate-spin text-white/40" />}
       </div>
-      <p className="max-w-[260px] text-xs text-white/40">{copy?.detail}</p>
+      <p className="max-w-[260px] text-xs text-white/40">
+        {selectValue === BOTH
+          ? `Each ${terms.contest} can be "Join any time" or "Everyone at once" - the creator picks one in the wizard. Pre-selected: ${copy?.label}.`
+          : copy?.detail}
+      </p>
 
       {/*
         THE SECOND DECISION, BELOW THE FIRST AND DELIBERATELY NOT MERGED INTO IT (task

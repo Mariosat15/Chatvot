@@ -454,7 +454,7 @@ export async function createProviderContest(
     ? clampGmRoundStartPolicy(input.roundStartPolicy, supportedModes)
     : input.roundStartPolicy;
   const roundStartPolicy =
-    shape.forcedRoundStartPolicy ?? requestedRoundStart ?? "reserve_full_round";
+    shape.forcedRoundStartPolicy ?? requestedRoundStart ?? "until_window_closes";
   const attemptsPolicy = shape.forcedAttemptsPolicy ?? input.attemptsPolicy;
   const attemptSeconds = resolveAttemptSeconds(
     parsed.fields,

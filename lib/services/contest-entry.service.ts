@@ -56,6 +56,7 @@ import { checkActor, checkLevelRequirement } from "./contest-entry/guards";
 import { buildParticipantSeat } from "./contest-entry/participant-seat";
 import { runPostEntrySideEffects } from "./contest-entry/side-effects";
 import { fail } from "./contest-entry/types";
+import { resolveRegistrationDeadline } from "../utils/registration-deadline";
 import {
   PROVIDER_OUTAGE_ENTRY_MESSAGE,
   providerBlocksContestEntry,
@@ -158,13 +159,12 @@ export async function enterContest(
         );
       }
 
-      // Reason: a legacy bug set registrationDeadline an hour BEFORE startTime, which would
-      // close entries before the contest existed. Treat startTime as the floor.
-      if (competition.registrationDeadline) {
-        const deadline = new Date(competition.registrationDeadline);
-        const start = new Date(competition.startTime);
-        const effective = deadline < start ? start : deadline;
-        if (new Date() > effective) {
+      // Reason: the same helper the lobby counts down to, so the button and this gate cannot
+      // disagree. It floors a legacy deadline at startTime, and since 2 Oct 2026 floors a game
+      // contest's deadline at its play-window end so late joiners are never refused.
+      {
+        const effective = resolveRegistrationDeadline(competition);
+        if (effective && new Date() > effective) {
           await session.abortTransaction();
           return fail(
             "registration_closed",

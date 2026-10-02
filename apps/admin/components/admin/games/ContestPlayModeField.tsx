@@ -1,13 +1,6 @@
 "use client";
 
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { AlertCircle } from "lucide-react";
 import { useTerms } from "@/contexts/TerminologyContext";
 import { PLAY_MODE_COPY, type PlayMode } from "@/lib/services/games/play-shape";
@@ -72,20 +65,47 @@ export function ContestPlayModeField({
         commit whose claim is that only admin screens moved. That is X8's pass.
       */}
       <Label className="text-gray-200">How this {terms.contest} is played</Label>
-      <Select value={value} onValueChange={(next) => onChange(next as PlayMode)}>
-        <SelectTrigger className="mt-2 bg-gray-700 border-gray-600 text-gray-100">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {options.map((mode) => (
-            <SelectItem key={mode} value={mode}>
-              {PLAY_MODE_COPY.get(mode)?.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      {/*
+        Reason (owner report, 2 Oct 2026): this was a drop-down that silently kept the title's
+        default, and the "When players may start one round" control below it read like the
+        play-style choice - so contests meant to be "Everyone at once" were created as
+        "Join any time". Every option is now visible at once as a card, and the round-start
+        control no longer exists to be confused with it.
+      */}
+      <div role="radiogroup" className="mt-2 grid gap-3 sm:grid-cols-2">
+        {options.map((mode) => {
+          const optionCopy = PLAY_MODE_COPY.get(mode);
+          const selected = mode === value;
+          return (
+            <button
+              key={mode}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              onClick={() => onChange(mode)}
+              className={`rounded-lg border p-3 text-left transition-colors ${
+                selected
+                  ? "border-cyan-400 bg-cyan-500/15 ring-1 ring-cyan-400"
+                  : "border-gray-600 bg-gray-700/60 hover:border-gray-400"
+              }`}
+            >
+              <span className="flex items-center gap-2 text-sm font-semibold text-gray-100">
+                <span
+                  className={`h-3.5 w-3.5 shrink-0 rounded-full border-2 ${
+                    selected ? "border-cyan-300 bg-cyan-400" : "border-gray-400"
+                  }`}
+                />
+                {optionCopy?.label}
+              </span>
+              <span className="mt-1 block text-xs text-gray-400">{optionCopy?.detail}</span>
+            </button>
+          );
+        })}
+      </div>
 
-      <p className="mt-2 text-xs text-gray-400">{copy?.detail}</p>
+      <p className="mt-2 text-xs text-gray-400">
+        Selected: <strong className="text-gray-200">{copy?.label}</strong>
+      </p>
 
       {/*
         Stated on the scheduled branch only, because it is the branch that takes controls away
@@ -100,10 +120,10 @@ export function ContestPlayModeField({
         <div className="mt-3 flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-3">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
           <p className="text-xs text-amber-200/90">
-            Everybody plays at once, so entry closes when the {terms.contest}{" "}
-            <strong>starts</strong> and every {terms.player} gets{" "}
-            <strong>one {terms.attempt}</strong>. Those two settings are withheld rather than
-            editable, and this choice cannot be changed once the {terms.contest} exists.
+            Everybody plays at once, so every {terms.player} gets{" "}
+            <strong>one {terms.attempt}</strong> and the lobby opens before the start. Late
+            joiners are still let in with whatever time is left. This choice cannot be changed
+            once the {terms.contest} exists.
           </p>
         </div>
       )}

@@ -28,6 +28,7 @@ import { getPlayerGameProfile } from "@/lib/services/games/player-game-stats.ser
 import { getOverviewStanding } from "@/lib/services/games/overview-standing.service";
 import { CROSS_GAME_SCORING_STARTED_CAPTION } from "@/lib/services/games/game-leaderboard.service";
 import { buildChartData, calculateStreaks } from "./dashboard/charts";
+import { getWeeklyCreditNet } from "./dashboard/weekly-credit-net";
 import { processCompetitionParticipations } from "./dashboard/process-competitions";
 import { processChallengeParticipations } from "./dashboard/process-challenges";
 import type {
@@ -163,6 +164,7 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
   const overviewStanding = await getOverviewStanding({
     userId,
     gameStanding,
+    weeklyCreditNet: await getWeeklyCreditNet(userId),
   }).catch((err) => {
     console.warn("⚠️ overviewStanding fetch failed:", err);
     return {
