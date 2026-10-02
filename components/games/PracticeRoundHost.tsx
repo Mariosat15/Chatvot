@@ -65,8 +65,19 @@ export function PracticeRoundHost({
   );
 
   useEffect(() => {
-    return () => {
+    // Reason: React's unmount cleanup does not run when the player closes the tab or
+    // kills the app. `pagehide` (and `beforeunload` as a fallback) is what actually fires
+    // then, and `keepalive` on the DELETE keeps the request alive after the document goes.
+    // Without this, a practice round stays `launched` until an operator ends it by hand.
+    const endIfLive = () => {
       if (liveRoundId.current) endRound(liveRoundId.current);
+    };
+    window.addEventListener("pagehide", endIfLive);
+    window.addEventListener("beforeunload", endIfLive);
+    return () => {
+      window.removeEventListener("pagehide", endIfLive);
+      window.removeEventListener("beforeunload", endIfLive);
+      endIfLive();
     };
   }, [endRound]);
 

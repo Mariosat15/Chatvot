@@ -242,6 +242,21 @@ describe("IncidentsSection import paths", () => {
     expect(code).not.toMatch(/from\s+["']\.\.\/IncidentResolutionModal["']/);
     expect(code).not.toMatch(/from\s+["']\.\/IncidentList["']/);
   });
+
+  it("offers search and status/severity/subject filters on the incidents list", () => {
+    const shell = readCode("apps/admin/components/admin/IncidentsSection.tsx");
+    expect(shell).toMatch(/placeholder=["']Search title, id, game/);
+    expect(shell).toMatch(/statusFilter/);
+    expect(shell).toMatch(/severityFilter/);
+    expect(shell).toMatch(/subjectFilter/);
+    expect(shell).toMatch(/Live operations/);
+    expect(shell).toMatch(/Open incidents/);
+    const board = readCode(
+      "apps/admin/components/admin/incidents/LiveOperationsBoard.tsx",
+    );
+    expect(board).toMatch(/placeholder=["']Search name, id, game/);
+    expect(board).toMatch(/KIND_FILTERS/);
+  });
 });
 
 describe("raising an incident uses the board subject id", () => {

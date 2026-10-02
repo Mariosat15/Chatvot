@@ -198,6 +198,11 @@ export default function RoundInspectorSection() {
                           holding settlement
                         </span>
                       )}
+                      {round.contestType === "practice" && (
+                        <span className="rounded border border-violet-500/30 bg-violet-500/10 px-2 py-0.5 text-xs text-violet-300">
+                          practice
+                        </span>
+                      )}
                       {round.integrityFlags && round.integrityFlags.length > 0 && (
                         <span className="flex items-center gap-1 rounded border border-orange-500/30 bg-orange-500/10 px-2 py-0.5 text-xs text-orange-400">
                           <AlertTriangle className="h-3 w-3" />
@@ -242,6 +247,7 @@ export default function RoundInspectorSection() {
                         {resolving ? (
                           <ResolveRoundDialog
                             roundId={round.roundId}
+                            isPractice={round.contestType === "practice"}
                             stillUnresolved={detail.stillUnresolved ?? 0}
                             onResolved={async () => {
                               setResolving(false);
@@ -257,7 +263,9 @@ export default function RoundInspectorSection() {
                             onClick={() => setResolving(true)}
                             className="border-amber-500/40 text-amber-300 hover:bg-amber-500/10"
                           >
-                            End this round…
+                            {round.contestType === "practice"
+                              ? "End practice round…"
+                              : "End this round…"}
                           </Button>
                         )}
                       </>

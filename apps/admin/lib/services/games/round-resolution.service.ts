@@ -161,11 +161,15 @@ export interface StuckRoundRow {
 }
 
 /**
- * The rounds an operator needs to see: unresolved, or live and past their expiry.
+ * The rounds an operator needs to see: unresolved, live and past their expiry, or a
+ * practice round still open.
  *
- * Reason it is not "every round": a round inspector that lists completed rounds buries the
- * handful that need a decision. The completed ones are reachable by id when a dispute needs
- * them.
+ * Reason practice is included even before expiry: a practice round keeps no result and is
+ * meant to close when the player leaves. When the tab-close beacon fails (mobile kill, crash),
+ * the round stays `launched` with hours left on the clock and never reaches the "past expiry"
+ * clause - so without this arm an operator cannot find it here at all. Paid contests stay on
+ * the expiry / unresolved rules: they have money attached and must not flood this list while
+ * they are still being played.
  */
 export async function listRoundsNeedingAttention(
   limit = 100,
@@ -177,6 +181,11 @@ export async function listRoundsNeedingAttention(
     $or: [
       { status: "unresolved" },
       { status: { $in: ["pending", "launched"] }, expiresAt: { $lt: now } },
+      {
+        contestType: "practice",
+        contestId: null,
+        status: { $in: ["pending", "launched"] },
+      },
     ],
   })
     .sort({ expiresAt: 1 })

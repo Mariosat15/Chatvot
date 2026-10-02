@@ -98,18 +98,27 @@ describe("manual resolution cannot enter a score", () => {
 });
 
 describe("the action list has exactly one definition", () => {
-  it("the dialog does not declare its own list", () => {
-    // Reason: the dialog used to import RESOLUTION_ACTIONS and render the endings. Ending a
-    // round is now hub-driven, so the one definition is the catalogue the incident door
-    // reads. A second list in this dialog is the drift the original test existed to stop.
+  it("practice endings read the shared list; paid rounds still go to the hub", () => {
+    // Reason: ending a practice round is allowed here because practice has no money and no
+    // incident to hang the reason on. Paid rounds still withhold to Incident Management.
+    // The dialog therefore holds BOTH paths - the shared RESOLUTION_ACTIONS for practice,
+    // and HubWithheldAction for everything else - and must not invent a second action list.
     const code = source("components", "admin", "games", "ResolveRoundDialog.tsx");
-    expect(code).not.toContain("RESOLUTION_ACTIONS");
-    expect(code).not.toContain("scores nothing for the player");
-    expect(code).not.toMatch(/\/resolve/);
+    expect(code).toContain("RESOLUTION_ACTIONS");
     expect(code).toContain("HubWithheldAction");
+    expect(code).toMatch(/isPractice/);
+    expect(code).toMatch(/\/api\/games\/rounds\/\$\{roundId\}\/resolve/);
     const catalogue = source("lib", "admin", "incident-actions.ts");
     expect(catalogue).toContain("round-resolution-actions");
     expect(catalogue).toContain("RESOLUTION_ACTIONS");
+  });
+
+  it("the resolve route refuses a non-practice round", () => {
+    // Enforcement half of the dialog's isPractice branch: a crafted POST cannot skip the hub
+    // for a money-bearing round.
+    const code = source(...RESOLVE_ROUTE);
+    expect(code).toMatch(/contestType\s*!==\s*"practice"/);
+    expect(code).toMatch(/Incident Management/);
   });
 
   it("the server service reads the same module too", () => {
@@ -202,11 +211,13 @@ describe("the state machine stays owned by the model", () => {
 });
 
 describe("the list only shows rounds needing a decision", () => {
-  it("queries unresolved rounds and live rounds past expiry, not everything", () => {
+  it("queries unresolved rounds, live rounds past expiry, and open practice rounds", () => {
     const code = source(...SERVICE);
     expect(code).toContain('status: "unresolved"');
     expect(code).toContain("expiresAt");
-    // A list including completed rounds buries the handful that matter.
+    // Practice stays on the list even before expiry: a left-open practice round never reaches
+    // the unpaid-expired clause while its window is still open.
+    expect(code).toMatch(/contestType:\s*"practice"/);
     expect(code).not.toMatch(/GameRound\.find\(\{\s*\}\)/);
   });
 

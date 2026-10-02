@@ -921,6 +921,42 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 2 Oct 2026 - Practice rounds close on exit, and Incident Management is searchable (owner request)
+
+Owner screenshots of Round Inspector and a stuck practice round: *"games practice rounds dont
+finish when user exit or close app... end the practice rounds immediately when user exits...
+for practice rounds if stay open for any reason can be closed from here... also incident
+management must be improved... list easy to find filters etc."*
+
+Three defects in one report.
+
+**1. Practice did not end on tab close.** `PracticeRoundHost` already DELETE'd the round on
+React unmount and on Leave, but React cleanup does not run when the player closes the tab or
+kills the app - so the round stayed `launched` until an operator found it. It now listens for
+`pagehide` and `beforeunload` and sends the same keepalive DELETE. Soft navigation still ends
+it on unmount.
+
+**2. Stuck practice had to go through Incident Management.** Ending a round from Round
+Inspector was withheld for every contest after the hub centralisation. Practice has no money
+and no incident to hang a reason on, so the dialog now **ends practice in place** (shared
+`RESOLUTION_ACTIONS`, posts to `/api/games/rounds/[id]/resolve`) and still withholds paid
+rounds to the hub. The resolve route **refuses a non-practice round** so a crafted POST cannot
+skip the hub. Live practice rounds also join the inspector list **before expiry** - without
+that arm a left-open practice round with hours left on the clock never appeared here at all.
+
+**3. Incident Management was a flat wall.** The hub now has three tabs (Live operations / Open
+incidents / All), search, and status / severity / subject filters on the incidents list. Live
+operations has its own kind chips and search. The list shows status and severity badges and a
+timestamp. Raising an incident from Live switches to Open so the new row is findable.
+
+**Not done / unchanged.** Paid competition and challenge rounds still end only from Incident
+Management. Practice still keeps no result (voided). Trading practice is still absent.
+**Never verified by eye** - both screens are behind an admin sign-in.
+
+`__tests__/admin/practice-round-exit.test.ts` (2), round-inspector suite (22, flipped),
+incident-hub (22, +1 filter assertion). `tools/probe-practice-and-incidents.ps1` (5 probes,
+each exactly one red).
+
 ### 2 Oct 2026 - Manage Game Masters opens the competitions and challenges it lists (owner request)
 
 Owner: *"we must be able as admin to click on any competition [or] challenge and direct us to
