@@ -2,21 +2,20 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import {
   ArrowLeft,
   Calendar,
-  CheckCircle,
-  ChevronLeft,
-  ChevronRight,
   FileText,
-  Loader2,
+  ShieldCheck,
   SlidersHorizontal,
   Trophy,
   Zap,
 } from "lucide-react";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
+import { AccessAndModeStep } from "@/components/gamemaster/AccessAndModeStep";
+import { WizardFooterNav, WizardProgressRail } from "@/components/gamemaster/WizardProgressRail";
+import { gameMasterScheduleError } from "@/lib/services/gamemaster/contest-start-guard";
+import type { CompetitionVisibility } from "@/lib/services/gamemaster/competition-visibility";
 import { defaultConfigValues, type ConfigField } from "@/lib/services/games/config-schema";
 import {
   DEFAULT_GAME_TIE_RULE,
@@ -67,11 +66,14 @@ interface PrizeShare {
 
 interface Props {
   title: ContestableTitleOption;
-  visibility: "public" | "gm_private" | undefined;
+  visibility: CompetitionVisibility | undefined;
+  /** Server's `creatableVisibilities`; the Access & Mode step offers exactly these. */
+  visibilityOptions: readonly CompetitionVisibility[];
+  onVisibilityChange: (next: CompetitionVisibility) => void;
   maxUsersPerCompetition: number;
-  /** Admin-controlled fee from Challenge Settings — display only; create ignores body. */
+  /** Admin-controlled fee from Challenge Settings â€” display only; create ignores body. */
   platformFeePercentage: number;
-  /** Package daily cap — banner + Launch gate only; earlier steps stay editable. */
+  /** Package daily cap â€” banner + Launch gate only; earlier steps stay editable. */
   maxCompetitionsPerDay: number;
   competitionsCreatedToday: number;
   /** Concurrent draft/upcoming/active cap from the package. */
@@ -84,11 +86,13 @@ interface Props {
 
 const STEPS = [
   { number: 1, title: "Basic Info", description: "Name and description", icon: FileText },
-  { number: 2, title: "Game Settings", description: "How the game plays", icon: SlidersHorizontal },
-  { number: 3, title: "Schedule & Entry", description: "Clock, players and fee", icon: Calendar },
-  { number: 4, title: "Prizes", description: "Who gets how much", icon: Trophy },
-  { number: 5, title: "Launch", description: "Review and create", icon: Zap },
+  { number: 2, title: "Access & Mode", description: "Who can join, how it plays", icon: ShieldCheck },
+  { number: 3, title: "Game Settings", description: "Options for this game", icon: SlidersHorizontal },
+  { number: 4, title: "Schedule & Entry", description: "Clock, players and fee", icon: Calendar },
+  { number: 5, title: "Prizes", description: "Who gets how much", icon: Trophy },
+  { number: 6, title: "Launch", description: "Review and create", icon: Zap },
 ] as const;
+const LAST_STEP = STEPS.length;
 
 const DEFAULT_PRIZES: PrizeShare[] = [
   { rank: 1, percentage: 70 },
@@ -106,11 +110,13 @@ function defaultUtcDraft(daysFromNow: number, time: string): string {
  * Game Master wizard for creating a provider contest.
  *
  * Mirrors the trading GM multi-step chrome. Platform fee is locked to admin
- * Challenge Settings — never editable; create route ignores any body fee.
+ * Challenge Settings â€” never editable; create route ignores any body fee.
  */
 export default function ProviderContestCreateForm({
   title,
   visibility,
+  visibilityOptions,
+  onVisibilityChange,
   maxUsersPerCompetition,
   platformFeePercentage,
   maxCompetitionsPerDay,
@@ -208,17 +214,26 @@ export default function ProviderContestCreateForm({
       if (!name.trim()) return "Give the competition a name.";
       if (!description.trim()) return "Add a short description.";
     }
-    if (n === 2 && !title.schema.ok) {
+    if (n === 2) {
+      if (!visibility || !visibilityOptions.includes(visibility)) {
+        return visibilityOptions.length === 0
+          ? "Your package does not allow creating a competition. Please contact support."
+          : "Choose who can join.";
+      }
+    }
+    if (n === 3 && !title.schema.ok) {
       return "This game cannot be configured yet.";
     }
-    if (n === 3) {
+    if (n === 4) {
       if (!startTime || !endTime) return "Set start and end times.";
       // Reason: drafts are UTC wall-clock (`YYYY-MM-DDTHH:mm`); bare `new Date(draft)` is local.
-      const startMs = new Date(utcDraftToIso(startTime)).getTime();
-      const endMs = new Date(utcDraftToIso(endTime)).getTime();
-      if (!(endMs > startMs)) {
-        return "End must be after start (UTC).";
-      }
+      // No tolerance here: the server allows a minute for a slow submit, the form does not.
+      const scheduleError = gameMasterScheduleError(
+        new Date(utcDraftToIso(startTime)),
+        new Date(utcDraftToIso(endTime)),
+        new Date(),
+      );
+      if (scheduleError) return scheduleError;
       if (entryNum < 0) return "Entry fee cannot be negative.";
       if (maxNum < 2) return "At least 2 players are required.";
       if (maxNum > maxUsersPerCompetition) {
@@ -230,14 +245,14 @@ export default function ProviderContestCreateForm({
       const roundError = rules.scheduleError();
       if (roundError) return roundError;
     }
-    if (n === 4 && Math.abs(prizeTotal - 100) > 0.01) {
+    if (n === 5 && Math.abs(prizeTotal - 100) > 0.01) {
       return "Prize shares must add up to 100%.";
     }
     return null;
   }
 
   function goNext() {
-    // Reason: either package cap blocks the whole wizard from step 1 — same as trading GM.
+    // Reason: either package cap blocks the whole wizard from step 1 â€” same as trading GM.
     if (!canCreate) {
       toast.error(
         blockedByActive
@@ -251,7 +266,7 @@ export default function ProviderContestCreateForm({
       toast.error(err);
       return;
     }
-    setStep((s) => Math.min(5, s + 1));
+    setStep((s) => Math.min(LAST_STEP, s + 1));
   }
 
   async function handleCreate() {
@@ -263,7 +278,7 @@ export default function ProviderContestCreateForm({
       );
       return;
     }
-    for (let n = 1; n <= 4; n++) {
+    for (let n = 1; n < LAST_STEP; n++) {
       const err = validateStep(n);
       if (err) {
         toast.error(err);
@@ -294,7 +309,7 @@ export default function ProviderContestCreateForm({
           settings,
           entryFee: entryNum,
           maxParticipants: maxNum,
-          // Fee omitted — server stamps Challenge Settings.
+          // Fee omitted â€” server stamps Challenge Settings.
           startTime: startIso,
           endTime: endIso,
           playWindowStart: startIso,
@@ -343,10 +358,10 @@ export default function ProviderContestCreateForm({
           <h1 className="text-2xl font-bold">{title.displayName}</h1>
           <p className="text-sm text-gray-400">
             {title.providerName}
-            {title.category ? ` · ${title.category}` : ""}
-            {" · "}
+            {title.category ? ` Â· ${title.category}` : ""}
+            {" Â· "}
             {remainingToday} / {maxCompetitionsPerDay} remaining today
-            {" · "}
+            {" Â· "}
             {remainingActive} / {maxActiveCompetitions} active slots
           </p>
         </div>
@@ -367,72 +382,12 @@ export default function ProviderContestCreateForm({
         ) : (
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
             <aside className="lg:col-span-1">
-              <div className="sticky top-20 rounded-2xl border border-gray-700/50 bg-gradient-to-br from-gray-800 to-gray-900 p-4 shadow-2xl sm:p-6">
-                <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-400">
-                  Creation Progress
-                </h3>
-                <div className="space-y-3">
-                  {STEPS.map((s) => {
-                    const Icon = s.icon;
-                    const active = step === s.number;
-                    const done = step > s.number;
-                    return (
-                      <button
-                        key={s.number}
-                        type="button"
-                        disabled={!done && !active}
-                        onClick={() => done && setStep(s.number)}
-                        className={cn(
-                          "flex w-full items-start gap-3 rounded-xl p-3 text-left transition",
-                          active && "bg-cyan-600/80 shadow-lg",
-                          done && !active && "bg-gray-700/50 hover:bg-gray-700",
-                          !done && !active && "bg-gray-800/50 opacity-60",
-                        )}
-                      >
-                        <span
-                          className={cn(
-                            "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
-                            active
-                              ? "bg-white/20"
-                              : done
-                                ? "bg-green-500/20"
-                                : "bg-gray-700/50",
-                          )}
-                        >
-                          {done ? (
-                            <CheckCircle className="h-4 w-4 text-green-400" />
-                          ) : (
-                            <Icon
-                              className={cn(
-                                "h-4 w-4",
-                                active ? "text-white" : "text-gray-400",
-                              )}
-                            />
-                          )}
-                        </span>
-                        <span className="min-w-0">
-                          <span
-                            className={cn(
-                              "block text-sm font-semibold",
-                              active ? "text-white" : "text-gray-300",
-                            )}
-                          >
-                            {s.title}
-                          </span>
-                          <span
-                            className={cn(
-                              "block text-xs",
-                              active ? "text-white/80" : "text-gray-500",
-                            )}
-                          >
-                            {s.description}
-                          </span>
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+              <WizardProgressRail
+                heading="Creation Progress"
+                steps={STEPS}
+                step={step}
+                onStep={setStep}
+              />
             </aside>
 
             <div className="lg:col-span-2">
@@ -446,11 +401,19 @@ export default function ProviderContestCreateForm({
                   />
                 )}
                 {step === 2 && (
-                  <GameSettingsStep
+                  <AccessAndModeStep
+                    visibilityOptions={visibilityOptions}
+                    visibility={visibility}
+                    onVisibility={onVisibilityChange}
                     canPickMode={canPickMode}
                     playMode={rules.playMode}
                     supportedPlayModes={title.supportedPlayModes}
                     onPlayMode={rules.selectPlayMode}
+                    disabled={submitting}
+                  />
+                )}
+                {step === 3 && (
+                  <GameSettingsStep
                     fields={fields}
                     settings={settings}
                     onSetting={(fieldName, value) =>
@@ -459,7 +422,7 @@ export default function ProviderContestCreateForm({
                     disabled={submitting}
                   />
                 )}
-                {step === 3 && (
+                {step === 4 && (
                   <ScheduleStep
                     startTime={startTime}
                     endTime={endTime}
@@ -477,7 +440,7 @@ export default function ProviderContestCreateForm({
                     disabled={submitting}
                   />
                 )}
-                {step === 4 && (
+                {step === 5 && (
                   <PrizesStep
                     prizes={prizes}
                     prizeTotal={prizeTotal}
@@ -488,7 +451,7 @@ export default function ProviderContestCreateForm({
                     defaults={defaults}
                   />
                 )}
-                {step === 5 && (
+                {step === LAST_STEP && (
                   <ReviewStep
                     name={name}
                     displayName={title.displayName}
@@ -503,48 +466,15 @@ export default function ProviderContestCreateForm({
                   />
                 )}
 
-                <div className="flex items-center justify-between gap-4 border-t border-gray-700/50 px-6 py-4">
-                  {step > 1 ? (
-                    <button
-                      type="button"
-                      onClick={() => setStep((s) => s - 1)}
-                      className="inline-flex items-center gap-1 text-sm text-gray-400 hover:text-white"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                      Previous
-                    </button>
-                  ) : (
-                    <Link
-                      href="/gamemaster"
-                      className="text-sm text-gray-400 hover:text-white"
-                    >
-                      Cancel
-                    </Link>
-                  )}
-                  {step < 5 ? (
-                    <button
-                      type="button"
-                      onClick={goNext}
-                      disabled={!canCreate}
-                      className="inline-flex items-center gap-2 rounded-lg bg-cyan-600 px-5 py-2.5 font-medium hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      Next
-                      <ChevronRight className="h-4 w-4" />
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      disabled={submitting || !canCreate}
-                      onClick={handleCreate}
-                      className="inline-flex items-center gap-2 rounded-lg bg-cyan-600 px-5 py-2.5 font-medium hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
-                      {canCreate
-                        ? "Create competition"
-                        : "Daily limit reached"}
-                    </button>
-                  )}
-                </div>
+                <WizardFooterNav
+                  isFirst={step === 1}
+                  isLast={step === LAST_STEP}
+                  canCreate={canCreate}
+                  submitting={submitting}
+                  onPrevious={() => setStep((s) => s - 1)}
+                  onNext={goNext}
+                  onCreate={handleCreate}
+                />
               </div>
             </div>
           </div>

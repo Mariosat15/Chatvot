@@ -24,6 +24,10 @@ import {
 import { isGmPrivateContestsEnabled } from "@/lib/services/gamemaster/gm-program-flags";
 import { applyGameMasterCompetitionDefaults } from "@/lib/services/gamemaster/competition-defaults-apply";
 import { loadGameMasterCompetitionDefaults } from "@/lib/services/gamemaster/competition-defaults.service";
+import {
+  gameMasterScheduleError,
+  START_IN_PAST_TOLERANCE_MS,
+} from "@/lib/services/gamemaster/contest-start-guard";
 
 /**
  * GET /api/gamemaster/competitions
@@ -443,6 +447,18 @@ export async function POST(request: NextRequest) {
         { success: false, error: "Missing required fields" },
         { status: 400 },
       );
+    }
+
+    // Reason: the wizard refuses a past start, but the route is the only check a direct
+    // request cannot skip.
+    const scheduleError = gameMasterScheduleError(
+      new Date(startTime),
+      new Date(endTime),
+      new Date(),
+      START_IN_PAST_TOLERANCE_MS,
+    );
+    if (scheduleError) {
+      return NextResponse.json({ success: false, error: scheduleError }, { status: 400 });
     }
 
     // Check max participants limit

@@ -194,6 +194,7 @@ function ScheduleHalf({
   value,
   disabled,
   nowLabel,
+  minDate,
   onChange,
 }: {
   id: string;
@@ -202,6 +203,8 @@ function ScheduleHalf({
   value: string;
   disabled?: boolean;
   nowLabel: string;
+  /** Earliest pickable day (UTC); the calendar greys out every day before it. */
+  minDate: string;
   onChange: (value: string) => void;
 }) {
   const { date, time } = splitUtcDraft(value);
@@ -225,6 +228,7 @@ function ScheduleHalf({
             id={`${id}-date`}
             type="date"
             value={date}
+            min={minDate}
             disabled={disabled}
             onChange={(e) => onChange(joinUtcDraft(e.target.value, time))}
             className={DATE_PICKER_CLASS}
@@ -282,6 +286,12 @@ export function UtcScheduleFields({
   }, []);
 
   const nowLabel = formatUtcClock(currentUtc);
+  const todayUtc = formatUtcDate(currentUtc);
+  // Reason: `min` on the date stops a past day, but today with an earlier hour still gets
+  // through, so say so here; the wizard and the create route both refuse it as well.
+  const startInPast =
+    Boolean(startTime) &&
+    new Date(`${startTime}:00Z`).getTime() < currentUtc.getTime();
   const windowBroken =
     Boolean(startTime) &&
     Boolean(endTime) &&
@@ -324,6 +334,7 @@ export function UtcScheduleFields({
           value={startTime}
           disabled={disabled}
           nowLabel={nowLabel}
+          minDate={todayUtc}
           onChange={onStartChange}
         />
         <ScheduleHalf
@@ -333,6 +344,7 @@ export function UtcScheduleFields({
           value={endTime}
           disabled={disabled}
           nowLabel={nowLabel}
+          minDate={todayUtc}
           onChange={onEndChange}
         />
       </div>
@@ -356,6 +368,12 @@ export function UtcScheduleFields({
         })}
       </div>
 
+      {startInPast ? (
+        <div className="rounded-xl border border-red-600/50 bg-red-500/10 p-3 text-sm text-red-200">
+          The start time has already passed. Choose a start after the current server time
+          (UTC) shown above.
+        </div>
+      ) : null}
       {windowBroken ? (
         <div className="rounded-xl border border-red-600/50 bg-red-500/10 p-3 text-sm text-red-200">
           End must be after start. Both times are UTC — check the hour boxes (0–23), not

@@ -921,6 +921,50 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 2 Oct 2026 - Access & Mode is a wizard step, and a GM contest cannot start in the past (owner request)
+
+The owner asked for two things. First, the Public/Private choice and the game mode should be
+inside the Game Master wizard's own Creation Progress steps, not in a strip above it. Second,
+a Game Master should not be able to create a broken contest, for example one starting before
+the current server time.
+
+**The wizard (provider games):** it has six steps now: Basic Info, **Access & Mode**, Game
+Settings, Schedule & Entry, Prizes, Launch. `components/gamemaster/AccessAndModeStep.tsx` holds
+the visibility cards and the "How players join" picker, which moved out of `GameSettingsStep`.
+The options are still exactly the server's `creatableVisibilities`, so no screen re-derives the
+package rule. An empty list says the package does not allow creation. Launch re-validates every
+earlier step. Two things deliberately stay as they were:
+- The **trading** form keeps the picker above it, because its 2,700-line form was not touched.
+- The visibility state stays in `CreateCompetitionGate`, so both POST bodies are unchanged.
+
+`ProviderContestCreateForm.tsx` would have gone over 500 lines, so the sidebar and footer moved
+into `WizardProgressRail.tsx`.
+
+**The start-time guard:** `lib/services/gamemaster/contest-start-guard.ts` (mirrored,
+byte-identical test) is the one rule. It refuses an unparseable date, a start behind the server
+clock, and an end at or before the start. It is used in four places:
+- The provider create service (both apps).
+- Both GM competition routes' **trading** path. **Before this, neither route refused a past
+  start**; only the trading form did, in the browser.
+- The wizard's schedule step.
+
+The server allows 60 seconds of slack, so a start picked "now" on a browser a few seconds
+behind is not refused in transit. The browser allows none. The calendar also greys out past
+UTC days, and a red note shows when today's start hour has passed.
+
+**Tests:** `__tests__/services/gm-contest-start-guard.test.ts` has 16 tests. Two older
+assertions were re-aimed rather than deleted, because the schedule step is now step 4 and the
+Next/Create buttons moved into the footer; their claims are unchanged. The related suites pass
+306/306. Three probes went red on exactly one test each.
+
+One probe first came back caught **only by the mirror check**. It removed the refusal but left
+the call, and the position test still passed. The test now also asserts that the answer is used
+to refuse, because an import is not a use.
+
+**Not verified by eye.** Needs a deploy of both apps. The stray whitespace change in
+`competition-end.actions.ts` in the working tree was not made by this work and was left out of
+the commit.
+
 ### 2 Oct 2026 - The play style is a Game Master default too (owner request)
 
 The owner asked for three things. When a game is set to **Both**, the admin wizard and the

@@ -6,7 +6,7 @@ import type { CompetitionVisibility } from "@/lib/services/gamemaster/competitio
 
 // Reason: a Map, not an object - the key travelled through JSON, and an object lookup walks
 // the prototype chain.
-const OPTIONS: ReadonlyMap<
+export const VISIBILITY_OPTION_COPY: ReadonlyMap<
   CompetitionVisibility,
   { label: string; hint: string; icon: typeof Globe }
 > = new Map([
@@ -49,7 +49,7 @@ export default function ContestVisibilityPicker({
       <div className="mx-auto flex max-w-3xl flex-wrap items-center gap-3">
         <span className="text-sm font-medium text-gray-300">Who can join</span>
         {options.map((id) => {
-          const option = OPTIONS.get(id);
+          const option = VISIBILITY_OPTION_COPY.get(id);
           if (!option) return null;
           const Icon = option.icon;
           const selected = value === id;
@@ -73,7 +73,7 @@ export default function ContestVisibilityPicker({
           );
         })}
         <span className="text-xs text-gray-500">
-          {value ? (OPTIONS.get(value)?.hint ?? "") : ""}
+          {value ? (VISIBILITY_OPTION_COPY.get(value)?.hint ?? "") : ""}
         </span>
       </div>
     </div>

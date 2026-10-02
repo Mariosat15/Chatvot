@@ -8,6 +8,10 @@
 import type { CreateProviderContestResult } from "@/lib/services/game-providers/provider-contest.service";
 import { createAndPublishProviderContest } from "@/lib/services/game-providers/provider-contest.service";
 import { clampMinParticipants } from "@/lib/services/gamemaster/game-permissions";
+import {
+  gameMasterScheduleError,
+  START_IN_PAST_TOLERANCE_MS,
+} from "@/lib/services/gamemaster/contest-start-guard";
 import { resolveGameMasterPlatformFeePercentage } from "@/lib/services/gamemaster/platform-fee";
 import type { GameTieRule } from "@/lib/services/games/game-tie-rule";
 import type { PlayMode } from "@/lib/services/games/play-shape";
@@ -131,6 +135,15 @@ export async function createGameMasterProviderCompetition(args: {
       error: "Entry fee, participant limit, start time and end time are required.",
     };
   }
+
+  // Reason: a start behind the clock is a listed contest nobody can ever enter.
+  const scheduleError = gameMasterScheduleError(
+    startTime,
+    endTime,
+    new Date(),
+    START_IN_PAST_TOLERANCE_MS,
+  );
+  if (scheduleError) return { ok: false, error: scheduleError };
 
   const effectiveMaxParticipants = Math.min(
     Math.floor(maxParticipantsRaw),

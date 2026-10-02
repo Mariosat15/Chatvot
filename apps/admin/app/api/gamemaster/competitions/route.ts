@@ -17,6 +17,10 @@ import { checkVisibilityAllowed } from "@/lib/services/gamemaster/visibility-per
 import { isGmPrivateContestsEnabled } from "@/lib/services/gamemaster/gm-program-flags";
 import { applyGameMasterCompetitionDefaults } from "@/lib/services/gamemaster/competition-defaults-apply";
 import { loadGameMasterCompetitionDefaults } from "@/lib/services/gamemaster/competition-defaults.service";
+import {
+  gameMasterScheduleError,
+  START_IN_PAST_TOLERANCE_MS,
+} from "@/lib/services/gamemaster/contest-start-guard";
 
 /**
  * GET /api/gamemaster/competitions
@@ -364,6 +368,17 @@ export async function POST(request: NextRequest) {
         { error: "Missing required fields" },
         { status: 400 },
       );
+    }
+
+    // Reason: same rule as the main app's route - a past start is a contest nobody can enter.
+    const scheduleError = gameMasterScheduleError(
+      new Date(startTime),
+      new Date(endTime),
+      new Date(),
+      START_IN_PAST_TOLERANCE_MS,
+    );
+    if (scheduleError) {
+      return NextResponse.json({ error: scheduleError }, { status: 400 });
     }
 
     // Check max participants limit

@@ -157,10 +157,12 @@ export default function CreateCompetitionGate({
   if (selection?.type === "provider") {
     return (
       <>
-        {visibilityPicker}
+        {/* Visibility is a step inside this wizard (Access & Mode), not a strip above it. */}
         <ProviderContestCreateForm
           title={selection.title}
           visibility={visibility}
+          visibilityOptions={visibilityOptions}
+          onVisibilityChange={setVisibility}
           maxUsersPerCompetition={maxUsers}
           platformFeePercentage={platformFeePercentage}
           maxCompetitionsPerDay={maxCompetitionsPerDay}

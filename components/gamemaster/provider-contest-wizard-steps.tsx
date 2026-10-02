@@ -17,7 +17,6 @@ import {
 import { ROUND_START_POLICY_COPY } from "@/lib/services/games/round-types";
 import {
   PLAY_MODE_COPY,
-  type PlayMode,
 } from "@/lib/services/games/play-shape";
 import { Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -126,65 +125,19 @@ export function BasicsStep({
 }
 
 export function GameSettingsStep({
-  canPickMode,
-  playMode,
-  supportedPlayModes,
-  onPlayMode,
   fields,
   settings,
   onSetting,
   disabled,
 }: {
-  canPickMode: boolean;
-  playMode: PlayMode;
-  supportedPlayModes: PlayMode[];
-  onPlayMode: (m: PlayMode) => void;
   fields: ConfigField[];
   settings: Record<string, unknown>;
   onSetting: (name: string, value: unknown) => void;
   disabled: boolean;
 }) {
-  const modes =
-    supportedPlayModes.length > 0 ? supportedPlayModes : ([playMode] as PlayMode[]);
-  const copy = PLAY_MODE_COPY.get(playMode);
-
+  // Play style moved to AccessAndModeStep, so this step holds only the title's own options.
   return (
     <StepPanel title="Game Settings" subtitle="Options for this title">
-      {/*
-        Always surface play style. When the title supports more than one mode the GM picks;
-        when it supports only one we still explain what that means so the schedule step is
-        not a surprise. Labels come from PLAY_MODE_COPY so they cannot drift from the
-        admin ContestPlayModeField / create service.
-      */}
-      <Field label="How players join">
-        {canPickMode ? (
-          <select
-            className={inputClass}
-            value={playMode}
-            onChange={(e) => onPlayMode(e.target.value as PlayMode)}
-            disabled={disabled}
-          >
-            {modes.map((mode) => (
-              <option key={mode} value={mode}>
-                {PLAY_MODE_COPY.get(mode)?.label ?? mode}
-              </option>
-            ))}
-          </select>
-        ) : (
-          <div className="rounded-lg border border-gray-700 bg-gray-900/60 px-3 py-2 text-sm text-gray-200">
-            {copy?.label ?? playMode}
-          </div>
-        )}
-        {copy?.detail && (
-          <p className="mt-2 text-xs text-gray-400">{copy.detail}</p>
-        )}
-        {playMode === "scheduled" && (
-          <p className="mt-2 text-xs text-amber-200/90">
-            Everyone starts together and each player gets one attempt. Players
-            who join late still get in and play whatever time is left.
-          </p>
-        )}
-      </Field>
       <div className="rounded-xl border border-gray-700 bg-gray-900/50 p-4">
         <ChallengeSettingsFields
           fields={fields}

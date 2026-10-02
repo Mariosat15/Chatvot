@@ -136,9 +136,11 @@ describe("the GM wizard offers the admin wizard's round rules", () => {
       /fit\?\.windowTooShort && \(fit\.reservesFullRound \|\| playMode === "scheduled"\)/,
     );
     const form = code(FORM);
-    const step3 = form.slice(form.indexOf("if (n === 3)"), form.indexOf("if (n === 4"));
-    expect(step3.length).toBeGreaterThan(0);
-    expect(step3).toMatch(/rules\.scheduleError\(\)/);
+    // Reason: Access & Mode became step 2 on 2 Oct 2026, so the schedule is step 4 now; the
+    // claim is unchanged and only the step number moved.
+    const scheduleStep = form.slice(form.indexOf("if (n === 4)"), form.indexOf("if (n === 5"));
+    expect(scheduleStep.length).toBeGreaterThan(0);
+    expect(scheduleStep).toMatch(/rules\.scheduleError\(\)/);
   });
 
   it("the schedule step renders the fit note with the one-click fix and the policy fields", () => {

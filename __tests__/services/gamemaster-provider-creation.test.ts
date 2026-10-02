@@ -308,8 +308,12 @@ describe("GM create UI reuses schema settings and does not enumerate games", () 
     expect(form).toMatch(/maxCompetitionsPerDay/);
     expect(form).toMatch(/competitionsCreatedToday/);
     // Next and Create both gate on canCreate — not Launch-only.
-    expect(form).toMatch(/onClick=\{goNext\}[\s\S]*?disabled=\{!canCreate\}/);
-    expect(form).toMatch(/disabled=\{submitting \|\| !canCreate\}/);
+    // Reason: the buttons moved into WizardFooterNav on 2 Oct 2026 (file-size limit); the claim
+    // is unchanged - the form hands canCreate over and the footer gates both buttons on it.
+    expect(form).toMatch(/<WizardFooterNav[\s\S]*?canCreate=\{canCreate\}[\s\S]*?onNext=\{goNext\}/);
+    const footer = readFileSync(join(process.cwd(), "components/gamemaster/WizardProgressRail.tsx"), "utf8");
+    expect(footer).toMatch(/onClick=\{onNext\} disabled=\{!canCreate\}/);
+    expect(footer).toMatch(/disabled=\{submitting \|\| !canCreate\}/);
   });
 
   it("utcDraftToIso treats YYYY-MM-DDTHH:mm as UTC, not local", async () => {
