@@ -37,6 +37,7 @@ import {
   resolveLobbySeconds,
   resolveSupportedPlayModes,
   type PlayMode,
+  type PlayShapeInput,
 } from "@/lib/services/games/play-shape";
 import type { PreflightResult } from "@/lib/services/games/contest-preflight";
 import type {
@@ -112,6 +113,13 @@ export interface CreateProviderContestInput {
    * shape closes entry at a different moment than the operator was shown.
    */
   playMode?: PlayMode;
+  /**
+   * True when `playMode` is a platform-wide PREFERENCE rather than a choice made for this
+   * title - the admin's Game Master default, which applies to every game. A preference the
+   * title cannot honour falls back to the title's own style instead of refusing the contest,
+   * because the Game Master never picked it and could not have fixed it.
+   */
+  playModeIsPreference?: boolean;
   resultGracePeriodSeconds: number;
   perRoundCostAcknowledged?: boolean;
 
@@ -337,7 +345,7 @@ export async function preflightProviderContest(
     roundStartPolicy: input.roundStartPolicy,
     // The shape the contest will be SAVED as, resolved the same way `createProviderContest`
     // resolves it, so an "everybody together" contest too short for one run is refused here.
-    playMode: resolveContestPlayMode(input.playMode, title),
+    playMode: resolveContestPlayMode(requestedPlayMode(input, title), title),
     perRoundCostAcknowledged: input.perRoundCostAcknowledged,
     // The catalogue already records this, so the sandbox check reads a real fact rather
     // than a placeholder. It is set when a round for this title last completed
@@ -415,7 +423,8 @@ export async function createProviderContest(
   // An omitted mode is not an error - it means "whatever this title is", which is what every
   // caller written before task 11 intends and what the wizard sends when a title supports one
   // shape. Refusing it would break the API for the sake of a field with a correct default.
-  if (input.playMode !== undefined && !isPlayModeSupported(title, input.playMode)) {
+  const chosenMode = requestedPlayMode(input, title);
+  if (chosenMode !== undefined && !isPlayModeSupported(title, chosenMode)) {
     const allowed = resolveSupportedPlayModes(title)
       .map((mode) => PLAY_MODE_COPY.get(mode)?.label ?? mode)
       .join(" or ");
@@ -430,7 +439,7 @@ export async function createProviderContest(
   // The contest's own shape, which from task 11 onwards is not necessarily the title's. An
   // absent choice resolves to the title's default, so nothing about a single-shape title
   // changed.
-  const playMode = resolveContestPlayMode(input.playMode, title);
+  const playMode = resolveContestPlayMode(chosenMode, title);
   const shape = playShapeRules(playMode);
   const tooSoon = scheduledStartTooSoon(
     { playMode, playWindowStart: input.playWindowStart },
@@ -577,6 +586,21 @@ export async function createProviderContest(
       error: "Something went wrong. Please contact support.",
     };
   }
+}
+
+/**
+ * The mode a create request is asking for. A preference the title cannot honour reads as "no
+ * choice" (the title's own style); a real choice is passed through so it can be refused.
+ */
+export function requestedPlayMode(
+  input: Pick<CreateProviderContestInput, "playMode" | "playModeIsPreference">,
+  title: PlayShapeInput,
+): PlayMode | undefined {
+  const mode = input.playMode;
+  if (mode && input.playModeIsPreference && !isPlayModeSupported(title, mode)) {
+    return undefined;
+  }
+  return mode;
 }
 
 function validateBasics(input: CreateProviderContestInput): string | null {

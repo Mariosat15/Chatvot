@@ -93,6 +93,8 @@ export async function createGameMasterProviderCompetition(args: {
   maxUsersPerCompetition: number;
   /** Already checked against the package by the route (checkVisibilityAllowed). */
   visibility: "public" | "gm_private";
+  /** Option keys that hold the admin's default rather than the Game Master's own choice. */
+  adminFilled?: readonly string[];
 }): Promise<GameMasterProviderCreateResult> {
   const { body, userId, gameMasterName, maxUsersPerCompetition, visibility } = args;
 
@@ -188,6 +190,9 @@ export async function createGameMasterProviderCompetition(args: {
       roundStartPolicy:
         (body.roundStartPolicy as RoundStartPolicy | undefined) ?? undefined,
       playMode: (body.playMode as PlayMode | undefined) ?? undefined,
+      // Reason: the admin's play-style default covers every game, so a game that cannot be
+      // run that way uses its own style instead of refusing a contest the GM never misconfigured.
+      playModeIsPreference: args.adminFilled?.includes("playMode") ?? false,
       // The create service refuses anything that is not a game tie rule.
       tieRule: (body.tieRule as GameTieRule | undefined) ?? undefined,
       resultGracePeriodSeconds,

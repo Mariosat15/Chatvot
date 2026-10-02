@@ -147,8 +147,14 @@ export default function ProviderContestCreateForm({
     defaultUtcDraft(1, "12:00"),
   );
   const [endTime, setEndTime] = useState(() => defaultUtcDraft(1, "18:00"));
+  // Reason: the admin's play-style default only applies to a game that supports it (a game set
+  // to Both); any other game keeps its own style, exactly as the create service falls back.
+  const adminPlayMode = defaults.valueOf<PlayMode>("playMode", title.playMode);
+  const playModeLocked = defaults.isLocked("playMode");
   const rules = useProviderContestRules({
-    initialPlayMode: title.playMode,
+    initialPlayMode: title.supportedPlayModes.includes(adminPlayMode)
+      ? adminPlayMode
+      : title.playMode,
     supportedPlayModes: title.supportedPlayModes,
     fields,
     settings,
@@ -174,7 +180,7 @@ export default function ProviderContestCreateForm({
   );
   const [submitting, setSubmitting] = useState(false);
 
-  const canPickMode = title.supportedPlayModes.length > 1;
+  const canPickMode = title.supportedPlayModes.length > 1 && !playModeLocked;
   const fee = Number.isFinite(platformFeePercentage)
     ? platformFeePercentage
     : 10;

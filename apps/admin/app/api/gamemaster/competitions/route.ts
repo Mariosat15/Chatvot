@@ -318,6 +318,7 @@ export async function POST(request: NextRequest) {
         gameMasterName,
         maxUsersPerCompetition: effectiveLimits.maxUsersPerCompetition,
         visibility: visibilityVerdict.visibility,
+        adminFilled: withDefaults.adminFilled,
       });
 
       if (!providerResult.ok) {

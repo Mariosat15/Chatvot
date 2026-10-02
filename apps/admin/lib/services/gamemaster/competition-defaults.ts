@@ -16,15 +16,20 @@
  * - the platform fee, already admin-only (`platform-fee.ts`), never part of a GM request;
  * - start and end times, which are the Game Master's to choose - a default date is wrong the
  *   day after it is set;
- * - a game's play style and the latest moment an attempt may start, which the admin already
- *   decides per title ("A Competition may be created as"); a second setting here could only
- *   contradict that one. The title's play shape also still forces the attempts policy at write
- *   time, so a locked attempts default never overrides a synchronised race's single attempt.
+ * - the latest moment an attempt may start, which the play shape decides per contest.
+ *
+ * The PLAY STYLE is here (owner, 2 Oct 2026) but only as a preference: the admin decides per
+ * title which styles a game supports, and this default only chooses between them for a game
+ * set to "Both". A game supporting one style ignores it and uses its own - the create service
+ * falls back rather than refusing, because the Game Master never picked the value. The play
+ * shape still forces the attempts policy at write time, so a locked attempts default never
+ * overrides a synchronised race's single attempt.
  *
  * `path` is where the value sits in the create request body. It comes from this list and never
  * from a request, so walking it cannot be steered by a caller.
  */
 import { GAME_TIE_RULES, GAME_TIE_RULE_COPY } from "@/lib/services/games/game-tie-rule";
+import { PLAY_MODES, PLAY_MODE_COPY } from "@/lib/services/games/play-shape";
 import {
   ATTEMPTS_POLICIES,
   UNRESOLVED_ROUND_POLICIES,
@@ -388,6 +393,18 @@ export const COMPETITION_DEFAULT_OPTIONS: readonly CompetitionDefaultOption[] = 
     defaultValue: "intermediate",
   },
   // ---- Games ----
+  {
+    key: "playMode",
+    label: "Play style",
+    description:
+      "Used only for a game set to Both. A game set to one style always uses that style.",
+    games: GAMES,
+    group: "Games",
+    path: ["playMode"],
+    kind: "choice",
+    choices: choicesFromCopy(PLAY_MODES, PLAY_MODE_COPY),
+    defaultValue: "anytime",
+  },
   {
     key: "tieRule",
     label: "If two players have the same score",

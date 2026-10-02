@@ -256,7 +256,7 @@ export function applyGameMasterCompetitionDefaults(
   defaults: readonly ResolvedCompetitionDefault[],
   game: DefaultsGame,
 ):
-  | { ok: true; body: Record<string, unknown> }
+  | { ok: true; body: Record<string, unknown>; adminFilled: string[] }
   | { ok: false; errors: string[] } {
   const copy: Record<string, unknown> =
     body && typeof body === "object" && !Array.isArray(body)
@@ -264,6 +264,9 @@ export function applyGameMasterCompetitionDefaults(
       : {};
   const byKey = new Map(defaults.map((entry) => [entry.key, entry]));
   const errors: string[] = [];
+  // Which options carry the ADMIN's value rather than one the Game Master chose. A caller
+  // needs this when an admin value may not suit the particular game (the play style).
+  const adminFilled: string[] = [];
 
   for (const option of optionsForGame(game)) {
     const configured = byKey.get(option.key);
@@ -273,6 +276,7 @@ export function applyGameMasterCompetitionDefaults(
 
     if (!mayChange || isAbsent(sent)) {
       writePath(copy, option.path, structuredClone(adminValue));
+      adminFilled.push(option.key);
       continue;
     }
     const check = checkOptionValue(option, sent);
@@ -289,7 +293,9 @@ export function applyGameMasterCompetitionDefaults(
     errors.push("Minimum players cannot be more than maximum players.");
   }
 
-  return errors.length > 0 ? { ok: false, errors } : { ok: true, body: copy };
+  return errors.length > 0
+    ? { ok: false, errors }
+    : { ok: true, body: copy, adminFilled };
 }
 
 /** What the Game Master's form needs: the options for one game, with the admin's values. */

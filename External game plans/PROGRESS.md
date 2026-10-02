@@ -921,6 +921,36 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 2 Oct 2026 - The play style is a Game Master default too (owner request)
+
+The owner asked for three things. When a game is set to **Both**, the admin wizard and the
+Game Master wizard should both offer the mode choice, and the Game Master Competition
+Settings (Competitions -> Settings) should carry the mode as well.
+
+**The first two were already built** (`StepSchedule` and the GM form's `GameSettingsStep`
+both show the picker when a title supports more than one style). They need the previous
+commit deployed and the game's Play style saved as **Both**. On the GM wizard the picker is
+on step 2, Game settings.
+
+**What was added** is a `playMode` option in `COMPETITION_DEFAULT_OPTIONS` (Games group, a
+choice between the two styles, shipped default `anytime`), with the usual "Game Master may
+change" lock. This reverses that file's "NOT HERE" note, which said a play style default
+could only contradict the per-title setting. It is now a **preference**, not an override:
+
+- It only takes effect for a game that supports the chosen style.
+- A game set to one style ignores it.
+- `applyGameMasterCompetitionDefaults` now reports `adminFilled`, meaning which options carry
+  the admin's value rather than the Game Master's.
+- The GM create service passes `playModeIsPreference`.
+- `requestedPlayMode` in `provider-contest.service.ts` (mirrored) drops an unsupported
+  preference to the title's own style rather than refusing.
+- A mode the Game Master really chose is still refused if the game cannot run it.
+- The GM form starts on the admin's value when the game supports it, and hides the picker
+  when the admin locks the option.
+
+Tests are in `__tests__/services/gamemaster-competition-defaults.test.ts` (5 new). Nothing
+was backfilled. Never verified by eye.
+
 ### 2 Oct 2026 - A "Both" play style, and no late-start or late-entry cut-off on any game (owner report)
 
 Owner: *"providers choice is by default join at any time and even [if] we tick everyone at once ... it overwrites all and plays join at any time, so we need ... a choice both"* and *"the restriction too late to open a round must not happen ... users can join even if only a few seconds left ... remove that restriction from all games"*.

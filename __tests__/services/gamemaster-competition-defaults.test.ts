@@ -26,6 +26,7 @@ import {
   NO_GAME_MASTER_DEFAULTS,
   readGameMasterDefaults,
 } from "@/components/gamemaster/competition-defaults-lookup";
+import { requestedPlayMode } from "@/lib/services/game-providers/provider-contest.service";
 
 const ROOT = resolve(__dirname, "..", "..");
 const read = (path: string) => readFileSync(resolve(ROOT, path), "utf8");
@@ -283,6 +284,69 @@ describe("the Game Master forms hide locked options", () => {
     expect(form).toMatch(/valueOf<UnscoredContestPolicy>\(\s*"unscoredContestPolicy"/);
     expect(form).not.toMatch(/unresolvedRoundPolicy:\s*"/);
     expect(form).not.toMatch(/unscoredContestPolicy:\s*"/);
+  });
+});
+
+describe("the play style default (owner, 2 Oct 2026)", () => {
+  const BOTH_STYLES = { playMode: "anytime", supportedPlayModes: ["anytime", "scheduled"] };
+  const ANYTIME_ONLY = { playMode: "anytime" };
+
+  it("is a games-only choice between the two styles", () => {
+    const option = optionsForGame("provider").find((o) => o.key === "playMode");
+    expect(option?.kind).toBe("choice");
+    expect(option?.kind === "choice" && option.choices.map((c) => c.value)).toEqual([
+      "anytime",
+      "scheduled",
+    ]);
+    expect(optionsForGame("trading").some((o) => o.key === "playMode")).toBe(false);
+  });
+
+  it("reports which options carry the admin's value rather than the Game Master's", () => {
+    const filled = applyGameMasterCompetitionDefaults({}, shipped(), "provider");
+    expect(filled.ok && filled.adminFilled).toContain("playMode");
+    const chosen = applyGameMasterCompetitionDefaults(
+      { playMode: "scheduled" },
+      shipped(),
+      "provider",
+    );
+    expect(chosen.ok && chosen.adminFilled).not.toContain("playMode");
+    const locked = applyGameMasterCompetitionDefaults(
+      { playMode: "anytime" },
+      withEntry("playMode", "scheduled", false),
+      "provider",
+    );
+    expect(locked.ok && locked.body.playMode).toBe("scheduled");
+    expect(locked.ok && locked.adminFilled).toContain("playMode");
+  });
+
+  it("an admin preference a game cannot use falls back to the game's own style", () => {
+    expect(
+      requestedPlayMode({ playMode: "scheduled", playModeIsPreference: true }, ANYTIME_ONLY),
+    ).toBeUndefined();
+    expect(
+      requestedPlayMode({ playMode: "scheduled", playModeIsPreference: true }, BOTH_STYLES),
+    ).toBe("scheduled");
+    // A real choice is passed through so the create service can refuse it with a reason.
+    expect(requestedPlayMode({ playMode: "scheduled" }, ANYTIME_ONLY)).toBe("scheduled");
+  });
+
+  it("the Game Master routes pass the admin-filled list to the create service", () => {
+    for (const route of [
+      "app/api/gamemaster/competitions/route.ts",
+      "apps/admin/app/api/gamemaster/competitions/route.ts",
+    ]) {
+      expect(stripComments(read(route)), route).toContain(
+        "adminFilled: withDefaults.adminFilled",
+      );
+    }
+    const service = stripComments(read("lib/services/gamemaster/create-provider-competition.ts"));
+    expect(service).toMatch(/playModeIsPreference:\s*args\.adminFilled\?\.includes\("playMode"\)/);
+  });
+
+  it("the game form hides the picker when the admin locks the style", () => {
+    const form = stripComments(read("components/gamemaster/ProviderContestCreateForm.tsx"));
+    expect(form).toMatch(/canPickMode = title\.supportedPlayModes\.length > 1 && !playModeLocked/);
+    expect(form).toMatch(/playModeLocked = defaults\.isLocked\("playMode"\)/);
   });
 });
 

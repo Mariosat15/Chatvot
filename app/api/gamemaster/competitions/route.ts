@@ -382,6 +382,7 @@ export async function POST(request: NextRequest) {
         gameMasterName: session.user.name || "Game Master",
         maxUsersPerCompetition: effectiveLimits.maxUsersPerCompetition,
         visibility: visibilityVerdict.visibility,
+        adminFilled: withDefaults.adminFilled,
       });
 
       if (!providerResult.ok) {
