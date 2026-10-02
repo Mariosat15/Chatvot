@@ -23,6 +23,7 @@ import CompetitionCreationControl from "./gamemaster/CompetitionCreationControl"
 import GmDetailReferralsTab, { type ReferralTabRow } from "./gamemaster/GmDetailReferralsTab";
 import type { AdminAwaitingClaimRow } from "@/lib/admin/admin-terms-reminder-view";
 import { isGameMasterActiveCompetition } from "@/lib/services/gamemaster/active-competitions";
+import ContestOpenButton from "./gamemaster/ContestOpenButton";
 
 // ─── Interfaces ───────────────────────────────────────────────────────
 interface GMSubscription {
@@ -95,6 +96,8 @@ interface GMCompetition {
 interface GMEarning {
   id: string;
   sourceType: string;
+  /** The competition or challenge id - drives the Open button. */
+  sourceId?: string | null;
   sourceName: string;
   referredUserName: string;
   entryFeeAmount: number;
@@ -778,6 +781,7 @@ function CompetitionsTab({
                   <th className="px-4 py-3">Prize Pool</th>
                   <th className="px-4 py-3">Start</th>
                   <th className="px-4 py-3">End</th>
+                  <th className="px-4 py-3 text-right">View</th>
                 </tr>
               </thead>
               <tbody>
@@ -807,6 +811,9 @@ function CompetitionsTab({
                     </td>
                     <td className="px-4 py-3 text-gray-400 text-sm">
                       {new Date(comp.endTime).toLocaleDateString()}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <ContestOpenButton kind="competition" id={comp.id} />
                     </td>
                   </tr>
                 ))}
@@ -899,6 +906,7 @@ function EarningsTab({
                   <th className="px-4 py-3">Earning</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Date</th>
+                  <th className="px-4 py-3 text-right">View</th>
                 </tr>
               </thead>
               <tbody>
@@ -943,6 +951,9 @@ function EarningsTab({
                     </td>
                     <td className="px-4 py-3 text-gray-400 text-sm">
                       {new Date(e.createdAt).toLocaleDateString()}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <ContestOpenButton kind={e.sourceType} id={e.sourceId} />
                     </td>
                   </tr>
                 ))}

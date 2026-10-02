@@ -274,6 +274,7 @@ export async function GET(
       earnings: earnings.map((e) => ({
         id: e._id.toString(),
         sourceType: e.sourceType,
+        sourceId: e.sourceId ? String(e.sourceId) : null,
         sourceName: e.sourceName,
         referredUserName: e.referredUserName,
         entryFeeAmount: e.entryFeeAmount,

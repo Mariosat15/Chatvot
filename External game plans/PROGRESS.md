@@ -921,6 +921,36 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 2 Oct 2026 - Manage Game Masters opens the competitions and challenges it lists (owner request)
+
+Owner: *"we must be able as admin to click on any competition [or] challenge and direct us to
+the competition or challenge page in admin... have a button next to each."* A Game Master's
+detail screen listed contests **by name only** - the Competitions tab, and the Earnings tab,
+whose rows say which competition or challenge each commission came from - so an operator had to
+copy a name into another screen to find the contest.
+
+**What was built.** An **Open** button on every row of both tables, going to the same pages the
+Competitions and Challenges screens open: `/competitions/view/[id]` and `/challenges/view/[id]`.
+The address comes from one helper, `apps/admin/lib/admin/admin-contest-href.ts`
+(`adminContestViewHref`), rendered by `apps/admin/components/admin/gamemaster/ContestOpenButton.tsx`.
+The Earnings tab needed data, not just a button: `gamemasterearnings.sourceId` has always stored
+the competition or challenge id and `GET /api/gamemasters/[id]` **dropped it**, so the route now
+passes it through.
+
+**Three decisions worth keeping.** The kind is looked up in a **`Map`**, because it comes from a
+stored `sourceType` and an object index would hand `"__proto__"` something truthy. A row whose
+kind is unknown or whose id is not 24 hex characters shows **"No link"** rather than a button
+that opens a 404. And the link **widens no access** - opening the page still needs that page's
+own section grant, so an employee granted Game Masters but not Challenges is refused there, as
+before. Nothing is mirrored; all four files are admin-only.
+
+**Not done.** The Referrals tab shows only *counts* of competitions and challenges per player,
+not individual contests, so there is nothing there to link. The detail route still returns at
+most 50 earnings, unchanged. **Never verified by eye** - the screen is behind an admin sign-in.
+
+`__tests__/admin/gm-detail-contest-links.test.ts` (10 tests), `tools/probe-gm-contest-links.ps1`
+(8 probes, each exactly one red).
+
 ### 2 Oct 2026 - The wizards open on today, and say how long the lobby is (owner request)
 
 Owner, after a Game Master saw a one-minute lobby where the game was believed to say five:
