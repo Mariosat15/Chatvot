@@ -138,7 +138,7 @@ async function loadRoundBestScores(
  * Resolve card art the same way `/games` cards do: admin banner, then thumbnail,
  * then neon fallback. Never invents per-title art in Overview code.
  */
-function resolvePlayArt(cat: BrowsableGame | undefined, isTrading: boolean): string {
+export function resolvePlayArt(cat: BrowsableGame | undefined, isTrading: boolean): string {
   const banner = cat?.bannerUrl?.trim();
   if (banner) return banner;
   const thumb = cat?.thumbnailUrl?.trim();

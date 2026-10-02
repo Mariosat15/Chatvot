@@ -921,6 +921,12 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 2 Oct 2026 - Best rank always 0, and "Suggested for you" redesigned
+
+Owner: *"the best rank is always show 0"*. **Reporting defect, no money moved, nothing backfilled.** `CompetitionParticipant.currentRank` stays at its join-time `0` until settlement writes it, and three readers trusted it: `lib/actions/dashboard/process-competitions.ts` built Best/Avg rank from the stored value (so every running contest was dropped) and counted `0 <= 3` as a podium; `ContestsSidebar.tsx` printed `#0`; and `lib/actions/user/profile.actions.ts` had no rank for contests settled before the seat was written. Fixed by using the card's own live `computedRank`, treating `0` as absent (dash, never `#0`), and falling back to `Competition.finalLeaderboard` on the profile. The sidebar cell now reads **Best rank** rather than Avg rank. **Not changed, recorded:** `apps/admin/lib/actions/user/profile.actions.ts` and `lib/services/unified-user-stats.service.ts` still read the stored rank the same way.
+
+"Suggested for you" (`components/dashboard/GameSuggestionsCard.tsx`) was a plain list; it is now a card grid in the "Play by game" frame with game artwork, game name, Live/Upcoming badge, start time, entry fee, prize pool and seats. `suggestOpenContests` now also returns `gameLabel`, `artSrc` (via the now-exported `resolvePlayArt`), `prizePool`, `currentParticipants` and `maxParticipants`; a catalogue failure leaves the suggestions in place without artwork. Still suggestions only (X14). **Never verified by eye.**
+
 ### 1 Oct 2026 - "Everyone at once" for every game (`21` s4.1v)
 
 Owner: everyone-at-once worked for Volt Velocity only; other games started as soon as a player

@@ -178,16 +178,22 @@ export async function processCompetitionParticipations(params: {
     } else if (competition.status === "completed") {
       processedCompetitions.completed.push(compData);
 
-      if (participation.currentRank === 1) processedCompetitions.stats.won++;
-      if (participation.currentRank <= 3)
+      if (computedRank === 1) processedCompetitions.stats.won++;
+      // Reason: 0 means "no rank recorded", not a podium - `0 <= 3` counted every
+      // unranked finish as a top-three.
+      if (computedRank > 0 && computedRank <= 3)
         processedCompetitions.stats.topThreeFinishes++;
     }
 
-    if (participation.currentRank > 0) {
-      totalRankSum += participation.currentRank;
+    // Reason: the stored currentRank stays 0 on a live contest until settlement writes
+    // it, so reading it here dropped every running contest from Best/Avg rank and the
+    // sidebar showed 0. `computedRank` is the live rank the card itself displays, and
+    // falls back to the stored value for finished contests.
+    if (computedRank > 0) {
+      totalRankSum += computedRank;
       rankedCount++;
-      if (participation.currentRank < processedCompetitions.stats.bestRank) {
-        processedCompetitions.stats.bestRank = participation.currentRank;
+      if (computedRank < processedCompetitions.stats.bestRank) {
+        processedCompetitions.stats.bestRank = computedRank;
       }
     }
   }

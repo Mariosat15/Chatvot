@@ -87,6 +87,7 @@ interface ContestsSidebarProps {
       won: number;
       topThreeFinishes: number;
       averageRank: number;
+      bestRank: number;
     };
   };
   challenges: {
@@ -676,9 +677,11 @@ export default function ContestsSidebar({
             </div>
             <div>
               <div className="text-lg font-bold text-blue-400">
-                #{competitions.stats.averageRank.toFixed(0) || "–"}
+                {competitions.stats.bestRank > 0
+                  ? `#${competitions.stats.bestRank}`
+                  : "–"}
               </div>
-              <div className="text-[11px] text-gray-500">Avg {terms.rank}</div>
+              <div className="text-[11px] text-gray-500">Best {terms.rank}</div>
             </div>
           </div>
 

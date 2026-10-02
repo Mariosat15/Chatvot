@@ -277,8 +277,25 @@ export async function getUserCompetitionStats(
         .filter((c: any) => c.status === "completed")
         .map((c: any) => c._id.toString()),
     );
+    // Reason: contests settled before settlement wrote `currentRank` onto the seat still
+    // hold the join-time 0, so the profile showed no best rank for real finishes. The
+    // competition's stored finalLeaderboard has the rank; read it as the fallback.
+    const finalRankByCompetition = new Map<string, number>();
+    for (const c of competitionsData as any[]) {
+      const row = Array.isArray(c.finalLeaderboard)
+        ? c.finalLeaderboard.find((r: any) => String(r?.userId) === String(targetUserId))
+        : undefined;
+      if (row && Number(row.rank) > 0) {
+        finalRankByCompetition.set(c._id.toString(), Number(row.rank));
+      }
+    }
+    const rankOf = (p: any): number =>
+      Number(p.currentRank) > 0
+        ? Number(p.currentRank)
+        : (finalRankByCompetition.get(p.competitionId?.toString()) ?? 0);
 
     participations.forEach((p: any) => {
+      const rank = rankOf(p);
       totalCapitalTraded += p.startingCapital || 0;
       totalPnl += p.pnl || 0;
       totalTrades += p.totalTrades || 0;
@@ -293,7 +310,7 @@ export async function getUserCompetitionStats(
         totalLoss += Math.abs(p.averageLoss) * p.losingTrades;
 
       // Best performances (include active competitions)
-      if (p.currentRank && p.currentRank < bestRank) bestRank = p.currentRank;
+      if (rank > 0 && rank < bestRank) bestRank = rank;
       if ((p.pnl || 0) > bestPnl) bestPnl = p.pnl || 0;
       if ((p.pnlPercentage || 0) > bestRoi) bestRoi = p.pnlPercentage || 0;
 
@@ -307,8 +324,8 @@ export async function getUserCompetitionStats(
       const isCompleted = completedCompetitionIds.has(
         p.competitionId?.toString(),
       );
-      if (isCompleted && p.currentRank === 1) competitionsWon++;
-      if (isCompleted && p.currentRank && p.currentRank <= 3) podiumFinishes++;
+      if (isCompleted && rank === 1) competitionsWon++;
+      if (isCompleted && rank > 0 && rank <= 3) podiumFinishes++;
     });
 
     const overallWinRate =
