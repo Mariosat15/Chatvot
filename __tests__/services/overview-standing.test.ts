@@ -19,7 +19,6 @@ import {
 } from "@/lib/utils/overview-rank-badge";
 import type { PlayerGameProfile } from "@/lib/services/games/player-game-stats.service";
 import type { BrowsableGame } from "@/lib/services/games/player-catalogue.service";
-import { readFileSync } from "node:fs";
 
 const ROOT = process.cwd();
 
@@ -574,9 +573,9 @@ describe("Overview streaks chrome", () => {
     expect(progress).toMatch(/OVERVIEW_COMPETE_ART\.viewLeaderboard/);
     expect(progress).not.toMatch(/OVERVIEW_COMPETE_ART\.crown/);
     // Reason: loom/press must match Matching Cards — brightness + scale, not scale alone.
-    expect(progress).toMatch(
-      // Flipped 3 Oct 2026: the loom (hover:scale-110) gave way to the shared small press.
-    );
+    // Flipped 3 Oct 2026: the loom (hover:scale-110) gave way to the shared small press.
+    expect(progress).toMatch(/\$\{PRESS_EFFECT\} \$\{ART_BUTTON_HOVER\}/);
+    expect(progress).not.toMatch(/hover:scale-110/);
     expect(progress).toMatch(/sm:col-span-2/);
     expect(progress).toMatch(/missions\.map/);
     expect(progress).toMatch(/Math\.round\(progressPercent\)/);
@@ -934,7 +933,10 @@ describe("Overview streaks chrome", () => {
     expect(suggestions).toMatch(/const PRIZE_ICON_BOX = "relative h-\[54px\] w-\[54px\] shrink-0"/);
     expect(suggestions).toMatch(/className=\{PRIZE_ICON_BOX\}/);
     expect(suggestions).toMatch(/h-\[72px\]/);
-    expect(suggestions).toMatch(/formatVolts\(c\.prizePool as number, \{ bare: true \}\)/);
+    // Reason: owner 3 Oct 2026 (later) - "the prize is not listed": the pool
+    // falls back to its ceiling, so the formatter takes the resolved amount.
+    // Flipped, not deleted.
+    expect(suggestions).toMatch(/formatVolts\(prizeAmount, \{ bare: true \}\)/);
     expect(suggestions).toMatch(/items-baseline[\s\S]{0,200}\{prizeNumber\}[\s\S]{0,200}\{creditSymbol\}/);
     expect(suggestions).not.toMatch(/object-cover object-right/);
 
@@ -966,6 +968,44 @@ describe("Overview streaks chrome", () => {
     );
     expect(labelSpan).not.toMatch(/rounded-full/);
     expect(labelSpan).not.toMatch(/bg-/);
+  });
+
+  it("Suggested card speaks for the competition: its own description first, its own prize", () => {
+    // Reason: owner 3 Oct 2026 - "takes the title and wording from the actual
+    // competition... take the prize from comp as well". The game tagline used
+    // to lead the blurb and an unjoined contest's pool (0) rendered "-".
+    const strip = (s: string) =>
+      s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+    const service = strip(
+      readFileSync(join(ROOT, "lib/services/games/game-suggestions.service.ts"), "utf8"),
+    );
+    const card = strip(
+      readFileSync(join(ROOT, "components/dashboard/GameSuggestionsCard.tsx"), "utf8"),
+    );
+
+    // Title is the competition's name, never the game's.
+    expect(service).toMatch(/name:\s*c\.name,/);
+    // Blurb order: competition description -> game tagline -> game description.
+    const blurbStart = service.indexOf("const blurb =");
+    const blurbEnd = service.indexOf(";", blurbStart);
+    expect(blurbStart).toBeGreaterThan(-1);
+    const blurb = service.slice(blurbStart, blurbEnd);
+    expect(blurb.length).toBeGreaterThan(40);
+    const own = blurb.indexOf("c.description");
+    const tagline = blurb.indexOf("cat?.tagline");
+    const catDesc = blurb.indexOf("cat?.description");
+    expect(own).toBeGreaterThan(-1);
+    expect(tagline).toBeGreaterThan(own);
+    expect(catDesc).toBeGreaterThan(tagline);
+
+    // Prize: the competition's pool, else its ceiling (fee x seats), else null.
+    expect(service).toMatch(/prizePoolMax\s*=\s*entryFee > 0 && seats !== null \? entryFee \* seats : null/);
+    expect(service).toMatch(/prizePoolMax,/);
+    // The card prefers the collected pool and labels a ceiling as "up to".
+    expect(card).toMatch(/isPositive\(c\.prizePool\)\s*\?\s*c\.prizePool\s*:\s*isPositive\(c\.prizePoolMax\)/);
+    expect(card).toMatch(/prizeIsMaximum \? "Prize up to" : "Prize"/);
+    // An absent amount is still a dash, never 0.
+    expect(card).toMatch(/hasPrize \? formatVolts\(prizeAmount, \{ bare: true \}\) : "-"/);
   });
 
   it("every Suggested-for-you asset is a transparent PNG, never a black canvas", async () => {

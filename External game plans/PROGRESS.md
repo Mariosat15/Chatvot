@@ -931,6 +931,15 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 3 October 2026 - Suggested cards speak for the competition: its own wording, its own prize
+
+- **Owner request:** "take the title and wording from the actual competition ... the prize is not listed fix it to take the prize from comp as well".
+- **Nothing was computed wrongly; no risk number; nothing backfilled.** The title was already the competition's `name`. The description led with the **game's** catalogue tagline, so every contest of one game read identically; it now leads with the competition's own `description`, then tagline, then catalogue description (`game-suggestions.service.ts`).
+- **Why the prize read "-":** `prizePool` starts at 0 and grows by one entry fee per entrant (`contest-entry.service.ts`), so every contest nobody has joined yet showed a dash. The service now also returns `prizePoolMax` = entry fee x seats, the same raw basis as the pool the lobby shows. The card shows the collected pool when there is one, otherwise **"Prize up to"** the ceiling, and a dash only for a free or seat-unlimited contest with nothing collected. The ceiling is gross, as the lobby's pool figure is. It is not net of the platform fee, because the card must not show a second number that disagrees with the lobby.
+- The undeclared `prizePoolCredits` / `entryFeeCredits` fallbacks some screens read were deliberately **not** copied in: no schema declares them, so nothing writes them.
+- Pinned in `__tests__/services/overview-standing.test.ts`; the old `formatVolts(c.prizePool ...)` assertion was **flipped, not deleted**. Two probes (tagline first again; ceiling dropped) each turn exactly 1 red. The same file also had a duplicate `readFileSync` import and an argument-less `toMatch()` left by an earlier sweep; both are fixed, and the latter now asserts the shared press.
+- **Never verified by eye.**
+
 ### 3 October 2026 - One small press for every player-side button; new Challenge art; Suggested covers fill the width
 
 - **Owner request:** "make them the same when hover and press ... the button effect will be small press like the buttons in competition for all buttons in app user side", replace the Challenge button with the supplied art, and "the images must fill the left and right space".

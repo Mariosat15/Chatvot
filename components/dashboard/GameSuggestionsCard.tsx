@@ -20,6 +20,7 @@ interface Suggestion {
   gameLabel?: string;
   artSrc?: string;
   prizePool?: number;
+  prizePoolMax?: number | null;
   currentParticipants?: number;
   maxParticipants?: number | null;
   blurb?: string;
@@ -86,12 +87,21 @@ function SuggestionTile({
   const isPrivate = c.visibility === "gm_private";
   const isGmFunded = c.fundingMode === "gm_funded";
   const isLive = c.status === "active";
-  // Reason: prizePool is authoritative; absent/zero renders a dash, never entry fee.
-  const hasPrize =
-    typeof c.prizePool === "number" && Number.isFinite(c.prizePool) && c.prizePool > 0;
+  // Reason: the competition's collected pool wins; before anyone has entered it
+  // is 0, so the card quotes the pool's ceiling as "Up to" instead of a dash
+  // (owner, 3 Oct 2026). A dash only when the contest has neither figure.
+  const isPositive = (n: unknown): n is number =>
+    typeof n === "number" && Number.isFinite(n) && n > 0;
+  const prizeAmount = isPositive(c.prizePool)
+    ? c.prizePool
+    : isPositive(c.prizePoolMax)
+      ? c.prizePoolMax
+      : null;
+  const hasPrize = prizeAmount !== null;
+  const prizeIsMaximum = hasPrize && !isPositive(c.prizePool);
   // Reason: number and symbol are rendered as two baseline-aligned spans, so the
   // volt glyph sits on the number's baseline instead of floating inside one string.
-  const prizeNumber = hasPrize ? formatVolts(c.prizePool as number, { bare: true }) : "-";
+  const prizeNumber = hasPrize ? formatVolts(prizeAmount, { bare: true }) : "-";
   return (
     <Link
       href={`/competitions/${c.competitionId}`}
@@ -165,7 +175,7 @@ function SuggestionTile({
           )}
         </div>
 
-        {/* 3–5. Game label → competition title → description */}
+        {/* 3–5. Game label → competition title → the competition's own description (game copy only as fallback) */}
         <div className="mt-2.5 min-w-0">
           <p className="truncate text-[12px] font-bold uppercase tracking-[0.14em] text-cyan-300">
             {c.gameLabel ?? "Game"}
@@ -222,7 +232,7 @@ function SuggestionTile({
           </span>
           <div className="flex min-w-0 flex-1 flex-col justify-center">
             <p className="text-[12px] font-bold uppercase leading-none tracking-[0.16em] text-amber-200">
-              Prize
+              {prizeIsMaximum ? "Prize up to" : "Prize"}
             </p>
             <p className="mt-1.5 flex min-w-0 items-baseline gap-1 leading-none text-white">
               <span className="truncate text-[24px] font-extrabold tabular-nums">

@@ -33,10 +33,22 @@ export interface GameSuggestion {
    * (3 Oct 2026) and the owner reverted it, so the plate is only the last resort.
    */
   artSrc: string;
+  /** The competition's own pool, the figure its lobby shows. */
   prizePool: number;
+  /**
+   * The most that pool can reach: entry fee x seats, same basis as `prizePool`.
+   * Reason: the pool grows by one fee per entrant (contest-entry.service), so a
+   * contest nobody has joined yet reads 0 and the card said nothing (owner,
+   * 3 Oct 2026). Null when the contest is free or has no seat limit, because
+   * neither has a ceiling to quote.
+   */
+  prizePoolMax: number | null;
   currentParticipants: number;
   maxParticipants: number | null;
-  /** Short blurb under the contest name — catalogue tagline, then description. */
+  /**
+   * Short blurb under the contest name — the competition's own description,
+   * then the catalogue tagline, then the catalogue description.
+   */
   blurb: string;
   visibility: "public" | "gm_private";
   fundingMode: "player_paid" | "gm_funded";
@@ -102,27 +114,35 @@ export async function suggestOpenContests(
   return contests.map((c) => {
     const cat = byKey.get(c.gameKey);
     const isTrading = c.gameKey === TRADING_GAME_TYPE;
+    // Reason: owner, 3 Oct 2026 - the card must read like the competition it
+    // opens, so the operator's own wording leads and the game's copy is only
+    // the fallback for a contest written without one.
     const blurb =
-      (cat?.tagline && cat.tagline.trim()) ||
       (c.description && c.description.trim()) ||
+      (cat?.tagline && cat.tagline.trim()) ||
       (cat?.description && cat.description.trim()) ||
       "";
+    const prizePool = c.prizePool || 0;
+    const entryFee = c.entryFee || 0;
+    const seats =
+      typeof c.maxParticipants === "number" && c.maxParticipants > 0
+        ? c.maxParticipants
+        : null;
+    const prizePoolMax = entryFee > 0 && seats !== null ? entryFee * seats : null;
     return {
       gameKey: c.gameKey,
       competitionId: c._id.toString(),
       name: c.name,
-      entryFee: c.entryFee ?? 0,
+      entryFee,
       startTime: c.startTime,
       status: c.status,
       reason: "played_before" as const,
       gameLabel: cat?.displayName ?? (isTrading ? "Trading" : "Game"),
       artSrc: c.imageUrl?.trim() || resolvePlayArt(cat, isTrading),
-      prizePool: c.prizePool ?? 0,
+      prizePool,
+      prizePoolMax,
       currentParticipants: c.currentParticipants ?? 0,
-      maxParticipants:
-        typeof c.maxParticipants === "number" && c.maxParticipants > 0
-          ? c.maxParticipants
-          : null,
+      maxParticipants: seats,
       blurb: blurb.length > 120 ? `${blurb.slice(0, 117).trimEnd()}…` : blurb,
       // Reason: absent visibility / fundingMode resolve like the rest of the platform
       // (invariant 5 / player-paid default) — never invent gm_private or gm_funded.
