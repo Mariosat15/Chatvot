@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   buildTopPlayCards,
@@ -8,6 +8,7 @@ import {
 } from "@/lib/services/games/overview-standing.service";
 import {
   allOverviewAssets,
+  OVERVIEW_COMPETE_ART,
   overviewPlayCardArt,
   SUGGESTED_PRIZE_ART,
   SUGGESTED_UI_ART,
@@ -653,6 +654,20 @@ describe("Overview streaks chrome", () => {
     expect(cardFooter).toMatch(/OVERVIEW_COMPETE_ART\.challenge/);
     expect(cardFooter).toMatch(/OVERVIEW_COMPETE_ART\.matchingCards/);
     expect((cardFooter.match(/\$\{ART_ACTION\}/g) ?? []).length).toBe(2);
+    // Reason: owner, 3 Oct 2026 - both footer buttons must be the same size.
+    // With object-contain, an art draws at full column width only when the box
+    // is no wider (relative to its height) than the art itself. Read both PNG
+    // headers so a replacement art with a taller shape fails here, not on screen.
+    const artAction = compete.match(/const ART_ACTION =\s*`([^`]*)`/)?.[1] ?? "";
+    expect(artAction).not.toMatch(/\bh-\d/);
+    const aspect = artAction.match(/aspect-\[(\d+)\/(\d+)\]/);
+    expect(aspect).not.toBeNull();
+    const boxRatio = Number(aspect![1]) / Number(aspect![2]);
+    for (const src of [OVERVIEW_COMPETE_ART.challenge, OVERVIEW_COMPETE_ART.matchingCards]) {
+      const png = readFileSync(join(process.cwd(), "public", src));
+      const artRatio = png.readUInt32BE(16) / png.readUInt32BE(20);
+      expect(boxRatio).toBeLessThanOrEqual(artRatio);
+    }
     // Reason: header Matching Cards survives only for the empty state.
     expect(compete).toMatch(
       /matches\.length === 0 && !loading && \([\s\S]*?MATCHING_CARDS_HREF/,

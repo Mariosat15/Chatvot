@@ -18,10 +18,15 @@ import { PERFORMANCE_INTERVALS } from "@/lib/utils/performance";
 const MATCHING_CARDS_HREF = "/leaderboard?board=trading&view=cards";
 
 // Reason: owner, 29 Sep 2026 - card footer uses the supplied neon button art
-// (Challenge + Matching Cards), not CSS pills. Shared height so they sit even;
-// hover brightens, press shrinks, always a hand cursor.
+// (Challenge + Matching Cards), not CSS pills. Hover brightens, press shrinks,
+// always a hand cursor.
+// Reason: owner, 3 Oct 2026 - "make sure both buttons have the same size". The
+// two arts have different shapes (Challenge 1000x251, Matching Cards 1021x316),
+// so a fixed h-12 box made Matching Cards hit the height first and draw
+// narrower. A box no wider than 16:5 is narrower than BOTH arts' ratios, so
+// each fills the full column width and the two read as one size.
 const ART_ACTION =
-  `relative block h-12 w-full min-w-0 cursor-pointer ${PRESS_EFFECT} ${ART_BUTTON_HOVER}`;
+  `relative block aspect-[16/5] w-full min-w-0 cursor-pointer ${PRESS_EFFECT} ${ART_BUTTON_HOVER}`;
 
 const COMPETE_TILE =
   "flex min-h-[58px] items-center gap-3 rounded-lg border border-cyan-400/30 bg-[#07101f]/90 px-3 py-2 shadow-[inset_0_0_12px_rgba(34,211,238,0.06)]";
