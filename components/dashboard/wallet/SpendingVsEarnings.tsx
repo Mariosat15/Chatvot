@@ -1,9 +1,10 @@
 "use client";
 
 import { useMemo } from "react";
-import { PieChart } from "lucide-react";
 import { formatVolts } from "@/lib/utils/format-volts";
+import { WALLET_ART } from "@/lib/services/games/wallet-assets";
 import { AnalyticsCard } from "./AnalyticsCard";
+import WalletNeonIcon from "./WalletNeonIcon";
 
 export type SpendingSlice = {
   key: string;
@@ -47,7 +48,14 @@ export default function SpendingVsEarnings({ slices }: { slices: SpendingSlice[]
     <AnalyticsCard
       title="Spending vs Earnings"
       subtitle="Compare your spending with earnings and prizes."
-      icon={<PieChart className="h-4 w-4" />}
+      icon={
+        <WalletNeonIcon
+          src={WALLET_ART.spend}
+          size={32}
+          ringClass="ring-pink-400/45"
+          bgClass="bg-pink-500/15"
+        />
+      }
       accent="magenta"
       bodyClassName="justify-center"
     >
@@ -74,7 +82,7 @@ export default function SpendingVsEarnings({ slices }: { slices: SpendingSlice[]
                 strokeDasharray={a.dash}
                 strokeLinecap="butt"
                 transform={`rotate(${a.rot} 70 70)`}
-                style={{ filter: `drop-shadow(0 0 4px ${a.color})` }}
+                style={{ filter: `drop-shadow(0 0 8px ${a.color})` }}
               />
             ))}
           </svg>

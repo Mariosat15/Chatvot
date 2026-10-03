@@ -922,6 +922,37 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 3 October 2026 - Wallet Analytics matches Overview glow (backdrop + neon tiles)
+
+**Owner report:** Wallet Analytics (image 1) had no mountain background and looked
+plain next to the target mock (image 2) and the Overview tab — Lucide chips,
+opaque cards, charts without glow.
+
+**Built (main app only).**
+- `WalletBackdrop` — same wash pattern as Overview, art from `WALLET_ART.backdrop`
+  (`public/assets/neon/wallet/hero-backdrop-b.png`, already synced from
+  `menu items/ui/wallet items`).
+- KPI, Insights, Header and chart panel titles use `WalletNeonIcon` + `WALLET_ART`
+  with `object-contain` (Overview icon language). Lucide chips removed from those
+  surfaces.
+- Cards are glass (`backdrop-blur` + translucent fills) so the ridge shows through.
+- Balance trend: stronger gold fill, SVG glow filter, visible dots. Breakdown /
+  flow bars and the donut get drop-shadow glow.
+- Tests flipped in `wallet-analytics.test.ts`. **Never verified by eye.**
+
+### 3 October 2026 - Overview Suggested for you banners no longer cropped
+
+**Owner report:** the contest artwork on the overview "Suggested for you" cards was
+cut off at the top (COMPETITIONS / COMPETE LIVE sliced by the frame).
+
+**Cause:** a fixed `h-20` strip with `object-cover` — the same crop that
+`GamePageContests` already refused for operator banners with baked-in copy.
+
+**Fix (main app only):** `GameSuggestionsCard` now uses natural height +
+`object-contain` / `object-center`, so whatever aspect ratio the upload is, the
+full banner shows centered. Loading skeleton height raised to match. Guard in
+`overview-standing.test.ts`. **Never verified by eye** (behind sign-in).
+
 ### 2 October 2026 - Every Game Master setting on one screen: Manage Game Masters -> Settings
 
 **Owner request:** the Game Master settings were spread across two places, so put them together.

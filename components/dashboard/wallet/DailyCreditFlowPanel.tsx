@@ -11,8 +11,9 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { ArrowUpDown } from "lucide-react";
+import { WALLET_ART } from "@/lib/services/games/wallet-assets";
 import { AnalyticsCard, ChartRangeSelector } from "./AnalyticsCard";
+import WalletNeonIcon from "./WalletNeonIcon";
 import { WALLET_GOLD, WALLET_RED, WALLET_TEAL, type WalletRange } from "./wallet-tokens";
 
 type FlowPoint = { date: string; net: number };
@@ -45,7 +46,14 @@ export default function DailyCreditFlowPanel({
     <AnalyticsCard
       title="Daily Credit Flow"
       subtitle="Daily net credit movement in your wallet."
-      icon={<ArrowUpDown className="h-4 w-4" />}
+      icon={
+        <WalletNeonIcon
+          src={WALLET_ART.netMovement}
+          size={32}
+          ringClass="ring-cyan-400/45"
+          bgClass="bg-cyan-500/15"
+        />
+      }
       accent="cyan"
       controls={<ChartRangeSelector value={range} onChange={onRangeChange} />}
       bodyClassName="pt-2"
@@ -103,9 +111,20 @@ export default function DailyCreditFlowPanel({
                   "Net",
                 ]}
               />
-              <Bar dataKey="net" radius={[3, 3, 0, 0]} maxBarSize={18}>
+              <Bar
+                dataKey="net"
+                radius={[4, 4, 4, 4]}
+                maxBarSize={20}
+                style={{ filter: "drop-shadow(0 0 6px rgba(16,185,129,0.35))" }}
+              >
                 {data.map((entry) => (
-                  <Cell key={entry.date} fill={barColor(entry.net)} />
+                  <Cell
+                    key={entry.date}
+                    fill={barColor(entry.net)}
+                    style={{
+                      filter: `drop-shadow(0 0 6px ${barColor(entry.net)}88)`,
+                    }}
+                  />
                 ))}
               </Bar>
             </BarChart>

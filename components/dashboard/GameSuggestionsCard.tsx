@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Clock, Gamepad2, Sparkles, Trophy, Users } from "lucide-react";
 import { formatVolts } from "@/lib/utils/format-volts";
@@ -26,7 +25,7 @@ interface Suggestion {
 const SECTION_FRAME =
   "rounded-2xl border border-sky-400/35 bg-[#050B18]/40 p-3 shadow-[0_0_18px_-6px_rgba(56,189,248,0.45),inset_0_0_14px_rgba(56,189,248,0.06)]";
 const CARD =
-  "group relative flex h-full min-h-[168px] flex-col overflow-hidden rounded-xl border border-sky-400/45 bg-[#0A0F1F]/80 shadow-[0_0_12px_-2px_rgba(56,189,248,0.45)] transition hover:-translate-y-0.5 hover:border-sky-300/80 hover:shadow-[0_0_18px_0_rgba(56,189,248,0.6)] focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60 motion-reduce:transition-none motion-reduce:hover:translate-y-0";
+  "group relative flex h-full flex-col overflow-hidden rounded-xl border border-sky-400/45 bg-[#0A0F1F]/80 shadow-[0_0_12px_-2px_rgba(56,189,248,0.45)] transition hover:-translate-y-0.5 hover:border-sky-300/80 hover:shadow-[0_0_18px_0_rgba(56,189,248,0.6)] focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60 motion-reduce:transition-none motion-reduce:hover:translate-y-0";
 
 /** "Starts in 2h 15m" / "Starts in 3d" / "Live now" — coarse on purpose; the lobby has the exact clock. */
 function startLabel(startTime: string, status: string, now: number): string {
@@ -57,19 +56,25 @@ function SuggestionTile({
 
   return (
     <Link href={`/competitions/${c.competitionId}`} className={CARD} aria-label={`Open ${c.name}`}>
-      <div className="relative h-20 w-full shrink-0 overflow-hidden">
+      {/*
+        Reason: contest banners are operator artwork with baked-in copy
+        (titles, icons, taglines). A fixed h-20 + object-cover box sliced
+        those off (owner report, overview Suggested for you). Natural height
+        + contain auto-supports whatever ratio the upload is — same fix as
+        GamePageContests.
+      */}
+      <div className="relative w-full shrink-0 overflow-hidden bg-gradient-to-br from-sky-900/40 to-indigo-900/30">
         {c.artSrc ? (
-          <Image
+          // eslint-disable-next-line @next/next/no-img-element -- unknown aspect; natural height must win
+          <img
             src={c.artSrc}
             alt=""
-            fill
-            sizes="(min-width: 1280px) 25vw, (min-width: 640px) 50vw, 100vw"
-            className="object-cover object-center opacity-85 transition duration-300 group-hover:scale-105 motion-reduce:transition-none motion-reduce:group-hover:scale-100"
+            className="mx-auto block h-auto w-full object-contain object-center opacity-90 transition duration-300 group-hover:scale-105 motion-reduce:transition-none motion-reduce:group-hover:scale-100"
           />
         ) : (
-          <div className="absolute inset-0 bg-gradient-to-br from-sky-900/40 to-indigo-900/30" />
+          <div className="aspect-[16/9]" aria-hidden />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#0A0F1F] via-[#0A0F1F]/40 to-transparent" />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#0A0F1F] via-[#0A0F1F]/30 to-transparent" />
         <span
           className={`absolute left-2 top-2 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider backdrop-blur-sm ${
             live
@@ -159,7 +164,7 @@ export default function GameSuggestionsCard({
         <div className="mb-3 h-4 w-40 animate-pulse rounded bg-sky-400/10" />
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="h-[168px] animate-pulse rounded-xl border border-sky-400/15 bg-[#0A0F1F]/60" />
+            <div key={i} className="h-[220px] animate-pulse rounded-xl border border-sky-400/15 bg-[#0A0F1F]/60" />
           ))}
         </div>
       </section>

@@ -1,20 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import {
-  ArrowDownToLine,
-  ArrowUpFromLine,
-  Coins,
-  Gamepad2,
-  Gift,
-  Lightbulb,
-  ShoppingCart,
-  Trophy,
-  type LucideIcon,
-} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatVolts } from "@/lib/utils/format-volts";
+import { WALLET_ART } from "@/lib/services/games/wallet-assets";
 import { Sparkline } from "./AnalyticsCard";
+import WalletNeonIcon from "./WalletNeonIcon";
 import { WALLET_CATEGORY } from "./wallet-tokens";
 
 export type InsightItem = {
@@ -32,14 +23,14 @@ export type InsightItem = {
   spark: number[];
 };
 
-const ICONS: Record<InsightItem["key"], LucideIcon> = {
-  deposits: ArrowDownToLine,
-  withdrawals: ArrowUpFromLine,
-  purchases: ShoppingCart,
-  gameEarnings: Gamepad2,
-  bonuses: Gift,
-  prizes: Trophy,
-  net: Coins,
+const ART: Record<InsightItem["key"], string> = {
+  deposits: WALLET_ART.deposits,
+  withdrawals: WALLET_ART.withdrawals,
+  purchases: WALLET_ART.purchases,
+  gameEarnings: WALLET_ART.gameEarnings,
+  bonuses: WALLET_ART.bonuses,
+  prizes: WALLET_ART.prizes,
+  net: WALLET_ART.netMovement,
 };
 
 const COLORS: Record<InsightItem["key"], string> = {
@@ -63,16 +54,19 @@ const BORDERS: Record<InsightItem["key"], string> = {
 };
 
 /**
- * Wallet Insights — seven compact cards (rebuild guide §12).
+ * Wallet Insights — seven neon-tile cards (Overview icon language).
  */
 export default function WalletInsights({ items }: { items: InsightItem[] }) {
   return (
-    <section className="rounded-[16px] border border-cyan-400/25 bg-[linear-gradient(135deg,rgba(9,22,45,0.96)_0%,rgba(3,10,25,0.96)_100%)] p-4 shadow-[0_0_18px_rgba(0,229,255,0.06)] sm:p-5">
+    <section className="rounded-[16px] border border-cyan-400/30 bg-[linear-gradient(135deg,rgba(9,22,45,0.68)_0%,rgba(3,10,25,0.76)_100%)] p-4 shadow-[0_0_22px_rgba(0,229,255,0.1)] backdrop-blur-md sm:p-5">
       <div className="mb-3.5 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/15 ring-1 ring-amber-400/40 text-amber-300">
-            <Lightbulb className="h-4 w-4" aria-hidden />
-          </div>
+          <WalletNeonIcon
+            src={WALLET_ART.insights}
+            size={36}
+            ringClass="ring-amber-400/45"
+            bgClass="bg-amber-500/15"
+          />
           <div>
             <h3 className="text-base font-semibold text-white">Wallet Insights</h3>
             <p className="text-[11px] text-slate-400 sm:text-xs">
@@ -82,7 +76,7 @@ export default function WalletInsights({ items }: { items: InsightItem[] }) {
         </div>
         <Link
           href="/wallet"
-          className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-amber-400/45 bg-amber-500/10 px-3.5 py-1.5 text-xs font-semibold text-amber-200 transition-colors hover:border-amber-300/70 hover:bg-amber-500/20"
+          className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-amber-400/50 bg-amber-500/15 px-3.5 py-1.5 text-xs font-semibold text-amber-200 shadow-[0_0_12px_rgba(250,204,21,0.2)] transition-colors hover:border-amber-300/70 hover:bg-amber-500/25"
         >
           View All Transactions
           <span aria-hidden>→</span>
@@ -91,28 +85,23 @@ export default function WalletInsights({ items }: { items: InsightItem[] }) {
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-7">
         {items.map((item) => {
-          const Icon = ICONS[item.key];
           const color = COLORS[item.key];
           const up = (item.deltaPct ?? 0) >= 0;
           return (
             <div
               key={item.key}
               className={cn(
-                "rounded-xl border bg-black/35 px-2.5 py-2.5",
+                "rounded-xl border bg-black/40 px-2.5 py-2.5 shadow-[0_0_12px_rgba(0,0,0,0.25)]",
                 BORDERS[item.key],
               )}
             >
               <div className="mb-1.5 flex items-center gap-1.5">
-                <div
-                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md"
-                  style={{
-                    background: `${color}22`,
-                    boxShadow: `0 0 10px ${color}33`,
-                    color,
-                  }}
-                >
-                  <Icon className="h-3.5 w-3.5" aria-hidden />
-                </div>
+                <WalletNeonIcon
+                  src={ART[item.key]}
+                  size={24}
+                  ringClass="ring-white/20"
+                  bgClass="bg-black/50"
+                />
                 <span className="truncate text-[10px] font-semibold uppercase tracking-wider text-slate-400">
                   {item.label}
                 </span>

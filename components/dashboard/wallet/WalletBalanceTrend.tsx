@@ -9,8 +9,9 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { BarChart3 } from "lucide-react";
+import { WALLET_ART } from "@/lib/services/games/wallet-assets";
 import { AnalyticsCard, ChartRangeSelector } from "./AnalyticsCard";
+import WalletNeonIcon from "./WalletNeonIcon";
 import { WALLET_GOLD, type WalletRange } from "./wallet-tokens";
 
 type Point = { date: string; balance: number };
@@ -48,7 +49,14 @@ export default function WalletBalanceTrend({
     <AnalyticsCard
       title="Wallet Balance Trend"
       subtitle="Track your wallet balance over time with daily changes."
-      icon={<BarChart3 className="h-4 w-4" />}
+      icon={
+        <WalletNeonIcon
+          src={WALLET_ART.balance}
+          size={32}
+          ringClass="ring-amber-400/45"
+          bgClass="bg-amber-500/15"
+        />
+      }
       accent="gold"
       controls={<ChartRangeSelector value={range} onChange={onRangeChange} />}
       bodyClassName="pt-2"
@@ -66,26 +74,34 @@ export default function WalletBalanceTrend({
             >
               <defs>
                 <linearGradient id="walletGoldFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={WALLET_GOLD} stopOpacity={0.35} />
+                  <stop offset="0%" stopColor={WALLET_GOLD} stopOpacity={0.55} />
+                  <stop offset="55%" stopColor={WALLET_GOLD} stopOpacity={0.18} />
                   <stop offset="100%" stopColor={WALLET_GOLD} stopOpacity={0.02} />
                 </linearGradient>
+                <filter id="walletGoldGlow" x="-20%" y="-20%" width="140%" height="140%">
+                  <feGaussianBlur stdDeviation="3.5" result="blur" />
+                  <feMerge>
+                    <feMergeNode in="blur" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
               </defs>
               <CartesianGrid
                 strokeDasharray="3 3"
-                stroke="rgba(255,255,255,0.06)"
+                stroke="rgba(255,255,255,0.07)"
                 vertical={false}
               />
               <XAxis
                 dataKey="date"
                 tickFormatter={formatAxisDate}
-                tick={{ fill: "#64748B", fontSize: 11 }}
+                tick={{ fill: "#94A3B8", fontSize: 11 }}
                 axisLine={false}
                 tickLine={false}
                 minTickGap={28}
               />
               <YAxis
                 orientation="right"
-                tick={{ fill: "#64748B", fontSize: 11 }}
+                tick={{ fill: "#94A3B8", fontSize: 11 }}
                 axisLine={false}
                 tickLine={false}
                 width={48}
@@ -96,10 +112,11 @@ export default function WalletBalanceTrend({
               <Tooltip
                 contentStyle={{
                   background: "rgba(5,12,28,0.95)",
-                  border: `1px solid ${WALLET_GOLD}66`,
+                  border: `1px solid ${WALLET_GOLD}99`,
                   borderRadius: 10,
                   fontSize: 12,
                   color: "#fff",
+                  boxShadow: `0 0 18px ${WALLET_GOLD}55`,
                 }}
                 labelFormatter={(label) => formatTipDate(String(label))}
                 formatter={(value) => [
@@ -111,11 +128,12 @@ export default function WalletBalanceTrend({
                 type="monotone"
                 dataKey="balance"
                 stroke={WALLET_GOLD}
-                strokeWidth={2.5}
+                strokeWidth={3}
                 fill="url(#walletGoldFill)"
-                dot={false}
+                filter="url(#walletGoldGlow)"
+                dot={{ r: 3, fill: WALLET_GOLD, stroke: "#fff", strokeWidth: 1 }}
                 activeDot={{
-                  r: 5,
+                  r: 6,
                   fill: WALLET_GOLD,
                   stroke: "#fff",
                   strokeWidth: 2,

@@ -65,6 +65,7 @@ describe("Wallet Analytics page wiring", () => {
 
   it("composes the reference sections in order without enumerating game codes", () => {
     const page = readCode("components/dashboard/wallet/WalletAnalytics.tsx");
+    expect(page).toMatch(/WalletBackdrop/);
     expect(page).toMatch(/WalletAnalyticsHeader/);
     expect(page).toMatch(/WalletKpiGrid/);
     expect(page).toMatch(/WalletBalanceTrend/);
@@ -76,13 +77,15 @@ describe("Wallet Analytics page wiring", () => {
     expect(page).toMatch(/useState<WalletRange>\("30d"\)/);
     expect(page).not.toMatch(/circuit-sprint|circuit-perfect|gameCode|providerKey/);
 
-    // Order: header → KPI → balance/breakdown → flow/spend → insights
-    const idx = (s: string) => page.indexOf(s);
-    expect(idx("WalletAnalyticsHeader")).toBeLessThan(idx("WalletKpiGrid"));
-    expect(idx("WalletKpiGrid")).toBeLessThan(idx("WalletBalanceTrend"));
-    expect(idx("WalletBalanceTrend")).toBeLessThan(idx("CreditBreakdownPanel"));
-    expect(idx("DailyCreditFlowPanel")).toBeLessThan(idx("SpendingVsEarnings"));
-    expect(idx("SpendingVsEarnings")).toBeLessThan(idx("WalletInsights"));
+    // Order in the return tree (imports would reverse Backdrop vs Header).
+    const ret = page.slice(page.lastIndexOf("return ("));
+    const idx = (s: string) => ret.indexOf(s);
+    expect(idx("<WalletBackdrop")).toBeLessThan(idx("<WalletAnalyticsHeader"));
+    expect(idx("<WalletAnalyticsHeader")).toBeLessThan(idx("<WalletKpiGrid"));
+    expect(idx("<WalletKpiGrid")).toBeLessThan(idx("<WalletBalanceTrend"));
+    expect(idx("<WalletBalanceTrend")).toBeLessThan(idx("<CreditBreakdownPanel"));
+    expect(idx("<DailyCreditFlowPanel")).toBeLessThan(idx("<SpendingVsEarnings"));
+    expect(idx("<SpendingVsEarnings")).toBeLessThan(idx("<WalletInsights"));
   });
 
   it("insights strip has seven cards including Prizes Won and links to /wallet", () => {
@@ -114,13 +117,27 @@ describe("Wallet Analytics page wiring", () => {
     }
   });
 
-  it("KPI cards use Lucide chips matching the reference mock icons", () => {
+  it("KPI / insights / header use neon WALLET_ART tiles like Overview — not Lucide chips", () => {
+    // Reason: owner Oct 2026 — Wallet Analytics looked plain vs Overview; Lucide
+    // chips were the gap. Flipped from the Lucide assertion, not deleted.
     const kpi = readCode("components/dashboard/wallet/WalletKpiGrid.tsx");
+    const insights = readCode("components/dashboard/wallet/WalletInsights.tsx");
+    const header = readCode(
+      "components/dashboard/wallet/WalletAnalyticsHeader.tsx",
+    );
+    const backdrop = readCode("components/dashboard/wallet/WalletBackdrop.tsx");
     const page = readCode("components/dashboard/wallet/WalletAnalytics.tsx");
-    expect(kpi).toMatch(/Coins/);
-    expect(kpi).toMatch(/ShoppingCart/);
-    expect(kpi).toMatch(/Gamepad2/);
-    expect(kpi).toMatch(/Trophy/);
+    expect(kpi).toMatch(/WALLET_ART/);
+    expect(kpi).toMatch(/WalletNeonIcon/);
+    expect(kpi).toMatch(/object-contain/);
+    expect(kpi).not.toMatch(/from ["']lucide-react["']/);
+    expect(insights).toMatch(/WALLET_ART/);
+    expect(insights).toMatch(/WalletNeonIcon/);
+    expect(insights).not.toMatch(/from ["']lucide-react["']/);
+    expect(header).toMatch(/WALLET_ART\.header/);
+    expect(header).toMatch(/WalletNeonIcon/);
+    expect(backdrop).toMatch(/WALLET_ART\.backdrop/);
+    expect(backdrop).toMatch(/object-cover/);
     expect(page).toMatch(/label:\s*"Credit Balance"/);
     expect(page).toMatch(/label:\s*"Total Spend"/);
     expect(page).toMatch(/label:\s*"Game Earnings"/);

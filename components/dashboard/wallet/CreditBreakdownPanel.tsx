@@ -10,9 +10,10 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { PieChart } from "lucide-react";
 import { formatVolts } from "@/lib/utils/format-volts";
+import { WALLET_ART } from "@/lib/services/games/wallet-assets";
 import { AnalyticsCard } from "./AnalyticsCard";
+import WalletNeonIcon from "./WalletNeonIcon";
 import { WALLET_CATEGORY } from "./wallet-tokens";
 
 export type BreakdownDay = {
@@ -80,7 +81,14 @@ export default function CreditBreakdownPanel({
     <AnalyticsCard
       title="Credit Breakdown"
       subtitle="See how your credits are sourced and used."
-      icon={<PieChart className="h-4 w-4" />}
+      icon={
+        <WalletNeonIcon
+          src={WALLET_ART.netMovement}
+          size={32}
+          ringClass="ring-cyan-400/45"
+          bgClass="bg-cyan-500/15"
+        />
+      }
       accent="cyan"
       bodyClassName="gap-3 pt-2"
     >
@@ -143,8 +151,9 @@ export default function CreditBreakdownPanel({
                   dataKey={s.key}
                   name={s.label}
                   fill={s.color}
-                  radius={[2, 2, 0, 0]}
-                  maxBarSize={10}
+                  radius={[3, 3, 0, 0]}
+                  maxBarSize={12}
+                  style={{ filter: `drop-shadow(0 0 5px ${s.color}99)` }}
                 />
               ))}
             </BarChart>

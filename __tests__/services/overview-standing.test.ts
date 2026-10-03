@@ -781,6 +781,23 @@ describe("Overview streaks chrome", () => {
     expect(assets).not.toMatch(/hero-banner-chartvolt\.png/);
   });
 
+  it("Suggested for you shows full contest banners — natural height + contain, never a cropped strip", () => {
+    // Reason: owner report Oct 2026 — fixed h-20 + object-cover sliced baked-in
+    // titles (COMPETITIONS / COMPETE LIVE) off the top of overview cards. Same
+    // auto-fit as GamePageContests: whatever ratio the upload is, show it whole.
+    const suggestions = readFileSync(
+      join(ROOT, "components/dashboard/GameSuggestionsCard.tsx"),
+      "utf8",
+    )
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    expect(suggestions).toMatch(/object-contain/);
+    expect(suggestions).toMatch(/h-auto w-full/);
+    expect(suggestions).toMatch(/object-center/);
+    expect(suggestions).not.toMatch(/h-20/);
+    expect(suggestions).not.toMatch(/object-cover/);
+  });
+
   it("Play by Game caption distinguishes discovery from most-played", () => {
     const ui = readFileSync(
       join(ROOT, "components/dashboard/overview/OverviewPlayByGame.tsx"),

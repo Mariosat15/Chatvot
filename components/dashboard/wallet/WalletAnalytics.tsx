@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import type { ComprehensiveDashboardData } from "@/lib/actions/comprehensive-dashboard.actions";
 import WalletAnalyticsHeader from "./WalletAnalyticsHeader";
+import WalletBackdrop from "./WalletBackdrop";
 import WalletKpiGrid, { type KpiItem } from "./WalletKpiGrid";
 import WalletBalanceTrend from "./WalletBalanceTrend";
 import CreditBreakdownPanel, {
@@ -325,7 +326,7 @@ export default function WalletAnalytics({ overview, charts }: Props) {
   }, [breakdownRaw, breakdownTotals, flow]);
 
   return (
-    <div className="space-y-3.5 sm:space-y-4">
+    <WalletBackdrop>
       <WalletAnalyticsHeader rangeLabel={rangeLabel} />
       <WalletKpiGrid items={kpis} />
 
@@ -348,6 +349,6 @@ export default function WalletAnalytics({ overview, charts }: Props) {
       </div>
 
       <WalletInsights items={insights} />
-    </div>
+    </WalletBackdrop>
   );
 }

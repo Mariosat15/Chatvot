@@ -104,8 +104,9 @@ export function AnalyticsCard({
   return (
     <section
       className={cn(
-        "relative flex h-full flex-col overflow-hidden rounded-[16px] border",
-        "bg-[linear-gradient(135deg,rgba(9,22,45,0.96)_0%,rgba(3,10,25,0.96)_100%)]",
+        "relative flex h-full flex-col overflow-hidden rounded-[16px] border backdrop-blur-md",
+        // Reason: glass so the page mountain backdrop reads through (target mock).
+        "bg-[linear-gradient(135deg,rgba(9,22,45,0.72)_0%,rgba(3,10,25,0.78)_100%)]",
         a.border,
         a.glow,
         className,
@@ -113,17 +114,9 @@ export function AnalyticsCard({
     >
       <div className="flex min-h-[56px] items-start justify-between gap-3 border-b border-white/[0.06] px-4 py-3 sm:px-5 sm:py-3.5">
         <div className="flex min-w-0 items-start gap-2.5">
-          {icon ? (
-            <div
-              className={cn(
-                "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
-                a.iconBg,
-                a.iconText,
-              )}
-            >
-              {icon}
-            </div>
-          ) : null}
+          {/* Reason: callers supply a finished neon tile (Overview style); wrapping
+              again in a fixed chip would crop the glow. */}
+          {icon ? <div className="mt-0.5 shrink-0">{icon}</div> : null}
           <div className="min-w-0">
             <h3 className="text-[15px] font-semibold tracking-tight text-white sm:text-base">
               {title}
@@ -214,7 +207,23 @@ export function Sparkline({
     .join(" ");
   return (
     <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} aria-hidden>
-      <path d={d} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" />
+      <defs>
+        <filter id={`spark-glow-${color.replace("#", "")}`} x="-40%" y="-40%" width="180%" height="180%">
+          <feGaussianBlur stdDeviation="1.4" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
+      <path
+        d={d}
+        fill="none"
+        stroke={color}
+        strokeWidth="2.25"
+        strokeLinecap="round"
+        style={{ filter: `url(#spark-glow-${color.replace("#", "")})` }}
+      />
     </svg>
   );
 }
