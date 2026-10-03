@@ -955,7 +955,7 @@ transparent.
 - **Why blending was the wrong fix:** `mix-blend-screen` hides black only
   visually. The padding still takes up layout space, so the badges rendered tiny
   and the edges showed.
-- Tests in `overview-standing.test.ts` (28):
+- Tests in `overview-standing.test.ts` (27):
   - the clean-cover test was **flipped, not deleted**;
   - a new pixel test reads every Suggested asset and fails above 2% opaque black.
     Probed: the original `badge-private.png` is 79% black, the clear one 0%.

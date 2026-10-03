@@ -69,16 +69,26 @@ describe("games catalogue routes", () => {
     expect(card).toMatch(/line-clamp-2/);
   });
 
-  it("catalogue card artwork fills the whole image area", () => {
+  it("catalogue card artwork fills the area AND is never cropped (blurred cover backdrop + contain)", () => {
     const card = readCode(CARD);
-    // Reason (history): until 28 Sep 2026 this asserted aspect-[16/10] with
-    // object-contain, because object-cover sliced the ChartVolt / Circuit Sprint
-    // banners. The owner then asked for the artwork to fill the whole space (the
-    // letterboxed bands read as empty boxes), so the card is 16/8.5 with cover.
+    // Reason (history): until 28 Sep 2026 this asserted object-contain alone, which
+    // left empty letterbox bands; then cover alone, which sliced the banners' own
+    // text (owner, 3 Oct 2026: images must always be centred and display correctly
+    // whatever their shape). Flipped, not deleted: both failures stay pinned.
     // The shared aspect still keeps every card the same height.
     expect(card).toMatch(/aspect-\[16\/8\.5\]/);
-    expect(card).toMatch(/object-cover/);
-    expect(card).not.toMatch(/object-contain/);
+    const images = card.match(/<Image[\s\S]*?\/>/g) ?? [];
+    expect(images).toHaveLength(2);
+    const [backdrop, art] = images;
+    // Backdrop: decorative, fills the box, blurred so it reads as glow not content.
+    expect(backdrop).toMatch(/object-cover/);
+    expect(backdrop).toMatch(/blur-/);
+    expect(backdrop).toMatch(/aria-hidden/);
+    expect(backdrop).toMatch(/alt=""/);
+    // Artwork: drawn last (on top), whole, centred.
+    expect(art).toMatch(/object-contain object-center/);
+    expect(art).not.toMatch(/object-cover/);
+    expect(art).toMatch(/alt=\{banner\.alt\}/);
   });
 
   it("empty game page is designed, not a blank return", () => {
