@@ -155,7 +155,7 @@ export default function LiveCompetitions({
           <Link href={ctaLink}>
             <Button
               size="lg"
-              className="font-bold hover:scale-105 transition-all"
+              className="font-bold  transition-all"
               style={{
                 background: theme?.effects?.gradientStyle,
                 color: theme?.colors?.background,

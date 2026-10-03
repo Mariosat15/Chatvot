@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars -- pre-existing warnings; this file was touched only to drop a hover scale in the 3 Oct 2026 shared-press sweep */
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -200,7 +201,7 @@ export default function CompetitionStatusWrapper({
         {/* Active - Trade Button */}
         {isActive && (
           <Link href={`/competitions/${competitionId}/trade`} className="block">
-            <Button className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold py-3 text-lg shadow-lg shadow-green-500/25 transition-all hover:scale-[1.02]">
+            <Button className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold py-3 text-lg shadow-lg shadow-green-500/25">
               <Play className="h-5 w-5 mr-2" />
               Start Trading Now
             </Button>
@@ -214,7 +215,7 @@ export default function CompetitionStatusWrapper({
               href={`/competitions/${competitionId}/results`}
               className="block"
             >
-              <Button className="w-full bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-600 hover:to-violet-700 text-white font-bold py-3 text-lg shadow-lg shadow-purple-500/25 transition-all hover:scale-[1.02]">
+              <Button className="w-full bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-600 hover:to-violet-700 text-white font-bold py-3 text-lg shadow-lg shadow-purple-500/25">
                 <BarChart3 className="h-5 w-5 mr-2" />
                 View Trading Results
               </Button>

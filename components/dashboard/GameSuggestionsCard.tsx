@@ -101,27 +101,19 @@ function SuggestionTile({
       {/*
         1. Cover — the competition's own image, else its game's catalogue art
         (resolved server-side). Upcoming/Live pill top-left, entry fee top-right.
-        Reason: drawn twice - a blurred, dimmed `object-cover` fill behind an
-        `object-contain` copy - so any uploaded shape shows WHOLE and centred.
-        `object-cover` alone cropped the game's logo name off (owner 3 Oct 2026).
+        Reason: the image must fill edge to edge (owner 3 Oct 2026, replacing the
+        blurred-backdrop + `object-contain` version that left side bands). The
+        16/11 box sits between the 16:9 catalogue art and ~1.35:1 uploads, and
+        `object-top` keeps a logo printed at the top of the art in view.
       */}
-      <div className="relative aspect-[16/9] w-full shrink-0 overflow-hidden bg-gradient-to-br from-sky-900/40 to-indigo-900/30">
+      <div className="relative aspect-[16/11] w-full shrink-0 overflow-hidden bg-gradient-to-br from-sky-900/40 to-indigo-900/30">
         {c.artSrc ? (
-          <>
-            {/* eslint-disable-next-line @next/next/no-img-element -- competition / catalogue URLs vary by host */}
-            <img
-              src={c.artSrc}
-              alt=""
-              aria-hidden
-              className="absolute inset-0 h-full w-full scale-110 object-cover object-center opacity-50 blur-xl"
-            />
-            {/* eslint-disable-next-line @next/next/no-img-element -- competition / catalogue URLs vary by host */}
-            <img
-              src={c.artSrc}
-              alt=""
-              className="absolute inset-0 h-full w-full object-contain object-center transition duration-300 group-hover:scale-[1.03] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
-            />
-          </>
+          // eslint-disable-next-line @next/next/no-img-element -- competition / catalogue URLs vary by host
+          <img
+            src={c.artSrc}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover object-top transition duration-300 group-hover:scale-[1.03] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
+          />
         ) : null}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-[#020918]/90 to-transparent" />
         <div className="absolute inset-x-2.5 top-2.5 flex items-start justify-between gap-2">

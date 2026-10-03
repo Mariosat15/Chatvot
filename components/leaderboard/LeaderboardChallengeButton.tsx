@@ -240,7 +240,7 @@ export default function LeaderboardChallengeButton({
           h-10 px-4 rounded-xl font-semibold text-xs flex items-center gap-2 transition-all
           ${
             canChallenge
-              ? "bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white shadow-lg shadow-orange-500/25 hover:shadow-orange-500/40 hover:scale-[1.02]"
+              ? "bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white shadow-lg shadow-orange-500/25 hover:shadow-orange-500/40"
               : "bg-gray-800/50 text-gray-500 border border-gray-700/50 cursor-not-allowed"
           }
         `}

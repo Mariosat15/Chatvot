@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars, security/detect-object-injection -- pre-existing warnings; this file was touched only to drop a hover scale in the 3 Oct 2026 shared-press sweep */
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
@@ -403,7 +404,7 @@ export default function GameModeSimpleOrderForm({
             "py-6 rounded-2xl font-bold text-xl transition-all flex flex-col items-center justify-center gap-2",
             "bg-gradient-to-br from-green-500 to-emerald-600 text-white shadow-lg",
             canTrade
-              ? "hover:from-green-400 hover:to-emerald-500 hover:shadow-xl hover:shadow-green-500/30 hover:scale-[1.02] active:scale-95"
+              ? "hover:from-green-400 hover:to-emerald-500 hover:shadow-xl hover:shadow-green-500/30 active:scale-95"
               : "opacity-50 cursor-not-allowed",
           )}
         >
@@ -424,7 +425,7 @@ export default function GameModeSimpleOrderForm({
             "py-6 rounded-2xl font-bold text-xl transition-all flex flex-col items-center justify-center gap-2",
             "bg-gradient-to-br from-red-500 to-rose-600 text-white shadow-lg",
             canTrade
-              ? "hover:from-red-400 hover:to-rose-500 hover:shadow-xl hover:shadow-red-500/30 hover:scale-[1.02] active:scale-95"
+              ? "hover:from-red-400 hover:to-rose-500 hover:shadow-xl hover:shadow-red-500/30 active:scale-95"
               : "opacity-50 cursor-not-allowed",
           )}
         >

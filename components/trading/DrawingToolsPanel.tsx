@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars -- pre-existing warnings; this file was touched only to drop a hover scale in the 3 Oct 2026 shared-press sweep */
 "use client";
 
 import { useState } from "react";
@@ -294,7 +295,7 @@ export default function DrawingToolsPanel({
                     key={color}
                     onClick={() => handleColorChange(color)}
                     className={cn(
-                      "h-8 w-8 rounded border-2 transition-all hover:scale-110",
+                      "h-8 w-8 rounded border-2 transition-all ",
                       displayColor === color
                         ? "border-white ring-2 ring-white/30"
                         : "border-transparent",

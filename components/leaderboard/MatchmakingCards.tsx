@@ -408,7 +408,7 @@ export default function MatchmakingCards({
         <Button
           onClick={handleFindBestMatch}
           disabled={findingMatch}
-          className="w-full bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 hover:from-pink-600 hover:via-purple-600 hover:to-indigo-600 text-white font-bold py-4 text-lg shadow-lg shadow-purple-500/25 transition-all hover:shadow-purple-500/40 hover:scale-[1.02]"
+          className="w-full bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 hover:from-pink-600 hover:via-purple-600 hover:to-indigo-600 text-white font-bold py-4 text-lg shadow-lg shadow-purple-500/25 transition-all hover:shadow-purple-500/40 "
         >
           {findingMatch ? (
             <Loader2 className="h-6 w-6 mr-3 animate-spin" />

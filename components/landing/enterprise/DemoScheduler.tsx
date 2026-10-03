@@ -88,7 +88,7 @@ export default function DemoScheduler({
       <Button
         onClick={() => setIsOpen(true)}
         size="lg"
-        className="font-bold hover:scale-105 transition-all group"
+        className="font-bold  transition-all group"
         style={{
           background: theme?.effects?.gradientStyle,
           color: theme?.colors?.background,

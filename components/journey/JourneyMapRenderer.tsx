@@ -478,7 +478,7 @@ export default function JourneyMapRenderer({
                       : map.isUnlocked
                       ? "bg-amber-500"
                       : "bg-slate-600",
-                    map.isUnlocked && "cursor-pointer hover:scale-125"
+                    map.isUnlocked && "cursor-pointer"
                   )}
                   title={`${map.name} ${map.isComplete ? "(Complete)" : map.isUnlocked ? "" : "(Locked)"}`}
                 />

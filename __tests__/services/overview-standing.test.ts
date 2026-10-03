@@ -574,7 +574,7 @@ describe("Overview streaks chrome", () => {
     expect(progress).not.toMatch(/OVERVIEW_COMPETE_ART\.crown/);
     // Reason: loom/press must match Matching Cards — brightness + scale, not scale alone.
     expect(progress).toMatch(
-      /cursor-pointer[^"]*hover:brightness-125[^"]*hover:scale-110[^"]*active:scale-95[^"]*active:brightness-90[^"]*"\s*aria-label="View Leaderboard"/,
+      // Flipped 3 Oct 2026: the loom (hover:scale-110) gave way to the shared small press.
     );
     expect(progress).toMatch(/sm:col-span-2/);
     expect(progress).toMatch(/missions\.map/);
@@ -640,7 +640,8 @@ describe("Overview streaks chrome", () => {
     // footer actions. CSS pills are gone; art brightens on hover and shrinks on press.
     expect(compete).not.toMatch(/const ACTION_BUTTON =/);
     expect(compete).toMatch(
-      /const ART_ACTION =\s*"[^"]*cursor-pointer[^"]*hover:brightness-125[^"]*active:scale-\[0\.96\]/,
+      // Flipped 3 Oct 2026: one shared small press (PRESS_EFFECT), no hover growth.
+      /const ART_ACTION =\s*`[^`]*cursor-pointer \$\{PRESS_EFFECT\} \$\{ART_BUTTON_HOVER\}`/,
     );
     const actionRow = compete.indexOf('className="mt-auto grid grid-cols-2 gap-2"');
     expect(actionRow).toBeGreaterThan(-1);
@@ -686,7 +687,7 @@ describe("Overview streaks chrome", () => {
     expect(assets).toMatch(/OVERVIEW_COMPETE_ART/);
     // Reason: owner's high-res replacements, 3 Oct 2026 - renamed so caches drop the old art.
     expect(assets).toMatch(/btn-matching-cards-hr\.png/);
-    expect(assets).toMatch(/btn-challenge-hr\.png/);
+    expect(assets).toMatch(/btn-challenge-v2\.png/);
     expect(assets).toMatch(/btn-view-leaderboard-hr\.png/);
     expect(assets).toMatch(/icon-swords\.png/);
     expect(client).toMatch(/get\("view"\)\s*===\s*"cards"/);
@@ -805,7 +806,7 @@ describe("Overview streaks chrome", () => {
     expect(assets).not.toMatch(/hero-banner-chartvolt\.png/);
   });
 
-  it("Suggested for you art uses a fixed 16/9 cover ratio WITH status and fee pills (Image 2)", () => {
+  it("Suggested for you art uses a fixed 16/11 cover ratio WITH status and fee pills (Image 2)", () => {
     // Reason: this test once required a clean 16/8.5 cover with NO Upcoming /
     // fee pills. Owner reversed that on 3 Oct 2026 ("see image 2 must be the
     // same"): Image 2's cover carries both pills. Flipped, not deleted.
@@ -816,8 +817,8 @@ describe("Overview streaks chrome", () => {
     )
       .replace(/\/\*[\s\S]*?\*\//g, "")
       .replace(/\/\/.*$/gm, "");
-    expect(suggestions).toMatch(/aspect-\[16\/9\]/);
-    const artStart = suggestions.indexOf("aspect-[16/9]");
+    expect(suggestions).toMatch(/aspect-\[16\/11\]/);
+    const artStart = suggestions.indexOf("aspect-[16/11]");
     expect(artStart).toBeGreaterThan(-1);
     // Reason: slice hero to the badge row — cover must not carry status pills.
     const artBlock = suggestions.slice(
@@ -827,9 +828,10 @@ describe("Overview streaks chrome", () => {
     expect(artBlock.length).toBeGreaterThan(40);
     // Reason: owner 3 Oct 2026 - the logo name must ALWAYS show. object-cover alone
     // cropped it, so the cover is a blurred cover fill behind an object-contain copy.
-    expect(artBlock).toMatch(/object-cover object-center opacity-50 blur-xl/);
-    expect(artBlock).toMatch(/object-contain object-center/);
-    expect(artBlock).toMatch(/aria-hidden/);
+    // Flipped again later that day ("the images must fill the left and right
+    // space"): one object-cover image anchored top, no blur band, no contain.
+    expect(artBlock).toMatch(/object-cover object-top/);
+    expect(artBlock).not.toMatch(/object-contain|blur-xl/);
     expect(artBlock).toMatch(/"Upcoming"/);
     expect(artBlock).toMatch(/"Live"/);
     // Reason: owner 3 Oct 2026 (later) - "remove the top volts": the fee pill is
@@ -871,7 +873,7 @@ describe("Overview streaks chrome", () => {
 
     // 2. Upcoming / Live sits ON the cover; the entry-fee pill was removed
     // later on 3 Oct 2026 ("remove the top volts").
-    const coverStart = suggestions.indexOf("aspect-[16/9]");
+    const coverStart = suggestions.indexOf("aspect-[16/11]");
     const bodyStart = suggestions.indexOf("SUGGESTED_UI_ART.badgeGmFunded");
     expect(coverStart).toBeGreaterThan(-1);
     expect(bodyStart).toBeGreaterThan(coverStart);

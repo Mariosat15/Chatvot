@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ChevronRight, Lock, Star, Trophy } from "lucide-react";
+import { ART_BUTTON_HOVER, PRESS_EFFECT } from "@/components/ui/press-effect";
 import type {
   OverviewMission,
   OverviewStanding,
@@ -323,7 +324,7 @@ export default function OverviewProgress({
           <Link
             href={LEADERBOARD_HREF}
             // Reason: same loom as Matching Cards — brighten + grow on hover, shrink + dim on press.
-            className="relative mt-1 inline-flex h-12 w-full max-w-[220px] shrink-0 cursor-pointer drop-shadow-[0_0_16px_rgba(34,211,238,0.55)] transition-[transform,filter] duration-200 ease-out hover:brightness-125 hover:scale-110 hover:drop-shadow-[0_0_22px_rgba(34,211,238,0.85)] active:scale-95 active:brightness-90 motion-reduce:hover:scale-100 motion-reduce:active:scale-100"
+            className={`relative mt-1 inline-flex h-12 w-full max-w-[220px] shrink-0 cursor-pointer drop-shadow-[0_0_16px_rgba(34,211,238,0.55)] hover:drop-shadow-[0_0_22px_rgba(34,211,238,0.85)] ${PRESS_EFFECT} ${ART_BUTTON_HOVER}`}
             aria-label="View Leaderboard"
           >
             <Image

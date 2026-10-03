@@ -864,7 +864,7 @@ export default function ProfileSettingsSection() {
               size="lg"
               className={`relative px-8 py-6 text-base font-bold text-white shadow-lg transition-all ${
                 hasUnsavedChanges
-                  ? "bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:from-emerald-400 hover:via-teal-400 hover:to-cyan-400 shadow-emerald-500/30 hover:shadow-emerald-500/50 ring-2 ring-emerald-400/40 hover:scale-[1.02]"
+                  ? "bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:from-emerald-400 hover:via-teal-400 hover:to-cyan-400 shadow-emerald-500/30 hover:shadow-emerald-500/50 ring-2 ring-emerald-400/40 "
                   : "bg-dark-600 text-gray-400 cursor-not-allowed"
               }`}
             >

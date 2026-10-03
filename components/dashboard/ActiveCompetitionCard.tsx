@@ -369,7 +369,7 @@ export default function ActiveCompetitionCard({
       <div className="p-4 bg-gradient-to-r from-gray-900/80 to-gray-900/50 border-t border-gray-700/50">
         <Link
           href={`/competitions/${competition._id}/trade`}
-          className="block w-full py-3 px-6 bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-400 hover:to-yellow-500 text-gray-900 font-bold rounded-xl text-center transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg hover:shadow-yellow-500/50"
+          className="block w-full py-3 px-6 bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-400 hover:to-yellow-500 text-gray-900 font-bold rounded-xl text-center transition-all duration-300 transform  hover:shadow-lg hover:shadow-yellow-500/50"
         >
           <span className="flex items-center justify-center gap-2">
             Trade Now

@@ -113,7 +113,7 @@ export default function FinalCTA({
           <Link href={primaryCTA.href}>
             <Button
               size="lg"
-              className="font-bold text-lg px-8 py-6 hover:scale-105 transition-all group"
+              className="font-bold text-lg px-8 py-6  transition-all group"
               style={{
                 background: theme?.effects?.gradientStyle,
                 color: theme?.colors?.background,
@@ -129,7 +129,7 @@ export default function FinalCTA({
             <Button
               size="lg"
               variant="outline"
-              className="font-bold text-lg px-8 py-6 hover:scale-105 transition-all"
+              className="font-bold text-lg px-8 py-6  transition-all"
               style={{
                 borderColor: effectiveColors.primary,
                 color: effectiveColors.primary,

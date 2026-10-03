@@ -276,7 +276,8 @@ describe("mobile dashboard split", () => {
     expect(compete).toMatch(/src=\{OVERVIEW_COMPETE_ART\.matchingCards\}/);
     expect(compete).not.toMatch(/const ACTION_BUTTON =/);
     expect(compete).toMatch(
-      /const ART_ACTION =\s*"[^"]*cursor-pointer[^"]*hover:brightness-125[^"]*active:scale-\[0\.96\]/,
+      // Flipped 3 Oct 2026: one shared small press (PRESS_EFFECT), no hover growth.
+      /const ART_ACTION =\s*`[^`]*cursor-pointer \$\{PRESS_EFFECT\} \$\{ART_BUTTON_HOVER\}`/,
     );
     expect(compete).toMatch(
       /matches\.length === 0 && !loading && \([\s\S]*?MATCHING_CARDS_HREF/,

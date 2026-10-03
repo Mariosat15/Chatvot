@@ -1074,7 +1074,7 @@ export default function CompetitionCard({
         ) : !isCompleted && !isCancelled ? (
           <Link href={`/competitions/${competition._id}`} className="block">
             <Button
-              className={`w-full font-black text-base py-6 rounded-xl transition-all duration-300 transform hover:scale-105 active:scale-95 ${
+              className={`w-full font-black text-base py-6 rounded-xl transition-all duration-150 active:scale-95 ${
                 isUserIn
                   ? "bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white shadow-lg shadow-green-500/30"
                   : registrationClosed && !isUserIn
@@ -1129,7 +1129,7 @@ export default function CompetitionCard({
           <Link href={`/competitions/${competition._id}`} className="block">
             <Button
               variant="outline"
-              className={`w-full font-bold py-6 rounded-xl border-2 bg-transparent transition-all duration-300 transform hover:scale-105 ${
+              className={`w-full font-bold py-6 rounded-xl border-2 bg-transparent transition-all duration-300 transform  ${
                 isCancelled
                   ? "border-red-600 text-red-400 hover:bg-gradient-to-r hover:from-red-500 hover:to-red-600 hover:text-white hover:border-transparent"
                   : "border-gray-600 text-gray-100 hover:bg-gradient-to-r hover:from-yellow-500 hover:to-amber-500 hover:text-gray-900 hover:border-transparent"

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
+import { PRESS_EFFECT } from "@/components/ui/press-effect";
 
 /**
  * The buttons from the sheet's `BUTTONS` block: the violet gradient primary with a second line
@@ -56,8 +57,7 @@ const TONES = new Map<NeonButtonTone, string>([
 // preflight no longer sets it on a button, and an anchor styled as a control does not get one
 // either once it has no `href` semantics a browser recognises as a link. The disabled string
 // below overrides it with `cursor-not-allowed`, which is why that class stays there.
-const BASE =
-  "inline-flex w-full cursor-pointer items-center justify-center gap-2.5 rounded-xl border px-4 py-3 text-sm font-semibold transition-all";
+const BASE = `inline-flex w-full cursor-pointer items-center justify-center gap-2.5 rounded-xl border px-4 py-3 text-sm font-semibold ${PRESS_EFFECT}`;
 const DISABLED =
   "cursor-not-allowed border-[#161E36] bg-[#080C18] text-gray-500 shadow-none";
 
@@ -149,7 +149,7 @@ export function NeonPill({
   return (
     <Link
       href={href}
-      className="inline-flex items-center gap-2 rounded-lg border border-[#1B2540] bg-[#0A0F1F]/80 px-3 py-2 text-xs font-medium text-gray-300 transition-colors hover:border-[#2A3766] hover:text-gray-100"
+      className={`inline-flex items-center gap-2 rounded-lg border border-[#1B2540] bg-[#0A0F1F]/80 px-3 py-2 text-xs font-medium text-gray-300 hover:border-[#2A3766] hover:text-gray-100 ${PRESS_EFFECT}`}
     >
       <Icon className="h-3.5 w-3.5" />
       {label}

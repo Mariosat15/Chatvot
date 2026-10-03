@@ -62,7 +62,7 @@ export const OVERVIEW_COMPETE_ART = {
   // Owner's high-resolution replacements (3 Oct 2026), keyed transparent by
   // tools/overview/key-out-black.mjs. New filenames so browsers drop the old art.
   matchingCards: "/assets/neon/overview/compete/btn-matching-cards-hr.png",
-  challenge: "/assets/neon/overview/compete/btn-challenge-hr.png",
+  challenge: "/assets/neon/overview/compete/btn-challenge-v2.png",
   viewLeaderboard: "/assets/neon/overview/compete/btn-view-leaderboard-hr.png",
 } as const;
 

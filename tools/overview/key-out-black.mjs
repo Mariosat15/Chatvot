@@ -27,7 +27,8 @@ const JOBS = [
   ["suggested/src-join.jpg", "suggested/btn-join-hr.png", null, { haze: 70 }],
   ["suggested/src-prize-icon.jpg", "suggested/prize-icon-hr.png"],
   ["compete/src-view-leaderboard.png", "compete/btn-view-leaderboard-hr.png"],
-  ["compete/src-challenge.png", "compete/btn-challenge-hr.png"],
+  // Second owner supply (3 Oct 2026, rounded plate); v2 name drops cached art.
+  ["compete/src-challenge-v2.jpg", "compete/btn-challenge-v2.png"],
   ["compete/src-matching-cards.png", "compete/btn-matching-cards-hr.png"],
 ];
 /** Below this brightness a pixel is JPEG noise on the black canvas, not art. */

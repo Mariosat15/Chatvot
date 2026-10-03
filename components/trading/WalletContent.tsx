@@ -282,7 +282,7 @@ export default function WalletContent({
           {/* Quick Actions - Stack on mobile */}
           <div className="mt-4 sm:mt-6 md:mt-8 flex flex-col sm:flex-row gap-2 sm:gap-4">
             <DepositModal>
-              <Button className="w-full sm:flex-1 bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold h-12 sm:h-14 text-base sm:text-lg transition-all hover:scale-105 hover:shadow-lg hover:shadow-yellow-500/50">
+              <Button className="w-full sm:flex-1 bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold h-12 sm:h-14 text-base sm:text-lg hover:shadow-lg hover:shadow-yellow-500/50">
                 <ArrowDownCircle className="mr-2 h-5 w-5 sm:h-6 sm:w-6" />
                 Buy {settings.credits.name}
               </Button>
@@ -291,7 +291,7 @@ export default function WalletContent({
             <WithdrawalModal>
               <Button
                 variant="outline"
-                className="w-full sm:flex-1 border-gray-600 bg-gray-800/50 hover:bg-gray-800 text-gray-100 h-12 sm:h-14 text-base sm:text-lg hover:scale-105 transition-all"
+                className="w-full sm:flex-1 border-gray-600 bg-gray-800/50 hover:bg-gray-800 text-gray-100 h-12 sm:h-14 text-base sm:text-lg  transition-all"
                 disabled={stats.currentBalance < 1}
               >
                 <ArrowUpCircle className="mr-2 h-5 w-5 sm:h-6 sm:w-6" />

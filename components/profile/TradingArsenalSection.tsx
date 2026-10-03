@@ -1419,7 +1419,7 @@ function CosmeticCard({
           {/* Info Button - Always Visible */}
           <button
             onClick={onInfo}
-            className="absolute top-2 left-2 bg-cyan-500/90 hover:bg-cyan-400 rounded-full p-1.5 shadow-lg shadow-cyan-500/30 transition-all hover:scale-110"
+            className="absolute top-2 left-2 bg-cyan-500/90 hover:bg-cyan-400 rounded-full p-1.5 shadow-lg shadow-cyan-500/30 transition-all "
             title="View Details"
           >
             <Info className="w-4 h-4 text-white" />
@@ -1520,7 +1520,7 @@ function FrameCard({
           {/* Info Button */}
           <button
             onClick={onInfo}
-            className="absolute top-2 left-2 bg-purple-500/90 hover:bg-purple-400 rounded-full p-1.5 shadow-lg shadow-purple-500/30 transition-all hover:scale-110 z-20"
+            className="absolute top-2 left-2 bg-purple-500/90 hover:bg-purple-400 rounded-full p-1.5 shadow-lg shadow-purple-500/30 transition-all  z-20"
             title="View Details"
           >
             <Info className="w-4 h-4 text-white" />

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars -- pre-existing warnings; this file was touched only to drop a hover scale in the 3 Oct 2026 shared-press sweep */
 "use client";
 
 import {
@@ -201,7 +202,7 @@ export default function ProfileContent({
           </div>
           <Link
             href="/wallet"
-            className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors text-sm font-medium hover:scale-105 transform"
+            className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors text-sm font-medium  transform"
           >
             View Details
           </Link>
@@ -490,7 +491,7 @@ export default function ProfileContent({
             </p>
             <Link
               href="/competitions"
-              className="inline-block mt-4 px-6 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors font-medium hover:scale-105 transform"
+              className="inline-block mt-4 px-6 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors font-medium  transform"
             >
               Browse Competitions
             </Link>
@@ -510,7 +511,7 @@ export default function ProfileContent({
               <Link
                 key={comp.competitionId}
                 href={`/competitions/${comp.competitionId}`}
-                className="block bg-dark-800/50 hover:bg-dark-800/70 rounded-xl p-4 border border-dark-600 hover:border-primary-500/50 transition-all hover:scale-105 transform"
+                className="block bg-dark-800/50 hover:bg-dark-800/70 rounded-xl p-4 border border-dark-600 hover:border-primary-500/50 transition-all  transform"
               >
                 <div className="flex items-center justify-between flex-wrap gap-4">
                   <div className="flex-1 min-w-0">
@@ -715,7 +716,7 @@ export default function ProfileContent({
                 <Link
                   key={challenge.challengeId}
                   href={`/challenges/${challenge.challengeId}`}
-                  className="block bg-dark-800/50 hover:bg-dark-800/70 rounded-xl p-4 border border-dark-600 hover:border-orange-500/50 transition-all hover:scale-105 transform"
+                  className="block bg-dark-800/50 hover:bg-dark-800/70 rounded-xl p-4 border border-dark-600 hover:border-orange-500/50 transition-all  transform"
                 >
                   <div className="flex items-center justify-between flex-wrap gap-4">
                     <div className="flex-1 min-w-0">

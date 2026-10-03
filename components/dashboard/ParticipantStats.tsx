@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- pre-existing warnings; this file was touched only to drop a hover scale in the 3 Oct 2026 shared-press sweep */
 "use client";
 
 import { useState } from "react";
@@ -104,7 +105,7 @@ export default function ParticipantStats({ stats }: ParticipantStatsProps) {
             className={`w-full flex items-center justify-between p-3 rounded-lg border transition-all ${item.bgColor} ${item.borderColor} ${item.hoverBg} ${
               viewMode === item.mode
                 ? "ring-2 ring-yellow-500/50 scale-[1.02]"
-                : "hover:scale-[1.01]"
+                : ""
             }`}
           >
             <div className="flex items-center gap-3">

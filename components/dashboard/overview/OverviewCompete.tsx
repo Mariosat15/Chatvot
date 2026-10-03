@@ -12,6 +12,7 @@ import {
   OVERVIEW_COMPETE_ART,
 } from "@/lib/services/games/overview-assets";
 import { NEON_HEADING, NEON_LABEL } from "@/components/neon/tokens";
+import { ART_BUTTON_HOVER, PRESS_EFFECT } from "@/components/ui/press-effect";
 import { PERFORMANCE_INTERVALS } from "@/lib/utils/performance";
 
 const MATCHING_CARDS_HREF = "/leaderboard?board=trading&view=cards";
@@ -20,7 +21,7 @@ const MATCHING_CARDS_HREF = "/leaderboard?board=trading&view=cards";
 // (Challenge + Matching Cards), not CSS pills. Shared height so they sit even;
 // hover brightens, press shrinks, always a hand cursor.
 const ART_ACTION =
-  "relative block h-12 w-full min-w-0 cursor-pointer transition-[transform,filter] duration-200 ease-out hover:brightness-125 hover:scale-[1.04] active:scale-[0.96] active:brightness-90 motion-reduce:hover:scale-100 motion-reduce:active:scale-100";
+  `relative block h-12 w-full min-w-0 cursor-pointer ${PRESS_EFFECT} ${ART_BUTTON_HOVER}`;
 
 const COMPETE_TILE =
   "flex min-h-[58px] items-center gap-3 rounded-lg border border-cyan-400/30 bg-[#07101f]/90 px-3 py-2 shadow-[inset_0_0_12px_rgba(34,211,238,0.06)]";
@@ -254,7 +255,7 @@ export default function OverviewCompete({
         {matches.length === 0 && !loading && (
           <Link
             href={MATCHING_CARDS_HREF}
-            className="relative inline-flex h-10 w-[184px] shrink-0 cursor-pointer drop-shadow-[0_0_14px_rgba(139,92,246,0.6)] transition-[transform,filter] duration-200 ease-out hover:brightness-125 hover:scale-110 active:scale-95 active:brightness-90 sm:h-11 sm:w-[204px]"
+            className={`relative inline-flex h-10 w-[184px] shrink-0 cursor-pointer drop-shadow-[0_0_14px_rgba(139,92,246,0.6)] ${PRESS_EFFECT} ${ART_BUTTON_HOVER} sm:h-11 sm:w-[204px]`}
             aria-label="Matching Cards"
           >
             <Image

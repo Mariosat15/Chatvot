@@ -254,7 +254,7 @@ export default function LiveChallenges({
           <Link href={ctaLink}>
             <Button
               size="lg"
-              className="font-bold text-lg px-10 py-6 hover:scale-105 transition-all duration-300 rounded-xl group"
+              className="font-bold text-lg px-10 py-6  transition-all duration-300 rounded-xl group"
               style={{
                 background: `linear-gradient(135deg, ${effectiveColors.secondary}, ${effectiveColors.primary})`,
                 color: theme?.colors?.background,
