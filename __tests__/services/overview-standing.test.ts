@@ -801,27 +801,35 @@ describe("Overview streaks chrome", () => {
     expect(assets).not.toMatch(/hero-banner-chartvolt\.png/);
   });
 
-  it("Suggested for you shows full contest banners — natural height + contain, never a cropped strip", () => {
-    // Reason: owner report Oct 2026 — fixed h-20 + object-cover sliced baked-in
-    // titles (COMPETITIONS / COMPETE LIVE) off the top of overview cards. Same
-    // auto-fit as GamePageContests: whatever ratio the upload is, show it whole.
+  it("Suggested for you art uses a fixed 16/8.5 cover ratio (Image 1 densify)", () => {
+    // Reason: flipped 3 Oct 2026 — owner Image 1 requires aspect-[16/8.5] +
+    // object-cover so artwork stays ~40% of the card. The earlier natural-height
+    // + contain rule made cards too tall (Image 2). h-20 strip remains forbidden.
     const suggestions = readFileSync(
       join(ROOT, "components/dashboard/GameSuggestionsCard.tsx"),
       "utf8",
     )
       .replace(/\/\*[\s\S]*?\*\//g, "")
       .replace(/\/\/.*$/gm, "");
-    expect(suggestions).toMatch(/object-contain/);
-    expect(suggestions).toMatch(/h-auto w-full/);
-    expect(suggestions).toMatch(/object-center/);
+    expect(suggestions).toMatch(/aspect-\[16\/8\.5\]/);
+    // Reason: cover must be on the artwork <img>, not only on the Join plate.
+    // Slice from the aspect class to the Upcoming label — that is the hero only.
+    const artStart = suggestions.indexOf("aspect-[16/8.5]");
+    expect(artStart).toBeGreaterThan(-1);
+    const artBlock = suggestions.slice(
+      artStart,
+      suggestions.indexOf("Upcoming", artStart),
+    );
+    expect(artBlock.length).toBeGreaterThan(40);
+    expect(artBlock).toMatch(/object-cover/);
     expect(suggestions).not.toMatch(/h-20/);
-    expect(suggestions).not.toMatch(/object-cover/);
+    expect(suggestions).not.toMatch(/h-auto w-full/);
   });
 
-  it("Suggested for you prize graphics sit under the amount; Starts in has no pill background", () => {
-    // Reason: owner 3 Oct 2026 — match Suggested mock; backround1/2 under prize;
-    // Starts in must be plain text (no badge chrome). Clock/users plates
-    // screen-blend so the black export canvas does not paint a box.
+  it("Suggested for you matches Image 1: badges, prize strip, meta row, Join CTA", () => {
+    // Reason: owner 3 Oct 2026 densify — GM Funded from fundingMode; prize chrome
+    // by isGmFunded not game art; prize art absolute (no framed box); Starts in
+    // plain text; Join compact premium strip.
     const suggestions = readFileSync(
       join(ROOT, "components/dashboard/GameSuggestionsCard.tsx"),
       "utf8",
@@ -839,28 +847,57 @@ describe("Overview streaks chrome", () => {
     expect(assets).toMatch(/prize-trophy\.jpg/);
     expect(assets).toMatch(/prize-cubes\.png/);
     expect(assets).toMatch(/icon-clock\.jpg/);
+    expect(assets).toMatch(/btn-join\.jpg/);
     expect(suggestions).toMatch(/suggestedPrizeArt/);
     expect(suggestions).toMatch(/SUGGESTED_UI_ART\.clock/);
+    expect(suggestions).toMatch(/SUGGESTED_UI_ART\.users/);
     expect(suggestions).toMatch(/mix-blend-screen/);
     expect(suggestions).toMatch(/Starts in/);
-    // Reason: Suggested header — star over prize plates 1+2; no Lucide sparkles.
     expect(suggestions).toMatch(/OVERVIEW_ICON_ART\.star/);
     expect(suggestions).toMatch(/SUGGESTED_PRIZE_ART\.trophy/);
-    expect(suggestions).toMatch(/SUGGESTED_PRIZE_ART\.cubes/);
     expect(suggestions).not.toMatch(/\bSparkles\b/);
-    // Prize plate uses the shared art helper; Join is a real CTA button strip.
     expect(suggestions).toMatch(/>\s*Join\s*</);
-    // Starts-in row: call site (not the helper def) — clock + text, no pill chrome.
+    // GM Funded badge from real fundingMode — must not be omitted from the tree.
+    expect(suggestions).toMatch(/fundingMode === "gm_funded"/);
+    expect(suggestions).toMatch(/SUGGESTED_UI_ART\.badgeGmFunded/);
+    expect(suggestions).toMatch(/SUGGESTED_UI_ART\.badgePrivate/);
+    expect(suggestions).toMatch(/SUGGESTED_UI_ART\.badgePublic/);
+    expect(suggestions).toMatch(/h-8 w-auto/);
+    // Prize panel height + absolute right art (not a bordered picture frame).
+    expect(suggestions).toMatch(/h-\[88px\]/);
+    expect(suggestions).toMatch(/w-\[42%\]/);
+    expect(suggestions).toMatch(/absolute inset-y-0 right-0/);
+    // Prize chrome follows funding, not which decorative plate was chosen.
+    expect(suggestions).toMatch(/isGmFunded\s*\?/);
+    expect(suggestions).toMatch(/text-\[28px\]/);
+    // Title hierarchy floors.
+    expect(suggestions).toMatch(/text-\[19px\]/);
+    expect(suggestions).toMatch(/text-\[12px\].*uppercase/);
+    // Join compact, not a tall 60–70px pill.
+    expect(suggestions).toMatch(/h-\[50px\]/);
+    expect(suggestions).toMatch(/SUGGESTED_UI_ART\.join/);
+    // Starts-in row: clock plate sits beside the label; neither wears pill chrome.
     const callIdx = suggestions.lastIndexOf("startLabel(c.startTime");
     expect(callIdx).toBeGreaterThan(-1);
-    const startSpan = suggestions.slice(
+    const metaStart = suggestions.lastIndexOf("justify-between", callIdx);
+    // Reason: users icon sits AFTER the starts-in call — slice past both.
+    const usersIdx = suggestions.indexOf("SUGGESTED_UI_ART.users", callIdx);
+    expect(metaStart).toBeGreaterThan(-1);
+    expect(usersIdx).toBeGreaterThan(callIdx);
+    const metaRow = suggestions.slice(metaStart, usersIdx + 40);
+    expect(metaRow).toMatch(/SUGGESTED_UI_ART\.clock/);
+    expect(metaRow).toMatch(/SUGGESTED_UI_ART\.users/);
+    expect(metaRow).toMatch(/startLabel\(c\.startTime/);
+    // The label itself must stay plain text (no badge/pill on the starts-in string).
+    const labelSpan = suggestions.slice(
       suggestions.lastIndexOf("<span", callIdx),
       suggestions.indexOf("</span>", callIdx) + 7,
     );
-    expect(startSpan).toMatch(/startLabel\(c\.startTime/);
-    expect(startSpan).toMatch(/SUGGESTED_UI_ART\.clock/);
-    expect(startSpan).not.toMatch(/rounded-full/);
-    expect(startSpan).not.toMatch(/bg-/);
+    expect(labelSpan).toMatch(/startLabel\(c\.startTime/);
+    expect(labelSpan).not.toMatch(/rounded-full/);
+    expect(labelSpan).not.toMatch(/bg-/);
+    // Four-column desktop grid.
+    expect(suggestions).toMatch(/xl:grid-cols-4/);
   });
 
   it("Play by Game caption distinguishes discovery from most-played", () => {

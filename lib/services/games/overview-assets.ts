@@ -143,6 +143,8 @@ export const SUGGESTED_UI_ART = {
   badgeGmFunded: "/assets/neon/overview/suggested/badge-gm-funded.png",
   badgePrivate: "/assets/neon/overview/suggested/badge-private.png",
   badgePublic: "/assets/neon/overview/suggested/badge-public.png",
+  /** Owner Join CTA plate (3 Oct 2026 densify pass). */
+  join: "/assets/neon/overview/suggested/btn-join.jpg",
 } as const;
 
 /** Pick the prize decoration for a suggestion card. Unknown codes get the trophy. */
