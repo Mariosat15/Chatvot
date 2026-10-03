@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, Clock, Gamepad2 } from "lucide-react";
+import { ArrowRight, Gamepad2 } from "lucide-react";
 import { formatVolts } from "@/lib/utils/format-volts";
 import {
   OVERVIEW_ICON_ART,
@@ -63,21 +63,16 @@ function SuggestionTile({
   creditSymbol: string;
   now: number;
 }) {
-  const live = c.status === "active";
   const seats =
     c.maxParticipants && c.maxParticipants > 0
       ? `${c.currentParticipants ?? 0}/${c.maxParticipants}`
       : `${c.currentParticipants ?? 0}`;
-  // Reason: entry fee (top-right) is not the prize — GM-funded seats read Free.
-  const fee =
-    c.fundingMode === "gm_funded" || c.entryFee <= 0
-      ? "Free"
-      : formatVolts(c.entryFee, { symbol: creditSymbol });
   const prizeArt = suggestedPrizeArt(c.gameKey);
   const isPrivate = c.visibility === "gm_private";
   const isGmFunded = c.fundingMode === "gm_funded";
+  // Reason: prizePool is authoritative; absent/zero renders a dash, never entry fee.
   const prizeAmount =
-    c.prizePool && c.prizePool > 0
+    typeof c.prizePool === "number" && Number.isFinite(c.prizePool) && c.prizePool > 0
       ? formatVolts(c.prizePool, { symbol: creditSymbol })
       : "-";
 
@@ -87,7 +82,10 @@ function SuggestionTile({
       className={CARD}
       aria-label={`Open ${c.name}`}
     >
-      {/* 1. Artwork — fixed 16/8.5 so the hero stays ~40% of the card (Image 1). */}
+      {/*
+        1. Cover — clean hero only (Image 2). No Upcoming / entry-fee pills on
+        the artwork; status lives in the badge row below.
+      */}
       <div className="relative aspect-[16/8.5] w-full shrink-0 overflow-hidden bg-gradient-to-br from-sky-900/40 to-indigo-900/30">
         {c.artSrc ? (
           // eslint-disable-next-line @next/next/no-img-element -- catalogue URLs vary by host
@@ -97,34 +95,17 @@ function SuggestionTile({
             className="absolute inset-0 h-full w-full object-cover object-center opacity-95 transition duration-300 group-hover:scale-[1.03] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
           />
         ) : null}
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#020918] via-[#020918]/25 to-transparent" />
-        <span
-          className={`absolute left-2.5 top-2.5 inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider backdrop-blur-sm ${
-            live
-              ? "border-emerald-400/60 bg-emerald-500/20 text-emerald-300"
-              : "border-cyan-400/60 bg-black/55 text-white"
-          }`}
-        >
-          {live ? (
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
-          ) : (
-            <Clock className="h-3.5 w-3.5 text-cyan-300" aria-hidden />
-          )}
-          {live ? "Live" : "Upcoming"}
-        </span>
-        <span className="absolute right-2.5 top-2.5 inline-flex items-center gap-0.5 rounded-full border border-amber-300/70 bg-black/55 px-2.5 py-1 text-[12px] font-bold tabular-nums text-amber-200 backdrop-blur-sm">
-          {fee}
-        </span>
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#020918] via-[#020918]/20 to-transparent" />
       </div>
 
       {/*
-        Body rhythm (Image 1): badges 10px under art, then label/title/desc,
-        meta, prize, join — tight gaps, no stretched navy voids.
+        Body order (Image 2): badges → game label → title → blurb → meta →
+        prize strip → Join. Tight gaps, no stretched navy voids.
       */}
       <div className="flex flex-1 flex-col px-3.5 pb-3 pt-2.5">
-        {/* 2. Status badges — GM Funded when fundingMode says so; never hidden. */}
+        {/* 2. Status badges — GM Funded from fundingMode; Private/Public from visibility. */}
         <div className="flex flex-wrap items-center gap-1.5">
-          {isGmFunded && (
+          {isGmFunded ? (
             <Image
               src={SUGGESTED_UI_ART.badgeGmFunded}
               alt="GM Funded"
@@ -132,7 +113,7 @@ function SuggestionTile({
               height={32}
               className={BADGE_IMG}
             />
-          )}
+          ) : null}
           {isPrivate ? (
             <Image
               src={SUGGESTED_UI_ART.badgePrivate}
@@ -153,7 +134,7 @@ function SuggestionTile({
         </div>
 
         {/* 3–5. Game label → competition title → description */}
-        <div className="mt-3.5 min-w-0">
+        <div className="mt-3 min-w-0">
           <p className="truncate text-[12px] font-bold uppercase tracking-[0.14em] text-cyan-300">
             {c.gameLabel ?? "Game"}
           </p>
@@ -167,8 +148,8 @@ function SuggestionTile({
           ) : null}
         </div>
 
-        {/* 6. Meta — one row, starts-in left / seats right */}
-        <div className="mt-4 flex items-center justify-between gap-2 text-[13px] font-semibold text-cyan-100">
+        {/* 6. Meta — starts-in left / seats right (plain text, never pills). */}
+        <div className="mt-3.5 flex items-center justify-between gap-2 text-[13px] font-semibold text-cyan-100">
           <span className="inline-flex min-w-0 items-center gap-1.5 tabular-nums">
             <Image
               src={SUGGESTED_UI_ART.clock}
@@ -192,28 +173,22 @@ function SuggestionTile({
         </div>
 
         {/*
-          7. Prize panel — one integrated strip. Panel chrome follows funding
-          (gold for GM funded, cyan otherwise). Decorative art is absolute on
-          the right, never a framed picture box. Amount is entry-fee-independent.
+          7. Prize strip — full banner plate is the background (art on the
+          right by design). Small trophy icon + amount sit on the empty left.
+          Never crop the banner into a framed 42% picture box.
         */}
-        <div
-          className={`relative mt-4 h-[88px] overflow-hidden rounded-xl border px-3.5 ${
-            isGmFunded
-              ? "border-amber-300/65 bg-gradient-to-r from-amber-950/80 via-[#2a1a08]/90 to-amber-950/40 shadow-[inset_0_0_24px_rgba(250,204,21,0.12)]"
-              : "border-cyan-400/55 bg-gradient-to-r from-[#041828]/95 via-[#061a2e]/90 to-[#041428]/50 shadow-[inset_0_0_24px_rgba(56,189,248,0.12)]"
-          }`}
-        >
+        <div className="relative mt-3.5 h-[88px] overflow-hidden rounded-xl">
           <Image
             src={prizeArt}
             alt=""
-            width={180}
-            height={100}
-            className={`pointer-events-none absolute inset-y-0 right-0 h-full w-[42%] object-contain object-right opacity-95 ${KNOCK_BLACK}`}
+            fill
+            sizes="280px"
+            className="object-cover object-right"
           />
-          <div className="relative z-[1] flex h-full max-w-[58%] items-center gap-2.5">
+          <div className="relative z-[1] flex h-full max-w-[58%] items-center gap-2.5 px-3.5">
             <span className="relative h-9 w-9 shrink-0">
               <Image
-                src={SUGGESTED_PRIZE_ART.trophy}
+                src={SUGGESTED_PRIZE_ART.icon}
                 alt=""
                 fill
                 sizes="36px"
@@ -222,40 +197,32 @@ function SuggestionTile({
             </span>
             <div className="min-w-0">
               <p
-                className={`text-[12px] font-bold uppercase tracking-[0.16em] ${
+                className={`text-[11px] font-bold uppercase tracking-[0.16em] ${
                   isGmFunded ? "text-amber-200/90" : "text-cyan-300/90"
                 }`}
               >
                 Prize
               </p>
-              <p className="mt-0.5 truncate text-[28px] font-extrabold leading-none tabular-nums text-white drop-shadow-[0_0_12px_rgba(56,189,248,0.4)]">
+              <p className="mt-0.5 truncate text-[26px] font-extrabold leading-none tabular-nums text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]">
                 {prizeAmount}
               </p>
             </div>
           </div>
         </div>
 
-        {/* 8. Join CTA — compact premium strip, not a tall flat pill */}
-        <span className="relative mt-3.5 inline-flex h-[50px] w-full items-center justify-center overflow-hidden rounded-[14px] border border-cyan-300/85 bg-gradient-to-r from-[#0a4a8a] via-[#0e6bb8] to-[#14b8e0] text-[16px] font-bold text-white shadow-[0_0_20px_-2px_rgba(0,200,255,0.75),inset_0_0_14px_rgba(125,211,252,0.28)] transition group-hover:brightness-110">
-          <span
-            className="pointer-events-none absolute inset-0 opacity-35"
-            aria-hidden
-          >
-            <Image
-              src={SUGGESTED_UI_ART.join}
-              alt=""
-              fill
-              sizes="280px"
-              className={`object-cover ${KNOCK_BLACK}`}
-            />
-          </span>
-          <span className="relative z-[1] inline-flex items-center gap-1.5">
-            Join
-            <ArrowRight
-              className="h-4 w-4 transition group-hover:translate-x-0.5"
-              aria-hidden
-            />
-          </span>
+        {/*
+          8. Join CTA — plate already says "Join →". Never overlay that word
+          again (that was the "JJoin" glitch on Image 1).
+        */}
+        <span className="relative mt-3.5 block h-[50px] w-full overflow-hidden transition group-hover:brightness-110">
+          <Image
+            src={SUGGESTED_UI_ART.join}
+            alt="Join"
+            fill
+            sizes="280px"
+            className={`object-contain ${KNOCK_BLACK}`}
+          />
+          <span className="sr-only">Join</span>
         </span>
       </div>
     </Link>
@@ -264,8 +231,8 @@ function SuggestionTile({
 
 /**
  * Contests suggested from games the player has actually played (X11.5).
- * Layout matches owner Image 1 densify pass (3 Oct 2026) — tighter cards,
- * fixed art ratio, strong badges, integrated prize strip.
+ * Layout matches owner Image 2 (3 Oct 2026): clean cover, GM/Private/Public
+ * badges, full prize-strip background, Join plate without double text.
  * Never invites anyone - suggestions only (X14).
  */
 export default function GameSuggestionsCard({

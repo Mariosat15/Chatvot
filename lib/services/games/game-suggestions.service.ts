@@ -12,7 +12,7 @@ import {
   listBrowsableGames,
   type BrowsableGame,
 } from "@/lib/services/games/player-catalogue.service";
-import { resolvePlayArt } from "@/lib/services/games/overview-standing.service";
+import { overviewPlayCardArt } from "@/lib/services/games/overview-assets";
 import { resolveContestViewer } from "@/lib/services/gamemaster/contest-viewer.service";
 import { withEnterableContests } from "@/lib/services/gamemaster/visible-contests";
 
@@ -26,7 +26,11 @@ export interface GameSuggestion {
   reason: "played_before" | "declared_interest";
   /** Catalogue display name of the game, so the card can say what it is. */
   gameLabel: string;
-  /** Same artwork the "Play by game" strip uses for this title. */
+  /**
+   * Curated neon play plate for this title (Suggested Image 2 mock).
+   * Reason: catalogue banners vary and were showing the wrong plates on
+   * Overview; /games still uses resolvePlayArt (banner → thumb → fallback).
+   */
   artSrc: string;
   prizePool: number;
   currentParticipants: number;
@@ -110,7 +114,7 @@ export async function suggestOpenContests(
       status: c.status,
       reason: "played_before" as const,
       gameLabel: cat?.displayName ?? (isTrading ? "Trading" : "Game"),
-      artSrc: resolvePlayArt(cat, isTrading),
+      artSrc: overviewPlayCardArt(cat?.gameCode, isTrading),
       prizePool: c.prizePool ?? 0,
       currentParticipants: c.currentParticipants ?? 0,
       maxParticipants:

@@ -801,10 +801,9 @@ describe("Overview streaks chrome", () => {
     expect(assets).not.toMatch(/hero-banner-chartvolt\.png/);
   });
 
-  it("Suggested for you art uses a fixed 16/8.5 cover ratio (Image 1 densify)", () => {
-    // Reason: flipped 3 Oct 2026 — owner Image 1 requires aspect-[16/8.5] +
-    // object-cover so artwork stays ~40% of the card. The earlier natural-height
-    // + contain rule made cards too tall (Image 2). h-20 strip remains forbidden.
+  it("Suggested for you art uses a fixed 16/8.5 cover ratio (Image 2)", () => {
+    // Reason: owner Image 2 — aspect-[16/8.5] + object-cover on the hero only.
+    // Cover must stay clean (no Upcoming / fee pills). h-20 strip remains forbidden.
     const suggestions = readFileSync(
       join(ROOT, "components/dashboard/GameSuggestionsCard.tsx"),
       "utf8",
@@ -812,24 +811,26 @@ describe("Overview streaks chrome", () => {
       .replace(/\/\*[\s\S]*?\*\//g, "")
       .replace(/\/\/.*$/gm, "");
     expect(suggestions).toMatch(/aspect-\[16\/8\.5\]/);
-    // Reason: cover must be on the artwork <img>, not only on the Join plate.
-    // Slice from the aspect class to the Upcoming label — that is the hero only.
     const artStart = suggestions.indexOf("aspect-[16/8.5]");
     expect(artStart).toBeGreaterThan(-1);
+    // Reason: slice hero to the badge row — cover must not carry status pills.
     const artBlock = suggestions.slice(
       artStart,
-      suggestions.indexOf("Upcoming", artStart),
+      suggestions.indexOf("badgeGmFunded", artStart),
     );
     expect(artBlock.length).toBeGreaterThan(40);
     expect(artBlock).toMatch(/object-cover/);
+    expect(artBlock).not.toMatch(/Upcoming/);
+    expect(artBlock).not.toMatch(/Live/);
+    expect(artBlock).not.toMatch(/entryFee/);
     expect(suggestions).not.toMatch(/h-20/);
     expect(suggestions).not.toMatch(/h-auto w-full/);
   });
 
-  it("Suggested for you matches Image 1: badges, prize strip, meta row, Join CTA", () => {
-    // Reason: owner 3 Oct 2026 densify — GM Funded from fundingMode; prize chrome
-    // by isGmFunded not game art; prize art absolute (no framed box); Starts in
-    // plain text; Join compact premium strip.
+  it("Suggested for you matches Image 2: clean cover, badges, full prize strip, Join plate", () => {
+    // Reason: owner 3 Oct 2026 — Image 2 is the target. Full prize banner as
+    // background (not a 42% framed crop); Join plate already says Join (never
+    // overlay that word — that was the JJoin glitch); GM Funded from fundingMode.
     const suggestions = readFileSync(
       join(ROOT, "components/dashboard/GameSuggestionsCard.tsx"),
       "utf8",
@@ -842,45 +843,61 @@ describe("Overview streaks chrome", () => {
     )
       .replace(/\/\*[\s\S]*?\*\//g, "")
       .replace(/\/\/.*$/gm, "");
+    const service = readFileSync(
+      join(ROOT, "lib/services/games/game-suggestions.service.ts"),
+      "utf8",
+    )
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
     expect(assets).toMatch(/SUGGESTED_PRIZE_ART/);
     expect(assets).toMatch(/SUGGESTED_UI_ART/);
     expect(assets).toMatch(/prize-trophy\.jpg/);
     expect(assets).toMatch(/prize-cubes\.png/);
     expect(assets).toMatch(/icon-clock\.jpg/);
     expect(assets).toMatch(/btn-join\.jpg/);
+    expect(assets).toMatch(/SUGGESTED_PRIZE_ART[\s\S]*icon:/);
     expect(suggestions).toMatch(/suggestedPrizeArt/);
     expect(suggestions).toMatch(/SUGGESTED_UI_ART\.clock/);
     expect(suggestions).toMatch(/SUGGESTED_UI_ART\.users/);
     expect(suggestions).toMatch(/mix-blend-screen/);
     expect(suggestions).toMatch(/Starts in/);
     expect(suggestions).toMatch(/OVERVIEW_ICON_ART\.star/);
-    expect(suggestions).toMatch(/SUGGESTED_PRIZE_ART\.trophy/);
+    expect(suggestions).toMatch(/SUGGESTED_PRIZE_ART\.icon/);
     expect(suggestions).not.toMatch(/\bSparkles\b/);
-    expect(suggestions).toMatch(/>\s*Join\s*</);
+    // Join plate carries the label — never overlay "Join" + ArrowRight (JJoin).
+    const joinIdx = suggestions.indexOf("SUGGESTED_UI_ART.join");
+    expect(joinIdx).toBeGreaterThan(-1);
+    const joinCta = suggestions.slice(
+      suggestions.lastIndexOf("<span", joinIdx),
+      suggestions.indexOf("</span>", suggestions.indexOf("sr-only", joinIdx)) + 7,
+    );
+    expect(joinCta).toMatch(/SUGGESTED_UI_ART\.join/);
+    expect(joinCta).toMatch(/sr-only/);
+    expect(joinCta).not.toMatch(/ArrowRight/);
+    expect(joinCta).not.toMatch(/inline-flex items-center gap-1\.5/);
+    // Curated play plates on Suggested (not stale catalogue banners).
+    expect(service).toMatch(/overviewPlayCardArt/);
+    expect(service).not.toMatch(/resolvePlayArt/);
     // GM Funded badge from real fundingMode — must not be omitted from the tree.
     expect(suggestions).toMatch(/fundingMode === "gm_funded"/);
     expect(suggestions).toMatch(/SUGGESTED_UI_ART\.badgeGmFunded/);
     expect(suggestions).toMatch(/SUGGESTED_UI_ART\.badgePrivate/);
     expect(suggestions).toMatch(/SUGGESTED_UI_ART\.badgePublic/);
     expect(suggestions).toMatch(/h-8 w-auto/);
-    // Prize panel height + absolute right art (not a bordered picture frame).
+    // Prize strip: full banner fill, not a 42% absolute crop in a framed box.
     expect(suggestions).toMatch(/h-\[88px\]/);
-    expect(suggestions).toMatch(/w-\[42%\]/);
-    expect(suggestions).toMatch(/absolute inset-y-0 right-0/);
-    // Prize chrome follows funding, not which decorative plate was chosen.
+    expect(suggestions).not.toMatch(/w-\[42%\]/);
+    expect(suggestions).not.toMatch(/absolute inset-y-0 right-0/);
+    expect(suggestions).toMatch(/object-cover object-right/);
     expect(suggestions).toMatch(/isGmFunded\s*\?/);
-    expect(suggestions).toMatch(/text-\[28px\]/);
-    // Title hierarchy floors.
+    expect(suggestions).toMatch(/text-\[26px\]/);
     expect(suggestions).toMatch(/text-\[19px\]/);
     expect(suggestions).toMatch(/text-\[12px\].*uppercase/);
-    // Join compact, not a tall 60–70px pill.
     expect(suggestions).toMatch(/h-\[50px\]/);
-    expect(suggestions).toMatch(/SUGGESTED_UI_ART\.join/);
     // Starts-in row: clock plate sits beside the label; neither wears pill chrome.
     const callIdx = suggestions.lastIndexOf("startLabel(c.startTime");
     expect(callIdx).toBeGreaterThan(-1);
     const metaStart = suggestions.lastIndexOf("justify-between", callIdx);
-    // Reason: users icon sits AFTER the starts-in call — slice past both.
     const usersIdx = suggestions.indexOf("SUGGESTED_UI_ART.users", callIdx);
     expect(metaStart).toBeGreaterThan(-1);
     expect(usersIdx).toBeGreaterThan(callIdx);
@@ -888,7 +905,6 @@ describe("Overview streaks chrome", () => {
     expect(metaRow).toMatch(/SUGGESTED_UI_ART\.clock/);
     expect(metaRow).toMatch(/SUGGESTED_UI_ART\.users/);
     expect(metaRow).toMatch(/startLabel\(c\.startTime/);
-    // The label itself must stay plain text (no badge/pill on the starts-in string).
     const labelSpan = suggestions.slice(
       suggestions.lastIndexOf("<span", callIdx),
       suggestions.indexOf("</span>", callIdx) + 7,
@@ -896,7 +912,6 @@ describe("Overview streaks chrome", () => {
     expect(labelSpan).toMatch(/startLabel\(c\.startTime/);
     expect(labelSpan).not.toMatch(/rounded-full/);
     expect(labelSpan).not.toMatch(/bg-/);
-    // Four-column desktop grid.
     expect(suggestions).toMatch(/xl:grid-cols-4/);
   });
 

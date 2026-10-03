@@ -326,7 +326,7 @@ This plan has two tracks. **As of 30 September 2026**:
 
 - **Wallet Analytics neon icon remap CODE-COMPLETE 3 Oct (eng)** — header/insights/trend→wallet; Credit Balance→deposit; Total Spend / Spending vs Earnings / Withdrawals→withdrawal; Game Earnings→games; Prizes Won→trophy; Credit Breakdown→credits; Daily Credit Flow→chart2; Deposits→deposit; Purchases→purch; Bonuses→gift; Net Movement→chart. `WalletNeonIcon` + mobile images use `mix-blend-screen` and `bg-transparent`. Assets under `public/assets/neon/wallet/icon-*`. Desktop + mobile. Tests: `wallet-analytics.test.ts`. **Never verified by eye.**
 - **Mobile Overview neon plates refreshed 3 Oct (eng)** — owner re-supplied deposit/withdrawal/trophy/games/wallet/chart/lamp/purchases; files overwritten under `public/assets/neon/wallet/` + `icon-lamp.jpg`. Mapping unchanged (`MOBILE_OVERVIEW_ART` + `ICON_BOX` h-10 + screen blend). **Never verified by eye.**
-- **Suggested for You densify CODE-COMPLETE 3 Oct (eng)** — cards rebuilt to Image 1: `aspect-[16/8.5]` cover art, h-8 GM/Private/Public badges (`fundingMode` / `visibility`), 19px title / 28px prize, integrated 88px prize strip (gold when GM funded), absolute prize art (no framed box), 50px Join CTA, tighter vertical rhythm. Flipped prior natural-height+contain guard. Tests: `overview-standing.test.ts`. **Never verified by eye.**
+- **Suggested for You rebuilt to Image 2 CODE-COMPLETE 3 Oct (eng)** — clean cover (no Upcoming/fee pills); GM/Private/Public badges; full prize-banner background + small trophy icon (not a 42% framed crop); Join plate alone (fixes JJoin); curated `overviewPlayCardArt` covers. Tests: `overview-standing.test.ts`. **Never verified by eye.** The earlier densify-to-Image-1 pass is correct as history only.
 - **Mobile Overview Quick Actions / Quick Access neon remap CODE-COMPLETE 3 Oct (eng)** — Deposit→deposit, Withdraw→withdrawal, Compete→trophy, Play→games, Wallet Analytics→wallet, Performance→chart, Tutorials→lamp, Marketplace→purchases, Wallet/Volts→wallet. Shared `ICON_BOX` h-10 + `mix-blend-screen` / `bg-transparent` (no black canvas). Assets under `public/assets/neon/wallet/icon-*` + `overview/items/icon-lamp.jpg`. Tests: `mobile-dashboard-split.test.ts`. **Never verified by eye.**
 - **Mobile Overview icon parity CODE-COMPLETE 3 Oct (eng)** — phone Progress→games, Streaks→fire (shared `TILES`), Suggested (`GameSuggestionsCard`) on `MobileDashboard`. Same blend knock-out as desktop. Tests: `mobile-dashboard-split.test.ts`. **Never verified by eye.**
 - **Overview neon icon remap CODE-COMPLETE 3 Oct (eng)** — Credits→wallet, win rate→chart2, ROI→chart, prizes→trophy; Player Progress→games; Streaks header→fire; streak tiles (best→trophy, wins→chart2, played→games, top3→chart, weeks→calendar); Suggested header→star over prize plates. Black canvases use `mix-blend-screen`. Assets under `public/assets/neon/overview/items/icon-*`. Tests: `overview-standing.test.ts`. **Never verified by eye.**
@@ -930,11 +930,28 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 3 October 2026 - Suggested for You rebuilt to Image 2 (correct target)
+
+**Owner:** Image 1 (live densify) was wrong; Image 2 is the target. Fix cover
+overlays, JJoin, boxed prize art, badge/prize order.
+
+**What was wrong on Image 1:** Upcoming + entry-fee pills on the cover; prize
+banner cropped into a 42% framed box with the full strip also used as the tiny
+left icon; `btn-join.jpg` (already says Join) plus a text "Join" overlay =
+JJoin; stale catalogue banners instead of curated play plates.
+
+**Built (main app only).**
+- `GameSuggestionsCard` — clean `16/8.5` cover; badge row; title hierarchy; meta;
+  prize strip uses the banner as full `object-cover` background +
+  `SUGGESTED_PRIZE_ART.icon` on the left; Join plate only (`sr-only` for a11y).
+- `game-suggestions.service.ts` — `artSrc` from `overviewPlayCardArt` (curated);
+  `/games` still uses `resolvePlayArt`.
+- Tests flipped to Image 2 claims. **Never verified by eye.**
+
 ### 3 October 2026 - Suggested for You densify to Image 1
 
-**Owner:** Image 1 is the target; Image 2 (tall empty cards, weak badges, framed
-prize art, tiny type) is not acceptable. Do not invent a new structure — match
-Image 1 geometry and hierarchy.
+**Owner (later superseded same day):** Image 1 densify geometry. Correct as
+history; Image 2 rebuild above is the present target.
 
 **Built (main app only).**
 - `GameSuggestionsCard` — fixed `16/8.5` cover art; badge row h-8; title hierarchy;

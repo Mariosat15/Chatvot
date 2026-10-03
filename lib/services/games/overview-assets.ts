@@ -128,13 +128,20 @@ export const MOBILE_OVERVIEW_ART = {
 } as const;
 
 /**
- * Suggested-for-you art (owner mock 3 Oct 2026).
- * Prize plates sit UNDER the amount; badge/icon plates are screen-blended
- * so the black export canvas does not paint a box on the card.
+ * Suggested-for-you art (owner Image 2 target, 3 Oct 2026).
+ * Prize strips are full horizontal banners (art on the right, empty left for
+ * the amount). The small left trophy is a separate icon plate — never the
+ * banner scaled into a 36px box. Badge / clock / users / Join plates keep
+ * black canvases; knock out with `mix-blend-screen` at the call site.
+ * Join plate already paints "Join →" — never overlay that word again.
  */
 export const SUGGESTED_PRIZE_ART = {
+  /** Full prize strip background — Circuit Sprint / default. */
   trophy: "/assets/neon/overview/suggested/prize-trophy.jpg",
+  /** Full prize strip background — Volt Stack / stack titles. */
   cubes: "/assets/neon/overview/suggested/prize-cubes.png",
+  /** Small left-of-amount trophy (not the strip). */
+  icon: "/assets/neon/overview/items/icon-trophy-neon.jpg",
 } as const;
 
 export const SUGGESTED_UI_ART = {
@@ -143,7 +150,7 @@ export const SUGGESTED_UI_ART = {
   badgeGmFunded: "/assets/neon/overview/suggested/badge-gm-funded.png",
   badgePrivate: "/assets/neon/overview/suggested/badge-private.png",
   badgePublic: "/assets/neon/overview/suggested/badge-public.png",
-  /** Owner Join CTA plate (3 Oct 2026 densify pass). */
+  /** Owner Join CTA — label is baked into the plate. */
   join: "/assets/neon/overview/suggested/btn-join.jpg",
 } as const;
 
