@@ -128,22 +128,20 @@ export const MOBILE_OVERVIEW_ART = {
 } as const;
 
 /**
- * Suggested-for-you art (owner Image 2 target, 3 Oct 2026).
+ * Suggested-for-you art (owner Image 2 target, 3 Oct 2026; high-resolution
+ * replacements supplied by the owner the same day).
  * Every file here is a genuinely TRANSPARENT PNG cropped to its artwork,
  * produced by `node tools/overview/key-out-black.mjs` from the black-canvas
  * originals beside them. Reason: `mix-blend-screen` only hid the black over a
  * dark page and kept the padding in the layout box, so badges rendered tiny and
- * plates showed black edges - the owner rejected both. The prize entries are the
- * art alone (the plate's frame is CSS), so every card's art sits in one box.
- * Join has no image: it is a CSS button, so it can never carry a black canvas.
+ * plates showed black edges - the owner rejected both. The `-hr` files are kept
+ * at full source resolution and rendered `unoptimized`, so the browser only
+ * ever scales them DOWN: re-encoding them at the ~95px layout width is what made
+ * the previous badges look blurred.
  */
 export const SUGGESTED_PRIZE_ART = {
-  /** Prize art - Circuit Sprint / default. */
-  trophy: "/assets/neon/overview/suggested/prize-trophy-art.png",
-  /** Prize art - Volt Stack / stack titles. */
-  cubes: "/assets/neon/overview/suggested/prize-cubes-art.png",
-  /** Small trophy left of the amount. */
-  icon: "/assets/neon/overview/suggested/icon-trophy-clear.png",
+  /** Trophy left of the prize amount. The decorative right-hand art was removed. */
+  icon: "/assets/neon/overview/suggested/prize-icon-hr.png",
 } as const;
 
 export const SUGGESTED_UI_ART = {
@@ -151,20 +149,12 @@ export const SUGGESTED_UI_ART = {
   star: "/assets/neon/overview/suggested/icon-star-clear.png",
   clock: "/assets/neon/overview/suggested/icon-clock-clear.png",
   users: "/assets/neon/overview/suggested/icon-users-clear.png",
-  badgeGmFunded: "/assets/neon/overview/suggested/badge-gm-funded-clear.png",
-  badgePrivate: "/assets/neon/overview/suggested/badge-private-clear.png",
-  badgePublic: "/assets/neon/overview/suggested/badge-public-clear.png",
+  badgeGmFunded: "/assets/neon/overview/suggested/badge-gm-hr.png",
+  badgePrivate: "/assets/neon/overview/suggested/badge-private-hr.png",
+  badgePublic: "/assets/neon/overview/suggested/badge-public-hr.png",
+  /** Full-width Join button. Decorative: the label is supplied by `alt`. */
+  join: "/assets/neon/overview/suggested/btn-join-hr.png",
 } as const;
-
-/** Pick the prize decoration for a suggestion card. Unknown codes get the trophy. */
-export function suggestedPrizeArt(gameKey?: string | null): string {
-  if (!gameKey) return SUGGESTED_PRIZE_ART.trophy;
-  // Reason: only stack-shaped titles use the cube plate; everything else is the trophy.
-  if (gameKey.includes("volt-stack") || gameKey.includes("stack")) {
-    return SUGGESTED_PRIZE_ART.cubes;
-  }
-  return SUGGESTED_PRIZE_ART.trophy;
-}
 
 const PLAY_GENERIC = "/assets/neon/overview/play-generic.png";
 

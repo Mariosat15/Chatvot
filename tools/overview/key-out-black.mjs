@@ -13,21 +13,17 @@ import path from "node:path";
 import sharp from "sharp";
 
 const ROOT = path.resolve("public/assets/neon/overview");
-/** Fractions of the plate holding the prize art, inside its frame lines. */
-const PRIZE_ART = { x0: 0.6, x1: 0.96, y0: 0.1, y1: 0.88, cropAlpha: 70 };
 const JOBS = [
-  ["suggested/badge-gm-funded.png", "suggested/badge-gm-funded-clear.png"],
-  ["suggested/badge-private.png", "suggested/badge-private-clear.png"],
-  ["suggested/badge-public.png", "suggested/badge-public-clear.png"],
-  // Reason: the prize plates are a whole framed panel with the art in the right
-  // ~40%. Only the art is kept; the frame is CSS, so every card's art sits in
-  // one identical box instead of being cropped to whatever width the card has.
-  ["suggested/prize-trophy.jpg", "suggested/prize-trophy-art.png", PRIZE_ART],
-  ["suggested/prize-cubes.png", "suggested/prize-cubes-art.png", PRIZE_ART],
   ["suggested/icon-clock.jpg", "suggested/icon-clock-clear.png"],
   ["suggested/icon-users.jpg", "suggested/icon-users-clear.png"],
-  ["items/icon-trophy-neon.jpg", "suggested/icon-trophy-clear.png"],
   ["items/icon-star.jpg", "suggested/icon-star-clear.png"],
+  // Owner's high-resolution replacements (3 Oct 2026). Kept at full source
+  // resolution so the browser only ever downscales them - never blurry.
+  ["suggested/src-badge-private.jpg", "suggested/badge-private-hr.png"],
+  ["suggested/src-badge-public.jpg", "suggested/badge-public-hr.png"],
+  ["suggested/src-badge-gm.png", "suggested/badge-gm-hr.png"],
+  ["suggested/src-join.jpg", "suggested/btn-join-hr.png"],
+  ["suggested/src-prize-icon.jpg", "suggested/prize-icon-hr.png"],
 ];
 /** Below this brightness a pixel is JPEG noise on the black canvas, not art. */
 const NOISE_FLOOR = 14;

@@ -823,15 +823,19 @@ describe("Overview streaks chrome", () => {
       suggestions.indexOf("badgeGmFunded", artStart),
     );
     expect(artBlock.length).toBeGreaterThan(40);
-    expect(artBlock).toMatch(/object-cover/);
+    // Reason: owner 3 Oct 2026 - the logo name must ALWAYS show. object-cover alone
+    // cropped it, so the cover is a blurred cover fill behind an object-contain copy.
+    expect(artBlock).toMatch(/object-cover object-center opacity-50 blur-xl/);
+    expect(artBlock).toMatch(/object-contain object-center/);
+    expect(artBlock).toMatch(/aria-hidden/);
     expect(artBlock).toMatch(/"Upcoming"/);
     expect(artBlock).toMatch(/"Live"/);
     expect(artBlock).toMatch(/feeLabel/);
     expect(suggestions).not.toMatch(/h-20/);
-    expect(suggestions).not.toMatch(/h-auto w-full/);
+    expect(artBlock).not.toMatch(/h-auto/);
   });
 
-  it("Suggested for you matches Image 2: competition cover, pills, big badges, fixed prize strip, CSS Join", () => {
+  it("Suggested for you matches Image 2: competition cover, pills, big hi-res badges, prize strip, image Join", () => {
     // Reason: owner 3 Oct 2026 (second pass) rejected four things the first
     // Image-2 rebuild shipped, so each is pinned in the opposite direction:
     // a curated per-game plate replaced the competition's own image; the cover
@@ -874,36 +878,50 @@ describe("Overview streaks chrome", () => {
     expect(suggestions).not.toMatch(/mix-blend-screen/);
     const block = assets.slice(
       assets.indexOf("export const SUGGESTED_PRIZE_ART"),
-      assets.indexOf("export function suggestedPrizeArt"),
+      assets.indexOf("const PLAY_GENERIC"),
     );
     expect(block.length).toBeGreaterThan(100);
     expect(block).not.toMatch(/\.jpg"/);
-    expect(block).not.toMatch(/btn-join/);
-    expect(suggestions).not.toMatch(/SUGGESTED_UI_ART\.join/);
+    // Reason: owner 3 Oct 2026 supplied a transparent high-res Join plate and
+    // asked for it; the CSS button that replaced the old black-canvas plate is
+    // superseded. Flipped, not deleted - the black-canvas ban above still holds.
+    expect(block).toMatch(/btn-join-hr\.png/);
+    expect(suggestions).toMatch(/SUGGESTED_UI_ART\.join/);
+    expect(assets).not.toMatch(/suggestedPrizeArt/);
 
     // 4. Badges at a visible size (cropped plates, so the height is the badge).
     expect(suggestions).toMatch(/fundingMode === "gm_funded"/);
     expect(suggestions).toMatch(/SUGGESTED_UI_ART\.badgeGmFunded/);
     expect(suggestions).toMatch(/SUGGESTED_UI_ART\.badgePrivate/);
     expect(suggestions).toMatch(/SUGGESTED_UI_ART\.badgePublic/);
-    expect(suggestions).toMatch(/const BADGE_IMG = "h-7 w-auto shrink-0"/);
+    expect(suggestions).toMatch(/const BADGE_IMG = "h-8 w-auto shrink-0"/);
+    // Reason: Next re-encoding a 650-890px plate at ~95px blurred it; the full
+    // file is served and the browser only scales down.
+    expect(suggestions.match(/unoptimized/g)?.length ?? 0).toBeGreaterThanOrEqual(5);
 
-    // 5. Prize strip: fixed height, art in ONE fixed box, never a cropped banner.
-    expect(suggestions).toMatch(/const PRIZE_ART_BOX = "relative h-\[52px\] w-\[112px\] shrink-0"/);
-    expect(suggestions).toMatch(/className=\{PRIZE_ART_BOX\}/);
+    // 5. Prize strip: fixed height; the right-hand prize art is GONE (owner
+    // crossed it out, 3 Oct 2026); a bigger trophy spans both lines; the number
+    // and the volt symbol are two baseline-aligned spans, not one string.
+    expect(suggestions).not.toMatch(/PRIZE_ART_BOX/);
+    expect(suggestions).toMatch(/const PRIZE_ICON_BOX = "relative h-\[54px\] w-\[54px\] shrink-0"/);
+    expect(suggestions).toMatch(/className=\{PRIZE_ICON_BOX\}/);
     expect(suggestions).toMatch(/h-\[72px\]/);
+    expect(suggestions).toMatch(/formatVolts\(c\.prizePool as number, \{ bare: true \}\)/);
+    expect(suggestions).toMatch(/items-baseline[\s\S]{0,200}\{prizeNumber\}[\s\S]{0,200}\{creditSymbol\}/);
     expect(suggestions).not.toMatch(/object-cover object-right/);
 
-    // 6. Join is a full-width CSS button carrying its own label.
-    const joinIdx = suggestions.search(/>\r?\n\s*Join\r?\n/);
+    // 6. Join is the owner's full-width transparent image, labelled by alt, and
+    // NOT a nested link (the whole card is already the link).
+    const joinIdx = suggestions.indexOf("SUGGESTED_UI_ART.join");
     expect(joinIdx).toBeGreaterThan(-1);
     const joinCta = suggestions.slice(
-      suggestions.lastIndexOf("<span", joinIdx),
-      suggestions.indexOf("</span>", joinIdx) + 7,
+      suggestions.lastIndexOf("<Image", joinIdx),
+      suggestions.indexOf("/>", joinIdx) + 2,
     );
-    expect(joinCta).toMatch(/h-11 w-full/);
-    expect(joinCta).toMatch(/ArrowRight/);
-    expect(joinCta).not.toMatch(/<Image/);
+    expect(joinCta.length).toBeGreaterThan(40);
+    expect(joinCta).toMatch(/alt="Join"/);
+    expect(joinCta).toMatch(/w-full/);
+    expect(joinCta).not.toMatch(/<Link/);
 
     // 7. Phone: swipe row; sm: 2 columns; xl: 4 (Image 2).
     expect(suggestions).toMatch(/const TILE_ROW =[\s\S]*?snap-x[\s\S]*?sm:grid-cols-2[\s\S]*?xl:grid-cols-4/);
@@ -927,7 +945,7 @@ describe("Overview streaks chrome", () => {
       ...Object.values(SUGGESTED_PRIZE_ART),
       ...Object.values(SUGGESTED_UI_ART),
     ];
-    expect(files.length).toBeGreaterThanOrEqual(9);
+    expect(files.length).toBeGreaterThanOrEqual(8);
     for (const src of files) {
       expect(src.endsWith(".png"), src).toBe(true);
       const { data, info } = await sharp(join(ROOT, "public", src))

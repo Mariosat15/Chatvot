@@ -931,6 +931,57 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 3 October 2026 - Suggested for You: logo always whole, owner's high-res badges and Join
+
+**Owner:** the cover logos must always show, centred. Use the supplied Join,
+Private, Public, GM and prize images, all transparent and high resolution, not
+blurred. Remove the prize art on the right of the strip. Line the "Prize" word up
+with the number and the volt symbol, and make the trophy a little bigger.
+
+**Cause of the blur:** the badges went through Next's image optimiser at their
+~95px layout width, so a 650-890px plate was re-encoded small and then rendered.
+**Cause of the crop:** the cover was `object-cover` only, the same fault fixed
+on the `/games` cards earlier today.
+
+**Built (main app only):**
+- The five supplied images are kept as `suggested/src-*` sources.
+  `key-out-black.mjs` cuts them to transparent PNGs at full resolution:
+  `badge-{private,public,gm}-hr.png`, `btn-join-hr.png` and `prize-icon-hr.png`.
+  Every one is rendered `unoptimized`, so the browser only ever scales down.
+- The cover uses the same two layers as `/games`: a blurred cover fill with an
+  `object-contain object-center` copy on top.
+- The prize strip lost its right-hand art. `suggestedPrizeArt`, both prize
+  plates, the old badges, the old Join plate and the old trophy were **deleted**,
+  because nothing reads them now. A 54px trophy spans both lines. The number
+  (`formatVolts(..., { bare: true })`) and the credit symbol are two
+  baseline-aligned spans.
+- Join is the supplied image, full width, labelled by `alt`. It is still inside
+  the card link, not a second link.
+- `overview-standing.test.ts` (27): the CSS-Join, prize-art-box and cover-only
+  assertions were **flipped, not deleted**. The pixel test now covers the new
+  files.
+- **Never verified by eye.**
+
+### 3 October 2026 - `/games` cards: artwork always centred, never cropped
+
+**Owner:** the game images must always be centred and display correctly, with an
+automatic adjustment so they always fit.
+
+**Cause:** `GameCatalogueCard` drew every banner with `object-cover` in a fixed
+16/8.5 box. Measured banners range from 1.5:1 (`banner-trading.webp`) to 3:1, and
+operator uploads can be any shape, so cover sliced the banners' own text (for
+example "Trade • Compete • Conquer"). The earlier `object-contain` version had
+the opposite problem: empty bands.
+
+**Built (main app only):**
+- The same image is drawn twice. A blurred, dimmed `object-cover` copy fills the
+  box; it is decorative (`alt=""`, `aria-hidden`). The full artwork sits on top
+  with `object-contain object-center`.
+- Any shape is centred and whole, with no empty bands.
+- `games-catalogue-routes.test.ts`: the cover-only test was **flipped, not
+  deleted**. It now pins both layers and their order.
+- **Never verified by eye.**
+
 ### 3 October 2026 - Suggested for You: real covers back, no black anywhere
 
 **Owner:** Image 1 must match Image 2. Put each competition's own image back,

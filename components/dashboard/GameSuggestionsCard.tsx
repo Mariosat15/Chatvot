@@ -8,7 +8,6 @@ import { formatVolts } from "@/lib/utils/format-volts";
 import {
   SUGGESTED_PRIZE_ART,
   SUGGESTED_UI_ART,
-  suggestedPrizeArt,
 } from "@/lib/services/games/overview-assets";
 
 interface Suggestion {
@@ -43,18 +42,20 @@ const TILE_ROW =
   "-mx-3.5 mt-4 flex snap-x snap-proximity scroll-px-3.5 gap-3 overflow-x-auto overscroll-x-contain px-3.5 pb-1 [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:grid sm:grid-cols-2 sm:gap-4 sm:overflow-visible sm:px-0 sm:pb-0 xl:grid-cols-4";
 const TILE_SLOT = "w-[82%] max-w-[320px] shrink-0 snap-start sm:w-auto sm:max-w-none";
 
-/** Badge plates are transparent and cropped, so the height IS the badge. */
-const BADGE_IMG = "h-7 w-auto shrink-0";
+/**
+ * Badge plates are transparent and cropped, so the height IS the badge.
+ * Reason: rendered `unoptimized` from the full-resolution file (650-890px wide)
+ * so the browser only scales DOWN; Next re-encoding them at ~95px was what made
+ * the earlier badges look blurred (owner 3 Oct 2026).
+ */
+const BADGE_IMG = "h-8 w-auto shrink-0";
 
 /** Overlay pill on the cover — translucent tint, never a black block. */
 const COVER_PILL =
   "inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[12px] font-bold uppercase tracking-wide backdrop-blur-sm";
 
-/**
- * Prize-art box. Reason: one fixed box on every card is what makes the art
- * "inline, all the same height and width" - both cut-outs are ~2.15:1.
- */
-const PRIZE_ART_BOX = "relative h-[52px] w-[112px] shrink-0";
+/** Prize trophy - sized to span both lines (label + amount) so they centre on it. */
+const PRIZE_ICON_BOX = "relative h-[54px] w-[54px] shrink-0";
 
 /** "Starts in 2h 44m" / "Live now". */
 function startLabel(startTime: string, status: string, now: number): string {
@@ -82,16 +83,15 @@ function SuggestionTile({
     c.maxParticipants && c.maxParticipants > 0
       ? `${c.currentParticipants ?? 0}/${c.maxParticipants}`
       : `${c.currentParticipants ?? 0}`;
-  const prizeArt = suggestedPrizeArt(c.gameKey);
-  const isStackArt = prizeArt === SUGGESTED_PRIZE_ART.cubes;
   const isPrivate = c.visibility === "gm_private";
   const isGmFunded = c.fundingMode === "gm_funded";
   const isLive = c.status === "active";
   // Reason: prizePool is authoritative; absent/zero renders a dash, never entry fee.
-  const prizeAmount =
-    typeof c.prizePool === "number" && Number.isFinite(c.prizePool) && c.prizePool > 0
-      ? formatVolts(c.prizePool, { symbol: creditSymbol })
-      : "-";
+  const hasPrize =
+    typeof c.prizePool === "number" && Number.isFinite(c.prizePool) && c.prizePool > 0;
+  // Reason: number and symbol are rendered as two baseline-aligned spans, so the
+  // volt glyph sits on the number's baseline instead of floating inside one string.
+  const prizeNumber = hasPrize ? formatVolts(c.prizePool as number, { bare: true }) : "-";
   const feeLabel =
     c.entryFee > 0 ? formatVolts(c.entryFee, { symbol: creditSymbol }) : "Free";
 
@@ -104,15 +104,27 @@ function SuggestionTile({
       {/*
         1. Cover — the competition's own image, else its game's catalogue art
         (resolved server-side). Upcoming/Live pill top-left, entry fee top-right.
+        Reason: drawn twice - a blurred, dimmed `object-cover` fill behind an
+        `object-contain` copy - so any uploaded shape shows WHOLE and centred.
+        `object-cover` alone cropped the game's logo name off (owner 3 Oct 2026).
       */}
       <div className="relative aspect-[16/9] w-full shrink-0 overflow-hidden bg-gradient-to-br from-sky-900/40 to-indigo-900/30">
         {c.artSrc ? (
-          // eslint-disable-next-line @next/next/no-img-element -- competition / catalogue URLs vary by host
-          <img
-            src={c.artSrc}
-            alt=""
-            className="absolute inset-0 h-full w-full object-cover object-center transition duration-300 group-hover:scale-[1.03] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
-          />
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element -- competition / catalogue URLs vary by host */}
+            <img
+              src={c.artSrc}
+              alt=""
+              aria-hidden
+              className="absolute inset-0 h-full w-full scale-110 object-cover object-center opacity-50 blur-xl"
+            />
+            {/* eslint-disable-next-line @next/next/no-img-element -- competition / catalogue URLs vary by host */}
+            <img
+              src={c.artSrc}
+              alt=""
+              className="absolute inset-0 h-full w-full object-contain object-center transition duration-300 group-hover:scale-[1.03] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
+            />
+          </>
         ) : null}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-[#020918]/90 to-transparent" />
         <div className="absolute inset-x-2.5 top-2.5 flex items-start justify-between gap-2">
@@ -141,8 +153,9 @@ function SuggestionTile({
             <Image
               src={SUGGESTED_UI_ART.badgeGmFunded}
               alt="GM Funded"
-              width={118}
-              height={28}
+              width={887}
+              height={210}
+              unoptimized
               className={BADGE_IMG}
             />
           ) : null}
@@ -150,16 +163,18 @@ function SuggestionTile({
             <Image
               src={SUGGESTED_UI_ART.badgePrivate}
               alt="Private"
-              width={95}
-              height={28}
+              width={653}
+              height={192}
+              unoptimized
               className={BADGE_IMG}
             />
           ) : (
             <Image
               src={SUGGESTED_UI_ART.badgePublic}
               alt="Public"
-              width={94}
-              height={28}
+              width={715}
+              height={215}
+              unoptimized
               className={BADGE_IMG}
             />
           )}
@@ -205,56 +220,50 @@ function SuggestionTile({
         </div>
 
         {/*
-          7. Prize strip — CSS frame, fixed height; trophy, label + amount, then
-          the art in one fixed box on the right. Same size on every card.
+          7. Prize strip — CSS frame, fixed height; a trophy spanning both lines,
+          then "Prize" over the amount, all left-aligned on one edge. The
+          decorative right-hand art was removed on the owner's instruction.
         */}
-        <div
-          className={`mt-3 flex h-[72px] items-center gap-2.5 rounded-xl border px-3 ${
-            isStackArt
-              ? "border-cyan-400/60 bg-cyan-500/[0.07] shadow-[inset_0_0_16px_rgba(34,211,238,0.12)]"
-              : "border-amber-400/60 bg-amber-500/[0.07] shadow-[inset_0_0_16px_rgba(251,191,36,0.12)]"
-          }`}
-        >
-          <span className="relative h-9 w-9 shrink-0">
+        <div className="mt-3 flex h-[72px] items-center gap-3 rounded-xl border border-amber-400/60 bg-amber-500/[0.07] px-3 shadow-[inset_0_0_16px_rgba(251,191,36,0.12)]">
+          <span className={PRIZE_ICON_BOX}>
             <Image
               src={SUGGESTED_PRIZE_ART.icon}
               alt=""
               fill
-              sizes="36px"
+              sizes="54px"
+              unoptimized
               className="object-contain"
             />
           </span>
-          <div className="min-w-0 flex-1">
-            <p
-              className={`text-[11px] font-bold uppercase tracking-[0.16em] ${
-                isStackArt ? "text-cyan-300" : "text-amber-200"
-              }`}
-            >
+          <div className="flex min-w-0 flex-1 flex-col justify-center">
+            <p className="text-[12px] font-bold uppercase leading-none tracking-[0.16em] text-amber-200">
               Prize
             </p>
-            <p className="mt-0.5 truncate text-[22px] font-extrabold leading-none tabular-nums text-white">
-              {prizeAmount}
+            <p className="mt-1.5 flex min-w-0 items-baseline gap-1 leading-none text-white">
+              <span className="truncate text-[24px] font-extrabold tabular-nums">
+                {prizeNumber}
+              </span>
+              {hasPrize ? (
+                <span className="shrink-0 text-[18px] font-bold text-amber-300">
+                  {creditSymbol}
+                </span>
+              ) : null}
             </p>
           </div>
-          <span className={PRIZE_ART_BOX}>
-            <Image
-              src={prizeArt}
-              alt=""
-              fill
-              sizes="112px"
-              className="object-contain object-right"
-            />
-          </span>
         </div>
 
         {/*
-          8. Join — a CSS button, never an image plate, so it can never carry a
-          black canvas. It is a span: the whole card is already the link.
+          8. Join — the owner's transparent high-resolution button (3 Oct 2026),
+          full width. It is an image inside the card link, not a second link.
         */}
-        <span className="mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-cyan-300/80 bg-gradient-to-r from-cyan-500/30 via-sky-500/20 to-cyan-500/30 text-[15px] font-bold uppercase tracking-[0.14em] text-white shadow-[0_0_16px_rgba(0,220,255,0.4),inset_0_0_12px_rgba(56,189,248,0.25)] transition group-hover:border-cyan-200 group-hover:shadow-[0_0_22px_rgba(0,220,255,0.6),inset_0_0_14px_rgba(56,189,248,0.35)]">
-          Join
-          <ArrowRight className="h-4 w-4" aria-hidden />
-        </span>
+        <Image
+          src={SUGGESTED_UI_ART.join}
+          alt="Join"
+          width={1024}
+          height={200}
+          unoptimized
+          className="mt-3 h-auto w-full transition group-hover:brightness-125 motion-reduce:transition-none"
+        />
       </div>
     </Link>
   );
@@ -263,7 +272,7 @@ function SuggestionTile({
 /**
  * Contests suggested from games the player has actually played (X11.5).
  * Layout matches owner Image 2 (3 Oct 2026): competition cover with Upcoming
- * and fee pills, GM/Private/Public badges, fixed prize strip, CSS Join button.
+ * and fee pills, GM/Private/Public badges, fixed prize strip, image Join button.
  * Every image is a transparent PNG - nothing renders on a black canvas.
  * Never invites anyone - suggestions only (X14).
  */

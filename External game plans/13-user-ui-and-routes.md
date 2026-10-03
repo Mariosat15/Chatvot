@@ -3284,6 +3284,15 @@ and read the same payload, so the two trees cannot disagree about a figure.
   in one fixed 112×52 box on every card. Join is a **CSS button**, not an image. Phones
   get a snap swipe row; `sm` gets 2 columns and `xl` gets 4. A pixel test fails any
   Suggested asset that is more than 2% opaque black.
+  > **Amended later on 3 Oct 2026; the 112×52 prize box and the CSS Join are history.**
+  > The owner supplied high-resolution Join, Private, Public, GM and prize images.
+  > - All five are transparent full-resolution PNGs, rendered `unoptimized` because
+  >   Next's re-encode at the layout width was what blurred the old badges.
+  > - Join is the image, inside the card link.
+  > - The prize strip's right-hand art is **removed**. A 54px trophy spans the "Prize"
+  >   label and the amount, and the number and credit symbol are baseline-aligned spans.
+  > - The cover now draws the image twice, a blurred cover fill under an
+  >   `object-contain` copy, so the logo is never cropped.
 
 **Not built:** there is no games catalogue API, so featured games come from the player's own
 play cards rather than a curated list. **Never verified by eye** — the dashboard is behind
