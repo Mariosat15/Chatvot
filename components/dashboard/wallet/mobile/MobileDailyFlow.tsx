@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import {
   Bar,
   BarChart,
@@ -11,6 +12,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { WALLET_ART } from "@/lib/services/games/wallet-assets";
 import { WALLET_GOLD, WALLET_RED, WALLET_TEAL } from "../wallet-tokens";
 
 type FlowPoint = { date: string; net: number };
@@ -36,10 +38,21 @@ export default function MobileDailyFlow({ data }: { data: FlowPoint[] }) {
       aria-label="Daily volt flow"
       className="rounded-[18px] border border-[#1E2A4D] bg-[linear-gradient(160deg,rgba(12,22,44,0.92)_0%,rgba(5,10,22,0.96)_100%)] p-4"
     >
-      <h2 className="text-sm font-bold text-white">Daily Volt Flow</h2>
-      <p className="mt-0.5 text-[11px] text-slate-400">
-        Green = Volts in · Red = Volts out
-      </p>
+      <div className="mb-2 flex items-start gap-2">
+        <Image
+          src={WALLET_ART.dailyFlow}
+          alt=""
+          width={28}
+          height={28}
+          className="mt-0.5 h-7 w-7 shrink-0 object-contain mix-blend-screen"
+        />
+        <div>
+          <h2 className="text-sm font-bold text-white">Daily Credit Flow</h2>
+          <p className="mt-0.5 text-[11px] text-slate-400">
+            Green = Volts in · Red = Volts out
+          </p>
+        </div>
+      </div>
 
       {data.length < 1 ? (
         <div className="flex h-[220px] items-center justify-center text-sm text-slate-500">

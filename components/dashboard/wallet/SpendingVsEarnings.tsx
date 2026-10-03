@@ -50,10 +50,10 @@ export default function SpendingVsEarnings({ slices }: { slices: SpendingSlice[]
       subtitle="Compare your spending with earnings and prizes."
       icon={
         <WalletNeonIcon
-          src={WALLET_ART.spend}
+          src={WALLET_ART.spending}
           size={32}
           ringClass="ring-pink-400/45"
-          bgClass="bg-pink-500/15"
+          bgClass="bg-transparent"
         />
       }
       accent="magenta"

@@ -33,8 +33,14 @@ function TileLink({ tile, height }: { tile: Tile; height: string }) {
       href={tile.href}
       className={`${MOBILE_CARD} ${tile.tone} ${height} flex flex-col items-center justify-center gap-1 px-1 active:scale-95 transition-transform`}
     >
-      <span className="relative h-9 w-9">
-        <Image src={tile.art} alt="" fill sizes="36px" className="object-contain" />
+      <span className="relative h-9 w-9 overflow-hidden rounded-lg bg-transparent">
+        <Image
+          src={tile.art}
+          alt=""
+          fill
+          sizes="36px"
+          className="object-contain mix-blend-screen"
+        />
       </span>
       <span className="text-center text-[11px] font-semibold leading-tight">
         {tile.label}

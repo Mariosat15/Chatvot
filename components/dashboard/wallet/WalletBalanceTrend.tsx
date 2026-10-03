@@ -51,10 +51,10 @@ export default function WalletBalanceTrend({
       subtitle="Track your wallet balance over time with daily changes."
       icon={
         <WalletNeonIcon
-          src={WALLET_ART.balance}
+          src={WALLET_ART.trend}
           size={32}
           ringClass="ring-amber-400/45"
-          bgClass="bg-amber-500/15"
+          bgClass="bg-transparent"
         />
       }
       accent="gold"

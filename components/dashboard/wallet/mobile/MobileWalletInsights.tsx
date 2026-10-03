@@ -34,7 +34,14 @@ const COLOR_BY_KEY: Record<string, string> = {
 export default function MobileWalletInsights({ items }: { items: InsightItem[] }) {
   return (
     <section aria-label="Wallet insights">
-      <h2 className="mb-2.5 px-0 text-xs font-semibold uppercase tracking-[0.16em] text-white">
+      <h2 className="mb-2.5 flex items-center gap-2 px-0 text-xs font-semibold uppercase tracking-[0.16em] text-white">
+        <Image
+          src={WALLET_ART.insights}
+          alt=""
+          width={22}
+          height={22}
+          className="h-[22px] w-[22px] object-contain mix-blend-screen"
+        />
         Wallet Insights
       </h2>
       <div className={MOBILE_CAROUSEL}>
@@ -52,7 +59,7 @@ export default function MobileWalletInsights({ items }: { items: InsightItem[] }
                   alt=""
                   width={22}
                   height={22}
-                  className="h-[22px] w-[22px] object-contain"
+                  className="h-[22px] w-[22px] object-contain mix-blend-screen"
                 />
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-300">
                   {item.label}

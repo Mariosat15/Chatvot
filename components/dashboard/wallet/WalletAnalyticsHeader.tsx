@@ -31,7 +31,7 @@ export default function WalletAnalyticsHeader({
             src={WALLET_ART.header}
             size={56}
             ringClass="ring-cyan-400/55"
-            bgClass="bg-cyan-500/15"
+            bgClass="bg-transparent"
             className="shadow-[0_0_22px_rgba(0,229,255,0.4)]"
           />
           <div className="min-w-0">

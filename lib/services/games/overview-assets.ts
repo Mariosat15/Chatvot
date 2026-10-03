@@ -101,18 +101,18 @@ export const OVERVIEW_NAV_TAB_ART = {
 } as const;
 
 /**
- * Mobile Overview art — owner `menu items/ui/wallet items` tiles (29 Sep 2026),
- * downsized to webp. Phones only; desktop keeps the plates above.
+ * Mobile Overview art — same neon plates as desktop (3 Oct 2026) so phone
+ * and desktop never disagree about which glyph means what.
  */
 export const MOBILE_OVERVIEW_ART = {
-  deposit: "/assets/neon/overview/mobile/action-deposit.webp",
-  withdraw: "/assets/neon/overview/mobile/action-withdraw.webp",
+  deposit: "/assets/neon/wallet/icon-deposit.jpg",
+  withdraw: "/assets/neon/wallet/icon-withdrawal.jpg",
   compete: "/assets/neon/overview/mobile/action-compete.webp",
   play: "/assets/neon/overview/mobile/action-play.webp",
-  volt: "/assets/neon/overview/mobile/icon-volt.webp",
-  walletChart: "/assets/neon/overview/mobile/wallet-chart.webp",
-  star: "/assets/neon/overview/mobile/icon-star.webp",
-  gift: "/assets/neon/overview/mobile/icon-gift.webp",
+  volt: OVERVIEW_ICON_ART.wallet,
+  walletChart: OVERVIEW_ICON_ART.wallet,
+  star: OVERVIEW_ICON_ART.star,
+  gift: "/assets/neon/wallet/icon-gift.jpg",
 } as const;
 
 /**

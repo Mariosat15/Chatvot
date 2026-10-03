@@ -91,7 +91,7 @@ export default function MobileBalanceCard() {
             alt=""
             width={18}
             height={18}
-            className="h-[18px] w-[18px] object-contain"
+            className="h-[18px] w-[18px] object-contain mix-blend-screen"
           />
           Wallet / Volts
         </p>
@@ -134,7 +134,7 @@ export default function MobileBalanceCard() {
             alt=""
             fill
             sizes="96px"
-            className="object-contain opacity-80"
+            className="object-contain mix-blend-screen opacity-80"
           />
         )}
       </div>

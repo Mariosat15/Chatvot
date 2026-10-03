@@ -50,11 +50,12 @@ const RING: Record<KpiItem["accent"], string> = {
   orange: "ring-orange-400/50",
 };
 
+// Reason: owner 3 Oct 2026 — no fill behind neon plates (black canvas knock-out).
 const ICON_BG: Record<KpiItem["accent"], string> = {
-  gold: "bg-amber-500/15",
-  magenta: "bg-pink-500/15",
-  cyan: "bg-cyan-500/15",
-  orange: "bg-orange-500/15",
+  gold: "bg-transparent",
+  magenta: "bg-transparent",
+  cyan: "bg-transparent",
+  orange: "bg-transparent",
 };
 
 const SPARK: Record<KpiItem["accent"], string> = {
@@ -93,7 +94,13 @@ export default function WalletKpiGrid({ items }: { items: KpiItem[] }) {
               className="pointer-events-none absolute -right-2 top-1/2 h-24 w-24 -translate-y-1/2 opacity-[0.08]"
               aria-hidden
             >
-              <Image src={artSrc} alt="" fill sizes="96px" className="object-contain" />
+              <Image
+                src={artSrc}
+                alt=""
+                fill
+                sizes="96px"
+                className="object-contain mix-blend-screen"
+              />
             </div>
             <WalletNeonIcon
               src={artSrc}

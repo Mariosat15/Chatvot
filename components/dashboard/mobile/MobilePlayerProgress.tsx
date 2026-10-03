@@ -34,6 +34,7 @@ export default function MobilePlayerProgress() {
       title="Player progress"
       href="/dashboard?tab=performance"
       linkLabel="View progress"
+      iconSrc={OVERVIEW_ICON_ART.games}
     >
       <div className={`${MOBILE_CARD} border-cyan-400/40 p-4`}>
         <div className="flex items-center gap-4">

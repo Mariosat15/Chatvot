@@ -48,10 +48,10 @@ export default function DailyCreditFlowPanel({
       subtitle="Daily net credit movement in your wallet."
       icon={
         <WalletNeonIcon
-          src={WALLET_ART.netMovement}
+          src={WALLET_ART.dailyFlow}
           size={32}
           ringClass="ring-cyan-400/45"
-          bgClass="bg-cyan-500/15"
+          bgClass="bg-transparent"
         />
       }
       accent="cyan"

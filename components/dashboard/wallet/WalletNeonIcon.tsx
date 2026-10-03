@@ -4,7 +4,8 @@ import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 /**
- * Overview-matching neon tile — contain + soft glow so operator art is not cropped.
+ * Overview-matching neon tile — contain + screen-blend so black export
+ * canvases drop out and the glyph stays crisp at a fixed box size.
  * Reason: Lucide chips made Wallet Analytics look like a different product from Overview.
  */
 export default function WalletNeonIcon({
@@ -36,17 +37,18 @@ export default function WalletNeonIcon({
         "relative flex shrink-0 items-center justify-center overflow-hidden ring-1 shadow-[0_0_14px_rgba(255,255,255,0.08)]",
         box,
         ringClass ?? "ring-white/15",
-        bgClass ?? "bg-black/35",
+        // Reason: no fill behind the plate — owner asked for no icon background.
+        bgClass ?? "bg-transparent",
         className,
       )}
     >
-      <span className="pointer-events-none absolute inset-0 z-[1] bg-gradient-to-br from-white/10 to-transparent" />
       <Image
         src={src}
         alt=""
         fill
         sizes={`${size}px`}
-        className="scale-[1.08] object-contain object-center drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]"
+        // Reason: scale>1 softens JPG plates; screen blend knocks the black canvas.
+        className="object-contain object-center mix-blend-screen"
       />
     </span>
   );

@@ -67,9 +67,26 @@ describe("mobile dashboard split", () => {
       "<MobileGameCarousel",
       "<MobilePlayerProgress",
       "<MobileCompeteCarousel",
+      // Reason: 3 Oct 2026 — Suggested star header matches desktop Overview.
+      "<GameSuggestionsCard",
+      "<MobileRecentActivity",
+      "<MobileStreakGrid",
     ].map((tag) => code.indexOf(tag));
     for (const idx of order) expect(idx).toBeGreaterThan(-1);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
+  });
+
+  it("phone Overview section headers share desktop neon plates (games / fire / blend)", () => {
+    // Reason: owner 3 Oct 2026 — desktop icon remap must land on the phone tree too.
+    const progress = read(`${MOBILE_DIR}/MobilePlayerProgress.tsx`);
+    const streaks = read(`${MOBILE_DIR}/MobileActivityStreaks.tsx`);
+    const section = read(`${MOBILE_DIR}/MobileSection.tsx`);
+    expect(progress).toMatch(/iconSrc=\{OVERVIEW_ICON_ART\.games\}/);
+    expect(streaks).toMatch(/iconSrc=\{OVERVIEW_ICON_ART\.fire\}/);
+    expect(streaks).toMatch(/TILES\.map/);
+    expect(streaks).toMatch(/mix-blend-screen/);
+    expect(section).toMatch(/iconSrc/);
+    expect(section).toMatch(/mix-blend-screen/);
   });
 
   it("phones have no bottom nav, and content clears the fixed logo bar", () => {

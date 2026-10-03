@@ -12,13 +12,13 @@ export default function MobileWalletHeader({ rangeLabel }: { rangeLabel: string 
   return (
     <header className="flex min-h-[64px] items-center justify-between gap-3">
       <div className="flex min-w-0 items-center gap-2.5">
-        <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 ring-1 ring-amber-400/45">
+        <span className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-transparent ring-1 ring-amber-400/45">
           <Image
             src={WALLET_ART.header}
             alt=""
             width={28}
             height={28}
-            className="h-7 w-7 object-contain"
+            className="h-7 w-7 object-contain mix-blend-screen"
           />
         </span>
         <div className="min-w-0">

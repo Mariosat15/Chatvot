@@ -84,7 +84,7 @@ export function MobileStreakGrid() {
   const streaks = data.overviewStanding.streaks;
 
   return (
-    <MobileSection title="Streaks">
+    <MobileSection title="Streaks" iconSrc={OVERVIEW_ICON_ART.fire}>
       <ul className="grid grid-cols-2 gap-2.5">
         {TILES.map((tile) => {
           const value = streakValue(streaks, tile.key);
@@ -96,8 +96,14 @@ export function MobileStreakGrid() {
                 active ? "" : "opacity-60"
               }`}
             >
-              <span className="relative h-10 w-10 shrink-0">
-                <Image src={tile.artSrc} alt="" fill sizes="40px" className="object-contain" />
+              <span className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-transparent">
+                <Image
+                  src={tile.artSrc}
+                  alt=""
+                  fill
+                  sizes="40px"
+                  className="object-contain mix-blend-screen"
+                />
               </span>
               <div className="min-w-0">
                 <p className="text-lg font-bold tabular-nums" style={{ color: tile.color }}>

@@ -143,8 +143,22 @@ describe("Wallet Analytics page wiring", () => {
       "components/dashboard/wallet/WalletAnalyticsHeader.tsx",
     );
     const backdrop = readCode("components/dashboard/wallet/WalletBackdrop.tsx");
+    const neon = readCode("components/dashboard/wallet/WalletNeonIcon.tsx");
+    const assets = readCode("lib/services/games/wallet-assets.ts");
     const model = readCode(
       "components/dashboard/wallet/useWalletAnalyticsModel.ts",
+    );
+    const trend = readCode(
+      "components/dashboard/wallet/WalletBalanceTrend.tsx",
+    );
+    const breakdown = readCode(
+      "components/dashboard/wallet/CreditBreakdownPanel.tsx",
+    );
+    const flow = readCode(
+      "components/dashboard/wallet/DailyCreditFlowPanel.tsx",
+    );
+    const spending = readCode(
+      "components/dashboard/wallet/SpendingVsEarnings.tsx",
     );
     expect(kpi).toMatch(/WALLET_ART/);
     expect(kpi).toMatch(/WalletNeonIcon/);
@@ -157,6 +171,23 @@ describe("Wallet Analytics page wiring", () => {
     expect(header).toMatch(/WalletNeonIcon/);
     expect(backdrop).toMatch(/WALLET_ART\.backdrop/);
     expect(backdrop).toMatch(/object-cover/);
+    // Reason: owner 3 Oct 2026 — remap + no fill behind black-canvas plates.
+    expect(neon).toMatch(/mix-blend-screen/);
+    expect(neon).toMatch(/bg-transparent/);
+    expect(assets).toMatch(/icon-wallet\.jpg/);
+    expect(assets).toMatch(/icon-deposit\.jpg/);
+    expect(assets).toMatch(/icon-withdrawal\.jpg/);
+    expect(assets).toMatch(/icon-games\.jpg/);
+    expect(assets).toMatch(/icon-trophy\.jpg/);
+    expect(assets).toMatch(/icon-credits\.jpg/);
+    expect(assets).toMatch(/icon-chart-2\.png/);
+    expect(assets).toMatch(/icon-purchases\.jpg/);
+    expect(assets).toMatch(/icon-gift\.jpg/);
+    expect(assets).toMatch(/icon-chart\.jpg/);
+    expect(trend).toMatch(/WALLET_ART\.trend/);
+    expect(breakdown).toMatch(/WALLET_ART\.breakdown/);
+    expect(flow).toMatch(/WALLET_ART\.dailyFlow/);
+    expect(spending).toMatch(/WALLET_ART\.spending/);
     expect(model).toMatch(/label:\s*"Credit Balance"/);
     expect(model).toMatch(/label:\s*"Total Spend"/);
     expect(model).toMatch(/label:\s*"Game Earnings"/);

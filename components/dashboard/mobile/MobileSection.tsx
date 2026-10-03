@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { ChevronRight, GalleryHorizontalEnd } from "lucide-react";
@@ -16,6 +17,7 @@ export default function MobileSection({
   href,
   linkLabel = "See all",
   linkAsButton = false,
+  iconSrc,
   children,
 }: {
   title: string;
@@ -23,14 +25,30 @@ export default function MobileSection({
   linkLabel?: string;
   /** Render the header link as a pill button so it reads as pressable. */
   linkAsButton?: boolean;
+  /** Optional neon plate — same glyph as the desktop section header. */
+  iconSrc?: string;
   children: ReactNode;
 }) {
   return (
     <section aria-label={title}>
       <div className="mb-2.5 flex items-center justify-between gap-3">
-        <h2 className={`${NEON_HEADING} text-xs tracking-[0.16em] text-white`}>
-          {title}
-        </h2>
+        <div className="flex min-w-0 items-center gap-2">
+          {iconSrc && (
+            <span className="relative flex h-8 w-8 shrink-0 overflow-hidden rounded-lg bg-transparent">
+              <Image
+                src={iconSrc}
+                alt=""
+                fill
+                sizes="32px"
+                // Reason: owner plates are black-canvas exports — match desktop knock-out.
+                className="object-contain mix-blend-screen"
+              />
+            </span>
+          )}
+          <h2 className={`${NEON_HEADING} text-xs tracking-[0.16em] text-white`}>
+            {title}
+          </h2>
+        </div>
         {href && linkAsButton && (
           <Link
             href={href}

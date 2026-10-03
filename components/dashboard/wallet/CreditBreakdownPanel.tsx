@@ -83,10 +83,10 @@ export default function CreditBreakdownPanel({
       subtitle="See how your credits are sourced and used."
       icon={
         <WalletNeonIcon
-          src={WALLET_ART.netMovement}
+          src={WALLET_ART.breakdown}
           size={32}
           ringClass="ring-cyan-400/45"
-          bgClass="bg-cyan-500/15"
+          bgClass="bg-transparent"
         />
       }
       accent="cyan"

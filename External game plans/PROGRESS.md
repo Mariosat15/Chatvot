@@ -324,6 +324,8 @@ project low risk.
 
 This plan has two tracks. **As of 30 September 2026**:
 
+- **Wallet Analytics neon icon remap CODE-COMPLETE 3 Oct (eng)** — header/insights/trend→wallet; Credit Balance→deposit; Total Spend / Spending vs Earnings / Withdrawals→withdrawal; Game Earnings→games; Prizes Won→trophy; Credit Breakdown→credits; Daily Credit Flow→chart2; Deposits→deposit; Purchases→purch; Bonuses→gift; Net Movement→chart. `WalletNeonIcon` + mobile images use `mix-blend-screen` and `bg-transparent`. Assets under `public/assets/neon/wallet/icon-*`. Desktop + mobile. Tests: `wallet-analytics.test.ts`. **Never verified by eye.**
+- **Mobile Overview icon parity CODE-COMPLETE 3 Oct (eng)** — phone Progress→games, Streaks→fire (shared `TILES`), balance/Quick Access wallet plates, Suggested (`GameSuggestionsCard`) mounted on `MobileDashboard`. Same `mix-blend-screen` knock-out as desktop. Tests: `mobile-dashboard-split.test.ts`. **Never verified by eye.**
 - **Overview neon icon remap CODE-COMPLETE 3 Oct (eng)** — Credits→wallet, win rate→chart2, ROI→chart, prizes→trophy; Player Progress→games; Streaks header→fire; streak tiles (best→trophy, wins→chart2, played→games, top3→chart, weeks→calendar); Suggested header→star over prize plates. Black canvases use `mix-blend-screen`. Assets under `public/assets/neon/overview/items/icon-*`. Tests: `overview-standing.test.ts`. **Never verified by eye.**
 - **Suggested for You mock CODE-COMPLETE 3 Oct (eng)** — prize plates under amount, Starts-in plain text, catalogue blurb/visibility/funding badges. Commit `cdb9459c`.
 - **Mobile Wallet Analytics + Quick Access CODE-COMPLETE 3 Oct (eng)** — dedicated `MobileWallet` tree below `md` (not a shrunk desktop); shared `useWalletAnalyticsModel`; Deposit/Withdraw → `/wallet`; recent txns via `getWalletTransactions(5)`. Overview Quick Access = Wallet Analytics / Performance / Tutorials / Marketplace. Desktop `DesktopWalletAnalytics` unchanged. Tests: `wallet-analytics.test.ts` + `mobile-dashboard-split.test.ts`. **Never verified by eye.**
@@ -924,6 +926,22 @@ remains outstanding is the **opponent** half listed above, not the game half.
 ## WORK LOG
 
 Newest at the top.
+
+### 3 October 2026 - Mobile Overview icon parity + Wallet Analytics neon remap
+
+**Owner:** commit/push first; mirror desktop Overview icon remap onto phone Overview;
+then remap Wallet Analytics icons on desktop and mobile (wallet / deposit / withdrawal /
+games / trophy / credits / chart2 / purch / gift / chart) with no background, same size,
+crisp not blurred.
+
+**Built (main app only).**
+- Phone Overview: `MobileSection.iconSrc`, Progress→`OVERVIEW_ICON_ART.games`,
+  Streaks→fire + shared `TILES` with `mix-blend-screen`, Suggested via
+  `GameSuggestionsCard` on `MobileDashboard`, balance/Quick Access wallet plates blended.
+- Wallet: `WALLET_ART` remapped to new plates under `public/assets/neon/wallet/`;
+  `WalletNeonIcon` defaults to transparent + screen blend; panel srcs use
+  `trend` / `breakdown` / `dailyFlow` / `spending`; mobile headers/KPIs/insights match.
+- Tests: `wallet-analytics.test.ts`, `mobile-dashboard-split.test.ts`. **Never verified by eye.**
 
 ### 3 October 2026 - Overview neon icon remap (KPI / Progress / Streaks / Suggested)
 

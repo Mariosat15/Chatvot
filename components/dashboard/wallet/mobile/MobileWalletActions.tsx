@@ -20,7 +20,7 @@ export default function MobileWalletActions() {
           alt=""
           width={22}
           height={22}
-          className="h-[22px] w-[22px] object-contain"
+          className="h-[22px] w-[22px] object-contain mix-blend-screen"
         />
         Deposit
       </Link>
@@ -33,7 +33,7 @@ export default function MobileWalletActions() {
           alt=""
           width={22}
           height={22}
-          className="h-[22px] w-[22px] object-contain"
+          className="h-[22px] w-[22px] object-contain mix-blend-screen"
         />
         Withdraw
       </Link>

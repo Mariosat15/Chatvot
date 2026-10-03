@@ -65,7 +65,7 @@ export default function WalletInsights({ items }: { items: InsightItem[] }) {
             src={WALLET_ART.insights}
             size={36}
             ringClass="ring-amber-400/45"
-            bgClass="bg-amber-500/15"
+            bgClass="bg-transparent"
           />
           <div>
             <h3 className="text-base font-semibold text-white">Wallet Insights</h3>
@@ -100,7 +100,7 @@ export default function WalletInsights({ items }: { items: InsightItem[] }) {
                   src={ART[item.key]}
                   size={24}
                   ringClass="ring-white/20"
-                  bgClass="bg-black/50"
+                  bgClass="bg-transparent"
                 />
                 <span className="truncate text-[10px] font-semibold uppercase tracking-wider text-slate-400">
                   {item.label}

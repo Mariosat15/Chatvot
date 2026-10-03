@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import {
   Area,
   AreaChart,
@@ -9,6 +10,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { WALLET_ART } from "@/lib/services/games/wallet-assets";
 import { ChartRangeSelector } from "../AnalyticsCard";
 import { WALLET_GOLD, type WalletRange } from "../wallet-tokens";
 
@@ -48,11 +50,20 @@ export default function MobileWalletTrend({
       className="rounded-[18px] border border-[#1E2A4D] bg-[linear-gradient(160deg,rgba(12,22,44,0.92)_0%,rgba(5,10,22,0.96)_100%)] p-4"
     >
       <div className="mb-3 flex flex-col gap-2">
-        <div>
-          <h2 className="text-sm font-bold text-white">Wallet Balance Trend</h2>
-          <p className="mt-0.5 text-[11px] text-slate-400">
-            See how your Volt balance changes over time.
-          </p>
+        <div className="flex items-start gap-2">
+          <Image
+            src={WALLET_ART.trend}
+            alt=""
+            width={28}
+            height={28}
+            className="mt-0.5 h-7 w-7 shrink-0 object-contain mix-blend-screen"
+          />
+          <div>
+            <h2 className="text-sm font-bold text-white">Wallet Balance Trend</h2>
+            <p className="mt-0.5 text-[11px] text-slate-400">
+              See how your Volt balance changes over time.
+            </p>
+          </div>
         </div>
         <ChartRangeSelector value={range} onChange={onRangeChange} />
       </div>

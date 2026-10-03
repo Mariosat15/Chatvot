@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import GameSuggestionsCard from "../GameSuggestionsCard";
 import MobileWelcome from "./MobileWelcome";
 import MobileBalanceCard from "./MobileBalanceCard";
 import { MobileQuickActions, MobileQuickAccess } from "./MobileActions";
@@ -41,6 +42,8 @@ export default function MobileDashboard({
       <MobilePlayerProgress />
       <MobileFeaturedGames />
       <MobileCompeteCarousel />
+      {/* Reason: same Suggested star header as desktop Overview (owner 3 Oct 2026). */}
+      <GameSuggestionsCard />
       <MobileRecentActivity />
       <MobileStreakGrid />
     </div>

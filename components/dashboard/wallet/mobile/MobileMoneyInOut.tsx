@@ -1,6 +1,8 @@
 "use client";
 
+import Image from "next/image";
 import { formatVolts } from "@/lib/utils/format-volts";
+import { WALLET_ART } from "@/lib/services/games/wallet-assets";
 import type { BreakdownTotals } from "../CreditBreakdownPanel";
 import { WALLET_CATEGORY } from "../wallet-tokens";
 
@@ -72,8 +74,15 @@ export default function MobileMoneyInOut({
 
   return (
     <section aria-label="Money in and out">
-      <h2 className="mb-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-white">
-        Money In & Out
+      <h2 className="mb-2.5 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-white">
+        <Image
+          src={WALLET_ART.breakdown}
+          alt=""
+          width={22}
+          height={22}
+          className="h-[22px] w-[22px] object-contain mix-blend-screen"
+        />
+        Credit Breakdown
       </h2>
       <div className="space-y-3">
         <div className="rounded-[18px] border border-emerald-400/30 bg-[linear-gradient(160deg,rgba(6,32,24,0.9)_0%,rgba(5,10,22,0.96)_100%)] p-4">
