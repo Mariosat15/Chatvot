@@ -3275,6 +3275,15 @@ and read the same payload, so the two trees cannot disagree about a figure.
   Dashboard item opens `/dashboard?tab=overview`.
 - Real data only: Suggested for You reads `/api/games/suggestions`; a joinable suggestion
   with no player count shows `-`.
+- **Suggested for You cards (3 Oct 2026, second Image-2 pass).** The cover is the
+  **competition's own `imageUrl`, else its game's catalogue art** (`resolvePlayArt`), never
+  a curated per-game plate: the owner rejected that substitution. The cover carries the
+  Upcoming/Live and fee pills. Badges, clock, users, star and both prize arts are
+  **transparent cropped PNGs** made by `tools/overview/key-out-black.mjs`, never
+  `mix-blend-screen`, which keeps the black padding in the layout box. The prize art sits
+  in one fixed 112×52 box on every card. Join is a **CSS button**, not an image. Phones
+  get a snap swipe row; `sm` gets 2 columns and `xl` gets 4. A pixel test fails any
+  Suggested asset that is more than 2% opaque black.
 
 **Not built:** there is no games catalogue API, so featured games come from the player's own
 play cards rather than a curated list. **Never verified by eye** — the dashboard is behind

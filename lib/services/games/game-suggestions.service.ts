@@ -12,7 +12,7 @@ import {
   listBrowsableGames,
   type BrowsableGame,
 } from "@/lib/services/games/player-catalogue.service";
-import { overviewPlayCardArt } from "@/lib/services/games/overview-assets";
+import { resolvePlayArt } from "@/lib/services/games/overview-standing.service";
 import { resolveContestViewer } from "@/lib/services/gamemaster/contest-viewer.service";
 import { withEnterableContests } from "@/lib/services/gamemaster/visible-contests";
 
@@ -27,9 +27,10 @@ export interface GameSuggestion {
   /** Catalogue display name of the game, so the card can say what it is. */
   gameLabel: string;
   /**
-   * Curated neon play plate for this title (Suggested Image 2 mock).
-   * Reason: catalogue banners vary and were showing the wrong plates on
-   * Overview; /games still uses resolvePlayArt (banner → thumb → fallback).
+   * The contest's own image, then its game's catalogue banner / thumbnail, then
+   * the curated plate. Reason: each card must show the artwork that represents
+   * that competition and game - a curated plate per game code replaced them once
+   * (3 Oct 2026) and the owner reverted it, so the plate is only the last resort.
    */
   artSrc: string;
   prizePool: number;
@@ -71,7 +72,7 @@ export async function suggestOpenContests(
       ),
     )
       .select(
-        "name description entryFee startTime status gameKey prizePool currentParticipants maxParticipants visibility fundingMode",
+        "name description imageUrl entryFee startTime status gameKey prizePool currentParticipants maxParticipants visibility fundingMode",
       )
       .sort({ startTime: 1 })
       .limit(limit)
@@ -80,6 +81,7 @@ export async function suggestOpenContests(
           _id: { toString(): string };
           name: string;
           description?: string;
+          imageUrl?: string;
           entryFee?: number;
           startTime: Date;
           status: string;
@@ -114,7 +116,7 @@ export async function suggestOpenContests(
       status: c.status,
       reason: "played_before" as const,
       gameLabel: cat?.displayName ?? (isTrading ? "Trading" : "Game"),
-      artSrc: overviewPlayCardArt(cat?.gameCode, isTrading),
+      artSrc: c.imageUrl?.trim() || resolvePlayArt(cat, isTrading),
       prizePool: c.prizePool ?? 0,
       currentParticipants: c.currentParticipants ?? 0,
       maxParticipants:

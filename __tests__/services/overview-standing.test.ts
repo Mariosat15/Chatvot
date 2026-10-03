@@ -9,6 +9,8 @@ import {
 import {
   allOverviewAssets,
   overviewPlayCardArt,
+  SUGGESTED_PRIZE_ART,
+  SUGGESTED_UI_ART,
 } from "@/lib/services/games/overview-assets";
 import {
   resolveOverviewRankBadge,
@@ -801,17 +803,19 @@ describe("Overview streaks chrome", () => {
     expect(assets).not.toMatch(/hero-banner-chartvolt\.png/);
   });
 
-  it("Suggested for you art uses a fixed 16/8.5 cover ratio (Image 2)", () => {
-    // Reason: owner Image 2 — aspect-[16/8.5] + object-cover on the hero only.
-    // Cover must stay clean (no Upcoming / fee pills). h-20 strip remains forbidden.
+  it("Suggested for you art uses a fixed 16/9 cover ratio WITH status and fee pills (Image 2)", () => {
+    // Reason: this test once required a clean 16/8.5 cover with NO Upcoming /
+    // fee pills. Owner reversed that on 3 Oct 2026 ("see image 2 must be the
+    // same"): Image 2's cover carries both pills. Flipped, not deleted.
+    // h-20 strip remains forbidden.
     const suggestions = readFileSync(
       join(ROOT, "components/dashboard/GameSuggestionsCard.tsx"),
       "utf8",
     )
       .replace(/\/\*[\s\S]*?\*\//g, "")
       .replace(/\/\/.*$/gm, "");
-    expect(suggestions).toMatch(/aspect-\[16\/8\.5\]/);
-    const artStart = suggestions.indexOf("aspect-[16/8.5]");
+    expect(suggestions).toMatch(/aspect-\[16\/9\]/);
+    const artStart = suggestions.indexOf("aspect-[16/9]");
     expect(artStart).toBeGreaterThan(-1);
     // Reason: slice hero to the badge row — cover must not carry status pills.
     const artBlock = suggestions.slice(
@@ -820,17 +824,19 @@ describe("Overview streaks chrome", () => {
     );
     expect(artBlock.length).toBeGreaterThan(40);
     expect(artBlock).toMatch(/object-cover/);
-    expect(artBlock).not.toMatch(/Upcoming/);
-    expect(artBlock).not.toMatch(/Live/);
-    expect(artBlock).not.toMatch(/entryFee/);
+    expect(artBlock).toMatch(/"Upcoming"/);
+    expect(artBlock).toMatch(/"Live"/);
+    expect(artBlock).toMatch(/feeLabel/);
     expect(suggestions).not.toMatch(/h-20/);
     expect(suggestions).not.toMatch(/h-auto w-full/);
   });
 
-  it("Suggested for you matches Image 2: clean cover, badges, full prize strip, Join plate", () => {
-    // Reason: owner 3 Oct 2026 — Image 2 is the target. Full prize banner as
-    // background (not a 42% framed crop); Join plate already says Join (never
-    // overlay that word — that was the JJoin glitch); GM Funded from fundingMode.
+  it("Suggested for you matches Image 2: competition cover, pills, big badges, fixed prize strip, CSS Join", () => {
+    // Reason: owner 3 Oct 2026 (second pass) rejected four things the first
+    // Image-2 rebuild shipped, so each is pinned in the opposite direction:
+    // a curated per-game plate replaced the competition's own image; the cover
+    // lost its Upcoming / fee pills; badges and Join rendered tiny on black
+    // canvases; and the prize art was a full banner cropped to each card's width.
     const suggestions = readFileSync(
       join(ROOT, "components/dashboard/GameSuggestionsCard.tsx"),
       "utf8",
@@ -849,70 +855,96 @@ describe("Overview streaks chrome", () => {
     )
       .replace(/\/\*[\s\S]*?\*\//g, "")
       .replace(/\/\/.*$/gm, "");
-    expect(assets).toMatch(/SUGGESTED_PRIZE_ART/);
-    expect(assets).toMatch(/SUGGESTED_UI_ART/);
-    expect(assets).toMatch(/prize-trophy\.jpg/);
-    expect(assets).toMatch(/prize-cubes\.png/);
-    expect(assets).toMatch(/icon-clock\.jpg/);
-    expect(assets).toMatch(/btn-join\.jpg/);
-    expect(assets).toMatch(/SUGGESTED_PRIZE_ART[\s\S]*icon:/);
-    expect(suggestions).toMatch(/suggestedPrizeArt/);
-    expect(suggestions).toMatch(/SUGGESTED_UI_ART\.clock/);
-    expect(suggestions).toMatch(/SUGGESTED_UI_ART\.users/);
-    expect(suggestions).toMatch(/mix-blend-screen/);
-    expect(suggestions).toMatch(/Starts in/);
-    expect(suggestions).toMatch(/OVERVIEW_ICON_ART\.star/);
-    expect(suggestions).toMatch(/SUGGESTED_PRIZE_ART\.icon/);
-    expect(suggestions).not.toMatch(/\bSparkles\b/);
-    // Join plate carries the label — never overlay "Join" + ArrowRight (JJoin).
-    const joinIdx = suggestions.indexOf("SUGGESTED_UI_ART.join");
-    expect(joinIdx).toBeGreaterThan(-1);
-    const joinCta = suggestions.slice(
-      suggestions.lastIndexOf("<span", joinIdx),
-      suggestions.indexOf("</span>", suggestions.indexOf("sr-only", joinIdx)) + 7,
+
+    // 1. Cover = the competition's own image, then the game's catalogue art.
+    expect(service).toMatch(/"name description imageUrl /);
+    expect(service).toMatch(/artSrc:\s*c\.imageUrl\?\.trim\(\)\s*\|\|\s*resolvePlayArt\(cat, isTrading\)/);
+    expect(service).not.toMatch(/overviewPlayCardArt/);
+
+    // 2. Upcoming / Live and entry-fee pills sit ON the cover again.
+    const coverStart = suggestions.indexOf("aspect-[16/9]");
+    const bodyStart = suggestions.indexOf("SUGGESTED_UI_ART.badgeGmFunded");
+    expect(coverStart).toBeGreaterThan(-1);
+    expect(bodyStart).toBeGreaterThan(coverStart);
+    const cover = suggestions.slice(coverStart, bodyStart);
+    expect(cover).toMatch(/"Upcoming"/);
+    expect(cover).toMatch(/\{feeLabel\}/);
+
+    // 3. No black canvases anywhere on the card: no blend hack, no jpg plates.
+    expect(suggestions).not.toMatch(/mix-blend-screen/);
+    const block = assets.slice(
+      assets.indexOf("export const SUGGESTED_PRIZE_ART"),
+      assets.indexOf("export function suggestedPrizeArt"),
     );
-    expect(joinCta).toMatch(/SUGGESTED_UI_ART\.join/);
-    expect(joinCta).toMatch(/sr-only/);
-    expect(joinCta).not.toMatch(/ArrowRight/);
-    expect(joinCta).not.toMatch(/inline-flex items-center gap-1\.5/);
-    // Curated play plates on Suggested (not stale catalogue banners).
-    expect(service).toMatch(/overviewPlayCardArt/);
-    expect(service).not.toMatch(/resolvePlayArt/);
-    // GM Funded badge from real fundingMode — must not be omitted from the tree.
+    expect(block.length).toBeGreaterThan(100);
+    expect(block).not.toMatch(/\.jpg"/);
+    expect(block).not.toMatch(/btn-join/);
+    expect(suggestions).not.toMatch(/SUGGESTED_UI_ART\.join/);
+
+    // 4. Badges at a visible size (cropped plates, so the height is the badge).
     expect(suggestions).toMatch(/fundingMode === "gm_funded"/);
     expect(suggestions).toMatch(/SUGGESTED_UI_ART\.badgeGmFunded/);
     expect(suggestions).toMatch(/SUGGESTED_UI_ART\.badgePrivate/);
     expect(suggestions).toMatch(/SUGGESTED_UI_ART\.badgePublic/);
-    expect(suggestions).toMatch(/h-8 w-auto/);
-    // Prize strip: full banner fill, not a 42% absolute crop in a framed box.
-    expect(suggestions).toMatch(/h-\[88px\]/);
-    expect(suggestions).not.toMatch(/w-\[42%\]/);
-    expect(suggestions).not.toMatch(/absolute inset-y-0 right-0/);
-    expect(suggestions).toMatch(/object-cover object-right/);
-    expect(suggestions).toMatch(/isGmFunded\s*\?/);
-    expect(suggestions).toMatch(/text-\[26px\]/);
-    expect(suggestions).toMatch(/text-\[19px\]/);
-    expect(suggestions).toMatch(/text-\[12px\].*uppercase/);
-    expect(suggestions).toMatch(/h-\[50px\]/);
-    // Starts-in row: clock plate sits beside the label; neither wears pill chrome.
+    expect(suggestions).toMatch(/const BADGE_IMG = "h-7 w-auto shrink-0"/);
+
+    // 5. Prize strip: fixed height, art in ONE fixed box, never a cropped banner.
+    expect(suggestions).toMatch(/const PRIZE_ART_BOX = "relative h-\[52px\] w-\[112px\] shrink-0"/);
+    expect(suggestions).toMatch(/className=\{PRIZE_ART_BOX\}/);
+    expect(suggestions).toMatch(/h-\[72px\]/);
+    expect(suggestions).not.toMatch(/object-cover object-right/);
+
+    // 6. Join is a full-width CSS button carrying its own label.
+    const joinIdx = suggestions.search(/>\r?\n\s*Join\r?\n/);
+    expect(joinIdx).toBeGreaterThan(-1);
+    const joinCta = suggestions.slice(
+      suggestions.lastIndexOf("<span", joinIdx),
+      suggestions.indexOf("</span>", joinIdx) + 7,
+    );
+    expect(joinCta).toMatch(/h-11 w-full/);
+    expect(joinCta).toMatch(/ArrowRight/);
+    expect(joinCta).not.toMatch(/<Image/);
+
+    // 7. Phone: swipe row; sm: 2 columns; xl: 4 (Image 2).
+    expect(suggestions).toMatch(/const TILE_ROW =[\s\S]*?snap-x[\s\S]*?sm:grid-cols-2[\s\S]*?xl:grid-cols-4/);
+    expect(suggestions).toMatch(/className=\{TILE_SLOT\}/);
+
+    // Meta row keeps starts-in left, seats right, as plain text.
     const callIdx = suggestions.lastIndexOf("startLabel(c.startTime");
     expect(callIdx).toBeGreaterThan(-1);
-    const metaStart = suggestions.lastIndexOf("justify-between", callIdx);
-    const usersIdx = suggestions.indexOf("SUGGESTED_UI_ART.users", callIdx);
-    expect(metaStart).toBeGreaterThan(-1);
-    expect(usersIdx).toBeGreaterThan(callIdx);
-    const metaRow = suggestions.slice(metaStart, usersIdx + 40);
-    expect(metaRow).toMatch(/SUGGESTED_UI_ART\.clock/);
-    expect(metaRow).toMatch(/SUGGESTED_UI_ART\.users/);
-    expect(metaRow).toMatch(/startLabel\(c\.startTime/);
     const labelSpan = suggestions.slice(
       suggestions.lastIndexOf("<span", callIdx),
       suggestions.indexOf("</span>", callIdx) + 7,
     );
-    expect(labelSpan).toMatch(/startLabel\(c\.startTime/);
     expect(labelSpan).not.toMatch(/rounded-full/);
     expect(labelSpan).not.toMatch(/bg-/);
-    expect(suggestions).toMatch(/xl:grid-cols-4/);
+  });
+
+  it("every Suggested-for-you asset is a transparent PNG, never a black canvas", async () => {
+    // Reason: a structural test cannot see a black canvas - only the pixels can.
+    const sharp = (await import("sharp")).default;
+    const files = [
+      ...Object.values(SUGGESTED_PRIZE_ART),
+      ...Object.values(SUGGESTED_UI_ART),
+    ];
+    expect(files.length).toBeGreaterThanOrEqual(9);
+    for (const src of files) {
+      expect(src.endsWith(".png"), src).toBe(true);
+      const { data, info } = await sharp(join(ROOT, "public", src))
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      expect(info.channels, src).toBe(4);
+      // A black canvas is opaque near-black pixels. Edge glow (partial alpha
+      // with colour) is fine; opaque black is the defect the owner reported.
+      let opaqueBlack = 0;
+      for (let i = 0; i < data.length; i += 4) {
+        const [r, g, b, a] = data.subarray(i, i + 4);
+        if (a > 200 && Math.max(r, g, b) < 24) opaqueBlack += 1;
+      }
+      const pixels = info.width * info.height;
+      expect(opaqueBlack / pixels, `${src} opaque-black share`).toBeLessThan(0.02);
+    }
   });
 
   it("Play by Game caption distinguishes discovery from most-played", () => {

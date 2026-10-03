@@ -931,6 +931,36 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 3 October 2026 - Suggested for You: real covers back, no black anywhere
+
+**Owner:** Image 1 must match Image 2. Put each competition's own image back,
+because the curated game plates were wrong. Prize images go inline at the same
+height and width with no black background. Private/Public badges and the Join
+button were far too small. Mobile must look like Image 2. Every image must be
+transparent.
+
+**Built (main app only, nothing mirrored).**
+- `game-suggestions.service.ts`: `artSrc` is `imageUrl`, else `resolvePlayArt`.
+  This reverses that morning's `overviewPlayCardArt` choice.
+- `tools/overview/key-out-black.mjs` (sharp): alpha = brightest channel, colour
+  divided back out, cropped to the art. It writes the `*-clear.png` badges and
+  icons, plus `prize-trophy-art.png` and `prize-cubes-art.png` cut from the
+  framed plates. The originals are kept as sources.
+- `GameSuggestionsCard.tsx`:
+  - Upcoming/Live and fee pills on the cover;
+  - `h-7` badges;
+  - an `h-[72px]` CSS-framed prize strip with the art in a fixed 112×52 box;
+  - a full-width `h-11` CSS Join with an arrow, with `SUGGESTED_UI_ART.join` removed;
+  - a phone snap swipe row, then `sm` 2 columns and `xl` 4.
+- **Why blending was the wrong fix:** `mix-blend-screen` hides black only
+  visually. The padding still takes up layout space, so the badges rendered tiny
+  and the edges showed.
+- Tests in `overview-standing.test.ts` (28):
+  - the clean-cover test was **flipped, not deleted**;
+  - a new pixel test reads every Suggested asset and fails above 2% opaque black.
+    Probed: the original `badge-private.png` is 79% black, the clear one 0%.
+- **Never verified by eye.**
+
 ### 3 October 2026 - Mobile Overview polish (Upcoming off, scroll, back bar)
 
 **Owner:** remove Upcoming competitions (Suggested covers it); menu scrolling

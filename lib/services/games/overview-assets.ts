@@ -129,29 +129,31 @@ export const MOBILE_OVERVIEW_ART = {
 
 /**
  * Suggested-for-you art (owner Image 2 target, 3 Oct 2026).
- * Prize strips are full horizontal banners (art on the right, empty left for
- * the amount). The small left trophy is a separate icon plate — never the
- * banner scaled into a 36px box. Badge / clock / users / Join plates keep
- * black canvases; knock out with `mix-blend-screen` at the call site.
- * Join plate already paints "Join →" — never overlay that word again.
+ * Every file here is a genuinely TRANSPARENT PNG cropped to its artwork,
+ * produced by `node tools/overview/key-out-black.mjs` from the black-canvas
+ * originals beside them. Reason: `mix-blend-screen` only hid the black over a
+ * dark page and kept the padding in the layout box, so badges rendered tiny and
+ * plates showed black edges - the owner rejected both. The prize entries are the
+ * art alone (the plate's frame is CSS), so every card's art sits in one box.
+ * Join has no image: it is a CSS button, so it can never carry a black canvas.
  */
 export const SUGGESTED_PRIZE_ART = {
-  /** Full prize strip background — Circuit Sprint / default. */
-  trophy: "/assets/neon/overview/suggested/prize-trophy.jpg",
-  /** Full prize strip background — Volt Stack / stack titles. */
-  cubes: "/assets/neon/overview/suggested/prize-cubes.png",
-  /** Small left-of-amount trophy (not the strip). */
-  icon: "/assets/neon/overview/items/icon-trophy-neon.jpg",
+  /** Prize art - Circuit Sprint / default. */
+  trophy: "/assets/neon/overview/suggested/prize-trophy-art.png",
+  /** Prize art - Volt Stack / stack titles. */
+  cubes: "/assets/neon/overview/suggested/prize-cubes-art.png",
+  /** Small trophy left of the amount. */
+  icon: "/assets/neon/overview/suggested/icon-trophy-clear.png",
 } as const;
 
 export const SUGGESTED_UI_ART = {
-  clock: "/assets/neon/overview/suggested/icon-clock.jpg",
-  users: "/assets/neon/overview/suggested/icon-users.jpg",
-  badgeGmFunded: "/assets/neon/overview/suggested/badge-gm-funded.png",
-  badgePrivate: "/assets/neon/overview/suggested/badge-private.png",
-  badgePublic: "/assets/neon/overview/suggested/badge-public.png",
-  /** Owner Join CTA — label is baked into the plate. */
-  join: "/assets/neon/overview/suggested/btn-join.jpg",
+  /** Section header star. */
+  star: "/assets/neon/overview/suggested/icon-star-clear.png",
+  clock: "/assets/neon/overview/suggested/icon-clock-clear.png",
+  users: "/assets/neon/overview/suggested/icon-users-clear.png",
+  badgeGmFunded: "/assets/neon/overview/suggested/badge-gm-funded-clear.png",
+  badgePrivate: "/assets/neon/overview/suggested/badge-private-clear.png",
+  badgePublic: "/assets/neon/overview/suggested/badge-public-clear.png",
 } as const;
 
 /** Pick the prize decoration for a suggestion card. Unknown codes get the trophy. */

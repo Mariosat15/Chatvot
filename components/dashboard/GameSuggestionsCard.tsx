@@ -3,10 +3,9 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, Gamepad2 } from "lucide-react";
+import { ArrowRight, Clock, Gamepad2 } from "lucide-react";
 import { formatVolts } from "@/lib/utils/format-volts";
 import {
-  OVERVIEW_ICON_ART,
   SUGGESTED_PRIZE_ART,
   SUGGESTED_UI_ART,
   suggestedPrizeArt,
@@ -30,18 +29,34 @@ interface Suggestion {
 }
 
 const SECTION_FRAME =
-  "rounded-2xl border border-cyan-400/65 bg-gradient-to-b from-[rgba(5,18,42,0.98)] to-[rgba(2,9,24,0.98)] p-5 shadow-[0_0_28px_-6px_rgba(0,200,255,0.35),inset_0_0_20px_rgba(56,189,248,0.08)] sm:p-6";
+  "rounded-2xl border border-cyan-400/65 bg-gradient-to-b from-[rgba(5,18,42,0.98)] to-[rgba(2,9,24,0.98)] p-3.5 shadow-[0_0_28px_-6px_rgba(0,200,255,0.35),inset_0_0_20px_rgba(56,189,248,0.08)] sm:p-6";
 
 const CARD =
   "group relative flex h-full flex-col overflow-hidden rounded-xl border border-[rgba(0,220,255,0.65)] bg-gradient-to-b from-[rgba(5,18,42,0.98)] to-[rgba(2,9,24,0.98)] shadow-[0_0_18px_rgba(0,200,255,0.12)] transition hover:-translate-y-0.5 hover:border-cyan-300/90 hover:shadow-[0_0_22px_rgba(0,200,255,0.22)] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60 motion-reduce:transition-none motion-reduce:hover:translate-y-0";
 
-/** Knock out the black canvas ChatGPT exports leave around neon plates. */
-const KNOCK_BLACK = "mix-blend-screen";
+/**
+ * Phone: a swipe row of Image-2-sized cards. From `sm`: 2 columns, `xl`: 4.
+ * Reason: stacking six full-width covers inside a padded frame on a 390px
+ * screen is what made this section "not look ok" on mobile (owner 3 Oct 2026).
+ */
+const TILE_ROW =
+  "-mx-3.5 mt-4 flex snap-x snap-proximity scroll-px-3.5 gap-3 overflow-x-auto overscroll-x-contain px-3.5 pb-1 [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:grid sm:grid-cols-2 sm:gap-4 sm:overflow-visible sm:px-0 sm:pb-0 xl:grid-cols-4";
+const TILE_SLOT = "w-[82%] max-w-[320px] shrink-0 snap-start sm:w-auto sm:max-w-none";
 
-/** Badge plates — 28–32px tall, never tiny. */
-const BADGE_IMG = `h-8 w-auto shrink-0 ${KNOCK_BLACK}`;
+/** Badge plates are transparent and cropped, so the height IS the badge. */
+const BADGE_IMG = "h-7 w-auto shrink-0";
 
-/** "Starts in 2h 44m" / "Live now" — plain text, never a pill (owner 3 Oct 2026). */
+/** Overlay pill on the cover — translucent tint, never a black block. */
+const COVER_PILL =
+  "inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[12px] font-bold uppercase tracking-wide backdrop-blur-sm";
+
+/**
+ * Prize-art box. Reason: one fixed box on every card is what makes the art
+ * "inline, all the same height and width" - both cut-outs are ~2.15:1.
+ */
+const PRIZE_ART_BOX = "relative h-[52px] w-[112px] shrink-0";
+
+/** "Starts in 2h 44m" / "Live now". */
 function startLabel(startTime: string, status: string, now: number): string {
   const start = new Date(startTime).getTime();
   if (status === "active" || !Number.isFinite(start) || start <= now) {
@@ -68,13 +83,17 @@ function SuggestionTile({
       ? `${c.currentParticipants ?? 0}/${c.maxParticipants}`
       : `${c.currentParticipants ?? 0}`;
   const prizeArt = suggestedPrizeArt(c.gameKey);
+  const isStackArt = prizeArt === SUGGESTED_PRIZE_ART.cubes;
   const isPrivate = c.visibility === "gm_private";
   const isGmFunded = c.fundingMode === "gm_funded";
+  const isLive = c.status === "active";
   // Reason: prizePool is authoritative; absent/zero renders a dash, never entry fee.
   const prizeAmount =
     typeof c.prizePool === "number" && Number.isFinite(c.prizePool) && c.prizePool > 0
       ? formatVolts(c.prizePool, { symbol: creditSymbol })
       : "-";
+  const feeLabel =
+    c.entryFee > 0 ? formatVolts(c.entryFee, { symbol: creditSymbol }) : "Free";
 
   return (
     <Link
@@ -83,34 +102,47 @@ function SuggestionTile({
       aria-label={`Open ${c.name}`}
     >
       {/*
-        1. Cover — clean hero only (Image 2). No Upcoming / entry-fee pills on
-        the artwork; status lives in the badge row below.
+        1. Cover — the competition's own image, else its game's catalogue art
+        (resolved server-side). Upcoming/Live pill top-left, entry fee top-right.
       */}
-      <div className="relative aspect-[16/8.5] w-full shrink-0 overflow-hidden bg-gradient-to-br from-sky-900/40 to-indigo-900/30">
+      <div className="relative aspect-[16/9] w-full shrink-0 overflow-hidden bg-gradient-to-br from-sky-900/40 to-indigo-900/30">
         {c.artSrc ? (
-          // eslint-disable-next-line @next/next/no-img-element -- catalogue URLs vary by host
+          // eslint-disable-next-line @next/next/no-img-element -- competition / catalogue URLs vary by host
           <img
             src={c.artSrc}
             alt=""
-            className="absolute inset-0 h-full w-full object-cover object-center opacity-95 transition duration-300 group-hover:scale-[1.03] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
+            className="absolute inset-0 h-full w-full object-cover object-center transition duration-300 group-hover:scale-[1.03] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
           />
         ) : null}
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#020918] via-[#020918]/20 to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-[#020918]/90 to-transparent" />
+        <div className="absolute inset-x-2.5 top-2.5 flex items-start justify-between gap-2">
+          <span
+            className={`${COVER_PILL} ${
+              isLive
+                ? "border-emerald-300/70 bg-emerald-500/25 text-emerald-100"
+                : "border-cyan-300/70 bg-cyan-500/20 text-cyan-50"
+            }`}
+          >
+            <Clock className="h-3.5 w-3.5" aria-hidden />
+            {isLive ? "Live" : "Upcoming"}
+          </span>
+          <span
+            className={`${COVER_PILL} border-amber-300/70 bg-amber-500/20 text-amber-50 tabular-nums`}
+          >
+            {feeLabel}
+          </span>
+        </div>
       </div>
 
-      {/*
-        Body order (Image 2): badges → game label → title → blurb → meta →
-        prize strip → Join. Tight gaps, no stretched navy voids.
-      */}
-      <div className="flex flex-1 flex-col px-3.5 pb-3 pt-2.5">
-        {/* 2. Status badges — GM Funded from fundingMode; Private/Public from visibility. */}
+      <div className="flex flex-1 flex-col px-3.5 pb-3.5 pt-3">
+        {/* 2. Badges — GM Funded from fundingMode; Private/Public from visibility. */}
         <div className="flex flex-wrap items-center gap-1.5">
           {isGmFunded ? (
             <Image
               src={SUGGESTED_UI_ART.badgeGmFunded}
               alt="GM Funded"
-              width={130}
-              height={32}
+              width={118}
+              height={28}
               className={BADGE_IMG}
             />
           ) : null}
@@ -118,45 +150,45 @@ function SuggestionTile({
             <Image
               src={SUGGESTED_UI_ART.badgePrivate}
               alt="Private"
-              width={110}
-              height={32}
+              width={95}
+              height={28}
               className={BADGE_IMG}
             />
           ) : (
             <Image
               src={SUGGESTED_UI_ART.badgePublic}
               alt="Public"
-              width={110}
-              height={32}
+              width={94}
+              height={28}
               className={BADGE_IMG}
             />
           )}
         </div>
 
         {/* 3–5. Game label → competition title → description */}
-        <div className="mt-3 min-w-0">
+        <div className="mt-2.5 min-w-0">
           <p className="truncate text-[12px] font-bold uppercase tracking-[0.14em] text-cyan-300">
             {c.gameLabel ?? "Game"}
           </p>
-          <p className="mt-1 line-clamp-2 text-[19px] font-bold leading-snug text-white">
+          <p className="mt-1 line-clamp-2 text-[18px] font-bold leading-snug text-white">
             {c.name}
           </p>
           {c.blurb ? (
-            <p className="mt-1.5 line-clamp-2 text-[13px] leading-snug text-slate-400">
+            <p className="mt-1 line-clamp-2 text-[13px] leading-snug text-slate-400">
               {c.blurb}
             </p>
           ) : null}
         </div>
 
-        {/* 6. Meta — starts-in left / seats right (plain text, never pills). */}
-        <div className="mt-3.5 flex items-center justify-between gap-2 text-[13px] font-semibold text-cyan-100">
+        {/* 6. Meta — starts-in left / seats right. mt-auto pins the bottom block level across cards. */}
+        <div className="mt-auto flex items-center justify-between gap-2 pt-3 text-[13px] font-semibold text-cyan-100">
           <span className="inline-flex min-w-0 items-center gap-1.5 tabular-nums">
             <Image
               src={SUGGESTED_UI_ART.clock}
               alt=""
               width={18}
               height={18}
-              className={`h-[18px] w-[18px] shrink-0 object-contain ${KNOCK_BLACK}`}
+              className="h-[18px] w-[18px] shrink-0 object-contain"
             />
             <span className="truncate">{startLabel(c.startTime, c.status, now)}</span>
           </span>
@@ -166,63 +198,62 @@ function SuggestionTile({
               alt=""
               width={18}
               height={18}
-              className={`h-[18px] w-[18px] shrink-0 object-contain ${KNOCK_BLACK}`}
+              className="h-[18px] w-[18px] shrink-0 object-contain"
             />
             {seats}
           </span>
         </div>
 
         {/*
-          7. Prize strip — full banner plate is the background (art on the
-          right by design). Small trophy icon + amount sit on the empty left.
-          Never crop the banner into a framed 42% picture box.
+          7. Prize strip — CSS frame, fixed height; trophy, label + amount, then
+          the art in one fixed box on the right. Same size on every card.
         */}
-        <div className="relative mt-3.5 h-[88px] overflow-hidden rounded-xl">
-          <Image
-            src={prizeArt}
-            alt=""
-            fill
-            sizes="280px"
-            className="object-cover object-right"
-          />
-          <div className="relative z-[1] flex h-full max-w-[58%] items-center gap-2.5 px-3.5">
-            <span className="relative h-9 w-9 shrink-0">
-              <Image
-                src={SUGGESTED_PRIZE_ART.icon}
-                alt=""
-                fill
-                sizes="36px"
-                className={`object-contain ${KNOCK_BLACK}`}
-              />
-            </span>
-            <div className="min-w-0">
-              <p
-                className={`text-[11px] font-bold uppercase tracking-[0.16em] ${
-                  isGmFunded ? "text-amber-200/90" : "text-cyan-300/90"
-                }`}
-              >
-                Prize
-              </p>
-              <p className="mt-0.5 truncate text-[26px] font-extrabold leading-none tabular-nums text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]">
-                {prizeAmount}
-              </p>
-            </div>
+        <div
+          className={`mt-3 flex h-[72px] items-center gap-2.5 rounded-xl border px-3 ${
+            isStackArt
+              ? "border-cyan-400/60 bg-cyan-500/[0.07] shadow-[inset_0_0_16px_rgba(34,211,238,0.12)]"
+              : "border-amber-400/60 bg-amber-500/[0.07] shadow-[inset_0_0_16px_rgba(251,191,36,0.12)]"
+          }`}
+        >
+          <span className="relative h-9 w-9 shrink-0">
+            <Image
+              src={SUGGESTED_PRIZE_ART.icon}
+              alt=""
+              fill
+              sizes="36px"
+              className="object-contain"
+            />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p
+              className={`text-[11px] font-bold uppercase tracking-[0.16em] ${
+                isStackArt ? "text-cyan-300" : "text-amber-200"
+              }`}
+            >
+              Prize
+            </p>
+            <p className="mt-0.5 truncate text-[22px] font-extrabold leading-none tabular-nums text-white">
+              {prizeAmount}
+            </p>
           </div>
+          <span className={PRIZE_ART_BOX}>
+            <Image
+              src={prizeArt}
+              alt=""
+              fill
+              sizes="112px"
+              className="object-contain object-right"
+            />
+          </span>
         </div>
 
         {/*
-          8. Join CTA — plate already says "Join →". Never overlay that word
-          again (that was the "JJoin" glitch on Image 1).
+          8. Join — a CSS button, never an image plate, so it can never carry a
+          black canvas. It is a span: the whole card is already the link.
         */}
-        <span className="relative mt-3.5 block h-[50px] w-full overflow-hidden transition group-hover:brightness-110">
-          <Image
-            src={SUGGESTED_UI_ART.join}
-            alt="Join"
-            fill
-            sizes="280px"
-            className={`object-contain ${KNOCK_BLACK}`}
-          />
-          <span className="sr-only">Join</span>
+        <span className="mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-cyan-300/80 bg-gradient-to-r from-cyan-500/30 via-sky-500/20 to-cyan-500/30 text-[15px] font-bold uppercase tracking-[0.14em] text-white shadow-[0_0_16px_rgba(0,220,255,0.4),inset_0_0_12px_rgba(56,189,248,0.25)] transition group-hover:border-cyan-200 group-hover:shadow-[0_0_22px_rgba(0,220,255,0.6),inset_0_0_14px_rgba(56,189,248,0.35)]">
+          Join
+          <ArrowRight className="h-4 w-4" aria-hidden />
         </span>
       </div>
     </Link>
@@ -231,8 +262,9 @@ function SuggestionTile({
 
 /**
  * Contests suggested from games the player has actually played (X11.5).
- * Layout matches owner Image 2 (3 Oct 2026): clean cover, GM/Private/Public
- * badges, full prize-strip background, Join plate without double text.
+ * Layout matches owner Image 2 (3 Oct 2026): competition cover with Upcoming
+ * and fee pills, GM/Private/Public badges, fixed prize strip, CSS Join button.
+ * Every image is a transparent PNG - nothing renders on a black canvas.
  * Never invites anyone - suggestions only (X14).
  */
 export default function GameSuggestionsCard({
@@ -270,12 +302,11 @@ export default function GameSuggestionsCard({
     return (
       <section className={SECTION_FRAME} aria-busy="true">
         <div className="mb-3 h-5 w-48 animate-pulse rounded bg-cyan-400/10" />
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className={TILE_ROW}>
           {[0, 1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="h-[380px] animate-pulse rounded-xl border border-cyan-400/15 bg-[#0A0F1F]/60"
-            />
+            <div key={i} className={TILE_SLOT}>
+              <div className="h-[420px] animate-pulse rounded-xl border border-cyan-400/15 bg-[#0A0F1F]/60" />
+            </div>
           ))}
         </div>
       </section>
@@ -312,21 +343,19 @@ export default function GameSuggestionsCard({
     <section aria-labelledby="suggested-heading" className={SECTION_FRAME}>
       <div className="mb-1 flex flex-wrap items-end justify-between gap-2">
         <div className="flex items-center gap-3">
-          <span className="relative flex h-11 w-11 shrink-0 items-center justify-center">
-            <span className="relative h-11 w-11">
-              <Image
-                src={OVERVIEW_ICON_ART.star}
-                alt=""
-                fill
-                sizes="44px"
-                className={`${KNOCK_BLACK} object-contain`}
-              />
-            </span>
+          <span className="relative h-10 w-10 shrink-0 sm:h-11 sm:w-11">
+            <Image
+              src={SUGGESTED_UI_ART.star}
+              alt=""
+              fill
+              sizes="44px"
+              className="object-contain"
+            />
           </span>
           <div>
             <h2
               id="suggested-heading"
-              className="text-[20px] font-bold uppercase tracking-[0.12em] text-[#16DFFF]"
+              className="text-[17px] font-bold uppercase tracking-[0.12em] text-[#16DFFF] sm:text-[20px]"
             >
               Suggested for you
             </h2>
@@ -337,20 +366,17 @@ export default function GameSuggestionsCard({
         </div>
         <Link
           href="/competitions"
-          className="inline-flex items-center gap-1 text-[14px] font-semibold text-cyan-300 hover:text-cyan-200"
+          className="inline-flex min-h-[44px] items-center gap-1 text-[14px] font-semibold text-cyan-300 hover:text-cyan-200"
         >
           View all
           <ArrowRight className="h-4 w-4" aria-hidden />
         </Link>
       </div>
-      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className={TILE_ROW}>
         {contests.map((c) => (
-          <SuggestionTile
-            key={c.competitionId}
-            c={c}
-            creditSymbol={creditSymbol}
-            now={now}
-          />
+          <div key={c.competitionId} className={TILE_SLOT}>
+            <SuggestionTile c={c} creditSymbol={creditSymbol} now={now} />
+          </div>
         ))}
       </div>
     </section>
