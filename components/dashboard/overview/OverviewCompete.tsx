@@ -261,6 +261,7 @@ export default function OverviewCompete({
               src={OVERVIEW_COMPETE_ART.matchingCards}
               alt="Matching Cards"
               fill
+              unoptimized
               sizes="204px"
               className="object-contain"
             />

@@ -22,8 +22,13 @@ const JOBS = [
   ["suggested/src-badge-private.jpg", "suggested/badge-private-hr.png"],
   ["suggested/src-badge-public.jpg", "suggested/badge-public-hr.png"],
   ["suggested/src-badge-gm.png", "suggested/badge-gm-hr.png"],
-  ["suggested/src-join.jpg", "suggested/btn-join-hr.png"],
+  // Reason: the Join source carries a wide low-brightness glow that read as fog
+  // around the button (owner, 3 Oct 2026); `haze` keys that faint layer out.
+  ["suggested/src-join.jpg", "suggested/btn-join-hr.png", null, { haze: 70 }],
   ["suggested/src-prize-icon.jpg", "suggested/prize-icon-hr.png"],
+  ["compete/src-view-leaderboard.png", "compete/btn-view-leaderboard-hr.png"],
+  ["compete/src-challenge.png", "compete/btn-challenge-hr.png"],
+  ["compete/src-matching-cards.png", "compete/btn-matching-cards-hr.png"],
 ];
 /** Below this brightness a pixel is JPEG noise on the black canvas, not art. */
 const NOISE_FLOOR = 14;
@@ -31,7 +36,8 @@ const NOISE_FLOOR = 14;
 const CROP_ALPHA = 28;
 const PAD = 6;
 
-async function keyOut(src, dest, region) {
+async function keyOut(src, dest, region, opts = {}) {
+  const haze = opts.haze ?? NOISE_FLOOR;
   let image = sharp(path.join(ROOT, src)).removeAlpha();
   if (region) {
     // The plate's frame lines are bright, so the region is cut from the
@@ -59,11 +65,18 @@ async function keyOut(src, dest, region) {
   for (let i = 0, p = 0; i < data.length; i += 3, p += 4) {
     const r = data[i], g = data[i + 1], b = data[i + 2];
     const peak = Math.max(r, g, b);
-    const a = peak <= NOISE_FLOOR ? 0 : peak;
+    // Above the haze floor, alpha is rescaled so bright art keeps full opacity
+    // while the faint glow below it fades to nothing; colour still un-screens by peak.
+    const a =
+      peak <= haze
+        ? 0
+        : haze === NOISE_FLOOR
+          ? peak
+          : Math.round(((peak - haze) * 255) / (255 - haze));
     if (a > 0) {
-      out[p] = Math.min(255, Math.round((r * 255) / a));
-      out[p + 1] = Math.min(255, Math.round((g * 255) / a));
-      out[p + 2] = Math.min(255, Math.round((b * 255) / a));
+      out[p] = Math.min(255, Math.round((r * 255) / peak));
+      out[p + 1] = Math.min(255, Math.round((g * 255) / peak));
+      out[p + 2] = Math.min(255, Math.round((b * 255) / peak));
       out[p + 3] = a;
     }
     if (a >= cropAlpha) {
@@ -114,4 +127,4 @@ async function artworkBounds(src, width, height) {
   };
 }
 
-for (const [src, dest, region] of JOBS) await keyOut(src, dest, region);
+for (const [src, dest, region, opts] of JOBS) await keyOut(src, dest, region, opts);

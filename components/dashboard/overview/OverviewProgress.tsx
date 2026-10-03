@@ -330,6 +330,7 @@ export default function OverviewProgress({
               src={OVERVIEW_COMPETE_ART.viewLeaderboard}
               alt="View Leaderboard"
               fill
+              unoptimized
               sizes="220px"
               className="object-contain"
             />

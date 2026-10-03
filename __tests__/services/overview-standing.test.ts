@@ -684,8 +684,10 @@ describe("Overview streaks chrome", () => {
       expect(before).not.toMatch(/text-\[(8|9)px\]/);
     }
     expect(assets).toMatch(/OVERVIEW_COMPETE_ART/);
-    expect(assets).toMatch(/btn-matching-cards\.png/);
-    expect(assets).toMatch(/btn-challenge\.png/);
+    // Reason: owner's high-res replacements, 3 Oct 2026 - renamed so caches drop the old art.
+    expect(assets).toMatch(/btn-matching-cards-hr\.png/);
+    expect(assets).toMatch(/btn-challenge-hr\.png/);
+    expect(assets).toMatch(/btn-view-leaderboard-hr\.png/);
     expect(assets).toMatch(/icon-swords\.png/);
     expect(client).toMatch(/get\("view"\)\s*===\s*"cards"/);
     expect(client).toMatch(/initialViewMode/);
@@ -830,7 +832,9 @@ describe("Overview streaks chrome", () => {
     expect(artBlock).toMatch(/aria-hidden/);
     expect(artBlock).toMatch(/"Upcoming"/);
     expect(artBlock).toMatch(/"Live"/);
-    expect(artBlock).toMatch(/feeLabel/);
+    // Reason: owner 3 Oct 2026 (later) - "remove the top volts": the fee pill is
+    // gone from the cover; the status pill stays. Flipped, not deleted.
+    expect(artBlock).not.toMatch(/feeLabel|entryFee/);
     expect(suggestions).not.toMatch(/h-20/);
     expect(artBlock).not.toMatch(/h-auto/);
   });
@@ -865,14 +869,15 @@ describe("Overview streaks chrome", () => {
     expect(service).toMatch(/artSrc:\s*c\.imageUrl\?\.trim\(\)\s*\|\|\s*resolvePlayArt\(cat, isTrading\)/);
     expect(service).not.toMatch(/overviewPlayCardArt/);
 
-    // 2. Upcoming / Live and entry-fee pills sit ON the cover again.
+    // 2. Upcoming / Live sits ON the cover; the entry-fee pill was removed
+    // later on 3 Oct 2026 ("remove the top volts").
     const coverStart = suggestions.indexOf("aspect-[16/9]");
     const bodyStart = suggestions.indexOf("SUGGESTED_UI_ART.badgeGmFunded");
     expect(coverStart).toBeGreaterThan(-1);
     expect(bodyStart).toBeGreaterThan(coverStart);
     const cover = suggestions.slice(coverStart, bodyStart);
     expect(cover).toMatch(/"Upcoming"/);
-    expect(cover).toMatch(/\{feeLabel\}/);
+    expect(cover).not.toMatch(/\{feeLabel\}/);
 
     // 3. No black canvases anywhere on the card: no blend hack, no jpg plates.
     expect(suggestions).not.toMatch(/mix-blend-screen/);
@@ -920,7 +925,9 @@ describe("Overview streaks chrome", () => {
     );
     expect(joinCta.length).toBeGreaterThan(40);
     expect(joinCta).toMatch(/alt="Join"/);
-    expect(joinCta).toMatch(/w-full/);
+    // Reason: owner 3 Oct 2026 - Join read foggy at full width, so it is a
+    // touch narrower and centred (was w-full). Flipped, not deleted.
+    expect(joinCta).toMatch(/mx-auto[^"]*w-\[92%\]/);
     expect(joinCta).not.toMatch(/<Link/);
 
     // 7. Phone: swipe row; sm: 2 columns; xl: 4 (Image 2).

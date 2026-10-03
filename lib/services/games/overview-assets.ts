@@ -59,9 +59,11 @@ export const OVERVIEW_COMPETE_ART = {
   score: "/assets/neon/overview/compete/icon-score-target.png",
   competitions: "/assets/neon/overview/compete/icon-competitions-trophy.png",
   avatarRing: "/assets/neon/overview/compete/avatar-ring.png",
-  matchingCards: "/assets/neon/overview/compete/btn-matching-cards.png",
-  challenge: "/assets/neon/overview/compete/btn-challenge.png",
-  viewLeaderboard: "/assets/neon/overview/compete/btn-view-leaderboard.png",
+  // Owner's high-resolution replacements (3 Oct 2026), keyed transparent by
+  // tools/overview/key-out-black.mjs. New filenames so browsers drop the old art.
+  matchingCards: "/assets/neon/overview/compete/btn-matching-cards-hr.png",
+  challenge: "/assets/neon/overview/compete/btn-challenge-hr.png",
+  viewLeaderboard: "/assets/neon/overview/compete/btn-view-leaderboard-hr.png",
 } as const;
 
 /** KPI plate art — wallet / chart2 / chart / trophy (owner 3 Oct 2026). */

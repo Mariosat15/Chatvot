@@ -92,9 +92,6 @@ function SuggestionTile({
   // Reason: number and symbol are rendered as two baseline-aligned spans, so the
   // volt glyph sits on the number's baseline instead of floating inside one string.
   const prizeNumber = hasPrize ? formatVolts(c.prizePool as number, { bare: true }) : "-";
-  const feeLabel =
-    c.entryFee > 0 ? formatVolts(c.entryFee, { symbol: creditSymbol }) : "Free";
-
   return (
     <Link
       href={`/competitions/${c.competitionId}`}
@@ -138,11 +135,7 @@ function SuggestionTile({
             <Clock className="h-3.5 w-3.5" aria-hidden />
             {isLive ? "Live" : "Upcoming"}
           </span>
-          <span
-            className={`${COVER_PILL} border-amber-300/70 bg-amber-500/20 text-amber-50 tabular-nums`}
-          >
-            {feeLabel}
-          </span>
+          {/* Reason: owner, 3 Oct 2026 - the entry-fee pill on the cover is removed. */}
         </div>
       </div>
 
@@ -259,10 +252,10 @@ function SuggestionTile({
         <Image
           src={SUGGESTED_UI_ART.join}
           alt="Join"
-          width={1024}
-          height={200}
+          width={1014}
+          height={184}
           unoptimized
-          className="mt-3 h-auto w-full transition group-hover:brightness-125 motion-reduce:transition-none"
+          className="mx-auto mt-3 h-auto w-[92%] transition group-hover:brightness-125 motion-reduce:transition-none"
         />
       </div>
     </Link>
@@ -272,7 +265,7 @@ function SuggestionTile({
 /**
  * Contests suggested from games the player has actually played (X11.5).
  * Layout matches owner Image 2 (3 Oct 2026): competition cover with Upcoming
- * and fee pills, GM/Private/Public badges, fixed prize strip, image Join button.
+ * pill (the fee pill was removed 3 Oct 2026), GM/Private/Public badges, fixed prize strip, image Join button.
  * Every image is a transparent PNG - nothing renders on a black canvas.
  * Never invites anyone - suggestions only (X14).
  */

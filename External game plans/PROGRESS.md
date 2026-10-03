@@ -931,6 +931,23 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 3 October 2026 - Owner's high-res View Leaderboard / Challenge / Matching Cards; fee pill gone; Join de-fogged
+
+- **Buttons:** the owner supplied three new button images. They are keyed transparent by
+  `tools/overview/key-out-black.mjs` into
+  `compete/btn-{view-leaderboard,challenge,matching-cards}-hr.png` (986x209, 1018x220,
+  1021x316) and wired through `OVERVIEW_COMPETE_ART`. The new filenames make browsers fetch
+  the new art. The old PNGs were deleted. The leaderboard image and the header Matching
+  Cards image are now `unoptimized`, as the per-card pair already was, so Next does not
+  re-encode them soft.
+- **Fee pill:** "remove the top volts" means the entry-fee pill on the Suggested for You
+  cover is removed. The Upcoming/Live pill stays.
+- **Join:** the source carried a wide, faint glow that read as fog. The key-out tool gained a
+  per-job `haze` floor (70). Below it the glow keys to nothing, and above it alpha is rescaled
+  so the button itself stays fully opaque. The result is 1014x184, drawn `mx-auto w-[92%]`:
+  a touch smaller and still centred.
+- Tests in `overview-standing.test.ts` were flipped, not deleted. **Never verified by eye.**
+
 ### 3 October 2026 - `/games` cards: artwork fills the card left to right
 
 Owner: "image must fill the space left right". The two-layer cover (blurred fill under a
