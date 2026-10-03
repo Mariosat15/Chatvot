@@ -2,9 +2,12 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ChevronRight, Flame } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import type { OverviewStanding } from "@/lib/services/games/overview-types";
-import { OVERVIEW_STREAK_ART } from "@/lib/services/games/overview-assets";
+import {
+  OVERVIEW_ICON_ART,
+  OVERVIEW_STREAK_ART,
+} from "@/lib/services/games/overview-assets";
 import { NEON_PANEL, NEON_HEADING, NEON_LABEL } from "@/components/neon/tokens";
 
 interface OverviewStreaksProps {
@@ -114,8 +117,14 @@ export default function OverviewStreaks({ streaks }: OverviewStreaksProps) {
     >
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="flex items-start gap-2.5">
-          <span className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-lg border border-orange-400/40 bg-orange-500/15 text-orange-300 shadow-[0_0_14px_rgba(251,146,60,0.45)]">
-            <Flame className="h-4 w-4" aria-hidden />
+          <span className="relative mt-0.5 flex h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-orange-400/40 bg-transparent shadow-[0_0_14px_rgba(251,146,60,0.45)]">
+            <Image
+              src={OVERVIEW_ICON_ART.fire}
+              alt=""
+              fill
+              sizes="40px"
+              className="object-contain mix-blend-screen"
+            />
           </span>
           <div>
             <h2
@@ -161,7 +170,7 @@ export default function OverviewStreaks({ streaks }: OverviewStreaksProps) {
                     alt=""
                     fill
                     sizes="36px"
-                    className="object-contain"
+                    className="object-contain mix-blend-screen"
                   />
                 </div>
                 <div className="min-w-0 flex-1">

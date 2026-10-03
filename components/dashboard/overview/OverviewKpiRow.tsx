@@ -1,7 +1,5 @@
 "use client";
 
-"use client";
-
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { formatVolts } from "@/lib/utils/format-volts";
@@ -204,7 +202,13 @@ function KpiCard({
         className="pointer-events-none absolute -right-2 top-1/2 h-24 w-24 -translate-y-1/2 opacity-[0.07]"
         aria-hidden
       >
-        <Image src={artSrc} alt="" fill sizes="96px" className="object-contain" />
+        <Image
+          src={artSrc}
+          alt=""
+          fill
+          sizes="96px"
+          className="object-contain mix-blend-screen"
+        />
       </div>
 
       <div className="relative z-10 flex min-w-0 flex-1 items-center gap-3">
@@ -219,7 +223,9 @@ function KpiCard({
             alt=""
             fill
             sizes="56px"
-            className="scale-[1.08] object-contain drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]"
+            // Reason: owner plates ship on a black canvas — screen blend knocks
+            // it out so the glass ring shows through (same as Suggested badges).
+            className="scale-[1.08] object-contain mix-blend-screen drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]"
           />
         </span>
 

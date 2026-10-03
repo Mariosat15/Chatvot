@@ -33,6 +33,18 @@ export const OVERVIEW_ICON_ART = {
   activity: "/assets/neon/overview/items/icon-activity-calendar.png",
   /** Neon glass trophy for activity rows (transparent, 29 Sep 2026). */
   trophyGlass: "/assets/neon/overview/items/icon-trophy-glass.png",
+  /**
+   * Owner neon plates (3 Oct 2026) — black export canvases; knock out with
+   * `mix-blend-screen` at the call site (same as Suggested badge plates).
+   */
+  wallet: "/assets/neon/overview/items/icon-wallet.jpg",
+  chart2: "/assets/neon/overview/items/icon-chart-2.png",
+  chart: "/assets/neon/overview/items/icon-chart.jpg",
+  trophyNeon: "/assets/neon/overview/items/icon-trophy-neon.jpg",
+  games: "/assets/neon/overview/items/icon-games.jpg",
+  fire: "/assets/neon/overview/items/icon-fire.jpg",
+  calendarNeon: "/assets/neon/overview/items/icon-calendar-neon.png",
+  star: "/assets/neon/overview/items/icon-star.jpg",
 } as const;
 
 /**
@@ -52,22 +64,25 @@ export const OVERVIEW_COMPETE_ART = {
   viewLeaderboard: "/assets/neon/overview/compete/btn-view-leaderboard.png",
 } as const;
 
-/** KPI plate art — credits / win rate / ROI / prizes. */
+/** KPI plate art — wallet / chart2 / chart / trophy (owner 3 Oct 2026). */
 export const OVERVIEW_KPI_ART = {
-  credits: OVERVIEW_ICON_ART.progress,
-  winRate: OVERVIEW_ICON_ART.target,
-  roi: OVERVIEW_ICON_ART.growth,
-  prizes: OVERVIEW_ICON_ART.trophy,
+  credits: OVERVIEW_ICON_ART.wallet,
+  winRate: OVERVIEW_ICON_ART.chart2,
+  roi: OVERVIEW_ICON_ART.chart,
+  prizes: OVERVIEW_ICON_ART.trophyNeon,
 } as const;
 
-/** Streak tile icons — contest-shaped labels, game art (image 7). */
+/**
+ * Streak tile icons — contest-shaped labels (owner 3 Oct 2026).
+ * Header uses `OVERVIEW_ICON_ART.fire` separately.
+ */
 export const OVERVIEW_STREAK_ART = {
-  podiumStreak: "/assets/neon/overview/items/streak-flame.png",
-  bestStreak: "/assets/neon/overview/items/streak-calendar.png",
-  contestWins: "/assets/neon/overview/items/streak-trend.png",
-  contestsPlayed: "/assets/neon/overview/items/streak-days.png",
-  topThreeFinishes: "/assets/neon/overview/items/streak-trophy.png",
-  weeksActive: "/assets/neon/overview/items/streak-bars.png",
+  podiumStreak: OVERVIEW_ICON_ART.fire,
+  bestStreak: OVERVIEW_ICON_ART.trophyNeon,
+  contestWins: OVERVIEW_ICON_ART.chart2,
+  contestsPlayed: OVERVIEW_ICON_ART.games,
+  topThreeFinishes: OVERVIEW_ICON_ART.chart,
+  weeksActive: OVERVIEW_ICON_ART.calendarNeon,
 } as const;
 
 /**
@@ -171,6 +186,7 @@ export function allOverviewAssets(): string[] {
     ...Object.values(OVERVIEW_NAV_TAB_ART),
     ...Object.values(MOBILE_OVERVIEW_ART),
     ...Object.values(SUGGESTED_PRIZE_ART),
+    ...Object.values(SUGGESTED_UI_ART),
     ...ranks,
     ...levels,
   ];

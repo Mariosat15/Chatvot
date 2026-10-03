@@ -265,13 +265,14 @@ export default function OverviewProgress({
     >
       <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
         <div className="flex items-start gap-2.5">
-          <span className="relative mt-0.5 flex h-11 w-11 shrink-0 overflow-hidden rounded-lg border border-amber-400/40 bg-amber-500/10 shadow-[0_0_14px_rgba(251,191,36,0.4)]">
+          <span className="relative mt-0.5 flex h-11 w-11 shrink-0 overflow-hidden rounded-lg border border-amber-400/40 bg-transparent shadow-[0_0_14px_rgba(251,191,36,0.4)]">
             <Image
-              src={OVERVIEW_ICON_ART.progress}
+              src={OVERVIEW_ICON_ART.games}
               alt=""
               fill
               sizes="44px"
-              className="object-cover"
+              // Reason: games plate is a black-canvas export — no fill behind it.
+              className="object-contain mix-blend-screen"
             />
           </span>
           <div>

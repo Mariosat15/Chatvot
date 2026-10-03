@@ -324,6 +324,8 @@ project low risk.
 
 This plan has two tracks. **As of 30 September 2026**:
 
+- **Overview neon icon remap CODE-COMPLETE 3 Oct (eng)** — Credits→wallet, win rate→chart2, ROI→chart, prizes→trophy; Player Progress→games; Streaks header→fire; streak tiles (best→trophy, wins→chart2, played→games, top3→chart, weeks→calendar); Suggested header→star over prize plates. Black canvases use `mix-blend-screen`. Assets under `public/assets/neon/overview/items/icon-*`. Tests: `overview-standing.test.ts`. **Never verified by eye.**
+- **Suggested for You mock CODE-COMPLETE 3 Oct (eng)** — prize plates under amount, Starts-in plain text, catalogue blurb/visibility/funding badges. Commit `cdb9459c`.
 - **Mobile Wallet Analytics + Quick Access CODE-COMPLETE 3 Oct (eng)** — dedicated `MobileWallet` tree below `md` (not a shrunk desktop); shared `useWalletAnalyticsModel`; Deposit/Withdraw → `/wallet`; recent txns via `getWalletTransactions(5)`. Overview Quick Access = Wallet Analytics / Performance / Tutorials / Marketplace. Desktop `DesktopWalletAnalytics` unchanged. Tests: `wallet-analytics.test.ts` + `mobile-dashboard-split.test.ts`. **Never verified by eye.**
 - **Wallet Analytics REBUILT 30 Sep (eng)** — first pass rejected; page rebuilt to `Rebuil Wallet Analitics.md` + reference mock (compact header, Lucide KPI chips, Recharts panels, one global 30d range, 7 insight cards). See `13` **s5.1h**. Tests: `wallet-analytics.test.ts` (8). **Never verified by eye.**
 - **Wallet Analytics CODE-COMPLETE 30 Sep (eng)** — first ship (superseded same day by rebuild above — correct as history). Header label **"Wallet Analytics"** (`tab` id still `wallet`).
@@ -922,6 +924,18 @@ remains outstanding is the **opponent** half listed above, not the game half.
 ## WORK LOG
 
 Newest at the top.
+
+### 3 October 2026 - Overview neon icon remap (KPI / Progress / Streaks / Suggested)
+
+**Owner:** replace Credits→wallet, Contest win rate→chart2, ROI→chart, Prizes→trophy;
+Player Progress→games; Streaks & Consistency→fire; Best streak→trophy; Contest
+wins→chart2; Contests played→games; Top 3→chart; Weeks active→calendar;
+Suggested for you→star (prize plates 1+2 under the star, no black canvas).
+
+**Built (main app only).**
+- Plates under `public/assets/neon/overview/items/icon-{wallet,chart-2,chart,trophy-neon,games,fire,calendar-neon,star}.*`
+- `OVERVIEW_KPI_ART` / `OVERVIEW_STREAK_ART` / section headers remapped; `mix-blend-screen` on call sites.
+- Tests: `overview-standing.test.ts` (26). **Never verified by eye.**
 
 ### 3 October 2026 - Suggested for you matches owner mock (prize plates + neon badges)
 

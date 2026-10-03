@@ -3,10 +3,12 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, Clock, Gamepad2, Sparkles } from "lucide-react";
+import { ArrowRight, Clock, Gamepad2 } from "lucide-react";
 import { formatVolts } from "@/lib/utils/format-volts";
 import { NEON_HEADING } from "@/components/neon/tokens";
 import {
+  OVERVIEW_ICON_ART,
+  SUGGESTED_PRIZE_ART,
   SUGGESTED_UI_ART,
   suggestedPrizeArt,
 } from "@/lib/services/games/overview-assets";
@@ -315,8 +317,37 @@ export default function GameSuggestionsCard({
   return (
     <section aria-labelledby="suggested-heading" className={SECTION_FRAME}>
       <div className="mb-1 flex flex-wrap items-end justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-sky-400" aria-hidden />
+        <div className="flex items-center gap-2.5">
+          {/* Reason: prize plates sit UNDER the star; black canvases are screened out. */}
+          <span className="relative flex h-11 w-11 shrink-0 items-center justify-center">
+            <span className="pointer-events-none absolute inset-0 opacity-45" aria-hidden>
+              <Image
+                src={SUGGESTED_PRIZE_ART.trophy}
+                alt=""
+                fill
+                sizes="44px"
+                className={`${KNOCK_BLACK} object-contain`}
+              />
+            </span>
+            <span className="pointer-events-none absolute inset-0 opacity-40" aria-hidden>
+              <Image
+                src={SUGGESTED_PRIZE_ART.cubes}
+                alt=""
+                fill
+                sizes="44px"
+                className={`${KNOCK_BLACK} object-contain`}
+              />
+            </span>
+            <span className="relative h-11 w-11">
+              <Image
+                src={OVERVIEW_ICON_ART.star}
+                alt=""
+                fill
+                sizes="44px"
+                className={`${KNOCK_BLACK} object-contain`}
+              />
+            </span>
+          </span>
           <h2 id="suggested-heading" className={NEON_HEADING}>
             Suggested for you
           </h2>

@@ -421,6 +421,11 @@ describe("Overview streaks chrome", () => {
     expect(ui).not.toMatch(/Trading Days/);
     expect(ui).not.toMatch(/Win Streak/);
     expect(ui).not.toMatch(/Loss Streak/);
+    // Reason: owner 3 Oct 2026 — section header is the fire plate, not Lucide.
+    expect(ui).toMatch(/OVERVIEW_ICON_ART\.fire/);
+    expect(ui).not.toMatch(/\bFlame\b/);
+    expect(ui).toMatch(/OVERVIEW_STREAK_ART\.bestStreak/);
+    expect(ui).toMatch(/mix-blend-screen/);
 
     // Reason: streaks must come from overall UserGameStats fields, never from
     // the trading trade-streak calculator on comprehensive-dashboard.
@@ -573,6 +578,8 @@ describe("Overview streaks chrome", () => {
     expect(progress).toMatch(/missions\.map/);
     expect(progress).toMatch(/Math\.round\(progressPercent\)/);
     expect(progress).toMatch(/OVERVIEW_ICON_ART/);
+    // Reason: Player Progress header is the games plate (owner 3 Oct 2026).
+    expect(progress).toMatch(/OVERVIEW_ICON_ART\.games/);
     expect(progress).toMatch(/object-cover/);
     // Reason: metric progress can hit 100% while badge gates remain — the card
     // must name Required badge under "% complete" or it looks finished.
@@ -720,6 +727,19 @@ describe("Overview streaks chrome", () => {
     expect(assets).toMatch(/icon-progress\.png/);
     expect(assets).toMatch(/icon-target\.png/);
     expect(assets).toMatch(/icon-activity-calendar\.png/);
+    // Reason: owner 3 Oct 2026 — KPI / streaks / Suggested headers remapped.
+    expect(assets).toMatch(/icon-wallet\.jpg/);
+    expect(assets).toMatch(/icon-chart-2\.png/);
+    expect(assets).toMatch(/icon-chart\.jpg/);
+    expect(assets).toMatch(/icon-trophy-neon\.jpg/);
+    expect(assets).toMatch(/icon-games\.jpg/);
+    expect(assets).toMatch(/icon-fire\.jpg/);
+    expect(assets).toMatch(/icon-calendar-neon\.png/);
+    expect(assets).toMatch(/icon-star\.jpg/);
+    expect(assets).toMatch(/credits:\s*OVERVIEW_ICON_ART\.wallet/);
+    expect(assets).toMatch(/winRate:\s*OVERVIEW_ICON_ART\.chart2/);
+    expect(assets).toMatch(/roi:\s*OVERVIEW_ICON_ART\.chart/);
+    expect(assets).toMatch(/prizes:\s*OVERVIEW_ICON_ART\.trophyNeon/);
   });
 
   it("Overview KPI and Compete poll light live endpoints, not full dashboard", () => {
@@ -823,6 +843,11 @@ describe("Overview streaks chrome", () => {
     expect(suggestions).toMatch(/SUGGESTED_UI_ART\.clock/);
     expect(suggestions).toMatch(/mix-blend-screen/);
     expect(suggestions).toMatch(/Starts in/);
+    // Reason: Suggested header — star over prize plates 1+2; no Lucide sparkles.
+    expect(suggestions).toMatch(/OVERVIEW_ICON_ART\.star/);
+    expect(suggestions).toMatch(/SUGGESTED_PRIZE_ART\.trophy/);
+    expect(suggestions).toMatch(/SUGGESTED_PRIZE_ART\.cubes/);
+    expect(suggestions).not.toMatch(/\bSparkles\b/);
     // Prize plate uses the shared art helper; Join is a real CTA button strip.
     expect(suggestions).toMatch(/>\s*Join\s*</);
     // Starts-in row: call site (not the helper def) — clock + text, no pill chrome.
