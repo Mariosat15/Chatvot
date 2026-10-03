@@ -931,6 +931,16 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 3 October 2026 - Suggested cards change live, with no reload
+
+- **Owner request:** "show upcoming, if they go live show live, if they cancel remove and put others that fit the player ... they must be changing live, not need to refresh the page".
+- **Nothing was computed wrongly; no risk number; nothing backfilled.** `GameSuggestionsCard` fetched `/api/games/suggestions` once, on mount. It now re-asks every 15s while the tab is visible and immediately when the tab is shown again. A separate 15s tick keeps "Starts in" counting down between polls.
+- **The server already does the hard part:** `suggestOpenContests` returns only `upcoming` / `active` contests the player may enter. A cancelled one drops out on the next poll and the next best fit takes its slot. Status, seats and the prize move with each poll too. No new endpoint was added, so the poll and the first render cannot disagree.
+- **"Live" comes from the stored status, never the browser clock.** Past the start but not yet flipped by the cron, the meta line reads "Starting now" (it said "Live now", contradicting the Upcoming pill). This is the `13` s1.1j rule.
+- A failed poll keeps the last good list rather than blanking the section, and polls never overlap.
+- Pinned in `__tests__/services/overview-standing.test.ts`. Five probes were run: no first load, no visibility re-ask, a leaked interval and the clock deciding "Live" each turn exactly 1 red, and a control mutation stays green.
+- **Never verified by eye.**
+
 ### 3 October 2026 - Suggested cards speak for the competition: its own wording, its own prize
 
 - **Owner request:** "take the title and wording from the actual competition ... the prize is not listed fix it to take the prize from comp as well".

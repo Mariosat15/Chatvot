@@ -58,12 +58,18 @@ const COVER_PILL =
 /** Prize trophy - sized to span both lines (label + amount) so they centre on it. */
 const PRIZE_ICON_BOX = "relative h-[54px] w-[54px] shrink-0";
 
+/** Re-ask the server for the suggestion list this often while the tab is visible. */
+const SUGGESTIONS_POLL_MS = 15_000;
+/** Re-render the "Starts in" labels this often between polls. */
+const CLOCK_TICK_MS = 15_000;
+
 /** "Starts in 2h 44m" / "Live now". */
 function startLabel(startTime: string, status: string, now: number): string {
   const start = new Date(startTime).getTime();
-  if (status === "active" || !Number.isFinite(start) || start <= now) {
-    return "Live now";
-  }
+  if (status === "active") return "Live now";
+  // Reason: past the start but not yet flipped to active by the cron - the
+  // stored status decides "Live", never the browser clock.
+  if (!Number.isFinite(start) || start <= now) return "Starting now";
   const mins = Math.round((start - now) / 60000);
   if (mins < 60) return `Starts in ${Math.max(1, mins)}m`;
   const hours = Math.floor(mins / 60);
@@ -281,11 +287,20 @@ export default function GameSuggestionsCard({
   const [interests, setInterests] = useState<string[]>([]);
   const [now, setNow] = useState(() => Date.now());
 
+  // Reason: owner, 3 Oct 2026 - the cards must change live: Upcoming -> Live,
+  // a cancelled contest replaced by the next one that fits, prize and seats
+  // moving as people join. The service already returns only upcoming/active
+  // contests, so re-asking it is the whole mechanism; a failed poll keeps the
+  // last good list rather than blanking the section. Paused while the tab is
+  // hidden and re-asked the moment it is shown again.
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    let inFlight = false;
+    const load = async () => {
+      if (inFlight) return;
+      inFlight = true;
       try {
-        const res = await fetch("/api/games/suggestions");
+        const res = await fetch("/api/games/suggestions", { cache: "no-store" });
         const data = await res.json();
         if (cancelled || !res.ok || !data.success) return;
         setContests(Array.isArray(data.contests) ? data.contests : []);
@@ -294,11 +309,25 @@ export default function GameSuggestionsCard({
       } catch {
         // Silent - suggestions are additive chrome, not a required surface.
       } finally {
+        inFlight = false;
         if (!cancelled) setLoading(false);
       }
-    })();
+    };
+    void load();
+    const poll = window.setInterval(() => {
+      if (document.visibilityState === "visible") void load();
+    }, SUGGESTIONS_POLL_MS);
+    // Reason: "Starts in 55m" must count down between polls too.
+    const tick = window.setInterval(() => setNow(Date.now()), CLOCK_TICK_MS);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void load();
+    };
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       cancelled = true;
+      window.clearInterval(poll);
+      window.clearInterval(tick);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, []);
 

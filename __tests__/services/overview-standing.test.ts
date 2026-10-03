@@ -1008,6 +1008,40 @@ describe("Overview streaks chrome", () => {
     expect(card).toMatch(/hasPrize \? formatVolts\(prizeAmount, \{ bare: true \}\) : "-"/);
   });
 
+  it("Suggested cards update live: poll, pause while hidden, keep the last good list", () => {
+    // Reason: owner 3 Oct 2026 - Upcoming -> Live, cancelled contests replaced,
+    // "they must be changing live not need to refresh the page".
+    const card = readFileSync(
+      join(ROOT, "components/dashboard/GameSuggestionsCard.tsx"),
+      "utf8",
+    )
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    expect(card).toMatch(/setInterval\(\(\) => \{\s*if \(document\.visibilityState === "visible"\) void load\(\);\s*\}, SUGGESTIONS_POLL_MS\)/);
+    // Loaded once immediately, then polled: the bare call sits between the
+    // loader's end and the interval (the poll's own call does not count).
+    expect(card).toMatch(/\};\s*void load\(\);\s*const poll = window\.setInterval/);
+    expect(card).toMatch(/addEventListener\("visibilitychange", onVisible\)/);
+    expect(card).toMatch(/clearInterval\(poll\)/);
+    expect(card).toMatch(/setInterval\(\(\) => setNow\(Date\.now\(\)\), CLOCK_TICK_MS\)/);
+    // A failed poll returns before setContests - the old list stays on screen.
+    const loadStart = card.indexOf("const load = async");
+    const loadBody = card.slice(loadStart, card.indexOf("void load();", loadStart));
+    expect(loadBody.length).toBeGreaterThan(100);
+    expect(loadBody.indexOf("!data.success) return")).toBeGreaterThan(-1);
+    expect(loadBody.indexOf("!data.success) return")).toBeLessThan(loadBody.indexOf("setContests("));
+    expect(loadBody).not.toMatch(/catch[\s\S]*setContests\(\[\]\)/);
+    // "Live" comes from the stored status, never from the clock passing start.
+    expect(card).toMatch(/if \(status === "active"\) return "Live now";/);
+    expect(card).toMatch(/start <= now\) return "Starting now"/);
+    // The service returns only open contests, so a cancelled one drops out.
+    const service = readFileSync(
+      join(ROOT, "lib/services/games/game-suggestions.service.ts"),
+      "utf8",
+    );
+    expect(service).toMatch(/status:\s*\{\s*\$in:\s*\["upcoming", "active"\]\s*\}/);
+  });
+
   it("every Suggested-for-you asset is a transparent PNG, never a black canvas", async () => {
     // Reason: a structural test cannot see a black canvas - only the pixels can.
     const sharp = (await import("sharp")).default;
