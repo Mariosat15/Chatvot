@@ -100,6 +100,34 @@ export const MOBILE_OVERVIEW_ART = {
   gift: "/assets/neon/overview/mobile/icon-gift.webp",
 } as const;
 
+/**
+ * Suggested-for-you art (owner mock 3 Oct 2026).
+ * Prize plates sit UNDER the amount; badge/icon plates are screen-blended
+ * so the black export canvas does not paint a box on the card.
+ */
+export const SUGGESTED_PRIZE_ART = {
+  trophy: "/assets/neon/overview/suggested/prize-trophy.jpg",
+  cubes: "/assets/neon/overview/suggested/prize-cubes.png",
+} as const;
+
+export const SUGGESTED_UI_ART = {
+  clock: "/assets/neon/overview/suggested/icon-clock.jpg",
+  users: "/assets/neon/overview/suggested/icon-users.jpg",
+  badgeGmFunded: "/assets/neon/overview/suggested/badge-gm-funded.png",
+  badgePrivate: "/assets/neon/overview/suggested/badge-private.png",
+  badgePublic: "/assets/neon/overview/suggested/badge-public.png",
+} as const;
+
+/** Pick the prize decoration for a suggestion card. Unknown codes get the trophy. */
+export function suggestedPrizeArt(gameKey?: string | null): string {
+  if (!gameKey) return SUGGESTED_PRIZE_ART.trophy;
+  // Reason: only stack-shaped titles use the cube plate; everything else is the trophy.
+  if (gameKey.includes("volt-stack") || gameKey.includes("stack")) {
+    return SUGGESTED_PRIZE_ART.cubes;
+  }
+  return SUGGESTED_PRIZE_ART.trophy;
+}
+
 const PLAY_GENERIC = "/assets/neon/overview/play-generic.png";
 
 const PLAY_BY_CODE = new Map<string, string>([
@@ -142,6 +170,7 @@ export function allOverviewAssets(): string[] {
     ...Object.values(OVERVIEW_COMPETE_ART),
     ...Object.values(OVERVIEW_NAV_TAB_ART),
     ...Object.values(MOBILE_OVERVIEW_ART),
+    ...Object.values(SUGGESTED_PRIZE_ART),
     ...ranks,
     ...levels,
   ];

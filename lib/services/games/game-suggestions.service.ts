@@ -31,6 +31,10 @@ export interface GameSuggestion {
   prizePool: number;
   currentParticipants: number;
   maxParticipants: number | null;
+  /** Short blurb under the contest name — catalogue tagline, then description. */
+  blurb: string;
+  visibility: "public" | "gm_private";
+  fundingMode: "player_paid" | "gm_funded";
 }
 
 export async function suggestOpenContests(
@@ -63,7 +67,7 @@ export async function suggestOpenContests(
       ),
     )
       .select(
-        "name entryFee startTime status gameKey prizePool currentParticipants maxParticipants",
+        "name description entryFee startTime status gameKey prizePool currentParticipants maxParticipants visibility fundingMode",
       )
       .sort({ startTime: 1 })
       .limit(limit)
@@ -71,6 +75,7 @@ export async function suggestOpenContests(
         Array<{
           _id: { toString(): string };
           name: string;
+          description?: string;
           entryFee?: number;
           startTime: Date;
           status: string;
@@ -78,6 +83,8 @@ export async function suggestOpenContests(
           prizePool?: number;
           currentParticipants?: number;
           maxParticipants?: number;
+          visibility?: "public" | "gm_private";
+          fundingMode?: "player_paid" | "gm_funded";
         }>
       >(),
     // Reason: artwork is decoration - a catalogue failure must not hide the suggestions.
@@ -89,6 +96,11 @@ export async function suggestOpenContests(
   return contests.map((c) => {
     const cat = byKey.get(c.gameKey);
     const isTrading = c.gameKey === TRADING_GAME_TYPE;
+    const blurb =
+      (cat?.tagline && cat.tagline.trim()) ||
+      (c.description && c.description.trim()) ||
+      (cat?.description && cat.description.trim()) ||
+      "";
     return {
       gameKey: c.gameKey,
       competitionId: c._id.toString(),
@@ -105,6 +117,11 @@ export async function suggestOpenContests(
         typeof c.maxParticipants === "number" && c.maxParticipants > 0
           ? c.maxParticipants
           : null,
+      blurb: blurb.length > 120 ? `${blurb.slice(0, 117).trimEnd()}…` : blurb,
+      // Reason: absent visibility / fundingMode resolve like the rest of the platform
+      // (invariant 5 / player-paid default) — never invent gm_private or gm_funded.
+      visibility: c.visibility === "gm_private" ? "gm_private" : "public",
+      fundingMode: c.fundingMode === "gm_funded" ? "gm_funded" : "player_paid",
     };
   });
 }

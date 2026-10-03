@@ -1,10 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, Clock, Gamepad2, Sparkles, Trophy, Users } from "lucide-react";
+import { ArrowRight, Clock, Gamepad2, Sparkles } from "lucide-react";
 import { formatVolts } from "@/lib/utils/format-volts";
-import { NEON_HEADING, NEON_LABEL } from "@/components/neon/tokens";
+import { NEON_HEADING } from "@/components/neon/tokens";
+import {
+  SUGGESTED_UI_ART,
+  suggestedPrizeArt,
+} from "@/lib/services/games/overview-assets";
 
 interface Suggestion {
   gameKey: string;
@@ -18,19 +23,25 @@ interface Suggestion {
   prizePool?: number;
   currentParticipants?: number;
   maxParticipants?: number | null;
+  blurb?: string;
+  visibility?: "public" | "gm_private";
+  fundingMode?: "player_paid" | "gm_funded";
 }
 
-// Reason: same frame and card glow as "Play by game", so the two strips read as one
-// dashboard rather than a styled section beside a plain list.
 const SECTION_FRAME =
-  "rounded-2xl border border-sky-400/35 bg-[#050B18]/40 p-3 shadow-[0_0_18px_-6px_rgba(56,189,248,0.45),inset_0_0_14px_rgba(56,189,248,0.06)]";
+  "rounded-2xl border border-sky-400/55 bg-[#050B18]/70 p-3.5 shadow-[0_0_28px_-6px_rgba(56,189,248,0.65),inset_0_0_20px_rgba(56,189,248,0.08)]";
 const CARD =
-  "group relative flex h-full flex-col overflow-hidden rounded-xl border border-sky-400/45 bg-[#0A0F1F]/80 shadow-[0_0_12px_-2px_rgba(56,189,248,0.45)] transition hover:-translate-y-0.5 hover:border-sky-300/80 hover:shadow-[0_0_18px_0_rgba(56,189,248,0.6)] focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60 motion-reduce:transition-none motion-reduce:hover:translate-y-0";
+  "group relative flex h-full flex-col overflow-hidden rounded-xl border border-sky-400/55 bg-[#070E1C]/95 shadow-[0_0_18px_-2px_rgba(56,189,248,0.55)] transition hover:-translate-y-0.5 hover:border-sky-300/90 hover:shadow-[0_0_26px_0_rgba(56,189,248,0.7)] focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60 motion-reduce:transition-none motion-reduce:hover:translate-y-0";
 
-/** "Starts in 2h 15m" / "Starts in 3d" / "Live now" — coarse on purpose; the lobby has the exact clock. */
+/** Knock out the black canvas ChatGPT exports leave around neon plates. */
+const KNOCK_BLACK = "mix-blend-screen";
+
+/** "Starts in 2h 44m" / "Live now" — plain text, never a pill (owner 3 Oct 2026). */
 function startLabel(startTime: string, status: string, now: number): string {
   const start = new Date(startTime).getTime();
-  if (status === "active" || !Number.isFinite(start) || start <= now) return "Live now";
+  if (status === "active" || !Number.isFinite(start) || start <= now) {
+    return "Live now";
+  }
   const mins = Math.round((start - now) / 60000);
   if (mins < 60) return `Starts in ${Math.max(1, mins)}m`;
   const hours = Math.floor(mins / 60);
@@ -52,16 +63,24 @@ function SuggestionTile({
     c.maxParticipants && c.maxParticipants > 0
       ? `${c.currentParticipants ?? 0}/${c.maxParticipants}`
       : `${c.currentParticipants ?? 0}`;
-  const fee = c.entryFee > 0 ? formatVolts(c.entryFee, { symbol: creditSymbol }) : "Free";
+  const fee =
+    c.fundingMode === "gm_funded" || c.entryFee <= 0
+      ? "Free"
+      : formatVolts(c.entryFee, { symbol: creditSymbol });
+  const prizeArt = suggestedPrizeArt(c.gameKey);
+  const isPrivate = c.visibility === "gm_private";
+  const isGmFunded = c.fundingMode === "gm_funded";
+  const isCubes = prizeArt.includes("prize-cubes");
 
   return (
-    <Link href={`/competitions/${c.competitionId}`} className={CARD} aria-label={`Open ${c.name}`}>
+    <Link
+      href={`/competitions/${c.competitionId}`}
+      className={CARD}
+      aria-label={`Open ${c.name}`}
+    >
       {/*
-        Reason: contest banners are operator artwork with baked-in copy
-        (titles, icons, taglines). A fixed h-20 + object-cover box sliced
-        those off (owner report, overview Suggested for you). Natural height
-        + contain auto-supports whatever ratio the upload is — same fix as
-        GamePageContests.
+        Reason: contest banners are operator artwork with baked-in copy.
+        Natural height + contain — same auto-fit as GamePageContests.
       */}
       <div className="relative w-full shrink-0 overflow-hidden bg-gradient-to-br from-sky-900/40 to-indigo-900/30">
         {c.artSrc ? (
@@ -69,55 +88,147 @@ function SuggestionTile({
           <img
             src={c.artSrc}
             alt=""
-            className="mx-auto block h-auto w-full object-contain object-center opacity-90 transition duration-300 group-hover:scale-105 motion-reduce:transition-none motion-reduce:group-hover:scale-100"
+            className="mx-auto block h-auto w-full object-contain object-center opacity-95 transition duration-300 group-hover:scale-[1.03] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
           />
         ) : (
           <div className="aspect-[16/9]" aria-hidden />
         )}
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#0A0F1F] via-[#0A0F1F]/30 to-transparent" />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#070E1C] via-[#070E1C]/30 to-transparent" />
         <span
           className={`absolute left-2 top-2 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider backdrop-blur-sm ${
             live
               ? "border-emerald-400/60 bg-emerald-500/20 text-emerald-300"
-              : "border-sky-400/50 bg-sky-500/15 text-sky-200"
+              : "border-sky-400/60 bg-sky-500/20 text-sky-100"
           }`}
         >
-          {live && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />}
+          {live ? (
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
+          ) : (
+            <Clock className="h-3 w-3" aria-hidden />
+          )}
           {live ? "Live" : "Upcoming"}
         </span>
-        <span className="absolute right-2 top-2 rounded-full border border-amber-300/50 bg-black/50 px-2 py-0.5 text-[11px] font-bold text-amber-200 backdrop-blur-sm">
+        <span className="absolute right-2 top-2 inline-flex items-center gap-0.5 rounded-full border border-amber-300/60 bg-black/55 px-2 py-0.5 text-[11px] font-bold tabular-nums text-amber-200 backdrop-blur-sm">
           {fee}
         </span>
       </div>
 
-      <div className="flex flex-1 flex-col justify-between gap-2 p-3">
-        <div className="min-w-0">
-          <p className={`${NEON_LABEL} truncate text-sky-300/80`}>{c.gameLabel ?? "Game"}</p>
-          <p className="truncate text-sm font-semibold text-white">{c.name}</p>
+      <div className="flex flex-1 flex-col gap-2.5 p-3">
+        {/*
+          Reason: owner supplied full neon badge plates — screen-blend drops the
+          black export canvas so only the glowing pill remains.
+        */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          {isGmFunded && (
+            <Image
+              src={SUGGESTED_UI_ART.badgeGmFunded}
+              alt="GM Funded"
+              width={118}
+              height={28}
+              className={`h-7 w-auto ${KNOCK_BLACK}`}
+            />
+          )}
+          {isPrivate ? (
+            <Image
+              src={SUGGESTED_UI_ART.badgePrivate}
+              alt="Private"
+              width={100}
+              height={28}
+              className={`h-7 w-auto ${KNOCK_BLACK}`}
+            />
+          ) : (
+            <Image
+              src={SUGGESTED_UI_ART.badgePublic}
+              alt="Public"
+              width={100}
+              height={28}
+              className={`h-7 w-auto ${KNOCK_BLACK}`}
+            />
+          )}
         </div>
-        <div className="flex items-center justify-between gap-2 text-[11px] text-gray-400">
-          <span className="inline-flex items-center gap-1">
-            <Clock className="h-3 w-3 text-sky-400" aria-hidden />
+
+        <div className="min-w-0">
+          <p className="truncate text-[10px] font-bold uppercase tracking-[0.14em] text-sky-300/90">
+            {c.gameLabel ?? "Game"}
+          </p>
+          <p className="mt-0.5 truncate text-sm font-bold leading-snug text-white">
+            {c.name}
+          </p>
+          {c.blurb ? (
+            <p className="mt-1 line-clamp-2 text-[11px] leading-snug text-slate-400">
+              {c.blurb}
+            </p>
+          ) : null}
+        </div>
+
+        {/*
+          Reason: owner — Starts in must not sit in a pill / coloured background.
+          Clock plate is screen-blended so its black canvas vanishes.
+        */}
+        <div className="flex items-center justify-between gap-2 text-[11px] text-sky-200">
+          <span className="inline-flex items-center gap-1.5 tabular-nums">
+            <Image
+              src={SUGGESTED_UI_ART.clock}
+              alt=""
+              width={22}
+              height={22}
+              className={`h-[22px] w-[22px] shrink-0 object-contain ${KNOCK_BLACK}`}
+            />
             {startLabel(c.startTime, c.status, now)}
           </span>
-          <span className="inline-flex items-center gap-1">
-            <Users className="h-3 w-3 text-sky-400" aria-hidden />
+          <span className="inline-flex items-center gap-1.5 tabular-nums">
+            <Image
+              src={SUGGESTED_UI_ART.users}
+              alt=""
+              width={22}
+              height={22}
+              className={`h-[22px] w-[22px] shrink-0 object-contain ${KNOCK_BLACK}`}
+            />
             {seats}
           </span>
         </div>
-        <div className="flex items-center justify-between border-t border-white/5 pt-2">
-          <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-200">
-            <Trophy className="h-3.5 w-3.5 text-amber-300" aria-hidden />
-            {/* Reason: an absent pool is a dash, never 0 - a 0 reads as "nothing to win". */}
-            {c.prizePool && c.prizePool > 0
-              ? formatVolts(c.prizePool, { symbol: creditSymbol })
-              : "-"}
-          </span>
-          <span className="inline-flex items-center gap-1 text-xs font-semibold text-sky-300 transition group-hover:text-sky-200">
-            Join
-            <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" aria-hidden />
-          </span>
+
+        <div
+          className={`relative mt-auto min-h-[78px] overflow-hidden rounded-lg border px-3 py-2.5 ${
+            isCubes
+              ? "border-sky-400/55 shadow-[inset_0_0_20px_rgba(56,189,248,0.12)]"
+              : "border-amber-300/50 shadow-[inset_0_0_20px_rgba(250,204,21,0.1)]"
+          }`}
+        >
+          {/*
+            Reason: owner — backround1/2 sit UNDER the prize amount (right plate),
+            not as a separate card. Text stays above via relative z.
+          */}
+          <Image
+            src={prizeArt}
+            alt=""
+            width={160}
+            height={90}
+            className={`pointer-events-none absolute inset-y-0 right-0 h-full w-[62%] object-contain object-right opacity-95 ${KNOCK_BLACK}`}
+          />
+          <div className="relative z-[1] max-w-[48%]">
+            <p
+              className={`text-[10px] font-bold uppercase tracking-[0.16em] ${
+                isCubes ? "text-sky-300/85" : "text-amber-200/85"
+              }`}
+            >
+              Prize
+            </p>
+            <p className="mt-0.5 text-xl font-extrabold tabular-nums text-white drop-shadow-[0_0_10px_rgba(56,189,248,0.35)]">
+              {c.prizePool && c.prizePool > 0
+                ? formatVolts(c.prizePool, { symbol: creditSymbol })
+                : "-"}
+            </p>
+          </div>
         </div>
+
+        <span className="inline-flex min-h-[42px] w-full items-center justify-center gap-1.5 rounded-full border border-sky-300/80 bg-gradient-to-r from-sky-600/90 via-sky-500/85 to-cyan-400/90 text-sm font-bold text-white shadow-[0_0_22px_-2px_rgba(56,189,248,0.9),inset_0_0_14px_rgba(125,211,252,0.35)] transition group-hover:from-sky-500 group-hover:to-cyan-300">
+          Join
+          <ArrowRight
+            className="h-4 w-4 transition group-hover:translate-x-0.5"
+            aria-hidden
+          />
+        </span>
       </div>
     </Link>
   );
@@ -125,6 +236,7 @@ function SuggestionTile({
 
 /**
  * Contests suggested from games the player has actually played (X11.5).
+ * Layout matches owner Suggested-for-you mock (3 Oct 2026).
  * Never invites anyone - suggestions only (X14).
  */
 export default function GameSuggestionsCard({
@@ -164,7 +276,10 @@ export default function GameSuggestionsCard({
         <div className="mb-3 h-4 w-40 animate-pulse rounded bg-sky-400/10" />
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="h-[220px] animate-pulse rounded-xl border border-sky-400/15 bg-[#0A0F1F]/60" />
+            <div
+              key={i}
+              className="h-[320px] animate-pulse rounded-xl border border-sky-400/15 bg-[#0A0F1F]/60"
+            />
           ))}
         </div>
       </section>
@@ -179,7 +294,9 @@ export default function GameSuggestionsCard({
           <span className="flex h-11 w-11 items-center justify-center rounded-full border border-sky-400/40 bg-sky-500/10 shadow-[0_0_14px_-2px_rgba(56,189,248,0.5)]">
             <Gamepad2 className="h-5 w-5 text-sky-300" aria-hidden />
           </span>
-          <p className="text-sm font-semibold text-white">No open contests for your games right now</p>
+          <p className="text-sm font-semibold text-white">
+            No open contests for your games right now
+          </p>
           <p className="max-w-sm text-xs text-gray-400">
             We will suggest contests here as soon as one opens for a game you play.
           </p>
@@ -197,7 +314,7 @@ export default function GameSuggestionsCard({
 
   return (
     <section aria-labelledby="suggested-heading" className={SECTION_FRAME}>
-      <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+      <div className="mb-1 flex flex-wrap items-end justify-between gap-2">
         <div className="flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-sky-400" aria-hidden />
           <h2 id="suggested-heading" className={NEON_HEADING}>
@@ -212,10 +329,17 @@ export default function GameSuggestionsCard({
           <ArrowRight className="h-3.5 w-3.5" aria-hidden />
         </Link>
       </div>
-      <p className="mb-3 text-xs text-gray-400">Open contests for the games you play.</p>
+      <p className="mb-3 text-xs text-gray-400">
+        Open contests for the games you play.
+      </p>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {contests.map((c) => (
-          <SuggestionTile key={c.competitionId} c={c} creditSymbol={creditSymbol} now={now} />
+          <SuggestionTile
+            key={c.competitionId}
+            c={c}
+            creditSymbol={creditSymbol}
+            now={now}
+          />
         ))}
       </div>
     </section>

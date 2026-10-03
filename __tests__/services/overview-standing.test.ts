@@ -798,6 +798,46 @@ describe("Overview streaks chrome", () => {
     expect(suggestions).not.toMatch(/object-cover/);
   });
 
+  it("Suggested for you prize graphics sit under the amount; Starts in has no pill background", () => {
+    // Reason: owner 3 Oct 2026 — match Suggested mock; backround1/2 under prize;
+    // Starts in must be plain text (no badge chrome). Clock/users plates
+    // screen-blend so the black export canvas does not paint a box.
+    const suggestions = readFileSync(
+      join(ROOT, "components/dashboard/GameSuggestionsCard.tsx"),
+      "utf8",
+    )
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    const assets = readFileSync(
+      join(ROOT, "lib/services/games/overview-assets.ts"),
+      "utf8",
+    )
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    expect(assets).toMatch(/SUGGESTED_PRIZE_ART/);
+    expect(assets).toMatch(/SUGGESTED_UI_ART/);
+    expect(assets).toMatch(/prize-trophy\.jpg/);
+    expect(assets).toMatch(/prize-cubes\.png/);
+    expect(assets).toMatch(/icon-clock\.jpg/);
+    expect(suggestions).toMatch(/suggestedPrizeArt/);
+    expect(suggestions).toMatch(/SUGGESTED_UI_ART\.clock/);
+    expect(suggestions).toMatch(/mix-blend-screen/);
+    expect(suggestions).toMatch(/Starts in/);
+    // Prize plate uses the shared art helper; Join is a real CTA button strip.
+    expect(suggestions).toMatch(/>\s*Join\s*</);
+    // Starts-in row: call site (not the helper def) — clock + text, no pill chrome.
+    const callIdx = suggestions.lastIndexOf("startLabel(c.startTime");
+    expect(callIdx).toBeGreaterThan(-1);
+    const startSpan = suggestions.slice(
+      suggestions.lastIndexOf("<span", callIdx),
+      suggestions.indexOf("</span>", callIdx) + 7,
+    );
+    expect(startSpan).toMatch(/startLabel\(c\.startTime/);
+    expect(startSpan).toMatch(/SUGGESTED_UI_ART\.clock/);
+    expect(startSpan).not.toMatch(/rounded-full/);
+    expect(startSpan).not.toMatch(/bg-/);
+  });
+
   it("Play by Game caption distinguishes discovery from most-played", () => {
     const ui = readFileSync(
       join(ROOT, "components/dashboard/overview/OverviewPlayByGame.tsx"),

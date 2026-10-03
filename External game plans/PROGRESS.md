@@ -923,6 +923,20 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 3 October 2026 - Suggested for you matches owner mock (prize plates + neon badges)
+
+**Owner:** recreate Overview Suggested for you to match the attached mock;
+backround1 (trophy) and backround2 (cubes) sit under the prize amount; Starts in
+clock must not have a background plate.
+
+**Built (main app only).**
+- Assets under `public/assets/neon/overview/suggested/` — prize plates, GM/Private/
+  Public badge plates, clock + users icons.
+- `GameSuggestionsCard` — neon section/cards, screen-blended badge/icon plates
+  (black export canvas knocked out), prize art under amount, Starts in plain
+  (no pill/`bg-`), neon Join CTA.
+- Guard extended in `overview-standing.test.ts`. **Never verified by eye.**
+
 ### 3 October 2026 - Mobile Wallet Analytics rebuild + Overview Quick Access
 
 **Owner:** (1) commit/push prior Wallet glow work first; (2) mobile Overview Quick
@@ -959,6 +973,23 @@ opaque cards, charts without glow.
 - Balance trend: stronger gold fill, SVG glow filter, visible dots. Breakdown /
   flow bars and the donut get drop-shadow glow.
 - Tests flipped in `wallet-analytics.test.ts`. **Never verified by eye.**
+
+### 3 October 2026 - Overview Suggested for you matches mock (prize art + plain Starts in)
+
+**Owner request:** recreate "Suggested for you" to match the attached mock —
+Public / GM Funded badges, blurb, prize plate with graphics **under** the amount,
+Join CTA; **"Starts in" must have no pill / coloured background**.
+
+**Built (main app only):**
+- Assets: `public/assets/neon/overview/suggested/prize-trophy.jpg` (backround1) and
+  `prize-cubes.png` (backround2), registered in `SUGGESTED_PRIZE_ART` /
+  `suggestedPrizeArt()` in `overview-assets.ts` (cubes for stack titles, trophy default).
+- `GameSuggestionsCard` layout: badge row, title + blurb, plain Starts-in + seats
+  (clock icon, no `rounded-full` / `bg-*` on that span), prize box with art under
+  the amount, solid Join strip.
+- `suggestOpenContests` also returns `blurb`, `visibility`, `fundingMode`.
+- Guards in `overview-standing.test.ts` (banner contain + prize/Starts-in).
+  **Never verified by eye** (behind sign-in).
 
 ### 3 October 2026 - Overview Suggested for you banners no longer cropped
 
