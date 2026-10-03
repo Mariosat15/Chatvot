@@ -931,6 +931,18 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 3 October 2026 - `/games` cards: artwork fills the card left to right
+
+Owner: "image must fill the space left right". The two-layer cover (blurred fill under a
+centred `object-contain` copy) left dim side strips, because uploaded game art measures about
+1.35:1 while the box was 16/8.5 (1.88:1). `GameCatalogueCard.tsx` now uses a **16/11** box
+(1.45:1), between the uploads and the built-in banners (1.5-1.78:1, measured with sharp), and
+draws the artwork once with `object-cover object-center`. The crop is small and lands on the
+edges: about 3% top and bottom of an upload, about 10% each side of a 16:9 banner. The
+centred logo stays inside. The blurred backdrop was deleted as redundant. Cards are taller
+but still all the same height. The test in `games-catalogue-routes.test.ts` was flipped, not
+deleted. **Never verified by eye.**
+
 ### 3 October 2026 - Suggested for You: logo always whole, owner's high-res badges and Join
 
 **Owner:** the cover logos must always show, centred. Use the supplied Join,

@@ -69,25 +69,21 @@ describe("games catalogue routes", () => {
     expect(card).toMatch(/line-clamp-2/);
   });
 
-  it("catalogue card artwork fills the area AND is never cropped (blurred cover backdrop + contain)", () => {
+  it("catalogue card artwork fills the card edge to edge in a box shaped like the art", () => {
     const card = readCode(CARD);
-    // Reason (history): until 28 Sep 2026 this asserted object-contain alone, which
-    // left empty letterbox bands; then cover alone, which sliced the banners' own
-    // text (owner, 3 Oct 2026: images must always be centred and display correctly
-    // whatever their shape). Flipped, not deleted: both failures stay pinned.
-    // The shared aspect still keeps every card the same height.
-    expect(card).toMatch(/aspect-\[16\/8\.5\]/);
+    // Reason (history): until 28 Sep 2026 this asserted object-contain alone (empty
+    // bands); then cover in a 16/8.5 box, which sliced the banners' own text; then a
+    // blurred cover backdrop under contain, which still left side strips (owner,
+    // 3 Oct 2026: "must fill the space left right"). Flipped, not deleted. The box is
+    // now 16/11, between uploaded art (~1.35:1) and built-in banners (1.5-1.78:1), so
+    // cover fills the width and trims only edges, never the centred logo.
+    expect(card).toMatch(/aspect-\[16\/11\]/);
+    expect(card).not.toMatch(/aspect-\[16\/8\.5\]/);
     const images = card.match(/<Image[\s\S]*?\/>/g) ?? [];
-    expect(images).toHaveLength(2);
-    const [backdrop, art] = images;
-    // Backdrop: decorative, fills the box, blurred so it reads as glow not content.
-    expect(backdrop).toMatch(/object-cover/);
-    expect(backdrop).toMatch(/blur-/);
-    expect(backdrop).toMatch(/aria-hidden/);
-    expect(backdrop).toMatch(/alt=""/);
-    // Artwork: drawn last (on top), whole, centred.
-    expect(art).toMatch(/object-contain object-center/);
-    expect(art).not.toMatch(/object-cover/);
+    expect(images).toHaveLength(1);
+    const [art] = images;
+    expect(art).toMatch(/object-cover object-center/);
+    expect(art).not.toMatch(/object-contain|blur-/);
     expect(art).toMatch(/alt=\{banner\.alt\}/);
   });
 

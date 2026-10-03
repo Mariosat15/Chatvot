@@ -36,28 +36,20 @@ export function GameCard({ game }: { game: GameCardData }) {
         always match).
       */}
       <article className="flex h-full w-full flex-col overflow-hidden rounded-[18px] border border-[rgba(38,171,255,.30)] bg-[linear-gradient(180deg,rgba(10,23,48,.96),rgba(4,12,29,.98))] shadow-[0_18px_50px_rgba(0,0,0,.35),inset_0_1px_0_rgba(255,255,255,.03)] transition-[transform,border-color,box-shadow] duration-[220ms] ease-out group-hover:-translate-y-1 group-hover:border-[rgba(0,220,255,.8)] group-hover:shadow-[0_18px_50px_rgba(0,0,0,.35),0_0_30px_rgba(0,190,255,.10),inset_0_1px_0_rgba(255,255,255,.03)] motion-reduce:transition-none motion-reduce:group-hover:translate-y-0">
-        <div className="relative aspect-[16/8.5] w-full shrink-0 overflow-hidden bg-[#07101F]">
+        <div className="relative aspect-[16/11] w-full shrink-0 overflow-hidden bg-[#07101F]">
           {/*
-            Reason: banners arrive in any shape (1.5:1 to 3:1 measured, uploads unknown) and the
-            box is 16/8.5. A single fit always loses: contain left empty bands (rejected before
-            28 Sep 2026), cover sliced the banner's own text (owner, 3 Oct 2026). So the same
-            image is drawn twice - a blurred cover copy fills the box, and the full artwork sits
-            on top with contain, centred, never cropped, whatever its shape.
+            Reason: the artwork must fill the card edge to edge (owner, 3 Oct 2026) without
+            slicing its logo. Uploaded game art measures ~1.35:1 and the built-in banners 1.5-1.78:1,
+            so the box is 16/11 (1.45:1), between them: cover then trims only ~3% top and bottom
+            of an upload, or ~10% at each side of a wide banner, all outside the centred logo.
+            The earlier 16/8.5 box needed contain plus a blurred fill, which left side strips.
           */}
-          <Image
-            src={banner.src}
-            alt=""
-            aria-hidden
-            fill
-            sizes="(max-width: 767px) 100vw, (max-width: 1279px) 50vw, 460px"
-            className="scale-110 object-cover object-center opacity-60 blur-xl"
-          />
           <Image
             src={banner.src}
             alt={banner.alt}
             fill
             sizes="(max-width: 767px) 100vw, (max-width: 1279px) 50vw, 460px"
-            className="object-contain object-center transition-transform duration-300 group-hover:scale-[1.03] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
+            className="object-cover object-center transition-transform duration-300 group-hover:scale-[1.03] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
           />
           <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,transparent_60%,rgba(3,10,25,.65))]" />
           {game.category ? (
