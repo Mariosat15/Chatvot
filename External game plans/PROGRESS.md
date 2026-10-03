@@ -929,6 +929,19 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 3 October 2026 - Suggested for You densify to Image 1
+
+**Owner:** Image 1 is the target; Image 2 (tall empty cards, weak badges, framed
+prize art, tiny type) is not acceptable. Do not invent a new structure — match
+Image 1 geometry and hierarchy.
+
+**Built (main app only).**
+- `GameSuggestionsCard` — fixed `16/8.5` cover art; badge row h-8; title hierarchy;
+  meta row; 88px prize strip with absolute right art; gold chrome when
+  `fundingMode === "gm_funded"`; compact Join with `btn-join.jpg` wash.
+- Flipped the natural-height+contain test (that rule produced Image 2).
+- Tests: `overview-standing.test.ts` Suggested cases. **Never verified by eye.**
+
 ### 3 October 2026 - Mobile Overview Quick Actions / Quick Access neon remap
 
 **Owner:** on phone Overview — Deposit→deposit, Withdraw→withdrawal, Compete→Trophy,
