@@ -654,20 +654,25 @@ describe("Overview streaks chrome", () => {
     expect(cardFooter).toMatch(/OVERVIEW_COMPETE_ART\.challenge/);
     expect(cardFooter).toMatch(/OVERVIEW_COMPETE_ART\.matchingCards/);
     expect((cardFooter.match(/\$\{ART_ACTION\}/g) ?? []).length).toBe(2);
-    // Reason: owner, 3 Oct 2026 - both footer buttons must be the same size.
-    // With object-contain, an art draws at full column width only when the box
-    // is no wider (relative to its height) than the art itself. Read both PNG
-    // headers so a replacement art with a taller shape fails here, not on screen.
+    // Reason: owner, 3 Oct 2026 - both footer buttons must be the same size
+    // (height AND width) and a bit smaller than the column. Flipped from the
+    // first version, which only proved equal width: read both PNG headers and
+    // require identical dimensions whose shape is exactly the box's, so a
+    // replacement art that is not run through fit-button-pair.mjs fails here.
     const artAction = compete.match(/const ART_ACTION =\s*`([^`]*)`/)?.[1] ?? "";
     expect(artAction).not.toMatch(/\bh-\d/);
+    expect(artAction).not.toMatch(/\bw-full\b/);
+    expect(artAction).toMatch(/\bmx-auto\b/);
     const aspect = artAction.match(/aspect-\[(\d+)\/(\d+)\]/);
     expect(aspect).not.toBeNull();
-    const boxRatio = Number(aspect![1]) / Number(aspect![2]);
-    for (const src of [OVERVIEW_COMPETE_ART.challenge, OVERVIEW_COMPETE_ART.matchingCards]) {
-      const png = readFileSync(join(process.cwd(), "public", src));
-      const artRatio = png.readUInt32BE(16) / png.readUInt32BE(20);
-      expect(boxRatio).toBeLessThanOrEqual(artRatio);
-    }
+    const dims = [OVERVIEW_COMPETE_ART.challenge, OVERVIEW_COMPETE_ART.matchingCards].map(
+      (src) => {
+        const png = readFileSync(join(process.cwd(), "public", src));
+        return [png.readUInt32BE(16), png.readUInt32BE(20)];
+      },
+    );
+    expect(dims[0]).toEqual(dims[1]);
+    expect(dims[0]).toEqual([Number(aspect![1]), Number(aspect![2])]);
     // Reason: header Matching Cards survives only for the empty state.
     expect(compete).toMatch(
       /matches\.length === 0 && !loading && \([\s\S]*?MATCHING_CARDS_HREF/,
@@ -701,8 +706,9 @@ describe("Overview streaks chrome", () => {
     }
     expect(assets).toMatch(/OVERVIEW_COMPETE_ART/);
     // Reason: owner's high-res replacements, 3 Oct 2026 - renamed so caches drop the old art.
-    expect(assets).toMatch(/btn-matching-cards-hr\.png/);
-    expect(assets).toMatch(/btn-challenge-v2\.png/);
+    // Flipped 3 Oct 2026: v3 = both arts fitted to one shared canvas.
+    expect(assets).toMatch(/btn-matching-cards-v3\.png/);
+    expect(assets).toMatch(/btn-challenge-v3\.png/);
     expect(assets).toMatch(/btn-view-leaderboard-hr\.png/);
     expect(assets).toMatch(/icon-swords\.png/);
     expect(client).toMatch(/get\("view"\)\s*===\s*"cards"/);

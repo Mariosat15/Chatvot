@@ -1,7 +1,7 @@
 /**
  * Overview neon asset map.
  *
- * Play-card art FALLBACK only — Overview prefers `bannerUrl` / `thumbnailUrl`
+ * Play-card art FALLBACK only â€” Overview prefers `bannerUrl` / `thumbnailUrl`
  * from the catalogue (same source as `/games` cards). These keyed neon plates
  * cover titles that have no admin artwork yet. Unknown codes fall through to
  * the generic trophy. Do not enumerate games for stats here (R29).
@@ -9,7 +9,7 @@
  * KPI / Progress / Mission icons are owner neon tiles from `ui/items`
  * (29 Sep 2026). Global Rank plates live under `ranks/` (from `ui/Rank`).
  * Level plates are stored under `levels/` (from `ui/levels`) for later screens
- * — Overview must not use them for Global Rank.
+ * â€” Overview must not use them for Global Rank.
  */
 
 import { overviewRankSrc, OVERVIEW_RANK_TOP_N } from "@/lib/utils/overview-rank-badge";
@@ -29,12 +29,12 @@ export const OVERVIEW_ICON_ART = {
   target: "/assets/neon/overview/items/icon-target.png",
   growth: "/assets/neon/overview/items/icon-growth.png",
   trophy: "/assets/neon/overview/items/icon-trophy.png",
-  /** Calendar glass tile — Recent Activity header (transparent, 29 Sep 2026). */
+  /** Calendar glass tile â€” Recent Activity header (transparent, 29 Sep 2026). */
   activity: "/assets/neon/overview/items/icon-activity-calendar.png",
   /** Neon glass trophy for activity rows (transparent, 29 Sep 2026). */
   trophyGlass: "/assets/neon/overview/items/icon-trophy-glass.png",
   /**
-   * Owner neon plates (3 Oct 2026) — black export canvases; knock out with
+   * Owner neon plates (3 Oct 2026) â€” black export canvases; knock out with
    * `mix-blend-screen` at the call site (same as Suggested badge plates).
    */
   wallet: "/assets/neon/overview/items/icon-wallet.jpg",
@@ -48,7 +48,7 @@ export const OVERVIEW_ICON_ART = {
 } as const;
 
 /**
- * Compete chrome — owner plates with keyed black backgrounds.
+ * Compete chrome â€” owner plates with keyed black backgrounds.
  * Buttons already carry their own label art.
  */
 export const OVERVIEW_COMPETE_ART = {
@@ -61,12 +61,12 @@ export const OVERVIEW_COMPETE_ART = {
   avatarRing: "/assets/neon/overview/compete/avatar-ring.png",
   // Owner's high-resolution replacements (3 Oct 2026), keyed transparent by
   // tools/overview/key-out-black.mjs. New filenames so browsers drop the old art.
-  matchingCards: "/assets/neon/overview/compete/btn-matching-cards-hr.png",
-  challenge: "/assets/neon/overview/compete/btn-challenge-v2.png",
+  matchingCards: "/assets/neon/overview/compete/btn-matching-cards-v3.png",
+  challenge: "/assets/neon/overview/compete/btn-challenge-v3.png",
   viewLeaderboard: "/assets/neon/overview/compete/btn-view-leaderboard-hr.png",
 } as const;
 
-/** KPI plate art — wallet / chart2 / chart / trophy (owner 3 Oct 2026). */
+/** KPI plate art â€” wallet / chart2 / chart / trophy (owner 3 Oct 2026). */
 export const OVERVIEW_KPI_ART = {
   credits: OVERVIEW_ICON_ART.wallet,
   winRate: OVERVIEW_ICON_ART.chart2,
@@ -75,7 +75,7 @@ export const OVERVIEW_KPI_ART = {
 } as const;
 
 /**
- * Streak tile icons — contest-shaped labels (owner 3 Oct 2026).
+ * Streak tile icons â€” contest-shaped labels (owner 3 Oct 2026).
  * Header uses `OVERVIEW_ICON_ART.fire` separately.
  */
 export const OVERVIEW_STREAK_ART = {
@@ -88,7 +88,7 @@ export const OVERVIEW_STREAK_ART = {
 } as const;
 
 /**
- * Owner `ui/match/uper` HUD plates (29 Sep 2026) — kept on disk for reference.
+ * Owner `ui/match/uper` HUD plates (29 Sep 2026) â€” kept on disk for reference.
  * The live Header does **not** mount these: owner rejected both five floating
  * plates and the shared-frame reading, and asked to keep the Lucide gold-pill
  * strip. Still listed in the asset inventory so a missing file fails the suite.
@@ -103,7 +103,7 @@ export const OVERVIEW_NAV_TAB_ART = {
 } as const;
 
 /**
- * Mobile Overview art — owner neon plates (3 Oct 2026).
+ * Mobile Overview art â€” owner neon plates (3 Oct 2026).
  * Quick Actions / Quick Access / Wallet card all share these paths so a
  * remapped glyph cannot drift between tiles. Black canvases knock out with
  * `mix-blend-screen` at the call site.
@@ -111,9 +111,9 @@ export const OVERVIEW_NAV_TAB_ART = {
 export const MOBILE_OVERVIEW_ART = {
   deposit: "/assets/neon/wallet/icon-deposit.jpg",
   withdraw: "/assets/neon/wallet/icon-withdrawal.jpg",
-  /** Compete — trophy plate (replaces old compete.webp). */
+  /** Compete â€” trophy plate (replaces old compete.webp). */
   compete: "/assets/neon/wallet/icon-trophy.jpg",
-  /** Play — games controller plate. */
+  /** Play â€” games controller plate. */
   play: "/assets/neon/wallet/icon-games.jpg",
   /** Wallet / Volts hero label. */
   volt: "/assets/neon/wallet/icon-wallet.jpg",
