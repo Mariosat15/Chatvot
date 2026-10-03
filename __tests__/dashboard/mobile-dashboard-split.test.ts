@@ -92,15 +92,24 @@ describe("mobile dashboard split", () => {
     expect(read("components/Header.tsx")).not.toMatch(/MobileTabStrip/);
   });
 
-  it("Quick access is All Competitions / Profile / 1v1 / Marketplace, not split by game", () => {
-    // Reason: owner, 29 Sep 2026 - one competitions tile for every game, Profile in
-    // the slot the removed bottom nav used to carry.
+  it("Quick access is Wallet Analytics / Performance / Tutorials / Marketplace", () => {
+    // Reason: flipped 3 Oct 2026 — owner replaced competitions/profile/1v1 with
+    // the three dashboard tabs phones otherwise bury; Marketplace stays.
     const code = read("components/dashboard/mobile/MobileActions.tsx");
     const block = code.slice(code.indexOf("const QUICK_ACCESS"), code.indexOf("export function MobileQuickAccess"));
     expect(block.length).toBeGreaterThan(40);
     const labels = [...block.matchAll(/label:\s*"([^"]+)"/g)].map((m) => m[1]);
-    expect(labels).toEqual(["All Competitions", "Profile", "1v1 Challenges", "Marketplace"]);
-    expect(block).toMatch(/label: "Profile", href: "\/profile"/);
+    expect(labels).toEqual([
+      "Wallet Analytics",
+      "Performance",
+      "Tutorials",
+      "Marketplace",
+    ]);
+    expect(block).toMatch(/\/dashboard\?tab=wallet/);
+    expect(block).toMatch(/\/dashboard\?tab=performance/);
+    expect(block).toMatch(/\/dashboard\?tab=tutorials/);
+    expect(block).toMatch(/\/marketplace/);
+    expect(block).not.toMatch(/\/competitions"|\/profile"|\/challenges"/);
     expect(code).not.toMatch(/Trading Competitions|Game Competitions|tradingEnabled/);
   });
 

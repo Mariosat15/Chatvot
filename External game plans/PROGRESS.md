@@ -324,6 +324,7 @@ project low risk.
 
 This plan has two tracks. **As of 30 September 2026**:
 
+- **Mobile Wallet Analytics + Quick Access CODE-COMPLETE 3 Oct (eng)** — dedicated `MobileWallet` tree below `md` (not a shrunk desktop); shared `useWalletAnalyticsModel`; Deposit/Withdraw → `/wallet`; recent txns via `getWalletTransactions(5)`. Overview Quick Access = Wallet Analytics / Performance / Tutorials / Marketplace. Desktop `DesktopWalletAnalytics` unchanged. Tests: `wallet-analytics.test.ts` + `mobile-dashboard-split.test.ts`. **Never verified by eye.**
 - **Wallet Analytics REBUILT 30 Sep (eng)** — first pass rejected; page rebuilt to `Rebuil Wallet Analitics.md` + reference mock (compact header, Lucide KPI chips, Recharts panels, one global 30d range, 7 insight cards). See `13` **s5.1h**. Tests: `wallet-analytics.test.ts` (8). **Never verified by eye.**
 - **Wallet Analytics CODE-COMPLETE 30 Sep (eng)** — first ship (superseded same day by rebuild above — correct as history). Header label **"Wallet Analytics"** (`tab` id still `wallet`).
 - **Neon Overview redesign CODE-COMPLETE 29 Sep (eng)** — Header **nav-only**; Global Rank from **`ui/Rank`**; Play by Game top 4 / discovery; Account Status thin expandable bar; KPI icons **`h-14` + scale-1.08 contain (crisp)**; Activity **calendar glass** header + trophy-glass rows; Player Progress = **3** active missions (**2+1** grid) + **milestone tile strip** (stars/locks) + cyan **View Leaderboard** + gold **View All Missions** pill + rounded XP % + **Required badge** footer — ring + recent-badges strip removed from this panel (owner mockup, later 29 Sep); **Compete** neon plates (swords / Matching Cards / Challenge / avatar ring); ⚡ on credits; hero height-capped **`hero-banner-elements.jpg`**. See `13` **s5.1g**. Tests: `overview-standing.test.ts`. **Phones get their own tree** since later 29 Sep (`13` **s5.1g-m**): `MobileDashboard` below `md`, five-tab bottom nav, desktop untouched. **Never verified by eye.**
@@ -921,6 +922,25 @@ remains outstanding is the **opponent** half listed above, not the game half.
 ## WORK LOG
 
 Newest at the top.
+
+### 3 October 2026 - Mobile Wallet Analytics rebuild + Overview Quick Access
+
+**Owner:** (1) commit/push prior Wallet glow work first; (2) mobile Overview Quick
+Access → Wallet Analytics / Performance / Tutorials (keep Marketplace); (3) rebuild
+mobile Wallet per `REBUILD CHARTVOLT WALLET PAGE FOR MOBILE.md` — dedicated phone
+layout, desktop unchanged, shared data.
+
+**Built (main app only).**
+- Quick Access tiles in `MobileActions.tsx` (2×2 dashboard destinations).
+- `useWalletAnalyticsModel` — one period drives every panel; desktop and mobile
+  each call it (no shared layout).
+- `DesktopWalletAnalytics` — previous desktop tree, gated `hidden md:block`.
+- `mobile/MobileWallet` + sections: header, balance hero, Deposit/Withdraw,
+  2×2 overview, trend, money in/out bars, daily flow, swipe insights, recent
+  five transactions (`getWalletTransactions(5)`). Shell: `block md:hidden`.
+- Tests updated in `wallet-analytics.test.ts` and `mobile-dashboard-split.test.ts`.
+  **Never verified by eye** (behind sign-in). Transaction detail bottom sheet
+  and available/pending row deferred (no pending balance field on overview).
 
 ### 3 October 2026 - Wallet Analytics matches Overview glow (backdrop + neon tiles)
 

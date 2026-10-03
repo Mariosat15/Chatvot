@@ -63,8 +63,23 @@ describe("Wallet Analytics page wiring", () => {
     expect(layout).not.toMatch(/from ["']\.\/HeroStatsBar["']/);
   });
 
+  it("shell splits desktop and mobile trees without shrinking desktop into a phone", () => {
+    const shell = readCode("components/dashboard/wallet/WalletAnalytics.tsx");
+    expect(shell).toMatch(/hidden md:block/);
+    expect(shell).toMatch(/block md:hidden/);
+    expect(shell).toMatch(/DesktopWalletAnalytics/);
+    expect(shell).toMatch(/MobileWallet/);
+    expect(shell).not.toMatch(/circuit-sprint|circuit-perfect|gameCode|providerKey/);
+  });
+
   it("composes the reference sections in order without enumerating game codes", () => {
-    const page = readCode("components/dashboard/wallet/WalletAnalytics.tsx");
+    // Reason: desktop layout moved to DesktopWalletAnalytics; math lives in the model.
+    const page = readCode(
+      "components/dashboard/wallet/DesktopWalletAnalytics.tsx",
+    );
+    const model = readCode(
+      "components/dashboard/wallet/useWalletAnalyticsModel.ts",
+    );
     expect(page).toMatch(/WalletBackdrop/);
     expect(page).toMatch(/WalletAnalyticsHeader/);
     expect(page).toMatch(/WalletKpiGrid/);
@@ -74,7 +89,7 @@ describe("Wallet Analytics page wiring", () => {
     expect(page).toMatch(/SpendingVsEarnings/);
     expect(page).toMatch(/WalletInsights/);
     // Reason: one global period — not independent chip state per panel.
-    expect(page).toMatch(/useState<WalletRange>\("30d"\)/);
+    expect(model).toMatch(/useState<WalletRange>\("30d"\)/);
     expect(page).not.toMatch(/circuit-sprint|circuit-perfect|gameCode|providerKey/);
 
     // Order in the return tree (imports would reverse Backdrop vs Header).
@@ -90,7 +105,9 @@ describe("Wallet Analytics page wiring", () => {
 
   it("insights strip has seven cards including Prizes Won and links to /wallet", () => {
     const insights = readCode("components/dashboard/wallet/WalletInsights.tsx");
-    const page = readCode("components/dashboard/wallet/WalletAnalytics.tsx");
+    const model = readCode(
+      "components/dashboard/wallet/useWalletAnalyticsModel.ts",
+    );
     expect(insights).toMatch(/View All Transactions/);
     const hrefIdx = insights.lastIndexOf(
       "href=",
@@ -99,10 +116,10 @@ describe("Wallet Analytics page wiring", () => {
     expect(insights.slice(hrefIdx, insights.indexOf("View All Transactions"))).toMatch(
       /href=["']\/wallet["']/,
     );
-    // Reason: labels live on the orchestrator; the strip only renders item.label.
-    expect(page).toMatch(/label:\s*"Deposits"/);
-    expect(page).toMatch(/label:\s*"Prizes Won"/);
-    expect(page).toMatch(/label:\s*"Net Movement"/);
+    // Reason: labels live on the shared model; the strip only renders item.label.
+    expect(model).toMatch(/label:\s*"Deposits"/);
+    expect(model).toMatch(/label:\s*"Prizes Won"/);
+    expect(model).toMatch(/label:\s*"Net Movement"/);
     const keys = [
       "deposits",
       "withdrawals",
@@ -126,7 +143,9 @@ describe("Wallet Analytics page wiring", () => {
       "components/dashboard/wallet/WalletAnalyticsHeader.tsx",
     );
     const backdrop = readCode("components/dashboard/wallet/WalletBackdrop.tsx");
-    const page = readCode("components/dashboard/wallet/WalletAnalytics.tsx");
+    const model = readCode(
+      "components/dashboard/wallet/useWalletAnalyticsModel.ts",
+    );
     expect(kpi).toMatch(/WALLET_ART/);
     expect(kpi).toMatch(/WalletNeonIcon/);
     expect(kpi).toMatch(/object-contain/);
@@ -138,10 +157,43 @@ describe("Wallet Analytics page wiring", () => {
     expect(header).toMatch(/WalletNeonIcon/);
     expect(backdrop).toMatch(/WALLET_ART\.backdrop/);
     expect(backdrop).toMatch(/object-cover/);
-    expect(page).toMatch(/label:\s*"Credit Balance"/);
-    expect(page).toMatch(/label:\s*"Total Spend"/);
-    expect(page).toMatch(/label:\s*"Game Earnings"/);
-    expect(page).toMatch(/label:\s*"Prizes Won"/);
+    expect(model).toMatch(/label:\s*"Credit Balance"/);
+    expect(model).toMatch(/label:\s*"Total Spend"/);
+    expect(model).toMatch(/label:\s*"Game Earnings"/);
+    expect(model).toMatch(/label:\s*"Prizes Won"/);
+  });
+
+  it("mobile wallet is a dedicated tree with Deposit/Withdraw and shared model", () => {
+    const mobile = readCode(
+      "components/dashboard/wallet/mobile/MobileWallet.tsx",
+    );
+    const actions = readCode(
+      "components/dashboard/wallet/mobile/MobileWalletActions.tsx",
+    );
+    const ret = mobile.slice(mobile.lastIndexOf("return ("));
+    const idx = (s: string) => ret.indexOf(s);
+    expect(idx("<MobileWalletHeader")).toBeLessThan(
+      idx("<MobileWalletBalanceCard"),
+    );
+    expect(idx("<MobileWalletBalanceCard")).toBeLessThan(
+      idx("<MobileWalletActions"),
+    );
+    expect(idx("<MobileWalletActions")).toBeLessThan(
+      idx("<MobileWalletOverview"),
+    );
+    expect(idx("<MobileWalletOverview")).toBeLessThan(idx("<MobileWalletTrend"));
+    expect(idx("<MobileWalletTrend")).toBeLessThan(idx("<MobileMoneyInOut"));
+    expect(idx("<MobileMoneyInOut")).toBeLessThan(idx("<MobileDailyFlow"));
+    expect(idx("<MobileDailyFlow")).toBeLessThan(idx("<MobileWalletInsights"));
+    expect(idx("<MobileWalletInsights")).toBeLessThan(
+      idx("<MobileRecentTransactions"),
+    );
+    expect(mobile).toMatch(/useWalletAnalyticsModel/);
+    expect(actions).toMatch(/Deposit/);
+    expect(actions).toMatch(/Withdraw/);
+    expect(actions).toMatch(/href=["']\/wallet["']/);
+    // Reason: must not pull the desktop grid into the phone tree.
+    expect(mobile).not.toMatch(/WalletKpiGrid|CreditBreakdownPanel|WalletBackdrop/);
   });
 
   it("chart panels carry the reference subtitles", () => {

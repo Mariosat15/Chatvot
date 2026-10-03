@@ -4,7 +4,6 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   MOBILE_OVERVIEW_ART,
-  OVERVIEW_COMPETE_ART,
   OVERVIEW_ICON_ART,
 } from "@/lib/services/games/overview-assets";
 import MobileSection, { MOBILE_CARD } from "./MobileSection";
@@ -56,15 +55,35 @@ export function MobileQuickActions() {
 }
 
 /**
- * Quick Access 2x2. Reason: owner, 29 Sep 2026 - one "All Competitions" tile
- * (every game lists on `/competitions`), not a trading tile beside a games
- * tile; Profile takes the freed slot now the phone has no bottom nav.
+ * Quick Access 2x2. Reason: owner, 3 Oct 2026 — dashboard destinations that
+ * phones otherwise bury behind the tab strip. Marketplace stays; competitions /
+ * profile / 1v1 already have other entry points.
  */
 const QUICK_ACCESS: Tile[] = [
-  { label: "All Competitions", href: "/competitions", art: OVERVIEW_ICON_ART.trophy, tone: "border-cyan-400/45 text-cyan-100" },
-  { label: "Profile", href: "/profile", art: OVERVIEW_COMPETE_ART.avatarRing, tone: "border-orange-400/45 text-orange-100" },
-  { label: "1v1 Challenges", href: "/challenges", art: OVERVIEW_COMPETE_ART.swords, tone: "border-violet-400/45 text-violet-100" },
-  { label: "Marketplace", href: "/marketplace", art: MOBILE_OVERVIEW_ART.gift, tone: "border-amber-400/45 text-amber-100" },
+  {
+    label: "Wallet Analytics",
+    href: "/dashboard?tab=wallet",
+    art: MOBILE_OVERVIEW_ART.walletChart,
+    tone: "border-cyan-400/45 text-cyan-100",
+  },
+  {
+    label: "Performance",
+    href: "/dashboard?tab=performance",
+    art: OVERVIEW_ICON_ART.growth,
+    tone: "border-violet-400/45 text-violet-100",
+  },
+  {
+    label: "Tutorials",
+    href: "/dashboard?tab=tutorials",
+    art: OVERVIEW_ICON_ART.target,
+    tone: "border-orange-400/45 text-orange-100",
+  },
+  {
+    label: "Marketplace",
+    href: "/marketplace",
+    art: MOBILE_OVERVIEW_ART.gift,
+    tone: "border-amber-400/45 text-amber-100",
+  },
 ];
 
 export function MobileQuickAccess() {
