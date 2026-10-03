@@ -86,13 +86,15 @@ export default function MobileBalanceCard() {
     >
       <div className="min-w-0 flex-1">
         <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-200/90">
-          <Image
-            src={MOBILE_OVERVIEW_ART.volt}
-            alt=""
-            width={18}
-            height={18}
-            className="h-[18px] w-[18px] object-contain mix-blend-screen"
-          />
+          <span className="relative inline-block h-5 w-5 shrink-0 overflow-hidden bg-transparent">
+            <Image
+              src={MOBILE_OVERVIEW_ART.volt}
+              alt=""
+              fill
+              sizes="20px"
+              className="object-contain mix-blend-screen"
+            />
+          </span>
           Wallet / Volts
         </p>
         <p className="mt-1 truncate text-[28px] font-bold leading-tight tabular-nums text-white">
@@ -130,7 +132,8 @@ export default function MobileBalanceCard() {
           </svg>
         ) : (
           <Image
-            src={MOBILE_OVERVIEW_ART.walletChart}
+            // Reason: empty sparkline fallback is a chart glyph, never the wallet plate.
+            src={MOBILE_OVERVIEW_ART.performance}
             alt=""
             fill
             sizes="96px"

@@ -325,7 +325,8 @@ project low risk.
 This plan has two tracks. **As of 30 September 2026**:
 
 - **Wallet Analytics neon icon remap CODE-COMPLETE 3 Oct (eng)** — header/insights/trend→wallet; Credit Balance→deposit; Total Spend / Spending vs Earnings / Withdrawals→withdrawal; Game Earnings→games; Prizes Won→trophy; Credit Breakdown→credits; Daily Credit Flow→chart2; Deposits→deposit; Purchases→purch; Bonuses→gift; Net Movement→chart. `WalletNeonIcon` + mobile images use `mix-blend-screen` and `bg-transparent`. Assets under `public/assets/neon/wallet/icon-*`. Desktop + mobile. Tests: `wallet-analytics.test.ts`. **Never verified by eye.**
-- **Mobile Overview icon parity CODE-COMPLETE 3 Oct (eng)** — phone Progress→games, Streaks→fire (shared `TILES`), balance/Quick Access wallet plates, Suggested (`GameSuggestionsCard`) mounted on `MobileDashboard`. Same `mix-blend-screen` knock-out as desktop. Tests: `mobile-dashboard-split.test.ts`. **Never verified by eye.**
+- **Mobile Overview Quick Actions / Quick Access neon remap CODE-COMPLETE 3 Oct (eng)** — Deposit→deposit, Withdraw→withdrawal, Compete→trophy, Play→games, Wallet Analytics→wallet, Performance→chart, Tutorials→lamp, Marketplace→purchases, Wallet/Volts→wallet. Shared `ICON_BOX` h-10 + `mix-blend-screen` / `bg-transparent` (no black canvas). Assets under `public/assets/neon/wallet/icon-*` + `overview/items/icon-lamp.jpg`. Tests: `mobile-dashboard-split.test.ts`. **Never verified by eye.**
+- **Mobile Overview icon parity CODE-COMPLETE 3 Oct (eng)** — phone Progress→games, Streaks→fire (shared `TILES`), Suggested (`GameSuggestionsCard`) on `MobileDashboard`. Same blend knock-out as desktop. Tests: `mobile-dashboard-split.test.ts`. **Never verified by eye.**
 - **Overview neon icon remap CODE-COMPLETE 3 Oct (eng)** — Credits→wallet, win rate→chart2, ROI→chart, prizes→trophy; Player Progress→games; Streaks header→fire; streak tiles (best→trophy, wins→chart2, played→games, top3→chart, weeks→calendar); Suggested header→star over prize plates. Black canvases use `mix-blend-screen`. Assets under `public/assets/neon/overview/items/icon-*`. Tests: `overview-standing.test.ts`. **Never verified by eye.**
 - **Suggested for You mock CODE-COMPLETE 3 Oct (eng)** — prize plates under amount, Starts-in plain text, catalogue blurb/visibility/funding badges. Commit `cdb9459c`.
 - **Mobile Wallet Analytics + Quick Access CODE-COMPLETE 3 Oct (eng)** — dedicated `MobileWallet` tree below `md` (not a shrunk desktop); shared `useWalletAnalyticsModel`; Deposit/Withdraw → `/wallet`; recent txns via `getWalletTransactions(5)`. Overview Quick Access = Wallet Analytics / Performance / Tutorials / Marketplace. Desktop `DesktopWalletAnalytics` unchanged. Tests: `wallet-analytics.test.ts` + `mobile-dashboard-split.test.ts`. **Never verified by eye.**
@@ -926,6 +927,19 @@ remains outstanding is the **opponent** half listed above, not the game half.
 ## WORK LOG
 
 Newest at the top.
+
+### 3 October 2026 - Mobile Overview Quick Actions / Quick Access neon remap
+
+**Owner:** on phone Overview — Deposit→deposit, Withdraw→withdrawal, Compete→Trophy,
+Play→games, Wallet Analytics→wallet, Performance→chart, Tutorials→lamp,
+Marketplace→purch (purchases), Wallet/Volts→wallet; no background, same size, crisp.
+
+**Built (main app only).**
+- Freshest plates into `public/assets/neon/wallet/icon-{deposit,withdrawal,trophy,games,wallet,chart,purchases}.jpg`
+  and `public/assets/neon/overview/items/icon-lamp.jpg`.
+- `MOBILE_OVERVIEW_ART` remapped; `MobileActions` shared `ICON_BOX` + screen blend;
+  `MobileBalanceCard` header→wallet, empty sparkline→chart.
+- Tests: `mobile-dashboard-split.test.ts` (14). **Never verified by eye.**
 
 ### 3 October 2026 - Mobile Overview icon parity + Wallet Analytics neon remap
 

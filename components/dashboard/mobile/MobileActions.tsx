@@ -2,10 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import {
-  MOBILE_OVERVIEW_ART,
-  OVERVIEW_ICON_ART,
-} from "@/lib/services/games/overview-assets";
+import { MOBILE_OVERVIEW_ART } from "@/lib/services/games/overview-assets";
 import MobileSection, { MOBILE_CARD } from "./MobileSection";
 
 interface Tile {
@@ -21,25 +18,49 @@ interface Tile {
  * lands on the same screen while promising a different one.
  */
 const QUICK_ACTIONS: Tile[] = [
-  { label: "Deposit", href: "/wallet", art: MOBILE_OVERVIEW_ART.deposit, tone: "border-emerald-400/55 text-emerald-200" },
-  { label: "Withdraw", href: "/wallet", art: MOBILE_OVERVIEW_ART.withdraw, tone: "border-violet-400/55 text-violet-200" },
-  { label: "Compete", href: "/competitions", art: MOBILE_OVERVIEW_ART.compete, tone: "border-amber-400/55 text-amber-200" },
-  { label: "Play", href: "/games", art: MOBILE_OVERVIEW_ART.play, tone: "border-cyan-400/55 text-cyan-200" },
+  {
+    label: "Deposit",
+    href: "/wallet",
+    art: MOBILE_OVERVIEW_ART.deposit,
+    tone: "border-emerald-400/55 text-emerald-200",
+  },
+  {
+    label: "Withdraw",
+    href: "/wallet",
+    art: MOBILE_OVERVIEW_ART.withdraw,
+    tone: "border-violet-400/55 text-violet-200",
+  },
+  {
+    label: "Compete",
+    href: "/competitions",
+    art: MOBILE_OVERVIEW_ART.compete,
+    tone: "border-amber-400/55 text-amber-200",
+  },
+  {
+    label: "Play",
+    href: "/games",
+    art: MOBILE_OVERVIEW_ART.play,
+    tone: "border-cyan-400/55 text-cyan-200",
+  },
 ];
+
+/** Fixed box so every neon plate renders at the same crisp size. */
+const ICON_BOX = "relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-transparent";
 
 function TileLink({ tile, height }: { tile: Tile; height: string }) {
   return (
     <Link
       href={tile.href}
-      className={`${MOBILE_CARD} ${tile.tone} ${height} flex flex-col items-center justify-center gap-1 px-1 active:scale-95 transition-transform`}
+      className={`${MOBILE_CARD} ${tile.tone} ${height} flex flex-col items-center justify-center gap-1.5 px-1 active:scale-95 transition-transform`}
     >
-      <span className="relative h-9 w-9 overflow-hidden rounded-lg bg-transparent">
+      <span className={ICON_BOX}>
         <Image
           src={tile.art}
           alt=""
           fill
-          sizes="36px"
-          className="object-contain mix-blend-screen"
+          sizes="40px"
+          // Reason: contain + no scale-up softens JPG plates; screen knocks black canvas.
+          className="object-contain object-center mix-blend-screen"
         />
       </span>
       <span className="text-center text-[11px] font-semibold leading-tight">
@@ -75,19 +96,19 @@ const QUICK_ACCESS: Tile[] = [
   {
     label: "Performance",
     href: "/dashboard?tab=performance",
-    art: OVERVIEW_ICON_ART.growth,
+    art: MOBILE_OVERVIEW_ART.performance,
     tone: "border-violet-400/45 text-violet-100",
   },
   {
     label: "Tutorials",
     href: "/dashboard?tab=tutorials",
-    art: OVERVIEW_ICON_ART.target,
+    art: MOBILE_OVERVIEW_ART.tutorials,
     tone: "border-orange-400/45 text-orange-100",
   },
   {
     label: "Marketplace",
     href: "/marketplace",
-    art: MOBILE_OVERVIEW_ART.gift,
+    art: MOBILE_OVERVIEW_ART.marketplace,
     tone: "border-amber-400/45 text-amber-100",
   },
 ];

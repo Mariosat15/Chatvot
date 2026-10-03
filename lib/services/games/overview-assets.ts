@@ -101,16 +101,28 @@ export const OVERVIEW_NAV_TAB_ART = {
 } as const;
 
 /**
- * Mobile Overview art — same neon plates as desktop (3 Oct 2026) so phone
- * and desktop never disagree about which glyph means what.
+ * Mobile Overview art — owner neon plates (3 Oct 2026).
+ * Quick Actions / Quick Access / Wallet card all share these paths so a
+ * remapped glyph cannot drift between tiles. Black canvases knock out with
+ * `mix-blend-screen` at the call site.
  */
 export const MOBILE_OVERVIEW_ART = {
   deposit: "/assets/neon/wallet/icon-deposit.jpg",
   withdraw: "/assets/neon/wallet/icon-withdrawal.jpg",
-  compete: "/assets/neon/overview/mobile/action-compete.webp",
-  play: "/assets/neon/overview/mobile/action-play.webp",
-  volt: OVERVIEW_ICON_ART.wallet,
-  walletChart: OVERVIEW_ICON_ART.wallet,
+  /** Compete — trophy plate (replaces old compete.webp). */
+  compete: "/assets/neon/wallet/icon-trophy.jpg",
+  /** Play — games controller plate. */
+  play: "/assets/neon/wallet/icon-games.jpg",
+  /** Wallet / Volts hero label. */
+  volt: "/assets/neon/wallet/icon-wallet.jpg",
+  /** Wallet Analytics Quick Access. */
+  walletChart: "/assets/neon/wallet/icon-wallet.jpg",
+  /** Performance Quick Access. */
+  performance: "/assets/neon/wallet/icon-chart.jpg",
+  /** Tutorials Quick Access. */
+  tutorials: "/assets/neon/overview/items/icon-lamp.jpg",
+  /** Marketplace Quick Access. */
+  marketplace: "/assets/neon/wallet/icon-purchases.jpg",
   star: OVERVIEW_ICON_ART.star,
   gift: "/assets/neon/wallet/icon-gift.jpg",
 } as const;
