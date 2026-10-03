@@ -3241,6 +3241,14 @@ Matching Cards / Challenge lack loom/press/hand, is correct as history
 > directly after Getting Started, on the owner's request. This is a reorder of `MobileDashboard.tsx` only.
 > A document listing it after Featured games is correct as history and stale as a present fact.
 
+> **Amended 3 October 2026 (Upcoming removed + back bar):** `Upcoming competitions` was **removed** from
+> the phone Overview — Suggested for You already lists open contests — and `MobileUpcomingCompetitions.tsx`
+> was deleted. Carousels use `snap-proximity` + `scroll-smooth` + touch momentum (not `snap-mandatory`).
+> Header tabs stay desktop-only on **every** dashboard tab; phones get `MobileDashboardBackBar` →
+> `/dashboard?tab=overview`, and the sidebar Dashboard link pins the same query. A document listing
+> Upcoming on the phone tree, or claiming the Header strip returns on Wallet/Performance/Tutorials, is
+> correct as history only. **Never verified by eye.**
+
 #### 5.1g-m The phone Overview is a second tree - BUILT 29 September 2026
 
 Owner spec `External game plans/Mobile Dashboard` (three-phone reference). **The desktop was
@@ -3252,23 +3260,21 @@ and read the same payload, so the two trees cannot disagree about a figure.
 - **Order on the phone is Wallet, Actions, Games, Progress, Competition** (owner): welcome,
   balance, quick actions + quick access, getting-started, play-by-game carousel, player
   progress, featured games (only when the player has history — otherwise the carousel *is*
-  the featured list), upcoming competitions (one card per swipe), compete (one opponent per
-  swipe), recent activity (4 rows), streaks (2-column grid). Files under
-  `components/dashboard/mobile/`.
+  the featured list), compete (one opponent per swipe), **Suggested for You**, recent activity
+  (4 rows), streaks (2-column grid). Files under `components/dashboard/mobile/`.
+  **Upcoming competitions left the tree on 3 Oct 2026** (Suggested covers it).
 - **A CSS-hidden tree stays mounted**, so every mobile fetch or poll is gated on
   `useOverviewLive("mobile")` or `viewport === "mobile"` — otherwise each dashboard load
   polls matchmaking and presence twice. Pinned by `__tests__/dashboard/mobile-dashboard-split.test.ts`.
 - **R58:** no mobile file imports `overview-standing.service`; types come from
   `overview-types.ts`.
-- **Bottom nav is five tabs** — Home, Games (`terms.games`), Compete, Wallet, Profile — 72px
-  plus `env(safe-area-inset-bottom)`, `min-h-[44px]` targets, cyan glow on the active tab.
-  Compete lights on `/competitions`, `/challenges` and `/leaderboard`. Challenges,
-  Marketplace, Leaderboard and Sign out left the bar for the UserSidebar drawer and Quick
-  Access; two nav tests were **flipped, not deleted**.
-- The Header's phone tab strip is withheld on the Overview only; every other dashboard tab
-  keeps it so a player can get back.
-- Real data only: upcoming competitions are the player's own active/upcoming contests plus
-  `/api/games/suggestions`; a joinable suggestion has no player count and shows `-`.
+- **Bottom nav was removed 29 Sep 2026** — phones use the top logo bar + UserSidebar drawer.
+  A document describing five bottom tabs is correct as history only.
+- The Header tab strip is **desktop-only on every dashboard tab**. Phones get
+  `MobileDashboardBackBar` on Wallet / Performance / Contests / Tutorials, and the drawer
+  Dashboard item opens `/dashboard?tab=overview`.
+- Real data only: Suggested for You reads `/api/games/suggestions`; a joinable suggestion
+  with no player count shows `-`.
 
 **Not built:** there is no games catalogue API, so featured games come from the player's own
 play cards rather than a curated list. **Never verified by eye** — the dashboard is behind

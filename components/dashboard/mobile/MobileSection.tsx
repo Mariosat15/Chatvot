@@ -8,9 +8,13 @@ import { NEON_HEADING } from "@/components/neon/tokens";
 export const MOBILE_CARD =
   "rounded-[18px] border border-[#1E2A4D] bg-[linear-gradient(160deg,rgba(12,22,44,0.92)_0%,rgba(5,10,22,0.96)_100%)]";
 
-/** Horizontal swipe row: snap to each card, no visible scrollbar. */
+/**
+ * Horizontal swipe row — soft snap + momentum scrolling.
+ * Reason: snap-mandatory felt clunky on phones (owner 3 Oct 2026); proximity
+ * + scroll-smooth + touch momentum keeps cards aligned without fighting the finger.
+ */
 export const MOBILE_CAROUSEL =
-  "-mx-3 flex snap-x snap-mandatory scroll-px-3 gap-3 overflow-x-auto px-3 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
+  "-mx-3 flex snap-x snap-proximity scroll-smooth scroll-px-3 gap-3 overflow-x-auto overscroll-x-contain px-3 pb-1 [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [&::-webkit-scrollbar]:hidden";
 
 export default function MobileSection({
   title,

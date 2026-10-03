@@ -324,6 +324,7 @@ project low risk.
 
 This plan has two tracks. **As of 30 September 2026**:
 
+- **Mobile Overview polish CODE-COMPLETE 3 Oct (eng)** — removed Upcoming competitions (Suggested already lists open contests; deleted `MobileUpcomingCompetitions.tsx`); carousels use `snap-proximity` + `scroll-smooth` + touch momentum; drawer scroll smoothed; `MobileDashboardBackBar` on non-overview tabs; sidebar Dashboard → `/dashboard?tab=overview` (with `isActive` stripping the query). Tests: `mobile-dashboard-split.test.ts`. **Never verified by eye.**
 - **Wallet Analytics neon icon remap CODE-COMPLETE 3 Oct (eng)** — header/insights/trend→wallet; Credit Balance→deposit; Total Spend / Spending vs Earnings / Withdrawals→withdrawal; Game Earnings→games; Prizes Won→trophy; Credit Breakdown→credits; Daily Credit Flow→chart2; Deposits→deposit; Purchases→purch; Bonuses→gift; Net Movement→chart. `WalletNeonIcon` + mobile images use `mix-blend-screen` and `bg-transparent`. Assets under `public/assets/neon/wallet/icon-*`. Desktop + mobile. Tests: `wallet-analytics.test.ts`. **Never verified by eye.**
 - **Mobile Overview neon plates refreshed 3 Oct (eng)** — owner re-supplied deposit/withdrawal/trophy/games/wallet/chart/lamp/purchases; files overwritten under `public/assets/neon/wallet/` + `icon-lamp.jpg`. Mapping unchanged (`MOBILE_OVERVIEW_ART` + `ICON_BOX` h-10 + screen blend). **Never verified by eye.**
 - **Suggested for You rebuilt to Image 2 CODE-COMPLETE 3 Oct (eng)** — clean cover (no Upcoming/fee pills); GM/Private/Public badges; full prize-banner background + small trophy icon (not a 42% framed crop); Join plate alone (fixes JJoin); curated `overviewPlayCardArt` covers. Tests: `overview-standing.test.ts`. **Never verified by eye.** The earlier densify-to-Image-1 pass is correct as history only.
@@ -929,6 +930,20 @@ remains outstanding is the **opponent** half listed above, not the game half.
 ## WORK LOG
 
 Newest at the top.
+
+### 3 October 2026 - Mobile Overview polish (Upcoming off, scroll, back bar)
+
+**Owner:** remove Upcoming competitions (Suggested covers it); menu scrolling
+felt clunky; Wallet Analytics / Tutorials / Performance had no way back to
+Overview on phone (Header tabs withheld).
+
+**Built (main app only).**
+- Dropped `MobileUpcomingCompetitions` from `MobileDashboard`; deleted the file.
+- `MOBILE_CAROUSEL` → `snap-proximity` + `scroll-smooth` + touch momentum;
+  sidebar drawer `overscroll-contain` + the same.
+- `MobileDashboardBackBar` on every non-overview dashboard tab (`md:hidden`).
+- Sidebar Dashboard href pinned to `?tab=overview`; `isActive` strips `?…`.
+- Tests flipped/added in `mobile-dashboard-split.test.ts`. **Never verified by eye.**
 
 ### 3 October 2026 - Suggested for You rebuilt to Image 2 (correct target)
 

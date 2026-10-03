@@ -61,7 +61,9 @@ const FRAME_GLOW =
 function buildMainNavItems(terms: TerminologyPack): NavItem[] {
   return [
     {
-      href: "/dashboard",
+      // Reason: bare /dashboard restores the last ?tab= from localStorage, so a
+      // player who left Wallet Analytics would never land on Overview. Always pin it.
+      href: "/dashboard?tab=overview",
       label: "Dashboard",
       icon: <GameIcon name="headset" size={40} className={NAV_ICON} />,
       color: "text-blue-400",
@@ -304,7 +306,9 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
 
   const isActive = (path: string) => {
     if (path === "/") return pathname === "/";
-    return pathname.startsWith(path);
+    // Reason: Dashboard href carries ?tab=overview; pathname has no query string.
+    const pathOnly = path.split("?")[0] || path;
+    return pathname.startsWith(pathOnly);
   };
 
   const handleSignOut = async () => {
@@ -760,7 +764,11 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
           </Button>
         </div>
 
-        <div className="h-[calc(100%-4rem)] overflow-y-auto">
+        {/*
+          Reason: owner 3 Oct 2026 — menu scrolling felt clunky. Touch momentum
+          + contain stops the drawer fighting the page underneath.
+        */}
+        <div className="h-[calc(100%-4rem)] overflow-y-auto overscroll-contain scroll-smooth [-webkit-overflow-scrolling:touch]">
           <SidebarContent />
         </div>
       </aside>

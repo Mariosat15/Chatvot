@@ -14,6 +14,7 @@ import PlayerGamePerformancePanel from "./PlayerGamePerformancePanel";
 import MarketHolidaysCard from "./MarketHolidaysCard";
 import DesktopDashboard from "./desktop/DesktopDashboard";
 import MobileDashboard from "./mobile/MobileDashboard";
+import MobileDashboardBackBar from "./mobile/MobileDashboardBackBar";
 import { DashboardOverviewProvider } from "@/hooks/useDashboardOverview";
 import { DASHBOARD_TABS, type DashboardNavTab } from "@/lib/constants";
 import { useTerms } from "@/contexts/TerminologyContext";
@@ -110,6 +111,12 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
 
   return (
     <div className="w-full overflow-x-hidden">
+      {/*
+        Reason: phones withhold the Header tab strip, so Wallet / Performance /
+        Tutorials / Contests need an explicit path back to Overview.
+      */}
+      {activeTab !== "overview" ? <MobileDashboardBackBar /> : null}
+
       {/*
         Reason: on a phone the Overview opens on the wallet, not a setup
         checklist — the mobile tree mounts the card below Quick Access instead.

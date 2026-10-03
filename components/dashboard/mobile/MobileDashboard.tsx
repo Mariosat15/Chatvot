@@ -7,7 +7,6 @@ import MobileBalanceCard from "./MobileBalanceCard";
 import { MobileQuickActions, MobileQuickAccess } from "./MobileActions";
 import { MobileGameCarousel, MobileFeaturedGames } from "./MobileGames";
 import MobilePlayerProgress from "./MobilePlayerProgress";
-import MobileUpcomingCompetitions from "./MobileUpcomingCompetitions";
 import MobileCompeteCarousel from "./MobileCompeteCarousel";
 import { MobileRecentActivity, MobileStreakGrid } from "./MobileActivityStreaks";
 
@@ -19,6 +18,9 @@ import { MobileRecentActivity, MobileStreakGrid } from "./MobileActivityStreaks"
  * actions that matter on a phone; the desktop order is left untouched.
  * Every section reads `useDashboardOverview()` — the same payload the
  * desktop tree reads — so the two can never show different numbers.
+ *
+ * Upcoming competitions was removed 3 Oct 2026 — Suggested for You already
+ * lists open contests for games the player plays.
  */
 export default function MobileDashboard({
   gettingStarted,
@@ -36,13 +38,11 @@ export default function MobileDashboard({
       <MobileQuickActions />
       <MobileQuickAccess />
       {gettingStarted}
-      {/* Reason: owner, 29 Sep 2026 - what starts soon sits above Play by game. */}
-      <MobileUpcomingCompetitions />
       <MobileGameCarousel />
       <MobilePlayerProgress />
       <MobileFeaturedGames />
       <MobileCompeteCarousel />
-      {/* Reason: same Suggested star header as desktop Overview (owner 3 Oct 2026). */}
+      {/* Reason: open contests live here — not a second Upcoming strip. */}
       <GameSuggestionsCard />
       <MobileRecentActivity />
       <MobileStreakGrid />

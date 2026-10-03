@@ -57,23 +57,53 @@ describe("mobile dashboard split", () => {
     }
   });
 
-  it("mobile order is Wallet, Actions, Games, Progress, Competition", () => {
+  it("mobile order is Wallet, Actions, Games, Progress, Competition — no Upcoming strip", () => {
+    // Reason: flipped 3 Oct 2026 — owner removed Upcoming competitions; Suggested
+    // for You already lists open contests. The orphan component file is deleted.
     const code = read(`${MOBILE_DIR}/MobileDashboard.tsx`);
+    expect(code).not.toMatch(/MobileUpcomingCompetitions/);
+    expect(existsSync(join(ROOT, `${MOBILE_DIR}/MobileUpcomingCompetitions.tsx`))).toBe(
+      false,
+    );
     const order = [
       "<MobileBalanceCard",
       "<MobileQuickActions",
-      // Reason: moved 29 Sep 2026 - owner put Upcoming competitions above Play by game.
-      "<MobileUpcomingCompetitions",
       "<MobileGameCarousel",
       "<MobilePlayerProgress",
       "<MobileCompeteCarousel",
-      // Reason: 3 Oct 2026 — Suggested star header matches desktop Overview.
       "<GameSuggestionsCard",
       "<MobileRecentActivity",
       "<MobileStreakGrid",
     ].map((tag) => code.indexOf(tag));
     for (const idx of order) expect(idx).toBeGreaterThan(-1);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
+  });
+
+  it("phones get a back-to-Overview bar, smooth carousels, and Dashboard opens Overview", () => {
+    // Reason: owner 3 Oct 2026 — Header tabs are withheld on phone, so Wallet /
+    // Performance / Tutorials stranded players; menu scroll felt clunky; bare
+    // /dashboard restored the last tab from localStorage.
+    const layout = read("components/dashboard/DashboardLayout.tsx");
+    expect(layout).toMatch(/MobileDashboardBackBar/);
+    expect(layout).toMatch(
+      /activeTab !== "overview" \? <MobileDashboardBackBar/,
+    );
+    const back = read(`${MOBILE_DIR}/MobileDashboardBackBar.tsx`);
+    expect(back).toMatch(/href="\/dashboard\?tab=overview"/);
+    expect(back).toMatch(/md:hidden/);
+
+    const section = read(`${MOBILE_DIR}/MobileSection.tsx`);
+    expect(section).toMatch(/snap-proximity/);
+    expect(section).toMatch(/scroll-smooth/);
+    expect(section).toMatch(/-webkit-overflow-scrolling:touch/);
+    expect(section).not.toMatch(/snap-mandatory/);
+
+    const sidebar = read("components/UserSidebar.tsx");
+    expect(sidebar).toMatch(/href:\s*"\/dashboard\?tab=overview"/);
+    expect(sidebar).toMatch(/path\.split\("\?"\)/);
+    expect(sidebar).toMatch(
+      /overflow-y-auto overscroll-contain scroll-smooth \[-webkit-overflow-scrolling:touch\]/,
+    );
   });
 
   it("phone Overview section headers share desktop neon plates (games / fire / blend)", () => {
