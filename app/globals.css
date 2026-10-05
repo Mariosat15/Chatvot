@@ -180,6 +180,19 @@
   .auth-card .select-trigger {
     @apply h-11 border-cyan-400/25 bg-[#06101e]/85 text-cyan-50 focus:!border-yellow-400;
   }
+  /* Reason: hide the scrollbar chrome on auth pages while keeping scroll
+     (keyboard + long registration). Nested overflow on the card is banned. */
+  .auth-page-scroll {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  .auth-page-scroll::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
   .auth-layout {
     @apply flex flex-col justify-between lg:flex-row h-screen bg-gray-900 relative overflow-hidden;
   }

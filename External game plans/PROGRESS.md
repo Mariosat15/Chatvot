@@ -322,7 +322,7 @@ project low risk.
 
 ## START HERE NEXT
 
-- **Login / registration look CODE-COMPLETE 5 Oct (eng)** — glass card on full-bleed art matching the owner mockup; Branding slots for sign-in and sign-up backgrounds; Google/Apple buttons are look-only. Tests: `auth-page-look.test.ts`. **Never verified by eye.**
+- **Login / registration mobile + desktop polish CODE-COMPLETE 5 Oct (eng)** — dedicated mobile Sign In + 2-step Register (`md` gate via `AuthViewportSwitch`); desktop mockup unchanged; centered backgrounds; scrollbar chrome hidden; social buttons removed for now; Terms/Privacy are real links; GM `ref` preserved across steps. Spec: `redising login.md`. Tests: `auth-page-look.test.ts`. **Never verified by eye.**
 
 This plan has two tracks. **As of 30 September 2026**:
 
@@ -933,11 +933,21 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 5 October 2026 - Dedicated mobile auth + desktop polish
+
+**Owner instruction:** keep desktop Sign In / Registration look; build separate mobile layouts (not shrunk desktop); 2-step mobile register; center background art; faster Sign In ↔ Sign Up; hide scrollbar; remove Google/Apple for now; Terms/Privacy must link to real pages; preserve GM referral. Spec: `External game plans/redising login.md`.
+
+- **Structure:** `AuthBrandingProvider` in `(auth)/layout`; pages use `AuthViewportSwitch` (769px) so only one tree mounts. Desktop: `DesktopSignIn` / `DesktopRegister` + `DesktopAuthShell`. Mobile: `MobileSignIn` / `MobileRegister` + `MobileAuthShell` (portrait crop + stronger overlay). Shared: `useSignInForm` / `useSignUpForm`.
+- **Mobile register:** Step 1 Account Details → Step 2 Profile & Preferences (interest cards + terms + captcha). Page scrolls; no nested card scrollbar.
+- **Desktop polish:** `object-center` backgrounds; `.auth-page-scroll` hides scrollbar chrome; opposite-page BG prefetch; `AuthTermsAgree` links `/terms` and `/privacy`; social row not rendered.
+- **Referral:** `ref` kept in the hook and on cross-links / post-signup redirect.
+- Tests: `__tests__/auth/auth-page-look.test.ts`. **Never verified by eye.**
+
 ### 5 October 2026 - Login and registration look (Google not wired)
 
 **Owner instruction:** restyle `/sign-in` and `/sign-up` to the two-panel mockup; use the city and arena pictures as backgrounds; add Branding uploads for those two pictures; change the look first; then say in at most three sentences whether Google/Apple login is possible.
 
-- **Look:** `AuthShell` is a full-bleed background + glass card. Sign-in uses the city/trader art; sign-up uses the arena collage. Existing fields, captcha, honeypot and interest radios stayed. Remember-me, forgot-password and the terms tick are UI-only. Google/Apple buttons toast "not enabled yet".
+- **Look:** full-bleed background + glass card (later split into DesktopAuthShell). Sign-in city/trader art; sign-up arena collage. Google/Apple were look-only; **removed from pages later the same day** (see entry above).
 - **Branding:** `authPageSignInImage` / `authPageSignUpImage` on both HeroSettings copies. Branding → Images has two upload cards (10MB). Empty stored paths fall back to `public/assets/auth/sign-in-bg.jpg` and `sign-up-bg.jpg`.
 - **Not built:** Better Auth `socialProviders`. Needs Google/Apple console apps, callback URLs, and env secrets before anyone can actually enter that way.
 - Tests: `__tests__/auth/auth-page-look.test.ts`. **Never verified by eye.**

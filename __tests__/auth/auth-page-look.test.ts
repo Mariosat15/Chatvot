@@ -1,8 +1,8 @@
 /**
- * Login / registration look (5 Oct 2026).
+ * Login / registration look (5 Oct 2026) + dedicated mobile layouts.
  *
- * The mockup is layout only. Forms stay real HTML. Social buttons are look-only
- * until the owner approves OAuth. Empty branding fields fall back to shipped art.
+ * Desktop look stays; mobile is a separate tree behind AuthViewportSwitch.
+ * Social OAuth is intentionally not on the pages (owner: remove for now).
  */
 import { describe, it, expect } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
@@ -40,8 +40,13 @@ describe("auth page look", () => {
     expect(src).toContain("authPageSignUpImage");
     expect(src).toContain("DEFAULT_AUTH_SIGN_IN_BG");
     expect(src).toContain("DEFAULT_AUTH_SIGN_UP_BG");
-    expect(src).toMatch(/heroSettings\?\.authPageSignInImage \|\| DEFAULT_AUTH_SIGN_IN_BG/);
-    expect(src).toMatch(/heroSettings\?\.authPageSignUpImage \|\| DEFAULT_AUTH_SIGN_UP_BG/);
+    expect(src).toMatch(
+      /heroSettings\?\.authPageSignInImage \|\| DEFAULT_AUTH_SIGN_IN_BG/,
+    );
+    expect(src).toMatch(
+      /heroSettings\?\.authPageSignUpImage \|\| DEFAULT_AUTH_SIGN_UP_BG/,
+    );
+    expect(src).toContain("AuthBrandingProvider");
   });
 
   it("both HeroSettings copies declare the two background fields", () => {
@@ -65,14 +70,69 @@ describe("auth page look", () => {
     expect(src).toContain("JSON.stringify(authSettings)");
   });
 
-  it("the glass card wraps the forms and the social row is look-only", () => {
-    const shell = read("components/auth/AuthShell.tsx");
-    const social = stripComments(read("components/auth/AuthSocialRow.tsx"));
+  it("pages split desktop and mobile through AuthViewportSwitch and share hooks", () => {
     const signIn = read("app/(auth)/sign-in/page.tsx");
-    expect(shell).toContain("auth-card");
-    expect(signIn).toContain("AuthSocialRow");
-    expect(social).not.toMatch(/socialProviders|signIn\.social|google\(/i);
-    expect(social).toContain("not enabled yet");
+    const signUp = read("app/(auth)/sign-up/page.tsx");
+    const switchSrc = read("components/auth/AuthViewportSwitch.tsx");
+    expect(signIn).toContain("AuthViewportSwitch");
+    expect(signIn).toContain("DesktopSignIn");
+    expect(signIn).toContain("MobileSignIn");
+    expect(signUp).toContain("DesktopRegister");
+    expect(signUp).toContain("MobileRegister");
+    expect(switchSrc).toContain("min-width: 769px");
+    expect(read("components/auth/desktop/DesktopSignIn.tsx")).toContain(
+      "useSignInForm",
+    );
+    expect(read("components/auth/mobile/MobileSignIn.tsx")).toContain(
+      "useSignInForm",
+    );
+    expect(read("components/auth/desktop/DesktopRegister.tsx")).toContain(
+      "useSignUpForm",
+    );
+    expect(read("components/auth/mobile/MobileRegister.tsx")).toContain(
+      "useSignUpForm",
+    );
+  });
+
+  it("desktop and mobile shells center the background and hide the scrollbar chrome", () => {
+    const desktop = read("components/auth/desktop/DesktopAuthShell.tsx");
+    const mobile = read("components/auth/mobile/MobileAuthShell.tsx");
+    const css = read("app/globals.css");
+    expect(desktop).toContain("object-cover object-center");
+    expect(desktop).toContain("auth-page-scroll");
+    expect(mobile).toContain("auth-page-scroll");
+    expect(mobile).toContain("min-h-dvh");
+    expect(css).toContain(".auth-page-scroll");
+    expect(css).toContain("scrollbar-width: none");
+  });
+
+  it("mobile registration is a two-step one-column flow and terms link to real pages", () => {
+    const mobileReg = read("components/auth/mobile/MobileRegister.tsx");
+    const terms = read("components/auth/AuthTermsAgree.tsx");
+    const hook = read("hooks/useSignUpForm.ts");
+    expect(mobileReg).toContain("goToStep2");
+    expect(mobileReg).toContain("Step {step} of 2");
+    expect(mobileReg).toContain("MobileInterestSelector");
+    expect(mobileReg).not.toMatch(/grid-cols-2/);
+    expect(terms).toContain('href="/terms"');
+    expect(terms).toContain('href="/privacy"');
+    expect(hook).toContain("referralCode");
+    expect(hook).toContain("termsAccepted");
+  });
+
+  it("sign-in and sign-up pages do not render Google/Apple social buttons", () => {
+    const signIn = stripComments(read("app/(auth)/sign-in/page.tsx"));
+    const signUp = stripComments(read("app/(auth)/sign-up/page.tsx"));
+    const desktopIn = stripComments(
+      read("components/auth/desktop/DesktopSignIn.tsx"),
+    );
+    const mobileIn = stripComments(
+      read("components/auth/mobile/MobileSignIn.tsx"),
+    );
+    for (const src of [signIn, signUp, desktopIn, mobileIn]) {
+      expect(src).not.toContain("AuthSocialRow");
+      expect(src).not.toMatch(/OR CONTINUE WITH/i);
+    }
   });
 
   it("Better Auth still has no socialProviders — Google is not wired", () => {

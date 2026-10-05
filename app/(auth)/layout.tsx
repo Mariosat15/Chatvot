@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { connectToDatabase } from "@/database/mongoose";
 import HeroSettings from "@/database/models/hero-settings.model";
 import { WhiteLabel } from "@/database/models/whitelabel.model";
-import AuthShell from "@/components/auth/AuthShell";
+import { AuthBrandingProvider } from "@/components/auth/AuthBrandingContext";
 import {
   DEFAULT_AUTH_SIGN_IN_BG,
   DEFAULT_AUTH_SIGN_UP_BG,
@@ -48,13 +48,7 @@ const Layout = async ({ children }: { children: React.ReactNode }) => {
   const authSettings = await getAuthPageSettings();
 
   return (
-    <AuthShell
-      logo={authSettings.logo}
-      signInImage={authSettings.signInImage}
-      signUpImage={authSettings.signUpImage}
-    >
-      {children}
-    </AuthShell>
+    <AuthBrandingProvider value={authSettings}>{children}</AuthBrandingProvider>
   );
 };
 
