@@ -931,6 +931,17 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 5 October 2026 - Anyone holding the Employees section can manage admins, not only the original admin
+
+**Owner instruction:** "Full Admin should be able to create other admins and grant them anything." The employee and role-template routes were identity-locked: past the `employees` section grant, each one also demanded that the caller *be* the original admin (`ADMIN_EMAIL`, else the oldest admin by `createdAt`), through four private copies of `isOriginalAdmin`. So a Full Admin holding every section could open the Employees screen and was refused on every write. **Nothing was computed wrongly, there is no risk number and nothing was backfilled.**
+
+- **New rule, one definition:** `apps/admin/lib/admin/employee-management-access.ts` - `canManageEmployees` = stored `allowedSections` includes `employees` OR original admin. Used by GET/POST `/api/employees`, PUT/PATCH/DELETE `/api/employees/[id]`, POST/PUT/DELETE `/api/employees/role-templates`, and reported as `currentAdmin.canManageEmployees` by `upgrade-super-admin` GET, which `EmployeesSection.tsx` now gates on instead of `isSuperAdmin`. Granting any section, including `employees` itself, is therefore open to every holder of `employees`.
+- **Not widened for `users`-only callers.** `GET /api/employees` admits `employees` OR `users` at the guard; the identity lock had been silently refusing `users`-only callers past it, and the new rule still does - so nobody gains access they did not have.
+- **The original admin's own account stays protected** by the kept `isOriginalAdmin(employee)` checks in `[id]`: nobody else can modify, lock, reset or delete it. Without that, any holder of `employees` could lock out the owner.
+- `upgrade-super-admin` POST still refuses non-original callers; it is unreachable (`needsUpgrade` is always false).
+- Incidental: five pre-existing lint warnings in `[id]` and `upgrade-super-admin` removed (unused `auth`/`deletedRole`, `any`, unused `request`) because the pre-commit hook lints staged files at `--max-warnings=0`.
+- **Verification:** `__tests__/admin/employee-management-access.test.ts` (11 tests, behavioural against mongodb-memory-server plus structural); R101s `privileged-route-guards.test.ts` still green; 5 probes each RED x1 (helper ignoring sections, an identity check restored in role-templates, the PATCH protection removed, the screen gating on `isSuperAdmin`, the status route reporting false). Admin typecheck 243 -> 241, the two vanished errors being inside deleted private copies; the rest are line shifts. **Never verified by eye.**
+
 ### 3 October 2026 - A new employee can log in, and the role templates know every section
 
 Owner report: a newly registered employee could not log in with the emailed credentials until a

@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import { Admin } from "@/database/models/admin.model";
+import { canManageEmployees } from "@/lib/admin/employee-management-access";
 // The original/default admin is ALWAYS considered the super admin
 // They are identified by being the first admin created or matching ADMIN_EMAIL env var
 
 // GET - Check super admin status
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const guard = await guardSection("employees");
 
@@ -50,6 +51,9 @@ export async function GET(request: NextRequest) {
         email: admin.email,
         name: admin.name,
         isSuperAdmin: isSuperAdmin,
+        // Reason: the screen used to gate on isSuperAdmin, which turned away every admin
+        // the owner had granted Employees. Same rule as the routes it calls.
+        canManageEmployees: await canManageEmployees(admin),
         role: isSuperAdmin ? "Super Admin" : "Admin",
       },
       needsUpgrade: false, // Original admin never needs upgrade
@@ -64,7 +68,7 @@ export async function GET(request: NextRequest) {
 }
 
 // POST - Not needed for original admin, but keep for compatibility
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   try {
     const guard = await guardSection("employees");
 

@@ -210,8 +210,8 @@ export default function EmployeesSection() {
         return;
       }
 
-      if (!statusData.currentAdmin?.isSuperAdmin) {
-        setAccessError("Only super admins can access employee management.");
+      if (!statusData.currentAdmin?.canManageEmployees) {
+        setAccessError("You do not have access to employee management.");
         setLoading(false);
         return;
       }

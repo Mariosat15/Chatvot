@@ -20,26 +20,10 @@ import { adminEventsService } from "@/lib/services/admin-events.service";
 import { adminSectionLabel } from "@/lib/admin/admin-section-catalog";
 import { replaceTemplateVariables } from "@/lib/admin/employee-email-template";
 import { syncDefaultRoleTemplates } from "@/lib/admin/default-role-templates";
-
-// Check if an admin is the original/super admin
-async function isOriginalAdmin(admin: {
-  email: string;
-  _id: { toString(): string };
-}): Promise<boolean> {
-  const defaultAdminEmail = (
-    process.env.ADMIN_EMAIL || "admin@email.com"
-  ).toLowerCase();
-  const isDefaultEmail = admin.email.toLowerCase() === defaultAdminEmail;
-
-  // Also check if they're the first admin (oldest by creation date)
-  const oldestAdmin = await Admin.findOne({})
-    .sort({ createdAt: 1 })
-    .select("_id");
-  const isFirstAdmin =
-    oldestAdmin && oldestAdmin._id.toString() === admin._id.toString();
-
-  return isDefaultEmail || Boolean(isFirstAdmin);
-}
+import {
+  canManageEmployees,
+  EMPLOYEE_MANAGEMENT_DENIED,
+} from "@/lib/admin/employee-management-access";
 
 // Generate random password using unbiased random selection
 function generatePassword(length = 12): string {
@@ -75,10 +59,9 @@ export async function GET(_request: NextRequest) {
       return NextResponse.json({ error: "Admin not found" }, { status: 404 });
     }
 
-    const isSuperAdmin = await isOriginalAdmin(currentAdmin);
-    if (!isSuperAdmin) {
+    if (!(await canManageEmployees(currentAdmin))) {
       return NextResponse.json(
-        { error: "Only super admin can manage employees" },
+        { error: EMPLOYEE_MANAGEMENT_DENIED },
         { status: 403 },
       );
     }
@@ -167,10 +150,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Admin not found" }, { status: 404 });
     }
 
-    const isSuperAdmin = await isOriginalAdmin(currentAdmin);
-    if (!isSuperAdmin) {
+    if (!(await canManageEmployees(currentAdmin))) {
       return NextResponse.json(
-        { error: "Only super admin can manage employees" },
+        { error: EMPLOYEE_MANAGEMENT_DENIED },
         { status: 403 },
       );
     }

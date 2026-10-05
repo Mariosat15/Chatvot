@@ -10,22 +10,11 @@ import {
 import { auditLogService } from "@/lib/services/audit-log.service";
 import { adminEventsService } from "@/lib/services/admin-events.service";
 import { customerAssignmentService } from "@/lib/services/customer-assignment.service";
-
-// Check if an admin is the original/super admin
-async function isOriginalAdmin(admin: any): Promise<boolean> {
-  const defaultAdminEmail = (
-    process.env.ADMIN_EMAIL || "admin@email.com"
-  ).toLowerCase();
-  const isDefaultEmail = admin.email.toLowerCase() === defaultAdminEmail;
-
-  const oldestAdmin = await Admin.findOne({})
-    .sort({ createdAt: 1 })
-    .select("_id");
-  const isFirstAdmin =
-    oldestAdmin && oldestAdmin._id.toString() === admin._id.toString();
-
-  return isDefaultEmail || isFirstAdmin;
-}
+import {
+  canManageEmployees,
+  EMPLOYEE_MANAGEMENT_DENIED,
+  isOriginalAdmin,
+} from "@/lib/admin/employee-management-access";
 
 // GET - Get single employee
 export async function GET(
@@ -36,13 +25,6 @@ export async function GET(
     const guard = await guardSection("employees");
 
     if (!guard.ok) return guard.response;
-
-    const auth = {
-      adminId: guard.admin.id,
-      email: guard.admin.email,
-      name: guard.admin.name,
-      isSuperAdmin: guard.admin.role === "super_admin",
-    };
 
     await connectToDatabase();
 
@@ -95,9 +77,9 @@ export async function PUT(
 
     // Get current admin
     const currentAdmin = await Admin.findById(auth.adminId);
-    if (!currentAdmin || !(await isOriginalAdmin(currentAdmin))) {
+    if (!currentAdmin || !(await canManageEmployees(currentAdmin))) {
       return NextResponse.json(
-        { error: "Only super admin can manage employees" },
+        { error: EMPLOYEE_MANAGEMENT_DENIED },
         { status: 403 },
       );
     }
@@ -173,7 +155,7 @@ export async function PUT(
       role: auth.isSuperAdmin ? ("superadmin" as const) : ("admin" as const),
     };
 
-    const changes: Record<string, any> = {};
+    const changes: Record<string, unknown> = {};
     if (name) changes.name = name;
     if (email && email !== employee.email) changes.email = email;
     if (roleTemplateId || customSections) changes.role = employee.role;
@@ -246,9 +228,9 @@ export async function DELETE(
 
     // Get current admin
     const currentAdmin = await Admin.findById(auth.adminId);
-    if (!currentAdmin || !(await isOriginalAdmin(currentAdmin))) {
+    if (!currentAdmin || !(await canManageEmployees(currentAdmin))) {
       return NextResponse.json(
-        { error: "Only super admin can manage employees" },
+        { error: EMPLOYEE_MANAGEMENT_DENIED },
         { status: 403 },
       );
     }
@@ -279,7 +261,6 @@ export async function DELETE(
 
     const deletedName = employee.name;
     const deletedEmail = employee.email;
-    const deletedRole = employee.role || "Employee";
 
     // Force logout before deletion (in case there's any caching)
     await Admin.updateOne(
@@ -382,9 +363,9 @@ export async function PATCH(
 
     // Get current admin
     const currentAdmin = await Admin.findById(auth.adminId);
-    if (!currentAdmin || !(await isOriginalAdmin(currentAdmin))) {
+    if (!currentAdmin || !(await canManageEmployees(currentAdmin))) {
       return NextResponse.json(
-        { error: "Only super admin can manage employees" },
+        { error: EMPLOYEE_MANAGEMENT_DENIED },
         { status: 403 },
       );
     }

@@ -8,22 +8,10 @@ import {
   ADMIN_SECTIONS,
   type AdminSection,
 } from "@/database/models/admin-employee.model";
-
-// Check if an admin is the original/super admin
-async function isOriginalAdmin(admin: { email: string; _id: unknown }): Promise<boolean> {
-  const defaultAdminEmail = (
-    process.env.ADMIN_EMAIL || "admin@email.com"
-  ).toLowerCase();
-  const isDefaultEmail = admin.email.toLowerCase() === defaultAdminEmail;
-
-  const oldestAdmin = await Admin.findOne({})
-    .sort({ createdAt: 1 })
-    .select("_id");
-  const isFirstAdmin =
-    oldestAdmin && oldestAdmin._id.toString() === String(admin._id);
-
-  return isDefaultEmail || isFirstAdmin;
-}
+import {
+  canManageEmployees,
+  EMPLOYEE_MANAGEMENT_DENIED,
+} from "@/lib/admin/employee-management-access";
 
 // GET - List all role templates
 export async function GET(_request: NextRequest) {
@@ -77,9 +65,9 @@ export async function POST(request: NextRequest) {
 
     // Get current admin
     const currentAdmin = await Admin.findById(auth.adminId);
-    if (!currentAdmin || !(await isOriginalAdmin(currentAdmin))) {
+    if (!currentAdmin || !(await canManageEmployees(currentAdmin))) {
       return NextResponse.json(
-        { error: "Only super admin can manage role templates" },
+        { error: EMPLOYEE_MANAGEMENT_DENIED },
         { status: 403 },
       );
     }
@@ -153,9 +141,9 @@ export async function PUT(request: NextRequest) {
 
     // Get current admin
     const currentAdmin = await Admin.findById(auth.adminId);
-    if (!currentAdmin || !(await isOriginalAdmin(currentAdmin))) {
+    if (!currentAdmin || !(await canManageEmployees(currentAdmin))) {
       return NextResponse.json(
-        { error: "Only super admin can manage role templates" },
+        { error: EMPLOYEE_MANAGEMENT_DENIED },
         { status: 403 },
       );
     }
@@ -239,9 +227,9 @@ export async function DELETE(request: NextRequest) {
 
     // Get current admin
     const currentAdmin = await Admin.findById(auth.adminId);
-    if (!currentAdmin || !(await isOriginalAdmin(currentAdmin))) {
+    if (!currentAdmin || !(await canManageEmployees(currentAdmin))) {
       return NextResponse.json(
-        { error: "Only super admin can manage role templates" },
+        { error: EMPLOYEE_MANAGEMENT_DENIED },
         { status: 403 },
       );
     }
