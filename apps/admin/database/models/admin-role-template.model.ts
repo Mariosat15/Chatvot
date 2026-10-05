@@ -6,6 +6,7 @@ export interface IAdminRoleTemplate extends Document {
   description: string;
   allowedSections: AdminSection[];
   isDefault: boolean; // Pre-made templates
+  seededSections?: AdminSection[];
   isActive: boolean;
   createdBy: string;
   createdAt: Date;
@@ -34,6 +35,15 @@ const AdminRoleTemplateSchema = new Schema<IAdminRoleTemplate>(
       type: Boolean,
       default: false,
     },
+    // Reason: the code sections a default template has already been offered by
+    // syncDefaultRoleTemplates. Only sections absent from here are added, so a section a
+    // super admin removed stays removed while sections added to the code later still arrive.
+    seededSections: [
+      {
+        type: String,
+        enum: ADMIN_SECTIONS,
+      },
+    ],
     isActive: {
       type: Boolean,
       default: true,
@@ -66,10 +76,11 @@ type RoleTemplateInput = Omit<
 export const DEFAULT_ROLE_TEMPLATES: RoleTemplateInput[] = [
   {
     name: "Full Admin",
-    description: "Full access to all admin sections except employee management",
-    allowedSections: ADMIN_SECTIONS.filter(
-      (s) => s !== "employees",
-    ) as AdminSection[],
+    // Reason: owner decision, 3 Oct 2026 - an admin can do everything a super admin can,
+    // employee management included. Derived from ADMIN_SECTIONS so every section added
+    // later reaches it through syncDefaultRoleTemplates.
+    description: "Full access to every admin section, like the super admin",
+    allowedSections: [...ADMIN_SECTIONS],
     isDefault: true,
     isActive: true,
     createdBy: "system",
@@ -91,7 +102,9 @@ export const DEFAULT_ROLE_TEMPLATES: RoleTemplateInput[] = [
       "market-data",
       "kyc-history",
       "messaging",
+      "round-inspector",
       "wiki",
+      "tutorials",
       "profile",
     ],
     isDefault: true,
@@ -112,6 +125,7 @@ export const DEFAULT_ROLE_TEMPLATES: RoleTemplateInput[] = [
       "fees",
       "currency",
       "payment-providers",
+      "vendors",
       "audit-logs",
       "wiki",
       "profile",
@@ -149,6 +163,7 @@ export const DEFAULT_ROLE_TEMPLATES: RoleTemplateInput[] = [
       "messaging",
       "incidents",
       "wiki",
+      "tutorials",
       "profile",
     ],
     isDefault: true,
@@ -161,12 +176,20 @@ export const DEFAULT_ROLE_TEMPLATES: RoleTemplateInput[] = [
     allowedSections: [
       "overview",
       "hero-page",
+      "site-pages",
+      "landing-pages",
+      "cookie-consent",
+      "system-announcements",
       "marketplace",
       "competitions",
       "challenges",
       "notifications",
       "email-templates",
       "branding",
+      "terminology",
+      "trading-page",
+      "journey-map",
+      "tutorials",
       "wiki",
       "profile",
     ],
@@ -181,8 +204,12 @@ export const DEFAULT_ROLE_TEMPLATES: RoleTemplateInput[] = [
       "overview",
       "dev-zone-menu",
       "server-monitor",
+      "server-fleet",
       "server-options",
       "redis",
+      "mdb-cluster",
+      "data-cleanup",
+      "data-maintenance",
       "dev-settings",
       "performance-simulator",
       "image-optimizer",
@@ -210,6 +237,9 @@ export const DEFAULT_ROLE_TEMPLATES: RoleTemplateInput[] = [
       "symbols",
       "market-data",
       "analytics",
+      "provider-health",
+      "game-performance",
+      "round-inspector",
       "audit-logs",
       "wiki",
       "profile",
@@ -225,9 +255,31 @@ export const DEFAULT_ROLE_TEMPLATES: RoleTemplateInput[] = [
       "overview",
       "gamemaster-dashboard",
       "gamemaster-management",
+      "gm-competition-defaults",
       "users",
       "competitions",
       "challenges",
+      "wiki",
+      "profile",
+    ],
+    isDefault: true,
+    isActive: true,
+    createdBy: "system",
+  },
+  {
+    name: "Games Manager",
+    description: "Access to game providers, games, rounds and game performance",
+    allowedSections: [
+      "overview",
+      "game-providers",
+      "provider-health",
+      "game-performance",
+      "round-inspector",
+      "competitions",
+      "challenges",
+      "badges",
+      "journey-map",
+      "gamification-wizard",
       "wiki",
       "profile",
     ],

@@ -931,6 +931,45 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 3 October 2026 - A new employee can log in, and the role templates know every section
+
+Owner report: a newly registered employee could not log in with the emailed credentials until a
+super admin toggled lock-out on and off; the ready-made role templates and the section picker were
+missing many sections added since; Full Admin should have everything the super admin has.
+
+- **The login defect was a missing `iat`, not bad credentials.** `apps/admin/app/api/auth/login/route.ts`
+  signed the `admin_token` with jose's `SignJWT` and never called `.setIssuedAt()`, so the token
+  carried no issue time. check-session compared that absent value against `forceLogoutAt` /
+  `passwordChangedAt`, read it as 1970, and logged the employee out on the first poll. Unlocking
+  cleared `forceLogoutAt`, which is why the toggle "fixed" it. The token now carries `iat`, and one
+  helper (`lib/admin/session-token-time.ts`, `wasIssuedBefore`) answers the question in both
+  check-session and `verifyAdminAuth` - a missing `iat` still counts as issued before any stored
+  moment, deliberately, because failing open there would let a pre-logout token survive.
+  **Every employee must log in once after deploy**; tokens issued before it have no `iat`.
+- **One section catalogue.** `lib/admin/admin-section-catalog.ts` (model-free, admin-only) labels
+  and groups every `ADMIN_SECTIONS` id; the picker and the credentials email both read it. 14
+  sections were previously unpickable. A test asserts every section is labelled and filed in
+  exactly one group, so the next section added cannot be forgotten silently.
+- **Templates now pick up sections the code gains.** Both entry points used to insert defaults
+  only into an EMPTY collection, so no template ever learned a new section. `syncDefaultRoleTemplates`
+  (`lib/admin/default-role-templates.ts`) offers each default section once, recorded in a new
+  `seededSections` field, and copies new ones to the employees on that template. A section an
+  operator removed is never re-added, and an operator's own template with a default's name is
+  left alone. **Caveat: on the first sync no section has been recorded as offered, so any default
+  section an operator previously removed from a default template comes back once.**
+- **Full Admin = every section** (`[...ADMIN_SECTIONS]`), plus additions to the narrower templates
+  and a new **Games Manager** template.
+- Incidental: the credentials email escapes HTML in substituted values and substitutes literally
+  (a generated password containing `$&` was being mangled by `String.replace`).
+
+**Not changed, and it decides whether Full Admin really can "do all":** the employee and
+role-template routes refuse unless the caller is the ORIGINAL admin (`isOriginalAdmin` - ADMIN_EMAIL
+or the oldest account), whatever sections they hold. Full Admin now SEES the Employees tab and the
+server refuses its writes. Lifting that is a security decision for the owner. Also noticed and not
+fixed: `init_templates` re-upserts the default employee email templates on every visit, overwriting
+operator edits. 24 tests, 8 probes in `tools/probe-admin-employee-access.ps1` all red. Admin
+typecheck error list identical before and after (243). **Never verified by eye.**
+
 ### 3 October 2026 - Suggested cards change live, with no reload
 
 - **Owner request:** "show upcoming, if they go live show live, if they cancel remove and put others that fit the player ... they must be changing live, not need to refresh the page".

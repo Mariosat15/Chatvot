@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import { Admin } from "@/database/models/admin.model";
-import { jwtVerify } from "jose";
+import { jwtVerify, type JWTPayload } from "jose";
 import { getAdminJwtSecret } from "@/lib/admin/jwt-secret";
+import { wasIssuedBefore } from "@/lib/admin/session-token-time";
 
 const SECRET_KEY = new TextEncoder().encode(getAdminJwtSecret());
 
@@ -25,7 +26,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Verify JWT
-    let payload: any;
+    let payload: JWTPayload & { adminId?: string };
     try {
       const verified = await jwtVerify(token, SECRET_KEY);
       payload = verified.payload;
@@ -56,7 +57,7 @@ export async function GET(request: NextRequest) {
 
     // Check if account is locked out (toggle-based)
     // IMPORTANT: Treat undefined as false (not locked out)
-    if ((admin as any).isLockedOut === true) {
+    if (admin.isLockedOut === true) {
       return NextResponse.json({
         valid: false,
         reason: "locked_out",
@@ -66,27 +67,21 @@ export async function GET(request: NextRequest) {
     }
 
     // Check if force logged out
-    if (admin.forceLogoutAt) {
-      const tokenIssuedAt = new Date((payload.iat || 0) * 1000);
-      if (tokenIssuedAt < new Date(admin.forceLogoutAt)) {
-        return NextResponse.json({
-          valid: false,
-          reason: "force_logout",
-          message: "Your session has been terminated by an administrator.",
-        });
-      }
+    if (wasIssuedBefore(payload.iat, admin.forceLogoutAt)) {
+      return NextResponse.json({
+        valid: false,
+        reason: "force_logout",
+        message: "Your session has been terminated by an administrator.",
+      });
     }
 
     // Check if password was changed after token was issued
-    if (admin.passwordChangedAt) {
-      const tokenIssuedAt = new Date((payload.iat || 0) * 1000);
-      if (tokenIssuedAt < new Date(admin.passwordChangedAt)) {
-        return NextResponse.json({
-          valid: false,
-          reason: "password_changed",
-          message: "Your password was changed. Please log in again.",
-        });
-      }
+    if (wasIssuedBefore(payload.iat, admin.passwordChangedAt)) {
+      return NextResponse.json({
+        valid: false,
+        reason: "password_changed",
+        message: "Your password was changed. Please log in again.",
+      });
     }
 
     // Update last activity

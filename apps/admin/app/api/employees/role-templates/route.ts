@@ -2,17 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import { Admin } from "@/database/models/admin.model";
-import {
-  AdminRoleTemplate,
-  DEFAULT_ROLE_TEMPLATES,
-} from "@/database/models/admin-role-template.model";
+import { AdminRoleTemplate } from "@/database/models/admin-role-template.model";
+import { syncDefaultRoleTemplates } from "@/lib/admin/default-role-templates";
 import {
   ADMIN_SECTIONS,
   type AdminSection,
 } from "@/database/models/admin-employee.model";
 
 // Check if an admin is the original/super admin
-async function isOriginalAdmin(admin: any): Promise<boolean> {
+async function isOriginalAdmin(admin: { email: string; _id: unknown }): Promise<boolean> {
   const defaultAdminEmail = (
     process.env.ADMIN_EMAIL || "admin@email.com"
   ).toLowerCase();
@@ -22,32 +20,23 @@ async function isOriginalAdmin(admin: any): Promise<boolean> {
     .sort({ createdAt: 1 })
     .select("_id");
   const isFirstAdmin =
-    oldestAdmin && oldestAdmin._id.toString() === admin._id.toString();
+    oldestAdmin && oldestAdmin._id.toString() === String(admin._id);
 
   return isDefaultEmail || isFirstAdmin;
 }
 
 // GET - List all role templates
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const guard = await guardSection("employees");
 
     if (!guard.ok) return guard.response;
 
-    const auth = {
-      adminId: guard.admin.id,
-      email: guard.admin.email,
-      name: guard.admin.name,
-      isSuperAdmin: guard.admin.role === "super_admin",
-    };
-
     await connectToDatabase();
 
-    // Initialize default templates if none exist
-    const count = await AdminRoleTemplate.countDocuments();
-    if (count === 0) {
-      await AdminRoleTemplate.insertMany(DEFAULT_ROLE_TEMPLATES);
-    }
+    // Reason: inserting only into an empty collection meant every section and template added
+    // to the code later never reached a stored template.
+    await syncDefaultRoleTemplates();
 
     const templates = await AdminRoleTemplate.find({})
       .sort({ isDefault: -1, name: 1 })

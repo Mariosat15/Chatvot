@@ -8,6 +8,7 @@ import {
 } from "@/database/models/admin-employee.model";
 import mongoose from "mongoose";
 import { getAdminJwtSecret } from "./jwt-secret";
+import { wasIssuedBefore } from "./session-token-time";
 
 const SECRET_KEY = new TextEncoder().encode(getAdminJwtSecret());
 
@@ -64,7 +65,7 @@ export async function verifyAdminAuth(): Promise<AdminAuthResult> {
       await connectToDatabase();
       const admin = await Admin.findById(payload.adminId)
         .select(
-          "name email role allowedSections status createdAt forceLogoutAt isLockedOut tempPasswordExpiresAt",
+          "name email role allowedSections status createdAt forceLogoutAt passwordChangedAt isLockedOut tempPasswordExpiresAt",
         )
         .lean();
 
@@ -86,7 +87,7 @@ export async function verifyAdminAuth(): Promise<AdminAuthResult> {
 
       // Check if admin is locked out (toggle-based lockout)
       // IMPORTANT: Treat undefined as false (not locked out)
-      if ((admin as any).isLockedOut === true) {
+      if ((admin as { isLockedOut?: boolean }).isLockedOut === true) {
         console.log(
           `❌ Admin ${admin.email} is locked out - session invalidated`,
         );
@@ -94,14 +95,23 @@ export async function verifyAdminAuth(): Promise<AdminAuthResult> {
       }
 
       // Check if force logout was triggered after token was issued
-      if (admin.forceLogoutAt && payload.iat) {
-        const tokenIssuedAt = new Date((payload.iat as number) * 1000);
-        if (new Date(admin.forceLogoutAt) > tokenIssuedAt) {
-          console.log(
-            `❌ Admin ${admin.email} was force logged out - session invalidated`,
-          );
-          return { isAuthenticated: false };
-        }
+      if (wasIssuedBefore(payload.iat, admin.forceLogoutAt)) {
+        console.log(
+          `❌ Admin ${admin.email} was force logged out - session invalidated`,
+        );
+        return { isAuthenticated: false };
+      }
+
+      if (
+        wasIssuedBefore(
+          payload.iat,
+          (admin as { passwordChangedAt?: Date }).passwordChangedAt,
+        )
+      ) {
+        console.log(
+          `❌ Admin ${admin.email} changed password - session invalidated`,
+        );
+        return { isAuthenticated: false };
       }
 
       adminName = admin.name || "Admin";
@@ -116,7 +126,7 @@ export async function verifyAdminAuth(): Promise<AdminAuthResult> {
       const isOriginalAdmin: boolean =
         admin.email.toLowerCase() === defaultAdminEmail ||
         (oldestAdmin !== null &&
-          oldestAdmin._id.toString() === (admin._id as any).toString());
+          oldestAdmin._id.toString() === String(admin._id));
 
       isSuperAdmin = isOriginalAdmin;
       role = isOriginalAdmin ? "Super Admin" : admin.role || "Employee";

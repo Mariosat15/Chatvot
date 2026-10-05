@@ -2,10 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { guardAnySection, guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import { Admin } from "@/database/models/admin.model";
-import {
-  AdminRoleTemplate,
-  DEFAULT_ROLE_TEMPLATES,
-} from "@/database/models/admin-role-template.model";
+import { AdminRoleTemplate } from "@/database/models/admin-role-template.model";
 import {
   EmployeeEmailTemplate,
   DEFAULT_EMPLOYEE_EMAIL_TEMPLATES,
@@ -20,6 +17,9 @@ import CompanySettings from "@/database/models/company-settings.model";
 import { WhiteLabel } from "@/database/models/whitelabel.model";
 import { auditLogService } from "@/lib/services/audit-log.service";
 import { adminEventsService } from "@/lib/services/admin-events.service";
+import { adminSectionLabel } from "@/lib/admin/admin-section-catalog";
+import { replaceTemplateVariables } from "@/lib/admin/employee-email-template";
+import { syncDefaultRoleTemplates } from "@/lib/admin/default-role-templates";
 
 // Check if an admin is the original/super admin
 async function isOriginalAdmin(admin: {
@@ -51,39 +51,6 @@ function generatePassword(length = 12): string {
     password += chars[crypto.randomInt(0, chars.length)];
   }
   return password;
-}
-
-// Replace template variables
-function replaceTemplateVariables(
-  text: string,
-  variables: Record<string, unknown>,
-): string {
-  let result = text;
-
-  // Handle simple variables
-  // Reason: a literal split/join, never `replace` with a string - `replace`
-  // reads `$&` and `$$` in the replacement as patterns, and the generated
-  // password alphabet contains both `$` and `&`, so the emailed password
-  // could differ from the stored one.
-  for (const [key, value] of Object.entries(variables)) {
-    result = result.split(`{{${key}}}`).join(String(value || ""));
-  }
-
-  // Handle sections list (Mustache-like)
-  if (variables.sections && Array.isArray(variables.sections)) {
-    const sectionsMatch = result.match(
-      /\{\{#sections\}\}([\s\S]*?)\{\{\/sections\}\}/,
-    );
-    if (sectionsMatch) {
-      const itemTemplate = sectionsMatch[1];
-      const sectionsList = variables.sections
-        .map((s: string) => itemTemplate.replace("{{.}}", s))
-        .join("");
-      result = result.replace(sectionsMatch[0], sectionsList);
-    }
-  }
-
-  return result;
 }
 
 // GET - List all employees
@@ -213,12 +180,9 @@ export async function POST(request: NextRequest) {
 
     // Initialize default role templates if needed
     if (action === "init_templates") {
-      const existingTemplates = await AdminRoleTemplate.countDocuments({
-        isDefault: true,
-      });
-      if (existingTemplates === 0) {
-        await AdminRoleTemplate.insertMany(DEFAULT_ROLE_TEMPLATES);
-      }
+      // Reason: inserting only when no default existed meant sections and templates added to
+      // the code later never reached the stored ready-made templates.
+      await syncDefaultRoleTemplates();
 
       // Initialize email templates
       for (const template of DEFAULT_EMPLOYEE_EMAIL_TEMPLATES) {
@@ -535,83 +499,7 @@ async function sendEmployeeCredentialsEmail(
       whiteLabelSettings?.nodemailerEmail || process.env.NODEMAILER_EMAIL;
 
     // Prepare variables
-    const sectionLabels: Record<string, string> = {
-      // Dashboard
-      overview: "Overview",
-      // Content
-      "hero-page": "Hero Page",
-      marketplace: "Marketplace",
-      // Trading
-      competitions: "Competitions",
-      challenges: "1v1 Challenges",
-      "trading-history": "Trading History",
-      analytics: "Analytics",
-      market: "Market Hours",
-      symbols: "Trading Symbols",
-      "market-data": "Market Data",
-      // User Management
-      users: "Users",
-      badges: "Badges & XP",
-      "customer-assignment": "Customer Assignment",
-      // Finance
-      financial: "Financial Dashboard",
-      payments: "Pending Payments",
-      "failed-deposits": "Failed Deposits",
-      withdrawals: "Withdrawal Settings",
-      "pending-withdrawals": "Pending Withdrawals",
-      // Security
-      "kyc-settings": "KYC Settings",
-      "kyc-history": "KYC History",
-      fraud: "Fraud Detection",
-      // Operations
-      "price-health": "Price Feed Health",
-      incidents: "Incident Management",
-      // Messaging
-      messaging: "Support Center",
-      "messaging-settings": "Messaging Settings",
-      // Help
-      wiki: "Documentation",
-      // Game Master
-      "gamemaster-dashboard": "GM Dashboard",
-      "gamemaster-management": "Manage Game Masters",
-      "gamemaster-reports-export": "Export GM Reports",
-      // AI & Automation
-      "ai-agent": "AI Agent",
-      "ai-knowledge": "AI Database",
-      // Settings
-      settings: "Settings",
-      credentials: "Credentials",
-      environment: "Environment",
-      branding: "Branding",
-      company: "Company",
-      invoices: "Invoices",
-      "email-templates": "Email Templates",
-      notifications: "Notifications",
-      "trading-risk": "Trading Risk",
-      currency: "Currency",
-      fees: "Fees",
-      "payment-providers": "Payment Providers",
-      database: "Database",
-      "audit-logs": "Audit Logs",
-      // Dev Zone
-      "dev-zone-menu": "Dev Zone",
-      "server-monitor": "Server Monitor",
-      "server-options": "Server Options",
-      redis: "Redis Cache",
-      "dev-settings": "Test",
-      "performance-simulator": "Performance Simulator",
-      "image-optimizer": "Image Optimizer",
-      "dependency-updates": "Dependency Updates",
-      // Admin
-      employees: "Employees",
-      // My Account
-      profile: "My Profile",
-    };
-
-    const sections = allowedSections.map(
-      // eslint-disable-next-line security/detect-object-injection -- `s` is an AdminSection enum value from the stored employee, not request text
-      (s) => sectionLabels[s] || s,
-    );
+    const sections = allowedSections.map((s) => adminSectionLabel(s));
     const sectionsText = sections.map((s) => `• ${s}`).join("\n");
 
     const variables = {
@@ -628,7 +516,9 @@ async function sendEmployeeCredentialsEmail(
 
     // Replace variables in template
     const subject = replaceTemplateVariables(template.subject, variables);
-    const htmlBody = replaceTemplateVariables(template.htmlBody, variables);
+    const htmlBody = replaceTemplateVariables(template.htmlBody, variables, {
+      html: true,
+    });
     const textBody = replaceTemplateVariables(template.textBody, variables);
 
     // Check email configuration

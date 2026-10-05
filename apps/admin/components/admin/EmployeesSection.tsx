@@ -67,6 +67,10 @@ import {
   Unlock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  ADMIN_SECTION_GROUPS,
+  adminSectionLabel,
+} from "@/lib/admin/admin-section-catalog";
 
 interface Employee {
   id: string;
@@ -109,148 +113,8 @@ interface EmailTemplate {
   isActive: boolean;
 }
 
-const SECTION_LABELS: Record<string, string> = {
-  // Dashboard
-  overview: "Overview",
-  // Content
-  "hero-page": "Hero Page",
-  "site-pages": "Site Pages",
-  "landing-pages": "Landing Pages",
-  "cookie-consent": "Cookie Consent",
-  visitors: "Visitor Analytics",
-  marketplace: "Marketplace",
-  // Trading
-  competitions: "Competitions",
-  challenges: "1v1 Challenges",
-  "trading-history": "Trading History",
-  analytics: "Analytics",
-  market: "Market Hours",
-  symbols: "Trading Symbols",
-  "market-data": "Market Data",
-  // User Management
-  users: "Users",
-  badges: "Badges & XP",
-  "customer-assignment": "Customer Assignment",
-  // Finance
-  financial: "Financial Dashboard",
-  payments: "Pending Payments",
-  "failed-deposits": "Failed Deposits",
-  withdrawals: "Withdrawal Settings",
-  "pending-withdrawals": "Pending Withdrawals",
-  // Security
-  "kyc-settings": "KYC Settings",
-  "kyc-history": "KYC History",
-  fraud: "Fraud Detection",
-  // Operations
-  "price-health": "Price Feed Health",
-  incidents: "Incident Management",
-  // Messaging
-  messaging: "Support Center",
-  "messaging-settings": "Messaging Settings",
-  // Help
-  wiki: "Documentation",
-  // Game Master
-  "gamemaster-dashboard": "GM Dashboard",
-  "gamemaster-management": "Manage Game Masters",
-  "gamemaster-reports-export": "Export GM Reports",
-  "gm-competition-defaults": "GM Competition Defaults",
-  // AI & Automation
-  "ai-agent": "AI Agent",
-  "ai-knowledge": "AI Database",
-  // Settings
-  settings: "Settings",
-  credentials: "Credentials",
-  environment: "Environment",
-  branding: "Branding",
-  company: "Company",
-  invoices: "Invoices",
-  "email-templates": "Email Templates",
-  notifications: "Notifications",
-  "trading-risk": "Trading Risk",
-  currency: "Currency",
-  fees: "Fees",
-  "payment-providers": "Payment Providers",
-  database: "Database",
-  "audit-logs": "Audit Logs",
-  // Dev Zone
-  "dev-zone-menu": "Dev Zone",
-  "server-monitor": "Server Monitor",
-  "server-options": "Server Options",
-  redis: "Redis Cache",
-  "dev-settings": "Test",
-  "performance-simulator": "Performance Simulator",
-  "image-optimizer": "Image Optimizer",
-  "dependency-updates": "Dependency Updates",
-  "command-alerts": "Command Alerts",
-  "data-cleanup": "Data Cleanup",
-  // Admin
-  employees: "Employees",
-  // My Account
-  profile: "My Profile",
-};
-
-const SECTION_GROUPS = {
-  Dashboard: ["overview"],
-  Content: ["hero-page", "site-pages", "landing-pages", "cookie-consent", "visitors", "marketplace"],
-  Trading: [
-    "competitions",
-    "challenges",
-    "trading-history",
-    "analytics",
-    "market",
-    "symbols",
-    "market-data",
-  ],
-  "User Management": ["users", "badges", "customer-assignment"],
-  Finance: [
-    "financial",
-    "payments",
-    "failed-deposits",
-    "withdrawals",
-    "pending-withdrawals",
-  ],
-  Security: ["kyc-settings", "kyc-history", "fraud"],
-  Operations: ["price-health", "incidents"],
-  Messaging: ["messaging", "messaging-settings"],
-  Help: ["wiki"],
-  "Game Master": [
-    "gamemaster-dashboard",
-    "gamemaster-management",
-    "gamemaster-reports-export",
-    "gm-competition-defaults",
-  ],
-  "AI & Automation": ["ai-agent", "ai-knowledge"],
-  Settings: [
-    "settings",
-    "credentials",
-    "environment",
-    "branding",
-    "company",
-    "invoices",
-    "email-templates",
-    "notifications",
-    "trading-risk",
-    "currency",
-    "fees",
-    "payment-providers",
-    "database",
-    "audit-logs",
-  ],
-  "Dev Zone": [
-    "dev-zone-menu",
-    "server-monitor",
-    "server-options",
-    "redis",
-    "dev-settings",
-    "performance-simulator",
-    "image-optimizer",
-    "dependency-updates",
-    "command-alerts",
-    "data-cleanup",
-  ],
-  Admin: ["employees"],
-  "My Account": ["profile"],
-};
+const SECTION_GROUPS = ADMIN_SECTION_GROUPS;
+const getSectionLabel = adminSectionLabel;
 
 const ROLE_ICONS: Record<string, React.ReactNode> = {
   "Super Admin": <Crown className="h-4 w-4 text-yellow-400" />,
@@ -262,12 +126,6 @@ const ROLE_ICONS: Record<string, React.ReactNode> = {
   "Content Manager": <FileText className="h-4 w-4 text-pink-400" />,
   Custom: <User className="h-4 w-4 text-gray-400" />,
 };
-
-// Reason: SECTION_LABELS is a trusted compile-time constant — no injection risk.
-/* eslint-disable security/detect-object-injection */
-const getSectionLabel = (section: string): string =>
-  SECTION_LABELS[section] || section;
-/* eslint-enable security/detect-object-injection */
 
 export default function EmployeesSection() {
   const [employees, setEmployees] = useState<Employee[]>([]);

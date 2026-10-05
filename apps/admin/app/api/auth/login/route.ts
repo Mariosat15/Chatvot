@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import { Admin } from "@/database/models/admin.model";
+import { ADMIN_SECTIONS } from "@/database/models/admin-employee.model";
 import { SignJWT } from "jose";
 import { auditLogService } from "@/lib/services/audit-log.service";
 import { getAdminJwtSecret } from "@/lib/admin/jwt-secret";
@@ -31,46 +32,8 @@ function checkLoginRateLimit(ip: string): { allowed: boolean; retryAfterMs: numb
   return { allowed: true, retryAfterMs: 0 };
 }
 
-// All available admin sections for super admin
-const ALL_ADMIN_SECTIONS = [
-  "overview",
-  "hero-page",
-  "marketplace",
-  "competitions",
-  "challenges",
-  "trading-history",
-  "analytics",
-  "market",
-  "symbols",
-  "users",
-  "badges",
-  "financial",
-  "payments",
-  "failed-deposits",
-  "withdrawals",
-  "pending-withdrawals",
-  "kyc-settings",
-  "kyc-history",
-  "fraud",
-  "wiki",
-  "tutorials",
-  "credentials",
-  "email-templates",
-  "notifications",
-  "payment-providers",
-  "fee",
-  "invoicing",
-  "reconciliation",
-  "database",
-  "ai-agent",
-  "whitelabel",
-  "audit-logs",
-  "employees",
-  "system-announcements",
-];
-
 // Check if admin is the original/super admin
-async function isOriginalAdmin(admin: any): Promise<boolean> {
+async function isOriginalAdmin(admin: { email: string; _id: unknown }): Promise<boolean> {
   const defaultAdminEmail = (
     process.env.ADMIN_EMAIL || "admin@email.com"
   ).toLowerCase();
@@ -80,7 +43,7 @@ async function isOriginalAdmin(admin: any): Promise<boolean> {
     .sort({ createdAt: 1 })
     .select("_id");
   const isFirstAdmin =
-    !!oldestAdmin && oldestAdmin._id.toString() === admin._id.toString();
+    !!oldestAdmin && oldestAdmin._id.toString() === String(admin._id);
 
   return isDefaultEmail || isFirstAdmin;
 }
@@ -208,7 +171,7 @@ export async function POST(request: NextRequest) {
     // Get allowed sections - super admin gets all, others get their assigned sections
     // IMPORTANT: Convert Mongoose array to plain JS array for JWT serialization
     const allowedSections = isSuperAdmin
-      ? [...ALL_ADMIN_SECTIONS]
+      ? [...ADMIN_SECTIONS]
       : admin.allowedSections
         ? [...admin.allowedSections]
         : [];
@@ -228,7 +191,7 @@ export async function POST(request: NextRequest) {
     );
 
     // Generate JWT with role, name, and sections
-    const adminId = (admin._id as any).toString();
+    const adminId = String(admin._id);
     const adminName = admin.name || admin.email.split("@")[0];
     const token = await new SignJWT({
       adminId,
@@ -239,6 +202,10 @@ export async function POST(request: NextRequest) {
       allowedSections,
     })
       .setProtectedHeader({ alg: "HS256" })
+      // Reason: jose adds no `iat` unless asked. Without it check-session reads the token
+      // as issued in 1970, so any stored forceLogoutAt (Reset Password) or
+      // passwordChangedAt logged the employee out on the first poll, every login.
+      .setIssuedAt()
       .setExpirationTime("7d")
       .sign(SECRET_KEY);
 

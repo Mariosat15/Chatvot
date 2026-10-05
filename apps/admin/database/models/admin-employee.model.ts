@@ -90,7 +90,9 @@ export const ADMIN_SECTIONS = [
   "gamemaster-management", // For super admin - manage all game masters
   // Reason: exporting the referred-players report hands out every player's email in bulk, so it
   // is granted separately from viewing it (Gamemaster Program v2, task 4). Add-only enum value;
-  // deliberately in NO default role template - an operator must grant it by name.
+  // in no narrow default role template - only "Full Admin", which carries every section by
+  // owner decision (3 Oct 2026). This comment used to say "NO default role template", which
+  // was already false: Full Admin was ADMIN_SECTIONS minus employees.
   "gamemaster-reports-export",
   // Reason: the admin's default and "Game Master can change this" switch for every competition
   // option (1 Oct 2026). Add-only enum value - removing it orphans every employee storing it.
