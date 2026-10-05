@@ -1,38 +1,42 @@
 /**
- * Wallet Analytics neon asset map — owner plates (3 Oct 2026).
- * Black export canvases; knock out with `mix-blend-screen` at the call site.
- * Desktop + mobile Wallet tab share these paths.
+ * Wallet Analytics neon asset map — owner Menuitems set (5 Oct 2026).
+ * Transparent, trimmed, squared tiles from `tools/overview/import-menuitems.mjs`;
+ * no `mix-blend-screen` needed. Desktop + mobile Wallet tab share these paths.
  */
+
+import { NEON_ICON } from "./overview-assets";
 
 export const WALLET_ART = {
   /** Page title — Wallet Analytics. */
-  header: "/assets/neon/wallet/icon-wallet.jpg",
+  header: NEON_ICON("wallet-blue"),
+  /** Date-range chip beside the header. */
+  range: NEON_ICON("calendar-blue"),
   /** Wide mountain-chart plate behind the page hero. */
   backdrop: "/assets/neon/wallet/hero-backdrop-b.png",
   /** Credit Balance KPI. */
-  balance: "/assets/neon/wallet/icon-deposit.jpg",
+  balance: NEON_ICON("deposit"),
   /** Total Spend KPI. */
-  spend: "/assets/neon/wallet/icon-withdrawal.jpg",
+  spend: NEON_ICON("withdrawal"),
   /** Game Earnings. */
-  gameEarnings: "/assets/neon/wallet/icon-games.jpg",
+  gameEarnings: NEON_ICON("games-orange"),
   /** Prizes Won. */
-  prizes: "/assets/neon/wallet/icon-trophy.jpg",
+  prizes: NEON_ICON("trophy-purple"),
   /** Wallet Insights section header. */
-  insights: "/assets/neon/wallet/icon-wallet.jpg",
+  insights: NEON_ICON("wallet-blue"),
   /** Wallet Balance Trend panel. */
-  trend: "/assets/neon/wallet/icon-wallet.jpg",
+  trend: NEON_ICON("wallet-blue"),
   /** Credit Breakdown panel. */
-  breakdown: "/assets/neon/wallet/icon-credits.jpg",
+  breakdown: NEON_ICON("credits"),
   /** Daily Credit Flow panel. */
-  dailyFlow: "/assets/neon/wallet/icon-chart-2.png",
+  dailyFlow: NEON_ICON("chart-bars-red"),
   /** Spending vs Earnings panel. */
-  spending: "/assets/neon/wallet/icon-withdrawal.jpg",
-  deposits: "/assets/neon/wallet/icon-deposit.jpg",
-  withdrawals: "/assets/neon/wallet/icon-withdrawal.jpg",
-  purchases: "/assets/neon/wallet/icon-purchases.jpg",
-  bonuses: "/assets/neon/wallet/icon-gift.jpg",
+  spending: NEON_ICON("withdrawal"),
+  deposits: NEON_ICON("deposit"),
+  withdrawals: NEON_ICON("withdrawal"),
+  purchases: NEON_ICON("purchases"),
+  bonuses: NEON_ICON("gift"),
   /** Net Movement insight. */
-  netMovement: "/assets/neon/wallet/icon-chart.jpg",
+  netMovement: NEON_ICON("chart-growth-orange"),
 } as const;
 
 /** Every wallet asset a test can assert exists on disk. */

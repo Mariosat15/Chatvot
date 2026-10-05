@@ -1,6 +1,6 @@
 "use client";
 
-import { Calendar } from "lucide-react";
+import Image from "next/image";
 import { WALLET_ART } from "@/lib/services/games/wallet-assets";
 import WalletNeonIcon from "./WalletNeonIcon";
 import { WALLET_CYAN } from "./wallet-tokens";
@@ -44,7 +44,9 @@ export default function WalletAnalyticsHeader({
           </div>
         </div>
         <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/40 bg-black/45 px-3.5 py-2 text-xs font-medium text-cyan-100 shadow-[0_0_14px_rgba(0,229,255,0.25)]">
-          <Calendar className="h-3.5 w-3.5 shrink-0 text-cyan-300" aria-hidden />
+          <span className="relative h-4 w-4 shrink-0">
+            <Image src={WALLET_ART.range} alt="" fill sizes="16px" className="object-contain" />
+          </span>
           <span className="tabular-nums">{rangeLabel}</span>
         </div>
       </div>

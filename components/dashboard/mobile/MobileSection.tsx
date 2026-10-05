@@ -49,7 +49,7 @@ export default function MobileSection({
                 fill
                 sizes="32px"
                 // Reason: owner plates are black-canvas exports — match desktop knock-out.
-                className="object-contain mix-blend-screen"
+                className="object-contain"
               />
             </span>
           )}

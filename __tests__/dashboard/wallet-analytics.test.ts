@@ -171,19 +171,25 @@ describe("Wallet Analytics page wiring", () => {
     expect(header).toMatch(/WalletNeonIcon/);
     expect(backdrop).toMatch(/WALLET_ART\.backdrop/);
     expect(backdrop).toMatch(/object-cover/);
-    // Reason: owner 3 Oct 2026 — remap + no fill behind black-canvas plates.
-    expect(neon).toMatch(/mix-blend-screen/);
+    // Reason: flipped 5 Oct 2026 — the Menuitems set is transparent, so no
+    // screen blend and still no fill behind the plate.
+    expect(neon).not.toMatch(/mix-blend-screen/);
     expect(neon).toMatch(/bg-transparent/);
-    expect(assets).toMatch(/icon-wallet\.jpg/);
-    expect(assets).toMatch(/icon-deposit\.jpg/);
-    expect(assets).toMatch(/icon-withdrawal\.jpg/);
-    expect(assets).toMatch(/icon-games\.jpg/);
-    expect(assets).toMatch(/icon-trophy\.jpg/);
-    expect(assets).toMatch(/icon-credits\.jpg/);
-    expect(assets).toMatch(/icon-chart-2\.png/);
-    expect(assets).toMatch(/icon-purchases\.jpg/);
-    expect(assets).toMatch(/icon-gift\.jpg/);
-    expect(assets).toMatch(/icon-chart\.jpg/);
+    for (const slug of [
+      "wallet-blue",
+      "deposit",
+      "withdrawal",
+      "games-orange",
+      "trophy-purple",
+      "credits",
+      "chart-bars-red",
+      "purchases",
+      "gift",
+      "chart-growth-orange",
+    ]) {
+      expect(assets).toContain(`NEON_ICON("${slug}")`);
+    }
+    expect(assets).not.toMatch(/icon-[a-z0-9-]+\.jpg/);
     expect(trend).toMatch(/WALLET_ART\.trend/);
     expect(breakdown).toMatch(/WALLET_ART\.breakdown/);
     expect(flow).toMatch(/WALLET_ART\.dailyFlow/);

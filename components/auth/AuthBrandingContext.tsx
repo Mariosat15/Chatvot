@@ -9,6 +9,8 @@ export type AuthBranding = {
   signUpImage: string;
   // Icon slugs, not components: this value crosses from the server layout.
   featurePills: AuthFeaturePill[];
+  /** Company Settings contact email, shown on sign-in so a locked-out player can reach us. */
+  supportEmail: string;
 };
 
 const AuthBrandingContext = createContext<AuthBranding | null>(null);

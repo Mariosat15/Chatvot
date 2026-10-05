@@ -3,9 +3,10 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, Clock, Gamepad2 } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { formatVolts } from "@/lib/utils/format-volts";
 import {
+  OVERVIEW_ICON_ART,
   SUGGESTED_PRIZE_ART,
   SUGGESTED_UI_ART,
 } from "@/lib/services/games/overview-assets";
@@ -144,7 +145,9 @@ function SuggestionTile({
                 : "border-cyan-300/70 bg-cyan-500/20 text-cyan-50"
             }`}
           >
-            <Clock className="h-3.5 w-3.5" aria-hidden />
+            <span className="relative h-4 w-4 shrink-0">
+              <Image src={SUGGESTED_UI_ART.clock} alt="" fill sizes="16px" className="object-contain" />
+            </span>
             {isLive ? "Live" : "Upcoming"}
           </span>
           {/* Reason: owner, 3 Oct 2026 - the entry-fee pill on the cover is removed. */}
@@ -355,7 +358,9 @@ export default function GameSuggestionsCard({
       <section className={SECTION_FRAME}>
         <div className="flex flex-col items-center gap-2 px-4 py-6 text-center">
           <span className="flex h-11 w-11 items-center justify-center rounded-full border border-cyan-400/40 bg-cyan-500/10 shadow-[0_0_14px_-2px_rgba(56,189,248,0.5)]">
-            <Gamepad2 className="h-5 w-5 text-cyan-300" aria-hidden />
+            <span className="relative h-7 w-7">
+              <Image src={OVERVIEW_ICON_ART.gamepad} alt="" fill sizes="28px" className="object-contain" />
+            </span>
           </span>
           <p className="text-sm font-semibold text-white">
             No open contests for your games right now

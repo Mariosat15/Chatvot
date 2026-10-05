@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import InputField from "@/components/forms/InputField";
 import AuthVerificationBanners from "@/components/auth/AuthVerificationBanners";
+import AuthSupportContact from "@/components/auth/AuthSupportContact";
 import DesktopAuthShell from "@/components/auth/desktop/DesktopAuthShell";
 import { useSignInForm } from "@/hooks/useSignInForm";
 
@@ -109,6 +110,7 @@ export default function DesktopSignIn() {
             Create an account
           </Link>
         </p>
+        <AuthSupportContact className="border-t border-cyan-400/15 pt-3" />
       </form>
     </DesktopAuthShell>
   );

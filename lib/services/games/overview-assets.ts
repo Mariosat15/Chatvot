@@ -1,7 +1,7 @@
 /**
  * Overview neon asset map.
  *
- * Play-card art FALLBACK only â€” Overview prefers `bannerUrl` / `thumbnailUrl`
+ * Play-card art FALLBACK only — Overview prefers `bannerUrl` / `thumbnailUrl`
  * from the catalogue (same source as `/games` cards). These keyed neon plates
  * cover titles that have no admin artwork yet. Unknown codes fall through to
  * the generic trophy. Do not enumerate games for stats here (R29).
@@ -9,7 +9,7 @@
  * KPI / Progress / Mission icons are owner neon tiles from `ui/items`
  * (29 Sep 2026). Global Rank plates live under `ranks/` (from `ui/Rank`).
  * Level plates are stored under `levels/` (from `ui/levels`) for later screens
- * â€” Overview must not use them for Global Rank.
+ * — Overview must not use them for Global Rank.
  */
 
 import { overviewRankSrc, OVERVIEW_RANK_TOP_N } from "@/lib/utils/overview-rank-badge";
@@ -23,41 +23,54 @@ export const OVERVIEW_KPI_ICONS = "/assets/neon/overview/kpi-icons-strip.png";
 export const OVERVIEW_STREAK_ICONS =
   "/assets/neon/overview/streak-icons-strip.png";
 
+/**
+ * Owner Menuitems icon set (5 Oct 2026) — genuinely transparent, trimmed to
+ * the artwork and squared by `node tools/overview/import-menuitems.mjs`, so
+ * every slot renders them the same size and centred with no blend trick.
+ * Reason: the older black-canvas plates needed `mix-blend-screen`, which
+ * washed out each tile's dark glass fill and left padding in the box.
+ */
+export const NEON_ICON = (slug: string) => `/assets/neon/icons/${slug}.webp`;
+
 /** Standalone neon tiles used as KPI / Progress / Mission / Activity icons. */
 export const OVERVIEW_ICON_ART = {
-  progress: "/assets/neon/overview/items/icon-progress.png",
-  target: "/assets/neon/overview/items/icon-target.png",
-  growth: "/assets/neon/overview/items/icon-growth.png",
-  trophy: "/assets/neon/overview/items/icon-trophy.png",
-  /** Calendar glass tile â€” Recent Activity header (transparent, 29 Sep 2026). */
-  activity: "/assets/neon/overview/items/icon-activity-calendar.png",
-  /** Neon glass trophy for activity rows (transparent, 29 Sep 2026). */
-  trophyGlass: "/assets/neon/overview/items/icon-trophy-glass.png",
-  /**
-   * Owner neon plates (3 Oct 2026) â€” black export canvases; knock out with
-   * `mix-blend-screen` at the call site (same as Suggested badge plates).
-   */
-  wallet: "/assets/neon/overview/items/icon-wallet.jpg",
-  chart2: "/assets/neon/overview/items/icon-chart-2.png",
-  chart: "/assets/neon/overview/items/icon-chart.jpg",
-  trophyNeon: "/assets/neon/overview/items/icon-trophy-neon.jpg",
-  games: "/assets/neon/overview/items/icon-games.jpg",
-  fire: "/assets/neon/overview/items/icon-fire.jpg",
-  calendarNeon: "/assets/neon/overview/items/icon-calendar-neon.png",
-  star: "/assets/neon/overview/items/icon-star.jpg",
+  progress: NEON_ICON("chart-growth-orange"),
+  target: NEON_ICON("target-purple"),
+  growth: NEON_ICON("growth-green"),
+  trophy: NEON_ICON("trophy-green"),
+  /** Recent Activity header. */
+  activity: NEON_ICON("calendar-blue"),
+  /** Activity rows. */
+  trophyGlass: NEON_ICON("trophy-green"),
+  wallet: NEON_ICON("wallet-blue"),
+  chart2: NEON_ICON("chart-bars-red"),
+  chart: NEON_ICON("chart-growth-orange"),
+  trophyNeon: NEON_ICON("trophy-purple"),
+  games: NEON_ICON("games-orange"),
+  fire: NEON_ICON("fire"),
+  calendarNeon: NEON_ICON("calendar-gold"),
+  star: NEON_ICON("star"),
+  /** Activity rows for trades and marketplace purchases. */
+  tradeActivity: NEON_ICON("chart-growth-orange"),
+  purchaseActivity: NEON_ICON("purchases"),
+  /** Play by game header and the no-contests empty state. */
+  gamepad: NEON_ICON("gamepad-blue"),
+  /** Profile level chip on compete cards. */
+  shield: NEON_ICON("shield"),
 } as const;
 
 /**
- * Compete chrome â€” owner plates with keyed black backgrounds.
+ * Compete chrome — icons from the Menuitems set (5 Oct 2026); avatar ring
+ * and buttons are owner plates with keyed black backgrounds.
  * Buttons already carry their own label art.
  */
 export const OVERVIEW_COMPETE_ART = {
-  swords: "/assets/neon/overview/compete/icon-swords.png",
-  crown: "/assets/neon/overview/compete/icon-crown.png",
-  oneVsOne: "/assets/neon/overview/compete/icon-1v1-badge.png",
-  level: "/assets/neon/overview/compete/icon-level-crown.png",
-  score: "/assets/neon/overview/compete/icon-score-target.png",
-  competitions: "/assets/neon/overview/compete/icon-competitions-trophy.png",
+  swords: NEON_ICON("swords"),
+  crown: NEON_ICON("crown"),
+  oneVsOne: NEON_ICON("swords"),
+  level: NEON_ICON("crown"),
+  score: NEON_ICON("target-purple"),
+  competitions: NEON_ICON("trophy-blue"),
   avatarRing: "/assets/neon/overview/compete/avatar-ring.png",
   // Owner's high-resolution replacements (3 Oct 2026), keyed transparent by
   // tools/overview/key-out-black.mjs. New filenames so browsers drop the old art.
@@ -66,7 +79,7 @@ export const OVERVIEW_COMPETE_ART = {
   viewLeaderboard: "/assets/neon/overview/compete/btn-view-leaderboard-hr.png",
 } as const;
 
-/** KPI plate art â€” wallet / chart2 / chart / trophy (owner 3 Oct 2026). */
+/** KPI plate art — wallet / chart2 / chart / trophy (owner 3 Oct 2026). */
 export const OVERVIEW_KPI_ART = {
   credits: OVERVIEW_ICON_ART.wallet,
   winRate: OVERVIEW_ICON_ART.chart2,
@@ -75,7 +88,7 @@ export const OVERVIEW_KPI_ART = {
 } as const;
 
 /**
- * Streak tile icons â€” contest-shaped labels (owner 3 Oct 2026).
+ * Streak tile icons — contest-shaped labels (owner 3 Oct 2026).
  * Header uses `OVERVIEW_ICON_ART.fire` separately.
  */
 export const OVERVIEW_STREAK_ART = {
@@ -88,7 +101,7 @@ export const OVERVIEW_STREAK_ART = {
 } as const;
 
 /**
- * Owner `ui/match/uper` HUD plates (29 Sep 2026) â€” kept on disk for reference.
+ * Owner `ui/match/uper` HUD plates (29 Sep 2026) — kept on disk for reference.
  * The live Header does **not** mount these: owner rejected both five floating
  * plates and the shared-frame reading, and asked to keep the Lucide gold-pill
  * strip. Still listed in the asset inventory so a missing file fails the suite.
@@ -103,30 +116,29 @@ export const OVERVIEW_NAV_TAB_ART = {
 } as const;
 
 /**
- * Mobile Overview art â€” owner neon plates (3 Oct 2026).
+ * Mobile Overview art — owner Menuitems set (5 Oct 2026).
  * Quick Actions / Quick Access / Wallet card all share these paths so a
- * remapped glyph cannot drift between tiles. Black canvases knock out with
- * `mix-blend-screen` at the call site.
+ * remapped glyph cannot drift between tiles.
  */
 export const MOBILE_OVERVIEW_ART = {
-  deposit: "/assets/neon/wallet/icon-deposit.jpg",
-  withdraw: "/assets/neon/wallet/icon-withdrawal.jpg",
-  /** Compete â€” trophy plate (replaces old compete.webp). */
-  compete: "/assets/neon/wallet/icon-trophy.jpg",
-  /** Play â€” games controller plate. */
-  play: "/assets/neon/wallet/icon-games.jpg",
+  deposit: NEON_ICON("deposit"),
+  withdraw: NEON_ICON("withdrawal"),
+  /** Compete — trophy. */
+  compete: NEON_ICON("trophy-purple"),
+  /** Play — games controller. */
+  play: NEON_ICON("games-orange"),
   /** Wallet / Volts hero label. */
-  volt: "/assets/neon/wallet/icon-wallet.jpg",
+  volt: NEON_ICON("wallet-blue"),
   /** Wallet Analytics Quick Access. */
-  walletChart: "/assets/neon/wallet/icon-wallet.jpg",
+  walletChart: NEON_ICON("wallet-blue"),
   /** Performance Quick Access. */
-  performance: "/assets/neon/wallet/icon-chart.jpg",
+  performance: NEON_ICON("chart-growth-orange"),
   /** Tutorials Quick Access. */
-  tutorials: "/assets/neon/overview/items/icon-lamp.jpg",
+  tutorials: NEON_ICON("lightbulb"),
   /** Marketplace Quick Access. */
-  marketplace: "/assets/neon/wallet/icon-purchases.jpg",
+  marketplace: NEON_ICON("purchases"),
   star: OVERVIEW_ICON_ART.star,
-  gift: "/assets/neon/wallet/icon-gift.jpg",
+  gift: NEON_ICON("gift"),
 } as const;
 
 /**
@@ -148,9 +160,9 @@ export const SUGGESTED_PRIZE_ART = {
 
 export const SUGGESTED_UI_ART = {
   /** Section header star. */
-  star: "/assets/neon/overview/suggested/icon-star-clear.png",
-  clock: "/assets/neon/overview/suggested/icon-clock-clear.png",
-  users: "/assets/neon/overview/suggested/icon-users-clear.png",
+  star: NEON_ICON("star"),
+  clock: NEON_ICON("clock"),
+  users: NEON_ICON("users"),
   badgeGmFunded: "/assets/neon/overview/suggested/badge-gm-hr.png",
   badgePrivate: "/assets/neon/overview/suggested/badge-private-hr.png",
   badgePublic: "/assets/neon/overview/suggested/badge-public-hr.png",

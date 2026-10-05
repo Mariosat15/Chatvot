@@ -122,7 +122,7 @@ export default function OverviewStreaks({ streaks }: OverviewStreaksProps) {
             alt=""
             fill
             sizes="40px"
-            className="object-contain mix-blend-screen"
+            className="object-contain"
           />
         </span>
         <div>
@@ -161,7 +161,7 @@ export default function OverviewStreaks({ streaks }: OverviewStreaksProps) {
                     alt=""
                     fill
                     sizes="36px"
-                    className="object-contain mix-blend-screen"
+                    className="object-contain"
                   />
                 </div>
                 <div className="min-w-0 flex-1">

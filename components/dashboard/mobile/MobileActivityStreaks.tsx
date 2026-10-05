@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { Package, TrendingUp } from "lucide-react";
 import { useDashboardOverview } from "@/hooks/useDashboardOverview";
 import type { OverviewActivityItem } from "@/lib/services/games/overview-types";
 import { OVERVIEW_ICON_ART } from "@/lib/services/games/overview-assets";
@@ -31,14 +30,15 @@ function ActivityIcon({ kind }: { kind: OverviewActivityItem["kind"] }) {
       </span>
     );
   }
-  const Icon = kind === "trade" ? TrendingUp : Package;
-  const tone =
-    kind === "trade"
-      ? "border-orange-400/40 bg-orange-500/15 text-orange-300"
-      : "border-sky-400/40 bg-sky-500/15 text-sky-300";
   return (
-    <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border ${tone}`}>
-      <Icon className="h-4 w-4" aria-hidden />
+    <span className="relative h-10 w-10 shrink-0">
+      <Image
+        src={kind === "trade" ? OVERVIEW_ICON_ART.tradeActivity : OVERVIEW_ICON_ART.purchaseActivity}
+        alt=""
+        fill
+        sizes="40px"
+        className="object-contain"
+      />
     </span>
   );
 }
@@ -103,7 +103,7 @@ export function MobileStreakGrid() {
                   alt=""
                   fill
                   sizes="40px"
-                  className="object-contain mix-blend-screen"
+                  className="object-contain"
                 />
               </span>
               <div className="min-w-0">

@@ -80,7 +80,7 @@ export default function MobileMoneyInOut({
           alt=""
           width={22}
           height={22}
-          className="h-[22px] w-[22px] object-contain mix-blend-screen"
+          className="h-[22px] w-[22px] object-contain"
         />
         Credit Breakdown
       </h2>

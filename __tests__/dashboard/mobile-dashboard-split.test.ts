@@ -114,9 +114,10 @@ describe("mobile dashboard split", () => {
     expect(progress).toMatch(/iconSrc=\{OVERVIEW_ICON_ART\.games\}/);
     expect(streaks).toMatch(/iconSrc=\{OVERVIEW_ICON_ART\.fire\}/);
     expect(streaks).toMatch(/TILES\.map/);
-    expect(streaks).toMatch(/mix-blend-screen/);
+    // Reason: flipped 5 Oct 2026 — transparent Menuitems art needs no screen blend.
+    expect(streaks).not.toMatch(/mix-blend-screen/);
     expect(section).toMatch(/iconSrc/);
-    expect(section).toMatch(/mix-blend-screen/);
+    expect(section).not.toMatch(/mix-blend-screen/);
     // Reason: owner, 5 Oct 2026 - no View all on phone Recent activity.
     expect(streaks).toMatch(/title="Recent activity"/);
     expect(streaks).not.toMatch(/href="\/dashboard\?tab=contests"/);
@@ -164,17 +165,18 @@ describe("mobile dashboard split", () => {
   });
 
   it("phone Quick Actions / Quick Access / Wallet card use owner neon plates, equal size, no bg", () => {
-    // Reason: owner 3 Oct 2026 — Deposit/Withdraw/Trophy/games/wallet/chart/lamp/purch;
-    // black canvases knock out with mix-blend-screen; one ICON_BOX for equal size.
-    expect(MOBILE_OVERVIEW_ART.deposit).toBe("/assets/neon/wallet/icon-deposit.jpg");
-    expect(MOBILE_OVERVIEW_ART.withdraw).toBe("/assets/neon/wallet/icon-withdrawal.jpg");
-    expect(MOBILE_OVERVIEW_ART.compete).toBe("/assets/neon/wallet/icon-trophy.jpg");
-    expect(MOBILE_OVERVIEW_ART.play).toBe("/assets/neon/wallet/icon-games.jpg");
-    expect(MOBILE_OVERVIEW_ART.volt).toBe("/assets/neon/wallet/icon-wallet.jpg");
-    expect(MOBILE_OVERVIEW_ART.walletChart).toBe("/assets/neon/wallet/icon-wallet.jpg");
-    expect(MOBILE_OVERVIEW_ART.performance).toBe("/assets/neon/wallet/icon-chart.jpg");
-    expect(MOBILE_OVERVIEW_ART.tutorials).toBe("/assets/neon/overview/items/icon-lamp.jpg");
-    expect(MOBILE_OVERVIEW_ART.marketplace).toBe("/assets/neon/wallet/icon-purchases.jpg");
+    // Reason: flipped 5 Oct 2026 — owner replaced the black-canvas plates with the
+    // transparent Menuitems set; one ICON_BOX still keeps every tile equal size.
+    const icon = (slug: string) => `/assets/neon/icons/${slug}.webp`;
+    expect(MOBILE_OVERVIEW_ART.deposit).toBe(icon("deposit"));
+    expect(MOBILE_OVERVIEW_ART.withdraw).toBe(icon("withdrawal"));
+    expect(MOBILE_OVERVIEW_ART.compete).toBe(icon("trophy-purple"));
+    expect(MOBILE_OVERVIEW_ART.play).toBe(icon("games-orange"));
+    expect(MOBILE_OVERVIEW_ART.volt).toBe(icon("wallet-blue"));
+    expect(MOBILE_OVERVIEW_ART.walletChart).toBe(icon("wallet-blue"));
+    expect(MOBILE_OVERVIEW_ART.performance).toBe(icon("chart-growth-orange"));
+    expect(MOBILE_OVERVIEW_ART.tutorials).toBe(icon("lightbulb"));
+    expect(MOBILE_OVERVIEW_ART.marketplace).toBe(icon("purchases"));
     // Reason: old compete/play webps must not survive as the live mapping.
     expect(MOBILE_OVERVIEW_ART.compete).not.toMatch(/action-compete/);
     expect(MOBILE_OVERVIEW_ART.play).not.toMatch(/action-play/);
@@ -182,7 +184,7 @@ describe("mobile dashboard split", () => {
     const actions = read(`${MOBILE_DIR}/MobileActions.tsx`);
     expect(actions).toMatch(/const ICON_BOX =\s*"relative h-10 w-10/);
     expect((actions.match(/className=\{ICON_BOX\}/g) ?? []).length).toBe(1);
-    expect(actions).toMatch(/mix-blend-screen/);
+    expect(actions).not.toMatch(/mix-blend-screen/);
     expect(actions).toMatch(/object-contain/);
     expect(actions).toMatch(/bg-transparent/);
     // Reason: both tile lists must read from MOBILE_OVERVIEW_ART, never hard-coded paths.
@@ -197,7 +199,7 @@ describe("mobile dashboard split", () => {
 
     const balance = read(`${MOBILE_DIR}/MobileBalanceCard.tsx`);
     expect(balance).toMatch(/MOBILE_OVERVIEW_ART\.volt/);
-    expect(balance).toMatch(/mix-blend-screen/);
+    expect(balance).not.toMatch(/mix-blend-screen/);
     // Reason: empty sparkline fallback is the chart plate, not a second wallet.
     expect(balance).toMatch(/MOBILE_OVERVIEW_ART\.performance/);
   });

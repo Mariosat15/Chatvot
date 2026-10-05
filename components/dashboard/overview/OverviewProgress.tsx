@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ChevronRight, Lock, Star, Trophy } from "lucide-react";
+import { ChevronRight, Lock, Trophy } from "lucide-react";
 import type {
   OverviewMission,
   OverviewStanding,
@@ -115,19 +115,15 @@ function MilestoneTiles({
               }`}
             >
               {isDone || isCurrent ? (
-                useTrophy ? (
-                  <Trophy
-                    className="h-3.5 w-3.5 text-amber-300 drop-shadow-[0_0_6px_rgba(251,191,36,0.8)] sm:h-4 sm:w-4"
-                    aria-hidden
-                    fill="currentColor"
+                <span className="relative h-5 w-5 sm:h-6 sm:w-6">
+                  <Image
+                    src={useTrophy ? OVERVIEW_ICON_ART.trophyNeon : OVERVIEW_ICON_ART.star}
+                    alt=""
+                    fill
+                    sizes="24px"
+                    className="object-contain"
                   />
-                ) : (
-                  <Star
-                    className="h-3.5 w-3.5 text-amber-300 drop-shadow-[0_0_6px_rgba(251,191,36,0.8)] sm:h-4 sm:w-4"
-                    aria-hidden
-                    fill="currentColor"
-                  />
-                )
+                </span>
               ) : (
                 <Lock
                   className="h-3 w-3 text-gray-500 sm:h-3.5 sm:w-3.5"
@@ -275,7 +271,7 @@ export default function OverviewProgress({
               fill
               sizes="44px"
               // Reason: games plate is a black-canvas export — no fill behind it.
-              className="object-contain mix-blend-screen"
+              className="object-contain"
             />
           </span>
           <div>

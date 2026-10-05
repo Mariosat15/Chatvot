@@ -44,7 +44,7 @@ export default function MobileDailyFlow({ data }: { data: FlowPoint[] }) {
           alt=""
           width={28}
           height={28}
-          className="mt-0.5 h-7 w-7 shrink-0 object-contain mix-blend-screen"
+          className="mt-0.5 h-7 w-7 shrink-0 object-contain"
         />
         <div>
           <h2 className="text-sm font-bold text-white">Daily Credit Flow</h2>

@@ -60,7 +60,7 @@ function TileLink({ tile, height }: { tile: Tile; height: string }) {
           fill
           sizes="40px"
           // Reason: contain + no scale-up softens JPG plates; screen knocks black canvas.
-          className="object-contain object-center mix-blend-screen"
+          className="object-contain object-center"
         />
       </span>
       <span className="text-center text-[11px] font-semibold leading-tight">

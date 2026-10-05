@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { GalleryHorizontalEnd, Loader2, Shield, Swords, Trophy } from "lucide-react";
+import { GalleryHorizontalEnd, Loader2, Swords } from "lucide-react";
 import ProfileImage from "@/components/ui/ProfileImage";
 import ProfileCard from "@/components/profile/ProfileCard";
 import ChallengeCreateDialog from "@/components/challenges/ChallengeCreateDialog";
@@ -178,14 +178,14 @@ export default function MobileCompeteCarousel() {
                 </div>
 
                 <div className="grid grid-cols-3 gap-1.5 text-center">
-                  <Stat icon={<Shield className="mx-auto h-3 w-3 text-cyan-300" aria-hidden />} value={m.overallScore} label="Score" />
+                  <Stat icon={<StatIcon src={OVERVIEW_COMPETE_ART.score} />} value={m.overallScore} label="Score" />
                   <Stat
-                    icon={<Trophy className="mx-auto h-3 w-3 text-amber-300" aria-hidden />}
+                    icon={<StatIcon src={OVERVIEW_COMPETE_ART.competitions} />}
                     value={`${m.competitionsWon}/${m.competitionsEntered}`}
                     label="Competitions"
                   />
                   <Stat
-                    icon={<Swords className="mx-auto h-3 w-3 text-violet-300" aria-hidden />}
+                    icon={<StatIcon src={OVERVIEW_COMPETE_ART.oneVsOne} />}
                     value={`${m.challengesWon}/${m.challengesEntered}`}
                     label="1v1"
                   />
@@ -253,6 +253,15 @@ export default function MobileCompeteCarousel() {
         />
       )}
     </MobileSection>
+  );
+}
+
+/** Same Menuitems art as the desktop compete tiles, sized for the phone stat chip. */
+function StatIcon({ src }: { src: string }) {
+  return (
+    <span className="relative mx-auto block h-5 w-5">
+      <Image src={src} alt="" fill sizes="20px" className="object-contain" />
+    </span>
   );
 }
 

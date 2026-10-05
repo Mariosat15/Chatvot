@@ -6,7 +6,6 @@ import Link from "next/link";
 import {
   GalleryHorizontalEnd,
   Loader2,
-  Shield,
   Swords,
   TrendingUp,
 } from "lucide-react";
@@ -16,6 +15,7 @@ import ChallengeCreateDialog from "@/components/challenges/ChallengeCreateDialog
 import { OVERVIEW_COMPETE_MATCH_LIMIT } from "@/lib/services/games/overview-types";
 import {
   OVERVIEW_COMPETE_ART,
+  OVERVIEW_ICON_ART,
 } from "@/lib/services/games/overview-assets";
 import { NEON_HEADING, NEON_LABEL } from "@/components/neon/tokens";
 import {
@@ -333,7 +333,9 @@ export default function OverviewCompete({
                   <p
                     className={`${NEON_LABEL} mt-1 flex items-center gap-1.5 truncate text-[11px] text-cyan-200/90`}
                   >
-                    <Shield className="h-3.5 w-3.5 text-cyan-300" aria-hidden />
+                    <span className="relative h-4 w-4 shrink-0">
+                      <Image src={OVERVIEW_ICON_ART.shield} alt="" fill sizes="16px" className="object-contain" />
+                    </span>
                     Lv. {m.profileLevel}
                   </p>
                 </div>

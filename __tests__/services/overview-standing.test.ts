@@ -426,7 +426,9 @@ describe("Overview streaks chrome", () => {
     expect(ui).toMatch(/OVERVIEW_ICON_ART\.fire/);
     expect(ui).not.toMatch(/\bFlame\b/);
     expect(ui).toMatch(/OVERVIEW_STREAK_ART\.bestStreak/);
-    expect(ui).toMatch(/mix-blend-screen/);
+    // Reason: flipped 5 Oct 2026 — Menuitems art is transparent, so the screen
+    // blend that knocked out black canvases would now only wash the colours.
+    expect(ui).not.toMatch(/mix-blend-screen/);
     // Reason: owner, 5 Oct 2026 - remove View all / View Details from Streaks.
     expect(ui).not.toMatch(/View Details/);
     expect(ui).not.toMatch(/View All/);
@@ -722,7 +724,8 @@ describe("Overview streaks chrome", () => {
     expect(assets).toMatch(/btn-matching-cards-v3\.png/);
     expect(assets).toMatch(/btn-challenge-v3\.png/);
     expect(assets).toMatch(/btn-view-leaderboard-hr\.png/);
-    expect(assets).toMatch(/icon-swords\.png/);
+    // Reason: flipped 5 Oct 2026 — compete icons now come from the Menuitems set.
+    expect(assets).toMatch(/swords:\s*NEON_ICON\("swords"\)/);
     expect(client).toMatch(/get\("view"\)\s*===\s*"cards"/);
     expect(client).toMatch(/initialViewMode/);
     const cards = readFileSync(
@@ -762,18 +765,19 @@ describe("Overview streaks chrome", () => {
     expect(badge).toMatch(/\/assets\/neon\/overview\/ranks\//);
     expect(badge).not.toMatch(/\/assets\/neon\/overview\/levels\//);
     expect(assets).toMatch(/OVERVIEW_ICON_ART/);
-    expect(assets).toMatch(/icon-progress\.png/);
-    expect(assets).toMatch(/icon-target\.png/);
-    expect(assets).toMatch(/icon-activity-calendar\.png/);
-    // Reason: owner 3 Oct 2026 — KPI / streaks / Suggested headers remapped.
-    expect(assets).toMatch(/icon-wallet\.jpg/);
-    expect(assets).toMatch(/icon-chart-2\.png/);
-    expect(assets).toMatch(/icon-chart\.jpg/);
-    expect(assets).toMatch(/icon-trophy-neon\.jpg/);
-    expect(assets).toMatch(/icon-games\.jpg/);
-    expect(assets).toMatch(/icon-fire\.jpg/);
-    expect(assets).toMatch(/icon-calendar-neon\.png/);
-    expect(assets).toMatch(/icon-star\.jpg/);
+    // Reason: flipped 5 Oct 2026 — owner replaced every plate with the
+    // transparent Menuitems set (public/assets/neon/icons/*.webp).
+    expect(assets).toMatch(/progress:\s*NEON_ICON\("chart-growth-orange"\)/);
+    expect(assets).toMatch(/target:\s*NEON_ICON\("target-purple"\)/);
+    expect(assets).toMatch(/activity:\s*NEON_ICON\("calendar-blue"\)/);
+    expect(assets).toMatch(/wallet:\s*NEON_ICON\("wallet-blue"\)/);
+    expect(assets).toMatch(/chart2:\s*NEON_ICON\("chart-bars-red"\)/);
+    expect(assets).toMatch(/trophyNeon:\s*NEON_ICON\("trophy-purple"\)/);
+    expect(assets).toMatch(/games:\s*NEON_ICON\("games-orange"\)/);
+    expect(assets).toMatch(/fire:\s*NEON_ICON\("fire"\)/);
+    expect(assets).toMatch(/calendarNeon:\s*NEON_ICON\("calendar-gold"\)/);
+    expect(assets).toMatch(/star:\s*NEON_ICON\("star"\)/);
+    expect(assets).not.toMatch(/icon-[a-z0-9-]+\.jpg/);
     expect(assets).toMatch(/credits:\s*OVERVIEW_ICON_ART\.wallet/);
     expect(assets).toMatch(/winRate:\s*OVERVIEW_ICON_ART\.chart2/);
     expect(assets).toMatch(/roi:\s*OVERVIEW_ICON_ART\.chart/);
@@ -864,7 +868,14 @@ describe("Overview streaks chrome", () => {
     // Flipped again later that day ("the images must fill the left and right
     // space"): one object-cover image anchored top, no blur band, no contain.
     expect(artBlock).toMatch(/object-cover object-top/);
-    expect(artBlock).not.toMatch(/object-contain|blur-xl/);
+    // Reason: 5 Oct 2026 — the status pill's clock is a 16px Menuitems icon that
+    // must stay object-contain; strip it so the rule still polices the cover.
+    const coverOnly = artBlock.replace(
+      /<span className="relative h-4 w-4 shrink-0">[\s\S]*?<\/span>/,
+      "",
+    );
+    expect(coverOnly.length).toBeLessThan(artBlock.length);
+    expect(coverOnly).not.toMatch(/object-contain|blur-xl/);
     expect(artBlock).toMatch(/"Upcoming"/);
     expect(artBlock).toMatch(/"Live"/);
     // Reason: owner 3 Oct 2026 (later) - "remove the top volts": the fee pill is
@@ -1065,7 +1076,7 @@ describe("Overview streaks chrome", () => {
     expect(service).toMatch(/status:\s*\{\s*\$in:\s*\["upcoming", "active"\]\s*\}/);
   });
 
-  it("every Suggested-for-you asset is a transparent PNG, never a black canvas", async () => {
+  it("every Suggested-for-you asset is a transparent PNG or WebP, never a black canvas", async () => {
     // Reason: a structural test cannot see a black canvas - only the pixels can.
     const sharp = (await import("sharp")).default;
     const files = [
@@ -1074,7 +1085,8 @@ describe("Overview streaks chrome", () => {
     ];
     expect(files.length).toBeGreaterThanOrEqual(8);
     for (const src of files) {
-      expect(src.endsWith(".png"), src).toBe(true);
+      // Reason: 5 Oct 2026 — Menuitems icons ship as alpha WebP; JPG has no alpha.
+      expect(/\.(png|webp)$/.test(src), src).toBe(true);
       const { data, info } = await sharp(join(ROOT, "public", src))
         .ensureAlpha()
         .raw()

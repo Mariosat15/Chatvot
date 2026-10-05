@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { ChevronRight, Package, TrendingUp } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import type { OverviewActivityItem } from "@/lib/services/games/overview-types";
 import { OVERVIEW_ICON_ART } from "@/lib/services/games/overview-assets";
 import { NEON_PANEL_LIT, NEON_HEADING } from "@/components/neon/tokens";
@@ -37,16 +37,15 @@ function ActivityIcon({ kind }: { kind: OverviewActivityItem["kind"] }) {
       </span>
     );
   }
-  if (kind === "trade") {
-    return (
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-orange-400/40 bg-orange-500/15 text-orange-300 shadow-[0_0_12px_rgba(251,146,60,0.35)]">
-        <TrendingUp className="h-4 w-4" aria-hidden />
-      </span>
-    );
-  }
   return (
-    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-sky-400/40 bg-sky-500/15 text-sky-300 shadow-[0_0_12px_rgba(56,189,248,0.35)]">
-      <Package className="h-4 w-4" aria-hidden />
+    <span className="relative flex h-10 w-10 shrink-0">
+      <Image
+        src={kind === "trade" ? OVERVIEW_ICON_ART.tradeActivity : OVERVIEW_ICON_ART.purchaseActivity}
+        alt=""
+        fill
+        sizes="40px"
+        className="object-contain"
+      />
     </span>
   );
 }

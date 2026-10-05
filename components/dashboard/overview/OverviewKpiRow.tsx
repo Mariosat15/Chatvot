@@ -207,7 +207,7 @@ function KpiCard({
           alt=""
           fill
           sizes="96px"
-          className="object-contain mix-blend-screen"
+          className="object-contain"
         />
       </div>
 
@@ -225,7 +225,7 @@ function KpiCard({
             sizes="56px"
             // Reason: owner plates ship on a black canvas — screen blend knocks
             // it out so the glass ring shows through (same as Suggested badges).
-            className="scale-[1.08] object-contain mix-blend-screen drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]"
+            className="scale-[1.08] object-contain drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]"
           />
         </span>
 

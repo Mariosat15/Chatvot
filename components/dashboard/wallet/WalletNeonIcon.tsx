@@ -48,7 +48,7 @@ export default function WalletNeonIcon({
         fill
         sizes={`${size}px`}
         // Reason: scale>1 softens JPG plates; screen blend knocks the black canvas.
-        className="object-contain object-center mix-blend-screen"
+        className="object-contain object-center"
       />
     </span>
   );

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AuthVerificationBanners from "@/components/auth/AuthVerificationBanners";
+import AuthSupportContact from "@/components/auth/AuthSupportContact";
 import MobileAuthShell from "@/components/auth/mobile/MobileAuthShell";
 import MobileAuthCard from "@/components/auth/mobile/MobileAuthCard";
 import MobileAuthInput from "@/components/auth/mobile/MobileAuthInput";
@@ -132,6 +133,7 @@ export default function MobileSignIn() {
               Create your account
             </Link>
           </p>
+          <AuthSupportContact className="border-t border-cyan-400/15 pt-3" />
         </form>
       </MobileAuthCard>
 

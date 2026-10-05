@@ -43,7 +43,7 @@ export default function MobileWalletBalanceCard({
           alt=""
           width={18}
           height={18}
-          className="h-[18px] w-[18px] object-contain mix-blend-screen"
+          className="h-[18px] w-[18px] object-contain"
         />
         Wallet Balance
       </p>

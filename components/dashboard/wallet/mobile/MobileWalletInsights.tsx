@@ -40,7 +40,7 @@ export default function MobileWalletInsights({ items }: { items: InsightItem[] }
           alt=""
           width={22}
           height={22}
-          className="h-[22px] w-[22px] object-contain mix-blend-screen"
+          className="h-[22px] w-[22px] object-contain"
         />
         Wallet Insights
       </h2>
@@ -59,7 +59,7 @@ export default function MobileWalletInsights({ items }: { items: InsightItem[] }
                   alt=""
                   width={22}
                   height={22}
-                  className="h-[22px] w-[22px] object-contain mix-blend-screen"
+                  className="h-[22px] w-[22px] object-contain"
                 />
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-300">
                   {item.label}

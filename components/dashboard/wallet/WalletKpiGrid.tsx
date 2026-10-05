@@ -99,7 +99,7 @@ export default function WalletKpiGrid({ items }: { items: KpiItem[] }) {
                 alt=""
                 fill
                 sizes="96px"
-                className="object-contain mix-blend-screen"
+                className="object-contain"
               />
             </div>
             <WalletNeonIcon

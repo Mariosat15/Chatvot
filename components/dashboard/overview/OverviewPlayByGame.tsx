@@ -2,7 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, Gamepad2 } from "lucide-react";
+import { ArrowRight } from "lucide-react";
+import { OVERVIEW_ICON_ART } from "@/lib/services/games/overview-assets";
 import type { OverviewPlayCard } from "@/lib/services/games/overview-types";
 import { OVERVIEW_PLAY_CARD_LIMIT } from "@/lib/services/games/overview-types";
 import { NEON_PANEL, NEON_HEADING, NEON_LABEL } from "@/components/neon/tokens";
@@ -37,7 +38,9 @@ export default function OverviewPlayByGame({ cards }: OverviewPlayByGameProps) {
     <section aria-labelledby="play-by-game-heading" className={PLAY_SECTION_FRAME}>
       <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
         <div className="flex items-center gap-2">
-          <Gamepad2 className="h-4 w-4 text-sky-400" aria-hidden />
+          <span className="relative h-6 w-6 shrink-0">
+            <Image src={OVERVIEW_ICON_ART.gamepad} alt="" fill sizes="24px" className="object-contain" />
+          </span>
           <h2
             id="play-by-game-heading"
             className={`${NEON_HEADING} text-sm uppercase tracking-[0.14em]`}
