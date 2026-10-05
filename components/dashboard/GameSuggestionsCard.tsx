@@ -9,6 +9,10 @@ import {
   SUGGESTED_PRIZE_ART,
   SUGGESTED_UI_ART,
 } from "@/lib/services/games/overview-assets";
+import {
+  OVERVIEW_ACTION_BUTTON,
+  OVERVIEW_ACTION_BUTTON_INLINE,
+} from "@/components/dashboard/overview/overview-actions";
 
 interface Suggestion {
   gameKey: string;
@@ -254,17 +258,13 @@ function SuggestionTile({
         </div>
 
         {/*
-          8. Join — the owner's transparent high-resolution button (3 Oct 2026),
-          full width. It is an image inside the card link, not a second link.
+          8. Join — same sharp cyan CTA as Challenge / Matching Cards / View
+          Leaderboard (owner, 5 Oct 2026). Inside the card link, not a nested link.
         */}
-        <Image
-          src={SUGGESTED_UI_ART.join}
-          alt="Join"
-          width={1014}
-          height={184}
-          unoptimized
-          className="mx-auto mt-3 h-auto w-[92%] transition group-hover:brightness-125 motion-reduce:transition-none"
-        />
+        <span className={`${OVERVIEW_ACTION_BUTTON} mt-3`} aria-hidden>
+          Join
+          <ArrowRight className="h-3.5 w-3.5" />
+        </span>
       </div>
     </Link>
   );
@@ -273,8 +273,10 @@ function SuggestionTile({
 /**
  * Contests suggested from games the player has actually played (X11.5).
  * Layout matches owner Image 2 (3 Oct 2026): competition cover with Upcoming
- * pill (the fee pill was removed 3 Oct 2026), GM/Private/Public badges, fixed prize strip, image Join button.
- * Every image is a transparent PNG - nothing renders on a black canvas.
+ * pill (the fee pill was removed 3 Oct 2026), GM/Private/Public badges, fixed prize strip.
+ * Join / Browse / View all use the shared sharp cyan OVERVIEW_ACTION_BUTTON
+ * (5 Oct 2026) — same CTA as Compete and View Leaderboard, no PNG bloom.
+ * Every badge/prize image is a transparent PNG - nothing renders on a black canvas.
  * Never invites anyone - suggestions only (X14).
  */
 export default function GameSuggestionsCard({
@@ -362,7 +364,7 @@ export default function GameSuggestionsCard({
           </p>
           <Link
             href="/competitions"
-            className="mt-1 inline-flex items-center gap-1 rounded-lg border border-cyan-400/50 bg-cyan-500/10 px-3 py-1.5 text-[13px] font-semibold text-cyan-200 transition hover:border-cyan-300 hover:bg-cyan-500/20"
+            className={`${OVERVIEW_ACTION_BUTTON_INLINE} mt-1`}
           >
             Browse competitions
             <ArrowRight className="h-3.5 w-3.5" aria-hidden />
@@ -399,7 +401,7 @@ export default function GameSuggestionsCard({
         </div>
         <Link
           href="/competitions"
-          className="inline-flex min-h-[44px] items-center gap-1 text-[14px] font-semibold text-cyan-300 hover:text-cyan-200"
+          className={OVERVIEW_ACTION_BUTTON_INLINE}
         >
           View all
           <ArrowRight className="h-4 w-4" aria-hidden />

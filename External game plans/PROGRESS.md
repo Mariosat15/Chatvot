@@ -931,6 +931,14 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 5 October 2026 - Overview CTAs share one sharp cyan button (no blur)
+
+**Owner instruction:** Challenge / Matching Cards / View Leaderboard / Suggested Join looked blurry and inconsistent. The PNG button art carried a soft neon bloom, and CSS `drop-shadow` doubled it; colours also disagreed (orange Challenge, purple Matching Cards, cyan Leaderboard, text-only Browse).
+
+- **One definition:** `components/dashboard/overview/overview-actions.ts` — `OVERVIEW_ACTION_BUTTON` / `_INLINE` borrow `neonButtonClasses("outline")` plus `PRESS_EFFECT`. No `drop-shadow` / `shadow-[0_0_*]` bloom.
+- **Wired everywhere on the Overview:** desktop `OverviewCompete` (Challenge + Matching Cards), `OverviewProgress` (View Leaderboard + View All Missions), mobile `MobileCompeteCarousel` + `MobileSection` header CTAs, `GameSuggestionsCard` (Join, Browse competitions, View all).
+- Tests flipped in `mobile-dashboard-split.test.ts` and `overview-standing.test.ts` (44 green). **Never verified by eye.**
+
 ### 5 October 2026 - Anyone holding the Employees section can manage admins, not only the original admin
 
 **Owner instruction:** "Full Admin should be able to create other admins and grant them anything." The employee and role-template routes were identity-locked: past the `employees` section grant, each one also demanded that the caller *be* the original admin (`ADMIN_EMAIL`, else the oldest admin by `createdAt`), through four private copies of `isOriginalAdmin`. So a Full Admin holding every section could open the Employees screen and was refused on every write. **Nothing was computed wrongly, there is no risk number and nothing was backfilled.**

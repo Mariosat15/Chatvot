@@ -211,22 +211,28 @@ describe("mobile dashboard split", () => {
     }
   });
 
-  it("the phone Compete header's Matching Cards is a pressable pill, not bare text", () => {
-    // Reason: owner, 29 Sep 2026 - a plain cyan word did not read as tappable.
+  it("the phone Compete header's Matching Cards is a pressable CTA, not bare text", () => {
+    // Reason: flipped 5 Oct 2026 - violet glow pill replaced by the shared
+    // sharp cyan OVERVIEW_ACTION_BUTTON_INLINE (owner: no blur, one theme).
     const carousel = read("components/dashboard/mobile/MobileCompeteCarousel.tsx");
     const section = read("components/dashboard/mobile/MobileSection.tsx");
     expect(carousel).toMatch(/linkLabel="Matching Cards"\s*linkAsButton/);
+    expect(section).toMatch(/OVERVIEW_ACTION_BUTTON_INLINE/);
     const pill = section.slice(section.indexOf("linkAsButton && ("));
     expect(pill.length).toBeGreaterThan(40);
-    expect(pill).toMatch(/rounded-full[^"]*active:scale-95/);
+    expect(pill).toMatch(/OVERVIEW_ACTION_BUTTON_INLINE/);
+    expect(pill).not.toMatch(/shadow-\[0_0_14px_rgba\(139,92,246/);
     expect(pill).toMatch(/<ChevronRight/);
   });
 
   it("each phone Compete card carries Matching Cards beside its Challenge button", () => {
     // Reason: owner, 29 Sep 2026 - moved off the header onto every card. The
     // header pill survives only for the empty state, so it is conditional.
+    // Flipped 5 Oct 2026: ACTION_BUTTON is the shared sharp cyan CTA, not a
+    // local orange/purple pair with bloom shadows.
     const carousel = read("components/dashboard/mobile/MobileCompeteCarousel.tsx");
     expect(carousel).toMatch(/href=\{matches\.length === 0 && !loading \? MATCHING_CARDS_HREF : undefined\}/);
+    expect(carousel).toMatch(/const ACTION_BUTTON = OVERVIEW_ACTION_BUTTON/);
     const start = carousel.indexOf('<div className="grid grid-cols-2 gap-2">');
     expect(start).toBeGreaterThan(-1);
     const row = carousel.slice(start, carousel.indexOf("</article>", start));
@@ -235,8 +241,9 @@ describe("mobile dashboard split", () => {
     const cards = row.indexOf("href={MATCHING_CARDS_HREF}");
     expect(challenge).toBeGreaterThan(-1);
     expect(cards).toBeGreaterThan(challenge);
-    expect((row.match(/\$\{ACTION_BUTTON\}/g) ?? []).length).toBe(2);
-    expect(carousel).toMatch(/const ACTION_BUTTON =\s*"[^"]*h-12[^"]*active:scale-95/);
+    expect((row.match(/className=\{ACTION_BUTTON\}/g) ?? []).length).toBe(2);
+    expect(row).not.toMatch(/shadow-\[0_0_14px_rgba\(251,146,60/);
+    expect(row).not.toMatch(/shadow-\[0_0_14px_rgba\(139,92,246/);
   });
 
   it("desktop Compete tiles put the icon beside the figure, as in the reference", () => {
@@ -268,17 +275,15 @@ describe("mobile dashboard split", () => {
   });
 
   it("each desktop Compete card carries Matching Cards beside its Challenge button", () => {
-    // Reason: flipped 29 Sep 2026 - owner replaced the CSS pills with neon art
-    // (Challenge + Matching Cards). Same two-column layout; hover brightens,
-    // press shrinks, hand cursor. Header art survives only when empty.
+    // Reason: flipped 5 Oct 2026 - PNG Challenge/Matching Cards art + drop-shadow
+    // blooms looked blurry (owner). Both footers use OVERVIEW_ACTION_BUTTON;
+    // empty-state header still links Matching Cards.
     const compete = read("components/dashboard/overview/OverviewCompete.tsx");
-    expect(compete).toMatch(/src=\{OVERVIEW_COMPETE_ART\.challenge\}/);
-    expect(compete).toMatch(/src=\{OVERVIEW_COMPETE_ART\.matchingCards\}/);
-    expect(compete).not.toMatch(/const ACTION_BUTTON =/);
-    expect(compete).toMatch(
-      // Flipped 3 Oct 2026: one shared small press (PRESS_EFFECT), no hover growth.
-      /const ART_ACTION =\s*`[^`]*cursor-pointer \$\{PRESS_EFFECT\} \$\{ART_BUTTON_HOVER\}`/,
-    );
+    expect(compete).toMatch(/const ACTION_BUTTON = OVERVIEW_ACTION_BUTTON/);
+    expect(compete).not.toMatch(/const ART_ACTION =/);
+    expect(compete).not.toMatch(/OVERVIEW_COMPETE_ART\.challenge/);
+    expect(compete).not.toMatch(/OVERVIEW_COMPETE_ART\.matchingCards/);
+    expect(compete).not.toMatch(/drop-shadow-\[0_0_12px_rgba\(251,146,60/);
     expect(compete).toMatch(
       /matches\.length === 0 && !loading && \([\s\S]*?MATCHING_CARDS_HREF/,
     );
@@ -290,7 +295,6 @@ describe("mobile dashboard split", () => {
     const cards = row.indexOf("href={MATCHING_CARDS_HREF}");
     expect(challenge).toBeGreaterThan(-1);
     expect(cards).toBeGreaterThan(challenge);
-    expect((row.match(/\$\{ART_ACTION\}/g) ?? []).length).toBe(2);
-    expect(row).toMatch(/\bunoptimized\b/);
+    expect((row.match(/className=\{ACTION_BUTTON\}/g) ?? []).length).toBe(2);
   });
 });

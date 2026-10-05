@@ -3,7 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Loader2, Shield, TrendingUp } from "lucide-react";
+import {
+  GalleryHorizontalEnd,
+  Loader2,
+  Shield,
+  Swords,
+  TrendingUp,
+} from "lucide-react";
 import ProfileImage from "@/components/ui/ProfileImage";
 import ProfileCard from "@/components/profile/ProfileCard";
 import ChallengeCreateDialog from "@/components/challenges/ChallengeCreateDialog";
@@ -12,21 +18,18 @@ import {
   OVERVIEW_COMPETE_ART,
 } from "@/lib/services/games/overview-assets";
 import { NEON_HEADING, NEON_LABEL } from "@/components/neon/tokens";
-import { ART_BUTTON_HOVER, PRESS_EFFECT } from "@/components/ui/press-effect";
+import {
+  OVERVIEW_ACTION_BUTTON,
+  OVERVIEW_ACTION_BUTTON_INLINE,
+} from "@/components/dashboard/overview/overview-actions";
 import { PERFORMANCE_INTERVALS } from "@/lib/utils/performance";
 
 const MATCHING_CARDS_HREF = "/leaderboard?board=trading&view=cards";
 
-// Reason: owner, 29 Sep 2026 - card footer uses the supplied neon button art
-// (Challenge + Matching Cards), not CSS pills. Hover brightens, press shrinks,
-// always a hand cursor.
-// Reason: owner, 3 Oct 2026 - "same size and a bit smaller". The two supplied
-// arts had different shapes, so no shared box could show both at one height
-// and one width. tools/overview/fit-button-pair.mjs now writes both to one
-// 960x268 canvas, and this box has exactly that shape, so the pair draw
-// identically; 88% of the column, centred, is the "bit smaller".
-const ART_ACTION =
-  `relative mx-auto block aspect-[960/268] w-[88%] min-w-0 cursor-pointer ${PRESS_EFFECT} ${ART_BUTTON_HOVER}`;
+// Reason: owner, 5 Oct 2026 - PNG Challenge/Matching Cards art plus drop-shadow
+// blooms looked blurry and mismatched the cyan theme. One shared sharp CSS
+// button (overview-actions) for every CTA; press via PRESS_EFFECT.
+const ACTION_BUTTON = OVERVIEW_ACTION_BUTTON;
 
 const COMPETE_TILE =
   "flex min-h-[58px] items-center gap-3 rounded-lg border border-cyan-400/30 bg-[#07101f]/90 px-3 py-2 shadow-[inset_0_0_12px_rgba(34,211,238,0.06)]";
@@ -260,17 +263,11 @@ export default function OverviewCompete({
         {matches.length === 0 && !loading && (
           <Link
             href={MATCHING_CARDS_HREF}
-            className={`relative inline-flex h-10 w-[184px] shrink-0 cursor-pointer drop-shadow-[0_0_14px_rgba(139,92,246,0.6)] ${PRESS_EFFECT} ${ART_BUTTON_HOVER} sm:h-11 sm:w-[204px]`}
+            className={`${OVERVIEW_ACTION_BUTTON_INLINE} shrink-0`}
             aria-label="Matching Cards"
           >
-            <Image
-              src={OVERVIEW_COMPETE_ART.matchingCards}
-              alt="Matching Cards"
-              fill
-              unoptimized
-              sizes="204px"
-              className="object-contain"
-            />
+            <GalleryHorizontalEnd className="h-4 w-4 shrink-0" aria-hidden />
+            Matching Cards
           </Link>
         )}
       </div>
@@ -448,9 +445,8 @@ export default function OverviewCompete({
                 </div>
               </div>
 
-              {/* Reason: owner, 29 Sep 2026 - Matching Cards beside Challenge on
-                  every card. Supplied neon art (transparent back) replaces the
-                  CSS pills; both share one height so the row stays even. */}
+              {/* Reason: owner, 5 Oct 2026 - Matching Cards beside Challenge on
+                  every card. Same sharp cyan CTA (no PNG bloom). */}
               <div className="mt-auto grid grid-cols-2 gap-2">
                 <button
                   type="button"
@@ -460,33 +456,19 @@ export default function OverviewCompete({
                       username: m.username,
                     })
                   }
-                  className={`${ART_ACTION} drop-shadow-[0_0_12px_rgba(251,146,60,0.55)] hover:drop-shadow-[0_0_18px_rgba(251,146,60,0.85)]`}
+                  className={ACTION_BUTTON}
                   aria-label={`Challenge ${m.username}`}
                 >
-                  <Image
-                    src={OVERVIEW_COMPETE_ART.challenge}
-                    alt=""
-                    fill
-                    unoptimized
-                    sizes="200px"
-                    className="object-contain"
-                  />
-                  <span className="sr-only">Challenge</span>
+                  <Swords className="h-4 w-4 shrink-0" aria-hidden />
+                  Challenge
                 </button>
                 <Link
                   href={MATCHING_CARDS_HREF}
-                  className={`${ART_ACTION} drop-shadow-[0_0_12px_rgba(139,92,246,0.55)] hover:drop-shadow-[0_0_18px_rgba(139,92,246,0.85)]`}
+                  className={ACTION_BUTTON}
                   aria-label="Matching Cards"
                 >
-                  <Image
-                    src={OVERVIEW_COMPETE_ART.matchingCards}
-                    alt=""
-                    fill
-                    unoptimized
-                    sizes="200px"
-                    className="object-contain"
-                  />
-                  <span className="sr-only">Matching Cards</span>
+                  <GalleryHorizontalEnd className="h-4 w-4 shrink-0" aria-hidden />
+                  <span className="truncate">Matching Cards</span>
                 </Link>
               </div>
             </article>

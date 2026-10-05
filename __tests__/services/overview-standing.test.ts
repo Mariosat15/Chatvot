@@ -8,7 +8,6 @@ import {
 } from "@/lib/services/games/overview-standing.service";
 import {
   allOverviewAssets,
-  OVERVIEW_COMPETE_ART,
   overviewPlayCardArt,
   SUGGESTED_PRIZE_ART,
   SUGGESTED_UI_ART,
@@ -568,13 +567,14 @@ describe("Overview streaks chrome", () => {
     expect(progress).toMatch(/MILESTONE_TILE_CAP/);
     expect(progress).toMatch(/Active Missions/);
     expect(progress).toMatch(/View Leaderboard/);
-    // Reason: the owner replaced the solid cyan crown pill with the supplied
-    // neon button art (29 Sep 2026); it looms and presses like Matching Cards.
-    expect(progress).toMatch(/OVERVIEW_COMPETE_ART\.viewLeaderboard/);
+    // Reason: flipped 5 Oct 2026 - PNG View Leaderboard art + drop-shadow bloom
+    // replaced by the shared sharp cyan OVERVIEW_ACTION_BUTTON (owner: no blur,
+    // one theme with Challenge / Matching Cards / Join).
+    expect(progress).toMatch(/OVERVIEW_ACTION_BUTTON/);
+    expect(progress).not.toMatch(/OVERVIEW_COMPETE_ART\.viewLeaderboard/);
     expect(progress).not.toMatch(/OVERVIEW_COMPETE_ART\.crown/);
-    // Reason: loom/press must match Matching Cards — brightness + scale, not scale alone.
-    // Flipped 3 Oct 2026: the loom (hover:scale-110) gave way to the shared small press.
-    expect(progress).toMatch(/\$\{PRESS_EFFECT\} \$\{ART_BUTTON_HOVER\}/);
+    expect(progress).not.toMatch(/ART_BUTTON_HOVER/);
+    expect(progress).not.toMatch(/drop-shadow-\[0_0_16px_rgba\(34,211,238/);
     expect(progress).not.toMatch(/hover:scale-110/);
     expect(progress).toMatch(/sm:col-span-2/);
     expect(progress).toMatch(/missions\.map/);
@@ -634,15 +634,15 @@ describe("Overview streaks chrome", () => {
     expect(compete).toMatch(/Matching Cards/);
     expect(compete).toMatch(/OVERVIEW_COMPETE_ART/);
     expect(compete).toMatch(/btn-challenge|challenge|Challenge/);
-    // Reason: Matching Cards + Challenge must loom on hover, press in, and show a hand.
+    // Reason: Matching Cards + Challenge share one sharp cyan CTA and press.
     expect(compete).toMatch(/cursor-pointer/);
-    // Reason: flipped 29 Sep 2026 - owner supplied neon button art for both
-    // footer actions. CSS pills are gone; art brightens on hover and shrinks on press.
-    expect(compete).not.toMatch(/const ACTION_BUTTON =/);
-    expect(compete).toMatch(
-      // Flipped 3 Oct 2026: one shared small press (PRESS_EFFECT), no hover growth.
-      /const ART_ACTION =\s*`[^`]*cursor-pointer \$\{PRESS_EFFECT\} \$\{ART_BUTTON_HOVER\}`/,
-    );
+    // Reason: flipped 5 Oct 2026 - PNG art + drop-shadow blooms looked blurry
+    // (owner). Both footers use OVERVIEW_ACTION_BUTTON; equal size is the
+    // shared class (h-11 w-full), not identical PNG canvases.
+    expect(compete).toMatch(/const ACTION_BUTTON = OVERVIEW_ACTION_BUTTON/);
+    expect(compete).not.toMatch(/const ART_ACTION =/);
+    expect(compete).not.toMatch(/OVERVIEW_COMPETE_ART\.challenge/);
+    expect(compete).not.toMatch(/drop-shadow-\[0_0_12px_rgba\(251,146,60/);
     const actionRow = compete.indexOf('className="mt-auto grid grid-cols-2 gap-2"');
     expect(actionRow).toBeGreaterThan(-1);
     const cardFooter = compete.slice(actionRow, compete.indexOf("</article>", actionRow));
@@ -650,28 +650,20 @@ describe("Overview streaks chrome", () => {
     expect(cardFooter.indexOf("href={MATCHING_CARDS_HREF}")).toBeGreaterThan(
       cardFooter.indexOf("setChallengeTarget("),
     );
-    expect(cardFooter).toMatch(/OVERVIEW_COMPETE_ART\.challenge/);
-    expect(cardFooter).toMatch(/OVERVIEW_COMPETE_ART\.matchingCards/);
-    expect((cardFooter.match(/\$\{ART_ACTION\}/g) ?? []).length).toBe(2);
-    // Reason: owner, 3 Oct 2026 - both footer buttons must be the same size
-    // (height AND width) and a bit smaller than the column. Flipped from the
-    // first version, which only proved equal width: read both PNG headers and
-    // require identical dimensions whose shape is exactly the box's, so a
-    // replacement art that is not run through fit-button-pair.mjs fails here.
-    const artAction = compete.match(/const ART_ACTION =\s*`([^`]*)`/)?.[1] ?? "";
-    expect(artAction).not.toMatch(/\bh-\d/);
-    expect(artAction).not.toMatch(/\bw-full\b/);
-    expect(artAction).toMatch(/\bmx-auto\b/);
-    const aspect = artAction.match(/aspect-\[(\d+)\/(\d+)\]/);
-    expect(aspect).not.toBeNull();
-    const dims = [OVERVIEW_COMPETE_ART.challenge, OVERVIEW_COMPETE_ART.matchingCards].map(
-      (src) => {
-        const png = readFileSync(join(process.cwd(), "public", src));
-        return [png.readUInt32BE(16), png.readUInt32BE(20)];
-      },
-    );
-    expect(dims[0]).toEqual(dims[1]);
-    expect(dims[0]).toEqual([Number(aspect![1]), Number(aspect![2])]);
+    expect((cardFooter.match(/className=\{ACTION_BUTTON\}/g) ?? []).length).toBe(2);
+    expect(cardFooter).toMatch(/<Swords/);
+    expect(cardFooter).toMatch(/GalleryHorizontalEnd/);
+    // Reason: the shared token forbids soft glow blooms (blur root cause).
+    const actions = readFileSync(
+      join(ROOT, "components/dashboard/overview/overview-actions.ts"),
+      "utf8",
+    )
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    expect(actions).toMatch(/OVERVIEW_ACTION_BUTTON/);
+    expect(actions).toMatch(/neonButtonClasses\("outline"\)/);
+    expect(actions).not.toMatch(/drop-shadow/);
+    expect(actions).not.toMatch(/shadow-\[0_0_/);
     // Reason: header Matching Cards survives only for the empty state.
     expect(compete).toMatch(
       /matches\.length === 0 && !loading && \([\s\S]*?MATCHING_CARDS_HREF/,
@@ -861,12 +853,13 @@ describe("Overview streaks chrome", () => {
     expect(artBlock).not.toMatch(/h-auto/);
   });
 
-  it("Suggested for you matches Image 2: competition cover, pills, big hi-res badges, prize strip, image Join", () => {
+  it("Suggested for you matches Image 2: competition cover, pills, big hi-res badges, prize strip, sharp Join CTA", () => {
     // Reason: owner 3 Oct 2026 (second pass) rejected four things the first
     // Image-2 rebuild shipped, so each is pinned in the opposite direction:
     // a curated per-game plate replaced the competition's own image; the cover
     // lost its Upcoming / fee pills; badges and Join rendered tiny on black
     // canvases; and the prize art was a full banner cropped to each card's width.
+    // Amended 5 Oct 2026: Join is the shared sharp cyan CTA, not PNG art.
     const suggestions = readFileSync(
       join(ROOT, "components/dashboard/GameSuggestionsCard.tsx"),
       "utf8",
@@ -909,11 +902,11 @@ describe("Overview streaks chrome", () => {
     );
     expect(block.length).toBeGreaterThan(100);
     expect(block).not.toMatch(/\.jpg"/);
-    // Reason: owner 3 Oct 2026 supplied a transparent high-res Join plate and
-    // asked for it; the CSS button that replaced the old black-canvas plate is
-    // superseded. Flipped, not deleted - the black-canvas ban above still holds.
-    expect(block).toMatch(/btn-join-hr\.png/);
-    expect(suggestions).toMatch(/SUGGESTED_UI_ART\.join/);
+    // Reason: flipped 5 Oct 2026 - Join PNG art looked blurry beside the
+    // Compete CTAs; asset may remain on disk but the card must not render it.
+    // The black-canvas ban above still holds for the prize/badge plates.
+    expect(suggestions).not.toMatch(/SUGGESTED_UI_ART\.join/);
+    expect(suggestions).toMatch(/OVERVIEW_ACTION_BUTTON/);
     expect(assets).not.toMatch(/suggestedPrizeArt/);
 
     // 4. Badges at a visible size (cropped plates, so the height is the badge).
@@ -923,8 +916,8 @@ describe("Overview streaks chrome", () => {
     expect(suggestions).toMatch(/SUGGESTED_UI_ART\.badgePublic/);
     expect(suggestions).toMatch(/const BADGE_IMG = "h-8 w-auto shrink-0"/);
     // Reason: Next re-encoding a 650-890px plate at ~95px blurred it; the full
-    // file is served and the browser only scales down.
-    expect(suggestions.match(/unoptimized/g)?.length ?? 0).toBeGreaterThanOrEqual(5);
+    // file is served and the browser only scales down. Join no longer counts.
+    expect(suggestions.match(/unoptimized/g)?.length ?? 0).toBeGreaterThanOrEqual(4);
 
     // 5. Prize strip: fixed height; the right-hand prize art is GONE (owner
     // crossed it out, 3 Oct 2026); a bigger trophy spans both lines; the number
@@ -940,20 +933,21 @@ describe("Overview streaks chrome", () => {
     expect(suggestions).toMatch(/items-baseline[\s\S]{0,200}\{prizeNumber\}[\s\S]{0,200}\{creditSymbol\}/);
     expect(suggestions).not.toMatch(/object-cover object-right/);
 
-    // 6. Join is the owner's full-width transparent image, labelled by alt, and
-    // NOT a nested link (the whole card is already the link).
-    const joinIdx = suggestions.indexOf("SUGGESTED_UI_ART.join");
+    // 6. Join is the shared sharp cyan CTA (owner, 5 Oct 2026), NOT a nested
+    // link and NOT the foggy PNG art. Flipped from SUGGESTED_UI_ART.join.
+    expect(suggestions).not.toMatch(/SUGGESTED_UI_ART\.join/);
+    const joinIdx = suggestions.indexOf('OVERVIEW_ACTION_BUTTON} mt-3');
     expect(joinIdx).toBeGreaterThan(-1);
+    // The Join label sits inside the card Link as a span, never a second Link.
     const joinCta = suggestions.slice(
-      suggestions.lastIndexOf("<Image", joinIdx),
-      suggestions.indexOf("/>", joinIdx) + 2,
+      suggestions.lastIndexOf("<span", joinIdx),
+      suggestions.indexOf("</span>", joinIdx) + 7,
     );
-    expect(joinCta.length).toBeGreaterThan(40);
-    expect(joinCta).toMatch(/alt="Join"/);
-    // Reason: owner 3 Oct 2026 - Join read foggy at full width, so it is a
-    // touch narrower and centred (was w-full). Flipped, not deleted.
-    expect(joinCta).toMatch(/mx-auto[^"]*w-\[92%\]/);
+    expect(joinCta.length).toBeGreaterThan(20);
+    expect(joinCta).toMatch(/Join/);
     expect(joinCta).not.toMatch(/<Link/);
+    expect(suggestions).toMatch(/Browse competitions/);
+    expect(suggestions).toMatch(/OVERVIEW_ACTION_BUTTON_INLINE/);
 
     // 7. Phone: swipe row; sm: 2 columns; xl: 4 (Image 2).
     expect(suggestions).toMatch(/const TILE_ROW =[\s\S]*?snap-x[\s\S]*?sm:grid-cols-2[\s\S]*?xl:grid-cols-4/);

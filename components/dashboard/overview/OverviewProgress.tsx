@@ -3,13 +3,11 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ChevronRight, Lock, Star, Trophy } from "lucide-react";
-import { ART_BUTTON_HOVER, PRESS_EFFECT } from "@/components/ui/press-effect";
 import type {
   OverviewMission,
   OverviewStanding,
 } from "@/lib/services/games/overview-types";
 import {
-  OVERVIEW_COMPETE_ART,
   OVERVIEW_ICON_ART,
   OVERVIEW_KPI_ART,
 } from "@/lib/services/games/overview-assets";
@@ -18,6 +16,10 @@ import {
   NEON_HEADING,
   NEON_LABEL,
 } from "@/components/neon/tokens";
+import {
+  OVERVIEW_ACTION_BUTTON,
+  OVERVIEW_ACTION_BUTTON_INLINE,
+} from "@/components/dashboard/overview/overview-actions";
 
 const JOURNEY_HREF = "/profile?tab=journey";
 const LEADERBOARD_HREF = "/leaderboard";
@@ -289,7 +291,7 @@ export default function OverviewProgress({
         </div>
         <Link
           href={JOURNEY_HREF}
-          className="inline-flex items-center gap-1 rounded-full border border-amber-400/55 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-300 shadow-[0_0_14px_rgba(251,191,36,0.25)] transition hover:bg-amber-500/20 hover:text-amber-200"
+          className={OVERVIEW_ACTION_BUTTON_INLINE}
         >
           View All Missions
           <ChevronRight className="h-3.5 w-3.5" aria-hidden />
@@ -323,18 +325,14 @@ export default function OverviewProgress({
           </p>
           <Link
             href={LEADERBOARD_HREF}
-            // Reason: same loom as Matching Cards — brighten + grow on hover, shrink + dim on press.
-            className={`relative mt-1 inline-flex h-12 w-full max-w-[220px] shrink-0 cursor-pointer drop-shadow-[0_0_16px_rgba(34,211,238,0.55)] hover:drop-shadow-[0_0_22px_rgba(34,211,238,0.85)] ${PRESS_EFFECT} ${ART_BUTTON_HOVER}`}
+            // Reason: owner, 5 Oct 2026 - same sharp cyan CTA as Challenge /
+            // Matching Cards / Join; no PNG bloom or drop-shadow blur.
+            className={`${OVERVIEW_ACTION_BUTTON} mt-1 max-w-[220px]`}
             aria-label="View Leaderboard"
           >
-            <Image
-              src={OVERVIEW_COMPETE_ART.viewLeaderboard}
-              alt="View Leaderboard"
-              fill
-              unoptimized
-              sizes="220px"
-              className="object-contain"
-            />
+            <Trophy className="h-4 w-4 shrink-0" aria-hidden />
+            View Leaderboard
+            <ChevronRight className="h-3.5 w-3.5 shrink-0" aria-hidden />
           </Link>
         </div>
 
