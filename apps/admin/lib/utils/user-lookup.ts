@@ -1,5 +1,6 @@
 import type { Document, Filter } from "mongodb";
 import { connectToDatabase } from "@/database/mongoose";
+import { PLAYER_TYPES, isPlayerType } from "./player-type";
 
 export interface UserInfo {
   id: string;
@@ -9,7 +10,7 @@ export interface UserInfo {
   username?: string;
   profileImage?: string;
   bio?: string;
-  role?: string; // 'trader', 'admin', 'backoffice'
+  role?: string; // player type ('trader', 'gamer', 'both') or a staff role
   country?: string;
   address?: string;
   city?: string;
@@ -74,7 +75,7 @@ export async function getUserById(userId: string): Promise<UserInfo | null> {
 }
 
 /**
- * Get ALL traders from the database (only users with role='trader' or no role set)
+ * Get ALL players from the database (trader, gamer or both, or no role set)
  * Identifies traders by EMAIL and ROLE field (not by name)
  * Returns an array of all trader users, deduplicated by email
  */
@@ -101,10 +102,10 @@ export async function getAllUsers(): Promise<UserInfo[]> {
           // Must have email
           { email: { $exists: true, $ne: null } },
           { email: { $nin: [""] } },
-          // Role filter - only traders
+          // Role filter - only players (trader, gamer, both; absent = legacy trader)
           {
             $or: [
-              { role: "trader" }, // Explicitly set as trader
+              { role: { $in: [...PLAYER_TYPES] } },
               { role: { $exists: false } }, // No role field = legacy user, treat as trader
               { role: null }, // Null role = treat as trader
             ],
@@ -127,9 +128,10 @@ export async function getAllUsers(): Promise<UserInfo[]> {
       // Skip if we already have this user by email (dedupe by email)
       if (uniqueUsersMap.has(email)) continue;
 
-      // Double-check role: skip if explicitly set to non-trader
+      // Double-check role. Reason: this list feeds leaderboards, so filtering
+      // on "trader" alone would drop every gamer and "both" player.
       const role = user.role || "trader"; // Default to trader if no role
-      if (role !== "trader") continue;
+      if (!isPlayerType(role)) continue;
 
       // Skip admin email (extra safety)
       if (adminEmail && email === adminEmail) continue;
@@ -141,7 +143,7 @@ export async function getAllUsers(): Promise<UserInfo[]> {
         username: user.username || undefined,
         profileImage: user.profileImage || user.image, // Check both profileImage and image (better-auth)
         bio: user.bio,
-        role: "trader",
+        role,
         country: user.country,
         address: user.address,
         city: user.city,

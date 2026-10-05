@@ -5,17 +5,13 @@ import { auditLogService } from "@/lib/services/audit-log.service";
 import { ObjectId } from "mongodb";
 import { parseOptionalPhoneInput } from "@/lib/utils/phone";
 import { assertPhoneAvailable } from "@/lib/services/phone-uniqueness.service";
+import { ASSIGNABLE_ROLES, STAFF_ROLES } from "@/lib/utils/player-type";
 
-// Valid user roles (includes legacy roles for backwards compatibility)
-// Active roles: trader, affiliate (coming soon), gamemaster (coming soon)
-// Legacy roles: admin, backoffice (kept for existing users but no longer assignable via UI)
-const VALID_ROLES = [
-  "trader",
-  "affiliate",
-  "gamemaster",
-  "admin",
-  "backoffice",
-] as const;
+// Valid user roles: the three player types plus gamemaster (owner, 5 Oct 2026), and the
+// staff roles admin / backoffice, kept for existing users but not assignable via the UI.
+// Reason: "affiliate" was never live and is no longer assignable. It is NOT a schema enum,
+// so any document still holding it is untouched - it just cannot be set again.
+const VALID_ROLES: readonly string[] = [...ASSIGNABLE_ROLES, ...STAFF_ROLES];
 
 /**
  * Build a query that matches user by various ID formats

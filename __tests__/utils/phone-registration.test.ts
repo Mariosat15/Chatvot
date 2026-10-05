@@ -57,7 +57,11 @@ describe("phone normalisation (registration)", () => {
   });
 
   it("sign-up form requires phoneCountry and phoneNational via PhoneInputField", () => {
-    const page = stripComments(read("app/(auth)/sign-up/page.tsx"));
+    // Reason: the sign-up page only switches between desktop and mobile forms;
+    // the field lives in the desktop form and its defaults in the shared hook.
+    const page = stripComments(
+      read("components/auth/desktop/DesktopRegister.tsx") + read("hooks/useSignUpForm.ts"),
+    );
     // Reason: a commented-out tag still contains the identifier; require the JSX
     // open tag. Count so a second unused import cannot cover a removal.
     expect(page).toMatch(/<PhoneInputField[\s\S]*?required/);

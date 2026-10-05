@@ -88,6 +88,11 @@
 - **Changeable from Profile → Settings** — old stored copies of the name are rewritten automatically
 - **One-off backfill** — `npx tsx tools/users/backfill-public-names.ts` (report-only until `--apply`)
 
+### 🎮 Player Type
+- **Required at sign-up** — Trader, Gamer or Both, stored on the user's role
+- **Upgrades automatically** — a trader who starts a game round, or a gamer who places a trade, becomes Both
+- **Game Master is derived** — shown automatically while the user has an active Game Master subscription; the player type is kept underneath
+
 ### 💼 Credit Wallet System
 - **Virtual currency** — Users deposit real money to receive credits
 - **Multiple payment methods** — Stripe integration ready

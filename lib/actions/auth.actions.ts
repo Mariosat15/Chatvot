@@ -16,6 +16,7 @@ import {
 } from "@/lib/services/registration-security.service";
 import { getFraudSettings } from "@/lib/services/fraud-settings.service";
 import { parseSignupInterest } from "@/lib/utils/signup-interest";
+import { playerTypeForSignupInterest } from "@/lib/utils/player-type";
 import { parsePhoneInput } from "@/lib/utils/phone";
 import { assertPhoneAvailable } from "@/lib/services/phone-uniqueness.service";
 import { recordReferralClaim } from "@/lib/services/gamemaster/referral-claim.service";
@@ -204,6 +205,19 @@ export const signUpWithEmail = async ({
       };
     }
 
+    // Reason: the player type is mandatory (owner, 5 Oct 2026) and becomes the account's
+    // role, so it is refused here, before the account exists, rather than defaulted - a
+    // missing answer would otherwise silently make every bot and skipped form a trader.
+    const interest = parseSignupInterest(signupInterest);
+    const role = playerTypeForSignupInterest(interest);
+    if (!interest || !role) {
+      return {
+        success: false,
+        error: "Please choose whether you are a trader, a gamer or both.",
+        code: "PLAYER_TYPE_REQUIRED",
+      };
+    }
+
     const response = await auth.api.signUpEmail({
       body: { email, password, name: fullName },
     });
@@ -225,14 +239,8 @@ export const signUpWithEmail = async ({
         }
         queries.push({ _id: userId });
 
-        // All new users are traders by default
-        // Admin role can ONLY be assigned through the admin panel
-        const role = "trader";
-
-        // Reason: Q16 — store the registration answer as information for later
-        // product use. Invalid / missing values are omitted rather than defaulted,
-        // so a bot that skips the field does not invent "both".
-        const interest = parseSignupInterest(signupInterest);
+        // The role is the player type chosen above (trader / gamer / both).
+        // Staff roles can ONLY be assigned through the admin panel.
         const profileFields: Record<string, unknown> = {
           country,
           address,
@@ -248,14 +256,12 @@ export const signUpWithEmail = async ({
           phoneVerified: false,
           username: chosenUsername.value,
           usernameLower: chosenUsername.key,
-          role, // All signups are traders - admin role assigned via admin panel only
+          role, // Player type from the registration choice - never a staff role
+          signupInterest: interest,
+          signupInterestAt: new Date(),
           emailVerified: false, // Must verify email before login
           updatedAt: new Date(),
         };
-        if (interest) {
-          profileFields.signupInterest = interest;
-          profileFields.signupInterestAt = new Date();
-        }
 
         await ensureUsernameIndex(db as unknown as Db);
         let updateResult;

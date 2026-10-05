@@ -29,13 +29,13 @@ function interestCopy(value: SignupInterest): {
 } {
   if (value === "trading") {
     return {
-      title: "Trading",
+      title: "Trader",
       description: "Trading competitions & challenges",
     };
   }
   if (value === "games") {
     return {
-      title: "Games",
+      title: "Gamer",
       description: "Skill games & competitions",
     };
   }
@@ -56,7 +56,7 @@ export default function MobileInterestSelector({
   return (
     <fieldset className="space-y-2">
       <legend className="text-sm font-semibold text-white">
-        What do you want to compete in?
+        What kind of player are you?
       </legend>
       <div className="grid grid-cols-1 gap-2.5">
         {SIGNUP_INTEREST_OPTIONS.map((opt) => {

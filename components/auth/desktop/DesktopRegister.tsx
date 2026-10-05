@@ -222,7 +222,7 @@ export default function DesktopRegister() {
 
         <fieldset className="space-y-2">
           <legend className="text-sm font-medium text-white">
-            What are you most interested in?
+            What kind of player are you?
           </legend>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
             {SIGNUP_INTEREST_OPTIONS.map((opt) => (

@@ -2,6 +2,7 @@ import { connectToDatabase } from "@/database/mongoose";
 import { ObjectId, ReadPreference } from "mongodb";
 import { userCache } from "./cache";
 import { resolvePublicName } from "./username";
+import { isPlayerType } from "./player-type";
 
 export interface UserInfo {
   id: string;
@@ -14,7 +15,7 @@ export interface UserInfo {
   publicName: string;
   profileImage?: string;
   bio?: string;
-  role?: string; // 'trader', 'admin', 'backoffice'
+  role?: string; // player type ('trader', 'gamer', 'both') or a staff role
   country?: string;
   address?: string;
   city?: string;
@@ -139,7 +140,7 @@ export async function getPublicName(userId: string): Promise<string> {
 }
 
 /**
- * Get ALL traders from the database (only users with role='trader' or no role set)
+ * Get ALL players from the database (trader, gamer or both, or no role set)
  * Identifies traders by EMAIL and ROLE field (not by name)
  * Returns an array of all trader users, deduplicated by email
  */
@@ -187,9 +188,11 @@ export async function getAllUsers(): Promise<UserInfo[]> {
       if (!id || !email) continue;
       if (uniqueUsersMap.has(email)) continue;
 
-      // Only traders: role='trader', undefined, or null
+      // Only players: trader, gamer or both (absent means a legacy trader).
+      // Reason: this list feeds the public leaderboard, so filtering on
+      // "trader" alone would drop every gamer and "both" player.
       const role = user.role || "trader";
-      if (role !== "trader") continue;
+      if (!isPlayerType(role)) continue;
 
       // Skip admin
       if (adminEmail && email === adminEmail) continue;
@@ -207,7 +210,7 @@ export async function getAllUsers(): Promise<UserInfo[]> {
         publicName: resolvePublicName({ username: user.username, id }),
         profileImage: user.profileImage || user.image,
         bio: user.bio,
-        role: "trader",
+        role,
         country: user.country,
         address: user.address,
         city: user.city,

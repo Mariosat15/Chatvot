@@ -3,6 +3,7 @@ import GameRound, {
   LIVE_ROUND_STATUSES,
 } from "@/database/models/games/game-round.model";
 import { resolveEnabledProvider } from "@/lib/services/game-providers/registry";
+import { recordPlayerActivity } from "@/lib/services/player-type.service";
 import type {
   CreateRoundInput,
   CreateRoundOutcome,
@@ -405,6 +406,10 @@ export async function createRound(
     round.providerCreateLatencyMs = created.latencyMs;
   }
   await round.save();
+
+  // Reason: a trader's first game makes them "both" (owner, 5 Oct 2026). Only once the
+  // provider accepted the round, and not awaited, so the launch is never delayed by it.
+  void recordPlayerActivity(input.userId, "games");
 
   return {
     success: true,

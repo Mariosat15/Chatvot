@@ -29,6 +29,7 @@ import {
 import { isMarketOpen } from "@/lib/services/market-hours.service";
 import { validateLimitOrderPrice } from "@/lib/utils/limit-order-validation";
 import PriceLog from "@/database/models/trading/price-log.model";
+import { recordPlayerActivity } from "@/lib/services/player-type.service";
 
 /**
  * Check if market is open and throw error if closed
@@ -51,7 +52,6 @@ async function ensureMarketOpen(): Promise<void> {
  * Check competition risk limits (max drawdown and daily loss)
  * Returns { allowed: boolean, reason?: string }
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function checkCompetitionRiskLimits(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   competition: any,
@@ -397,7 +397,7 @@ export const placeOrder = async (params: {
     }
 
     // Validate symbol is in competition's allowed assets
-    if (!FOREX_PAIRS[symbol]) {
+    if (!Object.prototype.hasOwnProperty.call(FOREX_PAIRS, symbol)) {
       throw new Error(`Invalid forex pair: ${symbol}`);
     }
 
@@ -789,6 +789,10 @@ export const placeOrder = async (params: {
 
       await mongoSession.commitTransaction();
       mongoSession.endSession(); // End session immediately after commit
+
+      // Reason: a gamer's first trade makes them "both" (owner, 5 Oct 2026). After the
+      // commit and not awaited, so a label update can never fail or slow the order.
+      void recordPlayerActivity(session.user.id, "trading");
 
       // 🔔 Send notifications NON-BLOCKING (fire and forget)
       if (orderType === "market") {

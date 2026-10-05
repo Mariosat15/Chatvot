@@ -23,11 +23,13 @@ describe("signup interest (Q16)", () => {
     expect(SIGNUP_INTEREST_OPTIONS).toHaveLength(3);
   });
 
+  // Reason: the sign-up page now only switches between the desktop and mobile
+  // forms, so the choice is asserted on the form that renders it.
   it("sign-up form offers the three options and requires a choice", () => {
-    const page = read("app/(auth)/sign-up/page.tsx");
-    expect(page).toMatch(/SIGNUP_INTEREST_OPTIONS/);
-    expect(page).toMatch(/signupInterest/);
-    expect(page).toMatch(/required:\s*["']Please pick one["']/);
+    const desktop = read("components/auth/desktop/DesktopRegister.tsx");
+    expect(desktop).toMatch(/SIGNUP_INTEREST_OPTIONS/);
+    expect(desktop).toMatch(/signupInterest/);
+    expect(desktop).toMatch(/required:\s*["']Please pick one["']/);
   });
 
   it("auth action stores signupInterest only when parse accepts it", () => {

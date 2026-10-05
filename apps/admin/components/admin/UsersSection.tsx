@@ -42,7 +42,8 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 
-// Valid user roles
+// Player types plus gamemaster (owner, 5 Oct 2026). Affiliate is retired; a stored
+// legacy value falls back to the first entry's badge below.
 const USER_ROLES = [
   {
     value: "trader",
@@ -50,9 +51,14 @@ const USER_ROLES = [
     color: "bg-cyan-500/20 text-cyan-400 border-cyan-500/30",
   },
   {
-    value: "affiliate",
-    label: "Affiliate",
-    color: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
+    value: "gamer",
+    label: "Gamer",
+    color: "bg-fuchsia-500/20 text-fuchsia-400 border-fuchsia-500/30",
+  },
+  {
+    value: "both",
+    label: "Both",
+    color: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
   },
   {
     value: "gamemaster",
@@ -659,6 +665,9 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
               <SelectContent>
                 <SelectItem value="all">All Roles</SelectItem>
                 <SelectItem value="trader">Traders</SelectItem>
+                <SelectItem value="gamer">Gamers</SelectItem>
+                <SelectItem value="both">Both</SelectItem>
+                <SelectItem value="gamemaster">Game Masters</SelectItem>
                 <SelectItem value="admin">Admins</SelectItem>
                 <SelectItem value="backoffice">Back Office</SelectItem>
               </SelectContent>

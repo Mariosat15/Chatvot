@@ -1,10 +1,12 @@
 /**
  * Registration-time platform interest (open question 16 / chapter `20` s1.2).
  *
- * Informational only — stored on the user document for later product use
- * (catalogue defaults, onboarding copy). It does NOT gate matchmaking,
- * challenges, or entry. Inference and per-game declarations remain separate
- * (X14: paying / declaring interest is not consent to invitations).
+ * Since 5 Oct 2026 the answer is MANDATORY and also sets the account's player
+ * type (`user.role`: trader / gamer / both) - see `lib/utils/player-type.ts`.
+ * It still does NOT gate matchmaking, challenges, or entry: a gamer may enter a
+ * trading contest and becomes "both" when they do. Inference and per-game
+ * declarations remain separate (X14: declaring interest is not consent to
+ * invitations).
  */
 
 export const SIGNUP_INTEREST_VALUES = ["trading", "games", "both"] as const;
@@ -18,12 +20,12 @@ export const SIGNUP_INTEREST_OPTIONS: ReadonlyArray<{
 }> = [
   {
     value: "trading",
-    label: "Trading",
-    hint: "Competitions on the markets",
+    label: "Trader",
+    hint: "Trading competitions on the markets",
   },
   {
     value: "games",
-    label: "Games",
+    label: "Gamer",
     hint: "Skill games and puzzles",
   },
   {
