@@ -14,6 +14,7 @@ import Header from "@/components/Header";
 import { connectToDatabase } from "@/database/mongoose";
 import { ObjectId } from "mongodb";
 import AnnouncementBanner from "@/components/AnnouncementBanner";
+import { getPublicName } from "@/lib/utils/user-lookup";
 
 const emailVerifiedCache = new Map<string, { verified: boolean; ts: number }>();
 const EMAIL_VERIFIED_TTL_MS = 5 * 60 * 1000;
@@ -55,9 +56,14 @@ const Layout = async ({ children }: { children: React.ReactNode }) => {
     }
   }
 
+  // Reason: Better Auth's session carries no `username`, and the sidebar card is the one place a
+  // player sees how everybody else sees them, so it must show the public name, not the real one.
+  const publicName = await getPublicName(session.user.id);
+
   const user = {
     id: session.user.id,
     name: session.user.name,
+    publicName,
     email: session.user.email,
   };
 

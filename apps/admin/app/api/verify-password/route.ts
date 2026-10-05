@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
 import { requireAdminAuth } from "@/lib/admin/auth";
-import { connectToDatabase } from "@/database/mongoose";
-import { Admin } from "@/database/models/admin.model";
+import { verifyAdminPassword } from "@/lib/admin/verify-admin-password";
 
 /**
  * POST /api/admin/verify-password
@@ -18,30 +16,11 @@ export async function POST(request: Request) {
 
     const { password } = await request.json();
 
-    if (!password) {
+    const check = await verifyAdminPassword(auth.adminId as string, password);
+    if (!check.ok) {
       return NextResponse.json(
-        { success: false, message: "Password is required" },
-        { status: 400 },
-      );
-    }
-
-    await connectToDatabase();
-
-    const admin = await Admin.findById(auth.adminId).select("password");
-
-    if (!admin) {
-      return NextResponse.json(
-        { success: false, message: "Admin account not found" },
-        { status: 404 },
-      );
-    }
-
-    const isValid = await bcrypt.compare(password, admin.password);
-
-    if (!isValid) {
-      return NextResponse.json(
-        { success: false, message: "Invalid password" },
-        { status: 401 },
+        { success: false, message: check.message },
+        { status: check.status },
       );
     }
 

@@ -66,6 +66,7 @@ export default function DesktopSignIn() {
           placeholder="Enter your password"
           type="password"
           autoComplete="current-password"
+          showPasswordToggle
           register={register}
           error={errors.password}
           validation={{ required: "Password is required", minLength: 8 }}

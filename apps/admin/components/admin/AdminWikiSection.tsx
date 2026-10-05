@@ -4273,6 +4273,31 @@ export default function AdminWikiSection() {
                   </p>
                 </div>
 
+                <div className="bg-blue-500/10 border border-blue-500/30 rounded p-3">
+                  <div className="font-medium text-blue-400 mb-1 flex items-center gap-2">
+                    <UserCog className="h-4 w-4" />
+                    Reset Password
+                  </div>
+                  <p className="text-xs">
+                    Security tab → Reset Password. Type or generate a new
+                    password (8+ characters), confirm with your own admin
+                    password. Signs the user out everywhere by default. Logged
+                    in the audit log; the password itself never is.
+                  </p>
+                </div>
+
+                <div className="bg-blue-500/10 border border-blue-500/30 rounded p-3">
+                  <div className="font-medium text-blue-400 mb-1 flex items-center gap-2">
+                    <Wallet className="h-4 w-4" />
+                    Export Activity
+                  </div>
+                  <p className="text-xs">
+                    History tab → Export Activity downloads everything the tab
+                    shows (wallet, contests, trades, KYC, security, notes…) as a
+                    CSV for Excel. Each export is recorded in the audit log.
+                  </p>
+                </div>
+
                 <div className="bg-orange-500/10 border border-orange-500/30 rounded p-3">
                   <div className="font-medium text-orange-400 mb-1 flex items-center gap-2">
                     <Clock className="h-4 w-4" />

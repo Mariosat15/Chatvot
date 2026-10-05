@@ -82,6 +82,7 @@ import PlayerGamePerformance, {
 } from "@/components/admin/games/PlayerGamePerformance";
 import { CustomerAuditTrail } from "./CustomerAuditTrail";
 import { TransferCustomerDialog } from "./TransferCustomerDialog";
+import UserPasswordResetCard from "./users/UserPasswordResetCard";
 import TransactionDetailDialog, {
   type TxDetail,
 } from "./transactions/TransactionDetailDialog";
@@ -93,7 +94,10 @@ interface UserFullDetailPanelProps {
   onRefresh?: () => void;
 }
 
-// Valid user roles
+// Assignable roles: the three player types plus gamemaster (owner, 5 Oct 2026).
+// Reason: Affiliate was a "coming soon" placeholder and is removed. Gamemaster is
+// normally derived from an active GM subscription (see effectiveRole below), so a
+// player who becomes a Game Master shows it automatically without this button.
 const USER_ROLES = [
   {
     value: "trader",
@@ -104,12 +108,20 @@ const USER_ROLES = [
     comingSoon: false,
   },
   {
-    value: "affiliate",
-    label: "Affiliate",
-    color: "bg-emerald-500",
-    icon: "🤝",
-    disabled: true,
-    comingSoon: true,
+    value: "gamer",
+    label: "Gamer",
+    color: "bg-fuchsia-500",
+    icon: "🕹️",
+    disabled: false,
+    comingSoon: false,
+  },
+  {
+    value: "both",
+    label: "Both",
+    color: "bg-yellow-500",
+    icon: "🏆",
+    disabled: false,
+    comingSoon: false,
   },
   {
     value: "gamemaster",
@@ -660,6 +672,32 @@ export default function UserFullDetailPanel({
       setUserTxsExporting(false);
     }
   }, [user.id, user.email, userTxFilters]);
+
+  // Download this user's whole activity history (every kind the History tab shows) as CSV.
+  const [activityExporting, setActivityExporting] = useState(false);
+  const handleExportActivity = useCallback(async () => {
+    if (!user.id) return;
+    setActivityExporting(true);
+    try {
+      const res = await fetch(`/api/users/${user.id}/history?format=csv`);
+      if (!res.ok) throw new Error("Export failed");
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const safeName = (user.email || user.id).replace(/[^a-z0-9]+/gi, "_");
+      a.download = `activity_${safeName}_${new Date().toISOString().split("T")[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      toast.success("Activity exported");
+    } catch {
+      toast.error("Failed to export activity. Something went wrong. Please contact support.");
+    } finally {
+      setActivityExporting(false);
+    }
+  }, [user.id, user.email]);
 
   // Fraud Investigation State
   interface FraudStatus {
@@ -2143,6 +2181,12 @@ export default function UserFullDetailPanel({
                             </div>
                           </div>
 
+                          {/* Password reset (admin sets a new sign-in password) */}
+                          <UserPasswordResetCard
+                            userId={user.id}
+                            userEmail={user.email}
+                          />
+
                           {/* Two-Factor Authentication */}
                           <div
                             className={`p-3 rounded-lg border ${twoFactorEnabled ? "bg-green-500/10 border-green-500/30" : "bg-gray-700/30 border-gray-700"}`}
@@ -2407,7 +2451,7 @@ export default function UserFullDetailPanel({
                         {/* Role */}
                         <div className="space-y-2">
                           <Label className="text-gray-300">User Role</Label>
-                          <div className="grid grid-cols-3 gap-3">
+                          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                             {USER_ROLES.map((role) => (
                               <button
                                 key={role.value}
@@ -3635,9 +3679,22 @@ export default function UserFullDetailPanel({
                           <Button
                             variant="outline"
                             size="sm"
+                            onClick={handleExportActivity}
+                            disabled={activityExporting}
+                            title="Download this user's full activity history as a CSV for Excel"
+                            className="ml-auto border-gray-600 text-gray-300 hover:text-white hover:bg-gray-700"
+                          >
+                            <Download
+                              className={`h-4 w-4 mr-1 ${activityExporting ? "animate-pulse" : ""}`}
+                            />
+                            {activityExporting ? "Exporting…" : "Export Activity"}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
                             onClick={fetchHistory}
                             disabled={loadingHistory}
-                            className="ml-auto border-gray-600 text-gray-300 hover:text-white hover:bg-gray-700"
+                            className="border-gray-600 text-gray-300 hover:text-white hover:bg-gray-700"
                           >
                             <RefreshCw
                               className={`h-4 w-4 mr-1 ${loadingHistory ? "animate-spin" : ""}`}

@@ -2,17 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import { guardSection } from "@/lib/admin/section-route-guard";
 import { ObjectId } from "mongodb";
+import { buildUserActivityCsv } from "@/lib/admin/user-activity-csv";
 
 interface HistoryItem {
   id: string;
   type: string;
   category: string;
   description: string;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
   status?: string;
   amount?: number;
   createdAt: Date;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 /**
@@ -32,6 +33,10 @@ export async function GET(
     if (!guard.ok) return guard.response;
 
     const { userId } = await params;
+    // Reason: the on-screen tab caps trades/security logs/notifications for speed;
+    // an export is the record somebody asked for, so it takes (nearly) everything.
+    const exportCsv = request.nextUrl.searchParams.get("format") === "csv";
+    const cap = (screenLimit: number) => (exportCsv ? 10000 : screenLimit);
 
     if (!userId || typeof userId !== "string") {
       return NextResponse.json(
@@ -237,7 +242,7 @@ export async function GET(
           userId: userId,
         })
         .sort({ openedAt: -1 })
-        .limit(100)
+        .limit(cap(100))
         .toArray();
 
       for (const trade of trades) {
@@ -493,7 +498,7 @@ export async function GET(
           userId: userId,
         })
         .sort({ createdAt: -1 })
-        .limit(50)
+        .limit(cap(50))
         .toArray();
 
       for (const log of securityLogs) {
@@ -555,7 +560,7 @@ export async function GET(
           userId: userId,
         })
         .sort({ createdAt: -1 })
-        .limit(30)
+        .limit(cap(30))
         .toArray();
 
       for (const notif of notifications) {
@@ -742,6 +747,38 @@ export async function GET(
       (a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     );
+
+    if (exportCsv) {
+      // Reason: an export takes a player's whole record off the platform, so who
+      // pulled it must be answerable afterwards.
+      try {
+        const AuditLog = (await import("@/database/models/audit-log.model")).default;
+        await AuditLog.logAction({
+          userId: guard.admin.id,
+          userName: guard.admin.name || "Admin",
+          userEmail: guard.admin.email || "admin@system",
+          userRole: "admin",
+          action: "user_activity_export",
+          actionCategory: "data",
+          description: `Exported activity history for user ${userId} (${history.length} rows)`,
+          targetType: "user",
+          targetId: userId,
+          metadata: { rows: history.length },
+          status: "success",
+        });
+      } catch (auditError) {
+        console.error("❌ Failed to log activity export to audit log:", auditError);
+      }
+      const csv = buildUserActivityCsv(history);
+      const safeId = userId.replace(/[^a-z0-9]+/gi, "_");
+      return new NextResponse(csv, {
+        headers: {
+          "Content-Type": "text/csv; charset=utf-8",
+          "Content-Disposition": `attachment; filename="user-activity-${safeId}-${new Date().toISOString().split("T")[0]}.csv"`,
+          "Cache-Control": "no-store",
+        },
+      });
+    }
 
     // Get unique categories and types for filters
     const types = [...new Set(history.map((h) => h.type))];

@@ -26,6 +26,8 @@ import {
 interface SidebarUser {
   id: string;
   name: string;
+  /** Username (or the stable `Player_XXXXXX` fallback) - what other players see. */
+  publicName?: string;
   email: string;
 }
 
@@ -514,7 +516,9 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
                     isCollapsed ? "text-sm" : "text-lg",
                   )}
                 >
-                  {user?.name?.[0] || user?.email?.[0]?.toUpperCase() || "U"}
+                  {user?.publicName?.[0]?.toUpperCase() ||
+                    user?.email?.[0]?.toUpperCase() ||
+                    "U"}
                 </AvatarFallback>
               </Avatar>
               <div
@@ -530,7 +534,7 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
             {!isCollapsed && (
               <div className="min-w-0 flex-1">
                 <h3 className="truncate font-bold text-white">
-                  {user?.name || terms.player}
+                  {user?.publicName || terms.player}
                 </h3>
                 <p className="truncate text-xs text-slate-400">{user?.email}</p>
                 <div className="mt-1.5 inline-flex items-center gap-1.5 rounded-md border border-cyan-400/30 bg-cyan-500/10 px-1.5 py-0.5">
