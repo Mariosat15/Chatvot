@@ -18,6 +18,8 @@ export default function DesktopSignIn() {
     resendingEmail,
     handleResendVerification,
     onSubmit,
+    rememberMe,
+    setRememberMe,
   } = useSignInForm();
   const {
     register,
@@ -48,6 +50,8 @@ export default function DesktopSignIn() {
           name="email"
           label="Email"
           placeholder="contact@example.com"
+          type="email"
+          autoComplete="username"
           register={register}
           error={errors.email}
           validation={{
@@ -61,6 +65,7 @@ export default function DesktopSignIn() {
           label="Password"
           placeholder="Enter your password"
           type="password"
+          autoComplete="current-password"
           register={register}
           error={errors.password}
           validation={{ required: "Password is required", minLength: 8 }}
@@ -70,6 +75,9 @@ export default function DesktopSignIn() {
           <label className="inline-flex cursor-pointer items-center gap-2 text-cyan-100/80">
             <input
               type="checkbox"
+              name="rememberMe"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
               className="h-4 w-4 rounded border-cyan-400/40 accent-yellow-400"
             />
             Remember me

@@ -6,6 +6,7 @@ import { FingerprintProvider } from "@/contexts/FingerprintProvider";
 import { TerminologyProvider } from "@/contexts/TerminologyContext";
 import { getTerms } from "@/lib/services/terminology.service";
 import GlobalPresenceTracker from "@/components/GlobalPresenceTracker";
+import AccountStandingGuard from "@/components/AccountStandingGuard";
 import ChallengePopup from "@/components/challenges/ChallengePopup";
 import AffiliateTermsModal from "@/components/gamemaster/AffiliateTermsModal";
 import UserSidebar from "@/components/UserSidebar";
@@ -65,6 +66,9 @@ const Layout = async ({ children }: { children: React.ReactNode }) => {
       <TerminologyProvider terms={terms}>
         {/* Global presence tracking for online/offline status */}
         <GlobalPresenceTracker userId={session.user.id} />
+
+        {/* Live lock / deactivate / ban check on every page, desktop and mobile */}
+        <AccountStandingGuard />
 
         {/* Real-time challenge popup notifications (WS push) */}
         <ChallengePopup userId={session.user.id} />

@@ -986,45 +986,7 @@ export default function AdminDashboard({
     return () => clearInterval(timer);
   }, []);
 
-  // Real-time session validation - checks every 10 seconds
-  // This ensures force logout and suspension take effect immediately
-  useEffect(() => {
-    const checkSession = async () => {
-      try {
-        const response = await fetch("/api/auth/check-session");
-        const data = await response.json();
-
-        if (!data.valid) {
-          console.log("⚠️ Session invalidated:", data.reason);
-
-          // Show appropriate message based on reason
-          if (data.reason === "account_disabled") {
-            toast.error("Your account has been suspended");
-          } else if (data.reason === "force_logout") {
-            toast.error("You have been logged out by an administrator");
-          } else if (data.reason === "password_changed") {
-            toast.error("Your password was changed. Please log in again.");
-          } else {
-            toast.error("Session expired. Please log in again.");
-          }
-
-          // Redirect to login
-          router.push("/login");
-        }
-      } catch (error) {
-        console.error("Session check failed:", error);
-        // Don't redirect on network errors - let user continue working
-      }
-    };
-
-    // Check immediately on mount
-    checkSession();
-
-    // Then check every 30 seconds — session won't expire in 10s, forced logout still takes effect within 30s
-    const sessionCheckInterval = setInterval(checkSession, 30000);
-
-    return () => clearInterval(sessionCheckInterval);
-  }, [router]);
+  // Session validation lives in AdminSessionGuard (root layout) so it covers every admin page.
 
   const handleLogout = async () => {
     try {

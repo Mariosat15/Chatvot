@@ -6,6 +6,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { signInWithEmail } from "@/lib/actions/auth.actions";
 import { trackDeviceFingerprint } from "@/lib/services/device-fingerprint.service";
+import {
+  readRememberedEmail,
+  rememberSignInEmail,
+} from "@/lib/utils/remember-sign-in";
 
 export function useSignInForm() {
   const router = useRouter();
@@ -15,13 +19,23 @@ export function useSignInForm() {
   );
   const [resendingEmail, setResendingEmail] = useState(false);
   const [resendEmail, setResendEmail] = useState<string | null>(null);
+  const [rememberMe, setRememberMe] = useState(false);
 
   const form = useForm<SignInFormData>({
     defaultValues: { email: "", password: "" },
     mode: "onBlur",
   });
 
-  const { getValues } = form;
+  const { getValues, setValue } = form;
+
+  // Reason: read after mount, never during render - localStorage does not exist on the
+  // server, and reading it in render would make the server and client HTML disagree.
+  useEffect(() => {
+    const remembered = readRememberedEmail();
+    if (!remembered) return;
+    setRememberMe(true);
+    if (!getValues("email")) setValue("email", remembered);
+  }, [getValues, setValue]);
 
   useEffect(() => {
     const verification = searchParams.get("verification");
@@ -85,6 +99,7 @@ export function useSignInForm() {
     try {
       const result = await signInWithEmail(data);
       if (result.success) {
+        rememberSignInEmail(data.email, rememberMe);
         if ((result as { twoFactorRequired?: boolean }).twoFactorRequired) {
           const methods = (
             result as { twoFactorMethods?: string[] }
@@ -139,5 +154,7 @@ export function useSignInForm() {
     resendingEmail,
     handleResendVerification,
     onSubmit,
+    rememberMe,
+    setRememberMe,
   };
 }

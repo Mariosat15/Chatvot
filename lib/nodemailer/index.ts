@@ -1,4 +1,6 @@
 import nodemailer from "nodemailer";
+import { applyEmailFinalizer } from "./email-brand";
+import { escapeHtml, renderChartVoltEmail } from "./chartvolt-email-layout";
 import { INVOICE_EMAIL_TEMPLATE } from "@/lib/nodemailer/templates";
 import { connectToDatabase } from "@/database/mongoose";
 import { WhiteLabel } from "@/database/models/whitelabel.model";
@@ -28,26 +30,26 @@ export async function getTransporter() {
   try {
     const settings = await getSettings();
 
-    return nodemailer.createTransport({
+    return applyEmailFinalizer(nodemailer.createTransport({
       service: "gmail",
       auth: {
         user: settings.nodemailerEmail || process.env.NODEMAILER_EMAIL!,
         pass: settings.nodemailerPassword || process.env.NODEMAILER_PASSWORD!,
       },
-    });
+    }));
   } catch (error) {
     console.error(
       "⚠️ Error getting email settings from database, using environment variables:",
       error,
     );
     // Fallback to environment variables
-    return nodemailer.createTransport({
+    return applyEmailFinalizer(nodemailer.createTransport({
       service: "gmail",
       auth: {
         user: process.env.NODEMAILER_EMAIL!,
         pass: process.env.NODEMAILER_PASSWORD!,
       },
-    });
+    }));
   }
 }
 
@@ -59,57 +61,6 @@ export const transporter = nodemailer.createTransport({
     pass: process.env.NODEMAILER_PASSWORD || "default",
   },
 });
-
-/**
- * Get email-friendly logo URLs from WhiteLabel settings
- * Always uses uploaded images from admin panel
- * Automatically uses the correct domain from environment variables
- */
-async function getEmailImageUrls() {
-  try {
-    await connectToDatabase();
-    const settings = await WhiteLabel.findOne();
-
-    // Get base URL from environment (works for both dev and production)
-    const baseUrl =
-      process.env.NEXT_PUBLIC_BASE_URL ||
-      process.env.BETTER_AUTH_URL ||
-      "http://localhost:3000";
-
-    // Get logo URLs from database (uploaded via admin panel)
-    let logoUrl = settings?.emailLogo || "/assets/images/logo.png";
-    let dashboardUrl =
-      settings?.dashboardPreview || "/assets/images/dashboard-preview.png";
-
-    // If URLs are already full URLs (e.g., CDN links), use them directly
-    // Otherwise, prepend the base domain
-    if (!logoUrl.startsWith("http")) {
-      logoUrl = `${baseUrl}${logoUrl}`;
-    }
-
-    if (!dashboardUrl.startsWith("http")) {
-      dashboardUrl = `${baseUrl}${dashboardUrl}`;
-    }
-
-    console.log("🖼️  Email images configuration:");
-    console.log("   - Base URL:", baseUrl);
-    console.log("   - Logo:", logoUrl);
-    console.log("   - Dashboard:", dashboardUrl);
-
-    return { logoUrl, dashboardPreviewUrl: dashboardUrl };
-  } catch (error) {
-    console.error("❌ Error fetching white label settings:", error);
-    // Fallback to default
-    const baseUrl =
-      process.env.NEXT_PUBLIC_BASE_URL ||
-      process.env.BETTER_AUTH_URL ||
-      "http://localhost:3000";
-    return {
-      logoUrl: `${baseUrl}/assets/images/logo.png`,
-      dashboardPreviewUrl: `${baseUrl}/assets/images/dashboard-preview.png`,
-    };
-  }
-}
 
 /**
  * Get welcome email configuration from database
@@ -231,9 +182,6 @@ function buildWelcomeEmailHtml(
     "Explore the dashboard for trends and the latest market news",
   ];
 
-  const featureListHtml = featureItems
-    .map((item: string) => `<li style="margin-bottom: 12px;">${item}</li>`)
-    .join("\n                                ");
 
   // Get the CTA URL
   let ctaUrl = template.ctaButtonUrl || config.baseUrl;
@@ -258,115 +206,25 @@ function buildWelcomeEmailHtml(
   );
 
   // Build the dynamic template
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="format-detection" content="telephone=no">
-    <meta name="x-apple-disable-message-reformatting">
-    <title>Welcome to ${config.platformName}</title>
-    <style type="text/css">
-        @media (prefers-color-scheme: dark) {
-            .email-container { background-color: #141414 !important; border: 1px solid #30333A !important; }
-            .dark-bg { background-color: #050505 !important; }
-            .dark-text { color: #ffffff !important; }
-            .dark-text-secondary { color: #9ca3af !important; }
-            .dark-text-muted { color: #6b7280 !important; }
-            .dark-border { border-color: #30333A !important; }
-        }
-        @media only screen and (max-width: 600px) {
-            .email-container { width: 100% !important; margin: 0 !important; }
-            .mobile-padding { padding: 24px !important; }
-            .mobile-header-padding { padding: 24px 24px 12px 24px !important; }
-            .mobile-text { font-size: 14px !important; line-height: 1.5 !important; }
-            .mobile-title { font-size: 24px !important; line-height: 1.3 !important; }
-            .mobile-button { width: 100% !important; text-align: center !important; }
-            .mobile-button a { width: calc(100% - 64px) !important; display: block !important; text-align: center !important; }
-            .mobile-outer-padding { padding: 20px 10px !important; }
-            .dashboard-preview { padding: 0 15px 30px 15px !important; }
-        }
-        @media only screen and (max-width: 480px) {
-            .mobile-title { font-size: 22px !important; }
-            .mobile-padding { padding: 15px !important; }
-            .mobile-header-padding { padding: 15px 15px 8px 15px !important; }
-        }
-    </style>
-</head>
-<body style="margin: 0; padding: 0; background-color: #050505; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #050505;">
-        <tr>
-            <td align="center" class="mobile-outer-padding" style="padding: 40px 20px;">
-                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" class="email-container" style="max-width: 600px; background-color: #141414; border-radius: 8px; border: 1px solid #30333A;">
-                    
-                    <!-- Header with Logo -->
-                    <tr>
-                        <td align="left" class="mobile-header-padding" style="padding: 40px 40px 20px 40px;">
-                            <img src="${config.logoUrl}" alt="${config.platformName} Logo" width="150" style="max-width: 100%; height: auto;">
-                        </td>
-                    </tr>
-                    
-                    <!-- Dashboard Preview Image -->
-                    <tr>
-                        <td align="center" class="dashboard-preview" style="padding: 40px 40px 0px 40px;">
-                            <img src="${config.dashboardPreviewUrl}" alt="${config.platformName} Dashboard Preview" width="100%" style="max-width: 520px; width: 100%; height: auto; border-radius: 12px; border: 1px solid #30333A;">
-                        </td>
-                    </tr>
-                    
-                    <!-- Main Content -->
-                    <tr>
-                        <td class="mobile-padding" style="padding: 40px 40px 40px 40px;">
-                            
-                            <!-- Welcome Heading -->
-                            <h1 class="mobile-title dark-text" style="margin: 0 0 30px 0; font-size: 24px; font-weight: 600; color: #FDD458; line-height: 1.2;">
-                                ${heading}
-                            </h1>
-                            
-                            <!-- Intro Text -->
-                            ${config.intro}  
-                            
-                            <!-- Feature List Label -->
-                            <p class="mobile-text dark-text-secondary" style="margin: 0 0 15px 0; font-size: 16px; line-height: 1.6; color: #CCDADC; font-weight: 600;">
-                                ${template.featureListLabel || "Here's what you can do right now:"}
-                            </p>
-                            
-                            <!-- Feature List -->
-                            <ul class="mobile-text dark-text-secondary" style="margin: 0 0 30px 0; padding-left: 20px; font-size: 16px; line-height: 1.6; color: #CCDADC;">
-                                ${featureListHtml}
-                            </ul>
-                            
-                            <!-- Additional Text -->
-                            <p class="mobile-text dark-text-secondary" style="margin: 0 0 40px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">
-                                ${template.closingText || "We'll keep you informed with timely updates, insights, and alerts — so you can focus on making the right calls."}
-                            </p>
-                            
-                            <!-- CTA Button -->
-                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 0 0 40px 0; width: 100%;">
-                                <tr>
-                                    <td align="center">
-                                        <a href="${ctaUrl}" style="display: block; width: 100%; background: linear-gradient(135deg, #FDD458 0%, #E8BA40 100%); color: #000000; text-decoration: none; padding: 16px 32px; border-radius: 8px; font-size: 16px; font-weight: 500; line-height: 1; text-align: center; box-sizing: border-box;">
-                                            ${template.ctaButtonText || "Go to Dashboard"}
-                                        </a>
-                                    </td>
-                                </tr>
-                            </table>
-                            
-                            <!-- Footer Text -->
-                            <p class="mobile-text dark-text-muted" style="margin: 40px 0 0 0; font-size: 14px; line-height: 1.5; color: #CCDADC !important; text-align: center;">
-                               ${footerAddress}<br>
-                                <a href="${unsubscribeUrl}" style="color: #CCDADC !important; text-decoration: underline;">Unsubscribe</a> | 
-                                <a href="${websiteUrl}" style="color: #CCDADC !important; text-decoration: underline;">Visit ${config.platformName}</a><br>
-                                © ${new Date().getFullYear()} ${config.platformName}
-                            </p>
-                        </td>
-                    </tr>
-                    
-                </table>
-            </td>
-        </tr>
-    </table>
-</body>
-</html>`;
+  return renderChartVoltEmail({
+    title: `Welcome to ${config.platformName}`,
+    platformName: config.platformName,
+    logoUrl: config.logoUrl,
+    eyebrow: "Welcome",
+    heading,
+    bodyHtml: config.intro,
+    listTitle: template.featureListLabel || "Here's what you can do right now:",
+    listItems: featureItems,
+    closingHtml:
+      template.closingText ||
+      "We'll keep you informed with timely updates, insights and alerts, so you can focus on making the right calls.",
+    cta: { text: template.ctaButtonText || "Go to Dashboard", url: ctaUrl },
+    footerAddress,
+    footerLinks: [
+      { label: "Unsubscribe", url: unsubscribeUrl === "#" ? "" : unsubscribeUrl },
+      { label: `Visit ${config.platformName}`, url: websiteUrl },
+    ],
+  });
 }
 
 export const sendWelcomeEmail = async ({
@@ -723,16 +581,17 @@ export const sendInvoiceEmail = async ({
     console.log(
       `✅ [INVOICE] PDF generated successfully: ${filename} (${(buffer.length / 1024).toFixed(2)} KB)`,
     );
-  } catch (pdfError: any) {
+  } catch (pdfError) {
+    const pdfErr = pdfError as Error | undefined;
     console.error("❌ [INVOICE] Failed to generate PDF:");
-    console.error("   Error name:", pdfError?.name);
-    console.error("   Error message:", pdfError?.message);
-    console.error("   Error stack:", pdfError?.stack?.substring(0, 500));
+    console.error("   Error name:", pdfErr?.name);
+    console.error("   Error message:", pdfErr?.message);
+    console.error("   Error stack:", pdfErr?.stack?.substring(0, 500));
     console.log("⚠️ [INVOICE] Will send email WITHOUT PDF attachment");
     // Continue without PDF attachment if generation fails
   }
 
-  const mailOptions: any = {
+  const mailOptions: nodemailer.SendMailOptions = {
     from: `"${companySettings.companyName}" <${settings.nodemailerEmail || process.env.NODEMAILER_EMAIL}>`,
     to: customerEmail,
     subject: emailSubject,
@@ -821,141 +680,38 @@ function buildDepositEmailHtml(
     "Climb the leaderboard and win real prizes!",
   ];
 
-  const featureListHtml = featureItems
-    .map((item: string) => `<li style="margin-bottom: 12px;">${item}</li>`)
-    .join("\n                                ");
 
   // Get the CTA URL
   let ctaUrl = template.ctaButtonUrl || `${config.baseUrl}/competitions`;
   ctaUrl = ctaUrl.replace(/\{\{baseUrl\}\}/g, config.baseUrl);
 
   // Build the dynamic template using database values
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Deposit Confirmed - ${config.platformName}</title>
-    <style type="text/css">
-        @media only screen and (max-width: 600px) {
-            .email-container { width: 100% !important; margin: 0 !important; }
-            .mobile-padding { padding: 24px !important; }
-        }
-    </style>
-</head>
-<body style="margin: 0; padding: 0; background-color: #050505; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #050505;">
-        <tr>
-            <td align="center" style="padding: 40px 20px;">
-                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" class="email-container" style="max-width: 600px; background-color: #141414; border-radius: 8px; border: 1px solid #30333A;">
-                    
-                    <!-- Header with Logo -->
-                    <tr>
-                        <td align="left" style="padding: 40px 40px 20px 40px;">
-                            <img src="${config.logoUrl}" alt="${config.platformName}" width="150" style="max-width: 100%; height: auto;">
-                        </td>
-                    </tr>
-                    
-                    <!-- Main Content -->
-                    <tr>
-                        <td class="mobile-padding" style="padding: 20px 40px 40px 40px;">
-                            
-                            <!-- Success Banner -->
-                            <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 8px; padding: 24px; margin-bottom: 24px; text-align: center;">
-                                <h1 style="margin: 0 0 8px 0; font-size: 24px; font-weight: 600; color: #ffffff;">
-                                    ${template.headingText || "✓ Deposit Successful!"}
-                                </h1>
-                                <p style="margin: 0; font-size: 14px; color: rgba(255,255,255,0.9);">
-                                    Your credits are now available
-                                </p>
-                            </div>
-                            
-                            <!-- Greeting -->
-                            <p style="margin: 0 0 24px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">
-                                Hi ${config.name},
-                            </p>
-                            
-                            <p style="margin: 0 0 24px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">
-                                ${template.introText || "Great news! Your deposit has been processed successfully and your credits are ready to use."}
-                            </p>
-                            
-                            <!-- Transaction Details -->
-                            <div style="background-color: #1E1E1E; border-radius: 8px; padding: 24px; margin-bottom: 24px;">
-                                <h2 style="margin: 0 0 16px 0; font-size: 18px; font-weight: 600; color: #ffffff;">
-                                    Transaction Details
-                                </h2>
-                                
-                                <table style="width: 100%; border-collapse: collapse;">
-                                    <tr>
-                                        <td style="padding: 12px 0; color: #9ca3af; border-bottom: 1px solid #30333A;">Credits Purchased</td>
-                                        <td style="padding: 12px 0; text-align: right; color: #10b981; font-weight: 700; font-size: 18px; border-bottom: 1px solid #30333A;">${config.credits} ⚡</td>
-                                    </tr>
-                                    <tr>
-                                        <td style="padding: 12px 0; color: #9ca3af; border-bottom: 1px solid #30333A;">Amount Charged</td>
-                                        <td style="padding: 12px 0; text-align: right; color: #ffffff; border-bottom: 1px solid #30333A;">€${config.amount.toFixed(2)}</td>
-                                    </tr>
-                                    <tr>
-                                        <td style="padding: 12px 0; color: #9ca3af; border-bottom: 1px solid #30333A;">Payment Method</td>
-                                        <td style="padding: 12px 0; text-align: right; color: #ffffff; border-bottom: 1px solid #30333A;">${config.paymentMethod}</td>
-                                    </tr>
-                                    <tr>
-                                        <td style="padding: 12px 0; color: #9ca3af;">Transaction ID</td>
-                                        <td style="padding: 12px 0; text-align: right; color: #9ca3af; font-family: monospace; font-size: 12px;">${config.transactionId}</td>
-                                    </tr>
-                                </table>
-                            </div>
-                            
-                            <!-- New Balance -->
-                            <div style="background-color: #1E1E1E; border-radius: 8px; padding: 24px; margin-bottom: 24px; text-align: center; border: 1px solid #FDD458;">
-                                <p style="margin: 0 0 8px 0; font-size: 14px; color: #9ca3af; text-transform: uppercase;">Your New Balance</p>
-                                <p style="margin: 0; font-size: 32px; font-weight: 700; color: #FDD458;">${config.newBalance.toFixed(0)} ⚡</p>
-                            </div>
-                            
-                            <!-- What's Next -->
-                            <div style="background-color: #050505; border-radius: 8px; padding: 20px; margin-bottom: 24px; border: 1px solid #30333A;">
-                                <h3 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600; color: #FDD458;">
-                                    ${template.featureListLabel || "What's Next?"}
-                                </h3>
-                                <ul style="margin: 0; padding-left: 20px; color: #CCDADC; font-size: 14px; line-height: 1.8;">
-                                    ${featureListHtml}
-                                </ul>
-                            </div>
-                            
-                            <!-- Closing Text -->
-                            ${template.closingText ? `<p style="margin: 0 0 24px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">${template.closingText}</p>` : ""}
-                            
-                            <!-- CTA Button -->
-                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
-                                <tr>
-                                    <td align="center">
-                                        <a href="${ctaUrl}" style="display: inline-block; background: linear-gradient(135deg, #FDD458 0%, #E8BA40 100%); color: #000000; text-decoration: none; padding: 16px 32px; border-radius: 8px; font-size: 16px; font-weight: 500; line-height: 1;">
-                                            ${template.ctaButtonText || "Start Competing Now"}
-                                        </a>
-                                    </td>
-                                </tr>
-                            </table>
-                            
-                        </td>
-                    </tr>
-                    
-                    <!-- Footer -->
-                    <tr>
-                        <td style="padding: 20px 40px 40px 40px; border-top: 1px solid #30333A;">
-                            <p style="margin: 0 0 10px 0; font-size: 12px; color: #6b7280; text-align: center;">
-                                ${config.companyAddress}
-                            </p>
-                            <p style="margin: 0; font-size: 12px; color: #6b7280; text-align: center;">
-                                © ${new Date().getFullYear()} ${config.platformName} | <a href="${config.baseUrl}" style="color: #CCDADC !important; text-decoration: underline;">Visit Website</a>
-                            </p>
-                        </td>
-                    </tr>
-                    
-                </table>
-            </td>
-        </tr>
-    </table>
-</body>
-</html>`;
+  return renderChartVoltEmail({
+    title: `Deposit Confirmed - ${config.platformName}`,
+    platformName: config.platformName,
+    logoUrl: config.logoUrl,
+    eyebrow: "Wallet",
+    heading: template.headingText || "Deposit Successful!",
+    subheading: "Your credits are now available",
+    greetingName: config.name,
+    bodyHtml:
+      template.introText ||
+      "Great news! Your deposit has been processed successfully and your credits are ready to use.",
+    detailsTitle: "Transaction Details",
+    details: [
+      { label: "Credits Purchased", value: `${config.credits} &#9889;`, tone: "green" },
+      { label: "Amount Charged", value: `&euro;${config.amount.toFixed(2)}` },
+      { label: "Payment Method", value: escapeHtml(config.paymentMethod) },
+      { label: "Transaction ID", value: escapeHtml(config.transactionId), tone: "muted", mono: true },
+    ],
+    highlight: { label: "Your New Balance", value: `${config.newBalance.toFixed(0)} &#9889;`, tone: "gold" },
+    listTitle: template.featureListLabel || "What's Next?",
+    listItems: featureItems,
+    closingHtml: template.closingText || undefined,
+    cta: { text: template.ctaButtonText || "Start Competing Now", url: ctaUrl },
+    footerAddress: config.companyAddress,
+    footerLinks: [{ label: "Visit Website", url: config.baseUrl }],
+  });
 }
 
 /**
@@ -1113,84 +869,38 @@ function buildRefundEmailHtml(
   };
 
   const features = (template.featureItems || []).map(replace);
-  const featureListHtml = features
-    .map(
-      (f) =>
-        `<li style="margin-bottom:8px;color:#CCDADC;font-size:14px;line-height:1.8;">${f}</li>`,
-    )
-    .join("");
   const ctaUrl = replace(template.ctaButtonUrl || `${config.baseUrl}/wallet`);
 
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Refund Processed - ${config.platformName}</title>
-</head>
-<body style="margin:0;padding:0;background-color:#050505;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color:#050505;">
-        <tr>
-            <td align="center" style="padding:40px 20px;">
-                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width:600px;background-color:#141414;border-radius:8px;border:1px solid #30333A;">
-                    <tr>
-                        <td align="left" style="padding:40px 40px 20px 40px;">
-                            <img src="${config.logoUrl}" alt="${config.platformName}" width="150" style="max-width:100%;height:auto;">
-                        </td>
-                    </tr>
-                    <tr>
-                        <td style="padding:20px 40px 40px 40px;">
-                            <div style="background:linear-gradient(135deg,#f59e0b 0%,#d97706 100%);border-radius:8px;padding:24px;margin-bottom:24px;text-align:center;">
-                                <h1 style="margin:0 0 8px 0;font-size:24px;font-weight:600;color:#ffffff;">
-                                    ${replace(template.headingText || "Refund Processed")}
-                                </h1>
-                                <p style="margin:0;font-size:14px;color:rgba(255,255,255,0.9);">
-                                    Money is on its way back to you
-                                </p>
-                            </div>
-                            <p style="margin:0 0 24px 0;font-size:16px;line-height:1.6;color:#CCDADC;">Hi ${config.name},</p>
-                            <p style="margin:0 0 24px 0;font-size:16px;line-height:1.6;color:#CCDADC;">
-                                ${replace(template.introText || "Your refund has been processed successfully.")}
-                            </p>
-                            <div style="background-color:#1E1E1E;border-radius:8px;padding:24px;margin-bottom:24px;">
-                                <h2 style="margin:0 0 16px 0;font-size:18px;font-weight:600;color:#ffffff;">Refund Details</h2>
-                                <table style="width:100%;border-collapse:collapse;">
-                                    <tr>
-                                        <td style="padding:12px 0;color:#9ca3af;border-bottom:1px solid #30333A;">Refund Amount</td>
-                                        <td style="padding:12px 0;text-align:right;color:#f59e0b;font-weight:700;font-size:18px;border-bottom:1px solid #30333A;">${config.currency === "EUR" ? "€" : config.currency + " "}${config.refundAmount.toFixed(2)}</td>
-                                    </tr>
-                                    <tr>
-                                        <td style="padding:12px 0;color:#9ca3af;border-bottom:1px solid #30333A;">Refunded To</td>
-                                        <td style="padding:12px 0;text-align:right;color:#ffffff;border-bottom:1px solid #30333A;">${config.paymentMethod}</td>
-                                    </tr>
-                                    <tr>
-                                        <td style="padding:12px 0;color:#9ca3af;${config.refundId ? "border-bottom:1px solid #30333A;" : ""}">Original Transaction</td>
-                                        <td style="padding:12px 0;text-align:right;color:#9ca3af;font-family:monospace;font-size:12px;${config.refundId ? "border-bottom:1px solid #30333A;" : ""}">${config.transactionId}</td>
-                                    </tr>
-                                    ${config.refundId ? `<tr><td style="padding:12px 0;color:#9ca3af;">Refund Reference</td><td style="padding:12px 0;text-align:right;color:#9ca3af;font-family:monospace;font-size:12px;">${config.refundId}</td></tr>` : ""}
-                                </table>
-                            </div>
-                            ${featureListHtml ? `<div style="background-color:#050505;border-radius:8px;padding:20px;margin-bottom:24px;border:1px solid #30333A;"><h3 style="margin:0 0 12px 0;font-size:16px;font-weight:600;color:#f59e0b;">${replace(template.featureListLabel || "What happens next?")}</h3><ul style="margin:0;padding-left:20px;">${featureListHtml}</ul></div>` : ""}
-                            ${template.closingText ? `<p style="margin:0 0 24px 0;font-size:16px;line-height:1.6;color:#CCDADC;">${replace(template.closingText)}</p>` : ""}
-                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
-                                <tr><td align="center">
-                                    <a href="${ctaUrl}" style="display:inline-block;background:linear-gradient(135deg,#FDD458 0%,#E8BA40 100%);color:#000000;text-decoration:none;padding:16px 32px;border-radius:8px;font-size:16px;font-weight:500;line-height:1;">${replace(template.ctaButtonText || "View Wallet")}</a>
-                                </td></tr>
-                            </table>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td style="padding:20px 40px 40px 40px;border-top:1px solid #30333A;">
-                            <p style="margin:0 0 10px 0;font-size:12px;color:#6b7280;text-align:center;">${config.companyAddress}</p>
-                            <p style="margin:0;font-size:12px;color:#6b7280;text-align:center;">© ${new Date().getFullYear()} ${config.platformName} | <a href="${config.baseUrl}" style="color:#CCDADC !important;text-decoration:underline;">Visit Website</a></p>
-                        </td>
-                    </tr>
-                </table>
-            </td>
-        </tr>
-    </table>
-</body>
-</html>`;
+  const details = [
+    {
+      label: "Refund Amount",
+      value: `${config.currency === "EUR" ? "&euro;" : escapeHtml(config.currency) + " "}${config.refundAmount.toFixed(2)}`,
+      tone: "gold" as const,
+    },
+    { label: "Refunded To", value: escapeHtml(config.paymentMethod) },
+    { label: "Original Transaction", value: escapeHtml(config.transactionId), tone: "muted" as const, mono: true },
+  ];
+  if (config.refundId) {
+    details.push({ label: "Refund Reference", value: escapeHtml(config.refundId), tone: "muted" as const, mono: true });
+  }
+  return renderChartVoltEmail({
+    title: `Refund Processed - ${config.platformName}`,
+    platformName: config.platformName,
+    logoUrl: config.logoUrl,
+    eyebrow: "Wallet",
+    heading: replace(template.headingText || "Refund Processed"),
+    subheading: "Money is on its way back to you",
+    greetingName: config.name,
+    bodyHtml: replace(template.introText || "Your refund has been processed successfully."),
+    detailsTitle: "Refund Details",
+    details,
+    listTitle: replace(template.featureListLabel || "What happens next?"),
+    listItems: features,
+    closingHtml: template.closingText ? replace(template.closingText) : undefined,
+    cta: { text: replace(template.ctaButtonText || "View Wallet"), url: ctaUrl },
+    footerAddress: config.companyAddress,
+    footerLinks: [{ label: "Visit Website", url: config.baseUrl }],
+  });
 }
 
 /**
@@ -1368,163 +1078,43 @@ function buildWithdrawalEmailHtml(
     "Contact support if you haven't received it after 7 days",
   ];
 
-  const featureListHtml = featureItems
-    .map((item: string) => `<li style="margin-bottom: 12px;">${item}</li>`)
-    .join("\n                                ");
 
   // Get the CTA URL
   let ctaUrl = template.ctaButtonUrl || `${config.baseUrl}/wallet`;
   ctaUrl = ctaUrl.replace(/\{\{baseUrl\}\}/g, config.baseUrl);
 
   // Build the dynamic template using database values
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Withdrawal Processed - ${config.platformName}</title>
-    <style type="text/css">
-        @media only screen and (max-width: 600px) {
-            .email-container { width: 100% !important; margin: 0 !important; }
-            .mobile-padding { padding: 24px !important; }
-        }
-    </style>
-</head>
-<body style="margin: 0; padding: 0; background-color: #050505; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #050505;">
-        <tr>
-            <td align="center" style="padding: 40px 20px;">
-                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" class="email-container" style="max-width: 600px; background-color: #141414; border-radius: 8px; border: 1px solid #30333A;">
-                    
-                    <!-- Header with Logo -->
-                    <tr>
-                        <td align="left" style="padding: 40px 40px 20px 40px;">
-                            <img src="${config.logoUrl}" alt="${config.platformName}" width="150" style="max-width: 100%; height: auto;">
-                        </td>
-                    </tr>
-                    
-                    <!-- Main Content -->
-                    <tr>
-                        <td class="mobile-padding" style="padding: 20px 40px 40px 40px;">
-                            
-                            <!-- Success Banner -->
-                            <div style="background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%); border-radius: 8px; padding: 24px; margin-bottom: 24px; text-align: center;">
-                                <h1 style="margin: 0 0 8px 0; font-size: 24px; font-weight: 600; color: #ffffff;">
-                                    ${template.headingText || "💸 Withdrawal Processed"}
-                                </h1>
-                                <p style="margin: 0; font-size: 14px; color: rgba(255,255,255,0.9);">
-                                    Your funds are on the way
-                                </p>
-                            </div>
-                            
-                            <!-- Greeting -->
-                            <p style="margin: 0 0 24px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">
-                                Hi ${config.name},
-                            </p>
-                            
-                            <p style="margin: 0 0 24px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">
-                                ${template.introText || "Your withdrawal request has been processed and your funds are on the way!"}
-                            </p>
-                            
-                            <!-- Transaction Details -->
-                            <div style="background-color: #1E1E1E; border-radius: 8px; padding: 24px; margin-bottom: 24px;">
-                                <h2 style="margin: 0 0 16px 0; font-size: 18px; font-weight: 600; color: #ffffff;">
-                                    Withdrawal Details
-                                </h2>
-                                
-                                <table style="width: 100%; border-collapse: collapse;">
-                                    <tr>
-                                        <td style="padding: 12px 0; color: #9ca3af; border-bottom: 1px solid #30333A;">Credits Withdrawn</td>
-                                        <td style="padding: 12px 0; text-align: right; color: #ffffff; font-weight: 600; border-bottom: 1px solid #30333A;">${config.credits} ⚡</td>
-                                    </tr>
-                                    <tr>
-                                        <td style="padding: 12px 0; color: #9ca3af; border-bottom: 1px solid #30333A;">Processing Fee</td>
-                                        <td style="padding: 12px 0; text-align: right; color: #ef4444; border-bottom: 1px solid #30333A;">-€${config.fee.toFixed(2)}</td>
-                                    </tr>
-                                    <tr>
-                                        <td style="padding: 12px 0; color: #9ca3af; border-bottom: 1px solid #30333A;">Amount You Receive</td>
-                                        <td style="padding: 12px 0; text-align: right; color: #10b981; font-weight: 700; font-size: 18px; border-bottom: 1px solid #30333A;">€${config.netAmount.toFixed(2)}</td>
-                                    </tr>
-                                    <tr>
-                                        <td style="padding: 12px 0; color: #9ca3af; border-bottom: 1px solid #30333A;">Payment Method</td>
-                                        <td style="padding: 12px 0; text-align: right; color: #ffffff; border-bottom: 1px solid #30333A;">${config.paymentMethod}</td>
-                                    </tr>
-                                    <tr>
-                                        <td style="padding: 12px 0; color: #9ca3af;">Reference ID</td>
-                                        <td style="padding: 12px 0; text-align: right; color: #9ca3af; font-family: monospace; font-size: 12px;">${config.withdrawalId}</td>
-                                    </tr>
-                                </table>
-                            </div>
-                            
-                            <!-- Remaining Balance -->
-                            <div style="background-color: #1E1E1E; border-radius: 8px; padding: 24px; margin-bottom: 24px; text-align: center; border: 1px solid #30333A;">
-                                <p style="margin: 0 0 8px 0; font-size: 14px; color: #9ca3af; text-transform: uppercase;">Remaining Balance</p>
-                                <p style="margin: 0; font-size: 32px; font-weight: 700; color: #FDD458;">${config.remainingBalance.toFixed(0)} ⚡</p>
-                            </div>
-                            
-                            <!-- Timeline Info -->
-                            <div style="background-color: #1E1E1E; border-radius: 8px; padding: 20px; margin-bottom: 24px; border-left: 4px solid #8B5CF6;">
-                                <p style="margin: 0; font-size: 14px; color: #CCDADC;">
-                                    ⏱️ ${config.timelineMessage}
-                                </p>
-                            </div>
-                            
-                            <!-- What's Next -->
-                            <div style="background-color: #050505; border-radius: 8px; padding: 20px; margin-bottom: 24px; border: 1px solid #30333A;">
-                                <h3 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600; color: #FDD458;">
-                                    ${template.featureListLabel || "What's Next?"}
-                                </h3>
-                                <ul style="margin: 0; padding-left: 20px; color: #CCDADC; font-size: 14px; line-height: 1.8;">
-                                    ${featureListHtml}
-                                </ul>
-                            </div>
-                            
-                            <!-- Closing Text -->
-                            ${template.closingText ? `<p style="margin: 0 0 24px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">${template.closingText}</p>` : ""}
-                            
-                            <!-- CTA Button -->
-                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
-                                <tr>
-                                    <td align="center">
-                                        <a href="${ctaUrl}" style="display: inline-block; background: linear-gradient(135deg, #FDD458 0%, #E8BA40 100%); color: #000000; text-decoration: none; padding: 16px 32px; border-radius: 8px; font-size: 16px; font-weight: 500; line-height: 1;">
-                                            ${template.ctaButtonText || "View Wallet"}
-                                        </a>
-                                    </td>
-                                </tr>
-                            </table>
-                            
-                            <!-- Support Note -->
-                            ${
-                              config.supportEmail
-                                ? `
-                            <p style="margin: 24px 0 0 0; font-size: 13px; color: #6b7280; text-align: center;">
-                                Questions? Contact us at <a href="mailto:${config.supportEmail}" style="color: #FDD458; text-decoration: none;">${config.supportEmail}</a>
-                            </p>
-                            `
-                                : ""
-                            }
-                            
-                        </td>
-                    </tr>
-                    
-                    <!-- Footer -->
-                    <tr>
-                        <td style="padding: 20px 40px 40px 40px; border-top: 1px solid #30333A;">
-                            <p style="margin: 0 0 10px 0; font-size: 12px; color: #6b7280; text-align: center;">
-                                ${config.companyAddress}
-                            </p>
-                            <p style="margin: 0; font-size: 12px; color: #6b7280; text-align: center;">
-                                © ${new Date().getFullYear()} ${config.platformName} | <a href="${config.baseUrl}" style="color: #CCDADC !important; text-decoration: underline;">Visit Website</a>
-                            </p>
-                        </td>
-                    </tr>
-                    
-                </table>
-            </td>
-        </tr>
-    </table>
-</body>
-</html>`;
+  return renderChartVoltEmail({
+    title: `Withdrawal Processed - ${config.platformName}`,
+    platformName: config.platformName,
+    logoUrl: config.logoUrl,
+    eyebrow: "Wallet",
+    heading: template.headingText || "Withdrawal Processed",
+    subheading: "Your funds are on the way",
+    greetingName: config.name,
+    bodyHtml:
+      template.introText ||
+      "Your withdrawal request has been processed and your funds are on the way!",
+    detailsTitle: "Withdrawal Details",
+    details: [
+      { label: "Credits Withdrawn", value: `${config.credits} &#9889;` },
+      { label: "Processing Fee", value: `-&euro;${config.fee.toFixed(2)}`, tone: "red" },
+      { label: "Amount You Receive", value: `&euro;${config.netAmount.toFixed(2)}`, tone: "green" },
+      { label: "Payment Method", value: escapeHtml(config.paymentMethod) },
+      { label: "Reference ID", value: escapeHtml(config.withdrawalId), tone: "muted", mono: true },
+    ],
+    highlight: { label: "Remaining Balance", value: `${config.remainingBalance.toFixed(0)} &#9889;`, tone: "gold" },
+    panel: { icon: "&#9201;", title: "When to expect it", lines: [escapeHtml(config.timelineMessage)] },
+    listTitle: template.featureListLabel || "What's Next?",
+    listItems: featureItems,
+    closingHtml: template.closingText || undefined,
+    cta: { text: template.ctaButtonText || "View Wallet", url: ctaUrl },
+    ctaNote: config.supportEmail
+      ? `Questions? Contact us at <a href="mailto:${escapeHtml(config.supportEmail)}" style="color:#00dcff;text-decoration:none;">${escapeHtml(config.supportEmail)}</a>`
+      : undefined,
+    footerAddress: config.companyAddress,
+    footerLinks: [{ label: "Visit Website", url: config.baseUrl }],
+  });
 }
 
 /**
@@ -1723,9 +1313,6 @@ function buildAccountManagerAssignedEmailHtml(
     item.replace(/\{\{managerFirstName\}\}/g, config.managerFirstName),
   );
 
-  const featureListHtml = featureItems
-    .map((item: string) => `<li style="margin-bottom: 12px;">${item}</li>`)
-    .join("\n                                ");
 
   // Replace template variables
   const heading = (
@@ -1746,115 +1333,23 @@ function buildAccountManagerAssignedEmailHtml(
   let ctaUrl = template.ctaButtonUrl || `${config.baseUrl}/messaging`;
   ctaUrl = ctaUrl.replace(/\{\{baseUrl\}\}/g, config.baseUrl);
 
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Your Account Manager - ${config.platformName}</title>
-    <style type="text/css">
-        @media only screen and (max-width: 600px) {
-            .email-container { width: 100% !important; margin: 0 !important; }
-            .mobile-padding { padding: 24px !important; }
-        }
-    </style>
-</head>
-<body style="margin: 0; padding: 0; background-color: #050505; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #050505;">
-        <tr>
-            <td align="center" style="padding: 40px 20px;">
-                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" class="email-container" style="max-width: 600px; background-color: #141414; border-radius: 8px; border: 1px solid #30333A;">
-                    
-                    <!-- Header with Logo -->
-                    <tr>
-                        <td align="left" style="padding: 40px 40px 20px 40px;">
-                            <img src="${config.logoUrl}" alt="${config.platformName}" width="150" style="max-width: 100%; height: auto;">
-                        </td>
-                    </tr>
-                    
-                    <!-- Main Content -->
-                    <tr>
-                        <td class="mobile-padding" style="padding: 20px 40px 40px 40px;">
-                            
-                            <!-- Welcome Banner -->
-                            <div style="background: linear-gradient(135deg, #10b981 0%, #3b82f6 100%); border-radius: 8px; padding: 24px; margin-bottom: 24px; text-align: center;">
-                                <h1 style="margin: 0 0 8px 0; font-size: 24px; font-weight: 600; color: #ffffff;">
-                                    ${heading}
-                                </h1>
-                                <p style="margin: 0; font-size: 14px; color: rgba(255,255,255,0.9);">
-                                    Your dedicated support is here
-                                </p>
-                            </div>
-                            
-                            <!-- Greeting -->
-                            <p style="margin: 0 0 24px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">
-                                Hi ${config.customerName},
-                            </p>
-                            
-                            <p style="margin: 0 0 24px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">
-                                ${introText}
-                            </p>
-                            
-                            <!-- Account Manager Card -->
-                            <div style="background-color: #1E1E1E; border-radius: 8px; padding: 24px; margin-bottom: 24px; text-align: center; border: 1px solid #FDD458;">
-                                <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #10b981 0%, #3b82f6 100%); border-radius: 50%; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center;">
-                                    <span style="font-size: 36px; color: white; line-height: 80px;">${config.managerFirstName.charAt(0).toUpperCase()}</span>
-                                </div>
-                                <h2 style="margin: 0 0 8px 0; font-size: 22px; font-weight: 600; color: #FDD458;">
-                                    ${config.managerFirstName}
-                                </h2>
-                                <p style="margin: 0; font-size: 14px; color: #9ca3af;">
-                                    Your Dedicated Account Manager
-                                </p>
-                            </div>
-                            
-                            <!-- Feature List -->
-                            <div style="background-color: #050505; border-radius: 8px; padding: 20px; margin-bottom: 24px; border: 1px solid #30333A;">
-                                <h3 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600; color: #FDD458;">
-                                    ${template.featureListLabel || "Your Account Manager"}
-                                </h3>
-                                <ul style="margin: 0; padding-left: 20px; color: #CCDADC; font-size: 14px; line-height: 1.8;">
-                                    ${featureListHtml}
-                                </ul>
-                            </div>
-                            
-                            <!-- Closing Text -->
-                            <p style="margin: 0 0 24px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">
-                                ${closingText}
-                            </p>
-                            
-                            <!-- CTA Button -->
-                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
-                                <tr>
-                                    <td align="center">
-                                        <a href="${ctaUrl}" style="display: inline-block; background: linear-gradient(135deg, #FDD458 0%, #E8BA40 100%); color: #000000; text-decoration: none; padding: 16px 32px; border-radius: 8px; font-size: 16px; font-weight: 500; line-height: 1;">
-                                            ${template.ctaButtonText || "Send a Message"}
-                                        </a>
-                                    </td>
-                                </tr>
-                            </table>
-                            
-                        </td>
-                    </tr>
-                    
-                    <!-- Footer -->
-                    <tr>
-                        <td style="padding: 20px 40px 40px 40px; border-top: 1px solid #30333A;">
-                            <p style="margin: 0 0 10px 0; font-size: 12px; color: #6b7280; text-align: center;">
-                                ${config.companyAddress}
-                            </p>
-                            <p style="margin: 0; font-size: 12px; color: #6b7280; text-align: center;">
-                                © ${new Date().getFullYear()} ${config.platformName} | <a href="${config.baseUrl}" style="color: #CCDADC !important; text-decoration: underline;">Visit Website</a>
-                            </p>
-                        </td>
-                    </tr>
-                    
-                </table>
-            </td>
-        </tr>
-    </table>
-</body>
-</html>`;
+  return renderChartVoltEmail({
+    title: `Your Account Manager - ${config.platformName}`,
+    platformName: config.platformName,
+    logoUrl: config.logoUrl,
+    eyebrow: "Personal Support",
+    heading,
+    subheading: "Your dedicated support is here",
+    greetingName: config.customerName,
+    bodyHtml: introText,
+    highlight: { label: "Your Dedicated Account Manager", value: escapeHtml(config.managerFirstName), tone: "gold" },
+    listTitle: template.featureListLabel || "Your Account Manager",
+    listItems: featureItems,
+    closingHtml: closingText,
+    cta: { text: template.ctaButtonText || "Send a Message", url: ctaUrl },
+    footerAddress: config.companyAddress,
+    footerLinks: [{ label: "Visit Website", url: config.baseUrl }],
+  });
 }
 
 /**
@@ -1899,9 +1394,6 @@ function buildAccountManagerChangedEmailHtml(
     item.replace(/\{\{newManagerFirstName\}\}/g, config.newManagerFirstName),
   );
 
-  const featureListHtml = featureItems
-    .map((item: string) => `<li style="margin-bottom: 12px;">${item}</li>`)
-    .join("\n                                ");
 
   // Replace template variables
   const heading = (
@@ -1922,115 +1414,23 @@ function buildAccountManagerChangedEmailHtml(
   let ctaUrl = template.ctaButtonUrl || `${config.baseUrl}/messaging`;
   ctaUrl = ctaUrl.replace(/\{\{baseUrl\}\}/g, config.baseUrl);
 
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>New Account Manager - ${config.platformName}</title>
-    <style type="text/css">
-        @media only screen and (max-width: 600px) {
-            .email-container { width: 100% !important; margin: 0 !important; }
-            .mobile-padding { padding: 24px !important; }
-        }
-    </style>
-</head>
-<body style="margin: 0; padding: 0; background-color: #050505; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #050505;">
-        <tr>
-            <td align="center" style="padding: 40px 20px;">
-                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" class="email-container" style="max-width: 600px; background-color: #141414; border-radius: 8px; border: 1px solid #30333A;">
-                    
-                    <!-- Header with Logo -->
-                    <tr>
-                        <td align="left" style="padding: 40px 40px 20px 40px;">
-                            <img src="${config.logoUrl}" alt="${config.platformName}" width="150" style="max-width: 100%; height: auto;">
-                        </td>
-                    </tr>
-                    
-                    <!-- Main Content -->
-                    <tr>
-                        <td class="mobile-padding" style="padding: 20px 40px 40px 40px;">
-                            
-                            <!-- Header Banner -->
-                            <div style="background: linear-gradient(135deg, #8B5CF6 0%, #3b82f6 100%); border-radius: 8px; padding: 24px; margin-bottom: 24px; text-align: center;">
-                                <h1 style="margin: 0 0 8px 0; font-size: 24px; font-weight: 600; color: #ffffff;">
-                                    ${heading}
-                                </h1>
-                                <p style="margin: 0; font-size: 14px; color: rgba(255,255,255,0.9);">
-                                    Your support continues seamlessly
-                                </p>
-                            </div>
-                            
-                            <!-- Greeting -->
-                            <p style="margin: 0 0 24px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">
-                                Hi ${config.customerName},
-                            </p>
-                            
-                            <p style="margin: 0 0 24px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">
-                                ${introText}
-                            </p>
-                            
-                            <!-- New Account Manager Card -->
-                            <div style="background-color: #1E1E1E; border-radius: 8px; padding: 24px; margin-bottom: 24px; text-align: center; border: 1px solid #FDD458;">
-                                <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #8B5CF6 0%, #3b82f6 100%); border-radius: 50%; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center;">
-                                    <span style="font-size: 36px; color: white; line-height: 80px;">${config.newManagerFirstName.charAt(0).toUpperCase()}</span>
-                                </div>
-                                <h2 style="margin: 0 0 8px 0; font-size: 22px; font-weight: 600; color: #FDD458;">
-                                    ${config.newManagerFirstName}
-                                </h2>
-                                <p style="margin: 0; font-size: 14px; color: #9ca3af;">
-                                    Your New Account Manager
-                                </p>
-                            </div>
-                            
-                            <!-- Feature List -->
-                            <div style="background-color: #050505; border-radius: 8px; padding: 20px; margin-bottom: 24px; border: 1px solid #30333A;">
-                                <h3 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600; color: #FDD458;">
-                                    ${template.featureListLabel || "Your New Account Manager"}
-                                </h3>
-                                <ul style="margin: 0; padding-left: 20px; color: #CCDADC; font-size: 14px; line-height: 1.8;">
-                                    ${featureListHtml}
-                                </ul>
-                            </div>
-                            
-                            <!-- Closing Text -->
-                            <p style="margin: 0 0 24px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">
-                                ${closingText}
-                            </p>
-                            
-                            <!-- CTA Button -->
-                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
-                                <tr>
-                                    <td align="center">
-                                        <a href="${ctaUrl}" style="display: inline-block; background: linear-gradient(135deg, #FDD458 0%, #E8BA40 100%); color: #000000; text-decoration: none; padding: 16px 32px; border-radius: 8px; font-size: 16px; font-weight: 500; line-height: 1;">
-                                            ${template.ctaButtonText || "Say Hello"}
-                                        </a>
-                                    </td>
-                                </tr>
-                            </table>
-                            
-                        </td>
-                    </tr>
-                    
-                    <!-- Footer -->
-                    <tr>
-                        <td style="padding: 20px 40px 40px 40px; border-top: 1px solid #30333A;">
-                            <p style="margin: 0 0 10px 0; font-size: 12px; color: #6b7280; text-align: center;">
-                                ${config.companyAddress}
-                            </p>
-                            <p style="margin: 0; font-size: 12px; color: #6b7280; text-align: center;">
-                                © ${new Date().getFullYear()} ${config.platformName} | <a href="${config.baseUrl}" style="color: #CCDADC !important; text-decoration: underline;">Visit Website</a>
-                            </p>
-                        </td>
-                    </tr>
-                    
-                </table>
-            </td>
-        </tr>
-    </table>
-</body>
-</html>`;
+  return renderChartVoltEmail({
+    title: `New Account Manager - ${config.platformName}`,
+    platformName: config.platformName,
+    logoUrl: config.logoUrl,
+    eyebrow: "Personal Support",
+    heading,
+    subheading: "Your account has a new point of contact",
+    greetingName: config.customerName,
+    bodyHtml: introText,
+    highlight: { label: "Your New Account Manager", value: escapeHtml(config.newManagerFirstName), tone: "gold" },
+    listTitle: template.featureListLabel || "Your New Account Manager",
+    listItems: featureItems,
+    closingHtml: closingText,
+    cta: { text: template.ctaButtonText || "Say Hello", url: ctaUrl },
+    footerAddress: config.companyAddress,
+    footerLinks: [{ label: "Visit Website", url: config.baseUrl }],
+  });
 }
 
 /**

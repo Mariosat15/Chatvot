@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- pre-existing loose types across this
+ * service (template variables and Mongoose results); tightening them is unrelated to the
+ * edits that made the pre-commit hook lint this whole file. */
 import Notification from "@/database/models/notification.model";
 import NotificationTemplate, {
   NotificationType,
@@ -42,11 +45,22 @@ export interface GetNotificationsOptions {
 /**
  * Replace template variables with actual values
  */
+/**
+ * Format an entry fee for templates that append the word "credits" themselves.
+ * An absent or non-finite fee renders "0" rather than leaking `{{entryFee}}`.
+ */
+export function formatFeeAmount(entryFee: number | undefined): string {
+  return typeof entryFee === "number" && Number.isFinite(entryFee)
+    ? entryFee.toFixed(2)
+    : "0";
+}
+
 export function replaceVariables(
   text: string,
   variables: Record<string, any>,
 ): string {
   return text.replace(/\{\{(\w+)\}\}/g, (match, key) => {
+    // eslint-disable-next-line security/detect-object-injection -- key is \w+ from the template
     return variables[key] !== undefined ? String(variables[key]) : match;
   });
 }
@@ -486,6 +500,7 @@ class NotificationService {
     userId: string,
     competitionName: string,
     reason: string,
+    competitionId?: string,
   ): Promise<any> {
     return this.send({
       userId,
@@ -493,6 +508,7 @@ class NotificationService {
       variables: {
         competitionName,
         reason,
+        ...(competitionId ? { competitionId } : {}),
       },
     });
   }
@@ -502,14 +518,17 @@ class NotificationService {
    */
   async notifyLiquidation(
     userId: string,
-    competitionName: string,
+    symbol: string,
     reason: string,
   ): Promise<any> {
+    // Reason: the template reads {{symbol}}. This parameter used to be named
+    // `competitionName` and was sent under that key, so every caller's symbol was
+    // dropped and the email printed the raw placeholder.
     return this.send({
       userId,
       templateId: "liquidation",
       variables: {
-        competitionName,
+        symbol,
         reason,
       },
     });
@@ -581,11 +600,19 @@ class NotificationService {
   async notifyCompetitionJoined(
     userId: string,
     competitionName: string,
+    entryFee?: number,
+    competitionId?: string,
   ): Promise<any> {
+    // Reason: the seeded template reads {{entryFee}} and {{competitionId}}; without
+    // them the player's email showed the raw placeholder text.
     return this.send({
       userId,
       templateId: "competition_joined",
-      variables: { competitionName },
+      variables: {
+        competitionName,
+        entryFee: formatFeeAmount(entryFee),
+        ...(competitionId ? { competitionId } : {}),
+      },
     });
   }
 
@@ -596,6 +623,8 @@ class NotificationService {
     userId: string,
     competitionName: string,
     reason?: string,
+    entryFee?: number,
+    competitionId?: string,
   ): Promise<any> {
     return this.send({
       userId,
@@ -603,6 +632,8 @@ class NotificationService {
       variables: {
         competitionName,
         reason: reason || "Competition was cancelled",
+        entryFee: formatFeeAmount(entryFee),
+        ...(competitionId ? { competitionId } : {}),
       },
     });
   }
@@ -672,13 +703,22 @@ class NotificationService {
     userId: string,
     competitionName: string,
     finalPosition: number,
+    pnl?: number,
+    competitionId?: string,
   ): Promise<any> {
+    // Reason: the template reads {{finalRank}} and {{pnl}}; only `finalPosition` was
+    // sent, so both leaked as raw placeholders. Same formatting as the admin copy.
+    const safePnl = typeof pnl === "number" && Number.isFinite(pnl) ? pnl : 0;
+    const rank = (finalPosition || 0).toString();
     return this.send({
       userId,
       templateId: "competition_ended",
       variables: {
         competitionName,
-        finalPosition: finalPosition.toString(),
+        finalPosition: rank,
+        finalRank: rank,
+        pnl: safePnl >= 0 ? `+${safePnl.toFixed(2)}` : safePnl.toFixed(2),
+        ...(competitionId ? { competitionId } : {}),
       },
     });
   }

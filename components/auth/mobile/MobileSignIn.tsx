@@ -21,6 +21,8 @@ export default function MobileSignIn() {
     resendingEmail,
     handleResendVerification,
     onSubmit,
+    rememberMe,
+    setRememberMe,
   } = useSignInForm();
   const {
     register,
@@ -55,7 +57,7 @@ export default function MobileSignIn() {
             placeholder="contact@example.com"
             type="email"
             icon="mail"
-            autoComplete="email"
+            autoComplete="username"
             register={register}
             error={errors.email}
             validation={{
@@ -90,6 +92,9 @@ export default function MobileSignIn() {
             <label className="inline-flex cursor-pointer items-center gap-2 text-cyan-100/85">
               <input
                 type="checkbox"
+                name="rememberMe"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
                 className="h-4 w-4 rounded border-cyan-400/40 accent-yellow-400"
               />
               Keep me signed in

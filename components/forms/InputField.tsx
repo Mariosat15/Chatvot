@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 interface InputFieldProps extends FormInputProps {
   onFocus?: () => void;
   onBlur?: () => void;
+  autoComplete?: string;
 }
 
 const InputField = ({
@@ -20,6 +21,7 @@ const InputField = ({
   value,
   onFocus,
   onBlur,
+  autoComplete,
 }: InputFieldProps) => {
   return (
     <div className="space-y-2">
@@ -32,6 +34,7 @@ const InputField = ({
         placeholder={placeholder}
         disabled={disabled}
         value={value}
+        autoComplete={autoComplete}
         className={cn("form-input", {
           "opacity-50 cursor-not-allowed": disabled,
         })}

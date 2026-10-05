@@ -1030,13 +1030,15 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
       }
 
       // Notify all participants about competition end - non-blocking
-      // Signature: (userId, competitionName, finalPosition)
+      // Signature: (userId, competitionName, finalPosition, pnl, competitionId)
       for (const participant of leaderboard) {
         notificationService
           .notifyCompetitionEnded(
             participant.userId,
             competition.name,
             participant.rank || 0,
+            participant.pnl,
+            competition._id.toString(),
           )
           .catch((e: Error) =>
             console.error("Failed to send competition end notification:", e),

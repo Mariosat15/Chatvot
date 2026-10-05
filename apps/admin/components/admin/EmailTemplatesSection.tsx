@@ -25,6 +25,7 @@ import {
   Swords,
   FileSignature,
   KeyRound,
+  ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,6 +41,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { toast } from "sonner";
+import EmailDisclaimerCard from "./EmailDisclaimerCard";
 import {
   Dialog,
   DialogContent,
@@ -87,7 +89,8 @@ type TemplateType =
   | "margin_warning"
   | "challenge_received"
   | "gm_terms_request"
-  | "password_reset";
+  | "password_reset"
+  | "two_factor_otp";
 
 const TEMPLATE_CONFIG: Record<
   TemplateType,
@@ -495,6 +498,30 @@ const TEMPLATE_CONFIG: Record<
       ctaButtonUrl: "{{resetLink}}",
     },
   },
+  two_factor_otp: {
+    title: "Two-Factor Code",
+    description:
+      "Sent when a player signs in with email as their second factor. The code itself is always added below your text.",
+    icon: ShieldCheck,
+    variables: ["{{name}}", "{{platformName}}", "{{ttlMinutes}}"],
+    defaults: {
+      templateType: "two_factor_otp",
+      name: "Two-Factor Code",
+      subject: "Your {{platformName}} verification code",
+      headingText: "Your verification code",
+      introText:
+        "Hi {{name}}, use the code below to finish signing in to {{platformName}}.",
+      featureListLabel: "Keep your account safe",
+      featureItems: [
+        "This code expires in {{ttlMinutes}} minutes",
+        "{{platformName}} staff will never ask you for this code",
+        "If you did not try to sign in, change your password now",
+      ],
+      closingText: "",
+      ctaButtonText: "",
+      ctaButtonUrl: "",
+    },
+  },
 };
 
 const DEFAULT_TEMPLATE: EmailTemplate = {
@@ -699,6 +726,8 @@ export default function EmailTemplatesSection() {
 
   return (
     <div className="space-y-6">
+      <EmailDisclaimerCard />
+
       {/* Template Type Selector */}
       <div className="flex flex-wrap gap-2 p-1.5 bg-gray-900 rounded-lg border border-gray-800">
         {(Object.keys(TEMPLATE_CONFIG) as TemplateType[]).map((type) => {

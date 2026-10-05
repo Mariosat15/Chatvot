@@ -3,6 +3,7 @@ import { connectToDatabase } from "@/database/mongoose";
 import { guardSection } from "@/lib/admin/section-route-guard";
 import AuditLog from "@/database/models/audit-log.model";
 import UserNote from "@/database/models/user-notes.model";
+import { revokePlayerSessions } from "@/lib/services/revoke-player-sessions";
 
 /**
  * POST /api/users/[userId]/deactivate
@@ -106,19 +107,10 @@ export async function POST(
 
     // Reason: Invalidate all sessions for this user so they are immediately
     // logged out everywhere. better-auth stores sessions in "session" collection.
-    try {
-      const deleteResult = await db
-        .collection("session")
-        .deleteMany({ userId });
-      console.log(
-        `🔒 Deleted ${deleteResult.deletedCount} sessions for admin-deactivated user ${userId}`,
-      );
-    } catch (sessionError) {
-      console.error(
-        "⚠️ Failed to delete sessions after admin deactivation:",
-        sessionError,
-      );
-    }
+    const revoked = await revokePlayerSessions(db, userId);
+    console.log(
+      `🔒 Deleted ${revoked} sessions for admin-deactivated user ${userId}`,
+    );
 
     return NextResponse.json({
       success: true,

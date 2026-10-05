@@ -50,6 +50,7 @@ export async function GET(request: NextRequest) {
       "challenge_received",
       "gm_terms_request",
       "password_reset",
+      "two_factor_otp",
     ];
 
     const existingTypes = new Set(templates.map((t) => t.templateType));
@@ -202,6 +203,12 @@ export async function POST(request: NextRequest) {
         "../../../../../lib/nodemailer/send-password-reset"
       );
       await sendTestPasswordResetEmail(testEmail);
+      emailSent = true;
+    } else if (templateType === "two_factor_otp") {
+      const { sendTwoFactorOTP } = await import(
+        "../../../../../lib/nodemailer/send-two-factor-otp"
+      );
+      await sendTwoFactorOTP({ email: testEmail, name: "Test User", otp: "123456" });
       emailSent = true;
     }
 

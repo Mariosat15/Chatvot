@@ -23,6 +23,8 @@ import {
   sendAccountManagerChangedEmail,
 } from "@/lib/nodemailer";
 import { getSettings } from "@/lib/services/settings.service";
+import { escapeHtml, renderChartVoltEmail } from "../nodemailer/chartvolt-email-layout";
+import { getEmailBrand } from "../nodemailer/email-brand";
 import { employeeNotificationService } from "./employee-notification.service";
 
 export interface AssignCustomerParams {
@@ -898,31 +900,22 @@ class CustomerAssignmentService {
             from: `"${companyName}" <${fromEmail}>`,
             to: employeeEmail,
             subject: `New Customer Assigned: ${customerName}`,
-            html: `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #0a0a0a;">
-                <div style="background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); padding: 30px; border-radius: 10px 10px 0 0;">
-                  <h1 style="color: white; margin: 0; font-size: 24px;">👤 New Customer Assigned</h1>
-                </div>
-                <div style="background: #141414; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #30333A; border-top: none;">
-                  <p style="color: #CCDADC; font-size: 16px; line-height: 1.6;">
-                    Hello ${employeeName},
-                  </p>
-                  <p style="color: #CCDADC; font-size: 16px; line-height: 1.6;">
-                    A new customer has been assigned to you:
-                  </p>
-                  <div style="background: #1E1E1E; border: 1px solid #30333A; border-radius: 8px; padding: 20px; margin: 20px 0;">
-                    <p style="margin: 8px 0; color: #CCDADC;"><strong style="color: #FDD458;">Name:</strong> ${customerName}</p>
-                    <p style="margin: 8px 0; color: #CCDADC;"><strong style="color: #FDD458;">Email:</strong> ${customerEmail}</p>
-                  </div>
-                  <p style="color: #CCDADC; font-size: 16px; line-height: 1.6;">
-                    Please log in to the admin panel to view the customer's details and manage their account.
-                  </p>
-                  <p style="color: #6b7280; font-size: 14px; margin-top: 30px;">
-                    Best regards,<br/>${companyName} Admin Team
-                  </p>
-                </div>
-              </div>
-            `,
+            html: renderChartVoltEmail({
+              title: `New Customer Assigned: ${customerName}`,
+              platformName: companyName,
+              logoUrl: (await getEmailBrand()).logoUrl,
+              eyebrow: "Admin team",
+              heading: "New customer assigned",
+              greetingName: employeeName,
+              bodyHtml: '<p style="margin:0;">A new customer has been assigned to you.</p>',
+              detailsTitle: "Customer",
+              details: [
+                { label: "Name", value: escapeHtml(customerName) },
+                { label: "Email", value: escapeHtml(customerEmail) },
+              ],
+              closingHtml:
+                "Please log in to the admin panel to view the customer's details and manage their account.",
+            }),
           });
           console.log(
             `📧 [Notification] Employee EMAIL sent to ${employeeEmail}`,

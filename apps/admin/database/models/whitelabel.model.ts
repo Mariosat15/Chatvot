@@ -4,6 +4,9 @@ export interface WhiteLabelDocument extends Document {
   // App Branding
   appLogo: string;
   emailLogo: string;
+  // Platform-wide footer disclaimer appended to every outgoing email.
+  emailDisclaimer: string;
+  showEmailDisclaimer: boolean;
   profileImage: string;
   dashboardPreview: string;
   favicon: string;
@@ -229,6 +232,16 @@ const WhiteLabelSchema = new Schema<WhiteLabelDocument>(
     emailLogo: {
       type: String,
       default: "/assets/images/logo.png",
+    },
+    // Reason: one legal line for every email (admin > Email Templates), so it is
+    // never edited twenty times. Empty means the layout's built-in default.
+    emailDisclaimer: {
+      type: String,
+      default: "",
+    },
+    showEmailDisclaimer: {
+      type: Boolean,
+      default: true,
     },
     profileImage: {
       type: String,

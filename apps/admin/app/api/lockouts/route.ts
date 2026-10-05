@@ -2,15 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import AccountLockout from "@/database/models/account-lockout.model";
+import { revokePlayerSessions } from "@/lib/services/revoke-player-sessions";
 
 /**
  * GET /api/lockouts - List all active account lockouts
  */
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     const guard = await guardSection("fraud");
     if (!guard.ok) return guard.response;
-    const session = guard.admin;
 
     await connectToDatabase();
     const now = new Date();
@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
 
     await connectToDatabase();
 
-    const lockoutData: Record<string, any> = {
+    const lockoutData: Record<string, unknown> = {
       email,
       userId,
       reason: "admin_action",
@@ -88,6 +88,16 @@ export async function POST(req: NextRequest) {
     }
 
     const lockout = await AccountLockout.create(lockoutData);
+
+    // Reason: a manual lock used to be checked only at the next sign-in, so a player already
+    // signed in kept playing. Revoke their sessions now; AccountStandingGuard kicks the open tab.
+    const db = (await connectToDatabase()).connection.db;
+    let lockedUserId: string | undefined = userId;
+    if (!lockedUserId && db) {
+      const user = await db.collection("user").findOne({ email }, { projection: { _id: 1 } });
+      lockedUserId = user?._id ? String(user._id) : undefined;
+    }
+    await revokePlayerSessions(db, lockedUserId);
 
     // Create audit log
     const AuditLog = (await import("@/database/models/audit-log.model"))

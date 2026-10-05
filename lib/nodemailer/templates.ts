@@ -1235,11 +1235,12 @@ export const INVOICE_EMAIL_TEMPLATE = `<!DOCTYPE html>
         }
     </style>
 </head>
-<body style="margin: 0; padding: 0; background-color: #050505; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #050505;">
+<body bgcolor="#030712" style="margin: 0; padding: 0; background-color: #030712; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" bgcolor="#030712" style="background-color: #030712;">
         <tr>
             <td align="center" style="padding: 40px 20px;">
-                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" class="email-container" style="max-width: 600px; background-color: #141414; border-radius: 8px; border: 1px solid #30333A;">
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" class="email-container" bgcolor="#071226" style="max-width: 600px; background-color: #071226; border-radius: 16px; border: 1px solid #0bbfe6;">
+                    <tr><td height="4" style="height:4px;line-height:4px;font-size:0;border-radius:16px 16px 0 0;background:#00d9ff;background-image:linear-gradient(90deg,#00d9ff,#6648ff,#ff32c8,#ffc928);">&nbsp;</td></tr>
                     
                     <!-- Header with Logo -->
                     <tr>
@@ -1253,8 +1254,8 @@ export const INVOICE_EMAIL_TEMPLATE = `<!DOCTYPE html>
                         <td class="mobile-padding" style="padding: 20px 40px 40px 40px;">
                             
                             <!-- Invoice Header -->
-                            <div style="background-color: #1E1E1E; border-radius: 8px; padding: 24px; margin-bottom: 24px; border-left: 4px solid #FDD458;">
-                                <h1 style="margin: 0 0 8px 0; font-size: 24px; font-weight: 600; color: #FDD458;">
+                            <div style="background-color: #0b1a33; border-radius: 8px; padding: 24px; margin-bottom: 24px; border-left: 4px solid #ffc928;">
+                                <h1 style="margin: 0 0 8px 0; font-size: 24px; font-weight: 600; color: #ffc928;">
                                     Invoice {{invoiceNumber}}
                                 </h1>
                                 <p style="margin: 0; font-size: 14px; color: #9ca3af;">
@@ -1263,31 +1264,31 @@ export const INVOICE_EMAIL_TEMPLATE = `<!DOCTYPE html>
                             </div>
                             
                             <!-- Greeting -->
-                            <p style="margin: 0 0 24px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">
+                            <p style="margin: 0 0 24px 0; font-size: 16px; line-height: 1.6; color: #d7e3f1;">
                                 Dear {{customerName}},
                             </p>
                             
                             <!-- Message -->
-                            <p style="margin: 0 0 24px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">
+                            <p style="margin: 0 0 24px 0; font-size: 16px; line-height: 1.6; color: #d7e3f1;">
                                 {{emailBody}}
                             </p>
                             
                             <!-- Invoice Summary -->
-                            <div style="background-color: #1E1E1E; border-radius: 8px; padding: 24px; margin-bottom: 24px;">
+                            <div style="background-color: #0b1a33; border-radius: 8px; padding: 24px; margin-bottom: 24px;">
                                 <h2 style="margin: 0 0 16px 0; font-size: 18px; font-weight: 600; color: #ffffff;">
                                     Invoice Summary
                                 </h2>
                                 
                                 <table style="width: 100%; border-collapse: collapse;">
                                     {{lineItemsHtml}}
-                                    <tr style="border-top: 1px solid #30333A;">
+                                    <tr style="border-top: 1px solid #1d3150;">
                                         <td style="padding: 12px 0; color: #9ca3af;">Subtotal</td>
                                         <td style="padding: 12px 0; text-align: right; color: #ffffff;">{{subtotal}}</td>
                                     </tr>
                                     {{vatRowHtml}}
-                                    <tr style="border-top: 2px solid #FDD458;">
+                                    <tr style="border-top: 2px solid #ffc928;">
                                         <td style="padding: 16px 0; font-weight: 700; color: #ffffff; font-size: 18px;">Total</td>
-                                        <td style="padding: 16px 0; text-align: right; font-weight: 700; color: #FDD458; font-size: 18px;">{{total}}</td>
+                                        <td style="padding: 16px 0; text-align: right; font-weight: 700; color: #ffc928; font-size: 18px;">{{total}}</td>
                                     </tr>
                                 </table>
                             </div>
@@ -1303,7 +1304,7 @@ export const INVOICE_EMAIL_TEMPLATE = `<!DOCTYPE html>
                             <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                                 <tr>
                                     <td align="center">
-                                        <a href="{{dashboardUrl}}" style="display: inline-block; background: linear-gradient(135deg, #FDD458 0%, #E8BA40 100%); color: #000000; text-decoration: none; padding: 16px 32px; border-radius: 8px; font-size: 16px; font-weight: 500; line-height: 1;">
+                                        <a href="{{dashboardUrl}}" style="display: inline-block; background-color: #ffc928; color: #07101f; text-decoration: none; padding: 16px 32px; border-radius: 8px; font-size: 16px; font-weight: 500; line-height: 1;">
                                             View Your Account
                                         </a>
                                     </td>
@@ -1316,7 +1317,7 @@ export const INVOICE_EMAIL_TEMPLATE = `<!DOCTYPE html>
                     {{#if showLegalDisclaimer}}
                     <!-- Legal Disclaimer Section -->
                     <tr>
-                        <td style="padding: 20px 40px; background-color: #0a0a0a; border-top: 1px solid #30333A;">
+                        <td style="padding: 20px 40px; background-color: #050d1c; border-top: 1px solid #1d3150;">
                             <div style="color: #6b7280; font-size: 11px; line-height: 1.7;">
                                 
                                 <p style="margin: 0 0 12px 0; font-weight: 600; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px;">
@@ -1325,7 +1326,7 @@ export const INVOICE_EMAIL_TEMPLATE = `<!DOCTYPE html>
                                 
                                 {{{legalDisclaimerHtml}}}
                                 
-                                <p style="margin: 0; padding-top: 10px; border-top: 1px solid #1E1E1E; font-size: 10px; color: #4b5563;">
+                                <p style="margin: 0; padding-top: 10px; border-top: 1px solid #0b1a33; font-size: 10px; color: #4b5563;">
                                     This email and any attachments are confidential and intended solely for the addressee. If you received this in error, please delete it and notify us immediately. Invoice generated automatically - please do not reply directly to this email.
                                 </p>
                                 
@@ -1336,7 +1337,7 @@ export const INVOICE_EMAIL_TEMPLATE = `<!DOCTYPE html>
                     
                     <!-- Company Footer -->
                     <tr>
-                        <td style="padding: 20px 40px 40px 40px; border-top: 1px solid #30333A;">
+                        <td style="padding: 20px 40px 40px 40px; border-top: 1px solid #1d3150;">
                             <table style="width: 100%;">
                                 <tr>
                                     <td style="color: #9ca3af; font-size: 12px; line-height: 1.6;">
@@ -1349,7 +1350,7 @@ export const INVOICE_EMAIL_TEMPLATE = `<!DOCTYPE html>
                             </table>
                             
                             <p style="margin: 20px 0 0 0; font-size: 12px; color: #6b7280; text-align: center;">
-                                © {{year}} {{companyName}} | <a href="{{websiteUrl}}" style="color: #CCDADC !important; text-decoration: underline;">Visit Website</a>
+                                © {{year}} {{companyName}} | <a href="{{websiteUrl}}" style="color: #d7e3f1 !important; text-decoration: underline;">Visit Website</a>
                             </p>
                         </td>
                     </tr>

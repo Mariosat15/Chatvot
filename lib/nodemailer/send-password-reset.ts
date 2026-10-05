@@ -7,16 +7,10 @@ import { getTransporter } from "./index";
 import { getSettings } from "@/lib/services/settings.service";
 import { getEmailTemplate } from "@/database/models/email-template.model";
 import { connectToDatabase } from "@/database/mongoose";
+import { escapeHtml, renderChartVoltEmail } from "./chartvolt-email-layout";
+import { getEmailBrand } from "./email-brand";
 
 const DEFAULT_EXPIRY_HOURS = 1;
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
 
 function applyVars(
   text: string,
@@ -129,70 +123,26 @@ export async function sendPasswordResetEmail({
     vars,
   );
 
-  const featureHtml = featureItems
-    .map(
-      (item) =>
-        `<li style="color:#a0a0a0;font-size:15px;line-height:1.6;margin:0 0 8px;">${escapeHtml(item)}</li>`,
-    )
-    .join("");
-
-  const html = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${escapeHtml(subject)}</title>
-</head>
-<body style="margin:0;padding:0;background-color:#0a0a0a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0a0a0a;padding:40px 20px;">
-    <tr>
-      <td align="center">
-        <table width="600" cellpadding="0" cellspacing="0" style="background-color:#1a1a1a;border-radius:16px;overflow:hidden;">
-          <tr>
-            <td style="padding:40px 40px 20px;text-align:center;">
-              <h1 style="color:#f5c518;margin:0;font-size:28px;font-weight:bold;">${escapeHtml(platformName)}</h1>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:20px 40px;">
-              <h2 style="color:#ffffff;margin:0 0 20px;font-size:24px;">${escapeHtml(headingText)}</h2>
-              <p style="color:#a0a0a0;font-size:16px;line-height:1.6;margin:0 0 24px;">
-                ${escapeHtml(introText)}
-              </p>
-              <table width="100%" cellpadding="0" cellspacing="0">
-                <tr>
-                  <td align="center" style="padding:12px 0 28px;">
-                    <a href="${escapeHtml(resetLink)}"
-                       style="display:inline-block;background-color:#f5c518;color:#000000;text-decoration:none;padding:16px 40px;border-radius:8px;font-weight:bold;font-size:16px;">
-                      ${escapeHtml(ctaButtonText)}
-                    </a>
-                  </td>
-                </tr>
-              </table>
-              ${
-                featureListLabel
-                  ? `<p style="color:#ffffff;font-size:15px;font-weight:600;margin:0 0 10px;">${escapeHtml(featureListLabel)}</p>`
-                  : ""
-              }
-              <ul style="padding-left:20px;margin:0 0 24px;">${featureHtml}</ul>
-              <p style="color:#7a7a7a;font-size:13px;line-height:1.6;margin:0;word-break:break-all;">
-                ${escapeHtml(closingText)}
-              </p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:24px 40px 36px;text-align:center;border-top:1px solid #2a2a2a;">
-              <p style="color:#555;font-size:12px;margin:0;">
-                ${escapeHtml(companyAddress || platformName)}
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
+  const brand = await getEmailBrand();
+  const html = renderChartVoltEmail({
+    title: subject,
+    platformName,
+    logoUrl: brand.logoUrl,
+    preheader: introText,
+    eyebrow: "Account security",
+    heading: escapeHtml(headingText),
+    bodyHtml: `<p style="margin:0;">${escapeHtml(introText)}</p>`,
+    cta: { text: ctaButtonText, url: resetLink },
+    ctaNote: `This link expires in ${expiryHours} hour${expiryHours === 1 ? "" : "s"}.`,
+    showFallbackLink: true,
+    panel: {
+      icon: "&#128274;",
+      title: featureListLabel || "Security tips",
+      lines: featureItems.map((item) => escapeHtml(item)),
+    },
+    closingHtml: closingText.includes(resetLink) ? undefined : escapeHtml(closingText),
+    footerAddress: companyAddress || brand.companyAddress,
+  });
 
   const text = [
     headingText,

@@ -17,6 +17,8 @@ export function runPostEntrySideEffects(
   competitionId: string,
   competitionName: string,
   actor: ContestEntryActor,
+  // Reason: what the player was actually charged - zero when a Game Master funded the seat.
+  chargedEntryFee = 0,
 ): void {
   void (async () => {
     try {
@@ -49,6 +51,8 @@ export function runPostEntrySideEffects(
       await notificationService.notifyCompetitionJoined(
         actor.userId,
         competitionName,
+        chargedEntryFee,
+        competitionId,
       );
     } catch (error) {
       console.error("⚠️ Competition joined notification failed:", error);

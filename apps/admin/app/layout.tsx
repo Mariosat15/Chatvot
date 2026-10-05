@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { unstable_noStore as noStore } from "next/cache";
 import { Toaster } from "@/components/ui/sonner";
+import AdminSessionGuard from "@/components/admin/AdminSessionGuard";
 import { AppSettingsProvider } from "@/contexts/AppSettingsContext";
 import { TerminologyProvider } from "@/contexts/TerminologyContext";
 import { getTerms } from "@/lib/services/terminology.service";
@@ -63,6 +64,7 @@ export default async function RootLayout({
         <AppSettingsProvider>
           <TerminologyProvider terms={terms}>{children}</TerminologyProvider>
         </AppSettingsProvider>
+        <AdminSessionGuard />
         <Toaster />
       </body>
     </html>

@@ -13,6 +13,9 @@ import {
 } from "@/database/models/admin-employee.model";
 import crypto from "crypto";
 import nodemailer from "nodemailer";
+// Reason: this route builds its own transporter, so it must opt in to the
+// shared finalizer or credentials emails go out without the disclaimer.
+import { applyEmailFinalizer } from "@/lib/nodemailer/email-brand";
 import CompanySettings from "@/database/models/company-settings.model";
 import { WhiteLabel } from "@/database/models/whitelabel.model";
 import { auditLogService } from "@/lib/services/audit-log.service";
@@ -398,26 +401,26 @@ async function getEmailTransporter() {
     // Get email settings from database (same as main app)
     const settings = await WhiteLabel.findOne();
 
-    return nodemailer.createTransport({
+    return applyEmailFinalizer(nodemailer.createTransport({
       service: "gmail",
       auth: {
         user: settings?.nodemailerEmail || process.env.NODEMAILER_EMAIL!,
         pass: settings?.nodemailerPassword || process.env.NODEMAILER_PASSWORD!,
       },
-    });
+    }));
   } catch (error) {
     console.error(
       "⚠️ Error getting email settings from database, using environment variables:",
       error,
     );
     // Fallback to environment variables
-    return nodemailer.createTransport({
+    return applyEmailFinalizer(nodemailer.createTransport({
       service: "gmail",
       auth: {
         user: process.env.NODEMAILER_EMAIL!,
         pass: process.env.NODEMAILER_PASSWORD!,
       },
-    });
+    }));
   }
 }
 

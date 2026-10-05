@@ -225,6 +225,8 @@ export async function cancelCompetitionAndRefund(
           userId,
           competition.name,
           reason,
+          entryFee,
+          competitionId,
         );
       } catch (notifError) {
         console.error(

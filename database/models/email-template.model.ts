@@ -19,7 +19,8 @@ export interface IEmailTemplate extends Document {
     | "challenge_received"
     | "notification_alert"
     | "gm_terms_request"
-    | "password_reset";
+    | "password_reset"
+    | "two_factor_otp";
   name: string;
   subject: string;
   fromName: string;
@@ -84,6 +85,9 @@ const EmailTemplateSchema = new Schema<IEmailTemplate>(
         // Reason: forgot-password flow. Add-only enum — a missing value rejects
         // the whole write, so never remove this once shipped.
         "password_reset",
+        // Reason: the email second factor. It was sent with hard-coded HTML and
+        // never appeared under Email Templates. Add-only, like the rest.
+        "two_factor_otp",
       ],
       required: true,
       unique: true,
@@ -530,6 +534,26 @@ function getTemplateDefaults(type: string): Partial<IEmailTemplate> {
           "If the button does not work, copy and paste this link into your browser: {{resetLink}}",
         ctaButtonText: "Reset Password",
         ctaButtonUrl: "{{resetLink}}",
+        useAIPersonalization: false,
+      };
+
+    case "two_factor_otp":
+      return {
+        name: "Two-Factor Code",
+        subject: "Your {{platformName}} verification code",
+        fromName: "{{platformName}} Security",
+        headingText: "Your verification code",
+        introText:
+          "Hi {{name}}, use the code below to finish signing in to {{platformName}}.",
+        featureListLabel: "Keep your account safe",
+        featureItems: [
+          "This code expires in {{ttlMinutes}} minutes",
+          "{{platformName}} staff will never ask you for this code",
+          "If you did not try to sign in, change your password now",
+        ],
+        closingText: "",
+        ctaButtonText: "",
+        ctaButtonUrl: "",
         useAIPersonalization: false,
       };
 

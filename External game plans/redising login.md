@@ -1183,3 +1183,51 @@ Also fixed: admin login trims the email; /api/credentials (first-login
 and wrote any employee's login into WhiteLabel - now owner only, min 8;
 profile routes' auth.email / auth.isSuperAdmin were undefined.
 Not retroactive: customers already left unassigned stay unassigned.
+
+==================================================
+43. REMEMBER ME, LOCKOUT KICK, CHARTVOLT EMAIL THEME (5 Oct 2026)
+==================================================
+
+Remember Me: lib/utils/remember-sign-in.ts stores the EMAIL ONLY (never the
+password; the inputs carry autocomplete so the browser's password manager
+offers it). Wired into useSignInForm, so desktop and mobile both use it.
+localStorage is wrapped because it throws when a browser refuses storage.
+
+Lockout kick: an operator's decision used to be checked only at sign-in.
+- Player: GET /api/user/account-standing (account-standing.service.ts),
+  polled by AccountStandingGuard in app/(root)/layout.tsx. Lock or
+  deactivate -> session revoked, sent to sign-in. Ban or FULL suspension
+  -> /account/review (deviation: review, not sign-out, so the player can
+  read why). A partial suspension (e.g. duplicate-KYC challenge block)
+  does not redirect.
+- failed_login and rate_limit lockouts deliberately do NOT end a live
+  session: they are written by whoever types wrong passwords at an email,
+  so honouring them would let a stranger sign a player out of a contest.
+- Admin: AdminSessionGuard extracted and mounted in apps/admin/app/layout.tsx.
+- api-server is out of scope.
+
+Email theme: lib/nodemailer/chartvolt-email-layout.ts + email-brand.ts
+(mirrored, byte-identical test). #030712 page, #071226 card, #0bbfe6
+border, gradient bar, gold #ffc928 CTA, security panel, Trade/Play/
+Compete/Conquer strip, logo on top, no background image. bgcolor is set
+on body and every table because mobile clients dropped background-color -
+that is why emails showed white on the phone.
+- Disclaimer: one platform-wide text (WhiteLabel emailDisclaimer /
+  showEmailDisclaimer), edited in Admin > Email Templates (card at the
+  top). Empty text = built-in default; only an explicit "off" hides it.
+  Applied by applyEmailFinalizer on the transporter, so EVERY email gets
+  it - including operator HTML templates (slot, then {{emailDisclaimer}},
+  then before </body>). The employees route now uses the finalizer too.
+- Cache: the admin process clears it on save; the player app picks the
+  change up within 60s.
+- {{entryFee}} leaks fixed by formatFeeAmount (absent fee renders "0").
+- Missing template added: two_factor_otp (both models, admin screen,
+  test-send). The invoice email is edited under Invoice Settings, so no
+  dead "invoice" tab was added; its email was re-themed dark, while the
+  printable invoice document stays light on purpose.
+- Deviations: the welcome email no longer renders dashboardPreviewUrl;
+  the employee welcome body is still operator HTML and only gains the
+  disclaimer and dark color-scheme.
+
+Proven by __tests__/services/chartvolt-email-theme.test.ts (19 tests).
+Never verified by eye in a real mail client.

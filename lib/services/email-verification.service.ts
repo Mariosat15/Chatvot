@@ -7,6 +7,8 @@ import crypto from "crypto";
 import { connectToDatabase } from "@/database/mongoose";
 import EmailTemplate from "@/database/models/email-template.model";
 import { getTransporter } from "@/lib/nodemailer";
+import { escapeHtml, renderChartVoltEmail } from "@/lib/nodemailer/chartvolt-email-layout";
+import { getEmailBrand } from "@/lib/nodemailer/email-brand";
 import { getSettings } from "@/lib/services/settings.service";
 import { ObjectId } from "mongodb";
 
@@ -135,79 +137,14 @@ export async function sendVerificationEmail({
       `Thanks for signing up! Please click the button below to verify your email address and activate your account.`;
     const ctaButtonText = template?.ctaButtonText || "Verify Email";
 
-    // Build HTML email
-    const htmlContent = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${subject}</title>
-</head>
-<body style="margin: 0; padding: 0; background-color: #0a0a0a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #0a0a0a; padding: 40px 20px;">
-    <tr>
-      <td align="center">
-        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #1a1a1a; border-radius: 16px; overflow: hidden;">
-          <!-- Header -->
-          <tr>
-            <td style="padding: 40px 40px 20px; text-align: center;">
-              <h1 style="color: #f5c518; margin: 0; font-size: 28px; font-weight: bold;">${platformName}</h1>
-            </td>
-          </tr>
-          
-          <!-- Content -->
-          <tr>
-            <td style="padding: 20px 40px;">
-              <h2 style="color: #ffffff; margin: 0 0 20px; font-size: 24px;">${headingText}</h2>
-              <p style="color: #a0a0a0; font-size: 16px; line-height: 1.6; margin: 0 0 30px;">
-                ${introText}
-              </p>
-              
-              <!-- CTA Button -->
-              <table width="100%" cellpadding="0" cellspacing="0">
-                <tr>
-                  <td align="center" style="padding: 20px 0;">
-                    <a href="${verificationUrl}" 
-                       style="display: inline-block; background-color: #f5c518; color: #000000; 
-                              text-decoration: none; padding: 16px 40px; border-radius: 8px; 
-                              font-weight: bold; font-size: 16px;">
-                      ${ctaButtonText}
-                    </a>
-                  </td>
-                </tr>
-              </table>
-              
-              <!-- Alternative Link -->
-              <p style="color: #666666; font-size: 14px; line-height: 1.6; margin: 20px 0 0;">
-                If the button doesn't work, copy and paste this link into your browser:
-              </p>
-              <p style="color: #f5c518; font-size: 12px; word-break: break-all; margin: 10px 0 0;">
-                ${verificationUrl}
-              </p>
-              
-              <!-- Expiry Notice -->
-              <p style="color: #666666; font-size: 14px; margin: 30px 0 0;">
-                This link will expire in ${TOKEN_EXPIRY_HOURS} hours.
-              </p>
-            </td>
-          </tr>
-          
-          <!-- Footer -->
-          <tr>
-            <td style="padding: 30px 40px; border-top: 1px solid #333333;">
-              <p style="color: #666666; font-size: 12px; margin: 0; text-align: center;">
-                If you didn't create an account with ${platformName}, you can safely ignore this email.
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
-    `;
+    const htmlContent = await buildVerificationHtml({
+      subject,
+      platformName,
+      headingText,
+      introText,
+      ctaButtonText,
+      verificationUrl,
+    });
 
     // Send email
     const transporter = await getTransporter();
@@ -227,6 +164,39 @@ export async function sendVerificationEmail({
     console.error("❌ Failed to send verification email:", error);
     return false;
   }
+}
+
+/**
+ * Verification email body in the shared ChartVolt dark layout. Both the first
+ * send and the resend use it, so the two can no longer drift apart.
+ */
+async function buildVerificationHtml(args: {
+  subject: string;
+  platformName: string;
+  headingText: string;
+  introText: string;
+  ctaButtonText: string;
+  verificationUrl: string;
+}): Promise<string> {
+  const brand = await getEmailBrand();
+  return renderChartVoltEmail({
+    title: args.subject,
+    platformName: args.platformName,
+    logoUrl: brand.logoUrl,
+    preheader: args.introText,
+    eyebrow: "Verify your email",
+    heading: escapeHtml(args.headingText),
+    bodyHtml: `<p style="margin:0;">${escapeHtml(args.introText)}</p>`,
+    cta: { text: args.ctaButtonText, url: args.verificationUrl },
+    ctaNote: `This link expires in ${TOKEN_EXPIRY_HOURS} hours.`,
+    showFallbackLink: true,
+    panel: {
+      icon: "&#128274;",
+      title: "Didn't sign up?",
+      lines: [`If you didn't create an account with ${escapeHtml(args.platformName)}, you can safely ignore this email.`],
+    },
+    footerAddress: brand.companyAddress,
+  });
 }
 
 /**
@@ -346,6 +316,7 @@ export async function resendVerificationEmail(
     // Find user by email (case-insensitive)
     // Escape the email to prevent ReDoS attacks
     const user = await db.collection("user").findOne({
+      // eslint-disable-next-line security/detect-non-literal-regexp -- input is escaped by escapeRegex
       email: { $regex: new RegExp(`^${escapeRegex(email)}$`, "i") },
     });
 
@@ -435,55 +406,14 @@ export async function resendVerificationEmail(
       `Thanks for signing up! Please click the button below to verify your email address and activate your account.`;
     const ctaButtonText = template?.ctaButtonText || "Verify Email";
 
-    // Build HTML email (simplified version)
-    const htmlContent = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${subject}</title>
-</head>
-<body style="margin: 0; padding: 0; background-color: #0a0a0a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #0a0a0a; padding: 40px 20px;">
-    <tr>
-      <td align="center">
-        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #1a1a1a; border-radius: 16px; overflow: hidden;">
-          <tr>
-            <td style="padding: 40px 40px 20px; text-align: center;">
-              <h1 style="color: #f5c518; margin: 0; font-size: 28px; font-weight: bold;">${platformName}</h1>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding: 20px 40px;">
-              <h2 style="color: #ffffff; margin: 0 0 20px; font-size: 24px;">${headingText}</h2>
-              <p style="color: #a0a0a0; font-size: 16px; line-height: 1.6; margin: 0 0 30px;">${introText}</p>
-              <table width="100%" cellpadding="0" cellspacing="0">
-                <tr>
-                  <td align="center" style="padding: 20px 0;">
-                    <a href="${verificationUrl}" 
-                       style="display: inline-block; background: linear-gradient(135deg, #f5c518 0%, #d4a516 100%); 
-                              color: #000000; text-decoration: none; padding: 16px 48px; 
-                              border-radius: 8px; font-weight: bold; font-size: 16px;">
-                      ${ctaButtonText}
-                    </a>
-                  </td>
-                </tr>
-              </table>
-              <p style="color: #666666; font-size: 14px; margin-top: 30px;">
-                If you didn't create an account, you can safely ignore this email.
-              </p>
-              <p style="color: #666666; font-size: 12px; margin-top: 20px;">
-                This link will expire in 24 hours.
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
+    const htmlContent = await buildVerificationHtml({
+      subject,
+      platformName,
+      headingText,
+      introText,
+      ctaButtonText,
+      verificationUrl,
+    });
 
     // Send email using nodemailer transporter
     const { getTransporter } = await import("@/lib/nodemailer");

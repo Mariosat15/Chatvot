@@ -347,7 +347,12 @@ export async function enterContest(
         `✅ User ${actor.userId} entered "${competition.name}" (fee €${entryFee}${funded ? ", funded by Game Master" : ""})`,
       );
 
-      runPostEntrySideEffects(competitionId, competition.name, actor);
+      runPostEntrySideEffects(
+        competitionId,
+        competition.name,
+        actor,
+        funded ? 0 : entryFee,
+      );
 
       return {
         success: true,
