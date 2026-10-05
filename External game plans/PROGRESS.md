@@ -931,12 +931,20 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 5 October 2026 - Overview: drop Activity/Streaks View all; other view links are text
+
+**Owner instruction:** remove Recent Activity and Streaks & Consistency "View all"; keep View Leaderboard as a button; every other "view …" link should be text, not a bordered button.
+
+- **Removed:** header links on `OverviewActivity` and `OverviewStreaks`; phone `MobileRecentActivity` no longer passes `href` into `MobileSection`.
+- **Text links:** `OVERVIEW_TEXT_LINK` in `overview-actions.ts` — View All Missions, Suggested View all / Browse competitions, and non-`linkAsButton` mobile section headers. Challenge / Matching Cards / Join / View Leaderboard stay `OVERVIEW_ACTION_BUTTON` / `_INLINE`.
+- Tests flipped in `overview-standing.test.ts` and `mobile-dashboard-split.test.ts`. **Never verified by eye.**
+
 ### 5 October 2026 - Overview CTAs share one sharp cyan button (no blur)
 
 **Owner instruction:** Challenge / Matching Cards / View Leaderboard / Suggested Join looked blurry and inconsistent. The PNG button art carried a soft neon bloom, and CSS `drop-shadow` doubled it; colours also disagreed (orange Challenge, purple Matching Cards, cyan Leaderboard, text-only Browse).
 
 - **One definition:** `components/dashboard/overview/overview-actions.ts` — `OVERVIEW_ACTION_BUTTON` / `_INLINE` borrow `neonButtonClasses("outline")` plus `PRESS_EFFECT`. No `drop-shadow` / `shadow-[0_0_*]` bloom.
-- **Wired everywhere on the Overview:** desktop `OverviewCompete` (Challenge + Matching Cards), `OverviewProgress` (View Leaderboard + View All Missions), mobile `MobileCompeteCarousel` + `MobileSection` header CTAs, `GameSuggestionsCard` (Join, Browse competitions, View all).
+- **Wired on Overview actions:** desktop `OverviewCompete` (Challenge + Matching Cards), `OverviewProgress` View Leaderboard, mobile `MobileCompeteCarousel` + `MobileSection` `linkAsButton`, `GameSuggestionsCard` Join. (Later same day: other "view" links became text — see entry above.)
 - Tests flipped in `mobile-dashboard-split.test.ts` and `overview-standing.test.ts` (44 green). **Never verified by eye.**
 
 ### 5 October 2026 - Anyone holding the Employees section can manage admins, not only the original admin

@@ -427,6 +427,10 @@ describe("Overview streaks chrome", () => {
     expect(ui).not.toMatch(/\bFlame\b/);
     expect(ui).toMatch(/OVERVIEW_STREAK_ART\.bestStreak/);
     expect(ui).toMatch(/mix-blend-screen/);
+    // Reason: owner, 5 Oct 2026 - remove View all / View Details from Streaks.
+    expect(ui).not.toMatch(/View Details/);
+    expect(ui).not.toMatch(/View All/);
+    expect(ui).not.toMatch(/href=["']\/profile["']/);
 
     // Reason: streaks must come from overall UserGameStats fields, never from
     // the trading trade-streak calculator on comprehensive-dashboard.
@@ -576,6 +580,20 @@ describe("Overview streaks chrome", () => {
     expect(progress).not.toMatch(/ART_BUTTON_HOVER/);
     expect(progress).not.toMatch(/drop-shadow-\[0_0_16px_rgba\(34,211,238/);
     expect(progress).not.toMatch(/hover:scale-110/);
+    // Reason: flipped later 5 Oct 2026 - View All Missions is quiet text; only
+    // View Leaderboard stays a "view" button among Overview view links.
+    expect(progress).toMatch(/OVERVIEW_TEXT_LINK/);
+    const missionsLink = progress.slice(
+      progress.indexOf("View All Missions") - 120,
+      progress.indexOf("View All Missions"),
+    );
+    expect(missionsLink).toMatch(/OVERVIEW_TEXT_LINK/);
+    expect(missionsLink).not.toMatch(/OVERVIEW_ACTION_BUTTON/);
+    const leaderboardLink = progress.slice(
+      progress.indexOf("View Leaderboard") - 160,
+      progress.indexOf("View Leaderboard"),
+    );
+    expect(leaderboardLink).toMatch(/OVERVIEW_ACTION_BUTTON/);
     expect(progress).toMatch(/sm:col-span-2/);
     expect(progress).toMatch(/missions\.map/);
     expect(progress).toMatch(/Math\.round\(progressPercent\)/);
@@ -606,6 +624,9 @@ describe("Overview streaks chrome", () => {
     expect(activity).not.toMatch(/Clock3/);
     // Reason: header tile is transparent — no black/sky fill behind the calendar.
     expect(activity).not.toMatch(/overflow-hidden rounded-lg border border-sky-400/);
+    // Reason: owner, 5 Oct 2026 - remove View All from Recent Activity.
+    expect(activity).not.toMatch(/View All/);
+    expect(activity).not.toMatch(/href=["']\/dashboard\?tab=contests["']/);
   });
 
   it("Compete strip fetches ranked matches and links Match Cards", () => {
@@ -947,7 +968,15 @@ describe("Overview streaks chrome", () => {
     expect(joinCta).toMatch(/Join/);
     expect(joinCta).not.toMatch(/<Link/);
     expect(suggestions).toMatch(/Browse competitions/);
-    expect(suggestions).toMatch(/OVERVIEW_ACTION_BUTTON_INLINE/);
+    // Reason: flipped later 5 Oct 2026 - Browse / View all are text links;
+    // Join stays the action button.
+    expect(suggestions).toMatch(/OVERVIEW_TEXT_LINK/);
+    expect(suggestions).not.toMatch(/OVERVIEW_ACTION_BUTTON_INLINE/);
+    const viewAllIdx = suggestions.indexOf("View all");
+    expect(viewAllIdx).toBeGreaterThan(-1);
+    expect(suggestions.slice(Math.max(0, viewAllIdx - 120), viewAllIdx)).toMatch(
+      /OVERVIEW_TEXT_LINK/,
+    );
 
     // 7. Phone: swipe row; sm: 2 columns; xl: 4 (Image 2).
     expect(suggestions).toMatch(/const TILE_ROW =[\s\S]*?snap-x[\s\S]*?sm:grid-cols-2[\s\S]*?xl:grid-cols-4/);

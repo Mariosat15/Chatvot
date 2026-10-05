@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { ChevronRight, Package, TrendingUp } from "lucide-react";
 import type { OverviewActivityItem } from "@/lib/services/games/overview-types";
 import { OVERVIEW_ICON_ART } from "@/lib/services/games/overview-assets";
@@ -62,32 +61,24 @@ export default function OverviewActivity({ items }: OverviewActivityProps) {
       className={`${NEON_PANEL_LIT} flex h-full min-h-0 flex-col p-4 sm:p-5`}
       aria-labelledby="activity-heading"
     >
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2.5">
-          {/* Reason: tile already paints its own neon frame — no black fill behind it. */}
-          <span className="relative flex h-14 w-14 shrink-0 drop-shadow-[0_0_16px_rgba(56,189,248,0.6)]">
-            <Image
-              src={OVERVIEW_ICON_ART.activity}
-              alt=""
-              fill
-              sizes="56px"
-              className="object-contain"
-            />
-          </span>
-          <h2
-            id="activity-heading"
-            className={`${NEON_HEADING} text-sm tracking-[0.14em] text-white`}
-          >
-            Recent Activity
-          </h2>
-        </div>
-        <Link
-          href="/dashboard?tab=contests"
-          className="inline-flex items-center gap-1 text-xs font-semibold text-amber-300 hover:text-amber-200"
+      {/* Reason: owner, 5 Oct 2026 - remove View All from Recent Activity. */}
+      <div className="mb-3 flex items-center gap-2.5">
+        {/* Reason: tile already paints its own neon frame — no black fill behind it. */}
+        <span className="relative flex h-14 w-14 shrink-0 drop-shadow-[0_0_16px_rgba(56,189,248,0.6)]">
+          <Image
+            src={OVERVIEW_ICON_ART.activity}
+            alt=""
+            fill
+            sizes="56px"
+            className="object-contain"
+          />
+        </span>
+        <h2
+          id="activity-heading"
+          className={`${NEON_HEADING} text-sm tracking-[0.14em] text-white`}
         >
-          View All
-          <ChevronRight className="h-3.5 w-3.5" aria-hidden />
-        </Link>
+          Recent Activity
+        </h2>
       </div>
 
       {items.length === 0 ? (

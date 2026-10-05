@@ -50,8 +50,9 @@ export function MobileRecentActivity() {
   const [now, setNow] = useState<number | null>(null);
   useEffect(() => setNow(Date.now()), []);
 
+  // Reason: owner, 5 Oct 2026 - no View all on Recent activity (desktop or phone).
   return (
-    <MobileSection title="Recent activity" href="/dashboard?tab=contests">
+    <MobileSection title="Recent activity">
       {items.length === 0 ? (
         <div className={`${MOBILE_CARD} p-4 text-sm text-gray-400`}>
           Nothing yet — join a contest and it will show up here.

@@ -11,7 +11,7 @@ import {
 } from "@/lib/services/games/overview-assets";
 import {
   OVERVIEW_ACTION_BUTTON,
-  OVERVIEW_ACTION_BUTTON_INLINE,
+  OVERVIEW_TEXT_LINK,
 } from "@/components/dashboard/overview/overview-actions";
 
 interface Suggestion {
@@ -274,8 +274,9 @@ function SuggestionTile({
  * Contests suggested from games the player has actually played (X11.5).
  * Layout matches owner Image 2 (3 Oct 2026): competition cover with Upcoming
  * pill (the fee pill was removed 3 Oct 2026), GM/Private/Public badges, fixed prize strip.
- * Join / Browse / View all use the shared sharp cyan OVERVIEW_ACTION_BUTTON
- * (5 Oct 2026) — same CTA as Compete and View Leaderboard, no PNG bloom.
+ * Join uses the shared sharp cyan OVERVIEW_ACTION_BUTTON; Browse / View all
+ * are quiet text links (owner, 5 Oct 2026 — only View Leaderboard stays a
+ * "view" button).
  * Every badge/prize image is a transparent PNG - nothing renders on a black canvas.
  * Never invites anyone - suggestions only (X14).
  */
@@ -362,10 +363,7 @@ export default function GameSuggestionsCard({
           <p className="max-w-sm text-[13px] text-gray-400">
             We will suggest contests here as soon as one opens for a game you play.
           </p>
-          <Link
-            href="/competitions"
-            className={`${OVERVIEW_ACTION_BUTTON_INLINE} mt-1`}
-          >
+          <Link href="/competitions" className={`${OVERVIEW_TEXT_LINK} mt-1`}>
             Browse competitions
             <ArrowRight className="h-3.5 w-3.5" aria-hidden />
           </Link>
@@ -399,10 +397,7 @@ export default function GameSuggestionsCard({
             </p>
           </div>
         </div>
-        <Link
-          href="/competitions"
-          className={OVERVIEW_ACTION_BUTTON_INLINE}
-        >
+        <Link href="/competitions" className={OVERVIEW_TEXT_LINK}>
           View all
           <ArrowRight className="h-4 w-4" aria-hidden />
         </Link>

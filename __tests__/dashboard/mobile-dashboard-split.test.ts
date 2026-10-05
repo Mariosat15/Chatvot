@@ -117,6 +117,9 @@ describe("mobile dashboard split", () => {
     expect(streaks).toMatch(/mix-blend-screen/);
     expect(section).toMatch(/iconSrc/);
     expect(section).toMatch(/mix-blend-screen/);
+    // Reason: owner, 5 Oct 2026 - no View all on phone Recent activity.
+    expect(streaks).toMatch(/title="Recent activity"/);
+    expect(streaks).not.toMatch(/href="\/dashboard\?tab=contests"/);
   });
 
   it("phones have no bottom nav, and content clears the fixed logo bar", () => {
@@ -214,15 +217,22 @@ describe("mobile dashboard split", () => {
   it("the phone Compete header's Matching Cards is a pressable CTA, not bare text", () => {
     // Reason: flipped 5 Oct 2026 - violet glow pill replaced by the shared
     // sharp cyan OVERVIEW_ACTION_BUTTON_INLINE (owner: no blur, one theme).
+    // Later same day: quiet header "view" links use OVERVIEW_TEXT_LINK; only
+    // linkAsButton (Matching Cards) stays a bordered button.
     const carousel = read("components/dashboard/mobile/MobileCompeteCarousel.tsx");
     const section = read("components/dashboard/mobile/MobileSection.tsx");
     expect(carousel).toMatch(/linkLabel="Matching Cards"\s*linkAsButton/);
     expect(section).toMatch(/OVERVIEW_ACTION_BUTTON_INLINE/);
+    expect(section).toMatch(/OVERVIEW_TEXT_LINK/);
     const pill = section.slice(section.indexOf("linkAsButton && ("));
     expect(pill.length).toBeGreaterThan(40);
     expect(pill).toMatch(/OVERVIEW_ACTION_BUTTON_INLINE/);
     expect(pill).not.toMatch(/shadow-\[0_0_14px_rgba\(139,92,246/);
     expect(pill).toMatch(/<ChevronRight/);
+    const textLink = section.slice(section.indexOf("!linkAsButton && ("));
+    expect(textLink.length).toBeGreaterThan(40);
+    expect(textLink).toMatch(/OVERVIEW_TEXT_LINK/);
+    expect(textLink).not.toMatch(/OVERVIEW_ACTION_BUTTON/);
   });
 
   it("each phone Compete card carries Matching Cards beside its Challenge button", () => {

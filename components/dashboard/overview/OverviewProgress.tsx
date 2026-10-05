@@ -18,7 +18,7 @@ import {
 } from "@/components/neon/tokens";
 import {
   OVERVIEW_ACTION_BUTTON,
-  OVERVIEW_ACTION_BUTTON_INLINE,
+  OVERVIEW_TEXT_LINK,
 } from "@/components/dashboard/overview/overview-actions";
 
 const JOURNEY_HREF = "/profile?tab=journey";
@@ -289,10 +289,7 @@ export default function OverviewProgress({
             </p>
           </div>
         </div>
-        <Link
-          href={JOURNEY_HREF}
-          className={OVERVIEW_ACTION_BUTTON_INLINE}
-        >
+        <Link href={JOURNEY_HREF} className={OVERVIEW_TEXT_LINK}>
           View All Missions
           <ChevronRight className="h-3.5 w-3.5" aria-hidden />
         </Link>

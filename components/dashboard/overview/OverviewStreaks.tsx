@@ -1,8 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
-import { ChevronRight } from "lucide-react";
 import type { OverviewStanding } from "@/lib/services/games/overview-types";
 import {
   OVERVIEW_ICON_ART,
@@ -115,36 +113,28 @@ export default function OverviewStreaks({ streaks }: OverviewStreaksProps) {
       aria-labelledby="streaks-heading"
       className={`${NEON_PANEL} border-cyan-400/25 p-4 shadow-[0_0_28px_-12px_rgba(34,211,238,0.45)] sm:p-5`}
     >
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div className="flex items-start gap-2.5">
-          <span className="relative mt-0.5 flex h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-orange-400/40 bg-transparent shadow-[0_0_14px_rgba(251,146,60,0.45)]">
-            <Image
-              src={OVERVIEW_ICON_ART.fire}
-              alt=""
-              fill
-              sizes="40px"
-              className="object-contain mix-blend-screen"
-            />
-          </span>
-          <div>
-            <h2
-              id="streaks-heading"
-              className={`${NEON_HEADING} text-sm uppercase tracking-[0.14em] text-white`}
-            >
-              Streaks &amp; Consistency
-            </h2>
-            <p className="mt-1 text-xs text-gray-400 sm:text-sm">
-              Keep showing up. Consistency leads to greatness.
-            </p>
-          </div>
+      {/* Reason: owner, 5 Oct 2026 - remove View all / View Details from Streaks. */}
+      <div className="mb-4 flex items-start gap-2.5">
+        <span className="relative mt-0.5 flex h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-orange-400/40 bg-transparent shadow-[0_0_14px_rgba(251,146,60,0.45)]">
+          <Image
+            src={OVERVIEW_ICON_ART.fire}
+            alt=""
+            fill
+            sizes="40px"
+            className="object-contain mix-blend-screen"
+          />
+        </span>
+        <div>
+          <h2
+            id="streaks-heading"
+            className={`${NEON_HEADING} text-sm uppercase tracking-[0.14em] text-white`}
+          >
+            Streaks &amp; Consistency
+          </h2>
+          <p className="mt-1 text-xs text-gray-400 sm:text-sm">
+            Keep showing up. Consistency leads to greatness.
+          </p>
         </div>
-        <Link
-          href="/profile"
-          className={`${NEON_LABEL} inline-flex shrink-0 items-center gap-1 text-[11px] text-amber-300 transition-colors hover:text-amber-200`}
-        >
-          View Details
-          <ChevronRight className="h-3.5 w-3.5" aria-hidden />
-        </Link>
       </div>
 
       <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">

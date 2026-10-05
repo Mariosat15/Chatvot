@@ -3,7 +3,10 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { ChevronRight, GalleryHorizontalEnd } from "lucide-react";
 import { NEON_HEADING } from "@/components/neon/tokens";
-import { OVERVIEW_ACTION_BUTTON_INLINE } from "@/components/dashboard/overview/overview-actions";
+import {
+  OVERVIEW_ACTION_BUTTON_INLINE,
+  OVERVIEW_TEXT_LINK,
+} from "@/components/dashboard/overview/overview-actions";
 
 /** Glass card shell shared by every mobile Overview section. */
 export const MOBILE_CARD =
@@ -67,10 +70,7 @@ export default function MobileSection({
           </Link>
         )}
         {href && !linkAsButton && (
-          <Link
-            href={href}
-            className={OVERVIEW_ACTION_BUTTON_INLINE}
-          >
+          <Link href={href} className={OVERVIEW_TEXT_LINK}>
             {linkLabel}
             <ChevronRight className="h-3.5 w-3.5" aria-hidden />
           </Link>
