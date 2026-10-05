@@ -66,17 +66,27 @@ export const getAuth = async (): Promise<ReturnType<typeof betterAuth>> => {
             // Reason: email OUR /reset-password page with the token. The
             // better-auth callback URL needs a mounted HTTP handler we do
             // not expose — the token alone is enough for auth.api.resetPassword.
+            // better-auth swallows send errors, so log loudly here too.
             const baseUrl =
               process.env.NEXT_PUBLIC_BASE_URL ||
               process.env.BETTER_AUTH_URL ||
               "http://localhost:3000";
             const resetLink = `${baseUrl.replace(/\/$/, "")}/reset-password?token=${encodeURIComponent(token)}`;
-            await sendPasswordResetEmail({
-              email: user.email,
-              name: user.name,
-              resetLink,
-              expiryHours: 1,
-            });
+            try {
+              await sendPasswordResetEmail({
+                email: user.email,
+                name: user.name,
+                resetLink,
+                expiryHours: 1,
+              });
+              console.log(`📧 [password-reset] sent to ${user.email}`);
+            } catch (err) {
+              console.error(
+                `❌ [password-reset] failed to send to ${user.email}:`,
+                err,
+              );
+              throw err;
+            }
           },
         },
         plugins: [

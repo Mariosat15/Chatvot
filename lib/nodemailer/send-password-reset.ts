@@ -5,9 +5,7 @@
 
 import { getTransporter } from "./index";
 import { getSettings } from "@/lib/services/settings.service";
-import EmailTemplate, {
-  getEmailTemplate,
-} from "@/database/models/email-template.model";
+import { getEmailTemplate } from "@/database/models/email-template.model";
 import { connectToDatabase } from "@/database/mongoose";
 
 const DEFAULT_EXPIRY_HOURS = 1;
@@ -80,19 +78,16 @@ export async function sendPasswordResetEmail({
     "{{companyAddress}}": companyAddress,
   };
 
-  let template = await EmailTemplate.findOne({
-    templateType: "password_reset",
-    isActive: { $ne: false },
-  });
-
-  if (!template) {
-    // Reason: first request should still send — create the default row so the
-    // admin Email Templates screen can edit it afterwards.
-    try {
-      template = await getEmailTemplate("password_reset");
-    } catch (err) {
-      console.warn("⚠️ [password-reset] could not seed template:", err);
+  // Reason: always go through getEmailTemplate — a findOne-only path keeps a
+  // row that was name-seeded with the schema's welcome subject forever.
+  let template: Awaited<ReturnType<typeof getEmailTemplate>> | null = null;
+  try {
+    template = await getEmailTemplate("password_reset");
+    if (template.isActive === false) {
+      template = null;
     }
+  } catch (err) {
+    console.warn("⚠️ [password-reset] could not load template:", err);
   }
 
   const subject = applyVars(

@@ -202,6 +202,26 @@ const EmailTemplate =
 
 export default EmailTemplate;
 
+// Reason: schema field defaults are welcome-shaped (historical). Creating a
+// row with only `{ templateType, name }` therefore stores a "password reset"
+// document that still says "Welcome to ChartVolt…". Exact match only — an
+// operator who edited the subject is left alone.
+const WELCOME_SCHEMA_DEFAULT_SUBJECT =
+  "Welcome to {{platformName}} - Start competing and win real prizes!";
+
+function needsTypeSpecificDefaultsRepair(
+  templateType: IEmailTemplate["templateType"],
+  template: IEmailTemplate,
+): boolean {
+  if (templateType === "welcome") return false;
+  const defaults = getTemplateDefaults(templateType);
+  if (!defaults.subject) return false;
+  return (
+    template.subject === WELCOME_SCHEMA_DEFAULT_SUBJECT &&
+    defaults.subject !== WELCOME_SCHEMA_DEFAULT_SUBJECT
+  );
+}
+
 // Helper function to get or create default template
 export async function getEmailTemplate(
   templateType: IEmailTemplate["templateType"],
@@ -215,6 +235,25 @@ export async function getEmailTemplate(
       templateType,
       ...defaults,
     });
+    return template;
+  }
+
+  if (needsTypeSpecificDefaultsRepair(templateType, template)) {
+    const defaults = getTemplateDefaults(templateType);
+    template.name = defaults.name ?? template.name;
+    template.subject = defaults.subject ?? template.subject;
+    template.headingText = defaults.headingText ?? template.headingText;
+    template.introText = defaults.introText ?? template.introText;
+    template.featureListLabel =
+      defaults.featureListLabel ?? template.featureListLabel;
+    template.featureItems = defaults.featureItems ?? template.featureItems;
+    template.closingText = defaults.closingText ?? template.closingText;
+    template.ctaButtonText = defaults.ctaButtonText ?? template.ctaButtonText;
+    template.ctaButtonUrl = defaults.ctaButtonUrl ?? template.ctaButtonUrl;
+    if (defaults.useAIPersonalization !== undefined) {
+      template.useAIPersonalization = defaults.useAIPersonalization;
+    }
+    await template.save();
   }
 
   return template;

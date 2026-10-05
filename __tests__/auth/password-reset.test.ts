@@ -33,13 +33,35 @@ describe("password reset + mobile auth polish", () => {
     const section = read(
       "apps/admin/components/admin/EmailTemplatesSection.tsx",
     );
-    const route = read("apps/admin/app/api/email-templates/route.ts");
+    const route = stripComments(
+      read("apps/admin/app/api/email-templates/route.ts"),
+    );
     expect(section).toContain("password_reset:");
     expect(section).toContain("Password Reset");
     expect(section).toContain("KeyRound");
     expect(route).toContain('"password_reset"');
     expect(route).toContain("sendTestPasswordResetEmail");
-    expect(route).toContain("password_reset: \"Password Reset\"");
+    // Reason: name-only EmailTemplate.create fills the schema's welcome
+    // defaults — that is how reset mail went out as a welcome email.
+    expect(route).toContain("getEmailTemplate");
+    expect(route).not.toMatch(
+      /EmailTemplate\.create\(\s*\{\s*templateType/,
+    );
+  });
+
+  it("getEmailTemplate repairs password_reset rows stuck on welcome defaults", () => {
+    const main = read("database/models/email-template.model.ts");
+    const admin = read("apps/admin/database/models/email-template.model.ts");
+    for (const src of [main, admin]) {
+      expect(src).toContain("needsTypeSpecificDefaultsRepair");
+      expect(src).toContain("WELCOME_SCHEMA_DEFAULT_SUBJECT");
+      expect(src).toContain(
+        "Welcome to {{platformName}} - Start competing and win real prizes!",
+      );
+    }
+    const sender = stripComments(read("lib/nodemailer/send-password-reset.ts"));
+    expect(sender).toContain('getEmailTemplate("password_reset")');
+    expect(sender).not.toContain("EmailTemplate.findOne");
   });
 
   it("better-auth sends the branded reset email and revokes sessions", () => {

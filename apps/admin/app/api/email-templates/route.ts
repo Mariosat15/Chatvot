@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import EmailTemplate, {
+  getEmailTemplate,
   IEmailTemplate,
 } from "@/database/models/email-template.model";
 import { guardSection } from "@/lib/admin/section-route-guard";
@@ -17,16 +18,12 @@ export async function GET(request: NextRequest) {
     const templateType = searchParams.get("type");
 
     if (templateType) {
-      // Get specific template
-      let template = await EmailTemplate.findOne({ templateType });
-
-      if (!template) {
-        // Create default template if it doesn't exist
-        template = await EmailTemplate.create({
-          templateType,
-          name: getDefaultName(templateType),
-        });
-      }
+      // Reason: getEmailTemplate applies type-specific defaults (and repairs
+      // rows that were created with only a name, which inherit welcome copy
+      // from the schema). Never EmailTemplate.create({ templateType, name }).
+      const template = await getEmailTemplate(
+        templateType as IEmailTemplate["templateType"],
+      );
 
       return NextResponse.json({ template });
     }
@@ -59,10 +56,8 @@ export async function GET(request: NextRequest) {
 
     for (const type of templateTypes) {
       if (!existingTypes.has(type)) {
-        const newTemplate = await EmailTemplate.create({
-          templateType: type,
-          name: getDefaultName(type),
-        });
+        // Reason: same footgun as above — name-only create fills welcome defaults.
+        const newTemplate = await getEmailTemplate(type);
         templates.push(newTemplate);
       }
     }
@@ -247,25 +242,3 @@ export async function POST(request: NextRequest) {
   }
 }
 
-function getDefaultName(type: string): string {
-  const names: Record<string, string> = {
-    welcome: "Welcome Email",
-    price_alert: "Price Alert Email",
-    invoice: "Invoice Email",
-    news_summary: "News Summary Email",
-    inactive_reminder: "Inactive User Reminder",
-    deposit_completed: "Deposit Completed Email",
-    withdrawal_completed: "Withdrawal Completed Email",
-    refund_completed: "Refund Completed Email",
-    email_verification: "Email Verification",
-    account_manager_assigned: "Account Manager Assigned",
-    account_manager_changed: "Account Manager Changed",
-    competition_starting: "Competition Starting Soon",
-    competition_ended: "Competition Ended — Results Available",
-    margin_warning: "Margin Warning Alert",
-    challenge_received: "Challenge Received",
-    gm_terms_request: "Game Master Terms Request",
-    password_reset: "Password Reset",
-  };
-  return names[type] || "Email Template"; // eslint-disable-line security/detect-object-injection
-}
