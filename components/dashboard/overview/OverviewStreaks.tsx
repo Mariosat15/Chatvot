@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { ChevronRight } from "lucide-react";
 import type { OverviewStanding } from "@/lib/services/games/overview-types";
 import {
   OVERVIEW_ICON_ART,
