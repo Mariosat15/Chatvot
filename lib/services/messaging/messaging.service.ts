@@ -990,6 +990,7 @@ export class MessagingService {
   static async escalateFromAI(
     conversationId: string,
     reason: string,
+    transferContent?: (employeeName: string) => string,
   ): Promise<IConversation> {
     await connectToDatabase();
 
@@ -1118,8 +1119,9 @@ export class MessagingService {
 
     // Build transfer message
     const employeeName = assignedEmployee?.name || "our support team";
-    const transferMessage =
-      reason === "User requested"
+    const transferMessage = transferContent
+      ? transferContent(employeeName)
+      : reason === "User requested"
         ? `I'm connecting you with ${employeeName}. They'll be with you shortly!`
         : `I'm transferring you to ${employeeName} who will be able to assist you further. They'll be with you shortly!`;
 

@@ -7,7 +7,7 @@ import MessagingService from "@/lib/services/messaging/messaging.service";
  * GET /api/messaging/support
  * Get or create support conversation for user
  */
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user?.id) {
@@ -47,16 +47,23 @@ export async function GET(request: NextRequest) {
       session.user.name || "User",
     );
 
+    const ticket = conversation as unknown as {
+      ticketNumber?: string;
+      isArchived?: boolean;
+      archivedAt?: Date;
+      resolvedByName?: string;
+    };
+
     return NextResponse.json({
       conversation: {
         id: conversation._id.toString(),
         type: conversation.type,
         status: conversation.status,
         // Ticket system fields
-        ticketNumber: (conversation as any).ticketNumber || null,
-        isArchived: (conversation as any).isArchived || false,
-        archivedAt: (conversation as any).archivedAt || null,
-        resolvedByName: (conversation as any).resolvedByName || null,
+        ticketNumber: ticket.ticketNumber || null,
+        isArchived: ticket.isArchived || false,
+        archivedAt: ticket.archivedAt || null,
+        resolvedByName: ticket.resolvedByName || null,
         // Participants
         participants: conversation.participants.filter((p) => p.isActive),
         lastMessage: conversation.lastMessage,
@@ -218,10 +225,10 @@ export async function POST(request: NextRequest) {
         : null,
       conversationId: conversation._id.toString(),
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error sending support message:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to send message" },
+      { error: (error instanceof Error && error.message) || "Failed to send message" },
       { status: 500 },
     );
   }
@@ -273,7 +280,7 @@ async function handleAIResponse(
 
   // Count AI messages in this conversation
   // IMPORTANT: Only count messages AFTER lastResolvedAt to reset counter on resolve
-  const aiMessageQuery: any = {
+  const aiMessageQuery: Record<string, unknown> = {
     conversationId: new mongoose.default.Types.ObjectId(conversationId),
     senderType: "ai",
   };
@@ -311,6 +318,21 @@ async function handleAIResponse(
     (settings as { aiMaxResponsesBeforeEscalation?: number })
       .aiMaxResponsesBeforeEscalation || 10;
   const shouldAutoEscalate = aiMessageCount >= maxResponses;
+
+  // Reason: a "Contact us" Game Master package can only be enabled by an employee, so the
+  // AI must hand the chat over rather than answer - to the assigned employee, else anyone.
+  const { detectContactUsPackageRequest, GM_CONTACT_US_ESCALATION_REASON, contactUsTransferMessage } =
+    await import("@/lib/services/gamemaster/contact-us-support");
+  const contactUsRequest = await detectContactUsPackageRequest(userMessage, userId);
+  if (contactUsRequest) {
+    return await escalateToHuman(
+      conversationId,
+      userId,
+      userName,
+      GM_CONTACT_US_ESCALATION_REASON,
+      (employeeName) => contactUsTransferMessage(contactUsRequest.packageName, employeeName),
+    );
+  }
 
   if (shouldEscalate || shouldAutoEscalate) {
     // Escalate to human - find assigned employee or any available
@@ -436,6 +458,7 @@ async function escalateToHuman(
   userId: string,
   userName: string,
   reason: string,
+  transferContent?: (employeeName: string) => string,
 ) {
   const mongoose = await import("mongoose");
   const { connectToDatabase } = await import("@/database/mongoose");
@@ -526,11 +549,11 @@ async function escalateToHuman(
 
   // Check if employee is already in participants
   const employeeAlreadyParticipant = conversation?.participants?.some(
-    (p: any) => p.id === employeeId && p.type === "employee",
+    (p: { id?: string; type?: string }) => p.id === employeeId && p.type === "employee",
   );
 
   // Build update operations
-  const updateOps: any = {
+  const updateOps = {
     $set: {
       isAIHandled: false,
       assignedEmployeeId: employeeId
@@ -571,8 +594,9 @@ async function escalateToHuman(
   }
 
   // Send escalation message
-  const escalationContent =
-    reason === "User requested human assistance"
+  const escalationContent = transferContent
+    ? transferContent(employeeName)
+    : reason === "User requested human assistance"
       ? `I'm connecting you with ${employeeName}, your dedicated account manager. They'll be with you shortly!`
       : `I'm transferring you to ${employeeName} who will be able to assist you further. They'll be with you shortly!`;
 

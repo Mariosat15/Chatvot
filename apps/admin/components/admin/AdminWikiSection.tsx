@@ -6048,6 +6048,21 @@ export default function AdminWikiSection() {
                   </p>
                 </div>
                 <div className="bg-gray-900 p-3 rounded">
+                  <strong className="text-white">
+                    &quot;Contact us&quot; packages:
+                  </strong>
+                  <p className="text-gray-400 mt-1">
+                    A package marked &quot;Contact us&quot; cannot be bought
+                    directly. When a player asks the support AI about one, the AI
+                    tells them they are being transferred and hands the chat to
+                    their assigned support employee, or to any available team
+                    member if none is assigned. To let that player buy it, use
+                    Enable GM Package - on the Game Master&apos;s detail view, or
+                    for someone who is not a Game Master yet, in Users → the
+                    player → Security Status → Game Master Package.
+                  </p>
+                </div>
+                <div className="bg-gray-900 p-3 rounded">
                   <strong className="text-white">Earnings History:</strong>
                   <p className="text-gray-400 mt-1">
                     Complete breakdown of all earnings, by

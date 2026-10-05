@@ -73,6 +73,10 @@ const QUERY_EXPANSIONS: Record<string, string[]> = {
   loss: ["lose", "negative", "down"],
 };
 
+// Reason: the lookup key is a word the customer typed, and an object lookup walks the
+// prototype chain - "constructor" would return a function and `for...of` over it throws.
+const QUERY_EXPANSION_MAP: ReadonlyMap<string, string[]> = new Map(Object.entries(QUERY_EXPANSIONS));
+
 /**
  * Expand query with synonyms for better matching
  */
@@ -85,7 +89,7 @@ function expandQuery(query: string): string[] {
 
   // Add expansions for each word
   for (const word of words) {
-    const synonyms = QUERY_EXPANSIONS[word];
+    const synonyms = QUERY_EXPANSION_MAP.get(word);
     if (synonyms) {
       for (const synonym of synonyms) {
         // Create query with synonym replacement
@@ -183,11 +187,12 @@ function cosineSimilarity(a: number[], b: number[]): number {
   let normA = 0;
   let normB = 0;
 
-  for (let i = 0; i < a.length; i++) {
-    dotProduct += a[i] * b[i];
-    normA += a[i] * a[i];
-    normB += b[i] * b[i];
-  }
+  a.forEach((av, i) => {
+    const bv = b.at(i) ?? 0;
+    dotProduct += av * bv;
+    normA += av * av;
+    normB += bv * bv;
+  });
 
   return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
 }
@@ -297,7 +302,7 @@ async function searchKnowledgeBase(
 
           // Check for expanded synonyms in content
           for (const term of keyTerms) {
-            const synonyms = QUERY_EXPANSIONS[term] || [];
+            const synonyms = QUERY_EXPANSION_MAP.get(term) || [];
             for (const syn of synonyms) {
               if (contentLower.includes(syn)) matchScore += 0.1;
             }
@@ -357,8 +362,7 @@ function buildContext(results: SearchResult[]): string {
   }
 
   let context = "";
-  for (let i = 0; i < results.length; i++) {
-    const result = results[i];
+  for (const [i, result] of results.entries()) {
     context += `\n=== KNOWLEDGE ${i + 1} ===\n`;
     if (result.section) {
       context += `Topic: ${result.section}\n`;
@@ -443,6 +447,7 @@ RULES:
 5. Only say "I don't have that information" if the KNOWLEDGE BASE truly has NOTHING relevant.
 6. NEVER make up information not in the KNOWLEDGE BASE.
 7. NEVER mention competitors or other platforms.
+8. Some Game Master packages are "Contact us" packages: they cannot be bought directly and only a member of our team can enable them. If the customer wants one, tell them they will be transferred to a human team member who will enable it for them. Never quote a price or promise it is enabled.
 
 KNOWLEDGE BASE:
 ${context}

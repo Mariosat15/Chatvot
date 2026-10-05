@@ -2,20 +2,20 @@ import { NextRequest, NextResponse } from "next/server";
 import mongoose from "mongoose";
 import { ObjectId } from "mongodb";
 import { connectToDatabase } from "@/database/mongoose";
-import { MarketplaceItem } from "@/database/models/marketplace/marketplace-item.model";
 import { guardSection } from "@/lib/admin/section-route-guard";
 import { auditLogService } from "@/lib/services/audit-log.service";
 import {
-  isContactUsPackage,
-  isUnlockedForUser,
-} from "@/lib/services/gamemaster/contact-us-package";
+  listContactUsPackagesForUser,
+  setContactUsPackageUnlock,
+} from "@/lib/services/gamemaster/package-unlocks.service";
 
 /**
  * Per-Game-Master unlocks for "Contact us" GM packages.
  *
  * A package with `gameMasterConfig.contactUsOnly` cannot be bought; players are sent to support
  * chat. From Manage Game Masters an operator can enable such a package for ONE Game Master, after
- * which that player (and only that player) sees the normal buy button for it.
+ * which that player (and only that player) sees the normal buy button for it. The Users section
+ * has a sibling route keyed on the player id for players who are not Game Masters yet.
  *
  * Reason: the unlock is keyed on the subscription's `userId` (the player id the purchase route
  * compares against), never on the subscription `_id` from the URL.
@@ -69,23 +69,7 @@ export async function GET(
     const gm = await loadGameMasterUserId(id);
     if (!gm.ok) return gm.response;
 
-    const items = await MarketplaceItem.find({
-      category: "gamemaster",
-      "gameMasterConfig.contactUsOnly": true,
-    })
-      .select("name price isPublished status category gameMasterConfig.contactUsOnly +contactUsUnlockedUserIds")
-      .sort({ price: 1 })
-      .lean();
-
-    const packages = items.map((item) => ({
-      id: String(item._id),
-      name: item.name,
-      price: item.price,
-      isPublished: item.isPublished,
-      status: item.status,
-      unlocked: isUnlockedForUser(item, gm.userId),
-    }));
-
+    const packages = await listContactUsPackagesForUser(gm.userId);
     return NextResponse.json({ success: true, packages });
   } catch (error) {
     console.error("❌ Error loading GM package unlocks:", error);
@@ -119,28 +103,14 @@ export async function PUT(
     const gm = await loadGameMasterUserId(id);
     if (!gm.ok) return gm.response;
 
-    const item = await MarketplaceItem.findById(packageId)
-      .select("name category gameMasterConfig.contactUsOnly")
-      .lean();
-    // Reason: refuse anything that is not a Contact-us GM package, so this route cannot be used
-    // to stamp an unlock list onto an ordinary item where nothing would ever read it.
-    if (!item || !isContactUsPackage(item)) {
-      return NextResponse.json(
-        { success: false, error: "This package is not a Contact us Game Master package" },
-        { status: 400 },
-      );
+    const result = await setContactUsPackageUnlock(gm.userId, packageId, enabled);
+    if (!result.ok) {
+      return NextResponse.json({ success: false, error: result.error }, { status: 400 });
     }
-
-    await MarketplaceItem.updateOne(
-      { _id: item._id },
-      enabled
-        ? { $addToSet: { contactUsUnlockedUserIds: gm.userId } }
-        : { $pull: { contactUsUnlockedUserIds: gm.userId } },
-    );
 
     await auditLogService.logSettingsUpdated(
       guard.admin,
-      `GM package "${item.name}" purchase ${enabled ? "enabled" : "disabled"} for Game Master ${gm.name ?? gm.userId}`,
+      `GM package "${result.packageName}" purchase ${enabled ? "enabled" : "disabled"} for Game Master ${gm.name ?? gm.userId}`,
       { unlocked: !enabled },
       { unlocked: enabled, gameMasterUserId: gm.userId, packageId },
     );

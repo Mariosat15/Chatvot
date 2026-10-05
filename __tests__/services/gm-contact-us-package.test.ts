@@ -92,7 +92,32 @@ describe("contact-us wiring", () => {
     expect(handlers.length).toBe(2);
     expect(guards.length).toBe(handlers.length);
     expect(refusals.length).toBe(handlers.length);
-    expect(src).toContain("isContactUsPackage(item)");
+    expect(src).toContain("setContactUsPackageUnlock(");
+  });
+
+  // Reason: the "only a contact-us package can be enabled" refusal moved into the shared
+  // service so the Game Master screen and the Users screen cannot drift; the claim is unchanged.
+  it("only a contact-us package can be enabled, through one shared service", () => {
+    const service = stripComments(read("apps/admin/lib/services/gamemaster/package-unlocks.service.ts"));
+    expect(service).toContain("isContactUsPackage(item)");
+    for (const path of [
+      "apps/admin/app/api/gamemasters/[id]/package-unlocks/route.ts",
+      "apps/admin/app/api/users/[userId]/package-unlocks/route.ts",
+    ]) {
+      const src = stripComments(read(path));
+      expect(src).toContain("setContactUsPackageUnlock(");
+      expect(src).not.toContain("$addToSet");
+    }
+  });
+
+  it("the Users-screen unlock route guards every handler with the users section", () => {
+    const src = stripComments(read("apps/admin/app/api/users/[userId]/package-unlocks/route.ts"));
+    const handlers = src.match(/export async function (GET|POST|PUT|PATCH|DELETE)\b/g) ?? [];
+    const guards = src.match(/guardSection\("users"\)/g) ?? [];
+    const refusals = src.match(/if \(!guard\.ok\) return guard\.response/g) ?? [];
+    expect(handlers.length).toBe(2);
+    expect(guards.length).toBe(handlers.length);
+    expect(refusals.length).toBe(handlers.length);
   });
 
   it("the unlock list is hidden from ordinary reads in both model copies", () => {

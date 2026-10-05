@@ -28,7 +28,19 @@ interface ContactUsPackageRow {
   unlocked: boolean;
 }
 
-export default function EnableGmPackageButton({ subscriptionId }: { subscriptionId: string }) {
+/**
+ * Pass `subscriptionId` on Manage Game Masters, or `userId` in the Users section - the latter
+ * reaches players who are not Game Masters yet. Both routes share one unlock service.
+ */
+type EnableGmPackageButtonProps =
+  | { subscriptionId: string; userId?: never }
+  | { userId: string; subscriptionId?: never };
+
+export default function EnableGmPackageButton(props: EnableGmPackageButtonProps) {
+  const endpoint = props.userId
+    ? `/api/users/${encodeURIComponent(props.userId)}/package-unlocks`
+    : `/api/gamemasters/${props.subscriptionId}/package-unlocks`;
+  const subject = props.userId ? "this player" : "this Game Master";
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -37,7 +49,7 @@ export default function EnableGmPackageButton({ subscriptionId }: { subscription
   const load = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/gamemasters/${subscriptionId}/package-unlocks`);
+      const response = await fetch(endpoint);
       const data = await response.json();
       if (!response.ok || !data.success) {
         throw new Error(data.error || "Something went wrong. Please contact support.");
@@ -53,7 +65,7 @@ export default function EnableGmPackageButton({ subscriptionId }: { subscription
   const toggle = async (pkg: ContactUsPackageRow) => {
     setSavingId(pkg.id);
     try {
-      const response = await fetch(`/api/gamemasters/${subscriptionId}/package-unlocks`, {
+      const response = await fetch(endpoint, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ packageId: pkg.id, enabled: !pkg.unlocked }),
@@ -67,8 +79,8 @@ export default function EnableGmPackageButton({ subscriptionId }: { subscription
       );
       toast.success(
         data.unlocked
-          ? `"${pkg.name}" can now be bought by this Game Master`
-          : `"${pkg.name}" is back to Contact us for this Game Master`,
+          ? `"${pkg.name}" can now be bought by ${subject}`
+          : `"${pkg.name}" is back to Contact us for ${subject}`,
       );
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Something went wrong. Please contact support.");
@@ -96,8 +108,8 @@ export default function EnableGmPackageButton({ subscriptionId }: { subscription
           <DialogHeader>
             <DialogTitle>Enable GM package</DialogTitle>
             <DialogDescription className="text-gray-400">
-              These packages are set to Contact us. Enable one to let this Game Master buy it
-              directly; everyone else still sees Contact us.
+              These packages are set to Contact us. Enable one to let {subject} buy it directly;
+              everyone else still sees Contact us.
             </DialogDescription>
           </DialogHeader>
 

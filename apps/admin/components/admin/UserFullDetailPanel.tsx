@@ -83,6 +83,7 @@ import PlayerGamePerformance, {
 import { CustomerAuditTrail } from "./CustomerAuditTrail";
 import { TransferCustomerDialog } from "./TransferCustomerDialog";
 import UserPasswordResetCard from "./users/UserPasswordResetCard";
+import EnableGmPackageButton from "./gamemaster/EnableGmPackageButton";
 import TransactionDetailDialog, {
   type TxDetail,
 } from "./transactions/TransactionDetailDialog";
@@ -2277,6 +2278,21 @@ export default function UserFullDetailPanel({
                               >
                                 Manage
                               </Button>
+                            </div>
+                          </div>
+
+                          {/* Contact-us GM packages: works before the player is a Game Master */}
+                          <div className="p-3 rounded-lg border bg-yellow-500/5 border-yellow-500/30">
+                            <div className="flex items-center justify-between gap-3">
+                              <div>
+                                <p className="text-sm font-medium text-white">
+                                  Game Master Package
+                                </p>
+                                <p className="text-xs text-gray-400">
+                                  Enable a &quot;Contact us&quot; package so this player can buy it
+                                </p>
+                              </div>
+                              <EnableGmPackageButton userId={user.id} />
                             </div>
                           </div>
                         </CardContent>

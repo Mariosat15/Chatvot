@@ -113,11 +113,25 @@ export async function POST(
 async function processAIResponse(
   conversationId: string,
   userMessage: string,
-  _userId: string,
+  userId: string,
   _userName: string,
 ) {
   try {
     const settings = await MessagingService.getSettings();
+
+    // Reason: a "Contact us" Game Master package can only be enabled by an employee, so
+    // the AI hands the chat over - to the assigned employee, else anyone available.
+    const { detectContactUsPackageRequest, GM_CONTACT_US_ESCALATION_REASON, contactUsTransferMessage } =
+      await import("@/lib/services/gamemaster/contact-us-support");
+    const contactUsRequest = await detectContactUsPackageRequest(userMessage, userId);
+    if (contactUsRequest) {
+      await MessagingService.escalateFromAI(
+        conversationId,
+        GM_CONTACT_US_ESCALATION_REASON,
+        (employeeName) => contactUsTransferMessage(contactUsRequest.packageName, employeeName),
+      );
+      return;
+    }
 
     // Check for escalation keywords
     const escalation = (
